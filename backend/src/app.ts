@@ -6,10 +6,18 @@ import session from 'express-session'
 import passport from 'passport'
 import { authenticate } from './middleware/auth.js'
 import { formioRouter } from './routes'
+import cors from 'cors';
 
 
 const app = express()
 const port = 4000;
+
+if (process.env.NODE_ENV === 'development') {
+  console.log('Allowing CORS for development environment')
+  app.use(cors());
+}else{
+  console.log('Blocking CORS for production environment')
+}
 
 app.use(
   session({
