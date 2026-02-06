@@ -29,7 +29,6 @@ const authToFormio = async (user: User) => {
   
   // this is what the url is supposed to be but it's not working against the configured server
   // const resp = await axios.post(`${FORMIO_URL}/user/login`, body);
-  console.log('FORMIO_URL', FORMIO_URL, body)
   const resp = await axios.post(`${FORMIO_URL}/admin/login`, body);
   return resp.headers['x-jwt-token'];
 };
@@ -37,7 +36,6 @@ const authToFormio = async (user: User) => {
 // define the home page route
 router.use('/', async (req: RequestWithUser, res: express.Response) => {
   try {
-    console.log('beginning auth for', req.method, req.originalUrl);
     const method = req.method;
     const user: User = req.decodedJwt ? req.decodedJwt as User : {} as User;
     const token = await authToFormio(user);
