@@ -53,7 +53,6 @@ router.use('/', async (req: RequestWithUser, res: express.Response) => {
     if (mountPrefix && proxiedPath.startsWith(mountPrefix)) {
       proxiedPath = proxiedPath.slice(mountPrefix.length) || '/';
     }
-    console.log("DEBUG", req.baseUrl, req.originalUrl, proxiedPath)
     // Ensure proxiedPath starts with '/'
     if (!proxiedPath.startsWith('/')) proxiedPath = '/' + proxiedPath;
 
