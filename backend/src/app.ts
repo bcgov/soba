@@ -1,18 +1,10 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: ['.env.local', '.env'] });
 
-<<<<<<< Updated upstream
-import express from 'express';
-import session from 'express-session';
-import passport from 'passport';
-import { authenticate } from './middleware/auth.js';
-import { formioRouter } from './routes';
-=======
 import express from 'express'
 import session from 'express-session'
 import passport from 'passport'
-import { router } from './routes/index.js'
->>>>>>> Stashed changes
+import { router } from './routes'
 import cors from 'cors';
 
 const app = express();

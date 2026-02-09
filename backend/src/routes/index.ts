@@ -2,9 +2,6 @@ import express from 'express';
 import { formRouter } from '../features/forms';
 import { createJwtMiddleware } from '../middleware/auth';
 
-<<<<<<< Updated upstream
-export { formioRouter };
-=======
 const router = express.Router();
 
 router.use('/form', createJwtMiddleware(), formRouter);
@@ -15,4 +12,3 @@ router.use('/*', (req, res) => {
 });
 
 export { router };
->>>>>>> Stashed changes

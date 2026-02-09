@@ -16,17 +16,11 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export default async function RootLayout({
-  children,
-  params
-}: Readonly<{
-  children: React.ReactNode;
-  params: { lang: Locale };
-}>) {
-  const param = await params;
-  const dictionary = await getDictionary(param.lang);
+export default async function RootLayout({ children, params }: { children: React.ReactNode; params: { lang: string } }) {
+  const lang = params.lang as Locale;
+  const dictionary = await getDictionary(lang);
   return (
-    <html lang={param.lang}>
+    <html lang={lang}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
