@@ -1,24 +1,31 @@
-version: "3.9"
+# Sidecar services for local development.
+# Run from inside the devcontainer: docker compose -f .devcontainer/docker-compose.yml up -d
+#
+# Connection strings (from inside devcontainer):
+#   MongoDB:   mongodb://host.docker.internal:27017
+#   PostgreSQL: postgresql://postgres:postgres@host.docker.internal:5432/postgres
 
 services:
-  devcontainer:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    volumes:
-      - ..:/workspaces/soba:cached
-    command: sleep infinity
-    user: node
-    depends_on:
-      - mongodb
-
   mongodb:
     image: mongo:7
-    restart: unless-stopped
     ports:
       - "27017:27017"
     volumes:
-      - mongo-data:/data/db
+      - mongodb_data:/data/db
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
 
 volumes:
-  mongo-data:
+  mongodb_data:
+  postgres_data:
