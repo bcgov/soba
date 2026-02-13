@@ -1,0 +1,20 @@
+crunchy:
+  instances:
+    replicas: 3
+    dataVolumeClaimSpec:
+      storage: 1Gi
+      walStorage: 1Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  pgBackRest:
+    pvc:
+      retention: 2
+      volume:
+        storage: 4Gi
+  proxy:
+    pgBouncer:
+      replicas: 2
+      requests:
+        cpu: 10m
+        memory: 64Mi

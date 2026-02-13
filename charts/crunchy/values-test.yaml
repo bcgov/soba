@@ -1,0 +1,10 @@
+crunchy:
+  instances:
+    replicas: 3
+    dataVolumeClaimSpec:
+      storage: 1Gi
+      walStorage: 1Gi
+  pgBackRest:
+    pvc:
+      volume:
+        storage: 4Gi

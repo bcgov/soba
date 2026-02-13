@@ -1,0 +1,14 @@
+crunchy:
+  instances:
+    replicas: 2
+    dataVolumeClaimSpec:
+      storage: 1Gi
+      walStorage: 1Gi
+  pgBackRest:
+    pvc:
+      retention: 1
+      retentionFullType: count
+      fullBackupSchedule: ~
+      incrementalBackupSchedule: ~
+      volume:
+        storage: 1Gi

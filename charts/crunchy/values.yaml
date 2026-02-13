@@ -1,0 +1,111 @@
+global:
+  config:
+    dbName: soba
+crunchy:
+  enabled: true
+  postgresVersion: 16
+  openshift: true
+  imagePullPolicy: IfNotPresent
+  clone:
+    enabled: false
+    s3:
+      enabled: false
+    pvc:
+      enabled: false
+    path: ~
+  restore:
+    repoName: ~
+    enabled: false
+    target: ~
+  instances:
+    name: db
+    replicas: 2
+    metadata:
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9187'
+    dataVolumeClaimSpec:
+      storage: 1Gi
+      storageClassName: netapp-block-standard
+      walStorage: 1Gi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    replicaCertCopy:
+      requests:
+        cpu: 1m
+        memory: 32Mi
+
+  pgBackRest:
+    enabled: true
+    backupPath: /backups/cluster/version
+    clusterCounter: 1
+    retentionFullType: count
+    s3:
+      enabled: false
+      retention: 7
+      bucket: ~
+      endpoint: ~
+      accessKey: ~
+      secretKey: ~
+      fullBackupSchedule: ~
+      incrementalBackupSchedule: ~
+    pvc:
+      retention: 2
+      retentionFullType: count
+      fullBackupSchedule: 0 8 * * *
+      incrementalBackupSchedule: 0 0-7,9-23 * * *
+      volume:
+        accessModes: "ReadWriteOnce"
+        storage: 4Gi
+        storageClassName: netapp-file-backup
+    config:
+      requests:
+        cpu: 5m
+        memory: 32Mi
+    repoHost:
+      requests:
+        cpu: 20m
+        memory: 128Mi
+    sidecars:
+      requests:
+        cpu: 5m
+        memory: 16Mi
+    jobs:
+      requests:
+        cpu: 20m
+        memory: 128Mi
+
+  patroni:
+    postgresql:
+      pg_hba:
+        - "host all all 0.0.0.0/0 scram-sha-256"
+        - "host all all ::1/128 scram-sha-256"
+      parameters:
+        shared_buffers: 16MB
+        wal_buffers: "64kB"
+        min_wal_size: 32MB
+        max_wal_size: 64MB
+        max_slot_wal_keep_size: 128MB
+        work_mem: 2MB
+        log_min_duration_statement: 1000ms
+        effective_io_concurrency: 20
+
+  proxy:
+    enabled: true
+    pgBouncer:
+      image:
+      replicas: 2
+      requests:
+        cpu: 5m
+        memory: 32Mi
+      maxConnections: 100
+      poolMode: 'transaction'
+
+  pgmonitor:
+    enabled: true
+    exporter:
+      image:
+      requests:
+        cpu: 10m
+        memory: 32Mi

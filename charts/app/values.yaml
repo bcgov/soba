@@ -1,0 +1,59 @@
+global:
+  repository: ~
+  registry: ghcr.io
+  tag: ~
+  autoscaling: false
+  secrets:
+    enabled: true
+    databasePassword: ~
+    databaseName: ~
+    persist: true
+  config:
+    databaseUser: ~
+  domain: "apps.silver.devops.gov.bc.ca"
+  databaseAlias: ~
+
+backend:
+  enabled: true
+  deploymentStrategy: Recreate
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 7
+    targetCPUUtilizationPercentage: 80
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 4000
+  pdb:
+    enabled: false
+    minAvailable: 1
+
+frontend:
+  enabled: true
+  deploymentStrategy: Recreate
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 7
+    targetCPUUtilizationPercentage: 80
+  service:
+    enabled: true
+    type: ClusterIP
+    ports:
+      - name: http
+        port: 80
+        targetPort: 3000
+        protocol: TCP
+  ingress:
+    annotations:
+      haproxy.router.openshift.io/balance: "roundrobin"
+      route.openshift.io/termination: "edge"
+      haproxy.router.openshift.io/rate-limit-connections: "true"
+      haproxy.router.openshift.io/rate-limit-connections.concurrent-tcp: "10"
+      haproxy.router.openshift.io/rate-limit-connections.rate-http: "20"
+      haproxy.router.openshift.io/rate-limit-connections.rate-tcp: "50"
+      haproxy.router.openshift.io/disable_cookies: "true"
+  pdb:
+    enabled: false
+    minAvailable: 1
