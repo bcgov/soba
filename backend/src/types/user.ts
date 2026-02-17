@@ -10,5 +10,5 @@ export interface User {
   Role: string[];
 }
 
-export const ADMIN = 'Project Administrator';
-export const MANAGER = 'Manager';
+export const ADMIN = process.env.ADMIN_ROLE_NAME || 'Admin';
+export const MANAGER = process.env.MANAGER_ROLE_NAME || 'Manager';
