@@ -130,39 +130,25 @@ jobs:
           oc_token: ${{ secrets.OC_TOKEN }}
           oc_server: https://api.silver.devops.gov.bc.ca:6443
           values_file: charts/crunchy/values-dev.yaml
-          release_name: soba-db
+          release_name: soba
 
       - name: Re-checkout repository after CrunchyDB
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.set-vars.outputs.ref }}
 
-      - name: Wait for CrunchyDB
-        run: |
-          oc login --token="${{ secrets.OC_TOKEN }}" \
-            --server=https://api.silver.devops.gov.bc.ca:6443 \
-            --insecure-skip-tls-verify=true
-          oc project ${{ secrets.OC_NAMESPACE }}
-
-          echo "Waiting for CrunchyDB pods to be ready..."
-          oc rollout status statefulset/soba-db-crunchy-db \
-            --namespace ${{ secrets.OC_NAMESPACE }} \
-            --watch=true --timeout=300s || true
-          oc wait --for=condition=Ready pod \
-            -l postgres-operator.crunchydata.com/cluster=soba-db-crunchy \
-            --namespace ${{ secrets.OC_NAMESPACE }} \
-            --timeout=300s
+      - name: Login to OpenShift Cluster
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: https://api.silver.devops.gov.bc.ca:6443
+          openshift_token: ${{ secrets.OC_TOKEN }}
+          insecure_skip_tls_verify: true
+          namespace: ${{ secrets.OC_NAMESPACE }}
 
       - name: Deploy App
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          # Re-authenticate — ensures kubeconfig is set for helm
-          oc login --token="${{ secrets.OC_TOKEN }}" \
-            --server=https://api.silver.devops.gov.bc.ca:6443 \
-            --insecure-skip-tls-verify=true
-          oc project ${{ secrets.OC_NAMESPACE }}
-
           RELEASE="soba-${{ needs.set-vars.outputs.JOB_NAME }}"
           NAMESPACE="${{ secrets.OC_NAMESPACE }}"
           TAG="sha-$(git rev-parse --short HEAD)"
@@ -179,7 +165,7 @@ jobs:
             --set-string global.repository="${GITHUB_REPOSITORY}" \
             --set-string global.tag="${TAG}" \
             --set-string global.config.databaseUser="${DB_USER}" \
-            --set-string global.databaseAlias=soba-db-crunchy \
+            --set-string global.databaseAlias=soba-crunchy \
             --wait --timeout 300s
 
       - name: Wait on App

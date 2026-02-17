@@ -49,7 +49,7 @@ runs:
         oc_token: ${{ inputs.oc_token }}
         oc_server: ${{ inputs.oc_server }}
         values_file: charts/crunchy/values-${{ inputs.environment }}.yaml
-        release_name: soba-db
+        release_name: soba
 
     # Step 3: Re-checkout — action-crunchy wipes the workspace with its own repo checkout
     - name: Re-checkout repository after CrunchyDB
@@ -61,24 +61,14 @@ runs:
       uses: actions/checkout@v4
       if: ${{ inputs.ref == '' }}
 
-    # Step 4: Wait for CrunchyDB
-    - name: Wait for CrunchyDB
-      shell: bash
-      run: |
-        oc login --token="${{ inputs.oc_token }}" \
-          --server=${{ inputs.oc_server }} \
-          --insecure-skip-tls-verify=true
-        oc project ${{ inputs.oc_namespace }}
-
-        echo "Waiting for CrunchyDB pods to be ready..."
-        oc rollout status statefulset/soba-db-crunchy-db \
-          --namespace ${{ inputs.oc_namespace }} \
-          --watch=true --timeout=300s || true
-        # Verify at least one pod is ready
-        oc wait --for=condition=Ready pod \
-          -l postgres-operator.crunchydata.com/cluster=soba-db-crunchy \
-          --namespace ${{ inputs.oc_namespace }} \
-          --timeout=300s
+    # Step 4: Login to OpenShift (after re-checkout, safe from workspace wipe)
+    - name: Login to OpenShift Cluster
+      uses: redhat-actions/oc-login@v1
+      with:
+        openshift_server_url: ${{ inputs.oc_server }}
+        openshift_token: ${{ inputs.oc_token }}
+        insecure_skip_tls_verify: true
+        namespace: ${{ inputs.oc_namespace }}
 
     # Step 5: Deploy App via Helm
     - name: Deploy App
@@ -103,7 +93,7 @@ runs:
           --set-string global.repository="${GITHUB_REPOSITORY}" \
           --set-string global.tag="${TAG}" \
           --set-string global.config.databaseUser="${DB_USER}" \
-          --set-string global.databaseAlias=soba-db-crunchy \
+          --set-string global.databaseAlias=soba-crunchy \
           --wait --timeout 300s
 
     # Step 6: Wait for App rollout
