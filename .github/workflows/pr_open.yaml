@@ -104,6 +104,7 @@ jobs:
   deploy:
     name: Deploy
     permissions:
+      contents: read
       pull-requests: write
     environment:
       name: pr
