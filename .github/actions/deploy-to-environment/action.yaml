@@ -26,12 +26,11 @@ inputs:
 runs:
   using: composite
   steps:
-    # Step 1: Install oc + helm CLI
-    - name: Install OpenShift CLI tools
+    # Step 1: Install oc CLI (Helm is pre-installed on GitHub runners)
+    - name: Install OpenShift CLI
       uses: redhat-actions/openshift-tools-installer@v1
       with:
         oc: "4.14"
-        helm: "3.16"
 
     - name: Checkout repository from pull request
       uses: actions/checkout@v4
