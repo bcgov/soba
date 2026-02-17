@@ -117,14 +117,70 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.set-vars.outputs.ref }}
-      - name: Deploy to environment
-        uses: ./.github/actions/deploy-to-environment
+
+      - name: Install OpenShift CLI
+        uses: redhat-actions/openshift-tools-installer@v1
         with:
-          environment: dev
-          job_name: ${{ needs.set-vars.outputs.JOB_NAME }}
+          oc: "4.14"
+
+      - name: Login to OpenShift Cluster
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: https://api.silver.devops.gov.bc.ca:6443
+          openshift_token: ${{ secrets.OC_TOKEN }}
+          insecure_skip_tls_verify: true
+          namespace: ${{ secrets.OC_NAMESPACE }}
+
+      - name: Deploy CrunchyDB
+        uses: bcgov/action-crunchy@v1.2.6
+        with:
           oc_namespace: ${{ secrets.OC_NAMESPACE }}
           oc_token: ${{ secrets.OC_TOKEN }}
-          ref: ${{ needs.set-vars.outputs.ref }}
+          oc_server: https://api.silver.devops.gov.bc.ca:6443
+          values_file: charts/crunchy/values-dev.yaml
+          release_name: soba-db
+
+      - name: Wait for CrunchyDB
+        run: |
+          echo "Waiting for CrunchyDB pods to be ready..."
+          oc rollout status statefulset/soba-db-crunchy-db \
+            --namespace ${{ secrets.OC_NAMESPACE }} \
+            --watch=true --timeout=300s || true
+          oc wait --for=condition=Ready pod \
+            -l postgres-operator.crunchydata.com/cluster=soba-db-crunchy \
+            --namespace ${{ secrets.OC_NAMESPACE }} \
+            --timeout=300s
+
+      - name: Deploy App
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          RELEASE="soba-${{ needs.set-vars.outputs.JOB_NAME }}"
+          NAMESPACE="${{ secrets.OC_NAMESPACE }}"
+          TAG="sha-$(git rev-parse --short HEAD)"
+
+          if [[ "${{ needs.set-vars.outputs.JOB_NAME }}" == pr-* ]]; then
+            PR_NUM=$(echo "${{ needs.set-vars.outputs.JOB_NAME }}" | sed 's/pr-//')
+            DB_USER="app-${PR_NUM}"
+          else
+            DB_USER="appproxy"
+          fi
+
+          helm upgrade --install "${RELEASE}" charts/app/ \
+            --namespace "${NAMESPACE}" \
+            --set-string global.repository="${GITHUB_REPOSITORY}" \
+            --set-string global.tag="${TAG}" \
+            --set-string global.config.databaseUser="${DB_USER}" \
+            --set-string global.databaseAlias=soba-db-crunchy \
+            --wait --timeout 300s
+
+      - name: Wait on App
+        run: |
+          NAMESPACE="${{ secrets.OC_NAMESPACE }}"
+          RELEASE="soba-${{ needs.set-vars.outputs.JOB_NAME }}"
+          oc rollout status deployment/${RELEASE}-backend --namespace ${NAMESPACE} --watch=true --timeout=300s
+          oc rollout status deployment/${RELEASE}-frontend --namespace ${NAMESPACE} --watch=true --timeout=300s
+
       - name: Release Comment on PR
         uses: marocchino/sticky-pull-request-comment@v2
         if: success()
