@@ -1,75 +1,98 @@
 # Base CrunchyDB reference values — NOT used directly.
 # The action only reads the environment-specific file (values-dev.yaml, values-test.yaml, values-prod.yaml).
 # Each environment file must be self-contained.
+# Structure must match bcgov/action-crunchy chart templates.
+global:
+  config:
+    dbName: soba
+
 crunchy:
-  # -- Database name
-  pgDatabase: soba
-  # -- PostgreSQL major version
+  enabled: true
   postgresVersion: 16
-  # -- Enable OpenShift-specific settings
-  openshift: true
+  imagePullPolicy: IfNotPresent
 
-  # -- High-availability instances
   instances:
-    - name: db
-      replicas: 2
-      dataVolumeClaimSpec:
-        storage: 1Gi
-        storageClassName: netapp-block-standard
-      walVolumeClaimSpec:
-        storage: 1Gi
-        storageClassName: netapp-block-standard
-      requests:
-        cpu: 50m
-        memory: 128Mi
-      limits:
-        cpu: 250m
-        memory: 256Mi
-
-  # -- pgBackRest backup configuration
-  pgBackRestConfig:
-    repos:
-      - name: repo1
-        volume:
-          volumeClaimSpec:
-            storage: 4Gi
-            storageClassName: netapp-file-backup
-        schedules:
-          full: "0 8 * * *"
-          incremental: "0 0-7,9-23 * * *"
-        retention:
-          full: 2
-          fullType: count
-
-  # -- pgBouncer connection pooling proxy
-  pgBouncerConfig:
+    name: db
     replicas: 2
+    dataVolumeClaimSpec:
+      storage: 1Gi
+      storageClassName: netapp-block-standard
+      walStorage: 1Gi
     requests:
-      cpu: 10m
-      memory: 64Mi
-    limits:
       cpu: 50m
       memory: 128Mi
-    config:
-      global:
-        pool_mode: transaction
-        max_client_conn: "100"
-        default_pool_size: "20"
-        min_pool_size: "2"
+    replicaCertCopy:
+      requests:
+        cpu: 1m
+        memory: 32Mi
 
-  # -- pgMonitor Prometheus exporter
-  pgmonitor:
+  pgBackRest:
     enabled: true
-    exporter:
-      image: ~
+    backupPath: /backups/default/cluster/version
+    clusterCounter: 2
+    retentionFullType: count
+    s3:
+      enabled: false
+    pvc:
+      retention: 2
+      retentionFullType: count
+      fullBackupSchedule: "0 8 * * *"
+      incrementalBackupSchedule: "0 0,12 * * *"
+      volume:
+        accessModes: "ReadWriteOnce"
+        storage: 4Gi
+        storageClassName: netapp-file-backup
+    config:
+      requests:
+        cpu: 5m
+        memory: 32Mi
+    repoHost:
+      requests:
+        cpu: 20m
+        memory: 128Mi
+    sidecars:
+      requests:
+        cpu: 5m
+        memory: 16Mi
+    jobs:
+      requests:
+        cpu: 20m
+        memory: 128Mi
 
-  # -- Patroni HA settings
   patroni:
     postgresql:
+      pg_hba:
+        - "host all all 0.0.0.0/0 md5"
+        - "host all all ::/128 md5"
       parameters:
         shared_buffers: 128MB
+        wal_buffers: "64kB"
+        min_wal_size: 32MB
+        max_wal_size: 64MB
+        max_slot_wal_keep_size: 128MB
         effective_cache_size: 256MB
         work_mem: 4MB
         maintenance_work_mem: 64MB
         max_connections: "100"
         password_encryption: scram-sha-256
+        log_min_duration_statement: 1000ms
+        effective_io_concurrency: 20
+
+  proxy:
+    enabled: true
+    pgBouncer:
+      replicas: 2
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      maxConnections: 100
+      poolMode: transaction
+      defaultPoolSize: "20"
+      minPoolSize: "2"
+
+  pgmonitor:
+    enabled: true
+    exporter:
+      requests:
+        cpu: 10m
+        memory: 32Mi
