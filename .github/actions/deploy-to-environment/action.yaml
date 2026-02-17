@@ -41,16 +41,7 @@ runs:
       uses: actions/checkout@v4
       if: ${{ inputs.ref == '' }}
 
-    # Step 2: Login to OpenShift
-    - name: Login to OpenShift Cluster
-      uses: redhat-actions/oc-login@v1
-      with:
-        openshift_server_url: ${{ inputs.oc_server }}
-        openshift_token: ${{ inputs.oc_token }}
-        insecure_skip_tls_verify: true
-        namespace: ${{ inputs.oc_namespace }}
-
-    # Step 3: Deploy CrunchyDB
+    # Step 2: Deploy CrunchyDB (action-crunchy handles its own oc login internally)
     - name: Deploy CrunchyDB
       uses: bcgov/action-crunchy@v1.2.6
       with:
@@ -60,10 +51,25 @@ runs:
         values_file: charts/crunchy/values-${{ inputs.environment }}.yaml
         release_name: soba-db
 
+    # Step 3: Re-checkout — action-crunchy wipes the workspace with its own repo checkout
+    - name: Re-checkout repository after CrunchyDB
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.ref }}
+      if: ${{ inputs.ref != '' }}
+    - name: Re-checkout repository after CrunchyDB
+      uses: actions/checkout@v4
+      if: ${{ inputs.ref == '' }}
+
     # Step 4: Wait for CrunchyDB
     - name: Wait for CrunchyDB
       shell: bash
       run: |
+        oc login --token="${{ inputs.oc_token }}" \
+          --server=${{ inputs.oc_server }} \
+          --insecure-skip-tls-verify=true
+        oc project ${{ inputs.oc_namespace }}
+
         echo "Waiting for CrunchyDB pods to be ready..."
         oc rollout status statefulset/soba-db-crunchy-db \
           --namespace ${{ inputs.oc_namespace }} \

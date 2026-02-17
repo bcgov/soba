@@ -123,14 +123,6 @@ jobs:
         with:
           oc: "4.14"
 
-      - name: Login to OpenShift Cluster
-        uses: redhat-actions/oc-login@v1
-        with:
-          openshift_server_url: https://api.silver.devops.gov.bc.ca:6443
-          openshift_token: ${{ secrets.OC_TOKEN }}
-          insecure_skip_tls_verify: true
-          namespace: ${{ secrets.OC_NAMESPACE }}
-
       - name: Deploy CrunchyDB
         uses: bcgov/action-crunchy@v1.2.6
         with:
@@ -140,8 +132,18 @@ jobs:
           values_file: charts/crunchy/values-dev.yaml
           release_name: soba-db
 
+      - name: Re-checkout repository after CrunchyDB
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.set-vars.outputs.ref }}
+
       - name: Wait for CrunchyDB
         run: |
+          oc login --token="${{ secrets.OC_TOKEN }}" \
+            --server=https://api.silver.devops.gov.bc.ca:6443 \
+            --insecure-skip-tls-verify=true
+          oc project ${{ secrets.OC_NAMESPACE }}
+
           echo "Waiting for CrunchyDB pods to be ready..."
           oc rollout status statefulset/soba-db-crunchy-db \
             --namespace ${{ secrets.OC_NAMESPACE }} \
@@ -155,6 +157,12 @@ jobs:
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
+          # Re-authenticate — ensures kubeconfig is set for helm
+          oc login --token="${{ secrets.OC_TOKEN }}" \
+            --server=https://api.silver.devops.gov.bc.ca:6443 \
+            --insecure-skip-tls-verify=true
+          oc project ${{ secrets.OC_NAMESPACE }}
+
           RELEASE="soba-${{ needs.set-vars.outputs.JOB_NAME }}"
           NAMESPACE="${{ secrets.OC_NAMESPACE }}"
           TAG="sha-$(git rev-parse --short HEAD)"
