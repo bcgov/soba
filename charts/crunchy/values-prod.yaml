@@ -1,20 +1,32 @@
+# Production environment overrides.
+# 3 replicas, higher resources, 2 full backup retention.
 crunchy:
   instances:
-    replicas: 3
-    dataVolumeClaimSpec:
-      storage: 1Gi
-      walStorage: 1Gi
-    requests:
-      cpu: 100m
-      memory: 256Mi
-  pgBackRest:
-    pvc:
-      retention: 2
-      volume:
-        storage: 4Gi
-  proxy:
-    pgBouncer:
-      replicas: 2
+    - name: db
+      replicas: 3
+      dataVolumeClaimSpec:
+        storage: 1Gi
+        storageClassName: netapp-block-standard
+      walVolumeClaimSpec:
+        storage: 1Gi
+        storageClassName: netapp-block-standard
       requests:
-        cpu: 10m
-        memory: 64Mi
+        cpu: 100m
+        memory: 256Mi
+
+  pgBouncerConfig:
+    replicas: 2
+    requests:
+      cpu: 10m
+      memory: 64Mi
+
+  pgBackRestConfig:
+    repos:
+      - name: repo1
+        volume:
+          volumeClaimSpec:
+            storage: 4Gi
+            storageClassName: netapp-file-backup
+        retention:
+          full: 2
+          fullType: count

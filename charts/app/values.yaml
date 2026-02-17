@@ -1,20 +1,35 @@
+# -- Container registry (e.g. ghcr.io)
+# -- Set by pipeline via --set-string
 global:
+  # -- GitHub repository path (e.g. bcgov/soba)
   repository: ~
+  # -- Container registry hostname
   registry: ghcr.io
+  # -- Image tag (e.g. sha-abc1234, pr-42, latest)
   tag: ~
+  # -- Enable HorizontalPodAutoscaler for all components
   autoscaling: false
+  # -- Database secrets pulled from CrunchyDB operator
   secrets:
+    # -- Enable CrunchyDB secret lookup
     enabled: true
     databasePassword: ~
     databaseName: ~
+    # -- Keep secrets on helm uninstall
     persist: true
   config:
+    # -- CrunchyDB user (appproxy for main, app-{N} for PRs)
     databaseUser: ~
+  # -- OpenShift apps domain
   domain: "apps.silver.devops.gov.bc.ca"
+  # -- CrunchyDB cluster release name (set by pipeline)
   databaseAlias: ~
 
+# -- Backend (Express API on port 4000)
 backend:
+  # -- Enable backend deployment
   enabled: true
+  # -- Deployment update strategy
   deploymentStrategy: Recreate
   autoscaling:
     enabled: true
@@ -29,8 +44,11 @@ backend:
     enabled: false
     minAvailable: 1
 
+# -- Frontend (Next.js on port 3000)
 frontend:
+  # -- Enable frontend deployment
   enabled: true
+  # -- Deployment update strategy
   deploymentStrategy: Recreate
   autoscaling:
     enabled: true

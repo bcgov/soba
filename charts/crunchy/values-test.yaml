@@ -1,10 +1,20 @@
+# Test environment overrides.
+# 3 replicas for HA testing.
 crunchy:
   instances:
-    replicas: 3
-    dataVolumeClaimSpec:
-      storage: 1Gi
-      walStorage: 1Gi
-  pgBackRest:
-    pvc:
-      volume:
-        storage: 4Gi
+    - name: db
+      replicas: 3
+      dataVolumeClaimSpec:
+        storage: 1Gi
+        storageClassName: netapp-block-standard
+      walVolumeClaimSpec:
+        storage: 1Gi
+        storageClassName: netapp-block-standard
+
+  pgBackRestConfig:
+    repos:
+      - name: repo1
+        volume:
+          volumeClaimSpec:
+            storage: 4Gi
+            storageClassName: netapp-file-backup

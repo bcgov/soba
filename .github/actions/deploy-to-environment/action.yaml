@@ -78,6 +78,8 @@ runs:
     # Step 5: Deploy App via Helm
     - name: Deploy App
       shell: bash
+      env:
+        GITHUB_REPOSITORY: ${{ github.repository }}
       run: |
         RELEASE="soba-${{ inputs.job_name }}"
         NAMESPACE="${{ inputs.oc_namespace }}"
@@ -93,7 +95,7 @@ runs:
 
         helm upgrade --install "${RELEASE}" charts/app/ \
           --namespace "${NAMESPACE}" \
-          --set-string global.repository=${{ github.repository }} \
+          --set-string global.repository="${GITHUB_REPOSITORY}" \
           --set-string global.tag="${TAG}" \
           --set-string global.config.databaseUser="${DB_USER}" \
           --set-string global.databaseAlias=soba-db-crunchy \

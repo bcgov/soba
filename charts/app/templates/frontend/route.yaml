@@ -2,14 +2,14 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: {{ include "fullname" . }}
-  labels: {{- include "labels" . | nindent 4 }}
+  name: {{ include "soba.fullname" . }}
+  labels: {{- include "soba.labels" . | nindent 4 }}
   annotations:
     {{- range $key, $val := .Values.frontend.ingress.annotations }}
     {{ $key }}: {{ $val | quote }}
     {{- end }}
 spec:
-  host: {{ include "fullname" . }}.{{ .Values.global.domain }}
+  host: {{ include "soba.fullname" . }}.{{ .Values.global.domain }}
   port:
     targetPort: http
   tls:
@@ -17,6 +17,6 @@ spec:
     insecureEdgeTerminationPolicy: Redirect
   to:
     kind: Service
-    name: {{ include "fullname" . }}-frontend
+    name: {{ include "soba.fullname" . }}-frontend
     weight: 100
 {{- end }}

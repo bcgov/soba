@@ -1,9 +1,9 @@
-{{- if and .Values.frontend.enabled .Values.frontend.service.enabled }}
+{{- if .Values.frontend.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "fullname" . }}-frontend
-  labels: {{- include "labels" . | nindent 4 }}
+  name: {{ include "soba.fullname" . }}-frontend
+  labels: {{- include "soba.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.frontend.service.type }}
   ports:
@@ -14,5 +14,5 @@ spec:
       protocol: {{ .protocol }}
     {{- end }}
   selector:
-    app: {{ include "fullname" . }}-frontend
+    app: {{ include "soba.fullname" . }}-frontend
 {{- end }}

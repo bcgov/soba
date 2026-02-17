@@ -1,111 +1,75 @@
-global:
-  config:
-    dbName: soba
+# Base CrunchyDB reference values — NOT used directly.
+# The action only reads the environment-specific file (values-dev.yaml, values-test.yaml, values-prod.yaml).
+# Each environment file must be self-contained.
 crunchy:
-  enabled: true
+  # -- Database name
+  pgDatabase: soba
+  # -- PostgreSQL major version
   postgresVersion: 16
+  # -- Enable OpenShift-specific settings
   openshift: true
-  imagePullPolicy: IfNotPresent
-  clone:
-    enabled: false
-    s3:
-      enabled: false
-    pvc:
-      enabled: false
-    path: ~
-  restore:
-    repoName: ~
-    enabled: false
-    target: ~
+
+  # -- High-availability instances
   instances:
-    name: db
+    - name: db
+      replicas: 2
+      dataVolumeClaimSpec:
+        storage: 1Gi
+        storageClassName: netapp-block-standard
+      walVolumeClaimSpec:
+        storage: 1Gi
+        storageClassName: netapp-block-standard
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+
+  # -- pgBackRest backup configuration
+  pgBackRestConfig:
+    repos:
+      - name: repo1
+        volume:
+          volumeClaimSpec:
+            storage: 4Gi
+            storageClassName: netapp-file-backup
+        schedules:
+          full: "0 8 * * *"
+          incremental: "0 0-7,9-23 * * *"
+        retention:
+          full: 2
+          fullType: count
+
+  # -- pgBouncer connection pooling proxy
+  pgBouncerConfig:
     replicas: 2
-    metadata:
-      annotations:
-        prometheus.io/scrape: 'true'
-        prometheus.io/port: '9187'
-    dataVolumeClaimSpec:
-      storage: 1Gi
-      storageClassName: netapp-block-standard
-      walStorage: 1Gi
     requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
       cpu: 50m
       memory: 128Mi
-    replicaCertCopy:
-      requests:
-        cpu: 1m
-        memory: 32Mi
-
-  pgBackRest:
-    enabled: true
-    backupPath: /backups/cluster/version
-    clusterCounter: 1
-    retentionFullType: count
-    s3:
-      enabled: false
-      retention: 7
-      bucket: ~
-      endpoint: ~
-      accessKey: ~
-      secretKey: ~
-      fullBackupSchedule: ~
-      incrementalBackupSchedule: ~
-    pvc:
-      retention: 2
-      retentionFullType: count
-      fullBackupSchedule: 0 8 * * *
-      incrementalBackupSchedule: 0 0-7,9-23 * * *
-      volume:
-        accessModes: "ReadWriteOnce"
-        storage: 4Gi
-        storageClassName: netapp-file-backup
     config:
-      requests:
-        cpu: 5m
-        memory: 32Mi
-    repoHost:
-      requests:
-        cpu: 20m
-        memory: 128Mi
-    sidecars:
-      requests:
-        cpu: 5m
-        memory: 16Mi
-    jobs:
-      requests:
-        cpu: 20m
-        memory: 128Mi
+      global:
+        pool_mode: transaction
+        max_client_conn: "100"
+        default_pool_size: "20"
+        min_pool_size: "2"
 
-  patroni:
-    postgresql:
-      pg_hba:
-        - "host all all 0.0.0.0/0 scram-sha-256"
-        - "host all all ::1/128 scram-sha-256"
-      parameters:
-        shared_buffers: 16MB
-        wal_buffers: "64kB"
-        min_wal_size: 32MB
-        max_wal_size: 64MB
-        max_slot_wal_keep_size: 128MB
-        work_mem: 2MB
-        log_min_duration_statement: 1000ms
-        effective_io_concurrency: 20
-
-  proxy:
-    enabled: true
-    pgBouncer:
-      image:
-      replicas: 2
-      requests:
-        cpu: 5m
-        memory: 32Mi
-      maxConnections: 100
-      poolMode: 'transaction'
-
+  # -- pgMonitor Prometheus exporter
   pgmonitor:
     enabled: true
     exporter:
-      image:
-      requests:
-        cpu: 10m
-        memory: 32Mi
+      image: ~
+
+  # -- Patroni HA settings
+  patroni:
+    postgresql:
+      parameters:
+        shared_buffers: 128MB
+        effective_cache_size: 256MB
+        work_mem: 4MB
+        maintenance_work_mem: 64MB
+        max_connections: "100"
+        password_encryption: scram-sha-256

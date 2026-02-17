@@ -41,27 +41,36 @@ jobs:
     timeout-minutes: 10
     strategy:
       matrix:
-        component: [backend, frontend]
+        include:
+          - component: backend
+            package_manager: npm
+            cache_dependency_path: backend/package-lock.json
+          - component: frontend
+            package_manager: pnpm
+            cache_dependency_path: frontend/pnpm-lock.yaml
     steps:
       - name: Checkout repository from pull request
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.set-vars.outputs.ref }}
+      - name: Setup pnpm
+        if: matrix.package_manager == 'pnpm'
+        uses: pnpm/action-setup@v4
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: ${{ matrix.component }}/package-lock.json
+          cache: ${{ matrix.package_manager }}
+          cache-dependency-path: ${{ matrix.cache_dependency_path }}
       - name: Install dependencies
         working-directory: ${{ matrix.component }}
-        run: npm ci
+        run: ${{ matrix.package_manager == 'pnpm' && 'pnpm install --frozen-lockfile' || 'npm ci' }}
       - name: Run lint
         working-directory: ${{ matrix.component }}
-        run: npm run lint --if-present
+        run: ${{ matrix.package_manager }} run lint --if-present
       - name: Run format check
         working-directory: ${{ matrix.component }}
-        run: npm run format:check --if-present
+        run: ${{ matrix.package_manager }} run format:check --if-present
 
   build:
     name: Build & Push
