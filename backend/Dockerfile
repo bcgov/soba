@@ -6,7 +6,8 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+RUN npx tsc
 
 EXPOSE 4000
 
-CMD ["npm", "start"]
+CMD ["npm", "serve"]
