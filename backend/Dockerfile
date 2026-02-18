@@ -10,4 +10,4 @@ RUN npx tsc
 
 EXPOSE 4000
 
-CMD ["npm", "serve"]
+CMD ["npm", "start"]
