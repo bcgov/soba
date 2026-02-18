@@ -16,9 +16,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export default async function RootLayout({ children, params }: { children: React.ReactNode; params: { lang: string } }) {
-  const lang = params.lang as Locale;
-  const dictionary = await getDictionary(lang);
+export default async function RootLayout({ children, params }: { children: React.ReactNode; params: Promise<{ lang: string }> }) {
+  const { lang } = await params;
+  const dictionary = await getDictionary(lang as Locale);
   return (
     <html lang={lang}>
       <body

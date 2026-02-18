@@ -19,21 +19,12 @@ const FormioProvider = dynamic(
 function FormList() {
   const dict = useDictionary();
   const { authenticated } = useKeycloak();
-  const opt = {
-    language: dict.locale,
-    i18n: {
-      [dict.locale]: dict
-    },
-    builder: {
-      premium: false
-    }
-  }
   return (
     <>
       {authenticated ?
         (
           <FormioProvider baseUrl={process.env.NEXT_PUBLIC_FORMIO_BASE_URL} projectUrl={process.env.NEXT_PUBLIC_FORMIO_BASE_URL}>
-            <FormioGrid options={opt} />
+            <FormioGrid formQuery={{ type: 'form' }} />
           </FormioProvider>
         ) :
         (
