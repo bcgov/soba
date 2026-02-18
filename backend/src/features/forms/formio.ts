@@ -27,10 +27,10 @@ const authToFormio = async (user: User) => {
       password: '',
     },
   };
-  if (user && hasRole(user, ADMIN)) {
+  if (user && hasRole(user as unknown as Record<string, unknown>, ADMIN)) {
     body.data.email = FORMIO_ADMIN_USER;
     body.data.password = FORMIO_ADMIN_PASS;
-  } else if (user && hasRole(user, 'manager')) {
+  } else if (user && hasRole(user as unknown as Record<string, unknown>, 'manager')) {
     body.data.email = FORMIO_MANAGER_USER;
     body.data.password = FORMIO_MANAGER_PASS;
   }
@@ -46,7 +46,7 @@ router.use(formioLimiter);
 router.use('/', async (req: RequestWithUser, res: express.Response) => {
   try {
     const method = req.method;
-    const user: User = req.decodedJwt ? (req.decodedJwt as User) : ({} as User);
+    const user: User = req.decodedJwt ? (req.decodedJwt as unknown as User) : ({} as User);
     const token = await authToFormio(user);
     console.log('auth successful');
 

@@ -140,6 +140,10 @@ export const jwtErrorHandler = (err: unknown, req: Request, res: Response, next:
   next(err);
 };
 
-export const hasRole = (user: Record<string, unknown> | undefined, role: string) => {
-  return user && user[ROLE_FIELD] && user[ROLE_FIELD].includes(role);
+export const hasRole = (user: Record<string, unknown> | undefined, role: string): boolean => {
+  if (!user || typeof user !== 'object') return false;
+  const roles = user[ROLE_FIELD];
+  if (typeof roles === 'string') return roles.includes(role);
+  if (Array.isArray(roles)) return roles.includes(role);
+  return false;
 };

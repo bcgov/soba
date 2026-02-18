@@ -69,10 +69,10 @@ jobs:
         run: ${{ matrix.package_manager == 'pnpm' && 'pnpm install --frozen-lockfile' || 'npm ci' }}
       - name: Run lint
         working-directory: ${{ matrix.component }}
-        run: ${{ matrix.package_manager }} run lint --if-present
+        run: ${{ matrix.package_manager }} run lint
       - name: Run format check
         working-directory: ${{ matrix.component }}
-        run: ${{ matrix.package_manager }} run format:check --if-present
+        run: ${{ matrix.package_manager }} run format:check
 
   build:
     name: Build & Push
