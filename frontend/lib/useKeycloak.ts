@@ -1,6 +1,12 @@
 import { useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from './store';
-import { login, logout, refreshToken, initKeycloak, getKeycloakInstance } from './slices/keycloakSlice';
+import {
+  login,
+  logout,
+  refreshToken,
+  initKeycloak,
+  getKeycloakInstance,
+} from './slices/keycloakSlice';
 
 export function useKeycloak() {
   const dispatch = useAppDispatch();

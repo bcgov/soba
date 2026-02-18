@@ -7,7 +7,4 @@ const router = express.Router();
 router.use('/', formioRouter);
 router.use('/formio', formioRouter);
 
-export {
-  router as formRouter,
-  formioRouter
-}
+export { router as formRouter, formioRouter };

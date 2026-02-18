@@ -5,6 +5,7 @@
 #   MongoDB:   mongodb://host.docker.internal:27017
 #   PostgreSQL: postgresql://postgres:postgres@host.docker.internal:5432/postgres
 
+name: soba-dev-services
 services:
   mongodb:
     image: mongo:7

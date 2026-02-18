@@ -19,6 +19,9 @@
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "customizations": {
     "vscode": {
+      "settings": {
+        "remote.autoForwardPorts": false
+      },
       "extensions": [
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",

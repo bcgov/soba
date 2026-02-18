@@ -1,10 +1,10 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: ['.env.local', '.env'] });
 
-import express from 'express'
-import session from 'express-session'
-import passport from 'passport'
-import { router } from './routes'
+import express from 'express';
+import session from 'express-session';
+import passport from 'passport';
+import { router } from './routes';
 import cors from 'cors';
 
 const app = express();
