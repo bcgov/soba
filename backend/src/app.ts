@@ -1,5 +1,7 @@
 import dotenv from 'dotenv';
-dotenv.config({ path: ['.env.local', '.env'] });
+// Base first, then local overrides (convention from notify)
+dotenv.config({ path: '.env' });
+dotenv.config({ path: '.env.local', override: true });
 
 import express from 'express';
 import session from 'express-session';

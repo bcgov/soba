@@ -13,6 +13,34 @@ The Api is written in typescipt and uses the express library for routing and the
 
 This repository is built with node v24.4.1 and is set up inside the .nvmrc
 
+### Environment
+
+The backend uses two env files, loaded in order (later overrides earlier):
+
+1. **`.env`** — Base config (Form.io URL, JWT issuer/audience, role mapping). Created from `.env.example`.
+2. **`.env.local`** — Credentials and secrets (Form.io admin/manager, session secret). Created from `.env.local.example`.
+
+**How they are created**
+
+- In the devcontainer: `.env` and `.env.local` are created from their `.example` files if they don't exist. `.env.local` is never overwritten once it exists.
+- Outside the devcontainer: copy the examples manually:
+  ```bash
+  cp .env.example .env
+  cp .env.local.example .env.local
+  ```
+
+**How they are applied**
+
+- At startup, the app loads `.env` first, then `.env.local` with `override: true`, so `.env.local` overrides any matching keys in `.env`.
+- Put credentials and secrets in `.env.local` only; it is gitignored and never committed.
+
+| File                 | Purpose                                 | Committed |
+| -------------------- | --------------------------------------- | --------- |
+| `.env.example`       | Base config template                    | Yes       |
+| `.env.local.example` | Credentials template (Form.io, session) | Yes       |
+| `.env`               | Active base config                      | No        |
+| `.env.local`         | Active credentials, secrets             | No        |
+
 ### Docker
 
 The docker file exists but is untested
