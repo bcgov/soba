@@ -1,0 +1,94 @@
+# Dev environment — minimal footprint, no scheduled backups.
+# This file is self-contained (bcgov/action-crunchy only reads this one file).
+# Structure must match bcgov/action-crunchy chart templates.
+global:
+  config:
+    dbName: soba
+
+crunchy:
+  enabled: true
+  postgresVersion: 16
+  imagePullPolicy: IfNotPresent
+
+  instances:
+    name: db
+    replicas: 1
+    dataVolumeClaimSpec:
+      storage: 500Mi
+      storageClassName: netapp-block-standard
+      walStorage: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    replicaCertCopy:
+      requests:
+        cpu: 1m
+        memory: 32Mi
+
+  # pgBackRest: PGO requires at least one repo (used internally for replica bootstrap).
+  # Schedules set to null — no CronJobs, no scheduled backup pods.
+  pgBackRest:
+    enabled: true
+    backupPath: /backups/dev/cluster/version
+    clusterCounter: 1
+    retentionFullType: count
+    s3:
+      enabled: false
+    pvc:
+      retention: 1
+      retentionFullType: count
+      fullBackupSchedule: ~
+      incrementalBackupSchedule: ~
+      volume:
+        accessModes: "ReadWriteOnce"
+        storage: 256Mi
+        storageClassName: netapp-file-backup
+    config:
+      requests:
+        cpu: 5m
+        memory: 32Mi
+    repoHost:
+      requests:
+        cpu: 20m
+        memory: 128Mi
+    sidecars:
+      requests:
+        cpu: 5m
+        memory: 16Mi
+    jobs:
+      requests:
+        cpu: 20m
+        memory: 128Mi
+
+  patroni:
+    postgresql:
+      pg_hba:
+        - "host all all 0.0.0.0/0 md5"
+        - "host all all ::/128 md5"
+      parameters:
+        shared_buffers: 16MB
+        wal_buffers: "64kB"
+        min_wal_size: 32MB
+        max_wal_size: 64MB
+        max_slot_wal_keep_size: 128MB
+        work_mem: 2MB
+        log_min_duration_statement: 1000ms
+        effective_io_concurrency: 20
+
+  proxy:
+    enabled: true
+    pgBouncer:
+      replicas: 1
+      requests:
+        cpu: 5m
+        memory: 32Mi
+      maxConnections: 100
+      poolMode: transaction
+      defaultPoolSize: "20"
+
+  pgmonitor:
+    enabled: false
+    exporter:
+      requests:
+        cpu: 10m
+        memory: 32Mi

@@ -1,0 +1,70 @@
+{{- if .Values.backend.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "soba.fullname" . }}-backend
+  labels: {{- include "soba.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.global.autoscaling }}
+  replicas: 1
+  {{- end }}
+  strategy:
+    type: {{ .Values.backend.deploymentStrategy }}
+  selector:
+    matchLabels:
+      app: {{ include "soba.fullname" . }}-backend
+  template:
+    metadata:
+      labels:
+        app: {{ include "soba.fullname" . }}-backend
+        {{- include "soba.selectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: backend
+          image: {{ .Values.global.registry }}/{{ .Values.global.repository }}/backend:{{ .Values.global.tag }}
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+          ports:
+            - containerPort: 4000
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: {{ .Release.Name }}-backend
+                optional: true
+          env:
+            - name: NODE_ENV
+              value: production
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 4000
+              scheme: HTTP
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 4000
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 4000
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+{{- end }}

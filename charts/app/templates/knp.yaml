@@ -1,0 +1,59 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "soba.fullname" . }}-allow-ingress-to-frontend
+  labels: {{- include "soba.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ include "soba.fullname" . }}-frontend
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: ingress
+      ports:
+        - protocol: TCP
+          port: 3000
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "soba.fullname" . }}-allow-frontend-to-backend
+  labels: {{- include "soba.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ include "soba.fullname" . }}-backend
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: {{ include "soba.fullname" . }}-frontend
+      ports:
+        - protocol: TCP
+          port: 4000
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "soba.fullname" . }}-allow-backend-to-crunchy
+  labels: {{- include "soba.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      postgres-operator.crunchydata.com/role: pgbouncer
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: {{ include "soba.fullname" . }}-backend
+      ports:
+        - protocol: TCP
+          port: 5432
+  policyTypes:
+    - Ingress

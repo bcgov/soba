@@ -1,0 +1,68 @@
+{{- if .Values.frontend.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "soba.fullname" . }}-frontend
+  labels: {{- include "soba.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.global.autoscaling }}
+  replicas: 1
+  {{- end }}
+  strategy:
+    type: {{ .Values.frontend.deploymentStrategy }}
+  selector:
+    matchLabels:
+      app: {{ include "soba.fullname" . }}-frontend
+  template:
+    metadata:
+      labels:
+        app: {{ include "soba.fullname" . }}-frontend
+        {{- include "soba.selectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: frontend
+          image: {{ .Values.global.registry }}/{{ .Values.global.repository }}/frontend:{{ .Values.global.tag }}
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          env:
+            - name: BACKEND_URL
+              value: http://{{ include "soba.fullname" . }}-backend:{{ .Values.backend.service.port }}
+            - name: NODE_ENV
+              value: production
+          startupProbe:
+            httpGet:
+              path: /
+              port: 3000
+              scheme: HTTP
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+{{- end }}

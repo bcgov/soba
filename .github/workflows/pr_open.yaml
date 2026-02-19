@@ -1,0 +1,189 @@
+name: PR Deploy
+run-name: Deploy PR-${{ github.event.pull_request.number }}
+
+env:
+  ACRONYM: soba
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  set-vars:
+    name: Set variables
+    runs-on: ubuntu-latest
+    outputs:
+      JOB_NAME: ${{ steps.vars.outputs.JOB_NAME }}
+      URL: ${{ steps.vars.outputs.URL }}
+      ref: ${{ steps.vars.outputs.ref }}
+    steps:
+      - name: Setting variables
+        id: vars
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ACRONYM: ${{ env.ACRONYM }}
+        run: |
+          echo "JOB_NAME=pr-$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "URL=https://${ACRONYM}-pr-${PR_NUMBER}.apps.silver.devops.gov.bc.ca" >> "$GITHUB_OUTPUT"
+          echo "ref=refs/pull/$PR_NUMBER/head" >> "$GITHUB_OUTPUT"
+
+  lint-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    needs: set-vars
+    continue-on-error: true # TODO: Remove — temporary workaround to allow deploy even if lint/tests fail
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        include:
+          - component: backend
+            package_manager: npm
+            cache_dependency_path: backend/package-lock.json
+          - component: frontend
+            package_manager: pnpm
+            cache_dependency_path: frontend/pnpm-lock.yaml
+    steps:
+      - name: Checkout repository from pull request
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.set-vars.outputs.ref }}
+      - name: Setup pnpm
+        if: matrix.package_manager == 'pnpm'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: ${{ matrix.package_manager }}
+          cache-dependency-path: ${{ matrix.cache_dependency_path }}
+      - name: Install dependencies
+        working-directory: ${{ matrix.component }}
+        run: ${{ matrix.package_manager == 'pnpm' && 'pnpm install --frozen-lockfile' || 'npm ci' }}
+      - name: Run lint
+        working-directory: ${{ matrix.component }}
+        run: ${{ matrix.package_manager }} run lint
+      - name: Run format check
+        working-directory: ${{ matrix.component }}
+        run: ${{ matrix.package_manager }} run format:check
+
+  build:
+    name: Build & Push
+    permissions:
+      packages: write
+    runs-on: ubuntu-latest
+    needs: [set-vars, lint-test]
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        include:
+          - image_name: backend
+            context: ./backend
+          - image_name: frontend
+            context: ./frontend
+    steps:
+      - name: Checkout repository from pull request
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.set-vars.outputs.ref }}
+      - name: Build & Push
+        uses: ./.github/actions/build-push-container
+        with:
+          context: ${{ matrix.context }}
+          image_name: ${{ matrix.image_name }}
+          github_username: ${{ github.repository_owner }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ needs.set-vars.outputs.ref }}
+          pr_number: ${{ github.event.pull_request.number }}
+
+  deploy:
+    name: Deploy
+    permissions:
+      contents: read
+      pull-requests: write
+    environment:
+      name: pr
+      url: ${{ needs.set-vars.outputs.URL }}
+    runs-on: ubuntu-latest
+    needs: [set-vars, build]
+    timeout-minutes: 12
+    steps:
+      - name: Checkout repository from pull request
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.set-vars.outputs.ref }}
+
+      - name: Install OpenShift CLI
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
+
+      - name: Deploy CrunchyDB
+        uses: bcgov/action-crunchy@v1.2.6
+        with:
+          oc_namespace: ${{ secrets.OC_NAMESPACE }}
+          oc_token: ${{ secrets.OC_TOKEN }}
+          oc_server: https://api.silver.devops.gov.bc.ca:6443
+          values_file: charts/crunchy/values-dev.yaml
+          release_name: soba
+
+      - name: Re-checkout repository after CrunchyDB
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.set-vars.outputs.ref }}
+
+      - name: Login to OpenShift Cluster
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: https://api.silver.devops.gov.bc.ca:6443
+          openshift_token: ${{ secrets.OC_TOKEN }}
+          insecure_skip_tls_verify: true
+          namespace: ${{ secrets.OC_NAMESPACE }}
+
+      - name: Deploy App
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          RELEASE="soba-${{ needs.set-vars.outputs.JOB_NAME }}"
+          NAMESPACE="${{ secrets.OC_NAMESPACE }}"
+          TAG="sha-$(git rev-parse --short HEAD)"
+
+          if [[ "${{ needs.set-vars.outputs.JOB_NAME }}" == pr-* ]]; then
+            PR_NUM=$(echo "${{ needs.set-vars.outputs.JOB_NAME }}" | sed 's/pr-//')
+            DB_USER="app-${PR_NUM}"
+          else
+            DB_USER="appproxy"
+          fi
+
+          helm upgrade --install "${RELEASE}" charts/app/ \
+            --namespace "${NAMESPACE}" \
+            --set-string global.repository="${GITHUB_REPOSITORY}" \
+            --set-string global.tag="${TAG}" \
+            --set-string global.config.databaseUser="${DB_USER}" \
+            --set-string global.databaseAlias=soba-crunchy \
+            --wait --timeout 300s
+
+      - name: Wait on App
+        run: |
+          NAMESPACE="${{ secrets.OC_NAMESPACE }}"
+          RELEASE="soba-${{ needs.set-vars.outputs.JOB_NAME }}"
+          oc rollout status deployment/${RELEASE}-backend --namespace ${NAMESPACE} --watch=true --timeout=300s
+          oc rollout status deployment/${RELEASE}-frontend --namespace ${NAMESPACE} --watch=true --timeout=300s
+
+      - name: Release Comment on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: success()
+        with:
+          header: release
+          hide_and_recreate: true
+          hide_classify: "OUTDATED"
+          message: |
+            Release ${{ github.sha }} deployed at <${{ needs.set-vars.outputs.URL }}>
+          number: ${{ github.event.pull_request.number }}

@@ -1,6 +1,7 @@
 import Keycloak from 'keycloak-js';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
+import type { AppDispatch } from '../store';
 
 // Keep the Keycloak instance out of Redux state (non-serializable).
 // Store it in a module-level variable instead.
@@ -39,9 +40,12 @@ export const initKeycloak = createAsyncThunk<InitResult, void, { rejectValue: st
     });
 
     try {
-      const inited = await kc.init({
+      await kc.init({
         onLoad: 'check-sso',
-        silentCheckSsoRedirectUri: typeof window !== 'undefined' ? window.location.origin + '/silent-check-sso.html' : undefined,
+        silentCheckSsoRedirectUri:
+          typeof window !== 'undefined'
+            ? window.location.origin + '/silent-check-sso.html'
+            : undefined,
         checkLoginIframe: false,
       });
 
@@ -53,10 +57,10 @@ export const initKeycloak = createAsyncThunk<InitResult, void, { rejectValue: st
         idTokenParsed: kc.idTokenParsed as Keycloak.KeycloakTokenParsed | undefined,
         authenticated: !!kc.authenticated,
       };
-    } catch (err: any) {
-      return rejectWithValue(err?.message || String(err));
+    } catch (err: unknown) {
+      return rejectWithValue((err as { message?: string })?.message || String(err));
     }
-  }
+  },
 );
 
 const slice = createSlice({
@@ -94,7 +98,9 @@ const slice = createSlice({
         state.token = action.payload.token ?? undefined;
         //I don't love this but this is where formio pulls the token from
         localStorage.setItem('formioToken', action.payload.token ?? '');
-        state.idTokenParsed = action.payload.idTokenParsed as Keycloak.KeycloakTokenParsed | undefined;
+        state.idTokenParsed = action.payload.idTokenParsed as
+          | Keycloak.KeycloakTokenParsed
+          | undefined;
         state.authenticated = !!action.payload.authenticated;
       })
       .addCase(initKeycloak.rejected, (state, action) => {
@@ -107,7 +113,7 @@ const slice = createSlice({
 export const { setToken, setIdTokenParsed, setAuthenticated, clear } = slice.actions;
 
 // Helper thunks
-export const login = () => async (dispatch: any, getState: any) => {
+export const login = () => async (dispatch: AppDispatch) => {
   let kc: Keycloak.KeycloakInstance | null = kcInstance;
   if (!kc) {
     kc = new Keycloak({
@@ -124,17 +130,17 @@ export const login = () => async (dispatch: any, getState: any) => {
     dispatch(setToken(kc.token ?? undefined));
     dispatch(setIdTokenParsed(kc.idTokenParsed as Keycloak.KeycloakTokenParsed | undefined));
     dispatch(setAuthenticated(!!kc.authenticated));
-  } catch (err) {
+  } catch {
     // fallback to direct login redirect
     try {
       kc.login();
-    } catch (_e) {
+    } catch {
       // no-op
     }
   }
 };
 
-export const logout = () => (dispatch: any, getState: any) => {
+export const logout = () => (dispatch: AppDispatch) => {
   const kc: Keycloak.KeycloakInstance | null = kcInstance;
   if (kc) {
     kc.logout();
@@ -143,7 +149,7 @@ export const logout = () => (dispatch: any, getState: any) => {
   dispatch(clear());
 };
 
-export const refreshToken = () => async (dispatch: any, getState: any) => {
+export const refreshToken = () => async (dispatch: AppDispatch) => {
   const kc: Keycloak.KeycloakInstance | null = kcInstance;
   if (!kc) return;
   try {
@@ -153,7 +159,7 @@ export const refreshToken = () => async (dispatch: any, getState: any) => {
       dispatch(setIdTokenParsed(kc.idTokenParsed as Keycloak.KeycloakTokenParsed | undefined));
       dispatch(setAuthenticated(!!kc.authenticated));
     }
-  } catch (err) {
+  } catch {
     // token refresh failed
     dispatch(clear());
   }
