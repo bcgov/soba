@@ -6,6 +6,10 @@ echo "  SOBA — Dev Container Setup"
 echo "══════════════════════════════════════════════════════════════"
 echo ""
 
+# -- Install root dependencies ─────────────────────────────────────────────
+echo "==> Installing root dependencies..."
+pnpm install
+
 # ── Install backend dependencies ────────────────────────────────────────────
 echo "==> Installing backend dependencies..."
 cd backend
