@@ -1,0 +1,57 @@
+name: Setup Node Workspace
+description: Sets up Node.js with proper caching and dependency installation for the workspace
+
+inputs:
+  node_version:
+    description: Node.js version to use
+    required: false
+    default: "24"
+  component:
+    description: Component to set up (backend, frontend, or root)
+    required: false
+    default: "root"
+
+runs:
+  using: composite
+  steps:
+    - name: Determine package manager and cache path
+      id: pkg-manager
+      shell: bash
+      run: |
+        if [[ "${{ inputs.component }}" == "root" ]]; then
+          echo "manager=npm" >> $GITHUB_OUTPUT
+          echo "cache_path=package-lock.json" >> $GITHUB_OUTPUT
+          echo "install_cmd=npm ci" >> $GITHUB_OUTPUT
+        elif [[ "${{ inputs.component }}" == "frontend" ]]; then
+          echo "manager=pnpm" >> $GITHUB_OUTPUT
+          echo "cache_path=frontend/pnpm-lock.yaml" >> $GITHUB_OUTPUT
+          echo "install_cmd=pnpm install --frozen-lockfile" >> $GITHUB_OUTPUT
+        else
+          echo "manager=npm" >> $GITHUB_OUTPUT
+          echo "cache_path=${{ inputs.component }}/package-lock.json" >> $GITHUB_OUTPUT
+          echo "install_cmd=npm ci" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Setup pnpm
+      if: steps.pkg-manager.outputs.manager == 'pnpm'
+      uses: pnpm/action-setup@v4
+      with:
+        version: 9
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node_version }}
+        cache: ${{ steps.pkg-manager.outputs.manager }}
+        cache-dependency-path: ${{ steps.pkg-manager.outputs.cache_path }}
+
+    - name: Install dependencies
+      if: inputs.component != 'root'
+      working-directory: ${{ inputs.component }}
+      shell: bash
+      run: ${{ steps.pkg-manager.outputs.install_cmd }}
+
+    - name: Install dependencies (root)
+      if: inputs.component == 'root'
+      shell: bash
+      run: ${{ steps.pkg-manager.outputs.install_cmd }}

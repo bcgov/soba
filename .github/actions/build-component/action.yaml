@@ -1,0 +1,31 @@
+name: Build Component
+description: Builds a specific component (frontend, backend, or monorepo at root)
+
+inputs:
+  component:
+    description: Component to build (root, frontend, or backend)
+    required: true
+  node_version:
+    description: Node.js version to use
+    required: false
+    default: "24"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node Workspace
+      uses: ./.github/actions/setup-node-workspace
+      with:
+        node_version: ${{ inputs.node_version }}
+        component: ${{ inputs.component }}
+
+    - name: Build component
+      if: inputs.component != 'root'
+      working-directory: ${{ inputs.component }}
+      shell: bash
+      run: npm run build
+
+    - name: Build component (root)
+      if: inputs.component == 'root'
+      shell: bash
+      run: npm run build
