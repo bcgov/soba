@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "lint": "pnpm --filter @soba/* run lint",
+    "check": "pnpm --filter @soba/* run check",
     "prepare": "husky"
   },
   "keywords": [],

@@ -10,18 +10,6 @@ echo ""
 echo "==> Installing root dependencies..."
 pnpm install
 
-# ── Install backend dependencies ────────────────────────────────────────────
-echo "==> Installing backend dependencies..."
-cd backend
-npm ci
-cd ..
-
-# ── Install frontend dependencies ─────────────────────────────────────────────
-echo "==> Installing frontend dependencies..."
-cd frontend
-pnpm install
-cd ..
-
 # ── Set up environment file ─────────────────────────────────────────────────
 if [ -f backend/.env.example ] && [ ! -f backend/.env ]; then
   echo "==> Creating backend/.env from .env.example..."
@@ -56,7 +44,7 @@ echo "  Setup complete!"
 echo "══════════════════════════════════════════════════════════════"
 echo ""
 echo "  Quick start:"
-echo "    Backend:  npm run dev --prefix backend   (or use launch config 'SOBA Backend')"
+echo "    Backend:  pnpm dev (in backend/)   (or use launch config 'SOBA Backend')"
 echo "    Frontend: pnpm dev (in frontend/)        (or use launch config 'SOBA Frontend')"
 echo "    Both:     use compound 'SOBA (Backend + Frontend)'"
 echo ""
