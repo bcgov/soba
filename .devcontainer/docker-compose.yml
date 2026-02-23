@@ -4,7 +4,16 @@
 # Connection strings (from inside devcontainer):
 #   MongoDB:   mongodb://host.docker.internal:27017
 #   PostgreSQL: postgresql://postgres:postgres@host.docker.internal:5432/postgres
+#   Form.io:   http://host.docker.internal:3001
+#
+# Local Form.io credentials (for backend .env):
+#   FORMIO_BASE_URL=http://host.docker.internal:3001
+#   FORMIO_ADMIN_USERNAME=formio@localhost.com
+#   FORMIO_ADMIN_PASSWORD=formio
+#   FORMIO_MANAGER_USERNAME=formio@localhost.com
+#   FORMIO_MANAGER_PASSWORD=formio
 
+name: soba-dev-services
 services:
   mongodb:
     image: mongo:7
@@ -12,6 +21,18 @@ services:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
+    restart: unless-stopped
+
+  formio:
+    image: formio/formio:latest
+    ports:
+      - "3001:3001"
+    environment:
+      ROOT_EMAIL: "formio@localhost.com"
+      ROOT_PASSWORD: "formio"
+      NODE_CONFIG: '{"mongo":"mongodb://mongodb:27017/formio-ce","port":3001,"jwt":{"secret":"formio-dev-secret-change-in-production"}}'
+    depends_on:
+      - mongodb
     restart: unless-stopped
 
   postgres:

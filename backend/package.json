@@ -9,6 +9,8 @@
     "dev": "npx tsc -w & npx nodemon dist/app.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "type-check": "tsc --noEmit",
+    "check": "npm run type-check && npm run lint",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "start": "node dist/app.js"

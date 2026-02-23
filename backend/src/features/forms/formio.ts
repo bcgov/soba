@@ -1,13 +1,13 @@
 import express from 'express';
 const router = express.Router();
-import axios from 'axios'
+import axios from 'axios';
 import rateLimit from 'express-rate-limit';
 
-const FORMIO_URL = process.env.FORMIO_BASE_URL
-const FORMIO_ADMIN_USER = process.env.FORMIO_ADMIN_USERNAME
-const FORMIO_ADMIN_PASS = process.env.FORMIO_ADMIN_PASSWORD
-const FORMIO_MANAGER_USER = process.env.FORMIO_MANAGER_USERNAME
-const FORMIO_MANAGER_PASS = process.env.FORMIO_MANAGER_PASSWORD
+const FORMIO_URL = process.env.FORMIO_BASE_URL;
+const FORMIO_ADMIN_USER = process.env.FORMIO_ADMIN_USERNAME;
+const FORMIO_ADMIN_PASS = process.env.FORMIO_ADMIN_PASSWORD;
+const FORMIO_MANAGER_USER = process.env.FORMIO_MANAGER_USERNAME;
+const FORMIO_MANAGER_PASS = process.env.FORMIO_MANAGER_PASSWORD;
 import { User, ADMIN } from '../../types/user';
 import { hasRole } from '../../middleware/auth';
 
@@ -24,17 +24,17 @@ const authToFormio = async (user: User) => {
   const body = {
     data: {
       email: '',
-      password: ''
-    }
-  }
-  if (user && hasRole(user, ADMIN)) {
+      password: '',
+    },
+  };
+  if (user && hasRole(user as unknown as Record<string, unknown>, ADMIN)) {
     body.data.email = FORMIO_ADMIN_USER;
     body.data.password = FORMIO_ADMIN_PASS;
-  } else if (user && hasRole(user, 'manager')) {
+  } else if (user && hasRole(user as unknown as Record<string, unknown>, 'manager')) {
     body.data.email = FORMIO_MANAGER_USER;
     body.data.password = FORMIO_MANAGER_PASS;
   }
-  
+
   // this is what the url is supposed to be but it's not working against the configured server
   // const resp = await axios.post(`${FORMIO_URL}/user/login`, body);
   const resp = await axios.post(`${FORMIO_URL}/admin/login`, body);
@@ -46,12 +46,12 @@ router.use(formioLimiter);
 router.use('/', async (req: RequestWithUser, res: express.Response) => {
   try {
     const method = req.method;
-    const user: User = req.decodedJwt ? req.decodedJwt as User : {} as User;
+    const user: User = req.decodedJwt ? (req.decodedJwt as unknown as User) : ({} as User);
     const token = await authToFormio(user);
     console.log('auth successful');
 
     const headers = {
-      'x-jwt-token': token
+      'x-jwt-token': token,
     };
 
     // Build the proxied path by removing the mount prefix (e.g. /api/form)
@@ -70,11 +70,12 @@ router.use('/', async (req: RequestWithUser, res: express.Response) => {
 
     const response = await axios[method.toLowerCase()](targetUrl, { headers });
     res.json(response.data);
-  } catch (error: any) {
-    if (error.response && error.response.status === 401) {
+  } catch (error: unknown) {
+    const err = error as { response?: { status?: number }; message?: string };
+    if (err.response && err.response.status === 401) {
       return res.status(404).json({ error: 'Page not found' });
     }
-    console.error('FormIO request failed:', error?.message || error);
+    console.error('FormIO request failed:', err?.message || error);
     res.status(500).json({ error: 'Failed to fetch FormIO data' });
   }
 });

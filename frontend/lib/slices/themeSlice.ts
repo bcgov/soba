@@ -6,7 +6,10 @@ export type ThemeState = {
 
 const initialState: ThemeState = {
   // Default to the user's system preference when available (client); fall back to light on server.
-  isDark: typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: dark)').matches : false,
+  isDark:
+    typeof window !== 'undefined'
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches
+      : false,
 };
 
 const slice = createSlice({

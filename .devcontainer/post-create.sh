@@ -27,6 +27,24 @@ else
   echo "==> backend/.env already exists or no .env.example, skipping..."
 fi
 
+# ── Set up local overrides file (create once, never overwrite) ──────────────
+if [ ! -f backend/.env.local ]; then
+  echo "==> Creating backend/.env.local from .env.local.example..."
+  cp backend/.env.local.example backend/.env.local
+  echo "    Add credentials and overrides to backend/.env.local (never committed)"
+else
+  echo "==> backend/.env.local already exists, skipping..."
+fi
+
+# ── Set up frontend environment file ───────────────────────────────────────
+if [ -f frontend/.env.example ] && [ ! -f frontend/.env ]; then
+  echo "==> Creating frontend/.env from .env.example..."
+  cp frontend/.env.example frontend/.env
+  echo "    Values are for localhost; edit frontend/.env for other environments"
+else
+  echo "==> frontend/.env already exists or no .env.example, skipping..."
+fi
+
 # ── Print summary ───────────────────────────────────────────────────────────
 echo ""
 echo "══════════════════════════════════════════════════════════════"
