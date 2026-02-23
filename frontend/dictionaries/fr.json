@@ -12,7 +12,28 @@
     "list": "Liste des Formulaires",
     "builder": "Constructeur de Formulaires"
   },
-
+  "base": {
+    "copyToClipboard": {
+      "copyToClipboard": "Copier dans le presse-papiers",
+      "linkToClipboard": "Lien copié dans le presse-papiers!",
+      "errCopyToClipboard": "Erreur lors de la copie dans le presse-papiers."
+    }
+  },
+  "forms": {
+    "manage": {
+      "share": {
+        "shareForm": "Partager le Formulaire",
+        "shareLink": "Lien de Partage",
+        "copyQRCode": "Copiez le lien ou scannez le code QR pour partager ce formulaire.",
+        "warningMessage": "Ce formulaire n'a pas été publié. Le lien ne fonctionnera pas tant que le formulaire n'est pas publié.",
+        "copyURLToClipboard": "Copier l'URL dans le presse-papiers",
+        "openThisForm": "Ouvrir ce formulaire",
+        "downloadQRCode": "Télécharger le code QR",
+        "close": "Fermer"
+      }
+    }
+  },
+  
   "Basic": "Basique",
   "Text Field": "Champ de Texte",
   "Text Area": "Zone de Texte",

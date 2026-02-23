@@ -2,8 +2,9 @@
 import React, { useMemo } from 'react';
 import { Provider } from 'react-redux';
 import makeStore from '../../lib/store';
-import { useDark } from '../../lib/hooks';
+import { useDark } from '../../lib/hooks/useDark';
 import { getDictionary } from './dictionaries';
+import { NotificationToast } from '../ui/base/NotificationToast';
 
 type Dictionary = Awaited<ReturnType<typeof getDictionary>>;
 
@@ -12,7 +13,12 @@ const DictionaryContext = React.createContext<Dictionary | null>(null);
 function ThemeApplier({ children }: { children: React.ReactNode }) {
   // This hook needs to run after the Provider is mounted so it can access the store.
   useDark();
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <NotificationToast />
+    </>
+  );
 }
 
 export default function DictionaryProvider({

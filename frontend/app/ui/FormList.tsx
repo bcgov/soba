@@ -1,9 +1,9 @@
 'use client';
 
-import { useDictionary } from '../[lang]/Providers';
-import './formio.css';
-import dynamic from 'next/dynamic';
-import { useKeycloak } from '@/lib/useKeycloak';
+import { useDictionary } from '../[lang]/Providers'
+import './formio.css'
+import dynamic from 'next/dynamic'
+import { useKeycloak } from '@/lib/hooks/useKeycloak';
 
 //dynamic as it requires document to be available
 const FormioGrid = dynamic(

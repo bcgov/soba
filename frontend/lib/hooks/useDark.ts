@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { useAppDispatch, useAppSelector } from './store';
-import { setDark, toggleDark } from './slices/themeSlice';
+import { useAppDispatch, useAppSelector } from '../store';
+import { setDark, toggleDark } from '../slices/themeSlice';
 
 // useDark hook: provides current value and toggles, persists to localStorage and applies document attribute
 export function useDark() {

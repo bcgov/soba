@@ -12,7 +12,28 @@
     "list": "Form List",
     "builder": "Form Builder"
   },
-
+  "base": {
+    "copyToClipboard": {
+      "copyToClipboard": "Copy to Clipboard",
+      "linkToClipboard": "Link copied to clipboard!",
+      "errCopyToClipboard": "Error copying to clipboard."
+    }
+  },
+  "forms": {
+    "manage": {
+      "share": {
+        "shareForm": "Share Form",
+        "shareLink": "Share Link",
+        "copyQRCode": "Copy the link or scan the QR code to share this form.",
+        "warningMessage": "This form has not been published. The link will not work until the form is published.",
+        "copyURLToClipboard": "Copy URL to Clipboard",
+        "openThisForm": "Open this form",
+        "downloadQRCode": "Download QR Code",
+        "close": "Close"
+      }
+    }
+  },
+  
   "Basic": "Basic",
   "Text Field": "Text Field",
   "Text Area": "Text Area",
