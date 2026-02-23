@@ -37,6 +37,8 @@ jobs:
 
       - name: Setup Node Workspace
         uses: ./.github/actions/setup-node-workspace
+        with:
+          component: frontend
 
       - name: Build frontend
         working-directory: frontend
