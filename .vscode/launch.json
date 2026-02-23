@@ -23,7 +23,7 @@
       "request": "launch",
       "cwd": "${workspaceFolder}/frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--host"],
+      "runtimeArgs": ["run", "dev", "--", "--hostname", "0.0.0.0"],
       "skipFiles": ["<node_internals>/**"],
       "console": "integratedTerminal"
     },
