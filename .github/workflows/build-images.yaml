@@ -85,6 +85,7 @@ jobs:
       ref: ${{ steps.vars.outputs.ref }}
       platforms: ${{ steps.vars.outputs.platforms }}
       image_version: ${{ steps.vars.outputs.image_version }}
+      matrix: ${{ steps.vars.outputs.matrix }}
     steps:
       - name: Set variables
         id: vars
@@ -107,6 +108,21 @@ jobs:
           fi
           echo "ref=$REF" >> $GITHUB_OUTPUT
           echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
+          # Build matrix based on requested platforms
+          MATRIX='{"include":[]}'
+          if echo "$PLATFORMS" | grep -q 'amd64'; then
+            MATRIX=$(echo "$MATRIX" | jq -c '.include += [
+              {"component":"backend","context":"./backend","platform":"linux/amd64","platform_pair":"linux-amd64","runner":"ubuntu-latest"},
+              {"component":"frontend","context":"./frontend","platform":"linux/amd64","platform_pair":"linux-amd64","runner":"ubuntu-latest"}
+            ]')
+          fi
+          if echo "$PLATFORMS" | grep -q 'arm64'; then
+            MATRIX=$(echo "$MATRIX" | jq -c '.include += [
+              {"component":"backend","context":"./backend","platform":"linux/arm64","platform_pair":"linux-arm64","runner":"ubuntu-24.04-arm"},
+              {"component":"frontend","context":"./frontend","platform":"linux/arm64","platform_pair":"linux-arm64","runner":"ubuntu-24.04-arm"}
+            ]')
+          fi
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
           if [ "${{ github.event_name }}" = "workflow_call" ] && [ -n "${{ inputs.image_version }}" ]; then
             echo "image_version=${{ inputs.image_version }}" >> $GITHUB_OUTPUT
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -128,30 +144,8 @@ jobs:
     needs: prepare
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - component: backend
-            context: ./backend
-            platform: linux/amd64
-            platform_pair: linux-amd64
-            runner: ubuntu-latest
-          - component: backend
-            context: ./backend
-            platform: linux/arm64
-            platform_pair: linux-arm64
-            runner: ubuntu-24.04-arm
-          - component: frontend
-            context: ./frontend
-            platform: linux/amd64
-            platform_pair: linux-amd64
-            runner: ubuntu-latest
-          - component: frontend
-            context: ./frontend
-            platform: linux/arm64
-            platform_pair: linux-arm64
-            runner: ubuntu-24.04-arm
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
-    if: ${{ contains(needs.prepare.outputs.platforms, 'amd64') && matrix.platform == 'linux/amd64' || contains(needs.prepare.outputs.platforms, 'arm64') && matrix.platform == 'linux/arm64' }}
     permissions:
       contents: read
       packages: write
