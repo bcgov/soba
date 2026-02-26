@@ -3,10 +3,12 @@ import { createWrapper } from 'next-redux-wrapper';
 import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
 import keycloakReducer, { KeycloakState } from './slices/keycloakSlice';
 import themeReducer, { ThemeState } from './slices/themeSlice';
+import notificationReducer, { NotificationState } from './slices/notificationSlice';
 
 const reducer = {
   keycloak: keycloakReducer,
   theme: themeReducer,
+  notification: notificationReducer,
 };
 
 const makeStore = () =>
@@ -25,6 +27,7 @@ export const wrapper = createWrapper<AppStore>(makeStore, { debug: false });
 export type RootState = {
   keycloak: KeycloakState;
   theme: ThemeState;
+  notification: NotificationState;
 };
 export type RootDispatch = AppDispatch;
 

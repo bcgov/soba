@@ -1,7 +1,8 @@
 'use client';
 import { useEffect } from 'react';
-import { useKeycloak } from '@/lib/useKeycloak';
+import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '../[lang]/Providers';
+import { ShareForm } from './forms/manage/ShareForm';
 
 function Header() {
   const dict = useDictionary();
@@ -34,17 +35,18 @@ function Header() {
 
   return (
     <ul className="flex px-4">
-      <li className="mr-6 w-1/2 my-auto">
-        <a href={'/' + dict.locale + '/'}>
-          <button type="button" className="inline-block text-xl font-bold">
-            {dict.header.list}
-          </button>
+      <li className="mr-6 w-1/2 my-auto flex items-center gap-2">
+        <a href={'/'+dict.locale+'/'}>
+          <button type="button" className="inline-block text-xl font-bold">{dict.header.list}</button>
         </a>
         <a href={'/' + dict.locale + '/builder'}>
           <button type="button" className="inline-block text-xl font-bold">
             {dict.header.builder}
           </button>
         </a>
+        {/* TODO: ShareForm is placed here temporarily to demonstrate functionality.
+              Once forms are created it will be moved to the appropriate form list/detail view. */}
+        <ShareForm formId="placeholder-form-id" />
       </li>
       <li className="mr-6 w-1/4">
         <h1 className="text-2xl font-bold">{dict.general.title}</h1>
