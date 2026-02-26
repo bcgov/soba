@@ -20,10 +20,10 @@ export default async function RootLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: { lang: string };
+  params: Promise<{ lang: string }>;
 }) {
-  const lang = params.lang as Locale;
-  const dictionary = await getDictionary(lang);
+  const { lang } = await params;
+  const dictionary = await getDictionary(lang as Locale);
   return (
     <html lang={lang}>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
