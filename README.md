@@ -68,6 +68,10 @@ mongodb://mongodb:27017
 
 ---
 
+## Building Docker Images
+
+See [docs/build-images.md](docs/build-images.md) for building images, targeting platforms (amd64/arm64), and pulling for local use.
+
 ## Project Structure
 
 - `backend/` — Express.js API server
