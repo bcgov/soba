@@ -14,5 +14,8 @@ dist
 # Docker artifacts
 Dockerfile
 
+# Generated migration artifacts
+drizzle/
+
 # Ignore lockfile
 package-lock.json

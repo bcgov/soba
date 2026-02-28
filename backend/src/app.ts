@@ -1,13 +1,14 @@
-import dotenv from 'dotenv';
-// Base first, then local overrides (convention from notify)
-dotenv.config({ path: '.env' });
-dotenv.config({ path: '.env.local', override: true });
+import { env } from './core/config/env';
+env.loadEnv();
 
 import express from 'express';
 import session from 'express-session';
 import passport from 'passport';
 import { router } from './routes';
 import cors from 'cors';
+import { createJwtMiddleware } from './middleware/auth';
+import { coreRouter } from './core/api';
+import { buildOpenApiSpec } from './core/api/shared/openapi';
 
 const app = express();
 const port = 4000;
@@ -27,9 +28,11 @@ app.use(
 
 app.use(passport.initialize());
 app.use(passport.session());
-
 app.get('/api/docs', (_, res) => {
   res.send('FormIO Wrapper API Documentation');
+});
+app.get('/api/docs/openapi.json', (_req, res) => {
+  res.json(buildOpenApiSpec());
 });
 
 app.get('/api/health', (_, res) => {
@@ -38,6 +41,7 @@ app.get('/api/health', (_, res) => {
 
 // Mount API router at /api so routes like /api/form/test map correctly.
 app.use('/api', router);
+app.use('/api/v1', express.json(), createJwtMiddleware(), coreRouter);
 
 app.listen(port, () => {
   return console.log(`Express is listening at http://localhost:${port}`);

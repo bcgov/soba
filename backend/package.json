@@ -2,18 +2,22 @@
   "name": "formio-wrapper",
   "version": "1.0.0",
   "description": "",
-  "main": "app.ts",
+  "main": "dist/src/app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "serve": "npx tsc && node dist/app.js",
-    "dev": "npx tsc -w & npx nodemon dist/app.js",
+    "serve": "npx tsc && node dist/src/app.js",
+    "dev": "npx tsc -w & npx nodemon dist/src/app.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "type-check": "tsc --noEmit",
     "check": "npm run type-check && npm run lint",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "start": "node dist/app.js"
+    "start": "node dist/src/app.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/core/db/migrate.ts",
+    "db:seed": "tsx src/core/db/seed.ts",
+    "worker": "tsx src/core/workers/outboxWorker.ts"
   },
   "keywords": [],
   "author": "Brandon Sharratt",
@@ -32,19 +36,28 @@
     "jiti": "^2.6.1",
     "nodemon": "^3.1.11",
     "prettier": "^3.8.1",
+    "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.48.0"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^8.4.1",
+    "@types/swagger-ui-express": "^4.1.8",
     "axios": "^1.13.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
+    "drizzle-kit": "^0.31.6",
+    "drizzle-orm": "^0.44.7",
     "express": "^4.22.1",
     "express-jwt": "^8.5.1",
+    "express-rate-limit": "^8.2.1",
     "express-session": "^1.18.2",
     "jsonwebtoken": "^9.0.2",
     "jwks-rsa": "^3.2.2",
     "passport": "^0.7.0",
-    "express-rate-limit": "^8.2.1"
+    "pg": "^8.16.3",
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^13.0.0",
+    "zod": "^4.3.6"
   }
 }
