@@ -1,8 +1,9 @@
 import { defineConfig } from 'drizzle-kit';
 import dotenv from 'dotenv';
 
-dotenv.config({ path: '.env' });
-dotenv.config({ path: '.env.local', override: true });
+const quiet = process.env.NODE_ENV === 'test';
+dotenv.config({ path: '.env', quiet });
+dotenv.config({ path: '.env.local', override: true, quiet });
 
 const databaseUrl = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/soba';
 

@@ -6,3 +6,6 @@
 !.env.example
 !.env.*.example
 .pnpm-store
+
+# Test coverage (e.g. backend Jest)
+coverage

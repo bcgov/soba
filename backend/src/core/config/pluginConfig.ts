@@ -1,33 +1,31 @@
-import { env } from './env';
+import {
+  env,
+  parseBooleanEnvValue,
+  parseNumberEnvValue,
+  parseCsvValue,
+  type EnvReader,
+} from './env';
 
-const normalizeKey = (value: string): string =>
+/** Normalize a key for env: trim, uppercase, replace non-alphanumeric with underscore. */
+export const normalizeKey = (value: string): string =>
   value
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, '_');
 
-const getRequiredBoolean = (envKey: string): boolean => {
-  const value = env.getRequiredEnv(envKey).trim().toLowerCase();
-  if (value === 'true') return true;
-  if (value === 'false') return false;
-  throw new Error(`${envKey} must be 'true' or 'false'`);
+/** Minimal env reader interface for plugin config (e.g. from createEnvReader). */
+export type PluginConfigEnvReader = Pick<EnvReader, 'getRequiredEnv' | 'getOptionalEnv'>;
+
+const getRequiredBoolean = (reader: PluginConfigEnvReader, envKey: string): boolean => {
+  return parseBooleanEnvValue(reader.getRequiredEnv(envKey));
 };
 
-const getRequiredNumber = (envKey: string): number => {
-  const value = env.getRequiredEnv(envKey);
-  const parsed = Number(value);
-  if (Number.isNaN(parsed)) {
-    throw new Error(`${envKey} must be a number`);
-  }
-  return parsed;
+const getRequiredNumber = (reader: PluginConfigEnvReader, envKey: string): number => {
+  return parseNumberEnvValue(reader.getRequiredEnv(envKey));
 };
 
-const getRequiredCsv = (envKey: string): string[] => {
-  const raw = env.getRequiredEnv(envKey);
-  return raw
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
+const getRequiredCsv = (reader: PluginConfigEnvReader, envKey: string): string[] => {
+  return parseCsvValue(reader.getRequiredEnv(envKey));
 };
 
 export interface PluginConfigReader {
@@ -38,16 +36,23 @@ export interface PluginConfigReader {
   getCsv(key: string): string[];
 }
 
-export const createPluginConfigReader = (pluginCode: string): PluginConfigReader => {
+export function createPluginConfigReaderFrom(
+  reader: PluginConfigEnvReader,
+  pluginCode: string,
+): PluginConfigReader {
   const prefix = `PLUGIN_${normalizeKey(pluginCode)}_`;
   const toEnvKey = (key: string) => `${prefix}${normalizeKey(key)}`;
 
   return {
-    getRequired: (key: string) => env.getRequiredEnv(toEnvKey(key)),
+    getRequired: (key: string) => reader.getRequiredEnv(toEnvKey(key)),
     getOptional: (key: string, defaultValue?: string) =>
-      env.getOptionalEnv(toEnvKey(key)) ?? defaultValue,
-    getBoolean: (key: string) => getRequiredBoolean(toEnvKey(key)),
-    getNumber: (key: string) => getRequiredNumber(toEnvKey(key)),
-    getCsv: (key: string) => getRequiredCsv(toEnvKey(key)),
+      reader.getOptionalEnv(toEnvKey(key)) ?? defaultValue,
+    getBoolean: (key: string) => getRequiredBoolean(reader, toEnvKey(key)),
+    getNumber: (key: string) => getRequiredNumber(reader, toEnvKey(key)),
+    getCsv: (key: string) => getRequiredCsv(reader, toEnvKey(key)),
   };
+}
+
+export const createPluginConfigReader = (pluginCode: string): PluginConfigReader => {
+  return createPluginConfigReaderFrom(env, pluginCode);
 };
