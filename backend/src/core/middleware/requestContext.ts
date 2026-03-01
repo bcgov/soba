@@ -1,6 +1,9 @@
 import { NextFunction, Request, Response } from 'express';
-import { findOrCreateUserByIdentity } from '../db/repos/membershipRepo';
-import { getWorkspaceResolvers } from '../integrations/workspace/WorkspaceResolverRegistry';
+import { findOrCreateUserByIdentity, getWorkspaceForUser } from '../db/repos/membershipRepo';
+import { getWorkspaceResolvers, getCacheAdapter } from '../integrations/plugins/PluginRegistry';
+import { membershipKey } from '../integrations/cache/cacheKeys';
+import { ForbiddenError, ValidationError } from '../errors';
+import { normalizeProfileFromJwt, idpAttributesFromJwt } from '../auth/jwtClaims';
 
 export interface CoreRequestContext {
   workspaceId: string;
@@ -31,24 +34,36 @@ export const resolveCoreContext = async (req: Request): Promise<CoreRequestConte
   if (!actorId) {
     const subject = typeof decoded?.sub === 'string' ? decoded.sub : '';
     if (!subject) {
-      throw new Error('Missing subject from token');
+      throw new ValidationError('Missing subject from token');
     }
 
     const provider =
       (typeof req.idpType === 'string' ? req.idpType : '') ||
+      (typeof decoded?.identity_provider === 'string' ? decoded.identity_provider : '') ||
       (typeof decoded?.idpType === 'string' ? decoded.idpType : '') ||
       'idir';
 
-    actorId = await findOrCreateUserByIdentity(provider, subject, {
-      displayName: typeof decoded?.display_name === 'string' ? decoded.display_name : undefined,
-      email: typeof decoded?.email === 'string' ? decoded.email : undefined,
-    });
+    const profile =
+      decoded && typeof decoded === 'object' ? normalizeProfileFromJwt(decoded) : undefined;
+    const idpAttributes =
+      decoded && typeof decoded === 'object' ? idpAttributesFromJwt(decoded) : undefined;
+
+    actorId = await findOrCreateUserByIdentity(provider, subject, profile, idpAttributes);
   }
 
   const resolvers = getWorkspaceResolvers();
   for (const resolver of resolvers) {
     const resolved = await resolver.resolve({ req, actorId });
     if (resolved) {
+      const cache = getCacheAdapter();
+      const cacheKey = membershipKey(resolved.workspaceId, actorId);
+      const getOrSet = cache.getOrSet?.bind(cache);
+      const membership = getOrSet
+        ? await getOrSet(cacheKey, () => getWorkspaceForUser(resolved.workspaceId, actorId))
+        : await getWorkspaceForUser(resolved.workspaceId, actorId);
+      if (!membership) {
+        throw new ForbiddenError('Actor does not belong to workspace');
+      }
       return {
         workspaceId: resolved.workspaceId,
         actorId,
@@ -57,7 +72,7 @@ export const resolveCoreContext = async (req: Request): Promise<CoreRequestConte
     }
   }
 
-  throw new Error('Unable to resolve workspace from request context');
+  throw new ForbiddenError('Unable to resolve workspace from request context');
 };
 
 export const coreContextMiddleware = async (req: Request, res: Response, next: NextFunction) => {
@@ -65,21 +80,29 @@ export const coreContextMiddleware = async (req: Request, res: Response, next: N
     req.coreContext = await resolveCoreContext(req);
     next();
   } catch (error) {
-    res.status(400).json({ error: (error as Error).message });
+    next(error);
   }
 };
 
 export const resolveCoreContextForWorkspace = async (
   req: Request,
   workspaceId: string,
+  context?: CoreRequestContext,
 ): Promise<CoreRequestContext> => {
-  const context = await resolveCoreContext(req);
-  if (context.workspaceId !== workspaceId) {
-    throw new Error('Resolved workspace does not match requested workspace');
+  const ctx = context ?? req.coreContext;
+  if (ctx) {
+    if (ctx.workspaceId !== workspaceId) {
+      throw new ForbiddenError('Resolved workspace does not match requested workspace');
+    }
+    return { workspaceId, actorId: ctx.actorId, workspaceSource: ctx.workspaceSource };
+  }
+  const resolved = await resolveCoreContext(req);
+  if (resolved.workspaceId !== workspaceId) {
+    throw new ForbiddenError('Resolved workspace does not match requested workspace');
   }
   return {
     workspaceId,
-    actorId: context.actorId,
-    workspaceSource: context.workspaceSource,
+    actorId: resolved.actorId,
+    workspaceSource: resolved.workspaceSource,
   };
 };

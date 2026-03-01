@@ -17,7 +17,7 @@ const ensureDatabaseExists = async () => {
     throw new Error('DATABASE_URL must include a database name');
   }
 
-  const adminDbName = env.getDbAdminDatabase();
+  const adminDbName = env.getDbAdminDatabase() ?? 'postgres';
   const adminUrl = new URL(databaseUrl);
   adminUrl.pathname = `/${adminDbName}`;
 

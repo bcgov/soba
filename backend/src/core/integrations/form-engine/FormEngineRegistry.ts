@@ -2,10 +2,10 @@ import { createPluginConfigReader } from '../../config/pluginConfig';
 import { FormEngineAdapter } from './FormEngineAdapter';
 import { FormEnginePluginDefinition } from './FormEnginePluginDefinition';
 import {
-  FormEnginePluginCatalogEntry,
   getFormEnginePluginCatalog,
   getFormEnginePluginDefinitions,
-} from './formEnginePluginCatalog';
+} from '../plugins/PluginRegistry';
+import type { FormEnginePluginCatalogEntry } from '../plugins/PluginRegistry';
 
 let cachedDefinitions: Map<string, FormEnginePluginDefinition> | null = null;
 
@@ -17,7 +17,8 @@ const getDefinitionsMap = (): Map<string, FormEnginePluginDefinition> => {
   return cachedDefinitions;
 };
 
-export const getFormEnginePlugins = (): FormEnginePluginCatalogEntry[] => getFormEnginePluginCatalog();
+export const getFormEnginePlugins = (): FormEnginePluginCatalogEntry[] =>
+  getFormEnginePluginCatalog();
 
 export const resolveFormEnginePlugin = (engineCode: string): FormEnginePluginDefinition => {
   const definition = getDefinitionsMap().get(engineCode);

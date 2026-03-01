@@ -1,13 +1,6 @@
 import { v7 as uuidv7 } from 'uuid';
 import { index, text, timestamp, uniqueIndex, uuid, integer } from 'drizzle-orm/pg-core';
-import {
-  appUsers,
-  platformFormEngines,
-  sobaSchema,
-  workspaceGroups,
-  workspaceMemberships,
-  workspaces,
-} from './core';
+import { appUsers, sobaSchema, workspaces } from './core';
 
 const idColumn = () => uuid('id').primaryKey().$defaultFn(uuidv7);
 
@@ -29,9 +22,7 @@ export const forms = sobaSchema.table(
     workspaceId: uuid('workspace_id')
       .notNull()
       .references(() => workspaces.id),
-    formEngineId: uuid('form_engine_id')
-      .notNull()
-      .references(() => platformFormEngines.id),
+    formEngineCode: text('form_engine_code').notNull(),
     slug: text('slug').notNull(),
     name: text('name').notNull(),
     description: text('description'),
@@ -43,58 +34,6 @@ export const forms = sobaSchema.table(
   (table) => ({
     workspaceSlugUnique: uniqueIndex('form_workspace_slug_uq').on(table.workspaceId, table.slug),
     workspaceIdx: index('form_workspace_idx').on(table.workspaceId),
-  }),
-);
-
-export const formMemberAccess = sobaSchema.table(
-  'form_member_access',
-  {
-    id: idColumn(),
-    workspaceId: uuid('workspace_id')
-      .notNull()
-      .references(() => workspaces.id),
-    formId: uuid('form_id')
-      .notNull()
-      .references(() => forms.id),
-    workspaceMembershipId: uuid('workspace_membership_id')
-      .notNull()
-      .references(() => workspaceMemberships.id),
-    accessLevel: text('access_level').notNull(),
-    ...strictAuditColumns(),
-  },
-  (table) => ({
-    uniqueGrant: uniqueIndex('form_member_access_workspace_form_member_uq').on(
-      table.workspaceId,
-      table.formId,
-      table.workspaceMembershipId,
-    ),
-    workspaceIdx: index('form_member_access_workspace_idx').on(table.workspaceId),
-  }),
-);
-
-export const formGroupAccess = sobaSchema.table(
-  'form_group_access',
-  {
-    id: idColumn(),
-    workspaceId: uuid('workspace_id')
-      .notNull()
-      .references(() => workspaces.id),
-    formId: uuid('form_id')
-      .notNull()
-      .references(() => forms.id),
-    groupId: uuid('group_id')
-      .notNull()
-      .references(() => workspaceGroups.id),
-    accessLevel: text('access_level').notNull(),
-    ...strictAuditColumns(),
-  },
-  (table) => ({
-    uniqueGrant: uniqueIndex('form_group_access_workspace_form_group_uq').on(
-      table.workspaceId,
-      table.formId,
-      table.groupId,
-    ),
-    workspaceIdx: index('form_group_access_workspace_idx').on(table.workspaceId),
   }),
 );
 
@@ -192,58 +131,6 @@ export const submissions = sobaSchema.table(
     ),
     workspaceIdx: index('submission_workspace_idx').on(table.workspaceId),
     formVersionIdx: index('submission_form_version_idx').on(table.formVersionId),
-  }),
-);
-
-export const submissionMemberAccess = sobaSchema.table(
-  'submission_member_access',
-  {
-    id: idColumn(),
-    workspaceId: uuid('workspace_id')
-      .notNull()
-      .references(() => workspaces.id),
-    submissionId: uuid('submission_id')
-      .notNull()
-      .references(() => submissions.id),
-    workspaceMembershipId: uuid('workspace_membership_id')
-      .notNull()
-      .references(() => workspaceMemberships.id),
-    accessLevel: text('access_level').notNull(),
-    ...strictAuditColumns(),
-  },
-  (table) => ({
-    uniqueGrant: uniqueIndex('submission_member_access_workspace_submission_member_uq').on(
-      table.workspaceId,
-      table.submissionId,
-      table.workspaceMembershipId,
-    ),
-    workspaceIdx: index('submission_member_access_workspace_idx').on(table.workspaceId),
-  }),
-);
-
-export const submissionGroupAccess = sobaSchema.table(
-  'submission_group_access',
-  {
-    id: idColumn(),
-    workspaceId: uuid('workspace_id')
-      .notNull()
-      .references(() => workspaces.id),
-    submissionId: uuid('submission_id')
-      .notNull()
-      .references(() => submissions.id),
-    groupId: uuid('group_id')
-      .notNull()
-      .references(() => workspaceGroups.id),
-    accessLevel: text('access_level').notNull(),
-    ...strictAuditColumns(),
-  },
-  (table) => ({
-    uniqueGrant: uniqueIndex('submission_group_access_workspace_submission_group_uq').on(
-      table.workspaceId,
-      table.submissionId,
-      table.groupId,
-    ),
-    workspaceIdx: index('submission_group_access_workspace_idx').on(table.workspaceId),
   }),
 );
 

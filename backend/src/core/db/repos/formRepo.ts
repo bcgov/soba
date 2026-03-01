@@ -1,6 +1,6 @@
 import { and, desc, eq, ilike, isNull, lt, or } from 'drizzle-orm';
 import { db } from '../client';
-import { forms, platformFormEngines } from '../schema';
+import { forms } from '../schema';
 
 export type FormListSort = 'id:desc' | 'updatedAt:desc';
 export type FormCursorMode = 'id' | 'ts_id';
@@ -28,7 +28,7 @@ export interface FormListRow {
 export interface FormRecord {
   id: string;
   workspaceId: string;
-  formEngineId: string;
+  formEngineCode: string;
   slug: string;
   name: string;
   description: string | null;
@@ -44,7 +44,7 @@ export interface FormRecord {
 interface CreateFormInput {
   workspaceId: string;
   actorId: string;
-  formEngineId: string;
+  formEngineCode: string;
   slug: string;
   name: string;
   description?: string;
@@ -130,7 +130,7 @@ export const createForm = async (input: CreateFormInput): Promise<FormRecord> =>
     .insert(forms)
     .values({
       workspaceId: input.workspaceId,
-      formEngineId: input.formEngineId,
+      formEngineCode: input.formEngineCode,
       slug: input.slug,
       name: input.name,
       description: input.description,
@@ -187,9 +187,8 @@ export const getFormEngineCodeForForm = async (
   formId: string,
 ): Promise<string | null> => {
   const row = await db
-    .select({ engineCode: platformFormEngines.code })
+    .select({ engineCode: forms.formEngineCode })
     .from(forms)
-    .innerJoin(platformFormEngines, eq(platformFormEngines.id, forms.formEngineId))
     .where(and(eq(forms.workspaceId, workspaceId), eq(forms.id, formId), isNull(forms.deletedAt)))
     .limit(1);
 

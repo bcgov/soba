@@ -6,7 +6,8 @@ declare module 'express-serve-static-core' {
   interface Request {
     decodedJwt?: Record<string, unknown>;
     bceidType?: 'bceidbasic' | 'bceidbusiness';
-    idpType?: 'idir' | 'bceidbasic' | 'bceidbusiness';
+    /** Identity provider code from token (e.g. idir, azureidir, bceidbasic, bceidbusiness). */
+    idpType?: string;
   }
 }
 
@@ -95,7 +96,14 @@ export const checkJwt = () => {
       }
 
       if (req.decodedJwt) {
-        req.idpType = 'idir';
+        const payload = req.decodedJwt as Record<string, unknown>;
+        const idp: string =
+          typeof payload.identity_provider === 'string'
+            ? payload.identity_provider
+            : typeof payload.idpType === 'string'
+              ? payload.idpType
+              : 'idir';
+        req.idpType = idp;
       }
 
       next();

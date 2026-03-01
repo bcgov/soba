@@ -1,8 +1,3 @@
-import { actorBelongsToWorkspace } from '../db/repos/membershipRepo';
-import {
-  getActiveFormEngineByCode,
-  getDefaultActiveFormEngine,
-} from '../db/repos/platformFormEngineRepo';
 import {
   createForm,
   FormCursorMode,
@@ -13,7 +8,12 @@ import {
   markFormDeleted,
   updateForm,
 } from '../db/repos/formRepo';
-import { resolveFormEnginePlugin } from '../integrations/form-engine/FormEngineRegistry';
+import { env } from '../config/env';
+import {
+  getFormEnginePlugins,
+  resolveFormEnginePlugin,
+} from '../integrations/form-engine/FormEngineRegistry';
+import { ValidationError } from '../errors';
 
 interface DeleteInput {
   workspaceId: string;
@@ -54,20 +54,23 @@ interface UpdateInput {
 
 export class FormService {
   async create(input: CreateInput): Promise<FormRecord> {
-    const inWorkspace = await actorBelongsToWorkspace(input.workspaceId, input.actorId);
-    if (!inWorkspace) throw new Error('Actor does not belong to workspace');
-
-    const selectedEngine = input.formEngineCode
-      ? await getActiveFormEngineByCode(input.formEngineCode)
-      : await getDefaultActiveFormEngine();
-    if (!selectedEngine) {
-      throw new Error(
+    const plugins = getFormEnginePlugins();
+    if (plugins.length === 0) {
+      throw new ValidationError('No form engine plugins installed.');
+    }
+    const defaultCode =
+      env.getFormEngineDefaultCode() ??
+      (plugins.some((p) => p.code === 'formio-v5') ? 'formio-v5' : plugins[0].code);
+    const engineCode = input.formEngineCode ?? defaultCode;
+    const installed = plugins.some((p) => p.code === engineCode);
+    if (!installed) {
+      throw new ValidationError(
         input.formEngineCode
-          ? `Form engine '${input.formEngineCode}' is not available`
-          : 'No default active form engine is configured',
+          ? `Form engine '${input.formEngineCode}' is not installed`
+          : `Default form engine '${defaultCode}' is not installed`,
       );
     }
-    resolveFormEnginePlugin(selectedEngine.code);
+    resolveFormEnginePlugin(engineCode);
 
     return createForm({
       workspaceId: input.workspaceId,
@@ -75,31 +78,23 @@ export class FormService {
       slug: input.slug,
       name: input.name,
       description: input.description,
-      formEngineId: selectedEngine.id,
+      formEngineCode: engineCode,
     });
   }
 
   async update(input: UpdateInput): Promise<FormRecord | null> {
-    const inWorkspace = await actorBelongsToWorkspace(input.workspaceId, input.actorId);
-    if (!inWorkspace) throw new Error('Actor does not belong to workspace');
     return updateForm(input);
   }
 
   async get(workspaceId: string, actorId: string, formId: string): Promise<FormRecord | null> {
-    const inWorkspace = await actorBelongsToWorkspace(workspaceId, actorId);
-    if (!inWorkspace) throw new Error('Actor does not belong to workspace');
     return getFormById(workspaceId, formId);
   }
 
   async list(input: ListInput) {
-    const inWorkspace = await actorBelongsToWorkspace(input.workspaceId, input.actorId);
-    if (!inWorkspace) throw new Error('Actor does not belong to workspace');
     return listFormsForWorkspace(input);
   }
 
   async delete(input: DeleteInput) {
-    const inWorkspace = await actorBelongsToWorkspace(input.workspaceId, input.actorId);
-    if (!inWorkspace) throw new Error('Actor does not belong to workspace');
     return markFormDeleted(input.workspaceId, input.formId, input.actorId);
   }
 }

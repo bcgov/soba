@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, lte, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, lte, or } from 'drizzle-orm';
 import { db } from '../client';
 import { integrationOutbox } from '../schema';
 import { QueueEvent } from '../../integrations/queue/QueueAdapter';
@@ -17,39 +17,36 @@ export const enqueueOutboxEvent = async (event: QueueEvent) => {
 };
 
 export const claimOutboxBatch = async (batchSize = 20) => {
-  const pending = await db
-    .select()
-    .from(integrationOutbox)
-    .where(
-      and(
-        eq(integrationOutbox.status, 'pending'),
-        or(
-          lte(integrationOutbox.nextAttemptAt, new Date()),
-          isNull(integrationOutbox.nextAttemptAt),
+  return db.transaction(async (tx) => {
+    const pending = await tx
+      .select()
+      .from(integrationOutbox)
+      .where(
+        and(
+          eq(integrationOutbox.status, 'pending'),
+          or(
+            lte(integrationOutbox.nextAttemptAt, new Date()),
+            isNull(integrationOutbox.nextAttemptAt),
+          ),
         ),
-      ),
-    )
-    .orderBy(asc(integrationOutbox.createdAt))
-    .limit(batchSize);
+      )
+      .orderBy(asc(integrationOutbox.createdAt))
+      .limit(batchSize)
+      .for('update', { skipLocked: true });
 
-  if (pending.length === 0) {
-    return [];
-  }
+    if (pending.length === 0) {
+      return [];
+    }
 
-  const claimed: typeof pending = [];
-  for (const item of pending) {
-    const updated = await db
+    const ids = pending.map((row) => row.id);
+    const updated = await tx
       .update(integrationOutbox)
       .set({ status: 'processing', updatedAt: new Date() })
-      .where(and(eq(integrationOutbox.id, item.id), eq(integrationOutbox.status, 'pending')))
+      .where(and(eq(integrationOutbox.status, 'pending'), inArray(integrationOutbox.id, ids)))
       .returning();
 
-    if (updated[0]) {
-      claimed.push(updated[0]);
-    }
-  }
-
-  return claimed;
+    return updated;
+  });
 };
 
 export const markOutboxSucceeded = async (id: string, actorId?: string) => {

@@ -45,7 +45,7 @@ export const createPluginConfigReader = (pluginCode: string): PluginConfigReader
   return {
     getRequired: (key: string) => env.getRequiredEnv(toEnvKey(key)),
     getOptional: (key: string, defaultValue?: string) =>
-      env.getOptionalEnv(toEnvKey(key), defaultValue),
+      env.getOptionalEnv(toEnvKey(key)) ?? defaultValue,
     getBoolean: (key: string) => getRequiredBoolean(toEnvKey(key)),
     getNumber: (key: string) => getRequiredNumber(toEnvKey(key)),
     getCsv: (key: string) => getRequiredCsv(toEnvKey(key)),

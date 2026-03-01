@@ -44,3 +44,45 @@ export const decodeCursor = (rawCursor: string): CursorToken => {
     throw new Error('Invalid cursor');
   }
 };
+
+export interface CursorQuery {
+  cursor?: string;
+  sort?: CursorSort;
+}
+
+export interface DecodedCursorMode {
+  cursorMode: CursorMode;
+  sort: CursorSort;
+  afterId?: string;
+  afterUpdatedAt?: Date;
+}
+
+export function decodeCursorAndMode(query: CursorQuery): DecodedCursorMode {
+  const decodedCursor = query.cursor ? decodeCursor(query.cursor) : undefined;
+  const cursorMode = resolveCursorMode({ sort: query.sort, cursor: decodedCursor });
+  const sort = query.sort ?? 'id:desc';
+  return {
+    cursorMode,
+    sort,
+    afterId: decodedCursor?.id,
+    afterUpdatedAt: decodedCursor?.m === 'ts_id' ? new Date(decodedCursor.ts) : undefined,
+  };
+}
+
+export interface CursorListItem {
+  id: string;
+  updatedAt: Date;
+}
+
+export function buildNextCursor(
+  lastItem: CursorListItem | undefined,
+  hasMore: boolean,
+  cursorMode: CursorMode,
+): string | null {
+  if (!hasMore || !lastItem) return null;
+  return encodeCursor(
+    cursorMode === 'ts_id'
+      ? { m: 'ts_id', ts: lastItem.updatedAt.toISOString(), id: lastItem.id }
+      : { m: 'id', id: lastItem.id },
+  );
+}

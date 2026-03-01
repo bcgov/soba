@@ -4,10 +4,18 @@ import {
   OpenAPIRegistry,
 } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
+import type { Router } from 'express';
 
 extendZodWithOpenApi(z);
 
 export type RegisterOpenApiPaths = (registry: OpenAPIRegistry) => void;
+
+/** Domain module contract for core API: router mounted at path + OpenAPI registration */
+export interface CoreDomain {
+  path: string;
+  router: Router;
+  registerOpenApi: RegisterOpenApiPaths;
+}
 
 const openApiPathRegistrars: RegisterOpenApiPaths[] = [];
 

@@ -21,20 +21,23 @@ const getRequiredEnv = (key: string): string => {
   return value;
 };
 
-const getOptionalEnv = (key: string, defaultValue?: string): string | undefined => {
+const getOptionalEnv = (key: string): string | undefined => {
   const value = process.env[key];
-  return value ?? defaultValue;
+  return value !== undefined && value !== '' ? value : undefined;
 };
 
-const getBooleanEnv = (key: string, defaultValue: boolean): boolean => {
+const getBooleanEnv = (key: string): boolean | undefined => {
   const value = process.env[key];
-  if (value === undefined || value === '') return defaultValue;
-  return value.trim().toLowerCase() === 'true';
+  if (value === undefined || value === '') return undefined;
+  const lower = value.trim().toLowerCase();
+  if (lower === 'true') return true;
+  if (lower === 'false') return false;
+  throw new Error(`${key} must be 'true' or 'false'`);
 };
 
-const getNumberEnv = (key: string, defaultValue: number): number => {
+const getNumberEnv = (key: string): number | undefined => {
   const value = process.env[key];
-  if (value === undefined || value === '') return defaultValue;
+  if (value === undefined || value === '') return undefined;
   const parsed = Number(value);
   if (Number.isNaN(parsed)) {
     throw new Error(`${key} must be a number`);
@@ -42,9 +45,9 @@ const getNumberEnv = (key: string, defaultValue: number): number => {
   return parsed;
 };
 
-const getCsvEnv = (key: string, defaultValue: string[]): string[] => {
+const getCsvEnv = (key: string): string[] | undefined => {
   const raw = getOptionalEnv(key);
-  if (!raw) return defaultValue;
+  if (!raw) return undefined;
   return raw
     .split(',')
     .map((item) => item.trim())
@@ -59,23 +62,30 @@ export const env = {
   getNumberEnv,
   getCsvEnv,
   getDatabaseUrl: () => getRequiredEnv('DATABASE_URL'),
-  getDbAdminDatabase: () => getOptionalEnv('DB_ADMIN_DATABASE', 'postgres') as string,
-  getOutboxPollIntervalMs: () => getNumberEnv('OUTBOX_POLL_INTERVAL_MS', 5000),
-  getSystemSobaUserId: () => getOptionalEnv('SYSTEM_SOBA_USER_ID'),
+  getDbAdminDatabase: () => getOptionalEnv('DB_ADMIN_DATABASE'),
+  getOutboxPollIntervalMs: () => getNumberEnv('OUTBOX_POLL_INTERVAL_MS'),
+  getOutboxBatchSize: () => getNumberEnv('OUTBOX_BATCH_SIZE'),
+  getSystemSobaUserEmail: () => getOptionalEnv('SYSTEM_SOBA_USER_EMAIL'),
+  /** Subject for the system SOBA user identity (provider=system). Default in code: soba-system. */
+  getSystemSobaSubject: () => getOptionalEnv('SOBA_SYSTEM_SUBJECT'),
   getWorkspacePluginsEnabled: () => getRequiredEnv('WORKSPACE_PLUGINS_ENABLED'),
   getWorkspacePluginsStrictModeRaw: () => getRequiredEnv('WORKSPACE_PLUGINS_STRICT_MODE'),
-  getFormioVersion: () => getOptionalEnv('FORMIO_VERSION', 'unknown') as string,
-  getFormioBaseUrl: () => getOptionalEnv('FORMIO_BASE_URL', '') as string,
-  getFormioAdminUsername: () => getOptionalEnv('FORMIO_ADMIN_USERNAME', '') as string,
-  getFormioAdminPassword: () => getOptionalEnv('FORMIO_ADMIN_PASSWORD', '') as string,
-  getFormioManagerUsername: () => getOptionalEnv('FORMIO_MANAGER_USERNAME', '') as string,
-  getFormioManagerPassword: () => getOptionalEnv('FORMIO_MANAGER_PASSWORD', '') as string,
+  getFormioVersion: () => getOptionalEnv('FORMIO_VERSION'),
+  getFormioBaseUrl: () => getOptionalEnv('FORMIO_BASE_URL'),
+  getFormioAdminUsername: () => getOptionalEnv('FORMIO_ADMIN_USERNAME'),
+  getFormioAdminPassword: () => getOptionalEnv('FORMIO_ADMIN_PASSWORD'),
+  getFormioManagerUsername: () => getOptionalEnv('FORMIO_MANAGER_USERNAME'),
+  getFormioManagerPassword: () => getOptionalEnv('FORMIO_MANAGER_PASSWORD'),
   getJwksUri: () => getRequiredEnv('JWKS_URI'),
   getJwtIssuer: () => getRequiredEnv('JWT_ISSUER'),
   getJwtAudience: () => getOptionalEnv('JWT_AUDIENCE'),
-  getRoleField: () => getOptionalEnv('ROLE_FIELD', 'Role') as string,
-  getAdminRoleName: () => getOptionalEnv('ADMIN_ROLE_NAME', 'Admin') as string,
-  getManagerRoleName: () => getOptionalEnv('MANAGER_ROLE_NAME', 'Manager') as string,
-  isDevelopment: () => getOptionalEnv('NODE_ENV', 'development') === 'development',
-  getSessionSecret: () => getOptionalEnv('SESSION_SECRET', 'dev-session-secret') as string,
+  getRoleField: () => getOptionalEnv('ROLE_FIELD'),
+  getAdminRoleName: () => getOptionalEnv('ADMIN_ROLE_NAME'),
+  getManagerRoleName: () => getOptionalEnv('MANAGER_ROLE_NAME'),
+  isDevelopment: () => getOptionalEnv('NODE_ENV') === 'development',
+  getSessionSecret: () => getOptionalEnv('SESSION_SECRET'),
+  getPluginsPath: () => getOptionalEnv('PLUGINS_PATH') ?? getOptionalEnv('WORKSPACE_PLUGINS_PATH'),
+  getCacheDefaultCode: () => getOptionalEnv('CACHE_DEFAULT_CODE'),
+  getMessageBusDefaultCode: () => getOptionalEnv('MESSAGEBUS_DEFAULT_CODE'),
+  getFormEngineDefaultCode: () => getOptionalEnv('FORM_ENGINE_DEFAULT_CODE'),
 };

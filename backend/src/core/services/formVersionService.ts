@@ -8,10 +8,15 @@ import {
   markFormVersionDeleted,
   updateFormVersionDraft,
 } from '../db/repos/formVersionRepo';
-import { actorBelongsToWorkspace } from '../db/repos/membershipRepo';
+import { db } from '../db/client';
 import { QueueAdapter } from '../integrations/queue/QueueAdapter';
 import { getFormEngineCodeForForm } from '../db/repos/formRepo';
 import { buildFormVersionCreateTopic } from '../integrations/form-engine/formEngineTopics';
+import {
+  FormVersionCreatePayloadSchema,
+  type FormVersionCreatePayload,
+} from '../integrations/queue/events';
+import { NotFoundError, ValidationError } from '../errors';
 
 interface CreateDraftInput {
   workspaceId: string;
@@ -57,52 +62,62 @@ export class FormVersionService {
   constructor(private readonly queueAdapter: QueueAdapter) {}
 
   async createDraft(input: CreateDraftInput) {
-    const inWorkspace = await actorBelongsToWorkspace(input.workspaceId, input.actorId);
-    if (!inWorkspace) throw new Error('Actor does not belong to workspace');
     return createEmptyFormVersionDraft(input);
   }
 
   async updateDraft(input: UpdateDraftInput) {
-    const inWorkspace = await actorBelongsToWorkspace(input.workspaceId, input.actorId);
-    if (!inWorkspace) throw new Error('Actor does not belong to workspace');
     return updateFormVersionDraft(input.workspaceId, input.formVersionId, input.actorId, {
       state: input.state,
     });
   }
 
   async save(input: SaveInput) {
-    const inWorkspace = await actorBelongsToWorkspace(input.workspaceId, input.actorId);
-    if (!inWorkspace) throw new Error('Actor does not belong to workspace');
-
-    const updated = await appendFormVersionRevision({
-      workspaceId: input.workspaceId,
-      formVersionId: input.formVersionId,
-      actorId: input.actorId,
-      eventType: input.eventType,
-      changeNote: input.note,
+    const updated = await db.transaction(async (tx) => {
+      const revised = await appendFormVersionRevision(
+        {
+          workspaceId: input.workspaceId,
+          formVersionId: input.formVersionId,
+          actorId: input.actorId,
+          eventType: input.eventType,
+          changeNote: input.note,
+        },
+        tx,
+      );
+      if (!revised) return null;
+      if (input.eventType === 'publish') {
+        await updateFormVersionDraft(
+          input.workspaceId,
+          input.formVersionId,
+          input.actorId,
+          { state: 'published' },
+          tx,
+        );
+      }
+      return revised;
     });
 
-    if (!updated) throw new Error('Form version not found');
-
-    if (input.eventType === 'publish') {
-      await updateFormVersionDraft(input.workspaceId, input.formVersionId, input.actorId, {
-        state: 'published',
-      });
-    }
+    if (!updated) throw new NotFoundError('Form version not found');
 
     if (input.enqueueProvision) {
       const formEngineCode = updated.formId
         ? await getFormEngineCodeForForm(input.workspaceId, updated.formId)
         : null;
       if (!formEngineCode) {
-        throw new Error('Cannot enqueue form version provision without a valid form engine');
+        throw new ValidationError(
+          'Cannot enqueue form version provision without a valid form engine',
+        );
       }
+      const payload: FormVersionCreatePayload = FormVersionCreatePayloadSchema.parse({
+        formVersionId: input.formVersionId,
+        engineCode: formEngineCode,
+        formId: updated.formId ?? undefined,
+      });
       await this.queueAdapter.enqueue({
         topic: buildFormVersionCreateTopic(formEngineCode),
         aggregateType: 'form_version',
         aggregateId: input.formVersionId,
         workspaceId: input.workspaceId,
-        payload: { formVersionId: input.formVersionId, engineCode: formEngineCode },
+        payload,
         actorId: input.actorId,
       });
     }
@@ -111,20 +126,14 @@ export class FormVersionService {
   }
 
   async delete(input: DeleteInput) {
-    const inWorkspace = await actorBelongsToWorkspace(input.workspaceId, input.actorId);
-    if (!inWorkspace) throw new Error('Actor does not belong to workspace');
     return markFormVersionDeleted(input.workspaceId, input.formVersionId, input.actorId);
   }
 
   async get(workspaceId: string, actorId: string, formVersionId: string) {
-    const inWorkspace = await actorBelongsToWorkspace(workspaceId, actorId);
-    if (!inWorkspace) throw new Error('Actor does not belong to workspace');
     return getFormVersionById(workspaceId, formVersionId);
   }
 
   async list(input: ListInput) {
-    const inWorkspace = await actorBelongsToWorkspace(input.workspaceId, input.actorId);
-    if (!inWorkspace) throw new Error('Actor does not belong to workspace');
     return listFormVersionsForWorkspace(input);
   }
 }

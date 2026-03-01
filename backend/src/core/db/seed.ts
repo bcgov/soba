@@ -5,24 +5,10 @@ env.loadEnv();
 import { and, eq } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { db, pool } from './client';
-import {
-  assertFormEngineInvariants,
-  listPlatformFormEngines,
-  setDefaultFormEngineByCode,
-  upsertPlatformFormEngineByCode,
-} from './repos/platformFormEngineRepo';
-import {
-  appUsers,
-  enterpriseWorkspaceBindings,
-  identityProviders,
-  userIdentities,
-  workspaces,
-  workspaceMemberships,
-} from './schema';
-import { getFormEnginePlugins } from '../integrations/form-engine/FormEngineRegistry';
+import { appUsers, identityProviders, userIdentities } from './schema';
 
 const SYSTEM_PROVIDER_CODE = 'system';
-const SYSTEM_SUBJECT = 'soba-system';
+const DEFAULT_SYSTEM_SUBJECT = 'soba-system';
 
 const ensureIdentityProvider = async (code: string, name: string, actorId?: string) => {
   const existing = await db.query.identityProviders.findFirst({
@@ -46,12 +32,13 @@ const ensureIdentityProvider = async (code: string, name: string, actorId?: stri
 const seed = async () => {
   await pool.query('CREATE SCHEMA IF NOT EXISTS soba;');
 
+  const systemSubject = env.getSystemSobaSubject() ?? DEFAULT_SYSTEM_SUBJECT;
   const systemProvider = await ensureIdentityProvider(SYSTEM_PROVIDER_CODE, 'SOBA Internal System');
 
   const existingSystemIdentity = await db.query.userIdentities.findFirst({
     where: and(
       eq(userIdentities.identityProviderId, systemProvider.id),
-      eq(userIdentities.subject, SYSTEM_SUBJECT),
+      eq(userIdentities.subject, systemSubject),
     ),
   });
 
@@ -60,8 +47,8 @@ const seed = async () => {
     systemUserId = uuidv7();
     await db.insert(appUsers).values({
       id: systemUserId,
-      displayName: 'SOBA System',
-      email: 'soba-system@local',
+      displayLabel: 'SOBA System',
+      profile: { displayName: 'SOBA System' },
       status: 'active',
       createdBy: null,
       updatedBy: null,
@@ -70,115 +57,14 @@ const seed = async () => {
       id: uuidv7(),
       userId: systemUserId,
       identityProviderId: systemProvider.id,
-      subject: SYSTEM_SUBJECT,
+      subject: systemSubject,
       externalUserId: 'soba-system',
       createdBy: systemUserId,
       updatedBy: systemUserId,
     });
   }
 
-  const providerSeeds = [
-    { code: 'idir', name: 'IDIR' },
-    { code: 'bceidbasic', name: 'BCEID Basic' },
-    { code: 'bceidbusiness', name: 'BCEID Business' },
-  ];
-  for (const provider of providerSeeds) {
-    await ensureIdentityProvider(provider.code, provider.name, systemUserId);
-  }
-
-  const discoveredEnginePlugins = getFormEnginePlugins();
-  if (discoveredEnginePlugins.length === 0) {
-    throw new Error('No form engine plugins installed. At least one engine plugin is required.');
-  }
-
-  for (const plugin of discoveredEnginePlugins) {
-    await upsertPlatformFormEngineByCode({
-      code: plugin.code,
-      name: plugin.name,
-      engineVersion: plugin.version,
-      isActive: true,
-      isDefault: false,
-      actorId: systemUserId,
-    });
-  }
-
-  const defaultCode =
-    env.getOptionalEnv('FORM_ENGINE_DEFAULT_CODE') ??
-    (discoveredEnginePlugins.some((plugin) => plugin.code === 'formio-v5')
-      ? 'formio-v5'
-      : discoveredEnginePlugins[0].code);
-  await setDefaultFormEngineByCode(defaultCode, systemUserId);
-  await assertFormEngineInvariants();
-
-  const registeredEngines = await listPlatformFormEngines();
-  console.log(
-    `[seed] form engines: ${registeredEngines
-      .map(
-        (engine) =>
-          `${engine.code}(active=${engine.isActive},default=${engine.isDefault},version=${
-            engine.engineVersion ?? 'unknown'
-          })`,
-      )
-      .join(', ')}`,
-  );
-
-  // Seed a baseline enterprise workspace binding so the CSTAR resolver has initial data.
-  const demoWorkspace = await db.query.workspaces.findFirst({
-    where: eq(workspaces.slug, 'demo-enterprise'),
-  });
-  let demoWorkspaceId = demoWorkspace?.id;
-  if (!demoWorkspaceId) {
-    demoWorkspaceId = uuidv7();
-    await db.insert(workspaces).values({
-      id: demoWorkspaceId,
-      kind: 'enterprise',
-      name: 'Demo Enterprise Workspace',
-      slug: 'demo-enterprise',
-      status: 'active',
-      createdBy: systemUserId,
-      updatedBy: systemUserId,
-    });
-  }
-
-  const ownerMembership = await db.query.workspaceMemberships.findFirst({
-    where: and(
-      eq(workspaceMemberships.workspaceId, demoWorkspaceId),
-      eq(workspaceMemberships.userId, systemUserId),
-    ),
-  });
-  if (!ownerMembership) {
-    await db.insert(workspaceMemberships).values({
-      id: uuidv7(),
-      workspaceId: demoWorkspaceId,
-      userId: systemUserId,
-      role: 'owner',
-      status: 'active',
-      source: 'seed',
-      acceptedAt: new Date(),
-      createdBy: systemUserId,
-      updatedBy: systemUserId,
-    });
-  }
-
-  const existingBinding = await db.query.enterpriseWorkspaceBindings.findFirst({
-    where: and(
-      eq(enterpriseWorkspaceBindings.providerCode, 'cstar'),
-      eq(enterpriseWorkspaceBindings.externalWorkspaceId, 'demo-cstar-workspace'),
-    ),
-  });
-  if (!existingBinding) {
-    await db.insert(enterpriseWorkspaceBindings).values({
-      id: uuidv7(),
-      workspaceId: demoWorkspaceId,
-      providerCode: 'cstar',
-      externalWorkspaceId: 'demo-cstar-workspace',
-      status: 'active',
-      createdBy: systemUserId,
-      updatedBy: systemUserId,
-    });
-  }
-
-  console.log(`Seed complete. SYSTEM_SOBA_USER_ID=${systemUserId}`);
+  console.log(`Seed complete. System user subject: ${systemSubject}`);
   await pool.end();
 };
 

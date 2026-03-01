@@ -32,6 +32,9 @@ export const FeaturesMetaResponseSchema = z
         })
         .openapi('Meta_PluginFeature'),
     ),
+    activeCache: z.object({ code: z.string() }).openapi('Meta_ActiveCache'),
+    activeMessageBus: z.object({ code: z.string() }).openapi('Meta_ActiveMessageBus'),
+    activeFormEngine: z.object({ code: z.string() }).openapi('Meta_ActiveFormEngine'),
   })
   .openapi('Meta_FeaturesResponse');
 
@@ -70,7 +73,6 @@ export const registerMetaOpenApi = (registry: OpenAPIRegistry) => {
     method: 'get',
     path: '/meta/plugins',
     tags: ['core.meta'],
-    security: [{ bearerAuth: [] }],
     responses: {
       200: {
         description: 'Enabled and discovered plugin catalog',
@@ -87,7 +89,6 @@ export const registerMetaOpenApi = (registry: OpenAPIRegistry) => {
     method: 'get',
     path: '/meta/features',
     tags: ['core.meta'],
-    security: [{ bearerAuth: [] }],
     responses: {
       200: {
         description: 'Core and plugin feature catalog',
@@ -104,7 +105,6 @@ export const registerMetaOpenApi = (registry: OpenAPIRegistry) => {
     method: 'get',
     path: '/meta/form-engines',
     tags: ['core.meta'],
-    security: [{ bearerAuth: [] }],
     responses: {
       200: {
         description: 'Configured platform form engines and plugin installation status',
@@ -121,7 +121,6 @@ export const registerMetaOpenApi = (registry: OpenAPIRegistry) => {
     method: 'get',
     path: '/meta/build',
     tags: ['core.meta'],
-    security: [{ bearerAuth: [] }],
     responses: {
       200: {
         description: 'Build metadata (version and deployment identifiers)',

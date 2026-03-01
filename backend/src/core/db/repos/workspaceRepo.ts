@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { db } from '../client';
 import { workspaces, workspaceMemberships } from '../schema';
+import { invalidateMembershipCache } from './membershipRepo';
 
 export const ensureHomeWorkspace = async (userId: string) => {
   const existing = await db
@@ -42,5 +43,6 @@ export const ensureHomeWorkspace = async (userId: string) => {
     acceptedAt: new Date(),
   });
 
+  invalidateMembershipCache(workspaceId, userId);
   return workspaceId;
 };

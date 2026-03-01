@@ -1,5 +1,5 @@
 import { and, desc, eq, isNull, lt, or } from 'drizzle-orm';
-import { db } from '../client';
+import { db, type DbOrTx } from '../client';
 import { formVersionRevisions, formVersions } from '../schema';
 
 interface CreateDraftInput {
@@ -40,33 +40,40 @@ export interface FormVersionListRow {
   updatedAt: Date;
 }
 
-export const createEmptyFormVersionDraft = async (input: CreateDraftInput) => {
-  const latest = await db
-    .select({ versionNo: formVersions.versionNo })
-    .from(formVersions)
-    .where(
-      and(eq(formVersions.workspaceId, input.workspaceId), eq(formVersions.formId, input.formId)),
-    )
-    .orderBy(desc(formVersions.versionNo))
-    .limit(1);
+export const createEmptyFormVersionDraft = async (input: CreateDraftInput, tx?: DbOrTx) => {
+  const run = async (d: DbOrTx) => {
+    const latest = await d
+      .select({ versionNo: formVersions.versionNo })
+      .from(formVersions)
+      .where(
+        and(eq(formVersions.workspaceId, input.workspaceId), eq(formVersions.formId, input.formId)),
+      )
+      .orderBy(desc(formVersions.versionNo))
+      .limit(1);
 
-  const nextVersion = (latest[0]?.versionNo ?? 0) + 1;
+    const nextVersion = (latest[0]?.versionNo ?? 0) + 1;
 
-  const created = await db
-    .insert(formVersions)
-    .values({
-      workspaceId: input.workspaceId,
-      formId: input.formId,
-      versionNo: nextVersion,
-      state: 'draft',
-      engineSyncStatus: 'pending',
-      currentRevisionNo: 0,
-      createdBy: input.actorId,
-      updatedBy: input.actorId,
-    })
-    .returning();
+    const created = await d
+      .insert(formVersions)
+      .values({
+        workspaceId: input.workspaceId,
+        formId: input.formId,
+        versionNo: nextVersion,
+        state: 'draft',
+        engineSyncStatus: 'pending',
+        currentRevisionNo: 0,
+        createdBy: input.actorId,
+        updatedBy: input.actorId,
+      })
+      .returning();
 
-  return created[0];
+    return created[0];
+  };
+
+  if (tx) {
+    return run(tx);
+  }
+  return db.transaction(run);
 };
 
 export const getFormVersionById = async (workspaceId: string, formVersionId: string) => {
@@ -150,8 +157,10 @@ export const updateFormVersionDraft = async (
     engineSyncStatus: string;
     engineSyncError: string;
   }>,
+  tx?: DbOrTx,
 ) => {
-  const updated = await db
+  const d = tx ?? db;
+  const updated = await d
     .update(formVersions)
     .set({
       ...patch,
@@ -164,8 +173,9 @@ export const updateFormVersionDraft = async (
   return updated[0] ?? null;
 };
 
-export const appendFormVersionRevision = async (input: SaveRevisionInput) => {
-  const current = await db
+export const appendFormVersionRevision = async (input: SaveRevisionInput, tx?: DbOrTx) => {
+  const d = tx ?? db;
+  const current = await d
     .select()
     .from(formVersions)
     .where(
@@ -181,7 +191,7 @@ export const appendFormVersionRevision = async (input: SaveRevisionInput) => {
 
   const nextRevision = version.currentRevisionNo + 1;
 
-  await db.insert(formVersionRevisions).values({
+  await d.insert(formVersionRevisions).values({
     workspaceId: input.workspaceId,
     formVersionId: input.formVersionId,
     revisionNo: nextRevision,
@@ -192,7 +202,7 @@ export const appendFormVersionRevision = async (input: SaveRevisionInput) => {
     changeNote: input.changeNote,
   });
 
-  const updated = await db
+  const updated = await d
     .update(formVersions)
     .set({
       currentRevisionNo: nextRevision,

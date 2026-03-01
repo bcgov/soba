@@ -1,6 +1,14 @@
-import { sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
-import { boolean, index, pgSchema, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  index,
+  jsonb,
+  pgSchema,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 export const sobaSchema = pgSchema('soba');
 
@@ -27,36 +35,19 @@ export const identityProviders = sobaSchema.table(
   }),
 );
 
-export const platformFormEngines = sobaSchema.table(
-  'platform_form_engine',
-  {
-    id: idColumn(),
-    code: text('code').notNull(),
-    name: text('name').notNull(),
-    engineVersion: text('engine_version'),
-    isActive: boolean('is_active').notNull().default(true),
-    isDefault: boolean('is_default').notNull().default(false),
-    ...auditColumns(),
-  },
-  (table) => ({
-    codeUnique: uniqueIndex('platform_form_engine_code_uq').on(table.code),
-    singleDefaultUnique: uniqueIndex('platform_form_engine_single_default_uq')
-      .on(table.isDefault)
-      .where(sql`${table.isDefault} = true`),
-  }),
-);
-
 export const appUsers = sobaSchema.table(
   'app_user',
   {
     id: idColumn(),
-    displayName: text('display_name'),
-    email: text('email'),
+    /** Human-readable label for user stamps / audit (idir_username, bceid_username, email, or fallback). */
+    displayLabel: text('display_label'),
+    /** IdP-agnostic display attributes (from token or seed). Use profileHelpers for displayName, email, etc. */
+    profile: jsonb('profile'),
     status: text('status').notNull(),
     ...auditColumns(),
   },
-  (table) => ({
-    emailIdx: index('app_user_email_idx').on(table.email),
+  () => ({
+    // No indexes on profile; use profileHelpers for display. Query by profile->>'email' if needed.
   }),
 );
 
@@ -72,6 +63,7 @@ export const userIdentities = sobaSchema.table(
       .references(() => identityProviders.id),
     subject: text('subject').notNull(),
     externalUserId: text('external_user_id'),
+    idpAttributes: jsonb('idp_attributes'),
     ...auditColumns(),
   },
   (table) => ({

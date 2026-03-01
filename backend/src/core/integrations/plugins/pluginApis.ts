@@ -1,7 +1,7 @@
 import express from 'express';
 import { registerOpenApiPaths } from '../../api/shared/openapi';
 import { createPluginConfigReader } from '../../config/pluginConfig';
-import { getEnabledPluginApiDefinitions } from './pluginCatalog';
+import { getEnabledPluginApiDefinitions } from './PluginRegistry';
 
 const enabledApiDefinitions = getEnabledPluginApiDefinitions();
 
