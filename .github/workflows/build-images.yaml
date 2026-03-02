@@ -68,12 +68,18 @@ on:
       - "backend/**"
       - "frontend/**"
       - ".github/workflows/build-images.yaml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
   push:
     branches: [main]
     paths:
       - "backend/**"
       - "frontend/**"
       - ".github/workflows/build-images.yaml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
 
 env:
   REGISTRY: ghcr.io
@@ -112,14 +118,14 @@ jobs:
           MATRIX='{"include":[]}'
           if echo "$PLATFORMS" | grep -q 'amd64'; then
             MATRIX=$(echo "$MATRIX" | jq -c '.include += [
-              {"component":"backend","context":"./backend","platform":"linux/amd64","platform_pair":"linux-amd64","runner":"ubuntu-latest"},
-              {"component":"frontend","context":"./frontend","platform":"linux/amd64","platform_pair":"linux-amd64","runner":"ubuntu-latest"}
+              {"component":"backend","dockerfile_dir":"./backend","platform":"linux/amd64","platform_pair":"linux-amd64","runner":"ubuntu-latest"},
+              {"component":"frontend","dockerfile_dir":"./frontend","platform":"linux/amd64","platform_pair":"linux-amd64","runner":"ubuntu-latest"}
             ]')
           fi
           if echo "$PLATFORMS" | grep -q 'arm64'; then
             MATRIX=$(echo "$MATRIX" | jq -c '.include += [
-              {"component":"backend","context":"./backend","platform":"linux/arm64","platform_pair":"linux-arm64","runner":"ubuntu-24.04-arm"},
-              {"component":"frontend","context":"./frontend","platform":"linux/arm64","platform_pair":"linux-arm64","runner":"ubuntu-24.04-arm"}
+              {"component":"backend","dockerfile_dir":"./backend","platform":"linux/arm64","platform_pair":"linux-arm64","runner":"ubuntu-24.04-arm"},
+              {"component":"frontend","dockerfile_dir":"./frontend","platform":"linux/arm64","platform_pair":"linux-arm64","runner":"ubuntu-24.04-arm"}
             ]')
           fi
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
@@ -170,7 +176,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          dockerfile: ${{ matrix.context }}/Dockerfile
+          dockerfile: ${{ matrix.dockerfile_dir }}/Dockerfile
           platforms: ${{ matrix.platform }}
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}

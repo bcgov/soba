@@ -20,15 +20,16 @@ endif
 .PHONY: build build-backend build-frontend
 
 build-backend:
-	docker build -t $(BACKEND_IMAGE):sha-$(SHORT_SHA) -t $(BACKEND_IMAGE):local \
+	docker build -f backend/Dockerfile -t $(BACKEND_IMAGE):sha-$(SHORT_SHA) -t $(BACKEND_IMAGE):local \
 		--label org.opencontainers.image.revision=$(FULL_SHA) \
 		--label org.opencontainers.image.version=$(IMAGE_VERSION) \
-		./backend
+		.
 
 build-frontend:
-	docker build -t $(FRONTEND_IMAGE):sha-$(SHORT_SHA) -t $(FRONTEND_IMAGE):local \
+	docker build -f frontend/Dockerfile -t $(FRONTEND_IMAGE):sha-$(SHORT_SHA) -t $(FRONTEND_IMAGE):local \
 		--label org.opencontainers.image.revision=$(FULL_SHA) \
 		--label org.opencontainers.image.version=$(IMAGE_VERSION) \
-		./frontend
+		.
 
 build: build-backend build-frontend
+ 

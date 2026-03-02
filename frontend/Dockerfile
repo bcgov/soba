@@ -29,7 +29,8 @@ COPY frontend ./frontend
 # Next.js telemetry note
 # ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app/frontend
-RUN pnpm --filter ./frontend run build
+# Run build from frontend dir so .next (and .next/standalone) is created here
+RUN pnpm run build
 
 # Production image, copy all the files and run next
 FROM base AS runner
