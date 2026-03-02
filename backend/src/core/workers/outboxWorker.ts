@@ -5,26 +5,28 @@ env.loadEnv();
 import rTracer from 'cls-rtracer';
 import { claimOutboxBatch, markOutboxFailed, markOutboxSucceeded } from '../db/repos/outboxRepo';
 import { getSyncService } from '../container';
+import { getSystemUser } from '../services/systemUser';
 import { pool } from '../db/client';
 import { log } from '../logging';
 
 const POLL_INTERVAL_MS = env.getOutboxPollIntervalMs() ?? 5000;
 const BATCH_SIZE = env.getOutboxBatchSize() ?? 25;
-const SYSTEM_ACTOR_DISPLAY_LABEL = 'SOBA System';
 
 const runOnce = async () => {
   const syncService = await getSyncService();
+  const systemUser = await getSystemUser();
+  const systemDisplayLabel = systemUser?.displayLabel ?? null;
 
   const batch = await claimOutboxBatch(BATCH_SIZE);
   for (const item of batch) {
     await rTracer.runWithId(async () => {
       try {
         await syncService.process(item);
-        await markOutboxSucceeded(item.id, SYSTEM_ACTOR_DISPLAY_LABEL);
+        await markOutboxSucceeded(item.id, systemDisplayLabel);
       } catch (error) {
         await markOutboxFailed(
           item.id,
-          SYSTEM_ACTOR_DISPLAY_LABEL,
+          systemDisplayLabel,
           (error as Error).message,
           item.attemptCount,
         );

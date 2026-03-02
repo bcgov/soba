@@ -1,6 +1,6 @@
 import { v7 as uuidv7 } from 'uuid';
 import { index, jsonb, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { appUsers, sobaSchema, workspaceGroups, workspaceMemberships, workspaces } from './core';
+import { sobaSchema, workspaceGroups, workspaceMemberships, workspaces } from './core';
 
 const idColumn = () => uuid('id').primaryKey().$defaultFn(uuidv7);
 

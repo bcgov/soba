@@ -9,6 +9,8 @@ import { appUsers, identityProviders, userIdentities } from './schema';
 
 const SYSTEM_PROVIDER_CODE = 'system';
 const DEFAULT_SYSTEM_SUBJECT = 'soba-system';
+const SYSTEM_DISPLAY_LABEL = 'SOBA System';
+const SEED_USER_STAMP = 'SOBA System (seed)';
 
 const ensureIdentityProvider = async (code: string, name: string, createdByLabel?: string) => {
   const existing = await db.query.identityProviders.findFirst({
@@ -32,7 +34,11 @@ const seed = async () => {
   await pool.query('CREATE SCHEMA IF NOT EXISTS soba;');
 
   const systemSubject = env.getSystemSobaSubject() ?? DEFAULT_SYSTEM_SUBJECT;
-  const systemProvider = await ensureIdentityProvider(SYSTEM_PROVIDER_CODE, 'SOBA Internal System');
+  const systemProvider = await ensureIdentityProvider(
+    SYSTEM_PROVIDER_CODE,
+    'SOBA Internal System',
+    SEED_USER_STAMP,
+  );
 
   const existingSystemIdentity = await db.query.userIdentities.findFirst({
     where: and(
@@ -41,17 +47,16 @@ const seed = async () => {
     ),
   });
 
-  const systemDisplayLabel = 'SOBA System';
   let systemUserId = existingSystemIdentity?.userId;
   if (!systemUserId) {
     systemUserId = uuidv7();
     await db.insert(appUsers).values({
       id: systemUserId,
-      displayLabel: systemDisplayLabel,
+      displayLabel: SYSTEM_DISPLAY_LABEL,
       profile: { displayName: 'SOBA System' },
       status: 'active',
-      createdBy: null,
-      updatedBy: null,
+      createdBy: SEED_USER_STAMP,
+      updatedBy: SEED_USER_STAMP,
     });
     await db.insert(userIdentities).values({
       id: uuidv7(),
@@ -59,8 +64,8 @@ const seed = async () => {
       identityProviderCode: systemProvider.code,
       subject: systemSubject,
       externalUserId: 'soba-system',
-      createdBy: systemDisplayLabel,
-      updatedBy: systemDisplayLabel,
+      createdBy: SEED_USER_STAMP,
+      updatedBy: SEED_USER_STAMP,
     });
   }
 

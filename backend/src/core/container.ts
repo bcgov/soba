@@ -9,7 +9,7 @@ import { FormService } from './services/formService';
 import { FormVersionService } from './services/formVersionService';
 import { SubmissionService } from './services/submissionService';
 import { SyncService } from './services/syncService';
-import { getSystemSobaUserId } from './services/systemUser';
+import { getSystemUser } from './services/systemUser';
 import { createFormsApiService } from './api/forms/serviceFactory';
 import { createSubmissionsApiService } from './api/submissions/serviceFactory';
 import { getFormEngineCodeForForm } from './db/repos/formRepo';
@@ -33,7 +33,7 @@ let syncServiceInstance: SyncService | null = null;
 
 export async function getSyncService(): Promise<SyncService> {
   if (!syncServiceInstance) {
-    const systemActorId = await getSystemSobaUserId();
+    const systemUser = await getSystemUser();
     syncServiceInstance = new SyncService(
       createFormEngineAdapter,
       {
@@ -43,7 +43,8 @@ export async function getSyncService(): Promise<SyncService> {
         getSubmissionById,
         getFormEngineCodeForForm,
       },
-      systemActorId,
+      systemUser?.id,
+      systemUser?.displayLabel ?? null,
     );
   }
   return syncServiceInstance;

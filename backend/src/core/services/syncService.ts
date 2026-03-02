@@ -16,13 +16,12 @@ interface OutboxItem {
   payload: unknown;
 }
 
-const SYSTEM_ACTOR_DISPLAY_LABEL = 'SOBA System';
-
 export class SyncService {
   constructor(
     private readonly createAdapter: (engineCode: string) => FormEngineAdapter,
     private readonly deps: SyncServiceDeps,
     private readonly systemActorId?: string,
+    private readonly systemActorDisplayLabel: string | null = null,
   ) {}
 
   private async resolveEngineCode(item: OutboxItem): Promise<string> {
@@ -91,7 +90,7 @@ export class SyncService {
       await this.deps.updateFormVersionDraft(
         item.workspaceId,
         item.aggregateId,
-        SYSTEM_ACTOR_DISPLAY_LABEL,
+        this.systemActorDisplayLabel,
         { engineSyncStatus: 'provisioning', engineSyncError: null },
       );
       const response = await formEngineAdapter.createFormVersionSchema({
@@ -102,7 +101,7 @@ export class SyncService {
       await this.deps.updateFormVersionDraft(
         item.workspaceId,
         item.aggregateId,
-        SYSTEM_ACTOR_DISPLAY_LABEL,
+        this.systemActorDisplayLabel,
         {
           engineSchemaRef: response.engineRef,
           engineSyncStatus: 'ready',
@@ -122,7 +121,7 @@ export class SyncService {
       await this.deps.updateSubmissionDraft(
         item.workspaceId,
         item.aggregateId,
-        SYSTEM_ACTOR_DISPLAY_LABEL,
+        this.systemActorDisplayLabel,
         { engineSyncStatus: 'provisioning', engineSyncError: null },
       );
       const response = await formEngineAdapter.createSubmissionRecord({
@@ -133,7 +132,7 @@ export class SyncService {
       await this.deps.updateSubmissionDraft(
         item.workspaceId,
         item.aggregateId,
-        SYSTEM_ACTOR_DISPLAY_LABEL,
+        this.systemActorDisplayLabel,
         {
           engineSubmissionRef: response.engineRef,
           engineSyncStatus: 'ready',

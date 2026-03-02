@@ -70,12 +70,9 @@ export class FormVersionService {
   }
 
   async updateDraft(input: UpdateDraftInput) {
-    return updateFormVersionDraft(
-      input.workspaceId,
-      input.formVersionId,
-      input.actorDisplayLabel,
-      { state: input.state },
-    );
+    return updateFormVersionDraft(input.workspaceId, input.formVersionId, input.actorDisplayLabel, {
+      state: input.state,
+    });
   }
 
   async save(input: SaveInput) {

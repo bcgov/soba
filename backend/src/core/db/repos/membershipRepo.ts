@@ -10,30 +10,11 @@ import {
 } from '../schema';
 import { getCacheAdapter } from '../../integrations/plugins/PluginRegistry';
 import { membershipKey } from '../../integrations/cache/cacheKeys';
+import { getSystemUser } from '../../services/systemUser';
 import { profileHelpers } from '../../auth/jwtClaims';
 import type { NormalizedProfile, IdpAttributes } from '../../auth/jwtClaims';
 
-/**
- * Returns the app_user id for the given identity (provider code + subject), or null if not found.
- * Used to resolve the system user by SOBA_SYSTEM_SUBJECT (provider=system).
- */
-export async function findUserIdByIdentity(
-  providerCode: string,
-  subject: string,
-): Promise<string | null> {
-  const normalizedCode = providerCode.toLowerCase();
-  const row = await db
-    .select({ userId: userIdentities.userId })
-    .from(userIdentities)
-    .where(
-      and(
-        eq(userIdentities.identityProviderCode, normalizedCode),
-        eq(userIdentities.subject, subject),
-      ),
-    )
-    .limit(1);
-  return row[0]?.userId ?? null;
-}
+export { findUserIdByIdentity } from './identityLookup';
 
 export const findOrCreateUserByIdentity = async (
   providerCode: string,
@@ -41,6 +22,9 @@ export const findOrCreateUserByIdentity = async (
   profile?: NormalizedProfile | null,
   idpAttributes?: IdpAttributes | null,
 ) => {
+  const systemUser = await getSystemUser();
+  const systemDisplayLabel = systemUser?.displayLabel ?? null;
+
   return db.transaction(async (tx) => {
     const normalizedProvider = providerCode.toLowerCase();
     const providerRow = await tx
@@ -57,6 +41,8 @@ export const findOrCreateUserByIdentity = async (
           code: normalizedProvider,
           name: normalizedProvider.toUpperCase(),
           isActive: true,
+          createdBy: systemDisplayLabel,
+          updatedBy: systemDisplayLabel,
         })
         .returning();
       provider = created[0];

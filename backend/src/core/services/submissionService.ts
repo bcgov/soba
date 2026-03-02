@@ -71,12 +71,9 @@ export class SubmissionService {
   }
 
   async update(input: UpdateInput) {
-    return updateSubmissionDraft(
-      input.workspaceId,
-      input.submissionId,
-      input.actorDisplayLabel,
-      { workflowState: input.workflowState },
-    );
+    return updateSubmissionDraft(input.workspaceId, input.submissionId, input.actorDisplayLabel, {
+      workflowState: input.workflowState,
+    });
   }
 
   async save(input: SaveInput) {

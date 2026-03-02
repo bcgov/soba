@@ -99,11 +99,6 @@ export class FormService {
   }
 
   async delete(input: DeleteInput) {
-    return markFormDeleted(
-      input.workspaceId,
-      input.formId,
-      input.actorId,
-      input.actorDisplayLabel,
-    );
+    return markFormDeleted(input.workspaceId, input.formId, input.actorId, input.actorDisplayLabel);
   }
 }
