@@ -1,10 +1,10 @@
 import express from 'express';
 import { formRouter } from '../features/forms';
-import { createJwtMiddleware } from '../middleware/auth';
+import { checkJwt } from '../middleware/auth';
 
 const router = express.Router();
 
-router.use('/form', createJwtMiddleware(), formRouter);
+router.use('/form', checkJwt(), formRouter);
 // Log and return a 404 for any unmatched API routes (helps debugging)
 router.use('/*', (req, res) => {
   console.warn(`API route not found: ${req.method} ${req.originalUrl}`);

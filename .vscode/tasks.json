@@ -1,0 +1,33 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Dev Services: Up + DB Init (arm64 override)",
+      "type": "shell",
+      "command": "docker compose -f .devcontainer/docker-compose.yml -f .devcontainer/docker-compose.override.arm64.yml up -d --build postgres mongodb formio && docker compose -f .devcontainer/docker-compose.yml -f .devcontainer/docker-compose.override.arm64.yml --profile db-init run --rm backend-db-init",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Dev Services: Up (arm64 override)",
+      "type": "shell",
+      "command": "docker compose -f .devcontainer/docker-compose.yml -f .devcontainer/docker-compose.override.arm64.yml up -d --build",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Dev Services: Down (arm64 override)",
+      "type": "shell",
+      "command": "docker compose -f .devcontainer/docker-compose.yml -f .devcontainer/docker-compose.override.arm64.yml down",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
+

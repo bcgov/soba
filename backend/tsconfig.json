@@ -14,8 +14,9 @@
     "sourceMap": true,
     "target": "es2017",
     "rootDirs": ["src/", "config/"],
-    "typeRoots": ["./node_modules/@types", "./typings"]
+    "typeRoots": ["./node_modules/@types", "./typings"],
+    "skipLibCheck": true
   },
-  "include": ["src/*"],
+  "include": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"],
   "exclude": ["node_modules", "bin", "test", "dist"]
 }

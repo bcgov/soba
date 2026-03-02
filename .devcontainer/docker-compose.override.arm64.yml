@@ -1,0 +1,4 @@
+services:
+  formio:
+    platform: linux/amd64
+

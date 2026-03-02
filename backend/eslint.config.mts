@@ -23,5 +23,19 @@ export default defineConfig([
     extends: ['json/recommended'],
   },
   { files: ['**/*.css'], plugins: { css }, language: 'css/css', extends: ['css/recommended'] },
-  globalIgnores(['dist', 'node_modules', 'package-lock.json']),
+  {
+    files: ['tests/**/*.ts'],
+    rules: {
+      'max-nested-callbacks': ['error', { max: 4 }],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'CallExpression[callee.name="describe"] CallExpression[callee.name="describe"]',
+          message:
+            'Nested describe is not allowed. Use a single top-level describe and flat it() only.',
+        },
+      ],
+    },
+  },
+  globalIgnores(['dist', 'node_modules', 'package-lock.json', 'coverage']),
 ]);

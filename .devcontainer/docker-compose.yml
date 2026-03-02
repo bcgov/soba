@@ -45,8 +45,30 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
+
+  backend-db-init:
+    image: node:20-alpine
+    profiles: ["db-init"]
+    working_dir: /workspace/backend
+    volumes:
+      - ..:/workspace
+      - backend_db_init_node_modules:/workspace/backend/node_modules
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/soba
+      DB_ADMIN_DATABASE: postgres
+      FORMIO_VERSION: local
+    command: sh -lc "npm install --no-audit --no-fund && npm run db:migrate && npm run db:seed"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   mongodb_data:
   postgres_data:
+  backend_db_init_node_modules:
