@@ -71,8 +71,30 @@ Features are the right place for product-specific behaviour that builds on core;
 
 ### Auth
 
-- **Location:** `backend/src/core/auth/`
-- **Role:** JWT validation and claim extraction (workspace id, membership, roles). Used by middleware to populate request context so API and services can act on behalf of the current user in a workspace.
+- **Location:** `backend/src/core/auth/` (profile helpers); auth middleware and IdP plugin discovery live in `backend/src/auth/` and `backend/src/middleware/` so core does not depend on plugin implementations.
+- **IdP (auth source) plugins:** Token validation and claim mapping are provided by **IdP plugins**, not by core. The contract is in `auth/IdpPlugin.ts` (`IdpPluginDefinition`: code, `createAuthMiddleware(config)`, `createClaimMapper(config)`). Discovery and composite middleware are in `auth/idpRegistry.ts`; plugins export `idpPluginDefinition` from `backend/src/plugins/` (e.g. `idp-bcgov-sso`, `idp-github`). Config: `IDP_PLUGINS` (comma-separated, ordered list) or `IDP_PLUGIN_DEFAULT_CODE`. The composite auth middleware tries each IdP plugin in order; the first to succeed sets `req.idpPluginCode` and `req.authPayload`.
+- **Actor resolution:** After auth, `middleware/actor.ts` uses the active plugin’s `claimMapper.mapPayload(payload)` and `findOrCreateUserByIdentity(providerCode, subject, profile, idpAttributes)` to set `req.actorId`. **Workspace and membership are not in the token** — they are resolved by **workspace resolver plugins** and `membershipRepo` in `resolveCoreContext` (request context).
+- **jwtClaims:** Core’s `core/auth/jwtClaims.ts` defines profile shape and helpers (`NormalizedProfile`, `profileHelpers` for displayLabel, displayName, email, etc.). IdP plugins populate these when mapping; core does not parse IdP-specific claims.
+
+**Request auth and context flow:** IdP (auth source) plugins validate the JWT and set `req.idpPluginCode` and `req.authPayload`; actor middleware uses the plugin’s claim mapper and `findOrCreateUserByIdentity` to set `req.actorId`; core request context then resolves workspace and membership via workspace resolver plugins and DB.
+
+```mermaid
+sequenceDiagram
+  participant Client
+  participant IdPAuth as "IdP auth middleware"
+  participant Actor as resolveActor
+  participant ReqCtx as resolveCoreContext
+  participant Resolvers as "Workspace resolvers"
+
+  Client->>IdPAuth: Request + JWT
+  IdPAuth->>IdPAuth: Try IdP plugins in order
+  IdPAuth->>Actor: req.idpPluginCode, req.authPayload
+  Actor->>Actor: claimMapper.mapPayload then findOrCreateUserByIdentity
+  Actor->>ReqCtx: req.actorId
+  ReqCtx->>Resolvers: resolve workspace from request
+  Resolvers->>ReqCtx: workspaceId, source
+  ReqCtx->>ReqCtx: getWorkspaceForUser, set coreContext
+```
 
 ### Config
 
@@ -99,6 +121,7 @@ Features are the right place for product-specific behaviour that builds on core;
 - **Location:** `backend/src/core/integrations/`
 - **Adapters:** Cache, message bus, queue (DbOutboxQueueAdapter writing to `integration_outbox`), form engine (FormEngineRegistry). Plugins are registered and provide implementations.
 - **Default plugins and expected implementations:**
+  - **Auth source (IdP)** — Configured via `IDP_PLUGINS` (or `IDP_PLUGIN_DEFAULT_CODE`); discovered from the same `plugins/` dir via `idpPluginDefinition`; **separate from the plugin registry**. Each IdP plugin provides auth middleware and a claim mapper. Examples: `idp-bcgov-sso`, `idp-github`. The plugin registry (below) handles workspace, cache, message bus, and form engine only.
   - **Workspace** — At least one resolver is required (`WORKSPACE_PLUGINS_ENABLED`). Expected: `personal-local` (kind personal), `enterprise-cstar` (kind enterprise). Others can implement `WorkspaceResolver` and be composed in order.
   - **Cache** — Env `CACHE_DEFAULT_CODE`; if unset, falls back to `cache-memory`. Expected: `cache-memory` (in-memory, for dev/single-instance). Production may use a Redis or similar plugin.
   - **Message bus** — Env `MESSAGEBUS_DEFAULT_CODE`; if unset, falls back to `messagebus-memory`. Expected: `messagebus-memory` (in-memory; publish is effectively a no-op; outbox worker drives async work). Production may use a real broker plugin (NATS or Redis or other...).

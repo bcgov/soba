@@ -7,7 +7,7 @@ Quick orientation for product owners and developers: what “core” is, how Dri
 **Core** is the shared backend kernel under `backend/src/core/`. It provides:
 
 - **API** — Forms, submissions, and meta endpoints (OpenAPI, pagination, JWT-protected under `/api/v1`)
-- **Auth** — JWT validation and claims (workspace, membership, roles)
+- **Auth** — Split between **IdP (auth source) plugins** (token validation and claim mapping to user identity) and **core** (request context: workspace and membership from workspace resolver plugins + DB). IdP plugins are configured via `IDP_PLUGINS` and live under `backend/src/plugins/` (e.g. `idp-bcgov-sso`, `idp-github`).
 - **Config** — Environment loading and plugin configuration
 - **Database** — Drizzle schema, repos, migrations, seed, and query logging
 - **Integrations** — Pluggable adapters: cache, message bus, outbox queue, form engine, plugin registry. Default implementations: **cache-memory**, **messagebus-memory** (in-memory; outbox worker drives async work). **Form engine:** multiple engines can be deployed side-by-side; each form has a `form_engine_code` and the registry returns the adapter for that code. Current default is **Form.io v5** (`formio-v5`); configurable via `FORM_ENGINE_DEFAULT_CODE`.
@@ -81,7 +81,7 @@ flowchart LR
 
 - **Outbox pattern** — Async integration events are written to `integration_outbox` (topic, aggregate, payload, status, retries). A worker claims and processes them, then updates status. This gives at-least-once delivery and avoids losing events if the process dies.
 
-- **Plugins** — Optional extensions add tables and behaviour. **Workspace** (required): at least one resolver, e.g. `personal-local`, `enterprise-cstar`. **Cache** and **message bus**: default to `cache-memory` and `messagebus-memory` (in-memory adapters) when not overridden by env. **Form engine**: multiple plugins can be installed; default for new forms is Form.io v5. **Core must not reference a plugin directly or any specific plugin implementation** — core only uses interfaces and the registry (which resolves by code from config); same dependency rule as for features. See [Core deep dive](core-deep-dive.md) for plugin types and expected implementations.
+- **Plugins** — Optional extensions add tables and behaviour. **Auth source (IdP)**: separate from the plugin registry; provide JWT validation and claim mapping; configured via `IDP_PLUGINS` (ordered list); composite auth tries them in order; actor is resolved via each plugin’s claim mapper + `findOrCreateUserByIdentity`. **Workspace** (required): at least one resolver, e.g. `personal-local`, `enterprise-cstar`. **Cache** and **message bus**: default to `cache-memory` and `messagebus-memory` (in-memory adapters) when not overridden by env. **Form engine**: multiple plugins can be installed; default for new forms is Form.io v5. The **plugin registry** (workspace, cache, message bus, form engine) is distinct from IdP plugin discovery. **Core must not reference a plugin directly or any specific plugin implementation** — core only uses interfaces and the registry (which resolves by code from config); same dependency rule as for features. See [Core deep dive](core-deep-dive.md) for plugin types and expected implementations.
 
 - **Features and feature flags** — **Features** are vertically sliced: each feature can include its own APIs and DB schemas/models. Features may **reference core**; **core must not reference features**. Feature flags (e.g. env or config) control whether a feature is enabled at runtime. **DB migrations always include all feature tables** — the migration set is built from the full schema (core + all feature schemas), so every feature table is migrated regardless of whether the feature is enabled; flags only control runtime activation. See [Core deep dive](core-deep-dive.md).
 
@@ -92,7 +92,8 @@ flowchart LR
 | API routes       | `backend/src/core/api/` — forms, submissions, meta                                                                                        |
 | Features         | `backend/src/features/` — vertically sliced features (APIs, optional schemas); mounted by app/routes, not by core                        |
 | Schema & types   | `backend/src/core/db/schema/` — core, forms, integration, plugins; feature schemas (if any) included in same migration set               |
-| Repos            | `backend/src/core/db/repos/` — form, formVersion, submission, workspace, membership, outbox, appUser; plugin repos under `repos/plugins/` |
+| Repos            | `backend/src/core/db/repos/` — form, formVersion, submission, workspace, membership, outbox, appUser; plugin-specific repos (e.g. personal settings, enterprise bindings) in `backend/src/core/db/repos/plugins/` |
+| Plugins          | `backend/src/plugins/` — one directory per plugin (IdP, workspace, form engine, cache, message bus); each exports its definition. IdP discovery in `backend/src/auth/`; plugin registry in `backend/src/core/integrations/plugins/` |
 | Composition root | `backend/src/core/container.ts`                                                                                                           |
 | Migrations       | `backend/drizzle/` — SQL and journal                                                                                                      |
 | Drizzle config   | `backend/drizzle.config.ts`                                                                                                               |
