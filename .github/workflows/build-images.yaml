@@ -31,7 +31,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch, refs/pull/N/head, or SHA (blank = default branch)"
+        description: "Branch, PR number (e.g. 9), refs/pull/N/head, or SHA (blank = default branch)"
         required: false
       platforms:
         description: "Architectures to build"
@@ -45,7 +45,7 @@ on:
   workflow_call:
     inputs:
       ref:
-        description: "Ref to build (e.g. refs/pull/N/head)"
+        description: "Ref to build (e.g. 9, refs/pull/9/head)"
         required: true
         type: string
       platforms:
@@ -112,6 +112,10 @@ jobs:
           if [ -z "$REF" ]; then
             REF="${{ github.ref }}"
           fi
+          # Normalize PR number to refs/pull/N/head for manual/call inputs
+          if echo "$REF" | grep -qE '^[0-9]+$'; then
+            REF="refs/pull/${REF}/head"
+          fi
           echo "ref=$REF" >> $GITHUB_OUTPUT
           echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
           # Build matrix based on requested platforms
@@ -131,6 +135,9 @@ jobs:
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
           if [ "${{ github.event_name }}" = "workflow_call" ] && [ -n "${{ inputs.image_version }}" ]; then
             echo "image_version=${{ inputs.image_version }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && echo "$REF" | grep -q 'refs/pull/'; then
+            PR_NUM=$(echo "$REF" | sed 's|refs/pull/||;s|/head||')
+            echo "image_version=pr-${PR_NUM}" >> $GITHUB_OUTPUT
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "image_version=pr-${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
           elif [ "${{ github.event_name }}" = "workflow_call" ]; then
@@ -171,11 +178,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Context = repo root (same as Makefile: docker build -f backend/Dockerfile .)
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ${{ github.workspace }}
           dockerfile: ${{ matrix.dockerfile_dir }}/Dockerfile
           platforms: ${{ matrix.platform }}
           labels: |
