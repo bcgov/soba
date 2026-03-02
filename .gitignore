@@ -1,2 +1,4 @@
 .pnpm-store
 node_modules
+logs_*
+.DS_Store

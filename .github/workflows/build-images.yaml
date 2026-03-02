@@ -68,6 +68,7 @@ on:
       - "backend/**"
       - "frontend/**"
       - ".github/workflows/build-images.yaml"
+      - ".gitignore"
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
@@ -77,6 +78,7 @@ on:
       - "backend/**"
       - "frontend/**"
       - ".github/workflows/build-images.yaml"
+      - ".gitignore"
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
@@ -132,7 +134,10 @@ jobs:
               {"component":"frontend","dockerfile_dir":"./frontend","platform":"linux/arm64","platform_pair":"linux-arm64","runner":"ubuntu-24.04-arm"}
             ]')
           fi
-          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          # Use delimiter so JSON is not mangled by GITHUB_OUTPUT parsing
+          echo "matrix<<MATRIX_EOF" >> $GITHUB_OUTPUT
+          echo "$MATRIX" >> $GITHUB_OUTPUT
+          echo "MATRIX_EOF" >> $GITHUB_OUTPUT
           if [ "${{ github.event_name }}" = "workflow_call" ] && [ -n "${{ inputs.image_version }}" ]; then
             echo "image_version=${{ inputs.image_version }}" >> $GITHUB_OUTPUT
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && echo "$REF" | grep -q 'refs/pull/'; then
