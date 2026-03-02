@@ -55,7 +55,6 @@ export const metaApiService = {
       name: packageJson.name,
       version: packageJson.version,
       nodeVersion: process.version,
-      formioVersion: env.getFormioVersion(),
       gitSha: env.getOptionalEnv('GIT_SHA') ?? 'unknown',
       gitTag: env.getOptionalEnv('GIT_TAG') ?? 'unknown',
       imageTag: env.getOptionalEnv('IMAGE_TAG') ?? 'unknown',

@@ -7,7 +7,7 @@ import passport from 'passport';
 import rTracer from 'cls-rtracer';
 import { router } from './routes';
 import cors from 'cors';
-import { createJwtMiddleware } from './middleware/auth';
+import { checkJwt } from './middleware/auth';
 import { coreRouter } from './core/api';
 import { metaRouter } from './core/api/meta';
 import { buildOpenApiSpec } from './core/api/shared/openapi';
@@ -69,9 +69,10 @@ app.get('/api/health', (_, res) => {
 });
 
 // ——— Core v1: mount before /api so /api/v1/* is not caught by legacy catch-all ———
-// Meta is public (no auth); forms/submissions require JWT.
+// Meta is public (no auth); forms/submissions require JWT then actor resolution then core context.
+import { resolveActor } from './middleware/actor';
 app.use('/api/v1/meta', express.json(), metaRouter);
-app.use('/api/v1', express.json(), createJwtMiddleware(), coreRouter);
+app.use('/api/v1', express.json(), checkJwt(), resolveActor, coreRouter);
 
 // ——— Legacy API: /api/form/* requires JWT ———
 app.use('/api', router);

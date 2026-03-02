@@ -1,54 +1,34 @@
 import { NextFunction, Request, Response } from 'express';
-import { findOrCreateUserByIdentity, getWorkspaceForUser } from '../db/repos/membershipRepo';
+import { eq } from 'drizzle-orm';
+import { getWorkspaceForUser } from '../db/repos/membershipRepo';
 import { getWorkspaceResolvers, getCacheAdapter } from '../integrations/plugins/PluginRegistry';
 import { membershipKey } from '../integrations/cache/cacheKeys';
 import { ForbiddenError, ValidationError } from '../errors';
-import { normalizeProfileFromJwt, idpAttributesFromJwt } from '../auth/jwtClaims';
+import { db } from '../db/client';
+import { appUsers } from '../db/schema';
 
 export interface CoreRequestContext {
   workspaceId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
   workspaceSource: string;
 }
 
 declare module 'express-serve-static-core' {
   interface Request {
     coreContext?: CoreRequestContext;
+    /** Resolved app_user id; set by auth/actor middleware before core context. */
+    actorId?: string;
   }
 }
 
 // Request context resolution policy:
-// 1) Actor resolution:
-//    - Prefer x-soba-user-id when present (trusted internal/gateway path).
-//    - Otherwise resolve from token identity (idpType + sub), creating user on first sight.
-// 2) Workspace resolution:
-//    - Run configured resolver plugins in priority order; first match wins.
-//    - Enterprise plugins typically map external tenant/workspace headers to a workspace.
-//    - Personal plugin typically uses selected workspace (cookie/header) then falls back to home.
-// 3) Failure behavior:
-//    - Missing actor identity or no resolver match throws and request is rejected upstream.
+// 1) Actor must be resolved before this middleware (via x-soba-user-id or auth middleware setting req.actorId).
+// 2) Workspace resolution: run configured resolver plugins in priority order; first match wins.
 export const resolveCoreContext = async (req: Request): Promise<CoreRequestContext> => {
-  const actorFromHeader = req.header('x-soba-user-id') || null;
-  const decoded = req.decodedJwt;
-  let actorId = actorFromHeader;
+  const actorId = req.actorId ?? req.header('x-soba-user-id') ?? null;
   if (!actorId) {
-    const subject = typeof decoded?.sub === 'string' ? decoded.sub : '';
-    if (!subject) {
-      throw new ValidationError('Missing subject from token');
-    }
-
-    const provider =
-      (typeof req.idpType === 'string' ? req.idpType : '') ||
-      (typeof decoded?.identity_provider === 'string' ? decoded.identity_provider : '') ||
-      (typeof decoded?.idpType === 'string' ? decoded.idpType : '') ||
-      'idir';
-
-    const profile =
-      decoded && typeof decoded === 'object' ? normalizeProfileFromJwt(decoded) : undefined;
-    const idpAttributes =
-      decoded && typeof decoded === 'object' ? idpAttributesFromJwt(decoded) : undefined;
-
-    actorId = await findOrCreateUserByIdentity(provider, subject, profile, idpAttributes);
+    throw new ValidationError('Missing actor identity (actorId or x-soba-user-id)');
   }
 
   const resolvers = getWorkspaceResolvers();
@@ -64,9 +44,16 @@ export const resolveCoreContext = async (req: Request): Promise<CoreRequestConte
       if (!membership) {
         throw new ForbiddenError('Actor does not belong to workspace');
       }
+      const userRow = await db
+        .select({ displayLabel: appUsers.displayLabel })
+        .from(appUsers)
+        .where(eq(appUsers.id, actorId))
+        .limit(1);
+      const actorDisplayLabel = userRow[0]?.displayLabel ?? null;
       return {
         workspaceId: resolved.workspaceId,
         actorId,
+        actorDisplayLabel,
         workspaceSource: resolved.source,
       };
     }
@@ -94,7 +81,12 @@ export const resolveCoreContextForWorkspace = async (
     if (ctx.workspaceId !== workspaceId) {
       throw new ForbiddenError('Resolved workspace does not match requested workspace');
     }
-    return { workspaceId, actorId: ctx.actorId, workspaceSource: ctx.workspaceSource };
+    return {
+      workspaceId,
+      actorId: ctx.actorId,
+      actorDisplayLabel: ctx.actorDisplayLabel,
+      workspaceSource: ctx.workspaceSource,
+    };
   }
   const resolved = await resolveCoreContext(req);
   if (resolved.workspaceId !== workspaceId) {
@@ -103,6 +95,7 @@ export const resolveCoreContextForWorkspace = async (
   return {
     workspaceId,
     actorId: resolved.actorId,
+    actorDisplayLabel: resolved.actorDisplayLabel,
     workspaceSource: resolved.workspaceSource,
   };
 };

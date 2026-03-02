@@ -17,23 +17,16 @@ const idColumn = () => uuid('id').primaryKey().$defaultFn(uuidv7);
 const auditColumns = () => ({
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  createdBy: uuid('created_by').references(() => appUsers.id),
-  updatedBy: uuid('updated_by').references(() => appUsers.id),
+  createdBy: text('created_by'),
+  updatedBy: text('updated_by'),
 });
 
-export const identityProviders = sobaSchema.table(
-  'identity_provider',
-  {
-    id: idColumn(),
-    code: text('code').notNull(),
-    name: text('name').notNull(),
-    isActive: boolean('is_active').notNull().default(true),
-    ...auditColumns(),
-  },
-  (table) => ({
-    codeUnique: uniqueIndex('identity_provider_code_uq').on(table.code),
-  }),
-);
+export const identityProviders = sobaSchema.table('identity_provider', {
+  code: text('code').primaryKey(),
+  name: text('name').notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  ...auditColumns(),
+});
 
 export const appUsers = sobaSchema.table(
   'app_user',
@@ -58,9 +51,9 @@ export const userIdentities = sobaSchema.table(
     userId: uuid('user_id')
       .notNull()
       .references(() => appUsers.id),
-    identityProviderId: uuid('identity_provider_id')
+    identityProviderCode: text('identity_provider_code')
       .notNull()
-      .references(() => identityProviders.id),
+      .references(() => identityProviders.code),
     subject: text('subject').notNull(),
     externalUserId: text('external_user_id'),
     idpAttributes: jsonb('idp_attributes'),
@@ -68,12 +61,12 @@ export const userIdentities = sobaSchema.table(
   },
   (table) => ({
     providerSubjectUnique: uniqueIndex('user_identity_provider_subject_uq').on(
-      table.identityProviderId,
+      table.identityProviderCode,
       table.subject,
     ),
     userProviderUnique: uniqueIndex('user_identity_user_provider_uq').on(
       table.userId,
-      table.identityProviderId,
+      table.identityProviderCode,
     ),
     userIdx: index('user_identity_user_idx').on(table.userId),
   }),

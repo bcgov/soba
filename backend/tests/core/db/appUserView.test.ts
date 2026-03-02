@@ -38,8 +38,9 @@ describe('appUserView', () => {
       updatedBy: null,
     } as AppUserRow;
     const view = toAppUserView(row);
-    expect(view.displayName).toBe('From Name');
-    expect(view.email).toBe('x@y.com');
+    // Core no longer maps raw claims (name, user_principal_name); IdP plugins set displayLabel/profile when creating users.
+    expect(view.displayName).toBeNull();
+    expect(view.email).toBeNull();
   });
 
   it('toSessionUser returns minimal session shape from view', () => {

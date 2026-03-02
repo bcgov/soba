@@ -19,7 +19,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/core/db/migrate.ts",
     "db:seed": "tsx src/core/db/seed.ts",
-    "worker": "tsx src/core/workers/outboxWorker.ts"
+    "worker": "tsx src/core/workers/outboxWorker.ts",
+    "script:test-signin": "tsx scripts/test-signin.ts"
   },
   "keywords": [],
   "author": "Brandon Sharratt",

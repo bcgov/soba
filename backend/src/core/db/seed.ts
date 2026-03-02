@@ -10,7 +10,7 @@ import { appUsers, identityProviders, userIdentities } from './schema';
 const SYSTEM_PROVIDER_CODE = 'system';
 const DEFAULT_SYSTEM_SUBJECT = 'soba-system';
 
-const ensureIdentityProvider = async (code: string, name: string, actorId?: string) => {
+const ensureIdentityProvider = async (code: string, name: string, createdByLabel?: string) => {
   const existing = await db.query.identityProviders.findFirst({
     where: eq(identityProviders.code, code),
   });
@@ -18,12 +18,11 @@ const ensureIdentityProvider = async (code: string, name: string, actorId?: stri
   const inserted = await db
     .insert(identityProviders)
     .values({
-      id: uuidv7(),
       code,
       name,
       isActive: true,
-      createdBy: actorId ?? null,
-      updatedBy: actorId ?? null,
+      createdBy: createdByLabel ?? null,
+      updatedBy: createdByLabel ?? null,
     })
     .returning();
   return inserted[0];
@@ -37,17 +36,18 @@ const seed = async () => {
 
   const existingSystemIdentity = await db.query.userIdentities.findFirst({
     where: and(
-      eq(userIdentities.identityProviderId, systemProvider.id),
+      eq(userIdentities.identityProviderCode, systemProvider.code),
       eq(userIdentities.subject, systemSubject),
     ),
   });
 
+  const systemDisplayLabel = 'SOBA System';
   let systemUserId = existingSystemIdentity?.userId;
   if (!systemUserId) {
     systemUserId = uuidv7();
     await db.insert(appUsers).values({
       id: systemUserId,
-      displayLabel: 'SOBA System',
+      displayLabel: systemDisplayLabel,
       profile: { displayName: 'SOBA System' },
       status: 'active',
       createdBy: null,
@@ -56,11 +56,11 @@ const seed = async () => {
     await db.insert(userIdentities).values({
       id: uuidv7(),
       userId: systemUserId,
-      identityProviderId: systemProvider.id,
+      identityProviderCode: systemProvider.code,
       subject: systemSubject,
       externalUserId: 'soba-system',
-      createdBy: systemUserId,
-      updatedBy: systemUserId,
+      createdBy: systemDisplayLabel,
+      updatedBy: systemDisplayLabel,
     });
   }
 

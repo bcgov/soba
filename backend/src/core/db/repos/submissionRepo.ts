@@ -7,12 +7,14 @@ interface CreateSubmissionInput {
   formId: string;
   formVersionId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
 }
 
 interface SaveSubmissionInput {
   workspaceId: string;
   submissionId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
   eventType: string;
   changeNote?: string;
 }
@@ -53,8 +55,8 @@ export const createEmptySubmission = async (input: CreateSubmissionInput) => {
       workflowState: 'draft',
       engineSyncStatus: 'pending',
       currentRevisionNo: 0,
-      createdBy: input.actorId,
-      updatedBy: input.actorId,
+      createdBy: input.actorDisplayLabel,
+      updatedBy: input.actorDisplayLabel,
     })
     .returning();
 
@@ -140,7 +142,7 @@ export const listSubmissionsForWorkspace = async (
 export const updateSubmissionDraft = async (
   workspaceId: string,
   submissionId: string,
-  actorId: string,
+  actorDisplayLabel: string | null,
   patch: Partial<{
     workflowState: string;
     engineSubmissionRef: string;
@@ -154,7 +156,7 @@ export const updateSubmissionDraft = async (
     .update(submissions)
     .set({
       ...patch,
-      updatedBy: actorId,
+      updatedBy: actorDisplayLabel,
       updatedAt: new Date(),
     })
     .where(and(eq(submissions.id, submissionId), eq(submissions.workspaceId, workspaceId)))
@@ -190,7 +192,7 @@ export const appendSubmissionRevision = async (input: SaveSubmissionInput) => {
 
   const updates: Record<string, unknown> = {
     currentRevisionNo: nextRevision,
-    updatedBy: input.actorId,
+    updatedBy: input.actorDisplayLabel,
     updatedAt: new Date(),
   };
 
@@ -215,6 +217,7 @@ export const markSubmissionDeleted = async (
   workspaceId: string,
   submissionId: string,
   actorId: string,
+  actorDisplayLabel: string | null,
 ) => {
   const updated = await db
     .update(submissions)
@@ -222,7 +225,7 @@ export const markSubmissionDeleted = async (
       workflowState: 'deleted',
       deletedAt: new Date(),
       deletedBy: actorId,
-      updatedBy: actorId,
+      updatedBy: actorDisplayLabel,
       updatedAt: new Date(),
     })
     .where(and(eq(submissions.id, submissionId), eq(submissions.workspaceId, workspaceId)))

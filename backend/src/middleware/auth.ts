@@ -1,115 +1,23 @@
-import express, { Request, Response, NextFunction } from 'express';
-import { expressjwt as jwt } from 'express-jwt';
-import jwksRsa from 'jwks-rsa';
+import { Request, Response, NextFunction } from 'express';
+import { createIdpAuthMiddleware } from '../auth/idpRegistry';
 
 declare module 'express-serve-static-core' {
   interface Request {
     decodedJwt?: Record<string, unknown>;
+    /** Validated token payload; set by IdP plugin middleware. Same as decodedJwt for compatibility. */
+    authPayload?: Record<string, unknown>;
     bceidType?: 'bceidbasic' | 'bceidbusiness';
     /** Identity provider code from token (e.g. idir, azureidir, bceidbasic, bceidbusiness). */
     idpType?: string;
+    /** Code of the IdP plugin that validated the token (e.g. bcgov-sso). */
+    idpPluginCode?: string;
   }
 }
 
 export const ROLE_FIELD = process.env.ROLE_FIELD || 'Role';
 
-export const createJwtMiddleware = () => {
-  return jwt({
-    secret: jwksRsa.expressJwtSecret({
-      cache: true,
-      jwksUri: process.env.JWKS_URI!,
-      handleSigningKeyError: (err, cb) => {
-        console.error('Error:', { error: err?.message, stack: err?.stack });
-        cb(new Error('Error occurred during authentication'));
-      },
-    }),
-    issuer: process.env.JWT_ISSUER!,
-    audience: process.env.JWT_AUDIENCE,
-    algorithms: ['RS256'],
-    requestProperty: 'decodedJwt',
-    getToken: function fromHeaderOrQuerystring(req) {
-      try {
-        if (!req || !req.headers) return null;
-
-        // Prefer Authorization: Bearer <token>
-        const authHeader = Array.isArray(req.headers.authorization)
-          ? req.headers.authorization[0]
-          : req.headers.authorization;
-        if (authHeader && typeof authHeader === 'string') {
-          const parts = authHeader.split(' ');
-          if (parts.length === 2 && parts[0].toLowerCase() === 'bearer') {
-            const token = parts[1];
-            console.debug('JWT extracted from Authorization header');
-            return token;
-          }
-        }
-
-        // Accept X-Jwt-Token (case-insensitive) header
-        const tokenHeader =
-          (req.get && req.get('X-Jwt-Token')) ||
-          (req.headers['x-jwt-token'] as string) ||
-          (req.headers['X-Jwt-Token'] as string);
-        if (tokenHeader && typeof tokenHeader === 'string') {
-          console.debug('JWT extracted from X-Jwt-Token header');
-          return tokenHeader;
-        }
-
-        // Fallback: query parameter 'token' or 'x-jwt-token'
-        const q = (req as express.Request).query;
-        if (q) {
-          if (q.token && typeof q.token === 'string') {
-            console.debug('JWT extracted from query param token');
-            return q.token;
-          }
-          if (q['x-jwt-token'] && typeof q['x-jwt-token'] === 'string') {
-            console.debug('JWT extracted from query param x-jwt-token');
-            return q['x-jwt-token'];
-          }
-        }
-
-        return null;
-      } catch (err) {
-        console.error('getToken error', err);
-        return null;
-      }
-    },
-  });
-};
-
-export const checkJwt = () => {
-  const middleware = createJwtMiddleware();
-
-  return (req: Request, res: Response, next: NextFunction) => {
-    middleware(req, res, (err) => {
-      if (err) {
-        console.error('JWT Validation Error:', {
-          error: err.message,
-          code: err.code,
-          inner: err.inner?.message,
-        });
-
-        return res.status(401).json({
-          error: 'Unauthorized',
-          message: 'Error occurred during authentication',
-          statusCode: 401,
-        });
-      }
-
-      if (req.decodedJwt) {
-        const payload = req.decodedJwt as Record<string, unknown>;
-        const idp: string =
-          typeof payload.identity_provider === 'string'
-            ? payload.identity_provider
-            : typeof payload.idpType === 'string'
-              ? payload.idpType
-              : 'idir';
-        req.idpType = idp;
-      }
-
-      next();
-    });
-  };
-};
+/** Composite IdP auth middleware: tries each configured IdP plugin in order; first success wins. Use this for protected routes. */
+export const checkJwt = () => createIdpAuthMiddleware();
 
 export const extractOidcSub = (req: Request, res: Response, next: NextFunction) => {
   if (req.decodedJwt) {

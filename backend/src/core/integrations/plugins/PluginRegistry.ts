@@ -226,7 +226,13 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
   const config = getWorkspacePluginsConfig();
   const discovered = discoverAndCache();
   return discovered.map((p) => {
-    const code = p.workspaceDefinition?.code ?? p.apiDefinition?.code ?? p.dir;
+    const code =
+      p.workspaceDefinition?.code ??
+      p.apiDefinition?.code ??
+      p.formEngineDefinition?.code ??
+      p.cacheDefinition?.code ??
+      p.messagebusDefinition?.code ??
+      p.dir;
     return {
       code,
       enabled: config.enabledPlugins.includes(code),

@@ -43,7 +43,6 @@ export const BuildMetaResponseSchema = z
     name: z.string(),
     version: z.string(),
     nodeVersion: z.string(),
-    formioVersion: z.string(),
     gitSha: z.string(),
     gitTag: z.string(),
     imageTag: z.string(),

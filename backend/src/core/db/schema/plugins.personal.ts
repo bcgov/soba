@@ -7,8 +7,8 @@ const idColumn = () => uuid('id').primaryKey().$defaultFn(uuidv7);
 const auditColumns = () => ({
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  createdBy: uuid('created_by').references(() => appUsers.id),
-  updatedBy: uuid('updated_by').references(() => appUsers.id),
+  createdBy: text('created_by'),
+  updatedBy: text('updated_by'),
 });
 
 export const personalWorkspaceSettings = sobaSchema.table(

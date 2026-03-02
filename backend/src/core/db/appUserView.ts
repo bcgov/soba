@@ -5,7 +5,7 @@
  */
 import type { InferSelectModel } from 'drizzle-orm';
 import { appUsers } from './schema';
-import { profileHelpers } from '../auth/jwtClaims';
+import { profileHelpers, type StoredProfile } from '../auth/jwtClaims';
 
 export type AppUserRow = InferSelectModel<typeof appUsers>;
 
@@ -23,11 +23,12 @@ export interface AppUserView extends AppUserRow {
  * Use this when you need .displayName, .email, .preferredUsername at call sites.
  */
 export function toAppUserView(row: AppUserRow): AppUserView {
+  const profile = row.profile as StoredProfile | null | undefined;
   return {
     ...row,
-    displayName: profileHelpers.getDisplayName(row.profile),
-    email: profileHelpers.getEmail(row.profile),
-    preferredUsername: profileHelpers.getPreferredUsername(row.profile),
+    displayName: profileHelpers.getDisplayName(profile),
+    email: profileHelpers.getEmail(profile),
+    preferredUsername: profileHelpers.getPreferredUsername(profile),
   };
 }
 

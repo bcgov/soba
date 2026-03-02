@@ -35,8 +35,8 @@ export interface FormRecord {
   status: string;
   createdAt: Date;
   updatedAt: Date;
-  createdBy: string;
-  updatedBy: string;
+  createdBy: string | null;
+  updatedBy: string | null;
   deletedAt: Date | null;
   deletedBy: string | null;
 }
@@ -44,6 +44,7 @@ export interface FormRecord {
 interface CreateFormInput {
   workspaceId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
   formEngineCode: string;
   slug: string;
   name: string;
@@ -53,6 +54,7 @@ interface CreateFormInput {
 interface UpdateFormInput {
   workspaceId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
   formId: string;
   slug?: string;
   name?: string;
@@ -135,8 +137,8 @@ export const createForm = async (input: CreateFormInput): Promise<FormRecord> =>
       name: input.name,
       description: input.description,
       status: 'active',
-      createdBy: input.actorId,
-      updatedBy: input.actorId,
+      createdBy: input.actorDisplayLabel,
+      updatedBy: input.actorDisplayLabel,
     })
     .returning();
 
@@ -151,7 +153,7 @@ export const updateForm = async (input: UpdateFormInput): Promise<FormRecord | n
       name: input.name,
       description: input.description,
       status: input.status,
-      updatedBy: input.actorId,
+      updatedBy: input.actorDisplayLabel,
       updatedAt: new Date(),
     })
     .where(
@@ -166,14 +168,19 @@ export const updateForm = async (input: UpdateFormInput): Promise<FormRecord | n
   return (updated[0] as FormRecord) ?? null;
 };
 
-export const markFormDeleted = async (workspaceId: string, formId: string, actorId: string) => {
+export const markFormDeleted = async (
+  workspaceId: string,
+  formId: string,
+  actorId: string,
+  actorDisplayLabel: string | null,
+) => {
   const updated = await db
     .update(forms)
     .set({
       status: 'deleted',
       deletedAt: new Date(),
       deletedBy: actorId,
-      updatedBy: actorId,
+      updatedBy: actorDisplayLabel,
       updatedAt: new Date(),
     })
     .where(and(eq(forms.id, formId), eq(forms.workspaceId, workspaceId)))

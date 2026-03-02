@@ -6,12 +6,14 @@ interface CreateDraftInput {
   workspaceId: string;
   formId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
 }
 
 interface SaveRevisionInput {
   workspaceId: string;
   formVersionId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
   eventType: string;
   changeNote?: string;
 }
@@ -62,8 +64,8 @@ export const createEmptyFormVersionDraft = async (input: CreateDraftInput, tx?: 
         state: 'draft',
         engineSyncStatus: 'pending',
         currentRevisionNo: 0,
-        createdBy: input.actorId,
-        updatedBy: input.actorId,
+        createdBy: input.actorDisplayLabel,
+        updatedBy: input.actorDisplayLabel,
       })
       .returning();
 
@@ -150,7 +152,7 @@ export const listFormVersionsForWorkspace = async (
 export const updateFormVersionDraft = async (
   workspaceId: string,
   formVersionId: string,
-  actorId: string,
+  actorDisplayLabel: string | null,
   patch: Partial<{
     state: string;
     engineSchemaRef: string;
@@ -164,7 +166,7 @@ export const updateFormVersionDraft = async (
     .update(formVersions)
     .set({
       ...patch,
-      updatedBy: actorId,
+      updatedBy: actorDisplayLabel,
       updatedAt: new Date(),
     })
     .where(and(eq(formVersions.id, formVersionId), eq(formVersions.workspaceId, workspaceId)))
@@ -206,7 +208,7 @@ export const appendFormVersionRevision = async (input: SaveRevisionInput, tx?: D
     .update(formVersions)
     .set({
       currentRevisionNo: nextRevision,
-      updatedBy: input.actorId,
+      updatedBy: input.actorDisplayLabel,
       updatedAt: new Date(),
     })
     .where(
@@ -224,6 +226,7 @@ export const markFormVersionDeleted = async (
   workspaceId: string,
   formVersionId: string,
   actorId: string,
+  actorDisplayLabel: string | null,
 ) => {
   const updated = await db
     .update(formVersions)
@@ -231,7 +234,7 @@ export const markFormVersionDeleted = async (
       state: 'deleted',
       deletedAt: new Date(),
       deletedBy: actorId,
-      updatedBy: actorId,
+      updatedBy: actorDisplayLabel,
       updatedAt: new Date(),
     })
     .where(and(eq(formVersions.id, formVersionId), eq(formVersions.workspaceId, workspaceId)))

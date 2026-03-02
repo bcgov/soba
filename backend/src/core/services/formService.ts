@@ -18,6 +18,7 @@ import { ValidationError } from '../errors';
 interface DeleteInput {
   workspaceId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
   formId: string;
 }
 
@@ -36,6 +37,7 @@ interface ListInput {
 interface CreateInput {
   workspaceId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
   slug: string;
   name: string;
   description?: string;
@@ -45,6 +47,7 @@ interface CreateInput {
 interface UpdateInput {
   workspaceId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
   formId: string;
   slug?: string;
   name?: string;
@@ -75,6 +78,7 @@ export class FormService {
     return createForm({
       workspaceId: input.workspaceId,
       actorId: input.actorId,
+      actorDisplayLabel: input.actorDisplayLabel,
       slug: input.slug,
       name: input.name,
       description: input.description,
@@ -95,6 +99,11 @@ export class FormService {
   }
 
   async delete(input: DeleteInput) {
-    return markFormDeleted(input.workspaceId, input.formId, input.actorId);
+    return markFormDeleted(
+      input.workspaceId,
+      input.formId,
+      input.actorId,
+      input.actorDisplayLabel,
+    );
   }
 }

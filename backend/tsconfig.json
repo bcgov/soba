@@ -17,6 +17,6 @@
     "typeRoots": ["./node_modules/@types", "./typings"],
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "include": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"],
   "exclude": ["node_modules", "bin", "test", "dist"]
 }

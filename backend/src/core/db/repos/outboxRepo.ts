@@ -11,8 +11,8 @@ export const enqueueOutboxEvent = async (event: QueueEvent) => {
     workspaceId: event.workspaceId,
     payload: event.payload,
     status: 'pending',
-    createdBy: event.actorId ?? null,
-    updatedBy: event.actorId ?? null,
+    createdBy: event.actorDisplayLabel ?? null,
+    updatedBy: event.actorDisplayLabel ?? null,
   });
 };
 
@@ -49,16 +49,21 @@ export const claimOutboxBatch = async (batchSize = 20) => {
   });
 };
 
-export const markOutboxSucceeded = async (id: string, actorId?: string) => {
+export const markOutboxSucceeded = async (id: string, actorDisplayLabel?: string | null) => {
   await db
     .update(integrationOutbox)
-    .set({ status: 'done', updatedAt: new Date(), updatedBy: actorId ?? null, lastError: null })
+    .set({
+      status: 'done',
+      updatedAt: new Date(),
+      updatedBy: actorDisplayLabel ?? null,
+      lastError: null,
+    })
     .where(eq(integrationOutbox.id, id));
 };
 
 export const markOutboxFailed = async (
   id: string,
-  actorId: string | undefined,
+  actorDisplayLabel: string | null | undefined,
   errorMessage: string,
   attemptCount: number,
 ) => {
@@ -71,7 +76,7 @@ export const markOutboxFailed = async (
       attemptCount: attemptCount + 1,
       nextAttemptAt: nextAttempt,
       lastError: errorMessage.slice(0, 1000),
-      updatedBy: actorId ?? null,
+      updatedBy: actorDisplayLabel ?? null,
       updatedAt: new Date(),
     })
     .where(eq(integrationOutbox.id, id));

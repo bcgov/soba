@@ -5,6 +5,7 @@ import { decodeCursorAndMode, buildNextCursor, type CursorSort } from '../shared
 export interface FormsContextInput {
   workspaceId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
 }
 
 interface ListFormsQueryInput {
@@ -121,6 +122,7 @@ export function createFormsApiService(
         await formService.create({
           workspaceId: ctx.workspaceId,
           actorId: ctx.actorId,
+          actorDisplayLabel: ctx.actorDisplayLabel,
           slug: input.slug,
           name: input.name,
           description: input.description,
@@ -132,6 +134,7 @@ export function createFormsApiService(
       const row = await formService.update({
         workspaceId: ctx.workspaceId,
         actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
         formId,
         slug: input.slug,
         name: input.name,
@@ -228,6 +231,7 @@ export function createFormsApiService(
         await formVersionService.createDraft({
           workspaceId: ctx.workspaceId,
           actorId: ctx.actorId,
+          actorDisplayLabel: ctx.actorDisplayLabel,
           formId,
         }),
       ),
@@ -236,6 +240,7 @@ export function createFormsApiService(
       const row = await formVersionService.updateDraft({
         workspaceId: ctx.workspaceId,
         actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
         formVersionId,
         state,
       });
@@ -251,6 +256,7 @@ export function createFormsApiService(
         .save({
           workspaceId: ctx.workspaceId,
           actorId: ctx.actorId,
+          actorDisplayLabel: ctx.actorDisplayLabel,
           formVersionId,
           eventType: input.eventType || 'save_draft',
           note: input.note,
@@ -262,6 +268,7 @@ export function createFormsApiService(
       formVersionService.delete({
         workspaceId: ctx.workspaceId,
         actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
         formVersionId,
       }),
 
@@ -269,6 +276,7 @@ export function createFormsApiService(
       formService.delete({
         workspaceId: ctx.workspaceId,
         actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
         formId,
       }),
   };

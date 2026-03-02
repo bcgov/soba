@@ -21,12 +21,14 @@ import { NotFoundError, ValidationError } from '../errors';
 interface CreateDraftInput {
   workspaceId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
   formId: string;
 }
 
 interface UpdateDraftInput {
   workspaceId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
   formVersionId: string;
   state?: string;
 }
@@ -34,6 +36,7 @@ interface UpdateDraftInput {
 interface SaveInput {
   workspaceId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
   formVersionId: string;
   eventType: string;
   note?: string;
@@ -43,6 +46,7 @@ interface SaveInput {
 interface DeleteInput {
   workspaceId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
   formVersionId: string;
 }
 
@@ -66,9 +70,12 @@ export class FormVersionService {
   }
 
   async updateDraft(input: UpdateDraftInput) {
-    return updateFormVersionDraft(input.workspaceId, input.formVersionId, input.actorId, {
-      state: input.state,
-    });
+    return updateFormVersionDraft(
+      input.workspaceId,
+      input.formVersionId,
+      input.actorDisplayLabel,
+      { state: input.state },
+    );
   }
 
   async save(input: SaveInput) {
@@ -78,6 +85,7 @@ export class FormVersionService {
           workspaceId: input.workspaceId,
           formVersionId: input.formVersionId,
           actorId: input.actorId,
+          actorDisplayLabel: input.actorDisplayLabel,
           eventType: input.eventType,
           changeNote: input.note,
         },
@@ -88,7 +96,7 @@ export class FormVersionService {
         await updateFormVersionDraft(
           input.workspaceId,
           input.formVersionId,
-          input.actorId,
+          input.actorDisplayLabel,
           { state: 'published' },
           tx,
         );
@@ -119,6 +127,7 @@ export class FormVersionService {
         workspaceId: input.workspaceId,
         payload,
         actorId: input.actorId,
+        actorDisplayLabel: input.actorDisplayLabel,
       });
     }
 
@@ -126,7 +135,12 @@ export class FormVersionService {
   }
 
   async delete(input: DeleteInput) {
-    return markFormVersionDeleted(input.workspaceId, input.formVersionId, input.actorId);
+    return markFormVersionDeleted(
+      input.workspaceId,
+      input.formVersionId,
+      input.actorId,
+      input.actorDisplayLabel,
+    );
   }
 
   async get(workspaceId: string, actorId: string, formVersionId: string) {

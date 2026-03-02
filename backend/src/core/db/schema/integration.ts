@@ -1,6 +1,6 @@
 import { v7 as uuidv7 } from 'uuid';
 import { index, jsonb, text, timestamp, uuid, integer } from 'drizzle-orm/pg-core';
-import { appUsers, sobaSchema, workspaces } from './core';
+import { sobaSchema, workspaces } from './core';
 
 const idColumn = () => uuid('id').primaryKey().$defaultFn(uuidv7);
 
@@ -21,8 +21,8 @@ export const integrationOutbox = sobaSchema.table(
     lastError: text('last_error'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-    createdBy: uuid('created_by').references(() => appUsers.id),
-    updatedBy: uuid('updated_by').references(() => appUsers.id),
+    createdBy: text('created_by'),
+    updatedBy: text('updated_by'),
   },
   (table) => ({
     statusWorkspaceIdx: index('integration_outbox_status_workspace_idx').on(

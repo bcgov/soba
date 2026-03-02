@@ -21,13 +21,13 @@ export async function findUserIdByIdentity(
   providerCode: string,
   subject: string,
 ): Promise<string | null> {
+  const normalizedCode = providerCode.toLowerCase();
   const row = await db
     .select({ userId: userIdentities.userId })
     .from(userIdentities)
-    .innerJoin(identityProviders, eq(identityProviders.id, userIdentities.identityProviderId))
     .where(
       and(
-        eq(identityProviders.code, providerCode.toLowerCase()),
+        eq(userIdentities.identityProviderCode, normalizedCode),
         eq(userIdentities.subject, subject),
       ),
     )
@@ -54,7 +54,6 @@ export const findOrCreateUserByIdentity = async (
       const created = await tx
         .insert(identityProviders)
         .values({
-          id: uuidv7(),
           code: normalizedProvider,
           name: normalizedProvider.toUpperCase(),
           isActive: true,
@@ -68,7 +67,7 @@ export const findOrCreateUserByIdentity = async (
       .from(userIdentities)
       .where(
         and(
-          eq(userIdentities.identityProviderId, provider.id),
+          eq(userIdentities.identityProviderCode, provider.code),
           eq(userIdentities.subject, subject),
         ),
       )
@@ -85,13 +84,16 @@ export const findOrCreateUserByIdentity = async (
       return existingRow.userId;
     }
 
+    const displayLabel = profileHelpers.getDisplayLabel(profile, subject) ?? subject;
     const createdUser = await tx
       .insert(appUsers)
       .values({
         id: uuidv7(),
-        displayLabel: profileHelpers.getDisplayLabel(profile, subject) ?? subject,
+        displayLabel,
         profile: profile ?? { displayName: subject },
         status: 'active',
+        createdBy: displayLabel,
+        updatedBy: displayLabel,
       })
       .returning({ id: appUsers.id });
 
@@ -100,9 +102,11 @@ export const findOrCreateUserByIdentity = async (
     await tx.insert(userIdentities).values({
       id: uuidv7(),
       userId,
-      identityProviderId: provider.id,
+      identityProviderCode: provider.code,
       subject,
       idpAttributes: idpAttributes ?? undefined,
+      createdBy: displayLabel,
+      updatedBy: displayLabel,
     });
 
     return userId;

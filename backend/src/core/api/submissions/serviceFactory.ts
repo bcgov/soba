@@ -4,6 +4,7 @@ import { decodeCursorAndMode, buildNextCursor, type CursorSort } from '../shared
 export interface SubmissionsContextInput {
   workspaceId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
 }
 
 interface ListSubmissionsQueryInput {
@@ -107,6 +108,7 @@ export function createSubmissionsApiService(submissionService: SubmissionService
         await submissionService.create({
           workspaceId: ctx.workspaceId,
           actorId: ctx.actorId,
+          actorDisplayLabel: ctx.actorDisplayLabel,
           formId,
           formVersionId,
         }),
@@ -116,6 +118,7 @@ export function createSubmissionsApiService(submissionService: SubmissionService
       const row = await submissionService.update({
         workspaceId: ctx.workspaceId,
         actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
         submissionId,
         workflowState,
       });
@@ -131,6 +134,7 @@ export function createSubmissionsApiService(submissionService: SubmissionService
         .save({
           workspaceId: ctx.workspaceId,
           actorId: ctx.actorId,
+          actorDisplayLabel: ctx.actorDisplayLabel,
           submissionId,
           eventType: input.eventType || 'edit_submission',
           note: input.note,
@@ -142,6 +146,7 @@ export function createSubmissionsApiService(submissionService: SubmissionService
       submissionService.delete({
         workspaceId: ctx.workspaceId,
         actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
         submissionId,
       }),
   };

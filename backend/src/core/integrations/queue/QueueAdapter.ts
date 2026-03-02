@@ -5,6 +5,7 @@ export interface QueueEvent {
   workspaceId: string;
   payload: Record<string, unknown>;
   actorId?: string;
+  actorDisplayLabel?: string | null;
 }
 
 export interface QueueAdapter {

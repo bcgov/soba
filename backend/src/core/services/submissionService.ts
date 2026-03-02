@@ -20,6 +20,7 @@ import { NotFoundError, ValidationError } from '../errors';
 interface CreateInput {
   workspaceId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
   formId: string;
   formVersionId: string;
 }
@@ -27,6 +28,7 @@ interface CreateInput {
 interface UpdateInput {
   workspaceId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
   submissionId: string;
   workflowState?: string;
 }
@@ -34,6 +36,7 @@ interface UpdateInput {
 interface SaveInput {
   workspaceId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
   submissionId: string;
   eventType: string;
   note?: string;
@@ -43,6 +46,7 @@ interface SaveInput {
 interface DeleteInput {
   workspaceId: string;
   actorId: string;
+  actorDisplayLabel: string | null;
   submissionId: string;
 }
 
@@ -67,9 +71,12 @@ export class SubmissionService {
   }
 
   async update(input: UpdateInput) {
-    return updateSubmissionDraft(input.workspaceId, input.submissionId, input.actorId, {
-      workflowState: input.workflowState,
-    });
+    return updateSubmissionDraft(
+      input.workspaceId,
+      input.submissionId,
+      input.actorDisplayLabel,
+      { workflowState: input.workflowState },
+    );
   }
 
   async save(input: SaveInput) {
@@ -77,6 +84,7 @@ export class SubmissionService {
       workspaceId: input.workspaceId,
       submissionId: input.submissionId,
       actorId: input.actorId,
+      actorDisplayLabel: input.actorDisplayLabel,
       eventType: input.eventType,
       changeNote: input.note,
     });
@@ -104,6 +112,7 @@ export class SubmissionService {
         workspaceId: input.workspaceId,
         payload,
         actorId: input.actorId,
+        actorDisplayLabel: input.actorDisplayLabel,
       });
     }
 
@@ -111,7 +120,12 @@ export class SubmissionService {
   }
 
   async delete(input: DeleteInput) {
-    return markSubmissionDeleted(input.workspaceId, input.submissionId, input.actorId);
+    return markSubmissionDeleted(
+      input.workspaceId,
+      input.submissionId,
+      input.actorId,
+      input.actorDisplayLabel,
+    );
   }
 
   async get(workspaceId: string, actorId: string, submissionId: string) {

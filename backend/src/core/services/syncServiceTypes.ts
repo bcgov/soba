@@ -2,7 +2,7 @@ export interface SyncServiceDeps {
   updateFormVersionDraft: (
     workspaceId: string,
     formVersionId: string,
-    actorId: string,
+    actorDisplayLabel: string | null,
     patch: Partial<{
       state: string;
       engineSchemaRef: string;
@@ -13,7 +13,7 @@ export interface SyncServiceDeps {
   updateSubmissionDraft: (
     workspaceId: string,
     submissionId: string,
-    actorId: string,
+    actorDisplayLabel: string | null,
     patch: Partial<{
       workflowState: string;
       engineSubmissionRef: string;

@@ -7,12 +7,8 @@ const idColumn = () => uuid('id').primaryKey().$defaultFn(uuidv7);
 const strictAuditColumns = () => ({
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  createdBy: uuid('created_by')
-    .notNull()
-    .references(() => appUsers.id),
-  updatedBy: uuid('updated_by')
-    .notNull()
-    .references(() => appUsers.id),
+  createdBy: text('created_by'),
+  updatedBy: text('updated_by'),
 });
 
 export const forms = sobaSchema.table(

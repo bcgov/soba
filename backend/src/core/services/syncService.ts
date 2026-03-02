@@ -16,6 +16,8 @@ interface OutboxItem {
   payload: unknown;
 }
 
+const SYSTEM_ACTOR_DISPLAY_LABEL = 'SOBA System';
+
 export class SyncService {
   constructor(
     private readonly createAdapter: (engineCode: string) => FormEngineAdapter,
@@ -86,20 +88,27 @@ export class SyncService {
         const formVersion = await this.deps.getFormVersionById(item.workspaceId, item.aggregateId);
         formId = formVersion?.formId ?? '';
       }
-      await this.deps.updateFormVersionDraft(item.workspaceId, item.aggregateId, actorId, {
-        engineSyncStatus: 'provisioning',
-        engineSyncError: null,
-      });
+      await this.deps.updateFormVersionDraft(
+        item.workspaceId,
+        item.aggregateId,
+        SYSTEM_ACTOR_DISPLAY_LABEL,
+        { engineSyncStatus: 'provisioning', engineSyncError: null },
+      );
       const response = await formEngineAdapter.createFormVersionSchema({
         formVersionId: item.aggregateId,
         workspaceId: item.workspaceId,
         formId,
       });
-      await this.deps.updateFormVersionDraft(item.workspaceId, item.aggregateId, actorId, {
-        engineSchemaRef: response.engineRef,
-        engineSyncStatus: 'ready',
-        engineSyncError: null,
-      });
+      await this.deps.updateFormVersionDraft(
+        item.workspaceId,
+        item.aggregateId,
+        SYSTEM_ACTOR_DISPLAY_LABEL,
+        {
+          engineSchemaRef: response.engineRef,
+          engineSyncStatus: 'ready',
+          engineSyncError: null,
+        },
+      );
       return;
     }
 
@@ -110,20 +119,27 @@ export class SyncService {
         const submission = await this.deps.getSubmissionById(item.workspaceId, item.aggregateId);
         formVersionId = submission?.formVersionId ?? '';
       }
-      await this.deps.updateSubmissionDraft(item.workspaceId, item.aggregateId, actorId, {
-        engineSyncStatus: 'provisioning',
-        engineSyncError: null,
-      });
+      await this.deps.updateSubmissionDraft(
+        item.workspaceId,
+        item.aggregateId,
+        SYSTEM_ACTOR_DISPLAY_LABEL,
+        { engineSyncStatus: 'provisioning', engineSyncError: null },
+      );
       const response = await formEngineAdapter.createSubmissionRecord({
         submissionId: item.aggregateId,
         workspaceId: item.workspaceId,
         formVersionId,
       });
-      await this.deps.updateSubmissionDraft(item.workspaceId, item.aggregateId, actorId, {
-        engineSubmissionRef: response.engineRef,
-        engineSyncStatus: 'ready',
-        engineSyncError: null,
-      });
+      await this.deps.updateSubmissionDraft(
+        item.workspaceId,
+        item.aggregateId,
+        SYSTEM_ACTOR_DISPLAY_LABEL,
+        {
+          engineSubmissionRef: response.engineRef,
+          engineSyncStatus: 'ready',
+          engineSyncError: null,
+        },
+      );
       return;
     }
 
