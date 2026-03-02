@@ -88,9 +88,9 @@ sequenceDiagram
 
   Client->>IdPAuth: Request + JWT
   IdPAuth->>IdPAuth: Try IdP plugins in order
-  IdPAuth->>Actor: req.idpPluginCode, req.authPayload
-  Actor->>Actor: claimMapper.mapPayload then findOrCreateUserByIdentity
-  Actor->>ReqCtx: req.actorId
+  IdPAuth->>Actor: "idpPluginCode, authPayload"
+  Actor->>Actor: "claimMapper + findOrCreateUserByIdentity"
+  Actor->>ReqCtx: actorId
   ReqCtx->>Resolvers: resolve workspace from request
   Resolvers->>ReqCtx: workspaceId, source
   ReqCtx->>ReqCtx: getWorkspaceForUser, set coreContext
