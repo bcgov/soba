@@ -45,5 +45,5 @@
       ]
     }
   },
-  "initializeCommand": "cp -n ${localWorkspaceFolder}/backend/.env.example ${localWorkspaceFolder}/backend/.env 2>/dev/null || true; cp -n ${localWorkspaceFolder}/backend/.env.local.example ${localWorkspaceFolder}/backend/.env.local 2>/dev/null || true; cp -n ${localWorkspaceFolder}/frontend/.env.example ${localWorkspaceFolder}/frontend/.env 2>/dev/null || true"
+  "initializeCommand": "bash -c \"cp -n backend/.env.example backend/.env 2>/dev/null || true; cp -n backend/.env.local.example backend/.env.local 2>/dev/null || true; cp -n frontend/.env.example frontend/.env 2>/dev/null || true\""
 }
