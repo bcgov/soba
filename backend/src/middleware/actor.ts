@@ -6,10 +6,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getIdpPlugins } from '../auth/idpRegistry';
 import { findOrCreateUserByIdentity } from '../core/db/repos/membershipRepo';
-import {
-  isSobaAdmin,
-  upsertSobaAdminFromIdp,
-} from '../core/db/repos/sobaAdminRepo';
+import { isSobaAdmin, upsertSobaAdminFromIdp } from '../core/db/repos/sobaAdminRepo';
 import { ValidationError } from '../core/errors';
 import { profileHelpers } from '../core/auth/jwtClaims';
 

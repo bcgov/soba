@@ -52,3 +52,35 @@ export const getCodesBySetMeta = asyncHandler(async (req: Request, res: Response
     })),
   });
 });
+
+export const getRolesMeta = asyncHandler(async (req: Request, res: Response) => {
+  const query = req.query as {
+    limit?: number;
+    cursor?: string;
+    only_enabled_features?: 'true' | 'false';
+  };
+  const result = await metaApiService.getRolesPaginated({
+    limit: query.limit ?? 20,
+    cursor: query.cursor,
+    onlyEnabledFeatures: query.only_enabled_features === 'true',
+  });
+  res.json(result);
+});
+
+export const getRoleByCodeMeta = asyncHandler(async (req: Request, res: Response) => {
+  const roleCode = req.params.roleCode as string;
+  const onlyEnabledFeatures = req.query.only_enabled_features !== 'false';
+  const role = await metaApiService.getRole(roleCode, { onlyEnabledFeatures });
+  if (!role) {
+    res.status(404).json({ error: 'Role not found' });
+    return;
+  }
+  res.json({
+    roleCode: role.code,
+    name: role.name,
+    description: role.description,
+    status: role.status,
+    createdAt: role.createdAt.toISOString(),
+    updatedAt: role.updatedAt.toISOString(),
+  });
+});

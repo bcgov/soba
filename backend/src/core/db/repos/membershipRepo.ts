@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, lt, or } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { db } from '../client';
 import {
@@ -121,6 +121,8 @@ export const getWorkspaceForUser = async (workspaceId: string, userId: string) =
       id: workspaces.id,
       kind: workspaces.kind,
       name: workspaces.name,
+      slug: workspaces.slug,
+      status: workspaces.status,
       membershipId: workspaceMemberships.id,
       role: workspaceMemberships.role,
     })
@@ -151,16 +153,152 @@ export const invalidateMembershipCache = (workspaceId: string, userId: string): 
   }
 };
 
-export const listWorkspacesForUser = async (userId: string) => {
-  return db
+export type WorkspaceListSort = 'id:desc' | 'updatedAt:desc';
+export type WorkspaceListCursorMode = 'id' | 'ts_id';
+
+export interface ListWorkspacesForUserInput {
+  userId: string;
+  limit: number;
+  sort: WorkspaceListSort;
+  cursorMode: WorkspaceListCursorMode;
+  afterId?: string;
+  afterUpdatedAt?: Date;
+  kind?: string;
+  status?: string;
+}
+
+export interface WorkspaceListRow {
+  id: string;
+  name: string;
+  slug: string | null;
+  kind: string;
+  role: string;
+  status: string;
+  updatedAt: Date;
+}
+
+export const listWorkspacesForUser = async (
+  input: ListWorkspacesForUserInput,
+): Promise<{ items: WorkspaceListRow[]; hasMore: boolean }> => {
+  const whereClauses = [
+    eq(workspaceMemberships.userId, input.userId),
+    eq(workspaceMemberships.status, 'active'),
+  ];
+  if (input.kind) {
+    whereClauses.push(eq(workspaces.kind, input.kind));
+  }
+  if (input.status) {
+    whereClauses.push(eq(workspaces.status, input.status));
+  }
+  if (input.cursorMode === 'id' && input.afterId) {
+    whereClauses.push(lt(workspaces.id, input.afterId));
+  }
+  if (input.cursorMode === 'ts_id' && input.afterId && input.afterUpdatedAt) {
+    whereClauses.push(
+      or(
+        lt(workspaces.updatedAt, input.afterUpdatedAt),
+        and(eq(workspaces.updatedAt, input.afterUpdatedAt), lt(workspaces.id, input.afterId)),
+      ),
+    );
+  }
+
+  const rows = await db
     .select({
-      workspaceId: workspaces.id,
+      id: workspaces.id,
       name: workspaces.name,
+      slug: workspaces.slug,
       kind: workspaces.kind,
       role: workspaceMemberships.role,
       status: workspaces.status,
+      updatedAt: workspaces.updatedAt,
     })
     .from(workspaceMemberships)
     .innerJoin(workspaces, eq(workspaces.id, workspaceMemberships.workspaceId))
-    .where(and(eq(workspaceMemberships.userId, userId), eq(workspaceMemberships.status, 'active')));
+    .where(and(...whereClauses))
+    .orderBy(
+      input.cursorMode === 'ts_id' || input.sort === 'updatedAt:desc'
+        ? desc(workspaces.updatedAt)
+        : desc(workspaces.id),
+      desc(workspaces.id),
+    )
+    .limit(input.limit + 1);
+
+  return {
+    items: rows.slice(0, input.limit),
+    hasMore: rows.length > input.limit,
+  };
+};
+
+export interface WorkspaceMemberRow {
+  id: string;
+  userId: string;
+  displayLabel: string | null;
+  role: string;
+  status: string;
+  updatedAt: Date;
+}
+
+export type MemberListSort = 'id:desc' | 'updatedAt:desc';
+export type MemberListCursorMode = 'id' | 'ts_id';
+
+export interface ListMembersForWorkspaceInput {
+  workspaceId: string;
+  limit: number;
+  sort: MemberListSort;
+  cursorMode: MemberListCursorMode;
+  afterId?: string;
+  afterUpdatedAt?: Date;
+  role?: string;
+  status?: string;
+}
+
+export const listMembersForWorkspace = async (
+  input: ListMembersForWorkspaceInput,
+): Promise<{ items: WorkspaceMemberRow[]; hasMore: boolean }> => {
+  const whereClauses = [eq(workspaceMemberships.workspaceId, input.workspaceId)];
+  if (input.role) {
+    whereClauses.push(eq(workspaceMemberships.role, input.role));
+  }
+  if (input.status) {
+    whereClauses.push(eq(workspaceMemberships.status, input.status));
+  }
+  if (input.cursorMode === 'id' && input.afterId) {
+    whereClauses.push(lt(workspaceMemberships.id, input.afterId));
+  }
+  if (input.cursorMode === 'ts_id' && input.afterId && input.afterUpdatedAt) {
+    whereClauses.push(
+      or(
+        lt(workspaceMemberships.updatedAt, input.afterUpdatedAt),
+        and(
+          eq(workspaceMemberships.updatedAt, input.afterUpdatedAt),
+          lt(workspaceMemberships.id, input.afterId),
+        ),
+      ),
+    );
+  }
+
+  const rows = await db
+    .select({
+      id: workspaceMemberships.id,
+      userId: workspaceMemberships.userId,
+      displayLabel: appUsers.displayLabel,
+      role: workspaceMemberships.role,
+      status: workspaceMemberships.status,
+      updatedAt: workspaceMemberships.updatedAt,
+    })
+    .from(workspaceMemberships)
+    .innerJoin(appUsers, eq(appUsers.id, workspaceMemberships.userId))
+    .where(and(...whereClauses))
+    .orderBy(
+      input.cursorMode === 'ts_id' || input.sort === 'updatedAt:desc'
+        ? desc(workspaceMemberships.updatedAt)
+        : desc(workspaceMemberships.id),
+      desc(workspaceMemberships.id),
+    )
+    .limit(input.limit + 1);
+
+  return {
+    items: rows.slice(0, input.limit),
+    hasMore: rows.length > input.limit,
+  };
 };

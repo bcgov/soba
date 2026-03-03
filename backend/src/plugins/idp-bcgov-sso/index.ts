@@ -31,7 +31,11 @@ function hasSobaAdminRole(decoded: Record<string, unknown>): boolean {
   const roles = (decoded.roles as string[] | undefined) ?? [];
   if (Array.isArray(roles) && roles.includes(SOBA_ADMIN_ROLE)) return true;
   const realmAccess = decoded.realm_access as { roles?: string[] } | undefined;
-  if (realmAccess && Array.isArray(realmAccess.roles) && realmAccess.roles.includes(SOBA_ADMIN_ROLE))
+  if (
+    realmAccess &&
+    Array.isArray(realmAccess.roles) &&
+    realmAccess.roles.includes(SOBA_ADMIN_ROLE)
+  )
     return true;
   const clientRoles = decoded.client_roles as string[] | undefined;
   if (Array.isArray(clientRoles) && clientRoles.includes(SOBA_ADMIN_ROLE)) return true;

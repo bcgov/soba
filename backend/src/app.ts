@@ -9,6 +9,7 @@ import { router } from './routes';
 import cors from 'cors';
 import { checkJwt } from './middleware/auth';
 import { coreRouter } from './core/api';
+import { healthRouter } from './core/api/health';
 import { metaRouter } from './core/api/meta';
 import { buildOpenApiSpec } from './core/api/shared/openapi';
 import swaggerUi from 'swagger-ui-express';
@@ -64,15 +65,15 @@ app.use(
     },
   }),
 );
-app.get('/api/health', (_, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
-});
-
 // ——— Core v1: mount before /api so /api/v1/* is not caught by legacy catch-all ———
-// Meta is public (no auth); forms/submissions require JWT then actor resolution then core context.
+// Meta and health are public (no auth); forms/submissions require JWT then actor resolution then core context.
 import { resolveActor } from './middleware/actor';
+import { requireSobaAdmin } from './core/middleware/requireSobaAdmin';
+import { adminRouter } from './core/api/admin';
 app.use('/api/v1/meta', express.json(), metaRouter);
+app.use('/api/v1/health', healthRouter);
 app.use('/api/v1', express.json(), checkJwt(), resolveActor, coreRouter);
+app.use('/api/v1/admin', express.json(), checkJwt(), resolveActor, requireSobaAdmin, adminRouter);
 
 // ——— Legacy API: /api/form/* requires JWT ———
 app.use('/api', router);

@@ -1,9 +1,46 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, lt } from 'drizzle-orm';
 import { db } from '../client';
-import { sobaAdmins } from '../schema';
+import { appUsers, sobaAdmins } from '../schema';
 
 export const SOBA_ADMIN_SOURCE_IDP = 'idp';
 export const SOBA_ADMIN_SOURCE_DIRECT = 'direct';
+
+export interface SobaAdminListRow {
+  userId: string;
+  source: string;
+  identityProviderCode: string | null;
+  syncedAt: Date | null;
+  displayLabel: string | null;
+}
+
+export interface ListSobaAdminsInput {
+  limit: number;
+  afterUserId?: string;
+}
+
+/**
+ * List SOBA platform admins with user display label (cursor-paginated by userId).
+ */
+export async function listSobaAdmins(
+  input: ListSobaAdminsInput,
+): Promise<{ items: SobaAdminListRow[]; hasMore: boolean }> {
+  const base = db
+    .select({
+      userId: sobaAdmins.userId,
+      source: sobaAdmins.source,
+      identityProviderCode: sobaAdmins.identityProviderCode,
+      syncedAt: sobaAdmins.syncedAt,
+      displayLabel: appUsers.displayLabel,
+    })
+    .from(sobaAdmins)
+    .innerJoin(appUsers, eq(appUsers.id, sobaAdmins.userId));
+  const withWhere = input.afterUserId ? base.where(lt(sobaAdmins.userId, input.afterUserId)) : base;
+  const rows = await withWhere.orderBy(desc(sobaAdmins.userId)).limit(input.limit + 1);
+  return {
+    items: rows.slice(0, input.limit),
+    hasMore: rows.length > input.limit,
+  };
+}
 
 /**
  * Returns whether the user is a SOBA platform admin (from table: idp-sourced or direct).
@@ -84,11 +121,7 @@ export async function addDirectSobaAdmin(
   addedByDisplayLabel: string | null,
 ): Promise<void> {
   const now = new Date();
-  const existing = await db
-    .select()
-    .from(sobaAdmins)
-    .where(eq(sobaAdmins.userId, userId))
-    .limit(1);
+  const existing = await db.select().from(sobaAdmins).where(eq(sobaAdmins.userId, userId)).limit(1);
 
   if (existing[0]) {
     await db
@@ -119,8 +152,6 @@ export async function addDirectSobaAdmin(
 export async function removeDirectSobaAdmin(userId: string): Promise<boolean> {
   const result = await db
     .delete(sobaAdmins)
-    .where(
-      and(eq(sobaAdmins.userId, userId), eq(sobaAdmins.source, SOBA_ADMIN_SOURCE_DIRECT)),
-    );
+    .where(and(eq(sobaAdmins.userId, userId), eq(sobaAdmins.source, SOBA_ADMIN_SOURCE_DIRECT)));
   return (result.rowCount ?? 0) > 0;
 }

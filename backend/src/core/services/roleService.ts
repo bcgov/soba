@@ -1,5 +1,5 @@
 import { getRoleByCode, listRoles } from '../db/repos/roleRepo';
-import { getByRoleCode, listRegistry } from '../db/repos/roleRegistryRepo';
+import { getByRoleCode, listRegistry, listRegistryPaginated } from '../db/repos/roleRegistryRepo';
 import { FeatureStatus } from '../db/codes';
 
 export interface RegisteredRole {
@@ -20,6 +20,14 @@ export interface RoleRow {
 export const roleService = {
   async getRegisteredRoles(options?: { onlyEnabledFeatures?: boolean }): Promise<RegisteredRole[]> {
     return listRegistry(options);
+  },
+
+  async getRegisteredRolesPaginated(options: {
+    limit: number;
+    afterRoleCode?: string;
+    onlyEnabledFeatures?: boolean;
+  }): Promise<{ items: RegisteredRole[]; hasMore: boolean }> {
+    return listRegistryPaginated(options);
   },
 
   async getRole(

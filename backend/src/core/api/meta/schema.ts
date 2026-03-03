@@ -95,6 +95,49 @@ export const FormEnginesMetaResponseSchema = z
   })
   .openapi('Meta_FormEnginesResponse');
 
+export const RoleMetaSchema = z
+  .object({
+    roleCode: z.string(),
+    providerType: z.string(),
+    featureCode: z.string().nullable(),
+  })
+  .openapi('Meta_Role');
+
+export const ListRolesQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    cursor: z.string().min(1).optional(),
+    only_enabled_features: z.enum(['true', 'false']).optional(),
+  })
+  .openapi('Meta_ListRolesQuery');
+
+export const RolesMetaResponseSchema = z
+  .object({
+    roles: z.array(RoleMetaSchema),
+    page: z.object({
+      limit: z.number().int().min(1),
+      hasMore: z.boolean(),
+      nextCursor: z.string().nullable(),
+      cursorMode: z.enum(['id']),
+    }),
+    filters: z.object({
+      only_enabled_features: z.boolean().optional(),
+    }),
+    sort: z.string(),
+  })
+  .openapi('Meta_RolesResponse');
+
+export const RoleByCodeMetaSchema = z
+  .object({
+    roleCode: z.string(),
+    name: z.string(),
+    description: z.string().nullable(),
+    status: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
+  .openapi('Meta_RoleByCode');
+
 export const registerMetaOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
@@ -192,6 +235,44 @@ export const registerMetaOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       404: { description: 'Code set not found or feature not enabled' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/meta/roles',
+    tags: ['core.meta'],
+    request: {
+      query: ListRolesQuerySchema,
+    },
+    responses: {
+      200: {
+        description:
+          'Registered roles with cursor pagination. Query: limit, cursor, only_enabled_features=true.',
+        content: {
+          'application/json': {
+            schema: RolesMetaResponseSchema,
+          },
+        },
+      },
+      400: { description: 'Invalid query or cursor' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/meta/roles/{roleCode}',
+    tags: ['core.meta'],
+    responses: {
+      200: {
+        description: 'Role by code. 404 if not in registry or feature not enabled.',
+        content: {
+          'application/json': {
+            schema: RoleByCodeMetaSchema,
+          },
+        },
+      },
+      404: { description: 'Role not found or feature not enabled' },
     },
   });
 };

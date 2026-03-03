@@ -1,5 +1,6 @@
 import {
   FormEngineAdapter,
+  type FormEngineHealthResult,
   FormVersionProvisionInput,
   SubmissionProvisionInput,
 } from '../../core/integrations/form-engine/FormEngineAdapter';
@@ -48,5 +49,21 @@ export class FormioEngineAdapter implements FormEngineAdapter {
   async createSubmissionRecord(input: SubmissionProvisionInput): Promise<{ engineRef: string }> {
     // This adapter is intentionally lightweight for iteration 1.
     return { engineRef: placeholderRef('formio-submission', input.submissionId) };
+  }
+
+  async healthCheck(): Promise<FormEngineHealthResult> {
+    try {
+      const url = this.config.renderApiUrl.replace(/\/$/, '') || this.config.renderApiUrl;
+      const res = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(5000) });
+      if (res.ok || res.status === 404) {
+        return { ok: true };
+      }
+      return { ok: false, message: `HTTP ${res.status}` };
+    } catch (err) {
+      return {
+        ok: false,
+        message: err instanceof Error ? err.message : String(err),
+      };
+    }
   }
 }
