@@ -8,9 +8,9 @@ import type {
   IdpPluginDefinition,
   IdpClaimMapper,
   IdpMapPayloadResult,
-} from '../../auth/IdpPlugin';
+} from '../../core/auth/IdpPlugin';
 import type { NormalizedProfile, IdpAttributes } from '../../core/auth/jwtClaims';
-import { authEnv } from '../../config/authEnv';
+import { authEnv } from '../../core/config/authEnv';
 import {
   firstString,
   firstEmailLike,

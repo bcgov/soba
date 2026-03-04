@@ -5,14 +5,13 @@
  */
 import { Request, Response, NextFunction } from 'express';
 import { getIdpPlugins } from '../auth/idpRegistry';
-import { findOrCreateUserByIdentity } from '../core/db/repos/membershipRepo';
-import { isSobaAdmin, upsertSobaAdminFromIdp } from '../core/db/repos/sobaAdminRepo';
-import { ValidationError } from '../core/errors';
-import { profileHelpers } from '../core/auth/jwtClaims';
+import { findOrCreateUserByIdentity } from '../db/repos/membershipRepo';
+import { isSobaAdmin, upsertSobaAdminFromIdp } from '../db/repos/sobaAdminRepo';
+import { ValidationError } from '../errors';
+import { profileHelpers } from '../auth/jwtClaims';
 
 export function resolveActor(req: Request, res: Response, next: NextFunction): void {
   if (req.actorId || req.header('x-soba-user-id')) {
-    // Actor already set (e.g. x-soba-user-id); still resolve isSobaAdmin from table
     const actorId = req.actorId ?? req.header('x-soba-user-id') ?? null;
     if (actorId) {
       isSobaAdmin(actorId)
@@ -54,7 +53,6 @@ export function resolveActor(req: Request, res: Response, next: NextFunction): v
     .then((actorId) => {
       req.actorId = actorId;
 
-      // Refresh soba_admin from IdP when mapper signals it
       const refresh =
         mapped.sobaAdmin === true
           ? upsertSobaAdminFromIdp(actorId, pluginCode, true, actorDisplayLabel)

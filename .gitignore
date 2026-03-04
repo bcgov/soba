@@ -7,5 +7,5 @@
 !.env.*.example
 .pnpm-store
 
-# Test coverage (e.g. backend Jest)
-coverage
+# Test coverage
+coverage/

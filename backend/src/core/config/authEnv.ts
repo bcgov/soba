@@ -1,8 +1,8 @@
 /**
- * Auth/IdP-specific env. Kept outside core so core has no dependency on plugin or IdP concepts.
+ * Auth/IdP-specific env.
  * Used by auth middleware and IdP plugin registry.
  */
-import { env } from '../core/config/env';
+import { env } from './env';
 
 function getOptionalEnv(key: string): string | undefined {
   const value = process.env[key];

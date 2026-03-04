@@ -91,11 +91,7 @@ export function createEnvReader(source: EnvSource) {
     getWorkspacePluginsEnabled: () => getRequiredEnvFrom(source, 'WORKSPACE_PLUGINS_ENABLED'),
     getWorkspacePluginsStrictModeRaw: () =>
       getRequiredEnvFrom(source, 'WORKSPACE_PLUGINS_STRICT_MODE'),
-    getRoleField: () => getOptionalEnvFrom(source, 'ROLE_FIELD'),
-    getAdminRoleName: () => getOptionalEnvFrom(source, 'ADMIN_ROLE_NAME'),
-    getManagerRoleName: () => getOptionalEnvFrom(source, 'MANAGER_ROLE_NAME'),
     isDevelopment: () => getOptionalEnvFrom(source, 'NODE_ENV') === 'development',
-    getSessionSecret: () => getOptionalEnvFrom(source, 'SESSION_SECRET'),
     getPluginsPath: () =>
       getOptionalEnvFrom(source, 'PLUGINS_PATH') ??
       getOptionalEnvFrom(source, 'WORKSPACE_PLUGINS_PATH'),
@@ -129,11 +125,7 @@ export const env = {
   getSystemSobaSubject: () => getOptionalEnv('SOBA_SYSTEM_SUBJECT'),
   getWorkspacePluginsEnabled: () => getRequiredEnv('WORKSPACE_PLUGINS_ENABLED'),
   getWorkspacePluginsStrictModeRaw: () => getRequiredEnv('WORKSPACE_PLUGINS_STRICT_MODE'),
-  getRoleField: () => getOptionalEnvFrom(process.env, 'ROLE_FIELD'),
-  getAdminRoleName: () => getOptionalEnv('ADMIN_ROLE_NAME'),
-  getManagerRoleName: () => getOptionalEnv('MANAGER_ROLE_NAME'),
   isDevelopment: () => getOptionalEnv('NODE_ENV') === 'development',
-  getSessionSecret: () => getOptionalEnv('SESSION_SECRET'),
   getPluginsPath: () => getOptionalEnv('PLUGINS_PATH') ?? getOptionalEnv('WORKSPACE_PLUGINS_PATH'),
   getCacheDefaultCode: () => getOptionalEnv('CACHE_DEFAULT_CODE'),
   getMessageBusDefaultCode: () => getOptionalEnv('MESSAGEBUS_DEFAULT_CODE'),

@@ -8,9 +8,9 @@ import type {
   IdpPluginDefinition,
   IdpClaimMapper,
   IdpMapPayloadResult,
-} from '../../auth/IdpPlugin';
+} from '../../core/auth/IdpPlugin';
 import type { NormalizedProfile, IdpAttributes } from '../../core/auth/jwtClaims';
-import { getToken } from '../../auth/IdpPlugin';
+import { getToken } from '../../core/auth/IdpPlugin';
 
 const DEFAULT_GITHUB_API_URL = 'https://api.github.com';
 

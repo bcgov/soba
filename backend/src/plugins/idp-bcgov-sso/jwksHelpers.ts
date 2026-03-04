@@ -6,7 +6,7 @@
 import type { RequestHandler } from 'express';
 import { expressjwt as jwt } from 'express-jwt';
 import jwksRsa from 'jwks-rsa';
-import { getToken } from '../../auth/IdpPlugin';
+import { getToken } from '../../core/auth/IdpPlugin';
 
 export function firstString(
   claims: Record<string, unknown>,

@@ -10,12 +10,13 @@ module.exports = {
   coverageDirectory: 'coverage',
   verbose: true,
   transform: {
-    '^.+\\.tsx?$': [
+    '^.+\\.[jt]sx?$': [
       'ts-jest',
       {
         tsconfig: 'tsconfig.json',
       },
     ],
   },
+  transformIgnorePatterns: ['node_modules/(?!uuid/)'],
   rootDir: __dirname,
 };

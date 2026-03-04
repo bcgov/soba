@@ -1,13 +1,12 @@
 /**
  * IdP plugin discovery and composite auth middleware.
- * Lives outside core so core has no direct reference to plugin or IdP code.
  */
 import fs from 'fs';
 import path from 'path';
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authEnv } from '../config/authEnv';
-import { createPluginConfigReader } from '../core/config/pluginConfig';
+import { createPluginConfigReader } from '../config/pluginConfig';
 import type { IdpPluginDefinition, IdpClaimMapper } from './IdpPlugin';
 
 const IdpPluginDefinitionSchema = z.object({

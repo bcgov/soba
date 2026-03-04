@@ -1,11 +1,10 @@
 /**
  * IdP (identity provider) plugin contract.
- * Lives outside core so core has no direct reference to plugin/IdP concepts.
  * Plugins implement this contract; auth layer discovers and wires them.
  */
 import type { Request } from 'express';
-import type { PluginConfigReader } from '../core/config/pluginConfig';
-import type { NormalizedProfile, IdpAttributes } from '../core/auth/jwtClaims';
+import type { PluginConfigReader } from '../config/pluginConfig';
+import type { NormalizedProfile, IdpAttributes } from './jwtClaims';
 
 /** Result of mapping a validated token payload to the common user shape. */
 export interface IdpMapPayloadResult {
