@@ -2,12 +2,12 @@ import express, { Request, Response, NextFunction } from 'express';
 import { expressjwt as jwt } from 'express-jwt';
 import jwksRsa from 'jwks-rsa';
 
-declare module 'express-serve-static-core' {
-  interface Request {
-    decodedJwt?: Record<string, unknown>;
-    bceidType?: 'bceidbasic' | 'bceidbusiness';
-    idpType?: 'idir' | 'bceidbasic' | 'bceidbusiness';
-  }
+// Instead of module augmentation (which caused resolution errors in the build),
+// define a local interface we can use when we need the extra fields.
+export interface JwtRequest extends Request {
+  decodedJwt?: Record<string, unknown>;
+  bceidType?: 'bceidbasic' | 'bceidbusiness';
+  idpType?: 'idir' | 'bceidbasic' | 'bceidbusiness';
 }
 
 export const ROLE_FIELD = process.env.ROLE_FIELD || 'Role';
@@ -78,7 +78,7 @@ export const createJwtMiddleware = () => {
 export const checkJwt = () => {
   const middleware = createJwtMiddleware();
 
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: JwtRequest, res: Response, next: NextFunction) => {
     middleware(req, res, (err) => {
       if (err) {
         console.error('JWT Validation Error:', {
@@ -103,7 +103,7 @@ export const checkJwt = () => {
   };
 };
 
-export const extractOidcSub = (req: Request, res: Response, next: NextFunction) => {
+export const extractOidcSub = (req: JwtRequest, res: Response, next: NextFunction) => {
   if (req.decodedJwt) {
     console.log('Authenticated request', {
       sub: req.decodedJwt.sub,
@@ -117,7 +117,12 @@ export const extractOidcSub = (req: Request, res: Response, next: NextFunction) 
   }
 };
 
-export const jwtErrorHandler = (err: unknown, req: Request, res: Response, next: NextFunction) => {
+export const jwtErrorHandler = (
+  err: unknown,
+  req: JwtRequest,
+  res: Response,
+  next: NextFunction,
+) => {
   const error = err as {
     name?: string;
     message?: string;

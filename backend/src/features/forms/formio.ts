@@ -11,7 +11,10 @@ const FORMIO_MANAGER_PASS = process.env.FORMIO_MANAGER_PASSWORD;
 import { User, ADMIN } from '../../types/user';
 import { hasRole } from '../../middleware/auth';
 
-type RequestWithUser = express.Request & { user?: User };
+type RequestWithUser = express.Request & {
+  user?: User;
+  decodedJwt?: Record<string, unknown>;
+};
 
 const formioLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes

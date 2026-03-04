@@ -1,5 +1,5 @@
 {
-  "name": "soba-ui",
+  "name": "@soba/frontend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,7 +9,9 @@
     "lint": "eslint",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
-    "format:check": "prettier . --check"
+    "format:check": "prettier . --check",
+    "type-check": "tsc --noEmit",
+    "check": "pnpm type-check && pnpm lint"
   },
   "dependencies": {
     "@formatjs/intl-localematcher": "^0.8.1",

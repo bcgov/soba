@@ -1,4 +1,7 @@
 export interface User {
+  // allow arbitrary JWT claims to be read dynamically (e.g. in hasRole)
+  [key: string]: unknown;
+
   iss: string;
   iat: number;
   exp: number;
