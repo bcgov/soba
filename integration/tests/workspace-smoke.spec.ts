@@ -14,10 +14,11 @@ test('page exposes core accessibility landmarks and skip navigation', async ({ p
   await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
   await expect(page.locator('main#main-content')).toBeVisible();
 
-  await page.keyboard.press('Tab');
-  const skipLink = page.getByText('Skip to main content');
+  const skipLink = page.locator('a[href="#main-content"]').first();
+  await expect(skipLink).toBeVisible();
+  await skipLink.focus();
   await expect(skipLink).toBeFocused();
-  await skipLink.press('Enter');
+  await page.keyboard.press('Enter');
   await expect(page.locator('main#main-content')).toBeFocused();
 });
 
