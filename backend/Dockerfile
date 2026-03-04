@@ -1,13 +1,22 @@
 FROM node:lts-alpine
 
+# enable pnpm via corepack and ensure workspace installs work
+RUN corepack enable pnpm
+
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci
+# copy root workspace config + backend package file
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY backend/package.json backend/
 
+# install only backend deps (hoisted into root node_modules)
+RUN pnpm install --filter ./backend...
+
+# copy entire repo and build backend
 COPY . .
-RUN npx tsc
+RUN pnpm --filter ./backend run build
 
 EXPOSE 4000
 
-CMD ["npm", "start"]
+# use package manager script to start
+CMD ["pnpm", "--filter", "./backend", "start"]

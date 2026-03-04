@@ -1,0 +1,22 @@
+{
+  "name": "soba",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "lint": "pnpm lint:frontend && pnpm lint:backend",
+    "lint:frontend": "pnpm --filter frontend run lint",
+    "lint:backend": "pnpm --filter backend run lint",
+    "check": "pnpm check:frontend && pnpm check:backend",
+    "check:frontend": "pnpm --filter frontend run check",
+    "check:backend": "pnpm --filter backend run check",
+    "prepare": "husky"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.28.2",
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}

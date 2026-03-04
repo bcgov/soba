@@ -1,7 +1,11 @@
 import { getDictionary, hasLocale, Locale } from './dictionaries';
 import { HomeSections } from '@/src/app/ui/HomeSections';
 
-export async function generateMetadata({ params }: PageProps<'/[lang]'>) {
+type PageProps = {
+  params: Promise<{ lang: string }>;
+};
+
+export async function generateMetadata({ params }: PageProps) {
   const param = await params;
   if (!hasLocale(param.lang)) {
     param.lang = 'en';

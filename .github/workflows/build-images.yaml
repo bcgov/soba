@@ -31,7 +31,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch, refs/pull/N/head, or SHA (blank = default branch)"
+        description: "Branch, PR number (e.g. 9), refs/pull/N/head, or SHA (blank = default branch)"
         required: false
       platforms:
         description: "Architectures to build"
@@ -45,7 +45,7 @@ on:
   workflow_call:
     inputs:
       ref:
-        description: "Ref to build (e.g. refs/pull/N/head)"
+        description: "Ref to build (e.g. 9, refs/pull/9/head)"
         required: true
         type: string
       platforms:
@@ -68,15 +68,27 @@ on:
       - "backend/**"
       - "frontend/**"
       - ".github/workflows/build-images.yaml"
+      - ".gitignore"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
   push:
     branches: [main]
     paths:
       - "backend/**"
       - "frontend/**"
       - ".github/workflows/build-images.yaml"
+      - ".gitignore"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
 
 env:
   REGISTRY: ghcr.io
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   prepare:
@@ -106,25 +118,35 @@ jobs:
           if [ -z "$REF" ]; then
             REF="${{ github.ref }}"
           fi
+          # Normalize PR number to refs/pull/N/head for manual/call inputs
+          if echo "$REF" | grep -qE '^[0-9]+$'; then
+            REF="refs/pull/${REF}/head"
+          fi
           echo "ref=$REF" >> $GITHUB_OUTPUT
           echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
           # Build matrix based on requested platforms
           MATRIX='{"include":[]}'
           if echo "$PLATFORMS" | grep -q 'amd64'; then
             MATRIX=$(echo "$MATRIX" | jq -c '.include += [
-              {"component":"backend","context":"./backend","platform":"linux/amd64","platform_pair":"linux-amd64","runner":"ubuntu-latest"},
-              {"component":"frontend","context":"./frontend","platform":"linux/amd64","platform_pair":"linux-amd64","runner":"ubuntu-latest"}
+              {"component":"backend","dockerfile_dir":"./backend","platform":"linux/amd64","platform_pair":"linux-amd64","runner":"ubuntu-latest"},
+              {"component":"frontend","dockerfile_dir":"./frontend","platform":"linux/amd64","platform_pair":"linux-amd64","runner":"ubuntu-latest"}
             ]')
           fi
           if echo "$PLATFORMS" | grep -q 'arm64'; then
             MATRIX=$(echo "$MATRIX" | jq -c '.include += [
-              {"component":"backend","context":"./backend","platform":"linux/arm64","platform_pair":"linux-arm64","runner":"ubuntu-24.04-arm"},
-              {"component":"frontend","context":"./frontend","platform":"linux/arm64","platform_pair":"linux-arm64","runner":"ubuntu-24.04-arm"}
+              {"component":"backend","dockerfile_dir":"./backend","platform":"linux/arm64","platform_pair":"linux-arm64","runner":"ubuntu-24.04-arm"},
+              {"component":"frontend","dockerfile_dir":"./frontend","platform":"linux/arm64","platform_pair":"linux-arm64","runner":"ubuntu-24.04-arm"}
             ]')
           fi
-          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          # Use delimiter so JSON is not mangled by GITHUB_OUTPUT parsing
+          echo "matrix<<MATRIX_EOF" >> $GITHUB_OUTPUT
+          echo "$MATRIX" >> $GITHUB_OUTPUT
+          echo "MATRIX_EOF" >> $GITHUB_OUTPUT
           if [ "${{ github.event_name }}" = "workflow_call" ] && [ -n "${{ inputs.image_version }}" ]; then
             echo "image_version=${{ inputs.image_version }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && echo "$REF" | grep -q 'refs/pull/'; then
+            PR_NUM=$(echo "$REF" | sed 's|refs/pull/||;s|/head||')
+            echo "image_version=pr-${PR_NUM}" >> $GITHUB_OUTPUT
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "image_version=pr-${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
           elif [ "${{ github.event_name }}" = "workflow_call" ]; then
@@ -146,9 +168,6 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
-    permissions:
-      contents: read
-      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -165,11 +184,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Context = repo root (same as Makefile: docker build -f backend/Dockerfile .)
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@v6
         with:
-          context: ${{ matrix.context }}
+          context: .
+          file: ${{ matrix.dockerfile_dir }}/Dockerfile
           platforms: ${{ matrix.platform }}
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
@@ -194,9 +215,6 @@ jobs:
   merge:
     needs: [prepare, build]
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     outputs:
       short_sha: ${{ steps.vars.outputs.short_sha }}
       image_version: ${{ needs.prepare.outputs.image_version }}
