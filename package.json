@@ -4,9 +4,18 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build": "pnpm build:frontend && pnpm build:backend",
+    "build:frontend": "pnpm --filter frontend run build",
+    "build:backend": "pnpm --filter backend run build",
+    "test": "pnpm test:frontend && pnpm test:backend",
+    "test:frontend": "pnpm --filter frontend run test",
+    "test:backend": "pnpm --filter backend run test",
     "lint": "pnpm lint:frontend && pnpm lint:backend",
+    "lint:fix": "pnpm lint:fix:frontend && pnpm lint:fix:backend",
     "lint:frontend": "pnpm --filter frontend run lint",
     "lint:backend": "pnpm --filter backend run lint",
+    "lint:fix:frontend": "pnpm --filter frontend run lint:fix",
+    "lint:fix:backend": "pnpm --filter backend run lint:fix",
     "check": "pnpm check:frontend && pnpm check:backend",
     "check:frontend": "pnpm --filter frontend run check",
     "check:backend": "pnpm --filter backend run check"

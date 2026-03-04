@@ -5,6 +5,7 @@ import { coreErrorHandler } from '../middleware/errorHandler';
 import { registerAdminOpenApi } from './admin';
 import { registerHealthOpenApi } from './health';
 import { formsDomain } from './forms';
+import { meDomain } from './me';
 import { membersDomain } from './members';
 import { metaDomain } from './meta';
 import { submissionsDomain } from './submissions';
@@ -13,7 +14,14 @@ import { registerOpenApiPaths } from './shared/openapi';
 
 // Meta is mounted at app level at /api/v1/meta and is public (no JWT, no core context).
 // Workspaces is mounted first at / so GET /workspaces and GET /workspaces/current are matched before forms.
-const coreDomains = [formsDomain, membersDomain, metaDomain, submissionsDomain, workspacesDomain];
+const coreDomains = [
+  formsDomain,
+  meDomain,
+  membersDomain,
+  metaDomain,
+  submissionsDomain,
+  workspacesDomain,
+];
 
 const router = express.Router();
 registerOpenApiPaths((registry) => {
@@ -26,7 +34,13 @@ registerOpenApiPaths((registry) => {
 
 router.use(coreContextMiddleware);
 router.use(requireCoreContext);
-const authenticatedDomains = [workspacesDomain, formsDomain, membersDomain, submissionsDomain];
+const authenticatedDomains = [
+  workspacesDomain,
+  formsDomain,
+  meDomain,
+  membersDomain,
+  submissionsDomain,
+];
 for (const domain of authenticatedDomains) {
   router.use(domain.path, domain.router);
 }

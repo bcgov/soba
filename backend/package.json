@@ -23,7 +23,6 @@
     "start": "node dist/app.js"
   },
   "keywords": [],
-  
   "author": "Brandon Sharratt",
   "license": "ISC",
   "devDependencies": {

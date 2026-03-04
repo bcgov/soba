@@ -33,6 +33,19 @@ export type BuildMeta = {
   imageTag: string;
 };
 
+export type CurrentUserResponse = {
+  actor: {
+    id: string;
+    displayLabel: string | null;
+    status: string;
+  };
+  profile: {
+    displayName: string | null;
+    email: string | null;
+    preferredUsername: string | null;
+  };
+};
+
 async function parseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     throw new Error(`Request failed (${response.status})`);
@@ -58,6 +71,18 @@ export async function fetchBuildMeta(): Promise<BuildMeta> {
 
 export async function fetchWorkspaces(token: string): Promise<WorkspacesResponse> {
   const response = await fetch(`${getSobaApiBaseUrl()}/workspaces`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+  });
+  return parseJson(response);
+}
+
+export async function fetchCurrentUser(token: string): Promise<CurrentUserResponse> {
+  const response = await fetch(`${getSobaApiBaseUrl()}/me`, {
     method: 'GET',
     cache: 'no-store',
     headers: {

@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from '../client';
 import { appUsers } from '../schema';
 
@@ -14,4 +14,9 @@ export async function findUserIdByEmail(email: string): Promise<string | null> {
     .where(sql`${appUsers.profile}->>'email' = ${email}`)
     .limit(1);
   return row[0]?.id ?? null;
+}
+
+export async function findAppUserById(userId: string) {
+  const row = await db.select().from(appUsers).where(eq(appUsers.id, userId)).limit(1);
+  return row[0] ?? null;
 }

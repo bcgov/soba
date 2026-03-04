@@ -17,6 +17,11 @@ module.exports = {
       },
     ],
   },
-  transformIgnorePatterns: ['node_modules/(?!uuid/)'],
+  // pnpm stores deps under node_modules/.pnpm/<pkg>@<version>/node_modules/<pkg>.
+  // Keep most node_modules ignored, but allow transforming uuid (ESM package).
+  transformIgnorePatterns: [
+    'node_modules/(?!\\.pnpm|uuid/)',
+    'node_modules/.pnpm/(?!(uuid)@)',
+  ],
   rootDir: __dirname,
 };

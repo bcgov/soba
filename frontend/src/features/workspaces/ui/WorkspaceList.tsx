@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Callout, Heading, InlineAlert, Text } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useKeycloak } from '@/lib/useKeycloak';
 import { fetchBuildMeta, fetchHealth, fetchWorkspaces, WorkspaceItem } from '@/src/shared/api/sobaApi';
@@ -56,43 +57,55 @@ function WorkspaceList() {
 
   return (
     <section className="p-4" data-testid="workspace-page" aria-labelledby="workspace-heading">
-      <h2 id="workspace-heading" className="text-xl font-semibold mb-3">
+      <Heading id="workspace-heading" level={2} className="mb-3">
         {dict.header.workspaces}
-      </h2>
+      </Heading>
 
-      <div className="mb-4 card-surface p-3 rounded" data-testid="backend-status" aria-live="polite">
-        <h3 className="text-lg font-semibold">Backend status</h3>
-        <p>Health: {health}</p>
-        {buildVersion ? <p>Build: {buildVersion}</p> : null}
+      <div className="mb-4" data-testid="backend-status">
+        <Callout
+          variant="lightGrey"
+          title="Backend status"
+          description={`Health: ${health}${buildVersion ? ` | Build: ${buildVersion}` : ''}`}
+        />
       </div>
 
       {!authenticated ? (
-        <p data-testid="workspace-not-authenticated">{dict.general.notAuthenticated}</p>
+        <div data-testid="workspace-not-authenticated">
+          <InlineAlert variant="warning">{dict.general.notAuthenticated}</InlineAlert>
+        </div>
       ) : null}
 
-      {initializing ? <p data-testid="workspace-auth-initializing">Initializing sign-in...</p> : null}
+      {initializing ? (
+        <Text data-testid="workspace-auth-initializing">Initializing sign-in...</Text>
+      ) : null}
 
       {authenticated ? (
         <div>
-          <h3 className="text-lg font-semibold mb-2">My Workspaces</h3>
+          <Heading level={3} className="mb-2">
+            My Workspaces
+          </Heading>
           {loading ? (
-            <p data-testid="workspace-loading" aria-live="polite">
+            <Text data-testid="workspace-loading" aria-live="polite">
               Loading workspaces...
-            </p>
+            </Text>
           ) : null}
           {error ? (
-            <p data-testid="workspace-error" className="text-red-700" role="alert">
-              {error}
-            </p>
+            <div data-testid="workspace-error">
+              <InlineAlert variant="danger" role="alert">
+                {error}
+              </InlineAlert>
+            </div>
           ) : null}
           {!loading && !error && workspaces.length === 0 ? (
-            <p data-testid="workspace-empty">No workspaces found.</p>
+            <Text data-testid="workspace-empty">No workspaces found.</Text>
           ) : null}
           {!loading && !error && workspaces.length > 0 ? (
             <ul data-testid="workspace-list" className="list-disc pl-5">
               {workspaces.map((workspace) => (
                 <li key={workspace.id} data-testid={`workspace-item-${workspace.id}`}>
-                  <strong>{workspace.name}</strong> ({workspace.kind}) - {workspace.role}
+                  <Text elementType="span">
+                    <strong>{workspace.name}</strong> ({workspace.kind}) - {workspace.role}
+                  </Text>
                 </li>
               ))}
             </ul>

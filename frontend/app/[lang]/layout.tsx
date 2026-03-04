@@ -14,9 +14,6 @@ export default async function RootLayout({
   const dictionary = await getDictionary(lang as Locale);
   return (
     <DictionaryProvider dictionary={dictionary}>
-      <a href="#main-content" className="skip-link">
-        {dictionary.header.skipToMain}
-      </a>
       <Header />
       <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl w-full">
         {children}

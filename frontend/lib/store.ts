@@ -2,11 +2,11 @@ import { configureStore } from '@reduxjs/toolkit';
 import { createWrapper } from 'next-redux-wrapper';
 import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
 import keycloakReducer, { KeycloakState } from './slices/keycloakSlice';
-import themeReducer, { ThemeState } from './slices/themeSlice';
+import currentUserReducer, { CurrentUserState } from './slices/currentUserSlice';
 
 const reducer = {
   keycloak: keycloakReducer,
-  theme: themeReducer,
+  currentUser: currentUserReducer,
 };
 
 const makeStore = () =>
@@ -24,7 +24,7 @@ export const wrapper = createWrapper<AppStore>(makeStore, { debug: false });
 // Strongly-typed hooks for use across the app
 export type RootState = {
   keycloak: KeycloakState;
-  theme: ThemeState;
+  currentUser: CurrentUserState;
 };
 export type RootDispatch = AppDispatch;
 

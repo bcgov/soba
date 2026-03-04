@@ -1,17 +1,24 @@
 'use client';
 import { useEffect } from 'react';
-import Link from 'next/link';
+import {
+  Button,
+  Header as BcHeader,
+  Heading,
+  Link as BcLink,
+  Text,
+} from '@bcgov/design-system-react-components';
+import { useAppDispatch } from '@/lib/store';
 import { useKeycloak } from '@/lib/useKeycloak';
-import { useAppDispatch, useAppSelector } from '@/lib/store';
-import { toggleMode } from '@/lib/slices/themeSlice';
+import { useCurrentUser } from '@/lib/useCurrentUser';
+import { clearCurrentUser, loadCurrentUser } from '@/lib/slices/currentUserSlice';
 import { useDictionary } from '../[lang]/Providers';
 import { getNavigationItems } from '@/src/app/plugins/registry';
 
 function Header() {
-  const dict = useDictionary();
-  const { authenticated, idTokenParsed, login, init } = useKeycloak();
   const dispatch = useAppDispatch();
-  const isDark = useAppSelector((state) => state.theme.mode === 'dark');
+  const dict = useDictionary();
+  const { authenticated, idTokenParsed, token, login, logout, init } = useKeycloak();
+  const currentUser = useCurrentUser();
   const locale = dict.locale === 'en' || dict.locale === 'fr' ? dict.locale : 'en';
   const navItems = getNavigationItems(locale, dict);
 
@@ -19,60 +26,105 @@ function Header() {
     init();
   }, [init]);
 
+  useEffect(() => {
+    if (!authenticated || !token) {
+      dispatch(clearCurrentUser());
+      return;
+    }
+    if (currentUser.token !== token || currentUser.status === 'idle') {
+      dispatch(loadCurrentUser(token));
+    }
+  }, [authenticated, token, currentUser.token, currentUser.status, dispatch]);
+
   const handleLogin = () => {
     // login is a bound callback that dispatches the login thunk
     login();
   };
 
-  const loginButton = () => {
+  const handleLogout = () => {
+    dispatch(clearCurrentUser());
+    logout();
+  };
+
+  const authActions = () => {
     if (authenticated) {
+      const isCurrentTokenUser = currentUser.token === token;
+      const backendDisplayName = isCurrentTokenUser ? currentUser.displayName : null;
+      const keycloakDisplayName =
+        typeof idTokenParsed?.display_name === 'string' && idTokenParsed.display_name.trim().length > 0
+          ? idTokenParsed.display_name
+          : null;
+      const displayName =
+        typeof backendDisplayName === 'string' && backendDisplayName.trim().length > 0
+          ? backendDisplayName
+          : isCurrentTokenUser && currentUser.hasError
+            ? keycloakDisplayName ?? 'Authenticated User'
+            : isCurrentTokenUser && currentUser.isLoaded
+              ? 'Authenticated User'
+              : null;
       return (
-        <span data-testid="logged-in-indicator">{`${dict.general.loggedAs} ${idTokenParsed?.display_name}`}</span>
+        <div className="flex items-center justify-end gap-3">
+          {displayName ? (
+            <Text data-testid="logged-in-indicator">{displayName}</Text>
+          ) : (
+            <span
+              aria-hidden="true"
+              className="inline-block h-5 w-44 rounded bg-[var(--surface-color-border-default)]/60 animate-pulse"
+            />
+          )}
+          <Button
+            id="logout-button"
+            type="button"
+            variant="secondary"
+            size="medium"
+            data-testid="logout-button"
+            onClick={handleLogout}
+          >
+            {dict.general.logout}
+          </Button>
+        </div>
       );
     }
     return (
-      <button
+      <Button
+        id="login-button"
         type="button"
+        variant="primary"
+        size="medium"
         data-testid="login-button"
-        className="btn-primary font-bold py-2 px-4 rounded"
         onClick={handleLogin}
       >
         {dict.general.login}
-      </button>
+      </Button>
     );
   };
 
   return (
-    <header className="app-header px-4 py-3 border-b" role="banner">
-      <div className="mx-auto max-w-6xl flex flex-wrap items-center gap-4" data-testid="app-header">
-        <h1 className="text-2xl font-bold mr-auto">{dict.general.title}</h1>
-
-        <nav aria-label="Primary" data-testid="primary-nav">
+    <BcHeader
+      title={dict.general.title}
+      titleElement="h1"
+      skipLinks={[
+        <BcLink key="skip-main" href="#main-content" isUnstyled>
+          {dict.header.skipToMain}
+        </BcLink>,
+      ]}
+    >
+      <div className="mx-auto max-w-6xl w-full flex flex-wrap items-center gap-4 px-4 py-3" data-testid="app-header">
+        <Heading level={1} className="sr-only">
+          {dict.general.title}
+        </Heading>
+        <nav aria-label="Primary" data-testid="primary-nav" className="mr-auto">
           <ul className="flex items-center gap-3">
             {navItems.map((item) => (
               <li key={item.id}>
-                <Link href={item.href} className="font-semibold underline-offset-4 hover:underline">
-                  {item.label}
-                </Link>
+                <BcLink href={item.href}>{item.label}</BcLink>
               </li>
             ))}
           </ul>
         </nav>
-
-        <button
-          type="button"
-          className="rounded px-3 py-2 border"
-          aria-label={dict.header.themeToggle ?? 'Toggle color theme'}
-          aria-pressed={isDark}
-          onClick={() => dispatch(toggleMode())}
-          data-testid="theme-toggle-button"
-        >
-          {isDark ? 'Dark' : 'Light'}
-        </button>
-
-        <div className="min-w-48 text-right">{loginButton()}</div>
+        <div className="min-w-48 text-right">{authActions()}</div>
       </div>
-    </header>
+    </BcHeader>
   );
 }
 
