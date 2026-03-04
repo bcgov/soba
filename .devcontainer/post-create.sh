@@ -10,6 +10,17 @@ echo ""
 echo "==> Installing root dependencies..."
 pnpm install
 
+# -- Install integration dependencies + Playwright Chromium ────────────────
+if [ -f integration/package.json ]; then
+  echo "==> Installing integration test dependencies..."
+  pnpm -C integration install --frozen-lockfile
+
+  echo "==> Installing Playwright Chromium (integration)..."
+  pnpm -C integration exec playwright install chromium
+else
+  echo "==> integration/package.json not found, skipping integration setup..."
+fi
+
 # ── Set up environment file ─────────────────────────────────────────────────
 if [ -f backend/.env.example ] && [ ! -f backend/.env ]; then
   echo "==> Creating backend/.env from .env.example..."

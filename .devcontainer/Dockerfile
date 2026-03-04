@@ -1,6 +1,8 @@
 # Multi-arch: linux/amd64 (Mac Intel), linux/arm64 (Mac Silicon)
 FROM mcr.microsoft.com/devcontainers/typescript-node:4-24-bookworm
 
+ARG TARGETARCH
+
 # Enable pnpm via corepack (frontend uses pnpm)
 RUN corepack enable pnpm
 
@@ -26,22 +28,44 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
+# ── Playwright runtime deps (Linux) ───────────────────────────────────────────
+# Keep this in its own layer so changes elsewhere do not invalidate it.
+RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get install -y --no-install-recommends \
+        libnspr4 \
+        libnss3 \
+        libatk1.0-0 \
+        libatk-bridge2.0-0 \
+        libdbus-1-3 \
+        libcups2 \
+        libxkbcommon0 \
+        libatspi2.0-0 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxfixes3 \
+        libxrandr2 \
+        libgbm1 \
+        libasound2 \
+    && rm -rf /var/lib/apt/lists/*
+
 # ── k6 (load testing) — multi-arch binary download ───────────────────────────
 # k6 apt repo lacks arm64 packages, so we download the binary directly.
 RUN set -e; \
-    ARCH="$(dpkg --print-architecture)"; \
+    case "${TARGETARCH}" in \
+        amd64|arm64) ARCH="${TARGETARCH}" ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
+    esac; \
     K6_VERSION="$(curl -fsSL https://api.github.com/repos/grafana/k6/releases/latest | jq -r '.tag_name')"; \
     curl -fsSL "https://github.com/grafana/k6/releases/download/${K6_VERSION}/k6-${K6_VERSION}-linux-${ARCH}.tar.gz" \
         | tar xz --strip-components=1 -C /usr/local/bin
 
 # ── OpenShift CLI (oc) — multi-arch binary download ───────────────────────────
-# Supports both Intel (x86_64) and Apple Silicon (aarch64) hosts.
+# Supports both Intel and Apple Silicon hosts.
 RUN set -e; \
-    ARCH="$(uname -m)"; \
-    case "$ARCH" in \
-        x86_64)  OC_SUFFIX="linux" ;; \
-        aarch64) OC_SUFFIX="linux-arm64" ;; \
-        *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
+    case "${TARGETARCH}" in \
+        amd64) OC_SUFFIX="linux" ;; \
+        arm64) OC_SUFFIX="linux-arm64" ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
     esac; \
     curl -fsSL "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-${OC_SUFFIX}.tar.gz" \
         | tar xz -C /usr/local/bin oc
