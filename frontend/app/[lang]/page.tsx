@@ -1,7 +1,11 @@
 import { FormList } from '../ui/FormList';
 import { getDictionary, hasLocale, Locale } from './dictionaries';
 
-export async function generateMetadata({ params }: PageProps<'/[lang]'>) {
+type PageProps = {
+  params: Promise<{ lang: string }>;
+};
+
+export async function generateMetadata({ params }: PageProps) {
   const param = await params;
   if (!hasLocale(param.lang)) {
     param.lang = 'en';
