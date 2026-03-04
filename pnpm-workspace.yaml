@@ -1,7 +1,10 @@
 packages:
-  - "frontend"
-  - "backend"
+  - frontend
+  - backend
 
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+
+overrides:
+  minimatch: "10.2.4"
