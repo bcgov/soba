@@ -34,8 +34,16 @@ import {
 } from '../src/core/db/schema';
 
 const API_BASE = process.env.SOBA_API_BASE_URL || 'http://localhost:4000';
-const TOKEN =
-  process.env.SOBA_TEST_TOKEN || process.argv.find((a) => a.startsWith('--token='))?.slice(8);
+
+function normalizeToken(rawToken: string | undefined): string | undefined {
+  if (!rawToken) return undefined;
+  const trimmed = rawToken.trim().replace(/^['"]|['"]$/g, '');
+  return trimmed.replace(/^Bearer\s+/i, '');
+}
+
+const TOKEN = normalizeToken(
+  process.env.SOBA_TEST_TOKEN || process.argv.find((a) => a.startsWith('--token='))?.slice(8),
+);
 
 type IdpKind = 'github' | 'bcgov-sso';
 
@@ -71,9 +79,17 @@ function getExpectedFromBcgovJwt(token: string): {
   providerCode: string;
   displayLabel?: string;
 } {
+  // JWTs must be dot-separated (header.payload.signature).
+  if (token.split('.').length !== 3) {
+    throw new Error(
+      'Expected a JWT for --idp=bcgov-sso (format: header.payload.signature). If using a GitHub token/PAT, run with --idp=github instead.',
+    );
+  }
   const decoded = jwt.decode(token);
   if (!decoded || typeof decoded !== 'object') {
-    throw new Error('Invalid JWT: could not decode');
+    throw new Error(
+      'Invalid JWT: could not decode payload. Ensure SOBA_TEST_TOKEN is a raw JWT string (no quotes, no extra text).',
+    );
   }
   const payload = decoded as Record<string, unknown>;
   const sub = payload.sub;

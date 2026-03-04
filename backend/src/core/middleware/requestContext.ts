@@ -14,16 +14,6 @@ export interface CoreRequestContext {
   workspaceSource: string;
 }
 
-declare module 'express-serve-static-core' {
-  interface Request {
-    coreContext?: CoreRequestContext;
-    /** Resolved app_user id; set by auth/actor middleware before core context. */
-    actorId?: string;
-    /** True when the actor is a SOBA platform admin (soba_admin table); set by actor middleware. */
-    isSobaAdmin?: boolean;
-  }
-}
-
 // Request context resolution policy:
 // 1) Actor must be resolved before this middleware (via x-soba-user-id or auth middleware setting req.actorId).
 // 2) Workspace resolution: run configured resolver plugins in priority order; first match wins.

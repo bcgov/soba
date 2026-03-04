@@ -12,7 +12,8 @@ function Header() {
   const { authenticated, idTokenParsed, login, init } = useKeycloak();
   const dispatch = useAppDispatch();
   const isDark = useAppSelector((state) => state.theme.mode === 'dark');
-  const navItems = getNavigationItems(dict.locale, dict);
+  const locale = dict.locale === 'en' || dict.locale === 'fr' ? dict.locale : 'en';
+  const navItems = getNavigationItems(locale, dict);
 
   useEffect(() => {
     init();
