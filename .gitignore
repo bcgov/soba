@@ -9,3 +9,10 @@
 
 # Test coverage
 coverage/
+
+# Integration test artifacts
+integration/node_modules/
+integration/test-results/
+integration/playwright-report/
+integration/.playwright/
+integration/.cache/

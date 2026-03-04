@@ -4,6 +4,7 @@ import {
   getBuildMeta,
   getCodesMeta,
   getFeaturesMeta,
+  getFrontendConfigMeta,
   getFormEnginesMeta,
   getPluginsMeta,
   getRolesMeta,
@@ -16,6 +17,7 @@ router.get('/plugins', getPluginsMeta);
 router.get('/features', getFeaturesMeta);
 router.get('/form-engines', getFormEnginesMeta);
 router.get('/build', getBuildMeta);
+router.get('/frontend-config', getFrontendConfigMeta);
 router.get('/codes', validateRequest({ query: ListCodesQuerySchema }), getCodesMeta);
 router.get('/roles', validateRequest({ query: ListRolesQuerySchema }), getRolesMeta);
 

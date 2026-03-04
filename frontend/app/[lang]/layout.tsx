@@ -1,19 +1,7 @@
-import { Geist, Geist_Mono } from 'next/font/google';
-import '../globals.css';
 import DictionaryProvider from './Providers';
 import { Locale } from './dictionaries';
 import { getDictionary } from './dictionaries';
 import { Header } from '../ui/Header';
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
 
 export default async function RootLayout({
   children,
@@ -25,13 +13,14 @@ export default async function RootLayout({
   const { lang } = await params;
   const dictionary = await getDictionary(lang as Locale);
   return (
-    <html lang={lang}>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <DictionaryProvider dictionary={dictionary}>
-          <Header />
-          {children}
-        </DictionaryProvider>
-      </body>
-    </html>
+    <DictionaryProvider dictionary={dictionary}>
+      <a href="#main-content" className="skip-link">
+        {dictionary.header.skipToMain}
+      </a>
+      <Header />
+      <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl w-full">
+        {children}
+      </main>
+    </DictionaryProvider>
   );
 }

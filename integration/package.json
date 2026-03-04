@@ -1,0 +1,12 @@
+{
+  "name": "soba-integration-tests",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.11.1",
+    "@playwright/test": "^1.52.0"
+  }
+}

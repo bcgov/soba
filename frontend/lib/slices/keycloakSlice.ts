@@ -2,6 +2,7 @@ import Keycloak from 'keycloak-js';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { AppDispatch } from '../store';
+import { loadFrontendRuntimeConfig } from '../runtimeConfig';
 
 // Keep the Keycloak instance out of Redux state (non-serializable).
 // Store it in a module-level variable instead.
@@ -33,10 +34,11 @@ type InitResult = {
 export const initKeycloak = createAsyncThunk<InitResult, void, { rejectValue: string }>(
   'keycloak/init',
   async (_, { rejectWithValue }) => {
+    const runtimeConfig = await loadFrontendRuntimeConfig();
     const kc = new Keycloak({
-      url: process.env.NEXT_PUBLIC_KEYCLOAK_URL || '',
-      realm: process.env.NEXT_PUBLIC_KEYCLOAK_REALM || '',
-      clientId: process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID || '',
+      url: runtimeConfig.auth.keycloak.url,
+      realm: runtimeConfig.auth.keycloak.realm,
+      clientId: runtimeConfig.auth.keycloak.clientId,
     });
 
     try {
@@ -96,8 +98,6 @@ const slice = createSlice({
       .addCase(initKeycloak.fulfilled, (state, action) => {
         state.initializing = false;
         state.token = action.payload.token ?? undefined;
-        //I don't love this but this is where formio pulls the token from
-        localStorage.setItem('formioToken', action.payload.token ?? '');
         state.idTokenParsed = action.payload.idTokenParsed as
           | Keycloak.KeycloakTokenParsed
           | undefined;
@@ -115,16 +115,16 @@ export const { setToken, setIdTokenParsed, setAuthenticated, clear } = slice.act
 // Helper thunks
 export const login = () => async (dispatch: AppDispatch) => {
   let kc: Keycloak.KeycloakInstance | null = kcInstance;
-  if (!kc) {
-    kc = new Keycloak({
-      url: process.env.NEXT_PUBLIC_KEYCLOAK_URL || '',
-      realm: process.env.NEXT_PUBLIC_KEYCLOAK_REALM || '',
-      clientId: process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID || '',
-    });
-    kcInstance = kc;
-  }
-
   try {
+    if (!kc) {
+      const runtimeConfig = await loadFrontendRuntimeConfig();
+      kc = new Keycloak({
+        url: runtimeConfig.auth.keycloak.url,
+        realm: runtimeConfig.auth.keycloak.realm,
+        clientId: runtimeConfig.auth.keycloak.clientId,
+      });
+      kcInstance = kc;
+    }
     // prefer a forced login flow
     await kc.init({ onLoad: 'login-required', checkLoginIframe: false, pkceMethod: 'S256' });
     dispatch(setToken(kc.token ?? undefined));
@@ -133,7 +133,7 @@ export const login = () => async (dispatch: AppDispatch) => {
   } catch {
     // fallback to direct login redirect
     try {
-      kc.login();
+      kc?.login();
     } catch {
       // no-op
     }

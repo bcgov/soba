@@ -19,6 +19,10 @@ export const getBuildMeta = (_req: Request, res: Response) => {
   res.json(metaApiService.getBuild());
 };
 
+export const getFrontendConfigMeta = (_req: Request, res: Response) => {
+  res.json(metaApiService.getFrontendConfig());
+};
+
 export const getCodesMeta = asyncHandler(async (req: Request, res: Response) => {
   const onlyEnabledFeatures = req.query.only_enabled_features === 'true';
   const codeSetFilter = req.query.code_set as string | undefined;

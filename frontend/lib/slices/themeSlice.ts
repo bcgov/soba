@@ -1,30 +1,35 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { getDefaultThemeId } from '@/src/shared/theme/registry';
+import type { ThemeMode } from '@/src/shared/theme/types';
 
 export type ThemeState = {
-  isDark: boolean;
+  mode: ThemeMode;
+  themeId: string;
 };
 
 const initialState: ThemeState = {
-  // Default to the user's system preference when available (client); fall back to light on server.
-  isDark:
-    typeof window !== 'undefined'
-      ? window.matchMedia('(prefers-color-scheme: dark)').matches
-      : false,
+  // Keep initial render deterministic for SSR/CSR hydration.
+  // Client preference is applied in `useDark()` after mount.
+  mode: 'light',
+  themeId: getDefaultThemeId(),
 };
 
 const slice = createSlice({
   name: 'theme',
   initialState,
   reducers: {
-    setDark(state, action: PayloadAction<boolean>) {
-      state.isDark = action.payload;
+    setMode(state, action: PayloadAction<ThemeMode>) {
+      state.mode = action.payload;
     },
-    toggleDark(state) {
-      state.isDark = !state.isDark;
+    toggleMode(state) {
+      state.mode = state.mode === 'dark' ? 'light' : 'dark';
+    },
+    setTheme(state, action: PayloadAction<string>) {
+      state.themeId = action.payload;
     },
   },
 });
 
-export const { setDark, toggleDark } = slice.actions;
+export const { setMode, toggleMode, setTheme } = slice.actions;
 
 export default slice.reducer;

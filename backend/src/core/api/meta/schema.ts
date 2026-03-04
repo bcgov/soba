@@ -48,6 +48,28 @@ export const BuildMetaResponseSchema = z
   })
   .openapi('Meta_BuildResponse');
 
+export const FrontendConfigMetaResponseSchema = z
+  .object({
+    auth: z.object({
+      provider: z.literal('keycloak'),
+      idpPluginDefaultCode: z.string(),
+      keycloak: z.object({
+        url: z.string(),
+        realm: z.string(),
+        clientId: z.string(),
+        pkceMethod: z.literal('S256'),
+      }),
+    }),
+    api: z.object({
+      baseUrl: z.string(),
+    }),
+    build: z.object({
+      name: z.string(),
+      version: z.string(),
+    }),
+  })
+  .openapi('Meta_FrontendConfigResponse');
+
 export const CodeRowWithSourceMetaSchema = z
   .object({
     code: z.string(),
@@ -176,6 +198,22 @@ export const registerMetaOpenApi = (registry: OpenAPIRegistry) => {
         content: {
           'application/json': {
             schema: BuildMetaResponseSchema,
+          },
+        },
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/meta/frontend-config',
+    tags: ['core.meta'],
+    responses: {
+      200: {
+        description: 'Public runtime configuration needed by the frontend',
+        content: {
+          'application/json': {
+            schema: FrontendConfigMetaResponseSchema,
           },
         },
       },

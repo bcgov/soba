@@ -9,8 +9,9 @@
     "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à cette section."
   },
   "header": {
-    "list": "Liste des Formulaires",
-    "builder": "Constructeur de Formulaires"
+    "workspaces": "Espaces de travail",
+    "themeToggle": "Basculer le theme de couleur",
+    "skipToMain": "Aller au contenu principal"
   },
 
   "Basic": "Basique",

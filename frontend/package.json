@@ -6,6 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run",
     "lint": "eslint",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
@@ -13,8 +16,6 @@
   },
   "dependencies": {
     "@formatjs/intl-localematcher": "^0.8.1",
-    "@formio/js": "^5.3.0",
-    "@formio/react": "^6.2.0",
     "@reduxjs/toolkit": "^2.11.2",
     "bootstrap": "^5.3.8",
     "keycloak-js": "^26.2.3",
@@ -40,6 +41,8 @@
     "globals": "^17.3.0",
     "prettier": "^3.8.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^4.0.18"
   }
 }

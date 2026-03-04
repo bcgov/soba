@@ -9,8 +9,9 @@
     "notAuthenticated": "You are not authenticated. Please login to access this section."
   },
   "header": {
-    "list": "Form List",
-    "builder": "Form Builder"
+    "workspaces": "Workspaces",
+    "themeToggle": "Toggle color theme",
+    "skipToMain": "Skip to main content"
   },
 
   "Basic": "Basic",

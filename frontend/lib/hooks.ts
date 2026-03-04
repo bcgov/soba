@@ -1,45 +1,42 @@
 import { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from './store';
-import { setDark, toggleDark } from './slices/themeSlice';
+import { setMode, setTheme, toggleMode } from './slices/themeSlice';
+import type { ThemeMode } from '@/src/shared/theme/types';
+import { getDefaultThemeId } from '@/src/shared/theme/registry';
 
 // useDark hook: provides current value and toggles, persists to localStorage and applies document attribute
 export function useDark() {
   const dispatch = useAppDispatch();
-  const isDark = useAppSelector((state) => state.theme.isDark);
+  const mode = useAppSelector((state) => state.theme.mode);
+  const themeId = useAppSelector((state) => state.theme.themeId);
+  const isDark = mode === 'dark';
 
   useEffect(() => {
-    // Try to read preference from localStorage (client-only)
     if (typeof window !== 'undefined') {
-      const stored = window.localStorage.getItem('isDark');
-      if (stored !== null) {
-        dispatch(setDark(stored === 'true'));
-        return;
-      }
+      const storedMode = window.localStorage.getItem('theme-mode');
+      const storedTheme = window.localStorage.getItem('theme-id');
 
-      // fallback to prefers-color-scheme
-      const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      dispatch(setDark(mq.matches));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      // Tell Bootstrap which theme to use (v5.3+ supports data-bs-theme)
-      document.documentElement.setAttribute('data-bs-theme', isDark ? 'dark' : 'light');
-      // Also toggle Tailwind's dark class so Tailwind dark variants apply when configured with `darkMode: 'class'`.
-      if (isDark) {
-        document.documentElement.classList.add('dark');
+      if (storedMode === 'light' || storedMode === 'dark') {
+        dispatch(setMode(storedMode));
       } else {
-        document.documentElement.classList.remove('dark');
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        dispatch(setMode(mq.matches ? 'dark' : 'light'));
       }
+
+      dispatch(setTheme(storedTheme ?? getDefaultThemeId()));
     }
+  }, [dispatch]);
+
+  useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem('isDark', isDark ? 'true' : 'false');
+      window.localStorage.setItem('theme-mode', mode);
+      window.localStorage.setItem('theme-id', themeId);
     }
-  }, [isDark]);
+  }, [mode, themeId]);
 
-  const toggle = () => dispatch(toggleDark());
+  const toggle = () => dispatch(toggleMode());
+  const setColorMode = (value: ThemeMode) => dispatch(setMode(value));
+  const setThemeId = (value: string) => dispatch(setTheme(value));
 
-  return { isDark, toggle, setDark: (v: boolean) => dispatch(setDark(v)) };
+  return { isDark, mode, themeId, toggle, setDark: (v: boolean) => setColorMode(v ? 'dark' : 'light'), setThemeId };
 }

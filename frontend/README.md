@@ -2,12 +2,13 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Environment
 
-The frontend uses `.env` for runtime config (Form.io URL, Keycloak). It is not committed; it is created from `.env.example` when the devcontainer starts.
+The frontend uses `.env` for backend discovery and runtime bootstrap. It is not committed; it is created from `.env.example` when the devcontainer starts.
 
 **`.env.example`** values are for the **localhost / local dev** environment:
 
-- `NEXT_PUBLIC_FORMIO_BASE_URL` — local Form.io (e.g. `http://localhost:3001`)
-- `NEXT_PUBLIC_KEYCLOAK_*` — BC Gov dev Keycloak
+- `NEXT_PUBLIC_SOBA_API_BASE_URL` — SOBA backend API base URL (e.g. `http://localhost:4000/api/v1`)
+
+At runtime, frontend auth configuration (Keycloak URL/realm/clientId) is loaded from backend `GET /api/v1/meta/frontend-config` based on backend IdP config.
 
 **How it is created**
 

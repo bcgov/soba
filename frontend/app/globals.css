@@ -1,26 +1,70 @@
 @import 'tailwindcss';
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --app-bg: #f6f9fc;
+  --app-surface: #ffffff;
+  --app-text: #1a1a1a;
+  --app-text-muted: #474543;
+  --app-border: #d8dee3;
+  --app-primary: #003366;
+  --app-primary-text: #ffffff;
+  --app-focus-ring: #1a5a96;
+  --app-danger: #ce3e39;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--app-bg);
+  --color-foreground: var(--app-text);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background: var(--app-bg);
+  color: var(--app-text);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+a {
+  color: var(--app-primary);
+}
+
+.app-header {
+  background: var(--app-surface);
+  border-color: var(--app-border);
+}
+
+.card-surface {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+}
+
+.btn-primary {
+  background: var(--app-primary);
+  color: var(--app-primary-text);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  z-index: 1000;
+  background: var(--app-primary);
+  color: var(--app-primary-text);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem;
+}
+
+.skip-link:focus-visible {
+  left: 1rem;
+  top: 1rem;
+}
+
+:focus-visible {
+  outline: 3px solid var(--app-focus-ring);
+  outline-offset: 2px;
 }
