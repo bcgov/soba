@@ -8,7 +8,7 @@ import {
   Text,
 } from '@bcgov/design-system-react-components';
 import { useAppDispatch } from '@/lib/store';
-import { useKeycloak } from '@/lib/useKeycloak';
+import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { clearCurrentUser, loadCurrentUser } from '@/lib/slices/currentUserSlice';
 import { useDictionary } from '../[lang]/Providers';
@@ -72,7 +72,7 @@ function Header() {
               className="inline-block h-5 w-44 rounded bg-[var(--surface-color-border-default)]/60 animate-pulse"
             />
           )}
-          <Button
+<Button
             id="logout-button"
             type="button"
             variant="secondary"

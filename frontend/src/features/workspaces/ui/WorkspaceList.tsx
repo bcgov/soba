@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Callout, Heading, InlineAlert, Text } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
-import { useKeycloak } from '@/lib/useKeycloak';
+import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { fetchBuildMeta, fetchHealth, fetchWorkspaces, WorkspaceItem } from '@/src/shared/api/sobaApi';
 
 function WorkspaceList() {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import { useParams } from "next/navigation";
 import {
@@ -29,12 +29,11 @@ function ShareForm({ formId, warning = false, isRTL = false }: ShareFormProps) {
   const [dialog, setDialog] = useState(false);
   const qrRef = useRef<HTMLCanvasElement>(null);
 
-  const [formLink, setFormLink] = useState("");
-
-  useEffect(() => {
+  const formLink = useMemo(() => {
+    if (typeof window === "undefined") return "";
     const url = new URL(`/${lang}/submit`, window.location.origin);
     url.searchParams.set("f", formId);
-    setFormLink(url.toString());
+    return url.toString();
   }, [formId, lang]);
 
   const downloadQr = () => {
@@ -66,7 +65,7 @@ function ShareForm({ formId, warning = false, isRTL = false }: ShareFormProps) {
           }}
         >
           <div
-            className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800"
+            className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800 text-left"
             data-cy="shareFormDialog"
           >
             {/* Title */}
