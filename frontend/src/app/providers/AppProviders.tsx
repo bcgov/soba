@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { Provider } from 'react-redux';
 import makeStore from '@/lib/store';
 import { getDictionary } from '@/app/[lang]/dictionaries';
+import { NotificationToast } from '@/app/ui/base/NotificationToast';
 
 type Dictionary = Awaited<ReturnType<typeof getDictionary>>;
 
@@ -20,7 +21,10 @@ export default function AppProviders({
 
   return (
     <DictionaryContext.Provider value={dictionary}>
-      <Provider store={store}>{children}</Provider>
+      <Provider store={store}>
+        {children}
+        <NotificationToast />
+      </Provider>
     </DictionaryContext.Provider>
   );
 }
