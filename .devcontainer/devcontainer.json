@@ -5,6 +5,7 @@
     "context": "."
   },
   "runArgs": [
+    "--add-host=host.docker.internal:host-gateway",
     "--env-file",
     "${localWorkspaceFolder}/backend/.env",
     "--env-file",
