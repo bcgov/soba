@@ -182,9 +182,9 @@ The `soba_admin` table stores the source (`idp` or `direct`). `/api/v1/admin` is
 
 Protected routes go through three steps:
 
-1. **`checkJwt()`** — Tries each IdP in `IDP_PLUGINS` order. Each validates the JWT (JWKS, issuer, audience). First success sets `req.idpPluginCode` and `req.authPayload`; otherwise 401.
+1. **`checkJwt()`** — Passport-backed auth entry point. It calls `passport.authenticate(..., { session: false })`, and the composite Passport strategy tries each IdP plugin in `IDP_PLUGINS` order until one succeeds. The winning plugin sets `req.idpPluginCode` and `req.authPayload`; otherwise the request gets a 401. `session: false` is intentional because the API is bearer-token based, stays stateless, scales more easily across instances, and remains compatible with trying multiple IdP plugins in order.
 
-2. **`resolveActor`** — The winning IdP’s `claimMapper` turns claims into an internal actor. We call `findOrCreateUserByIdentity` (creates `app_user` on first login) and, if the mapper says `sobaAdmin`, upsert or revoke the `soba_admin` row. Sets `req.actorId` and `req.isSobaAdmin`.
+2. **`resolveActor`** — The winning IdP’s `claimMapper` turns claims into an internal actor. We call `findOrCreateUserByIdentity` (creates `app_user` on first login) and, if the mapper says `sobaAdmin`, upsert or revoke the `soba_admin` row. Sets `req.actorId` and `req.isSobaAdmin`. Passport is the auth entry point; IdP plugins still own provider-specific token validation and claim mapping.
 
 3. **`coreContextMiddleware`** — Workspace resolvers figure out which workspace the request is for. We check the actor has an active membership there (cached as `membership:{workspaceId}:{userId}`) and set `req.coreContext`.
 
@@ -303,7 +303,7 @@ A single plugin directory can export more than one type — for example `persona
 ### Selection and priority
 
 - **Workspace resolvers** — all plugins listed in `WORKSPACE_PLUGINS_ENABLED` are activated. They are sorted by `priority` and tried in order on each request; the first resolver that returns a workspace wins.
-- **IdP plugins** — tried in `IDP_PLUGINS` order; first successful JWT validation wins.
+- **IdP plugins** — Passport uses `IDP_PLUGINS` as the ordered provider chain; the first plugin that successfully validates the token and maps claims wins.
 - **Cache, message bus, form engine** — single active instance selected by code; the registry creates it lazily on first use.
 
 If `WORKSPACE_PLUGINS_STRICT_MODE=true`, startup fails if any enabled workspace plugin is not found. Otherwise a warning is logged.
@@ -640,9 +640,9 @@ Right now any logged-in user gets a personal workspace and owner role on first l
 
 We don’t yet know how personal or enterprise resolvers will determine which workspace (tenant) a request belongs to. Today personal-local effectively assumes “the user’s one personal workspace” and we don’t have a real “selection” story. Once a user can belong to multiple workspaces we need a contract: how does the client tell the backend which workspace is active? Options to discuss for **personal-local** (and by analogy for enterprise): **cookie** (set on workspace switch, sent automatically; works for same-origin browser, not for API-only or cross-origin), **header** (e.g. `X-Workspace-Id` or `X-Tenant-Id`; explicit, works for API clients and SPAs; client must send it every time), **mint a token** (e.g. short-lived JWT or opaque token that encodes workspace; can be passed in header or cookie; revocable and auditable but we own token lifecycle). Enterprise may get context from a different source (e.g. IdP or gateway). We need to decide and document the contract so frontend and API consumers know what to send.
 
-## Custom IdP plugins vs. Passport
+## Passport-backed IdP auth
 
-Our IdP layer is custom: each plugin does `createAuthMiddleware` (express-jwt + jwks-rsa) and `createClaimMapper`. It works but overlaps with [Passport.js](https://www.passportjs.org). Passport would give us a big ecosystem (Keycloak, GitHub, Azure AD, etc.) and less code to maintain; staying custom keeps the surface small and we don’t need Passport’s session/serialization for a JWT API — and we’re already doing what its JWT strategy does. Open question: if we add more IdPs (Azure AD, BCeID, BC Services Card), does that justify switching to Passport, or is the thin plugin interface enough? Either way we still need custom claim mapping.
+Passport is now the protected-route auth entry point for the backend API. `checkJwt()` uses Passport in stateless mode (`session: false`) for per-request token verification, while IdP plugins remain customizable and still own provider-specific token validation and claim mapping. `IDP_PLUGINS` still controls provider order, and the first successful plugin wins.
 
 ## Two frontends
 

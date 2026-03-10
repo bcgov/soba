@@ -1,19 +1,11 @@
 /**
- * IdP plugin discovery and composite auth middleware.
+ * IdP plugin selection and auth middleware wiring.
  */
-import fs from 'fs';
-import path from 'path';
 import { Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
 import { authEnv } from '../config/authEnv';
 import { createPluginConfigReader } from '../config/pluginConfig';
 import type { IdpPluginDefinition, IdpClaimMapper } from './IdpPlugin';
-
-const IdpPluginDefinitionSchema = z.object({
-  code: z.string().min(1),
-  createAuthMiddleware: z.any(),
-  createClaimMapper: z.any(),
-});
+import { getIdpPluginDefinitions } from '../integrations/plugins/PluginRegistry';
 
 export interface IdpPluginInstance {
   code: string;
@@ -21,49 +13,11 @@ export interface IdpPluginInstance {
   claimMapper: IdpClaimMapper;
 }
 
-function getPluginsRoot(): string {
-  const fromEnv = authEnv.getPluginsPath();
-  if (fromEnv) return path.resolve(fromEnv);
-  const runningFromDist = __dirname.includes(path.sep + 'dist' + path.sep);
-  const pluginsDir = runningFromDist
-    ? path.join('dist', 'src', 'plugins')
-    : path.join('src', 'plugins');
-  return path.resolve(process.cwd(), pluginsDir);
-}
-
 let idpDefinitionsCache: IdpPluginDefinition[] | null = null;
 
 function discoverIdpDefinitions(): IdpPluginDefinition[] {
   if (idpDefinitionsCache) return idpDefinitionsCache;
-  const pluginsRoot = getPluginsRoot();
-  if (!fs.existsSync(pluginsRoot)) {
-    idpDefinitionsCache = [];
-    return idpDefinitionsCache;
-  }
-  const pluginDirs = fs
-    .readdirSync(pluginsRoot, { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .map((e) => e.name);
-
-  const result: IdpPluginDefinition[] = [];
-  for (const pluginDir of pluginDirs) {
-    const modulePath = path.join(pluginsRoot, pluginDir);
-    let raw: unknown;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      raw = require(modulePath);
-    } catch {
-      continue;
-    }
-    const obj = raw !== null && typeof raw === 'object' ? raw : {};
-    const idpDef = (obj as Record<string, unknown>).idpPluginDefinition;
-    if (idpDef === undefined) continue;
-    const parsed = IdpPluginDefinitionSchema.safeParse(idpDef);
-    if (parsed.success) {
-      result.push(idpDef as IdpPluginDefinition);
-    }
-  }
-  idpDefinitionsCache = result;
+  idpDefinitionsCache = getIdpPluginDefinitions();
   return idpDefinitionsCache;
 }
 

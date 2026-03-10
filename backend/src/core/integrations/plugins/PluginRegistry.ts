@@ -20,6 +20,7 @@ import type {
   MessageBusAdapter,
   MessageBusPluginDefinition,
 } from '../messagebus/MessageBusAdapter';
+import type { IdpPluginDefinition } from '../../auth/IdpPlugin';
 
 const WorkspaceResolverDefinitionSchema = z.object({
   code: z.string().min(1),
@@ -53,6 +54,12 @@ const MessageBusPluginDefinitionSchema = z.object({
   createAdapter: z.any(),
 });
 
+const IdpPluginDefinitionSchema = z.object({
+  code: z.string().min(1),
+  createAuthMiddleware: z.any(),
+  createClaimMapper: z.any(),
+});
+
 interface CachedPlugin {
   dir: string;
   workspaceDefinition?: WorkspaceResolverDefinition;
@@ -60,6 +67,7 @@ interface CachedPlugin {
   apiDefinition?: FeatureApiDefinition;
   cacheDefinition?: CachePluginDefinition;
   messagebusDefinition?: MessageBusPluginDefinition;
+  idpDefinition?: IdpPluginDefinition;
 }
 
 let cache: CachedPlugin[] | null = null;
@@ -165,6 +173,19 @@ function discoverAndCache(): CachedPlugin[] {
       } else {
         console.warn(
           `[PluginRegistry] invalid messagebusPluginDefinition in '${pluginDir}':`,
+          parsed.error.message,
+        );
+      }
+    }
+
+    const idpDef = (obj as Record<string, unknown>).idpPluginDefinition;
+    if (idpDef !== undefined) {
+      const parsed = IdpPluginDefinitionSchema.safeParse(idpDef);
+      if (parsed.success) {
+        entry.idpDefinition = idpDef as IdpPluginDefinition;
+      } else {
+        console.warn(
+          `[PluginRegistry] invalid idpPluginDefinition in '${pluginDir}':`,
           parsed.error.message,
         );
       }
@@ -288,6 +309,11 @@ export function getMessageBusPluginDefinitions(): MessageBusPluginDefinition[] {
   return discovered
     .map((p) => p.messagebusDefinition)
     .filter((d): d is MessageBusPluginDefinition => Boolean(d));
+}
+
+export function getIdpPluginDefinitions(): IdpPluginDefinition[] {
+  const discovered = discoverAndCache();
+  return discovered.map((p) => p.idpDefinition).filter((d): d is IdpPluginDefinition => Boolean(d));
 }
 
 let cacheAdapterInstance: CacheAdapter | null = null;
