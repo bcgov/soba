@@ -25,10 +25,11 @@ function getPluginsRoot(): string {
   const fromEnv = authEnv.getPluginsPath();
   if (fromEnv) return path.resolve(fromEnv);
   const runningFromDist = __dirname.includes(path.sep + 'dist' + path.sep);
-  const pluginsDir = runningFromDist
-    ? path.join('dist', 'src', 'plugins')
-    : path.join('src', 'plugins');
-  return path.resolve(process.cwd(), pluginsDir);
+  if (runningFromDist) {
+    // This file is dist/src/core/auth → ../../plugins = dist/src/plugins
+    return path.resolve(__dirname, '..', '..', 'plugins');
+  }
+  return path.resolve(process.cwd(), 'src', 'plugins');
 }
 
 let idpDefinitionsCache: IdpPluginDefinition[] | null = null;

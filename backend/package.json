@@ -13,7 +13,7 @@
     "db:seed": "tsx src/core/db/seed.ts",
     "build": "tsc",
     "serve": "pnpm run build && node dist/src/app.js",
-    "dev": "npx tsc -w & npx nodemon dist/app.js",
+    "dev": "npx tsc -w & npx nodemon --exec \"npx tsc && node dist/src/app.js\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
