@@ -1,0 +1,31 @@
+# Non-sensitive static config for PR deployments of SOBA.
+# Sensitive values (passwords, signing secrets, internal URLs) are injected at
+# runtime from GitHub Secrets via the workflow (see .github/workflows/pr_open.yaml).
+
+nsp:
+  enabled: false
+
+formio:
+  enabled: false
+  username: 'admin@example.com'
+
+crunchy:
+  enabled: false
+
+# Public OAuth identifiers — visible in browser network requests and JWT tokens
+keycloakClientId: 'connected-services-submit-6349'
+keycloakRealm: 'standard'
+jwtIssuer: 'https://dev.loginproxy.gov.bc.ca/auth/realms/standard'
+jwtAudience: 'connected-services-submit-6349'
+
+# Non-sensitive config
+roleField: 'role'
+nodeEnv: 'production'
+adminRoleName: 'admin'
+managerRoleName: 'manager'
+
+# formioManagerUsername injected from GitHub Secret FORMIO_MANAGER_USERNAME
+formioManagerUsername: 'your-formio-manager-username'
+
+fe_routes_enabled: true
+be_routes_enabled: true
