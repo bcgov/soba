@@ -294,6 +294,7 @@ At startup, [`PluginRegistry.ts`](./backend/src/core/integrations/plugins/Plugin
 | `workspacePluginDefinition`  | Workspace resolver                                 | `WORKSPACE_PLUGINS_ENABLED` (comma-separated, ordered)     |
 | `idpPluginDefinition`        | Identity provider (JWT validation + claim mapping) | `IDP_PLUGINS` (comma-separated, ordered)                   |
 | `formEnginePluginDefinition` | Form engine adapter                                | `FORM_ENGINE_DEFAULT_CODE`                                 |
+| —                             | Form engine **routes** (optional proxy/API)        | `PLUGIN_<CODE>_ROUTES_ENABLED=true` (per-engine, explicit)  |
 | `cachePluginDefinition`      | Cache adapter                                      | `CACHE_DEFAULT_CODE`                                       |
 | `messagebusPluginDefinition` | Message bus adapter                                | `MESSAGEBUS_DEFAULT_CODE`                                  |
 | `pluginApiDefinition`        | Optional REST API mounted under `/api/v1`          | Enabled automatically when the workspace plugin is enabled |
@@ -335,7 +336,7 @@ See [Environment Variables — Plugin and feature config](#plugin-and-feature-co
 | `enterprise-cstar`  | `PLUGIN_ENTERPRISE_CSTAR_`  | Workspace resolver              | Enterprise/ministry workspace; group sync not yet implemented  |
 | `idp-bcgov-sso`     | `PLUGIN_IDP_BCGOV_SSO_`     | IdP                             | BC Gov Keycloak SSO; maps `soba_admin` Keycloak role           |
 | `idp-github`        | `PLUGIN_IDP_GITHUB_`        | IdP                             | GitHub OAuth; alternative IdP                                  |
-| `formio-v5`         | `PLUGIN_FORMIO_V5_`         | Form engine                     | Form.io CE; no API client yet                                  |
+| `formio-v5`         | `PLUGIN_FORMIO_V5_`         | Form engine                     | Form.io CE; API client and proxy when `PLUGIN_FORMIO_V5_ROUTES_ENABLED=true` (proxy at `/api/v1/formio-v5`, protected) |
 | `cache-memory`      | `PLUGIN_CACHE_MEMORY_`      | Cache                           | In-process; default. Redis plugin not yet written              |
 | `messagebus-memory` | `PLUGIN_MESSAGEBUS_MEMORY_` | Message bus                     | In-process; default. Redis/NATS plugin not yet written         |
 
@@ -384,15 +385,23 @@ The `/meta/codes` endpoint supports filtering to a specific code set (e.g. `?cod
 
 ## Form Engine
 
-Form.io CE runs as a sidecar. The frontend never talks to it directly; only the backend does.
+Form.io CE runs as a sidecar. The frontend can talk to it via the **same-origin proxy** when form-engine routes are enabled.
+
+### Form-engine routes (optional)
+
+Form engine plugins can optionally expose HTTP routes (e.g. a Form.io CE proxy) by defining **`routeBasePath`** and **`createRouter(config)`** on the plugin definition. Routes are **only mounted** when the plugin’s config sets **`PLUGIN_<CODE>_ROUTES_ENABLED=true`** (explicit per-engine; not tied to workspace enablement). The path can be static or a function of config (e.g. `PROXY_PATH`). See `getFormEngineRouteDefinitions()` in `PluginRegistry.ts`.
+
+### formio-v5 proxy
+
+When **`PLUGIN_FORMIO_V5_ROUTES_ENABLED=true`**, the formio-v5 plugin mounts a Form.io CE API proxy at **`/api/v1/formio-v5`** (path from **`PLUGIN_FORMIO_V5_PROXY_PATH`**, default `/formio-v5`, prefixed with `/api/v1`). The route is **protected**: it uses the same auth as the rest of the v1 API (`checkJwt()`, `resolveActor`), so the client must send a valid app JWT in `Authorization: Bearer`. The proxy forwards requests to the Form.io CE server (using `ADMIN_API_URL`) and optionally passes through **`x-jwt-token`** from the client; otherwise it uses the server-side admin client. This gives the frontend a same-origin base URL for `FormioProvider` (e.g. `baseUrl: '/api/v1/formio-v5'`). All options (base URL, admin credentials) come from plugin config (`PLUGIN_FORMIO_V5_*`); there is no URL logging. Readiness checks stay on the adapter (`readinessCheck()`); readiness is reported via existing `/api/v1/health/ready`.
 
 ### Done
 
 - `formio-v5` plugin is wired in and selected via `FORM_ENGINE_DEFAULT_CODE`
+- Form.io CE API client and proxy in `formio-v5`; mount with `PLUGIN_FORMIO_V5_ROUTES_ENABLED=true`
 
 ### Not Done
 
-- No Form.io API client yet — the official [docs](https://apidocs.form.io/) target Enterprise; a CE-compatible reference client exists [here](https://github.com/usingtechnology/formio-ce-api)
 - Form field conventions not decided (title, tags, etc.) — worth exploring Formio tags as a way to associate forms with a Workspace (tenancy)
 - Not yet wired into the outbox pattern
 
@@ -467,7 +476,7 @@ Core domain routes (all under `/api/v1`, all protected):
 
 **OpenAPI / Swagger:** We generate the spec at runtime from Zod with `@asteasolutions/zod-to-openapi`. Each domain registers its routes. Spec at `/api/docs/openapi.json`, UI at `/api/docs`. Both public.
 
-**Health:** Under `/api/v1/health`, `GET /` is liveness (`{ status: 'OK', timestamp }`, no deps). `GET /ready` is readiness: we run `SELECT 1` and call `healthCheck()` on every form engine adapter; 200 when all pass, 503 with per-component detail when something fails.
+**Health:** Under `/api/v1/health`, `GET /` is liveness (`{ status: 'OK', timestamp }`, no deps). `GET /ready` is readiness: we run `SELECT 1` and call `readinessCheck()` on every form engine adapter; 200 when all pass, 503 with per-component detail when something fails.
 
 **CORS:** All origins in dev; blocked in production. No allow-list yet.
 

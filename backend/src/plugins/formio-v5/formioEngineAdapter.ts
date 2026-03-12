@@ -1,6 +1,6 @@
 import {
   FormEngineAdapter,
-  type FormEngineHealthResult,
+  type FormEngineReadinessResult,
   FormVersionProvisionInput,
   SubmissionProvisionInput,
 } from '../../core/integrations/form-engine/FormEngineAdapter';
@@ -14,8 +14,6 @@ export interface FormioV5Config {
   renderApiUrl: string;
   adminUsername: string;
   adminPassword: string;
-  managerUsername: string;
-  managerPassword: string;
   projectPath?: string;
   version?: string;
 }
@@ -27,8 +25,6 @@ const loadConfig = (config: PluginConfigReader): FormioV5Config => {
     renderApiUrl: config.getRequired('RENDER_API_URL'),
     adminUsername: config.getRequired('ADMIN_USERNAME'),
     adminPassword: config.getRequired('ADMIN_PASSWORD'),
-    managerUsername: config.getRequired('MANAGER_USERNAME'),
-    managerPassword: config.getRequired('MANAGER_PASSWORD'),
     projectPath: config.getOptional('PROJECT_PATH'),
     version: config.getOptional('VERSION'),
   };
@@ -51,7 +47,7 @@ export class FormioEngineAdapter implements FormEngineAdapter {
     return { engineRef: placeholderRef('formio-submission', input.submissionId) };
   }
 
-  async healthCheck(): Promise<FormEngineHealthResult> {
+  async readinessCheck(): Promise<FormEngineReadinessResult> {
     try {
       const url = this.config.renderApiUrl.replace(/\/$/, '') || this.config.renderApiUrl;
       const res = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(5000) });

@@ -131,7 +131,7 @@ The backend uses `.env` and `.env.local`. Values are loaded in order: `.env` fir
 | File                         | Purpose                                                          | Committed |
 | ---------------------------- | ---------------------------------------------------------------- | --------- |
 | `backend/.env.example`       | Base config (Form.io URL, JWT issuer/audience, role mapping)     | Yes       |
-| `backend/.env.local.example` | Template for credentials (Form.io admin/manager, session secret) | Yes       |
+| `backend/.env.local.example` | Template for credentials (Form.io admin, session secret) | Yes       |
 | `backend/.env`               | Active base config                                               | No        |
 | `backend/.env.local`         | Active credentials and secrets                                   | No        |
 

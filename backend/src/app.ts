@@ -15,6 +15,8 @@ import { resolveActor } from './core/middleware/actor';
 import { requireSobaAdmin } from './core/middleware/requireSobaAdmin';
 import { adminRouter } from './core/api/admin';
 import { globalRateLimit, apiRateLimit, publicRateLimit } from './core/middleware/rateLimit';
+import { getFormEngineRouteDefinitions } from './core/integrations/plugins/PluginRegistry';
+import { createPluginConfigReader } from './core/config/pluginConfig';
 
 const app = express();
 const port = 4000;
@@ -37,6 +39,21 @@ app.use(
 app.use(httpLogger);
 
 app.use(globalRateLimit);
+
+// ——— Form-engine proxy/routes under /api/v1 (protected; when PLUGIN_<CODE>_ROUTES_ENABLED=true) ———
+const formEngineRouteDefs = getFormEngineRouteDefinitions();
+for (const def of formEngineRouteDefs) {
+  const path = `/api/v1${def.routeBasePath.startsWith('/') ? '' : '/'}${def.routeBasePath}`;
+  app.use(
+    path,
+    apiRateLimit,
+    express.json(),
+    checkJwt(),
+    resolveActor,
+    def.createRouter(createPluginConfigReader(def.code)),
+  );
+  log.info({ code: def.code, path }, 'Form-engine routes mounted');
+}
 
 // ——— Public routes (no authentication) ———
 app.get('/api/docs/openapi.json', publicRateLimit, (_req, res) => {
