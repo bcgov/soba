@@ -3,9 +3,16 @@ description: Builds a container from a Dockerfile and pushes to GHCR
 
 inputs:
   context:
-    description: Effective Working Directory (e.g., ./backend or ./frontend)
+    description: Docker build context — use repo root (.) so Dockerfiles can copy workspace files
     required: true
-    default: "./"
+    default: "."
+  dockerfile:
+    description: Path to Dockerfile relative to repo root (e.g., ./backend/Dockerfile)
+    required: true
+  component_dir:
+    description: Component source directory — used for the Next.js config patch (e.g., ./frontend)
+    required: false
+    default: ""
   image_name:
     description: Image Name (e.g., backend or frontend)
     required: true
@@ -86,7 +93,7 @@ runs:
       if: ${{ inputs.image_name == 'frontend' }}
       shell: bash
       run: |
-        cat > ${{ inputs.context }}/next.config.ts << 'EOF'
+        cat > ${{ inputs.component_dir || inputs.context }}/next.config.ts << 'EOF'
         import type { NextConfig } from "next";
 
         const nextConfig: NextConfig = {
@@ -103,6 +110,7 @@ runs:
       uses: docker/build-push-action@v6
       with:
         context: ${{ inputs.context }}
+        file: ${{ inputs.dockerfile }}
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
