@@ -64,7 +64,7 @@ services:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/soba
       DB_ADMIN_DATABASE: postgres
       FORMIO_VERSION: local
-    command: sh -lc "corepack enable pnpm && pnpm install --filter @soba/backend... --frozen-lockfile && pnpm --filter @soba/backend run db:migrate && pnpm --filter @soba/backend run db:seed"
+    command: sh -lc "corepack enable pnpm && pnpm --filter @soba/backend run db:migrate && pnpm --filter @soba/backend run db:seed"
     depends_on:
       postgres:
         condition: service_healthy
