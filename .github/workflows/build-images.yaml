@@ -62,16 +62,17 @@ on:
         value: ${{ jobs.merge.outputs.short_sha }}
       image_version:
         value: ${{ jobs.merge.outputs.image_version }}
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - ".github/workflows/build-images.yaml"
-      - ".gitignore"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
+  # pull_request trigger disabled — PR builds now flow through pr_open.yaml → workflow_call
+  # pull_request:
+  #   types: [opened, synchronize, reopened]
+  #   paths:
+  #     - "backend/**"
+  #     - "frontend/**"
+  #     - ".github/workflows/build-images.yaml"
+  #     - ".gitignore"
+  #     - "package.json"
+  #     - "pnpm-lock.yaml"
+  #     - "pnpm-workspace.yaml"
   push:
     branches: [main]
     paths:
