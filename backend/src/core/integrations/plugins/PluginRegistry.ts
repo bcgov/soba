@@ -67,13 +67,13 @@ let cache: CachedPlugin[] | null = null;
 function getPluginsRoot(): string {
   const fromEnv = env.getPluginsPath();
   if (fromEnv) return path.resolve(fromEnv);
-  // When running compiled (from dist/), load plugins from dist/src/plugins.
-  // When running from source (tsx/ts-node), use src/plugins.
+  // Compiled: this file is dist/src/core/integrations/plugins → ../../../plugins = dist/src/plugins.
+  // Do not use process.cwd() for dist (breaks when node is started from repo root or /app).
   const runningFromDist = __dirname.includes(path.sep + 'dist' + path.sep);
-  const pluginsDir = runningFromDist
-    ? path.join('dist', 'src', 'plugins')
-    : path.join('src', 'plugins');
-  return path.resolve(process.cwd(), pluginsDir);
+  if (runningFromDist) {
+    return path.resolve(__dirname, '..', '..', '..', 'plugins');
+  }
+  return path.resolve(process.cwd(), 'src', 'plugins');
 }
 
 function discoverAndCache(): CachedPlugin[] {

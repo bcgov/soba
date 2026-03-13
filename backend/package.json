@@ -12,15 +12,15 @@
     "db:migrate": "tsx src/core/db/migrate.ts",
     "db:seed": "tsx src/core/db/seed.ts",
     "build": "tsc",
-    "serve": "pnpm run build && node dist/app.js",
-    "dev": "npx tsc -w & npx nodemon dist/app.js",
+    "serve": "pnpm run build && node dist/src/app.js",
+    "dev": "npx tsc -w & npx nodemon --exec \"npx tsc && node dist/src/app.js\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "type-check": "tsc --noEmit",
     "check": "pnpm type-check && pnpm lint",
-    "start": "node dist/app.js"
+    "start": "node dist/src/app.js"
   },
   "keywords": [],
   "author": "Brandon Sharratt",

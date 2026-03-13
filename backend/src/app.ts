@@ -17,7 +17,7 @@ import { adminRouter } from './core/api/admin';
 import { globalRateLimit, apiRateLimit, publicRateLimit } from './core/middleware/rateLimit';
 
 const app = express();
-const port = 4000;
+const port = Number(process.env.PORT) || 4000;
 
 if (process.env.NODE_ENV === 'development') {
   log.info('Allowing CORS for development environment');

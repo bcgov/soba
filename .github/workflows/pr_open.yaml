@@ -1,0 +1,196 @@
+name: PR Open
+run-name: Deploy PR-${{ github.event.pull_request.number }}
+
+env:
+  ACRONYM: soba
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/pr_open.yaml"
+      - ".github/workflows/build-images.yaml"
+      - ".gitignore"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "deployment/**"
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  set-vars:
+    name: Set variables
+    runs-on: ubuntu-latest
+    outputs:
+      JOB_NAME: ${{ steps.vars.outputs.JOB_NAME }}
+      URL: ${{ steps.vars.outputs.URL }}
+      ref: ${{ steps.vars.outputs.ref }}
+    steps:
+      - name: Setting variables
+        id: vars
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ACRONYM: ${{ env.ACRONYM }}
+        run: |
+          echo "JOB_NAME=pr-$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "URL=https://${ACRONYM}-pr-${PR_NUMBER}.${{ vars.OC_DOMAIN }}" >> "$GITHUB_OUTPUT"
+          echo "ref=refs/pull/$PR_NUMBER/head" >> "$GITHUB_OUTPUT"
+
+  # lint-test:
+  #   name: Lint & Test
+  #   runs-on: ubuntu-latest
+  #   needs: set-vars
+  #   continue-on-error: true
+  #   timeout-minutes: 10
+  #   strategy:
+  #     matrix:
+  #       include:
+  #         - component: backend
+  #           package_manager: npm
+  #           cache_dependency_path: backend/package-lock.json
+  #         - component: frontend
+  #           package_manager: pnpm
+  #           cache_dependency_path: frontend/pnpm-lock.yaml
+  #   steps:
+  #     - name: Checkout repository from pull request
+  #       uses: actions/checkout@v4
+  #       with:
+  #         ref: ${{ needs.set-vars.outputs.ref }}
+  #     - name: Setup pnpm
+  #       if: matrix.package_manager == 'pnpm'
+  #       uses: pnpm/action-setup@v4
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20
+  #         cache: ${{ matrix.package_manager }}
+  #         cache-dependency-path: ${{ matrix.cache_dependency_path }}
+  #     - name: Install dependencies
+  #       working-directory: ${{ matrix.component }}
+  #       run: ${{ matrix.package_manager == 'pnpm' && 'pnpm install --frozen-lockfile' || 'npm ci' }}
+  #     - name: Run lint
+  #       working-directory: ${{ matrix.component }}
+  #       run: ${{ matrix.package_manager }} run lint --if-present
+  #     - name: Run format check
+  #       working-directory: ${{ matrix.component }}
+  #       run: ${{ matrix.package_manager }} run format:check --if-present
+
+  build:
+    name: Build & Push
+    uses: ./.github/workflows/build-images.yaml
+    needs: [set-vars]
+    with:
+      ref: ${{ needs.set-vars.outputs.ref }}
+      platforms: amd64
+      image_version: pr-${{ github.event.pull_request.number }}
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+
+  deploy:
+    name: Deploy
+    permissions:
+      contents: read
+      pull-requests: write
+    environment:
+      name: pr
+      url: ${{ needs.set-vars.outputs.URL }}
+    runs-on: ubuntu-latest
+    needs: [set-vars, build]
+    timeout-minutes: 12
+    steps:
+      - name: Checkout repository from pull request
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.set-vars.outputs.ref }}
+
+      - name: Install OpenShift CLI
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
+
+      - name: Login to OpenShift Cluster
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: ${{ vars.OC_SERVER }}
+          openshift_token: ${{ secrets.OC_TOKEN }}
+          insecure_skip_tls_verify: true
+          namespace: ${{ secrets.OC_NAMESPACE }}
+
+      - name: Add Helm Repo
+        run: |
+          helm repo add bcgov ${{ vars.HELM_REPO_URL }}
+          helm repo update
+
+      - name: Deploy App
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          RELEASE="soba-${{ needs.set-vars.outputs.JOB_NAME }}"
+          NAMESPACE="${{ secrets.OC_NAMESPACE }}"
+          TAG="sha-${{ needs.build.outputs.short_sha }}"
+          PR_NUM="${{ github.event.pull_request.number }}"
+          DOMAIN="${{ vars.OC_DOMAIN }}"
+          HOST_FE="soba-pr-${PR_NUM}.${DOMAIN}"
+          HOST_BE="soba-pr-${PR_NUM}-be.${DOMAIN}"
+          REPO_LC=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
+
+          cat > /tmp/values-override.yaml <<EOF
+          be_image:
+            repository: "ghcr.io/${REPO_LC}/backend"
+            tag: "${TAG}"
+          fe_image:
+            repository: "ghcr.io/${REPO_LC}/frontend"
+            tag: "${TAG}"
+          sobaBEUrl: "https://${HOST_BE}"
+          keycloakUrl: "${{ secrets.KEYCLOAK_URL }}"
+          jwksUri: "${{ secrets.JWKS_URI }}"
+          formioBaseUrl: "${{ secrets.FORMIO_BASE_URL }}"
+          jwtSecret: "${{ secrets.JWT_SECRET }}"
+          sessionSecret: "${{ secrets.SESSION_SECRET }}"
+          formio:
+            password: "${{ secrets.FORMIO_ADMIN_PASSWORD }}"
+          formioManagerPassword: "${{ secrets.FORMIO_MANAGER_PASSWORD }}"
+          formioManagerUsername: "${{ secrets.FORMIO_MANAGER_USERNAME }}"
+          fe_routes:
+            - host: "${HOST_FE}"
+              service: "${RELEASE}-fe"
+              targetPort: 3000
+              wildcardPolicy: None
+              tls:
+                termination: edge
+                insecureEdgeTerminationPolicy: Redirect
+          be_routes:
+            - host: "${HOST_BE}"
+              service: "${RELEASE}-be"
+              targetPort: 4000
+              wildcardPolicy: None
+              tls:
+                termination: edge
+                insecureEdgeTerminationPolicy: Redirect
+          EOF
+
+          helm upgrade --install "${RELEASE}" bcgov/soba \
+            --namespace "${NAMESPACE}" \
+            -f deployment/helm/values-pr.yaml \
+            -f /tmp/values-override.yaml \
+            --wait --timeout 300s
+
+      - name: Release Comment on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: success()
+        with:
+          header: release
+          hide_and_recreate: true
+          hide_classify: "OUTDATED"
+          message: |
+            Release ${{ github.sha }} deployed at <${{ needs.set-vars.outputs.URL }}>
+          number: ${{ github.event.pull_request.number }}

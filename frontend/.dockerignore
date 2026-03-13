@@ -1,6 +1,18 @@
+# Frontend .dockerignore — used when build context is frontend/ (e.g. docker build -f Dockerfile . from frontend/).
+# Standard monorepo builds use repo root as context; see root .dockerignore.
+# Keep this in sync so frontend image stays clean regardless of where the build is run.
+
 node_modules
 .next
+coverage
+
 .git
 .gitignore
 *.md
-.env*.local
+
+.env
+.env.local
+.env.*.local
+
+*.log
+.DS_Store
