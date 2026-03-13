@@ -30,7 +30,8 @@ services:
     environment:
       ROOT_EMAIL: "formio@localhost.com"
       ROOT_PASSWORD: "formio"
-      NODE_CONFIG: '{"mongo":"mongodb://mongodb:27017/formio-ce","port":3001,"jwt":{"secret":"formio-dev-secret-change-in-production"}}'
+      # reservedForms includes "health" so GET /health reaches the server sanity-check (DB + schema). Without it, /health is treated as a form alias and returns 400.
+      NODE_CONFIG: '{"mongo":"mongodb://mongodb:27017/formio-ce","port":3001,"jwt":{"secret":"formio-dev-secret-change-in-production"},"reservedForms":["submissions","submission","exists","export","role","current","logout","import","form","access","health"]}'
     depends_on:
       - mongodb
     restart: unless-stopped

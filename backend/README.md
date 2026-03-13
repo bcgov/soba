@@ -3,7 +3,7 @@
 ### Overview
 
 This repository serves an api. This API uses configurable JWT secret, issuer and audience to handle user verification.
-Inside that JWT it has a configurable field called ROLE_FIELD which it uses to verify the user permissions. Given those permissions it will pass off calls to /api/formio/\* to formio using the credentials in formio which are configurable and as an example ADMIN and MANAGER users are supported with different FORMIO_ADMIN_USERNAME, FORMIO_ADMIN_PASSWORD and FORMIO_MANAGER_USERNAME FORMIO_MANAGER_PASSWORD
+Inside that JWT it has a configurable field called ROLE_FIELD which it uses to verify the user permissions. Given those permissions it will pass off calls to the Form.io proxy using admin credentials configured via PLUGIN_FORMIO_V5_ADMIN_USERNAME and PLUGIN_FORMIO_V5_ADMIN_PASSWORD.
 
 ### Language
 
@@ -18,7 +18,7 @@ This repository is built with node v24.4.1 and is set up inside the .nvmrc
 The backend uses two env files, loaded in order (later overrides earlier):
 
 1. **`.env`** — Base config (Form.io URL, JWT issuer/audience, role mapping). Created from `.env.example`.
-2. **`.env.local`** — Credentials and secrets (Form.io admin/manager, session secret). Created from `.env.local.example`.
+2. **`.env.local`** — Credentials and secrets (Form.io admin, session secret). Created from `.env.local.example`.
 
 **How they are created**
 

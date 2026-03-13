@@ -10,8 +10,8 @@ export interface SubmissionProvisionInput {
   formVersionId: string;
 }
 
-/** Result of a form engine health check; no config or credentials are exposed. */
-export interface FormEngineHealthResult {
+/** Result of a form engine readiness check; no config or credentials are exposed. */
+export interface FormEngineReadinessResult {
   ok: boolean;
   message?: string;
 }
@@ -19,6 +19,6 @@ export interface FormEngineHealthResult {
 export interface FormEngineAdapter {
   createFormVersionSchema(input: FormVersionProvisionInput): Promise<{ engineRef: string }>;
   createSubmissionRecord(input: SubmissionProvisionInput): Promise<{ engineRef: string }>;
-  /** Optional: report whether the engine is reachable. No config in result. */
-  healthCheck?(): Promise<FormEngineHealthResult>;
+  /** Optional: report whether the engine is reachable (readiness). No config in result. */
+  readinessCheck?(): Promise<FormEngineReadinessResult>;
 }

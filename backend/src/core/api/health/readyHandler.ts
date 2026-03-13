@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { pool } from '../../db/client';
-import { checkFormEngineHealth } from '../../integrations/form-engine/FormEngineRegistry';
+import { checkFormEngineReadiness } from '../../integrations/form-engine/FormEngineRegistry';
 
 export async function readinessHandler(_req: Request, res: Response): Promise<void> {
   let dbOk = false;
@@ -11,7 +11,7 @@ export async function readinessHandler(_req: Request, res: Response): Promise<vo
     // dbOk stays false
   }
 
-  const formEngines = await checkFormEngineHealth();
+  const formEngines = await checkFormEngineReadiness();
   const allEnginesOk = Object.values(formEngines).every((r) => r.ok);
 
   const body = {
