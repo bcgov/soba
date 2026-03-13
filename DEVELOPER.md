@@ -155,7 +155,7 @@ The devcontainer **initialize** and **post-create** steps copy from example file
 
 - **Runtime:** [Express](https://expressjs.com), TypeScript
 - **DB:** [Drizzle](https://orm.drizzle.team) ORM, PostgreSQL (`pg`)
-- **Auth:** JWT (e.g. BC Gov SSO), Passport, express-session
+- **Auth:** Bearer-token APIs with Passport-backed stateless verification, IdP plugins (e.g. BC Gov SSO)
 - **API docs:** OpenAPI/Swagger ([Zod](https://zod.dev) + `@asteasolutions/zod-to-openapi`)
 - **Logging:** [Pino](https://getpino.io)
 
@@ -197,7 +197,7 @@ Tests live under `backend/tests/`. See [In Detail — Testing](#testing) for app
 
 ### Plugin implementations
 
-The backend uses a **plugin architecture** so that workspace resolution, form engines, auth (IdP), cache, message bus, and optional feature APIs can be swapped or extended without changing core. Plugins are discovered from `backend/src/plugins/` (each directory is a plugin module). Configuration is via env (e.g. which plugins are enabled, plugin-specific keys). See [In Detail — Configuration of plugins and features](#configuration-of-plugins-and-features).
+The backend uses a **plugin architecture** so that workspace resolution, form engines, auth (IdP), cache, message bus, and optional feature APIs can be swapped or extended without changing core. Plugins are discovered from `backend/src/plugins/` (each directory is a plugin module). Configuration is via env (e.g. which plugins are enabled, plugin-specific keys). For auth, Passport is now the protected-route entry point, but IdP plugins still provide provider-specific token verification and claim mapping. See [In Detail — Configuration of plugins and features](#configuration-of-plugins-and-features).
 
 **Plugin types and current implementations:**
 
@@ -210,7 +210,7 @@ The backend uses a **plugin architecture** so that workspace resolution, form en
 | **Message bus**        | Async messaging                        | `messagebus-memory`; future: Redis, NATS                            |
 | **Feature API**        | Optional REST API per plugin           | e.g. `personal-local` (exposes `pluginApiDefinition` with basePath) |
 
-Workspace and IdP plugins are ordered via env (`WORKSPACE_PLUGINS_ENABLED`, `IDP_PLUGINS`); the first successful resolver or IdP wins. Plugin APIs (from plugins that export both a workspace resolver and a feature API definition) are registered via `createPluginApiRouter()` and can be mounted under `/api/v1` when desired.
+Workspace and IdP plugins are ordered via env (`WORKSPACE_PLUGINS_ENABLED`, `IDP_PLUGINS`); the first successful resolver or IdP wins. For IdP auth, Passport orchestrates the ordered plugin attempts and the winning plugin still supplies the mapped identity used by core. Plugin APIs (from plugins that export both a workspace resolver and a feature API definition) are registered via `createPluginApiRouter()` and can be mounted under `/api/v1` when desired.
 
 ### Features
 
@@ -228,7 +228,7 @@ To keep **transactions consistent across PostgreSQL and the form engine** (e.g. 
 
 ### Auth plugins and responsibilities
 
-**IdP plugins** are responsible for: (1) validating the JWT (issuer, signature via JWKS), and (2) mapping claims to a normalised identity (subject, profile, optional `soba_admin`). The composite middleware `checkJwt()` tries each configured IdP in order; the first success sets `req.idpPluginCode` and `req.authPayload`. **resolveActor** runs after `checkJwt()`: it uses the IdP’s claim mapper to get subject/profile, finds or creates the app user, sets `req.actorId` and `req.isSobaAdmin` (including refresh from IdP when the mapper returns `sobaAdmin`). So: IdP = “is this token valid and who is it?”; core = “resolve to internal actor and admin flag”. IdPs are configured with `IDP_PLUGINS` (comma-separated) and plugin-specific env (e.g. `PLUGIN_BCGOV_SSO_JWKS_URI`). See [In Detail — Auth flow](#auth-flow).
+**IdP plugins** are responsible for: (1) validating the token (issuer, signature via JWKS or provider API), and (2) mapping claims to a normalised identity (subject, profile, optional `soba_admin`). Protected routes enter auth through Passport: `checkJwt()` calls `passport.authenticate(..., { session: false })`, and the composite Passport strategy tries each configured IdP in order. The first success still sets `req.idpPluginCode` and `req.authPayload`, and Passport also authenticates the request principal. **resolveActor** runs after `checkJwt()`: it uses the IdP’s claim mapper to get subject/profile, finds or creates the app user, sets `req.actorId` and `req.isSobaAdmin` (including refresh from IdP when the mapper returns `sobaAdmin`). So: Passport = “run the protected-route auth flow”; IdP = “is this token valid and who is it?”; core = “resolve to internal actor and admin flag”. IdPs are configured with `IDP_PLUGINS` (comma-separated) and plugin-specific env (e.g. `PLUGIN_BCGOV_SSO_JWKS_URI`). `session: false` is intentional because it keeps the auth path stateless, aligned with bearer-token APIs, easier to scale across instances, and compatible with multiple IdP plugins tried in order. See [In Detail — Auth flow](#auth-flow).
 
 ### Drizzle
 
@@ -363,7 +363,7 @@ Without the outbox, we would have to call the form engine synchronously inside t
 ### Configuration of plugins and features
 
 - **Plugin discovery:** Plugins live under `backend/src/plugins/<pluginDir>/`. Each plugin module can export one or more of: `workspacePluginDefinition`, `formEnginePluginDefinition`, `pluginApiDefinition`, `idpPluginDefinition`, `cachePluginDefinition`, `messageBusPluginDefinition`. The registry validates with Zod and builds caches at startup.
-- **Which plugins run:** Workspace resolvers: `WORKSPACE_PLUGINS_ENABLED` (comma-separated codes). IdP: `IDP_PLUGINS` (comma-separated; default from `IDP_PLUGIN_DEFAULT_CODE`). Cache / message bus: `CACHE_DEFAULT_CODE`, `MESSAGEBUS_DEFAULT_CODE`. Form engine: `FORM_ENGINE_DEFAULT_CODE`. Only plugins that are both discovered and listed in the relevant env are used. `WORKSPACE_PLUGINS_STRICT_MODE=true` fails startup if any enabled workspace plugin is missing.
+- **Which plugins run:** Workspace resolvers: `WORKSPACE_PLUGINS_ENABLED` (comma-separated codes). IdP: `IDP_PLUGINS` (comma-separated; default from `IDP_PLUGIN_DEFAULT_CODE`). Cache / message bus: `CACHE_DEFAULT_CODE`, `MESSAGEBUS_DEFAULT_CODE`. Form engine: `FORM_ENGINE_DEFAULT_CODE`. Only plugins that are both discovered and listed in the relevant env are used. For auth, Passport uses the ordered IdP plugin list as its provider chain and stops at the first successful plugin. `WORKSPACE_PLUGINS_STRICT_MODE=true` fails startup if any enabled workspace plugin is missing.
 - **Plugin config:** Each plugin gets a `PluginConfigReader` built from env with a prefix. Prefix is `PLUGIN_<NORMALIZED_CODE>_` (e.g. `PLUGIN_FORMIO_V5_API_BASE_URL`). The reader exposes `getRequired`, `getOptional`, `getBoolean`, `getNumber`, `getCsv`. Use `.env.example` and `.env.local` for secrets; document keys in examples only.
 - **Features (DB):** The `soba.feature` and `soba.feature_status` tables are seeded via `pnpm db:seed`. Feature status (e.g. `enabled`/`disabled`) drives feature-flag behaviour. Roles and code tables support `source` and (for roles) `feature_code` so features can add codes and roles; see [Enable/Disable features, add codes + roles](#enabledisable-features-add-codes--roles-for-feature).
 
@@ -376,11 +376,12 @@ Without the outbox, we would have to call the form engine synchronously inside t
 ### Auth flow
 
 1. **Request hits protected route** — Middleware order: `checkJwt()` then `resolveActor` (and for `/api/v1/admin`, `requireSobaAdmin`).
-2. **checkJwt()** — Composite IdP middleware: for each IdP in `IDP_PLUGINS`, run that IdP’s auth middleware (typically verify JWT with JWKS, issuer/audience). First IdP that sets `req.idpPluginCode` and `req.authPayload` wins; if none succeed, respond 401.
-3. **resolveActor** — Uses the winning IdP’s `claimMapper.mapPayload(req.authPayload)` to get subject, profile, and optional `sobaAdmin`. Calls `findOrCreateUserByIdentity(...)` to get or create the app user and set `req.actorId`. If the mapper returns `sobaAdmin === true` or `false`, upserts SOBA admin flag from IdP. Sets `req.isSobaAdmin` from DB. Any failure (e.g. unknown IdP, missing payload) goes to error handler.
-4. **Downstream** — Handlers use `req.actorId` and `req.isSobaAdmin`; core context middleware can attach workspace etc. for domain routes.
+2. **checkJwt()** — Passport-backed auth middleware: it calls `passport.authenticate(..., { session: false })`, which runs the composite Passport strategy for protected API requests.
+3. **Composite Passport strategy** — For each IdP in `IDP_PLUGINS`, run that IdP’s auth middleware (typically verify JWT with JWKS, issuer/audience, or validate against the provider API). First IdP that sets `req.idpPluginCode` and `req.authPayload` wins; if none succeed, respond 401. `session: false` is intentional because the API is bearer-token based, stays stateless across requests, scales cleanly across instances, and remains compatible with trying multiple IdP plugins in order.
+4. **resolveActor** — Uses the winning IdP’s `claimMapper.mapPayload(req.authPayload)` to get subject, profile, and optional `sobaAdmin`. Calls `findOrCreateUserByIdentity(...)` to get or create the app user and set `req.actorId`. If the mapper returns `sobaAdmin === true` or `false`, upserts SOBA admin flag from IdP. Sets `req.isSobaAdmin` from DB. Any failure (e.g. unknown IdP, missing payload) goes to error handler.
+5. **Downstream** — Handlers use `req.actorId` and `req.isSobaAdmin`; core context middleware can attach workspace etc. for domain routes.
 
-Auth-related env: `IDP_PLUGINS`, `IDP_PLUGIN_DEFAULT_*`, and per-IdP `PLUGIN_<IDP>_*` (e.g. JWKS URI, issuer, audience). Session/Passport are used where needed (e.g. browser flows); JWT + IdP is the primary API auth.
+Auth-related env: `IDP_PLUGINS`, `IDP_PLUGIN_DEFAULT_*`, and per-IdP `PLUGIN_<IDP>_*` (e.g. JWKS URI, issuer, audience). Protected API auth is Passport-backed and stateless; IdP plugins still perform provider-specific verification and claim mapping.
 
 ### Enable/Disable features, add codes + roles for feature
 

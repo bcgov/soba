@@ -4,6 +4,7 @@ env.loadEnv();
 import express from 'express';
 import rTracer from 'cls-rtracer';
 import cors from 'cors';
+import passport from 'passport';
 import { checkJwt } from './core/middleware/auth';
 import { coreRouter } from './core/api';
 import { healthRouter } from './core/api/health';
@@ -17,9 +18,12 @@ import { adminRouter } from './core/api/admin';
 import { globalRateLimit, apiRateLimit, publicRateLimit } from './core/middleware/rateLimit';
 import { getFormEngineRouteDefinitions } from './core/integrations/plugins/PluginRegistry';
 import { createPluginConfigReader } from './core/config/pluginConfig';
+import { initializePassport } from './core/auth/passport';
 
 const app = express();
 const port = 4000;
+
+initializePassport();
 
 if (process.env.NODE_ENV === 'development') {
   log.info('Allowing CORS for development environment');
@@ -37,6 +41,7 @@ app.use(
 );
 
 app.use(httpLogger);
+app.use(passport.initialize());
 
 app.use(globalRateLimit);
 
