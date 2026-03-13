@@ -16,7 +16,15 @@ RUN pnpm install --filter ./backend...
 COPY . .
 RUN pnpm --filter ./backend run build
 
+# OpenShift / arbitrary UID: run non-root; g=u lets assigned user (often gid 0) read /app
+RUN chgrp -R 0 /app && chmod -R g=u /app
+# OpenShift: arbitrary UID + read-only root — never invoke pnpm/corepack at runtime (corepack mkdirs under $HOME/.cache; HOME can be unset)
+ENV HOME=/tmp
+ENV XDG_CACHE_HOME=/tmp/.cache
+USER 1001
+
 EXPOSE 4000
 
-# use package manager script to start
-CMD ["pnpm", "--filter", "./backend", "start"]
+# Run compiled app only (no corepack/pnpm — avoids EACCES on /.cache)
+WORKDIR /app
+CMD ["node", "backend/dist/src/app.js"]

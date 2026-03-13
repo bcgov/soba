@@ -1,0 +1,26 @@
+# Root .dockerignore — used when building from repo root:
+#   docker build -f backend/Dockerfile .
+#   docker build -f frontend/Dockerfile .
+# Images install deps and build inside the container; exclude host artifacts.
+
+# Dependencies and build artifacts
+**/node_modules
+**/dist
+**/.next
+**/coverage
+
+# Git and IDE
+.git
+.gitignore
+**/.git
+**/*.md
+
+# Local env (images use .env.example only)
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Misc
+**/*.log
+.DS_Store
+*.tsbuildinfo
