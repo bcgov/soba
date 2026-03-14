@@ -1,0 +1,57 @@
+{{- if .Values.backend.migration.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "soba.fullname" . }}-migrate-{{ .Release.Revision }}
+  labels:
+    {{- include "soba.labels" (dict "root" . "component" "backend") | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        {{- include "soba.selectorLabels" (dict "root" . "component" "migrate") | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          workingDir: /app/backend
+          command: ["sh", "-c"]
+          args:
+            - |
+              node dist/src/core/db/migrate.js && node dist/src/core/db/seed.js
+          env:
+            {{- if .Values.database.uri }}
+            - name: DATABASE_URL
+              value: {{ .Values.database.uri | quote }}
+            {{- else }}
+            - name: DB_HOST
+              value: {{ .Values.database.host | quote }}
+            - name: DB_PORT
+              value: {{ .Values.database.port | quote }}
+            - name: DB_USER
+              value: {{ .Values.database.user | quote }}
+            - name: DB_NAME
+              value: {{ .Values.database.name | quote }}
+            - name: DB_PASSWORD
+              value: {{ .Values.database.password | quote }}
+            {{- end }}
+            - name: DB_ADMIN_DATABASE
+              value: {{ .Values.database.adminDatabase | quote }}
+            - name: SOBA_SYSTEM_SUBJECT
+              value: {{ .Values.backend.config.sobaSystemSubject | quote }}
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+{{- end }}

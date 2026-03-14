@@ -1,0 +1,50 @@
+# PR environment — minimal resources, single replica, internal Form.io + MongoDB
+backend:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 128Mi
+    limits:
+      cpu: 100m
+      memory: 256Mi
+  autoscaling:
+    enabled: false
+
+frontend:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 128Mi
+    limits:
+      cpu: 100m
+      memory: 256Mi
+  autoscaling:
+    enabled: false
+
+formio:
+  internal:
+    enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 128Mi
+    limits:
+      cpu: 100m
+      memory: 256Mi
+
+mongodb:
+  internal:
+    enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 128Mi
+    limits:
+      cpu: 100m
+      memory: 256Mi
+  persistence:
+    size: 256Mi
