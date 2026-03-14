@@ -1,0 +1,113 @@
+# PR close: remove SOBA release (and secrets/PVCs) first, then Crunchy PR user/database.
+# Runs on PR close or manually with a PR number.
+name: PR Close
+run-name: Cleanup PR-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+
+on:
+  pull_request:
+    types: [closed]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/pr_open.yaml"
+      - ".github/workflows/pr_close.yaml"
+      - ".github/workflows/build-images.yaml"
+      - ".gitignore"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "deployments/**"
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to clean up (e.g. 42)"
+        required: true
+        type: number
+
+permissions: {}
+
+jobs:
+  set-vars:
+    name: Set variables
+    runs-on: ubuntu-latest
+    outputs:
+      PR_NUM: ${{ steps.vars.outputs.PR_NUM }}
+      JOB_NAME: ${{ steps.vars.outputs.JOB_NAME }}
+      RELEASE: ${{ steps.vars.outputs.RELEASE }}
+    steps:
+      - name: Setting variables
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PR_NUM="${{ github.event.inputs.pr_number }}"
+          else
+            PR_NUM="${{ github.event.pull_request.number }}"
+          fi
+          echo "PR_NUM=$PR_NUM" >> "$GITHUB_OUTPUT"
+          echo "JOB_NAME=pr-$PR_NUM" >> "$GITHUB_OUTPUT"
+          echo "RELEASE=soba-pr-$PR_NUM" >> "$GITHUB_OUTPUT"
+
+  soba-cleanup:
+    name: Uninstall SOBA and remove secrets/PVCs
+    needs: [set-vars]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install OpenShift CLI
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
+
+      - name: Login to OpenShift Cluster
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: ${{ vars.OC_SERVER }}
+          openshift_token: ${{ secrets.OC_TOKEN }}
+          insecure_skip_tls_verify: true
+          namespace: ${{ secrets.OC_NAMESPACE }}
+
+      - name: Set forceCleanup and uninstall SOBA
+        env:
+          RELEASE: ${{ needs.set-vars.outputs.RELEASE }}
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+        run: |
+          if ! helm status "${RELEASE}" -n "${NAMESPACE}" &>/dev/null; then
+            echo "Release ${RELEASE} not found, skipping uninstall."
+            exit 0
+          fi
+          helm upgrade "${RELEASE}" ./deployments/helm/soba \
+            --namespace "${NAMESPACE}" \
+            --set global.forceCleanup=true \
+            --reuse-values \
+            --wait --timeout 120s
+          helm uninstall "${RELEASE}" --namespace "${NAMESPACE}" --wait --timeout 120s
+
+  crunch-cleanup:
+    name: Remove Crunchy PR user and database
+    needs: [set-vars, soba-cleanup]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout action-crunchy
+        uses: actions/checkout@v4
+        with:
+          repository: bcgov/action-crunchy
+          ref: v1.1.0
+
+      - name: Install OpenShift CLI
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
+
+      - name: Login to OpenShift Cluster
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: ${{ vars.OC_SERVER }}
+          openshift_token: ${{ secrets.OC_TOKEN }}
+          insecure_skip_tls_verify: true
+          namespace: ${{ secrets.OC_NAMESPACE }}
+
+      - name: Remove PR user from Crunchy
+        run: |
+          ./scripts/user_change.sh remove "${{ needs.set-vars.outputs.PR_NUM }}" "pg-soba-crunchy"

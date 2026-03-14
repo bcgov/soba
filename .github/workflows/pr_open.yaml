@@ -1,0 +1,188 @@
+# PR pipeline: build images, deploy Crunchy Postgres (with PR-specific user), deploy SOBA from local Helm chart.
+name: PR Open
+run-name: Deploy PR-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+
+env:
+  ACRONYM: soba
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/pr_open.yaml"
+      - ".github/workflows/build-images.yaml"
+      - ".gitignore"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "deployments/**"
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to deploy (e.g. 42). Re-deploys without a code change."
+        required: true
+        type: number
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+  cancel-in-progress: true
+
+jobs:
+  set-vars:
+    name: Set variables
+    runs-on: ubuntu-latest
+    outputs:
+      JOB_NAME: ${{ steps.vars.outputs.JOB_NAME }}
+      URL: ${{ steps.vars.outputs.URL }}
+      ref: ${{ steps.vars.outputs.ref }}
+      PR_NUM: ${{ steps.vars.outputs.PR_NUM }}
+    steps:
+      - name: Setting variables
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PR_NUMBER="${{ github.event.inputs.pr_number }}"
+          else
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          fi
+          echo "PR_NUM=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "JOB_NAME=pr-$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "URL=https://${{ env.ACRONYM }}-pr-${PR_NUMBER}.${{ vars.OC_DOMAIN }}" >> "$GITHUB_OUTPUT"
+          echo "ref=refs/pull/$PR_NUMBER/head" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build & Push
+    uses: ./.github/workflows/build-images.yaml
+    needs: [set-vars]
+    with:
+      ref: ${{ needs.set-vars.outputs.ref }}
+      platforms: amd64
+      image_version: pr-${{ needs.set-vars.outputs.PR_NUM }}
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+
+  deploy-crunchy:
+    name: Deploy Crunchy Postgres
+    needs: [set-vars]
+    if: github.event_name == 'workflow_dispatch' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.set-vars.outputs.ref }}
+
+      - name: Deploy Crunchy (add PR user)
+        id: crunchy
+        uses: bcgov/action-crunchy@v1.1.0
+        with:
+          oc_namespace: ${{ secrets.OC_NAMESPACE }}
+          oc_token: ${{ secrets.OC_TOKEN }}
+          values_file: deployments/helm/action-crunchy/values.yml
+          release_name: pg-soba
+          ref: ${{ needs.set-vars.outputs.ref }}
+
+  deploy:
+    name: Deploy SOBA
+    needs: [set-vars, build, deploy-crunchy]
+    if: github.event_name == 'workflow_dispatch' || github.event.action != 'closed'
+    permissions:
+      contents: read
+      pull-requests: write
+    environment:
+      name: pr
+      url: ${{ needs.set-vars.outputs.URL }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout repository from pull request
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.set-vars.outputs.ref }}
+
+      - name: Install OpenShift CLI
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
+
+      - name: Login to OpenShift Cluster
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: ${{ vars.OC_SERVER }}
+          openshift_token: ${{ secrets.OC_TOKEN }}
+          insecure_skip_tls_verify: true
+          namespace: ${{ secrets.OC_NAMESPACE }}
+
+      - name: Get DB config from Crunchy secret
+        id: db
+        env:
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          CLUSTER: ${{ needs.deploy-crunchy.outputs.cluster }}
+          PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
+        run: |
+          SECRET_NAME="${CLUSTER}-pguser-app-${PR_NUM}"
+          echo "secret_name=$SECRET_NAME" >> "$GITHUB_OUTPUT"
+          DB_URI=$(oc get secret "$SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.uri}' | base64 -d)
+          echo "uri<<URI_EOF" >> "$GITHUB_OUTPUT"
+          printf '%s' "$DB_URI" >> "$GITHUB_OUTPUT"
+          echo "" >> "$GITHUB_OUTPUT"
+          echo "URI_EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Generate values override and deploy
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          RELEASE: soba-${{ needs.set-vars.outputs.JOB_NAME }}
+          TAG: sha-${{ needs.build.outputs.short_sha }}
+          DOMAIN: ${{ vars.OC_DOMAIN }}
+          DATABASE_URI: ${{ steps.db.outputs.uri }}
+        run: |
+          REPO_LC=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          # Escape single quotes for YAML: ' -> ''
+          DB_URI_ESC=$(printf '%s' "$DATABASE_URI" | sed "s/'/''/g")
+
+          cat > /tmp/values-override.yaml <<OVERRIDE
+          backend:
+            image:
+              repository: "ghcr.io/${REPO_LC}/backend"
+              tag: "${TAG}"
+            sso:
+              jwksUri: "${{ secrets.JWKS_URI }}"
+              jwtIssuer: "${{ secrets.KEYCLOAK_URL }}"
+              jwtAudience: "${{ secrets.JWT_AUDIENCE }}"
+          frontend:
+            image:
+              repository: "ghcr.io/${REPO_LC}/frontend"
+              tag: "${TAG}"
+          global:
+            domain: "${DOMAIN}"
+          database:
+            uri: '${DB_URI_ESC}'
+          formio:
+            admin:
+              password: "${{ secrets.FORMIO_ADMIN_PASSWORD }}"
+            jwtSecret: "${{ secrets.FORMIO_JWT_SECRET }}"
+          OVERRIDE
+
+          helm upgrade --install "${RELEASE}" ./deployments/helm/soba \
+            --namespace "${NAMESPACE}" \
+            -f deployments/helm/soba/values-pr.yaml \
+            -f /tmp/values-override.yaml \
+            --wait --timeout 300s
+
+      - name: Release Comment on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: success()
+        with:
+          header: release
+          hide_and_recreate: true
+          hide_classify: "OUTDATED"
+          message: |
+            Release ${{ github.sha }} deployed at <${{ needs.set-vars.outputs.URL }}>
+          number: ${{ needs.set-vars.outputs.PR_NUM }}
