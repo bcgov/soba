@@ -7,6 +7,8 @@ metadata:
 data:
   LOG_LEVEL: {{ .Values.backend.config.logLevel | quote }}
   NODE_ENV: {{ .Values.backend.config.nodeEnv | quote }}
+  {{- $frontendOrigin := printf "https://%s" (include "soba.frontendHost" .) }}
+  CORS_ORIGIN: {{ .Values.backend.config.corsOrigin | default $frontendOrigin | quote }}
   FORM_ENGINE_DEFAULT_CODE: {{ .Values.backend.config.formEngineDefaultCode | quote }}
   CACHE_DEFAULT_CODE: {{ .Values.backend.config.cacheDefaultCode | quote }}
   MESSAGEBUS_DEFAULT_CODE: {{ .Values.backend.config.messagebusDefaultCode | quote }}

@@ -53,6 +53,8 @@ backend:
   config:
     logLevel: info
     nodeEnv: production
+    # Allowed origin(s) for CORS (comma-separated). Defaults to frontend URL when unset.
+    corsOrigin: ""
     formEngineDefaultCode: formio-v5
     cacheDefaultCode: cache-memory
     messagebusDefaultCode: messagebus-memory

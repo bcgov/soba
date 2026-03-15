@@ -25,11 +25,24 @@ const port = Number(process.env.PORT) || 4000;
 
 initializePassport();
 
+const corsOrigin = process.env.CORS_ORIGIN;
 if (process.env.NODE_ENV === 'development') {
   log.info('Allowing CORS for development environment');
   app.use(cors());
+} else if (corsOrigin) {
+  const origins = corsOrigin
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  log.info({ origins }, 'Allowing CORS for configured origins');
+  app.use(
+    cors({
+      origin: origins.length === 1 ? origins[0] : origins,
+      credentials: true,
+    }),
+  );
 } else {
-  log.info('Blocking CORS for production environment');
+  log.info('No CORS_ORIGIN set; cross-origin requests will be blocked');
 }
 
 app.use(
