@@ -154,10 +154,6 @@ jobs:
             image:
               repository: "ghcr.io/${REPO_LC}/backend"
               tag: "${TAG}"
-            sso:
-              jwksUri: "${{ secrets.JWKS_URI }}"
-              jwtIssuer: "${{ secrets.KEYCLOAK_URL }}"
-              jwtAudience: "${{ secrets.JWT_AUDIENCE }}"
           frontend:
             image:
               repository: "ghcr.io/${REPO_LC}/frontend"

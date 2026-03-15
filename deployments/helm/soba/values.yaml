@@ -55,6 +55,8 @@ backend:
     nodeEnv: production
     # Allowed origin(s) for CORS (comma-separated). Defaults to frontend URL when unset.
     corsOrigin: ""
+    # Base URL for this API (returned in /api/v1/meta/frontend-config). Defaults to backend public URL when unset.
+    sobaApiBaseUrl: ""
     formEngineDefaultCode: formio-v5
     cacheDefaultCode: cache-memory
     messagebusDefaultCode: messagebus-memory

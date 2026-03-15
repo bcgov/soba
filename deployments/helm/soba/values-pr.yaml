@@ -1,6 +1,10 @@
 # PR environment — minimal resources, single replica, internal Form.io + MongoDB
 backend:
   replicas: 1
+  sso:
+    jwksUri: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/certs
+    jwtIssuer: https://dev.loginproxy.gov.bc.ca/auth/realms/standard
+    jwtAudience: connected-services-submit-6349
   migration:
     activeDeadlineSeconds: 600
   readinessProbe:
