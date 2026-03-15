@@ -155,6 +155,11 @@ jobs:
           # Escape single quotes for YAML: ' -> ''
           DB_URI_ESC=$(printf '%s' "$DATABASE_URI" | sed "s/'/''/g")
 
+          # SSO (backend.sso: jwksUri, jwtIssuer, jwtAudience) is not overridden here:
+          # GitHub environment SSO config is currently wrong, so chart uses values-pr.yaml defaults.
+          # When the environment is fixed, add backend.sso from GitHub (e.g. secrets JWKS_URI,
+          # KEYCLOAK_URL, JWT_AUDIENCE or equivalent vars) to the override block below.
+
           cat > /tmp/values-override.yaml <<OVERRIDE
           backend:
             image:
