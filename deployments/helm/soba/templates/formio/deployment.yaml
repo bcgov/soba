@@ -35,14 +35,15 @@ spec:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 30
-            periodSeconds: 20
+            initialDelaySeconds: {{ .Values.formio.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.formio.livenessProbe.periodSeconds }}
           readinessProbe:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
+            initialDelaySeconds: {{ .Values.formio.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.formio.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.formio.readinessProbe.timeoutSeconds }}
           resources:
             {{- toYaml .Values.formio.resources | nindent 12 }}
 {{- end }}

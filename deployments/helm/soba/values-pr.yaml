@@ -1,6 +1,9 @@
 # PR environment — minimal resources, single replica, internal Form.io + MongoDB
 backend:
   replicas: 1
+  readinessProbe:
+    initialDelaySeconds: 30
+    timeoutSeconds: 10
   resources:
     requests:
       cpu: 25m
@@ -13,6 +16,9 @@ backend:
 
 frontend:
   replicas: 1
+  readinessProbe:
+    initialDelaySeconds: 25
+    timeoutSeconds: 10
   resources:
     requests:
       cpu: 25m
@@ -34,6 +40,12 @@ formio:
     limits:
       cpu: 100m
       memory: 256Mi
+  # Formio depends on MongoDB; allow time for MongoDB to be ready after PR deploy
+  readinessProbe:
+    initialDelaySeconds: 45
+    timeoutSeconds: 10
+  livenessProbe:
+    initialDelaySeconds: 60
 
 mongodb:
   internal:
@@ -41,10 +53,10 @@ mongodb:
   replicas: 1
   resources:
     requests:
-      cpu: 25m
-      memory: 128Mi
-    limits:
-      cpu: 100m
+      cpu: 50m
       memory: 256Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
   persistence:
-    size: 256Mi
+    size: 2Gi
