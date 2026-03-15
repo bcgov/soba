@@ -61,4 +61,7 @@ mongodb:
       cpu: 250m
       memory: 512Mi
   persistence:
-    size: 2Gi
+    # 4Gi to avoid WiredTiger "No space left on device" / journal sync failures on PR envs.
+    # If the PVC was created earlier with a smaller size, delete the StatefulSet and PVC
+    # then redeploy so a new PVC is created with this size.
+    size: 4Gi
