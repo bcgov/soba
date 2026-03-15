@@ -36,6 +36,8 @@ crunchy:
   # No backups for PRs — ephemeral environments; saves resources and storage.
   pgBackRest:
     enabled: false
+    s3:
+      enabled: false
   patroni:
     postgresql:
       pg_hba:
