@@ -74,19 +74,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.set-vars.outputs.ref }}
 
       - name: Deploy Crunchy (add PR user)
         id: crunchy
-        uses: bcgov/action-crunchy@v1.1.0
+        uses: bcgov/action-crunchy@v2.0.0
         with:
           oc_namespace: ${{ secrets.OC_NAMESPACE }}
           oc_token: ${{ secrets.OC_TOKEN }}
           values_file: deployments/helm/action-crunchy/values.yml
           release_name: pg-soba
-          ref: ${{ needs.set-vars.outputs.ref }}
+          ref: v2.0.0
 
   deploy:
     name: Deploy SOBA
@@ -102,7 +102,7 @@ jobs:
     timeout-minutes: 12
     steps:
       - name: Checkout repository from pull request
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.set-vars.outputs.ref }}
 

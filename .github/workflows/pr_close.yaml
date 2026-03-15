@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install OpenShift CLI
         uses: redhat-actions/openshift-tools-installer@v1
@@ -90,10 +90,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout action-crunchy
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: bcgov/action-crunchy
-          ref: v1.1.0
+          ref: v2.0.0
 
       - name: Install OpenShift CLI
         uses: redhat-actions/openshift-tools-installer@v1
