@@ -186,9 +186,9 @@ dependencies, but templates within this chart that are conditionally rendered.
 
 The chart supports both **OpenShift Routes** (default) and **Kubernetes Ingress**.
 
-| Platform   | Configuration                                                                                     |
-| ---------- | ------------------------------------------------------------------------------------------------- |
-| OpenShift  | `backend.route.enabled=true` (default), `frontend.route.enabled=true` (default)                   |
+| Platform   | Configuration                                                                                             |
+| ---------- | --------------------------------------------------------------------------------------------------------- |
+| OpenShift  | `backend.route.enabled=true` (default), `frontend.route.enabled=true` (default)                           |
 | Kubernetes | `backend/frontend.route.enabled=false`, `backend/frontend.ingress.enabled=true`, `ingressClassName=nginx` |
 
 Both backend and frontend have independent `route` and `ingress` settings — set
