@@ -176,7 +176,7 @@ jobs:
             --namespace "${NAMESPACE}" \
             -f deployments/helm/soba/values-pr.yaml \
             -f /tmp/values-override.yaml \
-            --wait --timeout 300s
+            --wait --timeout 600s
 
       - name: Release Comment on PR
         uses: marocchino/sticky-pull-request-comment@v2

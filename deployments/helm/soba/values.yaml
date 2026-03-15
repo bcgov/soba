@@ -47,6 +47,7 @@ backend:
   # -- pre-install/pre-upgrade Job: runs drizzle migrate + seed
   migration:
     enabled: true
+    activeDeadlineSeconds: 300
 
   # -- configmap-app: general application config
   config:
