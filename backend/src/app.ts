@@ -23,6 +23,9 @@ import { initializePassport } from './core/auth/passport';
 const app = express();
 const port = Number(process.env.PORT) || 4000;
 
+// Trust X-Forwarded-* headers when behind OpenShift/ingress reverse proxy
+app.set('trust proxy', true);
+
 initializePassport();
 
 const corsOrigin = process.env.CORS_ORIGIN;

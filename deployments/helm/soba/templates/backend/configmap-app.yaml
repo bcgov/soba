@@ -11,6 +11,15 @@ data:
   CORS_ORIGIN: {{ .Values.backend.config.corsOrigin | default $frontendOrigin | quote }}
   {{- $backendApiBase := printf "https://%s/api/v1" (include "soba.backendHost" .) }}
   SOBA_API_BASE_URL: {{ .Values.backend.config.sobaApiBaseUrl | default $backendApiBase | quote }}
+  {{- if .Values.backend.config.gitSha }}
+  GIT_SHA: {{ .Values.backend.config.gitSha | quote }}
+  {{- end }}
+  {{- if .Values.backend.config.gitTag }}
+  GIT_TAG: {{ .Values.backend.config.gitTag | quote }}
+  {{- end }}
+  {{- if .Values.backend.config.imageTag }}
+  IMAGE_TAG: {{ .Values.backend.config.imageTag | quote }}
+  {{- end }}
   FORM_ENGINE_DEFAULT_CODE: {{ .Values.backend.config.formEngineDefaultCode | quote }}
   CACHE_DEFAULT_CODE: {{ .Values.backend.config.cacheDefaultCode | quote }}
   MESSAGEBUS_DEFAULT_CODE: {{ .Values.backend.config.messagebusDefaultCode | quote }}

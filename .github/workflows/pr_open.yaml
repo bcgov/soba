@@ -147,6 +147,7 @@ jobs:
           NAMESPACE: ${{ secrets.OC_NAMESPACE }}
           RELEASE: soba-${{ needs.set-vars.outputs.JOB_NAME }}
           TAG: sha-${{ needs.build.outputs.short_sha }}
+          SHORT_SHA: ${{ needs.build.outputs.short_sha }}
           DOMAIN: ${{ vars.OC_DOMAIN }}
           DATABASE_URI: ${{ steps.db.outputs.uri }}
         run: |
@@ -159,6 +160,10 @@ jobs:
             image:
               repository: "ghcr.io/${REPO_LC}/backend"
               tag: "${TAG}"
+            config:
+              gitSha: "${SHORT_SHA}"
+              gitTag: "${TAG}"
+              imageTag: "${TAG}"
           frontend:
             image:
               repository: "ghcr.io/${REPO_LC}/frontend"
