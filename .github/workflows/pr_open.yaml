@@ -72,6 +72,8 @@ jobs:
     needs: [set-vars]
     if: github.event_name == 'workflow_dispatch' || github.event.action != 'closed'
     runs-on: ubuntu-latest
+    outputs:
+      cluster: ${{ steps.crunchy.outputs.cluster }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
