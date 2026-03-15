@@ -18,6 +18,23 @@ spec:
       labels:
         {{- include "soba.selectorLabels" (dict "root" . "component" "formio") | nindent 8 }}
     spec:
+      {{- if and .Values.formio.internal.enabled .Values.mongodb.internal.enabled }}
+      initContainers:
+        - name: wait-mongodb
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              MONGODB_HOST="{{ include "soba.fullname" . }}-mongodb"
+              MONGODB_PORT="{{ .Values.mongodb.service.port }}"
+              echo "Waiting for MongoDB at ${MONGODB_HOST}:${MONGODB_PORT}..."
+              until nc -z "$MONGODB_HOST" "$MONGODB_PORT"; do
+                echo "MongoDB not ready, retrying in 2s..."
+                sleep 2
+              done
+              echo "MongoDB is ready."
+      {{- end }}
       containers:
         - name: formio
           image: "{{ .Values.formio.image.repository }}:{{ .Values.formio.image.tag }}"
