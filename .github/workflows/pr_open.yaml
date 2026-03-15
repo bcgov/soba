@@ -4,6 +4,8 @@ run-name: Deploy PR-${{ github.event.pull_request.number || github.event.inputs.
 
 env:
   ACRONYM: soba
+  # Opt into Node.js 24 for actions (Node 20 deprecated June 2026)
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
   pull_request:
@@ -80,6 +82,8 @@ jobs:
         with:
           ref: ${{ needs.set-vars.outputs.ref }}
 
+      # Note: action-crunchy may show "Unexpected input(s) 'diff_branch'" from its internal
+      # call to action-diff-triggers; that is fixed in the action-crunchy repo, not here.
       - name: Deploy Crunchy (add PR user)
         id: crunchy
         uses: bcgov/action-crunchy@v2.0.0
@@ -112,6 +116,7 @@ jobs:
         uses: redhat-actions/openshift-tools-installer@v1
         with:
           oc: "4.14"
+          skip_cache: "true"
 
       - name: Login to OpenShift Cluster
         uses: redhat-actions/oc-login@v1

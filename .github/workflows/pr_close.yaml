@@ -26,6 +26,10 @@ on:
 
 permissions: {}
 
+env:
+  # Opt into Node.js 24 for actions (Node 20 deprecated June 2026)
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   set-vars:
     name: Set variables
@@ -59,6 +63,7 @@ jobs:
         uses: redhat-actions/openshift-tools-installer@v1
         with:
           oc: "4.14"
+          skip_cache: "true"
 
       - name: Login to OpenShift Cluster
         uses: redhat-actions/oc-login@v1
@@ -99,6 +104,7 @@ jobs:
         uses: redhat-actions/openshift-tools-installer@v1
         with:
           oc: "4.14"
+          skip_cache: "true"
 
       - name: Login to OpenShift Cluster
         uses: redhat-actions/oc-login@v1
