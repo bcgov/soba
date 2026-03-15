@@ -53,23 +53,6 @@ services:
       retries: 10
     restart: unless-stopped
 
-  backend-db-init:
-    image: node:20-alpine
-    profiles: ["db-init"]
-    working_dir: /workspace
-    volumes:
-      - ..:/workspace
-    environment:
-      CI: "true"
-      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/soba
-      DB_ADMIN_DATABASE: postgres
-      FORMIO_VERSION: local
-    command: sh -lc "corepack enable pnpm && pnpm --filter @soba/backend run db:migrate && pnpm --filter @soba/backend run db:seed"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
 volumes:
   mongodb_data:
   postgres_data:

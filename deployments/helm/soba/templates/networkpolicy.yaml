@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "soba.fullname" . }}
+  labels:
+    {{- include "soba.labels" (dict "root" . "component" "") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "soba.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow traffic between all SOBA components in this release
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ include "soba.name" . }}
+              app.kubernetes.io/instance: {{ .Release.Name }}
+    # Allow ingress from OpenShift router (for Routes)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: ingress
+      ports:
+        - port: {{ .Values.backend.service.port }}
+          protocol: TCP
+        - port: {{ .Values.frontend.service.port }}
+          protocol: TCP

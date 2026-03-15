@@ -3,6 +3,7 @@ import {
   parseNumberEnvValue,
   parseCsvValue,
   createEnvReader,
+  resolveDatabaseUrl,
 } from '../../../src/core/config/env';
 
 describe('env', () => {
@@ -107,9 +108,70 @@ describe('env', () => {
     expect(reader.getCsvEnv('MISSING')).toBeUndefined();
   });
 
-  it('createEnvReader getDatabaseUrl returns DATABASE_URL from simulated env', () => {
+  it('createEnvReader getDatabaseUrl returns DATABASE_URL when set', () => {
     const reader = createEnvReader({ DATABASE_URL: 'postgres://localhost/db' });
     expect(reader.getDatabaseUrl()).toBe('postgres://localhost/db');
+  });
+
+  it('createEnvReader getDatabaseUrl returns built URL from components when DATABASE_URL unset', () => {
+    const reader = createEnvReader({
+      DB_HOST: 'db.example.com',
+      DB_PORT: '5433',
+      DB_USER: 'myuser',
+      DB_PASSWORD: 'mypass',
+      DB_NAME: 'mydb',
+    });
+    expect(reader.getDatabaseUrl()).toBe('postgres://myuser:mypass@db.example.com:5433/mydb');
+  });
+
+  it('resolveDatabaseUrl encodes special characters in password', () => {
+    const url = resolveDatabaseUrl({
+      DB_HOST: 'localhost',
+      DB_PORT: '5432',
+      DB_USER: 'u',
+      DB_PASSWORD: 'p@ss:w0rd#',
+      DB_NAME: 'db',
+    });
+    expect(url).toBe('postgres://u:p%40ss%3Aw0rd%23@localhost:5432/db');
+  });
+
+  it('createEnvReader getDatabaseUrl returns DATABASE_URL when both URL and components set', () => {
+    const reader = createEnvReader({
+      DATABASE_URL: 'postgres://url-only/used',
+      DB_HOST: 'ignored',
+      DB_PORT: '5432',
+      DB_USER: 'ignored',
+      DB_PASSWORD: 'ignored',
+      DB_NAME: 'ignored',
+    });
+    expect(reader.getDatabaseUrl()).toBe('postgres://url-only/used');
+  });
+
+  it('createEnvReader getDatabaseUrl throws when DATABASE_URL unset and component missing', () => {
+    const reader = createEnvReader({
+      DB_HOST: 'localhost',
+      DB_PORT: '5432',
+      DB_USER: 'u',
+      DB_PASSWORD: 'p',
+      // DB_NAME missing
+    });
+    expect(() => reader.getDatabaseUrl()).toThrow(
+      /DATABASE_URL or all of DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME are required/,
+    );
+  });
+
+  it('resolveDatabaseUrl throws when DATABASE_URL unset and one component empty', () => {
+    expect(() =>
+      resolveDatabaseUrl({
+        DB_HOST: 'localhost',
+        DB_PORT: '5432',
+        DB_USER: '',
+        DB_PASSWORD: 'p',
+        DB_NAME: 'db',
+      }),
+    ).toThrow(
+      /DATABASE_URL or all of DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME are required/,
+    );
   });
 
   it('createEnvReader getWorkspacePluginsEnabled returns required value from simulated env', () => {

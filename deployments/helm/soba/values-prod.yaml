@@ -1,0 +1,47 @@
+# Production — higher replicas, resources, HPA enabled, external Form.io likely
+backend:
+  replicas: 3
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 75
+  config:
+    nodeEnv: production
+    logLevel: warn
+
+frontend:
+  replicas: 3
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 75
+
+# Typically external in production; set formio.internal.enabled=false and
+# formio.external.url to the shared Form.io instance.
+formio:
+  internal:
+    enabled: false
+  external:
+    url: ""
+
+mongodb:
+  internal:
+    enabled: false
+  external:
+    uri: ""

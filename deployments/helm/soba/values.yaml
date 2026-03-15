@@ -1,0 +1,199 @@
+global:
+  domain: apps.gov.bc.ca
+  namespace: ""
+  # Set true to remove "keep" policy on Secrets/PVCs (e.g. PR teardown)
+  forceCleanup: false
+
+# -- Backend (Express API) ------------------------------------------------
+backend:
+  image:
+    repository: ghcr.io/bcgov/soba/backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  livenessProbe:
+    initialDelaySeconds: 15
+    periodSeconds: 20
+  readinessProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  service:
+    port: 4000
+  route:
+    enabled: true
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
+  ingress:
+    enabled: false
+    ingressClassName: ""
+    annotations: {}
+    tls: false
+    tlsSecretName: ""
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 80
+
+  # -- pre-install/pre-upgrade Job: runs drizzle migrate + seed
+  migration:
+    enabled: true
+    activeDeadlineSeconds: 300
+
+  # -- configmap-app: general application config
+  config:
+    logLevel: info
+    nodeEnv: production
+    formEngineDefaultCode: formio-v5
+    cacheDefaultCode: cache-memory
+    messagebusDefaultCode: messagebus-memory
+    outboxPollIntervalMs: "5000"
+    outboxBatchSize: "25"
+    sobaSystemSubject: soba-system
+    workspacePluginsEnabled: "enterprise-cstar,personal-local"
+    workspacePluginsStrictMode: "false"
+    pluginEnterpriseCstarHeaderKeys: "x-enterprise-workspace-id,x-cstar-tenant-id"
+    pluginEnterpriseCstarRequireExternalHeader: "false"
+    pluginPersonalLocalCookieKey: soba_workspace_id
+    pluginPersonalLocalAllowHeaderOverride: "true"
+
+  # -- configmap-formio: PLUGIN_FORMIO_V5_* (non-secret values)
+  formio:
+    routesEnabled: "true"
+    proxyPath: /formio-v5
+    # apiBaseUrl is auto-constructed from the formio service/external URL
+
+  # -- configmap-sso: IDP / SSO config
+  sso:
+    idpPluginDefaultCode: bcgov-sso
+    idpPlugins: bcgov-sso
+    jwksUri: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/certs
+    jwtIssuer: https://dev.loginproxy.gov.bc.ca/auth/realms/standard
+    jwtAudience: connected-services-submit-6349
+
+  # -- configmap-ratelimit: RATE_LIMIT_*
+  rateLimit:
+    windowMs: "60000"
+    max: "100"
+    apiWindowMs: "60000"
+    apiMax: "60"
+    publicWindowMs: "60000"
+    publicMax: "200"
+
+# -- Frontend (Next.js) ---------------------------------------------------
+frontend:
+  image:
+    repository: ghcr.io/bcgov/soba/frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  livenessProbe:
+    initialDelaySeconds: 15
+    periodSeconds: 20
+  readinessProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  service:
+    port: 3000
+  route:
+    enabled: true
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
+  ingress:
+    enabled: false
+    ingressClassName: ""
+    annotations: {}
+    tls: false
+    tlsSecretName: ""
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 80
+
+# -- Database (external Postgres) -----------------------------------------
+database:
+  # Option 1: full URI (takes precedence)
+  uri: ""
+  # Option 2: components (used when uri is empty)
+  host: ""
+  port: "5432"
+  user: postgres
+  password: ""
+  name: soba
+  adminDatabase: postgres
+  poolMax: "10"
+
+# -- Form.io ---------------------------------------------------------------
+formio:
+  internal:
+    enabled: true
+  external:
+    url: ""
+  image:
+    repository: docker.io/formio/formio
+    tag: 4.6.0
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+  service:
+    port: 3001
+  livenessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 20
+  readinessProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+  admin:
+    email: formio@soba.gov.bc.ca
+    password: ""
+  jwtSecret: ""
+
+# -- MongoDB (backing store for Form.io) -----------------------------------
+mongodb:
+  internal:
+    enabled: true
+  external:
+    uri: ""
+  image:
+    repository: docker.io/mongo
+    tag: "7"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+  service:
+    port: 27017
+  persistence:
+    size: 1Gi
+    storageClassName: ""

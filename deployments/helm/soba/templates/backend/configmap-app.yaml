@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "soba.fullname" . }}-backend-app
+  labels:
+    {{- include "soba.labels" (dict "root" . "component" "backend") | nindent 4 }}
+data:
+  LOG_LEVEL: {{ .Values.backend.config.logLevel | quote }}
+  NODE_ENV: {{ .Values.backend.config.nodeEnv | quote }}
+  FORM_ENGINE_DEFAULT_CODE: {{ .Values.backend.config.formEngineDefaultCode | quote }}
+  CACHE_DEFAULT_CODE: {{ .Values.backend.config.cacheDefaultCode | quote }}
+  MESSAGEBUS_DEFAULT_CODE: {{ .Values.backend.config.messagebusDefaultCode | quote }}
+  OUTBOX_POLL_INTERVAL_MS: {{ .Values.backend.config.outboxPollIntervalMs | quote }}
+  OUTBOX_BATCH_SIZE: {{ .Values.backend.config.outboxBatchSize | quote }}
+  SOBA_SYSTEM_SUBJECT: {{ .Values.backend.config.sobaSystemSubject | quote }}
+  WORKSPACE_PLUGINS_ENABLED: {{ .Values.backend.config.workspacePluginsEnabled | quote }}
+  WORKSPACE_PLUGINS_STRICT_MODE: {{ .Values.backend.config.workspacePluginsStrictMode | quote }}
+  PLUGIN_ENTERPRISE_CSTAR_HEADER_KEYS: {{ .Values.backend.config.pluginEnterpriseCstarHeaderKeys | quote }}
+  PLUGIN_ENTERPRISE_CSTAR_REQUIRE_EXTERNAL_HEADER: {{ .Values.backend.config.pluginEnterpriseCstarRequireExternalHeader | quote }}
+  PLUGIN_PERSONAL_LOCAL_COOKIE_KEY: {{ .Values.backend.config.pluginPersonalLocalCookieKey | quote }}
+  PLUGIN_PERSONAL_LOCAL_ALLOW_HEADER_OVERRIDE: {{ .Values.backend.config.pluginPersonalLocalAllowHeaderOverride | quote }}
+  {{- if not .Values.database.uri }}
+  DB_HOST: {{ .Values.database.host | quote }}
+  DB_PORT: {{ .Values.database.port | quote }}
+  DB_USER: {{ .Values.database.user | quote }}
+  DB_NAME: {{ .Values.database.name | quote }}
+  {{- end }}
+  DB_ADMIN_DATABASE: {{ .Values.database.adminDatabase | quote }}
+  DB_POOL_MAX: {{ .Values.database.poolMax | quote }}

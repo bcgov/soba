@@ -21,7 +21,7 @@ import { createPluginConfigReader } from './core/config/pluginConfig';
 import { initializePassport } from './core/auth/passport';
 
 const app = express();
-const port = 4000;
+const port = Number(process.env.PORT) || 4000;
 
 initializePassport();
 

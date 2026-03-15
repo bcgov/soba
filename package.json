@@ -18,7 +18,10 @@
     "lint:fix:backend": "pnpm --filter backend run lint:fix",
     "check": "pnpm check:frontend && pnpm check:backend",
     "check:frontend": "pnpm --filter frontend run check",
-    "check:backend": "pnpm --filter backend run check"
+    "check:backend": "pnpm --filter backend run check",
+    "db:migrate": "pnpm --filter @soba/backend run db:migrate",
+    "db:seed": "pnpm --filter @soba/backend run db:seed",
+    "db:init": "pnpm db:migrate && pnpm db:seed"
   },
   "keywords": [],
   "author": "",

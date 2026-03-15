@@ -1,0 +1,48 @@
+{{- if .Values.mongodb.internal.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "soba.fullname" . }}-mongodb
+  labels:
+    {{- include "soba.labels" (dict "root" . "component" "mongodb") | nindent 4 }}
+spec:
+  serviceName: {{ include "soba.fullname" . }}-mongodb
+  replicas: {{ .Values.mongodb.replicas }}
+  selector:
+    matchLabels:
+      {{- include "soba.selectorLabels" (dict "root" . "component" "mongodb") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "soba.selectorLabels" (dict "root" . "component" "mongodb") | nindent 8 }}
+    spec:
+      containers:
+        - name: mongodb
+          image: "{{ .Values.mongodb.image.repository }}:{{ .Values.mongodb.image.tag }}"
+          imagePullPolicy: {{ .Values.mongodb.image.pullPolicy }}
+          ports:
+            - name: mongo
+              containerPort: {{ .Values.mongodb.service.port }}
+              protocol: TCP
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+          resources:
+            {{- toYaml .Values.mongodb.resources | nindent 12 }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "soba.selectorLabels" (dict "root" . "component" "mongodb") | nindent 10 }}
+        annotations:
+          {{- include "soba.keepPolicy" . | nindent 10 }}
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        {{- if .Values.mongodb.persistence.storageClassName }}
+        storageClassName: {{ .Values.mongodb.persistence.storageClassName | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.mongodb.persistence.size }}
+{{- end }}

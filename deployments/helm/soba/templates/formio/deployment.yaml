@@ -1,0 +1,49 @@
+{{- if .Values.formio.internal.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "soba.fullname" . }}-formio
+  labels:
+    {{- include "soba.labels" (dict "root" . "component" "formio") | nindent 4 }}
+spec:
+  replicas: {{ .Values.formio.replicas }}
+  selector:
+    matchLabels:
+      {{- include "soba.selectorLabels" (dict "root" . "component" "formio") | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/formio/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secrets/formio-secret.yaml") . | sha256sum }}
+      labels:
+        {{- include "soba.selectorLabels" (dict "root" . "component" "formio") | nindent 8 }}
+    spec:
+      containers:
+        - name: formio
+          image: "{{ .Values.formio.image.repository }}:{{ .Values.formio.image.tag }}"
+          imagePullPolicy: {{ .Values.formio.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.formio.service.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "soba.fullname" . }}-formio
+            - secretRef:
+                name: {{ include "soba.fullname" . }}-formio
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ .Values.formio.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.formio.livenessProbe.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ .Values.formio.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.formio.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.formio.readinessProbe.timeoutSeconds }}
+          resources:
+            {{- toYaml .Values.formio.resources | nindent 12 }}
+{{- end }}
