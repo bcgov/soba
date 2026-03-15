@@ -18,8 +18,22 @@ export type FrontendRuntimeConfig = {
   };
 };
 
-const DEFAULT_SOBA_API_BASE_URL =
-  process.env.NEXT_PUBLIC_SOBA_API_BASE_URL || 'http://localhost:4000/api/v1';
+const DEFAULT_SOBA_API_BASE_URL = 'http://localhost:4000/api/v1';
+
+/**
+ * API base URL used before runtime config is loaded (and for the initial
+ * /meta/frontend-config fetch). In the browser we use window.__SOBA_API_BASE_URL
+ * injected by the server from NEXT_PUBLIC_SOBA_API_BASE_URL so deployed apps
+ * get the correct URL at runtime; local dev uses .env or the default.
+ */
+function getBootstrapApiBaseUrl(): string {
+  if (typeof window !== 'undefined' && window.__SOBA_API_BASE_URL) {
+    return window.__SOBA_API_BASE_URL;
+  }
+  return (
+    process.env.NEXT_PUBLIC_SOBA_API_BASE_URL || DEFAULT_SOBA_API_BASE_URL
+  );
+}
 
 let cachedConfig: FrontendRuntimeConfig | null = null;
 let configPromise: Promise<FrontendRuntimeConfig> | null = null;
@@ -45,7 +59,7 @@ export async function loadFrontendRuntimeConfig(): Promise<FrontendRuntimeConfig
   if (cachedConfig) return cachedConfig;
   if (configPromise) return configPromise;
 
-  configPromise = fetch(`${DEFAULT_SOBA_API_BASE_URL}/meta/frontend-config`, {
+  configPromise = fetch(`${getBootstrapApiBaseUrl()}/meta/frontend-config`, {
     method: 'GET',
     cache: 'no-store',
     headers: {
@@ -73,5 +87,5 @@ export function getCachedFrontendRuntimeConfig(): FrontendRuntimeConfig | null {
 }
 
 export function getSobaApiBaseUrl(): string {
-  return cachedConfig?.api.baseUrl ?? DEFAULT_SOBA_API_BASE_URL;
+  return cachedConfig?.api.baseUrl ?? getBootstrapApiBaseUrl();
 }
