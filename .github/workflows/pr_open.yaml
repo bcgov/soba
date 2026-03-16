@@ -153,6 +153,11 @@ jobs:
       #     helm repo add bcgov ${{ vars.HELM_REPO_URL }}
       #     helm repo update
 
+      # TODO: Remove after local chart testing — only needed because local chart
+      # doesn't include pre-built dependency archives (unlike the published bcgov/soba chart)
+      - name: Build chart dependencies
+        run: helm dependency build deployment/helm/charts/soba
+
       - name: Ensure app secrets
         env:
           NAMESPACE: ${{ secrets.OC_NAMESPACE }}
