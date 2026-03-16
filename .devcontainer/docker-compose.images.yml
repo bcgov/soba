@@ -6,7 +6,7 @@
 # Env: backend uses backend/.env.example + backend/.env.local.example (DATABASE_URL overridden for Docker).
 #      frontend uses frontend/.env.example.
 # Paths below are relative to this file's directory (.devcontainer/).
-
+name: soba-dev-images
 services:
   backend:
     image: soba/backend:local

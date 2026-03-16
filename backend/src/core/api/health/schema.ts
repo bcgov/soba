@@ -10,18 +10,18 @@ export const HealthLivenessResponseSchema = z
   })
   .openapi('Health_LivenessResponse');
 
-export const FormEngineHealthResultSchema = z
+export const FormEngineReadinessResultSchema = z
   .object({
     ok: z.boolean(),
     message: z.string().optional(),
   })
-  .openapi('Health_FormEngineResult');
+  .openapi('Health_FormEngineReadinessResult');
 
 export const HealthReadinessResponseSchema = z
   .object({
     status: z.enum(['ready', 'unhealthy']),
     db: z.enum(['ok', 'unreachable']),
-    formEngines: z.record(z.string(), FormEngineHealthResultSchema),
+    formEngines: z.record(z.string(), FormEngineReadinessResultSchema),
   })
   .openapi('Health_ReadinessResponse');
 

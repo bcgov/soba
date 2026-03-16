@@ -5,6 +5,7 @@
     "context": "."
   },
   "runArgs": [
+    "--add-host=host.docker.internal:host-gateway",
     "--env-file",
     "${localWorkspaceFolder}/backend/.env",
     "--env-file",
@@ -14,7 +15,7 @@
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
-      "minikube": "none"
+      "minikube": "latest"
     }
   },
   "forwardPorts": [3000, 3001, 4000],

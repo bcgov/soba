@@ -17,7 +17,7 @@ BACKEND_IMAGE := $(IMAGE_PREFIX)/backend
 FRONTEND_IMAGE := $(IMAGE_PREFIX)/frontend
 endif
 
-.PHONY: build build-backend build-frontend run-images run-images-down
+.PHONY: build build-backend build-frontend push push-backend push-frontend build-push run-images run-images-down
 
 build-backend:
 	docker build -f backend/Dockerfile -t $(BACKEND_IMAGE):sha-$(SHORT_SHA) -t $(BACKEND_IMAGE):local \
@@ -32,6 +32,18 @@ build-frontend:
 		.
 
 build: build-backend build-frontend
+
+push-backend:
+	docker push $(BACKEND_IMAGE):sha-$(SHORT_SHA)
+	docker push $(BACKEND_IMAGE):local
+
+push-frontend:
+	docker push $(FRONTEND_IMAGE):sha-$(SHORT_SHA)
+	docker push $(FRONTEND_IMAGE):local
+
+push: push-backend push-frontend
+
+build-push: build push
 
 # Run backend and frontend from built images (soba/backend:local, soba/frontend:local).
 # Uses backend/.env.example, backend/.env.local.example, frontend/.env.example.

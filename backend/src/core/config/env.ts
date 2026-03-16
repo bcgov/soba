@@ -73,6 +73,41 @@ function getCsvEnvFrom(source: EnvSource, key: string): string[] | undefined {
   return parseCsvValue(raw);
 }
 
+/**
+ * Resolves the database URL from an env source.
+ * 1. If DATABASE_URL is set and non-empty, return it.
+ * 2. Else if all of DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME are set, build and return the URL.
+ * 3. Else throw.
+ */
+export function resolveDatabaseUrl(source: EnvSource): string {
+  const url = getOptionalEnvFrom(source, 'DATABASE_URL');
+  if (url !== undefined && url !== '') return url;
+
+  const host = getOptionalEnvFrom(source, 'DB_HOST');
+  const port = getNumberEnvFrom(source, 'DB_PORT');
+  const user = getOptionalEnvFrom(source, 'DB_USER');
+  const password = getOptionalEnvFrom(source, 'DB_PASSWORD');
+  const dbName = getOptionalEnvFrom(source, 'DB_NAME');
+
+  if (
+    host !== undefined &&
+    host !== '' &&
+    port !== undefined &&
+    user !== undefined &&
+    user !== '' &&
+    password !== undefined &&
+    password !== '' &&
+    dbName !== undefined &&
+    dbName !== ''
+  ) {
+    return `postgres://${user}:${encodeURIComponent(password)}@${host}:${port}/${dbName}`;
+  }
+
+  throw new Error(
+    'DATABASE_URL or all of DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME are required',
+  );
+}
+
 /** Build an env reader that reads from the given source. Use in tests with a simulated .env object. */
 export function createEnvReader(source: EnvSource) {
   return {
@@ -82,7 +117,7 @@ export function createEnvReader(source: EnvSource) {
     getBooleanEnv: (key: string) => getBooleanEnvFrom(source, key),
     getNumberEnv: (key: string) => getNumberEnvFrom(source, key),
     getCsvEnv: (key: string) => getCsvEnvFrom(source, key),
-    getDatabaseUrl: () => getRequiredEnvFrom(source, 'DATABASE_URL'),
+    getDatabaseUrl: () => resolveDatabaseUrl(source),
     getDbAdminDatabase: () => getOptionalEnvFrom(source, 'DB_ADMIN_DATABASE'),
     getOutboxPollIntervalMs: () => getNumberEnvFrom(source, 'OUTBOX_POLL_INTERVAL_MS'),
     getOutboxBatchSize: () => getNumberEnvFrom(source, 'OUTBOX_BATCH_SIZE'),
@@ -122,7 +157,7 @@ export const env = {
   getBooleanEnv,
   getNumberEnv,
   getCsvEnv,
-  getDatabaseUrl: () => getRequiredEnv('DATABASE_URL'),
+  getDatabaseUrl: () => resolveDatabaseUrl(process.env),
   getDbAdminDatabase: () => getOptionalEnv('DB_ADMIN_DATABASE'),
   getOutboxPollIntervalMs: () => getNumberEnv('OUTBOX_POLL_INTERVAL_MS'),
   getOutboxBatchSize: () => getNumberEnv('OUTBOX_BATCH_SIZE'),

@@ -15,6 +15,7 @@
 #       with:
 #         ref: ${{ needs.set-vars.outputs.ref }}
 #         platforms: amd64
+#         image_version: pr-${{ github.event.pull_request.number }}  # e.g. pr-42 for PRs
 #       secrets: inherit
 #
 #     deploy:
@@ -86,6 +87,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
+  # Opt into Node.js 24 for actions (Node 20 deprecated June 2026)
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: read
@@ -171,7 +174,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.prepare.outputs.ref }}
 
@@ -221,7 +224,7 @@ jobs:
       image_version: ${{ needs.prepare.outputs.image_version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.prepare.outputs.ref }}
 

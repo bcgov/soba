@@ -1,4 +1,4 @@
-CREATE SCHEMA "soba";
+CREATE SCHEMA IF NOT EXISTS "soba";
 --> statement-breakpoint
 CREATE TABLE "soba"."app_user" (
 	"id" uuid PRIMARY KEY NOT NULL,

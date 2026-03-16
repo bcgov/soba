@@ -25,6 +25,7 @@ The `Dockerfile` builds a Node.js 24 image with:
 ### 3. Container start
 
 - **Environment**: `runArgs` loads `backend/.env` and `backend/.env.local` into the container environment.
+- **Host access**: `runArgs` includes `--add-host=host.docker.internal:host-gateway` so that `host.docker.internal` resolves to the host from inside the container (needed on Linux; Docker Desktop on Mac/Windows provides it by default).
 - **Forwarded ports**: 3000 (Frontend), 3001 (Form.io), 4000 (Backend)
 
 ### 4. Post-create (first run only)
@@ -75,7 +76,19 @@ Stop services:
 docker compose -f .devcontainer/docker-compose.yml down
 ```
 
+### Database (migrate + seed)
+
+After the sidecar services are running, from the **repo root** run:
+
+```bash
+pnpm db:init
+```
+
+This runs pending PostgreSQL migrations and seeds the database. You can also run `pnpm db:migrate` and `pnpm db:seed` separately.
+
 ### Connection strings (from inside devcontainer)
+
+Use `host.docker.internal` to reach the sidecar services (the devcontainer is started with `host.docker.internal:host-gateway` so this works on Linux and Docker Desktop):
 
 | Service    | Connection                                                          |
 | ---------- | ------------------------------------------------------------------- |
@@ -107,11 +120,15 @@ cd frontend && pnpm dev
 
 ### Endpoints
 
+Open these in a browser on your **host** (ports are forwarded from the container):
+
 | App         | URL                   |
 | ----------- | --------------------- |
 | Frontend    | http://localhost:3000 |
 | Backend API | http://localhost:4000 |
 | Form.io     | http://localhost:3001 |
+
+The frontend example uses `NEXT_PUBLIC_SOBA_API_BASE_URL=http://localhost:4000/api/v1`, so the app works when you use it from the host at http://localhost:3000 (API calls go to the forwarded backend).
 
 ---
 
@@ -124,13 +141,13 @@ The backend uses `.env` and `.env.local`. Values are loaded in order: `.env` fir
 | File                         | Purpose                                                          | Committed |
 | ---------------------------- | ---------------------------------------------------------------- | --------- |
 | `backend/.env.example`       | Base config (Form.io URL, JWT issuer/audience, role mapping)     | Yes       |
-| `backend/.env.local.example` | Template for credentials (Form.io admin/manager, session secret) | Yes       |
+| `backend/.env.local.example` | Template for credentials (Form.io admin, session secret) | Yes       |
 | `backend/.env`               | Active base config                                               | No        |
 | `backend/.env.local`         | Active credentials and secrets                                   | No        |
 
 ### Frontend
 
-The frontend uses `.env`. Next.js loads it at build/runtime. Values in `.env.example` are for the localhost environment (local Form.io, BC Gov dev Keycloak).
+The frontend uses `.env`. Next.js loads it at build/runtime. The example sets `NEXT_PUBLIC_SOBA_API_BASE_URL=http://localhost:4000/api/v1` so the app works when opened from a browser on the host at http://localhost:3000.
 
 | File                    | Purpose                               | Committed |
 | ----------------------- | ------------------------------------- | --------- |

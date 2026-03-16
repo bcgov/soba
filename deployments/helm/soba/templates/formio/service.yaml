@@ -1,0 +1,17 @@
+{{- if .Values.formio.internal.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "soba.fullname" . }}-formio
+  labels:
+    {{- include "soba.labels" (dict "root" . "component" "formio") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.formio.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "soba.selectorLabels" (dict "root" . "component" "formio") | nindent 4 }}
+{{- end }}
