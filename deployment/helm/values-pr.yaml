@@ -6,7 +6,7 @@ nsp:
   enabled: false
 
 formio:
-  enabled: false
+  enabled: true
   username: 'admin@example.com'
 
 crunchy:

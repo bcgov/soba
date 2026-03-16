@@ -155,6 +155,12 @@ jobs:
 
       # TODO: Remove after local chart testing — only needed because local chart
       # doesn't include pre-built dependency archives (unlike the published bcgov/soba chart)
+      - name: Add Helm Repos
+        run: |
+          helm repo add bcgov-crunchy https://bcgov.github.io/crunchy-postgres/
+          helm repo add bcgov https://bcgov.github.io/helm-charts/
+          helm repo update
+
       - name: Build chart dependencies
         run: helm dependency build deployment/helm/charts/soba
 
