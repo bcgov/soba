@@ -45,16 +45,26 @@ jobs:
     steps:
       - name: Setting variables
         id: vars
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_PR_NUMBER: ${{ github.event.inputs.pr_number }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ACRONYM: ${{ env.ACRONYM }}
+          OC_DOMAIN: ${{ vars.OC_DOMAIN }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            PR_NUMBER="${{ github.event.inputs.pr_number }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            PR_NUM="$DISPATCH_PR_NUMBER"
           else
-            PR_NUMBER="${{ github.event.pull_request.number }}"
+            PR_NUM="$PR_NUMBER"
           fi
-          echo "PR_NUM=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "JOB_NAME=pr-$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "URL=https://${{ env.ACRONYM }}-pr-${PR_NUMBER}.${{ vars.OC_DOMAIN }}" >> "$GITHUB_OUTPUT"
-          echo "ref=refs/pull/$PR_NUMBER/head" >> "$GITHUB_OUTPUT"
+          if ! [[ "$PR_NUM" =~ ^[0-9]+$ ]]; then
+            echo "::error::Invalid PR number: $PR_NUM"
+            exit 1
+          fi
+          echo "PR_NUM=$PR_NUM" >> "$GITHUB_OUTPUT"
+          echo "JOB_NAME=pr-$PR_NUM" >> "$GITHUB_OUTPUT"
+          echo "URL=https://${ACRONYM}-pr-${PR_NUM}.${OC_DOMAIN}" >> "$GITHUB_OUTPUT"
+          echo "ref=refs/pull/$PR_NUM/head" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build & Push
@@ -136,6 +146,7 @@ jobs:
           SECRET_NAME="${CLUSTER}-pguser-app-${PR_NUM}"
           echo "secret_name=$SECRET_NAME" >> "$GITHUB_OUTPUT"
           DB_URI=$(oc get secret "$SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.uri}' | base64 -d)
+          echo "::add-mask::$DB_URI"
           echo "uri<<URI_EOF" >> "$GITHUB_OUTPUT"
           printf '%s' "$DB_URI" >> "$GITHUB_OUTPUT"
           echo "" >> "$GITHUB_OUTPUT"
@@ -150,6 +161,8 @@ jobs:
           SHORT_SHA: ${{ needs.build.outputs.short_sha }}
           DOMAIN: ${{ vars.OC_DOMAIN }}
           DATABASE_URI: ${{ steps.db.outputs.uri }}
+          FORMIO_ADMIN_PASSWORD: ${{ secrets.FORMIO_ADMIN_PASSWORD }}
+          FORMIO_JWT_SECRET: ${{ secrets.FORMIO_JWT_SECRET }}
         run: |
           REPO_LC=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
           # Escape single quotes for YAML: ' -> ''
@@ -175,18 +188,15 @@ jobs:
               tag: "${TAG}"
           global:
             domain: "${DOMAIN}"
-          database:
-            uri: '${DB_URI_ESC}'
-          formio:
-            admin:
-              password: "${{ secrets.FORMIO_ADMIN_PASSWORD }}"
-            jwtSecret: "${{ secrets.FORMIO_JWT_SECRET }}"
           OVERRIDE
 
           helm upgrade --install "${RELEASE}" ./deployments/helm/soba \
             --namespace "${NAMESPACE}" \
             -f deployments/helm/soba/values-pr.yaml \
             -f /tmp/values-override.yaml \
+            --set "database.uri=${DB_URI_ESC}" \
+            --set "formio.admin.password=${FORMIO_ADMIN_PASSWORD}" \
+            --set "formio.jwtSecret=${FORMIO_JWT_SECRET}" \
             --wait --timeout 600s
 
       - name: Release Comment on PR
