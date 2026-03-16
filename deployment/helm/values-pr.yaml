@@ -24,8 +24,5 @@ nodeEnv: 'production'
 adminRoleName: 'admin'
 managerRoleName: 'manager'
 
-# formioManagerUsername injected from GitHub Secret FORMIO_MANAGER_USERNAME
-formioManagerUsername: 'your-formio-manager-username'
-
 fe_routes_enabled: true
 be_routes_enabled: true
