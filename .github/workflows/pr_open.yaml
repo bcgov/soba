@@ -153,17 +153,16 @@ jobs:
       #     helm repo add bcgov ${{ vars.HELM_REPO_URL }}
       #     helm repo update
 
-      # TODO: Remove after local chart testing — only needed because local chart
-      # doesn't include pre-built dependency archives (unlike the published bcgov/soba chart)
+      # TODO: Remove after local chart testing only needed because local chart was pulled into this
       - name: Add Helm Repos
         run: |
           helm repo add bcgov-crunchy https://bcgov.github.io/crunchy-postgres/
           helm repo add bcgov https://bcgov.github.io/helm-charts/
           helm repo update
-
+    #Remove for other helm repo chart.Only required for local chart testing
       - name: Build chart dependencies
         run: helm dependency build deployment/helm/charts/soba
-
+     #Remove comment and need to check if changes can be PRd into helm repo
       - name: Ensure app secrets
         env:
           NAMESPACE: ${{ secrets.OC_NAMESPACE }}
@@ -200,7 +199,7 @@ jobs:
           APP_SECRET_NAME="${RELEASE}-app-secrets"
           DB_SECRET_SHA=$(oc get secret "$DB_SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data}' | sha256sum | cut -d' ' -f1)
           APP_SECRET_SHA=$(oc get secret "$APP_SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data}' | sha256sum | cut -d' ' -f1)
-
+         #To be changed
           cat > /tmp/values-override.yaml <<OVERRIDE
           be_image:
             repository: "ghcr.io/${REPO_LC}/backend"
