@@ -26,9 +26,6 @@ on:
 
 permissions: {}
 
-env:
-  # Opt into Node.js 24 for actions (Node 20 deprecated June 2026)
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   set-vars:
