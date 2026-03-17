@@ -1,5 +1,5 @@
 import { createPluginConfigReader } from '../../config/pluginConfig';
-import { FormEngineAdapter, type FormEngineHealthResult } from './FormEngineAdapter';
+import { FormEngineAdapter, type FormEngineReadinessResult } from './FormEngineAdapter';
 import { FormEnginePluginDefinition } from './FormEnginePluginDefinition';
 import {
   getFormEnginePluginCatalog,
@@ -34,16 +34,18 @@ export const createFormEngineAdapter = (engineCode: string): FormEngineAdapter =
 };
 
 /**
- * Run health check on each registered form engine. Only reachability (ok/message) is returned; no config.
+ * Run readiness check on each registered form engine. Only reachability (ok/message) is returned; no config.
  */
-export const checkFormEngineHealth = async (): Promise<Record<string, FormEngineHealthResult>> => {
+export const checkFormEngineReadiness = async (): Promise<
+  Record<string, FormEngineReadinessResult>
+> => {
   const catalog = getFormEnginePluginCatalog();
-  const results: Record<string, FormEngineHealthResult> = {};
+  const results: Record<string, FormEngineReadinessResult> = {};
   for (const entry of catalog) {
     try {
       const adapter = createFormEngineAdapter(entry.code);
-      if (typeof adapter.healthCheck === 'function') {
-        results[entry.code] = await adapter.healthCheck();
+      if (typeof adapter.readinessCheck === 'function') {
+        results[entry.code] = await adapter.readinessCheck();
       } else {
         results[entry.code] = { ok: true };
       }

@@ -76,6 +76,16 @@ Stop services:
 docker compose -f .devcontainer/docker-compose.yml down
 ```
 
+### Database (migrate + seed)
+
+After the sidecar services are running, from the **repo root** run:
+
+```bash
+pnpm db:init
+```
+
+This runs pending PostgreSQL migrations and seeds the database. You can also run `pnpm db:migrate` and `pnpm db:seed` separately.
+
 ### Connection strings (from inside devcontainer)
 
 Use `host.docker.internal` to reach the sidecar services (the devcontainer is started with `host.docker.internal:host-gateway` so this works on Linux and Docker Desktop):
@@ -131,7 +141,7 @@ The backend uses `.env` and `.env.local`. Values are loaded in order: `.env` fir
 | File                         | Purpose                                                          | Committed |
 | ---------------------------- | ---------------------------------------------------------------- | --------- |
 | `backend/.env.example`       | Base config (Form.io URL, JWT issuer/audience, role mapping)     | Yes       |
-| `backend/.env.local.example` | Template for credentials (Form.io admin/manager, session secret) | Yes       |
+| `backend/.env.local.example` | Template for credentials (Form.io admin, session secret) | Yes       |
 | `backend/.env`               | Active base config                                               | No        |
 | `backend/.env.local`         | Active credentials and secrets                                   | No        |
 

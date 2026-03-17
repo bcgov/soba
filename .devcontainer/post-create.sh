@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Non-interactive so pnpm/npm never prompt during image build
+export CI=true
+
 echo "══════════════════════════════════════════════════════════════"
 echo "  SOBA — Dev Container Setup"
 echo "══════════════════════════════════════════════════════════════"

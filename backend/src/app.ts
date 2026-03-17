@@ -4,6 +4,7 @@ env.loadEnv();
 import express from 'express';
 import rTracer from 'cls-rtracer';
 import cors from 'cors';
+import passport from 'passport';
 import { checkJwt } from './core/middleware/auth';
 import { coreRouter } from './core/api';
 import { healthRouter } from './core/api/health';
@@ -15,15 +16,36 @@ import { resolveActor } from './core/middleware/actor';
 import { requireSobaAdmin } from './core/middleware/requireSobaAdmin';
 import { adminRouter } from './core/api/admin';
 import { globalRateLimit, apiRateLimit, publicRateLimit } from './core/middleware/rateLimit';
+import { getFormEngineRouteDefinitions } from './core/integrations/plugins/PluginRegistry';
+import { createPluginConfigReader } from './core/config/pluginConfig';
+import { initializePassport } from './core/auth/passport';
 
 const app = express();
-const port = 4000;
+const port = Number(process.env.PORT) || 4000;
 
+// Trust X-Forwarded-* headers when behind OpenShift/ingress reverse proxy
+app.set('trust proxy', true);
+
+initializePassport();
+
+const corsOrigin = process.env.CORS_ORIGIN;
 if (process.env.NODE_ENV === 'development') {
   log.info('Allowing CORS for development environment');
   app.use(cors());
+} else if (corsOrigin) {
+  const origins = corsOrigin
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  log.info({ origins }, 'Allowing CORS for configured origins');
+  app.use(
+    cors({
+      origin: origins.length === 1 ? origins[0] : origins,
+      credentials: true,
+    }),
+  );
 } else {
-  log.info('Blocking CORS for production environment');
+  log.info('No CORS_ORIGIN set; cross-origin requests will be blocked');
 }
 
 app.use(
@@ -35,8 +57,24 @@ app.use(
 );
 
 app.use(httpLogger);
+app.use(passport.initialize());
 
 app.use(globalRateLimit);
+
+// ——— Form-engine proxy/routes under /api/v1 (protected; when PLUGIN_<CODE>_ROUTES_ENABLED=true) ———
+const formEngineRouteDefs = getFormEngineRouteDefinitions();
+for (const def of formEngineRouteDefs) {
+  const path = `/api/v1${def.routeBasePath.startsWith('/') ? '' : '/'}${def.routeBasePath}`;
+  app.use(
+    path,
+    apiRateLimit,
+    express.json(),
+    checkJwt(),
+    resolveActor,
+    def.createRouter(createPluginConfigReader(def.code)),
+  );
+  log.info({ code: def.code, path }, 'Form-engine routes mounted');
+}
 
 // ——— Public routes (no authentication) ———
 app.get('/api/docs/openapi.json', publicRateLimit, (_req, res) => {

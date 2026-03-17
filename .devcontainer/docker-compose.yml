@@ -30,7 +30,8 @@ services:
     environment:
       ROOT_EMAIL: "formio@localhost.com"
       ROOT_PASSWORD: "formio"
-      NODE_CONFIG: '{"mongo":"mongodb://mongodb:27017/formio-ce","port":3001,"jwt":{"secret":"formio-dev-secret-change-in-production"}}'
+      # reservedForms includes "health" so GET /health reaches the server sanity-check (DB + schema). Without it, /health is treated as a form alias and returns 400.
+      NODE_CONFIG: '{"mongo":"mongodb://mongodb:27017/formio-ce","port":3001,"jwt":{"secret":"formio-dev-secret-change-in-production"},"reservedForms":["submissions","submission","exists","export","role","current","logout","import","form","access","health"]}'
     depends_on:
       - mongodb
     restart: unless-stopped
@@ -51,23 +52,6 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
-
-  backend-db-init:
-    image: node:20-alpine
-    profiles: ["db-init"]
-    working_dir: /workspace
-    volumes:
-      - ..:/workspace
-    environment:
-      CI: "true"
-      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/soba
-      DB_ADMIN_DATABASE: postgres
-      FORMIO_VERSION: local
-    command: sh -lc "corepack enable pnpm && pnpm install --filter @soba/backend... --frozen-lockfile && pnpm --filter @soba/backend run db:migrate && pnpm --filter @soba/backend run db:seed"
-    depends_on:
-      postgres:
-        condition: service_healthy
 
 volumes:
   mongodb_data:

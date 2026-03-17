@@ -42,14 +42,18 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# copy the static public folder from the frontend build
-COPY --from=builder /app/frontend/public ./public
-
-# Automatically leverage output traces to reduce image size
+# Standalone with outputFileTracingRoot (monorepo) nests server at frontend/server.js
+# Standalone does not include .next/static — must copy so /_next/static/* is served
 COPY --from=builder --chown=nextjs:nodejs /app/frontend/.next/standalone ./
-# static assets already live within the standalone build
+COPY --from=builder --chown=nextjs:nodejs /app/frontend/.next/static ./frontend/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/frontend/public ./frontend/public
 
-USER nextjs
+# OpenShift / arbitrary UID: group 0 + g=u so any non-root UID can read/serve static
+RUN chgrp -R 0 /app && chmod -R g=u /app
+ENV HOME=/tmp
+USER 1001
+
+WORKDIR /app/frontend
 
 EXPOSE 3000
 

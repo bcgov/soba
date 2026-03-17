@@ -15,6 +15,7 @@
 #       with:
 #         ref: ${{ needs.set-vars.outputs.ref }}
 #         platforms: amd64
+#         image_version: pr-${{ github.event.pull_request.number }}  # e.g. pr-42 for PRs
 #       secrets: inherit
 #
 #     deploy:
@@ -28,20 +29,21 @@
 name: Build Images
 
 on:
-  workflow_dispatch:
-    inputs:
-      ref:
-        description: "Branch, PR number (e.g. 9), refs/pull/N/head, or SHA (blank = default branch)"
-        required: false
-      platforms:
-        description: "Architectures to build"
-        required: true
-        default: amd64-arm64
-        type: choice
-        options:
-          - amd64
-          - arm64
-          - amd64-arm64
+  ##Deactivated.To be removed later as the actions are being handled by pipeline workflows currently
+  # workflow_dispatch:
+  #   inputs:
+  #     ref:
+  #       description: "Branch, PR number (e.g. 9), refs/pull/N/head, or SHA (blank = default branch)"
+  #       required: false
+  #     platforms:
+  #       description: "Architectures to build"
+  #       required: true
+  #       default: amd64-arm64
+  #       type: choice
+  #       options:
+  #         - amd64
+  #         - arm64
+  #         - amd64-arm64
   workflow_call:
     inputs:
       ref:
@@ -62,26 +64,28 @@ on:
         value: ${{ jobs.merge.outputs.short_sha }}
       image_version:
         value: ${{ jobs.merge.outputs.image_version }}
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - ".github/workflows/build-images.yaml"
-      - ".gitignore"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-  push:
-    branches: [main]
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - ".github/workflows/build-images.yaml"
-      - ".gitignore"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
+  # pull_request trigger disabled — PR builds now flow through pr_open.yaml → workflow_call
+  # pull_request:
+  #   types: [opened, synchronize, reopened]
+  #   paths:
+  #     - "backend/**"
+  #     - "frontend/**"
+  #     - ".github/workflows/build-images.yaml"
+  #     - ".gitignore"
+  #     - "package.json"
+  #     - "pnpm-lock.yaml"
+  #     - "pnpm-workspace.yaml"
+  ##Deactivated.To be removed later as the actions are being handled by pipeline workflows currently
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - "backend/**"
+  #     - "frontend/**"
+  #     - ".github/workflows/build-images.yaml"
+  #     - ".gitignore"
+  #     - "package.json"
+  #     - "pnpm-lock.yaml"
+  #     - "pnpm-workspace.yaml"
 
 env:
   REGISTRY: ghcr.io
@@ -170,7 +174,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.prepare.outputs.ref }}
 
@@ -220,7 +224,7 @@ jobs:
       image_version: ${{ needs.prepare.outputs.image_version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.prepare.outputs.ref }}
 

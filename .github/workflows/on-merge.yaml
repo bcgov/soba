@@ -1,0 +1,141 @@
+# Triggers when a PR is merged to the develop branch.
+name: On Merge
+run-name: Deploy develop (sha-${{ github.sha }})
+
+env:
+  ACRONYM: soba
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/on-merge.yaml"
+      - ".github/workflows/build-images.yaml"
+      - ".gitignore"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "deployments/**"
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & Push
+    uses: ./.github/workflows/build-images.yaml
+    with:
+      ref: develop
+      platforms: amd64
+      image_version: develop
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+
+  deploy-crunchy:
+    name: Deploy Crunchy Postgres
+    runs-on: ubuntu-latest
+    outputs:
+      cluster: ${{ steps.crunchy.outputs.cluster }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Deploy Crunchy
+        id: crunchy
+        uses: bcgov/action-crunchy@v2.0.0
+        with:
+          oc_namespace: ${{ secrets.OC_NAMESPACE }}
+          oc_token: ${{ secrets.OC_TOKEN }}
+          values_file: deployments/helm/action-crunchy/values.yml
+          release_name: pg-soba
+          ref: v2.0.0
+
+  deploy:
+    name: Deploy SOBA to Dev
+    needs: [build, deploy-crunchy]
+    permissions:
+      contents: read
+    environment:
+      name: dev
+      url: https://soba-dev.${{ vars.OC_DOMAIN }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install OpenShift CLI
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
+
+      - name: Login to OpenShift Cluster
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: ${{ vars.OC_SERVER }}
+          openshift_token: ${{ secrets.OC_TOKEN }}
+          insecure_skip_tls_verify: true
+          namespace: ${{ secrets.OC_NAMESPACE }}
+
+      - name: Get DB config from Crunchy secret
+        id: db
+        env:
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          CLUSTER: ${{ needs.deploy-crunchy.outputs.cluster }}
+        run: |
+          SECRET_NAME="${CLUSTER}-pguser-app"
+          echo "secret_name=$SECRET_NAME" >> "$GITHUB_OUTPUT"
+          DB_URI=$(oc get secret "$SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.uri}' | base64 -d)
+          echo "::add-mask::$DB_URI"
+          echo "uri<<URI_EOF" >> "$GITHUB_OUTPUT"
+          printf '%s' "$DB_URI" >> "$GITHUB_OUTPUT"
+          echo "" >> "$GITHUB_OUTPUT"
+          echo "URI_EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Generate values override and deploy
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          TAG: sha-${{ needs.build.outputs.short_sha }}
+          SHORT_SHA: ${{ needs.build.outputs.short_sha }}
+          DOMAIN: ${{ vars.OC_DOMAIN }}
+          DATABASE_URI: ${{ steps.db.outputs.uri }}
+        run: |
+          REPO_LC=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          DB_URI_ESC=$(printf '%s' "$DATABASE_URI" | sed "s/'/''/g")
+
+          cat > /tmp/values-override.yaml <<OVERRIDE
+          backend:
+            image:
+              repository: "ghcr.io/${REPO_LC}/backend"
+              tag: "${TAG}"
+            config:
+              gitSha: "${SHORT_SHA}"
+              gitTag: "${TAG}"
+              imageTag: "${TAG}"
+          frontend:
+            image:
+              repository: "ghcr.io/${REPO_LC}/frontend"
+              tag: "${TAG}"
+          global:
+            domain: "${DOMAIN}"
+          database:
+            uri: '${DB_URI_ESC}'
+          formio:
+            admin:
+              password: "${{ secrets.FORMIO_ADMIN_PASSWORD }}"
+            jwtSecret: "${{ secrets.FORMIO_JWT_SECRET }}"
+          OVERRIDE
+
+          helm upgrade --install "soba-dev" ./deployments/helm/soba \
+            --namespace "${NAMESPACE}" \
+            -f deployments/helm/soba/values-dev.yaml \
+            -f /tmp/values-override.yaml \
+            --wait --timeout 600s

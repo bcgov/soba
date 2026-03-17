@@ -1,0 +1,10 @@
+{{- if .Values.formio.internal.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "soba.fullname" . }}-formio
+  labels:
+    {{- include "soba.labels" (dict "root" . "component" "formio") | nindent 4 }}
+data:
+  FORMIO_PORT: {{ .Values.formio.service.port | quote }}
+{{- end }}

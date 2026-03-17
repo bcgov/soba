@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "soba.fullname" . }}-backend-sso
+  labels:
+    {{- include "soba.labels" (dict "root" . "component" "backend") | nindent 4 }}
+data:
+  IDP_PLUGIN_DEFAULT_CODE: {{ .Values.backend.sso.idpPluginDefaultCode | quote }}
+  IDP_PLUGINS: {{ .Values.backend.sso.idpPlugins | quote }}
+  {{- if .Values.backend.sso.jwksUri }}
+  IDP_PLUGIN_DEFAULT_SSO_JWKS_URI: {{ .Values.backend.sso.jwksUri | quote }}
+  {{- end }}
+  {{- if .Values.backend.sso.jwtIssuer }}
+  IDP_PLUGIN_DEFAULT_SSO_JWT_ISSUER: {{ .Values.backend.sso.jwtIssuer | quote }}
+  {{- end }}
+  {{- if .Values.backend.sso.jwtAudience }}
+  IDP_PLUGIN_DEFAULT_SSO_JWT_AUDIENCE: {{ .Values.backend.sso.jwtAudience | quote }}
+  {{- end }}

@@ -8,18 +8,22 @@ import path from 'path';
 import { z } from 'zod';
 import { env } from '../../config/env';
 import { getWorkspacePluginsConfig } from '../../config/workspacePlugins';
-import { createPluginConfigReader } from '../../config/pluginConfig';
+import { createPluginConfigReader, type PluginConfigReader } from '../../config/pluginConfig';
 import type {
   WorkspaceResolver,
   WorkspaceResolverDefinition,
 } from '../workspace/WorkspaceResolver';
-import type { FormEnginePluginDefinition } from '../form-engine/FormEnginePluginDefinition';
+import type {
+  FormEnginePluginDefinition,
+  FormEngineRouteDefinition,
+} from '../form-engine/FormEnginePluginDefinition';
 import type { FeatureApiDefinition } from './FeatureApiDefinition';
 import type { CacheAdapter, CachePluginDefinition } from '../cache/CacheAdapter';
 import type {
   MessageBusAdapter,
   MessageBusPluginDefinition,
 } from '../messagebus/MessageBusAdapter';
+import type { IdpPluginDefinition } from '../../auth/IdpPlugin';
 
 const WorkspaceResolverDefinitionSchema = z.object({
   code: z.string().min(1),
@@ -34,6 +38,8 @@ const FormEnginePluginDefinitionSchema = z.object({
     version: z.string().optional(),
   }),
   createAdapter: z.any(),
+  routeBasePath: z.union([z.string(), z.function()]).optional(),
+  createRouter: z.any().optional(),
 });
 
 const FeatureApiDefinitionSchema = z.object({
@@ -53,6 +59,12 @@ const MessageBusPluginDefinitionSchema = z.object({
   createAdapter: z.any(),
 });
 
+const IdpPluginDefinitionSchema = z.object({
+  code: z.string().min(1),
+  createAuthMiddleware: z.any(),
+  createClaimMapper: z.any(),
+});
+
 interface CachedPlugin {
   dir: string;
   workspaceDefinition?: WorkspaceResolverDefinition;
@@ -60,6 +72,7 @@ interface CachedPlugin {
   apiDefinition?: FeatureApiDefinition;
   cacheDefinition?: CachePluginDefinition;
   messagebusDefinition?: MessageBusPluginDefinition;
+  idpDefinition?: IdpPluginDefinition;
 }
 
 let cache: CachedPlugin[] | null = null;
@@ -67,13 +80,13 @@ let cache: CachedPlugin[] | null = null;
 function getPluginsRoot(): string {
   const fromEnv = env.getPluginsPath();
   if (fromEnv) return path.resolve(fromEnv);
-  // When running compiled (from dist/), load plugins from dist/src/plugins.
-  // When running from source (tsx/ts-node), use src/plugins.
+  // Compiled: this file is dist/src/core/integrations/plugins → ../../../plugins = dist/src/plugins.
+  // Do not use process.cwd() for dist (breaks when node is started from repo root or /app).
   const runningFromDist = __dirname.includes(path.sep + 'dist' + path.sep);
-  const pluginsDir = runningFromDist
-    ? path.join('dist', 'src', 'plugins')
-    : path.join('src', 'plugins');
-  return path.resolve(process.cwd(), pluginsDir);
+  if (runningFromDist) {
+    return path.resolve(__dirname, '..', '..', '..', 'plugins');
+  }
+  return path.resolve(process.cwd(), 'src', 'plugins');
 }
 
 function discoverAndCache(): CachedPlugin[] {
@@ -165,6 +178,19 @@ function discoverAndCache(): CachedPlugin[] {
       } else {
         console.warn(
           `[PluginRegistry] invalid messagebusPluginDefinition in '${pluginDir}':`,
+          parsed.error.message,
+        );
+      }
+    }
+
+    const idpDef = (obj as Record<string, unknown>).idpPluginDefinition;
+    if (idpDef !== undefined) {
+      const parsed = IdpPluginDefinitionSchema.safeParse(idpDef);
+      if (parsed.success) {
+        entry.idpDefinition = idpDef as IdpPluginDefinition;
+      } else {
+        console.warn(
+          `[PluginRegistry] invalid idpPluginDefinition in '${pluginDir}':`,
           parsed.error.message,
         );
       }
@@ -276,6 +302,34 @@ export function getFormEnginePluginDefinitions(): FormEnginePluginDefinition[] {
     .filter((d): d is FormEnginePluginDefinition => Boolean(d));
 }
 
+/** Returns true when PLUGIN_<CODE>_ROUTES_ENABLED is explicitly 'true' (case-insensitive). */
+function isFormEngineRoutesEnabled(config: PluginConfigReader): boolean {
+  const raw = config.getOptional('ROUTES_ENABLED');
+  return raw?.trim().toLowerCase() === 'true';
+}
+
+/**
+ * Form engine definitions that contribute HTTP routes and have routes enabled via
+ * PLUGIN_<CODE>_ROUTES_ENABLED=true. Used to mount proxy/routes in the app.
+ */
+export function getFormEngineRouteDefinitions(): FormEngineRouteDefinition[] {
+  const definitions = getFormEnginePluginDefinitions();
+  const result: FormEngineRouteDefinition[] = [];
+  for (const def of definitions) {
+    if (def.routeBasePath === undefined || def.createRouter === undefined) continue;
+    const config = createPluginConfigReader(def.code);
+    if (!isFormEngineRoutesEnabled(config)) continue;
+    const routeBasePath =
+      typeof def.routeBasePath === 'function' ? def.routeBasePath(config) : def.routeBasePath;
+    result.push({
+      code: def.code,
+      routeBasePath,
+      createRouter: def.createRouter,
+    });
+  }
+  return result;
+}
+
 export function getCachePluginDefinitions(): CachePluginDefinition[] {
   const discovered = discoverAndCache();
   return discovered
@@ -288,6 +342,11 @@ export function getMessageBusPluginDefinitions(): MessageBusPluginDefinition[] {
   return discovered
     .map((p) => p.messagebusDefinition)
     .filter((d): d is MessageBusPluginDefinition => Boolean(d));
+}
+
+export function getIdpPluginDefinitions(): IdpPluginDefinition[] {
+  const discovered = discoverAndCache();
+  return discovered.map((p) => p.idpDefinition).filter((d): d is IdpPluginDefinition => Boolean(d));
 }
 
 let cacheAdapterInstance: CacheAdapter | null = null;

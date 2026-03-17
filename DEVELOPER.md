@@ -60,15 +60,11 @@ This starts:
 
 **Inside the devcontainer** use `host.docker.internal` to reach these services (e.g. `mongodb://host.docker.internal:27017`, `postgresql://postgres:postgres@host.docker.internal:5432/postgres`, `http://host.docker.internal:3001`). The devcontainer is started with `--add-host=host.docker.internal:host-gateway` so that this hostname works on Linux as well as on Docker Desktop (Mac/Windows). On the host machine use `localhost` and the same ports. **Using the app from a browser on the host** (e.g. http://localhost:3000): the frontend example uses `NEXT_PUBLIC_SOBA_API_BASE_URL=http://localhost:4000/api/v1` so client-side API calls go to the forwarded backend; no change needed. Form.io login: `formio@localhost.com` / `formio`.
 
-Optional: run DB migrations and seed via the `db-init` profile:
-
-```bash
-docker compose -f .devcontainer/docker-compose.yml --profile db-init up
-```
+**Database (migrate + seed):** After the sidecars are up, from the repo root run `pnpm db:init` to run pending migrations and seed data. See [Drizzle](#drizzle) for individual `db:migrate` / `db:seed` commands.
 
 ### Mac Silicon (ARM)
 
-On Apple Silicon, Form.io must run as amd64 (no native arm64 image). Use the **tasks** that apply the override (run **Dev Services: Up (arm64 override)** or **Dev Services: Up + DB Init (arm64 override)** from the Command Palette / Tasks), or run the same compose flags in a terminal. See [Launch & tasks](#launch--tasks) for the task list.
+On Apple Silicon, Form.io must run as amd64 (no native arm64 image). Use the **tasks** that apply the override (run **Dev Services: Up (arm64 override)** from the Command Palette / Tasks), or run the same compose flags in a terminal. See [Launch & tasks](#launch--tasks) for the task list.
 
 ```bash
 docker compose -f .devcontainer/docker-compose.yml -f .devcontainer/docker-compose.override.arm64.yml up -d
@@ -93,6 +89,9 @@ The repo is a **[pnpm](https://pnpm.io) workspace** (faster installs, shared sto
 | `pnpm test:frontend` / `pnpm test:backend`         | Test one app                                                    |
 | `pnpm lint`                                        | Lint frontend and backend                                       |
 | `pnpm lint:fix`                                    | Lint with auto-fix both                                         |
+| `pnpm db:migrate`                                  | Run pending DB migrations (backend)                             |
+| `pnpm db:seed`                                     | Seed DB (run after migrate)                                     |
+| `pnpm db:init`                                     | Migrate then seed (full DB setup)                               |
 | `pnpm lint:frontend` / `pnpm lint:backend`         | Lint one app                                                    |
 | `pnpm lint:fix:frontend` / `pnpm lint:fix:backend` | Lint fix one app                                                |
 | `pnpm check`                                       | Type/style checks for both apps                                 |
@@ -117,11 +116,10 @@ VS Code config lives in `.vscode/launch.json` and `.vscode/tasks.json`.
 
 **Tasks (`tasks.json`):** Run from Command Palette → “Tasks: Run Task”.
 
-| Task                                            | Purpose                                                                         |
-| ----------------------------------------------- | ------------------------------------------------------------------------------- |
-| **Dev Services: Up (arm64 override)**           | Start MongoDB, PostgreSQL, Form.io (with ARM override so Form.io runs as amd64) |
-| **Dev Services: Up + DB Init (arm64 override)** | Same as Up, then run migrations + seed once                                     |
-| **Dev Services: Down (arm64 override)**         | Stop and remove the dev service containers                                      |
+| Task                                  | Purpose                                                                         |
+| ------------------------------------- | ------------------------------------------------------------------------------- |
+| **Dev Services: Up (arm64 override)** | Start MongoDB, PostgreSQL, Form.io (with ARM override so Form.io runs as amd64) |
+| **Dev Services: Down (arm64 override)** | Stop and remove the dev service containers                                    |
 
 Use the dev-services tasks on **Mac Silicon** so the override is applied; they work on amd64 as well. On other hosts you can instead run the `docker compose -f .devcontainer/docker-compose.yml up -d` command from the terminal (no override); or you can right-click the `docker-compose.yml` file and click `Compose Up`.
 
@@ -155,7 +153,7 @@ The devcontainer **initialize** and **post-create** steps copy from example file
 
 - **Runtime:** [Express](https://expressjs.com), TypeScript
 - **DB:** [Drizzle](https://orm.drizzle.team) ORM, PostgreSQL (`pg`)
-- **Auth:** JWT (e.g. BC Gov SSO), Passport, express-session
+- **Auth:** Bearer-token APIs with Passport-backed stateless verification, IdP plugins (e.g. BC Gov SSO)
 - **API docs:** OpenAPI/Swagger ([Zod](https://zod.dev) + `@asteasolutions/zod-to-openapi`)
 - **Logging:** [Pino](https://getpino.io)
 
@@ -197,7 +195,7 @@ Tests live under `backend/tests/`. See [In Detail — Testing](#testing) for app
 
 ### Plugin implementations
 
-The backend uses a **plugin architecture** so that workspace resolution, form engines, auth (IdP), cache, message bus, and optional feature APIs can be swapped or extended without changing core. Plugins are discovered from `backend/src/plugins/` (each directory is a plugin module). Configuration is via env (e.g. which plugins are enabled, plugin-specific keys). See [In Detail — Configuration of plugins and features](#configuration-of-plugins-and-features).
+The backend uses a **plugin architecture** so that workspace resolution, form engines, auth (IdP), cache, message bus, and optional feature APIs can be swapped or extended without changing core. Plugins are discovered from `backend/src/plugins/` (each directory is a plugin module). Configuration is via env (e.g. which plugins are enabled, plugin-specific keys). For auth, Passport is now the protected-route entry point, but IdP plugins still provide provider-specific token verification and claim mapping. See [In Detail — Configuration of plugins and features](#configuration-of-plugins-and-features).
 
 **Plugin types and current implementations:**
 
@@ -210,7 +208,7 @@ The backend uses a **plugin architecture** so that workspace resolution, form en
 | **Message bus**        | Async messaging                        | `messagebus-memory`; future: Redis, NATS                            |
 | **Feature API**        | Optional REST API per plugin           | e.g. `personal-local` (exposes `pluginApiDefinition` with basePath) |
 
-Workspace and IdP plugins are ordered via env (`WORKSPACE_PLUGINS_ENABLED`, `IDP_PLUGINS`); the first successful resolver or IdP wins. Plugin APIs (from plugins that export both a workspace resolver and a feature API definition) are registered via `createPluginApiRouter()` and can be mounted under `/api/v1` when desired.
+Workspace and IdP plugins are ordered via env (`WORKSPACE_PLUGINS_ENABLED`, `IDP_PLUGINS`); the first successful resolver or IdP wins. For IdP auth, Passport orchestrates the ordered plugin attempts and the winning plugin still supplies the mapped identity used by core. Plugin APIs (from plugins that export both a workspace resolver and a feature API definition) are registered via `createPluginApiRouter()` and can be mounted under `/api/v1` when desired.
 
 ### Features
 
@@ -218,7 +216,9 @@ Workspace and IdP plugins are ordered via env (`WORKSPACE_PLUGINS_ENABLED`, `IDP
 
 ### Form engines and formio-v5
 
-Form rendering and submission storage are delegated to a **form engine** plugin. The default is `formio-v5` (Form.io v5). The core stores form and submission metadata and draft state in PostgreSQL; the form engine (e.g. Form.io) holds the form definition and can persist submission payloads. The **FormioEngineAdapter** (`backend/src/plugins/formio-v5/`) talks to Form.io over HTTP. Config is via `PLUGIN_FORMIO_V5_*` (API base URL, admin/manager credentials, etc.). `FORM_ENGINE_DEFAULT_CODE` selects which engine to use; forms reference an engine code. See [In Detail — Configuration of plugins and features](#configuration-of-plugins-and-features).
+Form rendering and submission storage are delegated to a **form engine** plugin. The default is `formio-v5` (Form.io v5). The core stores form and submission metadata and draft state in PostgreSQL; the form engine (e.g. Form.io) holds the form definition and can persist submission payloads. The **FormioEngineAdapter** (`backend/src/plugins/formio-v5/`) talks to Form.io over HTTP. Config is via `PLUGIN_FORMIO_V5_*` (API base URL, admin credentials, etc.). `FORM_ENGINE_DEFAULT_CODE` selects which engine to use; forms reference an engine code.
+
+Form engine plugins can optionally expose **HTTP routes** (e.g. a Form.io CE proxy) by setting **`routeBasePath`** and **`createRouter(config)`**; routes are mounted only when **`PLUGIN_<CODE>_ROUTES_ENABLED=true`** (explicit per-engine). For formio-v5, set **`PLUGIN_FORMIO_V5_ROUTES_ENABLED=true`** to mount the proxy at **`/api/v1/formio-v5`** (path from **`PLUGIN_FORMIO_V5_PROXY_PATH`**, default `/formio-v5`). The proxy is **protected** (same auth as v1 API: app JWT in `Authorization: Bearer`). It forwards to Form.io CE and optionally passes through **`x-jwt-token`**; otherwise uses the server-side admin client. Health remains on the adapter and is reported via `/api/v1/health`. See [In Detail — Configuration of plugins and features](#configuration-of-plugins-and-features).
 
 ### Outbox
 
@@ -226,18 +226,19 @@ To keep **transactions consistent across PostgreSQL and the form engine** (e.g. 
 
 ### Auth plugins and responsibilities
 
-**IdP plugins** are responsible for: (1) validating the JWT (issuer, signature via JWKS), and (2) mapping claims to a normalised identity (subject, profile, optional `soba_admin`). The composite middleware `checkJwt()` tries each configured IdP in order; the first success sets `req.idpPluginCode` and `req.authPayload`. **resolveActor** runs after `checkJwt()`: it uses the IdP’s claim mapper to get subject/profile, finds or creates the app user, sets `req.actorId` and `req.isSobaAdmin` (including refresh from IdP when the mapper returns `sobaAdmin`). So: IdP = “is this token valid and who is it?”; core = “resolve to internal actor and admin flag”. IdPs are configured with `IDP_PLUGINS` (comma-separated) and plugin-specific env (e.g. `PLUGIN_BCGOV_SSO_JWKS_URI`). See [In Detail — Auth flow](#auth-flow).
+**IdP plugins** are responsible for: (1) validating the token (issuer, signature via JWKS or provider API), and (2) mapping claims to a normalised identity (subject, profile, optional `soba_admin`). Protected routes enter auth through Passport: `checkJwt()` calls `passport.authenticate(..., { session: false })`, and the composite Passport strategy tries each configured IdP in order. The first success still sets `req.idpPluginCode` and `req.authPayload`, and Passport also authenticates the request principal. **resolveActor** runs after `checkJwt()`: it uses the IdP’s claim mapper to get subject/profile, finds or creates the app user, sets `req.actorId` and `req.isSobaAdmin` (including refresh from IdP when the mapper returns `sobaAdmin`). So: Passport = “run the protected-route auth flow”; IdP = “is this token valid and who is it?”; core = “resolve to internal actor and admin flag”. IdPs are configured with `IDP_PLUGINS` (comma-separated) and plugin-specific env (e.g. `PLUGIN_BCGOV_SSO_JWKS_URI`). `session: false` is intentional because it keeps the auth path stateless, aligned with bearer-token APIs, easier to scale across instances, and compatible with multiple IdP plugins tried in order. See [In Detail — Auth flow](#auth-flow).
 
 ### Drizzle
 
 Schema and queries live in TypeScript; migrations are SQL in `backend/drizzle/`. The app uses **drizzle-orm** at runtime; **drizzle-kit** (run via `npx` from `backend/`) handles schema introspection and migration generation. Config: `backend/drizzle.config.ts` (reads `DATABASE_URL` from `.env`).
 
-| Command                    | Where      | Purpose                                                                   |
-| -------------------------- | ---------- | ------------------------------------------------------------------------- |
-| `pnpm db:migrate`          | `backend/` | Ensure DB exists, then run all pending migrations from `drizzle/`         |
-| `pnpm db:seed`             | `backend/` | Seed data (run after migrate)                                             |
-| `npx drizzle-kit generate` | `backend/` | Generate a new migration from schema changes (writes SQL into `drizzle/`) |
-| `npx drizzle-kit studio`   | `backend/` | Open Drizzle Studio (DB GUI); requires `DATABASE_URL`                     |
+| Command                    | Where           | Purpose                                                                   |
+| -------------------------- | --------------- | ------------------------------------------------------------------------- |
+| `pnpm db:migrate`          | repo root or `backend/` | Ensure DB exists, then run all pending migrations from `drizzle/`         |
+| `pnpm db:seed`             | repo root or `backend/` | Seed data (run after migrate)                                             |
+| `pnpm db:init`             | repo root       | Migrate then seed (convenience for local setup)                           |
+| `npx drizzle-kit generate` | `backend/`      | Generate a new migration from schema changes (writes SQL into `drizzle/`) |
+| `npx drizzle-kit studio`   | `backend/`      | Open Drizzle Studio (DB GUI); requires `DATABASE_URL`                     |
 
 Schema modules: `backend/src/core/db/schema/` (e.g. `core.ts`, `forms.ts`, `roles.ts`, `feature.ts`, `codes.ts`). After changing schema, run `drizzle-kit generate`, then `pnpm db:migrate` to apply.
 
@@ -361,7 +362,7 @@ Without the outbox, we would have to call the form engine synchronously inside t
 ### Configuration of plugins and features
 
 - **Plugin discovery:** Plugins live under `backend/src/plugins/<pluginDir>/`. Each plugin module can export one or more of: `workspacePluginDefinition`, `formEnginePluginDefinition`, `pluginApiDefinition`, `idpPluginDefinition`, `cachePluginDefinition`, `messageBusPluginDefinition`. The registry validates with Zod and builds caches at startup.
-- **Which plugins run:** Workspace resolvers: `WORKSPACE_PLUGINS_ENABLED` (comma-separated codes). IdP: `IDP_PLUGINS` (comma-separated; default from `IDP_PLUGIN_DEFAULT_CODE`). Cache / message bus: `CACHE_DEFAULT_CODE`, `MESSAGEBUS_DEFAULT_CODE`. Form engine: `FORM_ENGINE_DEFAULT_CODE`. Only plugins that are both discovered and listed in the relevant env are used. `WORKSPACE_PLUGINS_STRICT_MODE=true` fails startup if any enabled workspace plugin is missing.
+- **Which plugins run:** Workspace resolvers: `WORKSPACE_PLUGINS_ENABLED` (comma-separated codes). IdP: `IDP_PLUGINS` (comma-separated; default from `IDP_PLUGIN_DEFAULT_CODE`). Cache / message bus: `CACHE_DEFAULT_CODE`, `MESSAGEBUS_DEFAULT_CODE`. Form engine: `FORM_ENGINE_DEFAULT_CODE`. Only plugins that are both discovered and listed in the relevant env are used. For auth, Passport uses the ordered IdP plugin list as its provider chain and stops at the first successful plugin. `WORKSPACE_PLUGINS_STRICT_MODE=true` fails startup if any enabled workspace plugin is missing.
 - **Plugin config:** Each plugin gets a `PluginConfigReader` built from env with a prefix. Prefix is `PLUGIN_<NORMALIZED_CODE>_` (e.g. `PLUGIN_FORMIO_V5_API_BASE_URL`). The reader exposes `getRequired`, `getOptional`, `getBoolean`, `getNumber`, `getCsv`. Use `.env.example` and `.env.local` for secrets; document keys in examples only.
 - **Features (DB):** The `soba.feature` and `soba.feature_status` tables are seeded via `pnpm db:seed`. Feature status (e.g. `enabled`/`disabled`) drives feature-flag behaviour. Roles and code tables support `source` and (for roles) `feature_code` so features can add codes and roles; see [Enable/Disable features, add codes + roles](#enabledisable-features-add-codes--roles-for-feature).
 
@@ -374,11 +375,12 @@ Without the outbox, we would have to call the form engine synchronously inside t
 ### Auth flow
 
 1. **Request hits protected route** — Middleware order: `checkJwt()` then `resolveActor` (and for `/api/v1/admin`, `requireSobaAdmin`).
-2. **checkJwt()** — Composite IdP middleware: for each IdP in `IDP_PLUGINS`, run that IdP’s auth middleware (typically verify JWT with JWKS, issuer/audience). First IdP that sets `req.idpPluginCode` and `req.authPayload` wins; if none succeed, respond 401.
-3. **resolveActor** — Uses the winning IdP’s `claimMapper.mapPayload(req.authPayload)` to get subject, profile, and optional `sobaAdmin`. Calls `findOrCreateUserByIdentity(...)` to get or create the app user and set `req.actorId`. If the mapper returns `sobaAdmin === true` or `false`, upserts SOBA admin flag from IdP. Sets `req.isSobaAdmin` from DB. Any failure (e.g. unknown IdP, missing payload) goes to error handler.
-4. **Downstream** — Handlers use `req.actorId` and `req.isSobaAdmin`; core context middleware can attach workspace etc. for domain routes.
+2. **checkJwt()** — Passport-backed auth middleware: it calls `passport.authenticate(..., { session: false })`, which runs the composite Passport strategy for protected API requests.
+3. **Composite Passport strategy** — For each IdP in `IDP_PLUGINS`, run that IdP’s auth middleware (typically verify JWT with JWKS, issuer/audience, or validate against the provider API). First IdP that sets `req.idpPluginCode` and `req.authPayload` wins; if none succeed, respond 401. `session: false` is intentional because the API is bearer-token based, stays stateless across requests, scales cleanly across instances, and remains compatible with trying multiple IdP plugins in order.
+4. **resolveActor** — Uses the winning IdP’s `claimMapper.mapPayload(req.authPayload)` to get subject, profile, and optional `sobaAdmin`. Calls `findOrCreateUserByIdentity(...)` to get or create the app user and set `req.actorId`. If the mapper returns `sobaAdmin === true` or `false`, upserts SOBA admin flag from IdP. Sets `req.isSobaAdmin` from DB. Any failure (e.g. unknown IdP, missing payload) goes to error handler.
+5. **Downstream** — Handlers use `req.actorId` and `req.isSobaAdmin`; core context middleware can attach workspace etc. for domain routes.
 
-Auth-related env: `IDP_PLUGINS`, `IDP_PLUGIN_DEFAULT_*`, and per-IdP `PLUGIN_<IDP>_*` (e.g. JWKS URI, issuer, audience). Session/Passport are used where needed (e.g. browser flows); JWT + IdP is the primary API auth.
+Auth-related env: `IDP_PLUGINS`, `IDP_PLUGIN_DEFAULT_*`, and per-IdP `PLUGIN_<IDP>_*` (e.g. JWKS URI, issuer, audience). Protected API auth is Passport-backed and stateless; IdP plugins still perform provider-specific verification and claim mapping.
 
 ### Enable/Disable features, add codes + roles for feature
 
