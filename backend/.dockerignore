@@ -1,0 +1,19 @@
+# Backend .dockerignore — used when build context is backend/ (e.g. docker build -f Dockerfile . from backend/).
+# Standard monorepo builds use repo root as context; see root .dockerignore.
+# Keep this in sync so backend image stays clean regardless of where the build is run.
+
+node_modules
+dist
+coverage
+
+.git
+.gitignore
+*.md
+
+.env
+.env.local
+.env.*.local
+
+*.log
+.DS_Store
+*.tsbuildinfo

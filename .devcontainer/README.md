@@ -76,6 +76,16 @@ Stop services:
 docker compose -f .devcontainer/docker-compose.yml down
 ```
 
+### Database (migrate + seed)
+
+After the sidecar services are running, from the **repo root** run:
+
+```bash
+pnpm db:init
+```
+
+This runs pending PostgreSQL migrations and seeds the database. You can also run `pnpm db:migrate` and `pnpm db:seed` separately.
+
 ### Connection strings (from inside devcontainer)
 
 Use `host.docker.internal` to reach the sidecar services (the devcontainer is started with `host.docker.internal:host-gateway` so this works on Linux and Docker Desktop):

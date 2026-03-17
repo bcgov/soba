@@ -60,15 +60,11 @@ This starts:
 
 **Inside the devcontainer** use `host.docker.internal` to reach these services (e.g. `mongodb://host.docker.internal:27017`, `postgresql://postgres:postgres@host.docker.internal:5432/postgres`, `http://host.docker.internal:3001`). The devcontainer is started with `--add-host=host.docker.internal:host-gateway` so that this hostname works on Linux as well as on Docker Desktop (Mac/Windows). On the host machine use `localhost` and the same ports. **Using the app from a browser on the host** (e.g. http://localhost:3000): the frontend example uses `NEXT_PUBLIC_SOBA_API_BASE_URL=http://localhost:4000/api/v1` so client-side API calls go to the forwarded backend; no change needed. Form.io login: `formio@localhost.com` / `formio`.
 
-Optional: run DB migrations and seed via the `db-init` profile:
-
-```bash
-docker compose -f .devcontainer/docker-compose.yml --profile db-init up
-```
+**Database (migrate + seed):** After the sidecars are up, from the repo root run `pnpm db:init` to run pending migrations and seed data. See [Drizzle](#drizzle) for individual `db:migrate` / `db:seed` commands.
 
 ### Mac Silicon (ARM)
 
-On Apple Silicon, Form.io must run as amd64 (no native arm64 image). Use the **tasks** that apply the override (run **Dev Services: Up (arm64 override)** or **Dev Services: Up + DB Init (arm64 override)** from the Command Palette / Tasks), or run the same compose flags in a terminal. See [Launch & tasks](#launch--tasks) for the task list.
+On Apple Silicon, Form.io must run as amd64 (no native arm64 image). Use the **tasks** that apply the override (run **Dev Services: Up (arm64 override)** from the Command Palette / Tasks), or run the same compose flags in a terminal. See [Launch & tasks](#launch--tasks) for the task list.
 
 ```bash
 docker compose -f .devcontainer/docker-compose.yml -f .devcontainer/docker-compose.override.arm64.yml up -d
@@ -93,6 +89,9 @@ The repo is a **[pnpm](https://pnpm.io) workspace** (faster installs, shared sto
 | `pnpm test:frontend` / `pnpm test:backend`         | Test one app                                                    |
 | `pnpm lint`                                        | Lint frontend and backend                                       |
 | `pnpm lint:fix`                                    | Lint with auto-fix both                                         |
+| `pnpm db:migrate`                                  | Run pending DB migrations (backend)                             |
+| `pnpm db:seed`                                     | Seed DB (run after migrate)                                     |
+| `pnpm db:init`                                     | Migrate then seed (full DB setup)                               |
 | `pnpm lint:frontend` / `pnpm lint:backend`         | Lint one app                                                    |
 | `pnpm lint:fix:frontend` / `pnpm lint:fix:backend` | Lint fix one app                                                |
 | `pnpm check`                                       | Type/style checks for both apps                                 |
@@ -117,11 +116,10 @@ VS Code config lives in `.vscode/launch.json` and `.vscode/tasks.json`.
 
 **Tasks (`tasks.json`):** Run from Command Palette → “Tasks: Run Task”.
 
-| Task                                            | Purpose                                                                         |
-| ----------------------------------------------- | ------------------------------------------------------------------------------- |
-| **Dev Services: Up (arm64 override)**           | Start MongoDB, PostgreSQL, Form.io (with ARM override so Form.io runs as amd64) |
-| **Dev Services: Up + DB Init (arm64 override)** | Same as Up, then run migrations + seed once                                     |
-| **Dev Services: Down (arm64 override)**         | Stop and remove the dev service containers                                      |
+| Task                                  | Purpose                                                                         |
+| ------------------------------------- | ------------------------------------------------------------------------------- |
+| **Dev Services: Up (arm64 override)** | Start MongoDB, PostgreSQL, Form.io (with ARM override so Form.io runs as amd64) |
+| **Dev Services: Down (arm64 override)** | Stop and remove the dev service containers                                    |
 
 Use the dev-services tasks on **Mac Silicon** so the override is applied; they work on amd64 as well. On other hosts you can instead run the `docker compose -f .devcontainer/docker-compose.yml up -d` command from the terminal (no override); or you can right-click the `docker-compose.yml` file and click `Compose Up`.
 
@@ -234,12 +232,13 @@ To keep **transactions consistent across PostgreSQL and the form engine** (e.g. 
 
 Schema and queries live in TypeScript; migrations are SQL in `backend/drizzle/`. The app uses **drizzle-orm** at runtime; **drizzle-kit** (run via `npx` from `backend/`) handles schema introspection and migration generation. Config: `backend/drizzle.config.ts` (reads `DATABASE_URL` from `.env`).
 
-| Command                    | Where      | Purpose                                                                   |
-| -------------------------- | ---------- | ------------------------------------------------------------------------- |
-| `pnpm db:migrate`          | `backend/` | Ensure DB exists, then run all pending migrations from `drizzle/`         |
-| `pnpm db:seed`             | `backend/` | Seed data (run after migrate)                                             |
-| `npx drizzle-kit generate` | `backend/` | Generate a new migration from schema changes (writes SQL into `drizzle/`) |
-| `npx drizzle-kit studio`   | `backend/` | Open Drizzle Studio (DB GUI); requires `DATABASE_URL`                     |
+| Command                    | Where           | Purpose                                                                   |
+| -------------------------- | --------------- | ------------------------------------------------------------------------- |
+| `pnpm db:migrate`          | repo root or `backend/` | Ensure DB exists, then run all pending migrations from `drizzle/`         |
+| `pnpm db:seed`             | repo root or `backend/` | Seed data (run after migrate)                                             |
+| `pnpm db:init`             | repo root       | Migrate then seed (convenience for local setup)                           |
+| `npx drizzle-kit generate` | `backend/`      | Generate a new migration from schema changes (writes SQL into `drizzle/`) |
+| `npx drizzle-kit studio`   | `backend/`      | Open Drizzle Studio (DB GUI); requires `DATABASE_URL`                     |
 
 Schema modules: `backend/src/core/db/schema/` (e.g. `core.ts`, `forms.ts`, `roles.ts`, `feature.ts`, `codes.ts`). After changing schema, run `drizzle-kit generate`, then `pnpm db:migrate` to apply.
 

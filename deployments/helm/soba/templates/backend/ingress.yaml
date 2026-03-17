@@ -1,0 +1,35 @@
+{{- if .Values.backend.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "soba.fullname" . }}-backend
+  labels:
+    {{- include "soba.labels" (dict "root" . "component" "backend") | nindent 4 }}
+  {{- with .Values.backend.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.backend.ingress.ingressClassName }}
+  ingressClassName: {{ .Values.backend.ingress.ingressClassName }}
+  {{- end }}
+  {{- if .Values.backend.ingress.tls }}
+  tls:
+    - hosts:
+        - {{ include "soba.backendHost" . }}
+      {{- if .Values.backend.ingress.tlsSecretName }}
+      secretName: {{ .Values.backend.ingress.tlsSecretName }}
+      {{- end }}
+  {{- end }}
+  rules:
+    - host: {{ include "soba.backendHost" . }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "soba.fullname" . }}-backend
+                port:
+                  name: http
+{{- end }}

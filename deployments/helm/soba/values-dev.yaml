@@ -1,0 +1,42 @@
+# Dev environment — single replica, moderate resources
+backend:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+  config:
+    logLevel: debug
+    nodeEnv: development
+
+frontend:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+
+formio:
+  internal:
+    enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+
+mongodb:
+  internal:
+    enabled: true
+  replicas: 1
+  persistence:
+    size: 1Gi
