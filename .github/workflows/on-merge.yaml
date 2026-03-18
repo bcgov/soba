@@ -1,6 +1,6 @@
 # Triggers when a PR is merged to the develop branch.
 name: On Merge
-run-name: Deploy develop (sha-${{ github.sha }})
+run-name: Deploy to develop
 
 env:
   ACRONYM: soba
