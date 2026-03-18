@@ -1,4 +1,4 @@
-# Triggers when a PR is merged to the develop branch.
+# Triggers when PR is merged to the develop branch.
 name: On Merge
 run-name: Deploy to develop
 
