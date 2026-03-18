@@ -1,4 +1,4 @@
-# PR pipeline: build images, deploy Crunchy Postgres (with PR-specific user), deploy SOBA from local Helm chart.
+# PR pipeline: build images, deploy crunchy Postgres (with PR-specific user), deploy SOBA from local Helm chart.
 name: PR Open
 run-name: Deploy PR-${{ github.event.number }}
 

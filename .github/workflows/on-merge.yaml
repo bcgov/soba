@@ -1,6 +1,6 @@
-# Triggers when PR is merged to the develop branch.
+# Triggers when a PR is merged to the develop branch.
 name: On Merge
-run-name: Deploy to dev
+run-name: Deploy to Dev
 
 env:
   ACRONYM: soba
@@ -22,8 +22,8 @@ on:
 permissions: {}
 
 concurrency:
-  group: ${{ github.workflow }}
-  cancel-in-progress: true
+  group: openshift-deploy
+  cancel-in-progress: false
 
 jobs:
   build:

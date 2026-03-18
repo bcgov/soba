@@ -26,6 +26,9 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: openshift-deploy
+  cancel-in-progress: false
 
 jobs:
   set-vars:
@@ -80,7 +83,7 @@ jobs:
           # Step 1: Helm uninstall (if release exists)
           if helm status "${RELEASE}" -n "${NAMESPACE}" &>/dev/null; then
             echo "Uninstalling Helm release ${RELEASE}..."
-            helm uninstall "${RELEASE}" --namespace "${NAMESPACE}" --wait --timeout 120s || true
+            helm uninstall "${RELEASE}" --namespace "${NAMESPACE}" || true
           else
             echo "Release ${RELEASE} not found, skipping helm uninstall."
           fi
