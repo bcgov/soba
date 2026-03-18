@@ -86,7 +86,7 @@ jobs:
           fi
 
           echo "Sweeping all resources with label ${LABEL}..."
-          oc delete all,secret,pvc,configmap,role,rolebinding,serviceaccount,networkpolicy \
+          oc delete all,secret,pvc,configmap,serviceaccount,networkpolicy \
             -l "${LABEL}" \
             -n "${NAMESPACE}" \
             --ignore-not-found
