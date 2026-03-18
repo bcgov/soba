@@ -22,8 +22,8 @@ on:
 permissions: {}
 
 concurrency:
-  group: ${{ github.workflow }}
-  cancel-in-progress: true
+  group: openshift-deploy
+  cancel-in-progress: false
 
 jobs:
   build:
