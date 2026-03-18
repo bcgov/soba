@@ -1,6 +1,6 @@
 # Triggers when PR is merged to the develop branch.
 name: On Merge
-run-name: Deploy to dev
+run-name: Deploy to Dev
 
 env:
   ACRONYM: soba
