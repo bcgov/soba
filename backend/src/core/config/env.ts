@@ -139,6 +139,10 @@ export function createEnvReader(source: EnvSource) {
     getRateLimitApiMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_API_MAX'),
     getRateLimitPublicWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_PUBLIC_WINDOW_MS'),
     getRateLimitPublicMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_PUBLIC_MAX'),
+    getTemporalEnabled: () => getBooleanEnvFrom(source, 'TEMPORAL_ENABLED') ?? false,
+    getTemporalAddress: () => getOptionalEnvFrom(source, 'TEMPORAL_ADDRESS') ?? 'localhost:7233',
+    getTemporalNamespace: () => getOptionalEnvFrom(source, 'TEMPORAL_NAMESPACE') ?? 'default',
+    getTemporalTaskQueue: () => getOptionalEnvFrom(source, 'TEMPORAL_TASK_QUEUE') ?? 'soba',
   };
 }
 
@@ -177,4 +181,8 @@ export const env = {
   getRateLimitApiMax: () => getNumberEnv('RATE_LIMIT_API_MAX'),
   getRateLimitPublicWindowMs: () => getNumberEnv('RATE_LIMIT_PUBLIC_WINDOW_MS'),
   getRateLimitPublicMax: () => getNumberEnv('RATE_LIMIT_PUBLIC_MAX'),
+  getTemporalEnabled: () => getBooleanEnv('TEMPORAL_ENABLED') ?? false,
+  getTemporalAddress: () => getOptionalEnv('TEMPORAL_ADDRESS') ?? 'localhost:7233',
+  getTemporalNamespace: () => getOptionalEnv('TEMPORAL_NAMESPACE') ?? 'default',
+  getTemporalTaskQueue: () => getOptionalEnv('TEMPORAL_TASK_QUEUE') ?? 'soba',
 };
