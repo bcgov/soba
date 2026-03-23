@@ -72,7 +72,7 @@ services:
     restart: unless-stopped
 
   temporal-ui:
-    image: temporalio/ui:latest
+    image: temporalio/ui:2.48.0
     depends_on:
       - temporal
     environment:

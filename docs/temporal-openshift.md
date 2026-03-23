@@ -69,7 +69,7 @@ This is the process that actually executes your workflows and activities. It has
 
 **`temporal-ui-deployment.yaml`** _(optional)_
 
-Runs `temporalio/ui:latest` — a web dashboard to view running, completed, and failed workflows. Useful in dev and staging. Should be restricted or omitted in production.
+Runs `temporalio/ui:2.48.0` — a web dashboard to view running, completed, and failed workflows. Useful in dev and staging. Should be restricted or omitted in production.
 
 **`temporal-ui-service.yaml`** _(optional)_
 
@@ -158,7 +158,7 @@ temporalUi:
 | All services in one `docker-compose.yml`                                 | Each service is a separate OpenShift Deployment                                    |
 | `.env` / `.env.local` files                                              | ConfigMap (non-secret values) + Secret (passwords, tokens)                         |
 | Ports accessible on `localhost`                                          | Services communicate via internal cluster DNS                                      |
-| Single `npm run worker:dev` command                                      | Worker runs as a separate Deployment using the same backend image                  |
+| `pnpm temporal-worker:dev` from `backend/` (local)                      | Worker runs as a separate Deployment using the same backend image                  |
 | No resource limits                                                       | Resource requests and limits required                                              |
 | Temporal shares the main `postgres` container (port 5432, `temporal` db) | Temporal shares the existing PostgreSQL Service — same pattern, different DNS name |
 
@@ -433,7 +433,7 @@ spec:
     spec:
       containers:
         - name: ui
-          image: temporalio/ui:latest
+          image: temporalio/ui:2.48.0
           ports:
             - containerPort: 8080
           env:

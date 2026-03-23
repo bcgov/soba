@@ -46,9 +46,9 @@ The API server(backend) and the worker are **two separate processes**. Both need
 The worker does not subscribe or receive push notifications — it **polls** (keeps asking).
 
 ```
-Worker:  "Any tasks for queue 'soba-tasks'?"  →  Temporal: "No"
-Worker:  "Any tasks for queue 'soba-tasks'?"  →  Temporal: "No"
-Worker:  "Any tasks for queue 'soba-tasks'?"  →  Temporal: "YES, here's one"
+Worker:  "Any tasks for queue 'soba'?"  →  Temporal: "No"
+Worker:  "Any tasks for queue 'soba'?"  →  Temporal: "No"
+Worker:  "Any tasks for queue 'soba'?"  →  Temporal: "YES, here's one"
 Worker:  executes it, then asks again...
 ```
 
@@ -67,9 +67,9 @@ The Temporal SDK manages all the polling internally — you never write the loop
 The worker and the app must use the **same task queue name** — that's how Temporal knows which worker gets which job.
 
 ```
-App:    client.workflow.start(myWorkflow, { taskQueue: "soba-tasks" })
+App:    client.workflow.start(myWorkflow, { taskQueue: "soba" })
                                                        ↑ must match ↓
-Worker: Worker.create({ taskQueue: "soba-tasks" })
+Worker: Worker.create({ taskQueue: "soba" })
 ```
 
 If names don't match, the job sits in the queue forever — no worker picks it up.
@@ -86,7 +86,7 @@ Same task queue, multiple processes running in parallel:
 
 ```
 Worker Process 1  ──┐
-Worker Process 2  ──┼──► all polling "soba-tasks" queue
+Worker Process 2  ──┼──► all polling "soba" queue
 Worker Process 3  ──┘
 ```
 
@@ -97,7 +97,7 @@ Temporal distributes jobs across them automatically. If one crashes, the others 
 ```
 Worker A  →  polls "email-tasks"   → handles email workflows
 Worker B  →  polls "pdf-tasks"     → handles PDF generation
-Worker C  →  polls "soba-tasks"    → handles general app jobs
+Worker C  →  polls "soba"    → handles general app jobs
 ```
 
 The app routes jobs to specific queues:
@@ -145,13 +145,13 @@ temporal-worker.ts
 ### The two processes and their files
 
 ```
-npm run worker:dev
+pnpm temporal-worker:dev
   └── temporal-worker.ts        (loads .env via dotenv-init.ts)
         └── src/temporal/worker.ts      (connects to Temporal, starts polling)
               ├── workflows/index.ts    (your workflow functions)
               └── activities/index.ts   (your activity functions)
 
-npm run dev
+pnpm dev
   └── dist/app.js               (Express API)
         └── src/temporal/client.ts     (used in routes to start workflows)
 ```
@@ -171,7 +171,7 @@ Browser ---------> temporal-ui (Docker :8088)
                    temporal (Docker :7233)
 ```
 
-### Step-by-step: what happens when you run `npm run worker:dev`
+### Step-by-step: what happens when you run `pnpm temporal-worker:dev`
 
 **Step 1** ( Node.js loads `temporal-worker.ts`)
 
@@ -198,7 +198,7 @@ Browser ---------> temporal-ui (Docker :8088)
 
 **Step 6** — (`worker.ts` calls ---->`worker.run()`)
 
-- Worker git starts polling the `temporal` container for tasks
+- Worker starts polling the `temporal` container for tasks
 - Blocks here forever, waiting for work
 
 ---
@@ -265,7 +265,7 @@ backend/
         └── index.ts                      # Export all activity functions from here
 
 .devcontainer/
-├── docker-compose.yml                    # Adds temporal-db, temporal, temporal-ui services
+├── docker-compose.yml                    # Adds temporal, temporal-ui (uses existing postgres)
 └── config/
     └── temporal-dynamicconfig.yaml       # Temporal server settings (e.g. ID length limit)
 ```
@@ -279,7 +279,9 @@ Two services were added to `.devcontainer/docker-compose.yml`:
 | Service       | Image                      | Port | Purpose                     |
 | ------------- | -------------------------- | ---- | --------------------------- |
 | `temporal`    | temporalio/auto-setup:1.24 | 7233 | The Temporal server itself  |
-| `temporal-ui` | temporalio/ui:latest       | 8088 | Web UI to monitor workflows |
+| `temporal-ui` | temporalio/ui:2.48.0       | 8088 | Web UI to monitor workflows |
+
+**SDK and server versions:** Temporal documents that [all SDK versions support all server versions](https://docs.temporal.io/docs/server/versions-and-dependencies); SOBA still bumps the TypeScript SDK (`@temporalio/*`) on a regular cadence alongside the dev server image (`temporalio/auto-setup:1.24`).
 
 Temporal uses the **same `postgres` service** as the app (port 5432) but stores its state in a **separate database** named `temporal` (auto-created on first startup). The app uses the `soba` database. Both live in the same PostgreSQL instance — they do not interfere with each other.
 
@@ -306,7 +308,7 @@ Set in `backend/.env` (and `.env.example`). Read via `env.getTemporal*()` helper
 
 | Variable              | Default          | What it does                                      |
 | --------------------- | ---------------- | ------------------------------------------------- |
-| `TEMPORAL_ENABLED`    | `false`          | Set to `true` to turn on Temporal in production   |
+| `TEMPORAL_ENABLED`    | `false`          | When `true`, worker connects and `getClient()` works; when `false`, worker exits without connecting and `getClient()` rejects |
 | `TEMPORAL_ADDRESS`    | `localhost:7233` | Where the Temporal server is listening            |
 | `TEMPORAL_NAMESPACE`  | `default`        | Logical namespace for isolating workflows         |
 | `TEMPORAL_TASK_QUEUE` | `soba`           | Queue name — must match between worker and client |
@@ -329,17 +331,21 @@ import { run } from "./src/temporal/worker";
 
 ## Running locally
 
+Local dev uses the **same `postgres` service** as the rest of the stack (there is no separate `temporal-db` service); Temporal creates and uses its own database on that instance.
+
 **Step 1 — Start the Docker services** (from repo root, inside devcontainer):
 
 ```bash
-docker compose -f .devcontainer/docker-compose.yml up -d temporal-db temporal temporal-ui
+docker compose -f .devcontainer/docker-compose.yml up -d postgres temporal temporal-ui
 ```
 
 **Step 2 — Start the worker** (from `backend/`):
 
 ```bash
-npm run worker:dev   # watches for TypeScript changes and restarts automatically
+pnpm temporal-worker:dev   # watches for TypeScript changes and restarts automatically
 ```
+
+One-shot (no watch): `pnpm temporal-worker`. After `pnpm run build`: `pnpm temporal-worker:start` runs `node dist/temporal-worker.js` (same as OpenShift worker command).
 
 **Step 3 — Open the UI** to see running/completed/failed workflows:
 http://localhost:8088 (auto-forwarded by devcontainer)
@@ -347,7 +353,7 @@ http://localhost:8088 (auto-forwarded by devcontainer)
 **Step 4 — Start the API server as usual** (from `backend/`):
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 > Both the API server and the worker must be running at the same time for workflows to execute end-to-end.

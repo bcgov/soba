@@ -1,29 +1,59 @@
-import { Worker, NativeConnection } from '@temporalio/worker';
+import { NativeConnection, Runtime, Worker } from '@temporalio/worker';
 import { env } from '../core/config/env';
+import { log } from '../core/logging';
 import * as activities from './activities';
+import { createTemporalPinoLogger } from './temporalPinoLogger';
+
+const workerLog = log.child({ component: 'temporal-worker' });
 
 export async function run() {
+  if (!env.getTemporalEnabled()) {
+    workerLog.info(
+      'Temporal worker not starting (TEMPORAL_ENABLED is not true); set TEMPORAL_ENABLED=true to connect',
+    );
+    return;
+  }
+
+  Runtime.install({
+    logger: createTemporalPinoLogger(workerLog),
+  });
+
   const address = env.getTemporalAddress();
   const namespace = env.getTemporalNamespace();
   const taskQueue = env.getTemporalTaskQueue();
 
-  console.log(
-    `[temporal-worker] Connecting to ${address} (namespace: ${namespace}, queue: ${taskQueue})`,
-  );
+  workerLog.info({ address, namespace, taskQueue }, 'Connecting to Temporal');
 
   const connection = await NativeConnection.connect({ address });
 
-  const worker = await Worker.create({
-    connection,
-    workflowsPath: require.resolve('./workflows'),
-    activities,
-    taskQueue,
-    namespace,
-  });
+  try {
+    const worker = await Worker.create({
+      connection,
+      workflowsPath: require.resolve('./workflows'),
+      activities,
+      taskQueue,
+      namespace,
+    });
 
-  console.log('[temporal-worker] Worker started, polling for tasks');
-  await worker.run();
+    let shutdownRequested = false;
+    const onShutdownSignal = () => {
+      if (shutdownRequested) return;
+      shutdownRequested = true;
+      workerLog.info('Shutdown signal received, draining worker');
+      worker.shutdown();
+    };
+    process.once('SIGINT', onShutdownSignal);
+    process.once('SIGTERM', onShutdownSignal);
 
-  console.log('[temporal-worker] Worker shut down, closing connection');
-  await connection.close();
+    workerLog.info('Worker started, polling for tasks');
+    try {
+      await worker.run();
+    } finally {
+      process.off('SIGINT', onShutdownSignal);
+      process.off('SIGTERM', onShutdownSignal);
+    }
+  } finally {
+    workerLog.info('Worker shut down, closing connection');
+    await connection.close();
+  }
 }
