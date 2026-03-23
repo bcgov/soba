@@ -1,5 +1,6 @@
 import type { Locale } from '@/app/[lang]/dictionaries';
 import { workspacesPlugin } from '@/src/features/workspaces/plugin';
+import { designerPlugin } from '@/src/features/designer/plugin';
 import { isFeatureEnabled } from '@/src/shared/featureFlags/flags';
 import type { AppPlugin, PluginNavItem } from '@/src/app/plugins/types';
 
@@ -7,11 +8,12 @@ type Dictionary = {
   locale: string;
   header: {
     workspaces: string;
+    designer: string;
     themeToggle?: string;
   };
 };
 
-const allPlugins: AppPlugin[] = [workspacesPlugin];
+const allPlugins: AppPlugin[] = [workspacesPlugin, designerPlugin];
 
 function getEnabledPlugins(): AppPlugin[] {
   return allPlugins

@@ -11,7 +11,8 @@
   "header": {
     "workspaces": "Workspaces",
     "themeToggle": "Toggle color theme",
-    "skipToMain": "Skip to main content"
+    "skipToMain": "Skip to main content",
+    "designer": "Designer"
   },
   "base": {
     "copyToClipboard": {
@@ -34,7 +35,7 @@
       }
     }
   },
-  
+
   "Basic": "Basic",
   "Text Field": "Text Field",
   "Text Area": "Text Area",

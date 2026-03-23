@@ -51,14 +51,15 @@ function Header() {
       const isCurrentTokenUser = currentUser.token === token;
       const backendDisplayName = isCurrentTokenUser ? currentUser.displayName : null;
       const keycloakDisplayName =
-        typeof idTokenParsed?.display_name === 'string' && idTokenParsed.display_name.trim().length > 0
+        typeof idTokenParsed?.display_name === 'string' &&
+        idTokenParsed.display_name.trim().length > 0
           ? idTokenParsed.display_name
           : null;
       const displayName =
         typeof backendDisplayName === 'string' && backendDisplayName.trim().length > 0
           ? backendDisplayName
           : isCurrentTokenUser && currentUser.hasError
-            ? keycloakDisplayName ?? 'Authenticated User'
+            ? (keycloakDisplayName ?? 'Authenticated User')
             : isCurrentTokenUser && currentUser.isLoaded
               ? 'Authenticated User'
               : null;
@@ -72,7 +73,7 @@ function Header() {
               className="inline-block h-5 w-44 rounded bg-[var(--surface-color-border-default)]/60 animate-pulse"
             />
           )}
-<Button
+          <Button
             id="logout-button"
             type="button"
             variant="secondary"
@@ -109,7 +110,10 @@ function Header() {
         </BcLink>,
       ]}
     >
-      <div className="mx-auto max-w-6xl w-full flex flex-wrap items-center gap-4 px-4 py-3" data-testid="app-header">
+      <div
+        className="mx-auto max-w-6xl w-full flex flex-wrap items-center gap-4 px-4 py-3"
+        data-testid="app-header"
+      >
         <Heading level={1} className="sr-only">
           {dict.general.title}
         </Heading>

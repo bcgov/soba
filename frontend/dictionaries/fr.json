@@ -11,7 +11,8 @@
   "header": {
     "workspaces": "Espaces de travail",
     "themeToggle": "Basculer le theme de couleur",
-    "skipToMain": "Aller au contenu principal"
+    "skipToMain": "Aller au contenu principal",
+    "designer": "Générateur de Formulaire"
   },
   "base": {
     "copyToClipboard": {
@@ -34,7 +35,7 @@
       }
     }
   },
-  
+
   "Basic": "Basique",
   "Text Field": "Champ de Texte",
   "Text Area": "Zone de Texte",

@@ -5,7 +5,9 @@ import type { FeatureKey } from '@/src/shared/featureFlags/flags';
 type Dictionary = {
   locale: string;
   header: {
+    [x: string]: string;
     workspaces: string;
+    designer: string;
     themeToggle?: string;
   };
 };

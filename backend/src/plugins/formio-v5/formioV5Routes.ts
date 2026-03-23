@@ -17,7 +17,7 @@ type Req = Request;
 type Res = Response;
 
 function getToken(req: Req): string | undefined {
-  const t = req.headers['x-jwt-token'];
+  const t = req.header('x-jwt-token');
   return typeof t === 'string' ? t : Array.isArray(t) ? t[0] : undefined;
 }
 
@@ -99,10 +99,10 @@ export function createFormioV5ProxyRouter(config: PluginConfigReader): Router {
   });
 
   router.get('/current', async (req, res) => {
-    const token = getToken(req);
+    //const token = getToken(req);
     await handleJsonRoute(
       res,
-      async () => (await getClient(config)).currentUser({ token }),
+      async () => (await getClient(config)).currentUser(),
       'Failed to load current user',
     );
   });
@@ -145,10 +145,10 @@ export function createFormioV5ProxyRouter(config: PluginConfigReader): Router {
 
   // Forms
   router.get('/form', async (req, res) => {
-    const token = getToken(req);
+    // const token = getToken(req);
     await handleJsonRoute(
       res,
-      async () => (await getClient(config)).loadForms(queryFromReq(req), { token }),
+      async () => (await getClient(config)).loadForms(queryFromReq(req)),
       'Failed to load forms',
     );
   });

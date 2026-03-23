@@ -1,10 +1,11 @@
 export const FEATURE_KEYS = {
   workspaces: 'workspaces',
+  designer: 'designer',
 } as const;
 
 export type FeatureKey = (typeof FEATURE_KEYS)[keyof typeof FEATURE_KEYS];
 
-const DEFAULT_ENABLED_FEATURES: FeatureKey[] = [FEATURE_KEYS.workspaces];
+const DEFAULT_ENABLED_FEATURES: FeatureKey[] = [FEATURE_KEYS.workspaces, FEATURE_KEYS.designer];
 
 function normalizeFeatureToken(value: string): string {
   return value.trim().toLowerCase();
@@ -12,12 +13,7 @@ function normalizeFeatureToken(value: string): string {
 
 function parseFeatureList(raw: string | undefined): Set<string> {
   if (!raw) return new Set<string>();
-  return new Set(
-    raw
-      .split(',')
-      .map(normalizeFeatureToken)
-      .filter(Boolean),
-  );
+  return new Set(raw.split(',').map(normalizeFeatureToken).filter(Boolean));
 }
 
 const explicitlyEnabled = parseFeatureList(process.env.NEXT_PUBLIC_FEATURE_FLAGS);

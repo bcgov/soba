@@ -126,13 +126,18 @@ export class FormioCommunityEditionAPIv5Client {
       Accept: 'application/json',
       'Content-Type': 'application/json',
     };
-    if (token) headers['x-jwt-token'] = token;
+    if (token) {
+      headers['x-jwt-token'] = token;
+      headers['X-Jwt-Token'] = token;
+    }
     const res = await fetch(url, {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
+
     const text = await res.text();
+    console.log(url, headers, res.status, res.statusText, res.ok, text);
     if (!res.ok) throw new FormioApiError(res.status, text, url);
     if (res.status === 204 || !text) return undefined as T;
     try {
