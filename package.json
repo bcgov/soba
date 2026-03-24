@@ -21,7 +21,9 @@
     "check:backend": "pnpm --filter backend run check",
     "db:migrate": "pnpm --filter @soba/backend run db:migrate",
     "db:seed": "pnpm --filter @soba/backend run db:seed",
-    "db:init": "pnpm db:migrate && pnpm db:seed"
+    "db:init": "pnpm db:migrate && pnpm db:seed",
+    "dev:services:up": "docker compose -f .devcontainer/docker-compose.yml up -d --wait",
+    "dev:db:up": "pnpm dev:services:up && pnpm db:init"
   },
   "keywords": [],
   "author": "",
