@@ -308,7 +308,7 @@ Set in `backend/.env` (and `.env.example`). Read via `env.getTemporal*()` helper
 
 | Variable              | Default          | What it does                                      |
 | --------------------- | ---------------- | ------------------------------------------------- |
-| `TEMPORAL_ENABLED`    | `false`          | When `true`, worker connects and `getClient()` works; when `false`, worker exits without connecting and `getClient()` rejects |
+| `TEMPORAL_ALLOWED`    | `false`          | When `true`, worker connects and `getClient()` works; when `false`, worker exits without connecting and `getClient()` rejects |
 | `TEMPORAL_ADDRESS`    | `localhost:7233` | Where the Temporal server is listening            |
 | `TEMPORAL_NAMESPACE`  | `default`        | Logical namespace for isolating workflows         |
 | `TEMPORAL_TASK_QUEUE` | `soba`           | Queue name — must match between worker and client |

@@ -67,7 +67,7 @@ backend:
     outboxPollIntervalMs: "5000"
     outboxBatchSize: "25"
     sobaSystemSubject: soba-system
-    workspacePluginsEnabled: "enterprise-cstar,personal-local"
+    workspacePluginsAllowed: "enterprise-cstar,personal-local"
     workspacePluginsStrictMode: "false"
     pluginEnterpriseCstarHeaderKeys: "x-enterprise-workspace-id,x-cstar-tenant-id"
     pluginEnterpriseCstarRequireExternalHeader: "false"
@@ -76,7 +76,7 @@ backend:
 
   # -- configmap-formio: PLUGIN_FORMIO_V5_* (non-secret values)
   formio:
-    routesEnabled: "true"
+    routesAllowed: "true"
     proxyPath: /formio-v5
     # apiBaseUrl is auto-constructed from the formio service/external URL
 

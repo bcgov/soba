@@ -174,9 +174,9 @@ describe('env', () => {
     );
   });
 
-  it('createEnvReader getWorkspacePluginsEnabled returns required value from simulated env', () => {
-    const reader = createEnvReader({ WORKSPACE_PLUGINS_ENABLED: 'personal-local' });
-    expect(reader.getWorkspacePluginsEnabled()).toBe('personal-local');
+  it('createEnvReader getWorkspacePluginsAllowed returns required value from simulated env', () => {
+    const reader = createEnvReader({ WORKSPACE_PLUGINS_ALLOWED: 'personal-local' });
+    expect(reader.getWorkspacePluginsAllowed()).toBe('personal-local');
   });
 
   it('createEnvReader getWorkspacePluginsStrictModeRaw returns value from simulated env', () => {

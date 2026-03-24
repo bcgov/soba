@@ -26,7 +26,7 @@ data:
   OUTBOX_POLL_INTERVAL_MS: {{ .Values.backend.config.outboxPollIntervalMs | quote }}
   OUTBOX_BATCH_SIZE: {{ .Values.backend.config.outboxBatchSize | quote }}
   SOBA_SYSTEM_SUBJECT: {{ .Values.backend.config.sobaSystemSubject | quote }}
-  WORKSPACE_PLUGINS_ENABLED: {{ .Values.backend.config.workspacePluginsEnabled | quote }}
+  WORKSPACE_PLUGINS_ALLOWED: {{ .Values.backend.config.workspacePluginsAllowed | quote }}
   WORKSPACE_PLUGINS_STRICT_MODE: {{ .Values.backend.config.workspacePluginsStrictMode | quote }}
   PLUGIN_ENTERPRISE_CSTAR_HEADER_KEYS: {{ .Values.backend.config.pluginEnterpriseCstarHeaderKeys | quote }}
   PLUGIN_ENTERPRISE_CSTAR_REQUIRE_EXTERNAL_HEADER: {{ .Values.backend.config.pluginEnterpriseCstarRequireExternalHeader | quote }}

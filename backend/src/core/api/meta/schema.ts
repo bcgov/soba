@@ -15,7 +15,7 @@ export const PluginCatalogEntrySchema = z
 
 export const PluginsMetaResponseSchema = z
   .object({
-    enabledPluginCodes: z.array(z.string()),
+    allowedPluginCodes: z.array(z.string()),
     plugins: z.array(PluginCatalogEntrySchema),
   })
   .openapi('Meta_PluginsResponse');
@@ -146,7 +146,8 @@ export const registerMetaOpenApi = (registry: OpenAPIRegistry) => {
     tags: ['core.meta'],
     responses: {
       200: {
-        description: 'Enabled and discovered plugin catalog',
+        description:
+          'Discovered plugin catalog; includes allowedPluginCodes from WORKSPACE_PLUGINS_ALLOWED',
         content: {
           'application/json': {
             schema: PluginsMetaResponseSchema,

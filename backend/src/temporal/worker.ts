@@ -7,9 +7,9 @@ import { createTemporalPinoLogger } from './temporalPinoLogger';
 const workerLog = log.child({ component: 'temporal-worker' });
 
 export async function run() {
-  if (!env.getTemporalEnabled()) {
+  if (!env.getTemporalAllowed()) {
     workerLog.info(
-      'Temporal worker not starting (TEMPORAL_ENABLED is not true); set TEMPORAL_ENABLED=true to connect',
+      'Temporal worker not starting (TEMPORAL_ALLOWED is not true); set TEMPORAL_ALLOWED=true to connect',
     );
     return;
   }

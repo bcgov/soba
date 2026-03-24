@@ -61,7 +61,7 @@ app.use(passport.initialize());
 
 app.use(globalRateLimit);
 
-// ——— Form-engine proxy/routes under /api/v1 (protected; when PLUGIN_<CODE>_ROUTES_ENABLED=true) ———
+// ——— Form-engine proxy/routes under /api/v1 (protected; when PLUGIN_<CODE>_ROUTES_ALLOWED=true) ———
 const formEngineRouteDefs = getFormEngineRouteDefinitions();
 for (const def of formEngineRouteDefs) {
   const path = `/api/v1${def.routeBasePath.startsWith('/') ? '' : '/'}${def.routeBasePath}`;

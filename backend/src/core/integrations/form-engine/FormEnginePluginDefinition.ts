@@ -26,7 +26,7 @@ export interface FormEnginePluginDefinition {
   routeBasePath?: string | ((config: PluginConfigReader) => string);
   /**
    * Optional router factory. Only used when routeBasePath is set and
-   * PLUGIN_<CODE>_ROUTES_ENABLED is 'true'.
+   * PLUGIN_<CODE>_ROUTES_ALLOWED is 'true'.
    */
   createRouter?: (config: PluginConfigReader) => Router;
 }

@@ -31,10 +31,10 @@ export class MetaApiService {
       activeFormEngineCode,
       activeCacheCode,
       activeMessageBusCode,
-      ...config.enabledPlugins,
+      ...config.allowedPlugins,
     ]);
     return {
-      enabledPluginCodes: config.enabledPlugins,
+      allowedPluginCodes: config.allowedPlugins,
       plugins: plugins.map((plugin) => ({
         ...plugin,
         enabled: activeCodes.has(plugin.code),

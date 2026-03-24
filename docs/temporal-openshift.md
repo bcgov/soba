@@ -268,10 +268,10 @@ data:
   TEMPORAL_ADDRESS: temporal:7233 # DNS name of the temporal Service, port 7233
   TEMPORAL_NAMESPACE: default
   TEMPORAL_TASK_QUEUE: soba
-  TEMPORAL_ENABLED: "true"
+  TEMPORAL_ALLOWED: "true"
 ```
 
-Add `TEMPORAL_ADDRESS` and `TEMPORAL_ENABLED` to your existing backend ConfigMap/Secret as well, so both the API server and the worker pick them up.
+Add `TEMPORAL_ADDRESS` and `TEMPORAL_ALLOWED` to your existing backend ConfigMap/Secret as well, so both the API server and the worker pick them up.
 
 ---
 
@@ -396,7 +396,7 @@ spec:
                 configMapKeyRef:
                   name: temporal-config
                   key: TEMPORAL_ADDRESS
-            - name: TEMPORAL_ENABLED
+            - name: TEMPORAL_ALLOWED
               value: "true"
           resources:
             requests:
@@ -485,7 +485,7 @@ These variables must be set on both the API server and the worker Deployment.
 
 | Variable              | Value in OpenShift | Notes                                                       |
 | --------------------- | ------------------ | ----------------------------------------------------------- |
-| `TEMPORAL_ENABLED`    | `true`             | Must be explicitly set to `true`                            |
+| `TEMPORAL_ALLOWED`    | `true`             | Must be explicitly set to `true`                            |
 | `TEMPORAL_ADDRESS`    | `temporal:7233`    | Uses internal cluster DNS (`<service-name>:<port>`)         |
 | `TEMPORAL_NAMESPACE`  | `default`          | Change only if you set up a custom namespace in Temporal    |
 | `TEMPORAL_TASK_QUEUE` | `soba`             | Must match between API server, worker, and any client calls |
