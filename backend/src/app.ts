@@ -23,8 +23,8 @@ import { initializePassport } from './core/auth/passport';
 const app = express();
 const port = Number(process.env.PORT) || 4000;
 
-// Trust X-Forwarded-* headers when behind OpenShift/ingress reverse proxy
-app.set('trust proxy', true);
+// Trust X-Forwarded-* from a bounded number of proxies (not `true` — breaks express-rate-limit IP keys)
+app.set('trust proxy', env.getTrustProxySetting());
 
 initializePassport();
 

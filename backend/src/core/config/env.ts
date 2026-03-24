@@ -108,6 +108,22 @@ export function resolveDatabaseUrl(source: EnvSource): string {
   );
 }
 
+/**
+ * Express `trust proxy` value for `source`. Hop count (e.g. 1 = one ingress), or false when none.
+ * `true` is not returned — express-rate-limit rejects it (ERR_ERL_PERMISSIVE_TRUST_PROXY).
+ */
+export function resolveTrustProxySetting(source: EnvSource): number | boolean {
+  const raw = getOptionalEnvFrom(source, 'TRUST_PROXY_HOPS');
+  if (raw !== undefined && raw !== '') {
+    const n = parseNumberEnvValue(raw);
+    if (!Number.isInteger(n) || n < 0) {
+      throw new Error('TRUST_PROXY_HOPS must be a non-negative integer');
+    }
+    return n === 0 ? false : n;
+  }
+  return getOptionalEnvFrom(source, 'NODE_ENV') === 'development' ? false : 1;
+}
+
 /** Build an env reader that reads from the given source. Use in tests with a simulated .env object. */
 export function createEnvReader(source: EnvSource) {
   return {
@@ -139,6 +155,7 @@ export function createEnvReader(source: EnvSource) {
     getRateLimitApiMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_API_MAX'),
     getRateLimitPublicWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_PUBLIC_WINDOW_MS'),
     getRateLimitPublicMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_PUBLIC_MAX'),
+    getTrustProxySetting: () => resolveTrustProxySetting(source),
     getTemporalAllowed: () => getBooleanEnvFrom(source, 'TEMPORAL_ALLOWED') ?? false,
     getTemporalAddress: () => getOptionalEnvFrom(source, 'TEMPORAL_ADDRESS') ?? 'localhost:7233',
     getTemporalNamespace: () => getOptionalEnvFrom(source, 'TEMPORAL_NAMESPACE') ?? 'default',
@@ -181,6 +198,7 @@ export const env = {
   getRateLimitApiMax: () => getNumberEnv('RATE_LIMIT_API_MAX'),
   getRateLimitPublicWindowMs: () => getNumberEnv('RATE_LIMIT_PUBLIC_WINDOW_MS'),
   getRateLimitPublicMax: () => getNumberEnv('RATE_LIMIT_PUBLIC_MAX'),
+  getTrustProxySetting: () => resolveTrustProxySetting(process.env),
   getTemporalAllowed: () => getBooleanEnv('TEMPORAL_ALLOWED') ?? false,
   getTemporalAddress: () => getOptionalEnv('TEMPORAL_ADDRESS') ?? 'localhost:7233',
   getTemporalNamespace: () => getOptionalEnv('TEMPORAL_NAMESPACE') ?? 'default',
