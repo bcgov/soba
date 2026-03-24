@@ -26,7 +26,7 @@ const DEFAULT_SOBA_API_BASE_URL = 'http://localhost:4000/api/v1';
  * injected by the server from NEXT_PUBLIC_SOBA_API_BASE_URL so deployed apps
  * get the correct URL at runtime; local dev uses .env or the default.
  */
-function getBootstrapApiBaseUrl(): string {
+export function getBootstrapApiBaseUrl(): string {
   if (typeof window !== 'undefined' && window.__SOBA_API_BASE_URL) {
     return window.__SOBA_API_BASE_URL;
   }

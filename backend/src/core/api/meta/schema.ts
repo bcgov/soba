@@ -27,7 +27,7 @@ export const FeatureMetaSchema = z
     description: z.string().nullable(),
     version: z.string().nullable(),
     status: z.string(),
-    enabled: z.boolean(),
+    platformAllowed: z.boolean(),
   })
   .openapi('Meta_Feature');
 
@@ -162,7 +162,7 @@ export const registerMetaOpenApi = (registry: OpenAPIRegistry) => {
     tags: ['core.meta'],
     responses: {
       200: {
-        description: 'DB-backed feature list (code, name, status, enabled)',
+        description: 'DB-backed feature list (code, name, status, platformAllowed)',
         content: {
           'application/json': {
             schema: FeaturesMetaResponseSchema,

@@ -12,15 +12,17 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { clearCurrentUser, loadCurrentUser } from '@/lib/slices/currentUserSlice';
 import { useDictionary } from '../[lang]/Providers';
-import { getNavigationItems } from '@/src/app/plugins/registry';
+import type { PluginNavItem } from '@/src/app/plugins/types';
 
-function Header() {
+export type HeaderProps = {
+  navItems: PluginNavItem[];
+};
+
+function Header({ navItems }: HeaderProps) {
   const dispatch = useAppDispatch();
   const dict = useDictionary();
   const { authenticated, idTokenParsed, token, login, logout, init } = useKeycloak();
   const currentUser = useCurrentUser();
-  const locale = dict.locale === 'en' || dict.locale === 'fr' ? dict.locale : 'en';
-  const navItems = getNavigationItems(locale, dict);
 
   useEffect(() => {
     init();

@@ -253,6 +253,27 @@ const seedFeatures = async () => {
       version: null,
       status: FeatureStatus.enabled,
     },
+    {
+      code: 'workspaces',
+      name: 'Workspaces',
+      description: 'Workspace shell and membership (shared by design and submit flows)',
+      version: null,
+      status: FeatureStatus.enabled,
+    },
+    {
+      code: 'design-mode',
+      name: 'Design mode',
+      description: 'Form management and design surfaces',
+      version: null,
+      status: FeatureStatus.enabled,
+    },
+    {
+      code: 'submit-mode',
+      name: 'Submit mode',
+      description: 'Submitter-facing surfaces',
+      version: null,
+      status: FeatureStatus.enabled,
+    },
   ];
   for (const row of coreFeatures) {
     await db

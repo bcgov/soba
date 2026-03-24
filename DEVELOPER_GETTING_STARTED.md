@@ -347,7 +347,7 @@ Features are optional capabilities toggled per deployment in `soba.feature`. Eac
 ### Done
 
 - `soba.feature` and `soba.feature_status` tables exist and are seeded
-- Three core features seeded: `form-versions` (enabled), `submissions` (enabled), `meta` (enabled)
+- Core features seeded in `soba.feature` include `form-versions`, `submissions`, `meta`, `workspaces`, `design-mode`, `submit-mode` (all enabled by default in seed)
 - `featureRepo` exposes `listFeatures()`, `getFeatureByCode()`, and `isFeatureEnabled(status)`
 - `GET /api/v1/meta` returns all features and their status — this is the backend source of truth
 - Roles and code tables support `source = 'feature'` and `feature_code` so a feature can register its own roles and codes without touching core rows
@@ -355,7 +355,7 @@ Features are optional capabilities toggled per deployment in `soba.feature`. Eac
 ### Not Done
 
 - No route, service, or repo actually gates on features. We only call `isFeatureEnabled()` in the meta service and in `roleService` (for feature-linked roles).
-- Frontend still reads flags from env (`NEXT_PUBLIC_FEATURE_FLAGS`), not from `/meta` — see [Frontend](#frontend).
+- Frontend loads `/meta/features` for **`platformAllowed`** and intersects with optional **`NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`** per deployment — see [Frontend](#frontend).
 
 ### Adding a feature
 
@@ -363,7 +363,7 @@ Features are optional capabilities toggled per deployment in `soba.feature`. Eac
 2. Add feature-specific codes to the right code table with `source = '<feature_code>'`.
 3. Add feature-specific roles in `soba.role` with `source = 'feature'` and `feature_code`.
 4. In the service or middleware that implements the feature, call `getFeatureByCode(code)` and `isFeatureEnabled(row.status)` before doing the work.
-5. In the frontend, once we read flags from `/meta`, gate the UI on the feature code from that response.
+5. In the frontend, gate optional surfaces with `createIsFeatureAllowed(meta)` and a matching `featureCode` on the plugin (see `DEVELOPER.md` — Plugins).
 
 ## Meta API
 
@@ -372,7 +372,7 @@ All `/api/v1/meta` endpoints are **public** (no JWT). They’re the source of tr
 | Endpoint                    | Returns                                                                                            | Query params                                               |
 | --------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | `GET /meta/plugins`         | Discovered plugin catalog — code, enabled flag, whether it has a workspace resolver or feature API | —                                                          |
-| `GET /meta/features`        | All feature rows from `soba.feature` with `enabled` boolean                                        | —                                                          |
+| `GET /meta/features`        | All feature rows from `soba.feature` with **`platformAllowed`** (from status)                      | —                                                          |
 | `GET /meta/form-engines`    | Installed form engine plugins with `isDefault` flag                                                | —                                                          |
 | `GET /meta/build`           | Build metadata — version, `gitSha`, `gitTag`, `imageTag`                                           | —                                                          |
 | `GET /meta/frontend-config` | Keycloak config (url, realm, clientId), API base URL, build name/version                           | —                                                          |
@@ -381,7 +381,7 @@ All `/api/v1/meta` endpoints are **public** (no JWT). They’re the source of tr
 
 The `/meta/codes` endpoint supports filtering to a specific code set (e.g. `?code_set=workspace_membership_role`) or multiple sets comma-separated. The `only_enabled_features=true` flag excludes codes and roles that belong to disabled features.
 
-> **TODO — Frontend:** We only fetch `/meta/frontend-config` today (on Keycloak init). We should also load and cache on startup: `/meta/features` (replace `NEXT_PUBLIC_FEATURE_FLAGS`), `/meta/codes`, `/meta/roles`, `/meta/form-engines`. Keep `/api/v1/health` live (no cache) for liveness.
+> **TODO — Frontend:** Load and cache `/meta/codes`, `/meta/roles`, `/meta/form-engines` when needed. **`/meta/features`** is loaded for SSR (layout + home) alongside platform allowlist + `NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`. Keycloak init still loads `/meta/frontend-config`. Keep `/api/v1/health` live (no cache) for liveness.
 
 ## Form Engine
 
@@ -618,13 +618,13 @@ Between unit tests and full Playwright E2E, we should add **API-level integratio
 - BC Gov Design System (`@bcgov/design-system-react-components`, tokens, BC Sans).
 - i18n with `en`/`fr` and `useDictionary()`.
 - Redux with typed hooks (`useAppDispatch`, `useAppSelector`).
-- Feature flags (`NEXT_PUBLIC_FEATURE_FLAGS`, `isFeatureEnabled()`) and plugin/home-section registry; workspaces plugin is the reference.
+- Feature gating: `loadFeaturesMeta()` + `createIsFeatureAllowed()` (`platformAllowed` ∩ `NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`); plugin/home-section registry; workspaces plugin has no `featureCode` (always on).
 
 ### Not Done
 
-- No nav menu yet — `getNavItem` exists on the plugin interface but the Header doesn’t render links.
+- Header renders plugin nav when `getNavItem` returns an item (workspaces plugin supplies the home link).
 - No real landing page; home sections are plugin-driven but empty.
-- Feature flags come from env, not the backend — see [Discussion Points — Frontend feature flags](#frontend-feature-flags).
+- Platform feature truth from `/meta/features`; per-frontend narrowing via `NEXT_PUBLIC_SOBA_FEATURES_ALLOWED` (see `DEVELOPER.md`).
 - No role-aware UI (owner, admin, member, viewer).
 - No workspace management UI — we can fetch workspaces but there’s no switch/create/manage.
 - Form rendering UI is minimal; backend path exists, frontend pages are stubs.
@@ -663,7 +663,7 @@ We want to add API-only backend integration tests (see [Testing — API-only int
 
 ## Frontend feature flags
 
-Right now flags come from `NEXT_PUBLIC_FEATURE_FLAGS`. They should come from the backend (`GET /meta/features`) as the single source of truth. Known gap in `DEVELOPER.md` and elsewhere.
+**Resolved:** `GET /meta/features` supplies **`platformAllowed`** per `code`. Each frontend deployment sets **`NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`**: comma-separated codes, or **`*`** / **`all`** for every platform-allowed feature; **empty/unset** = none. Effective UI gate: `platformAllowed && (wildcard || listed)`. See `DEVELOPER.md` — Feature flags.
 
 ## Revision tables — current state vs. history
 

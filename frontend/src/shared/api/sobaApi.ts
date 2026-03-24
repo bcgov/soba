@@ -1,3 +1,5 @@
+import type { FeaturesMetaPayload } from '@/src/shared/config/featuresMeta';
+import { isFeaturesMetaPayload } from '@/src/shared/config/featuresMeta';
 import { getSobaApiBaseUrl } from '../config/runtimeConfig';
 
 export type WorkspaceItem = {
@@ -67,6 +69,21 @@ export async function fetchBuildMeta(): Promise<BuildMeta> {
     cache: 'no-store',
   });
   return parseJson(response);
+}
+
+export async function fetchFeaturesMeta(): Promise<FeaturesMetaPayload> {
+  const response = await fetch(`${getSobaApiBaseUrl()}/meta/features`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+  const payload = await parseJson<unknown>(response);
+  if (!isFeaturesMetaPayload(payload)) {
+    throw new Error('Invalid features meta response');
+  }
+  return payload;
 }
 
 export async function fetchWorkspaces(token: string): Promise<WorkspacesResponse> {

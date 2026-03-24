@@ -136,6 +136,8 @@ frontend:
     minReplicas: 1
     maxReplicas: 3
     targetCPUUtilizationPercentage: 80
+  # Comma-separated codes from GET /meta/features, or * / all for every platform-allowed feature. Empty = none.
+  featuresAllowed: "*"
 
 # -- Database (external Postgres) -----------------------------------------
 database:

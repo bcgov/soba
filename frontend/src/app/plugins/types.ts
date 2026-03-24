@@ -1,6 +1,5 @@
 import type React from 'react';
 import type { Locale } from '@/app/[lang]/dictionaries';
-import type { FeatureKey } from '@/src/shared/featureFlags/flags';
 
 type Dictionary = {
   locale: string;
@@ -18,7 +17,11 @@ export type PluginNavItem = {
 
 export type AppPlugin = {
   id: string;
-  featureFlag: FeatureKey;
+  /**
+   * When set, the plugin is included only if `isFeatureAllowed(featureCode)` is true
+   * (platform + `NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`). Omit for always-on shell (e.g. workspaces).
+   */
+  featureCode?: string;
   order?: number;
   getNavItem: (params: { locale: Locale; dictionary: Dictionary }) => PluginNavItem | null;
   HomeSection: React.ComponentType;

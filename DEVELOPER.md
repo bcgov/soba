@@ -296,11 +296,13 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 ### Plugins and home sections
 
-- **AppPlugin:** id, featureFlag, order, getNavItem, HomeSection. The **registry** (`src/app/plugins/registry.ts`) lists plugins, filters by feature flag, and exposes `getNavigationItems()` (for Header nav) and `getHomeSections()` (for the home page). The workspaces plugin is the reference implementation. See [In Detail — Plugins (frontend)](#plugins-frontend).
+- **AppPlugin:** id, optional `featureCode`, order, getNavItem, HomeSection. The **registry** (`src/app/plugins/registry.ts`) lists plugins, filters with `createIsFeatureAllowed(meta)` from `src/shared/featureFlags/flags.ts`, and exposes `getNavigationItems(..., isFeatureAllowed)` and `getHomeSections(isFeatureAllowed)`. The workspaces plugin is the reference implementation (no `featureCode` — always on). See [In Detail — Plugins (frontend)](#plugins-frontend).
 
 ### Feature flags
 
-- **Env:** `NEXT_PUBLIC_FEATURE_FLAGS` and `NEXT_PUBLIC_DISABLED_FEATURE_FLAGS` (comma-separated). `src/shared/featureFlags/flags.ts` defines `FEATURE_KEYS` and `isFeatureEnabled(feature)`. Defaults: workspaces enabled when no explicit list is set. Plugins use a feature key to be included in nav and home sections. This needs to be restructured and should be driven by backend configuration (one source of truth for enabled features).
+- **Platform:** `GET /meta/features` returns each row with **`platformAllowed`** (from `soba.feature` status). Loaded via `src/shared/config/featuresMeta.ts` (`loadFeaturesMeta`).
+- **Per-frontend deployment:** **`NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`** — comma-separated codes (same as meta, e.g. `workspaces`, `design-mode`, `submit-mode`), or **`*`** / **`all`** alone to allow every platform-allowed feature. **Empty/unset** = no codes allowed at the frontend layer (intersected with `platformAllowed`). Use a subset for submit-only or design-only Next.js images that share one API.
+- **`createIsFeatureAllowed(meta)`** returns `isFeatureAllowed(code)` = `platformAllowed && frontendAllowlist`. Constants: `FEATURE_CODES` in `src/shared/featureFlags/flags.ts`.
 
 ### i18n / dictionaries
 
@@ -425,7 +427,7 @@ Auth-related env: `IDP_PLUGINS`, `IDP_PLUGIN_DEFAULT_*`, and per-IdP `PLUGIN_<ID
 
 ### Plugins (frontend)
 
-- **Adding a plugin:** (1) Define a feature key in `src/shared/featureFlags/flags.ts` (FEATURE_KEYS and defaults). (2) Create a feature folder under `src/features/<name>/` with a component for the home section and a `plugin.tsx` (or similar) that exports an `AppPlugin`: id, featureFlag, order, getNavItem, HomeSection. (3) Register the plugin in `src/app/plugins/registry.ts` (add to the allPlugins array). Nav and home sections will include it when the feature flag is enabled.
+- **Adding a plugin:** (1) Optionally add a row to `soba.feature` if the surface is platform-gated; use a stable `code` and reference it as `featureCode` on the plugin when the plugin should hide when that feature is not allowed. Omit `featureCode` for always-on shell (e.g. workspaces). (2) Create a feature folder under `src/features/<name>/` with a component for the home section and a `plugin.tsx` that exports an `AppPlugin`: id, optional featureCode, order, getNavItem, HomeSection. (3) Register the plugin in `src/app/plugins/registry.ts`. Nav and home sections include it when `isFeatureAllowed(featureCode)` is true (or when `featureCode` is omitted).
 - **getNavItem** returns { id, href, label } for the Header nav; href typically includes locale (e.g. `/${locale}/`). **HomeSection** is the React component rendered on the home page for this plugin.
 
 ### Testing
