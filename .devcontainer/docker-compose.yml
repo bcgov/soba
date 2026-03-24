@@ -53,6 +53,35 @@ services:
       retries: 10
     restart: unless-stopped
 
+  temporal:
+    image: temporalio/auto-setup:1.24
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PWD: postgres
+      POSTGRES_SEEDS: postgres
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/temporal-dynamicconfig.yaml
+    ports:
+      - "7233:7233"
+    volumes:
+      - ./config:/etc/temporal/config/dynamicconfig
+    restart: unless-stopped
+
+  temporal-ui:
+    image: temporalio/ui:2.48.0
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8088:8080"
+    restart: unless-stopped
+
 volumes:
   mongodb_data:
   postgres_data:

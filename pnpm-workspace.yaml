@@ -6,5 +6,8 @@ ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
 
+onlyBuiltDependencies:
+  - protobufjs
+
 overrides:
   minimatch: "10.2.4"
