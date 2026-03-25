@@ -307,7 +307,8 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 ### Forms
 
-- Form-related UI lives under `app/ui/forms/` (e.g. ShareForm for manage flows). Form.io rendering is backend-driven; document when a form-render path is added.
+- Form-related UI lives under `app/ui/forms/` (e.g. ShareForm for manage flows).
+- **Form.io v5 proxy (frontend):** Code under **`src/features/formio-v5/`**: proxy `fetch` helpers, Keycloak **`Formio.registerPlugin`** on **`@formio/js`**, **Submit** page lists forms (`GET /form`); **`/{lang}/forms/{formId}`** renders with **`FormioProvider`** + **`Form`** from **`@formio/react`** ([FormioProvider](https://github.com/formio/react?tab=readme-ov-file#formioprovider)). With `PLUGIN_FORMIO_V5_ROUTES_ALLOWED=true`, the API mounts **`/api/v1/formio-v5`**. Use **Keycloak `Authorization: Bearer`** (`getFormioProxyBaseUrl()` = `getSobaApiBaseUrl() + '/formio-v5'`). The Express proxy is a **subset** of Form.io CE (`backend/src/plugins/formio-v5/formioV5Routes.ts`). **Renderer CSS:** avoid importing Form.io bundled CSS globally with Turbopack; load next to `<Form />` or use a CDN when needed.
 
 ### Testing
 

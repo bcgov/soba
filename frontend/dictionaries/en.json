@@ -45,6 +45,33 @@
       "errCopyToClipboard": "Error copying to clipboard."
     }
   },
+  "formioV5": {
+    "formList": {
+      "tableHeading": "Forms",
+      "loading": "Loading forms…",
+      "empty": "No forms were returned from the Form.io proxy. Create a form in Form.io or check API configuration.",
+      "refresh": "Refresh",
+      "needLogin": "Sign in to load forms.",
+      "unauthorized": "Unauthorized — your session may have expired. Try signing in again.",
+      "columns": {
+        "title": "Title",
+        "name": "Name",
+        "path": "Path"
+      }
+    },
+    "formRender": {
+      "pageTitle": "Form",
+      "backToList": "Back to form list",
+      "missingId": "No form was selected.",
+      "loadError": "The form could not be loaded. Check the browser network tab and API logs.",
+      "rendererError": "The form renderer stopped unexpectedly. Try again or return to the list.",
+      "segmentError": {
+        "title": "Something went wrong loading this form page.",
+        "tryAgain": "Try again",
+        "backToList": "Back to form list"
+      }
+    }
+  },
   "forms": {
     "manage": {
       "share": {

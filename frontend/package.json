@@ -21,6 +21,8 @@
     "@bcgov/design-system-react-components": "^0.6.1",
     "@bcgov/design-tokens": "^3.2.0",
     "@formatjs/intl-localematcher": "^0.8.1",
+    "@formio/js": "5.4.0-api98.1",
+    "@formio/react": "6.2.1-api98.0",
     "@reduxjs/toolkit": "^2.11.2",
     "bootstrap": "^5.3.8",
     "keycloak-js": "^26.2.3",

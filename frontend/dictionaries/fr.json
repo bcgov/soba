@@ -45,6 +45,33 @@
       "errCopyToClipboard": "Erreur lors de la copie dans le presse-papiers."
     }
   },
+  "formioV5": {
+    "formList": {
+      "tableHeading": "Formulaires",
+      "loading": "Chargement des formulaires…",
+      "empty": "Aucun formulaire renvoyé par le proxy Form.io. Créez un formulaire dans Form.io ou vérifiez la configuration de l’API.",
+      "refresh": "Actualiser",
+      "needLogin": "Connectez-vous pour charger les formulaires.",
+      "unauthorized": "Non autorisé — la session a peut-être expiré. Reconnectez-vous.",
+      "columns": {
+        "title": "Titre",
+        "name": "Nom",
+        "path": "Chemin"
+      }
+    },
+    "formRender": {
+      "pageTitle": "Formulaire",
+      "backToList": "Retour à la liste",
+      "missingId": "Aucun formulaire sélectionné.",
+      "loadError": "Le formulaire n’a pas pu être chargé. Vérifiez l’onglet réseau du navigateur et les journaux de l’API.",
+      "rendererError": "Le moteur de formulaire s’est arrêté de façon inattendue. Réessayez ou revenez à la liste.",
+      "segmentError": {
+        "title": "Un problème est survenu lors du chargement de cette page de formulaire.",
+        "tryAgain": "Réessayer",
+        "backToList": "Retour à la liste"
+      }
+    }
+  },
   "forms": {
     "manage": {
       "share": {

@@ -1,6 +1,6 @@
 import { DsPageHeading } from '@/app/ui/DsPageHeading';
 import MetaReviewClientLoader from '@/src/features/meta-review/ui/MetaReviewClientLoader';
-import { getDictionary, hasLocale, Locale } from '../dictionaries';
+import { getDictionary, hasLocale, Locale, resolveLocale } from '../dictionaries';
 
 type PageProps = {
   params: Promise<{ lang: string }>;
@@ -8,10 +8,8 @@ type PageProps = {
 
 export async function generateMetadata({ params }: PageProps) {
   const param = await params;
-  if (!hasLocale(param.lang)) {
-    param.lang = 'en';
-  }
-  const dict = await getDictionary(param.lang as Locale);
+  const locale = resolveLocale(param.lang);
+  const dict = await getDictionary(locale);
   const title = dict.metaPage?.title ?? 'Meta';
   return {
     title: `${title} | ${dict.general.title}`,
