@@ -89,7 +89,7 @@ jobs:
       name: pr
       url: ${{ needs.set-vars.outputs.URL }}
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 18
     steps:
       - name: Checkout repository from pull request
         uses: actions/checkout@v5
@@ -159,6 +159,7 @@ jobs:
 
           helm upgrade --install "${RELEASE}" ./deployments/helm/soba \
             --namespace "${NAMESPACE}" \
+            --timeout 660s \
             -f deployments/helm/soba/values-pr.yaml \
             -f /tmp/values-override.yaml
 
