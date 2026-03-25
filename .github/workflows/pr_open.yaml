@@ -163,7 +163,12 @@ jobs:
             -f /tmp/values-override.yaml
 
           echo "Waiting for migration job..."
-          oc wait --for=condition=complete job/${RELEASE}-migrate-1 \
+          JOB_NAME=$(oc get jobs -n "${NAMESPACE}" -o name | grep "${RELEASE}-migrate-")
+          if [ -z "$JOB_NAME" ]; then
+            echo "ERROR: Migration job not found for release ${RELEASE}"
+            exit 1
+          fi
+          oc wait --for=condition=complete "${JOB_NAME}" \
             -n "${NAMESPACE}" --timeout=600s
 
           echo "Waiting for backend rollout..."
