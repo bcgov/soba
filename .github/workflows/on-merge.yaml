@@ -139,14 +139,16 @@ jobs:
             -f deployments/helm/soba/values-dev.yaml \
             -f /tmp/values-override.yaml
 
-          echo "Waiting for migration job..."
-          JOB_NAME=$(oc get jobs -n "${NAMESPACE}" -o name | grep "soba-dev-migrate-")
-          if [ -z "$JOB_NAME" ]; then
-            echo "ERROR: Migration job not found for release soba-dev"
-            exit 1
-          fi
-          oc wait --for=condition=complete "${JOB_NAME}" \
+          REVISION=$(helm status "soba-dev" -n "${NAMESPACE}" -o json | jq -r '.version')
+          echo "Waiting for migration job (revision ${REVISION})..."
+          oc wait --for=condition=complete "job/soba-dev-migrate-${REVISION}" \
             -n "${NAMESPACE}" --timeout=600s
+
+          # Clean up old migration jobs and keep only current revision
+          oc get jobs -n "${NAMESPACE}" -o name \
+            | grep "soba-dev-migrate-" \
+            | grep -v -- "-migrate-${REVISION}$" \
+            | xargs -r oc delete -n "${NAMESPACE}" 2>/dev/null || true
 
           echo "Waiting for backend rollout..."
           oc rollout status deployment/soba-dev-backend -n "${NAMESPACE}" --timeout=300s
