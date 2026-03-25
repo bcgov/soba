@@ -10,8 +10,33 @@
   },
   "header": {
     "workspaces": "Espaces de travail",
+    "design": "Conception",
+    "submit": "Soumettre",
+    "metaReview": "Méta API",
     "themeToggle": "Basculer le theme de couleur",
-    "skipToMain": "Aller au contenu principal"
+    "skipToMain": "Aller au contenu principal",
+    "menu": "Menu",
+    "closeMenu": "Fermer le menu",
+    "mobileNavLabel": "Navigation",
+    "openMenuAria": "Ouvrir le menu de navigation",
+    "closeMenuAria": "Fermer le menu de navigation"
+  },
+  "metaPage": {
+    "title": "Méta API et santé",
+    "refresh": "Actualiser",
+    "loadCodes": "Charger les codes de référence",
+    "loadRoles": "Charger les rôles",
+    "sections": {
+      "health": "Santé",
+      "readiness": "Disponibilité",
+      "build": "Build",
+      "features": "Fonctionnalités",
+      "frontendConfig": "Config frontale",
+      "plugins": "Plugins",
+      "formEngines": "Moteurs de formulaire",
+      "codes": "Codes de référence",
+      "roles": "Rôles"
+    }
   },
   "base": {
     "copyToClipboard": {

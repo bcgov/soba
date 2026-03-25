@@ -86,6 +86,64 @@ export async function fetchFeaturesMeta(): Promise<FeaturesMetaPayload> {
   return payload;
 }
 
+/** Readiness may return 503 with a JSON body; callers should not use `parseJson` alone. */
+export async function fetchHealthReady(): Promise<{ status: number; body: unknown }> {
+  const response = await fetch(`${getSobaApiBaseUrl()}/health/ready`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+  const body = (await response.json()) as unknown;
+  return { status: response.status, body };
+}
+
+export async function fetchPluginsMeta(): Promise<unknown> {
+  const response = await fetch(`${getSobaApiBaseUrl()}/meta/plugins`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+  return parseJson(response);
+}
+
+export async function fetchFormEnginesMeta(): Promise<unknown> {
+  const response = await fetch(`${getSobaApiBaseUrl()}/meta/form-engines`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+  return parseJson(response);
+}
+
+export async function fetchFrontendConfigMeta(): Promise<unknown> {
+  const response = await fetch(`${getSobaApiBaseUrl()}/meta/frontend-config`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+  return parseJson(response);
+}
+
+export async function fetchCodesMeta(onlyEnabledFeatures = true): Promise<unknown> {
+  const q = onlyEnabledFeatures ? '?only_enabled_features=true' : '';
+  const response = await fetch(`${getSobaApiBaseUrl()}/meta/codes${q}`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+  return parseJson(response);
+}
+
+export async function fetchRolesMeta(onlyEnabledFeatures = true): Promise<unknown> {
+  const q = onlyEnabledFeatures ? '?only_enabled_features=true' : '';
+  const response = await fetch(`${getSobaApiBaseUrl()}/meta/roles${q}`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+  return parseJson(response);
+}
+
 export async function fetchWorkspaces(token: string): Promise<WorkspacesResponse> {
   const response = await fetch(`${getSobaApiBaseUrl()}/workspaces`, {
     method: 'GET',

@@ -3,6 +3,7 @@ import WorkspaceList from '@/src/features/workspaces/ui/WorkspaceList';
 
 export const workspacesPlugin: AppPlugin = {
   id: 'workspaces',
+  showInHeaderNav: false,
   order: 10,
   getNavItem: ({ locale, dictionary }) => ({
     id: 'workspaces',

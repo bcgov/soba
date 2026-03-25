@@ -227,9 +227,7 @@ describe('env', () => {
   });
 
   it('resolveTrustProxySetting honors TRUST_PROXY_HOPS', () => {
-    expect(
-      resolveTrustProxySetting({ NODE_ENV: 'development', TRUST_PROXY_HOPS: '2' }),
-    ).toBe(2);
+    expect(resolveTrustProxySetting({ NODE_ENV: 'development', TRUST_PROXY_HOPS: '2' })).toBe(2);
     expect(resolveTrustProxySetting({ TRUST_PROXY_HOPS: '0' })).toBe(false);
   });
 

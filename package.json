@@ -19,6 +19,8 @@
     "check": "pnpm check:frontend && pnpm check:backend",
     "check:frontend": "pnpm --filter frontend run check",
     "check:backend": "pnpm --filter backend run check",
+    "qa": "pnpm check && pnpm test",
+    "qa:build": "pnpm qa && pnpm build",
     "db:migrate": "pnpm --filter @soba/backend run db:migrate",
     "db:seed": "pnpm --filter @soba/backend run db:seed",
     "db:init": "pnpm db:migrate && pnpm db:seed",

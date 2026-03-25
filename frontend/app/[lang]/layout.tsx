@@ -4,7 +4,7 @@ import { getDictionary } from './dictionaries';
 import { Header } from '../ui/Header';
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed } from '@/src/shared/featureFlags/flags';
-import { getNavigationItems } from '@/src/app/plugins/registry';
+import { getHeaderNavigationItems, getOverlayNavigationItems } from '@/src/app/plugins/registry';
 
 export default async function RootLayout({
   children,
@@ -19,11 +19,12 @@ export default async function RootLayout({
 
   const featuresMeta = await loadFeaturesMeta();
   const isFeatureAllowed = createIsFeatureAllowed(featuresMeta);
-  const navItems = getNavigationItems(locale, dictionary, isFeatureAllowed);
+  const headerNavItems = getHeaderNavigationItems(locale, dictionary, isFeatureAllowed);
+  const overlayNavItems = getOverlayNavigationItems(locale, dictionary, isFeatureAllowed);
 
   return (
     <DictionaryProvider dictionary={dictionary}>
-      <Header navItems={navItems} />
+      <Header headerNavItems={headerNavItems} overlayNavItems={overlayNavItems} />
       <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl w-full">
         {children}
       </main>
