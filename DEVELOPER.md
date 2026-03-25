@@ -42,7 +42,7 @@ The project uses a VS Code devcontainer (`.devcontainer/`). Open the repo in VS 
 
 ### Host architecture (ARM vs AMD)
 
-The devcontainer image is **multi-arch**: `linux/amd64` (e.g. Mac Intel, typical Linux) and `linux/arm64` (e.g. Mac Silicon). Both are supported. On ARM, the [Form.io](https://form.io) sidecar runs under amd64 emulation via an override (see below).
+The devcontainer image is **multi-arch**: `linux/amd64` (e.g. Mac Intel, typical Linux) and `linux/arm64` (e.g. Mac Silicon). Both are supported. The [Form.io](https://form.io) sidecar in `.devcontainer/docker-compose.yml` is pinned to `platform: linux/amd64` (no native arm image), so on Apple Silicon it runs under emulation automatically—no extra compose override.
 
 ### Docker Compose (sidecar services)
 
@@ -61,14 +61,6 @@ This starts:
 **Inside the devcontainer** use `host.docker.internal` to reach these services (e.g. `mongodb://host.docker.internal:27017`, `postgresql://postgres:postgres@host.docker.internal:5432/postgres`, `http://host.docker.internal:3001`). The devcontainer is started with `--add-host=host.docker.internal:host-gateway` so that this hostname works on Linux as well as on Docker Desktop (Mac/Windows). On the host machine use `localhost` and the same ports. **Using the app from a browser on the host** (e.g. http://localhost:3000): the frontend example uses `NEXT_PUBLIC_SOBA_API_BASE_URL=http://localhost:4000/api/v1` so client-side API calls go to the forwarded backend; no change needed. Form.io login: `formio@localhost.com` / `formio`.
 
 **Database (migrate + seed):** After the sidecars are up, from the repo root run `pnpm db:init` to run pending migrations and seed data. See [Drizzle](#drizzle) for individual `db:migrate` / `db:seed` commands.
-
-### Mac Silicon (ARM)
-
-On Apple Silicon, Form.io must run as amd64 (no native arm64 image). Use the **tasks** that apply the override (run **Dev Services: Up (arm64 override)** from the Command Palette / Tasks), or run the same compose flags in a terminal. See [Launch & tasks](#launch--tasks) for the task list.
-
-```bash
-docker compose -f .devcontainer/docker-compose.yml -f .devcontainer/docker-compose.override.arm64.yml up -d
-```
 
 ---
 
@@ -116,12 +108,12 @@ VS Code config lives in `.vscode/launch.json` and `.vscode/tasks.json`.
 
 **Tasks (`tasks.json`):** Run from Command Palette → “Tasks: Run Task”.
 
-| Task                                  | Purpose                                                                         |
-| ------------------------------------- | ------------------------------------------------------------------------------- |
-| **Dev Services: Up (arm64 override)** | Start MongoDB, PostgreSQL, Form.io (with ARM override so Form.io runs as amd64) |
-| **Dev Services: Down (arm64 override)** | Stop and remove the dev service containers                                    |
+| Task                         | Purpose                                              |
+| ---------------------------- | ---------------------------------------------------- |
+| **Dev Services: Up**         | Start MongoDB, PostgreSQL, Form.io, Temporal, etc.    |
+| **Dev Services: Down**       | Stop and remove the dev service containers           |
 
-Use the dev-services tasks on **Mac Silicon** so the override is applied; they work on amd64 as well. On other hosts you can instead run the `docker compose -f .devcontainer/docker-compose.yml up -d` command from the terminal (no override); or you can right-click the `docker-compose.yml` file and click `Compose Up`.
+You can also run `docker compose -f .devcontainer/docker-compose.yml up -d` in a terminal, or right-click `docker-compose.yml` and use **Compose Up**.
 
 ---
 
@@ -144,6 +136,7 @@ The devcontainer **initialize** and **post-create** steps copy from example file
 
 - Backend uses **[dotenv](https://github.com/motdotla/dotenv)**: it loads `.env` then `.env.local` (with `override: true`) so local values win.
 - Frontend uses **[Next.js](https://nextjs.org) built-in** env loading (no extra lib): `.env`, `.env.local`, `.env.development` / `.env.production` are read automatically; expose client-side values via the `NEXT_PUBLIC_` prefix.
+- The devcontainer does **not** pass `backend/.env` or `backend/.env.local` into the container via Docker (`runArgs`); shells and one-off CLI commands only see variables you export yourself. App servers started inside the container still pick up the files through dotenv / Next.js.
 
 ---
 
