@@ -89,7 +89,7 @@ jobs:
       name: pr
       url: ${{ needs.set-vars.outputs.URL }}
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 18
     steps:
       - name: Checkout repository from pull request
         uses: actions/checkout@v5
@@ -159,17 +159,20 @@ jobs:
 
           helm upgrade --install "${RELEASE}" ./deployments/helm/soba \
             --namespace "${NAMESPACE}" \
+            --timeout 660s \
             -f deployments/helm/soba/values-pr.yaml \
             -f /tmp/values-override.yaml
 
-          echo "Waiting for migration job..."
-          JOB_NAME=$(oc get jobs -n "${NAMESPACE}" -o name | grep "${RELEASE}-migrate-")
-          if [ -z "$JOB_NAME" ]; then
-            echo "ERROR: Migration job not found for release ${RELEASE}"
-            exit 1
-          fi
-          oc wait --for=condition=complete "${JOB_NAME}" \
+          REVISION=$(helm status "${RELEASE}" -n "${NAMESPACE}" -o json | jq -r '.version')
+          echo "Waiting for migration job (revision ${REVISION})..."
+          oc wait --for=condition=complete "job/${RELEASE}-migrate-${REVISION}" \
             -n "${NAMESPACE}" --timeout=600s
+
+          # Clean up old migration jobs and keep only current revision
+          oc get jobs -n "${NAMESPACE}" -o name \
+            | grep "${RELEASE}-migrate-" \
+            | grep -v -- "-migrate-${REVISION}$" \
+            | xargs -r oc delete -n "${NAMESPACE}" 2>/dev/null || true
 
           echo "Waiting for backend rollout..."
           oc rollout status deployment/${RELEASE}-backend -n "${NAMESPACE}" --timeout=300s
