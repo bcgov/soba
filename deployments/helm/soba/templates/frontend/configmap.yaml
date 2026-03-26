@@ -5,5 +5,8 @@ metadata:
   labels:
     {{- include "soba.labels" (dict "root" . "component" "frontend") | nindent 4 }}
 data:
+  # Browser: public Route/Ingress to API (TLS).
   NEXT_PUBLIC_SOBA_API_BASE_URL: {{ printf "https://%s/api/v1" (include "soba.backendHost" .) | quote }}
-  NEXT_PUBLIC_SOBA_FEATURES_ALLOWED: {{ .Values.frontend.featuresAllowed | default "" | quote }}
+  # Next.js server-side bootstrap fetches only — in-cluster Service (not the public host).
+  SOBA_API_INTERNAL_URL: {{ .Values.frontend.internalApiBaseUrl | default (include "soba.sobaApiInternalBaseUrl" .) | quote }}
+  NEXT_PUBLIC_SOBA_FEATURES_ALLOWED: {{ .Values.frontend.featuresAllowed | default "*" | quote }}

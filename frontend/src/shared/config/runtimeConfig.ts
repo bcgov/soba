@@ -25,14 +25,19 @@ const DEFAULT_SOBA_API_BASE_URL = 'http://localhost:4000/api/v1';
  * /meta/frontend-config fetch). In the browser we use window.__SOBA_API_BASE_URL
  * injected by the server from NEXT_PUBLIC_SOBA_API_BASE_URL so deployed apps
  * get the correct URL at runtime; local dev uses .env or the default.
+ *
+ * In Docker Compose, the browser must use host-exposed ports (NEXT_PUBLIC → localhost:4000).
+ * Server Components run inside the frontend container and need SOBA_API_INTERNAL_URL
+ * (e.g. http://backend:4000/api/v1) — localhost:4000 there is this container, not the API.
  */
 export function getBootstrapApiBaseUrl(): string {
   if (typeof window !== 'undefined' && window.__SOBA_API_BASE_URL) {
     return window.__SOBA_API_BASE_URL;
   }
-  return (
-    process.env.NEXT_PUBLIC_SOBA_API_BASE_URL || DEFAULT_SOBA_API_BASE_URL
-  );
+  if (typeof window === 'undefined' && process.env.SOBA_API_INTERNAL_URL) {
+    return process.env.SOBA_API_INTERNAL_URL;
+  }
+  return process.env.NEXT_PUBLIC_SOBA_API_BASE_URL || DEFAULT_SOBA_API_BASE_URL;
 }
 
 let cachedConfig: FrontendRuntimeConfig | null = null;

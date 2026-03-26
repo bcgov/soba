@@ -154,6 +154,8 @@ frontend:
     minReplicas: 1
     maxReplicas: 3
     targetCPUUtilizationPercentage: 80
+  # Optional: override SOBA_API_INTERNAL_URL (Next SSR → API). Default: in-cluster http://<release>-backend.<namespace>.svc.cluster.local:<port>/api/v1
+  internalApiBaseUrl: ""
   # Comma-separated codes from GET /meta/features, or * / all for every platform-allowed feature. Empty = none.
   featuresAllowed: "*"
 

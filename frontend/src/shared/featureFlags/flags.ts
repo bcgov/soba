@@ -13,6 +13,19 @@ export type FeatureCode = (typeof FEATURE_CODES)[keyof typeof FEATURE_CODES];
 
 const FRONTEND_FEATURES_ENV = 'NEXT_PUBLIC_SOBA_FEATURES_ALLOWED';
 
+/**
+ * Raw allowlist string: runtime injection from root layout in the browser (Docker/compose),
+ * else `process.env` (build-time for client bundles, runtime on server).
+ */
+function getFrontendFeaturesAllowlistRaw(): string | undefined {
+  if (typeof window !== 'undefined' && typeof window.__SOBA_FEATURES_ALLOWED === 'string') {
+    const raw = window.__SOBA_FEATURES_ALLOWED;
+    return raw.trim() === '' ? undefined : raw;
+  }
+  const fromEnv = process.env[FRONTEND_FEATURES_ENV];
+  return fromEnv === undefined || fromEnv.trim() === '' ? undefined : fromEnv;
+}
+
 /** Wildcard: allow every platform-allowed feature on this frontend deployment. */
 const FRONTEND_FEATURES_WILDCARD_TOKENS = new Set(['*', 'all']);
 
@@ -54,7 +67,7 @@ export function createIsFeatureAllowed(meta: FeaturesMetaPayload) {
   const platformByCode = new Map(
     meta.features.map((f) => [normalizeFeatureCode(f.code), f.platformAllowed] as const),
   );
-  const policy = parseFrontendFeaturesAllowlist(process.env[FRONTEND_FEATURES_ENV]);
+  const policy = parseFrontendFeaturesAllowlist(getFrontendFeaturesAllowlistRaw());
 
   return function isFeatureAllowed(code: string): boolean {
     const key = normalizeFeatureCode(code);

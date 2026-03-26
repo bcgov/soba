@@ -4,21 +4,13 @@ import { useEffect, useState } from 'react';
 import { Callout, Heading, InlineAlert, Text } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import {
-  fetchBuildMeta,
-  fetchFeaturesMeta,
-  fetchHealth,
-  fetchWorkspaces,
-  WorkspaceItem,
-} from '@/src/shared/api/sobaApi';
-import { listEnabledKnownFeatures } from '@/src/shared/featureFlags/flags';
+import { fetchBuildMeta, fetchHealth, fetchWorkspaces, WorkspaceItem } from '@/src/shared/api/sobaApi';
 
 function WorkspaceList() {
   const dict = useDictionary();
   const { authenticated, token, initializing } = useKeycloak();
   const [health, setHealth] = useState<string>('unknown');
   const [buildVersion, setBuildVersion] = useState<string>('');
-  const [enabledFeaturesLabel, setEnabledFeaturesLabel] = useState<string>('');
   const [workspaces, setWorkspaces] = useState<WorkspaceItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
@@ -27,20 +19,13 @@ function WorkspaceList() {
     let cancelled = false;
     const loadPublicMetadata = async () => {
       try {
-        const [healthResponse, build, featuresMeta] = await Promise.all([
-          fetchHealth(),
-          fetchBuildMeta(),
-          fetchFeaturesMeta(),
-        ]);
+        const [healthResponse, build] = await Promise.all([fetchHealth(), fetchBuildMeta()]);
         if (cancelled) return;
         setHealth(healthResponse.status);
         setBuildVersion(build.version);
-        const enabled = listEnabledKnownFeatures(featuresMeta);
-        setEnabledFeaturesLabel(enabled.length > 0 ? enabled.join(', ') : '(none)');
       } catch {
         if (cancelled) return;
         setHealth('unreachable');
-        setEnabledFeaturesLabel('unavailable');
       }
     };
     loadPublicMetadata();
@@ -80,9 +65,7 @@ function WorkspaceList() {
         <Callout
           variant="lightGrey"
           title="Backend status"
-          description={`Health: ${health}${buildVersion ? ` | Build: ${buildVersion}` : ''}${
-            enabledFeaturesLabel ? ` | Features: ${enabledFeaturesLabel}` : ''
-          }`}
+          description={`Health: ${health}${buildVersion ? ` | Build: ${buildVersion}` : ''}`}
         />
       </div>
 
