@@ -97,6 +97,24 @@ backend:
     publicWindowMs: "60000"
     publicMax: "200"
 
+# -- Outbox worker (same backend image, runs integration_outbox consumer)
+# claimOutboxBatch uses FOR UPDATE SKIP LOCKED — safe to run replicas > 1.
+# enabled defaults to true if omitted (see deployment-outbox-worker template).
+outboxWorker:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  livenessProbe:
+    enabled: false
+    initialDelaySeconds: 60
+    periodSeconds: 60
+
 # -- Frontend (Next.js) ---------------------------------------------------
 frontend:
   image:

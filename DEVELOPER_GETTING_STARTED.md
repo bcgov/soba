@@ -416,11 +416,17 @@ We can’t atomically write to Postgres and Form.io (Mongo). So we write the int
 - `outboxWorker.ts` exists and polls/claims batches
 - `SyncService` shell exists to route events to the right form engine adapter
 
-### Not Done
+### Partially done (local dev)
 
-- Nothing calls `enqueueOutboxEvent` yet — no form or submission write enqueues.
-- No Form.io client (see Form Engine), so `SyncService` has nothing to call.
-- The full flow (enqueue → worker → sync → write ref back) has never been run.
+- `POST /form-versions/{id}/save` with `enqueueProvision: true` enqueues `form_version` events; `FormioEngineAdapter.createFormVersionSchema` calls Form.io `POST /form` when admin credentials are configured (otherwise the adapter falls back to a placeholder ref).
+- **Run the worker:** use the VS Code launch config **SOBA Outbox Worker**, or the compound **SOBA (Backend + Outbox + Temporal + Frontend)**. From `backend/`, you can also run `pnpm outbox-worker` or `pnpm outbox-worker:dev` in a second terminal.
+- **Kubernetes:** the chart deploys **`outboxWorker`** as a second Deployment (same backend image, command `node backend/dist/src/core/workers/outboxWorker.js`); see `deployments/helm/soba/values*.yaml` and `templates/backend/deployment-outbox-worker.yaml`.
+- **Form.io env:** the worker uses the same `PLUGIN_FORMIO_V5_*` settings as the API so provisioning can reach Form.io.
+
+### Still open
+
+- Submission provisioning via outbox remains placeholder in the Form.io adapter.
+- Production deployment should run the outbox worker as its own long-lived process (see deployment docs); locally, start it via the launch config or `pnpm outbox-worker:dev`, not only the API.
 
 ## Cache
 

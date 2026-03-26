@@ -16,6 +16,7 @@ export const enqueueOutboxEvent = async (event: QueueEvent) => {
   });
 };
 
+/** Claims rows for processing. `FOR UPDATE SKIP LOCKED` lets multiple worker pods claim disjoint batches safely. */
 export const claimOutboxBatch = async (batchSize = 20) => {
   return db.transaction(async (tx) => {
     const pending = await tx

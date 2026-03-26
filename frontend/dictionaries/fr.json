@@ -72,6 +72,30 @@
       }
     }
   },
+  "submitDemo": {
+    "tableHeading": "Formulaires SOBA",
+    "loading": "Chargement…",
+    "empty": "Aucun formulaire SOBA dans cet espace pour l’instant.",
+    "generate": "Générer un formulaire SOBA de démo",
+    "generating": "Création…",
+    "refresh": "Actualiser",
+    "needLogin": "Connectez-vous pour voir les formulaires SOBA.",
+    "noWorkspace": "Aucun espace de travail trouvé pour votre compte.",
+    "loadError": "Impossible de charger les formulaires.",
+    "generateError": "Impossible de créer le formulaire de démo.",
+    "pollTimeout": "Le provisionnement continue. Réessayez actualiser dans quelques secondes.",
+    "openForm": "Ouvrir dans la visionneuse",
+    "syncPending": "En attente",
+    "syncProvisioning": "Provisionnement",
+    "syncReady": "Prêt",
+    "syncFailed": "Échec",
+    "columns": {
+      "name": "Nom",
+      "slug": "Identifiant",
+      "sync": "Sync Form.io",
+      "open": "Ouvrir"
+    }
+  },
   "forms": {
     "manage": {
       "share": {

@@ -1,5 +1,5 @@
 import { DsPageHeading } from '@/app/ui/DsPageHeading';
-import FormioV5FormListLoader from '@/src/features/formio-v5/ui/FormioV5FormListLoader';
+import { SubmitDemoTempLoader } from '@/src/features/submit-demo-temp';
 import { getDictionary, hasLocale, Locale, resolveLocale } from '../dictionaries';
 
 type PageProps = {
@@ -23,7 +23,7 @@ export default async function Page({ params }: PageProps) {
   return (
     <section className="p-4" aria-labelledby="submit-mode-heading">
       <DsPageHeading id="submit-mode-heading">{dict.header.submit}</DsPageHeading>
-      <FormioV5FormListLoader />
+      <SubmitDemoTempLoader />
     </section>
   );
 }
