@@ -1,5 +1,5 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Button,
   Header as BcHeader,
@@ -17,8 +17,9 @@ import { getNavigationItems } from '@/src/app/plugins/registry';
 function Header() {
   const dispatch = useAppDispatch();
   const dict = useDictionary();
-  const { authenticated, idTokenParsed, token, login, logout, init } = useKeycloak();
+  const { authenticated, idTokenParsed, token, login, logout, init, refresh } = useKeycloak();
   const currentUser = useCurrentUser();
+  const [intervalRef, setIntervalRef] = useState<NodeJS.Timeout | null>(null);
   const locale = dict.locale === 'en' || dict.locale === 'fr' ? dict.locale : 'en';
   const navItems = getNavigationItems(locale, dict);
 
@@ -28,11 +29,23 @@ function Header() {
 
   useEffect(() => {
     if (!authenticated || !token) {
+      if (intervalRef) {
+        clearInterval(intervalRef);
+        setIntervalRef(null);
+      }
       dispatch(clearCurrentUser());
       return;
     }
     if (currentUser.token !== token || currentUser.status === 'idle') {
       dispatch(loadCurrentUser(token));
+    }
+
+    if (authenticated && !intervalRef) {
+      setIntervalRef(
+        setInterval(() => {
+          refresh();
+        }, 30000),
+      );
     }
   }, [authenticated, token, currentUser.token, currentUser.status, dispatch]);
 

@@ -1,4 +1,7 @@
 import { getSobaApiBaseUrl } from '../config/runtimeConfig';
+import { parseJson } from './sobaHelpers';
+
+export { SobaFormType, createSobaFormioForm, createFormioForm } from './sobaApiForms';
 
 export type WorkspaceItem = {
   id: string;
@@ -45,13 +48,6 @@ export type CurrentUserResponse = {
     preferredUsername: string | null;
   };
 };
-
-async function parseJson<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    throw new Error(`Request failed (${response.status})`);
-  }
-  return (await response.json()) as T;
-}
 
 export async function fetchHealth(): Promise<{ status: string }> {
   const response = await fetch(`${getSobaApiBaseUrl()}/health`, {

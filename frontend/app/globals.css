@@ -1,6 +1,10 @@
 @import 'tailwindcss';
 @import '@bcgov/bc-sans/css/BC_Sans.css';
 @import '@bcgov/design-tokens/css/variables.css';
+@import 'bootstrap/dist/css/bootstrap.min.css';
+@import '@formio/js/dist/formio.full.min.css';
+@import '@formio/js/dist/formio.builder.min.css';
+@import '@fortawesome/fontawesome-free/css/all.min.css';
 
 :root {
   --app-bg: var(--surface-color-background-light-gray);

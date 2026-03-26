@@ -5,10 +5,10 @@ import type { FeatureKey } from '@/src/shared/featureFlags/flags';
 type Dictionary = {
   locale: string;
   header: {
-    [x: string]: string;
+    [x: string]: string | undefined;
     workspaces: string;
     designer: string;
-    themeToggle?: string;
+    themeToggle?: string | undefined;
   };
 };
 
