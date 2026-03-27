@@ -1,7 +1,8 @@
 import { getSobaApiBaseUrl } from '../config/runtimeConfig';
 import { parseJson } from './sobaHelpers';
 
-export { SobaFormType, createSobaFormioForm, createFormioForm } from './sobaApiForms';
+export type { SobaFormType } from './sobaApiForms';
+export { createSobaFormioForm, createFormioForm } from './sobaApiForms';
 
 export type WorkspaceItem = {
   id: string;

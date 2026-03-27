@@ -14,7 +14,7 @@ function FormForm() {
   const [formSlug, setFormSlug] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [ministry, setMinistry] = useState('');
-  const [formSchema, setFormSchema] = useState<FormType>(undefined);
+  const [formSchema, setFormSchema] = useState<FormType>({} as FormType);
 
   const [alertVariant, setAlertVariant] = useState('');
   const [alertText, setAlertText] = useState('');
@@ -48,7 +48,7 @@ function FormForm() {
     };
 
     try {
-      await createSobaFormioForm(token, data);
+      await createSobaFormioForm(token as string, data);
       const formioData = { ...formSchema };
       formioData.name = formName;
       //first remove illegal chars, then remove starting and ending / or -
@@ -57,14 +57,14 @@ function FormForm() {
         .replace(/[^a-z\-\/]/g, '')
         .replace(/^[/-]+|[/-]+$/g, '');
       formioData.title = formSlug;
-      await createFormioForm(token, formioData);
+      await createFormioForm(token as string, formioData);
 
       setAlertText('Form Saved to SOBA and FORMIO');
       setAlertVariant('success');
       setShowAlert(true);
-    } catch (e: Error) {
+    } catch (e: unknown) {
       console.error('error creating form', e);
-      setAlertText('ERROR Saving Form to SOBA and FORMIO: ' + e.message);
+      setAlertText('ERROR Saving Form to SOBA and FORMIO: ' + (e as Error).message);
       setAlertVariant('danger');
       setShowAlert(true);
     }
@@ -80,9 +80,11 @@ function FormForm() {
 
   return (
     <>
-      <Alert variant={alertVariant} onClose={() => setShowAlert(false)} dismissible>
-        {alertText}
-      </Alert>
+      {showAlert && (
+        <Alert variant={alertVariant} onClose={() => setShowAlert(false)} dismissible>
+          {alertText}
+        </Alert>
+      )}
 
       <form>
         {/* On submission, the input value will be appended to

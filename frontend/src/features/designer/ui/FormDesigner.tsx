@@ -4,20 +4,13 @@ import dynamic from 'next/dynamic';
 import { useState, useMemo } from 'react';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
+import { FormType } from '@formio/react';
 
 const FormBuilder = dynamic(() => import('@formio/react').then((mod) => mod.FormBuilder), {
   ssr: false,
 });
 
 const FormioProvider = dynamic(() => import('@formio/react').then((mod) => mod.FormioProvider), {
-  ssr: false,
-});
-
-const FormType = dynamic(() => import('@formio/react').then((mod) => mod.FormType), {
-  ssr: false,
-});
-
-const FormDisplay = dynamic(() => import('@formio/react').then((mod) => mod.FormType), {
   ssr: false,
 });
 
@@ -30,7 +23,7 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel }) => {
   const { authenticated, initializing } = useKeycloak();
   const dict = useDictionary();
   const [schema, setSchema] = useState<Partial<FormType>>({
-    display: 'form' as FormDisplay,
+    display: 'form',
     components: [],
   });
 
