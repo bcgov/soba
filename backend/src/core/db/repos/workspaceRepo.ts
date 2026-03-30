@@ -22,7 +22,7 @@ const WORKSPACE_STATUS_ACTIVE = 'active';
 const GROUP_STATUS_ACTIVE = 'active';
 const MEMBERSHIP_STATUS_ACTIVE = 'active';
 
-/** Second int for `pg_advisory_xact_lock`; must not collide with other repo lock pairs (e.g. membership). */
+/** Second int for `pg_advisory_xact_lock`; must not collide with membershipRepo / sobaAdminRepo lock ids. */
 const ADV_LOCK_ENSURE_HOME_WORKSPACE = 1_892_478_311;
 
 /**
