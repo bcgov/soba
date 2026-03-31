@@ -211,7 +211,7 @@ Workspace and IdP plugins are ordered via env (`WORKSPACE_PLUGINS_ALLOWED`, `IDP
 
 Form rendering and submission storage are delegated to a **form engine** plugin. The default is `formio-v5` (Form.io v5). The core stores form and submission metadata and draft state in PostgreSQL; the form engine (e.g. Form.io) holds the form definition and can persist submission payloads. The **FormioEngineAdapter** (`backend/src/plugins/formio-v5/`) talks to Form.io over HTTP. Config is via `PLUGIN_FORMIO_V5_*` (API base URL, admin credentials, etc.). `FORM_ENGINE_DEFAULT_CODE` selects which engine to use; forms reference an engine code.
 
-Form engine plugins can optionally expose **HTTP routes** (e.g. a Form.io CE proxy) by setting **`routeBasePath`** and **`createRouter(config)`**; routes are mounted only when **`PLUGIN_<CODE>_ROUTES_ALLOWED=true`** (explicit per-engine). For formio-v5, set **`PLUGIN_FORMIO_V5_ROUTES_ALLOWED=true`** to mount the proxy at **`/api/v1/formio-v5`** (path from **`PLUGIN_FORMIO_V5_PROXY_PATH`**, default `/formio-v5`). The proxy is **protected** (same auth as v1 API: app JWT in `Authorization: Bearer`). It forwards to Form.io CE and optionally passes through **`x-jwt-token`**; otherwise uses the server-side admin client. Health remains on the adapter and is reported via `/api/v1/health`. See [In Detail — Configuration of plugins and features](#configuration-of-plugins-and-features).
+Form engine plugins can optionally expose **HTTP routes** (e.g. a Form.io CE proxy) by setting **`routeBasePath`** and **`createRouter(config)`**; routes are mounted only when **`PLUGIN_<CODE>_ROUTES_ALLOWED=true`** (explicit per-engine). For formio-v5, set **`PLUGIN_FORMIO_V5_ROUTES_ALLOWED=true`** to mount the proxy at **`/api/v1/formio-v5`** (path from **`PLUGIN_FORMIO_V5_PROXY_PATH`**, default `/formio-v5`). The proxy is **protected** (same auth as v1 API: app JWT in `Authorization: Bearer`). It forwards to Form.io CE and optionally passes through **`x-jwt-token`**; otherwise it uses the server-side admin client. Health remains on the adapter and is reported via `/api/v1/health`. See [In Detail — Configuration of plugins and features](#configuration-of-plugins-and-features).
 
 ### Outbox
 
@@ -354,6 +354,8 @@ We use a **transactional outbox** so that work that spans PostgreSQL and the for
   - **submission.engine_submission_ref** — After a submission is created, we provision a record in the form engine; the engine returns a reference. We store that in `submission.engine_submission_ref`.
 
 Without the outbox, we would have to call the form engine synchronously inside the request and risk partial commits (Postgres updated but form engine unreachable, or the reverse). The outbox lets us commit the domain write and the outbox row together (or in a single logical step), and let the worker eventually sync and fill in the refs with retries and backoff.
+
+The Form.io CE client (`backend/src/plugins/formio-v5/formioV5Client.ts`) automatically re-logs in and retries once on **HTTP 440** when the request used the server **admin** JWT only; if the Formio proxy forwarded an end-user **`x-jwt-token`**, 440 is not auto-retried and that session must be refreshed.
 
 ### Configuration of plugins and features
 
