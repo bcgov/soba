@@ -5,8 +5,8 @@ import { env } from '../core/config/env';
 let clientPromise: Promise<Client> | null = null;
 
 export function getClient(): Promise<Client> {
-  if (!env.getTemporalEnabled()) {
-    return Promise.reject(new Error('Temporal is disabled (TEMPORAL_ENABLED is not true).'));
+  if (!env.getTemporalAllowed()) {
+    return Promise.reject(new Error('Temporal is disabled (TEMPORAL_ALLOWED is not true).'));
   }
   if (!clientPromise) {
     clientPromise = createClient();

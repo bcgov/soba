@@ -42,7 +42,7 @@ The project uses a VS Code devcontainer (`.devcontainer/`). Open the repo in VS 
 
 ### Host architecture (ARM vs AMD)
 
-The devcontainer image is **multi-arch**: `linux/amd64` (e.g. Mac Intel, typical Linux) and `linux/arm64` (e.g. Mac Silicon). Both are supported. On ARM, the [Form.io](https://form.io) sidecar runs under amd64 emulation via an override (see below).
+The devcontainer image is **multi-arch**: `linux/amd64` (e.g. Mac Intel, typical Linux) and `linux/arm64` (e.g. Mac Silicon). Both are supported. The [Form.io](https://form.io) sidecar in `.devcontainer/docker-compose.yml` is pinned to `platform: linux/amd64` (no native arm image), so on Apple Silicon it runs under emulation automatically—no extra compose override.
 
 ### Docker Compose (sidecar services)
 
@@ -61,14 +61,6 @@ This starts:
 **Inside the devcontainer** use `host.docker.internal` to reach these services (e.g. `mongodb://host.docker.internal:27017`, `postgresql://postgres:postgres@host.docker.internal:5432/postgres`, `http://host.docker.internal:3001`). The devcontainer is started with `--add-host=host.docker.internal:host-gateway` so that this hostname works on Linux as well as on Docker Desktop (Mac/Windows). On the host machine use `localhost` and the same ports. **Using the app from a browser on the host** (e.g. http://localhost:3000): the frontend example uses `NEXT_PUBLIC_SOBA_API_BASE_URL=http://localhost:4000/api/v1` so client-side API calls go to the forwarded backend; no change needed. Form.io login: `formio@localhost.com` / `formio`.
 
 **Database (migrate + seed):** After the sidecars are up, from the repo root run `pnpm db:init` to run pending migrations and seed data. See [Drizzle](#drizzle) for individual `db:migrate` / `db:seed` commands.
-
-### Mac Silicon (ARM)
-
-On Apple Silicon, Form.io must run as amd64 (no native arm64 image). Use the **tasks** that apply the override (run **Dev Services: Up (arm64 override)** from the Command Palette / Tasks), or run the same compose flags in a terminal. See [Launch & tasks](#launch--tasks) for the task list.
-
-```bash
-docker compose -f .devcontainer/docker-compose.yml -f .devcontainer/docker-compose.override.arm64.yml up -d
-```
 
 ---
 
@@ -116,12 +108,12 @@ VS Code config lives in `.vscode/launch.json` and `.vscode/tasks.json`.
 
 **Tasks (`tasks.json`):** Run from Command Palette → “Tasks: Run Task”.
 
-| Task                                  | Purpose                                                                         |
-| ------------------------------------- | ------------------------------------------------------------------------------- |
-| **Dev Services: Up (arm64 override)** | Start MongoDB, PostgreSQL, Form.io (with ARM override so Form.io runs as amd64) |
-| **Dev Services: Down (arm64 override)** | Stop and remove the dev service containers                                    |
+| Task                         | Purpose                                              |
+| ---------------------------- | ---------------------------------------------------- |
+| **Dev Services: Up**         | Start MongoDB, PostgreSQL, Form.io, Temporal, etc.    |
+| **Dev Services: Down**       | Stop and remove the dev service containers           |
 
-Use the dev-services tasks on **Mac Silicon** so the override is applied; they work on amd64 as well. On other hosts you can instead run the `docker compose -f .devcontainer/docker-compose.yml up -d` command from the terminal (no override); or you can right-click the `docker-compose.yml` file and click `Compose Up`.
+You can also run `docker compose -f .devcontainer/docker-compose.yml up -d` in a terminal, or right-click `docker-compose.yml` and use **Compose Up**.
 
 ---
 
@@ -144,6 +136,7 @@ The devcontainer **initialize** and **post-create** steps copy from example file
 
 - Backend uses **[dotenv](https://github.com/motdotla/dotenv)**: it loads `.env` then `.env.local` (with `override: true`) so local values win.
 - Frontend uses **[Next.js](https://nextjs.org) built-in** env loading (no extra lib): `.env`, `.env.local`, `.env.development` / `.env.production` are read automatically; expose client-side values via the `NEXT_PUBLIC_` prefix.
+- The devcontainer does **not** pass `backend/.env` or `backend/.env.local` into the container via Docker (`runArgs`); shells and one-off CLI commands only see variables you export yourself. App servers started inside the container still pick up the files through dotenv / Next.js.
 
 ---
 
@@ -208,7 +201,7 @@ The backend uses a **plugin architecture** so that workspace resolution, form en
 | **Message bus**        | Async messaging                        | `messagebus-memory`; future: Redis, NATS                            |
 | **Feature API**        | Optional REST API per plugin           | e.g. `personal-local` (exposes `pluginApiDefinition` with basePath) |
 
-Workspace and IdP plugins are ordered via env (`WORKSPACE_PLUGINS_ENABLED`, `IDP_PLUGINS`); the first successful resolver or IdP wins. For IdP auth, Passport orchestrates the ordered plugin attempts and the winning plugin still supplies the mapped identity used by core. Plugin APIs (from plugins that export both a workspace resolver and a feature API definition) are registered via `createPluginApiRouter()` and can be mounted under `/api/v1` when desired.
+Workspace and IdP plugins are ordered via env (`WORKSPACE_PLUGINS_ALLOWED`, `IDP_PLUGINS`); the first successful resolver or IdP wins. For IdP auth, Passport orchestrates the ordered plugin attempts and the winning plugin still supplies the mapped identity used by core. Plugin APIs (from plugins that export both a workspace resolver and a feature API definition) are registered via `createPluginApiRouter()` and can be mounted under `/api/v1` when desired.
 
 ### Features
 
@@ -218,7 +211,7 @@ Workspace and IdP plugins are ordered via env (`WORKSPACE_PLUGINS_ENABLED`, `IDP
 
 Form rendering and submission storage are delegated to a **form engine** plugin. The default is `formio-v5` (Form.io v5). The core stores form and submission metadata and draft state in PostgreSQL; the form engine (e.g. Form.io) holds the form definition and can persist submission payloads. The **FormioEngineAdapter** (`backend/src/plugins/formio-v5/`) talks to Form.io over HTTP. Config is via `PLUGIN_FORMIO_V5_*` (API base URL, admin credentials, etc.). `FORM_ENGINE_DEFAULT_CODE` selects which engine to use; forms reference an engine code.
 
-Form engine plugins can optionally expose **HTTP routes** (e.g. a Form.io CE proxy) by setting **`routeBasePath`** and **`createRouter(config)`**; routes are mounted only when **`PLUGIN_<CODE>_ROUTES_ENABLED=true`** (explicit per-engine). For formio-v5, set **`PLUGIN_FORMIO_V5_ROUTES_ENABLED=true`** to mount the proxy at **`/api/v1/formio-v5`** (path from **`PLUGIN_FORMIO_V5_PROXY_PATH`**, default `/formio-v5`). The proxy is **protected** (same auth as v1 API: app JWT in `Authorization: Bearer`). It forwards to Form.io CE and optionally passes through **`x-jwt-token`**; otherwise uses the server-side admin client. Health remains on the adapter and is reported via `/api/v1/health`. See [In Detail — Configuration of plugins and features](#configuration-of-plugins-and-features).
+Form engine plugins can optionally expose **HTTP routes** (e.g. a Form.io CE proxy) by setting **`routeBasePath`** and **`createRouter(config)`**; routes are mounted only when **`PLUGIN_<CODE>_ROUTES_ALLOWED=true`** (explicit per-engine). For formio-v5, set **`PLUGIN_FORMIO_V5_ROUTES_ALLOWED=true`** to mount the proxy at **`/api/v1/formio-v5`** (path from **`PLUGIN_FORMIO_V5_PROXY_PATH`**, default `/formio-v5`). The proxy is **protected** (same auth as v1 API: app JWT in `Authorization: Bearer`). It forwards to Form.io CE and optionally passes through **`x-jwt-token`**; otherwise it uses the server-side admin client. Health remains on the adapter and is reported via `/api/v1/health`. See [In Detail — Configuration of plugins and features](#configuration-of-plugins-and-features).
 
 ### Outbox
 
@@ -296,11 +289,13 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 ### Plugins and home sections
 
-- **AppPlugin:** id, featureFlag, order, getNavItem, HomeSection. The **registry** (`src/app/plugins/registry.ts`) lists plugins, filters by feature flag, and exposes `getNavigationItems()` (for Header nav) and `getHomeSections()` (for the home page). The workspaces plugin is the reference implementation. See [In Detail — Plugins (frontend)](#plugins-frontend).
+- **AppPlugin:** id, optional `featureCode`, order, getNavItem, HomeSection. The **registry** (`src/app/plugins/registry.ts`) lists plugins, filters with `createIsFeatureAllowed(meta)` from `src/shared/featureFlags/flags.ts`, and exposes `getNavigationItems(..., isFeatureAllowed)` and `getHomeSections(isFeatureAllowed)`. The workspaces plugin is the reference implementation (no `featureCode` — always on). See [In Detail — Plugins (frontend)](#plugins-frontend).
 
 ### Feature flags
 
-- **Env:** `NEXT_PUBLIC_FEATURE_FLAGS` and `NEXT_PUBLIC_DISABLED_FEATURE_FLAGS` (comma-separated). `src/shared/featureFlags/flags.ts` defines `FEATURE_KEYS` and `isFeatureEnabled(feature)`. Defaults: workspaces enabled when no explicit list is set. Plugins use a feature key to be included in nav and home sections. This needs to be restructured and should be driven by backend configuration (one source of truth for enabled features).
+- **Platform:** `GET /meta/features` returns each row with **`platformAllowed`** (from `soba.feature` status). Loaded via `src/shared/config/featuresMeta.ts` (`loadFeaturesMeta`).
+- **Per-frontend deployment:** **`NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`** — comma-separated codes (same as meta, e.g. `workspaces`, `design-mode`, `submit-mode`), or **`*`** / **`all`** alone to allow every platform-allowed feature. **Empty/unset** = no codes allowed at the frontend layer (intersected with `platformAllowed`). Use a subset for submit-only or design-only Next.js images that share one API.
+- **`createIsFeatureAllowed(meta)`** returns `isFeatureAllowed(code)` = `platformAllowed && frontendAllowlist`. Constants: `FEATURE_CODES` in `src/shared/featureFlags/flags.ts`.
 
 ### i18n / dictionaries
 
@@ -312,7 +307,8 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 ### Forms
 
-- Form-related UI lives under `app/ui/forms/` (e.g. ShareForm for manage flows). Form.io rendering is backend-driven; document when a form-render path is added.
+- Form-related UI lives under `app/ui/forms/` (e.g. ShareForm for manage flows).
+- **Form.io v5 proxy (frontend):** Code under **`src/features/formio-v5/`**: proxy `fetch` helpers, Keycloak **`Formio.registerPlugin`** on **`@formio/js`**, **Submit** page lists forms (`GET /form`); **`/{lang}/forms/{formId}`** renders with **`FormioProvider`** + **`Form`** from **`@formio/react`** ([FormioProvider](https://github.com/formio/react?tab=readme-ov-file#formioprovider)). With `PLUGIN_FORMIO_V5_ROUTES_ALLOWED=true`, the API mounts **`/api/v1/formio-v5`**. Use **Keycloak `Authorization: Bearer`** (`getFormioProxyBaseUrl()` = `getSobaApiBaseUrl() + '/formio-v5'`). The Express proxy is a **subset** of Form.io CE (`backend/src/plugins/formio-v5/formioV5Routes.ts`). **Renderer CSS:** avoid importing Form.io bundled CSS globally with Turbopack; load next to `<Form />` or use a CDN when needed.
 
 ### Testing
 
@@ -359,10 +355,12 @@ We use a **transactional outbox** so that work that spans PostgreSQL and the for
 
 Without the outbox, we would have to call the form engine synchronously inside the request and risk partial commits (Postgres updated but form engine unreachable, or the reverse). The outbox lets us commit the domain write and the outbox row together (or in a single logical step), and let the worker eventually sync and fill in the refs with retries and backoff.
 
+The Form.io CE client (`backend/src/plugins/formio-v5/formioV5Client.ts`) automatically re-logs in and retries once on **HTTP 440** when the request used the server **admin** JWT only; if the Formio proxy forwarded an end-user **`x-jwt-token`**, 440 is not auto-retried and that session must be refreshed.
+
 ### Configuration of plugins and features
 
 - **Plugin discovery:** Plugins live under `backend/src/plugins/<pluginDir>/`. Each plugin module can export one or more of: `workspacePluginDefinition`, `formEnginePluginDefinition`, `pluginApiDefinition`, `idpPluginDefinition`, `cachePluginDefinition`, `messageBusPluginDefinition`. The registry validates with Zod and builds caches at startup.
-- **Which plugins run:** Workspace resolvers: `WORKSPACE_PLUGINS_ENABLED` (comma-separated codes). IdP: `IDP_PLUGINS` (comma-separated; default from `IDP_PLUGIN_DEFAULT_CODE`). Cache / message bus: `CACHE_DEFAULT_CODE`, `MESSAGEBUS_DEFAULT_CODE`. Form engine: `FORM_ENGINE_DEFAULT_CODE`. Only plugins that are both discovered and listed in the relevant env are used. For auth, Passport uses the ordered IdP plugin list as its provider chain and stops at the first successful plugin. `WORKSPACE_PLUGINS_STRICT_MODE=true` fails startup if any enabled workspace plugin is missing.
+- **Which plugins run:** Workspace resolvers: `WORKSPACE_PLUGINS_ALLOWED` (comma-separated codes). IdP: `IDP_PLUGINS` (comma-separated; default from `IDP_PLUGIN_DEFAULT_CODE`). Cache / message bus: `CACHE_DEFAULT_CODE`, `MESSAGEBUS_DEFAULT_CODE`. Form engine: `FORM_ENGINE_DEFAULT_CODE`. Only plugins that are both discovered and listed in the relevant env are used. For auth, Passport uses the ordered IdP plugin list as its provider chain and stops at the first successful plugin. `WORKSPACE_PLUGINS_STRICT_MODE=true` fails startup if any enabled workspace plugin is missing.
 - **Plugin config:** Each plugin gets a `PluginConfigReader` built from env with a prefix. Prefix is `PLUGIN_<NORMALIZED_CODE>_` (e.g. `PLUGIN_FORMIO_V5_API_BASE_URL`). The reader exposes `getRequired`, `getOptional`, `getBoolean`, `getNumber`, `getCsv`. Use `.env.example` and `.env.local` for secrets; document keys in examples only.
 - **Features (DB):** The `soba.feature` and `soba.feature_status` tables are seeded via `pnpm db:seed`. Feature status (e.g. `enabled`/`disabled`) drives feature-flag behaviour. Roles and code tables support `source` and (for roles) `feature_code` so features can add codes and roles; see [Enable/Disable features, add codes + roles](#enabledisable-features-add-codes--roles-for-feature).
 
@@ -425,7 +423,7 @@ Auth-related env: `IDP_PLUGINS`, `IDP_PLUGIN_DEFAULT_*`, and per-IdP `PLUGIN_<ID
 
 ### Plugins (frontend)
 
-- **Adding a plugin:** (1) Define a feature key in `src/shared/featureFlags/flags.ts` (FEATURE_KEYS and defaults). (2) Create a feature folder under `src/features/<name>/` with a component for the home section and a `plugin.tsx` (or similar) that exports an `AppPlugin`: id, featureFlag, order, getNavItem, HomeSection. (3) Register the plugin in `src/app/plugins/registry.ts` (add to the allPlugins array). Nav and home sections will include it when the feature flag is enabled.
+- **Adding a plugin:** (1) Optionally add a row to `soba.feature` if the surface is platform-gated; use a stable `code` and reference it as `featureCode` on the plugin when the plugin should hide when that feature is not allowed. Omit `featureCode` for always-on shell (e.g. workspaces). (2) Create a feature folder under `src/features/<name>/` with a component for the home section and a `plugin.tsx` that exports an `AppPlugin`: id, optional featureCode, order, getNavItem, HomeSection. (3) Register the plugin in `src/app/plugins/registry.ts`. Nav and home sections include it when `isFeatureAllowed(featureCode)` is true (or when `featureCode` is omitted).
 - **getNavItem** returns { id, href, label } for the Header nav; href typically includes locale (e.g. `/${locale}/`). **HomeSection** is the React component rendered on the home page for this plugin.
 
 ### Testing

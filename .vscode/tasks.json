@@ -2,18 +2,18 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Dev Services: Up (arm64 override)",
+      "label": "Dev Services: Up",
       "type": "shell",
-      "command": "docker compose -f .devcontainer/docker-compose.yml -f .devcontainer/docker-compose.override.arm64.yml up -d --build",
+      "command": "docker compose -f .devcontainer/docker-compose.yml up -d --build",
       "options": {
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
     },
     {
-      "label": "Dev Services: Down (arm64 override)",
+      "label": "Dev Services: Down",
       "type": "shell",
-      "command": "docker compose -f .devcontainer/docker-compose.yml -f .devcontainer/docker-compose.override.arm64.yml down",
+      "command": "docker compose -f .devcontainer/docker-compose.yml down",
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -21,4 +21,3 @@
     }
   ]
 }
-

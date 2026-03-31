@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "soba.labels" (dict "root" . "component" "backend") | nindent 4 }}
 data:
-  PLUGIN_FORMIO_V5_ROUTES_ENABLED: {{ .Values.backend.formio.routesEnabled | quote }}
+  PLUGIN_FORMIO_V5_ROUTES_ALLOWED: {{ .Values.backend.formio.routesAllowed | quote }}
   PLUGIN_FORMIO_V5_PROXY_PATH: {{ .Values.backend.formio.proxyPath | quote }}
   PLUGIN_FORMIO_V5_API_BASE_URL: {{ include "soba.formioBaseUrl" . | quote }}
   PLUGIN_FORMIO_V5_ADMIN_API_URL: {{ include "soba.formioBaseUrl" . | quote }}

@@ -108,6 +108,22 @@ export function resolveDatabaseUrl(source: EnvSource): string {
   );
 }
 
+/**
+ * Express `trust proxy` value for `source`. Hop count (e.g. 1 = one ingress), or false when none.
+ * `true` is not returned — express-rate-limit rejects it (ERR_ERL_PERMISSIVE_TRUST_PROXY).
+ */
+export function resolveTrustProxySetting(source: EnvSource): number | boolean {
+  const raw = getOptionalEnvFrom(source, 'TRUST_PROXY_HOPS');
+  if (raw !== undefined && raw !== '') {
+    const n = parseNumberEnvValue(raw);
+    if (!Number.isInteger(n) || n < 0) {
+      throw new Error('TRUST_PROXY_HOPS must be a non-negative integer');
+    }
+    return n === 0 ? false : n;
+  }
+  return getOptionalEnvFrom(source, 'NODE_ENV') === 'development' ? false : 1;
+}
+
 /** Build an env reader that reads from the given source. Use in tests with a simulated .env object. */
 export function createEnvReader(source: EnvSource) {
   return {
@@ -123,7 +139,7 @@ export function createEnvReader(source: EnvSource) {
     getOutboxBatchSize: () => getNumberEnvFrom(source, 'OUTBOX_BATCH_SIZE'),
     getSystemSobaUserEmail: () => getOptionalEnvFrom(source, 'SYSTEM_SOBA_USER_EMAIL'),
     getSystemSobaSubject: () => getOptionalEnvFrom(source, 'SOBA_SYSTEM_SUBJECT'),
-    getWorkspacePluginsEnabled: () => getRequiredEnvFrom(source, 'WORKSPACE_PLUGINS_ENABLED'),
+    getWorkspacePluginsAllowed: () => getRequiredEnvFrom(source, 'WORKSPACE_PLUGINS_ALLOWED'),
     getWorkspacePluginsStrictModeRaw: () =>
       getRequiredEnvFrom(source, 'WORKSPACE_PLUGINS_STRICT_MODE'),
     isDevelopment: () => getOptionalEnvFrom(source, 'NODE_ENV') === 'development',
@@ -139,7 +155,8 @@ export function createEnvReader(source: EnvSource) {
     getRateLimitApiMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_API_MAX'),
     getRateLimitPublicWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_PUBLIC_WINDOW_MS'),
     getRateLimitPublicMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_PUBLIC_MAX'),
-    getTemporalEnabled: () => getBooleanEnvFrom(source, 'TEMPORAL_ENABLED') ?? false,
+    getTrustProxySetting: () => resolveTrustProxySetting(source),
+    getTemporalAllowed: () => getBooleanEnvFrom(source, 'TEMPORAL_ALLOWED') ?? false,
     getTemporalAddress: () => getOptionalEnvFrom(source, 'TEMPORAL_ADDRESS') ?? 'localhost:7233',
     getTemporalNamespace: () => getOptionalEnvFrom(source, 'TEMPORAL_NAMESPACE') ?? 'default',
     getTemporalTaskQueue: () => getOptionalEnvFrom(source, 'TEMPORAL_TASK_QUEUE') ?? 'soba',
@@ -168,7 +185,7 @@ export const env = {
   getSystemSobaUserEmail: () => getOptionalEnv('SYSTEM_SOBA_USER_EMAIL'),
   /** Subject for the system SOBA user identity (provider=system). Default in code: soba-system. */
   getSystemSobaSubject: () => getOptionalEnv('SOBA_SYSTEM_SUBJECT'),
-  getWorkspacePluginsEnabled: () => getRequiredEnv('WORKSPACE_PLUGINS_ENABLED'),
+  getWorkspacePluginsAllowed: () => getRequiredEnv('WORKSPACE_PLUGINS_ALLOWED'),
   getWorkspacePluginsStrictModeRaw: () => getRequiredEnv('WORKSPACE_PLUGINS_STRICT_MODE'),
   isDevelopment: () => getOptionalEnv('NODE_ENV') === 'development',
   getPluginsPath: () => getOptionalEnv('PLUGINS_PATH') ?? getOptionalEnv('WORKSPACE_PLUGINS_PATH'),
@@ -181,7 +198,8 @@ export const env = {
   getRateLimitApiMax: () => getNumberEnv('RATE_LIMIT_API_MAX'),
   getRateLimitPublicWindowMs: () => getNumberEnv('RATE_LIMIT_PUBLIC_WINDOW_MS'),
   getRateLimitPublicMax: () => getNumberEnv('RATE_LIMIT_PUBLIC_MAX'),
-  getTemporalEnabled: () => getBooleanEnv('TEMPORAL_ENABLED') ?? false,
+  getTrustProxySetting: () => resolveTrustProxySetting(process.env),
+  getTemporalAllowed: () => getBooleanEnv('TEMPORAL_ALLOWED') ?? false,
   getTemporalAddress: () => getOptionalEnv('TEMPORAL_ADDRESS') ?? 'localhost:7233',
   getTemporalNamespace: () => getOptionalEnv('TEMPORAL_NAMESPACE') ?? 'default',
   getTemporalTaskQueue: () => getOptionalEnv('TEMPORAL_TASK_QUEUE') ?? 'soba',

@@ -36,6 +36,11 @@ type FormioForm = any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FormioSubmission = any;
 
+/**
+ * Optional override for Form.io CE `x-jwt-token`. `FormioEngineAdapter` never sets this (outbox uses admin JWT only).
+ * The HTTP proxy forwards `x-jwt-token` today; that is planned for removal so proxied traffic will match the adapter.
+ * Unit tests may set `token` directly to cover 440 behaviour.
+ */
 export type FormioRequestOptions = { token?: string };
 
 export interface FormioCommunityEditionAPIv5Options {
@@ -114,13 +119,17 @@ export class FormioCommunityEditionAPIv5Client {
     return token;
   }
 
-  private async request<T>(
-    path: string,
+  /** Used to avoid a login/retry loop for the Formio proxy’s no-admin fallback client (empty credentials). */
+  private hasAdminCredentials(): boolean {
+    return Boolean(this.username && this.password);
+  }
+
+  private async performFetch(
+    url: string,
     method: string,
-    body?: unknown,
+    body: string | undefined,
     opts?: FormioRequestOptions,
-  ): Promise<T> {
-    const url = `${this._baseUrl}${path}`;
+  ): Promise<{ ok: boolean; status: number; text: string }> {
     const token = opts?.token ?? this.token ?? undefined;
     const headers: Record<string, string> = {
       Accept: 'application/json',
@@ -130,15 +139,50 @@ export class FormioCommunityEditionAPIv5Client {
     const res = await fetch(url, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body,
     });
     const text = await res.text();
-    if (!res.ok) throw new FormioApiError(res.status, text, url);
-    if (res.status === 204 || !text) return undefined as T;
-    try {
-      return JSON.parse(text) as T;
-    } catch {
-      return undefined as T;
+    return { ok: res.ok, status: res.status, text };
+  }
+
+  /**
+   * Uses **`opts.token`** for `x-jwt-token` when the caller set it; otherwise **`this.token`** (admin JWT from `login()`).
+   *
+   * **Engine adapter / outbox** never pass `opts.token` — they only use the admin JWT. **HTTP proxy** routes may pass
+   * it when forwarding `x-jwt-token` (temporary; removal planned). After that change, non-test callers will match the adapter.
+   *
+   * **HTTP 440:** If `opts.token` was **not** provided, we treat this as admin JWT expiry: clear `this.token`, `login()`
+   * once, retry the same request. If `opts.token` **was** provided, we do not swap in admin credentials (440 surfaces to the caller).
+   * `refreshedFor440` allows at most one admin refresh per `request()` call.
+   */
+  private async request<T>(
+    path: string,
+    method: string,
+    body?: unknown,
+    opts?: FormioRequestOptions,
+  ): Promise<T> {
+    const url = `${this._baseUrl}${path}`;
+    const serializedBody = body !== undefined ? JSON.stringify(body) : undefined;
+    const usedCallerToken = opts?.token !== undefined;
+    let refreshedFor440 = false;
+
+    while (true) {
+      const { ok, status, text } = await this.performFetch(url, method, serializedBody, opts);
+      if (ok) {
+        if (status === 204 || !text) return undefined as T;
+        try {
+          return JSON.parse(text) as T;
+        } catch {
+          return undefined as T;
+        }
+      }
+      if (!refreshedFor440 && status === 440 && !usedCallerToken && this.hasAdminCredentials()) {
+        this.token = null;
+        await this.login();
+        refreshedFor440 = true;
+        continue;
+      }
+      throw new FormioApiError(status, text, url);
     }
   }
 

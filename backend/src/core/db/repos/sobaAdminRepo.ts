@@ -1,6 +1,9 @@
-import { and, desc, eq, lt } from 'drizzle-orm';
+import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { db } from '../client';
 import { appUsers, sobaAdmins } from '../schema';
+
+/** Second int for `pg_advisory_xact_lock`; must not collide with workspaceRepo / membershipRepo lock ids. */
+const ADV_LOCK_UPSERT_SOBA_ADMIN = 1_774_566_321;
 
 export const SOBA_ADMIN_SOURCE_IDP = 'idp';
 export const SOBA_ADMIN_SOURCE_DIRECT = 'direct';
@@ -70,6 +73,9 @@ export async function upsertSobaAdminFromIdp(
   const normalizedIdp = idpCode.toLowerCase();
 
   await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${userId}::text), ${ADV_LOCK_UPSERT_SOBA_ADMIN})`,
+    );
     const existing = await tx
       .select()
       .from(sobaAdmins)

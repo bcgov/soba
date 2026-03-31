@@ -25,6 +25,7 @@ services:
 
   formio:
     image: formio/formio:latest
+    platform: linux/amd64
     ports:
       - "3001:3001"
     environment:

@@ -36,22 +36,60 @@ const DEFAULT_SYSTEM_SUBJECT = 'soba-system';
 const SYSTEM_DISPLAY_LABEL = 'SOBA System';
 const SEED_USER_STAMP = 'SOBA System (seed)';
 
-const ensureIdentityProvider = async (code: string, name: string, createdByLabel?: string) => {
+/** Audit stamp (`createdByLabel` / `updatedBy`) is last. */
+const ensureIdentityProvider = async (
+  code: string,
+  name: string,
+  isActive: boolean = true,
+  createdByLabel?: string,
+) => {
   const existing = await db.query.identityProviders.findFirst({
     where: eq(identityProviders.code, code),
   });
-  if (existing) return existing;
+  if (existing) {
+    if (existing.name !== name || existing.isActive !== isActive) {
+      await db
+        .update(identityProviders)
+        .set({
+          name,
+          isActive,
+          updatedBy: createdByLabel ?? null,
+          updatedAt: new Date(),
+        })
+        .where(eq(identityProviders.code, code));
+      return (await db.query.identityProviders.findFirst({
+        where: eq(identityProviders.code, code),
+      }))!;
+    }
+    return existing;
+  }
   const inserted = await db
     .insert(identityProviders)
     .values({
       code,
       name,
-      isActive: true,
+      isActive,
       createdBy: createdByLabel ?? null,
       updatedBy: createdByLabel ?? null,
     })
     .returning();
   return inserted[0];
+};
+
+/** Codes match BC Gov Keycloak `identity_provider` (lowercased in app). See idp-bcgov-sso plugin. */
+const SEED_BC_GOV_IDENTITY_PROVIDERS = [
+  { code: 'idir', name: 'IDIR', isActive: false },
+  { code: 'azureidir', name: 'Azure IDIR', isActive: true },
+  { code: 'bceidbasic', name: 'BCeID Basic', isActive: false },
+  { code: 'bceidbusiness', name: 'BCeID Business', isActive: false },
+  { code: 'bcservicescard', name: 'BC Services Card', isActive: false },
+  { code: 'bcsc', name: 'BC Services Card', isActive: false },
+] as const;
+
+const seedBcgovSsoIdentityProviders = async (createdByLabel: string) => {
+  for (const { code, name, isActive } of SEED_BC_GOV_IDENTITY_PROVIDERS) {
+    await ensureIdentityProvider(code, name, isActive, createdByLabel);
+  }
 };
 
 const seedFeatureStatus = async () => {
@@ -253,6 +291,27 @@ const seedFeatures = async () => {
       version: null,
       status: FeatureStatus.enabled,
     },
+    {
+      code: 'workspaces',
+      name: 'Workspaces',
+      description: 'Workspace shell and membership (shared by design and submit flows)',
+      version: null,
+      status: FeatureStatus.enabled,
+    },
+    {
+      code: 'design-mode',
+      name: 'Design mode',
+      description: 'Form management and design surfaces',
+      version: null,
+      status: FeatureStatus.enabled,
+    },
+    {
+      code: 'submit-mode',
+      name: 'Submit mode',
+      description: 'Submitter-facing surfaces',
+      version: null,
+      status: FeatureStatus.enabled,
+    },
   ];
   for (const row of coreFeatures) {
     await db
@@ -308,10 +367,13 @@ const seed = async () => {
   await seedRoles();
   await seedCodeTables();
 
+  await seedBcgovSsoIdentityProviders(SEED_USER_STAMP);
+
   const systemSubject = env.getSystemSobaSubject() ?? DEFAULT_SYSTEM_SUBJECT;
   const systemProvider = await ensureIdentityProvider(
     SYSTEM_PROVIDER_CODE,
     'SOBA Internal System',
+    true,
     SEED_USER_STAMP,
   );
 

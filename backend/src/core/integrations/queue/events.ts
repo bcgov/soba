@@ -5,6 +5,11 @@ export const FormVersionCreatePayloadSchema = z.object({
   formVersionId: z.string().uuid(),
   engineCode: z.string().min(1),
   formId: z.string().uuid().optional(),
+  /** Form.io form document (POST /form body) when provided by the client on save. */
+  formioFormDefinition: z.record(z.string(), z.unknown()).optional(),
+  /** SOBA form slug/name for title, name, and path when creating the Form.io resource. */
+  formSlug: z.string().min(1).optional(),
+  formName: z.string().min(1).optional(),
 });
 export type FormVersionCreatePayload = z.infer<typeof FormVersionCreatePayloadSchema>;
 

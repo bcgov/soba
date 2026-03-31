@@ -4,13 +4,7 @@
     "dockerfile": "Dockerfile",
     "context": "."
   },
-  "runArgs": [
-    "--add-host=host.docker.internal:host-gateway",
-    "--env-file",
-    "${localWorkspaceFolder}/backend/.env",
-    "--env-file",
-    "${localWorkspaceFolder}/backend/.env.local"
-  ],
+  "runArgs": ["--add-host=host.docker.internal:host-gateway"],
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},

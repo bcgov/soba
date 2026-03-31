@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, or } from 'drizzle-orm';
+import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { db } from '../client';
 import {
@@ -13,6 +13,9 @@ import { membershipKey } from '../../integrations/cache/cacheKeys';
 import { getSystemUser } from '../../services/systemUser';
 import { profileHelpers } from '../../auth/jwtClaims';
 import type { NormalizedProfile, IdpAttributes } from '../../auth/jwtClaims';
+
+/** Second int for `pg_advisory_xact_lock`; must not collide with workspaceRepo / sobaAdminRepo lock ids. */
+const ADV_LOCK_FIND_OR_CREATE_IDENTITY = 2_147_483_622;
 
 export { findUserIdByIdentity } from './identityLookup';
 
@@ -47,6 +50,12 @@ export const findOrCreateUserByIdentity = async (
         .returning();
       provider = created[0];
     }
+
+    // Same shape as workspaceRepo.ensureHomeWorkspace: hashtext(single ::text param), fixed namespace int.
+    const identityLockPayload = `${provider.code}\u001f${subject}`;
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${identityLockPayload}::text), ${ADV_LOCK_FIND_OR_CREATE_IDENTITY})`,
+    );
 
     const existing = await tx
       .select({ userId: userIdentities.userId, id: userIdentities.id })

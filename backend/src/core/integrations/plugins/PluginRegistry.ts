@@ -214,14 +214,14 @@ export function getWorkspaceResolvers(): WorkspaceResolver[] {
     .filter((d): d is WorkspaceResolverDefinition => Boolean(d));
 
   const discoveredCodes = definitions.map((d) => d.code);
-  const unknownCodes = config.enabledPlugins.filter((code) => !discoveredCodes.includes(code));
+  const unknownCodes = config.allowedPlugins.filter((code) => !discoveredCodes.includes(code));
   if (unknownCodes.length > 0) {
     const message = `Unknown workspace plugins configured: ${unknownCodes.join(', ')}`;
     if (config.strictMode) throw new Error(message);
     console.warn(message);
   }
 
-  const selected = definitions.filter((d) => config.enabledPlugins.includes(d.code));
+  const selected = definitions.filter((d) => config.allowedPlugins.includes(d.code));
   workspaceResolversCache = selected
     .map((d) => d.createResolver(createPluginConfigReader(d.code)))
     .sort((a, b) => a.priority - b.priority);
@@ -234,7 +234,7 @@ export function getWorkspaceResolvers(): WorkspaceResolver[] {
   );
 
   if (workspaceResolversCache.length === 0) {
-    throw new Error('No workspace resolvers enabled. Check WORKSPACE_PLUGINS_ENABLED.');
+    throw new Error('No workspace resolvers enabled. Check WORKSPACE_PLUGINS_ALLOWED.');
   }
 
   return workspaceResolversCache;
@@ -261,7 +261,7 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
       p.dir;
     return {
       code,
-      enabled: config.enabledPlugins.includes(code),
+      enabled: config.allowedPlugins.includes(code),
       hasWorkspaceResolver: Boolean(p.workspaceDefinition),
       hasApi: Boolean(p.apiDefinition),
       apiBasePath: p.apiDefinition?.basePath,
@@ -274,7 +274,7 @@ export function getEnabledPluginApiDefinitions(): FeatureApiDefinition[] {
   const discovered = discoverAndCache();
   return discovered
     .filter((p) => p.workspaceDefinition && p.apiDefinition)
-    .filter((p) => config.enabledPlugins.includes(p.workspaceDefinition!.code))
+    .filter((p) => config.allowedPlugins.includes(p.workspaceDefinition!.code))
     .map((p) => p.apiDefinition!);
 }
 
@@ -302,15 +302,15 @@ export function getFormEnginePluginDefinitions(): FormEnginePluginDefinition[] {
     .filter((d): d is FormEnginePluginDefinition => Boolean(d));
 }
 
-/** Returns true when PLUGIN_<CODE>_ROUTES_ENABLED is explicitly 'true' (case-insensitive). */
-function isFormEngineRoutesEnabled(config: PluginConfigReader): boolean {
-  const raw = config.getOptional('ROUTES_ENABLED');
+/** Returns true when PLUGIN_<CODE>_ROUTES_ALLOWED is explicitly 'true' (case-insensitive). */
+function isFormEngineRoutesAllowed(config: PluginConfigReader): boolean {
+  const raw = config.getOptional('ROUTES_ALLOWED');
   return raw?.trim().toLowerCase() === 'true';
 }
 
 /**
- * Form engine definitions that contribute HTTP routes and have routes enabled via
- * PLUGIN_<CODE>_ROUTES_ENABLED=true. Used to mount proxy/routes in the app.
+ * Form engine definitions that contribute HTTP routes and have routes allowed via
+ * PLUGIN_<CODE>_ROUTES_ALLOWED=true. Used to mount proxy/routes in the app.
  */
 export function getFormEngineRouteDefinitions(): FormEngineRouteDefinition[] {
   const definitions = getFormEnginePluginDefinitions();
@@ -318,7 +318,7 @@ export function getFormEngineRouteDefinitions(): FormEngineRouteDefinition[] {
   for (const def of definitions) {
     if (def.routeBasePath === undefined || def.createRouter === undefined) continue;
     const config = createPluginConfigReader(def.code);
-    if (!isFormEngineRoutesEnabled(config)) continue;
+    if (!isFormEngineRoutesAllowed(config)) continue;
     const routeBasePath =
       typeof def.routeBasePath === 'function' ? def.routeBasePath(config) : def.routeBasePath;
     result.push({

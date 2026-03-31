@@ -57,6 +57,7 @@ export const SaveFormVersionBodySchema = z
     eventType: z.string().min(1).optional(),
     note: z.string().optional(),
     enqueueProvision: z.boolean().optional(),
+    formioFormDefinition: z.record(z.string(), z.unknown()).optional(),
   })
   .openapi('Forms_SaveFormVersionBody');
 
@@ -127,6 +128,7 @@ export const FormVersionListItemSchema = z
     versionNo: z.number().int(),
     state: z.string(),
     engineSyncStatus: z.string(),
+    engineSchemaRef: z.string().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -139,6 +141,7 @@ export const FormVersionResponseSchema = z
     versionNo: z.number().int(),
     state: z.string(),
     engineSyncStatus: z.string(),
+    engineSchemaRef: z.string().nullable(),
     currentRevisionNo: z.number().int(),
     publishedAt: z.string().nullable(),
     createdAt: z.string(),
