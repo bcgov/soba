@@ -84,15 +84,23 @@ If mongodb is internal, point at the in-cluster service; otherwise use mongodb.e
 {{- end }}
 
 {{/*
-Frontend public URL (used for NEXT_PUBLIC_SOBA_API_BASE_URL and Route host).
+Frontend public URL (Route / Ingress host).
 */}}
 {{- define "soba.frontendHost" -}}
 {{- printf "%s.%s" (include "soba.fullname" .) .Values.global.domain }}
 {{- end }}
 
 {{/*
-Backend public URL host.
+Backend public URL host (browser and NEXT_PUBLIC_SOBA_API_BASE_URL).
 */}}
 {{- define "soba.backendHost" -}}
 {{- printf "%s-api.%s" (include "soba.fullname" .) .Values.global.domain }}
+{{- end }}
+
+{{/*
+Cluster-internal API base URL for Next.js SSR (Server Components) — plain HTTP to backend Service.
+See frontend SOBA_API_INTERNAL_URL in runtimeConfig. Override with frontend.internalApiBaseUrl if needed.
+*/}}
+{{- define "soba.sobaApiInternalBaseUrl" -}}
+{{- printf "http://%s-backend.%s.svc.cluster.local:%v/api/v1" (include "soba.fullname" .) .Release.Namespace (.Values.backend.service.port) }}
 {{- end }}

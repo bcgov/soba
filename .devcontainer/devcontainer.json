@@ -4,13 +4,7 @@
     "dockerfile": "Dockerfile",
     "context": "."
   },
-  "runArgs": [
-    "--add-host=host.docker.internal:host-gateway",
-    "--env-file",
-    "${localWorkspaceFolder}/backend/.env",
-    "--env-file",
-    "${localWorkspaceFolder}/backend/.env.local"
-  ],
+  "runArgs": ["--add-host=host.docker.internal:host-gateway"],
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},
@@ -18,7 +12,7 @@
       "minikube": "latest"
     }
   },
-  "forwardPorts": [3000, 3001, 4000],
+  "forwardPorts": [3000, 3001, 4000, 5432, 7233, 8088, 27017],
   "portsAttributes": {
     "3000": {
       "label": "Frontend (Next.js)"
@@ -28,6 +22,18 @@
     },
     "4000": {
       "label": "Backend (Express)"
+    },
+    "5432": {
+      "label": "PostgreSQL"
+    },
+    "7233": {
+      "label": "Temporal gRPC"
+    },
+    "8088": {
+      "label": "Temporal UI"
+    },
+    "27017": {
+      "label": "MongoDB"
     }
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",

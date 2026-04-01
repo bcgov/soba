@@ -4,6 +4,7 @@ import {
   parseCsvValue,
   createEnvReader,
   resolveDatabaseUrl,
+  resolveTrustProxySetting,
 } from '../../../src/core/config/env';
 
 describe('env', () => {
@@ -174,9 +175,9 @@ describe('env', () => {
     );
   });
 
-  it('createEnvReader getWorkspacePluginsEnabled returns required value from simulated env', () => {
-    const reader = createEnvReader({ WORKSPACE_PLUGINS_ENABLED: 'personal-local' });
-    expect(reader.getWorkspacePluginsEnabled()).toBe('personal-local');
+  it('createEnvReader getWorkspacePluginsAllowed returns required value from simulated env', () => {
+    const reader = createEnvReader({ WORKSPACE_PLUGINS_ALLOWED: 'personal-local' });
+    expect(reader.getWorkspacePluginsAllowed()).toBe('personal-local');
   });
 
   it('createEnvReader getWorkspacePluginsStrictModeRaw returns value from simulated env', () => {
@@ -214,5 +215,31 @@ describe('env', () => {
     });
     expect(reader.getOutboxPollIntervalMs()).toBe(5000);
     expect(reader.getOutboxBatchSize()).toBe(10);
+  });
+
+  it('resolveTrustProxySetting returns false in development when TRUST_PROXY_HOPS unset', () => {
+    expect(resolveTrustProxySetting({ NODE_ENV: 'development' })).toBe(false);
+  });
+
+  it('resolveTrustProxySetting returns 1 when not development and TRUST_PROXY_HOPS unset', () => {
+    expect(resolveTrustProxySetting({ NODE_ENV: 'production' })).toBe(1);
+    expect(resolveTrustProxySetting({})).toBe(1);
+  });
+
+  it('resolveTrustProxySetting honors TRUST_PROXY_HOPS', () => {
+    expect(resolveTrustProxySetting({ NODE_ENV: 'development', TRUST_PROXY_HOPS: '2' })).toBe(2);
+    expect(resolveTrustProxySetting({ TRUST_PROXY_HOPS: '0' })).toBe(false);
+  });
+
+  it('resolveTrustProxySetting throws for invalid TRUST_PROXY_HOPS', () => {
+    expect(() => resolveTrustProxySetting({ TRUST_PROXY_HOPS: '-1' })).toThrow(
+      /non-negative integer/,
+    );
+    expect(() => resolveTrustProxySetting({ TRUST_PROXY_HOPS: '1.5' })).toThrow();
+  });
+
+  it('createEnvReader getTrustProxySetting delegates to resolveTrustProxySetting', () => {
+    const reader = createEnvReader({ NODE_ENV: 'development' });
+    expect(reader.getTrustProxySetting()).toBe(false);
   });
 });

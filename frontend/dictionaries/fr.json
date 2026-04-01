@@ -10,15 +10,91 @@
   },
   "header": {
     "workspaces": "Espaces de travail",
+    "design": "Conception",
+    "submit": "Soumettre",
+    "metaReview": "Méta API",
     "themeToggle": "Basculer le theme de couleur",
     "skipToMain": "Aller au contenu principal",
-    "designer": "Générateur de Formulaire"
+    "designer": "Générateur de Formulaire",
+    "menu": "Menu",
+    "closeMenu": "Fermer le menu",
+    "mobileNavLabel": "Navigation",
+    "openMenuAria": "Ouvrir le menu de navigation",
+    "closeMenuAria": "Fermer le menu de navigation"
+  },
+  "metaPage": {
+    "title": "Méta API et santé",
+    "refresh": "Actualiser",
+    "loadCodes": "Charger les codes de référence",
+    "loadRoles": "Charger les rôles",
+    "sections": {
+      "health": "Santé",
+      "readiness": "Disponibilité",
+      "build": "Build",
+      "features": "Fonctionnalités",
+      "frontendConfig": "Config frontale",
+      "plugins": "Plugins",
+      "formEngines": "Moteurs de formulaire",
+      "codes": "Codes de référence",
+      "roles": "Rôles"
+    }
   },
   "base": {
     "copyToClipboard": {
       "copyToClipboard": "Copier dans le presse-papiers",
       "linkToClipboard": "Lien copié dans le presse-papiers!",
       "errCopyToClipboard": "Erreur lors de la copie dans le presse-papiers."
+    }
+  },
+  "formioV5": {
+    "formList": {
+      "tableHeading": "Formulaires",
+      "loading": "Chargement des formulaires…",
+      "empty": "Aucun formulaire renvoyé par le proxy Form.io. Créez un formulaire dans Form.io ou vérifiez la configuration de l’API.",
+      "refresh": "Actualiser",
+      "needLogin": "Connectez-vous pour charger les formulaires.",
+      "unauthorized": "Non autorisé — la session a peut-être expiré. Reconnectez-vous.",
+      "columns": {
+        "title": "Titre",
+        "name": "Nom",
+        "path": "Chemin"
+      }
+    },
+    "formRender": {
+      "pageTitle": "Formulaire",
+      "backToList": "Retour à la liste",
+      "missingId": "Aucun formulaire sélectionné.",
+      "loadError": "Le formulaire n’a pas pu être chargé. Vérifiez l’onglet réseau du navigateur et les journaux de l’API.",
+      "rendererError": "Le moteur de formulaire s’est arrêté de façon inattendue. Réessayez ou revenez à la liste.",
+      "segmentError": {
+        "title": "Un problème est survenu lors du chargement de cette page de formulaire.",
+        "tryAgain": "Réessayer",
+        "backToList": "Retour à la liste"
+      }
+    }
+  },
+  "submitDemo": {
+    "tableHeading": "Formulaires SOBA",
+    "loading": "Chargement…",
+    "empty": "Aucun formulaire SOBA dans cet espace pour l’instant.",
+    "generate": "Générer un formulaire SOBA de démo",
+    "generating": "Création…",
+    "refresh": "Actualiser",
+    "needLogin": "Connectez-vous pour voir les formulaires SOBA.",
+    "noWorkspace": "Aucun espace de travail trouvé pour votre compte.",
+    "loadError": "Impossible de charger les formulaires.",
+    "generateError": "Impossible de créer le formulaire de démo.",
+    "pollTimeout": "Le provisionnement continue. Réessayez actualiser dans quelques secondes.",
+    "openForm": "Ouvrir dans la visionneuse",
+    "syncPending": "En attente",
+    "syncProvisioning": "Provisionnement",
+    "syncReady": "Prêt",
+    "syncFailed": "Échec",
+    "columns": {
+      "name": "Nom",
+      "slug": "Identifiant",
+      "sync": "Sync Form.io",
+      "open": "Ouvrir"
     }
   },
   "forms": {

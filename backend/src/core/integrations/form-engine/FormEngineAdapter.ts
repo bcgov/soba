@@ -2,6 +2,9 @@ export interface FormVersionProvisionInput {
   formVersionId: string;
   workspaceId: string;
   formId: string;
+  formioFormDefinition?: Record<string, unknown>;
+  formSlug?: string;
+  formName?: string;
 }
 
 export interface SubmissionProvisionInput {

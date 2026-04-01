@@ -2,37 +2,37 @@ import { parseWorkspacePluginsConfig } from '../../../src/core/config/workspaceP
 import { createEnvReader } from '../../../src/core/config/env';
 
 describe('workspacePlugins', () => {
-  it('parseWorkspacePluginsConfig returns enabledPlugins and strictMode from simulated env', () => {
+  it('parseWorkspacePluginsConfig returns allowedPlugins and strictMode from simulated env', () => {
     const reader = createEnvReader({
-      WORKSPACE_PLUGINS_ENABLED: 'personal-local, enterprise-cstar',
+      WORKSPACE_PLUGINS_ALLOWED: 'personal-local, enterprise-cstar',
       WORKSPACE_PLUGINS_STRICT_MODE: 'true',
     });
     const config = parseWorkspacePluginsConfig(reader);
-    expect(config.enabledPlugins).toEqual(['personal-local', 'enterprise-cstar']);
+    expect(config.allowedPlugins).toEqual(['personal-local', 'enterprise-cstar']);
     expect(config.strictMode).toBe(true);
   });
 
   it('parseWorkspacePluginsConfig strictMode false when WORKSPACE_PLUGINS_STRICT_MODE is false', () => {
     const reader = createEnvReader({
-      WORKSPACE_PLUGINS_ENABLED: 'personal-local',
+      WORKSPACE_PLUGINS_ALLOWED: 'personal-local',
       WORKSPACE_PLUGINS_STRICT_MODE: 'false',
     });
     const config = parseWorkspacePluginsConfig(reader);
     expect(config.strictMode).toBe(false);
   });
 
-  it('parseWorkspacePluginsConfig trims and splits WORKSPACE_PLUGINS_ENABLED', () => {
+  it('parseWorkspacePluginsConfig trims and splits WORKSPACE_PLUGINS_ALLOWED', () => {
     const reader = createEnvReader({
-      WORKSPACE_PLUGINS_ENABLED: '  a , b , c  ',
+      WORKSPACE_PLUGINS_ALLOWED: '  a , b , c  ',
       WORKSPACE_PLUGINS_STRICT_MODE: 'true',
     });
     const config = parseWorkspacePluginsConfig(reader);
-    expect(config.enabledPlugins).toEqual(['a', 'b', 'c']);
+    expect(config.allowedPlugins).toEqual(['a', 'b', 'c']);
   });
 
   it('parseWorkspacePluginsConfig throws when WORKSPACE_PLUGINS_STRICT_MODE is not true or false', () => {
     const reader = createEnvReader({
-      WORKSPACE_PLUGINS_ENABLED: 'personal-local',
+      WORKSPACE_PLUGINS_ALLOWED: 'personal-local',
       WORKSPACE_PLUGINS_STRICT_MODE: 'yes',
     });
     expect(() => parseWorkspacePluginsConfig(reader)).toThrow(
@@ -40,32 +40,32 @@ describe('workspacePlugins', () => {
     );
   });
 
-  it('parseWorkspacePluginsConfig throws when WORKSPACE_PLUGINS_ENABLED is empty', () => {
+  it('parseWorkspacePluginsConfig throws when WORKSPACE_PLUGINS_ALLOWED is empty', () => {
     const reader = createEnvReader({
-      WORKSPACE_PLUGINS_ENABLED: '',
+      WORKSPACE_PLUGINS_ALLOWED: '',
       WORKSPACE_PLUGINS_STRICT_MODE: 'true',
     });
     expect(() => parseWorkspacePluginsConfig(reader)).toThrow(
-      /WORKSPACE_PLUGINS_ENABLED is required/,
+      /WORKSPACE_PLUGINS_ALLOWED is required/,
     );
   });
 
-  it('parseWorkspacePluginsConfig throws when WORKSPACE_PLUGINS_ENABLED is only commas/whitespace', () => {
+  it('parseWorkspacePluginsConfig throws when WORKSPACE_PLUGINS_ALLOWED is only commas/whitespace', () => {
     const reader = createEnvReader({
-      WORKSPACE_PLUGINS_ENABLED: '  , , ',
+      WORKSPACE_PLUGINS_ALLOWED: '  , , ',
       WORKSPACE_PLUGINS_STRICT_MODE: 'true',
     });
     expect(() => parseWorkspacePluginsConfig(reader)).toThrow(
-      /WORKSPACE_PLUGINS_ENABLED must include at least one plugin code/,
+      /WORKSPACE_PLUGINS_ALLOWED must include at least one plugin code/,
     );
   });
 
   it('parseWorkspacePluginsConfig accepts single plugin code', () => {
     const reader = createEnvReader({
-      WORKSPACE_PLUGINS_ENABLED: 'personal-local',
+      WORKSPACE_PLUGINS_ALLOWED: 'personal-local',
       WORKSPACE_PLUGINS_STRICT_MODE: 'false',
     });
     const config = parseWorkspacePluginsConfig(reader);
-    expect(config.enabledPlugins).toEqual(['personal-local']);
+    expect(config.allowedPlugins).toEqual(['personal-local']);
   });
 });

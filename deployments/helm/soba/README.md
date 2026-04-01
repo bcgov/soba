@@ -96,6 +96,17 @@ templates/
     └── service.yaml
 ```
 
+## Frontend API bootstrap
+
+The frontend ConfigMap wires two base URLs (see `frontend/src/shared/config/runtimeConfig.ts`):
+
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_SOBA_API_BASE_URL` | Browser / client — public HTTPS URL from `soba.backendHost` (Route or Ingress). |
+| `SOBA_API_INTERNAL_URL` | Next.js server (SSR) — cluster Service DNS: `http://<release>-backend.<namespace>.svc.cluster.local:<backend.service.port>/api/v1` |
+
+Override the internal URL with `frontend.internalApiBaseUrl` if you use a mesh, split namespaces, or a different Service name.
+
 ## Database Configuration
 
 PostgreSQL must be running and reachable before deploying. The chart supports two

@@ -78,6 +78,7 @@ const toFormVersionDto = (item: {
   versionNo: number;
   state: string;
   engineSyncStatus: string;
+  engineSchemaRef: string | null;
   currentRevisionNo: number;
   publishedAt: Date | null;
   createdAt: Date;
@@ -88,6 +89,7 @@ const toFormVersionDto = (item: {
   versionNo: item.versionNo,
   state: item.state,
   engineSyncStatus: item.engineSyncStatus,
+  engineSchemaRef: item.engineSchemaRef,
   currentRevisionNo: item.currentRevisionNo,
   publishedAt: item.publishedAt?.toISOString() ?? null,
   createdAt: item.createdAt.toISOString(),
@@ -100,6 +102,7 @@ const toFormVersionListItemDto = (item: {
   versionNo: number;
   state: string;
   engineSyncStatus: string;
+  engineSchemaRef: string | null;
   createdAt: Date;
   updatedAt: Date;
 }) => ({
@@ -108,6 +111,7 @@ const toFormVersionListItemDto = (item: {
   versionNo: item.versionNo,
   state: item.state,
   engineSyncStatus: item.engineSyncStatus,
+  engineSchemaRef: item.engineSchemaRef,
   createdAt: item.createdAt.toISOString(),
   updatedAt: item.updatedAt.toISOString(),
 });
@@ -250,7 +254,12 @@ export function createFormsApiService(
     save: (
       ctx: FormsContextInput,
       formVersionId: string,
-      input: { eventType?: string; note?: string; enqueueProvision?: boolean },
+      input: {
+        eventType?: string;
+        note?: string;
+        enqueueProvision?: boolean;
+        formioFormDefinition?: Record<string, unknown>;
+      },
     ) =>
       formVersionService
         .save({
@@ -261,6 +270,7 @@ export function createFormsApiService(
           eventType: input.eventType || 'save_draft',
           note: input.note,
           enqueueProvision: input.enqueueProvision ?? true,
+          formioFormDefinition: input.formioFormDefinition,
         })
         .then((row) => toFormVersionDto(row)),
 

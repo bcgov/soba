@@ -43,9 +43,9 @@ export const getWorkspaceResolvers = (): WorkspaceResolver[] => {
     const definitions = discoverResolverDefinitions();
     const discoveredCodes = definitions.map((definition) => definition.code);
 
-    const enabledCodes = config.enabledPlugins;
+    const allowedCodes = config.allowedPlugins;
 
-    const unknownCodes = enabledCodes.filter((code) => !discoveredCodes.includes(code));
+    const unknownCodes = allowedCodes.filter((code) => !discoveredCodes.includes(code));
     if (unknownCodes.length > 0) {
       const message = `Unknown workspace plugins configured: ${unknownCodes.join(', ')}`;
       if (config.strictMode) {
@@ -55,7 +55,7 @@ export const getWorkspaceResolvers = (): WorkspaceResolver[] => {
     }
 
     const selectedDefinitions = definitions.filter((definition) =>
-      enabledCodes.includes(definition.code),
+      allowedCodes.includes(definition.code),
     );
     registry = selectedDefinitions
       .map((definition) => definition.createResolver(createPluginConfigReader(definition.code)))
@@ -69,7 +69,7 @@ export const getWorkspaceResolvers = (): WorkspaceResolver[] => {
     );
 
     if (registry.length === 0) {
-      throw new Error('No workspace resolvers enabled. Check WORKSPACE_PLUGINS_ENABLED.');
+      throw new Error('No workspace resolvers enabled. Check WORKSPACE_PLUGINS_ALLOWED.');
     }
   }
   return registry;

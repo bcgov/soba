@@ -10,13 +10,13 @@ const parseCsv = (value: string | undefined): string[] => {
 };
 
 export interface WorkspacePluginsConfig {
-  enabledPlugins: WorkspacePluginCode[];
+  allowedPlugins: WorkspacePluginCode[];
   strictMode: boolean;
 }
 
 /** Minimal env reader for workspace plugins config (e.g. from createEnvReader). */
 export interface WorkspacePluginsEnvReaderType {
-  getWorkspacePluginsEnabled(): string;
+  getWorkspacePluginsAllowed(): string;
   getWorkspacePluginsStrictModeRaw(): string;
 }
 
@@ -29,12 +29,12 @@ export function parseWorkspacePluginsConfig(
     throw new Error("WORKSPACE_PLUGINS_STRICT_MODE must be 'true' or 'false'");
   }
   const strictMode = strictModeRaw === 'true';
-  const enabledPlugins = parseCsv(reader.getWorkspacePluginsEnabled()) as WorkspacePluginCode[];
-  if (enabledPlugins.length === 0) {
-    throw new Error('WORKSPACE_PLUGINS_ENABLED must include at least one plugin code');
+  const allowedPlugins = parseCsv(reader.getWorkspacePluginsAllowed()) as WorkspacePluginCode[];
+  if (allowedPlugins.length === 0) {
+    throw new Error('WORKSPACE_PLUGINS_ALLOWED must include at least one plugin code');
   }
   return {
-    enabledPlugins,
+    allowedPlugins,
     strictMode,
   };
 }

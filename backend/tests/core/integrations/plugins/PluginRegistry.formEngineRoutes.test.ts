@@ -4,21 +4,21 @@ import {
 } from '../../../../src/core/integrations/plugins/PluginRegistry';
 
 describe('getFormEngineRouteDefinitions', () => {
-  const ROUTES_ENABLED_KEY = 'PLUGIN_FORMIO_V5_ROUTES_ENABLED';
+  const ROUTES_ALLOWED_KEY = 'PLUGIN_FORMIO_V5_ROUTES_ALLOWED';
   const PROXY_PATH_KEY = 'PLUGIN_FORMIO_V5_PROXY_PATH';
 
   function saveEnv(): Record<string, string | undefined> {
     return {
-      [ROUTES_ENABLED_KEY]: process.env[ROUTES_ENABLED_KEY],
+      [ROUTES_ALLOWED_KEY]: process.env[ROUTES_ALLOWED_KEY],
       [PROXY_PATH_KEY]: process.env[PROXY_PATH_KEY],
     };
   }
 
   function restoreEnv(saved: Record<string, string | undefined>): void {
-    if (saved[ROUTES_ENABLED_KEY] !== undefined) {
-      process.env[ROUTES_ENABLED_KEY] = saved[ROUTES_ENABLED_KEY];
+    if (saved[ROUTES_ALLOWED_KEY] !== undefined) {
+      process.env[ROUTES_ALLOWED_KEY] = saved[ROUTES_ALLOWED_KEY];
     } else {
-      delete process.env[ROUTES_ENABLED_KEY];
+      delete process.env[ROUTES_ALLOWED_KEY];
     }
     if (saved[PROXY_PATH_KEY] !== undefined) {
       process.env[PROXY_PATH_KEY] = saved[PROXY_PATH_KEY];
@@ -40,11 +40,11 @@ describe('getFormEngineRouteDefinitions', () => {
     });
   });
 
-  it('excludes formio-v5 when PLUGIN_FORMIO_V5_ROUTES_ENABLED is not true', () => {
+  it('excludes formio-v5 when PLUGIN_FORMIO_V5_ROUTES_ALLOWED is not true', () => {
     const saved = saveEnv();
     try {
-      delete process.env[ROUTES_ENABLED_KEY];
-      process.env[ROUTES_ENABLED_KEY] = 'false';
+      delete process.env[ROUTES_ALLOWED_KEY];
+      process.env[ROUTES_ALLOWED_KEY] = 'false';
       const routeDefs = getFormEngineRouteDefinitions();
       const formioV5 = routeDefs.find((r) => r.code === 'formio-v5');
       expect(formioV5).toBeUndefined();
@@ -53,10 +53,10 @@ describe('getFormEngineRouteDefinitions', () => {
     }
   });
 
-  it('includes formio-v5 with default path when ROUTES_ENABLED is true', () => {
+  it('includes formio-v5 with default path when ROUTES_ALLOWED is true', () => {
     const saved = saveEnv();
     try {
-      process.env[ROUTES_ENABLED_KEY] = 'true';
+      process.env[ROUTES_ALLOWED_KEY] = 'true';
       delete process.env[PROXY_PATH_KEY];
       const routeDefs = getFormEngineRouteDefinitions();
       const formioV5 = routeDefs.find((r) => r.code === 'formio-v5');
@@ -69,10 +69,10 @@ describe('getFormEngineRouteDefinitions', () => {
     }
   });
 
-  it('uses PLUGIN_FORMIO_V5_PROXY_PATH when set and ROUTES_ENABLED is true', () => {
+  it('uses PLUGIN_FORMIO_V5_PROXY_PATH when set and ROUTES_ALLOWED is true', () => {
     const saved = saveEnv();
     try {
-      process.env[ROUTES_ENABLED_KEY] = 'true';
+      process.env[ROUTES_ALLOWED_KEY] = 'true';
       process.env[PROXY_PATH_KEY] = '/custom-formio';
       const routeDefs = getFormEngineRouteDefinitions();
       const formioV5 = routeDefs.find((r) => r.code === 'formio-v5');
@@ -83,10 +83,10 @@ describe('getFormEngineRouteDefinitions', () => {
     }
   });
 
-  it('treats ROUTES_ENABLED as case-insensitive true', () => {
+  it('treats ROUTES_ALLOWED as case-insensitive true', () => {
     const saved = saveEnv();
     try {
-      process.env[ROUTES_ENABLED_KEY] = 'TRUE';
+      process.env[ROUTES_ALLOWED_KEY] = 'TRUE';
       const routeDefs = getFormEngineRouteDefinitions();
       const formioV5 = routeDefs.find((r) => r.code === 'formio-v5');
       expect(formioV5).toBeDefined();

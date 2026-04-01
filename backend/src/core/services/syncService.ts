@@ -97,6 +97,9 @@ export class SyncService {
         formVersionId: item.aggregateId,
         workspaceId: item.workspaceId,
         formId,
+        formioFormDefinition: payload.formioFormDefinition,
+        formSlug: payload.formSlug,
+        formName: payload.formName,
       });
       await this.deps.updateFormVersionDraft(
         item.workspaceId,
