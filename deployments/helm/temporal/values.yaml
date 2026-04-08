@@ -2,6 +2,8 @@ server:
   image:
     repository: temporalio/server
     tag: 1.30.3
+  configMapsToMount: "sprig"
+  setConfigFilePath: true
   securityContext:
     fsGroup: null
     runAsUser: null
