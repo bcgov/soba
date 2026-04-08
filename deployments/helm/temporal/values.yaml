@@ -2,7 +2,9 @@ server:
   image:
     repository: temporalio/server
     tag: 1.30.3
-  securityContext: {}
+  securityContext:
+    fsGroup: null
+    runAsUser: null
   resources:
     requests:
       cpu: 50m
