@@ -14,6 +14,8 @@ server:
       memory: 512Mi
   config:
     persistence:
+      defaultStore: default
+      visibilityStore: visibility
       default:
         driver: "sql"
         sql:
