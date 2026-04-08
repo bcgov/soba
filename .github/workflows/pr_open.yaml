@@ -109,6 +109,36 @@ jobs:
           insecure_skip_tls_verify: true
           namespace: ${{ secrets.OC_NAMESPACE }}
 
+      - name: Deploy Shared Temporal (idempotent)
+        env:
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          TEMPORAL_CHART_VERSION: ${{ vars.TEMPORAL_CHART_VERSION || '0.74.0' }}
+        run: |
+          helm upgrade --install temporal temporal \
+            --repo https://go.temporal.io/helm-charts \
+            --version "${TEMPORAL_CHART_VERSION}" \
+            --namespace "${NAMESPACE}" \
+            --timeout 900s \
+            -f deployments/helm/temporal/values.yaml
+
+          echo "Waiting for schema jobs..."
+          oc wait --for=condition=complete job -l app.kubernetes.io/instance=temporal \
+            -n "${NAMESPACE}" --timeout=600s || true
+
+          echo "Waiting for Temporal frontend..."
+          oc rollout status deployment/temporal-frontend \
+            -n "${NAMESPACE}" --timeout=300s
+
+      - name: Ensure Temporal PR namespace exists
+        env:
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
+        run: |
+          TEMPORAL_NS="soba-pr-${PR_NUM}"
+          oc exec deployment/temporal-admintools -n "${NAMESPACE}" -- \
+            sh -c "temporal operator namespace describe -n ${TEMPORAL_NS} 2>/dev/null || \
+                   temporal operator namespace create -n ${TEMPORAL_NS} --retention 3d"
+
       - name: Get DB config from Crunchy secret
         id: db
         env:
@@ -133,6 +163,7 @@ jobs:
           TAG: sha-${{ needs.build.outputs.short_sha }}
           DOMAIN: ${{ vars.OC_DOMAIN }}
           DATABASE_URI: ${{ steps.db.outputs.uri }}
+          PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
         run: |
           REPO_LC=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
           # Escape single quotes for YAML: ' -> ''
@@ -155,6 +186,9 @@ jobs:
             admin:
               password: "${{ secrets.FORMIO_ADMIN_PASSWORD }}"
             jwtSecret: "${{ secrets.FORMIO_JWT_SECRET }}"
+          temporal:
+            address: "temporal-frontend.${NAMESPACE}.svc.cluster.local:7233"
+            namespace: "soba-pr-${PR_NUM}"
           OVERRIDE
 
           helm upgrade --install "${RELEASE}" ./deployments/helm/soba \
@@ -185,6 +219,9 @@ jobs:
 
           echo "Waiting for mongodb rollout..."
           oc rollout status statefulset/${RELEASE}-mongodb -n "${NAMESPACE}" --timeout=300s
+
+          echo "Waiting for temporal-worker rollout..."
+          oc rollout status deployment/${RELEASE}-temporal-worker -n "${NAMESPACE}" --timeout=300s
 
       - name: Release Comment on PR
         uses: marocchino/sticky-pull-request-comment@v2

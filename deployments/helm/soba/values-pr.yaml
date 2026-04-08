@@ -77,3 +77,20 @@ outboxWorker:
     limits:
       cpu: 100m
       memory: 256Mi
+
+temporal:
+  allowed: "true"
+  address: ""
+  namespace: "default"
+  taskQueue: "soba"
+
+temporalWorker:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 128Mi
+    limits:
+      cpu: 100m
+      memory: 512Mi

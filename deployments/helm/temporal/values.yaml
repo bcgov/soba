@@ -1,0 +1,80 @@
+server:
+  image:
+    repository: temporalio/server
+    tag: 1.30.3
+  securityContext:
+    runAsUser: null
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  config:
+    persistence:
+      default:
+        driver: "sql"
+        sql:
+          driver: "postgres12"
+          host: pg-soba-crunchy-primary
+          port: 5432
+          database: temporal
+          user: temporal
+          existingSecret: pg-soba-crunchy-pguser-temporal
+          maxConns: 20
+          maxIdleConns: 20
+          maxConnLifetime: "1h"
+      visibility:
+        driver: "sql"
+        sql:
+          driver: "postgres12"
+          host: pg-soba-crunchy-primary
+          port: 5432
+          database: temporal_visibility
+          user: temporal
+          existingSecret: pg-soba-crunchy-pguser-temporal
+          maxConns: 20
+          maxIdleConns: 20
+          maxConnLifetime: "1h"
+
+cassandra:
+  enabled: false
+mysql:
+  enabled: false
+elasticsearch:
+  enabled: false
+prometheus:
+  enabled: false
+grafana:
+  enabled: false
+
+schema:
+  createDatabase:
+    enabled: false
+  setup:
+    enabled: true
+    backoffLimit: 100
+  update:
+    enabled: true
+    backoffLimit: 100
+
+web:
+  enabled: true
+  resources:
+    requests:
+      cpu: 15m
+      memory: 48Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+admintools:
+  enabled: true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 48Mi
+    limits:
+      cpu: 50m
+      memory: 128Mi

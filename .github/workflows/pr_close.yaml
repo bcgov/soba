@@ -73,6 +73,17 @@ jobs:
           insecure_skip_tls_verify: true
           namespace: ${{ secrets.OC_NAMESPACE }}
 
+      - name: Delete Temporal PR namespace
+        env:
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
+        run: |
+          TEMPORAL_NS="soba-pr-${PR_NUM}"
+          if oc get deployment temporal-admintools -n "${NAMESPACE}" &>/dev/null; then
+            oc exec deployment/temporal-admintools -n "${NAMESPACE}" -- \
+              temporal operator namespace delete -n "${TEMPORAL_NS}" --yes 2>/dev/null || true
+          fi
+
       - name: Uninstall SOBA and delete orphaned resources
         env:
           RELEASE: ${{ needs.set-vars.outputs.RELEASE }}

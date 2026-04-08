@@ -227,3 +227,22 @@ mongodb:
   persistence:
     size: 1Gi
     storageClassName: ""
+
+# -- Temporal (shared server, env vars for backend + worker) ------------------
+temporal:
+  allowed: "false"
+  address: ""
+  namespace: "default"
+  taskQueue: "soba"
+
+# -- Temporal worker (same backend image, runs temporal worker process) ------
+temporalWorker:
+  enabled: false
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 128Mi
+    limits:
+      cpu: 100m
+      memory: 512Mi

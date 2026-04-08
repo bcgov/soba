@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "soba.fullname" . }}-temporal
+  labels:
+    {{- include "soba.labels" (dict "root" . "component" "temporal") | nindent 4 }}
+data:
+  TEMPORAL_ALLOWED: {{ .Values.temporal.allowed | default "false" | quote }}
+  TEMPORAL_ADDRESS: {{ .Values.temporal.address | default "" | quote }}
+  TEMPORAL_NAMESPACE: {{ .Values.temporal.namespace | default "default" | quote }}
+  TEMPORAL_TASK_QUEUE: {{ .Values.temporal.taskQueue | default "soba" | quote }}
