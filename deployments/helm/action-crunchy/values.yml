@@ -87,3 +87,4 @@ crunchy:
       databases:
         - 'temporal'
         - 'temporal_visibility'
+      options: "SUPERUSER CREATEDB CREATEROLE"
