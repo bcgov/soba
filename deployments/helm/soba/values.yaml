@@ -235,9 +235,13 @@ temporal:
   namespace: "default"
   taskQueue: "soba"
 
-# -- Temporal worker (same backend image, runs temporal worker process) ------
+# -- Temporal worker (dedicated image with glibc for @temporalio/core-bridge) --
 temporalWorker:
   enabled: false
+  image:
+    repository: ghcr.io/bcgov/soba/temporal-worker
+    tag: latest
+    pullPolicy: IfNotPresent
   replicas: 1
   resources:
     requests:

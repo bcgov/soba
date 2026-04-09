@@ -178,6 +178,10 @@ jobs:
             image:
               repository: "ghcr.io/${REPO_LC}/frontend"
               tag: "${TAG}"
+          temporalWorker:
+            image:
+              repository: "ghcr.io/${REPO_LC}/temporal-worker"
+              tag: "${TAG}"
           global:
             domain: "${DOMAIN}"
           database:

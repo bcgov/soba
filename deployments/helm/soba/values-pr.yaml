@@ -86,6 +86,10 @@ temporal:
 
 temporalWorker:
   enabled: true
+  image:
+    repository: ghcr.io/bcgov/soba/temporal-worker
+    tag: latest
+    pullPolicy: IfNotPresent
   replicas: 1
   resources:
     requests:

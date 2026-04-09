@@ -28,11 +28,8 @@ spec:
     spec:
       containers:
         - name: temporal-worker
-          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
-          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
-          command:
-            - node
-            - backend/dist/src/temporal/worker.js
+          image: "{{ .Values.temporalWorker.image.repository }}:{{ .Values.temporalWorker.image.tag }}"
+          imagePullPolicy: {{ .Values.temporalWorker.image.pullPolicy }}
           envFrom:
             - configMapRef:
                 name: {{ include "soba.fullname" . }}-temporal
