@@ -1,10 +1,8 @@
 import type { Locale } from '@/app/[lang]/dictionaries';
-import { designModePlugin } from '@/src/features/design-mode/plugin';
+import { designerPlugin } from '@/src/features/designer/plugin';
 import { metaReviewPlugin } from '@/src/features/meta-review/plugin';
 import { submitModePlugin } from '@/src/features/submit-mode/plugin';
 import { workspacesPlugin } from '@/src/features/workspaces/plugin';
-import { designerPlugin } from '@/src/features/designer/plugin';
-import { isFeatureEnabled } from '@/src/shared/featureFlags/flags';
 import type { AppPlugin, PluginNavItem } from '@/src/app/plugins/types';
 
 type Dictionary = {
@@ -27,9 +25,7 @@ const allPlugins: AppPlugin[] = [
 
 function getEnabledPlugins(isFeatureAllowed: (code: string) => boolean): AppPlugin[] {
   return allPlugins
-    .filter(
-      (plugin) => plugin.featureCode === undefined || isFeatureAllowed(plugin.featureCode),
-    )
+    .filter((plugin) => plugin.featureCode === undefined || isFeatureAllowed(plugin.featureCode))
     .sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
 }
 

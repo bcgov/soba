@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { FormType } from '@formio/react';
@@ -22,10 +22,6 @@ interface DesignerProps {
 const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel }) => {
   const { authenticated, initializing } = useKeycloak();
   const dict = useDictionary();
-  const [schema, setSchema] = useState<Partial<FormType>>({
-    display: 'form',
-    components: [],
-  });
 
   const opt = useMemo(
     () => ({
@@ -37,12 +33,11 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel }) => {
         premium: false,
       },
     }),
-    [dict.locale, dict],
+    [dict],
   );
 
   // This function captures the updated JSON schema
   const handleSchemaChange = (updatedSchema: FormType) => {
-    setSchema(updatedSchema);
     onUpdateModel(updatedSchema);
   };
 

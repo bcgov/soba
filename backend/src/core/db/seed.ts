@@ -299,7 +299,7 @@ const seedFeatures = async () => {
       status: FeatureStatus.enabled,
     },
     {
-      code: 'design-mode',
+      code: 'designer',
       name: 'Design mode',
       description: 'Form management and design surfaces',
       version: null,

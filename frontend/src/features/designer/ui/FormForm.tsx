@@ -1,14 +1,21 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Alert, Button } from 'react-bootstrap';
 
 import { FormType } from '@formio/react';
 
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import FormDesigner from '@/src/features/designer/ui/FormDesigner';
-import { createFormioForm, createSobaFormioForm, SobaFormType } from '@/src/shared/api/sobaApi';
+import {
+  createFormioForm,
+  createSobaFormioForm,
+  getSobaForm,
+  SobaFormType,
+  getFormioForm,
+  getSobaFormVersionFromFormioId,
+} from '@/src/shared/api/sobaApi';
 
-function FormForm() {
+function FormForm({ id }: { id?: [string] }) {
   const { authenticated, token, initializing } = useKeycloak();
   const [formName, setFormName] = useState('');
   const [formSlug, setFormSlug] = useState('');
@@ -19,6 +26,35 @@ function FormForm() {
   const [alertVariant, setAlertVariant] = useState('');
   const [alertText, setAlertText] = useState('');
   const [showAlert, setShowAlert] = useState(false);
+
+  const [sobaForm, setSobaForm] = useState<SobaFormType | null>(null);
+  const [sobaFormVersion, setSobaFormVersion] = useState<SobaFormType | null>(null);
+
+  useEffect(() => {
+    // If we have an ID, we are editing an existing form, so we should load it
+    console.log('loading form with id', id);
+    if (id && id[0] && token) {
+      async function loadForm() {
+        //currently at least we have the formio form
+        const formioRes = await getFormioForm(token as string, id[0]);
+        setFormSchema(formioRes);
+        console.log('formioRes', formioRes);
+
+        const formVersionRes = await getSobaFormVersionFromFormioId(token as string, id[0]);
+        setSobaFormVersion(formVersionRes);
+        console.log('formVersionRes', formVersionRes);
+
+        // Load the existing form data
+        const formRes = await getSobaForm(token as string, id[0]);
+        setSobaForm(formRes);
+        setFormName(formRes.name);
+        setFormSlug(formRes.slug);
+        setFormDesc(formRes.description);
+        console.log('FR', formRes);
+      }
+      loadForm();
+    }
+  }, [id, token]);
 
   const updateName = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormName(e.target.value);
@@ -40,7 +76,15 @@ function FormForm() {
     setFormSchema(data);
   };
 
-  const saveForm = async () => {
+  const saveFormPublish = async () => {
+    await saveForm(true);
+  };
+
+  const saveFormDraft = async () => {
+    await saveForm(false);
+  };
+
+  const saveForm = async (publish: boolean = false) => {
     const data: SobaFormType = {
       name: formName,
       slug: formSlug,
@@ -57,7 +101,7 @@ function FormForm() {
         .replace(/[^a-z\-\/]/g, '')
         .replace(/^[/-]+|[/-]+$/g, '');
       formioData.title = formSlug;
-      await createFormioForm(token as string, formioData);
+      await createFormioForm(token as string, formioData, publish);
 
       setAlertText('Form Saved to SOBA and FORMIO');
       setAlertVariant('success');
@@ -137,8 +181,11 @@ function FormForm() {
           />
         </div>
         <div className="form-group">
-          <Button variant="primary" onClick={saveForm}>
+          <Button className="me-2" variant="primary" onClick={saveFormDraft}>
             Save Form
+          </Button>
+          <Button variant="primary" onClick={saveFormPublish}>
+            Save and Publish Form
           </Button>
         </div>
       </form>

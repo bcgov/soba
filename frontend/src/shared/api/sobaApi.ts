@@ -3,8 +3,16 @@ import { isFeaturesMetaPayload } from '@/src/shared/config/featuresMeta';
 import { getSobaApiBaseUrl } from '../config/runtimeConfig';
 import { parseJson } from './sobaHelpers';
 
-export type { SobaFormType } from './sobaApiForms';
-export { createSobaFormioForm, createFormioForm } from './sobaApiForms';
+export type { SobaFormType } from '../../types/forms';
+export {
+  createSobaFormioForm,
+  createFormioForm,
+  getFormioForm,
+  publishSobaFormVersion,
+  getSobaForm,
+  getSobaFormVersion,
+  getSobaFormVersionFromFormioId,
+} from './sobaApiForms';
 
 export type WorkspaceItem = {
   id: string;
