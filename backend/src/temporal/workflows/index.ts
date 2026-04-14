@@ -1,2 +1,2 @@
 // Temporal workflows barrel — add workflow exports here
-export {};
+export { sampleWorkflow } from './sampleWorkflow';

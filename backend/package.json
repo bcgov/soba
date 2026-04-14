@@ -8,6 +8,7 @@
     "test:signin": "tsx scripts/test-signin.ts",
     "script:test-signin": "tsx scripts/test-signin.ts",
     "script:test-formio-proxy": "tsx scripts/test-formio-proxy.ts",
+    "script:test-temporal": "tsx scripts/test-temporal.ts",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "db:migrate": "tsx src/core/db/migrate.ts",

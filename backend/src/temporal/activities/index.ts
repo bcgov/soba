@@ -1,2 +1,2 @@
 // Temporal activities barrel — add activity exports here
-export {};
+export { sample } from './sample';
