@@ -51,3 +51,17 @@ outboxWorker:
     limits:
       cpu: 100m
       memory: 256Mi
+
+temporal:
+  allowed: "true"
+  address: ""
+  namespace: "soba-dev"
+  taskQueue: "soba"
+
+temporalWorker:
+  enabled: true
+  image:
+    repository: ghcr.io/bcgov/soba/temporal-worker
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1

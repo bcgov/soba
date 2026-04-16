@@ -227,3 +227,26 @@ mongodb:
   persistence:
     size: 1Gi
     storageClassName: ""
+
+# -- Temporal (shared server, env vars for backend + worker) ------------------
+temporal:
+  allowed: "false"
+  address: ""
+  namespace: "default"
+  taskQueue: "soba"
+
+# -- Temporal worker (dedicated image with glibc for @temporalio/core-bridge) --
+temporalWorker:
+  enabled: false
+  image:
+    repository: ghcr.io/bcgov/soba/temporal-worker
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 128Mi
+    limits:
+      cpu: 100m
+      memory: 512Mi

@@ -83,3 +83,8 @@ crunchy:
       databases:
         - '{{ .Values.global.config.dbName }}'
         - 'postgres'
+    - name: 'temporal'
+      databases:
+        - 'temporal'
+        - 'temporal_visibility'
+      options: "SUPERUSER CREATEDB CREATEROLE"
