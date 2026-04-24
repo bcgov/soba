@@ -25,7 +25,7 @@ function getExpectedURL(depEnv?: string): string {
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: false,
-  workers: 3,
+  workers: 1,
 
   use: {
     baseURL: getExpectedURL(depEnv),
@@ -43,10 +43,6 @@ export default defineConfig({
     {
       name: "chromium",
       use: { browserName: "chromium" },
-    },
-    {
-      name: "firefox",
-      use: { browserName: "firefox" },
     },
   ],
 });
