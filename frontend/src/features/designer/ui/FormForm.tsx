@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Alert, Button } from 'react-bootstrap';
+import { Alert, Button, Spinner } from 'react-bootstrap';
 
 import { FormType } from '@formio/react';
 
@@ -9,48 +9,68 @@ import FormDesigner from '@/src/features/designer/ui/FormDesigner';
 import {
   createFormioForm,
   createSobaFormioForm,
-  getSobaForm,
-  SobaFormType,
   getFormioForm,
   getSobaFormVersionFromFormioId,
+  updateFormioForm,
+  saveSobaFormVersion,
 } from '@/src/shared/api/sobaApi';
+import type { SobaFormWithVersionResponse, SobaFormType } from '@/src/types/forms';
 
-function FormForm({ id }: { id?: [string] }) {
+function FormForm({ id }: { id?: string[] }) {
   const { authenticated, token, initializing } = useKeycloak();
   const [formName, setFormName] = useState('');
   const [formSlug, setFormSlug] = useState('');
   const [formDesc, setFormDesc] = useState('');
-  const [ministry, setMinistry] = useState('');
-  const [formSchema, setFormSchema] = useState<FormType>({} as FormType);
+  const [formSchema, setFormSchema] = useState<FormType | null>(null);
+  const [loadedSoba, setLoadedSoba] = useState<SobaFormWithVersionResponse | null>(null);
 
   const [alertVariant, setAlertVariant] = useState('');
   const [alertText, setAlertText] = useState('');
   const [showAlert, setShowAlert] = useState(false);
 
-  const [sobaForm, setSobaForm] = useState<SobaFormType | null>(null);
-  const [sobaFormVersion, setSobaFormVersion] = useState<SobaFormType | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     // If we have an ID, we are editing an existing form, so we should load it
-    console.log('loading form with id', id);
-    if (id && id[0] && token) {
+    const formioId = id?.[0];
+    if (formioId && token) {
+      // starting load for edit view
+      setLoading(true);
       async function loadForm() {
-        //currently at least we have the formio form
-        const formioRes = await getFormioForm(token as string, id[0]);
-        setFormSchema(formioRes);
-        console.log('formioRes', formioRes);
+        try {
+          // Fetch the SOBA form (using engine ref lookup) and the Form.io definition in parallel
+          const [sobaResp, formioResp] = await Promise.all([
+            getSobaFormVersionFromFormioId(token as string, formioId as string),
+            getFormioForm(token as string, formioId as string),
+          ]);
 
-        const formVersionRes = await getSobaFormVersionFromFormioId(token as string, id[0]);
-        setSobaFormVersion(formVersionRes);
-        console.log('formVersionRes', formVersionRes);
+          const parsed = sobaResp as SobaFormWithVersionResponse;
+          setLoadedSoba(parsed ?? null);
 
-        // Load the existing form data
-        const formRes = await getSobaForm(token as string, id[0]);
-        setSobaForm(formRes);
-        setFormName(formRes.name);
-        setFormSlug(formRes.slug);
-        setFormDesc(formRes.description);
-        console.log('FR', formRes);
+          // preload fields and metadata
+          setFormSchema(formioResp as FormType);
+          // debug: log the loaded form schema shape
+          try {
+            const obj = formioResp as unknown as Record<string, unknown>;
+          } catch {
+            // ignore logging errors
+          }
+          setFormName(parsed?.name ?? (formioResp as unknown as { title?: string })?.title ?? '');
+          setFormSlug(parsed?.slug ?? (formioResp as unknown as { path?: string })?.path ?? '');
+          setFormDesc(
+            parsed?.description ??
+              (formioResp as unknown as { description?: string })?.description ??
+              '',
+          );
+        } catch (e: unknown) {
+          console.error('Error loading form data', e);
+          setAlertText('Failed to load form: ' + (e as Error).message);
+          setAlertVariant('danger');
+          setShowAlert(true);
+        } finally {
+          // finished load
+          setLoading(false);
+        }
       }
       loadForm();
     }
@@ -58,10 +78,6 @@ function FormForm({ id }: { id?: [string] }) {
 
   const updateName = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormName(e.target.value);
-  };
-
-  const updateMinistry = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setMinistry(e.target.value);
   };
 
   const updateSlug = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,16 +108,33 @@ function FormForm({ id }: { id?: [string] }) {
     };
 
     try {
-      await createSobaFormioForm(token as string, data);
-      const formioData = { ...formSchema };
+      const formioData = { ...(formSchema ?? {}) } as FormType;
       formioData.name = formName;
-      //first remove illegal chars, then remove starting and ending / or -
+      // first remove illegal chars, then remove starting and ending / or -
       formioData.path = formSlug
         .toLowerCase()
         .replace(/[^a-z\-\/]/g, '')
-        .replace(/^[/-]+|[/-]+$/g, '');
+        .replace(/^[\/-]+|[\/-]+$/g, '');
       formioData.title = formSlug;
-      await createFormioForm(token as string, formioData, publish);
+
+      if (loadedSoba?.formVersion && loadedSoba.formVersion.id) {
+        // Edit/update path: update Form.io form and save to existing SOBA form version
+        const existingFormioId =
+          (formioData as Record<string, unknown>)._id ?? (formioData as any).id ?? id?.[0];
+        const formioIdToUse = existingFormioId ? String(existingFormioId) : String(id?.[0] ?? '');
+        await updateFormioForm(
+          token as string,
+          formioIdToUse,
+          formioData,
+          String(loadedSoba.formVersion.id),
+          publish,
+        );
+        await saveSobaFormVersion(token as string, loadedSoba.formVersion.id, formioData, publish);
+      } else {
+        // Create path (new form)
+        const sobaFormData = await createSobaFormioForm(token as string, data);
+        await createFormioForm(token as string, formioData as FormType, sobaFormData.id, publish);
+      }
 
       setAlertText('Form Saved to SOBA and FORMIO');
       setAlertVariant('success');
@@ -158,18 +191,6 @@ function FormForm({ id }: { id?: [string] }) {
           />
         </div>
         <div className="form-group">
-          <label htmlFor="ministryName">Ministry Name</label>
-          <input
-            type="text"
-            className="form-control"
-            id="ministryName"
-            aria-describedby="ministryName"
-            placeholder="Enter ministry name"
-            value={ministry}
-            onChange={updateMinistry}
-          />
-        </div>
-        <div className="form-group">
           <label htmlFor="formDescription">Description</label>
           <textarea
             className="form-control"
@@ -189,7 +210,25 @@ function FormForm({ id }: { id?: [string] }) {
           </Button>
         </div>
       </form>
-      <FormDesigner onUpdateModel={updateFormSchema} />
+      {/* If we are editing an existing form (id present) show spinner while loading.
+          For the create page (no id) render the designer immediately with no initial model.
+          For editing, only mount the designer after load completes and we have a schema. */}
+      {id && id[0] ? (
+        loading ? (
+          <div className="my-4 text-center">
+            <Spinner animation="border" role="status">
+              <span className="visually-hidden">Loading form...</span>
+            </Spinner>
+          </div>
+        ) : formSchema ? (
+          <FormDesigner onUpdateModel={updateFormSchema} initialModel={formSchema} />
+        ) : (
+          // If not loading and no schema, show a message (error state is shown via Alert)
+          <div className="my-4">Form schema not available.</div>
+        )
+      ) : (
+        <FormDesigner onUpdateModel={updateFormSchema} initialModel={null} />
+      )}
     </>
   );
 }

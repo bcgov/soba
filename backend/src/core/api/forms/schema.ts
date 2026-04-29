@@ -31,6 +31,12 @@ export const FormVersionIdParamsSchema = z
   })
   .openapi('Forms_FormVersionIdParams');
 
+export const FormEngineRefParamsSchema = z
+  .object({
+    engineRef: z.string().min(1),
+  })
+  .openapi('Forms_FormEngineRefParams');
+
 export const UpdateFormVersionBodySchema = z
   .object({
     state: z.string().min(1).optional(),
@@ -58,6 +64,7 @@ export const SaveFormVersionBodySchema = z
     note: z.string().optional(),
     enqueueProvision: z.boolean().optional(),
     formioFormDefinition: z.record(z.string(), z.unknown()).optional(),
+    engine_schema_ref: z.string().min(1).optional(),
   })
   .openapi('Forms_SaveFormVersionBody');
 
@@ -93,6 +100,25 @@ export const FormResponseSchema = z
     updatedAt: z.string(),
   })
   .openapi('Forms_FormResponse');
+
+export const FormVersionResponseSchema = z
+  .object({
+    id: z.string(),
+    formId: z.string(),
+    versionNo: z.number().int(),
+    state: z.string(),
+    engineSyncStatus: z.string(),
+    engineSchemaRef: z.string().nullable(),
+    currentRevisionNo: z.number().int(),
+    publishedAt: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
+  .openapi('Forms_FormVersionResponse');
+
+export const FormWithVersionResponseSchema = FormResponseSchema.extend({
+  formVersion: FormVersionResponseSchema.nullable(),
+}).openapi('Forms_FormWithVersionResponse');
 
 export const ListFormsResponseSchema = z
   .object({
@@ -133,21 +159,6 @@ export const FormVersionListItemSchema = z
     updatedAt: z.string(),
   })
   .openapi('Forms_FormVersionListItem');
-
-export const FormVersionResponseSchema = z
-  .object({
-    id: z.string(),
-    formId: z.string(),
-    versionNo: z.number().int(),
-    state: z.string(),
-    engineSyncStatus: z.string(),
-    engineSchemaRef: z.string().nullable(),
-    currentRevisionNo: z.number().int(),
-    publishedAt: z.string().nullable(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-  })
-  .openapi('Forms_FormVersionResponse');
 
 export const ListFormVersionsResponseSchema = z
   .object({
@@ -204,6 +215,29 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         content: {
           'application/json': {
             schema: FormResponseSchema,
+          },
+        },
+      },
+      404: {
+        description: 'Form not found',
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/forms/engine/{engineRef}',
+    tags: ['core.forms'],
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: FormEngineRefParamsSchema,
+    },
+    responses: {
+      200: {
+        description: 'Get form by engine schema ref',
+        content: {
+          'application/json': {
+            schema: FormWithVersionResponseSchema,
           },
         },
       },

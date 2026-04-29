@@ -22,3 +22,18 @@ export type SobaResponseFormType = {
   description: string;
   formEngineCode?: string;
 };
+
+export type SobaFormWithVersionResponse = SobaResponseFormType & {
+  formVersion?: {
+    id: string;
+    formId: string;
+    versionNo: number;
+    state: string;
+    engineSyncStatus: string;
+    engineSchemaRef?: string | null;
+    currentRevisionNo: number;
+    publishedAt?: string | null;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
+};

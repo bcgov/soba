@@ -20,11 +20,11 @@ export async function generateMetadata({ params }: PageProps) {
 export default async function Page({ params }: PageProps) {
   const { lang, formId } = await params;
   const locale = resolveLocale(lang);
-  const dict = await getDictionary(locale);
+  await getDictionary(locale); // ensure locale is valid; metadata handled in generateMetadata
 
   return (
     <section className="p-4" aria-labelledby="designer-heading">
-      <FormForm id={formId} />
+      <FormForm id={[formId]} />
     </section>
   );
 }

@@ -48,7 +48,8 @@
         "esbenp.prettier-vscode",
         "ms-azuretools.vscode-docker",
         "ckolkman.vscode-postgres",
-        "ms-kubernetes-tools.vscode-kubernetes-tools"
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "mongodb.mongodb-vscode"
       ]
     }
   },

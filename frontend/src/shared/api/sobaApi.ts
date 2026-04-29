@@ -7,8 +7,10 @@ export type { SobaFormType } from '../../types/forms';
 export {
   createSobaFormioForm,
   createFormioForm,
+  updateFormioForm,
   getFormioForm,
   publishSobaFormVersion,
+  saveSobaFormVersion,
   getSobaForm,
   getSobaFormVersion,
   getSobaFormVersionFromFormioId,

@@ -13,6 +13,8 @@ const FormioProvider = dynamic(() => import('@formio/react').then((mod) => mod.F
   ssr: false,
 });
 
+type Action = { name: string };
+
 interface FormActionButtonProps {
   action: Action;
   onClick: () => void;
