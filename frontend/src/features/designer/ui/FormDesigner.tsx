@@ -15,7 +15,7 @@ import type { FormBuilder as FormioBuilderInstance } from '@formio/js';
 
 /**
  * We use a type assertion on the dynamic import to ensure
- * the compiler recognizes the props correctly.
+ * the compiler recognizes the props correctly and satisfies strict linting.
  */
 const FormBuilder = dynamic(
   async () => {
@@ -52,24 +52,11 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
   const [engineReady, setEngineReady] = useState(false);
   const builderRef = useRef<FormioBuilderInstance | null>(null);
 
-  useEffect(() => {
-    const init = async () => {
-      const { Formio } = await import('@formio/js');
-      const g = globalThis as unknown as Record<string, unknown>;
-
-      if (!g['Formio']) {
-        g['Formio'] = Formio;
-      }
-
-      const baseUrl = `${process.env.NEXT_PUBLIC_SOBA_API_BASE_URL}/formio-v5`;
-      Formio.setBaseUrl(baseUrl);
-      Formio.setProjectUrl(baseUrl);
-
-      setEngineReady(true);
-    };
-    init();
-  }, []);
-
+  /**
+   * RECURSIVE SANITIZER
+   * Prevents the internal dialog crash by ensuring the 'widget' property 
+   * is always a valid object before the builder renders.
+   */
   const sanitizeForm = useCallback((input?: FormType | null): FormType => {
     if (!input) return { components: [] };
     try {
@@ -97,7 +84,31 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
     }
   }, []);
 
-  const initialFormRef = useRef<FormType>(sanitizeForm(initialModel));
+  /**
+   * STABLE STATE INITIALIZATION
+   * Using a lazy initializer function inside useState ensures this only runs once.
+   * This provides a stable reference to pass into the 'form' prop, satisfying 
+   * ESLint's 'react-hooks/refs' rule while keeping the Dialog fixed.
+   */
+  const [stableForm] = useState<FormType>(() => sanitizeForm(initialModel));
+
+  useEffect(() => {
+    const init = async () => {
+      const { Formio } = await import('@formio/js');
+      const g = globalThis as unknown as Record<string, unknown>;
+
+      if (!g['Formio']) {
+        g['Formio'] = Formio;
+      }
+
+      const baseUrl = `${process.env.NEXT_PUBLIC_SOBA_API_BASE_URL}/formio-v5`;
+      Formio.setBaseUrl(baseUrl);
+      Formio.setProjectUrl(baseUrl);
+
+      setEngineReady(true);
+    };
+    init();
+  }, []);
 
   const opt = useMemo(
     () => ({
@@ -113,10 +124,12 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
 
   const handleBuilderReady = useCallback((builder: FormioBuilderInstance) => {
     builderRef.current = builder;
-    if (builder.instance) {
-      builder.instance.setForm(initialFormRef.current);
+    
+    // Explicitly sync the instance with our stable state to ensure the form loads.
+    if (builder.instance && typeof builder.instance.setForm === 'function') {
+      builder.instance.setForm(stableForm);
     }
-  }, []);
+  }, [stableForm]);
 
   if (initializing || !engineReady) {
     return <div className="p-10 text-center">Loading Designer...</div>;
@@ -134,7 +147,7 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
       >
         <FormBuilder
           key="stable-form-builder"
-          form={initialFormRef.current}
+          form={stableForm}
           options={opt}
           onChange={onUpdateModel}
           onBuilderReady={handleBuilderReady}

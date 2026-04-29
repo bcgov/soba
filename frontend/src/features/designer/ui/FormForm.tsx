@@ -35,7 +35,7 @@ function FormForm({ id }: { id?: string[] }) {
     const formioId = id?.[0];
     if (formioId && token) {
       // starting load for edit view
-      setLoading(true);
+      //setLoading(true);
       async function loadForm() {
         try {
           // Fetch the SOBA form (using engine ref lookup) and the Form.io definition in parallel
@@ -49,12 +49,6 @@ function FormForm({ id }: { id?: string[] }) {
 
           // preload fields and metadata
           setFormSchema(formioResp as FormType);
-          // debug: log the loaded form schema shape
-          try {
-            const obj = formioResp as unknown as Record<string, unknown>;
-          } catch {
-            // ignore logging errors
-          }
           setFormName(parsed?.name ?? (formioResp as unknown as { title?: string })?.title ?? '');
           setFormSlug(parsed?.slug ?? (formioResp as unknown as { path?: string })?.path ?? '');
           setFormDesc(
@@ -120,7 +114,9 @@ function FormForm({ id }: { id?: string[] }) {
       if (loadedSoba?.formVersion && loadedSoba.formVersion.id) {
         // Edit/update path: update Form.io form and save to existing SOBA form version
         const existingFormioId =
-          (formioData as Record<string, unknown>)._id ?? (formioData as any).id ?? id?.[0];
+          (formioData as Record<string, unknown>)._id ??
+          (formioData as { id?: string }).id ??
+          id?.[0];
         const formioIdToUse = existingFormioId ? String(existingFormioId) : String(id?.[0] ?? '');
         await updateFormioForm(
           token as string,
