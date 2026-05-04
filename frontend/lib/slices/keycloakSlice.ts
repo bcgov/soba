@@ -34,6 +34,7 @@ type InitResult = {
 export const initKeycloak = createAsyncThunk<InitResult, void, { rejectValue: string }>(
   'keycloak/init',
   async (_, { rejectWithValue }) => {
+    delete localStorage.formioToken; // clear any stale token before init
     const runtimeConfig = await loadFrontendRuntimeConfig();
     const kc = new Keycloak({
       url: runtimeConfig.auth.keycloak.url,
@@ -53,6 +54,12 @@ export const initKeycloak = createAsyncThunk<InitResult, void, { rejectValue: st
 
       // store instance in module-level variable (not in Redux state)
       kcInstance = kc;
+
+      if (kc.idTokenParsed) {
+        await kc.updateToken(30);
+      }
+
+      localStorage.setItem('formioToken', kc.token ?? '');
 
       return {
         token: kc.token ?? undefined,
@@ -162,11 +169,12 @@ export const refreshToken = () => async (dispatch: AppDispatch) => {
   const kc: Keycloak.KeycloakInstance | null = kcInstance;
   if (!kc) return;
   try {
-    const refreshed = await kc.updateToken(30);
+    const refreshed = await kc.updateToken(0);
     if (refreshed) {
       dispatch(setToken(kc.token ?? undefined));
       dispatch(setIdTokenParsed(kc.idTokenParsed as Keycloak.KeycloakTokenParsed | undefined));
       dispatch(setAuthenticated(!!kc.authenticated));
+      localStorage.setItem('formioToken', kc.token ?? '');
     }
   } catch {
     // token refresh failed

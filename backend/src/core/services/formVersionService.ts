@@ -42,6 +42,7 @@ interface SaveInput {
   note?: string;
   enqueueProvision?: boolean;
   formioFormDefinition?: Record<string, unknown>;
+  engineSchemaRef?: string | null;
 }
 
 interface DeleteInput {
@@ -86,10 +87,22 @@ export class FormVersionService {
           actorDisplayLabel: input.actorDisplayLabel,
           eventType: input.eventType,
           changeNote: input.note,
+          engineSchemaRef: input.engineSchemaRef || null,
         },
         tx,
       );
       if (!revised) return null;
+      // Persist engineSchemaRef into the main formVersion row if supplied
+      if (input.engineSchemaRef != null) {
+        await updateFormVersionDraft(
+          input.workspaceId,
+          input.formVersionId,
+          input.actorDisplayLabel,
+          { engineSchemaRef: input.engineSchemaRef },
+          tx,
+        );
+      }
+
       if (input.eventType === 'publish') {
         await updateFormVersionDraft(
           input.workspaceId,

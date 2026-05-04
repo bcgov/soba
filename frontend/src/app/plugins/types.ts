@@ -4,8 +4,9 @@ import type { Locale } from '@/app/[lang]/dictionaries';
 type Dictionary = {
   locale: string;
   header: {
+    [x: string]: string | undefined;
     workspaces: string;
-    design: string;
+    designer: string;
     submit: string;
     metaReview?: string;
     themeToggle?: string;

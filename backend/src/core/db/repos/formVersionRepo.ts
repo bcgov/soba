@@ -16,6 +16,7 @@ interface SaveRevisionInput {
   actorDisplayLabel: string | null;
   eventType: string;
   changeNote?: string;
+  engineSchemaRef?: string | null;
 }
 
 export type FormVersionListSort = 'id:desc' | 'updatedAt:desc';
@@ -200,8 +201,8 @@ export const appendFormVersionRevision = async (input: SaveRevisionInput, tx?: D
     formVersionId: input.formVersionId,
     revisionNo: nextRevision,
     eventType: input.eventType,
-    beforeEngineSchemaRef: version.engineSchemaRef,
-    afterEngineSchemaRef: version.engineSchemaRef,
+    beforeEngineSchemaRef: input.engineSchemaRef ? input.engineSchemaRef : version.engineSchemaRef,
+    afterEngineSchemaRef: input.engineSchemaRef ? input.engineSchemaRef : version.engineSchemaRef,
     changedBy: input.actorId,
     changeNote: input.changeNote,
   });
@@ -210,6 +211,7 @@ export const appendFormVersionRevision = async (input: SaveRevisionInput, tx?: D
     .update(formVersions)
     .set({
       currentRevisionNo: nextRevision,
+      ...(input.engineSchemaRef ? { engineSchemaRef: input.engineSchemaRef } : {}),
       updatedBy: input.actorDisplayLabel,
       updatedAt: new Date(),
     })

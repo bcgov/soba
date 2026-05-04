@@ -15,6 +15,7 @@
     "metaReview": "Méta API",
     "themeToggle": "Basculer le theme de couleur",
     "skipToMain": "Aller au contenu principal",
+    "designer": "Générateur de Formulaire",
     "menu": "Menu",
     "closeMenu": "Fermer le menu",
     "mobileNavLabel": "Navigation",
@@ -110,7 +111,7 @@
       }
     }
   },
-  
+
   "Basic": "Basique",
   "Text Field": "Champ de Texte",
   "Text Area": "Zone de Texte",

@@ -153,6 +153,36 @@ export function createFormsApiService(
       return row ? toFormDto(row) : null;
     },
 
+    getFormByEngineRef: async (ctx: FormsContextInput, engineRef: string) => {
+      const row = await formService.getByEngineSchemaRef(ctx.workspaceId, engineRef);
+      if (!row) return null;
+
+      // Try to find the matching form version for this engineRef (search recent versions for the form)
+      const versionsResult = await formVersionService.list({
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        limit: 100,
+        formId: row.id,
+        state: undefined,
+        sort: 'id:desc',
+        cursorMode: 'id',
+      });
+
+      const matched = versionsResult.items.find((v) => v.engineSchemaRef === engineRef) ?? null;
+
+      let formVersionDto = null;
+      if (matched) {
+        // fetch the full form version record so we have fields like currentRevisionNo/publishedAt
+        const full = await formVersionService.get(ctx.workspaceId, matched.id);
+        if (full) formVersionDto = toFormVersionDto(full);
+      }
+
+      return {
+        ...toFormDto(row),
+        formVersion: formVersionDto,
+      };
+    },
+
     list: async (ctx: FormsContextInput, query: ListFormsQueryInput) => {
       const { cursorMode, sort, afterId, afterUpdatedAt } = decodeCursorAndMode({
         cursor: query.cursor,
@@ -259,6 +289,7 @@ export function createFormsApiService(
         note?: string;
         enqueueProvision?: boolean;
         formioFormDefinition?: Record<string, unknown>;
+        engine_schema_ref?: string;
       },
     ) =>
       formVersionService
@@ -271,6 +302,7 @@ export function createFormsApiService(
           note: input.note,
           enqueueProvision: input.enqueueProvision ?? true,
           formioFormDefinition: input.formioFormDefinition,
+          engineSchemaRef: input.engine_schema_ref || null,
         })
         .then((row) => toFormVersionDto(row)),
 

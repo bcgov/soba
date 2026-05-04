@@ -15,6 +15,7 @@
     "metaReview": "API meta",
     "themeToggle": "Toggle color theme",
     "skipToMain": "Skip to main content",
+    "designer": "Designer",
     "menu": "Menu",
     "closeMenu": "Close Menu",
     "mobileNavLabel": "Navigation",
@@ -110,7 +111,7 @@
       }
     }
   },
-  
+
   "Basic": "Basic",
   "Text Field": "Text Field",
   "Text Area": "Text Area",

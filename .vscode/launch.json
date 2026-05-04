@@ -48,7 +48,7 @@
       "request": "launch",
       "cwd": "${workspaceFolder}/frontend",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev", "--hostname", "0.0.0.0"],
+      "runtimeArgs": ["dev:watch"],
       "skipFiles": ["<node_internals>/**"],
       "console": "integratedTerminal"
     },
