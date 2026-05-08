@@ -6,7 +6,10 @@ metadata:
   labels:
     {{- include "soba.labels" (dict "root" . "component" "frontend") | nindent 4 }}
 spec:
-  host: {{ include "soba.frontendHost" . }}
+  host: {{ if .Values.global.routeHost }}{{ .Values.global.routeHost }}{{ else }}{{ include "soba.frontendHost" . }}{{ end }}
+  {{- if .Values.global.routePath }}
+  path: {{ .Values.global.routePath }}
+  {{- end }}
   to:
     kind: Service
     name: {{ include "soba.fullname" . }}-frontend

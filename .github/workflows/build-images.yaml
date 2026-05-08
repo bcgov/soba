@@ -58,6 +58,11 @@ on:
       image_version:
         description: "Tag suffix (e.g. pr-42, main). Default derived from ref."
         required: false
+      base_path:
+        description: "Next.js basePath for path-based routing (e.g. /pr-42)"
+        required: false
+        default: ""
+        type: string
         type: string
     outputs:
       short_sha:
@@ -199,6 +204,7 @@ jobs:
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ needs.prepare.outputs.image_version }}
+          build-args: ${{ matrix.component == 'frontend' && inputs.base_path != '' && format('BASE_PATH={0}', inputs.base_path) || '' }}
           outputs: type=image,name=${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.component }},push-by-digest=true,name-canonical=true,push=true
           provenance: false
           sbom: false

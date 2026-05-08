@@ -29,6 +29,8 @@ COPY frontend ./frontend
 # Next.js telemetry note
 # ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app/frontend
+ARG BASE_PATH=""
+ENV BASE_PATH=$BASE_PATH
 # Run build from frontend dir so .next (and .next/standalone) is created here
 RUN pnpm run build
 
