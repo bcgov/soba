@@ -58,11 +58,11 @@ on:
       image_version:
         description: "Tag suffix (e.g. pr-42, main). Default derived from ref."
         required: false
+        type: string
       base_path:
         description: "Next.js basePath for path-based routing (e.g. /pr-42)"
         required: false
         default: ""
-        type: string
         type: string
     outputs:
       short_sha:
