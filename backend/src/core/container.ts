@@ -23,7 +23,10 @@ const formVersionService = new FormVersionService(queue);
 const submissionService = new SubmissionService(queue);
 
 export const formsApiService = createFormsApiService(formService, formVersionService);
-export const submissionsApiService = createSubmissionsApiService(submissionService);
+export const submissionsApiService = createSubmissionsApiService(
+  submissionService,
+  formVersionService,
+);
 
 export function getCache(): ReturnType<typeof getCacheAdapter> {
   return getCacheAdapter();

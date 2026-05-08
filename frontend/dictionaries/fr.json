@@ -70,7 +70,8 @@
         "title": "Un problème est survenu lors du chargement de cette page de formulaire.",
         "tryAgain": "Réessayer",
         "backToList": "Retour à la liste"
-      }
+      },
+      "submitSuccess": "Formulaire soumis avec succès."
     }
   },
   "submitDemo": {
@@ -109,6 +110,37 @@
         "downloadQRCode": "Télécharger le code QR",
         "close": "Fermer"
       }
+    }
+  },
+  "form": {
+    "saved": "Formulaire enregistré avec succès.",
+    "saveError": "Erreur lors de l'enregistrement du formulaire.",
+    "nameLabel": "Nom du Formulaire",
+    "namePlaceholder": "Entrez le nom du formulaire",
+    "slugLabel": "Slug du Formulaire",
+    "slugPlaceholder": "Entrez le slug du formulaire",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Entrez la description du formulaire",
+    "loading": "Chargement du formulaire...",
+    "schemaNotAvailable": "Schéma du formulaire non disponible.",
+    "edit": "Modifier",
+    "input": "Soumettre les données",
+    "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à ce formulaire."
+  },
+  "submission": {
+    "submissions": "Soumissions",
+    "loading": "Chargement des soumissions…",
+    "empty": "Aucune soumission dans cet espace pour l’instant.",
+    "error": "Impossible de charger les soumissions.",
+    "refresh": "Actualiser",
+    "view": "Voir",
+    "workflow": "Flux de travail",
+    "columns": {
+      "id": "ID",
+      "created": "Créé",
+      "status": "Statut",
+      "version": "Version",
+      "user": "Utilisateur"
     }
   },
 

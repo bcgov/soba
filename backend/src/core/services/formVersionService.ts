@@ -7,6 +7,7 @@ import {
   listFormVersionsForWorkspace,
   markFormVersionDeleted,
   updateFormVersionDraft,
+  getFormVersionByEngineRef,
 } from '../db/repos/formVersionRepo';
 import { db } from '../db/client';
 import { QueueAdapter } from '../integrations/queue/QueueAdapter';
@@ -152,6 +153,10 @@ export class FormVersionService {
 
   async delete(input: DeleteInput) {
     return markFormVersionDeleted(input.workspaceId, input.formVersionId, input.actorDisplayLabel);
+  }
+
+  async getByEngineRef(workspaceId: string, engineRef: string) {
+    return getFormVersionByEngineRef(workspaceId, engineRef);
   }
 
   async get(workspaceId: string, formVersionId: string) {

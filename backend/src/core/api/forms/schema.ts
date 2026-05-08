@@ -203,6 +203,26 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'get',
+    path: '/forms/formio/form',
+    tags: ['core.forms'],
+    security: [{ bearerAuth: [] }],
+    request: {
+      query: ListFormsQuerySchema,
+    },
+    responses: {
+      200: {
+        description: 'List forms in Formio format with Soba metadata',
+        content: {
+          'application/json': {
+            schema: z.array(z.record(z.string(), z.unknown())),
+          },
+        },
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
     path: '/forms/{id}',
     tags: ['core.forms'],
     security: [{ bearerAuth: [] }],

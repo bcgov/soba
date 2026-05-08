@@ -13,6 +13,7 @@ import {
   deleteFormVersion,
   saveFormVersion,
   updateFormVersion,
+  listFormioForms,
 } from './controller';
 import {
   CreateFormBodySchema,
@@ -31,6 +32,7 @@ import {
 const router = express.Router();
 
 router.get('/forms', validateRequest({ query: ListFormsQuerySchema }), listForms);
+router.get('/forms/formio/form', validateRequest({ query: ListFormsQuerySchema }), listFormioForms);
 router.get(
   '/forms/engine/:engineRef',
   validateRequest({ params: FormEngineRefParamsSchema }),

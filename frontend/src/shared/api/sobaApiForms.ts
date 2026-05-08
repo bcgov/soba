@@ -7,6 +7,7 @@ import type {
   SobaResponseFormType,
   SobaFormWithVersionResponse,
 } from '../../types/forms';
+import type { ListSubmissionsResponse } from '../../features/submit-mode/types';
 
 export async function createSobaFormioForm(
   token: string,
@@ -226,7 +227,7 @@ export async function getSobaFormVersion(token: string, id: string): Promise<Sob
 export async function getSobaFormVersionFromFormioId(
   token: string,
   id: string,
-): Promise<SobaResponseFormType> {
+): Promise<SobaFormWithVersionResponse> {
   const response = await fetch(`${getSobaApiBaseUrl()}/forms/engine/${id}`, {
     method: 'GET',
     cache: 'no-store',
@@ -236,4 +237,67 @@ export async function getSobaFormVersionFromFormioId(
     },
   });
   return parseJson(response) as Promise<SobaFormWithVersionResponse>;
+}
+
+/**
+ * Create a soba submission after the formio one is created.
+ */
+
+export async function createSobaFormSubmission(
+  token: string,
+  formId: string,
+  formVersionId: string,
+  options?: Record<string, unknown>,
+): Promise<any> {
+  const sobaFormSubmissionData = {
+    formId,
+    formVersionId,
+    ...options,
+  };
+  const response = await fetch(`${getSobaApiBaseUrl()}/submissions`, {
+    method: 'POST',
+    cache: 'no-store',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(sobaFormSubmissionData),
+  });
+  const responseData = await parseJson(response);
+  return responseData;
+}
+
+export async function getSobaFormioForms(token: string): Promise<FormType[]> {
+  const response = await fetch(`${getSobaApiBaseUrl()}/forms/formio/form`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+  });
+  return parseJson(response);
+}
+
+export async function getSobaSubmissions(
+  token: string,
+  params?: Record<string, unknown>,
+): Promise<ListSubmissionsResponse> {
+  const query = new URLSearchParams();
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined) query.set(key, String(value));
+    }
+  }
+  const qs = query.toString();
+  const response = await fetch(`${getSobaApiBaseUrl()}/submissions${qs ? `?${qs}` : ''}`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+  });
+  return parseJson(response);
 }

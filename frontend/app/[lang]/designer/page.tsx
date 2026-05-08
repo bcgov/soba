@@ -18,10 +18,6 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function Page({ params }: PageProps) {
-  const { lang } = await params;
-  const locale = resolveLocale(lang);
-  await getDictionary(locale);
-
   // Render the same FormForm component used by the catch-all route.
   // Pass an empty array so FormForm treats this as "no formId" (i.e. listing / creating).
   return (

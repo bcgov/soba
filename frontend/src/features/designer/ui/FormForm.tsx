@@ -5,6 +5,7 @@ import { Alert, Button, Spinner } from 'react-bootstrap';
 import { FormType } from '@formio/react';
 
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
+import { useDictionary } from '@/app/[lang]/Providers';
 import FormDesigner from '@/src/features/designer/ui/FormDesigner';
 import {
   createFormioForm,
@@ -17,6 +18,7 @@ import {
 import type { SobaFormWithVersionResponse, SobaFormType } from '@/src/types/forms';
 
 function FormForm({ id }: { id?: string[] }) {
+  const dict = useDictionary();
   const { authenticated, token, initializing } = useKeycloak();
   const [formName, setFormName] = useState('');
   const [formSlug, setFormSlug] = useState('');
@@ -132,12 +134,12 @@ function FormForm({ id }: { id?: string[] }) {
         await createFormioForm(token as string, formioData as FormType, sobaFormData.id, publish);
       }
 
-      setAlertText('Form Saved to SOBA and FORMIO');
+      setAlertText(dict.form.saved);
       setAlertVariant('success');
       setShowAlert(true);
     } catch (e: unknown) {
       console.error('error creating form', e);
-      setAlertText('ERROR Saving Form to SOBA and FORMIO: ' + (e as Error).message);
+      setAlertText(dict.form.saveError);
       setAlertVariant('danger');
       setShowAlert(true);
     }
@@ -163,36 +165,36 @@ function FormForm({ id }: { id?: string[] }) {
         {/* On submission, the input value will be appended to
             the URL, e.g. /search?query=abc */}
         <div className="form-group">
-          <label htmlFor="formName">Form Name</label>
+          <label htmlFor="formName">{dict.form.nameLabel}</label>
           <input
             type="text"
             className="form-control"
             id="formName"
             aria-describedby="formName"
-            placeholder="Enter form name"
+            placeholder={dict.form.namePlaceholder}
             value={formName}
             onChange={updateName}
           />
         </div>
         <div className="form-group">
-          <label htmlFor="formSlug">Form Slug</label>
+          <label htmlFor="formSlug">{dict.form.slugLabel}</label>
           <input
             type="text"
             className="form-control"
             id="formSlug"
             aria-describedby="formSlug"
-            placeholder="Enter form slug"
+            placeholder={dict.form.slugPlaceholder}
             value={formSlug}
             onChange={updateSlug}
           />
         </div>
         <div className="form-group">
-          <label htmlFor="formDescription">Description</label>
+          <label htmlFor="formDescription">{dict.form.descriptionLabel}</label>
           <textarea
             className="form-control"
             id="formDescription"
             aria-describedby="formDescription"
-            placeholder="Enter form description"
+            placeholder={dict.form.descriptionPlaceholder}
             value={formDesc}
             onChange={updateDescription}
           />
@@ -213,14 +215,14 @@ function FormForm({ id }: { id?: string[] }) {
         loading ? (
           <div className="my-4 text-center">
             <Spinner animation="border" role="status">
-              <span className="visually-hidden">Loading form...</span>
+              <span className="visually-hidden">{dict.form.loading}</span>
             </Spinner>
           </div>
         ) : formSchema ? (
           <FormDesigner onUpdateModel={updateFormSchema} initialModel={formSchema} />
         ) : (
           // If not loading and no schema, show a message (error state is shown via Alert)
-          <div className="my-4">Form schema not available.</div>
+          <div className="my-4">{dict.form.schemaNotAvailable}</div>
         )
       ) : (
         <FormDesigner onUpdateModel={updateFormSchema} initialModel={null} />

@@ -149,7 +149,10 @@ export const login = () => async (dispatch: AppDispatch) => {
   } catch {
     // fallback to direct login redirect
     try {
-      kc?.login();
+      const opts = {
+        redirectUri: typeof window !== 'undefined' ? window.location.origin : undefined,
+      };
+      kc?.login(opts);
     } catch {
       // no-op
     }
