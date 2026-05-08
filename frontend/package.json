@@ -2,7 +2,6 @@
   "name": "@soba/frontend",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@10.28.2",
   "scripts": {
     "dev": "NEXT_DEBUG=1 next dev",
     "dev:watch": "nodemon --watch . --ext js,jsx,ts,tsx,json --exec \"npm run dev -- --hostname 0.0.0.0\"",
