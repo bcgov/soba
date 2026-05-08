@@ -15,7 +15,7 @@
 #       with:
 #         ref: ${{ needs.set-vars.outputs.ref }}
 #         platforms: amd64
-#         image_version: pr-${{ github.event.pull_request.number }}  # e.g. pr-42 for PRs
+#         image_version: pr-${{ github.event.pull_request.number }}
 #       secrets: inherit
 #
 #     deploy:
