@@ -30,6 +30,8 @@ COPY frontend ./frontend
 # ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app/frontend
 
+RUN pnpm config set ignore-scripts false
+
 # Run build from frontend dir so .next (and .next/standalone) is created here
 RUN pnpm run build
 
