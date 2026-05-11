@@ -33,7 +33,9 @@ COPY frontend ./frontend
 # ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app/frontend
 
-RUN pnpm config set only-built-dependencies core-js sharp unrs-resolver
+RUN npm pkg set pnpm.onlyBuiltDependencies[]="core-js" \
+    && npm pkg set pnpm.onlyBuiltDependencies[]="sharp" \
+    && npm pkg set pnpm.onlyBuiltDependencies[]="unrs-resolver"
 # Run build from frontend dir so .next (and .next/standalone) is created here
 RUN pnpm run build
 
