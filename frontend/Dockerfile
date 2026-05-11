@@ -16,7 +16,9 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY frontend/package.json frontend/
 
 # Set execution policy for specific packages
-RUN pnpm config set ignore-scripts false
+RUN echo "only-built-dependencies[]=core-js" >> .npmrc && \
+    echo "only-built-dependencies[]=sharp" >> .npmrc && \
+    echo "only-built-dependencies[]=unrs-resolver" >> .npmrc
 
 # install frontend dependencies through workspace
 RUN pnpm install --filter ./frontend... --frozen-lockfile
@@ -26,6 +28,7 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/frontend/node_modules ./frontend/node_modules
+COPY --from=deps /app/.npmrc ./
 
 COPY frontend ./frontend
 
