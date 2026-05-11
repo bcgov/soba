@@ -15,6 +15,9 @@ WORKDIR /app
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY frontend/package.json frontend/
 
+# Set execution policy for specific packages
+RUN pnpm config set ignore-scripts false
+
 # install frontend dependencies through workspace
 RUN pnpm install --filter ./frontend... --frozen-lockfile
 
