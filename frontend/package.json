@@ -58,12 +58,5 @@
     "typescript": "^5",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^4.0.18"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "core-js",
-      "sharp",
-      "unrs-resolver"
-    ]
   }
 }
