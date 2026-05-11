@@ -7,7 +7,7 @@ import type {
   SobaResponseFormType,
   SobaFormWithVersionResponse,
 } from '../../types/forms';
-import type { ListSubmissionsResponse } from '../../features/submit-mode/types';
+import type { ListSubmissionsResponse, SubmissionResponse } from '../../features/submit-mode/types';
 
 export async function createSobaFormioForm(
   token: string,
@@ -248,7 +248,7 @@ export async function createSobaFormSubmission(
   formId: string,
   formVersionId: string,
   options?: Record<string, unknown>,
-): Promise<any> {
+): Promise<SubmissionResponse> {
   const sobaFormSubmissionData = {
     formId,
     formVersionId,
@@ -264,7 +264,7 @@ export async function createSobaFormSubmission(
     },
     body: JSON.stringify(sobaFormSubmissionData),
   });
-  const responseData = await parseJson(response);
+  const responseData = await parseJson<SubmissionResponse>(response);
   return responseData;
 }
 

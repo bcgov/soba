@@ -13,7 +13,7 @@ import { useFormioV5FormChrome } from '@/src/features/formio-v5/useFormioV5FormC
 import { FormioV5FormRenderErrorBoundary } from '@/src/features/formio-v5/ui/FormioV5FormRenderErrorBoundary';
 import { getSobaFormVersionFromFormioId, createSobaFormSubmission } from '@/src/shared/api/sobaApi';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import { SobaResponseFormType } from '@/src/types/forms';
+import type { SobaFormWithVersionResponse } from '@/src/types/forms';
 
 const Form = dynamic(() => import('@formio/react').then((m) => m.Form), {
   ssr: false,

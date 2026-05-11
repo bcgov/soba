@@ -14,7 +14,7 @@ const FormioProvider = dynamic(() => import('@formio/react').then((mod) => mod.F
   ssr: false,
 });
 
-type Action = { name: string };
+type Action = { name: string; fn: (capId: string) => void };
 
 interface FormActionButtonProps {
   action: Action;
@@ -53,9 +53,11 @@ const CustomActionButtons = ({ action, onClick }: FormActionButtonProps) => {
     );
   }
 
+  const actionKey = action.name.toLowerCase() as keyof typeof dict.form;
+
   return (
     <button onClick={onClick} className="btn btn-primary btn-sm">
-      {dict.form[action.name.toLowerCase()] || action.name}
+      {dict.form[actionKey] || action.name}
     </button>
   );
 };

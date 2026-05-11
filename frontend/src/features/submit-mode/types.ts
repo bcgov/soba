@@ -27,3 +27,15 @@ export interface ListSubmissionsResponse {
   };
   sort: string;
 }
+
+export interface SubmissionResponse {
+  id: string;
+  formId: string;
+  formVersionId: string;
+  workflowState: string;
+  engineSyncStatus: string;
+  currentRevisionNo: number;
+  submittedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
