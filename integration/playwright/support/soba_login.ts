@@ -1,6 +1,5 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { authenticator } from "@otplib/preset-default";
-//import { authenticator } from 'otplib';
 export function formsettings() {
   if (!process.env.KEYCLOAK_USERNAME || !process.env.KEYCLOAK_PASSWORD) {
     throw new Error("Missing env variables");
@@ -16,7 +15,6 @@ export function formsettings() {
 
 export async function login(page: Page) {
   const { username, password, mfaCode } = formsettings();
-  //const mfaCode = process.env.MFA_CODE;
   await page.goto("/");
   await page.click('[data-testid="login-button"]');
   await page.fill('input[type="email"]', username);
@@ -32,8 +30,9 @@ export async function login(page: Page) {
   console.log("Generated OTP:", token);
   await page.fill('input[name="otc"]', token);
   await page.click('input[type="submit"]');
-  await page.click('div[data-bind="text"]');
-  await page.click('[data-testid="Navigation Menu"]');
-  //await page.waitForURL("/submit");
-  await page.pause();
+  await page.click('input[type="submit"]');
+  await expect(page.locator("#idSIButton9")).toBeVisible();
+  await page.locator("#idSIButton9").click();
+  //Visibility of logout button confirms successful login
+  await expect(page.locator('[data-testid="logout-button"]')).toBeVisible();
 }
