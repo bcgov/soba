@@ -30,6 +30,8 @@ COPY frontend ./frontend
 # ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app/frontend
 
+RUN pnpm approve-builds core-js sharp unrs-resolver
+
 # Run build from frontend dir so .next (and .next/standalone) is created here
 RUN pnpm run build
 
