@@ -207,3 +207,4 @@ jobs:
     secrets:
       Username: ${{ secrets.keycloakUsername }}
       Password: ${{ secrets.keycloakPassword }}
+      MFA_CODE: ${{ secrets.MFA_CODE }}

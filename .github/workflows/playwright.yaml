@@ -13,6 +13,8 @@ on:
         required: true
       Password:
         required: true
+      MFA_CODE:
+        required: true
 
 jobs:
   playwright-run:
