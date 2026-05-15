@@ -160,7 +160,7 @@ jobs:
           formio:
             admin:
               password: "${{ secrets.FORMIO_ADMIN_PASSWORD }}"
-            jwtSecret: "${{ secrets.FORMIO_JWT_SECRET }}"
+              jwtSecret: "${{ secrets.JWT_SECRET }}"
           OVERRIDE
 
           helm upgrade --install "${RELEASE}" ./deployments/helm/soba \
