@@ -157,10 +157,6 @@ jobs:
             routePath: "/pr-${PR_NUM}"
           database:
             uri: '${DB_URI_ESC}'
-          formio:
-            admin:
-              password: "${{ secrets.FORMIO_ADMIN_PASSWORD }}"
-              jwtSecret: "${{ secrets.JWT_SECRET }}"
           OVERRIDE
 
           helm upgrade --install "${RELEASE}" ./deployments/helm/soba \
