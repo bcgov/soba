@@ -72,9 +72,9 @@ spec:
           args:
             - |
               . /vault/secrets/soba-formio
-              export JWT_SECRET="$FORMIO_JWT_SECRET"
               export ROOT_EMAIL="{{ .Values.formio.admin.email }}"
-              export MONGO="{{ include "soba.mongodbUri" . }}"
+              export PLUGIN_FORMIO_V5_ADMIN_USERNAME="{{ .Values.formio.admin.email }}"
+              export NODE_CONFIG='{"mongo":{{ include "soba.mongodbUri" . | toJson }},"port":{{ .Values.formio.service.port }},"jwt":{"secret":"'"${FORMIO_JWT_SECRET}"'"},"reservedForms":["submissions","submission","exists","export","role","current","logout","import","form","access","health"]}'
               exec node --no-node-snapshot main
           envFrom:
             - configMapRef:
