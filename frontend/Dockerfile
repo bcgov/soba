@@ -3,7 +3,7 @@
 FROM node:20-alpine AS base
 
 # enable pnpm globally
-RUN corepack enable pnpm
+RUN corepack enable pnpm && corepack prepare pnpm@10.28.2 --activate
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -24,11 +24,14 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/frontend/node_modules ./frontend/node_modules
 
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY frontend ./frontend
 
 # Next.js telemetry note
 # ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app/frontend
+ARG BASE_PATH=""
+ENV BASE_PATH=$BASE_PATH
 # Run build from frontend dir so .next (and .next/standalone) is created here
 RUN pnpm run build
 

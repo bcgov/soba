@@ -3,6 +3,8 @@ global:
   namespace: ""
   # Set true to remove "keep" policy on Secrets/PVCs (e.g. PR teardown)
   forceCleanup: false
+  routeHost: ""
+  routePath: ""
 
 # -- Backend (Express API) ------------------------------------------------
 backend:
