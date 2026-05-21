@@ -208,3 +208,15 @@ jobs:
 
           echo "Waiting for mongodb rollout..."
           oc rollout status statefulset/soba-test-mongodb -n "${NAMESPACE}" --timeout=300s
+
+  Tests:
+    name: Integration Tests
+    needs: [deploy, set-vars]
+    uses: ./.github/workflows/playwright.yaml
+    with:
+      DEP_ENV: test
+      pr_branch: ${{ needs.set-vars.outputs.ref }}
+    secrets:
+      Username: ${{ secrets.keycloakUsername }}
+      Password: ${{ secrets.keycloakPassword }}
+      MFA_CODE: ${{ secrets.MFA_CODE }}
