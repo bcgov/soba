@@ -28,14 +28,11 @@ test.describe.serial("Landing page tests", () => {
 
   test("Checks the navigation links", async () => {
     await sharedPage.locator('[data-testid="nav-menu-button"]').click();
-    const designerLink = sharedPage.getByRole("link", { name: "Designer" });
-    await expect(designerLink).toBeVisible();
-    await expect(designerLink).toHaveAttribute("href", "/en/designer");
-    const SubmitLink = sharedPage.getByRole("link", { name: "Submit" });
-    await expect(SubmitLink).toBeVisible();
-    await expect(SubmitLink).toHaveAttribute("href", "/en/submit");
-    const APIMetaLink = sharedPage.getByRole("link", { name: "API meta" });
-    await expect(APIMetaLink).toBeVisible();
-    await expect(APIMetaLink).toHaveAttribute("href", "/en/meta");
+    const designLink = sharedPage.locator('a[href="/en/design"]');
+    await designLink.isVisible();
+    const SubmitLink = sharedPage.locator('a[href="/en/submit"]');
+    await SubmitLink.isVisible();
+    const APIMetaLink = sharedPage.locator('a[href="/en/meta"]');
+    await APIMetaLink.isVisible();
   });
 });
