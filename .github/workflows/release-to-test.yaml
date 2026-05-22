@@ -16,6 +16,7 @@ on:
       - ".github/workflows/release-to-test.yaml"
       - ".github/workflows/build-images.yaml"
       - ".github/workflows/playwright.yaml"
+      - "integration/playwright/"
       - ".gitignore"
       - "package.json"
       - "pnpm-lock.yaml"
