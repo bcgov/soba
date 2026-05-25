@@ -1,0 +1,56 @@
+name: Playwright Tests
+on:
+  workflow_call:
+    inputs:
+      DEP_ENV:
+        required: true
+        type: string
+      pr_branch:
+        required: true
+        type: string
+    secrets:
+      Username:
+        required: true
+      Password:
+        required: true
+
+jobs:
+  playwright-run:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.pr_branch }}
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./integration/playwright
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+        working-directory: ./integration/playwright
+
+      - name: Run Playwright tests
+        run: npx playwright test
+        working-directory: ./integration/playwright
+        env:
+          KEYCLOAK_USERNAME: ${{ secrets.Username }}
+          KEYCLOAK_PASSWORD: ${{ secrets.Password }}
+          DEP_ENV: ${{ inputs.DEP_ENV }}
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: playwright-report
+          path: "${{ github.workspace }}/integration/playwright/playwright-report"
+          if-no-files-found: ignore
+
+      - name: Upload Playwright screenshots on failure
+        uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: playwright-screenshots
+          path: "${{ github.workspace }}/integration/playwright/test-results"
