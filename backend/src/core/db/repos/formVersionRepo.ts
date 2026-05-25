@@ -245,3 +245,19 @@ export const markFormVersionDeleted = async (
 
   return updated[0] ?? null;
 };
+
+export const getFormVersionByEngineRef = async (workspaceId: string, engineRef: string) => {
+  const row = await db
+    .select()
+    .from(formVersions)
+    .where(
+      and(
+        eq(formVersions.workspaceId, workspaceId),
+        eq(formVersions.engineSchemaRef, engineRef),
+        isNull(formVersions.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return row[0] ?? null;
+};

@@ -27,6 +27,13 @@
     "dev:services:up": "docker compose -f .devcontainer/docker-compose.yml up -d --wait",
     "dev:db:up": "pnpm dev:services:up && pnpm db:init"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "core-js",
+      "sharp",
+      "unrs-resolver"
+    ]
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",

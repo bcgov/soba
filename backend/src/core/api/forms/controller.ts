@@ -140,3 +140,9 @@ export const deleteForm = asyncHandler(async (req: Request<FormIdParams>, res: R
   }
   res.status(204).send();
 });
+
+export const listFormioForms = asyncHandler(async (req: Request, res: Response) => {
+  const ctx = req.coreContext!;
+  const result = await formsApiService.listFormioForms(ctx, req.query as unknown as ListFormsQuery);
+  res.json(result);
+});

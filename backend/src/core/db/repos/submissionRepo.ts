@@ -1,6 +1,25 @@
 import { and, desc, eq, isNull, lt, or } from 'drizzle-orm';
 import { db } from '../client';
-import { submissionRevisions, submissions } from '../schema';
+import { submissionRevisions, submissions, forms, formVersions } from '../schema';
+
+export type SubmissionRecord = typeof submissions.$inferSelect;
+
+export interface SubmissionListRow {
+  id: string;
+  formId: string;
+  form: { name: string | null };
+  formVersionId: string;
+  formVersion: { versionNo: number | null };
+  workflowState: string;
+  engineSyncStatus: string;
+  submittedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SubmissionDetailRow extends SubmissionListRow {
+  currentRevisionNo: number;
+}
 
 interface CreateSubmissionInput {
   workspaceId: string;
@@ -8,6 +27,7 @@ interface CreateSubmissionInput {
   formVersionId: string;
   actorId: string;
   actorDisplayLabel: string | null;
+  workflowState?: string;
 }
 
 interface SaveSubmissionInput {
@@ -28,21 +48,11 @@ export interface ListSubmissionsInput {
   formId?: string;
   formVersionId?: string;
   workflowState?: string;
+  createdBy?: string;
   sort: SubmissionListSort;
   cursorMode: SubmissionCursorMode;
   afterId?: string;
   afterUpdatedAt?: Date;
-}
-
-export interface SubmissionListRow {
-  id: string;
-  formId: string;
-  formVersionId: string;
-  workflowState: string;
-  engineSyncStatus: string;
-  submittedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 export const createEmptySubmission = async (input: CreateSubmissionInput) => {
@@ -52,7 +62,7 @@ export const createEmptySubmission = async (input: CreateSubmissionInput) => {
       workspaceId: input.workspaceId,
       formId: input.formId,
       formVersionId: input.formVersionId,
-      workflowState: 'draft',
+      workflowState: input.workflowState || 'draft',
       engineSyncStatus: 'pending',
       currentRevisionNo: 0,
       createdBy: input.actorDisplayLabel,
@@ -63,10 +73,27 @@ export const createEmptySubmission = async (input: CreateSubmissionInput) => {
   return created[0];
 };
 
-export const getSubmissionById = async (workspaceId: string, submissionId: string) => {
+export const getSubmissionById = async (
+  workspaceId: string,
+  submissionId: string,
+): Promise<SubmissionDetailRow | null> => {
   const row = await db
-    .select()
+    .select({
+      id: submissions.id,
+      formId: submissions.formId,
+      form: { name: forms.name },
+      formVersionId: submissions.formVersionId,
+      formVersion: { versionNo: formVersions.versionNo },
+      workflowState: submissions.workflowState,
+      engineSyncStatus: submissions.engineSyncStatus,
+      currentRevisionNo: submissions.currentRevisionNo,
+      submittedAt: submissions.submittedAt,
+      createdAt: submissions.createdAt,
+      updatedAt: submissions.updatedAt,
+    })
     .from(submissions)
+    .leftJoin(forms, eq(submissions.formId, forms.id))
+    .leftJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
     .where(
       and(
         eq(submissions.workspaceId, workspaceId),
@@ -99,6 +126,10 @@ export const listSubmissionsForWorkspace = async (
     whereClauses.push(eq(submissions.workflowState, input.workflowState));
   }
 
+  if (input.createdBy) {
+    whereClauses.push(eq(submissions.createdBy, input.createdBy));
+  }
+
   if (input.cursorMode === 'id' && input.afterId) {
     whereClauses.push(lt(submissions.id, input.afterId));
   }
@@ -116,7 +147,9 @@ export const listSubmissionsForWorkspace = async (
     .select({
       id: submissions.id,
       formId: submissions.formId,
+      form: { name: forms.name },
       formVersionId: submissions.formVersionId,
+      formVersion: { versionNo: formVersions.versionNo },
       workflowState: submissions.workflowState,
       engineSyncStatus: submissions.engineSyncStatus,
       submittedAt: submissions.submittedAt,
@@ -124,6 +157,8 @@ export const listSubmissionsForWorkspace = async (
       updatedAt: submissions.updatedAt,
     })
     .from(submissions)
+    .innerJoin(forms, eq(submissions.formId, forms.id))
+    .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
     .where(and(...whereClauses))
     .orderBy(
       input.cursorMode === 'ts_id' || input.sort === 'updatedAt:desc'
