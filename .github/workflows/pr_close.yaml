@@ -6,6 +6,8 @@ run-name: Cleanup PR-${{ github.event.pull_request.number || github.event.inputs
 on:
   pull_request:
     types: [closed]
+    branches:
+      - develop
     paths:
       - "backend/**"
       - "frontend/**"
