@@ -47,16 +47,18 @@ export type HeaderProps = {
 function Header({ headerNavItems, overlayNavItems }: HeaderProps) {
   const dispatch = useAppDispatch();
   const dict = useDictionary();
+
   const locale = dict.locale === 'en' || dict.locale === 'fr' ? dict.locale : 'en';
   const homeHref = `/${locale}/`;
   const pathname = usePathname();
-  const { authenticated, idTokenParsed, token, login, logout, init } = useKeycloak();
+  const { authenticated, idTokenParsed, token, login, logout, init, refresh } = useKeycloak();
   const currentUser = useCurrentUser();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [headerBottomPx, setHeaderBottomPx] = useState(88);
   const headerChromeRef = useRef<HTMLDivElement>(null);
   const wasMenuOpenRef = useRef(false);
+  const intervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   useEffect(() => {
     init();
@@ -64,13 +66,23 @@ function Header({ headerNavItems, overlayNavItems }: HeaderProps) {
 
   useEffect(() => {
     if (!authenticated || !token) {
+      if (intervalRef) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = undefined;
+      }
       dispatch(clearCurrentUser());
       return;
     }
     if (currentUser.token !== token || currentUser.status === 'idle') {
       dispatch(loadCurrentUser(token));
     }
-  }, [authenticated, token, currentUser.token, currentUser.status, dispatch]);
+
+    if (authenticated && !intervalRef.current) {
+      intervalRef.current = setInterval(() => {
+        refresh();
+      }, 30000);
+    }
+  }, [authenticated, token, currentUser.token, currentUser.status, dispatch, refresh]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -132,14 +144,15 @@ function Header({ headerNavItems, overlayNavItems }: HeaderProps) {
       const isCurrentTokenUser = currentUser.token === token;
       const backendDisplayName = isCurrentTokenUser ? currentUser.displayName : null;
       const keycloakDisplayName =
-        typeof idTokenParsed?.display_name === 'string' && idTokenParsed.display_name.trim().length > 0
+        typeof idTokenParsed?.display_name === 'string' &&
+        idTokenParsed.display_name.trim().length > 0
           ? idTokenParsed.display_name
           : null;
       const displayName =
         typeof backendDisplayName === 'string' && backendDisplayName.trim().length > 0
           ? backendDisplayName
           : isCurrentTokenUser && currentUser.hasError
-            ? keycloakDisplayName ?? 'Authenticated User'
+            ? (keycloakDisplayName ?? 'Authenticated User')
             : isCurrentTokenUser && currentUser.isLoaded
               ? 'Authenticated User'
               : null;
@@ -186,21 +199,26 @@ function Header({ headerNavItems, overlayNavItems }: HeaderProps) {
         <BcHeader
           title={dict.general.title}
           titleElement="h1"
-          logoLinkElement={
-            <Link href={homeHref} title="Government of British Columbia" />
-          }
+          logoLinkElement={<Link href={homeHref} title="Government of British Columbia" />}
           skipLinks={[
             <BcLink key="skip-main" href="#main-content" isUnstyled>
               {dict.header.skipToMain}
             </BcLink>,
           ]}
         >
-          <div className="mx-auto max-w-6xl w-full flex flex-wrap items-center gap-4 px-4 py-3" data-testid="app-header">
+          <div
+            className="mx-auto max-w-6xl w-full flex flex-wrap items-center gap-4 px-4 py-3"
+            data-testid="app-header"
+          >
             <Heading level={1} className="sr-only">
               {dict.general.title}
             </Heading>
             {headerNavItems.length > 0 ? (
-              <nav aria-label="Primary" data-testid="primary-nav" className="mr-auto hidden md:block">
+              <nav
+                aria-label="Primary"
+                data-testid="primary-nav"
+                className="mr-auto hidden md:block"
+              >
                 <ul className="flex items-center gap-3">
                   {headerNavItems.map((item) => (
                     <li key={item.id}>

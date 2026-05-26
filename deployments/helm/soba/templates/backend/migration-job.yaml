@@ -28,6 +28,10 @@ spec:
             - |
               node dist/src/core/db/migrate.js && node dist/src/core/db/seed.js
           env:
+            - name: LOG_LEVEL
+              value: {{ .Values.backend.config.logLevel | quote }}
+            - name: NODE_ENV
+              value: {{ .Values.backend.config.nodeEnv | quote }}
             {{- if .Values.database.uri }}
             - name: DATABASE_URL
               value: {{ .Values.database.uri | quote }}

@@ -31,13 +31,13 @@ spec:
                 name: {{ include "soba.fullname" . }}-frontend
           livenessProbe:
             httpGet:
-              path: /
+              path: {{ if .Values.global.routePath }}{{ .Values.global.routePath }}/{{ else }}/{{ end }}
               port: http
             initialDelaySeconds: {{ .Values.frontend.livenessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.frontend.livenessProbe.periodSeconds }}
           readinessProbe:
             httpGet:
-              path: /
+              path: {{ if .Values.global.routePath }}{{ .Values.global.routePath }}/{{ else }}/{{ end }}
               port: http
             initialDelaySeconds: {{ .Values.frontend.readinessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.frontend.readinessProbe.periodSeconds }}

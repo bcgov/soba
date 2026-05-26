@@ -7,7 +7,7 @@ describe('isFeaturesMetaPayload', () => {
       isFeaturesMetaPayload({
         features: [
           {
-            code: 'design-mode',
+            code: 'designer',
             name: 'Design mode',
             description: null,
             version: null,

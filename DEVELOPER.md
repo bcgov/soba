@@ -108,10 +108,10 @@ VS Code config lives in `.vscode/launch.json` and `.vscode/tasks.json`.
 
 **Tasks (`tasks.json`):** Run from Command Palette → “Tasks: Run Task”.
 
-| Task                         | Purpose                                              |
-| ---------------------------- | ---------------------------------------------------- |
-| **Dev Services: Up**         | Start MongoDB, PostgreSQL, Form.io, Temporal, etc.    |
-| **Dev Services: Down**       | Stop and remove the dev service containers           |
+| Task                   | Purpose                                            |
+| ---------------------- | -------------------------------------------------- |
+| **Dev Services: Up**   | Start MongoDB, PostgreSQL, Form.io, Temporal, etc. |
+| **Dev Services: Down** | Stop and remove the dev service containers         |
 
 You can also run `docker compose -f .devcontainer/docker-compose.yml up -d` in a terminal, or right-click `docker-compose.yml` and use **Compose Up**.
 
@@ -225,13 +225,13 @@ To keep **transactions consistent across PostgreSQL and the form engine** (e.g. 
 
 Schema and queries live in TypeScript; migrations are SQL in `backend/drizzle/`. The app uses **drizzle-orm** at runtime; **drizzle-kit** (run via `npx` from `backend/`) handles schema introspection and migration generation. Config: `backend/drizzle.config.ts` (reads `DATABASE_URL` from `.env`).
 
-| Command                    | Where           | Purpose                                                                   |
-| -------------------------- | --------------- | ------------------------------------------------------------------------- |
+| Command                    | Where                   | Purpose                                                                   |
+| -------------------------- | ----------------------- | ------------------------------------------------------------------------- |
 | `pnpm db:migrate`          | repo root or `backend/` | Ensure DB exists, then run all pending migrations from `drizzle/`         |
 | `pnpm db:seed`             | repo root or `backend/` | Seed data (run after migrate)                                             |
-| `pnpm db:init`             | repo root       | Migrate then seed (convenience for local setup)                           |
-| `npx drizzle-kit generate` | `backend/`      | Generate a new migration from schema changes (writes SQL into `drizzle/`) |
-| `npx drizzle-kit studio`   | `backend/`      | Open Drizzle Studio (DB GUI); requires `DATABASE_URL`                     |
+| `pnpm db:init`             | repo root               | Migrate then seed (convenience for local setup)                           |
+| `npx drizzle-kit generate` | `backend/`              | Generate a new migration from schema changes (writes SQL into `drizzle/`) |
+| `npx drizzle-kit studio`   | `backend/`              | Open Drizzle Studio (DB GUI); requires `DATABASE_URL`                     |
 
 Schema modules: `backend/src/core/db/schema/` (e.g. `core.ts`, `forms.ts`, `roles.ts`, `feature.ts`, `codes.ts`). After changing schema, run `drizzle-kit generate`, then `pnpm db:migrate` to apply.
 
@@ -294,7 +294,7 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 ### Feature flags
 
 - **Platform:** `GET /meta/features` returns each row with **`platformAllowed`** (from `soba.feature` status). Loaded via `src/shared/config/featuresMeta.ts` (`loadFeaturesMeta`).
-- **Per-frontend deployment:** **`NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`** — comma-separated codes (same as meta, e.g. `workspaces`, `design-mode`, `submit-mode`), or **`*`** / **`all`** alone to allow every platform-allowed feature. **Empty/unset** = no codes allowed at the frontend layer (intersected with `platformAllowed`). Use a subset for submit-only or design-only Next.js images that share one API.
+- **Per-frontend deployment:** **`NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`** — comma-separated codes (same as meta, e.g. `workspaces`, `designer`, `submit-mode`), or **`*`** / **`all`** alone to allow every platform-allowed feature. **Empty/unset** = no codes allowed at the frontend layer (intersected with `platformAllowed`). Use a subset for submit-only or design-only Next.js images that share one API.
 - **`createIsFeatureAllowed(meta)`** returns `isFeatureAllowed(code)` = `platformAllowed && frontendAllowlist`. Constants: `FEATURE_CODES` in `src/shared/featureFlags/flags.ts`.
 
 ### i18n / dictionaries

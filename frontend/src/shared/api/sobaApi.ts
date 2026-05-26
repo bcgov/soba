@@ -1,6 +1,22 @@
 import type { FeaturesMetaPayload } from '@/src/shared/config/featuresMeta';
 import { isFeaturesMetaPayload } from '@/src/shared/config/featuresMeta';
 import { getSobaApiBaseUrl } from '../config/runtimeConfig';
+import { parseJson } from './sobaHelpers';
+
+export type { SobaFormType } from '../../types/forms';
+export {
+  createSobaFormioForm,
+  createFormioForm,
+  updateFormioForm,
+  getFormioForm,
+  publishSobaFormVersion,
+  saveSobaFormVersion,
+  getSobaForm,
+  getSobaFormVersion,
+  getSobaFormVersionFromFormioId,
+  createSobaFormSubmission,
+  getSobaFormioForms,
+} from './sobaApiForms';
 
 export type WorkspaceItem = {
   id: string;
@@ -47,13 +63,6 @@ export type CurrentUserResponse = {
     preferredUsername: string | null;
   };
 };
-
-async function parseJson<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    throw new Error(`Request failed (${response.status})`);
-  }
-  return (await response.json()) as T;
-}
 
 export async function fetchHealth(): Promise<{ status: string }> {
   const response = await fetch(`${getSobaApiBaseUrl()}/health`, {

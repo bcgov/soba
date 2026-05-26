@@ -294,7 +294,7 @@ At startup, [`PluginRegistry.ts`](./backend/src/core/integrations/plugins/Plugin
 | `workspacePluginDefinition`  | Workspace resolver                                 | `WORKSPACE_PLUGINS_ALLOWED` (comma-separated, ordered)     |
 | `idpPluginDefinition`        | Identity provider (JWT validation + claim mapping) | `IDP_PLUGINS` (comma-separated, ordered)                   |
 | `formEnginePluginDefinition` | Form engine adapter                                | `FORM_ENGINE_DEFAULT_CODE`                                 |
-| —                             | Form engine **routes** (optional proxy/API)        | `PLUGIN_<CODE>_ROUTES_ALLOWED=true` (per-engine, explicit)  |
+| —                            | Form engine **routes** (optional proxy/API)        | `PLUGIN_<CODE>_ROUTES_ALLOWED=true` (per-engine, explicit) |
 | `cachePluginDefinition`      | Cache adapter                                      | `CACHE_DEFAULT_CODE`                                       |
 | `messagebusPluginDefinition` | Message bus adapter                                | `MESSAGEBUS_DEFAULT_CODE`                                  |
 | `pluginApiDefinition`        | Optional REST API mounted under `/api/v1`          | Enabled automatically when the workspace plugin is enabled |
@@ -330,15 +330,15 @@ See [Environment Variables — Plugin and feature config](#plugin-and-feature-co
 
 ### Current plugins
 
-| Directory           | Normalized code prefix      | Types exported                  | Notes                                                          |
-| ------------------- | --------------------------- | ------------------------------- | -------------------------------------------------------------- |
-| `personal-local`    | `PLUGIN_PERSONAL_LOCAL_`    | Workspace resolver, Feature API | Personal workspace; auto-creates home workspace on first login |
-| `enterprise-cstar`  | `PLUGIN_ENTERPRISE_CSTAR_`  | Workspace resolver              | Enterprise/ministry workspace; group sync not yet implemented  |
-| `idp-bcgov-sso`     | `PLUGIN_IDP_BCGOV_SSO_`     | IdP                             | BC Gov Keycloak SSO; maps `soba_admin` Keycloak role           |
-| `idp-github`        | `PLUGIN_IDP_GITHUB_`        | IdP                             | GitHub OAuth; alternative IdP                                  |
+| Directory           | Normalized code prefix      | Types exported                  | Notes                                                                                                                  |
+| ------------------- | --------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `personal-local`    | `PLUGIN_PERSONAL_LOCAL_`    | Workspace resolver, Feature API | Personal workspace; auto-creates home workspace on first login                                                         |
+| `enterprise-cstar`  | `PLUGIN_ENTERPRISE_CSTAR_`  | Workspace resolver              | Enterprise/ministry workspace; group sync not yet implemented                                                          |
+| `idp-bcgov-sso`     | `PLUGIN_IDP_BCGOV_SSO_`     | IdP                             | BC Gov Keycloak SSO; maps `soba_admin` Keycloak role                                                                   |
+| `idp-github`        | `PLUGIN_IDP_GITHUB_`        | IdP                             | GitHub OAuth; alternative IdP                                                                                          |
 | `formio-v5`         | `PLUGIN_FORMIO_V5_`         | Form engine                     | Form.io CE; API client and proxy when `PLUGIN_FORMIO_V5_ROUTES_ALLOWED=true` (proxy at `/api/v1/formio-v5`, protected) |
-| `cache-memory`      | `PLUGIN_CACHE_MEMORY_`      | Cache                           | In-process; default. Redis plugin not yet written              |
-| `messagebus-memory` | `PLUGIN_MESSAGEBUS_MEMORY_` | Message bus                     | In-process; default. Redis/NATS plugin not yet written         |
+| `cache-memory`      | `PLUGIN_CACHE_MEMORY_`      | Cache                           | In-process; default. Redis plugin not yet written                                                                      |
+| `messagebus-memory` | `PLUGIN_MESSAGEBUS_MEMORY_` | Message bus                     | In-process; default. Redis/NATS plugin not yet written                                                                 |
 
 ## Features
 
@@ -347,7 +347,7 @@ Features are optional capabilities toggled per deployment in `soba.feature`. Eac
 ### Done
 
 - `soba.feature` and `soba.feature_status` tables exist and are seeded
-- Core features seeded in `soba.feature` include `form-versions`, `submissions`, `meta`, `workspaces`, `design-mode`, `submit-mode` (all enabled by default in seed)
+- Core features seeded in `soba.feature` include `form-versions`, `submissions`, `meta`, `workspaces`, `designer`, `submit-mode` (all enabled by default in seed)
 - `featureRepo` exposes `listFeatures()`, `getFeatureByCode()`, and `isFeatureEnabled(status)`
 - `GET /api/v1/meta` returns all features and their status — this is the backend source of truth
 - Roles and code tables support `source = 'feature'` and `feature_code` so a feature can register its own roles and codes without touching core rows
@@ -369,15 +369,15 @@ Features are optional capabilities toggled per deployment in `soba.feature`. Eac
 
 All `/api/v1/meta` endpoints are **public** (no JWT). They’re the source of truth for config and reference data so the frontend and tools can bootstrap without hardcoding.
 
-| Endpoint                    | Returns                                                                                            | Query params                                               |
-| --------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Endpoint                    | Returns                                                                                                                            | Query params                                               |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | `GET /meta/plugins`         | Discovered plugin catalog — **`allowedPluginCodes`** (from env), per-plugin `enabled` flag, workspace resolver / feature API flags | —                                                          |
-| `GET /meta/features`        | All feature rows from `soba.feature` with **`platformAllowed`** (from status)                      | —                                                          |
-| `GET /meta/form-engines`    | Installed form engine plugins with `isDefault` flag                                                | —                                                          |
-| `GET /meta/build`           | Build metadata — version, `gitSha`, `gitTag`, `imageTag`                                           | —                                                          |
-| `GET /meta/frontend-config` | Keycloak config (url, realm, clientId), API base URL, build name/version                           | —                                                          |
-| `GET /meta/codes`           | All code tables keyed by name (e.g. `form_status`, `workspace_membership_role`)                    | `code_set`, `source`, `is_active`, `only_enabled_features` |
-| `GET /meta/roles`           | All platform roles from `soba.role`                                                                | `code`, `source`, `status`, `only_enabled_features`        |
+| `GET /meta/features`        | All feature rows from `soba.feature` with **`platformAllowed`** (from status)                                                      | —                                                          |
+| `GET /meta/form-engines`    | Installed form engine plugins with `isDefault` flag                                                                                | —                                                          |
+| `GET /meta/build`           | Build metadata — version, `gitSha`, `gitTag`, `imageTag`                                                                           | —                                                          |
+| `GET /meta/frontend-config` | Keycloak config (url, realm, clientId), API base URL, build name/version                                                           | —                                                          |
+| `GET /meta/codes`           | All code tables keyed by name (e.g. `form_status`, `workspace_membership_role`)                                                    | `code_set`, `source`, `is_active`, `only_enabled_features` |
+| `GET /meta/roles`           | All platform roles from `soba.role`                                                                                                | `code`, `source`, `status`, `only_enabled_features`        |
 
 The `/meta/codes` endpoint supports filtering to a specific code set (e.g. `?code_set=workspace_membership_role`) or multiple sets comma-separated. The `only_enabled_features=true` flag excludes codes and roles that belong to disabled features.
 

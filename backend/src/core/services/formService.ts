@@ -7,6 +7,7 @@ import {
   listFormsForWorkspace,
   markFormDeleted,
   updateForm,
+  getFormByEngineSchemaRef,
 } from '../db/repos/formRepo';
 import { env } from '../config/env';
 import {
@@ -92,6 +93,13 @@ export class FormService {
 
   async get(workspaceId: string, formId: string): Promise<FormRecord | null> {
     return getFormById(workspaceId, formId);
+  }
+
+  async getByEngineSchemaRef(
+    workspaceId: string,
+    engineSchemaRef: string,
+  ): Promise<FormRecord | null> {
+    return getFormByEngineSchemaRef(workspaceId, engineSchemaRef);
   }
 
   async list(input: ListInput) {

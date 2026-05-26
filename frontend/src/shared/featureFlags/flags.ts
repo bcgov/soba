@@ -3,7 +3,7 @@ import type { FeaturesMetaPayload } from '@/src/shared/config/featuresMeta';
 /** Feature `code` values aligned with `GET /meta/features` and `soba.feature`. */
 export const FEATURE_CODES = {
   WORKSPACES: 'workspaces',
-  DESIGN_MODE: 'design-mode',
+  DESIGN_MODE: 'designer',
   SUBMIT_MODE: 'submit-mode',
   /** Dev/review: API meta & health inspection (matches `soba.feature` seed code `meta`). */
   META: 'meta',
@@ -46,10 +46,7 @@ export function parseFrontendFeaturesAllowlist(raw: string | undefined): Fronten
   if (raw === undefined || raw.trim() === '') {
     return new Set();
   }
-  const tokens = raw
-    .split(',')
-    .map(normalizeFeatureCode)
-    .filter(Boolean);
+  const tokens = raw.split(',').map(normalizeFeatureCode).filter(Boolean);
   if (tokens.length === 0) {
     return new Set();
   }

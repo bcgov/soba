@@ -15,7 +15,8 @@ export default async function RootLayout({
 }) {
   const { lang } = await params;
   const dictionary = await getDictionary(lang as Locale);
-  const locale = dictionary.locale === 'en' || dictionary.locale === 'fr' ? dictionary.locale : 'en';
+  const locale =
+    dictionary.locale === 'en' || dictionary.locale === 'fr' ? dictionary.locale : 'en';
 
   const featuresMeta = await loadFeaturesMeta();
   const isFeatureAllowed = createIsFeatureAllowed(featuresMeta);

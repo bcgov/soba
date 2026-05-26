@@ -1,6 +1,8 @@
 import { FormService } from '../../services/formService';
 import { FormVersionService } from '../../services/formVersionService';
 import { decodeCursorAndMode, buildNextCursor, type CursorSort } from '../shared/pagination';
+import { createPluginConfigReader } from '../../config/pluginConfig';
+import { getAuthenticatedFormioClient } from '../../../plugins/formio-v5/formioV5Client';
 
 export interface FormsContextInput {
   workspaceId: string;
@@ -153,6 +155,19 @@ export function createFormsApiService(
       return row ? toFormDto(row) : null;
     },
 
+    getFormByEngineRef: async (ctx: FormsContextInput, engineRef: string) => {
+      const version = await formVersionService.getByEngineRef(ctx.workspaceId, engineRef);
+      if (!version) return null;
+
+      const form = await formService.get(ctx.workspaceId, version.formId);
+      if (!form) return null;
+
+      return {
+        ...toFormDto(form),
+        formVersion: toFormVersionDto(version),
+      };
+    },
+
     list: async (ctx: FormsContextInput, query: ListFormsQueryInput) => {
       const { cursorMode, sort, afterId, afterUpdatedAt } = decodeCursorAndMode({
         cursor: query.cursor,
@@ -187,6 +202,73 @@ export function createFormsApiService(
         },
         sort,
       };
+    },
+
+    listFormioForms: async (ctx: FormsContextInput, query: ListFormsQueryInput) => {
+      const { cursorMode, sort, afterId, afterUpdatedAt } = decodeCursorAndMode({
+        cursor: query.cursor,
+        sort: query.sort,
+      });
+
+      const sobaFormsResult = await formService.list({
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        limit: query.limit,
+        q: query.q,
+        status: query.status,
+        sort,
+        cursorMode,
+        afterId,
+        afterUpdatedAt,
+      });
+
+      if (sobaFormsResult.items.length === 0) {
+        return [];
+      }
+
+      const formVersionsResult = await formVersionService.list({
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        limit: 1000,
+        sort: 'id:desc',
+        cursorMode: 'id',
+      });
+
+      const formMap = new Map(sobaFormsResult.items.map(f => [f.id, f]));
+      const refToSobaMap = new Map();
+      const formToRefMap = new Map();
+      const refsToFetch: string[] = [];
+
+      for (const v of formVersionsResult.items) {
+        if (v.engineSchemaRef && formMap.has(v.formId) && !formToRefMap.has(v.formId)) {
+          formToRefMap.set(v.formId, v.engineSchemaRef);
+          refToSobaMap.set(v.engineSchemaRef, {
+            form: formMap.get(v.formId),
+            formVersion: v,
+          });
+          refsToFetch.push(v.engineSchemaRef);
+        }
+      }
+
+      if (refsToFetch.length === 0) {
+        return [];
+      }
+
+      const config = createPluginConfigReader('formio-v5');
+      const client = await getAuthenticatedFormioClient(config);
+      if (!client) {
+        return [];
+      }
+
+      const formioForms = await client.loadForms({ params: { _id__in: refsToFetch.join(',') } });
+
+      return formioForms.map((f: any) => {
+        const sobaData = refToSobaMap.get(f._id);
+        return {
+          ...f,
+          _sobaForm: sobaData,
+        };
+      });
     },
 
     getFormVersion: async (ctx: FormsContextInput, formVersionId: string) => {
@@ -259,6 +341,7 @@ export function createFormsApiService(
         note?: string;
         enqueueProvision?: boolean;
         formioFormDefinition?: Record<string, unknown>;
+        engine_schema_ref?: string;
       },
     ) =>
       formVersionService
@@ -271,6 +354,7 @@ export function createFormsApiService(
           note: input.note,
           enqueueProvision: input.enqueueProvision ?? true,
           formioFormDefinition: input.formioFormDefinition,
+          engineSchemaRef: input.engine_schema_ref || null,
         })
         .then((row) => toFormVersionDto(row)),
 

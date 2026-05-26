@@ -23,6 +23,7 @@ interface CreateInput {
   actorDisplayLabel: string | null;
   formId: string;
   formVersionId: string;
+  workflowState?: string;
 }
 
 interface UpdateInput {
@@ -57,6 +58,7 @@ interface ListInput {
   formId?: string;
   formVersionId?: string;
   workflowState?: string;
+  createdBy?: string;
   sort: SubmissionListSort;
   cursorMode: SubmissionCursorMode;
   afterId?: string;
@@ -125,6 +127,8 @@ export class SubmissionService {
   }
 
   async list(input: ListInput) {
-    return listSubmissionsForWorkspace(input);
+    return listSubmissionsForWorkspace({
+      ...input,
+    });
   }
 }

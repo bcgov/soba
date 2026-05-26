@@ -1,5 +1,5 @@
 import type { AppPlugin } from '@/src/app/plugins/types';
-import { EmptyHomeSection } from '@/src/app/plugins/EmptyHomeSection';
+import SubmissionList from '@/src/features/submit-mode/ui/SubmissionList';
 import { FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 
 export const submitModePlugin: AppPlugin = {
@@ -12,5 +12,5 @@ export const submitModePlugin: AppPlugin = {
     href: `/${locale}/submit`,
     label: dictionary.header.submit,
   }),
-  HomeSection: EmptyHomeSection,
+  HomeSection: SubmissionList,
 };

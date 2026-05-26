@@ -6,7 +6,7 @@ describe('MetaApiService.getFeatures', () => {
   it('maps rows to platformAllowed from status', async () => {
     jest.spyOn(featureRepo, 'listFeatures').mockResolvedValue([
       {
-        code: 'design-mode',
+        code: 'desiger',
         name: 'Design mode',
         description: null,
         version: null,
@@ -28,7 +28,7 @@ describe('MetaApiService.getFeatures', () => {
     const result = await metaApiService.getFeatures();
 
     expect(result.features).toHaveLength(2);
-    const design = result.features.find((f) => f.code === 'design-mode');
+    const design = result.features.find((f) => f.code === 'designer');
     expect(design?.platformAllowed).toBe(true);
     expect(design).not.toHaveProperty('enabled');
     const off = result.features.find((f) => f.code === 'x-off');

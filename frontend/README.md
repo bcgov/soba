@@ -7,7 +7,7 @@ The frontend uses `.env` for backend discovery and runtime bootstrap. It is not 
 **`.env.example`** values are for the **localhost / local dev** environment:
 
 - `NEXT_PUBLIC_SOBA_API_BASE_URL` — SOBA backend API base URL (e.g. `http://localhost:4000/api/v1`)
-- `NEXT_PUBLIC_SOBA_FEATURES_ALLOWED` — comma-separated feature codes from `GET /meta/features` (e.g. `workspaces`, `design-mode`, `submit-mode`, `meta`), or **`*`** / **`all`** to allow every platform-allowed feature. The `meta` code enables the dev-oriented **API meta & health** page (`/{locale}/meta`) in the nav overlay. **Empty/unset:** no feature codes allowed at the frontend layer (plugins with a `featureCode` stay off). Typical local dev: `*`.
+- `NEXT_PUBLIC_SOBA_FEATURES_ALLOWED` — comma-separated feature codes from `GET /meta/features` (e.g. `workspaces`, `designer`, `submit-mode`, `meta`), or **`*`** / **`all`** to allow every platform-allowed feature. The `meta` code enables the dev-oriented **API meta & health** page (`/{locale}/meta`) in the nav overlay. **Empty/unset:** no feature codes allowed at the frontend layer (plugins with a `featureCode` stay off). Typical local dev: `*`.
 
 At runtime, frontend auth configuration (Keycloak URL/realm/clientId) is loaded from backend `GET /api/v1/meta/frontend-config` based on backend IdP config. Feature rows load from `GET /meta/features` for SSR (nav/home plugins).
 
@@ -44,3 +44,7 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Hangs when compiling
+
+If the next server is hanging in compiling / or some other route the fix is often to force a rebuild (stop server, rm -rf .next, restart server)

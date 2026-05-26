@@ -16,11 +16,6 @@ import {
 type Req = Request;
 type Res = Response;
 
-function getToken(req: Req): string | undefined {
-  const t = req.headers['x-jwt-token'];
-  return typeof t === 'string' ? t : Array.isArray(t) ? t[0] : undefined;
-}
-
 function queryFromReq(req: Req): FormioQuery | undefined {
   const q = req.query as Record<string, unknown>;
   if (!q || typeof q !== 'object') return undefined;
@@ -90,133 +85,116 @@ export function createFormioV5ProxyRouter(config: PluginConfigReader): Router {
 
   // CE project root + auth/session endpoints
   router.get('/', async (req, res) => {
-    const token = getToken(req);
     await handleJsonRoute(
       res,
-      async () => (await getClient(config)).loadProject({ token }),
+      async () => (await getClient(config)).loadProject({}),
       'Failed to load project',
     );
   });
 
   router.get('/current', async (req, res) => {
-    const token = getToken(req);
     await handleJsonRoute(
       res,
-      async () => (await getClient(config)).currentUser({ token }),
+      async () => (await getClient(config)).currentUser({}),
       'Failed to load current user',
     );
   });
 
   router.get('/access', async (req, res) => {
-    const token = getToken(req);
     await handleJsonRoute(
       res,
-      async () => (await getClient(config)).loadAccessInfo({ token }),
+      async () => (await getClient(config)).loadAccessInfo({}),
       'Failed to load access info',
     );
   });
 
   router.get('/role', async (req, res) => {
-    const token = getToken(req);
     await handleJsonRoute(
       res,
-      async () => (await getClient(config)).loadRoles(queryFromReq(req), { token }),
+      async () => (await getClient(config)).loadRoles(queryFromReq(req), {}),
       'Failed to load roles',
     );
   });
 
   router.get('/logout', async (req, res) => {
-    const token = getToken(req);
     await handleJsonRoute(
       res,
-      async () => (await (await getClient(config)).logout({ token })) ?? {},
+      async () => (await (await getClient(config)).logout({})) ?? {},
       'Failed to logout',
     );
   });
 
   router.post('/logout', async (req, res) => {
-    const token = getToken(req);
     await handleJsonRoute(
       res,
-      async () => (await (await getClient(config)).logout({ token })) ?? {},
+      async () => (await (await getClient(config)).logout({})) ?? {},
       'Failed to logout',
     );
   });
 
   // Forms
   router.get('/form', async (req, res) => {
-    const token = getToken(req);
+    console.log('hi123123123');
     await handleJsonRoute(
       res,
-      async () => (await getClient(config)).loadForms(queryFromReq(req), { token }),
+      async () => (await getClient(config)).loadForms(queryFromReq(req), {}),
       'Failed to load forms',
     );
   });
 
   router.post('/form', async (req, res) => {
-    const token = getToken(req);
     await handleJsonRoute(
       res,
-      async () => (await getClient(config)).saveForm(req.body, { token }),
+      async () => (await getClient(config)).saveForm(req.body, {}),
       'Failed to create form',
       201,
     );
   });
 
   router.get('/form/:id', async (req, res) => {
-    const token = getToken(req);
     await handleJsonRoute(
       res,
-      async () => (await getClient(config)).loadForm(req.params.id, queryFromReq(req), { token }),
+      async () => (await getClient(config)).loadForm(req.params.id, queryFromReq(req), {}),
       'Failed to load form',
     );
   });
 
   router.put('/form/:id', async (req, res) => {
-    const token = getToken(req);
     await handleJsonRoute(
       res,
-      async () =>
-        (await getClient(config)).saveForm({ ...req.body, _id: req.params.id }, { token }),
+      async () => (await getClient(config)).saveForm({ ...req.body, _id: req.params.id }, {}),
       'Failed to update form',
     );
   });
 
   router.delete('/form/:id', async (req, res) => {
-    const token = getToken(req);
     await handleEmptyRoute(
       res,
-      async () => (await getClient(config)).deleteForm(req.params.id, { token }),
+      async () => (await getClient(config)).deleteForm(req.params.id, {}),
       'Failed to delete form',
     );
   });
 
   // Submissions
   router.get('/form/:formId/submission', async (req, res) => {
-    const token = getToken(req);
     await handleJsonRoute(
       res,
       async () =>
-        (await getClient(config)).loadSubmissions(req.params.formId, queryFromReq(req), { token }),
+        (await getClient(config)).loadSubmissions(req.params.formId, queryFromReq(req), {}),
       'Failed to load submissions',
     );
   });
 
   router.post('/form/:formId/submission', async (req, res) => {
-    const token = getToken(req);
     await handleJsonRoute(
       res,
-      async () =>
-        (await getClient(config)).saveSubmission(req.params.formId, req.body, {
-          token,
-        }),
+      async () => (await getClient(config)).saveSubmission(req.params.formId, req.body, {}),
       'Failed to create submission',
       201,
     );
   });
 
   router.get('/form/:formId/submission/:sid', async (req, res) => {
-    const token = getToken(req);
     await handleJsonRoute(
       res,
       async () =>
@@ -224,32 +202,29 @@ export function createFormioV5ProxyRouter(config: PluginConfigReader): Router {
           req.params.formId,
           req.params.sid,
           queryFromReq(req),
-          { token },
+          {},
         ),
       'Failed to load submission',
     );
   });
 
   router.put('/form/:formId/submission/:sid', async (req, res) => {
-    const token = getToken(req);
     await handleJsonRoute(
       res,
       async () =>
         (await getClient(config)).saveSubmission(
           req.params.formId,
           { ...req.body, _id: req.params.sid },
-          { token },
+          {},
         ),
       'Failed to update submission',
     );
   });
 
   router.delete('/form/:formId/submission/:sid', async (req, res) => {
-    const token = getToken(req);
     await handleEmptyRoute(
       res,
-      async () =>
-        (await getClient(config)).deleteSubmission(req.params.formId, req.params.sid, { token }),
+      async () => (await getClient(config)).deleteSubmission(req.params.formId, req.params.sid, {}),
       'Failed to delete submission',
     );
   });
