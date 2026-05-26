@@ -38,6 +38,7 @@ export interface FormVersionListRow {
   versionNo: number;
   state: string;
   engineSyncStatus: string;
+  engineSchemaRef: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -130,6 +131,7 @@ export const listFormVersionsForWorkspace = async (
       versionNo: formVersions.versionNo,
       state: formVersions.state,
       engineSyncStatus: formVersions.engineSyncStatus,
+      engineSchemaRef: formVersions.engineSchemaRef,
       createdAt: formVersions.createdAt,
       updatedAt: formVersions.updatedAt,
     })

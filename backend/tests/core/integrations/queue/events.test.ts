@@ -25,6 +25,20 @@ describe('events', () => {
     expect(result.formId).toBe(payload.formId);
   });
 
+  it('parseFormVersionCreatePayload accepts optional formioFormDefinition and form slug/name', () => {
+    const payload = {
+      formVersionId: '11111111-1111-4111-a111-111111111111',
+      engineCode: 'formio-v5',
+      formioFormDefinition: { display: 'form', type: 'form', components: [] },
+      formSlug: 'fun-demo',
+      formName: 'Fun',
+    };
+    const result = parseFormVersionCreatePayload(payload);
+    expect(result.formioFormDefinition).toEqual(payload.formioFormDefinition);
+    expect(result.formSlug).toBe('fun-demo');
+    expect(result.formName).toBe('Fun');
+  });
+
   it('parseFormVersionCreatePayload throws on invalid formVersionId', () => {
     expect(() =>
       parseFormVersionCreatePayload({

@@ -24,8 +24,7 @@ The `Dockerfile` builds a Node.js 24 image with:
 
 ### 3. Container start
 
-- **Environment**: `runArgs` loads `backend/.env` and `backend/.env.local` into the container environment.
-- **Host access**: `runArgs` includes `--add-host=host.docker.internal:host-gateway` so that `host.docker.internal` resolves to the host from inside the container (needed on Linux; Docker Desktop on Mac/Windows provides it by default).
+- **Host access**: `runArgs` includes `--add-host=host.docker.internal:host-gateway` so that `host.docker.internal` resolves to the host from inside the container (needed on Linux; Docker Desktop on Mac/Windows provides it by default). Backend and frontend processes still read their own `.env` files via **dotenv** / Next.js; those files are **not** injected into the container via Docker `--env-file`.
 - **Forwarded ports**: 3000 (Frontend), 3001 (Form.io), 4000 (Backend)
 
 ### 4. Post-create (first run only)
@@ -136,7 +135,7 @@ The frontend example uses `NEXT_PUBLIC_SOBA_API_BASE_URL=http://localhost:4000/a
 
 ### Backend
 
-The backend uses `.env` and `.env.local`. Values are loaded in order: `.env` first, then `.env.local` (which overrides matching keys). The backend applies them at runtime via `dotenv`; the devcontainer also injects them into the container environment via `runArgs`.
+The backend uses `.env` and `.env.local`. Values are loaded in order: `.env` first, then `.env.local` (which overrides matching keys). The backend applies them at runtime via `dotenv` only (the devcontainer does not pass them through Docker `runArgs`).
 
 | File                         | Purpose                                                          | Committed |
 | ---------------------------- | ---------------------------------------------------------------- | --------- |
@@ -164,11 +163,11 @@ The frontend uses `.env`. Next.js loads it at build/runtime. The example sets `N
 
 ### How they are applied
 
-| Context              | Mechanism                                                                                 |
-| -------------------- | ----------------------------------------------------------------------------------------- |
-| **Devcontainer**     | `runArgs` passes `--env-file backend/.env` and `--env-file backend/.env.local` to Docker. |
-| **Backend process**  | `dotenv.config('.env')` then `dotenv.config('.env.local', override: true)`.               |
-| **Frontend process** | Next.js loads `frontend/.env` automatically at build and runtime.                         |
+| Context              | Mechanism                                                                   |
+| -------------------- | --------------------------------------------------------------------------- |
+| **Devcontainer**     | Does not load `backend/.env` or `backend/.env.local` into the container env. |
+| **Backend process**  | `dotenv.config('.env')` then `dotenv.config('.env.local', override: true)`. |
+| **Frontend process** | Next.js loads `frontend/.env` automatically at build and runtime.           |
 
 ### Summary
 

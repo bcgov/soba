@@ -1,0 +1,20 @@
+{
+  "name": "soba-integration-tests",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.11.1",
+    "@playwright/test": "^1.58.2",
+    "@types/dotenv": "^6.1.1",
+    "@types/node": "^25.6.0",
+    "dotenv": "^17.3.1",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@otplib/preset-default": "^12.0.1",
+    "otplib": "^13.4.0"
+  }
+}

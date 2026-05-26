@@ -67,7 +67,7 @@ backend:
     outboxPollIntervalMs: "5000"
     outboxBatchSize: "25"
     sobaSystemSubject: soba-system
-    workspacePluginsEnabled: "enterprise-cstar,personal-local"
+    workspacePluginsAllowed: "enterprise-cstar,personal-local"
     workspacePluginsStrictMode: "false"
     pluginEnterpriseCstarHeaderKeys: "x-enterprise-workspace-id,x-cstar-tenant-id"
     pluginEnterpriseCstarRequireExternalHeader: "false"
@@ -76,7 +76,7 @@ backend:
 
   # -- configmap-formio: PLUGIN_FORMIO_V5_* (non-secret values)
   formio:
-    routesEnabled: "true"
+    routesAllowed: "true"
     proxyPath: /formio-v5
     # apiBaseUrl is auto-constructed from the formio service/external URL
 
@@ -96,6 +96,24 @@ backend:
     apiMax: "60"
     publicWindowMs: "60000"
     publicMax: "200"
+
+# -- Outbox worker (same backend image, runs integration_outbox consumer)
+# claimOutboxBatch uses FOR UPDATE SKIP LOCKED — safe to run replicas > 1.
+# enabled defaults to true if omitted (see deployment-outbox-worker template).
+outboxWorker:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  livenessProbe:
+    enabled: false
+    initialDelaySeconds: 60
+    periodSeconds: 60
 
 # -- Frontend (Next.js) ---------------------------------------------------
 frontend:
@@ -136,6 +154,10 @@ frontend:
     minReplicas: 1
     maxReplicas: 3
     targetCPUUtilizationPercentage: 80
+  # Optional: override SOBA_API_INTERNAL_URL (Next SSR → API). Default: in-cluster http://<release>-backend.<namespace>.svc.cluster.local:<port>/api/v1
+  internalApiBaseUrl: ""
+  # Comma-separated codes from GET /meta/features, or * / all for every platform-allowed feature. Empty = none.
+  featuresAllowed: "*"
 
 # -- Database (external Postgres) -----------------------------------------
 database:

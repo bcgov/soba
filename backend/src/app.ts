@@ -23,8 +23,8 @@ import { initializePassport } from './core/auth/passport';
 const app = express();
 const port = Number(process.env.PORT) || 4000;
 
-// Trust X-Forwarded-* headers when behind OpenShift/ingress reverse proxy
-app.set('trust proxy', true);
+// Trust X-Forwarded-* from a bounded number of proxies (not `true` — breaks express-rate-limit IP keys)
+app.set('trust proxy', env.getTrustProxySetting());
 
 initializePassport();
 
@@ -61,7 +61,7 @@ app.use(passport.initialize());
 
 app.use(globalRateLimit);
 
-// ——— Form-engine proxy/routes under /api/v1 (protected; when PLUGIN_<CODE>_ROUTES_ENABLED=true) ———
+// ——— Form-engine proxy/routes under /api/v1 (protected; when PLUGIN_<CODE>_ROUTES_ALLOWED=true) ———
 const formEngineRouteDefs = getFormEngineRouteDefinitions();
 for (const def of formEngineRouteDefs) {
   const path = `/api/v1${def.routeBasePath.startsWith('/') ? '' : '/'}${def.routeBasePath}`;

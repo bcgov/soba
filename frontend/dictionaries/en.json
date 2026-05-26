@@ -10,14 +10,90 @@
   },
   "header": {
     "workspaces": "Workspaces",
+    "design": "Design",
+    "submit": "Submit",
+    "metaReview": "API meta",
     "themeToggle": "Toggle color theme",
-    "skipToMain": "Skip to main content"
+    "skipToMain": "Skip to main content",
+    "menu": "Menu",
+    "closeMenu": "Close Menu",
+    "mobileNavLabel": "Navigation",
+    "openMenuAria": "Open navigation menu",
+    "closeMenuAria": "Close navigation menu"
+  },
+  "metaPage": {
+    "title": "API meta & health",
+    "refresh": "Refresh",
+    "loadCodes": "Load reference codes",
+    "loadRoles": "Load roles",
+    "sections": {
+      "health": "Health",
+      "readiness": "Readiness",
+      "build": "Build",
+      "features": "Features",
+      "frontendConfig": "Frontend config",
+      "plugins": "Plugins",
+      "formEngines": "Form engines",
+      "codes": "Reference codes",
+      "roles": "Roles"
+    }
   },
   "base": {
     "copyToClipboard": {
       "copyToClipboard": "Copy to Clipboard",
       "linkToClipboard": "Link copied to clipboard!",
       "errCopyToClipboard": "Error copying to clipboard."
+    }
+  },
+  "formioV5": {
+    "formList": {
+      "tableHeading": "Forms",
+      "loading": "Loading forms…",
+      "empty": "No forms were returned from the Form.io proxy. Create a form in Form.io or check API configuration.",
+      "refresh": "Refresh",
+      "needLogin": "Sign in to load forms.",
+      "unauthorized": "Unauthorized — your session may have expired. Try signing in again.",
+      "columns": {
+        "title": "Title",
+        "name": "Name",
+        "path": "Path"
+      }
+    },
+    "formRender": {
+      "pageTitle": "Form",
+      "backToList": "Back to form list",
+      "missingId": "No form was selected.",
+      "loadError": "The form could not be loaded. Check the browser network tab and API logs.",
+      "rendererError": "The form renderer stopped unexpectedly. Try again or return to the list.",
+      "segmentError": {
+        "title": "Something went wrong loading this form page.",
+        "tryAgain": "Try again",
+        "backToList": "Back to form list"
+      }
+    }
+  },
+  "submitDemo": {
+    "tableHeading": "SOBA forms",
+    "loading": "Loading…",
+    "empty": "No SOBA forms in this workspace yet.",
+    "generate": "Generate demo SOBA form",
+    "generating": "Creating…",
+    "refresh": "Refresh",
+    "needLogin": "Sign in to view SOBA forms.",
+    "noWorkspace": "No workspace found for your account.",
+    "loadError": "Could not load forms.",
+    "generateError": "Could not create the demo form.",
+    "pollTimeout": "Provisioning is still running. Try refresh in a few seconds.",
+    "openForm": "Open in viewer",
+    "syncPending": "Pending",
+    "syncProvisioning": "Provisioning",
+    "syncReady": "Ready",
+    "syncFailed": "Failed",
+    "columns": {
+      "name": "Name",
+      "slug": "Slug",
+      "sync": "Form.io sync",
+      "open": "Open"
     }
   },
   "forms": {

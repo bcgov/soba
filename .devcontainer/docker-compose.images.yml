@@ -1,7 +1,7 @@
-# Run backend and frontend from images built with: make build
+# Run backend, outbox worker (same backend image), and frontend from images built with: make build
 # Prerequisites: dev services running (postgres, mongo, formio), e.g.:
 #   docker compose -f .devcontainer/docker-compose.yml up -d
-# Optional: create/seed DB once: docker compose -f .devcontainer/docker-compose.yml --profile db-init up
+# First-time DB: with Postgres up: cd backend && pnpm db:migrate && pnpm db:seed
 #
 # Env: backend uses backend/.env.example + backend/.env.local.example (DATABASE_URL overridden for Docker).
 #      frontend uses frontend/.env.example.
@@ -13,10 +13,29 @@ services:
     ports:
       - "4000:4000"
     env_file:
-      - ../backend/.env.example
-      - ../backend/.env.local.example
+      - ../backend/.env
+      - ../backend/.env.local
     environment:
       DATABASE_URL: postgres://postgres:postgres@host.docker.internal:5432/soba
+      # Form.io sidecar runs in sibling compose (host :3001). localhost here is this container.
+      PLUGIN_FORMIO_V5_API_BASE_URL: http://host.docker.internal:3001
+      PLUGIN_FORMIO_V5_ADMIN_API_URL: http://host.docker.internal:3001
+      PLUGIN_FORMIO_V5_RENDER_API_URL: http://host.docker.internal:3001
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  outbox-worker:
+    image: soba/backend:local
+    command: ["node", "backend/dist/src/core/workers/outboxWorker.js"]
+    env_file:
+      - ../backend/.env
+      - ../backend/.env.local
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@host.docker.internal:5432/soba
+      PLUGIN_FORMIO_V5_API_BASE_URL: http://host.docker.internal:3001
+      PLUGIN_FORMIO_V5_ADMIN_API_URL: http://host.docker.internal:3001
+      PLUGIN_FORMIO_V5_RENDER_API_URL: http://host.docker.internal:3001
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
@@ -25,10 +44,11 @@ services:
     image: soba/frontend:local
     ports:
       - "3000:3000"
-    env_file:
-      - ../frontend/.env.example
     environment:
-      NEXT_PUBLIC_SOBA_API_BASE_URL: http://host.docker.internal:4000/api/v1
+      NEXT_PUBLIC_SOBA_API_BASE_URL: http://localhost:4000/api/v1
+      NEXT_PUBLIC_SOBA_FEATURES_ALLOWED: all
+      # SSR / RSC fetch from inside this container (not localhost — that is this container)
+      SOBA_API_INTERNAL_URL: http://backend:4000/api/v1
     depends_on:
       - backend
     restart: unless-stopped

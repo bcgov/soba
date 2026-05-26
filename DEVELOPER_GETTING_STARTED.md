@@ -203,7 +203,7 @@ Protected routes go through three steps:
 
 A workspace is the tenancy boundary: forms, submissions, and members all belong to one. We resolve it on every protected request in `coreContextMiddleware` (see Auth).
 
-We have two resolver plugins, chosen via `WORKSPACE_PLUGINS_ENABLED`:
+We have two resolver plugins, chosen via `WORKSPACE_PLUGINS_ALLOWED`:
 
 - **`personal-local`** — resolves a personal workspace for the actor; auto-creates it on first login via `ensureHomeWorkspace`
 - **`enterprise-cstar`** — resolves workspace from an enterprise context (e.g. a ministry or team); intended for multi-user shared workspaces
@@ -291,10 +291,10 @@ At startup, [`PluginRegistry.ts`](./backend/src/core/integrations/plugins/Plugin
 
 | Export name                  | Plugin type                                        | Selected by env                                            |
 | ---------------------------- | -------------------------------------------------- | ---------------------------------------------------------- |
-| `workspacePluginDefinition`  | Workspace resolver                                 | `WORKSPACE_PLUGINS_ENABLED` (comma-separated, ordered)     |
+| `workspacePluginDefinition`  | Workspace resolver                                 | `WORKSPACE_PLUGINS_ALLOWED` (comma-separated, ordered)     |
 | `idpPluginDefinition`        | Identity provider (JWT validation + claim mapping) | `IDP_PLUGINS` (comma-separated, ordered)                   |
 | `formEnginePluginDefinition` | Form engine adapter                                | `FORM_ENGINE_DEFAULT_CODE`                                 |
-| —                             | Form engine **routes** (optional proxy/API)        | `PLUGIN_<CODE>_ROUTES_ENABLED=true` (per-engine, explicit)  |
+| —                             | Form engine **routes** (optional proxy/API)        | `PLUGIN_<CODE>_ROUTES_ALLOWED=true` (per-engine, explicit)  |
 | `cachePluginDefinition`      | Cache adapter                                      | `CACHE_DEFAULT_CODE`                                       |
 | `messagebusPluginDefinition` | Message bus adapter                                | `MESSAGEBUS_DEFAULT_CODE`                                  |
 | `pluginApiDefinition`        | Optional REST API mounted under `/api/v1`          | Enabled automatically when the workspace plugin is enabled |
@@ -303,7 +303,7 @@ A single plugin directory can export more than one type — for example `persona
 
 ### Selection and priority
 
-- **Workspace resolvers** — all plugins listed in `WORKSPACE_PLUGINS_ENABLED` are activated. They are sorted by `priority` and tried in order on each request; the first resolver that returns a workspace wins.
+- **Workspace resolvers** — all plugins listed in `WORKSPACE_PLUGINS_ALLOWED` are activated. They are sorted by `priority` and tried in order on each request; the first resolver that returns a workspace wins.
 - **IdP plugins** — Passport uses `IDP_PLUGINS` as the ordered provider chain; the first plugin that successfully validates the token and maps claims wins.
 - **Cache, message bus, form engine** — single active instance selected by code; the registry creates it lazily on first use.
 
@@ -336,7 +336,7 @@ See [Environment Variables — Plugin and feature config](#plugin-and-feature-co
 | `enterprise-cstar`  | `PLUGIN_ENTERPRISE_CSTAR_`  | Workspace resolver              | Enterprise/ministry workspace; group sync not yet implemented  |
 | `idp-bcgov-sso`     | `PLUGIN_IDP_BCGOV_SSO_`     | IdP                             | BC Gov Keycloak SSO; maps `soba_admin` Keycloak role           |
 | `idp-github`        | `PLUGIN_IDP_GITHUB_`        | IdP                             | GitHub OAuth; alternative IdP                                  |
-| `formio-v5`         | `PLUGIN_FORMIO_V5_`         | Form engine                     | Form.io CE; API client and proxy when `PLUGIN_FORMIO_V5_ROUTES_ENABLED=true` (proxy at `/api/v1/formio-v5`, protected) |
+| `formio-v5`         | `PLUGIN_FORMIO_V5_`         | Form engine                     | Form.io CE; API client and proxy when `PLUGIN_FORMIO_V5_ROUTES_ALLOWED=true` (proxy at `/api/v1/formio-v5`, protected) |
 | `cache-memory`      | `PLUGIN_CACHE_MEMORY_`      | Cache                           | In-process; default. Redis plugin not yet written              |
 | `messagebus-memory` | `PLUGIN_MESSAGEBUS_MEMORY_` | Message bus                     | In-process; default. Redis/NATS plugin not yet written         |
 
@@ -347,7 +347,7 @@ Features are optional capabilities toggled per deployment in `soba.feature`. Eac
 ### Done
 
 - `soba.feature` and `soba.feature_status` tables exist and are seeded
-- Three core features seeded: `form-versions` (enabled), `submissions` (enabled), `meta` (enabled)
+- Core features seeded in `soba.feature` include `form-versions`, `submissions`, `meta`, `workspaces`, `design-mode`, `submit-mode` (all enabled by default in seed)
 - `featureRepo` exposes `listFeatures()`, `getFeatureByCode()`, and `isFeatureEnabled(status)`
 - `GET /api/v1/meta` returns all features and their status — this is the backend source of truth
 - Roles and code tables support `source = 'feature'` and `feature_code` so a feature can register its own roles and codes without touching core rows
@@ -355,7 +355,7 @@ Features are optional capabilities toggled per deployment in `soba.feature`. Eac
 ### Not Done
 
 - No route, service, or repo actually gates on features. We only call `isFeatureEnabled()` in the meta service and in `roleService` (for feature-linked roles).
-- Frontend still reads flags from env (`NEXT_PUBLIC_FEATURE_FLAGS`), not from `/meta` — see [Frontend](#frontend).
+- Frontend loads `/meta/features` for **`platformAllowed`** and intersects with optional **`NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`** per deployment — see [Frontend](#frontend).
 
 ### Adding a feature
 
@@ -363,7 +363,7 @@ Features are optional capabilities toggled per deployment in `soba.feature`. Eac
 2. Add feature-specific codes to the right code table with `source = '<feature_code>'`.
 3. Add feature-specific roles in `soba.role` with `source = 'feature'` and `feature_code`.
 4. In the service or middleware that implements the feature, call `getFeatureByCode(code)` and `isFeatureEnabled(row.status)` before doing the work.
-5. In the frontend, once we read flags from `/meta`, gate the UI on the feature code from that response.
+5. In the frontend, gate optional surfaces with `createIsFeatureAllowed(meta)` and a matching `featureCode` on the plugin (see `DEVELOPER.md` — Plugins).
 
 ## Meta API
 
@@ -371,8 +371,8 @@ All `/api/v1/meta` endpoints are **public** (no JWT). They’re the source of tr
 
 | Endpoint                    | Returns                                                                                            | Query params                                               |
 | --------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `GET /meta/plugins`         | Discovered plugin catalog — code, enabled flag, whether it has a workspace resolver or feature API | —                                                          |
-| `GET /meta/features`        | All feature rows from `soba.feature` with `enabled` boolean                                        | —                                                          |
+| `GET /meta/plugins`         | Discovered plugin catalog — **`allowedPluginCodes`** (from env), per-plugin `enabled` flag, workspace resolver / feature API flags | —                                                          |
+| `GET /meta/features`        | All feature rows from `soba.feature` with **`platformAllowed`** (from status)                      | —                                                          |
 | `GET /meta/form-engines`    | Installed form engine plugins with `isDefault` flag                                                | —                                                          |
 | `GET /meta/build`           | Build metadata — version, `gitSha`, `gitTag`, `imageTag`                                           | —                                                          |
 | `GET /meta/frontend-config` | Keycloak config (url, realm, clientId), API base URL, build name/version                           | —                                                          |
@@ -381,7 +381,7 @@ All `/api/v1/meta` endpoints are **public** (no JWT). They’re the source of tr
 
 The `/meta/codes` endpoint supports filtering to a specific code set (e.g. `?code_set=workspace_membership_role`) or multiple sets comma-separated. The `only_enabled_features=true` flag excludes codes and roles that belong to disabled features.
 
-> **TODO — Frontend:** We only fetch `/meta/frontend-config` today (on Keycloak init). We should also load and cache on startup: `/meta/features` (replace `NEXT_PUBLIC_FEATURE_FLAGS`), `/meta/codes`, `/meta/roles`, `/meta/form-engines`. Keep `/api/v1/health` live (no cache) for liveness.
+> **TODO — Frontend:** Load and cache `/meta/codes`, `/meta/roles`, `/meta/form-engines` when needed. **`/meta/features`** is loaded for SSR (layout + home) alongside platform allowlist + `NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`. Keycloak init still loads `/meta/frontend-config`. Keep `/api/v1/health` live (no cache) for liveness.
 
 ## Form Engine
 
@@ -389,16 +389,16 @@ Form.io CE runs as a sidecar. The frontend can talk to it via the **same-origin 
 
 ### Form-engine routes (optional)
 
-Form engine plugins can optionally expose HTTP routes (e.g. a Form.io CE proxy) by defining **`routeBasePath`** and **`createRouter(config)`** on the plugin definition. Routes are **only mounted** when the plugin’s config sets **`PLUGIN_<CODE>_ROUTES_ENABLED=true`** (explicit per-engine; not tied to workspace enablement). The path can be static or a function of config (e.g. `PROXY_PATH`). See `getFormEngineRouteDefinitions()` in `PluginRegistry.ts`.
+Form engine plugins can optionally expose HTTP routes (e.g. a Form.io CE proxy) by defining **`routeBasePath`** and **`createRouter(config)`** on the plugin definition. Routes are **only mounted** when the plugin’s config sets **`PLUGIN_<CODE>_ROUTES_ALLOWED=true`** (explicit per-engine; not tied to workspace enablement). The path can be static or a function of config (e.g. `PROXY_PATH`). See `getFormEngineRouteDefinitions()` in `PluginRegistry.ts`.
 
 ### formio-v5 proxy
 
-When **`PLUGIN_FORMIO_V5_ROUTES_ENABLED=true`**, the formio-v5 plugin mounts a Form.io CE API proxy at **`/api/v1/formio-v5`** (path from **`PLUGIN_FORMIO_V5_PROXY_PATH`**, default `/formio-v5`, prefixed with `/api/v1`). The route is **protected**: it uses the same auth as the rest of the v1 API (`checkJwt()`, `resolveActor`), so the client must send a valid app JWT in `Authorization: Bearer`. The proxy forwards requests to the Form.io CE server (using `ADMIN_API_URL`) and optionally passes through **`x-jwt-token`** from the client; otherwise it uses the server-side admin client. This gives the frontend a same-origin base URL for `FormioProvider` (e.g. `baseUrl: '/api/v1/formio-v5'`). All options (base URL, admin credentials) come from plugin config (`PLUGIN_FORMIO_V5_*`); there is no URL logging. Readiness checks stay on the adapter (`readinessCheck()`); readiness is reported via existing `/api/v1/health/ready`.
+When **`PLUGIN_FORMIO_V5_ROUTES_ALLOWED=true`**, the formio-v5 plugin mounts a Form.io CE API proxy at **`/api/v1/formio-v5`** (path from **`PLUGIN_FORMIO_V5_PROXY_PATH`**, default `/formio-v5`, prefixed with `/api/v1`). The route is **protected**: it uses the same auth as the rest of the v1 API (`checkJwt()`, `resolveActor`), so the client must send a valid app JWT in `Authorization: Bearer`. The proxy forwards requests to the Form.io CE server (using `ADMIN_API_URL`) and optionally passes through **`x-jwt-token`** from the client; otherwise it uses the server-side admin client. This gives the frontend a same-origin base URL for `FormioProvider` (e.g. `baseUrl: '/api/v1/formio-v5'`). All options (base URL, admin credentials) come from plugin config (`PLUGIN_FORMIO_V5_*`); there is no URL logging. Readiness checks stay on the adapter (`readinessCheck()`); readiness is reported via existing `/api/v1/health/ready`.
 
 ### Done
 
 - `formio-v5` plugin is wired in and selected via `FORM_ENGINE_DEFAULT_CODE`
-- Form.io CE API client and proxy in `formio-v5`; mount with `PLUGIN_FORMIO_V5_ROUTES_ENABLED=true`
+- Form.io CE API client and proxy in `formio-v5`; mount with `PLUGIN_FORMIO_V5_ROUTES_ALLOWED=true`
 
 ### Not Done
 
@@ -416,11 +416,17 @@ We can’t atomically write to Postgres and Form.io (Mongo). So we write the int
 - `outboxWorker.ts` exists and polls/claims batches
 - `SyncService` shell exists to route events to the right form engine adapter
 
-### Not Done
+### Partially done (local dev)
 
-- Nothing calls `enqueueOutboxEvent` yet — no form or submission write enqueues.
-- No Form.io client (see Form Engine), so `SyncService` has nothing to call.
-- The full flow (enqueue → worker → sync → write ref back) has never been run.
+- `POST /form-versions/{id}/save` with `enqueueProvision: true` enqueues `form_version` events; `FormioEngineAdapter.createFormVersionSchema` calls Form.io `POST /form` when admin credentials are configured (otherwise the adapter falls back to a placeholder ref).
+- **Run the worker:** use the VS Code launch config **SOBA Outbox Worker**, or the compound **SOBA (Backend + Outbox + Temporal + Frontend)**. From `backend/`, you can also run `pnpm outbox-worker` or `pnpm outbox-worker:dev` in a second terminal.
+- **Kubernetes:** the chart deploys **`outboxWorker`** as a second Deployment (same backend image, command `node backend/dist/src/core/workers/outboxWorker.js`); see `deployments/helm/soba/values*.yaml` and `templates/backend/deployment-outbox-worker.yaml`.
+- **Form.io env:** the worker uses the same `PLUGIN_FORMIO_V5_*` settings as the API so provisioning can reach Form.io.
+
+### Still open
+
+- Submission provisioning via outbox remains placeholder in the Form.io adapter.
+- Production deployment should run the outbox worker as its own long-lived process (see deployment docs); locally, start it via the launch config or `pnpm outbox-worker:dev`, not only the API.
 
 ## Cache
 
@@ -618,13 +624,13 @@ Between unit tests and full Playwright E2E, we should add **API-level integratio
 - BC Gov Design System (`@bcgov/design-system-react-components`, tokens, BC Sans).
 - i18n with `en`/`fr` and `useDictionary()`.
 - Redux with typed hooks (`useAppDispatch`, `useAppSelector`).
-- Feature flags (`NEXT_PUBLIC_FEATURE_FLAGS`, `isFeatureEnabled()`) and plugin/home-section registry; workspaces plugin is the reference.
+- Feature gating: `loadFeaturesMeta()` + `createIsFeatureAllowed()` (`platformAllowed` ∩ `NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`); plugin/home-section registry; workspaces plugin has no `featureCode` (always on).
 
 ### Not Done
 
-- No nav menu yet — `getNavItem` exists on the plugin interface but the Header doesn’t render links.
+- Header renders plugin nav when `getNavItem` returns an item (workspaces plugin supplies the home link).
 - No real landing page; home sections are plugin-driven but empty.
-- Feature flags come from env, not the backend — see [Discussion Points — Frontend feature flags](#frontend-feature-flags).
+- Platform feature truth from `/meta/features`; per-frontend narrowing via `NEXT_PUBLIC_SOBA_FEATURES_ALLOWED` (see `DEVELOPER.md`).
 - No role-aware UI (owner, admin, member, viewer).
 - No workspace management UI — we can fetch workspaces but there’s no switch/create/manage.
 - Form rendering UI is minimal; backend path exists, frontend pages are stubs.
@@ -663,7 +669,7 @@ We want to add API-only backend integration tests (see [Testing — API-only int
 
 ## Frontend feature flags
 
-Right now flags come from `NEXT_PUBLIC_FEATURE_FLAGS`. They should come from the backend (`GET /meta/features`) as the single source of truth. Known gap in `DEVELOPER.md` and elsewhere.
+**Resolved:** `GET /meta/features` supplies **`platformAllowed`** per `code`. Each frontend deployment sets **`NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`**: comma-separated codes, or **`*`** / **`all`** for every platform-allowed feature; **empty/unset** = none. Effective UI gate: `platformAllowed && (wildcard || listed)`. See `DEVELOPER.md` — Feature flags.
 
 ## Revision tables — current state vs. history
 

@@ -10,7 +10,7 @@ import {
 } from '../db/repos/formVersionRepo';
 import { db } from '../db/client';
 import { QueueAdapter } from '../integrations/queue/QueueAdapter';
-import { getFormEngineCodeForForm } from '../db/repos/formRepo';
+import { getFormById, getFormEngineCodeForForm } from '../db/repos/formRepo';
 import { buildFormVersionCreateTopic } from '../integrations/form-engine/formEngineTopics';
 import {
   FormVersionCreatePayloadSchema,
@@ -41,6 +41,7 @@ interface SaveInput {
   eventType: string;
   note?: string;
   enqueueProvision?: boolean;
+  formioFormDefinition?: Record<string, unknown>;
 }
 
 interface DeleteInput {
@@ -112,10 +113,15 @@ export class FormVersionService {
           'Cannot enqueue form version provision without a valid form engine',
         );
       }
+      const formRecord =
+        updated.formId != null ? await getFormById(input.workspaceId, updated.formId) : null;
       const payload: FormVersionCreatePayload = FormVersionCreatePayloadSchema.parse({
         formVersionId: input.formVersionId,
         engineCode: formEngineCode,
         formId: updated.formId ?? undefined,
+        formioFormDefinition: input.formioFormDefinition,
+        formSlug: formRecord?.slug,
+        formName: formRecord?.name,
       });
       await this.queueAdapter.enqueue({
         topic: buildFormVersionCreateTopic(formEngineCode),

@@ -48,7 +48,7 @@ export const getPluginCatalog = (): PluginCatalogEntry[] => {
     const code = workspaceDef?.code || apiDef?.code || dir;
     return {
       code,
-      enabled: config.enabledPlugins.includes(code),
+      enabled: config.allowedPlugins.includes(code),
       hasWorkspaceResolver: Boolean(workspaceDef),
       hasApi: Boolean(apiDef),
       apiBasePath: apiDef?.basePath,
@@ -66,6 +66,6 @@ export const getEnabledPluginApiDefinitions = (): FeatureApiDefinition[] => {
       apiDefinition: module.pluginApiDefinition,
     }))
     .filter((entry) => Boolean(entry.workspaceDefinition && entry.apiDefinition))
-    .filter((entry) => config.enabledPlugins.includes(entry.workspaceDefinition!.code))
+    .filter((entry) => config.allowedPlugins.includes(entry.workspaceDefinition!.code))
     .map((entry) => entry.apiDefinition!);
 };
