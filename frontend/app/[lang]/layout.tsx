@@ -2,9 +2,11 @@ import DictionaryProvider from './Providers';
 import { Locale } from './dictionaries';
 import { getDictionary } from './dictionaries';
 import { Header } from '../ui/Header';
+import { Footer } from '../ui/Footer';
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed } from '@/src/shared/featureFlags/flags';
 import { getHeaderNavigationItems, getOverlayNavigationItems } from '@/src/app/plugins/registry';
+import React from 'react';
 
 export default async function RootLayout({
   children,
@@ -26,9 +28,14 @@ export default async function RootLayout({
   return (
     <DictionaryProvider dictionary={dictionary}>
       <Header headerNavItems={headerNavItems} overlayNavItems={overlayNavItems} />
-      <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl w-full">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8"
+      >
         {children}
       </main>
+      <Footer hideAcknowledgement={true} contact={React.createElement('span', null, '')} />
     </DictionaryProvider>
   );
 }

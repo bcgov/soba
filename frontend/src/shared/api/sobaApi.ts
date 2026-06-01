@@ -16,6 +16,7 @@ export {
   getSobaFormVersionFromFormioId,
   createSobaFormSubmission,
   getSobaFormioForms,
+  getSobaFormVersions,
 } from './sobaApiForms';
 
 export type WorkspaceItem = {

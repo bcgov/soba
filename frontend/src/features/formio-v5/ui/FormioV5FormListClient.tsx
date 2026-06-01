@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Heading, InlineAlert, Text } from '@bcgov/design-system-react-components';
+import { Alert, Button, Table } from 'react-bootstrap';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { getKeycloakInstance } from '@/lib/slices/keycloakSlice';
@@ -61,42 +61,46 @@ export default function FormioV5FormListClient() {
 
   if (!authenticated) {
     return (
-      <div className="mt-4">
-        <InlineAlert variant="warning" role="status">
+      <div className="mt-3">
+        <Alert variant="warning" role="status">
           {labels.needLogin}
-        </InlineAlert>
+        </Alert>
       </div>
     );
   }
 
   if (state.status === 'loading') {
     return (
-      <div className="mt-6">
-        <Text className="text-sm text-[var(--typography-color-secondary)]">{labels.loading}</Text>
+      <div className="mt-4">
+        <p className="text-muted small">{labels.loading}</p>
       </div>
     );
   }
 
   if (state.status === 'error') {
     return (
-      <div className="mt-6 space-y-3">
-        <InlineAlert variant="danger" role="alert">
+      <div className="mt-4 d-flex flex-column gap-3">
+        <Alert variant="danger" role="alert">
           {state.message}
-        </InlineAlert>
-        <Button type="button" onClick={() => void load()}>
-          {labels.refresh}
-        </Button>
+        </Alert>
+        <div>
+          <Button type="button" variant="secondary" onClick={() => void load()}>
+            {labels.refresh}
+          </Button>
+        </div>
       </div>
     );
   }
 
   if (state.status === 'ok' && state.forms.length === 0) {
     return (
-      <div className="mt-6 space-y-3">
-        <Text className="text-sm text-[var(--typography-color-secondary)]">{labels.empty}</Text>
-        <Button type="button" onClick={() => void load()}>
-          {labels.refresh}
-        </Button>
+      <div className="mt-4 d-flex flex-column gap-3">
+        <p className="text-muted small">{labels.empty}</p>
+        <div>
+          <Button type="button" variant="secondary" onClick={() => void load()}>
+            {labels.refresh}
+          </Button>
+        </div>
       </div>
     );
   }
@@ -108,42 +112,38 @@ export default function FormioV5FormListClient() {
   const { forms } = state;
 
   return (
-    <div className="mt-6">
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <Heading className="text-base font-semibold" level={2}>
-          {labels.tableHeading}
-        </Heading>
-        <Button type="button" onClick={() => void load()}>
+    <div className="mt-4">
+      <div className="mb-3 d-flex flex-wrap align-items-center gap-3">
+        <h2 className="h5 mb-0 fw-semibold">{labels.tableHeading}</h2>
+        <Button type="button" variant="secondary" size="sm" onClick={() => void load()}>
           {labels.refresh}
         </Button>
       </div>
-      <div className="overflow-x-auto rounded border border-[var(--surface-color-border-default)]">
-        <table className="w-full min-w-[32rem] border-collapse text-left text-sm">
-          <thead>
-            <tr className="border-b border-[var(--surface-color-border-default)] bg-[var(--surface-color-background-subtle)]">
-              <th className="px-3 py-2 font-semibold">{labels.columns.title}</th>
-              <th className="px-3 py-2 font-semibold">{labels.columns.name}</th>
-              <th className="px-3 py-2 font-semibold">{labels.columns.path}</th>
+      <div className="overflow-auto border rounded">
+        <Table hover bordered responsive className="mb-0 small">
+          <thead className="table-light">
+            <tr>
+              <th>{labels.columns.title}</th>
+              <th>{labels.columns.name}</th>
+              <th>{labels.columns.path}</th>
             </tr>
           </thead>
           <tbody>
             {forms.map((f: FormioV5FormListItem) => {
-              const href = `/${locale}/forms/${encodeURIComponent(f._id)}`;
+              const href = `/${locale}/${encodeURIComponent(f._id)}`;
               const name = formDisplayName(f);
               return (
-                <tr key={f._id} className="border-b border-[var(--surface-color-border-default)] last:border-b-0">
-                  <td className="px-3 py-2">
-                    <Link className="text-[var(--theme-primary-blue)] underline hover:no-underline" href={href}>
-                      {name}
-                    </Link>
+                <tr key={f._id}>
+                  <td>
+                    <Link href={href}>{name}</Link>
                   </td>
-                  <td className="px-3 py-2 text-[var(--typography-color-secondary)]">{f.name ?? '—'}</td>
-                  <td className="px-3 py-2 text-[var(--typography-color-secondary)]">{f.path ?? '—'}</td>
+                  <td className="text-muted">{f.name ?? '—'}</td>
+                  <td className="text-muted">{f.path ?? '—'}</td>
                 </tr>
               );
             })}
           </tbody>
-        </table>
+        </Table>
       </div>
     </div>
   );

@@ -1,13 +1,30 @@
-import { redirect } from 'next/navigation';
-import { hasLocale, type Locale } from '../dictionaries';
+import { getDictionary, resolveLocale } from '../dictionaries';
+import FormList from '@/src/features/designer/ui/FormList';
+import Link from 'next/link';
+import { AuthRedirect } from '@/src/app/ui/AuthRedirect';
 
 type PageProps = {
   params: Promise<{ lang: string }>;
 };
 
-/** Entry point for Form.io v5 UI; submit page hosts the proxy smoke panel. */
+export async function generateMetadata({ params }: PageProps) {
+  const param = await params;
+  const locale = resolveLocale(param.lang);
+  const dict = await getDictionary(locale);
+  return {
+    title: `${dict.general.title}`,
+    description: dict.general.description,
+  };
+}
+
 export default async function Page({ params }: PageProps) {
-  const { lang } = await params;
-  const locale = hasLocale(lang) ? lang : 'en';
-  redirect(`/${locale as Locale}/submit`);
+  const param = await params;
+  const locale = resolveLocale(param.lang);
+  return (
+    <AuthRedirect to={`/${locale}`} ifLogged={false}>
+      <div>
+        <FormList />
+      </div>
+    </AuthRedirect>
+  );
 }

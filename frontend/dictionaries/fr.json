@@ -4,9 +4,12 @@
     "login": "Connecter",
     "loggedAs": "Connecter á",
     "logout": "Déconnexion",
-    "title": "SOBA",
+    "title": "CHEFS 2",
     "description": "Formulaires de Nouvelle Génération",
-    "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à cette section."
+    "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à cette section.",
+    "forms": "Formulaires",
+    "feedback": "Retour d'information",
+    "help": "Aidé"
   },
   "header": {
     "workspaces": "Espaces de travail",
@@ -75,13 +78,13 @@
     }
   },
   "submitDemo": {
-    "tableHeading": "Formulaires SOBA",
+    "tableHeading": "Formulaires CHEFS 2",
     "loading": "Chargement…",
-    "empty": "Aucun formulaire SOBA dans cet espace pour l’instant.",
-    "generate": "Générer un formulaire SOBA de démo",
+    "empty": "Aucun formulaire CHEFS 2 dans cet espace pour l’instant.",
+    "generate": "Générer un formulaire CHEFS 2 de démo",
     "generating": "Création…",
     "refresh": "Actualiser",
-    "needLogin": "Connectez-vous pour voir les formulaires SOBA.",
+    "needLogin": "Connectez-vous pour voir les formulaires CHEFS 2.",
     "noWorkspace": "Aucun espace de travail trouvé pour votre compte.",
     "loadError": "Impossible de charger les formulaires.",
     "generateError": "Impossible de créer le formulaire de démo.",
@@ -125,7 +128,16 @@
     "schemaNotAvailable": "Schéma du formulaire non disponible.",
     "edit": "Modifier",
     "input": "Soumettre les données",
-    "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à ce formulaire."
+    "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à ce formulaire.",
+    "visibilityLabel": "Visibilité / Contrôle d'accès",
+    "selectVisibility": "Sélectionner la visibilité",
+    "visibilityPublic": "Publique",
+    "disclaimerLabel": "J'accepte l'avis de non-responsabilité et la déclaration de responsabilité",
+    "disclaimerTitle": "Avis de non-responsabilité",
+    "disclaimerText1": "Il est de votre responsabilité de vous conformer aux lois sur la protection de la vie privée régissant la collecte, l'utilisation et la divulgation d'informations personnellement identifiables.",
+    "disclaimerText2": "L'accès à cet outil de conception de formulaires n'accorde pas intrinsèquement l'autorisation de collecter, d'utiliser ou de divulguer des informations personnellement identifiables.",
+    "disclaimerText3": "Il est de votre responsabilité d'obtenir le consentement pour recueillir des informations comme l'exige la loi.",
+    "disclaimerText4": "Si vous utilisez BCeID ou BC Services Card comme options d'accès au formulaire, vous DEVEZ aviser l'équipe de gestion des informations d'identité (IDIM) par courriel (IDIM.Consulting@gov.bc.ca) de votre intention d'utiliser BCeID ou BC Services Card."
   },
   "submission": {
     "submissions": "Soumissions",
@@ -136,11 +148,22 @@
     "view": "Voir",
     "workflow": "Flux de travail",
     "columns": {
-      "id": "ID",
-      "created": "Créé",
-      "status": "Statut",
+      "id": "ID de Soumission",
+      "formName": "Nom du Formulaire",
+      "formId": "ID du Formulaire",
       "version": "Version",
+      "status": "Statut",
       "user": "Utilisateur"
+    },
+    "formList": {
+      "columns": {
+        "name": "Nom du Formulaire",
+        "version": "Version",
+        "path": "Chemin",
+        "actions": "Actions",
+        "createdBy": "Créé par",
+        "createdAt": "Date de création"
+      }
     }
   },
 

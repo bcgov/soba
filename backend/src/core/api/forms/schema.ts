@@ -13,9 +13,12 @@ export const CreateFormBodySchema = z
   })
   .openapi('Forms_CreateFormBody');
 
+export const FormVisibilityEnum = z.enum(['public', 'idir', 'bc-services-card', 'bceid']);
+
 export const CreateFormVersionBodySchema = z
   .object({
     formId: z.string().min(1),
+    visibility: z.array(FormVisibilityEnum).optional(),
   })
   .openapi('Forms_CreateFormVersionBody');
 
@@ -40,6 +43,7 @@ export const FormEngineRefParamsSchema = z
 export const UpdateFormVersionBodySchema = z
   .object({
     state: z.string().min(1).optional(),
+    visibility: z.array(FormVisibilityEnum).optional(),
   })
   .openapi('Forms_UpdateFormVersionBody');
 
@@ -111,6 +115,7 @@ export const FormVersionResponseSchema = z
     engineSchemaRef: z.string().nullable(),
     currentRevisionNo: z.number().int(),
     publishedAt: z.string().nullable(),
+    visibility: z.array(z.string()),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -155,6 +160,7 @@ export const FormVersionListItemSchema = z
     state: z.string(),
     engineSyncStatus: z.string(),
     engineSchemaRef: z.string().nullable(),
+    visibility: z.array(z.string()),
     createdAt: z.string(),
     updatedAt: z.string(),
   })

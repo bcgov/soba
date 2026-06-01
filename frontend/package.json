@@ -20,7 +20,6 @@
   },
   "dependencies": {
     "@bcgov/bc-sans": "^2.1.0",
-    "@bcgov/design-system-react-components": "^0.6.1",
     "@bcgov/design-tokens": "^3.2.0",
     "@formatjs/intl-localematcher": "^0.8.1",
     "@formio/js": "5.4.0-api98.1",
@@ -40,7 +39,6 @@
     "react-redux": "^9.2.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
     "@types/negotiator": "^0.6.4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -54,7 +52,6 @@
     "globals": "^17.3.0",
     "nodemon": "^3.1.11",
     "prettier": "^3.8.1",
-    "tailwindcss": "^4",
     "typescript": "^5",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^4.0.18"

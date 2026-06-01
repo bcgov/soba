@@ -1,103 +1,281 @@
 'use client';
 
-import dynamic from 'next/dynamic';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Spinner, Container, Form, InputGroup, Button } from 'react-bootstrap';
+import { DataTable, type Column } from '@/src/shared/components/DataTable';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useRouter, usePathname } from 'next/navigation';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
+import { FaGear, FaRegFile, FaWrench, FaPaperPlane, FaMagnifyingGlass, FaX } from 'react-icons/fa6';
+import { getSobaFormioForms } from '@/src/shared/api/sobaApi';
+import { useAppSelector } from '@/lib/store';
+import type { FormType } from '@formio/react';
 
-import 'bootstrap/dist/css/bootstrap.min.css';
-import '@formio/js/dist/formio.full.min.css';
+const CustomActionButtons = ({
+  form,
+  onAction,
+}: {
+  form: FormType;
+  onAction: (name: string, id: string) => void;
+}) => {
+  const formId = (form as any)._id || (form as any).id;
 
-const FormGrid = dynamic(() => import('@formio/react').then((mod) => mod.FormGrid), { ssr: false });
-const FormioProvider = dynamic(() => import('@formio/react').then((mod) => mod.FormioProvider), {
-  ssr: false,
-});
-
-type Action = { name: string; fn: (capId: string) => void };
-
-interface FormActionButtonProps {
-  action: Action;
-  onClick: () => void;
-  row?: { _id: string; id?: string };
-  form?: { _id: string; id?: string };
-}
-
-const CustomActionButtons = ({ action, onClick }: FormActionButtonProps) => {
-  const dict = useDictionary();
-  const router = useRouter();
-  const pathname = usePathname();
-  const locale = getLocaleFromPath(pathname);
-
-  const handleAction = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const spyFn = (capturedId: string) => {
-      if (capturedId) {
-        router.push(`/${locale}/forms/${capturedId}`);
-      }
-    };
-
-    action.fn = spyFn;
-
-    onClick();
-  };
-
-  if (action.name.toLowerCase() === 'delete') {
-    return (
-      <button type="button" onClick={handleAction} className="btn btn-primary btn-sm">
-        {/* We are visually replacing "Delete" with "Edit" or "Load" */}
-        {dict.form.input || 'Input Data'}
-      </button>
-    );
-  }
-
-  const actionKey = action.name.toLowerCase() as keyof typeof dict.form;
+  const actions = [
+    { name: 'manage', title: 'Manage' },
+    { name: 'submissions', title: 'Submissions' },
+  ];
 
   return (
-    <button onClick={onClick} className="btn btn-primary btn-sm">
-      {dict.form[actionKey] || action.name}
-    </button>
+    <div className="d-flex gap-2 justify-content-start">
+      {actions.map((action) => {
+        return (
+          <button
+            key={action.name}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onAction(action.name, formId);
+            }}
+            className="btn btn-link p-0 m-0"
+            style={{ textDecoration: 'underline', color: '#00538A' }}
+            title={action.title}
+          >
+            <div className="position-relative d-inline-flex align-items-center justify-content-center">
+              {action.title}
+            </div>
+          </button>
+        );
+      })}
+    </div>
   );
 };
 
 function FormList() {
-  const { authenticated, token, initializing } = useKeycloak();
   const dict = useDictionary();
+  const dictFormList = dict.submission?.formList;
+  const dictForm = dict.form;
+  const { authenticated, token, initializing } = useKeycloak();
+
+  // Helper type for the form object used in the table
+  type TableForm = FormType & {
+    _id?: string;
+    id?: string;
+    title?: string;
+    name?: string;
+    path?: string;
+    _sobaForm?: {
+      formVersion?: { versionNo?: number; state?: string; createdAt?: string; createdBy: string };
+    };
+  };
   const router = useRouter();
   const pathname = usePathname();
 
-  // Show a loader while we are waiting for Keycloak AND the Formio patch
-  if (initializing || (authenticated && !token)) {
-    return <div className="p-4">{dict.form.loading}</div>;
-  }
+  const [forms, setForms] = useState<FormType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!authenticated) {
-    return <div className="p-4">{dict.form.notAuthenticated}</div>;
-  }
-
-  const gridComponents = {
-    FormActionButton: CustomActionButtons,
-  };
+  const [searchQuery, setSearchQuery] = useState('');
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const locale = getLocaleFromPath(pathname);
 
-  const handleFormClick = (id: string) => {
-    if (id) {
-      router.push(`/${locale}/designer/${id}`);
+  const { activeWorkspaceId } = useAppSelector((state) => state.workspace);
+
+  useEffect(() => {
+    if (authenticated && token && activeWorkspaceId) {
+      let isMounted = true;
+      const loadForms = async () => {
+        setLoading(true);
+        try {
+          const data = await getSobaFormioForms(token as string, activeWorkspaceId);
+          if (isMounted) {
+            setForms(Array.isArray(data) ? data : []);
+          }
+        } catch (err: unknown) {
+          console.error('Error fetching forms:', err);
+          if (isMounted && err && typeof err === 'object' && 'message' in err) {
+            setError((err as { message: string }).message);
+          }
+        } finally {
+          if (isMounted) {
+            setLoading(false);
+          }
+        }
+      };
+      loadForms();
+      return () => {
+        isMounted = false;
+      };
     }
-  };
+  }, [authenticated, token, activeWorkspaceId]);
+
+  const filteredForms = useMemo(() => {
+    if (!searchQuery.trim()) return forms;
+    const query = searchQuery.toLowerCase();
+    return forms.filter(
+      (f) =>
+        (f.title || '').toLowerCase().includes(query) ||
+        (f.name || '').toLowerCase().includes(query) ||
+        (f.path || '').toLowerCase().includes(query),
+    );
+  }, [forms, searchQuery]);
+
+  // Removed unused totalPages
+  const paginatedForms = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredForms.slice(start, start + pageSize);
+  }, [filteredForms, currentPage, pageSize]);
+
+  useEffect(() => {
+    const setP = () => {
+      setCurrentPage(1);
+    };
+    setP();
+  }, [searchQuery, pageSize]);
+
+  const handleAction = useCallback(
+    (name: string, id: string) => {
+      if (name === 'manage') {
+        router.push(`/${locale}/designer/${id}`);
+      } else if (name === 'submit') {
+        router.push(`/${locale}/form/${id}`);
+      } else if (name === 'submissions') {
+        router.push(`/${locale}/submissions/${id}`);
+      }
+    },
+    [router, locale],
+  );
+
+  const columns: Column<TableForm>[] = useMemo(
+    () => [
+      {
+        key: 'name',
+        label: dictFormList?.columns?.name || dictForm?.nameLabel || 'Form Name',
+        width: '40%',
+        render: (form: TableForm) => {
+          const formId = form._id || form.id;
+          return (
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                handleAction('edit', formId!);
+              }}
+              className="text-decoration-underline"
+              style={{ cursor: 'pointer', color: '#00538A' }}
+            >
+              {form.title || form.name || dictForm?.nameLabel || 'Untitled Form'}
+            </a>
+          );
+        },
+      },
+      {
+        key: 'actions',
+        label: dictFormList?.columns?.actions || 'Actions',
+        align: 'start',
+        render: (form: TableForm) => <CustomActionButtons form={form} onAction={handleAction} />,
+      },
+      {
+        key: 'created',
+        label: dictFormList?.columns?.createdBy || 'Created By',
+        render: (form: TableForm) => {
+          const version = form._sobaForm?.formVersion;
+          if (!version) return <span className="text-muted small">v1</span>;
+          return <span className="small">{version.createdBy}</span>;
+        },
+      },
+      {
+        key: 'updated',
+        label: dictFormList?.columns?.createdAt || 'Created Date',
+        render: (form: TableForm) => {
+          const version = form._sobaForm?.formVersion;
+          if (!version || !version?.createdAt) return <span className="small"></span>;
+          const dString = new Intl.DateTimeFormat('en-US', {
+            month: 'long', // "May"
+            day: 'numeric', // "25"
+            year: 'numeric', // "2026"
+          }).format(new Date(version?.createdAt));
+          return <span className="small">{dString}</span>;
+        },
+      },
+    ],
+    [handleAction, dictFormList, dictForm],
+  );
+
+  if (initializing)
+    return (
+      <div className="p-5 text-center">
+        <Spinner animation="border" />
+      </div>
+    );
+  if (!authenticated) return <div className="p-5 text-center">{dict.general.notAuthenticated}</div>;
 
   return (
-    <section className="p-4">
-      <FormioProvider
-        baseUrl={process.env.NEXT_PUBLIC_SOBA_API_BASE_URL + '/forms/formio'}
-        projectUrl={process.env.NEXT_PUBLIC_SOBA_API_BASE_URL + '/forms/formio'}
-      >
-        <FormGrid components={gridComponents} onFormClick={handleFormClick} />
-      </FormioProvider>
-    </section>
+    <Container fluid className="py-4 px-lg-5">
+      <div>
+        <h1>Forms</h1>
+      </div>
+      <div className="mb-3 d-flex justify-content-between align-items-center">
+        <Button 
+          variant="primary" 
+          onClick={() => router.push(`/${locale}/designer`)}
+          style={{ backgroundColor: '#003366', borderColor: '#003366', borderRadius: '4px', padding: '6px 16px', fontWeight: '500' }}
+        >
+          Create
+        </Button>
+
+        <InputGroup style={{ maxWidth: '300px' }}>
+          <Form.Control
+            placeholder="Search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="border-end-0"
+          />
+          {searchQuery && (
+            <Button
+              variant="outline-secondary"
+              className="border-start-0 border-end-0 bg-white"
+              onClick={() => setSearchQuery('')}
+              style={{ borderColor: '#dee2e6' }}
+            >
+              <FaX size={12} />
+            </Button>
+          )}
+          <InputGroup.Text className="bg-white" style={{ cursor: 'pointer' }}>
+            <FaMagnifyingGlass className="text-muted" />
+          </InputGroup.Text>
+        </InputGroup>
+      </div>
+
+      <DataTable<TableForm>
+        data={paginatedForms as TableForm[]}
+        columns={columns}
+        loading={loading}
+        error={error}
+        emptyMessage="No forms found matching your criteria."
+        loadingMessage="Loading forms..."
+        itemName="items"
+        pageSize={pageSize}
+        currentPage={currentPage}
+        totalItems={filteredForms.length}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={setPageSize}
+        pageSizeOptions={[5, 10, 25, 50]}
+        keyExtractor={(form) => form._id || form.id || form.path || ''}
+      />
+
+      <style jsx global>{`
+        .hover\:text-primary:hover {
+          color: var(--bs-primary) !important;
+        }
+        .table-hover tbody tr:hover {
+          background-color: rgba(0, 123, 255, 0.03) !important;
+        }
+      `}</style>
+    </Container>
   );
 }
 

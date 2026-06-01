@@ -1,5 +1,5 @@
-import { getDictionary, hasLocale, Locale, resolveLocale } from '../../dictionaries';
-import FormForm from '@/src/features/designer/ui/FormForm';
+import { getDictionary, hasLocale, Locale } from '../../dictionaries';
+import FormDesignerLoader from '@/src/features/designer/ui/FormDesignerLoader';
 
 type PageProps = {
   params: Promise<{ lang: string; formId: string }>;
@@ -10,7 +10,7 @@ export async function generateMetadata({ params }: PageProps) {
   if (!hasLocale(param.lang)) {
     param.lang = 'en';
   }
-  const dict = await getDictionary(param.lang as Locale); // ensure lang is valid
+  const dict = await getDictionary(param.lang as Locale);
   return {
     title: `Form Designer | ${dict.general.title}`,
     description: dict.general.description,
@@ -22,7 +22,7 @@ export default async function Page({ params }: PageProps) {
 
   return (
     <section className="p-4" aria-labelledby="designer-heading">
-      <FormForm id={[formId]} />
+      <FormDesignerLoader id={[formId]} />
     </section>
   );
 }

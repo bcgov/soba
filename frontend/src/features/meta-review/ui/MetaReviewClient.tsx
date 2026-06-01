@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Button, Heading, InlineAlert, Text } from '@bcgov/design-system-react-components';
+import { Alert, Button } from 'react-bootstrap';
 import { useDictionary } from '@/app/[lang]/Providers';
 import {
   fetchBuildMeta,
@@ -31,19 +31,19 @@ function formatJson(data: unknown): string {
 }
 
 function JsonBlock({ state }: { state: SectionState }) {
-  if (state.status === 'loading') return <Text>Loading…</Text>;
+  if (state.status === 'loading') return <p className="text-muted small mb-0">Loading…</p>;
   if (state.status === 'error') {
     return (
       <div className="mt-2">
-        <InlineAlert variant="danger" role="alert">
+        <Alert variant="danger" role="alert">
           {state.message}
-        </InlineAlert>
+        </Alert>
       </div>
     );
   }
   if (state.status === 'ok') {
     return (
-      <pre className="mt-2 max-h-[28rem] overflow-auto rounded border border-[var(--surface-color-border-default)] bg-[var(--surface-color-background-subtle)] p-3 text-xs">
+      <pre className="mt-2 border rounded bg-light p-3 small overflow-auto" style={{ maxHeight: '28rem' }}>
         {formatJson(state.data)}
       </pre>
     );
@@ -61,8 +61,8 @@ function MetaSection({
   children?: ReactNode;
 }) {
   return (
-    <section className="mb-8 border-b border-[var(--surface-color-border-default)] pb-6 last:mb-0 last:border-b-0">
-      <Heading className="mb-2">{title}</Heading>
+    <section className="mb-4 pb-4 border-bottom">
+      <h2 className="h5 mb-2">{title}</h2>
       {children}
       <JsonBlock state={state} />
     </section>
@@ -161,21 +161,19 @@ export default function MetaReviewClient() {
 
   if (!labels) {
     return (
-      <InlineAlert variant="warning">
+      <Alert variant="warning">
         Missing dictionary keys for this page (metaPage).
-      </InlineAlert>
+      </Alert>
     );
   }
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <Button type="button" onClick={() => void loadCore()}>
+      <div className="mb-4 d-flex flex-wrap align-items-center gap-3">
+        <Button type="button" variant="secondary" onClick={() => void loadCore()}>
           {labels.refresh}
         </Button>
-        <Text className="text-sm text-[var(--typography-color-secondary)]">
-          GET /health, /health/ready, /meta/*
-        </Text>
+        <p className="text-muted small mb-0">GET /health, /health/ready, /meta/*</p>
       </div>
 
       <MetaSection title={labels.sections.health} state={health} />
@@ -186,26 +184,28 @@ export default function MetaReviewClient() {
       <MetaSection title={labels.sections.plugins} state={plugins} />
       <MetaSection title={labels.sections.formEngines} state={formEngines} />
 
-      <section className="mb-8 border-b border-[var(--surface-color-border-default)] pb-6">
-        <Heading className="mb-2">{labels.sections.codes}</Heading>
+      <section className="mb-4 pb-4 border-bottom">
+        <h2 className="h5 mb-2">{labels.sections.codes}</h2>
         <Button
           type="button"
+          variant="secondary"
           className="mb-2"
           onClick={() => void loadCodes()}
-          isDisabled={codes.status === 'loading'}
+          disabled={codes.status === 'loading'}
         >
           {labels.loadCodes}
         </Button>
         <JsonBlock state={codes} />
       </section>
 
-      <section className="mb-8">
-        <Heading className="mb-2">{labels.sections.roles}</Heading>
+      <section className="mb-4">
+        <h2 className="h5 mb-2">{labels.sections.roles}</h2>
         <Button
           type="button"
+          variant="secondary"
           className="mb-2"
           onClick={() => void loadRoles()}
-          isDisabled={roles.status === 'loading'}
+          disabled={roles.status === 'loading'}
         >
           {labels.loadRoles}
         </Button>

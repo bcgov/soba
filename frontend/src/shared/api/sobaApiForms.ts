@@ -9,20 +9,31 @@ import type {
 } from '../../types/forms';
 import type { ListSubmissionsResponse, SubmissionResponse } from '../../features/submit-mode/types';
 
+function getHeaders(token: string, workspaceId?: string, isJson: boolean = false): HeadersInit {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/json',
+  };
+  if (isJson) {
+    headers['Content-Type'] = 'application/json';
+  }
+  if (workspaceId) {
+    headers['x-workspace-id'] = workspaceId;
+  }
+  return headers;
+}
+
 export async function createSobaFormioForm(
   token: string,
   data: SobaFormType,
+  workspaceId?: string,
 ): Promise<CreateSobaFormioFormResponse> {
   data.formEngineCode = 'formio-v5';
 
   const response = await fetch(`${getSobaApiBaseUrl()}/forms`, {
     method: 'POST',
     cache: 'no-store',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(token, workspaceId, true),
     body: JSON.stringify(data),
   });
   return parseJson(response);
@@ -33,15 +44,13 @@ export async function createFormioForm(
   data: FormType,
   sobaId: string,
   publish: boolean,
+  visibility?: string[],
+  workspaceId?: string,
 ): Promise<FormType> {
   const response = await fetch(`${getSobaApiBaseUrl()}/formio-v5/form`, {
     method: 'POST',
     cache: 'no-store',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(token, workspaceId, true),
     body: JSON.stringify(data),
   });
   // parse the Form.io create response and attach the returned id to the form data
@@ -58,7 +67,7 @@ export async function createFormioForm(
     (data as Record<string, unknown>)._id = String(createdId);
   }
 
-  await createSobaFormVersion(token, data, sobaId, publish);
+  await createSobaFormVersion(token, data, sobaId, publish, visibility, workspaceId);
   return data;
 }
 
@@ -72,15 +81,12 @@ export async function updateFormioForm(
   data: FormType,
   sobaVersionId: string,
   publish: boolean,
+  workspaceId?: string,
 ): Promise<FormType> {
   const response = await fetch(`${getSobaApiBaseUrl()}/formio-v5/form/${id}`, {
     method: 'PUT',
     cache: 'no-store',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(token, workspaceId, true),
     body: JSON.stringify(data),
   });
 
@@ -97,37 +103,30 @@ export async function updateFormioForm(
   }
 
   // Save to the existing SOBA form version
-  await updateSobaFormVersion(token, sobaVersionId, data, publish);
+  await updateSobaFormVersion(token, sobaVersionId, data, publish, workspaceId);
   return data;
 }
-
-/**
- * Update an existing Form.io form (proxied) by id.
- * Returns the updated form payload (same shape as FormType).
- */
-// (Removed duplicate PUT-style updater — keep the PATCH-style `updateFormioForm` above.)
 
 async function createSobaFormVersion(
   token: string,
   data: FormType,
   sobaId: string,
   publish: boolean,
+  visibility?: string[],
+  workspaceId?: string,
 ) {
   const sobaFormVersionData = {
     formId: sobaId,
+    visibility,
   };
   const response = await fetch(`${getSobaApiBaseUrl()}/form-versions`, {
     method: 'POST',
     cache: 'no-store',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(token, workspaceId, true),
     body: JSON.stringify(sobaFormVersionData),
   });
   const responseData: SobaResponseFormType = await parseJson(response);
-  const update_resp = await updateSobaFormVersion(token, responseData.id, data, publish);
+  const update_resp = await updateSobaFormVersion(token, responseData.id, data, publish, workspaceId);
   return update_resp;
 }
 
@@ -136,6 +135,7 @@ async function updateSobaFormVersion(
   id: string,
   formData: FormType,
   publish: boolean,
+  workspaceId?: string,
 ): Promise<Response> {
   const data = {
     formioFormDefinition: formData,
@@ -145,16 +145,12 @@ async function updateSobaFormVersion(
   const response = await fetch(`${getSobaApiBaseUrl()}/form-versions/${id}/save`, {
     method: 'POST',
     cache: 'no-store',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(token, workspaceId, true),
     body: JSON.stringify(data),
   });
 
   if (publish) {
-    await publishSobaFormVersion(token, id);
+    await publishSobaFormVersion(token, id, workspaceId);
   }
 
   return parseJson(response);
@@ -169,18 +165,16 @@ export async function saveSobaFormVersion(
   id: string,
   formData: FormType,
   publish: boolean,
+  workspaceId?: string,
 ) {
-  return updateSobaFormVersion(token, id, formData, publish);
+  return updateSobaFormVersion(token, id, formData, publish, workspaceId);
 }
 
-export async function publishSobaFormVersion(token: string, id: string) {
+export async function publishSobaFormVersion(token: string, id: string, workspaceId?: string) {
   const response = await fetch(`${getSobaApiBaseUrl()}/form-versions/${id}`, {
     method: 'PATCH',
     cache: 'no-store',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-    },
+    headers: getHeaders(token, workspaceId, true),
     body: JSON.stringify({
       state: 'published',
     }),
@@ -188,38 +182,29 @@ export async function publishSobaFormVersion(token: string, id: string) {
   return parseJson(response);
 }
 
-export async function getFormioForm(token: string, id: string): Promise<FormType> {
+export async function getFormioForm(token: string, id: string, workspaceId?: string): Promise<FormType> {
   const response = await fetch(`${getSobaApiBaseUrl()}/formio-v5/form/${id}`, {
     method: 'GET',
     cache: 'no-store',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-    },
+    headers: getHeaders(token, workspaceId),
   });
   return parseJson(response);
 }
 
-export async function getSobaForm(token: string, id: string): Promise<SobaResponseFormType> {
+export async function getSobaForm(token: string, id: string, workspaceId?: string): Promise<SobaResponseFormType> {
   const response = await fetch(`${getSobaApiBaseUrl()}/forms/${id}`, {
     method: 'GET',
     cache: 'no-store',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-    },
+    headers: getHeaders(token, workspaceId),
   });
   return parseJson(response);
 }
 
-export async function getSobaFormVersion(token: string, id: string): Promise<SobaResponseFormType> {
+export async function getSobaFormVersion(token: string, id: string, workspaceId?: string): Promise<SobaResponseFormType> {
   const response = await fetch(`${getSobaApiBaseUrl()}/form-versions/${id}`, {
     method: 'GET',
     cache: 'no-store',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-    },
+    headers: getHeaders(token, workspaceId),
   });
   return parseJson(response);
 }
@@ -227,14 +212,12 @@ export async function getSobaFormVersion(token: string, id: string): Promise<Sob
 export async function getSobaFormVersionFromFormioId(
   token: string,
   id: string,
+  workspaceId?: string,
 ): Promise<SobaFormWithVersionResponse> {
   const response = await fetch(`${getSobaApiBaseUrl()}/forms/engine/${id}`, {
     method: 'GET',
     cache: 'no-store',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-    },
+    headers: getHeaders(token, workspaceId),
   });
   return parseJson(response) as Promise<SobaFormWithVersionResponse>;
 }
@@ -248,6 +231,7 @@ export async function createSobaFormSubmission(
   formId: string,
   formVersionId: string,
   options?: Record<string, unknown>,
+  workspaceId?: string,
 ): Promise<SubmissionResponse> {
   const sobaFormSubmissionData = {
     formId,
@@ -257,25 +241,18 @@ export async function createSobaFormSubmission(
   const response = await fetch(`${getSobaApiBaseUrl()}/submissions`, {
     method: 'POST',
     cache: 'no-store',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(token, workspaceId, true),
     body: JSON.stringify(sobaFormSubmissionData),
   });
   const responseData = await parseJson<SubmissionResponse>(response);
   return responseData;
 }
 
-export async function getSobaFormioForms(token: string): Promise<FormType[]> {
+export async function getSobaFormioForms(token: string, workspaceId?: string): Promise<FormType[]> {
   const response = await fetch(`${getSobaApiBaseUrl()}/forms/formio/form`, {
     method: 'GET',
     cache: 'no-store',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-    },
+    headers: getHeaders(token, workspaceId),
   });
   return parseJson(response);
 }
@@ -283,6 +260,7 @@ export async function getSobaFormioForms(token: string): Promise<FormType[]> {
 export async function getSobaSubmissions(
   token: string,
   params?: Record<string, unknown>,
+  workspaceId?: string,
 ): Promise<ListSubmissionsResponse> {
   const query = new URLSearchParams();
   if (params) {
@@ -294,10 +272,20 @@ export async function getSobaSubmissions(
   const response = await fetch(`${getSobaApiBaseUrl()}/submissions${qs ? `?${qs}` : ''}`, {
     method: 'GET',
     cache: 'no-store',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-    },
+    headers: getHeaders(token, workspaceId),
+  });
+  return parseJson(response);
+}
+
+export async function getSobaFormVersions(
+  token: string,
+  formId: string,
+  workspaceId?: string,
+): Promise<{ items: any[] }> {
+  const response = await fetch(`${getSobaApiBaseUrl()}/form-versions?formId=${formId}&limit=100`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: getHeaders(token, workspaceId),
   });
   return parseJson(response);
 }

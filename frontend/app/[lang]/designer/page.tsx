@@ -1,5 +1,5 @@
-import { getDictionary, hasLocale, Locale, resolveLocale } from '../dictionaries';
-import FormForm from '@/src/features/designer/ui/FormForm';
+import { getDictionary, hasLocale, Locale } from '../dictionaries';
+import FormDesignerLoader from '@/src/features/designer/ui/FormDesignerLoader';
 
 type PageProps = {
   params: Promise<{ lang: string }>;
@@ -18,11 +18,9 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function Page({ params }: PageProps) {
-  // Render the same FormForm component used by the catch-all route.
-  // Pass an empty array so FormForm treats this as "no formId" (i.e. listing / creating).
   return (
     <section className="p-4" aria-labelledby="designer-heading">
-      <FormForm id={[]} />
+      <FormDesignerLoader id={[]} />
     </section>
   );
 }

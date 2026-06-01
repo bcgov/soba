@@ -48,6 +48,8 @@ const toFormDto = (item: {
   status: string;
   createdAt: Date;
   updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
 }) => ({
   id: item.id,
   slug: item.slug,
@@ -56,6 +58,8 @@ const toFormDto = (item: {
   status: item.status,
   createdAt: item.createdAt.toISOString(),
   updatedAt: item.updatedAt.toISOString(),
+  createdBy: item.createdBy,
+  updatedBy: item.updatedBy,
 });
 
 const toFormListItemDto = (item: {
@@ -65,6 +69,8 @@ const toFormListItemDto = (item: {
   status: string;
   createdAt: Date;
   updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
 }) => ({
   id: item.id,
   slug: item.slug,
@@ -72,6 +78,8 @@ const toFormListItemDto = (item: {
   status: item.status,
   createdAt: item.createdAt.toISOString(),
   updatedAt: item.updatedAt.toISOString(),
+  createdBy: item.createdBy,
+  updatedBy: item.updatedBy,
 });
 
 const toFormVersionDto = (item: {
@@ -83,8 +91,11 @@ const toFormVersionDto = (item: {
   engineSchemaRef: string | null;
   currentRevisionNo: number;
   publishedAt: Date | null;
+  visibility: string[] | null;
   createdAt: Date;
   updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
 }) => ({
   id: item.id,
   formId: item.formId,
@@ -94,8 +105,11 @@ const toFormVersionDto = (item: {
   engineSchemaRef: item.engineSchemaRef,
   currentRevisionNo: item.currentRevisionNo,
   publishedAt: item.publishedAt?.toISOString() ?? null,
+  visibility: item.visibility ?? [],
   createdAt: item.createdAt.toISOString(),
   updatedAt: item.updatedAt.toISOString(),
+  createdBy: item.createdBy,
+  updatedBy: item.updatedBy,
 });
 
 const toFormVersionListItemDto = (item: {
@@ -105,8 +119,11 @@ const toFormVersionListItemDto = (item: {
   state: string;
   engineSyncStatus: string;
   engineSchemaRef: string | null;
+  visibility: string[] | null;
   createdAt: Date;
   updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
 }) => ({
   id: item.id,
   formId: item.formId,
@@ -114,8 +131,11 @@ const toFormVersionListItemDto = (item: {
   state: item.state,
   engineSyncStatus: item.engineSyncStatus,
   engineSchemaRef: item.engineSchemaRef,
+  visibility: item.visibility ?? [],
   createdAt: item.createdAt.toISOString(),
   updatedAt: item.updatedAt.toISOString(),
+  createdBy: item.createdBy,
+  updatedBy: item.updatedBy,
 });
 
 export function createFormsApiService(
@@ -312,23 +332,25 @@ export function createFormsApiService(
       };
     },
 
-    createDraft: async (ctx: FormsContextInput, formId: string) =>
+    createDraft: async (ctx: FormsContextInput, formId: string, visibility?: string[]) =>
       toFormVersionDto(
         await formVersionService.createDraft({
           workspaceId: ctx.workspaceId,
           actorId: ctx.actorId,
           actorDisplayLabel: ctx.actorDisplayLabel,
           formId,
+          visibility,
         }),
       ),
 
-    updateDraft: async (ctx: FormsContextInput, formVersionId: string, state?: string) => {
+    updateDraft: async (ctx: FormsContextInput, formVersionId: string, state?: string, visibility?: string[]) => {
       const row = await formVersionService.updateDraft({
         workspaceId: ctx.workspaceId,
         actorId: ctx.actorId,
         actorDisplayLabel: ctx.actorDisplayLabel,
         formVersionId,
         state,
+        visibility,
       });
       return row ? toFormVersionDto(row) : null;
     },

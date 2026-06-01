@@ -7,6 +7,7 @@ interface CreateDraftInput {
   formId: string;
   actorId: string;
   actorDisplayLabel: string | null;
+  visibility?: string[] | null;
 }
 
 interface SaveRevisionInput {
@@ -40,8 +41,11 @@ export interface FormVersionListRow {
   state: string;
   engineSyncStatus: string;
   engineSchemaRef: string | null;
+  visibility: string[] | null;
   createdAt: Date;
   updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
 }
 
 export const createEmptyFormVersionDraft = async (input: CreateDraftInput, tx?: DbOrTx) => {
@@ -66,6 +70,7 @@ export const createEmptyFormVersionDraft = async (input: CreateDraftInput, tx?: 
         state: 'draft',
         engineSyncStatus: 'pending',
         currentRevisionNo: 0,
+        visibility: input.visibility ?? [],
         createdBy: input.actorDisplayLabel,
         updatedBy: input.actorDisplayLabel,
       })
@@ -133,8 +138,11 @@ export const listFormVersionsForWorkspace = async (
       state: formVersions.state,
       engineSyncStatus: formVersions.engineSyncStatus,
       engineSchemaRef: formVersions.engineSchemaRef,
+      visibility: formVersions.visibility,
       createdAt: formVersions.createdAt,
       updatedAt: formVersions.updatedAt,
+      createdBy: formVersions.createdBy,
+      updatedBy: formVersions.updatedBy,
     })
     .from(formVersions)
     .where(and(...whereClauses))
@@ -142,7 +150,7 @@ export const listFormVersionsForWorkspace = async (
       input.cursorMode === 'ts_id' || input.sort === 'updatedAt:desc'
         ? desc(formVersions.updatedAt)
         : desc(formVersions.id),
-      desc(formVersions.id),
+      ...(input.cursorMode === 'ts_id' ? [desc(formVersions.id)] : []),
     )
     .limit(input.limit + 1);
 
@@ -161,6 +169,7 @@ export const updateFormVersionDraft = async (
     engineSchemaRef: string;
     engineSyncStatus: string;
     engineSyncError: string;
+    visibility: string[] | null;
   }>,
   tx?: DbOrTx,
 ) => {

@@ -24,6 +24,7 @@ interface CreateDraftInput {
   actorId: string;
   actorDisplayLabel: string | null;
   formId: string;
+  visibility?: string[];
 }
 
 interface UpdateDraftInput {
@@ -32,6 +33,7 @@ interface UpdateDraftInput {
   actorDisplayLabel: string | null;
   formVersionId: string;
   state?: string;
+  visibility?: string[];
 }
 
 interface SaveInput {
@@ -75,6 +77,7 @@ export class FormVersionService {
   async updateDraft(input: UpdateDraftInput) {
     return updateFormVersionDraft(input.workspaceId, input.formVersionId, input.actorDisplayLabel, {
       state: input.state,
+      visibility: input.visibility,
     });
   }
 

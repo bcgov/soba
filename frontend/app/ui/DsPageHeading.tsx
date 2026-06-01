@@ -1,11 +1,4 @@
-'use client';
 
-/**
- * `@bcgov/design-system-react-components` uses React Aria context (`createContext`), which only runs in
- * Client Components. App Router pages that stay Server Components (e.g. to export `generateMetadata`)
- * must not import those components directly—use this thin wrapper as the client boundary instead.
- */
-import { Heading } from '@bcgov/design-system-react-components';
 
 type DsPageHeadingProps = {
   id: string;
@@ -14,10 +7,20 @@ type DsPageHeadingProps = {
   children: React.ReactNode;
 };
 
+const TAG_MAP = {
+  1: 'h1',
+  2: 'h2',
+  3: 'h3',
+  4: 'h4',
+  5: 'h5',
+  6: 'h6',
+} as const;
+
 export function DsPageHeading({ id, level = 2, className, children }: DsPageHeadingProps) {
+  const Tag = TAG_MAP[level];
   return (
-    <Heading id={id} level={level} className={className}>
+    <Tag id={id} className={className}>
       {children}
-    </Heading>
+    </Tag>
   );
 }

@@ -13,7 +13,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect } from 'react';
-import { Button, InlineAlert, Text } from '@bcgov/design-system-react-components';
+import { Alert, Button } from 'react-bootstrap';
 import { useDictionary } from '@/app/[lang]/Providers';
 
 export default function FormIdRouteError({
@@ -35,20 +35,15 @@ export default function FormIdRouteError({
   }, [error]);
 
   return (
-    <div className="mt-6 space-y-4" role="alert">
-      <InlineAlert variant="danger">{labels.title}</InlineAlert>
-      <div className="flex flex-wrap gap-3">
-        <Button type="button" onClick={() => reset()}>
+    <div className="mt-4" role="alert">
+      <Alert variant="danger">{labels.title}</Alert>
+      <div className="d-flex flex-wrap gap-3">
+        <Button type="button" variant="primary" onClick={() => reset()}>
           {labels.tryAgain}
         </Button>
-        <Text className="text-sm">
-          <Link
-            className="text-[var(--theme-primary-blue)] underline hover:no-underline"
-            href={`/${locale}/submit`}
-          >
-            {labels.backToList}
-          </Link>
-        </Text>
+        <Link href={`/${locale}/submit`}>
+          {labels.backToList}
+        </Link>
       </div>
     </div>
   );

@@ -621,7 +621,6 @@ Between unit tests and full Playwright E2E, we should add **API-level integratio
 - Runtime config from backend (`GET /meta/frontend-config`): Keycloak URL, realm, client ID, API base; cached on first load.
 - SSO via Keycloak (`idp-bcgov-sso`): login/logout, token in Redux (`keycloak` slice).
 - Current user from `GET /me` after auth (`currentUser` slice); Header falls back to id-token claims while loading.
-- BC Gov Design System (`@bcgov/design-system-react-components`, tokens, BC Sans).
 - i18n with `en`/`fr` and `useDictionary()`.
 - Redux with typed hooks (`useAppDispatch`, `useAppSelector`).
 - Feature gating: `loadFeaturesMeta()` + `createIsFeatureAllowed()` (`platformAllowed` ∩ `NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`); plugin/home-section registry; workspaces plugin has no `featureCode` (always on).

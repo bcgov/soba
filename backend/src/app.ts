@@ -19,6 +19,10 @@ import { globalRateLimit, apiRateLimit, publicRateLimit } from './core/middlewar
 import { getFormEngineRouteDefinitions } from './core/integrations/plugins/PluginRegistry';
 import { createPluginConfigReader } from './core/config/pluginConfig';
 import { initializePassport } from './core/auth/passport';
+import { checkJwtOptional, resolveActorOptional, checkFormVisibility } from './core/middleware/formVisibility';
+import { getFormByEngineRef } from './core/api/forms/controller';
+import { createSubmission, saveSubmission } from './core/api/submissions/controller';
+
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
@@ -90,6 +94,55 @@ app.use(
     },
   }),
 );
+
+// ——— Public Submission Routes (Optionally Authenticated) ———
+const publicSubmissionRouter = express.Router();
+const publicSubmissionMiddleware = [
+  apiRateLimit,
+  express.json(),
+  checkJwtOptional(),
+  resolveActorOptional,
+  checkFormVisibility,
+];
+
+publicSubmissionRouter.get(
+  '/forms/engine/:engineRef',
+  ...publicSubmissionMiddleware,
+  getFormByEngineRef,
+);
+publicSubmissionRouter.post(
+  '/submissions',
+  ...publicSubmissionMiddleware,
+  createSubmission,
+);
+publicSubmissionRouter.post(
+  '/submissions/:id/save',
+  ...publicSubmissionMiddleware,
+  saveSubmission,
+);
+
+const formioDef = formEngineRouteDefs.find((d) => d.code === 'formio-v5');
+if (formioDef) {
+  const formioRouter = formioDef.createRouter(createPluginConfigReader('formio-v5'));
+  publicSubmissionRouter.get(
+    '/formio-v5/form/:id',
+    ...publicSubmissionMiddleware,
+    (req, res, next) => {
+      req.url = `/form/${req.params.id}`;
+      formioRouter(req, res, next);
+    },
+  );
+  publicSubmissionRouter.post(
+    '/formio-v5/form/:formId/submission',
+    ...publicSubmissionMiddleware,
+    (req, res, next) => {
+      req.url = `/form/${req.params.formId}/submission`;
+      formioRouter(req, res, next);
+    },
+  );
+}
+
+app.use('/api/v1', publicSubmissionRouter);
 
 // ——— Core v1 API ———
 app.use('/api/v1/meta', publicRateLimit, express.json(), metaRouter);

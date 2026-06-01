@@ -23,6 +23,8 @@ export interface FormListRow {
   status: string;
   createdAt: Date;
   updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
 }
 
 export interface FormRecord {
@@ -97,6 +99,8 @@ export const listFormsForWorkspace = async (
       status: forms.status,
       createdAt: forms.createdAt,
       updatedAt: forms.updatedAt,
+      createdBy: forms.createdBy,
+      updatedBy: forms.updatedBy,
     })
     .from(forms)
     .where(and(...whereClauses))

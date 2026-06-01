@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
 import { FormioProvider, Submission } from '@formio/react';
-import { InlineAlert } from '@bcgov/design-system-react-components';
+import { Alert } from 'react-bootstrap';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { getFormioProxyBaseUrl } from '@/src/shared/config/runtimeConfig';
 import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFormioRenderError';
@@ -18,7 +18,7 @@ import type { SobaFormWithVersionResponse } from '@/src/types/forms';
 const Form = dynamic(() => import('@formio/react').then((m) => m.Form), {
   ssr: false,
   loading: () => (
-    <p className="text-sm text-[var(--typography-color-secondary)]">Loading form renderer…</p>
+    <p className="text-muted small">Loading form renderer…</p>
   ),
 });
 
@@ -75,21 +75,21 @@ function FormioV5FormRenderBody({
   return (
     <>
       {renderError ? (
-        <InlineAlert variant="danger" role="alert">
+        <Alert variant="danger" role="alert">
           {renderError}
-        </InlineAlert>
+        </Alert>
       ) : null}
       {successAlert ? (
-        <InlineAlert variant="success" role="alert">
+        <Alert variant="success" role="alert">
           {labels.submitSuccess}
-        </InlineAlert>
+        </Alert>
       ) : null}
       <div className="formio-v5-chrome" data-soba-formio-chrome>
         <FormioV5FormRenderErrorBoundary
           fallback={
-            <InlineAlert variant="danger" role="alert">
+            <Alert variant="danger" role="alert">
               {labels.rendererError}
-            </InlineAlert>
+            </Alert>
           }
         >
           <FormioProvider baseUrl={base} projectUrl={base}>
@@ -124,14 +124,14 @@ export default function FormioV5FormRenderClient() {
 
   if (!formId) {
     return (
-      <InlineAlert variant="danger" role="alert">
+      <Alert variant="danger" role="alert">
         {labels.missingId}
-      </InlineAlert>
+      </Alert>
     );
   }
 
   return (
-    <div className="mt-4 space-y-4">
+    <div className="mt-3">
       <FormioV5FormRenderBody
         key={formId}
         src={src}

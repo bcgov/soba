@@ -41,6 +41,7 @@ export const formVersions = sobaSchema.table(
     currentRevisionNo: integer('current_revision_no').notNull().default(0),
     publishedAt: timestamp('published_at', { withTimezone: true }),
     publishedBy: uuid('published_by').references(() => appUsers.id),
+    visibility: text('visibility').array(),
     ...auditColumns(),
     ...softDeleteColumns(),
   },

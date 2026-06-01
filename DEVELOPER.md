@@ -243,7 +243,7 @@ Schema modules: `backend/src/core/db/schema/` (e.g. `core.ts`, `forms.ts`, `role
 
 - **Runtime:** [Next.js](https://nextjs.org) 16, React 19, TypeScript
 - **State:** [Redux Toolkit](https://redux-toolkit.js.org), react-redux, next-redux-wrapper
-- **UI:** [BC Gov design system](https://github.com/bcgov/design-system) (`@bcgov/design-system-react-components`, `@bcgov/design-tokens`, `@bcgov/bc-sans`), [Tailwind CSS](https://tailwindcss.com), Bootstrap
+- **UI:** Bootstrap
 - **Auth:** [Keycloak](https://www.keycloak.org) (keycloak-js) — BC Gov SSO
 - **Testing:** [Vitest](https://vitest.dev)
 
@@ -303,7 +303,7 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 ### UI and styling
 
-- **BC Gov:** `@bcgov/design-system-react-components` (Button, Header, Text, etc.), design tokens, `@bcgov/bc-sans`. **Tailwind** and **Bootstrap** are available. Prefer design-system components and tokens for consistency.
+ `@bcgov/bc-sans`. **Bootstrap** is used.
 
 ### Forms
 

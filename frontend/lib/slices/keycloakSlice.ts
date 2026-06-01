@@ -34,6 +34,16 @@ type InitResult = {
 export const initKeycloak = createAsyncThunk<InitResult, void, { rejectValue: string }>(
   'keycloak/init',
   async (_, { rejectWithValue }) => {
+    if (kcInstance) {
+      // If we already have an instance (e.g. after a layout remount from a language change),
+      // just restore the state from it without re-initializing.
+      return {
+        token: kcInstance.token ?? undefined,
+        idTokenParsed: kcInstance.idTokenParsed as Keycloak.KeycloakTokenParsed | undefined,
+        authenticated: !!kcInstance.authenticated,
+      };
+    }
+
     delete localStorage.formioToken; // clear any stale token before init
     const runtimeConfig = await loadFrontendRuntimeConfig();
     const kc = new Keycloak({
@@ -69,16 +79,7 @@ export const initKeycloak = createAsyncThunk<InitResult, void, { rejectValue: st
     } catch (err: unknown) {
       return rejectWithValue((err as { message?: string })?.message || String(err));
     }
-  },
-  {
-    /**
-     * `Header` calls `init()` from an effect; client navigations can remount the tree and re-run it.
-     * Each `kc.init({ onLoad: 'check-sso' })` may fall back to a full IdP redirect (e.g. when silent
-     * SSO / storage access fails in Firefox), which feels like a full-page “blink”. If we already
-     * have an instance (logout clears it), skip re-init entirely.
-     */
-    condition: () => kcInstance == null,
-  },
+  }
 );
 
 const slice = createSlice({
