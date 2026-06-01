@@ -3,9 +3,10 @@
 import React, { useEffect, useState } from 'react';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
-import { getSobaSubmissions } from '@/src/shared/api/sobaApiForms';
+import { getSobaSubmissions, getSobaFormVersionFromFormioId } from '@/src/shared/api/sobaApiForms';
 import type { SubmissionListItem } from '../types';
 import { DataTable, Column } from '@/src/shared/components/DataTable';
+import { useAppSelector } from '@/lib/store';
 
 interface SubmissionListProps {
   formId?: string;
@@ -17,17 +18,44 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
   const [submissions, setSubmissions] = useState<SubmissionListItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
+  const { activeWorkspaceId } = useAppSelector((state) => state.workspace);
+
   useEffect(() => {
     if (authenticated && token) {
-      const params = formId ? { formId } : undefined;
-      getSobaSubmissions(token, params)
-        .then((data) => {
+      const fetchSubmissions = async () => {
+        try {
+          let resolvedFormId = formId;
+
+          // If formId is provided and doesn't look like a UUID, it might be a Form.io ID.
+          // We need to resolve it to a SOBA Form ID first.
+          if (formId && formId.length !== 36) {
+            try {
+              const sobaForm = await getSobaFormVersionFromFormioId(
+                token,
+                formId,
+                activeWorkspaceId || undefined
+              );
+              if (sobaForm && sobaForm.id) {
+                resolvedFormId = sobaForm.id;
+              }
+            } catch (err) {
+              console.error('Failed to resolve Form.io ID to SOBA Form ID', err);
+            }
+          }
+
+          const params = resolvedFormId ? { formId: resolvedFormId } : undefined;
+          const data = await getSobaSubmissions(token, params, activeWorkspaceId || undefined);
           setSubmissions(data.items || []);
-        })
-        .catch((err) => console.error('Failed to fetch submissions', err))
-        .finally(() => setIsLoaded(true));
+        } catch (err) {
+          console.error('Failed to fetch submissions', err);
+        } finally {
+          setIsLoaded(true);
+        }
+      };
+      
+      fetchSubmissions();
     }
-  }, [authenticated, token, formId]);
+  }, [authenticated, token, formId, activeWorkspaceId]);
 
   const loading = !!(authenticated && token && !isLoaded);
 

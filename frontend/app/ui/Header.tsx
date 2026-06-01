@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import bcgovLogo from '../../public/bcgov-logo.png';
 import { usePathname, useRouter } from 'next/navigation';
 import { Form, Dropdown, Navbar, Container } from 'react-bootstrap';
 import { FaUser } from 'react-icons/fa6';
@@ -208,7 +209,7 @@ function Header({ headerNavItems }: HeaderProps) {
                 className="navbar-brand mb-0 d-flex align-items-center gap-2"
               >
                 <Image
-                  src="/bcgov-logo.png"
+                  src={bcgovLogo}
                   alt="BC Gov logo"
                   height={40}
                   width={160}

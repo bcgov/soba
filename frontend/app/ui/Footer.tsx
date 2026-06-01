@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import bcgovLogo from '../../public/bcgov-logo.png';
 
 // eslint-ignore-next-line import/no-unresolved
 import styles from './Footer.module.css';
@@ -106,7 +107,7 @@ export default function Footer({
   function defaultLogo() {
     return (
       <Image
-        src="/bcgov-logo.png"
+        src={bcgovLogo}
         alt="BC Gov logo"
         height={40}
         width={146}

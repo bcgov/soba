@@ -23,6 +23,7 @@ const CustomActionButtons = ({
 
   const actions = [
     { name: 'manage', title: 'Manage' },
+    { name: 'submit', title: 'Submit' },
     { name: 'submissions', title: 'Submissions' },
   ];
 
