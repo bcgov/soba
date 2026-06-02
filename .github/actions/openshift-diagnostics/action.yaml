@@ -1,0 +1,65 @@
+name: OpenShift Diagnostics
+description: Print Helm, OpenShift, and database diagnostics for a failed release deployment.
+
+# Pipeline performance fix: Revert if needed.
+inputs:
+  release:
+    description: Helm release name to inspect.
+    required: true
+  namespace:
+    description: OpenShift namespace to inspect.
+    required: true
+  database_uri:
+    description: Optional Postgres connection URI to inspect.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Print deployment diagnostics
+      shell: bash
+      env:
+        RELEASE: ${{ inputs.release }}
+        NAMESPACE: ${{ inputs.namespace }}
+        DATABASE_URI: ${{ inputs.database_uri }}
+      run: |
+        set +e
+
+        echo "Helm status for ${RELEASE}"
+        helm status "${RELEASE}" -n "${NAMESPACE}" || true
+
+        echo "Helm history for ${RELEASE}"
+        helm history "${RELEASE}" -n "${NAMESPACE}" || true
+
+        echo "Jobs for ${RELEASE}"
+        oc get jobs -n "${NAMESPACE}" -l "app.kubernetes.io/instance=${RELEASE}" -o wide || true
+
+        echo "Pods for ${RELEASE}"
+        oc get pods -n "${NAMESPACE}" -l "app.kubernetes.io/instance=${RELEASE}" -o wide || true
+
+        echo "Migration job details for ${RELEASE}"
+        for job in $(oc get jobs -n "${NAMESPACE}" -l "app.kubernetes.io/instance=${RELEASE}" -o name 2>/dev/null | grep -- "-migrate-" || true); do
+          echo "Describing ${job}"
+          oc describe "${job}" -n "${NAMESPACE}" || true
+        done
+
+        echo "Migration pod logs for ${RELEASE}"
+        for pod in $(oc get pods -n "${NAMESPACE}" -l "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/component=migrate" -o name 2>/dev/null || true); do
+          echo "Logs for ${pod}"
+          oc logs "${pod}" -n "${NAMESPACE}" --all-containers=true || true
+        done
+
+        if [ -n "$DATABASE_URI" ]; then
+          echo "Database connectivity check"
+          if command -v psql >/dev/null 2>&1; then
+            psql "$DATABASE_URI" -v ON_ERROR_STOP=1 -c "SELECT 1;" || true
+            psql "$DATABASE_URI" -v ON_ERROR_STOP=1 -c "SELECT current_database(), current_user;" || true
+          else
+            echo "psql is not available; skipping database diagnostics."
+          fi
+        fi
+
+        echo "Recent namespace events"
+        oc get events -n "${NAMESPACE}" --sort-by=.lastTimestamp | tail -100 || true
+# Pipeline performance fix: Revert if needed.

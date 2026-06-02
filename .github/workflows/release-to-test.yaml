@@ -147,6 +147,14 @@ jobs:
           echo "" >> "$GITHUB_OUTPUT"
           echo "URI_EOF" >> "$GITHUB_OUTPUT"
 
+      # Pipeline performance fix: Revert if needed.
+      - name: Wait for test database readiness
+        uses: ./.github/actions/wait-for-postgres
+        with:
+          database_uri: ${{ steps.db.outputs.uri }}
+          label: test database
+      # Pipeline performance fix: Revert if needed.
+
       - name: Generate values override and deploy
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -182,17 +190,17 @@ jobs:
             jwtSecret: "${{ secrets.FORMIO_JWT_SECRET }}"
           OVERRIDE
 
+          # Pipeline performance fix: Revert if needed.
           helm upgrade --install "soba-test" ./deployments/helm/soba \
             --namespace "${NAMESPACE}" \
+            --wait \
+            --wait-for-jobs \
             --timeout 660s \
             -f deployments/helm/soba/values-test.yaml \
             -f /tmp/values-override.yaml
+          # Pipeline performance fix: Revert if needed.
 
           REVISION=$(helm status "soba-test" -n "${NAMESPACE}" -o json | jq -r '.version')
-          echo "Waiting for migration job (revision ${REVISION})..."
-          oc wait --for=condition=complete "job/soba-test-migrate-${REVISION}" \
-            -n "${NAMESPACE}" --timeout=600s
-
           oc get jobs -n "${NAMESPACE}" -o name \
             | grep "soba-test-migrate-" \
             | grep -v -- "-migrate-${REVISION}$" \
@@ -209,6 +217,16 @@ jobs:
 
           echo "Waiting for mongodb rollout..."
           oc rollout status statefulset/soba-test-mongodb -n "${NAMESPACE}" --timeout=300s
+
+      # Pipeline performance fix: Revert if needed.
+      - name: Deployment diagnostics
+        if: failure()
+        uses: ./.github/actions/openshift-diagnostics
+        with:
+          release: soba-test
+          namespace: ${{ secrets.OC_NAMESPACE }}
+          database_uri: ${{ steps.db.outputs.uri }}
+      # Pipeline performance fix: Revert if needed.
 
   Tests:
     name: Integration Tests

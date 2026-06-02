@@ -30,6 +30,7 @@ concurrency:
 jobs:
   set-vars:
     name: Set variables
+    if: ${{ !startsWith(github.head_ref, 'release/') && github.head_ref != 'main' }}
     runs-on: ubuntu-latest
     outputs:
       JOB_NAME: ${{ steps.vars.outputs.JOB_NAME }}
@@ -128,6 +129,14 @@ jobs:
           echo "" >> "$GITHUB_OUTPUT"
           echo "URI_EOF" >> "$GITHUB_OUTPUT"
 
+      # Pipeline performance fix: Revert if needed.
+      - name: Wait for PR database readiness
+        uses: ./.github/actions/wait-for-postgres
+        with:
+          database_uri: ${{ steps.db.outputs.uri }}
+          label: PR database
+      # Pipeline performance fix: Revert if needed.
+
       - name: Generate values override and deploy
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -165,17 +174,17 @@ jobs:
             jwtSecret: "${{ secrets.FORMIO_JWT_SECRET }}"
           OVERRIDE
 
+          # Pipeline performance fix: Revert if needed.
           helm upgrade --install "${RELEASE}" ./deployments/helm/soba \
             --namespace "${NAMESPACE}" \
+            --wait \
+            --wait-for-jobs \
             --timeout 660s \
             -f deployments/helm/soba/values-pr.yaml \
             -f /tmp/values-override.yaml
+          # Pipeline performance fix: Revert if needed.
 
           REVISION=$(helm status "${RELEASE}" -n "${NAMESPACE}" -o json | jq -r '.version')
-          echo "Waiting for migration job (revision ${REVISION})..."
-          oc wait --for=condition=complete "job/${RELEASE}-migrate-${REVISION}" \
-            -n "${NAMESPACE}" --timeout=600s
-
           # Clean up old migration jobs and keep only current revision
           oc get jobs -n "${NAMESPACE}" -o name \
             | grep "${RELEASE}-migrate-" \
@@ -193,6 +202,16 @@ jobs:
 
           echo "Waiting for mongodb rollout..."
           oc rollout status statefulset/${RELEASE}-mongodb -n "${NAMESPACE}" --timeout=300s
+
+      # Pipeline performance fix: Revert if needed.
+      - name: Deployment diagnostics
+        if: failure()
+        uses: ./.github/actions/openshift-diagnostics
+        with:
+          release: soba-${{ needs.set-vars.outputs.JOB_NAME }}
+          namespace: ${{ secrets.OC_NAMESPACE }}
+          database_uri: ${{ steps.db.outputs.uri }}
+      # Pipeline performance fix: Revert if needed.
 
       - name: Release Comment on PR
         uses: marocchino/sticky-pull-request-comment@v2

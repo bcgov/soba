@@ -1,0 +1,51 @@
+name: Wait for Postgres
+description: Wait until a Postgres connection URI can authenticate and run a simple query.
+
+# Pipeline performance fix: Revert if needed.
+inputs:
+  database_uri:
+    description: Postgres connection URI to check.
+    required: true
+  label:
+    description: Human-readable database label for logs.
+    required: false
+    default: database
+  attempts:
+    description: Number of readiness attempts.
+    required: false
+    default: "60"
+  sleep_seconds:
+    description: Seconds to wait between attempts.
+    required: false
+    default: "5"
+
+runs:
+  using: composite
+  steps:
+    - name: Check Postgres readiness
+      shell: bash
+      env:
+        DATABASE_URI: ${{ inputs.database_uri }}
+        LABEL: ${{ inputs.label }}
+        ATTEMPTS: ${{ inputs.attempts }}
+        SLEEP_SECONDS: ${{ inputs.sleep_seconds }}
+      run: |
+        if ! command -v psql >/dev/null 2>&1; then
+          echo "psql is required for the ${LABEL} readiness check but was not found."
+          exit 1
+        fi
+
+        echo "Waiting for ${LABEL} to accept queries..."
+        for attempt in $(seq 1 "$ATTEMPTS"); do
+          if psql "$DATABASE_URI" -v ON_ERROR_STOP=1 -c "SELECT 1;" >/dev/null 2>&1; then
+            echo "${LABEL} is ready."
+            exit 0
+          fi
+
+          echo "${LABEL} is not ready yet; retry ${attempt}/${ATTEMPTS}..."
+          sleep "$SLEEP_SECONDS"
+        done
+
+        echo "${LABEL} did not become ready in time."
+        exit 1
+# Pipeline performance fix: Revert if needed.

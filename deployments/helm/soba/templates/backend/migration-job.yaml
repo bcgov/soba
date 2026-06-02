@@ -8,10 +8,15 @@ metadata:
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "0"
-    "helm.sh/hook-delete-policy": before-hook-creation
+    # Pipeline performance fix: Revert if needed.
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    # Pipeline performance fix: Revert if needed.
 spec:
   backoffLimit: 3
   activeDeadlineSeconds: {{ .Values.backend.migration.activeDeadlineSeconds }}
+  # Pipeline performance fix: Revert if needed.
+  ttlSecondsAfterFinished: 3600
+  # Pipeline performance fix: Revert if needed.
   template:
     metadata:
       labels:
@@ -49,6 +54,20 @@ spec:
             {{- end }}
             - name: DB_ADMIN_DATABASE
               value: {{ .Values.database.adminDatabase | quote }}
+            # Pipeline performance fix: Revert if needed.
+            - name: DB_CONNECTION_TIMEOUT_MS
+              value: {{ .Values.database.connectionTimeoutMs | quote }}
+            - name: DB_QUERY_TIMEOUT_MS
+              value: {{ .Values.database.queryTimeoutMs | quote }}
+            - name: DB_STATEMENT_TIMEOUT_MS
+              value: {{ .Values.database.statementTimeoutMs | quote }}
+            - name: DB_LOCK_TIMEOUT_MS
+              value: {{ .Values.database.lockTimeoutMs | quote }}
+            - name: DB_MIGRATION_READY_ATTEMPTS
+              value: {{ .Values.database.migrationReadyAttempts | quote }}
+            - name: DB_MIGRATION_READY_SLEEP_MS
+              value: {{ .Values.database.migrationReadySleepMs | quote }}
+            # Pipeline performance fix: Revert if needed.
             - name: SOBA_SYSTEM_SUBJECT
               value: {{ .Values.backend.config.sobaSystemSubject | quote }}
           resources:
