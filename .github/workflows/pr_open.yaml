@@ -134,6 +134,7 @@ jobs:
         uses: ./.github/actions/wait-for-postgres
         with:
           database_uri: ${{ steps.db.outputs.uri }}
+          namespace: ${{ secrets.OC_NAMESPACE }}
           label: PR database
       # Pipeline performance fix: Revert if needed.
 

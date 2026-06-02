@@ -6,6 +6,9 @@ inputs:
   database_uri:
     description: Postgres connection URI to check.
     required: true
+  namespace:
+    description: OpenShift namespace where the readiness Job should run.
+    required: true
   label:
     description: Human-readable database label for logs.
     required: false
@@ -18,6 +21,10 @@ inputs:
     description: Seconds to wait between attempts.
     required: false
     default: "5"
+  image:
+    description: Container image with pg_isready and psql.
+    required: false
+    default: postgres:16-alpine
 
 runs:
   using: composite
@@ -26,26 +33,90 @@ runs:
       shell: bash
       env:
         DATABASE_URI: ${{ inputs.database_uri }}
+        NAMESPACE: ${{ inputs.namespace }}
         LABEL: ${{ inputs.label }}
         ATTEMPTS: ${{ inputs.attempts }}
         SLEEP_SECONDS: ${{ inputs.sleep_seconds }}
+        IMAGE: ${{ inputs.image }}
       run: |
-        if ! command -v psql >/dev/null 2>&1; then
-          echo "psql is required for the ${LABEL} readiness check but was not found."
-          exit 1
+        RUN_ID="${GITHUB_RUN_ID:-manual}"
+        RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-1}"
+        JOB_NAME="pg-readiness-${RUN_ID}-${RUN_ATTEMPT}"
+        SECRET_NAME="${JOB_NAME}-secret"
+        ACTIVE_DEADLINE_SECONDS=$((ATTEMPTS * SLEEP_SECONDS + 60))
+        WAIT_TIMEOUT="$((ACTIVE_DEADLINE_SECONDS + 30))s"
+
+        cleanup() {
+          oc delete job "$JOB_NAME" -n "$NAMESPACE" --ignore-not-found=true >/dev/null 2>&1 || true
+          oc delete secret "$SECRET_NAME" -n "$NAMESPACE" --ignore-not-found=true >/dev/null 2>&1 || true
+        }
+        trap cleanup EXIT
+
+        cleanup
+
+        echo "Creating temporary in-cluster readiness check for ${LABEL}..."
+        oc create secret generic "$SECRET_NAME" \
+          -n "$NAMESPACE" \
+          --from-literal=DATABASE_URI="$DATABASE_URI" >/dev/null
+
+        cat <<EOF | oc apply -n "$NAMESPACE" -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ${JOB_NAME}
+  labels:
+    app.kubernetes.io/component: postgres-readiness
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: ${ACTIVE_DEADLINE_SECONDS}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: postgres-readiness
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: postgres-readiness
+          image: ${IMAGE}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DATABASE_URI
+              valueFrom:
+                secretKeyRef:
+                  name: ${SECRET_NAME}
+                  key: DATABASE_URI
+            - name: LABEL
+              value: "${LABEL}"
+            - name: ATTEMPTS
+              value: "${ATTEMPTS}"
+            - name: SLEEP_SECONDS
+              value: "${SLEEP_SECONDS}"
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for \${LABEL} to accept queries..."
+              for attempt in \$(seq 1 "\${ATTEMPTS}"); do
+                if pg_isready -d "\${DATABASE_URI}" >/dev/null 2>&1 &&
+                  psql "\${DATABASE_URI}" -v ON_ERROR_STOP=1 -c "SELECT 1;" >/dev/null 2>&1; then
+                  echo "\${LABEL} is ready after \${attempt} attempt(s)."
+                  exit 0
+                fi
+
+                sleep "\${SLEEP_SECONDS}"
+              done
+
+              echo "\${LABEL} did not become ready after \${ATTEMPTS} attempt(s)."
+              exit 1
+EOF
+
+        if oc wait --for=condition=complete "job/${JOB_NAME}" -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"; then
+          oc logs "job/${JOB_NAME}" -n "$NAMESPACE" || true
+          exit 0
         fi
 
-        echo "Waiting for ${LABEL} to accept queries..."
-        for attempt in $(seq 1 "$ATTEMPTS"); do
-          if psql "$DATABASE_URI" -v ON_ERROR_STOP=1 -c "SELECT 1;" >/dev/null 2>&1; then
-            echo "${LABEL} is ready."
-            exit 0
-          fi
-
-          echo "${LABEL} is not ready yet; retry ${attempt}/${ATTEMPTS}..."
-          sleep "$SLEEP_SECONDS"
-        done
-
-        echo "${LABEL} did not become ready in time."
+        echo "Readiness Job failed or timed out."
+        oc describe "job/${JOB_NAME}" -n "$NAMESPACE" || true
+        oc logs "job/${JOB_NAME}" -n "$NAMESPACE" || true
         exit 1
 # Pipeline performance fix: Revert if needed.
