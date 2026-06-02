@@ -79,7 +79,7 @@ export const initKeycloak = createAsyncThunk<InitResult, void, { rejectValue: st
     } catch (err: unknown) {
       return rejectWithValue((err as { message?: string })?.message || String(err));
     }
-  }
+  },
 );
 
 const slice = createSlice({
@@ -151,7 +151,10 @@ export const login = () => async (dispatch: AppDispatch) => {
     // fallback to direct login redirect
     try {
       const opts = {
-        redirectUri: typeof window !== 'undefined' ? window.location.origin : undefined,
+        redirectUri:
+          typeof window !== 'undefined'
+            ? window.location.origin + window.location.pathname
+            : undefined,
       };
       kc?.login(opts);
     } catch {
