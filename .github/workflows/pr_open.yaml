@@ -1,6 +1,6 @@
-# PR pipeline: build images, deploy crunchy Postgres (with PR-specific user), deploy SOBA from local Helm chart.
+# PR pipeline: QA (type-check, lint, unit tests), then build/deploy when app paths change.
 name: PR Open
-run-name: Deploy PR-${{ github.event.number }}
+run-name: PR-${{ github.event.number }}
 
 env:
   ACRONYM: soba
@@ -10,16 +10,6 @@ on:
     types: [opened, reopened, synchronize]
     branches:
       - develop
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - ".github/workflows/pr_open.yaml"
-      - ".github/workflows/build-images.yaml"
-      - ".gitignore"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "deployments/**"
 
 permissions: {}
 
@@ -28,8 +18,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect deployable changes
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.filter.outputs.deploy }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Filter changed paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            deploy:
+              - 'backend/**'
+              - 'frontend/**'
+              - '.github/workflows/pr_open.yaml'
+              - '.github/workflows/build-images.yaml'
+              - '.github/workflows/qa.yaml'
+              - '.gitignore'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'deployments/**'
+
+  qa:
+    name: QA
+    uses: ./.github/workflows/qa.yaml
+    permissions:
+      contents: read
+
   set-vars:
     name: Set variables
+    needs: [qa, changes]
+    if: needs.changes.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     outputs:
       JOB_NAME: ${{ steps.vars.outputs.JOB_NAME }}
