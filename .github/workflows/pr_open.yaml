@@ -148,7 +148,7 @@ jobs:
               repository: "ghcr.io/${REPO_LC}/backend"
               tag: "${TAG}"
             config:
-              corsOrigin: "https://soba-dev.${DOMAIN}"
+              corsOrigin: "https://soba-pr-${PR_NUM}.${DOMAIN}"
           frontend:
             image:
               repository: "ghcr.io/${REPO_LC}/frontend"
