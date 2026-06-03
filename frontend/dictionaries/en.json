@@ -77,30 +77,6 @@
       "submitSuccess": "Form submitted successfully."
     }
   },
-  "submitDemo": {
-    "tableHeading": "CHEFS 2 forms",
-    "loading": "Loading…",
-    "empty": "No CHEFS 2 forms in this workspace yet.",
-    "generate": "Generate demo CHEFS 2 form",
-    "generating": "Creating…",
-    "refresh": "Refresh",
-    "needLogin": "Sign in to view CHEFS 2 forms.",
-    "noWorkspace": "No workspace found for your account.",
-    "loadError": "Could not load forms.",
-    "generateError": "Could not create the demo form.",
-    "pollTimeout": "Provisioning is still running. Try refresh in a few seconds.",
-    "openForm": "Open in viewer",
-    "syncPending": "Pending",
-    "syncProvisioning": "Provisioning",
-    "syncReady": "Ready",
-    "syncFailed": "Failed",
-    "columns": {
-      "name": "Name",
-      "slug": "Slug",
-      "sync": "Form.io sync",
-      "open": "Open"
-    }
-  },
   "forms": {
     "manage": {
       "share": {

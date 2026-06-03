@@ -1,6 +1,5 @@
 import { getDictionary, resolveLocale } from '../dictionaries';
 import FormList from '@/src/features/designer/ui/FormList';
-import Link from 'next/link';
 import { AuthRedirect } from '@/src/app/ui/AuthRedirect';
 
 type PageProps = {
@@ -12,7 +11,7 @@ export async function generateMetadata({ params }: PageProps) {
   const locale = resolveLocale(param.lang);
   const dict = await getDictionary(locale);
   return {
-    title: `${dict.general.title}`,
+    title: `${dict.formioV5.formList.tableHeading} | ${dict.general.title}`,
     description: dict.general.description,
   };
 }

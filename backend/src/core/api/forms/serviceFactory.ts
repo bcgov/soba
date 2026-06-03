@@ -40,6 +40,9 @@ interface UpdateFormInput {
   status?: string;
 }
 
+/** Minimal Form.io form document fields used when merging SOBA metadata into list results. */
+type FormioListedForm = Record<string, unknown> & { _id: string };
+
 const toFormDto = (item: {
   id: string;
   slug: string;
@@ -254,7 +257,7 @@ export function createFormsApiService(
         cursorMode: 'id',
       });
 
-      const formMap = new Map(sobaFormsResult.items.map(f => [f.id, f]));
+      const formMap = new Map(sobaFormsResult.items.map((f) => [f.id, f]));
       const refToSobaMap = new Map();
       const formToRefMap = new Map();
       const refsToFetch: string[] = [];
@@ -280,9 +283,11 @@ export function createFormsApiService(
         return [];
       }
 
-      const formioForms = await client.loadForms({ params: { _id__in: refsToFetch.join(',') } });
+      const formioForms = (await client.loadForms({
+        params: { _id__in: refsToFetch.join(',') },
+      })) as FormioListedForm[];
 
-      return formioForms.map((f: any) => {
+      return formioForms.map((f) => {
         const sobaData = refToSobaMap.get(f._id);
         return {
           ...f,

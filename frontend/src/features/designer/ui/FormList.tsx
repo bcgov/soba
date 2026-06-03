@@ -7,7 +7,7 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useRouter, usePathname } from 'next/navigation';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
-import { FaGear, FaRegFile, FaWrench, FaPaperPlane, FaMagnifyingGlass, FaX } from 'react-icons/fa6';
+import { FaMagnifyingGlass, FaX } from 'react-icons/fa6';
 import { getSobaFormioForms } from '@/src/shared/api/sobaApi';
 import { useAppSelector } from '@/lib/store';
 import type { FormType } from '@formio/react';
@@ -220,10 +220,16 @@ function FormList() {
         <h1>Forms</h1>
       </div>
       <div className="mb-3 d-flex justify-content-between align-items-center">
-        <Button 
-          variant="primary" 
+        <Button
+          variant="primary"
           onClick={() => router.push(`/${locale}/designer`)}
-          style={{ backgroundColor: '#003366', borderColor: '#003366', borderRadius: '4px', padding: '6px 16px', fontWeight: '500' }}
+          style={{
+            backgroundColor: '#003366',
+            borderColor: '#003366',
+            borderRadius: '4px',
+            padding: '6px 16px',
+            fontWeight: '500',
+          }}
         >
           Create
         </Button>

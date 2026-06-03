@@ -33,7 +33,7 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
               const sobaForm = await getSobaFormVersionFromFormioId(
                 token,
                 formId,
-                activeWorkspaceId || undefined
+                activeWorkspaceId || undefined,
               );
               if (sobaForm && sobaForm.id) {
                 resolvedFormId = sobaForm.id;
@@ -52,7 +52,7 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
           setIsLoaded(true);
         }
       };
-      
+
       fetchSubmissions();
     }
   }, [authenticated, token, formId, activeWorkspaceId]);

@@ -263,7 +263,7 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 - **App Router:** `app/` holds layouts and pages; `app/layout.tsx` is the root (html/body, globals.css); `app/[lang]/layout.tsx` wraps locale routes with `DictionaryProvider`, `Header`, and main content. The home page is `app/[lang]/page.tsx`; locale is required (e.g. `/en`, `/fr`).
 - **Where code lives:** `app/` — pages, layouts, shared UI (`app/ui/`). `src/` — features (`src/features/`), shared API/config (`src/shared/`), app-level plugins and types (`src/app/`). `lib/` — Redux store, slices, hooks, runtime config loader. Path aliases: `@/lib`, `@/app`, `@/src`.
-- **Adding pages:** Add under `app/[lang]/` (e.g. `app/[lang]/submit/page.tsx`) or new segments; use the locale layout for nav and dictionary.
+- **Adding pages:** Add under `app/[lang]/` (e.g. `app/[lang]/forms/page.tsx`) or new segments; use the locale layout for nav and dictionary.
 
 ### Runtime config and env
 

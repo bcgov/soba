@@ -13,6 +13,8 @@ on:
         required: true
       Password:
         required: true
+      MFA_CODE:
+        required: true
 
 jobs:
   playwright-run:
@@ -38,6 +40,7 @@ jobs:
         env:
           KEYCLOAK_USERNAME: ${{ secrets.Username }}
           KEYCLOAK_PASSWORD: ${{ secrets.Password }}
+          MFA_CODE: ${{ secrets.MFA_CODE }}
           DEP_ENV: ${{ inputs.DEP_ENV }}
 
       - name: Upload Playwright report

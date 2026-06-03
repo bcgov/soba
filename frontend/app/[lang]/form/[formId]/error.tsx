@@ -41,7 +41,10 @@ export default function FormIdRouteError({
         <Button type="button" variant="primary" onClick={() => reset()}>
           {labels.tryAgain}
         </Button>
-        <Link href={`/${locale}/submit`}>
+        <Link
+          className="text-[var(--theme-primary-blue)] underline hover:no-underline"
+          href={`/${locale}/forms`}
+        >
           {labels.backToList}
         </Link>
       </div>

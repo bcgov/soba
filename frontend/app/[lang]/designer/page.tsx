@@ -17,6 +17,7 @@ export async function generateMetadata({ params }: PageProps) {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default async function Page({ params }: PageProps) {
   return (
     <section className="p-4" aria-labelledby="designer-heading">

@@ -1,50 +1,69 @@
-# PR pipeline: build images, deploy crunchy Postgres (with PR-specific user), deploy SOBA from local Helm chart.
-name: PR Open
-run-name: Deploy PR-${{ github.event.number }}
+# Deploy release branches to the OpenShift test environment.
+name: Release to Test
+run-name: Deploy ${{ github.event.inputs.release_branch || github.ref_name }} to Test
 
 env:
   ACRONYM: soba
+  OC_VERSION: "4.14"
 
 on:
-  pull_request:
-    types: [opened, reopened, synchronize]
+  push:
     branches:
-      - develop
+      - "release/sprint-*"
     paths:
       - "backend/**"
       - "frontend/**"
-      - ".github/workflows/pr_open.yaml"
+      - ".github/workflows/release-to-test.yaml"
       - ".github/workflows/build-images.yaml"
+      - ".github/workflows/playwright.yaml"
+      - "integration/playwright/"
       - ".gitignore"
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "deployments/**"
+  workflow_dispatch:
+    inputs:
+      release_branch:
+        description: "Release branch to deploy, for example release/sprint-30"
+        required: true
+        type: string
 
 permissions: {}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.number }}
-  cancel-in-progress: true
+  group: openshift-test
+  cancel-in-progress: false
 
 jobs:
   set-vars:
-    name: Set variables
-    runs-on: ubuntu-latest
+    name: Set release variables
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     outputs:
-      JOB_NAME: ${{ steps.vars.outputs.JOB_NAME }}
-      URL: ${{ steps.vars.outputs.URL }}
       ref: ${{ steps.vars.outputs.ref }}
-      PR_NUM: ${{ steps.vars.outputs.PR_NUM }}
+      branch: ${{ steps.vars.outputs.branch }}
+      image_version: ${{ steps.vars.outputs.image_version }}
     steps:
-      - name: Setting variables
+      - name: Validate release branch
         id: vars
         run: |
-          PR_NUMBER="${{ github.event.number }}"
-          echo "PR_NUM=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "JOB_NAME=pr-$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "URL=https://soba-pr-${PR_NUMBER}.${{ vars.OC_DOMAIN }}" >> "$GITHUB_OUTPUT"
-          echo "ref=refs/pull/$PR_NUMBER/head" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            BRANCH="${{ github.event.inputs.release_branch }}"
+          else
+            BRANCH="${{ github.ref_name }}"
+          fi
+
+          if ! echo "$BRANCH" | grep -Eq '^release/sprint-[0-9]+$'; then
+            echo "Branch '$BRANCH' does not match release/sprint-xxx."
+            exit 1
+          fi
+
+          IMAGE_VERSION=$(echo "$BRANCH" | tr '/' '-')
+
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "ref=refs/heads/$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "image_version=$IMAGE_VERSION" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build & Push
@@ -53,8 +72,7 @@ jobs:
     with:
       ref: ${{ needs.set-vars.outputs.ref }}
       platforms: amd64
-      image_version: pr-${{ needs.set-vars.outputs.PR_NUM }}
-      #base_path: /pr-${{ needs.set-vars.outputs.PR_NUM }}
+      image_version: ${{ needs.set-vars.outputs.image_version }}
     secrets: inherit
     permissions:
       contents: read
@@ -63,7 +81,10 @@ jobs:
   deploy-crunchy:
     name: Deploy Crunchy Postgres
     needs: [set-vars]
-    runs-on: ubuntu-latest
+    environment:
+      name: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     outputs:
       cluster: ${{ steps.crunchy.outputs.cluster }}
     steps:
@@ -72,7 +93,7 @@ jobs:
         with:
           ref: ${{ needs.set-vars.outputs.ref }}
 
-      - name: Deploy Crunchy (add PR user)
+      - name: Deploy Crunchy
         id: crunchy
         uses: bcgov/action-crunchy@v2.0.0
         with:
@@ -83,18 +104,17 @@ jobs:
           ref: v2.0.0
 
   deploy:
-    name: Deploy SOBA
+    name: Deploy SOBA to Test
     needs: [set-vars, build, deploy-crunchy]
     permissions:
       contents: read
-      pull-requests: write
     environment:
-      name: pr
-      url: ${{ needs.set-vars.outputs.URL }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 18
+      name: test
+      url: https://${{ env.ACRONYM }}-test.${{ vars.OC_DOMAIN }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
-      - name: Checkout repository from pull request
+      - name: Checkout
         uses: actions/checkout@v5
         with:
           ref: ${{ needs.set-vars.outputs.ref }}
@@ -102,7 +122,7 @@ jobs:
       - name: Install OpenShift CLI
         uses: redhat-actions/openshift-tools-installer@v1
         with:
-          oc: "4.14"
+          oc: ${{ env.OC_VERSION }}
 
       - name: Login to OpenShift Cluster
         uses: redhat-actions/oc-login@v1
@@ -117,9 +137,8 @@ jobs:
         env:
           NAMESPACE: ${{ secrets.OC_NAMESPACE }}
           CLUSTER: ${{ needs.deploy-crunchy.outputs.cluster }}
-          PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
         run: |
-          SECRET_NAME="${CLUSTER}-pguser-app-${PR_NUM}"
+          SECRET_NAME="${CLUSTER}-pguser-app"
           echo "secret_name=$SECRET_NAME" >> "$GITHUB_OUTPUT"
           DB_URI=$(oc get secret "$SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.uri}' | base64 -d)
           echo "::add-mask::$DB_URI"
@@ -132,14 +151,12 @@ jobs:
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
           NAMESPACE: ${{ secrets.OC_NAMESPACE }}
-          RELEASE: soba-${{ needs.set-vars.outputs.JOB_NAME }}
           TAG: sha-${{ needs.build.outputs.short_sha }}
+          SHORT_SHA: ${{ needs.build.outputs.short_sha }}
           DOMAIN: ${{ vars.OC_DOMAIN }}
-          PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
           DATABASE_URI: ${{ steps.db.outputs.uri }}
         run: |
           REPO_LC=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
-          # Escape single quotes for YAML: ' -> ''
           DB_URI_ESC=$(printf '%s' "$DATABASE_URI" | sed "s/'/''/g")
 
           cat > /tmp/values-override.yaml <<OVERRIDE
@@ -148,15 +165,15 @@ jobs:
               repository: "ghcr.io/${REPO_LC}/backend"
               tag: "${TAG}"
             config:
-              corsOrigin: "https://soba-pr-${PR_NUM}.${DOMAIN}"
+              gitSha: "${SHORT_SHA}"
+              gitTag: "${TAG}"
+              imageTag: "${TAG}"
           frontend:
             image:
               repository: "ghcr.io/${REPO_LC}/frontend"
               tag: "${TAG}"
           global:
             domain: "${DOMAIN}"
-            routeHost: "soba-pr-${PR_NUM}.${DOMAIN}"
-            routePath: ""
           database:
             uri: '${DB_URI_ESC}'
           formio:
@@ -165,53 +182,41 @@ jobs:
             jwtSecret: "${{ secrets.FORMIO_JWT_SECRET }}"
           OVERRIDE
 
-          helm upgrade --install "${RELEASE}" ./deployments/helm/soba \
+          helm upgrade --install "soba-test" ./deployments/helm/soba \
             --namespace "${NAMESPACE}" \
             --timeout 660s \
-            -f deployments/helm/soba/values-pr.yaml \
+            -f deployments/helm/soba/values-test.yaml \
             -f /tmp/values-override.yaml
 
-          REVISION=$(helm status "${RELEASE}" -n "${NAMESPACE}" -o json | jq -r '.version')
+          REVISION=$(helm status "soba-test" -n "${NAMESPACE}" -o json | jq -r '.version')
           echo "Waiting for migration job (revision ${REVISION})..."
-          oc wait --for=condition=complete "job/${RELEASE}-migrate-${REVISION}" \
+          oc wait --for=condition=complete "job/soba-test-migrate-${REVISION}" \
             -n "${NAMESPACE}" --timeout=600s
 
-          # Clean up old migration jobs and keep only current revision
           oc get jobs -n "${NAMESPACE}" -o name \
-            | grep "${RELEASE}-migrate-" \
+            | grep "soba-test-migrate-" \
             | grep -v -- "-migrate-${REVISION}$" \
             | xargs -r oc delete -n "${NAMESPACE}" 2>/dev/null || true
 
           echo "Waiting for backend rollout..."
-          oc rollout status deployment/${RELEASE}-backend -n "${NAMESPACE}" --timeout=300s
+          oc rollout status deployment/soba-test-backend -n "${NAMESPACE}" --timeout=300s
 
           echo "Waiting for frontend rollout..."
-          oc rollout status deployment/${RELEASE}-frontend -n "${NAMESPACE}" --timeout=300s
+          oc rollout status deployment/soba-test-frontend -n "${NAMESPACE}" --timeout=300s
 
           echo "Waiting for formio rollout..."
-          oc rollout status deployment/${RELEASE}-formio -n "${NAMESPACE}" --timeout=300s
+          oc rollout status deployment/soba-test-formio -n "${NAMESPACE}" --timeout=300s
 
           echo "Waiting for mongodb rollout..."
-          oc rollout status statefulset/${RELEASE}-mongodb -n "${NAMESPACE}" --timeout=300s
-
-      - name: Release Comment on PR
-        uses: marocchino/sticky-pull-request-comment@v2
-        if: success()
-        with:
-          header: release
-          hide_and_recreate: true
-          hide_classify: "OUTDATED"
-          message: |
-            Release ${{ github.sha }} deployed at <${{ needs.set-vars.outputs.URL }}>
-          number: ${{ needs.set-vars.outputs.PR_NUM }}
+          oc rollout status statefulset/soba-test-mongodb -n "${NAMESPACE}" --timeout=300s
 
   Tests:
     name: Integration Tests
     needs: [deploy, set-vars]
     uses: ./.github/workflows/playwright.yaml
     with:
-      DEP_ENV: ${{ github.event.number }} #Passes PR number
-      pr_branch: ${{ needs.set-vars.outputs.ref }} # Passes the PR branch
+      DEP_ENV: test
+      pr_branch: ${{ needs.set-vars.outputs.ref }}
     secrets:
       Username: ${{ secrets.keycloakUsername }}
       Password: ${{ secrets.keycloakPassword }}
