@@ -43,7 +43,7 @@ jobs:
           PR_NUMBER="${{ github.event.number }}"
           echo "PR_NUM=$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "JOB_NAME=pr-$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "URL=https://soba-dev.${{ vars.OC_DOMAIN }}/pr-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "URL=https://soba-pr-${PR_NUMBER}.${{ vars.OC_DOMAIN }}" >> "$GITHUB_OUTPUT"
           echo "ref=refs/pull/$PR_NUMBER/head" >> "$GITHUB_OUTPUT"
 
   build:
@@ -54,7 +54,7 @@ jobs:
       ref: ${{ needs.set-vars.outputs.ref }}
       platforms: amd64
       image_version: pr-${{ needs.set-vars.outputs.PR_NUM }}
-      base_path: /pr-${{ needs.set-vars.outputs.PR_NUM }}
+      #base_path: /pr-${{ needs.set-vars.outputs.PR_NUM }}
     secrets: inherit
     permissions:
       contents: read
@@ -148,15 +148,15 @@ jobs:
               repository: "ghcr.io/${REPO_LC}/backend"
               tag: "${TAG}"
             config:
-              corsOrigin: "https://soba-dev.${DOMAIN}"
+              corsOrigin: "https://soba-pr-${PR_NUM}.${DOMAIN}"
           frontend:
             image:
               repository: "ghcr.io/${REPO_LC}/frontend"
               tag: "${TAG}"
           global:
             domain: "${DOMAIN}"
-            routeHost: "soba-dev.${DOMAIN}"
-            routePath: "/pr-${PR_NUM}"
+            routeHost: "soba-pr-${PR_NUM}.${DOMAIN}"
+            routePath: ""
           database:
             uri: '${DB_URI_ESC}'
           formio:

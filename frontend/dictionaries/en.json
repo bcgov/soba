@@ -74,30 +74,6 @@
       "submitSuccess": "Form submitted successfully."
     }
   },
-  "submitDemo": {
-    "tableHeading": "SOBA forms",
-    "loading": "Loading…",
-    "empty": "No SOBA forms in this workspace yet.",
-    "generate": "Generate demo SOBA form",
-    "generating": "Creating…",
-    "refresh": "Refresh",
-    "needLogin": "Sign in to view SOBA forms.",
-    "noWorkspace": "No workspace found for your account.",
-    "loadError": "Could not load forms.",
-    "generateError": "Could not create the demo form.",
-    "pollTimeout": "Provisioning is still running. Try refresh in a few seconds.",
-    "openForm": "Open in viewer",
-    "syncPending": "Pending",
-    "syncProvisioning": "Provisioning",
-    "syncReady": "Ready",
-    "syncFailed": "Failed",
-    "columns": {
-      "name": "Name",
-      "slug": "Slug",
-      "sync": "Form.io sync",
-      "open": "Open"
-    }
-  },
   "forms": {
     "manage": {
       "share": {

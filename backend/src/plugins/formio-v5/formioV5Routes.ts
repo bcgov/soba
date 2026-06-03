@@ -134,7 +134,6 @@ export function createFormioV5ProxyRouter(config: PluginConfigReader): Router {
 
   // Forms
   router.get('/form', async (req, res) => {
-    console.log('hi123123123');
     await handleJsonRoute(
       res,
       async () => (await getClient(config)).loadForms(queryFromReq(req), {}),

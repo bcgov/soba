@@ -5,6 +5,7 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useRouter, usePathname } from 'next/navigation';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
+import { getFormioProxyBaseUrl } from '@/src/shared/config/runtimeConfig';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '@formio/js/dist/formio.full.min.css';
@@ -25,21 +26,10 @@ interface FormActionButtonProps {
 
 const CustomActionButtons = ({ action, onClick }: FormActionButtonProps) => {
   const dict = useDictionary();
-  const router = useRouter();
-  const pathname = usePathname();
-  const locale = getLocaleFromPath(pathname);
 
   const handleAction = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-
-    const spyFn = (capturedId: string) => {
-      if (capturedId) {
-        router.push(`/${locale}/forms/${capturedId}`);
-      }
-    };
-
-    action.fn = spyFn;
 
     onClick();
   };
@@ -80,7 +70,7 @@ function FormList() {
   const gridComponents = {
     FormActionButton: CustomActionButtons,
   };
-
+  const formioBase = getFormioProxyBaseUrl();
   const locale = getLocaleFromPath(pathname);
 
   const handleFormClick = (id: string) => {
@@ -91,10 +81,7 @@ function FormList() {
 
   return (
     <section className="p-4">
-      <FormioProvider
-        baseUrl={process.env.NEXT_PUBLIC_SOBA_API_BASE_URL + '/forms/formio'}
-        projectUrl={process.env.NEXT_PUBLIC_SOBA_API_BASE_URL + '/forms/formio'}
-      >
+      <FormioProvider baseUrl={formioBase} projectUrl={formioBase}>
         <FormGrid components={gridComponents} onFormClick={handleFormClick} />
       </FormioProvider>
     </section>
