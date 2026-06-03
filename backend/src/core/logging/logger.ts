@@ -11,7 +11,7 @@ export function getCorrelationId(): string | undefined {
   return id != null ? String(id) : undefined;
 }
 
-const isDev = process.env.NODE_ENV !== 'production';
+const isDev = process.env.NODE_ENV === 'development';
 
 const pinoOptions: pino.LoggerOptions = {
   level: process.env.LOG_LEVEL ?? (isDev ? 'debug' : 'info'),

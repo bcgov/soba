@@ -1,11 +1,8 @@
-const path = require('path');
-const dotenv = require('dotenv');
+import path from 'path';
+import dotenv from 'dotenv';
 
 // Ensure dotenv does not log "injecting env" and tips when running tests.
 process.env.DOTENV_CONFIG_QUIET = 'true';
-
-// Silence app logging (pino) during tests so supertest error-handler tests don't dump JSON to stdout.
-process.env.LOG_LEVEL = process.env.LOG_LEVEL ?? 'silent';
 
 const backendRoot = __dirname;
 
@@ -13,14 +10,16 @@ const backendRoot = __dirname;
 dotenv.config({ path: path.join(backendRoot, '.env'), quiet: true });
 dotenv.config({ path: path.join(backendRoot, '.env.local'), override: true, quiet: true });
 
-/** @param {string} key @param {string} value */
-function setDefaultEnv(key, value) {
+// Always override after dotenv: supertest error-handler tests intentionally trigger 500s.
+process.env.NODE_ENV = 'test';
+process.env.LOG_LEVEL = 'silent';
+
+function setDefaultEnv(key: string, value: string): void {
   if (process.env[key] === undefined || process.env[key] === '') {
     process.env[key] = value;
   }
 }
 
-setDefaultEnv('NODE_ENV', 'test');
 // Unit tests mock repos; no live DB connection is required at import time.
 // Ensure no tests depend on active/running infrastructure (e.g. database, Redis, etc.).
 setDefaultEnv('DATABASE_URL', 'postgres://postgres:postgres@localhost:5432/soba_test');
