@@ -6,7 +6,7 @@ describe('MetaApiService.getFeatures', () => {
   it('maps rows to platformAllowed from status', async () => {
     jest.spyOn(featureRepo, 'listFeatures').mockResolvedValue([
       {
-        code: 'desiger',
+        code: 'designer',
         name: 'Design mode',
         description: null,
         version: null,

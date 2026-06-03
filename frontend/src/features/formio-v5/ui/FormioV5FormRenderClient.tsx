@@ -48,15 +48,12 @@ function FormioV5FormRenderBody({
   useFormioV5FormChrome(true);
 
   const submitForm = async (submission: Submission, saved?: boolean | undefined) => {
-    console.log('Form submitted with data:', submission);
-    console.log('Saved submission response:', saved);
-    if (saved) {
+     if (saved) {
       const res = await createSobaFormSubmission(
         token as string,
         sobaForm?.id ?? '',
         sobaForm?.formVersion?.id ?? '',
       );
-      console.log('SOBA form submission response:', res);
       if (res && res.id) {
         setSuccessAlert(true);
       }
@@ -66,7 +63,6 @@ function FormioV5FormRenderBody({
   useEffect(() => {
     if (sobaForm === null) {
       getSobaFormVersionFromFormioId(token as string, formId).then((res) => {
-        console.log('Mapping Form.io form ID to SOBa form version response:', res);
         setSobaForm(res);
       });
     }

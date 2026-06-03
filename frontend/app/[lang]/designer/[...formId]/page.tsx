@@ -1,4 +1,4 @@
-import { getDictionary, hasLocale, Locale, resolveLocale } from '../../dictionaries';
+import { getDictionary, hasLocale, Locale } from '../../dictionaries';
 import FormForm from '@/src/features/designer/ui/FormForm';
 
 type PageProps = {

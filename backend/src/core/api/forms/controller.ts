@@ -86,7 +86,6 @@ export const getFormVersion = asyncHandler(
 
 export const listFormVersions = asyncHandler(async (req: Request, res: Response) => {
   const ctx = req.coreContext!;
-  console.log('DEBUG', ctx, req.query);
   const result = await formsApiService.listFormVersions(
     ctx,
     req.query as unknown as ListFormVersionsQuery,
