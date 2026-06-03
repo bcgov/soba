@@ -119,4 +119,4 @@ EOF
         oc describe "job/${JOB_NAME}" -n "$NAMESPACE" || true
         oc logs "job/${JOB_NAME}" -n "$NAMESPACE" || true
         exit 1
-# Pipeline performance fix: Revert if needed.
+        # Pipeline performance fix: Revert if needed.
