@@ -100,8 +100,11 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
   const [builderKey, setBuilderKey] = useState(0);
 
   useEffect(() => {
-    setupFormioClient();
-    setEngineReady(true);
+    const init = () => {
+      setupFormioClient();
+      setEngineReady(true);
+    };
+    init();
   }, []);
 
   const opt = useMemo(
@@ -198,7 +201,8 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
 
   const handleExport = useCallback(() => {
     if (builderRef.current) {
-      const schema = (builderRef.current as any).schema || (builderRef.current as any).form || {};
+      const schema =
+        (builderRef.current as unknown).schema || (builderRef.current as unknown).form || {};
       const json = JSON.stringify(schema, null, 2);
       setExportJson(json);
       navigator.clipboard.writeText(json).catch((err) => console.error('Failed to copy', err));
@@ -210,14 +214,14 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
     try {
       const parsed = JSON.parse(importJson);
       setStableForm(sanitizeForm(parsed));
-      setBuilderKey(prev => prev + 1);
+      setBuilderKey((prev) => prev + 1);
       if (onUpdateModel) onUpdateModel(parsed);
       setShowImportModal(false);
       setImportJson('');
-    } catch (err) {
+    } catch {
       alert('Invalid JSON format');
     }
-  }, [importJson, onUpdateModel]);
+  }, [importJson, onUpdateModel, sanitizeForm]);
 
   if (initializing || !engineReady) {
     return <div className="p-10 text-center">Loading Designer...</div>;
@@ -232,14 +236,17 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
       {sidebarEl &&
         createPortal(
           <div className="p-2 mt-2 border-top bg-light">
-            <button className="mb-2 d-block btn btn-sm btn-outline-secondary w-100" onClick={handleExport}>
-              Export JSON
+            <button
+              className="mb-2 d-block btn btn-sm btn-outline-secondary w-100"
+              onClick={handleExport}
+            >
+              {dict.form.exportJson || 'Export JSON'}
             </button>
             <button
               className="d-block btn btn-sm btn-outline-secondary w-100"
               onClick={() => setShowImportModal(true)}
             >
-              Import JSON
+              {dict.form.importJson || 'Import JSON'}
             </button>
           </div>,
           sidebarEl,
@@ -259,7 +266,7 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
       {/* Export Modal */}
       <CommonModal
         show={showExportModal}
-        title="Export Form JSON"
+        title={dict.form.exportJson || 'Export Form JSON'}
         onClose={() => setShowExportModal(false)}
         size="lg"
         footer={
@@ -268,11 +275,13 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
             className="btn btn-secondary"
             onClick={() => setShowExportModal(false)}
           >
-            Close
+            {dict.form.close || 'Close'}
           </button>
         }
       >
-        <div className="alert alert-success py-2 mb-2">Copied to clipboard!</div>
+        <div className="alert alert-success py-2 mb-2">
+          {dict.form.copiedToClipboard || 'Copied to clipboard!'}
+        </div>
         <Form.Control
           as="textarea"
           style={{ height: '400px' }}
@@ -286,7 +295,7 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
       {/* Import Modal */}
       <CommonModal
         show={showImportModal}
-        title="Import Form JSON"
+        title={dict.form.importJson || 'Import Form JSON'}
         onClose={() => setShowImportModal(false)}
         size="lg"
         footer={
@@ -296,16 +305,17 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
               className="btn btn-secondary"
               onClick={() => setShowImportModal(false)}
             >
-              Cancel
+              {dict.form.cancel || 'Cancel'}
             </button>
             <button type="button" className="btn btn-primary" onClick={handleImport}>
-              Import Schema
+              {dict.form.importSchema || 'Import Schema'}
             </button>
           </>
         }
       >
         <p className="text-muted small">
-          Paste your Form.io JSON schema here. This will replace the current form design.
+          {dict.form.pasteSchema ||
+            'Paste your Form.io JSON schema here. This will replace the current form design.'}
         </p>
         <Form.Control
           as="textarea"
@@ -314,7 +324,7 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
           rows={15}
           value={importJson}
           onChange={(e) => setImportJson(e.target.value)}
-          placeholder="Paste JSON here..."
+          placeholder={dict.form.pasteJsonPlaceholder || 'Paste JSON here...'}
         />
       </CommonModal>
     </section>

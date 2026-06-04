@@ -1,33 +1,8 @@
 import type { Locale } from '@/app/[lang]/dictionaries';
 
-export type Dictionary = {
-  locale: string;
-  header: {
-    [x: string]: string | undefined;
-    workspaces: string;
-    designer: string;
-    submit: string;
-    metaReview?: string;
-    themeToggle?: string;
-  };
-  metaPage?: {
-    title: string;
-    refresh: string;
-    loadCodes: string;
-    loadRoles: string;
-    sections: {
-      health: string;
-      readiness: string;
-      build: string;
-      features: string;
-      frontendConfig: string;
-      plugins: string;
-      formEngines: string;
-      codes: string;
-      roles: string;
-    };
-  };
-};
+import en from '@/dictionaries/en.json';
+
+export type Dictionary = typeof en;
 
 export type PluginNavItem = {
   id: string;

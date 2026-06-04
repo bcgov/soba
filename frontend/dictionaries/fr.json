@@ -113,7 +113,47 @@
     "disclaimerText1": "Il est de votre responsabilité de vous conformer aux lois sur la protection de la vie privée régissant la collecte, l'utilisation et la divulgation d'informations personnellement identifiables.",
     "disclaimerText2": "L'accès à cet outil de conception de formulaires n'accorde pas intrinsèquement l'autorisation de collecter, d'utiliser ou de divulguer des informations personnellement identifiables.",
     "disclaimerText3": "Il est de votre responsabilité d'obtenir le consentement pour recueillir des informations comme l'exige la loi.",
-    "disclaimerText4": "Si vous utilisez BCeID ou BC Services Card comme options d'accès au formulaire, vous DEVEZ aviser l'équipe de gestion des informations d'identité (IDIM) par courriel (IDIM.Consulting@gov.bc.ca) de votre intention d'utiliser BCeID ou BC Services Card."
+    "disclaimerText4": "Si vous utilisez BCeID ou BC Services Card comme options d'accès au formulaire, vous DEVEZ aviser l'équipe de gestion des informations d'identité (IDIM) par courriel (IDIM.Consulting@gov.bc.ca) de votre intention d'utiliser BCeID ou BC Services Card.",
+    "exportJson": "Exporter JSON",
+    "importJson": "Importer JSON",
+    "importSchema": "Importer le schéma",
+    "copiedToClipboard": "Copié dans le presse-papiers !",
+    "pasteSchema": "Collez votre schéma JSON Form.io ici. Cela remplacera la conception actuelle du formulaire.",
+    "pasteJsonPlaceholder": "Collez le JSON ici...",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "designerTab": "Concepteur",
+    "settingsTab": "Paramètres",
+    "teamTab": "Équipe",
+    "settingsPlaceholder": "Les paramètres du formulaire seront disponibles ici.",
+    "teamManagement": "Gestion d'équipe",
+    "teamPlaceholder": "Les outils de gestion d'équipe seront disponibles ici.",
+    "readOnlyMode": "Mode lecture seule :",
+    "viewingHistoricalVersion": "Vous consultez la version historique",
+    "savePublishDisabled": "Les options Sauvegarder et Publier sont désactivées.",
+    "switchToCurrentDraft": "Passer au brouillon actuel",
+    "publishedVersion": "Version publiée :",
+    "publishedVersionCannotBeModified": "Cette version est publiée et ne peut être modifiée directement. Créez un nouveau brouillon de version pour apporter des modifications.",
+    "formVersion": "Version du formulaire",
+    "currentDraft": "Brouillon actuel",
+    "creating": "Création...",
+    "restoreAsNewVersion": "Restaurer comme nouvelle version",
+    "newVersion": "Nouvelle version",
+    "saving": "Sauvegarde...",
+    "save": "Sauvegarder",
+    "preview": "Aperçu",
+    "mustAgreeDisclaimer": "Doit accepter l'avis de non-responsabilité",
+    "cannotPublishHistory": "Impossible de publier l'historique",
+    "versionAlreadyPublished": "Version déjà publiée",
+    "saveChangesBeforePublishing": "Enregistrez les modifications avant de publier",
+    "publishForm": "Publier le formulaire",
+    "publish": "Publier",
+    "formPreview": "Aperçu du formulaire",
+    "untitledForm": "Formulaire sans titre",
+    "closePreview": "Fermer l'aperçu",
+    "noFormLayout": "Aucune mise en page de formulaire n'a encore été conçue.",
+    "apiKey": "Clé API",
+    "apiKeyPlaceholder": "Entrez votre clé API"
   },
   "submission": {
     "submissions": "Soumissions",
@@ -142,7 +182,6 @@
       }
     }
   },
-
   "Basic": "Basique",
   "Text Field": "Champ de Texte",
   "Text Area": "Zone de Texte",
@@ -153,7 +192,6 @@
   "Select": "Sélectionner",
   "Radio": "Bouton Radio",
   "Button": "Bouton",
-
   "Advanced": "Avancé",
   "Email": "Email",
   "Url": "Url",
@@ -166,7 +204,6 @@
   "Currency": "Devise",
   "Survey": "Sondage",
   "Signature": "Signature",
-
   "Layout": "Disposition",
   "HTML Element": "Élément HTML",
   "Content": "Contenu",
@@ -176,14 +213,12 @@
   "Table": "Tableau",
   "Tabs": "Onglets",
   "Well": "Panneau",
-
   "Data": "Données",
   "Hidden": "Caché",
   "Container": "Conteneur",
   "Data Map": "Carte de Données",
   "Data Grid": "Grille de Données",
   "Edit Grid": "Modifier la Grille de Données",
-
   "Submit": "Soumettre",
   "Drag and Drop a form component": "Glisser-déposer un composant de formulaire"
 }

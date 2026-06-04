@@ -19,6 +19,7 @@ const CustomActionButtons = ({
   form: FormType;
   onAction: (name: string, id: string) => void;
 }) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const formId = (form as any)._id || (form as any).id;
 
   const actions = [

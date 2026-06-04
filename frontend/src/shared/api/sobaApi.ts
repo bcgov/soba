@@ -3,9 +3,11 @@ import { isFeaturesMetaPayload } from '@/src/shared/config/featuresMeta';
 import { getSobaApiBaseUrl } from '../config/runtimeConfig';
 import { parseJson } from './sobaHelpers';
 
-export type { SobaFormType } from '../../types/forms';
-export type { WorkspaceItem, WorkspacesResponse } from '../../types/workspaces';
-export type { CurrentUserResponse } from '../../types/user';
+import type { SobaFormType } from '../../types/forms';
+import type { WorkspaceItem, WorkspacesResponse } from '../../types/workspaces';
+import type { CurrentUserResponse } from '../../types/user';
+
+export type { SobaFormType, WorkspaceItem, WorkspacesResponse, CurrentUserResponse };
 export {
   createSobaFormioForm,
   createFormioForm,
@@ -21,8 +23,6 @@ export {
   getSobaFormVersions,
 } from './sobaApiForms';
 
-
-
 export type BuildMeta = {
   name: string;
   version: string;
@@ -31,8 +31,6 @@ export type BuildMeta = {
   gitTag: string;
   imageTag: string;
 };
-
-
 
 export async function fetchHealth(): Promise<{ status: string }> {
   const response = await fetch(`${getSobaApiBaseUrl()}/health`, {

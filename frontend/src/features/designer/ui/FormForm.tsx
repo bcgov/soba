@@ -1,7 +1,17 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Alert, Button, Spinner, Form as BSForm, Row, Col, Dropdown } from 'react-bootstrap';
+import {
+  Alert,
+  Button,
+  Spinner,
+  Form as BSForm,
+  Row,
+  Col,
+  Dropdown,
+  Tabs,
+  Tab,
+} from 'react-bootstrap';
 import { FaInfoCircle } from 'react-icons/fa';
 import { Modal as CommonModal } from '@/src/components/Modal';
 import dynamic from 'next/dynamic';
@@ -12,6 +22,8 @@ import type { FormType } from '@formio/react';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import FormDesigner from '@/src/features/designer/ui/FormDesigner';
+import FormSettingsTab from './FormSettingsTab';
+import FormTeamTab from './FormTeamTab';
 import { useAppSelector } from '@/lib/store';
 
 import {
@@ -20,7 +32,6 @@ import {
   getFormioForm,
   getSobaFormVersionFromFormioId,
   updateFormioForm,
-  saveSobaFormVersion,
   getSobaFormVersions,
 } from '@/src/shared/api/sobaApi';
 import type { SobaFormWithVersionResponse, SobaFormType } from '@/src/types/forms';
@@ -28,7 +39,7 @@ import type { SobaFormWithVersionResponse, SobaFormType } from '@/src/types/form
 // Dynamic import for the Formio Renderer (to show the preview)
 const FormioFormRenderer = dynamic(() => import('@formio/react').then((mod) => mod.Form), {
   ssr: false,
-}) as React.ComponentType<any>;
+}) as React.ComponentType<{ form: FormType }>;
 
 /** Converts a human-readable title into a URL-safe slug. */
 function titleToSlug(title: string): string {
@@ -49,6 +60,7 @@ function FormForm({ id }: { id?: string[] }) {
 
   const { authenticated, token, initializing } = useKeycloak();
   const { activeWorkspaceId } = useAppSelector((state) => state.workspace);
+  const [activeTab, setActiveTab] = useState('designer');
   const [formName, setFormName] = useState('');
   const [formSlug, setFormSlug] = useState('');
   const [formDesc, setFormDesc] = useState('');
@@ -57,7 +69,7 @@ function FormForm({ id }: { id?: string[] }) {
   const [visibility, setVisibility] = useState<string[]>([]);
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
 
-  const [versions, setVersions] = useState<any[]>([]);
+  const [versions, setVersions] = useState<[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [isHistoryView, setIsHistoryView] = useState(false);
   const [historicalVersionNo, setHistoricalVersionNo] = useState<number | null>(null);
@@ -226,8 +238,8 @@ function FormForm({ id }: { id?: string[] }) {
     setLoading(true);
 
     try {
-      const nextVersionNo = Math.max(...versions.map((v: any) => v.versionNo), 0) + 1;
-      const cleanSchema = { ...(formSchema ?? {}) } as any;
+      const nextVersionNo = Math.max(...versions.map((v: unknown) => v.versionNo), 0) + 1;
+      const cleanSchema = { ...(formSchema ?? {}) } as unknown;
       delete cleanSchema._id;
       delete cleanSchema.id;
       delete cleanSchema.machineName;
@@ -246,7 +258,7 @@ function FormForm({ id }: { id?: string[] }) {
         activeWorkspaceId || undefined,
       );
 
-      const formioIdForNav = (createdFormio as any)._id || (createdFormio as any).id;
+      const formioIdForNav = (createdFormio as unknown)._id || (createdFormio as unknown).id;
 
       setAlertText(`Version ${nextVersionNo} draft created successfully!`);
       setAlertVariant('success');
@@ -355,7 +367,7 @@ function FormForm({ id }: { id?: string[] }) {
           visibility,
           activeWorkspaceId || undefined,
         );
-        formioIdForNav = (createdFormio as any)._id || (createdFormio as any).id;
+        formioIdForNav = (createdFormio as unknown)._id || (createdFormio as unknown).id;
       }
 
       setAlertText(publish ? 'Form published successfully!' : dict.form.saved);
@@ -398,45 +410,8 @@ function FormForm({ id }: { id?: string[] }) {
       : VISIBILITY_OPTIONS.filter((o) => visibility.includes(o.value))
           .map((o) => o.label)
           .join(', ');
-
-  return (
+  const renderDesignerContent = () => (
     <>
-      {showAlert && (
-        <Alert
-          variant={alertVariant}
-          onClose={() => setShowAlert(false)}
-          dismissible
-          className={styles.floatingAlert}
-        >
-          {alertText}
-        </Alert>
-      )}
-
-      {isHistoryView && (
-        <Alert variant="info" className="mb-4">
-          <div className="d-flex justify-content-between align-items-center">
-            <span>
-              <strong>Read-Only Mode:</strong> You are viewing historical version{' '}
-              <strong>v{historicalVersionNo}</strong>. Save and Publish options are disabled.
-            </span>
-            <Button size="sm" variant="outline-info" onClick={() => handleVersionChange('current')}>
-              Switch to Current Draft
-            </Button>
-          </div>
-        </Alert>
-      )}
-
-      {!isHistoryView && isCurrentPublished && (
-        <Alert variant="info" className="mb-4">
-          <div className="d-flex justify-content-between align-items-center">
-            <span>
-              <strong>Published Version:</strong> This version is published and cannot be modified
-              directly. Create a new version draft to make changes.
-            </span>
-          </div>
-        </Alert>
-      )}
-
       <BSForm>
         <Row className="mb-3 align-items-end">
           <Col md={versions.length > 0 ? 6 : 8}>
@@ -455,13 +430,13 @@ function FormForm({ id }: { id?: string[] }) {
           {versions.length > 0 && (
             <Col md={2}>
               <BSForm.Group controlId="formVersionSelector">
-                <BSForm.Label>Form Version</BSForm.Label>
+                <BSForm.Label>{dict.form.formVersion || 'Form Version'}</BSForm.Label>
                 <BSForm.Select
                   value={selectedVersionId || 'current'}
                   onChange={(e) => handleVersionChange(e.target.value)}
                 >
                   <option value="current">
-                    Current Draft{' '}
+                    {dict.form.currentDraft || 'Current Draft'}{' '}
                     {loadedSoba?.formVersion?.versionNo
                       ? `(v${loadedSoba.formVersion.versionNo})`
                       : ''}
@@ -511,23 +486,26 @@ function FormForm({ id }: { id?: string[] }) {
             </BSForm.Group>
           </Col>
         </Row>
-        
+
         <Row className="mb-3">
           <Col>
             <BSForm.Group controlId="formDisclaimerCheckbox" className="d-flex align-items-center">
               <BSForm.Check
                 type="checkbox"
                 id="disclaimer-checkbox"
-                label={dict.form.disclaimerLabel || 'I agree to the disclaimer and statement of responsibility'}
+                label={
+                  dict.form.disclaimerLabel ||
+                  'I agree to the disclaimer and statement of responsibility'
+                }
                 checked={agreedDisclaimer}
                 onChange={(e) => setAgreedDisclaimer(e.target.checked)}
                 disabled={isHistoryView || isCurrentPublished}
                 className="me-2"
               />
-              <FaInfoCircle 
-                className="text-info cursor-pointer" 
+              <FaInfoCircle
+                className="text-info cursor-pointer"
                 style={{ cursor: 'pointer' }}
-                onClick={() => setShowDisclaimerModal(true)} 
+                onClick={() => setShowDisclaimerModal(true)}
               />
             </BSForm.Group>
           </Col>
@@ -578,7 +556,11 @@ function FormForm({ id }: { id?: string[] }) {
             onClick={createNewVersion}
             disabled={isSaving || loading || !agreedDisclaimer}
           >
-            {isSaving ? 'Creating...' : isHistoryView ? 'Restore as New Version' : 'New Version'}
+            {isSaving
+              ? dict.form.creating || 'Creating...'
+              : isHistoryView
+                ? dict.form.restoreAsNewVersion || 'Restore as New Version'
+                : dict.form.newVersion || 'New Version'}
           </Button>
         )}
         <Button
@@ -587,7 +569,7 @@ function FormForm({ id }: { id?: string[] }) {
           onClick={saveFormDraft}
           disabled={isHistoryView || isCurrentPublished || isSaving || loading || !agreedDisclaimer}
         >
-          {isSaving ? 'Saving...' : 'Save'}
+          {isSaving ? dict.form.saving || 'Saving...' : dict.form.save || 'Save'}
         </Button>
         <Button
           variant="outline-primary"
@@ -595,51 +577,119 @@ function FormForm({ id }: { id?: string[] }) {
           onClick={() => setShowPreview(true)}
           disabled={isSaving || loading}
         >
-          Preview
+          {dict.form.preview || 'Preview'}
         </Button>
         <Button
           variant="primary"
           className="rounded-pill px-4"
           onClick={saveFormPublish}
-          disabled={isHistoryView || isCurrentPublished || isDirty || isSaving || loading || !agreedDisclaimer}
+          disabled={
+            isHistoryView ||
+            isCurrentPublished ||
+            isDirty ||
+            isSaving ||
+            loading ||
+            !agreedDisclaimer
+          }
           title={
             !agreedDisclaimer
-              ? 'Must agree to disclaimer'
+              ? dict.form.mustAgreeDisclaimer || 'Must agree to disclaimer'
               : isHistoryView
-                ? 'Cannot publish history'
+                ? dict.form.cannotPublishHistory || 'Cannot publish history'
                 : isCurrentPublished
-                  ? 'Version already published'
+                  ? dict.form.versionAlreadyPublished || 'Version already published'
                   : isDirty
-                    ? 'Save changes before publishing'
-                    : 'Publish form'
+                    ? dict.form.saveChangesBeforePublishing || 'Save changes before publishing'
+                    : dict.form.publishForm || 'Publish form'
           }
         >
-          Publish
+          {dict.form.publish || 'Publish'}
         </Button>
       </div>
+    </>
+  );
+
+  return (
+    <>
+      {showAlert && (
+        <Alert
+          variant={alertVariant}
+          onClose={() => setShowAlert(false)}
+          dismissible
+          className={styles.floatingAlert}
+        >
+          {alertText}
+        </Alert>
+      )}
+
+      {isHistoryView && (
+        <Alert variant="info" className="mb-4">
+          <div className="d-flex justify-content-between align-items-center">
+            <span>
+              <strong>{dict.form.readOnlyMode || 'Read-Only Mode:'}</strong>{' '}
+              {dict.form.viewingHistoricalVersion || 'You are viewing historical version'}{' '}
+              <strong>v{historicalVersionNo}</strong>.{' '}
+              {dict.form.savePublishDisabled || 'Save and Publish options are disabled.'}
+            </span>
+            <Button size="sm" variant="outline-info" onClick={() => handleVersionChange('current')}>
+              {dict.form.switchToCurrentDraft ||
+                'Switch to ' + (dict.form.currentDraft || 'Current Draft')}
+            </Button>
+          </div>
+        </Alert>
+      )}
+
+      {!isHistoryView && isCurrentPublished && (
+        <Alert variant="info" className="mb-4">
+          <div className="d-flex justify-content-between align-items-center">
+            <span>
+              <strong>{dict.form.publishedVersion || 'Published Version:'}</strong>{' '}
+              {dict.form.publishedVersionCannotBeModified ||
+                'This version is published and cannot be modified'}
+            </span>
+          </div>
+        </Alert>
+      )}
+
+      {id && id[0] ? (
+        <Tabs
+          id="form-designer-tabs"
+          activeKey={activeTab}
+          onSelect={(k) => setActiveTab(k || 'designer')}
+          className="mb-3"
+        >
+          <Tab eventKey="designer" title="Designer">
+            {renderDesignerContent()}
+          </Tab>
+          <Tab eventKey="settings" title={dict.form.settingsTab || 'Settings'}>
+            <FormSettingsTab dict={dict} />
+          </Tab>
+          <Tab eventKey="team" title={dict.form.teamTab || 'Team'}>
+            <FormTeamTab dict={dict} />
+          </Tab>
+        </Tabs>
+      ) : (
+        renderDesignerContent()
+      )}
 
       {/* Preview Modal */}
       <CommonModal
         show={showPreview}
-        title={`Form Preview: ${formName || 'Untitled Form'}`}
+        title={`${dict.form.formPreview || 'Form Preview:'} ${formName || dict.form.untitledForm || 'Untitled Form'}`}
         onClose={() => setShowPreview(false)}
         size="lg"
         footer={
           <Button variant="secondary" onClick={() => setShowPreview(false)}>
-            Close Preview
+            {dict.form.closePreview || 'Close Preview'}
           </Button>
         }
       >
         {formSchema ? (
-          <FormioFormRenderer
-            form={formSchema}
-            onSubmit={(sub: any) => {
-              console.log('Preview Submission:', sub);
-              alert('Submission successful (Preview mode)');
-            }}
-          />
+          <FormioFormRenderer form={formSchema} />
         ) : (
-          <p className="text-center p-5 text-muted">No form layout designed yet.</p>
+          <p className="text-center p-5 text-muted">
+            {dict.form.noFormLayout || 'No form layout designed yet.'}
+          </p>
         )}
       </CommonModal>
 
@@ -656,10 +706,22 @@ function FormForm({ id }: { id?: string[] }) {
         }
       >
         <div>
-          <p>{dict.form.disclaimerText1 || 'It is your responsibility to comply with Privacy laws governing the collection, use and disclosure of personally identifiable information.'}</p>
-          <p>{dict.form.disclaimerText2 || 'Access to this form designer tool does not inherently grant permission to collect, use or disclose any personally identifiable information.'}</p>
-          <p>{dict.form.disclaimerText3 || 'It is your responsibility to obtain consent to collect information as required by law.'}</p>
-          <p>{dict.form.disclaimerText4 || 'If you use BCeID or BC Services Card as form access options, you MUST notify the Identity Information Management (IDIM) team by email (IDIM.Consulting@gov.bc.ca) your intent to leverage BCeID or BC Services Card.'}</p>
+          <p>
+            {dict.form.disclaimerText1 ||
+              'It is your responsibility to comply with Privacy laws governing the collection, use and disclosure of personally identifiable information.'}
+          </p>
+          <p>
+            {dict.form.disclaimerText2 ||
+              'Access to this form designer tool does not inherently grant permission to collect, use or disclose any personally identifiable information.'}
+          </p>
+          <p>
+            {dict.form.disclaimerText3 ||
+              'It is your responsibility to obtain consent to collect information as required by law.'}
+          </p>
+          <p>
+            {dict.form.disclaimerText4 ||
+              'If you use BCeID or BC Services Card as form access options, you MUST notify the Identity Information Management (IDIM) team by email (IDIM.Consulting@gov.bc.ca) your intent to leverage BCeID or BC Services Card.'}
+          </p>
         </div>
       </CommonModal>
     </>
