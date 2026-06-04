@@ -77,3 +77,10 @@ outboxWorker:
     limits:
       cpu: 100m
       memory: 256Mi
+
+vault:
+  enabled: true
+  role: acf456-nonprod
+  secretPath: acf456-nonprod/soba-dev
+  serviceAccountName: acf456-vault
+

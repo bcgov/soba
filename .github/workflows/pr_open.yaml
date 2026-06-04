@@ -169,8 +169,7 @@ jobs:
             routeHost: "soba-dev.${DOMAIN}"
             routePath: "/pr-${PR_NUM}"
           database:
-            existingSecretName: "${{ steps.db.outputs.secret_name }}"
-            existingSecretKey: "uri"
+            uri: '${DB_URI_ESC}'
           OVERRIDE
 
           # Pipeline performance fix: Revert if needed.

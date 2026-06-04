@@ -10,3 +10,4 @@ data:
   PLUGIN_FORMIO_V5_API_BASE_URL: {{ include "soba.formioBaseUrl" . | quote }}
   PLUGIN_FORMIO_V5_ADMIN_API_URL: {{ include "soba.formioBaseUrl" . | quote }}
   PLUGIN_FORMIO_V5_RENDER_API_URL: {{ include "soba.formioBaseUrl" . | quote }}
+  PLUGIN_FORMIO_V5_ADMIN_USERNAME: {{ .Values.formio.admin.email | quote }}
