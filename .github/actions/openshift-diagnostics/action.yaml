@@ -1,7 +1,6 @@
 name: OpenShift Diagnostics
 description: Print Helm, OpenShift, and database diagnostics for a failed release deployment.
 
-# Pipeline performance fix: Revert if needed.
 inputs:
   release:
     description: Helm release name to inspect.
@@ -9,10 +8,14 @@ inputs:
   namespace:
     description: OpenShift namespace to inspect.
     required: true
-  database_uri:
-    description: Optional Postgres connection URI to inspect.
+  database_secret_name:
+    description: Optional existing Kubernetes secret that contains the Postgres connection URI.
     required: false
     default: ""
+  database_secret_key:
+    description: Secret key that stores the Postgres connection URI.
+    required: false
+    default: uri
 
 runs:
   using: composite
@@ -22,9 +25,18 @@ runs:
       env:
         RELEASE: ${{ inputs.release }}
         NAMESPACE: ${{ inputs.namespace }}
-        DATABASE_URI: ${{ inputs.database_uri }}
+        DATABASE_SECRET_NAME: ${{ inputs.database_secret_name }}
+        DATABASE_SECRET_KEY: ${{ inputs.database_secret_key }}
       run: |
         set +e
+        RUN_ID="${GITHUB_RUN_ID:-manual}"
+        RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-1}"
+        JOB_NAME="pg-diagnostics-${RUN_ID}-${RUN_ATTEMPT}"
+
+        cleanup() {
+          oc delete job "$JOB_NAME" -n "$NAMESPACE" --ignore-not-found=true >/dev/null 2>&1 || true
+        }
+        trap cleanup EXIT
 
         echo "Helm status for ${RELEASE}"
         helm status "${RELEASE}" -n "${NAMESPACE}" || true
@@ -50,16 +62,66 @@ runs:
           oc logs "${pod}" -n "${NAMESPACE}" --all-containers=true || true
         done
 
-        if [ -n "$DATABASE_URI" ]; then
+        if [ -n "$DATABASE_SECRET_NAME" ]; then
           echo "Database connectivity check"
-          if command -v psql >/dev/null 2>&1; then
-            psql "$DATABASE_URI" -v ON_ERROR_STOP=1 -c "SELECT 1;" || true
-            psql "$DATABASE_URI" -v ON_ERROR_STOP=1 -c "SELECT current_database(), current_user;" || true
-          else
-            echo "psql is not available; skipping database diagnostics."
+          jq -n \
+            --arg job_name "$JOB_NAME" \
+            --arg secret_name "$DATABASE_SECRET_NAME" \
+            --arg secret_key "$DATABASE_SECRET_KEY" \
+            '{
+              apiVersion: "batch/v1",
+              kind: "Job",
+              metadata: {
+                name: $job_name,
+                labels: {
+                  "app.kubernetes.io/component": "postgres-diagnostics"
+                }
+              },
+              spec: {
+                backoffLimit: 0,
+                activeDeadlineSeconds: 120,
+                template: {
+                  metadata: {
+                    labels: {
+                      "app.kubernetes.io/component": "postgres-diagnostics"
+                    }
+                  },
+                  spec: {
+                    restartPolicy: "Never",
+                    containers: [
+                      {
+                        name: "postgres-diagnostics",
+                        image: "postgres:16-alpine",
+                        imagePullPolicy: "IfNotPresent",
+                        env: [
+                          {
+                            name: "DATABASE_URI",
+                            valueFrom: {
+                              secretKeyRef: {
+                                name: $secret_name,
+                                key: $secret_key
+                              }
+                            }
+                          }
+                        ],
+                        command: [
+                          "sh",
+                          "-c",
+                          "psql \"$DATABASE_URI\" -v ON_ERROR_STOP=1 -c \"SELECT 1;\" && psql \"$DATABASE_URI\" -v ON_ERROR_STOP=1 -c \"SELECT current_database(), current_user();\""
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }' | oc apply -n "$NAMESPACE" -f - || true
+
+          if ! oc wait --for=condition=complete "job/${JOB_NAME}" -n "$NAMESPACE" --timeout=150s; then
+            echo "Database diagnostics job failed or timed out."
+            oc describe "job/${JOB_NAME}" -n "$NAMESPACE" || true
           fi
+          oc logs "job/${JOB_NAME}" -n "${NAMESPACE}" || true
         fi
 
         echo "Recent namespace events"
         oc get events -n "${NAMESPACE}" --sort-by=.lastTimestamp | tail -100 || true
-# Pipeline performance fix: Revert if needed.

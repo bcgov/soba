@@ -92,18 +92,22 @@ jobs:
         run: |
           SECRET_NAME="${CLUSTER}-pguser-app"
           echo "secret_name=$SECRET_NAME" >> "$GITHUB_OUTPUT"
-          DB_URI=$(oc get secret "$SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.uri}' | base64 -d)
-          echo "::add-mask::$DB_URI"
-          echo "uri<<URI_EOF" >> "$GITHUB_OUTPUT"
-          printf '%s' "$DB_URI" >> "$GITHUB_OUTPUT"
-          echo "" >> "$GITHUB_OUTPUT"
-          echo "URI_EOF" >> "$GITHUB_OUTPUT"
+
+      # Pipeline performance fix: Revert if needed.
+      - name: Apply Form.io secret
+        uses: ./.github/actions/apply-formio-secret
+        with:
+          release: soba-dev
+          namespace: ${{ secrets.OC_NAMESPACE }}
+          admin_password: ${{ secrets.FORMIO_ADMIN_PASSWORD }}
+          jwt_secret: ${{ secrets.FORMIO_JWT_SECRET }}
+      # Pipeline performance fix: Revert if needed.
 
       # Pipeline performance fix: Revert if needed.
       - name: Wait for dev database readiness
         uses: ./.github/actions/wait-for-postgres
         with:
-          database_uri: ${{ steps.db.outputs.uri }}
+          secret_name: ${{ steps.db.outputs.secret_name }}
           namespace: ${{ secrets.OC_NAMESPACE }}
           label: dev database
       # Pipeline performance fix: Revert if needed.
@@ -115,10 +119,8 @@ jobs:
           TAG: sha-${{ needs.build.outputs.short_sha }}
           SHORT_SHA: ${{ needs.build.outputs.short_sha }}
           DOMAIN: ${{ vars.OC_DOMAIN }}
-          DATABASE_URI: ${{ steps.db.outputs.uri }}
         run: |
           REPO_LC=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
-          DB_URI_ESC=$(printf '%s' "$DATABASE_URI" | sed "s/'/''/g")
 
           cat > /tmp/values-override.yaml <<OVERRIDE
           backend:
@@ -136,11 +138,8 @@ jobs:
           global:
             domain: "${DOMAIN}"
           database:
-            uri: '${DB_URI_ESC}'
-          formio:
-            admin:
-              password: "${{ secrets.FORMIO_ADMIN_PASSWORD }}"
-            jwtSecret: "${{ secrets.FORMIO_JWT_SECRET }}"
+            existingSecretName: "${{ steps.db.outputs.secret_name }}"
+            existingSecretKey: "uri"
           OVERRIDE
 
           # Pipeline performance fix: Revert if needed.
@@ -179,7 +178,7 @@ jobs:
         with:
           release: soba-dev
           namespace: ${{ secrets.OC_NAMESPACE }}
-          database_uri: ${{ steps.db.outputs.uri }}
+          database_secret_name: ${{ steps.db.outputs.secret_name }}
       # Pipeline performance fix: Revert if needed.
 
   Tests:

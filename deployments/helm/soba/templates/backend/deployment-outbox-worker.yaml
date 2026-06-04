@@ -42,9 +42,30 @@ spec:
             - configMapRef:
                 name: {{ include "soba.fullname" . }}-backend-ratelimit
             - secretRef:
-                name: {{ include "soba.fullname" . }}-db
-            - secretRef:
                 name: {{ include "soba.fullname" . }}-formio
+          env:
+            {{- if .Values.database.existingSecretName }}
+            # Pipeline performance fix: Revert if needed.
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "soba.dbSecretName" . }}
+                  key: {{ include "soba.dbSecretKey" . }}
+            # Pipeline performance fix: Revert if needed.
+            {{- else }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "soba.dbSecretName" . }}
+                  key: {{ include "soba.dbSecretKey" . }}
+                  optional: true
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "soba.dbSecretName" . }}
+                  key: DB_PASSWORD
+                  optional: true
+            {{- end }}
           {{- if .Values.outboxWorker.livenessProbe.enabled }}
           livenessProbe:
             exec:
