@@ -68,6 +68,8 @@ runs:
 
         jq -nc \
           --arg name "$SECRET_NAME" \
+          --arg release "$RELEASE" \
+          --arg namespace "$NAMESPACE" \
           --arg admin_email "$FORMIO_ADMIN_EMAIL" \
           --arg admin_password "$FORMIO_ADMIN_PASSWORD" \
           --arg jwt_secret "$FORMIO_JWT_SECRET" \
@@ -75,7 +77,19 @@ runs:
           '{
             apiVersion: "v1",
             kind: "Secret",
-            metadata: { name: $name },
+            metadata: {
+              name: $name,
+              labels: {
+                "app.kubernetes.io/managed-by": "Helm",
+                "app.kubernetes.io/instance": $release,
+                "app.kubernetes.io/component": "formio"
+              },
+              annotations: {
+                "meta.helm.sh/release-name": $release,
+                "meta.helm.sh/release-namespace": $namespace,
+                "helm.sh/resource-policy": "keep"
+              }
+            },
             type: "Opaque",
             stringData: {
               PLUGIN_FORMIO_V5_ADMIN_USERNAME: $admin_email,

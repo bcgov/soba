@@ -107,7 +107,7 @@ runs:
                         command: [
                           "sh",
                           "-c",
-                          "psql \"$DATABASE_URI\" -v ON_ERROR_STOP=1 -c \"SELECT 1;\" && psql \"$DATABASE_URI\" -v ON_ERROR_STOP=1 -c \"SELECT current_database(), current_user();\""
+                          "psql \"$DATABASE_URI\" -v ON_ERROR_STOP=1 -c \"SELECT 1;\" && psql \"$DATABASE_URI\" -v ON_ERROR_STOP=1 -c \"SELECT current_database(), current_user;\""
                         ]
                       }
                     ]
