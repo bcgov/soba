@@ -23,6 +23,10 @@ inputs:
     description: Form.io container port used in NODE_CONFIG.
     required: false
     default: "3001"
+  mongodb_port:
+    description: MongoDB service port used in NODE_CONFIG.
+    required: false
+    default: "27017"
 
 runs:
   using: composite
@@ -36,11 +40,12 @@ runs:
         FORMIO_JWT_SECRET: ${{ inputs.jwt_secret }}
         FORMIO_ADMIN_EMAIL: ${{ inputs.admin_email }}
         FORMIO_PORT: ${{ inputs.formio_port }}
+        MONGODB_PORT: ${{ inputs.mongodb_port }}
       run: |
         set -euo pipefail
 
         SECRET_NAME="${RELEASE}-formio"
-        MONGODB_URI="mongodb://${RELEASE}-mongodb:${FORMIO_PORT}/formio-ce"
+        MONGODB_URI="mongodb://${RELEASE}-mongodb:${MONGODB_PORT}/formio-ce"
         NODE_CONFIG=$(
           jq -nc \
             --arg mongo "$MONGODB_URI" \
