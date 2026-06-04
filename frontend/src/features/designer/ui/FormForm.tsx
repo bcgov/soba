@@ -17,7 +17,7 @@ import { Modal as CommonModal } from '@/src/components/Modal';
 import dynamic from 'next/dynamic';
 import styles from './FormForm.module.css';
 
-import type { FormType } from '@formio/react';
+import type { FormProps, FormType } from '@formio/react';
 
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
@@ -34,12 +34,18 @@ import {
   updateFormioForm,
   getSobaFormVersions,
 } from '@/src/shared/api/sobaApi';
-import type { SobaFormWithVersionResponse, SobaFormType } from '@/src/types/forms';
+import type {
+  SobaFormWithVersionResponse,
+  SobaFormType,
+  SobaFormVersionType,
+} from '@/src/types/forms';
 
-// Dynamic import for the Formio Renderer (to show the preview)
-const FormioFormRenderer = dynamic(() => import('@formio/react').then((mod) => mod.Form), {
-  ssr: false,
-}) as React.ComponentType<{ form: FormType }>;
+const FormioFormRenderer = dynamic<FormProps>(
+  () => import('@formio/react').then((mod) => mod.Form),
+  {
+    ssr: false,
+  },
+);
 
 /** Converts a human-readable title into a URL-safe slug. */
 function titleToSlug(title: string): string {
@@ -69,7 +75,7 @@ function FormForm({ id }: { id?: string[] }) {
   const [visibility, setVisibility] = useState<string[]>([]);
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
 
-  const [versions, setVersions] = useState<[]>([]);
+  const [versions, setVersions] = useState<SobaFormVersionType[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [isHistoryView, setIsHistoryView] = useState(false);
   const [historicalVersionNo, setHistoricalVersionNo] = useState<number | null>(null);
@@ -199,7 +205,7 @@ function FormForm({ id }: { id?: string[] }) {
       return;
     }
 
-    const targetVersion = versions.find((v) => v.id === versionId);
+    const targetVersion = versions.find((v: SobaFormVersionType) => v.id === versionId);
     if (!targetVersion) return;
 
     setIsHistoryView(true);
@@ -238,10 +244,10 @@ function FormForm({ id }: { id?: string[] }) {
     setLoading(true);
 
     try {
-      const nextVersionNo = Math.max(...versions.map((v: unknown) => v.versionNo), 0) + 1;
-      const cleanSchema = { ...(formSchema ?? {}) } as unknown;
+      const nextVersionNo =
+        Math.max(...versions.map((v: SobaFormVersionType) => v.versionNo), 0) + 1;
+      const cleanSchema = { ...(formSchema ?? {}) };
       delete cleanSchema._id;
-      delete cleanSchema.id;
       delete cleanSchema.machineName;
 
       const slug = formSlug || titleToSlug(formName);
@@ -685,7 +691,7 @@ function FormForm({ id }: { id?: string[] }) {
         }
       >
         {formSchema ? (
-          <FormioFormRenderer form={formSchema} />
+          <FormioFormRenderer src="" form={formSchema} />
         ) : (
           <p className="text-center p-5 text-muted">
             {dict.form.noFormLayout || 'No form layout designed yet.'}

@@ -38,3 +38,16 @@ export type SobaFormWithVersionResponse = SobaResponseFormType & {
     updatedAt: string;
   } | null;
 };
+
+export type SobaFormVersionType = {
+  id: string;
+  versionNo: number;
+  state: string;
+  engineSyncStatus: string;
+  engineSchemaRef?: string | null;
+  currentRevisionNo: number;
+  publishedAt?: string | null;
+  visibility?: string[];
+  createdAt: string;
+  updatedAt: string;
+};

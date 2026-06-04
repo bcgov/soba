@@ -201,8 +201,7 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
 
   const handleExport = useCallback(() => {
     if (builderRef.current) {
-      const schema =
-        (builderRef.current as unknown).schema || (builderRef.current as unknown).form || {};
+      const schema = (builderRef.current as FormioBuilderInstance).form || {};
       const json = JSON.stringify(schema, null, 2);
       setExportJson(json);
       navigator.clipboard.writeText(json).catch((err) => console.error('Failed to copy', err));
