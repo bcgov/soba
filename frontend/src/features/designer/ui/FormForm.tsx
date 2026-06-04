@@ -325,7 +325,7 @@ function FormForm({ id }: { id?: string[] }) {
         .replace(/^[\/-]+|[\/-]+$/g, '');
       formioData.title = formName;
 
-      let formioIdForNav: string | null = null;
+      let formioIdForNav: string | undefined | null = null;
 
       if (loadedSoba?.formVersion && loadedSoba.formVersion.id) {
         // UPDATE Logic
@@ -373,7 +373,7 @@ function FormForm({ id }: { id?: string[] }) {
           visibility,
           activeWorkspaceId || undefined,
         );
-        formioIdForNav = (createdFormio as unknown)._id || (createdFormio as unknown).id;
+        formioIdForNav = (createdFormio as FormType)._id;
       }
 
       setAlertText(publish ? 'Form published successfully!' : dict.form.saved);
