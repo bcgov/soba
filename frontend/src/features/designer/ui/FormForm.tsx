@@ -264,7 +264,7 @@ function FormForm({ id }: { id?: string[] }) {
         activeWorkspaceId || undefined,
       );
 
-      const formioIdForNav = (createdFormio as unknown)._id || (createdFormio as unknown).id;
+      const formioIdForNav = (createdFormio as FormType)._id;
 
       setAlertText(`Version ${nextVersionNo} draft created successfully!`);
       setAlertVariant('success');
