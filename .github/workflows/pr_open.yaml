@@ -141,6 +141,8 @@ jobs:
           DOMAIN: ${{ vars.OC_DOMAIN }}
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
         run: |
+          # Pipeline performance fix: Revert if needed.
+          set -euo pipefail
           REPO_LC=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
 
           cat > /tmp/values-override.yaml <<OVERRIDE
@@ -180,17 +182,17 @@ jobs:
             | grep -v -- "-migrate-${REVISION}$" \
             | xargs -r oc delete -n "${NAMESPACE}" 2>/dev/null || true
 
-          echo "Waiting for backend rollout..."
-          oc rollout status deployment/${RELEASE}-backend -n "${NAMESPACE}" --timeout=300s
-
-          echo "Waiting for frontend rollout..."
-          oc rollout status deployment/${RELEASE}-frontend -n "${NAMESPACE}" --timeout=300s
-
-          echo "Waiting for formio rollout..."
-          oc rollout status deployment/${RELEASE}-formio -n "${NAMESPACE}" --timeout=300s
-
-          echo "Waiting for mongodb rollout..."
-          oc rollout status statefulset/${RELEASE}-mongodb -n "${NAMESPACE}" --timeout=300s
+          for rollout in \
+            "deployment/${RELEASE}-backend:backend" \
+            "deployment/${RELEASE}-frontend:frontend" \
+            "deployment/${RELEASE}-formio:formio" \
+            "statefulset/${RELEASE}-mongodb:mongodb"; do
+            resource="${rollout%%:*}"
+            label="${rollout##*:}"
+            echo "Waiting for ${label} rollout..."
+            oc rollout status "${resource}" -n "${NAMESPACE}" --timeout=300s
+          done
+          # Pipeline performance fix: Revert if needed.
 
       # Pipeline performance fix: Revert if needed.
       - name: Deployment diagnostics
