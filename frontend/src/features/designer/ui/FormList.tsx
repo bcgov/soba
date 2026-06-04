@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Spinner, Container, Form, InputGroup, Button } from 'react-bootstrap';
-import { DataTable, type Column } from '@/src/shared/components/DataTable';
+import { DataTable, type Column } from '@/src/components/DataTable';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useRouter, usePathname } from 'next/navigation';

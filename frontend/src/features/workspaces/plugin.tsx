@@ -1,5 +1,4 @@
-import type { AppPlugin } from '@/src/app/plugins/types';
-import { EmptyHomeSection } from '@/src/app/plugins/EmptyHomeSection';
+import type { AppPlugin } from '@/src/types/plugins';
 
 export const workspacesPlugin: AppPlugin = {
   id: 'workspaces',
@@ -10,5 +9,4 @@ export const workspacesPlugin: AppPlugin = {
     href: `/${locale}/`,
     label: dictionary.header.workspaces,
   }),
-  HomeSection: EmptyHomeSection,
 };

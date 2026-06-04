@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { Spinner } from 'react-bootstrap';
@@ -16,21 +16,15 @@ export function AuthRedirect({
 }) {
   const { authenticated, initializing } = useKeycloak();
   const router = useRouter();
-  const [redirecting, setRedirecting] = useState(false);
+  const shouldRedirect = !initializing && ((ifLogged && authenticated) || (!ifLogged && !authenticated));
 
   useEffect(() => {
-    if (!initializing) {
-      if (ifLogged && authenticated) {
-        setRedirecting(true);
-        router.replace(to);
-      } else if (!ifLogged && !authenticated) {
-        setRedirecting(true);
-        router.replace(to);
-      }
+    if (shouldRedirect) {
+      router.replace(to);
     }
-  }, [authenticated, initializing, to, ifLogged, router]);
+  }, [shouldRedirect, router, to]);
 
-  if (initializing || redirecting) {
+  if (initializing || shouldRedirect) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '50vh' }}>
         <Spinner animation="border" />

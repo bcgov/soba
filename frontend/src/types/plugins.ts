@@ -1,7 +1,6 @@
-import type React from 'react';
 import type { Locale } from '@/app/[lang]/dictionaries';
 
-type Dictionary = {
+export type Dictionary = {
   locale: string;
   header: {
     [x: string]: string | undefined;
@@ -50,5 +49,4 @@ export type AppPlugin = {
   showInHeaderNav?: boolean;
   order?: number;
   getNavItem: (params: { locale: Locale; dictionary: Dictionary }) => PluginNavItem | null;
-  HomeSection: React.ComponentType;
 };

@@ -21,8 +21,9 @@ export const loadWorkspaces = createAsyncThunk(
     try {
       const response = await fetchWorkspaces(token);
       return response.items;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to load workspaces');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to load workspaces';
+      return rejectWithValue(message);
     }
   }
 );

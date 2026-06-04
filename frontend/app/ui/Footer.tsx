@@ -4,7 +4,7 @@ import bcgovLogo from '../../public/bcgov-logo.png';
 // eslint-ignore-next-line import/no-unresolved
 import styles from './Footer.module.css';
 
-export interface FooterLinksProps {
+interface FooterLinksProps {
   /**
    * Title for the list of links - associated to the list of links as a `<figcaption>`
    */
@@ -21,7 +21,7 @@ export interface FooterLinksProps {
  * @param {FooterLinksProps} props
  * @returns {React.ReactElement}
  */
-export function FooterLinks({ title, links }: FooterLinksProps) {
+function FooterLinks({ title, links }: FooterLinksProps) {
   return (
     <figure className={styles['bcds-footer--links']}>
       {title && <figcaption className={styles['bcds-footer--links-title']}>{title}</figcaption>}
@@ -37,7 +37,7 @@ export function FooterLinks({ title, links }: FooterLinksProps) {
   );
 }
 
-export interface FooterProps {
+interface FooterProps {
   /**
    * Land acknowledgement block (defaults to Gov.bc.ca land acknowledgement)
    */
@@ -81,7 +81,7 @@ export interface FooterProps {
  * @param {FooterProps} props
  * @returns {React.ReactElement}
  */
-export default function Footer({
+function Footer({
   children,
   acknowledgement,
   logo,
@@ -144,23 +144,23 @@ export default function Footer({
       <FooterLinks
         title="More Info"
         links={[
-          <a href="https://www2.gov.bc.ca/gov/content/home">Home</a>,
-          <a href="https://www2.gov.bc.ca/gov/content?id=3C4F47288DFB454987435AB5EFEFBB7F">
+          <a key="home" href="https://www2.gov.bc.ca/gov/content/home">Home</a>,
+          <a key="about" href="https://www2.gov.bc.ca/gov/content?id=3C4F47288DFB454987435AB5EFEFBB7F">
             About gov.bc.ca
           </a>,
-          <a href="https://www2.gov.bc.ca/gov/content?id=79F93E018712422FBC8E674A67A70535">
+          <a key="disclaimer" href="https://www2.gov.bc.ca/gov/content?id=79F93E018712422FBC8E674A67A70535">
             Disclaimer
           </a>,
-          <a href="https://www2.gov.bc.ca/gov/content?id=9E890E16955E4FF4BF3B0E07B4722932">
+          <a key="privacy" href="https://www2.gov.bc.ca/gov/content?id=9E890E16955E4FF4BF3B0E07B4722932">
             Privacy
           </a>,
-          <a href="https://www2.gov.bc.ca/gov/content?id=E08E79740F9C41B9B0C484685CC5E412">
+          <a key="accessibility" href="https://www2.gov.bc.ca/gov/content?id=E08E79740F9C41B9B0C484685CC5E412">
             Accessibility
           </a>,
-          <a href="https://www2.gov.bc.ca/gov/content?id=1AAACC9C65754E4D89A118B875E0FBDA">
+          <a key="copyright" href="https://www2.gov.bc.ca/gov/content?id=1AAACC9C65754E4D89A118B875E0FBDA">
             Copyright
           </a>,
-          <a href="https://www2.gov.bc.ca/gov/content?id=6A77C17D0CCB48F897F8598CCC019111">
+          <a key="contact" href="https://www2.gov.bc.ca/gov/content?id=6A77C17D0CCB48F897F8598CCC019111">
             Contact us
           </a>,
         ]}

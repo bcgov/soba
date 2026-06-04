@@ -120,7 +120,10 @@ export async function checkFormVisibility(req: Request, res: Response, next: Nex
             matched = true;
             break;
           }
-          if (option === 'bc-services-card' && (userIdp === 'bcservicescard' || userIdp === 'bcsc')) {
+          if (
+            option === 'bc-services-card' &&
+            (userIdp === 'bcservicescard' || userIdp === 'bcsc')
+          ) {
             matched = true;
             break;
           }
@@ -133,7 +136,9 @@ export async function checkFormVisibility(req: Request, res: Response, next: Nex
         }
       } else {
         // If visibility list is empty, default to workspace membership check
-        const membership = req.actorId ? await getWorkspaceForUser(formVersion.workspaceId, req.actorId) : null;
+        const membership = req.actorId
+          ? await getWorkspaceForUser(formVersion.workspaceId, req.actorId)
+          : null;
         if (!membership) {
           return res.status(403).json({
             error: 'Forbidden',
@@ -157,7 +162,10 @@ export async function checkFormVisibility(req: Request, res: Response, next: Nex
         .select({ userId: userIdentities.userId })
         .from(userIdentities)
         .where(
-          and(eq(userIdentities.identityProviderCode, 'system'), eq(userIdentities.subject, 'soba-system')),
+          and(
+            eq(userIdentities.identityProviderCode, 'system'),
+            eq(userIdentities.subject, 'soba-system'),
+          ),
         )
         .limit(1);
 

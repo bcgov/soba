@@ -348,7 +348,12 @@ export function createFormsApiService(
         }),
       ),
 
-    updateDraft: async (ctx: FormsContextInput, formVersionId: string, state?: string, visibility?: string[]) => {
+    updateDraft: async (
+      ctx: FormsContextInput,
+      formVersionId: string,
+      state?: string,
+      visibility?: string[],
+    ) => {
       const row = await formVersionService.updateDraft({
         workspaceId: ctx.workspaceId,
         actorId: ctx.actorId,

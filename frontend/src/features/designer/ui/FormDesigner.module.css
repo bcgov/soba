@@ -25,13 +25,11 @@
   cursor: grab !important;
 }
 
-/* Sticky Sidebar Logic */
 :global(.builder-sidebar) {
   position: sticky;
   top: 1rem;
   align-self: flex-start;
-  max-height: calc(100vh - 2rem);
-  overflow-y: auto;
+  max-height: none;
   padding-right: 0.5rem;
   z-index: 10;
 }

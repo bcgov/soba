@@ -104,7 +104,12 @@ export const createFormVersion = asyncHandler(
 export const updateFormVersion = asyncHandler(
   async (req: Request<FormVersionIdParams, unknown, UpdateFormVersionBody>, res: Response) => {
     const ctx = req.coreContext!;
-    const result = await formsApiService.updateDraft(ctx, req.params.id, req.body.state, req.body.visibility);
+    const result = await formsApiService.updateDraft(
+      ctx,
+      req.params.id,
+      req.body.state,
+      req.body.visibility,
+    );
     if (!result) {
       throw new NotFoundError('Form version not found');
     }

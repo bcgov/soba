@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { getSobaSubmissions, getSobaFormVersionFromFormioId } from '@/src/shared/api/sobaApiForms';
-import type { SubmissionListItem } from '../types';
-import { DataTable, Column } from '@/src/shared/components/DataTable';
+import type { SubmissionListItem } from '@/src/types/submissions';
+import { DataTable, Column } from '@/src/components/DataTable';
 import { useAppSelector } from '@/lib/store';
 
 interface SubmissionListProps {
@@ -13,7 +13,7 @@ interface SubmissionListProps {
 }
 
 export function SubmissionList({ formId }: SubmissionListProps = {}) {
-  const { authenticated, token, initializing, idTokenParsed } = useKeycloak();
+  const { authenticated, token, initializing } = useKeycloak();
   const dict = useDictionary();
   const [submissions, setSubmissions] = useState<SubmissionListItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -134,4 +134,3 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
   );
 }
 
-export default SubmissionList;

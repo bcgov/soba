@@ -9,7 +9,7 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { getFormioProxyBaseUrl } from '@/src/shared/config/runtimeConfig';
 import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFormioRenderError';
 import { setupFormioClient } from '@/src/features/formio-v5/setupFormioClient';
-import { useFormioV5FormChrome } from '@/src/features/formio-v5/useFormioV5FormChrome';
+import { useFormioV5FormChrome } from '@/lib/hooks/useFormioV5FormChrome';
 import { FormioV5FormRenderErrorBoundary } from '@/src/features/formio-v5/ui/FormioV5FormRenderErrorBoundary';
 import { getSobaFormVersionFromFormioId, createSobaFormSubmission } from '@/src/shared/api/sobaApi';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';

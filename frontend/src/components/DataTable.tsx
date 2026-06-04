@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Table, Spinner, Pagination } from 'react-bootstrap';
+import { Table, Spinner } from 'react-bootstrap';
 
 export interface Column<T> {
   key: string;
@@ -81,7 +81,7 @@ export function DataTable<T>({
               <tr key={keyExtractor(item)} style={{ borderBottom: '1px solid #dee2e6' }}>
                 {columns.map((col) => (
                   <td key={`${keyExtractor(item)}-${col.key}`} className={`px-4 py-3 text-${col.align || 'start'}`}>
-                    {col.render ? col.render(item) : (item as any)[col.key]}
+                    {col.render ? col.render(item) : (item as Record<string, unknown>)[col.key] as React.ReactNode}
                   </td>
                 ))}
               </tr>

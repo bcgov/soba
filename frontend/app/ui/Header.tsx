@@ -14,10 +14,10 @@ import { loadWorkspaces, setActiveWorkspaceId } from '@/lib/slices/workspaceSlic
 import { useAppSelector } from '@/lib/store';
 import { useDictionary } from '../[lang]/Providers';
 import { LoginButton } from './LoginButton';
-import type { PluginNavItem } from '@/src/app/plugins/types';
+import type { PluginNavItem } from '@/src/types/plugins';
 import styles from './Header.module.css';
 
-export type HeaderProps = {
+type HeaderProps = {
   headerNavItems: PluginNavItem[];
   overlayNavItems: PluginNavItem[];
 };
@@ -248,31 +248,9 @@ function Header({ headerNavItems }: HeaderProps) {
           </Navbar>
         </header>
 
-        <div className={`subHeader border-bottom ${authenticated ? 'd-block' : 'd-none'}`}>
-          <div className="container-xl px-3 px-sm-4 d-flex align-items-center py-2 gap-3">
-            <Link
-              className="border-end pe-3 text-decoration-none"
-              href={`/${locale}/forms`}
-              title="Forms"
-            >
-              {dict.general.forms}
-            </Link>
-            <Link
-              className="border-end pe-3 text-decoration-none"
-              href={`/${locale}/feedback`}
-              title="Feedback"
-            >
-              {dict.general.feedback}
-            </Link>
-            <Link className="text-decoration-none" href={`/${locale}/help`} title="Help">
-              {dict.general.help}
-            </Link>
-          </div>
-        </div>
       </div>
     </>
   );
 }
 
-export default Header;
 export { Header };

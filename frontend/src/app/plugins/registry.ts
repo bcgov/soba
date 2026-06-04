@@ -3,18 +3,7 @@ import { designerPlugin } from '@/src/features/designer/plugin';
 import { metaReviewPlugin } from '@/src/features/meta-review/plugin';
 import { submitModePlugin } from '@/src/features/submit-mode/plugin';
 import { workspacesPlugin } from '@/src/features/workspaces/plugin';
-import type { AppPlugin, PluginNavItem } from '@/src/app/plugins/types';
-
-type Dictionary = {
-  locale: string;
-  header: {
-    workspaces: string;
-    designer: string;
-    submit: string;
-    metaReview?: string;
-    themeToggle?: string;
-  };
-};
+import type { AppPlugin, PluginNavItem, Dictionary } from '@/src/types/plugins';
 
 const allPlugins: AppPlugin[] = [
   workspacesPlugin,
@@ -58,11 +47,4 @@ export function getOverlayNavigationItems(
   isFeatureAllowed: (code: string) => boolean,
 ): PluginNavItem[] {
   return navItemsFromPlugins(getEnabledPlugins(isFeatureAllowed), locale, dictionary);
-}
-
-export function getHomeSections(isFeatureAllowed: (code: string) => boolean) {
-  return getEnabledPlugins(isFeatureAllowed).map((plugin) => ({
-    id: plugin.id,
-    Section: plugin.HomeSection,
-  }));
 }

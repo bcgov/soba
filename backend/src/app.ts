@@ -19,10 +19,13 @@ import { globalRateLimit, apiRateLimit, publicRateLimit } from './core/middlewar
 import { getFormEngineRouteDefinitions } from './core/integrations/plugins/PluginRegistry';
 import { createPluginConfigReader } from './core/config/pluginConfig';
 import { initializePassport } from './core/auth/passport';
-import { checkJwtOptional, resolveActorOptional, checkFormVisibility } from './core/middleware/formVisibility';
+import {
+  checkJwtOptional,
+  resolveActorOptional,
+  checkFormVisibility,
+} from './core/middleware/formVisibility';
 import { getFormByEngineRef } from './core/api/forms/controller';
 import { createSubmission, saveSubmission } from './core/api/submissions/controller';
-
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
@@ -110,16 +113,8 @@ publicSubmissionRouter.get(
   ...publicSubmissionMiddleware,
   getFormByEngineRef,
 );
-publicSubmissionRouter.post(
-  '/submissions',
-  ...publicSubmissionMiddleware,
-  createSubmission,
-);
-publicSubmissionRouter.post(
-  '/submissions/:id/save',
-  ...publicSubmissionMiddleware,
-  saveSubmission,
-);
+publicSubmissionRouter.post('/submissions', ...publicSubmissionMiddleware, createSubmission);
+publicSubmissionRouter.post('/submissions/:id/save', ...publicSubmissionMiddleware, saveSubmission);
 
 const formioDef = formEngineRouteDefs.find((d) => d.code === 'formio-v5');
 if (formioDef) {

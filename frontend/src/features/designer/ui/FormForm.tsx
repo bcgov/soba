@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Alert, Button, Spinner, Form as BSForm, Row, Col, Dropdown } from 'react-bootstrap';
 import { FaInfoCircle } from 'react-icons/fa';
-import { Modal as CommonModal } from '@/src/shared/components/Modal';
+import { Modal as CommonModal } from '@/src/components/Modal';
 import dynamic from 'next/dynamic';
 import styles from './FormForm.module.css';
 

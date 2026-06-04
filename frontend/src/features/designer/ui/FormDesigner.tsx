@@ -14,7 +14,7 @@ import { getFormioProxyBaseUrl } from '@/src/shared/config/runtimeConfig';
 import { setupFormioClient } from '@/src/features/formio-v5/setupFormioClient';
 import './FormDesigner.module.css';
 import Form from 'react-bootstrap/Form';
-import { Modal as CommonModal } from '@/src/shared/components/Modal';
+import { Modal as CommonModal } from '@/src/components/Modal';
 
 // Import Types
 import type { FormBuilder as FormioBuilderInstance } from '@formio/js';
@@ -231,12 +231,12 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
     <section className="p-4 w-full min-h-screen position-relative">
       {sidebarEl &&
         createPortal(
-          <div className="d-flex gap-2 p-2 mt-2 border-top bg-light">
-            <button className="btn btn-sm btn-outline-secondary w-100" onClick={handleExport}>
+          <div className="p-2 mt-2 border-top bg-light">
+            <button className="mb-2 d-block btn btn-sm btn-outline-secondary w-100" onClick={handleExport}>
               Export JSON
             </button>
             <button
-              className="btn btn-sm btn-outline-secondary w-100"
+              className="d-block btn btn-sm btn-outline-secondary w-100"
               onClick={() => setShowImportModal(true)}
             >
               Import JSON

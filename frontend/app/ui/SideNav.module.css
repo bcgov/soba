@@ -1,0 +1,9 @@
+.sideNav {
+  height: 100%;
+  border-right: 1px solid var(--app-border, #dee2e6);
+}
+
+/* Add custom hover background */
+:global(.hover-bg-light:hover) {
+  background-color: #f8f9fa;
+}

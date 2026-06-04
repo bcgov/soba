@@ -59,5 +59,4 @@ function NotificationToast() {
   )
 }
 
-export default NotificationToast
 export { NotificationToast }

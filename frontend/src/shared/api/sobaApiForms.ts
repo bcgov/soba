@@ -7,7 +7,7 @@ import type {
   SobaResponseFormType,
   SobaFormWithVersionResponse,
 } from '../../types/forms';
-import type { ListSubmissionsResponse, SubmissionResponse } from '../../features/submit-mode/types';
+import type { ListSubmissionsResponse, SubmissionResponse } from '@/src/types/submissions';
 
 function getHeaders(token: string, workspaceId?: string, isJson: boolean = false): HeadersInit {
   const headers: Record<string, string> = {
@@ -281,7 +281,7 @@ export async function getSobaFormVersions(
   token: string,
   formId: string,
   workspaceId?: string,
-): Promise<{ items: any[] }> {
+): Promise<{ items: [] }> {
   const response = await fetch(`${getSobaApiBaseUrl()}/form-versions?formId=${formId}&limit=100`, {
     method: 'GET',
     cache: 'no-store',
