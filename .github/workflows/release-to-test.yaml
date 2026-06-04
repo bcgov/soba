@@ -142,16 +142,6 @@ jobs:
           echo "secret_name=$SECRET_NAME" >> "$GITHUB_OUTPUT"
 
       # Pipeline performance fix: Revert if needed.
-      - name: Apply Form.io secret
-        uses: ./.github/actions/apply-formio-secret
-        with:
-          release: soba-test
-          namespace: ${{ secrets.OC_NAMESPACE }}
-          admin_password: ${{ secrets.FORMIO_ADMIN_PASSWORD }}
-          jwt_secret: ${{ secrets.FORMIO_JWT_SECRET }}
-      # Pipeline performance fix: Revert if needed.
-
-      # Pipeline performance fix: Revert if needed.
       - name: Wait for test database readiness
         uses: ./.github/actions/wait-for-postgres
         with:

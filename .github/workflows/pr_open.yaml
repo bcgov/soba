@@ -124,16 +124,6 @@ jobs:
           echo "secret_name=$SECRET_NAME" >> "$GITHUB_OUTPUT"
 
       # Pipeline performance fix: Revert if needed.
-      - name: Apply Form.io secret
-        uses: ./.github/actions/apply-formio-secret
-        with:
-          release: soba-${{ needs.set-vars.outputs.JOB_NAME }}
-          namespace: ${{ secrets.OC_NAMESPACE }}
-          admin_password: ${{ secrets.FORMIO_ADMIN_PASSWORD }}
-          jwt_secret: ${{ secrets.FORMIO_JWT_SECRET }}
-      # Pipeline performance fix: Revert if needed.
-
-      # Pipeline performance fix: Revert if needed.
       - name: Wait for PR database readiness
         uses: ./.github/actions/wait-for-postgres
         with:
@@ -169,7 +159,8 @@ jobs:
             routeHost: "soba-dev.${DOMAIN}"
             routePath: "/pr-${PR_NUM}"
           database:
-            uri: '${DB_URI_ESC}'
+            existingSecretName: "${{ steps.db.outputs.secret_name }}"
+            existingSecretKey: "uri"
           OVERRIDE
 
           # Pipeline performance fix: Revert if needed.

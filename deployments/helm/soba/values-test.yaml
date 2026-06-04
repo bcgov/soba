@@ -54,3 +54,9 @@ outboxWorker:
     limits:
       cpu: 500m
       memory: 512Mi
+
+vault:
+  enabled: true
+  role: acf456-nonprod
+  secretPath: acf456-nonprod/soba-test
+  serviceAccountName: acf456-vault
