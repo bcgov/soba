@@ -14,10 +14,34 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/formio/configmap.yaml") . | sha256sum }}
+        {{- if not .Values.vault.enabled }}
         checksum/secret: {{ include (print $.Template.BasePath "/secrets/formio-secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if .Values.vault.enabled }}
+        vault.hashicorp.com/agent-inject: 'true'
+        vault.hashicorp.com/agent-pre-populate-only: 'true'
+        vault.hashicorp.com/auth-path: {{ .Values.vault.authPath | quote }}
+        vault.hashicorp.com/namespace: {{ .Values.vault.namespace | quote }}
+        vault.hashicorp.com/role: {{ .Values.vault.role | quote }}
+        vault.hashicorp.com/agent-requests-cpu: '10m'
+        vault.hashicorp.com/agent-limits-cpu: '50m'
+        vault.hashicorp.com/agent-requests-mem: '25Mi'
+        vault.hashicorp.com/agent-limits-mem: '75Mi'
+        vault.hashicorp.com/error-on-missing-key-soba-formio: 'true'
+        vault.hashicorp.com/agent-inject-secret-soba-formio: {{ .Values.vault.secretPath | quote }}
+        vault.hashicorp.com/agent-inject-template-soba-formio: |
+          {{`{{- with secret "`}}{{ .Values.vault.secretPath }}{{`" }}`}}
+          {{`export ROOT_PASSWORD="{{ .Data.data.FORMIO_ADMIN_PASSWORD }}"`}}
+          {{`export PLUGIN_FORMIO_V5_ADMIN_PASSWORD="{{ .Data.data.FORMIO_ADMIN_PASSWORD }}"`}}
+          {{`export FORMIO_JWT_SECRET="{{ .Data.data.FORMIO_JWT_SECRET }}"`}}
+          {{`{{- end }}`}}
+        {{- end }}
       labels:
         {{- include "soba.selectorLabels" (dict "root" . "component" "formio") | nindent 8 }}
     spec:
+      {{- if .Values.vault.enabled }}
+      serviceAccountName: {{ .Values.vault.serviceAccountName | quote }}
+      {{- end }}
       {{- if and .Values.formio.internal.enabled .Values.mongodb.internal.enabled }}
       initContainers:
         - name: wait-mongodb
@@ -43,11 +67,25 @@ spec:
             - name: http
               containerPort: {{ .Values.formio.service.port }}
               protocol: TCP
+          {{- if .Values.vault.enabled }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              . /vault/secrets/soba-formio
+              export ROOT_EMAIL="{{ .Values.formio.admin.email }}"
+              export PLUGIN_FORMIO_V5_ADMIN_USERNAME="{{ .Values.formio.admin.email }}"
+              export NODE_CONFIG='{"mongo":{{ include "soba.mongodbUri" . | toJson }},"port":{{ .Values.formio.service.port }},"jwt":{"secret":"'"${FORMIO_JWT_SECRET}"'"},"reservedForms":["submissions","submission","exists","export","role","current","logout","import","form","access","health"]}'
+              exec node --no-node-snapshot main
+          envFrom:
+            - configMapRef:
+                name: {{ include "soba.fullname" . }}-formio
+          {{- else }}
           envFrom:
             - configMapRef:
                 name: {{ include "soba.fullname" . }}-formio
             - secretRef:
                 name: {{ include "soba.fullname" . }}-formio
+          {{- end }}
           livenessProbe:
             httpGet:
               path: /health
