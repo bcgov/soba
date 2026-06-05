@@ -122,6 +122,8 @@ function Header({ headerNavItems }: HeaderProps) {
           {workspaces.length > 1 && (
             <Form.Select
               size="sm"
+              id="workspace-select"
+              data-testid="workspace-select"
               value={activeWorkspaceId || ''}
               onChange={(e) => dispatch(setActiveWorkspaceId(e.target.value))}
               style={{ width: 'auto', maxWidth: '200px' }}
@@ -139,6 +141,8 @@ function Header({ headerNavItems }: HeaderProps) {
           <Form.Select
             size="sm"
             value={locale}
+            id="lang-selector"
+            data-testid="lang-selector"
             onChange={(e) => handleLanguageChange(e.target.value)}
             style={{ width: 'auto' }}
             className="mr-2"
@@ -150,7 +154,7 @@ function Header({ headerNavItems }: HeaderProps) {
 
           {displayName ? (
             <Dropdown>
-              <Dropdown.Toggle className={styles.userDrop} id="dropdown-user">
+              <Dropdown.Toggle className={styles.userDrop} data-testid="user-dropdown" id="dropdown-user">
                 <FaUser className="align-text-top" />
                 <span className={styles.limitText + ' ms-2 me-2'}>{displayName}</span>
               </Dropdown.Toggle>
@@ -180,7 +184,9 @@ function Header({ headerNavItems }: HeaderProps) {
       <div className="d-flex align-items-center justify-content-end gap-3">
         <Form.Select
           size="sm"
+          id="lang-selector"
           value={locale}
+          data-testid="lang-selector"
           onChange={(e) => handleLanguageChange(e.target.value)}
           style={{ width: 'auto' }}
           className="mr-2"
@@ -189,7 +195,7 @@ function Header({ headerNavItems }: HeaderProps) {
           <option value="en">EN</option>
           <option value="fr">FR</option>
         </Form.Select>
-        <LoginButton label={dict.general.login} />
+        <LoginButton data-testid="header-login-button" label={dict.general.login} />
       </div>
     );
   };
@@ -205,6 +211,7 @@ function Header({ headerNavItems }: HeaderProps) {
             <Container fluid="xl" className="px-3 px-sm-4 gap-3">
               <Link
                 href={homeHref}
+                data-testid="bcgov-header-logo"
                 title="Government of British Columbia"
                 className="navbar-brand mb-0 d-flex align-items-center gap-2"
               >

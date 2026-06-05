@@ -23,8 +23,7 @@ const CustomActionButtons = ({
   designModeEnabled?: boolean;
   submitModeEnabled?: boolean;
 }) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const formId = (form as any)._id || (form as any).id;
+  const formId = form._id;
 
   const actions = [];
   if (designModeEnabled) actions.push({ name: 'manage', title: 'Manage' });
@@ -40,6 +39,7 @@ const CustomActionButtons = ({
           <button
             key={action.name}
             type="button"
+            data-test-id={action.name + '-' + formId + '-button'}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -169,13 +169,14 @@ function FormList({
         label: dictFormList?.columns?.name || dictForm?.nameLabel || 'Form Name',
         width: '40%',
         render: (form: TableForm) => {
-          const formId = form._id || form.id;
+          const formId = form._id;
           return designModeEnabled ? (
             <a
               href="#"
+              data-testid={'form-link-' + formId}
               onClick={(e) => {
                 e.preventDefault();
-                handleAction('edit', formId!);
+                handleAction('manage', formId!);
               }}
               className="text-decoration-underline"
               style={{ cursor: 'pointer', color: '#00538A' }}
@@ -244,6 +245,7 @@ function FormList({
         {designModeEnabled && (
           <Button
             variant="primary"
+            data-testid="create-form-button"
             onClick={() => router.push(`/${locale}/designer`)}
             style={{
               backgroundColor: '#003366',
@@ -260,6 +262,7 @@ function FormList({
         <InputGroup style={{ maxWidth: '300px' }}>
           <Form.Control
             placeholder="Search"
+            data-testid="search-forms-text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="border-end-0"
@@ -267,6 +270,7 @@ function FormList({
           {searchQuery && (
             <Button
               variant="outline-secondary"
+              data-testid="search-forms-button"
               className="border-start-0 border-end-0 bg-white"
               onClick={() => setSearchQuery('')}
               style={{ borderColor: '#dee2e6' }}

@@ -108,6 +108,7 @@ function Footer({
     return (
       <Image
         src={bcgovLogo}
+        data-testid="bcgov-footer-logo"
         alt="BC Gov logo"
         height={40}
         width={146}

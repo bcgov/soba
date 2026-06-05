@@ -27,6 +27,7 @@ export function SideNav({ showAppLinks, showHome }: SideNavProps) {
     navItems.push({
       href: `/`,
       title: 'Home',
+      testId: 'home-nav',
       icon: <FaHouse size={20} />,
       isActive: pathname === `/` || pathname === `/${locale}`,
     });
@@ -36,18 +37,21 @@ export function SideNav({ showAppLinks, showHome }: SideNavProps) {
       {
         href: `/${locale}/forms`,
         title: dict.general.forms,
+        testId: 'forms-nav',
         icon: <FaWpforms size={20} />,
         isActive: pathname.startsWith(`/${locale}/forms`),
       },
       {
         href: `/${locale}/feedback`,
         title: dict.general.feedback,
+        testId: 'feedback-nav',
         icon: <FaCommentDots size={20} />,
         isActive: pathname.startsWith(`/${locale}/feedback`),
       },
       {
         href: `/${locale}/help`,
         title: dict.general.help,
+        testId: 'help-nav',
         icon: <FaCircleQuestion size={20} />,
         isActive: pathname.startsWith(`/${locale}/help`),
       },
@@ -61,6 +65,7 @@ export function SideNav({ showAppLinks, showHome }: SideNavProps) {
           <li className="nav-item" key={item.href}>
             <Link
               href={item.href}
+              data-testid={item.testId}
               className={`nav-link d-flex align-items-center gap-3 px-3 py-2 text-decoration-none rounded ${
                 item.isActive ? 'bg-primary text-white' : 'text-dark hover-bg-light'
               }`}

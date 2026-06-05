@@ -105,6 +105,7 @@ export function DataTable<T>({
             {onPageSizeChange ? (
               <select
                 value={pageSize}
+                data-testid="datatable-page-size-select"
                 onChange={(e) => onPageSizeChange(Number(e.target.value))}
                 className="form-select form-select-sm"
                 style={{
@@ -137,6 +138,7 @@ export function DataTable<T>({
               {onPageChange && totalPages > 1 && (
                 <select
                   value={currentPage}
+                  data-testid="datatable-page-select-select"
                   onChange={(e) => onPageChange(Number(e.target.value))}
                   className="form-select form-select-sm"
                   style={{
@@ -159,6 +161,7 @@ export function DataTable<T>({
             <div className="d-flex gap-2">
               <button
                 onClick={() => onPageChange && onPageChange(currentPage - 1)}
+                data-testid="datatable-prev-page-button"
                 disabled={currentPage === 1}
                 className="btn btn-link p-0 text-dark"
                 style={{ textDecoration: 'none', opacity: currentPage === 1 ? 0.5 : 1 }}
@@ -167,6 +170,7 @@ export function DataTable<T>({
               </button>
               <button
                 onClick={() => onPageChange && onPageChange(currentPage + 1)}
+                data-testid="datatable-next-page-button"
                 disabled={currentPage === totalPages}
                 className="btn btn-link p-0 text-dark"
                 style={{ textDecoration: 'none', opacity: currentPage === totalPages ? 0.5 : 1 }}

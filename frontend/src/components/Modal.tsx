@@ -21,7 +21,7 @@ export function Modal({
   scrollable = true,
 }: ModalProps) {
   return (
-    <BSModal show={show} onHide={onClose} size={size} centered scrollable={scrollable}>
+    <BSModal show={show} onHide={onClose} size={size} centered scrollable={scrollable} data-test-id={title + '-modal'}>
       <BSModal.Header closeButton>
         <BSModal.Title>{title}</BSModal.Title>
       </BSModal.Header>
