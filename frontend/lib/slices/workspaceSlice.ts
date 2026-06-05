@@ -25,7 +25,7 @@ export const loadWorkspaces = createAsyncThunk(
       const message = error instanceof Error ? error.message : 'Failed to load workspaces';
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 const workspaceSlice = createSlice({
@@ -40,7 +40,7 @@ const workspaceSlice = createSlice({
       state.activeWorkspaceId = null;
       state.status = 'idle';
       state.error = null;
-    }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -50,7 +50,7 @@ const workspaceSlice = createSlice({
       .addCase(loadWorkspaces.fulfilled, (state, action) => {
         state.status = 'succeeded';
         state.workspaces = action.payload;
-        
+
         // Auto-select a workspace if none is active
         if (!state.activeWorkspaceId && state.workspaces.length > 0) {
           // Prefer personal workspace

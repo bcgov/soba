@@ -247,7 +247,6 @@ function Header({ headerNavItems }: HeaderProps) {
             </Container>
           </Navbar>
         </header>
-
       </div>
     </>
   );

@@ -10,5 +10,5 @@ export const submitModePlugin: AppPlugin = {
     id: 'submit-mode',
     href: `/${locale}/forms`,
     label: dictionary.header.submit,
-  })
+  }),
 };

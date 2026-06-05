@@ -9,7 +9,8 @@
     "notAuthenticated": "You are not authenticated. Please login to access this section.",
     "forms": "Forms",
     "feedback": "Feedback",
-    "help": "Help"
+    "help": "Help",
+    "welcomeTo": "Welcome to"
   },
   "header": {
     "workspaces": "Workspaces",

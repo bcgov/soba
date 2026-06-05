@@ -16,7 +16,8 @@ export function AuthRedirect({
 }) {
   const { authenticated, initializing } = useKeycloak();
   const router = useRouter();
-  const shouldRedirect = !initializing && ((ifLogged && authenticated) || (!ifLogged && !authenticated));
+  const shouldRedirect =
+    !initializing && ((ifLogged && authenticated) || (!ifLogged && !authenticated));
 
   useEffect(() => {
     if (shouldRedirect) {
@@ -26,7 +27,10 @@ export function AuthRedirect({
 
   if (initializing || shouldRedirect) {
     return (
-      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '50vh' }}>
+      <div
+        className="d-flex justify-content-center align-items-center"
+        style={{ minHeight: '50vh' }}
+      >
         <Spinner animation="border" />
       </div>
     );

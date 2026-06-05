@@ -1,7 +1,11 @@
-'use client'
+'use client';
 
 import { useAppDispatch, useAppSelector } from '../store';
-import { addNotification, removeNotification, clearNotifications } from '../slices/notificationSlice';
+import {
+  addNotification,
+  removeNotification,
+  clearNotifications,
+} from '../slices/notificationSlice';
 import type { NotificationType } from '../slices/notificationSlice';
 
 export interface AddNotificationPayload {

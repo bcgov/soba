@@ -18,9 +18,9 @@ describe('normalizeFormioRenderError', () => {
   });
 
   it('reads single object { error }', () => {
-    expect(
-      normalizeFormioRenderError({ error: 'Bad request', formattedKeyOrPath: '' }, fb),
-    ).toBe('Bad request');
+    expect(normalizeFormioRenderError({ error: 'Bad request', formattedKeyOrPath: '' }, fb)).toBe(
+      'Bad request',
+    );
   });
 
   it('reads { message } when error missing', () => {

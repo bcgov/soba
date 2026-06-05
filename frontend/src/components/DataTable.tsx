@@ -80,8 +80,13 @@ export function DataTable<T>({
             data.map((item) => (
               <tr key={keyExtractor(item)} style={{ borderBottom: '1px solid #dee2e6' }}>
                 {columns.map((col) => (
-                  <td key={`${keyExtractor(item)}-${col.key}`} className={`px-4 py-3 text-${col.align || 'start'}`}>
-                    {col.render ? col.render(item) : (item as Record<string, unknown>)[col.key] as React.ReactNode}
+                  <td
+                    key={`${keyExtractor(item)}-${col.key}`}
+                    className={`px-4 py-3 text-${col.align || 'start'}`}
+                  >
+                    {col.render
+                      ? col.render(item)
+                      : ((item as Record<string, unknown>)[col.key] as React.ReactNode)}
                   </td>
                 ))}
               </tr>
@@ -91,8 +96,8 @@ export function DataTable<T>({
       </Table>
 
       {!loading && data.length > 0 && totalItems !== undefined && (
-        <div 
-          className="px-4 py-3 d-flex justify-content-between align-items-center" 
+        <div
+          className="px-4 py-3 d-flex justify-content-between align-items-center"
           style={{ backgroundColor: '#EBEBEB', color: '#333' }}
         >
           <div className="d-flex align-items-center gap-2">
@@ -102,41 +107,57 @@ export function DataTable<T>({
                 value={pageSize}
                 onChange={(e) => onPageSizeChange(Number(e.target.value))}
                 className="form-select form-select-sm"
-                style={{ width: '70px', display: 'inline-block', backgroundColor: 'transparent', border: 'none', fontWeight: '500' }}
+                style={{
+                  width: '70px',
+                  display: 'inline-block',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  fontWeight: '500',
+                }}
               >
                 {pageSizeOptions.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
                 ))}
               </select>
             ) : (
               <span className="fw-medium">{pageSize}</span>
             )}
           </div>
-          
+
           <div>
-            {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, totalItems)} of {totalItems} {itemName}
+            {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, totalItems)} of{' '}
+            {totalItems} {itemName}
           </div>
-          
+
           <div className="d-flex align-items-center gap-3">
             <div className="d-flex align-items-center gap-1">
               <span>{currentPage}</span>
               {onPageChange && totalPages > 1 && (
-                <select 
+                <select
                   value={currentPage}
                   onChange={(e) => onPageChange(Number(e.target.value))}
                   className="form-select form-select-sm"
-                  style={{ width: '50px', backgroundColor: 'transparent', border: 'none', padding: '0 10px 0 0' }}
+                  style={{
+                    width: '50px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    padding: '0 10px 0 0',
+                  }}
                 >
                   {[...Array(totalPages)].map((_, i) => (
-                    <option key={i+1} value={i+1}>{i+1}</option>
+                    <option key={i + 1} value={i + 1}>
+                      {i + 1}
+                    </option>
                   ))}
                 </select>
               )}
               <span>of {totalPages} page(s)</span>
             </div>
-            
+
             <div className="d-flex gap-2">
-              <button 
+              <button
                 onClick={() => onPageChange && onPageChange(currentPage - 1)}
                 disabled={currentPage === 1}
                 className="btn btn-link p-0 text-dark"
@@ -144,7 +165,7 @@ export function DataTable<T>({
               >
                 &lt;
               </button>
-              <button 
+              <button
                 onClick={() => onPageChange && onPageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
                 className="btn btn-link p-0 text-dark"

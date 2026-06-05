@@ -14,5 +14,5 @@ export const metaReviewPlugin: AppPlugin = {
       href: `/${locale}/meta`,
       label,
     };
-  }
+  },
 };

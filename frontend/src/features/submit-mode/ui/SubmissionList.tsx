@@ -133,4 +133,3 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
     </section>
   );
 }
-

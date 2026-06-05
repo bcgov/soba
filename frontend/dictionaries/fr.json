@@ -9,7 +9,8 @@
     "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à cette section.",
     "forms": "Formulaires",
     "feedback": "Retour d'information",
-    "help": "Aidé"
+    "help": "Aidé",
+    "welcomeTo": "Bienvenue sur"
   },
   "header": {
     "workspaces": "Espaces de travail",

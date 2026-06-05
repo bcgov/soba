@@ -4,10 +4,15 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useDictionary } from '../[lang]/Providers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import { FaWpforms, FaCommentDots, FaCircleQuestion } from 'react-icons/fa6';
+import { FaWpforms, FaCommentDots, FaCircleQuestion, FaHouse } from 'react-icons/fa6';
 import styles from './SideNav.module.css';
 
-export function SideNav() {
+interface SideNavProps {
+  showAppLinks: boolean;
+  showHome: boolean;
+}
+
+export function SideNav({ showAppLinks, showHome }: SideNavProps) {
   const { authenticated } = useKeycloak();
   const dict = useDictionary();
   const pathname = usePathname();
@@ -17,26 +22,37 @@ export function SideNav() {
     return null;
   }
 
-  const navItems = [
-    {
-      href: `/${locale}/forms`,
-      title: dict.general.forms,
-      icon: <FaWpforms size={20} />,
-      isActive: pathname.startsWith(`/${locale}/forms`),
-    },
-    {
-      href: `/${locale}/feedback`,
-      title: dict.general.feedback,
-      icon: <FaCommentDots size={20} />,
-      isActive: pathname.startsWith(`/${locale}/feedback`),
-    },
-    {
-      href: `/${locale}/help`,
-      title: dict.general.help,
-      icon: <FaCircleQuestion size={20} />,
-      isActive: pathname.startsWith(`/${locale}/help`),
-    },
-  ];
+  const navItems = [];
+  if (showHome) {
+    navItems.push({
+      href: `/`,
+      title: 'Home',
+      icon: <FaHouse size={20} />,
+      isActive: pathname === `/` || pathname === `/${locale}`,
+    });
+  }
+  if (showAppLinks) {
+    navItems.push(
+      {
+        href: `/${locale}/forms`,
+        title: dict.general.forms,
+        icon: <FaWpforms size={20} />,
+        isActive: pathname.startsWith(`/${locale}/forms`),
+      },
+      {
+        href: `/${locale}/feedback`,
+        title: dict.general.feedback,
+        icon: <FaCommentDots size={20} />,
+        isActive: pathname.startsWith(`/${locale}/feedback`),
+      },
+      {
+        href: `/${locale}/help`,
+        title: dict.general.help,
+        icon: <FaCircleQuestion size={20} />,
+        isActive: pathname.startsWith(`/${locale}/help`),
+      },
+    );
+  }
 
   return (
     <nav className={`d-flex flex-column py-3 px-2 ${styles.sideNav}`}>

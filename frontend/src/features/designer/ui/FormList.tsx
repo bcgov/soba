@@ -15,18 +15,23 @@ import type { FormType } from '@formio/react';
 const CustomActionButtons = ({
   form,
   onAction,
+  designModeEnabled,
+  submitModeEnabled,
 }: {
   form: FormType;
   onAction: (name: string, id: string) => void;
+  designModeEnabled?: boolean;
+  submitModeEnabled?: boolean;
 }) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const formId = (form as any)._id || (form as any).id;
 
-  const actions = [
-    { name: 'manage', title: 'Manage' },
-    { name: 'submit', title: 'Submit' },
-    { name: 'submissions', title: 'Submissions' },
-  ];
+  const actions = [];
+  if (designModeEnabled) actions.push({ name: 'manage', title: 'Manage' });
+  if (submitModeEnabled) {
+    actions.push({ name: 'submit', title: 'Submit' });
+    actions.push({ name: 'submissions', title: 'Submissions' });
+  }
 
   return (
     <div className="d-flex gap-2 justify-content-start">
@@ -54,7 +59,13 @@ const CustomActionButtons = ({
   );
 };
 
-function FormList() {
+function FormList({
+  designModeEnabled = true,
+  submitModeEnabled = true,
+}: {
+  designModeEnabled?: boolean;
+  submitModeEnabled?: boolean;
+}) {
   const dict = useDictionary();
   const dictFormList = dict.submission?.formList;
   const dictForm = dict.form;
@@ -159,7 +170,7 @@ function FormList() {
         width: '40%',
         render: (form: TableForm) => {
           const formId = form._id || form.id;
-          return (
+          return designModeEnabled ? (
             <a
               href="#"
               onClick={(e) => {
@@ -171,6 +182,8 @@ function FormList() {
             >
               {form.title || form.name || dictForm?.nameLabel || 'Untitled Form'}
             </a>
+          ) : (
+            <span>{form.title || form.name || dictForm?.nameLabel || 'Untitled Form'}</span>
           );
         },
       },
@@ -178,7 +191,14 @@ function FormList() {
         key: 'actions',
         label: dictFormList?.columns?.actions || 'Actions',
         align: 'start',
-        render: (form: TableForm) => <CustomActionButtons form={form} onAction={handleAction} />,
+        render: (form: TableForm) => (
+          <CustomActionButtons
+            form={form}
+            onAction={handleAction}
+            designModeEnabled={designModeEnabled}
+            submitModeEnabled={submitModeEnabled}
+          />
+        ),
       },
       {
         key: 'created',
@@ -204,7 +224,7 @@ function FormList() {
         },
       },
     ],
-    [handleAction, dictFormList, dictForm],
+    [handleAction, dictFormList, dictForm, designModeEnabled, submitModeEnabled],
   );
 
   if (initializing)
@@ -221,19 +241,21 @@ function FormList() {
         <h1>Forms</h1>
       </div>
       <div className="mb-3 d-flex justify-content-between align-items-center">
-        <Button
-          variant="primary"
-          onClick={() => router.push(`/${locale}/designer`)}
-          style={{
-            backgroundColor: '#003366',
-            borderColor: '#003366',
-            borderRadius: '4px',
-            padding: '6px 16px',
-            fontWeight: '500',
-          }}
-        >
-          Create
-        </Button>
+        {designModeEnabled && (
+          <Button
+            variant="primary"
+            onClick={() => router.push(`/${locale}/designer`)}
+            style={{
+              backgroundColor: '#003366',
+              borderColor: '#003366',
+              borderRadius: '4px',
+              padding: '6px 16px',
+              fontWeight: '500',
+            }}
+          >
+            Create
+          </Button>
+        )}
 
         <InputGroup style={{ maxWidth: '300px' }}>
           <Form.Control

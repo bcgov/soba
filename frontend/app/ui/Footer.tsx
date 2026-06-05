@@ -144,23 +144,43 @@ function Footer({
       <FooterLinks
         title="More Info"
         links={[
-          <a key="home" href="https://www2.gov.bc.ca/gov/content/home">Home</a>,
-          <a key="about" href="https://www2.gov.bc.ca/gov/content?id=3C4F47288DFB454987435AB5EFEFBB7F">
+          <a key="home" href="https://www2.gov.bc.ca/gov/content/home">
+            Home
+          </a>,
+          <a
+            key="about"
+            href="https://www2.gov.bc.ca/gov/content?id=3C4F47288DFB454987435AB5EFEFBB7F"
+          >
             About gov.bc.ca
           </a>,
-          <a key="disclaimer" href="https://www2.gov.bc.ca/gov/content?id=79F93E018712422FBC8E674A67A70535">
+          <a
+            key="disclaimer"
+            href="https://www2.gov.bc.ca/gov/content?id=79F93E018712422FBC8E674A67A70535"
+          >
             Disclaimer
           </a>,
-          <a key="privacy" href="https://www2.gov.bc.ca/gov/content?id=9E890E16955E4FF4BF3B0E07B4722932">
+          <a
+            key="privacy"
+            href="https://www2.gov.bc.ca/gov/content?id=9E890E16955E4FF4BF3B0E07B4722932"
+          >
             Privacy
           </a>,
-          <a key="accessibility" href="https://www2.gov.bc.ca/gov/content?id=E08E79740F9C41B9B0C484685CC5E412">
+          <a
+            key="accessibility"
+            href="https://www2.gov.bc.ca/gov/content?id=E08E79740F9C41B9B0C484685CC5E412"
+          >
             Accessibility
           </a>,
-          <a key="copyright" href="https://www2.gov.bc.ca/gov/content?id=1AAACC9C65754E4D89A118B875E0FBDA">
+          <a
+            key="copyright"
+            href="https://www2.gov.bc.ca/gov/content?id=1AAACC9C65754E4D89A118B875E0FBDA"
+          >
             Copyright
           </a>,
-          <a key="contact" href="https://www2.gov.bc.ca/gov/content?id=6A77C17D0CCB48F897F8598CCC019111">
+          <a
+            key="contact"
+            href="https://www2.gov.bc.ca/gov/content?id=6A77C17D0CCB48F897F8598CCC019111"
+          >
             Contact us
           </a>,
         ]}

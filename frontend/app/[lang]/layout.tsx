@@ -5,7 +5,7 @@ import { Header } from '../ui/Header';
 import { Footer } from '../ui/Footer';
 import { SideNav } from '../ui/SideNav';
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
-import { createIsFeatureAllowed } from '@/src/shared/featureFlags/flags';
+import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 import { getHeaderNavigationItems, getOverlayNavigationItems } from '@/src/app/plugins/registry';
 import React from 'react';
 
@@ -26,6 +26,10 @@ export default async function RootLayout({
   const headerNavItems = getHeaderNavigationItems(locale, dictionary, isFeatureAllowed);
   const overlayNavItems = getOverlayNavigationItems(locale, dictionary, isFeatureAllowed);
 
+  const showAppLinks =
+    isFeatureAllowed(FEATURE_CODES.SUBMIT_MODE) || isFeatureAllowed(FEATURE_CODES.DESIGN_MODE);
+  const showHome = isFeatureAllowed(FEATURE_CODES.MARKETING);
+
   return (
     <DictionaryProvider dictionary={dictionary}>
       <Header headerNavItems={headerNavItems} overlayNavItems={overlayNavItems} />
@@ -34,7 +38,7 @@ export default async function RootLayout({
           className="p-2 d-flex flex-column flex-shrink-0"
           style={{ minWidth: '70px', maxWidth: '240px' }}
         >
-          <SideNav />
+          <SideNav showAppLinks={showAppLinks} showHome={showHome} />
         </aside>
         <main className="flex-grow-1 p-5 overflow-auto">{children}</main>
       </div>

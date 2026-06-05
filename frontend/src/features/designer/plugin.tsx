@@ -1,7 +1,6 @@
 import type { AppPlugin } from '@/src/types/plugins';
 import { FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 
-
 export const designerPlugin: AppPlugin = {
   id: 'form-designer',
   featureCode: FEATURE_CODES.DESIGN_MODE,
@@ -11,5 +10,5 @@ export const designerPlugin: AppPlugin = {
     id: 'designer',
     href: `/${locale}/designer`,
     label: dictionary.header.designer,
-  })
+  }),
 };

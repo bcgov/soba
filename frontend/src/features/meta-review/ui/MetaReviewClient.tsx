@@ -43,7 +43,10 @@ function JsonBlock({ state }: { state: SectionState }) {
   }
   if (state.status === 'ok') {
     return (
-      <pre className="mt-2 border rounded bg-light p-3 small overflow-auto" style={{ maxHeight: '28rem' }}>
+      <pre
+        className="mt-2 border rounded bg-light p-3 small overflow-auto"
+        style={{ maxHeight: '28rem' }}
+      >
         {formatJson(state.data)}
       </pre>
     );
@@ -92,7 +95,9 @@ export default function MetaReviewClient() {
     setPlugins({ status: 'loading' });
     setFormEngines({ status: 'loading' });
 
-    const run = async <T,>(fn: () => Promise<T>): Promise<{ ok: true; data: T } | { ok: false; message: string }> => {
+    const run = async <T,>(
+      fn: () => Promise<T>,
+    ): Promise<{ ok: true; data: T } | { ok: false; message: string }> => {
       try {
         const data = await fn();
         return { ok: true, data };
@@ -123,9 +128,13 @@ export default function MetaReviewClient() {
     }
     setBuild(b.ok ? { status: 'ok', data: b.data } : { status: 'error', message: b.message });
     setFeatures(f.ok ? { status: 'ok', data: f.data } : { status: 'error', message: f.message });
-    setFrontendConfig(fc.ok ? { status: 'ok', data: fc.data } : { status: 'error', message: fc.message });
+    setFrontendConfig(
+      fc.ok ? { status: 'ok', data: fc.data } : { status: 'error', message: fc.message },
+    );
     setPlugins(p.ok ? { status: 'ok', data: p.data } : { status: 'error', message: p.message });
-    setFormEngines(fe.ok ? { status: 'ok', data: fe.data } : { status: 'error', message: fe.message });
+    setFormEngines(
+      fe.ok ? { status: 'ok', data: fe.data } : { status: 'error', message: fe.message },
+    );
   }, []);
 
   useEffect(() => {
@@ -160,11 +169,7 @@ export default function MetaReviewClient() {
   }, []);
 
   if (!labels) {
-    return (
-      <Alert variant="warning">
-        Missing dictionary keys for this page (metaPage).
-      </Alert>
-    );
+    return <Alert variant="warning">Missing dictionary keys for this page (metaPage).</Alert>;
   }
 
   return (

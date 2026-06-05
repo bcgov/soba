@@ -17,9 +17,7 @@ import type { SobaFormWithVersionResponse } from '@/src/types/forms';
 
 const Form = dynamic(() => import('@formio/react').then((m) => m.Form), {
   ssr: false,
-  loading: () => (
-    <p className="text-muted small">Loading form renderer…</p>
-  ),
+  loading: () => <p className="text-muted small">Loading form renderer…</p>,
 });
 
 type FormRenderLabels = {
@@ -48,7 +46,7 @@ function FormioV5FormRenderBody({
   useFormioV5FormChrome(true);
 
   const submitForm = async (submission: Submission, saved?: boolean | undefined) => {
-     if (saved) {
+    if (saved) {
       const res = await createSobaFormSubmission(
         token as string,
         sobaForm?.id ?? '',

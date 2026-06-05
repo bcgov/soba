@@ -29,4 +29,3 @@ export function setupFormioClient(): void {
   Formio.setBaseUrl(getFormioProxyBaseUrl());
   registerFormioSobaAuthPlugin();
 }
-

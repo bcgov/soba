@@ -1,6 +1,9 @@
 import { DsPageHeading } from '@/app/ui/DsPageHeading';
 import FormioV5FormRenderLoader from '@/src/features/formio-v5/ui/FormioV5FormRenderLoader';
 import { getDictionary, resolveLocale } from '../../dictionaries';
+import { notFound } from 'next/navigation';
+import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
+import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 
 type PageProps = {
   params: Promise<{ lang: string; formId: string }>;
@@ -18,12 +21,20 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function Page({ params }: PageProps) {
+  const featuresMeta = await loadFeaturesMeta();
+  const isFeatureAllowed = createIsFeatureAllowed(featuresMeta);
+  if (!isFeatureAllowed(FEATURE_CODES.SUBMIT_MODE)) {
+    notFound();
+  }
+
   const { lang } = await params;
   const locale = resolveLocale(lang);
   const dict = await getDictionary(locale);
   return (
     <section className="p-4" aria-labelledby="formio-v5-render-heading">
-      <DsPageHeading id="formio-v5-render-heading">{dict.formioV5.formRender.pageTitle}</DsPageHeading>
+      <DsPageHeading id="formio-v5-render-heading">
+        {dict.formioV5.formRender.pageTitle}
+      </DsPageHeading>
       <FormioV5FormRenderLoader />
     </section>
   );

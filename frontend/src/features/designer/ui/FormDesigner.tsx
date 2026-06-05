@@ -97,7 +97,6 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
    * ESLint's 'react-hooks/refs' rule while keeping the Dialog fixed.
    */
   const [stableForm, setStableForm] = useState<FormType>(() => sanitizeForm(initialModel));
-  const [builderKey, setBuilderKey] = useState(0);
 
   useEffect(() => {
     const init = () => {
@@ -174,6 +173,7 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
             well: true,
           },
         },
+        premium: false,
       },
     }),
     [dict],
@@ -211,9 +211,13 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
 
   const handleImport = useCallback(() => {
     try {
-      const parsed = JSON.parse(importJson);
+      let cleanedJson = importJson.replace(/"type"\s*:\s*"simple(.*?)advanced"/g, '"type": "$1"');
+      cleanedJson = cleanedJson.replace(/"type"\s*:\s*"simple(.*?)"/g, '"type": "$1"');
+      const parsed = JSON.parse(cleanedJson);
       setStableForm(sanitizeForm(parsed));
-      setBuilderKey((prev) => prev + 1);
+      if (builderRef.current) {
+        (builderRef.current as FormioBuilderInstance).form = parsed;
+      }
       if (onUpdateModel) onUpdateModel(parsed);
       setShowImportModal(false);
       setImportJson('');
@@ -253,7 +257,6 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
 
       <FormioProvider baseUrl={getFormioProxyBaseUrl()}>
         <FormBuilder
-          key={`formio-builder-${builderKey}`}
           initialForm={stableForm}
           options={opt}
           onChange={onUpdateModel}
@@ -261,7 +264,6 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
         />
       </FormioProvider>
 
-      {/* Export Modal */}
       {/* Export Modal */}
       <CommonModal
         show={showExportModal}

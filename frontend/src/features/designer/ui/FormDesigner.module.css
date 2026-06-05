@@ -8,7 +8,7 @@
 /* Fix Tailwind v4 conflict making sidebar components invisible */
 :global(.formio-builder-components span),
 :global(.formcomponent),
-:global([ref="sidebar-component"]) {
+:global([ref='sidebar-component']) {
   visibility: visible !important;
 }
 

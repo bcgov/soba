@@ -1,5 +1,8 @@
 import { getDictionary, hasLocale, Locale } from '../../dictionaries';
 import FormDesignerLoader from '@/src/features/designer/ui/FormDesignerLoader';
+import { notFound } from 'next/navigation';
+import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
+import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 
 type PageProps = {
   params: Promise<{ lang: string; formId: string }>;
@@ -18,6 +21,12 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function Page({ params }: PageProps) {
+  const featuresMeta = await loadFeaturesMeta();
+  const isFeatureAllowed = createIsFeatureAllowed(featuresMeta);
+  if (!isFeatureAllowed(FEATURE_CODES.DESIGN_MODE)) {
+    notFound();
+  }
+
   const { formId } = await params;
 
   return (
