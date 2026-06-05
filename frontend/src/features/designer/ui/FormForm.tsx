@@ -318,7 +318,7 @@ function FormForm({ id }: { id?: string[] }) {
 
     try {
       const formioData = { ...(formSchema ?? {}) } as FormType;
-      formioData.name = formName;
+      formioData.name = titleToSlug(formName);
       formioData.path = slug
         .toLowerCase()
         .replace(/[^a-z\-\/]/g, '')
