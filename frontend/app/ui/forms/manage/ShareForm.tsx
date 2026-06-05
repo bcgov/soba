@@ -31,9 +31,10 @@ function ShareForm({ formId, warning = false, isRTL = false }: ShareFormProps) {
 
   const formLink = useMemo(() => {
     if (typeof window === "undefined") return "";
-    const url = new URL(`/${lang}/submit`, window.location.origin);
-    url.searchParams.set("f", formId);
-    return url.toString();
+    return new URL(
+      `/${lang}/forms/${encodeURIComponent(formId)}`,
+      window.location.origin,
+    ).toString();
   }, [formId, lang]);
 
   const downloadQr = () => {

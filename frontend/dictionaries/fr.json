@@ -70,31 +70,8 @@
         "title": "Un problème est survenu lors du chargement de cette page de formulaire.",
         "tryAgain": "Réessayer",
         "backToList": "Retour à la liste"
-      }
-    }
-  },
-  "submitDemo": {
-    "tableHeading": "Formulaires SOBA",
-    "loading": "Chargement…",
-    "empty": "Aucun formulaire SOBA dans cet espace pour l’instant.",
-    "generate": "Générer un formulaire SOBA de démo",
-    "generating": "Création…",
-    "refresh": "Actualiser",
-    "needLogin": "Connectez-vous pour voir les formulaires SOBA.",
-    "noWorkspace": "Aucun espace de travail trouvé pour votre compte.",
-    "loadError": "Impossible de charger les formulaires.",
-    "generateError": "Impossible de créer le formulaire de démo.",
-    "pollTimeout": "Le provisionnement continue. Réessayez actualiser dans quelques secondes.",
-    "openForm": "Ouvrir dans la visionneuse",
-    "syncPending": "En attente",
-    "syncProvisioning": "Provisionnement",
-    "syncReady": "Prêt",
-    "syncFailed": "Échec",
-    "columns": {
-      "name": "Nom",
-      "slug": "Identifiant",
-      "sync": "Sync Form.io",
-      "open": "Ouvrir"
+      },
+      "submitSuccess": "Formulaire soumis avec succès."
     }
   },
   "forms": {
@@ -109,6 +86,37 @@
         "downloadQRCode": "Télécharger le code QR",
         "close": "Fermer"
       }
+    }
+  },
+  "form": {
+    "saved": "Formulaire enregistré avec succès.",
+    "saveError": "Erreur lors de l'enregistrement du formulaire.",
+    "nameLabel": "Nom du Formulaire",
+    "namePlaceholder": "Entrez le nom du formulaire",
+    "slugLabel": "Slug du Formulaire",
+    "slugPlaceholder": "Entrez le slug du formulaire",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Entrez la description du formulaire",
+    "loading": "Chargement du formulaire...",
+    "schemaNotAvailable": "Schéma du formulaire non disponible.",
+    "edit": "Modifier",
+    "input": "Soumettre les données",
+    "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à ce formulaire."
+  },
+  "submission": {
+    "submissions": "Soumissions",
+    "loading": "Chargement des soumissions…",
+    "empty": "Aucune soumission dans cet espace pour l’instant.",
+    "error": "Impossible de charger les soumissions.",
+    "refresh": "Actualiser",
+    "view": "Voir",
+    "workflow": "Flux de travail",
+    "columns": {
+      "id": "ID",
+      "created": "Créé",
+      "status": "Statut",
+      "version": "Version",
+      "user": "Utilisateur"
     }
   },
 

@@ -86,7 +86,6 @@ export const getFormVersion = asyncHandler(
 
 export const listFormVersions = asyncHandler(async (req: Request, res: Response) => {
   const ctx = req.coreContext!;
-  console.log('DEBUG', ctx, req.query);
   const result = await formsApiService.listFormVersions(
     ctx,
     req.query as unknown as ListFormVersionsQuery,
@@ -139,4 +138,10 @@ export const deleteForm = asyncHandler(async (req: Request<FormIdParams>, res: R
     throw new NotFoundError('Form not found');
   }
   res.status(204).send();
+});
+
+export const listFormioForms = asyncHandler(async (req: Request, res: Response) => {
+  const ctx = req.coreContext!;
+  const result = await formsApiService.listFormioForms(ctx, req.query as unknown as ListFormsQuery);
+  res.json(result);
 });

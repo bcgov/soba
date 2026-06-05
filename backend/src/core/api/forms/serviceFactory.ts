@@ -1,6 +1,8 @@
 import { FormService } from '../../services/formService';
 import { FormVersionService } from '../../services/formVersionService';
 import { decodeCursorAndMode, buildNextCursor, type CursorSort } from '../shared/pagination';
+import { createPluginConfigReader } from '../../config/pluginConfig';
+import { getAuthenticatedFormioClient } from '../../../plugins/formio-v5/formioV5Client';
 
 export interface FormsContextInput {
   workspaceId: string;
@@ -37,6 +39,9 @@ interface UpdateFormInput {
   description?: string | null;
   status?: string;
 }
+
+/** Minimal Form.io form document fields used when merging SOBA metadata into list results. */
+type FormioListedForm = Record<string, unknown> & { _id: string };
 
 const toFormDto = (item: {
   id: string;
@@ -154,32 +159,15 @@ export function createFormsApiService(
     },
 
     getFormByEngineRef: async (ctx: FormsContextInput, engineRef: string) => {
-      const row = await formService.getByEngineSchemaRef(ctx.workspaceId, engineRef);
-      if (!row) return null;
+      const version = await formVersionService.getByEngineRef(ctx.workspaceId, engineRef);
+      if (!version) return null;
 
-      // Try to find the matching form version for this engineRef (search recent versions for the form)
-      const versionsResult = await formVersionService.list({
-        workspaceId: ctx.workspaceId,
-        actorId: ctx.actorId,
-        limit: 100,
-        formId: row.id,
-        state: undefined,
-        sort: 'id:desc',
-        cursorMode: 'id',
-      });
-
-      const matched = versionsResult.items.find((v) => v.engineSchemaRef === engineRef) ?? null;
-
-      let formVersionDto = null;
-      if (matched) {
-        // fetch the full form version record so we have fields like currentRevisionNo/publishedAt
-        const full = await formVersionService.get(ctx.workspaceId, matched.id);
-        if (full) formVersionDto = toFormVersionDto(full);
-      }
+      const form = await formService.get(ctx.workspaceId, version.formId);
+      if (!form) return null;
 
       return {
-        ...toFormDto(row),
-        formVersion: formVersionDto,
+        ...toFormDto(form),
+        formVersion: toFormVersionDto(version),
       };
     },
 
@@ -217,6 +205,75 @@ export function createFormsApiService(
         },
         sort,
       };
+    },
+
+    listFormioForms: async (ctx: FormsContextInput, query: ListFormsQueryInput) => {
+      const { cursorMode, sort, afterId, afterUpdatedAt } = decodeCursorAndMode({
+        cursor: query.cursor,
+        sort: query.sort,
+      });
+
+      const sobaFormsResult = await formService.list({
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        limit: query.limit,
+        q: query.q,
+        status: query.status,
+        sort,
+        cursorMode,
+        afterId,
+        afterUpdatedAt,
+      });
+
+      if (sobaFormsResult.items.length === 0) {
+        return [];
+      }
+
+      const formVersionsResult = await formVersionService.list({
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        limit: 1000,
+        sort: 'id:desc',
+        cursorMode: 'id',
+      });
+
+      const formMap = new Map(sobaFormsResult.items.map((f) => [f.id, f]));
+      const refToSobaMap = new Map();
+      const formToRefMap = new Map();
+      const refsToFetch: string[] = [];
+
+      for (const v of formVersionsResult.items) {
+        if (v.engineSchemaRef && formMap.has(v.formId) && !formToRefMap.has(v.formId)) {
+          formToRefMap.set(v.formId, v.engineSchemaRef);
+          refToSobaMap.set(v.engineSchemaRef, {
+            form: formMap.get(v.formId),
+            formVersion: v,
+          });
+          refsToFetch.push(v.engineSchemaRef);
+        }
+      }
+
+      if (refsToFetch.length === 0) {
+        return [];
+      }
+
+      const config = createPluginConfigReader('formio-v5');
+      const client = await getAuthenticatedFormioClient(config);
+      if (!client) {
+        return [];
+      }
+
+      const formioForms = (await client.loadForms({
+        params: { _id__in: refsToFetch.join(',') },
+      })) as FormioListedForm[];
+
+      return formioForms.map((f) => {
+        const sobaData = refToSobaMap.get(f._id);
+        return {
+          ...f,
+          _sobaForm: sobaData,
+        };
+      });
     },
 
     getFormVersion: async (ctx: FormsContextInput, formVersionId: string) => {

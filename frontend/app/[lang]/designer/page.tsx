@@ -1,4 +1,4 @@
-import { getDictionary, hasLocale, Locale, resolveLocale } from '../dictionaries';
+import { getDictionary, hasLocale, Locale } from '../dictionaries';
 import FormForm from '@/src/features/designer/ui/FormForm';
 
 type PageProps = {
@@ -17,11 +17,8 @@ export async function generateMetadata({ params }: PageProps) {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default async function Page({ params }: PageProps) {
-  const { lang } = await params;
-  const locale = resolveLocale(lang);
-  await getDictionary(locale);
-
   // Render the same FormForm component used by the catch-all route.
   // Pass an empty array so FormForm treats this as "no formId" (i.e. listing / creating).
   return (

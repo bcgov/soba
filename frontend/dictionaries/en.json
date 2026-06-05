@@ -70,31 +70,8 @@
         "title": "Something went wrong loading this form page.",
         "tryAgain": "Try again",
         "backToList": "Back to form list"
-      }
-    }
-  },
-  "submitDemo": {
-    "tableHeading": "SOBA forms",
-    "loading": "Loading…",
-    "empty": "No SOBA forms in this workspace yet.",
-    "generate": "Generate demo SOBA form",
-    "generating": "Creating…",
-    "refresh": "Refresh",
-    "needLogin": "Sign in to view SOBA forms.",
-    "noWorkspace": "No workspace found for your account.",
-    "loadError": "Could not load forms.",
-    "generateError": "Could not create the demo form.",
-    "pollTimeout": "Provisioning is still running. Try refresh in a few seconds.",
-    "openForm": "Open in viewer",
-    "syncPending": "Pending",
-    "syncProvisioning": "Provisioning",
-    "syncReady": "Ready",
-    "syncFailed": "Failed",
-    "columns": {
-      "name": "Name",
-      "slug": "Slug",
-      "sync": "Form.io sync",
-      "open": "Open"
+      },
+      "submitSuccess": "Form submitted successfully."
     }
   },
   "forms": {
@@ -109,6 +86,37 @@
         "downloadQRCode": "Download QR Code",
         "close": "Close"
       }
+    }
+  },
+  "form": {
+    "saved": "Form saved successfully.",
+    "saveError": "Error saving form.",
+    "nameLabel": "Form Name",
+    "namePlaceholder": "Enter form name",
+    "slugLabel": "Form Slug",
+    "slugPlaceholder": "Enter form slug",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Enter form description",
+    "loading": "Loading form...",
+    "schemaNotAvailable": "Form schema not available.",
+    "edit": "Edit",
+    "input": "Submit Data",
+    "notAuthenticated": "You are not authenticated. Please login to access this form."
+  },
+  "submission": {
+    "submissions": "Submissions",
+    "loading": "Loading submissions…",
+    "empty": "No submissions in this workspace yet.",
+    "error": "Could not load submissions.",
+    "refresh": "Refresh",
+    "view": "View",
+    "workflow": "Workflow",
+    "columns": {
+      "id": "ID",
+      "created": "Created",
+      "status": "Status",
+      "version": "Version",
+      "user": "User"
     }
   },
 

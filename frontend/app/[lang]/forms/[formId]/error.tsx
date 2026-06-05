@@ -44,7 +44,7 @@ export default function FormIdRouteError({
         <Text className="text-sm">
           <Link
             className="text-[var(--theme-primary-blue)] underline hover:no-underline"
-            href={`/${locale}/submit`}
+            href={`/${locale}/forms`}
           >
             {labels.backToList}
           </Link>

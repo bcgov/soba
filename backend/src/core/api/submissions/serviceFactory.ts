@@ -1,5 +1,10 @@
 import { SubmissionService } from '../../services/submissionService';
 import { decodeCursorAndMode, buildNextCursor, type CursorSort } from '../shared/pagination';
+import type {
+  SubmissionRecord,
+  SubmissionListRow,
+  SubmissionDetailRow,
+} from '../../db/repos/submissionRepo';
 
 export interface SubmissionsContextInput {
   workspaceId: string;
@@ -13,44 +18,33 @@ interface ListSubmissionsQueryInput {
   formId?: string;
   formVersionId?: string;
   workflowState?: string;
+  createdBy?: string;
   sort?: CursorSort;
 }
 
-const toSubmissionDto = (item: {
-  id: string;
-  formId: string;
-  formVersionId: string;
-  workflowState: string;
-  engineSyncStatus: string;
-  currentRevisionNo: number;
-  submittedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-}) => ({
-  id: item.id,
-  formId: item.formId,
-  formVersionId: item.formVersionId,
-  workflowState: item.workflowState,
-  engineSyncStatus: item.engineSyncStatus,
-  currentRevisionNo: item.currentRevisionNo,
-  submittedAt: item.submittedAt?.toISOString() ?? null,
-  createdAt: item.createdAt.toISOString(),
-  updatedAt: item.updatedAt.toISOString(),
-});
+const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
+  const detail = item as Partial<SubmissionDetailRow>;
+  return {
+    id: item.id,
+    formId: item.formId,
+    formName: detail.form?.name ?? 'Untitled Form',
+    formVersionId: item.formVersionId,
+    versionNo: detail.formVersion?.versionNo ?? item.currentRevisionNo ?? 1,
+    workflowState: item.workflowState,
+    engineSyncStatus: item.engineSyncStatus,
+    currentRevisionNo: item.currentRevisionNo,
+    submittedAt: item.submittedAt?.toISOString() ?? null,
+    createdAt: item.createdAt.toISOString(),
+    updatedAt: item.updatedAt.toISOString(),
+  };
+};
 
-const toSubmissionListItemDto = (item: {
-  id: string;
-  formId: string;
-  formVersionId: string;
-  workflowState: string;
-  engineSyncStatus: string;
-  submittedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-}) => ({
+const toSubmissionListItemDto = (item: SubmissionListRow) => ({
   id: item.id,
   formId: item.formId,
+  formName: item.form.name ?? 'Untitled Form',
   formVersionId: item.formVersionId,
+  versionNo: item.formVersion.versionNo ?? 1,
   workflowState: item.workflowState,
   engineSyncStatus: item.engineSyncStatus,
   submittedAt: item.submittedAt?.toISOString() ?? null,
@@ -77,6 +71,7 @@ export function createSubmissionsApiService(submissionService: SubmissionService
         formId: query.formId,
         formVersionId: query.formVersionId,
         workflowState: query.workflowState,
+        createdBy: query.createdBy,
         sort,
         cursorMode,
         afterId,
@@ -98,12 +93,18 @@ export function createSubmissionsApiService(submissionService: SubmissionService
           formId: query.formId,
           formVersionId: query.formVersionId,
           workflowState: query.workflowState,
+          createdBy: query.createdBy,
         },
         sort,
       };
     },
 
-    create: async (ctx: SubmissionsContextInput, formId: string, formVersionId: string) =>
+    create: async (
+      ctx: SubmissionsContextInput,
+      formId: string,
+      formVersionId: string,
+      workflowState?: string,
+    ) =>
       toSubmissionDto(
         await submissionService.create({
           workspaceId: ctx.workspaceId,
@@ -111,6 +112,7 @@ export function createSubmissionsApiService(submissionService: SubmissionService
           actorDisplayLabel: ctx.actorDisplayLabel,
           formId,
           formVersionId,
+          workflowState,
         }),
       ),
 
