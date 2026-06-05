@@ -182,6 +182,21 @@ export async function publishSobaFormVersion(token: string, id: string, workspac
   return parseJson(response);
 }
 
+export async function updateSobaFormVersionVisibility(
+  token: string,
+  id: string,
+  visibility: string[],
+  workspaceId?: string,
+) {
+  const response = await fetch(`${getSobaApiBaseUrl()}/form-versions/${id}`, {
+    method: 'PATCH',
+    cache: 'no-store',
+    headers: getHeaders(token, workspaceId, true),
+    body: JSON.stringify({ visibility }),
+  });
+  return parseJson(response);
+}
+
 export async function getFormioForm(token: string, id: string, workspaceId?: string): Promise<FormType> {
   const response = await fetch(`${getSobaApiBaseUrl()}/formio-v5/form/${id}`, {
     method: 'GET',

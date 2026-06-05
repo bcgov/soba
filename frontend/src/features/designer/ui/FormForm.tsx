@@ -33,6 +33,7 @@ import {
   getSobaFormVersionFromFormioId,
   updateFormioForm,
   getSobaFormVersions,
+  updateSobaFormVersionVisibility,
 } from '@/src/shared/api/sobaApi';
 import type {
   SobaFormWithVersionResponse,
@@ -279,7 +280,7 @@ function FormForm({ id }: { id?: string[] }) {
           activeWorkspaceId || undefined,
         );
         setLoadedSoba(newSobaData as SobaFormWithVersionResponse);
-        router.replace(`/${lang}/designer/${formioIdForNav}`);
+        router.push(`/${lang}/designer/${formioIdForNav}`);
       }
     } catch (e: unknown) {
       console.error('Error creating new form version:', e);
@@ -344,20 +345,12 @@ function FormForm({ id }: { id?: string[] }) {
           publish,
           activeWorkspaceId || undefined,
         );
-        await fetch(
-          `${process.env.NEXT_PUBLIC_SOBA_API_BASE_URL}/form-versions/${loadedSoba.formVersion.id}`,
-          {
-            method: 'PATCH',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-              ...(activeWorkspaceId ? { 'x-workspace-id': activeWorkspaceId } : {}),
-            },
-            body: JSON.stringify({ visibility }),
-          },
+        await updateSobaFormVersionVisibility(
+          token as string,
+          String(loadedSoba.formVersion.id),
+          visibility,
+          activeWorkspaceId || undefined,
         );
-        // Note: updateFormioForm already calls updateSobaFormVersion internally,
-        // so we don't need a secondary saveSobaFormVersion call here.
       } else {
         // CREATE Logic
         const sobaFormData = await createSobaFormioForm(
@@ -390,7 +383,7 @@ function FormForm({ id }: { id?: string[] }) {
           activeWorkspaceId || undefined,
         );
         setLoadedSoba(newSobaData as SobaFormWithVersionResponse);
-        router.replace(`/${lang}/designer/${formioIdForNav}`);
+        router.push(`/${lang}/designer/${formioIdForNav}`);
       }
     } catch (e: unknown) {
       console.error('error saving form', e);
@@ -560,7 +553,7 @@ function FormForm({ id }: { id?: string[] }) {
             variant="outline-primary"
             className="rounded-pill px-4"
             onClick={createNewVersion}
-            disabled={isSaving || loading || !agreedDisclaimer}
+            disabled={isSaving || loading}
           >
             {isSaving
               ? dict.form.creating || 'Creating...'
@@ -585,32 +578,34 @@ function FormForm({ id }: { id?: string[] }) {
         >
           {dict.form.preview || 'Preview'}
         </Button>
-        <Button
-          variant="primary"
-          className="rounded-pill px-4"
-          onClick={saveFormPublish}
-          disabled={
-            isHistoryView ||
-            isCurrentPublished ||
-            isDirty ||
-            isSaving ||
-            loading ||
-            !agreedDisclaimer
-          }
-          title={
-            !agreedDisclaimer
-              ? dict.form.mustAgreeDisclaimer || 'Must agree to disclaimer'
-              : isHistoryView
-                ? dict.form.cannotPublishHistory || 'Cannot publish history'
-                : isCurrentPublished
-                  ? dict.form.versionAlreadyPublished || 'Version already published'
-                  : isDirty
-                    ? dict.form.saveChangesBeforePublishing || 'Save changes before publishing'
-                    : dict.form.publishForm || 'Publish form'
-          }
-        >
-          {dict.form.publish || 'Publish'}
-        </Button>
+        {id && id[0] && (
+          <Button
+            variant="primary"
+            className="rounded-pill px-4"
+            onClick={saveFormPublish}
+            disabled={
+              isHistoryView ||
+              isCurrentPublished ||
+              isDirty ||
+              isSaving ||
+              loading ||
+              !agreedDisclaimer
+            }
+            title={
+              !agreedDisclaimer
+                ? dict.form.mustAgreeDisclaimer || 'Must agree to disclaimer'
+                : isHistoryView
+                  ? dict.form.cannotPublishHistory || 'Cannot publish history'
+                  : isCurrentPublished
+                    ? dict.form.versionAlreadyPublished || 'Version already published'
+                    : isDirty
+                      ? dict.form.saveChangesBeforePublishing || 'Save changes before publishing'
+                      : dict.form.publishForm || 'Publish form'
+            }
+          >
+            {dict.form.publish || 'Publish'}
+          </Button>
+        )}
       </div>
     </>
   );
