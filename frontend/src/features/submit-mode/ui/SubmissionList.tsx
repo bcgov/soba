@@ -7,7 +7,7 @@ import { getSobaSubmissions } from '@/src/shared/api/sobaApiForms';
 import type { SubmissionListItem } from '../types';
 
 export function SubmissionList() {
-  const { authenticated, token, initializing, idTokenParsed } = useKeycloak();
+  const { authenticated, token, initializing } = useKeycloak();
   const dict = useDictionary();
   const [submissions, setSubmissions] = useState<SubmissionListItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -36,9 +36,7 @@ export function SubmissionList() {
   return (
     <section>
       <div>
-        <h2 >
-          {dict.submission?.submissions || 'Submissions'}
-        </h2>
+        <h2>{dict.submission?.submissions || 'Submissions'}</h2>
       </div>
 
       {loading ? (
@@ -54,30 +52,50 @@ export function SubmissionList() {
           <table>
             <thead>
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Submission ID</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Form Name</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Form ID</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Version</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Submission ID
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Form Name
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Form ID
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Version
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-100">
               {submissions.map((sub) => (
                 <tr key={sub.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">{sub.id}</code>
+                    <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">
+                      {sub.id}
+                    </code>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-semibold">{sub.formName || 'Untitled Form'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono text-xs">{sub.formId}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-semibold">
+                    {sub.formName || 'Untitled Form'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono text-xs">
+                    {sub.formId}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-bold">v{sub.versionNo || 1}</span>
+                    <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-bold">
+                      v{sub.versionNo || 1}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full border ${
-                      sub.workflowState === 'submitted' 
-                        ? 'bg-green-50 text-green-700 border-green-200' 
-                        : 'bg-amber-50 text-amber-700 border-amber-200'
-                    }`}>
+                    <span
+                      className={`px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full border ${
+                        sub.workflowState === 'submitted'
+                          ? 'bg-green-50 text-green-700 border-green-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}
+                    >
                       {sub.workflowState.toUpperCase()}
                     </span>
                   </td>

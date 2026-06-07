@@ -9,7 +9,7 @@ export const submitModePlugin: AppPlugin = {
   order: 30,
   getNavItem: ({ locale, dictionary }) => ({
     id: 'submit-mode',
-    href: `/${locale}/submit`,
+    href: `/${locale}/forms`,
     label: dictionary.header.submit,
   }),
   HomeSection: SubmissionList,

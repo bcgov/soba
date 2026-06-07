@@ -28,10 +28,10 @@ test.describe.serial("Landing page tests", () => {
 
   test("Checks the navigation links", async () => {
     await sharedPage.locator('[data-testid="nav-menu-button"]').click();
-    const designLink = sharedPage.locator('a[href="/en/design"]');
+    const designLink = sharedPage.locator('a[href="/en/designer"]');
     await designLink.isVisible();
-    const SubmitLink = sharedPage.locator('a[href="/en/submit"]');
-    await SubmitLink.isVisible();
+    const formsLink = sharedPage.locator('a[href="/en/forms"]');
+    await formsLink.isVisible();
     const APIMetaLink = sharedPage.locator('a[href="/en/meta"]');
     await APIMetaLink.isVisible();
   });

@@ -1,6 +1,6 @@
-# PR pipeline: build images, deploy crunchy Postgres (with PR-specific user), deploy SOBA from local Helm chart.
+# PR pipeline: QA (type-check, lint, unit tests), then build/deploy when app paths change.
 name: PR Open
-run-name: Deploy PR-${{ github.event.number }}
+run-name: PR-${{ github.event.number }}
 
 env:
   ACRONYM: soba
@@ -10,16 +10,6 @@ on:
     types: [opened, reopened, synchronize]
     branches:
       - develop
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - ".github/workflows/pr_open.yaml"
-      - ".github/workflows/build-images.yaml"
-      - ".gitignore"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "deployments/**"
 
 permissions: {}
 
@@ -28,9 +18,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect deployable changes
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.filter.outputs.deploy }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Filter changed paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            deploy:
+              - 'backend/**'
+              - 'frontend/**'
+              - '.github/workflows/pr_open.yaml'
+              - '.github/workflows/build-images.yaml'
+              - '.github/workflows/qa.yaml'
+              - '.gitignore'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'deployments/**'
+
+  qa:
+    name: QA
+    uses: ./.github/workflows/qa.yaml
+    permissions:
+      contents: read
+
   set-vars:
     name: Set variables
-    if: ${{ !startsWith(github.head_ref, 'release/') && github.head_ref != 'main' }}
+    needs: [qa, changes]
+    if: ${{ needs.changes.outputs.deploy == 'true' && !startsWith(github.head_ref, 'release/') && github.head_ref != 'main' }}
     runs-on: ubuntu-latest
     outputs:
       JOB_NAME: ${{ steps.vars.outputs.JOB_NAME }}
@@ -44,7 +67,7 @@ jobs:
           PR_NUMBER="${{ github.event.number }}"
           echo "PR_NUM=$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "JOB_NAME=pr-$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "URL=https://soba-dev.${{ vars.OC_DOMAIN }}/pr-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "URL=https://soba-pr-${PR_NUMBER}.${{ vars.OC_DOMAIN }}" >> "$GITHUB_OUTPUT"
           echo "ref=refs/pull/$PR_NUMBER/head" >> "$GITHUB_OUTPUT"
 
   build:
@@ -55,7 +78,7 @@ jobs:
       ref: ${{ needs.set-vars.outputs.ref }}
       platforms: amd64
       image_version: pr-${{ needs.set-vars.outputs.PR_NUM }}
-      base_path: /pr-${{ needs.set-vars.outputs.PR_NUM }}
+      #base_path: /pr-${{ needs.set-vars.outputs.PR_NUM }}
     secrets: inherit
     permissions:
       contents: read
@@ -151,15 +174,15 @@ jobs:
               repository: "ghcr.io/${REPO_LC}/backend"
               tag: "${TAG}"
             config:
-              corsOrigin: "https://soba-dev.${DOMAIN}"
+              corsOrigin: "https://soba-pr-${PR_NUM}.${DOMAIN}"
           frontend:
             image:
               repository: "ghcr.io/${REPO_LC}/frontend"
               tag: "${TAG}"
           global:
             domain: "${DOMAIN}"
-            routeHost: "soba-dev.${DOMAIN}"
-            routePath: "/pr-${PR_NUM}"
+            routeHost: "soba-pr-${PR_NUM}.${DOMAIN}"
+            routePath: ""
           database:
             existingSecretName: "${{ steps.db.outputs.secret_name }}"
             existingSecretKey: "uri"
