@@ -83,9 +83,7 @@ function FormForm({ id }: { id?: string[] }) {
 
   const VISIBILITY_OPTIONS = [
     { value: 'public', label: dict.form.visibilityPublic || 'Public' },
-    { value: 'idir', label: 'IDIR' },
-    { value: 'bc-services-card', label: 'BC Services Card' },
-    { value: 'bceid', label: 'BCeID' },
+    { value: 'azureidir', label: dict.form.visibilityAzureIDIR || 'IDIR - MFA' },
   ];
 
   const [alertVariant, setAlertVariant] = useState('');

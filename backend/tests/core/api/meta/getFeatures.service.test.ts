@@ -25,7 +25,7 @@ describe('MetaApiService.getFeatures', () => {
   it('maps rows to platformAllowed from status', async () => {
     jest.mocked(featureRepo.listFeatures).mockResolvedValue([
       {
-        code: 'designer',
+        code: 'design-mode',
         name: 'Design mode',
         description: null,
         version: null,
@@ -47,7 +47,7 @@ describe('MetaApiService.getFeatures', () => {
     const result = await metaApiService.getFeatures();
 
     expect(result.features).toHaveLength(2);
-    const design = result.features.find((f) => f.code === 'designer');
+    const design = result.features.find((f) => f.code === 'design-mode');
     expect(design?.platformAllowed).toBe(true);
     expect(design).not.toHaveProperty('enabled');
     const off = result.features.find((f) => f.code === 'x-off');

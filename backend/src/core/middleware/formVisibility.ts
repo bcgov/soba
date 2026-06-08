@@ -4,6 +4,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '../db/client';
 import { formVersions, submissions, userIdentities } from '../db/schema';
 import { getWorkspaceForUser } from '../db/repos/membershipRepo';
+import { listGroupsForIdp } from '../db/repos/idpGroupRepo';
 import { resolveActor } from './actor';
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
@@ -110,23 +111,9 @@ export async function checkFormVisibility(req: Request, res: Response, next: Nex
       let matched = false;
 
       if (allowedIdps.length > 0) {
-        for (const option of allowedIdps) {
-          if (option === 'idir' && (userIdp === 'idir' || userIdp === 'azureidir')) {
-            matched = true;
-            break;
-          }
-          if (option === 'bceid' && userIdp.startsWith('bceid')) {
-            matched = true;
-            break;
-          }
-          if (
-            option === 'bc-services-card' &&
-            (userIdp === 'bcservicescard' || userIdp === 'bcsc')
-          ) {
-            matched = true;
-            break;
-          }
-        }
+        // Match a discrete provider-code token (e.g. 'azureidir') or any IDP group the user belongs to.
+        const userGroups = await listGroupsForIdp(userIdp);
+        matched = allowedIdps.some((token) => token === userIdp || userGroups.includes(token));
         if (!matched) {
           return res.status(403).json({
             error: 'Forbidden',

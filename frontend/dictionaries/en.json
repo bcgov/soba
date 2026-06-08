@@ -109,6 +109,7 @@
     "visibilityLabel": "Visibility / Access Control",
     "selectVisibility": "Select Visibility",
     "visibilityPublic": "Public",
+    "visibilityAzureIDIR": "IDIR - MFA",
     "disclaimerLabel": "I agree to the disclaimer and statement of responsibility",
     "disclaimerTitle": "Disclaimer",
     "disclaimerText1": "It is your responsibility to comply with Privacy laws governing the collection, use and disclosure of personally identifiable information.",

@@ -109,6 +109,7 @@
     "visibilityLabel": "Visibilité / Contrôle d'accès",
     "selectVisibility": "Sélectionner la visibilité",
     "visibilityPublic": "Publique",
+    "visibilityAzureIDIR": "IDIR - MFA",
     "disclaimerLabel": "J'accepte l'avis de non-responsabilité et la déclaration de responsabilité",
     "disclaimerTitle": "Avis de non-responsabilité",
     "disclaimerText1": "Il est de votre responsabilité de vous conformer aux lois sur la protection de la vie privée régissant la collecte, l'utilisation et la divulgation d'informations personnellement identifiables.",

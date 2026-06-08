@@ -294,8 +294,13 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 ### Feature flags
 
 - **Platform:** `GET /meta/features` returns each row with **`platformAllowed`** (from `soba.feature` status). Loaded via `src/shared/config/featuresMeta.ts` (`loadFeaturesMeta`).
-- **Per-frontend deployment:** **`NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`** — comma-separated codes (same as meta, e.g. `workspaces`, `designer`, `submit-mode`), or **`*`** / **`all`** alone to allow every platform-allowed feature. **Empty/unset** = no codes allowed at the frontend layer (intersected with `platformAllowed`). Use a subset for submit-only or design-only Next.js images that share one API.
+- **Per-frontend deployment:** **`NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`** — comma-separated codes (same as meta, e.g. `workspaces`, `design-mode`, `submit-mode`, `marketing`), or **`*`** / **`all`** alone to allow every platform-allowed feature. **Empty/unset** = no codes allowed at the frontend layer (intersected with `platformAllowed`). Use a subset for submit-only or design-only Next.js images that share one API.
 - **`createIsFeatureAllowed(meta)`** returns `isFeatureAllowed(code)` = `platformAllowed && frontendAllowlist`. Constants: `FEATURE_CODES` in `src/shared/featureFlags/flags.ts`.
+
+### IDP groups
+
+- **Concept:** `soba.identity_provider` holds discrete IdPs (e.g. `idir`, `azureidir`). `soba.idp_group` + `soba.idp_group_member` group them logically so business functions can treat several IdPs the same (e.g. `bcgov` = `idir` + `azureidir`). Seeded groups: `bcgov` (BC Government), `bceid` (BCeID), `bc-citizens` (BC Citizens). This is a reusable primitive for future pluggable Form Access.
+- **Resolution:** `idpGroupRepo.listGroupsForIdp(code)` returns the group codes an IdP belongs to. Form visibility matches a stored token when it equals the user's IdP code or one of the user's group codes.
 
 ### i18n / dictionaries
 

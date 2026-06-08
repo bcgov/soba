@@ -347,7 +347,7 @@ Features are optional capabilities toggled per deployment in `soba.feature`. Eac
 ### Done
 
 - `soba.feature` and `soba.feature_status` tables exist and are seeded
-- Core features seeded in `soba.feature` include `form-versions`, `submissions`, `meta`, `workspaces`, `designer`, `submit-mode` (all enabled by default in seed)
+- Core features seeded in `soba.feature` include `form-versions`, `submissions`, `meta`, `workspaces`, `design-mode`, `submit-mode`, `marketing` (all enabled by default in seed)
 - `featureRepo` exposes `listFeatures()`, `getFeatureByCode()`, and `isFeatureEnabled(status)`
 - `GET /api/v1/meta` returns all features and their status — this is the backend source of truth
 - Roles and code tables support `source = 'feature'` and `feature_code` so a feature can register its own roles and codes without touching core rows
