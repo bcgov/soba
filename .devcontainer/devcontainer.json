@@ -4,17 +4,7 @@
     "dockerfile": "Dockerfile",
     "context": "."
   },
-  "containerEnv": {
-    "NODE_OPTIONS": "--max-old-space-size=4096"
-  },
-  "hostRequirements": {
-    "memory": "4gb"
-  },
-  "runArgs": [
-    "--add-host=host.docker.internal:host-gateway",
-    "--memory=4g",
-    "--memory-swap=8g"
-  ],
+  "runArgs": ["--add-host=host.docker.internal:host-gateway"],
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},

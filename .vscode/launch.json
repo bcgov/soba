@@ -9,6 +9,14 @@
         "SOBA Temporal Worker",
         "SOBA Frontend"
       ]
+    },
+    {
+      "name": "SOBA (Backend + Outbox + Temporal)",
+      "configurations": [
+        "SOBA Backend",
+        "SOBA Outbox Worker",
+        "SOBA Temporal Worker"
+      ]
     }
   ],
   "configurations": [
