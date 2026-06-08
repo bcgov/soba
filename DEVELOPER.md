@@ -38,7 +38,7 @@ The project uses a VS Code devcontainer (`.devcontainer/`). Open the repo in VS 
 | **kubectl**                   | `kubectl version --client` | Kubernetes CLI                       |
 | **Helm**                      | `helm version`             | Kubernetes package manager           |
 
-[Playwright](https://playwright.dev) (Chromium) is installed for the integration app via `pnpm -C integration exec playwright install chromium`. VS Code extensions: ESLint, Prettier, Docker, PostgreSQL, Kubernetes Tools.
+[Playwright](https://playwright.dev) (Chromium) is installed for the integration app via `npm exec --prefix integration/playwright -- playwright install chromium`. VS Code extensions: ESLint, Prettier, Docker, PostgreSQL, Kubernetes Tools.
 
 ### Host architecture (ARM vs AMD)
 
@@ -88,8 +88,12 @@ The repo is a **[pnpm](https://pnpm.io) workspace** (faster installs, shared sto
 | `pnpm lint:fix:frontend` / `pnpm lint:fix:backend` | Lint fix one app                                                |
 | `pnpm check`                                       | Type/style checks for both apps                                 |
 | `pnpm check:frontend` / `pnpm check:backend`       | Check one app                                                   |
+| `pnpm clean:workspace`                             | Remove deps, build outputs, and test artifacts (keeps `.env`)   |
+| `pnpm clean:workspace:full`                        | Same as above, plus remove gitignored env files                 |
 
-Package manager is pinned in `package.json` (`packageManager`: `pnpm@10.28.2`). The `integration` app lives outside the workspace and has its own `pnpm-lock.yaml`; use `pnpm -C integration <script>` for integration-specific commands.
+Package manager is pinned in `package.json` (`packageManager`: `pnpm@10.28.2`). The `integration` app lives outside the workspace and has its own `pnpm-lock.yaml`; use `pnpm -C integration/playwright <script>` for integration-specific commands.
+
+**Troubleshooting installs:** If `pnpm install` fails with `EINVAL` on a VM-backed workspace mount (Docker Desktop, Rancher, Cursor remote), run `pnpm clean:workspace && pnpm install` from the repo root.
 
 ---
 
@@ -331,7 +335,7 @@ Integration tests live in the **integration** app (repo root). An integration te
 
 **Tech:** [Playwright](https://playwright.dev) (Chromium). Tests target the running frontend and backend (default: `http://localhost:3000`, `http://localhost:4000/api/v1`; override with `E2E_BASE_URL`, `E2E_API_BASE_URL`).
 
-**Run tests:** From repo root, `pnpm -C integration test`. In the devcontainer, dependencies and Playwright Chromium are installed by post-create; otherwise run `pnpm -C integration install` and `pnpm -C integration exec playwright install chromium` once.
+**Run tests:** From repo root, `pnpm -C integration/playwright test`. In the devcontainer, dependencies and Playwright Chromium are installed by post-create; otherwise run `npm ci --prefix integration/playwright` and `npm exec --prefix integration/playwright -- playwright install chromium` once.
 
 **Frontend and `data-testid`:** Integration tests locate elements by `data-testid`. Frontend developers **must** add `data-testid` to:
 

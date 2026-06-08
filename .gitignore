@@ -11,6 +11,7 @@
 .bashrc.local
 .pnpm-store
 node_modules
+.devcontainer/.deps-installed
 
 # Test coverage
 coverage/

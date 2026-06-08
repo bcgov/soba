@@ -17,7 +17,8 @@ Runs on the host before the container is built or started:
 
 The `Dockerfile` builds a Node.js 24 image with:
 
-- **Package managers**: npm, pnpm (via corepack)
+- **Package managers**: npm, pnpm@10.28.2 (via corepack)
+- **pnpm store**: `/home/node/.local/share/pnpm/store` on container disk (not the virtiofs workspace mount)
 - **Database clients**: PostgreSQL 17 client, `mongosh` (MongoDB shell)
 - **CLI tools**: `jq`, `curl`, `k6` (load testing), `oc` (OpenShift CLI)
 - **Features**: Docker-in-Docker, GitHub CLI, kubectl, Helm
@@ -31,14 +32,16 @@ The `Dockerfile` builds a Node.js 24 image with:
 
 Runs once when the devcontainer is first created:
 
-- Installs backend dependencies (`npm ci` in `backend/`)
-- Installs frontend dependencies (`pnpm install` in `frontend/`)
+- Configures pnpm (copy import method, store off virtiofs) for reliable installs on all architectures
 - Creates `backend/.env`, `backend/.env.local`, and `frontend/.env` from examples if missing (safety net)
+- Cleans dependency trees, then runs `pnpm install` at the repo root (workspace: frontend + backend)
+- Installs `integration/playwright` dependencies and Playwright Chromium
 
 ### 5. Post-start (every container start)
 
 - Refreshes `backend/.env` and `frontend/.env` from their `.env.example` files on each start.
 - `backend/.env.local` is never touched and keeps your secrets.
+- Runs `pnpm install` only when `pnpm-lock.yaml` changed or dependencies are missing (not on every start).
 
 ---
 
@@ -243,6 +246,7 @@ For stable frontend dev on smaller machines, use **SOBA (Backend + Outbox + Temp
 | Symptom                          | Likely cause            | Action                                                                           |
 | -------------------------------- | ----------------------- | -------------------------------------------------------------------------------- |
 | `JavaScript heap out of memory`  | V8 heap too small       | Raise `max-old-space-size` for that task                                         |
+| `pnpm install` fails with `EINVAL` on virtiofs | Corrupt/partial `node_modules` on VM mount | Run `pnpm clean:workspace && pnpm install`, then rebuild container |
 | Jest/test suite `signal=SIGKILL` | Total RAM exceeded      | Lower heaps, use `soba-test-be`, avoid running `pnpm qa` while Next is compiling |
 | Slow but stable                  | Low heap / serial tests | Expected; use `test:parallel` or higher heaps on a bigger machine                |
 
