@@ -13,7 +13,7 @@ export const CreateFormBodySchema = z
   })
   .openapi('Forms_CreateFormBody');
 
-export const FormVisibilityEnum = z.enum(['public', 'idir', 'bc-services-card', 'bceid']);
+export const FormVisibilityEnum = z.enum(['public', 'azureidir']);
 
 export const CreateFormVersionBodySchema = z
   .object({
