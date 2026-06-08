@@ -133,7 +133,7 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
         advanced: {
           title: 'Advanced',
           weight: 10,
-          default: true,
+          default: false,
           components: {
             email: true,
             url: true,
@@ -150,7 +150,7 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
         data: {
           title: 'Data',
           weight: 20,
-          default: true,
+          default: false,
           components: {
             datagrid: true,
             editgrid: true,
@@ -161,7 +161,7 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
         layout: {
           title: 'Layout',
           weight: 30,
-          default: true,
+          default: false,
           components: {
             htmlelement: true,
             content: true,

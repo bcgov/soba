@@ -277,8 +277,10 @@ function FormForm({ id }: { id?: string[] }) {
           formioIdForNav,
           activeWorkspaceId || undefined,
         );
-        setLoadedSoba(newSobaData as SobaFormWithVersionResponse);
-        router.push(`/${lang}/designer/${formioIdForNav}`);
+        if (!loadedSoba?.formVersion || !loadedSoba.formVersion.id) {
+          setLoadedSoba(newSobaData as SobaFormWithVersionResponse);
+          router.push(`/${lang}/designer/${formioIdForNav}`);
+        }
       }
     } catch (e: unknown) {
       console.error('Error creating new form version:', e);
@@ -372,7 +374,7 @@ function FormForm({ id }: { id?: string[] }) {
       setShowAlert(true);
       setIsDirty(false);
 
-      if (!id && formioIdForNav) {
+      if ((!id || id.length === 0) && formioIdForNav) {
         // Fetch the newly created SOBA form version immediately
         // so that if the user clicks Save again, it triggers UPDATE logic.
         const newSobaData = await getSobaFormVersionFromFormioId(
@@ -411,7 +413,7 @@ function FormForm({ id }: { id?: string[] }) {
     <>
       <BSForm>
         <Row className="mb-3 align-items-end">
-          <Col md={versions.length > 0 ? 6 : 8}>
+          <Col md={8}>
             <BSForm.Group controlId="formName">
               <BSForm.Label>{dict.form.nameLabel}</BSForm.Label>
               <BSForm.Control
@@ -425,7 +427,7 @@ function FormForm({ id }: { id?: string[] }) {
           </Col>
 
           {versions.length > 0 && (
-            <Col md={2}>
+            <Col md={8}>
               <BSForm.Group controlId="formVersionSelector">
                 <BSForm.Label>{dict.form.formVersion || 'Form Version'}</BSForm.Label>
                 <BSForm.Select
@@ -450,7 +452,7 @@ function FormForm({ id }: { id?: string[] }) {
             </Col>
           )}
 
-          <Col md={versions.length > 0 ? 4 : 8}>
+          <Col md={8}>
             <BSForm.Group controlId="formVisibility">
               <BSForm.Label>
                 {dict.form.visibilityLabel || 'Visibility / Access Control'}

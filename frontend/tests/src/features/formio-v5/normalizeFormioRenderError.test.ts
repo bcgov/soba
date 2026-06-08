@@ -32,6 +32,6 @@ describe('normalizeFormioRenderError', () => {
   });
 
   it('returns fallback for unrecognized object', () => {
-    expect(normalizeFormioRenderError({ foo: 1 }, fb)).toBe(fb);
+    expect(normalizeFormioRenderError({ test: 1 }, fb)).toBe(fb);
   });
 });
