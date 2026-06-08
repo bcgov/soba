@@ -162,13 +162,14 @@ jobs:
           oc rollout status statefulset/soba-dev-mongodb -n "${NAMESPACE}" --timeout=300s
 
       # Pipeline performance fix: Revert if needed.
-      - name: Deployment diagnostics
-        if: failure()
-        uses: ./.github/actions/openshift-diagnostics
-        with:
-          release: soba-dev
-          namespace: ${{ secrets.OC_NAMESPACE }}
-          database_secret_name: ${{ steps.db.outputs.secret_name }}
+      # Temporarily disabled openshift diagnostics; uncomment to restore.
+      # - name: Deployment diagnostics
+      #   if: failure()
+      #   uses: ./.github/actions/openshift-diagnostics
+      #   with:
+      #     release: soba-dev
+      #     namespace: ${{ secrets.OC_NAMESPACE }}
+      #     database_secret_name: ${{ steps.db.outputs.secret_name }}
       # Pipeline performance fix: Revert if needed.
 
   Tests:
