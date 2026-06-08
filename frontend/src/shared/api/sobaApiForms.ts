@@ -145,7 +145,6 @@ async function updateSobaFormVersion(
 ): Promise<Response> {
   const data = {
     formioFormDefinition: formData,
-    enqueueProvision: false,
     engine_schema_ref: formData._id,
   };
   const response = await fetch(`${getSobaApiBaseUrl()}/form-versions/${id}/save`, {

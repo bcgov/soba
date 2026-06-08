@@ -8,7 +8,6 @@ import {
   FeatureStatus,
   FormStatus,
   FormVersionState,
-  OutboxStatus,
   RoleStatus,
   Roles,
   WorkspaceMembershipRole,
@@ -24,7 +23,6 @@ import {
   identityProviders,
   idpGroupMembers,
   idpGroups,
-  outboxStatus,
   roleStatus,
   roles,
   userIdentities,
@@ -267,32 +265,6 @@ const seedCodeTables = async () => {
   ];
   for (const row of workspaceMembershipStatusRows) {
     await db.insert(workspaceMembershipStatus).values(row).onConflictDoNothing();
-  }
-  const outboxStatusRows = [
-    {
-      code: OutboxStatus.pending,
-      source: CODE_SOURCE_CORE,
-      display: 'Pending',
-      sortOrder: 0,
-      isActive: true,
-    },
-    {
-      code: OutboxStatus.processing,
-      source: CODE_SOURCE_CORE,
-      display: 'Processing',
-      sortOrder: 1,
-      isActive: true,
-    },
-    {
-      code: OutboxStatus.done,
-      source: CODE_SOURCE_CORE,
-      display: 'Done',
-      sortOrder: 2,
-      isActive: true,
-    },
-  ];
-  for (const row of outboxStatusRows) {
-    await db.insert(outboxStatus).values(row).onConflictDoNothing();
   }
 };
 

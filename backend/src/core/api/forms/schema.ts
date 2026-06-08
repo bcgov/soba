@@ -66,7 +66,6 @@ export const SaveFormVersionBodySchema = z
   .object({
     eventType: z.string().min(1).optional(),
     note: z.string().optional(),
-    enqueueProvision: z.boolean().optional(),
     formioFormDefinition: z.record(z.string(), z.unknown()).optional(),
     engine_schema_ref: z.string().min(1).optional(),
   })

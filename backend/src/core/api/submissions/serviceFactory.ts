@@ -130,7 +130,7 @@ export function createSubmissionsApiService(submissionService: SubmissionService
     save: (
       ctx: SubmissionsContextInput,
       submissionId: string,
-      input: { eventType?: string; note?: string; enqueueProvision?: boolean },
+      input: { eventType?: string; note?: string },
     ) =>
       submissionService
         .save({
@@ -140,7 +140,6 @@ export function createSubmissionsApiService(submissionService: SubmissionService
           submissionId,
           eventType: input.eventType || 'edit_submission',
           note: input.note,
-          enqueueProvision: input.enqueueProvision ?? true,
         })
         .then((row) => toSubmissionDto(row)),
 

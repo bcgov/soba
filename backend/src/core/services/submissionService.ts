@@ -8,14 +8,7 @@ import {
   markSubmissionDeleted,
   updateSubmissionDraft,
 } from '../db/repos/submissionRepo';
-import { QueueAdapter } from '../integrations/queue/QueueAdapter';
-import { getFormEngineCodeForForm } from '../db/repos/formRepo';
-import { buildSubmissionCreateTopic } from '../integrations/form-engine/formEngineTopics';
-import {
-  SubmissionCreatePayloadSchema,
-  type SubmissionCreatePayload,
-} from '../integrations/queue/events';
-import { NotFoundError, ValidationError } from '../errors';
+import { NotFoundError } from '../errors';
 
 interface CreateInput {
   workspaceId: string;
@@ -41,7 +34,6 @@ interface SaveInput {
   submissionId: string;
   eventType: string;
   note?: string;
-  enqueueProvision?: boolean;
 }
 
 interface DeleteInput {
@@ -66,8 +58,6 @@ interface ListInput {
 }
 
 export class SubmissionService {
-  constructor(private readonly queueAdapter: QueueAdapter) {}
-
   async create(input: CreateInput) {
     return createEmptySubmission(input);
   }
@@ -89,31 +79,6 @@ export class SubmissionService {
     });
 
     if (!updated) throw new NotFoundError('Submission not found');
-
-    if (input.enqueueProvision) {
-      const formEngineCode = updated.formId
-        ? await getFormEngineCodeForForm(input.workspaceId, updated.formId)
-        : null;
-      if (!formEngineCode) {
-        throw new ValidationError(
-          'Cannot enqueue submission provision without a valid form engine',
-        );
-      }
-      const payload: SubmissionCreatePayload = SubmissionCreatePayloadSchema.parse({
-        submissionId: input.submissionId,
-        engineCode: formEngineCode,
-        formVersionId: updated.formVersionId ?? undefined,
-      });
-      await this.queueAdapter.enqueue({
-        topic: buildSubmissionCreateTopic(formEngineCode),
-        aggregateType: 'submission',
-        aggregateId: input.submissionId,
-        workspaceId: input.workspaceId,
-        payload,
-        actorId: input.actorId,
-        actorDisplayLabel: input.actorDisplayLabel,
-      });
-    }
 
     return updated;
   }

@@ -34,7 +34,6 @@ export const SaveSubmissionBodySchema = z
   .object({
     eventType: z.string().min(1).optional(),
     note: z.string().optional(),
-    enqueueProvision: z.boolean().optional(),
   })
   .openapi('Submissions_SaveSubmissionBody');
 

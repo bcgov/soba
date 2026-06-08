@@ -2,19 +2,17 @@
   "version": "0.2.0",
   "compounds": [
     {
-      "name": "SOBA (Backend + Outbox + Temporal + Frontend)",
+      "name": "SOBA (Backend + Temporal + Frontend)",
       "configurations": [
         "SOBA Backend",
-        "SOBA Outbox Worker",
         "SOBA Temporal Worker",
         "SOBA Frontend"
       ]
     },
     {
-      "name": "SOBA (Backend + Outbox + Temporal)",
+      "name": "SOBA (Backend + Temporal)",
       "configurations": [
         "SOBA Backend",
-        "SOBA Outbox Worker",
         "SOBA Temporal Worker"
       ]
     }
@@ -27,16 +25,6 @@
       "cwd": "${workspaceFolder}/backend",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],
-      "skipFiles": ["<node_internals>/**"],
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "SOBA Outbox Worker",
-      "type": "node",
-      "request": "launch",
-      "cwd": "${workspaceFolder}/backend",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["exec", "tsx", "watch", "src/core/workers/outboxWorker.ts"],
       "skipFiles": ["<node_internals>/**"],
       "console": "integratedTerminal"
     },

@@ -217,9 +217,9 @@ Form rendering and submission storage are delegated to a **form engine** plugin.
 
 Form engine plugins can optionally expose **HTTP routes** (e.g. a Form.io CE proxy) by setting **`routeBasePath`** and **`createRouter(config)`**; routes are mounted only when **`PLUGIN_<CODE>_ROUTES_ALLOWED=true`** (explicit per-engine). For formio-v5, set **`PLUGIN_FORMIO_V5_ROUTES_ALLOWED=true`** to mount the proxy at **`/api/v1/formio-v5`** (path from **`PLUGIN_FORMIO_V5_PROXY_PATH`**, default `/formio-v5`). The proxy is **protected** (same auth as v1 API: app JWT in `Authorization: Bearer`). It forwards to Form.io CE and optionally passes through **`x-jwt-token`**; otherwise it uses the server-side admin client. Health remains on the adapter and is reported via `/api/v1/health`. See [In Detail — Configuration of plugins and features](#configuration-of-plugins-and-features).
 
-### Outbox
+### Form engine cross-references
 
-To keep **transactions consistent across PostgreSQL and the form engine** (e.g. Form.io/Mongo), we use an **outbox pattern**: domain writes and a corresponding outbox event are used so a worker can reliably sync to the form engine and record the engine’s reference back in Postgres. We need this for **form_version** (sync schema → form engine, store `engine_schema_ref`) and **submission** (sync submission → form engine, store `engine_submission_ref`). See [In Detail — Outbox pattern](#outbox-pattern).
+Data lives in **two systems**: domain metadata/draft state in **PostgreSQL** and the form definition/submission payloads in the **form engine** (e.g. Form.io/Mongo). To match records across them we store the engine's reference on the domain row: `form_version.engine_schema_ref` (the Form.io form id/path) and `submission.engine_submission_ref`. The client creates the resource in the form engine and passes the returned reference to the SOBA save endpoint, which persists it. See [In Detail — Form engine cross-references](#form-engine-cross-references).
 
 ### Auth plugins and responsibilities
 
@@ -352,17 +352,14 @@ Use stable, semantic values (e.g. `workspace-page`, `login-button`, `workspace-i
 
 Optional deeper dives for onboarding: plugin/feature configuration, auth flow, feature and code management, and testing approach.
 
-### Outbox pattern
+### Form engine cross-references
 
-We use a **transactional outbox** so that work that spans PostgreSQL and the form engine (e.g. Form.io/Mongo) is reliable: we persist the intent in our DB, then a worker processes it and calls the external service.
+Form data spans two systems: domain metadata and draft state in **PostgreSQL**, and the form definition plus submission payloads in the **form engine** (e.g. Form.io/Mongo). We keep a reference to the engine record on each domain row so the two systems can be matched:
 
-- **Table:** `soba.integration_outbox` — one row per event (topic, aggregateType, aggregateId, workspaceId, payload, status, attemptCount, nextAttemptAt, lastError). Status flows: pending → processing → done (or failed with backoff).
-- **Flow:** When the app creates or updates a form version or submission that must exist in the form engine, it enqueues an event (via `QueueAdapter` → `DbOutboxQueueAdapter` → `enqueueOutboxEvent`). The **outbox worker** (`backend/src/core/workers/outboxWorker.ts`) polls, claims a batch (by status and nextAttemptAt), and passes each item to **SyncService**. SyncService resolves the form engine from the payload or aggregate, calls the form engine adapter (e.g. `createFormVersionSchema` or `createSubmissionRecord`), then updates the domain row in Postgres with the engine’s reference.
-- **Where we need it:** We need the outbox for two aggregates so the engine ref is written back into our DB after the form engine has accepted the data:
-  - **form_version.engine_schema_ref** — After a form version is created or published, we sync its schema to the form engine; the engine returns a reference (e.g. Form.io form path or ID). We store that in `form_version.engine_schema_ref` so we can render or submit against it.
-  - **submission.engine_submission_ref** — After a submission is created, we provision a record in the form engine; the engine returns a reference. We store that in `submission.engine_submission_ref`.
+- **form_version.engine_schema_ref** — the form engine's reference for the form schema (e.g. Form.io form id/path), used to render or submit against it.
+- **submission.engine_submission_ref** — the form engine's reference for a submission record.
 
-Without the outbox, we would have to call the form engine synchronously inside the request and risk partial commits (Postgres updated but form engine unreachable, or the reverse). The outbox lets us commit the domain write and the outbox row together (or in a single logical step), and let the worker eventually sync and fill in the refs with retries and backoff.
+The client creates/updates the resource in the form engine directly (the formio-v5 proxy, mounted when `PLUGIN_FORMIO_V5_ROUTES_ALLOWED=true`), then sends the returned id to the SOBA save endpoint (`POST /form-versions/{id}/save` with `engine_schema_ref`), which stores it on the `form_version` row. `engine_sync_status` records the sync state for the row.
 
 The Form.io CE client (`backend/src/plugins/formio-v5/formioV5Client.ts`) automatically re-logs in and retries once on **HTTP 440** when the request used the server **admin** JWT only; if the Formio proxy forwarded an end-user **`x-jwt-token`**, 440 is not auto-retried and that session must be refreshed.
 
@@ -392,7 +389,7 @@ Auth-related env: `IDP_PLUGINS`, `IDP_PLUGIN_DEFAULT_*`, and per-IdP `PLUGIN_<ID
 ### Enable/Disable features, add codes + roles for feature
 
 - **Feature status:** Rows in `soba.feature` have a `status` column; values come from `soba.feature_status` (e.g. `enabled`, `disabled`, `experimental`, `deprecated`). Application code uses `isFeatureEnabled(status)` (e.g. in `featureRepo`) so only `enabled` is treated as on. Seed inserts core feature rows and status codes; to add a feature, add a row to `feature` and (if needed) to `feature_status` (with `source = 'core'` or the feature code).
-- **Adding codes:** Code tables (e.g. `form_status`, `form_version_state`, `workspace_membership_role`, `feature_status`, `outbox_status`) use composite `(code, source)`. Core uses `source = 'core'`. To add codes for a feature: insert into the appropriate code table with `source = '<feature_code>'`. Seed and app code should use constants from a single place (e.g. `backend/src/core/db/codes/`) for core codes.
+- **Adding codes:** Code tables (e.g. `form_status`, `form_version_state`, `workspace_membership_role`, `feature_status`) use composite `(code, source)`. Core uses `source = 'core'`. To add codes for a feature: insert into the appropriate code table with `source = '<feature_code>'`. Seed and app code should use constants from a single place (e.g. `backend/src/core/db/codes/`) for core codes.
 - **Adding roles for a feature:** Table `soba.role` has `source` and `feature_code`. Core roles have `source = 'core'`. To add a feature-specific role: insert with `source = 'feature'` and `feature_code = '<feature_code>'`. Role listing/filtering (e.g. in meta or roleRepo) can filter by source or feature so the UI only shows applicable roles.
 
 ### App structure (frontend)

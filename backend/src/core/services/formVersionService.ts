@@ -10,14 +10,7 @@ import {
   getFormVersionByEngineRef,
 } from '../db/repos/formVersionRepo';
 import { db } from '../db/client';
-import { QueueAdapter } from '../integrations/queue/QueueAdapter';
-import { getFormById, getFormEngineCodeForForm } from '../db/repos/formRepo';
-import { buildFormVersionCreateTopic } from '../integrations/form-engine/formEngineTopics';
-import {
-  FormVersionCreatePayloadSchema,
-  type FormVersionCreatePayload,
-} from '../integrations/queue/events';
-import { NotFoundError, ValidationError } from '../errors';
+import { NotFoundError } from '../errors';
 
 interface CreateDraftInput {
   workspaceId: string;
@@ -43,7 +36,6 @@ interface SaveInput {
   formVersionId: string;
   eventType: string;
   note?: string;
-  enqueueProvision?: boolean;
   formioFormDefinition?: Record<string, unknown>;
   engineSchemaRef?: string | null;
 }
@@ -68,8 +60,6 @@ interface ListInput {
 }
 
 export class FormVersionService {
-  constructor(private readonly queueAdapter: QueueAdapter) {}
-
   async createDraft(input: CreateDraftInput) {
     return createEmptyFormVersionDraft(input);
   }
@@ -120,36 +110,6 @@ export class FormVersionService {
     });
 
     if (!updated) throw new NotFoundError('Form version not found');
-
-    if (input.enqueueProvision) {
-      const formEngineCode = updated.formId
-        ? await getFormEngineCodeForForm(input.workspaceId, updated.formId)
-        : null;
-      if (!formEngineCode) {
-        throw new ValidationError(
-          'Cannot enqueue form version provision without a valid form engine',
-        );
-      }
-      const formRecord =
-        updated.formId != null ? await getFormById(input.workspaceId, updated.formId) : null;
-      const payload: FormVersionCreatePayload = FormVersionCreatePayloadSchema.parse({
-        formVersionId: input.formVersionId,
-        engineCode: formEngineCode,
-        formId: updated.formId ?? undefined,
-        formioFormDefinition: input.formioFormDefinition,
-        formSlug: formRecord?.slug,
-        formName: formRecord?.name,
-      });
-      await this.queueAdapter.enqueue({
-        topic: buildFormVersionCreateTopic(formEngineCode),
-        aggregateType: 'form_version',
-        aggregateId: input.formVersionId,
-        workspaceId: input.workspaceId,
-        payload,
-        actorId: input.actorId,
-        actorDisplayLabel: input.actorDisplayLabel,
-      });
-    }
 
     return updated;
   }

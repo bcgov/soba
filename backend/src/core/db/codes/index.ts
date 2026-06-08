@@ -46,13 +46,6 @@ export const FormVersionState = {
 } as const;
 export type FormVersionStateCode = (typeof FormVersionState)[keyof typeof FormVersionState];
 
-export const OutboxStatus = {
-  pending: 'pending',
-  processing: 'processing',
-  done: 'done',
-} as const;
-export type OutboxStatusCode = (typeof OutboxStatus)[keyof typeof OutboxStatus];
-
 export const FeatureStatus = {
   enabled: 'enabled',
   disabled: 'disabled',

@@ -24,7 +24,6 @@ This doc isn’t complete. I may have missed things or misstated how ideas, code
    - [Features](#features)
    - [Meta API](#meta-api)
    - [Form Engine](#form-engine)
-   - [Outbox Pattern](#outbox-pattern)
    - [Cache](#cache)
    - [Message Bus](#message-bus)
    - [API Overview](#api-overview)
@@ -44,7 +43,7 @@ When estimating or implementing a new piece of functionality, use this as a map 
 
 ## Design-time: core, plugin, or feature?
 
-- **Core** — Behaviour that every deployment needs and that lives in `backend/src/core/` (or the frontend equivalent). Examples: workspace resolution, auth, forms/submissions domain, outbox.
+- **Core** — Behaviour that every deployment needs and that lives in `backend/src/core/` (or the frontend equivalent). Examples: workspace resolution, auth, forms/submissions domain.
 - **Plugin** — Swappable or extensible behaviour: workspace resolvers, IdP, form engine, cache, message bus, or an optional REST API mounted under `/api/v1`. Lives in `backend/src/plugins/<name>/`; selected and configured via env. Use when the capability might be replaced (e.g. different IdP or form engine) or when it’s optional and self-contained.
 - **Feature** — Optional capability toggled per deployment via `soba.feature` (status `enabled`/`disabled`). Can add its own codes and roles with `source = 'feature'` and `feature_code`. Use when the capability is optional but not a full plugin (e.g. a new workflow or UI area that can be turned off without changing resolvers or engines).
 
@@ -56,7 +55,7 @@ Use this when scoping or estimating. Not every item applies to every change.
 
 | Layer                  | What you’ll typically touch                                                                                                                                                                                                                                                                                                                                                                                      |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Backend**            | Zod schema(s) for request/response → `validateRequest` → controller → API service → domain service → repo. Optionally: new or changed tables → schema in `backend/src/core/db/schema/` → `drizzle-kit generate` → migration → `db:migrate` (and seed if adding codes/roles). If the flow spans Postgres and the form engine: outbox enqueue in the service and (once wired) outbox worker + form engine adapter. |
+| **Backend**            | Zod schema(s) for request/response → `validateRequest` → controller → API service → domain service → repo. Optionally: new or changed tables → schema in `backend/src/core/db/schema/` → `drizzle-kit generate` → migration → `db:migrate` (and seed if adding codes/roles). If the flow spans Postgres and the form engine: the client provisions the engine resource and passes its reference (`engine_schema_ref`) to the save endpoint. |
 | **Route registration** | Add or extend a router; ensure it’s mounted in the app (e.g. `app.ts`) with the right auth and context middleware.                                                                                                                                                                                                                                                                                               |
 | **Frontend**           | Page under `app/[lang]/` (locale layout, dictionary keys if needed); components (e.g. under `app/ui/` or `src/features/`); API client in `src/shared/api/sobaApi.ts` (token, types); Redux slice/thunk if you need client state; nav item if the plugin exposes `getNavItem`.                                                                                                                                    |
 | **Testids**            | Add `data-testid` to new interactive elements, landmarks, lists, and status/state so integration tests can target them (see [DEVELOPER.md](./DEVELOPER.md) — Integration).                                                                                                                                                                                                                                       |
@@ -102,9 +101,8 @@ Each file in `backend/src/core/db/schema/` owns a slice of the schema:
 | `core.ts`               | `identity_provider`, `app_user`, `user_identity`, `workspace`, `workspace_membership`, `workspace_group`, `workspace_group_membership`, `soba_admin` |
 | `forms.ts`              | `form`, `form_version`, `form_version_revision`                                                                                                      |
 | `roles.ts`              | `role`, `role_status`                                                                                                                                |
-| `codes.ts`              | `form_status`, `form_version_state`, `workspace_membership_role`, `workspace_membership_status`, `outbox_status`                                     |
+| `codes.ts`              | `form_status`, `form_version_state`, `workspace_membership_role`, `workspace_membership_status`                                                      |
 | `feature.ts`            | `feature`, `feature_status`                                                                                                                          |
-| `integration.ts`        | `integration_outbox`                                                                                                                                 |
 | `plugins.enterprise.ts` | Enterprise-specific tables (e.g. ministry/group bindings)                                                                                            |
 
 ## Helpers
@@ -130,7 +128,6 @@ Each repo (`backend/src/core/db/repos/`) owns queries for one domain. Key functi
 | `formRepo`        | `createForm`, `getFormById`, `listFormsForWorkspace`, `updateForm`, `markFormDeleted`, `getFormEngineCodeForForm`                                                    |
 | `formVersionRepo` | `createEmptyFormVersionDraft`, `getFormVersionById`, `listFormVersionsForWorkspace`, `updateFormVersionDraft`, `appendFormVersionRevision`, `markFormVersionDeleted` |
 | `submissionRepo`  | `createEmptySubmission`, `getSubmissionById`, `listSubmissionsForWorkspace`, `updateSubmissionDraft`, `appendSubmissionRevision`, `markSubmissionDeleted`            |
-| `outboxRepo`      | `enqueueOutboxEvent`, `claimOutboxBatch`, `markOutboxSucceeded`, `markOutboxFailed`                                                                                  |
 | `sobaAdminRepo`   | `isSobaAdmin`, `upsertSobaAdminFromIdp`, `addDirectSobaAdmin`, `removeDirectSobaAdmin`, `listSobaAdmins`                                                             |
 | `roleRepo`        | `listRoles`, `getRoleByCode`                                                                                                                                         |
 | `featureRepo`     | `listFeatures`, `getFeatureByCode`, `isFeatureEnabled`                                                                                                               |
@@ -154,7 +151,6 @@ Code constants live in `backend/src/core/db/codes/index.ts` and are seeded with 
 | `WorkspaceMembershipSource` | `auto_home`                                         | No (code only) | Used in `ensureHomeWorkspace` to tag and identify auto-created memberships                                                                      |
 | `FormStatus`                | `active`, `archived`, `deleted`                     | Yes            | `active` on create; `deleted` on soft-delete; `archived` — seeded only                                                                          |
 | `FormVersionState`          | `draft`, `published`, `deleted`                     | Yes            | `draft` on create; `published` on publish; `deleted` on soft-delete                                                                             |
-| `OutboxStatus`              | `pending`, `processing`, `done`                     | Yes            | All three used in outbox worker flow — `pending` on enqueue, `processing` on claim, `done` on success                                           |
 | `FeatureStatus`             | `enabled`, `disabled`, `experimental`, `deprecated` | Yes            | `enabled` — checked by `isFeatureEnabled()`; others seeded and available but only `enabled` triggers active behaviour                           |
 
 **Features seeded** (in `soba.feature`): `form-versions` (enabled), `submissions` (enabled), `meta` (enabled). These are the only feature rows; no feature-specific roles or code extensions exist yet.
@@ -261,7 +257,7 @@ route → validateRequest → controller → service → repo → DB
 
 **API service** (each domain has a `serviceFactory.ts`) — Calls domain services, maps rows to DTOs, does cursor encoding for lists. Created by a factory that gets the domain services it needs.
 
-**Domain service** (`backend/src/core/services/`) — Where the rules live: preconditions, repo coordination, outbox enqueue, form engine. `FormService`, `FormVersionService`, `SubmissionService` own behaviour; repos are just data.
+**Domain service** (`backend/src/core/services/`) — Where the rules live: preconditions, repo coordination, form engine references. `FormService`, `FormVersionService`, `SubmissionService` own behaviour; repos are just data.
 
 **Repo** — Data access only (see [Repos](#repos)).
 
@@ -403,30 +399,6 @@ When **`PLUGIN_FORMIO_V5_ROUTES_ALLOWED=true`**, the formio-v5 plugin mounts a F
 ### Not Done
 
 - Form field conventions not decided (title, tags, etc.) — worth exploring Formio tags as a way to associate forms with a Workspace (tenancy)
-- Not yet wired into the outbox pattern
-
-## Outbox Pattern
-
-We can’t atomically write to Postgres and Form.io (Mongo). So we write the intent to our DB first and a worker processes it with retries. We need this for two things: **form version** (after publish, sync schema to Form.io and store `engine_schema_ref`) and **submission** (after create, provision in Form.io and store `engine_submission_ref`).
-
-### Done
-
-- `soba.integration_outbox` table exists with the right shape: topic, aggregate type/id, workspace, payload, status (`pending → processing → done / failed`), attempt count, backoff columns
-- `DbOutboxQueueAdapter` and `enqueueOutboxEvent` exist for writing events
-- `outboxWorker.ts` exists and polls/claims batches
-- `SyncService` shell exists to route events to the right form engine adapter
-
-### Partially done (local dev)
-
-- `POST /form-versions/{id}/save` with `enqueueProvision: true` enqueues `form_version` events; `FormioEngineAdapter.createFormVersionSchema` calls Form.io `POST /form` when admin credentials are configured (otherwise the adapter falls back to a placeholder ref).
-- **Run the worker:** use the VS Code launch config **SOBA Outbox Worker**, or the compound **SOBA (Backend + Outbox + Temporal + Frontend)**. From `backend/`, you can also run `pnpm outbox-worker` or `pnpm outbox-worker:dev` in a second terminal.
-- **Kubernetes:** the chart deploys **`outboxWorker`** as a second Deployment (same backend image, command `node backend/dist/src/core/workers/outboxWorker.js`); see `deployments/helm/soba/values*.yaml` and `templates/backend/deployment-outbox-worker.yaml`.
-- **Form.io env:** the worker uses the same `PLUGIN_FORMIO_V5_*` settings as the API so provisioning can reach Form.io.
-
-### Still open
-
-- Submission provisioning via outbox remains placeholder in the Form.io adapter.
-- Production deployment should run the outbox worker as its own long-lived process (see deployment docs); locally, start it via the launch config or `pnpm outbox-worker:dev`, not only the API.
 
 ## Cache
 
@@ -455,7 +427,7 @@ Same adapter pattern (`MESSAGEBUS_DEFAULT_CODE`).
 ### Not Done
 
 - No Redis or NATS implementation yet (NATS preferred for pub/sub at scale)
-- `publish` is not called anywhere in core — in place for when the outbox worker and async flows need to fan out events
+- `publish` is not called anywhere in core — in place for when async flows need to fan out events
 - No events or message contracts defined
 
 ## API Overview
@@ -509,13 +481,12 @@ All endpoints below are fully connected end-to-end through the service → repo 
 
 ### What is NOT wired — Form.io / Mongo
 
-**Nothing talks to Form.io / Mongo yet.** That’s the biggest gap. The save endpoints accept `enqueueProvision` and the services will call `queueAdapter.enqueue()` when it’s true, but: the outbox worker has no Form.io client to call, no schema or submission payload is ever sent, and `engine_schema_ref` / `engine_submission_ref` stay null. So today you can create forms and submissions in our DB, but they’re empty — no rendered schema, no submission data. Rendering or reading from Form.io will fail until we have a client and the outbox wired through.
+**Server-side provisioning to Form.io / Mongo is not done.** The client creates the Form.io form directly (via the formio-v5 proxy) and passes the returned id to `POST /form-versions/{id}/save` as `engine_schema_ref`, which is stored on the `form_version` row. Submissions, however, do not yet populate `engine_submission_ref`, and there is no server-side reconciliation if the client and Postgres get out of sync.
 
 ### Not Done
 
 - No dedicated publish flow; we can set state to `published` via PATCH but there’s no publish endpoint or rules (e.g. draft-only, one published version per form).
 - Submission revisions store metadata/notes, not form field values (those would come from Form.io).
-- `enqueueProvision` defaults to true but the outbox does nothing yet — callers may want to pass false until we have a Form.io client.
 - No workflow rules for `workflowState`; no transitions or validations.
 - No per-form or per-submission access control; any workspace member can read/write/delete everything.
 
@@ -579,7 +550,7 @@ Tests live in `backend/tests/` (same shape as `src/`). Right now we have:
 - `jwtClaims` — IdP claim mapping and profile helpers
 - `validation`, `schema`, `pagination` — shared API middleware and helpers
 - `errors`, `errorHandler` — error class and HTTP response mapping
-- `cacheKeys`, `events`, `formEngineTopics` — integration utility tests
+- `cacheKeys` — integration utility tests
 
 A few route-level tests use Supertest (e.g. validation, error handler): they spin up a minimal Express app and assert status + shape without the full server.
 

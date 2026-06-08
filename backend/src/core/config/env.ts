@@ -135,8 +135,6 @@ export function createEnvReader(source: EnvSource) {
     getCsvEnv: (key: string) => getCsvEnvFrom(source, key),
     getDatabaseUrl: () => resolveDatabaseUrl(source),
     getDbAdminDatabase: () => getOptionalEnvFrom(source, 'DB_ADMIN_DATABASE'),
-    getOutboxPollIntervalMs: () => getNumberEnvFrom(source, 'OUTBOX_POLL_INTERVAL_MS'),
-    getOutboxBatchSize: () => getNumberEnvFrom(source, 'OUTBOX_BATCH_SIZE'),
     getSystemSobaUserEmail: () => getOptionalEnvFrom(source, 'SYSTEM_SOBA_USER_EMAIL'),
     getSystemSobaSubject: () => getOptionalEnvFrom(source, 'SOBA_SYSTEM_SUBJECT'),
     getWorkspacePluginsAllowed: () => getRequiredEnvFrom(source, 'WORKSPACE_PLUGINS_ALLOWED'),
@@ -180,8 +178,6 @@ export const env = {
   getCsvEnv,
   getDatabaseUrl: () => resolveDatabaseUrl(process.env),
   getDbAdminDatabase: () => getOptionalEnv('DB_ADMIN_DATABASE'),
-  getOutboxPollIntervalMs: () => getNumberEnv('OUTBOX_POLL_INTERVAL_MS'),
-  getOutboxBatchSize: () => getNumberEnv('OUTBOX_BATCH_SIZE'),
   getSystemSobaUserEmail: () => getOptionalEnv('SYSTEM_SOBA_USER_EMAIL'),
   /** Subject for the system SOBA user identity (provider=system). Default in code: soba-system. */
   getSystemSobaSubject: () => getOptionalEnv('SOBA_SYSTEM_SUBJECT'),

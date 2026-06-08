@@ -106,8 +106,8 @@ Use `host.docker.internal` to reach the sidecar services (the devcontainer is st
 
 ### Option 1: VS Code launch
 
-- **SOBA (Backend + Outbox + Temporal)**: backend stack only — then run `soba-fe` in a terminal for frontend (`http://localhost:3000`)
-- **SOBA (Backend + Outbox + Temporal + Frontend)**: everything including frontend via `pnpm dev:watch`
+- **SOBA (Backend + Temporal)**: backend stack only — then run `soba-fe` in a terminal for frontend (`http://localhost:3000`)
+- **SOBA (Backend + Temporal + Frontend)**: everything including frontend via `pnpm dev:watch`
 - **SOBA Backend** / **SOBA Frontend**: individual services (`http://localhost:4000`, `http://localhost:3000`)
 
 ### Option 2: Terminal
@@ -239,7 +239,7 @@ NODE_OPTIONS=--max-old-space-size=1024 pnpm --dir backend exec jest --runInBand
 | User `terminal.integrated.env.linux` | Yes                             | Usually no                             |
 | `package.json` script prefix         | Overrides shell for that script | Yes, if launch uses the script         |
 
-For stable frontend dev on smaller machines, use **SOBA (Backend + Outbox + Temporal)** from Run and Debug, then **`soba-fe`** in a terminal — instead of the all-in-one compound that starts frontend via `dev:watch`.
+For stable frontend dev on smaller machines, use **SOBA (Backend + Temporal)** from Run and Debug, then **`soba-fe`** in a terminal — instead of the all-in-one compound that starts frontend via `dev:watch`.
 
 ### Troubleshooting
 

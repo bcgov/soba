@@ -16,8 +16,6 @@
     "build": "tsc",
     "serve": "pnpm run build && node dist/src/app.js",
     "dev": "npx nodemon",
-    "outbox-worker": "tsx src/core/workers/outboxWorker.ts",
-    "outbox-worker:dev": "tsx watch src/core/workers/outboxWorker.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",

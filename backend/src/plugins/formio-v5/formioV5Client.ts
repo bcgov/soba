@@ -37,7 +37,7 @@ type FormioForm = any;
 type FormioSubmission = any;
 
 /**
- * Optional override for Form.io CE `x-jwt-token`. `FormioEngineAdapter` never sets this (outbox uses admin JWT only).
+ * Optional override for Form.io CE `x-jwt-token`. `FormioEngineAdapter` never sets this (it uses the admin JWT only).
  * The HTTP proxy forwards `x-jwt-token` today; that is planned for removal so proxied traffic will match the adapter.
  * Unit tests may set `token` directly to cover 440 behaviour.
  */
@@ -148,7 +148,7 @@ export class FormioCommunityEditionAPIv5Client {
   /**
    * Uses **`opts.token`** for `x-jwt-token` when the caller set it; otherwise **`this.token`** (admin JWT from `login()`).
    *
-   * **Engine adapter / outbox** never pass `opts.token` — they only use the admin JWT. **HTTP proxy** routes may pass
+   * **Engine adapter** never passes `opts.token` — it only uses the admin JWT. **HTTP proxy** routes may pass
    * it when forwarding `x-jwt-token` (temporary; removal planned). After that change, non-test callers will match the adapter.
    *
    * **HTTP 440:** If `opts.token` was **not** provided, we treat this as admin JWT expiry: clear `this.token`, `login()`

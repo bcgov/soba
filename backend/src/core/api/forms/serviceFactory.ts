@@ -371,7 +371,6 @@ export function createFormsApiService(
       input: {
         eventType?: string;
         note?: string;
-        enqueueProvision?: boolean;
         formioFormDefinition?: Record<string, unknown>;
         engine_schema_ref?: string;
       },
@@ -384,7 +383,6 @@ export function createFormsApiService(
           formVersionId,
           eventType: input.eventType || 'save_draft',
           note: input.note,
-          enqueueProvision: input.enqueueProvision ?? true,
           formioFormDefinition: input.formioFormDefinition,
           engineSchemaRef: input.engine_schema_ref || null,
         })
