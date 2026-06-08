@@ -106,8 +106,7 @@ export async function checkFormVisibility(req: Request, res: Response, next: Nex
         });
       }
 
-      const principal = req.user as any;
-      const userIdp = (principal.providerCode || req.idpType || '').toLowerCase();
+      const userIdp = (req.user.providerCode || req.idpType || '').toLowerCase();
       let matched = false;
 
       if (allowedIdps.length > 0) {
@@ -153,9 +152,8 @@ export async function checkFormVisibility(req: Request, res: Response, next: Nex
     let actorDisplayLabel = null;
 
     if (req.user) {
-      const principal = req.user as any;
       actorId = req.actorId;
-      actorDisplayLabel = principal.profile?.displayLabel || principal.profile?.displayName || null;
+      actorDisplayLabel = req.user.profile?.displayLabel || req.user.profile?.displayName || null;
     } else {
       // For unauthenticated/public submissions, resolve to the default seeded system user for DB constraints
       const systemIdentity = await db

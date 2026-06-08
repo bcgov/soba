@@ -43,6 +43,7 @@ const CustomActionButtons = ({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
+              if (!formId) return;
               onAction(action.name, formId);
             }}
             className="btn btn-link p-0 m-0"
