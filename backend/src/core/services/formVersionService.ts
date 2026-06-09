@@ -86,13 +86,14 @@ export class FormVersionService {
         tx,
       );
       if (!revised) return null;
-      // Persist engineSchemaRef into the main formVersion row if supplied
+      // Persist engineSchemaRef into the main formVersion row if supplied.
+      // A ref means the Form.io document exists, so the version is in sync ('ready').
       if (input.engineSchemaRef != null) {
         await updateFormVersionDraft(
           input.workspaceId,
           input.formVersionId,
           input.actorDisplayLabel,
-          { engineSchemaRef: input.engineSchemaRef },
+          { engineSchemaRef: input.engineSchemaRef, engineSyncStatus: 'ready' },
           tx,
         );
       }
