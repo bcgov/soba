@@ -47,4 +47,4 @@ The docker file exists but is untested
 
 ### Form Wrapper
 
-This project serves as a wrapper for formio currnetly, but it is not tied to formio, it can wrap other projects and multiple projects
+This project serves as a wrapper for formio currnetly, but it is not tied to formio, it can wrap other projects and multiple projects.
