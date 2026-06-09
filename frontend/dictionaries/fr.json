@@ -68,6 +68,7 @@
       "pageTitle": "Formulaire",
       "backToList": "Retour à la liste",
       "missingId": "Aucun formulaire sélectionné.",
+      "unavailable": "Ce formulaire n’est pas disponible pour soumission actuellement.",
       "loadError": "Le formulaire n’a pas pu être chargé. Vérifiez l’onglet réseau du navigateur et les journaux de l’API.",
       "rendererError": "Le moteur de formulaire s’est arrêté de façon inattendue. Réessayez ou revenez à la liste.",
       "segmentError": {

@@ -16,6 +16,20 @@ export interface UpsertSchemaInput {
   title?: string;
 }
 
+/** Input for creating a new (immutable) submission document in the engine for a save/revision. */
+export interface CreateSubmissionInput {
+  /** Engine ref of the form the submission belongs to (the form version's engineSchemaRef). */
+  engineFormRef: string;
+  /** SOBA submission id; part of the deterministic per-revision idempotency key. */
+  submissionId: string;
+  /** Target revision number for this save; part of the idempotency key. */
+  revisionNo: number;
+  /** SOBA workspace id; recorded on the engine document for tenancy/filtering. */
+  workspaceId: string;
+  /** The submission answer data to store. */
+  data: Record<string, unknown>;
+}
+
 export interface FormEngineAdapter {
   /** Optional: report whether the engine is reachable (readiness). No config in result. */
   readinessCheck?(): Promise<FormEngineReadinessResult>;
@@ -28,4 +42,15 @@ export interface FormEngineAdapter {
   readSchema?(engineRef: string): Promise<Record<string, unknown> | null>;
   /** Delete the engine document by ref (compensation / cleanup). */
   deleteSchema?(engineRef: string): Promise<void>;
+  /**
+   * Create a new submission document under `engineFormRef`. Each save makes a new (immutable)
+   * document; idempotent per `(submissionId, revisionNo)` via a planted correlation key, so a
+   * retried save converges on one document. Returns the engine ref.
+   */
+  createSubmission?(input: CreateSubmissionInput): Promise<{ engineRef: string }>;
+  /** Read a submission document by form ref + submission ref, stripped of engine-managed fields. Null if not found. */
+  readSubmission?(
+    engineFormRef: string,
+    engineRef: string,
+  ): Promise<Record<string, unknown> | null>;
 }

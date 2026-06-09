@@ -5,7 +5,6 @@ import type {
   SobaFormType,
   CreateSobaFormioFormResponse,
   SobaResponseFormType,
-  SobaFormWithVersionResponse,
   SobaFormVersionType,
 } from '../../types/forms';
 import type { ListSubmissionsResponse, SubmissionResponse } from '@/src/types/submissions';
@@ -90,23 +89,7 @@ export async function getSobaFormVersion(
   return parseJson(response);
 }
 
-export async function getSobaFormVersionFromFormioId(
-  token: string,
-  id: string,
-  workspaceId?: string,
-): Promise<SobaFormWithVersionResponse> {
-  const response = await fetch(`${getSobaApiBaseUrl()}/forms/engine/${id}`, {
-    method: 'GET',
-    cache: 'no-store',
-    headers: getHeaders(token, workspaceId),
-  });
-  return parseJson(response) as Promise<SobaFormWithVersionResponse>;
-}
-
-/**
- * Create a soba submission after the formio one is created.
- */
-
+/** Create the SOBA submission shell (a PG row); its answer data is saved via saveSobaFormSubmission. */
 export async function createSobaFormSubmission(
   token: string,
   formId: string,
@@ -127,6 +110,23 @@ export async function createSobaFormSubmission(
   });
   const responseData = await parseJson<SubmissionResponse>(response);
   return responseData;
+}
+
+/** Save a submission's answer data; the server writes a new engine document and records a revision. */
+export async function saveSobaFormSubmission(
+  token: string,
+  submissionId: string,
+  data: Record<string, unknown>,
+  eventType: string = 'submit',
+  workspaceId?: string,
+): Promise<SubmissionResponse> {
+  const response = await fetch(`${getSobaApiBaseUrl()}/submissions/${submissionId}/save`, {
+    method: 'POST',
+    cache: 'no-store',
+    headers: getHeaders(token, workspaceId, true),
+    body: JSON.stringify({ data, eventType }),
+  });
+  return parseJson<SubmissionResponse>(response);
 }
 
 export async function getSobaFormioForms(token: string, workspaceId?: string): Promise<FormType[]> {

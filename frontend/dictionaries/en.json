@@ -68,6 +68,7 @@
       "pageTitle": "Form",
       "backToList": "Back to form list",
       "missingId": "No form was selected.",
+      "unavailable": "This form is not currently available for submission.",
       "loadError": "The form could not be loaded. Check the browser network tab and API logs.",
       "rendererError": "The form renderer stopped unexpectedly. Try again or return to the list.",
       "segmentError": {

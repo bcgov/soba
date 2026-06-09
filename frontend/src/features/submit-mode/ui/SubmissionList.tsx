@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
-import { getSobaSubmissions, getSobaFormVersionFromFormioId } from '@/src/shared/api/sobaApiForms';
+import { getSobaSubmissions } from '@/src/shared/api/sobaApiForms';
 import type { SubmissionListItem } from '@/src/types/submissions';
 import { DataTable, Column } from '@/src/components/DataTable';
 import { useAppSelector } from '@/lib/store';
@@ -24,26 +24,8 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
     if (authenticated && token) {
       const fetchSubmissions = async () => {
         try {
-          let resolvedFormId = formId;
-
-          // If formId is provided and doesn't look like a UUID, it might be a Form.io ID.
-          // We need to resolve it to a SOBA Form ID first.
-          if (formId && formId.length !== 36) {
-            try {
-              const sobaForm = await getSobaFormVersionFromFormioId(
-                token,
-                formId,
-                activeWorkspaceId || undefined,
-              );
-              if (sobaForm && sobaForm.id) {
-                resolvedFormId = sobaForm.id;
-              }
-            } catch (err) {
-              console.error('Failed to resolve Form.io ID to SOBA Form ID', err);
-            }
-          }
-
-          const params = resolvedFormId ? { formId: resolvedFormId } : undefined;
+          // `formId` is the SOBA formId (routed from FormList); list submissions for it directly.
+          const params = formId ? { formId } : undefined;
           const data = await getSobaSubmissions(token, params, activeWorkspaceId || undefined);
           setSubmissions(data.items || []);
         } catch (err) {

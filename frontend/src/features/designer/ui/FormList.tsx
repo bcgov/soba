@@ -24,8 +24,8 @@ const CustomActionButtons = ({
   submitModeEnabled?: boolean;
 }) => {
   const formId = form._id;
-  // 'manage' opens the designer keyed on the SOBA formId; submit/submissions still use the
-  // Form.io _id until the Submissions-on-SOBA-ids stage.
+  // All actions (manage/submit/submissions) are keyed on the SOBA formId; the Form.io _id is never
+  // used for routing.
   const sobaFormId =
     (form as { _sobaForm?: { form?: { id?: string } } })._sobaForm?.form?.id ?? formId;
 
@@ -47,9 +47,8 @@ const CustomActionButtons = ({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              const targetId = action.name === 'manage' ? sobaFormId : formId;
-              if (!targetId) return;
-              onAction(action.name, targetId);
+              if (!sobaFormId) return;
+              onAction(action.name, sobaFormId);
             }}
             className="btn btn-link p-0 m-0"
             style={{ textDecoration: 'underline', color: '#00538A' }}
