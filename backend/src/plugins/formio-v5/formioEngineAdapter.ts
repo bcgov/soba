@@ -1,8 +1,10 @@
 import {
   FormEngineAdapter,
   type FormEngineReadinessResult,
+  type UpsertSchemaInput,
 } from '../../core/integrations/form-engine/FormEngineAdapter';
 import { PluginConfigReader } from '../../core/config/pluginConfig';
+import { getAuthenticatedFormioClient } from './formioV5Client';
 
 export interface FormioV5Config {
   apiBaseUrl: string;
@@ -26,10 +28,68 @@ const loadConfig = (config: PluginConfigReader): FormioV5Config => {
   };
 };
 
+/** Deterministic Form.io identity for a SOBA form version (unique per project; the idempotency key). */
+const sobaEngineName = (formVersionId: string): string => `soba-${formVersionId}`;
+
+/** Tenancy tags: always include `soba` and the workspace id; preserve any existing tags. */
+function mergeSobaWorkspaceTags(existing: unknown, workspaceId: string): string[] {
+  const out = new Set<string>(['soba', workspaceId]);
+  if (Array.isArray(existing)) {
+    for (const t of existing) {
+      const s = t == null ? '' : String(t).trim();
+      if (s) out.add(s);
+    }
+  } else if (typeof existing === 'string' && existing.trim()) {
+    for (const part of existing.split(',')) {
+      const s = part.trim();
+      if (s) out.add(s);
+    }
+  }
+  return [...out];
+}
+
+/** Build the Form.io form document for an upsert: deterministic identity + SOBA tenancy metadata. */
+function buildSchemaBody(input: UpsertSchemaInput): Record<string, unknown> {
+  const base = JSON.parse(JSON.stringify(input.schema ?? {})) as Record<string, unknown>;
+  const name = sobaEngineName(input.formVersionId);
+
+  const prevProps =
+    typeof base.properties === 'object' &&
+    base.properties !== null &&
+    !Array.isArray(base.properties)
+      ? (base.properties as Record<string, unknown>)
+      : {};
+
+  const title =
+    (input.title && input.title.trim()) ||
+    (typeof base.title === 'string' && base.title.trim()) ||
+    'Form';
+
+  const body: Record<string, unknown> = {
+    ...base,
+    name,
+    path: name,
+    title,
+    properties: {
+      ...prevProps,
+      soba_workspace_id: input.workspaceId,
+      soba_form_version_id: input.formVersionId,
+    },
+    tags: mergeSobaWorkspaceTags(base.tags, input.workspaceId),
+  };
+
+  delete body._id;
+  delete body.machineName;
+
+  return body;
+}
+
 export class FormioEngineAdapter implements FormEngineAdapter {
   private readonly config: FormioV5Config;
+  private readonly pluginConfig: PluginConfigReader;
 
   constructor(pluginConfig: PluginConfigReader) {
+    this.pluginConfig = pluginConfig;
     this.config = loadConfig(pluginConfig);
   }
 
@@ -47,5 +107,54 @@ export class FormioEngineAdapter implements FormEngineAdapter {
         message: err instanceof Error ? err.message : String(err),
       };
     }
+  }
+
+  /**
+   * Idempotent create-or-update of the Form.io document for a form version, keyed by the
+   * deterministic name `soba-{formVersionId}`. Retries converge on a single document.
+   */
+  async upsertSchema(input: UpsertSchemaInput): Promise<{ engineRef: string }> {
+    const client = await getAuthenticatedFormioClient(this.pluginConfig);
+    if (!client) {
+      throw new Error('Form.io admin client unavailable; cannot upsert form schema');
+    }
+
+    const body = buildSchemaBody(input);
+    const name = sobaEngineName(input.formVersionId);
+
+    // Find an existing document by the deterministic name so a retry updates instead of duplicating.
+    const existing = (await client.loadForms({ params: { name } })) as Array<
+      Record<string, unknown>
+    >;
+    const existingId = existing.length > 0 ? existing[0]._id : undefined;
+    if (existingId) {
+      body._id = existingId;
+    }
+
+    const saved = (await client.saveForm(body)) as Record<string, unknown> | null;
+    const engineRef = saved?._id;
+    if (engineRef == null || engineRef === '') {
+      throw new Error('Form.io saveForm did not return an _id');
+    }
+    return { engineRef: String(engineRef) };
+  }
+
+  /** Read the Form.io document by engine ref. Returns null if not found. */
+  async readSchema(engineRef: string): Promise<Record<string, unknown> | null> {
+    const client = await getAuthenticatedFormioClient(this.pluginConfig);
+    if (!client) {
+      throw new Error('Form.io admin client unavailable; cannot read form schema');
+    }
+    const doc = (await client.loadForm(engineRef)) as Record<string, unknown> | null;
+    return doc ?? null;
+  }
+
+  /** Delete the Form.io document by engine ref (compensation / cleanup). */
+  async deleteSchema(engineRef: string): Promise<void> {
+    const client = await getAuthenticatedFormioClient(this.pluginConfig);
+    if (!client) {
+      throw new Error('Form.io admin client unavailable; cannot delete form schema');
+    }
+    await client.deleteForm(engineRef);
   }
 }
