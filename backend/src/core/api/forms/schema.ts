@@ -4,16 +4,17 @@ import { CursorSortSchema } from '../shared/pagination';
 
 extendZodWithOpenApi(z);
 
+export const FormVisibilityEnum = z.enum(['public', 'azureidir']);
+
 export const CreateFormBodySchema = z
   .object({
     slug: z.string().trim().min(1),
     name: z.string().trim().min(1),
     description: z.string().optional(),
     formEngineCode: z.string().trim().min(1).optional(),
+    visibility: z.array(FormVisibilityEnum).optional(),
   })
   .openapi('Forms_CreateFormBody');
-
-export const FormVisibilityEnum = z.enum(['public', 'azureidir']);
 
 export const CreateFormVersionBodySchema = z
   .object({
@@ -71,6 +72,12 @@ export const SaveFormVersionBodySchema = z
     engine_schema_ref: z.string().min(1).optional(),
   })
   .openapi('Forms_SaveFormVersionBody');
+
+export const ProvisionSchemaBodySchema = z
+  .object({
+    schema: z.record(z.string(), z.unknown()),
+  })
+  .openapi('Forms_ProvisionSchemaBody');
 
 export const ListFormsQuerySchema = z
   .object({

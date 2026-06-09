@@ -1,5 +1,5 @@
 import { and, desc, eq, ilike, isNull, lt, or } from 'drizzle-orm';
-import { db } from '../client';
+import { db, type DbOrTx } from '../client';
 import { forms, formVersions } from '../schema';
 
 export type FormListSort = 'id:desc' | 'updatedAt:desc';
@@ -166,8 +166,9 @@ export const getFormByEngineSchemaRef = async (
   return rows[0] ?? null;
 };
 
-export const createForm = async (input: CreateFormInput): Promise<FormRecord> => {
-  const created = await db
+export const createForm = async (input: CreateFormInput, tx?: DbOrTx): Promise<FormRecord> => {
+  const d = tx ?? db;
+  const created = await d
     .insert(forms)
     .values({
       workspaceId: input.workspaceId,

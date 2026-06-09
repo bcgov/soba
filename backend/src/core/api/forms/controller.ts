@@ -7,6 +7,7 @@ import {
   FormVersionIdParamsSchema,
   ListFormsQuerySchema,
   ListFormVersionsQuerySchema,
+  ProvisionSchemaBodySchema,
   SaveFormVersionBodySchema,
   SaveFormVersionParamsSchema,
   UpdateFormBodySchema,
@@ -23,6 +24,7 @@ type FormIdParams = z.infer<typeof FormIdParamsSchema>;
 type FormVersionIdParams = z.infer<typeof FormVersionIdParamsSchema>;
 type UpdateFormBody = z.infer<typeof UpdateFormBodySchema>;
 type UpdateFormVersionBody = z.infer<typeof UpdateFormVersionBodySchema>;
+type ProvisionSchemaBody = z.infer<typeof ProvisionSchemaBodySchema>;
 type SaveFormVersionBody = z.infer<typeof SaveFormVersionBodySchema>;
 type SaveFormVersionParams = z.infer<typeof SaveFormVersionParamsSchema>;
 type ListFormsQuery = z.infer<typeof ListFormsQuerySchema>;
@@ -140,6 +142,28 @@ export const restoreFormVersion = asyncHandler(
     const result = await formsApiService.restore(ctx, req.params.id);
     if (!result) {
       throw new NotFoundError('Form version not found');
+    }
+    res.json(result);
+  },
+);
+
+export const provisionFormVersionSchema = asyncHandler(
+  async (req: Request<FormVersionIdParams, unknown, ProvisionSchemaBody>, res: Response) => {
+    const ctx = req.coreContext!;
+    const result = await formsApiService.provision(ctx, req.params.id, req.body.schema);
+    if (!result) {
+      throw new NotFoundError('Form version not found');
+    }
+    res.json(result);
+  },
+);
+
+export const getFormVersionSchema = asyncHandler(
+  async (req: Request<FormVersionIdParams>, res: Response) => {
+    const ctx = req.coreContext!;
+    const result = await formsApiService.getSchema(ctx, req.params.id);
+    if (!result) {
+      throw new NotFoundError('Form version schema not found');
     }
     res.json(result);
   },

@@ -250,8 +250,11 @@ function FormForm({ id }: { id?: string[] }) {
       delete cleanSchema.machineName;
 
       const slug = formSlug || titleToSlug(formName);
-      cleanSchema.name = `${formName}-v${nextVersionNo}`;
-      cleanSchema.path = `${slug}-v${nextVersionNo}`;
+      // temporary fix - need unique suffix to avoid Form.io path/name collisions across forms;
+      // removed when server-side provisioning (soba-{formVersionId}) lands.
+      const uniqueSuffix = crypto.randomUUID().slice(0, 8);
+      cleanSchema.name = `${formName}-v${nextVersionNo}-${uniqueSuffix}`;
+      cleanSchema.path = `${slug}-v${nextVersionNo}-${uniqueSuffix}`;
       cleanSchema.title = `${formName} (v${nextVersionNo})`;
 
       const createdFormio = await createFormioForm(
@@ -353,6 +356,10 @@ function FormForm({ id }: { id?: string[] }) {
         );
       } else {
         // CREATE Logic
+        const uniqueSuffix = crypto.randomUUID().slice(0, 8);
+        formioData.name = `${formioData.name}-${uniqueSuffix}`;
+        formioData.path = `${formioData.path}-${uniqueSuffix}`; //temporary fix path unique in formio
+
         const sobaFormData = await createSobaFormioForm(
           token as string,
           data,

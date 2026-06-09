@@ -48,4 +48,14 @@ describe('FormVersionService.save', () => {
 
     expect(updateDraft).not.toHaveBeenCalled();
   });
+
+  it('throws NotFoundError when the version revision cannot be created', async () => {
+    appendRevision.mockResolvedValue(null);
+
+    const svc = new FormVersionService();
+    await expect(svc.save({ ...baseInput, engineSchemaRef: 'engine-123' })).rejects.toThrow(
+      /not found/i,
+    );
+    expect(updateDraft).not.toHaveBeenCalled();
+  });
 });

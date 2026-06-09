@@ -153,4 +153,28 @@ describe('FormVersionService state transitions', () => {
     await expect(svc.restore(actor)).rejects.toThrow(/Cannot change/i);
     expect(updateDraft).not.toHaveBeenCalled();
   });
+
+  it('publish: throws NotFoundError when the version is missing', async () => {
+    getById.mockResolvedValue(null);
+    await expect(svc.publish(actor)).rejects.toThrow(/not found/i);
+    expect(updateDraft).not.toHaveBeenCalled();
+  });
+
+  it('unpublish: throws NotFoundError when the version is missing', async () => {
+    getById.mockResolvedValue(null);
+    await expect(svc.unpublish(actor)).rejects.toThrow(/not found/i);
+    expect(updateDraft).not.toHaveBeenCalled();
+  });
+
+  it('delete: throws NotFoundError when the version is missing', async () => {
+    getByIdInclDeleted.mockResolvedValue(null);
+    await expect(svc.delete(actor)).rejects.toThrow(/not found/i);
+    expect(updateDraft).not.toHaveBeenCalled();
+  });
+
+  it('restore: throws NotFoundError when the version is missing', async () => {
+    getByIdInclDeleted.mockResolvedValue(null);
+    await expect(svc.restore(actor)).rejects.toThrow(/not found/i);
+    expect(updateDraft).not.toHaveBeenCalled();
+  });
 });

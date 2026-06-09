@@ -31,6 +31,7 @@ interface CreateFormInput {
   name: string;
   description?: string;
   formEngineCode?: string;
+  visibility?: string[];
 }
 
 interface UpdateFormInput {
@@ -146,18 +147,19 @@ export function createFormsApiService(
   formVersionService: FormVersionService,
 ) {
   return {
-    createForm: async (ctx: FormsContextInput, input: CreateFormInput) =>
-      toFormDto(
-        await formService.create({
-          workspaceId: ctx.workspaceId,
-          actorId: ctx.actorId,
-          actorDisplayLabel: ctx.actorDisplayLabel,
-          slug: input.slug,
-          name: input.name,
-          description: input.description,
-          formEngineCode: input.formEngineCode,
-        }),
-      ),
+    createForm: async (ctx: FormsContextInput, input: CreateFormInput) => {
+      const { form, version } = await formService.create({
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
+        slug: input.slug,
+        name: input.name,
+        description: input.description,
+        formEngineCode: input.formEngineCode,
+        visibility: input.visibility,
+      });
+      return { ...toFormDto(form), formVersion: toFormVersionDto(version) };
+    },
 
     updateForm: async (ctx: FormsContextInput, formId: string, input: UpdateFormInput) => {
       const row = await formService.update({
@@ -419,6 +421,24 @@ export function createFormsApiService(
       });
       return row ? toFormVersionDto(row) : null;
     },
+
+    provision: async (
+      ctx: FormsContextInput,
+      formVersionId: string,
+      schema: Record<string, unknown>,
+    ) => {
+      const row = await formVersionService.provision({
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
+        formVersionId,
+        schema,
+      });
+      return row ? toFormVersionDto(row) : null;
+    },
+
+    getSchema: (ctx: FormsContextInput, formVersionId: string) =>
+      formVersionService.getSchema({ workspaceId: ctx.workspaceId, formVersionId }),
 
     deleteForm: (ctx: FormsContextInput, formId: string) =>
       formService.delete({

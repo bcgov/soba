@@ -10,6 +10,8 @@ import {
   updateFormVersionDraft,
   getFormVersionByEngineRef,
 } from '../db/repos/formVersionRepo';
+import { getFormById, getFormEngineCodeForForm } from '../db/repos/formRepo';
+import { createFormEngineAdapter } from '../integrations/form-engine/FormEngineRegistry';
 import { db } from '../db/client';
 import { NotFoundError, ValidationError } from '../errors';
 
@@ -222,6 +224,84 @@ export class FormVersionService {
       input.actorDisplayLabel,
       stateStamps('draft', input),
     );
+  }
+
+  /**
+   * Provision (create-or-update) the form version's schema in the form engine, server-side via the
+   * admin client. Sets engineSyncStatus 'provisioning' → 'ready' (with engineSchemaRef) or 'error'.
+   */
+  async provision(input: {
+    workspaceId: string;
+    actorId: string;
+    actorDisplayLabel: string | null;
+    formVersionId: string;
+    schema: Record<string, unknown>;
+  }) {
+    const version = await getFormVersionById(input.workspaceId, input.formVersionId);
+    if (!version) throw new NotFoundError('Form version not found');
+
+    const engineCode = await getFormEngineCodeForForm(input.workspaceId, version.formId);
+    if (!engineCode) {
+      throw new ValidationError('Form has no form engine configured');
+    }
+
+    const form = await getFormById(input.workspaceId, version.formId);
+    const adapter = createFormEngineAdapter(engineCode);
+    if (typeof adapter.upsertSchema !== 'function') {
+      throw new ValidationError(`Form engine '${engineCode}' does not support schema provisioning`);
+    }
+
+    await updateFormVersionDraft(input.workspaceId, input.formVersionId, input.actorDisplayLabel, {
+      engineSyncStatus: 'provisioning',
+      engineSyncError: null,
+    });
+
+    try {
+      const { engineRef } = await adapter.upsertSchema({
+        formVersionId: input.formVersionId,
+        workspaceId: input.workspaceId,
+        schema: input.schema,
+        title: form?.name,
+      });
+      return updateFormVersionDraft(
+        input.workspaceId,
+        input.formVersionId,
+        input.actorDisplayLabel,
+        { engineSchemaRef: engineRef, engineSyncStatus: 'ready', engineSyncError: null },
+      );
+    } catch (err) {
+      await updateFormVersionDraft(
+        input.workspaceId,
+        input.formVersionId,
+        input.actorDisplayLabel,
+        {
+          engineSyncStatus: 'error',
+          engineSyncError: err instanceof Error ? err.message : String(err),
+        },
+      );
+      throw err;
+    }
+  }
+
+  /** Reads the form version's schema back from the form engine (null if unprovisioned). */
+  async getSchema(input: { workspaceId: string; formVersionId: string }) {
+    const version = await getFormVersionById(input.workspaceId, input.formVersionId);
+    if (!version || !version.engineSchemaRef) return null;
+
+    const engineCode = await getFormEngineCodeForForm(input.workspaceId, version.formId);
+    if (!engineCode) return null;
+
+    const adapter = createFormEngineAdapter(engineCode);
+    if (typeof adapter.readSchema !== 'function') return null;
+
+    const doc = await adapter.readSchema(version.engineSchemaRef);
+    if (!doc) return null;
+    // Never expose engine identity fields to the client.
+    const cleaned: Record<string, unknown> = { ...doc };
+    for (const key of ['_id', 'machineName', 'created', 'modified', 'owner', 'project']) {
+      delete cleaned[key];
+    }
+    return cleaned;
   }
 
   async getByEngineRef(workspaceId: string, engineRef: string) {

@@ -109,4 +109,16 @@ describe('FormioEngineAdapter schema methods', () => {
     await adapter.deleteSchema('ref2');
     expect(client.deleteForm).toHaveBeenCalledWith('ref2');
   });
+
+  it('readSchema throws when no admin client is available', async () => {
+    mockedGetClient.mockResolvedValue(null);
+    const adapter = new FormioEngineAdapter(makeConfig());
+    await expect(adapter.readSchema('ref1')).rejects.toThrow(/admin client/i);
+  });
+
+  it('deleteSchema throws when no admin client is available', async () => {
+    mockedGetClient.mockResolvedValue(null);
+    const adapter = new FormioEngineAdapter(makeConfig());
+    await expect(adapter.deleteSchema('ref2')).rejects.toThrow(/admin client/i);
+  });
 });
