@@ -10,11 +10,7 @@ import type { CurrentUserResponse } from '../../types/user';
 export type { SobaFormType, WorkspaceItem, WorkspacesResponse, CurrentUserResponse };
 export {
   createSobaFormioForm,
-  createFormioForm,
-  updateFormioForm,
-  getFormioForm,
   publishSobaFormVersion,
-  saveSobaFormVersion,
   getSobaForm,
   getSobaFormVersion,
   getSobaFormVersionFromFormioId,

@@ -4,6 +4,7 @@ import {
   type UpsertSchemaInput,
 } from '../../core/integrations/form-engine/FormEngineAdapter';
 import { PluginConfigReader } from '../../core/config/pluginConfig';
+import { ValidationError } from '../../core/errors';
 import { getAuthenticatedFormioClient } from './formioV5Client';
 
 export interface FormioV5Config {
@@ -46,6 +47,24 @@ function mergeSobaWorkspaceTags(existing: unknown, workspaceId: string): string[
     }
   }
   return [...out];
+}
+
+/**
+ * Map a Form.io rejection that carries a 4xx status into a ValidationError (HTTP 400), so a
+ * malformed/rejected schema surfaces as a client error rather than a 500. Re-throws anything else
+ * (network/5xx) unchanged.
+ */
+function rethrowEngineRejection(err: unknown): never {
+  const status =
+    typeof err === 'object' && err !== null && 'status' in err
+      ? Number((err as { status: unknown }).status)
+      : NaN;
+  if (Number.isFinite(status) && status >= 400 && status < 500) {
+    const message =
+      err instanceof Error && err.message ? err.message : 'Form engine rejected the schema';
+    throw new ValidationError(`Form engine rejected the schema: ${message}`);
+  }
+  throw err;
 }
 
 /** Form.io-managed identity/audit fields the client must never set (write) or receive (read). */
@@ -141,7 +160,10 @@ export class FormioEngineAdapter implements FormEngineAdapter {
       body._id = existingId;
     }
 
-    const saved = (await client.saveForm(body)) as Record<string, unknown> | null;
+    const saved = (await client.saveForm(body).catch(rethrowEngineRejection)) as Record<
+      string,
+      unknown
+    > | null;
     const engineRef = saved?._id;
     if (engineRef == null || engineRef === '') {
       throw new Error('Form.io saveForm did not return an _id');

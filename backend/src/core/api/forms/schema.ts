@@ -297,10 +297,10 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
     },
     responses: {
       201: {
-        description: 'Created form',
+        description: 'Created form with its initial v1 draft',
         content: {
           'application/json': {
-            schema: FormResponseSchema,
+            schema: FormWithVersionResponseSchema,
           },
         },
       },
@@ -500,6 +500,61 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
       404: {
         description: 'Form not found',
       },
+    },
+  });
+
+  for (const action of ['publish', 'unpublish', 'restore'] as const) {
+    registry.registerPath({
+      method: 'post',
+      path: `/form-versions/{id}/${action}`,
+      tags: ['core.forms'],
+      security: [{ bearerAuth: [] }],
+      request: { params: FormVersionIdParamsSchema },
+      responses: {
+        200: {
+          description: `Form version ${action} action`,
+          content: { 'application/json': { schema: FormVersionResponseSchema } },
+        },
+        400: { description: 'Invalid state transition' },
+        404: { description: 'Form version not found' },
+      },
+    });
+  }
+
+  registry.registerPath({
+    method: 'get',
+    path: '/form-versions/{id}/schema',
+    tags: ['core.forms'],
+    security: [{ bearerAuth: [] }],
+    request: { params: FormVersionIdParamsSchema },
+    responses: {
+      200: {
+        description: 'Form version schema (engine document; engine-managed fields stripped)',
+        content: { 'application/json': { schema: z.record(z.string(), z.unknown()) } },
+      },
+      404: { description: 'Form version or schema not found' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/form-versions/{id}/schema',
+    tags: ['core.forms'],
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: FormVersionIdParamsSchema,
+      body: {
+        required: true,
+        content: { 'application/json': { schema: ProvisionSchemaBodySchema } },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Provisioned form version (schema saved to the engine)',
+        content: { 'application/json': { schema: FormVersionResponseSchema } },
+      },
+      400: { description: 'Engine rejected the schema' },
+      404: { description: 'Form version not found' },
     },
   });
 };

@@ -1,6 +1,7 @@
 import { FormioEngineAdapter } from '../../../src/plugins/formio-v5/formioEngineAdapter';
 import type { PluginConfigReader } from '../../../src/core/config/pluginConfig';
 import { getAuthenticatedFormioClient } from '../../../src/plugins/formio-v5/formioV5Client';
+import { ValidationError } from '../../../src/core/errors';
 
 jest.mock('../../../src/plugins/formio-v5/formioV5Client', () => ({
   getAuthenticatedFormioClient: jest.fn(),
@@ -92,6 +93,30 @@ describe('FormioEngineAdapter schema methods', () => {
     await expect(
       adapter.upsertSchema({ formVersionId: 'v1', workspaceId: 'ws1', schema: {} }),
     ).rejects.toThrow(/_id/i);
+  });
+
+  it('maps a Form.io 4xx rejection to a ValidationError', async () => {
+    const client = makeClient({
+      saveForm: jest
+        .fn()
+        .mockRejectedValue({ status: 400, message: 'The Path must be unique per Project.' }),
+    });
+    mockedGetClient.mockResolvedValue(client);
+    const adapter = new FormioEngineAdapter(makeConfig());
+    await expect(
+      adapter.upsertSchema({ formVersionId: 'v1', workspaceId: 'ws1', schema: {} }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('re-throws a non-4xx (5xx/network) saveForm rejection unchanged', async () => {
+    const client = makeClient({
+      saveForm: jest.fn().mockRejectedValue({ status: 503, message: 'upstream down' }),
+    });
+    mockedGetClient.mockResolvedValue(client);
+    const adapter = new FormioEngineAdapter(makeConfig());
+    await expect(
+      adapter.upsertSchema({ formVersionId: 'v1', workspaceId: 'ws1', schema: {} }),
+    ).rejects.not.toBeInstanceOf(ValidationError);
   });
 
   it('reads the document by ref', async () => {

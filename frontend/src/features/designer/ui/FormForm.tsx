@@ -218,15 +218,10 @@ function FormForm({ id }: { id?: string[] }) {
     setLoading(true);
 
     try {
-      // FLAG (engine cleaning): these deletes are now redundant — the engine strips engine-managed
-      // fields on save (adapter.upsertSchema). Candidate for removal; left as a no-harm safeguard.
-      const cleanSchema = { ...(formSchema ?? {}) } as FormType;
-      delete (cleanSchema as Record<string, unknown>)._id;
-      delete (cleanSchema as Record<string, unknown>).machineName;
-
+      // The engine strips engine-managed fields on save, so the raw schema can be submitted as-is.
       const ws = activeWorkspaceId || undefined;
       const newVersion = await createFormVersion(token as string, formId, visibility, ws);
-      await saveFormVersionSchema(token as string, newVersion.id, cleanSchema, ws);
+      await saveFormVersionSchema(token as string, newVersion.id, (formSchema ?? {}) as FormType, ws);
 
       // Refresh the version list and select the new draft in-page.
       const versionsData = await getSobaFormVersions(token as string, formId, ws);
