@@ -197,15 +197,30 @@ const seedCodeTables = async () => {
       isActive: true,
     },
     {
-      code: FormVersionState.deleted,
+      code: FormVersionState.archived,
       source: CODE_SOURCE_CORE,
-      display: 'Deleted',
+      display: 'Archived',
       sortOrder: 2,
       isActive: true,
     },
+    {
+      code: FormVersionState.deleted,
+      source: CODE_SOURCE_CORE,
+      display: 'Deleted',
+      sortOrder: 3,
+      isActive: true,
+    },
   ];
+  // Upsert so re-seeding keeps existing rows in sync (e.g. display/sortOrder changes),
+  // rather than skipping them as onConflictDoNothing would.
   for (const row of formVersionStateRows) {
-    await db.insert(formVersionState).values(row).onConflictDoNothing();
+    await db
+      .insert(formVersionState)
+      .values(row)
+      .onConflictDoUpdate({
+        target: [formVersionState.code, formVersionState.source],
+        set: { display: row.display, sortOrder: row.sortOrder, isActive: row.isActive },
+      });
   }
   const workspaceMembershipRoleRows = [
     {

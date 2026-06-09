@@ -42,6 +42,7 @@ export type FormStatusCode = (typeof FormStatus)[keyof typeof FormStatus];
 export const FormVersionState = {
   draft: 'draft',
   published: 'published',
+  archived: 'archived',
   deleted: 'deleted',
 } as const;
 export type FormVersionStateCode = (typeof FormVersionState)[keyof typeof FormVersionState];

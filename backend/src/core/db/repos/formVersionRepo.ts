@@ -168,8 +168,12 @@ export const updateFormVersionDraft = async (
     state: string;
     engineSchemaRef: string;
     engineSyncStatus: string;
-    engineSyncError: string;
+    engineSyncError: string | null;
     visibility: string[] | null;
+    publishedAt: Date | null;
+    publishedBy: string | null;
+    deletedAt: Date | null;
+    deletedBy: string | null;
   }>,
   tx?: DbOrTx,
 ) => {
@@ -235,24 +239,41 @@ export const appendFormVersionRevision = async (input: SaveRevisionInput, tx?: D
   return updated[0] ?? null;
 };
 
-export const markFormVersionDeleted = async (
+/** Loads a form version by id including soft-deleted rows (for restore/delete guards). */
+export const getFormVersionByIdIncludingDeleted = async (
   workspaceId: string,
   formVersionId: string,
-  actorDisplayLabel: string | null,
 ) => {
-  const updated = await db
-    .update(formVersions)
-    .set({
-      state: 'deleted',
-      deletedAt: new Date(),
-      deletedBy: actorDisplayLabel,
-      updatedBy: actorDisplayLabel,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(formVersions.id, formVersionId), eq(formVersions.workspaceId, workspaceId)))
-    .returning();
+  const row = await db
+    .select()
+    .from(formVersions)
+    .where(and(eq(formVersions.workspaceId, workspaceId), eq(formVersions.id, formVersionId)))
+    .limit(1);
 
-  return updated[0] ?? null;
+  return row[0] ?? null;
+};
+
+/** The form's currently-published version (if any), used by publish to demote the incumbent. */
+export const getPublishedVersionForForm = async (
+  workspaceId: string,
+  formId: string,
+  tx?: DbOrTx,
+) => {
+  const d = tx ?? db;
+  const row = await d
+    .select()
+    .from(formVersions)
+    .where(
+      and(
+        eq(formVersions.workspaceId, workspaceId),
+        eq(formVersions.formId, formId),
+        eq(formVersions.state, 'published'),
+        isNull(formVersions.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return row[0] ?? null;
 };
 
 export const getFormVersionByEngineRef = async (workspaceId: string, engineRef: string) => {

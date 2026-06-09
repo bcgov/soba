@@ -13,6 +13,9 @@ import {
   deleteFormVersion,
   saveFormVersion,
   updateFormVersion,
+  publishFormVersion,
+  unpublishFormVersion,
+  restoreFormVersion,
   listFormioForms,
 } from './controller';
 import {
@@ -79,6 +82,21 @@ router.post(
     body: SaveFormVersionBodySchema,
   }),
   saveFormVersion,
+);
+router.post(
+  '/form-versions/:id/publish',
+  validateRequest({ params: FormVersionIdParamsSchema }),
+  publishFormVersion,
+);
+router.post(
+  '/form-versions/:id/unpublish',
+  validateRequest({ params: FormVersionIdParamsSchema }),
+  unpublishFormVersion,
+);
+router.post(
+  '/form-versions/:id/restore',
+  validateRequest({ params: FormVersionIdParamsSchema }),
+  restoreFormVersion,
 );
 router.delete(
   '/form-versions/:id',

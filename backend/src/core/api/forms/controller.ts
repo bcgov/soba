@@ -104,12 +104,40 @@ export const createFormVersion = asyncHandler(
 export const updateFormVersion = asyncHandler(
   async (req: Request<FormVersionIdParams, unknown, UpdateFormVersionBody>, res: Response) => {
     const ctx = req.coreContext!;
-    const result = await formsApiService.updateDraft(
-      ctx,
-      req.params.id,
-      req.body.state,
-      req.body.visibility,
-    );
+    const result = await formsApiService.updateDraft(ctx, req.params.id, req.body.visibility);
+    if (!result) {
+      throw new NotFoundError('Form version not found');
+    }
+    res.json(result);
+  },
+);
+
+export const publishFormVersion = asyncHandler(
+  async (req: Request<FormVersionIdParams>, res: Response) => {
+    const ctx = req.coreContext!;
+    const result = await formsApiService.publish(ctx, req.params.id);
+    if (!result) {
+      throw new NotFoundError('Form version not found');
+    }
+    res.json(result);
+  },
+);
+
+export const unpublishFormVersion = asyncHandler(
+  async (req: Request<FormVersionIdParams>, res: Response) => {
+    const ctx = req.coreContext!;
+    const result = await formsApiService.unpublish(ctx, req.params.id);
+    if (!result) {
+      throw new NotFoundError('Form version not found');
+    }
+    res.json(result);
+  },
+);
+
+export const restoreFormVersion = asyncHandler(
+  async (req: Request<FormVersionIdParams>, res: Response) => {
+    const ctx = req.coreContext!;
+    const result = await formsApiService.restore(ctx, req.params.id);
     if (!result) {
       throw new NotFoundError('Form version not found');
     }

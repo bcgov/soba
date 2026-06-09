@@ -348,18 +348,12 @@ export function createFormsApiService(
         }),
       ),
 
-    updateDraft: async (
-      ctx: FormsContextInput,
-      formVersionId: string,
-      state?: string,
-      visibility?: string[],
-    ) => {
+    updateDraft: async (ctx: FormsContextInput, formVersionId: string, visibility?: string[]) => {
       const row = await formVersionService.updateDraft({
         workspaceId: ctx.workspaceId,
         actorId: ctx.actorId,
         actorDisplayLabel: ctx.actorDisplayLabel,
         formVersionId,
-        state,
         visibility,
       });
       return row ? toFormVersionDto(row) : null;
@@ -395,6 +389,36 @@ export function createFormsApiService(
         actorDisplayLabel: ctx.actorDisplayLabel,
         formVersionId,
       }),
+
+    publish: async (ctx: FormsContextInput, formVersionId: string) => {
+      const row = await formVersionService.publish({
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
+        formVersionId,
+      });
+      return row ? toFormVersionDto(row) : null;
+    },
+
+    unpublish: async (ctx: FormsContextInput, formVersionId: string) => {
+      const row = await formVersionService.unpublish({
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
+        formVersionId,
+      });
+      return row ? toFormVersionDto(row) : null;
+    },
+
+    restore: async (ctx: FormsContextInput, formVersionId: string) => {
+      const row = await formVersionService.restore({
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
+        formVersionId,
+      });
+      return row ? toFormVersionDto(row) : null;
+    },
 
     deleteForm: (ctx: FormsContextInput, formId: string) =>
       formService.delete({

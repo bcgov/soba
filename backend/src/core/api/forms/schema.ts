@@ -42,7 +42,8 @@ export const FormEngineRefParamsSchema = z
 
 export const UpdateFormVersionBodySchema = z
   .object({
-    state: z.string().min(1).optional(),
+    // state changes go through dedicated action endpoints (publish/unpublish/delete/restore);
+    // this PATCH only updates visibility.
     visibility: z.array(FormVisibilityEnum).optional(),
   })
   .openapi('Forms_UpdateFormVersionBody');

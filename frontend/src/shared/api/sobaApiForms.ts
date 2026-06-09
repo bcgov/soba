@@ -176,13 +176,10 @@ export async function saveSobaFormVersion(
 }
 
 export async function publishSobaFormVersion(token: string, id: string, workspaceId?: string) {
-  const response = await fetch(`${getSobaApiBaseUrl()}/form-versions/${id}`, {
-    method: 'PATCH',
+  const response = await fetch(`${getSobaApiBaseUrl()}/form-versions/${id}/publish`, {
+    method: 'POST',
     cache: 'no-store',
     headers: getHeaders(token, workspaceId, true),
-    body: JSON.stringify({
-      state: 'published',
-    }),
   });
   return parseJson(response);
 }
