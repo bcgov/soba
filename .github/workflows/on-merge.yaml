@@ -128,10 +128,6 @@ jobs:
             domain: "${DOMAIN}"
           database:
             uri: '${DB_URI_ESC}'
-          formio:
-            admin:
-              password: "${{ secrets.FORMIO_ADMIN_PASSWORD }}"
-            jwtSecret: "${{ secrets.FORMIO_JWT_SECRET }}"
           OVERRIDE
 
           helm upgrade --install "soba-dev" ./deployments/helm/soba \

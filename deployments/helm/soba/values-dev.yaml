@@ -40,3 +40,9 @@ mongodb:
   replicas: 1
   persistence:
     size: 1Gi
+
+vault:
+  enabled: true
+  role: acf456-nonprod
+  secretPath: acf456-nonprod/soba-dev
+  serviceAccountName: acf456-vault

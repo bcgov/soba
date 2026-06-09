@@ -209,3 +209,12 @@ mongodb:
   persistence:
     size: 1Gi
     storageClassName: ""
+
+# -- Vault Agent Injector
+vault:
+  enabled: false
+  role: ""
+  authPath: auth/k8s-silver
+  namespace: platform-services
+  secretPath: ""
+  serviceAccountName: ""
