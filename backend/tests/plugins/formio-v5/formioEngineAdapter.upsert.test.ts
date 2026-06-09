@@ -102,6 +102,25 @@ describe('FormioEngineAdapter schema methods', () => {
     expect(client.loadForm).toHaveBeenCalledWith('ref1');
   });
 
+  it('readSchema strips engine-managed fields from the document', async () => {
+    const client = makeClient({
+      loadForm: jest.fn().mockResolvedValue({
+        _id: 'eng-1',
+        machineName: 'soba-v1',
+        created: 'x',
+        modified: 'y',
+        owner: 'o',
+        project: 'p',
+        display: 'form',
+        components: [],
+      }),
+    });
+    mockedGetClient.mockResolvedValue(client);
+    const adapter = new FormioEngineAdapter(makeConfig());
+    const result = await adapter.readSchema('eng-1');
+    expect(result).toEqual({ display: 'form', components: [] });
+  });
+
   it('deletes the document by ref', async () => {
     const client = makeClient();
     mockedGetClient.mockResolvedValue(client);

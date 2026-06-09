@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useRef, useEffect, useCallback, useState } from 'react';
+import React, { useMemo, useRef, useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 
@@ -10,8 +10,6 @@ import '@formio/js/dist/formio.full.min.css';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import type { FormType } from '@formio/react';
-import { getFormioProxyBaseUrl } from '@/src/shared/config/runtimeConfig';
-import { setupFormioClient } from '@/src/features/formio-v5/setupFormioClient';
 import './FormDesigner.module.css';
 import Form from 'react-bootstrap/Form';
 import { Modal as CommonModal } from '@/src/components/Modal';
@@ -55,13 +53,19 @@ interface FormioComp {
 const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = null }) => {
   const { authenticated, initializing } = useKeycloak();
   const dict = useDictionary();
-  const [engineReady, setEngineReady] = useState(false);
+  // JSON-mode builder renders immediately — no Form.io proxy connection or auth plugin needed.
+  const [engineReady] = useState(true);
   const builderRef = useRef<FormioBuilderInstance | null>(null);
 
   /**
    * RECURSIVE SANITIZER
    * Prevents the internal dialog crash by ensuring the 'widget' property
    * is always a valid object before the builder renders.
+   *
+   * FLAG (engine cleaning): question whether this is still needed. A schema that is valid for the
+   * engine should load in the builder without client-side fix-ups. If it doesn't, that's an
+   * engine/builder concern — candidate for removal, or for the engine adapter to return a
+   * render-ready schema.
    */
   const sanitizeForm = useCallback((input?: FormType | null): FormType => {
     if (!input) return { components: [] };
@@ -97,14 +101,6 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
    * ESLint's 'react-hooks/refs' rule while keeping the Dialog fixed.
    */
   const [stableForm, setStableForm] = useState<FormType>(() => sanitizeForm(initialModel));
-
-  useEffect(() => {
-    const init = () => {
-      setupFormioClient();
-      setEngineReady(true);
-    };
-    init();
-  }, []);
 
   const opt = useMemo(
     () => ({
@@ -211,6 +207,9 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
 
   const handleImport = useCallback(() => {
     try {
+      // FLAG (engine-dependent): this rewrites legacy CHEFS-1 component types to Form.io types.
+      // It is a backend/engine-dependent transformation that should live in the engine adapter or a
+      // server-side import path, not in the designer. Move when the import flow is built.
       let cleanedJson = importJson.replace(/"type"\s*:\s*"simple(.*?)advanced"/g, '"type": "$1"');
       cleanedJson = cleanedJson.replace(/"type"\s*:\s*"simple(.*?)"/g, '"type": "$1"');
       const parsed = JSON.parse(cleanedJson);
@@ -255,7 +254,7 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
           sidebarEl,
         )}
 
-      <FormioProvider baseUrl={getFormioProxyBaseUrl()}>
+      <FormioProvider>
         <FormBuilder
           initialForm={stableForm}
           options={opt}

@@ -3,6 +3,7 @@ export type SobaFormType = {
   name: string;
   description: string;
   formEngineCode?: string;
+  visibility?: string[];
 };
 
 export type CreateSobaFormioFormResponse = {
@@ -13,6 +14,8 @@ export type CreateSobaFormioFormResponse = {
   slug: string;
   status: string;
   updatedAt: Date;
+  // POST /forms now returns the form plus its initial v1 draft (FormWithVersionResponse).
+  formVersion?: SobaFormVersionType | null;
 };
 
 export type SobaResponseFormType = {

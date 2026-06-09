@@ -294,14 +294,7 @@ export class FormVersionService {
     const adapter = createFormEngineAdapter(engineCode);
     if (typeof adapter.readSchema !== 'function') return null;
 
-    const doc = await adapter.readSchema(version.engineSchemaRef);
-    if (!doc) return null;
-    // Never expose engine identity fields to the client.
-    const cleaned: Record<string, unknown> = { ...doc };
-    for (const key of ['_id', 'machineName', 'created', 'modified', 'owner', 'project']) {
-      delete cleaned[key];
-    }
-    return cleaned;
+    return adapter.readSchema(version.engineSchemaRef);
   }
 
   async getByEngineRef(workspaceId: string, engineRef: string) {

@@ -118,23 +118,6 @@ describe('FormVersionService provision/getSchema', () => {
     expect(createAdapter).not.toHaveBeenCalled();
   });
 
-  it('getSchema: strips engine identity fields from the returned document', async () => {
-    getById.mockResolvedValue({ id: 'v1', formId: 'f1', engineSchemaRef: 'eng-1' });
-    const readSchema = jest.fn().mockResolvedValue({
-      _id: 'eng-1',
-      machineName: 'soba-v1',
-      created: 'x',
-      modified: 'y',
-      display: 'form',
-      components: [],
-    });
-    createAdapter.mockReturnValue({ readSchema });
-
-    const result = await svc.getSchema({ workspaceId: 'ws1', formVersionId: 'v1' });
-
-    expect(result).toEqual({ display: 'form', components: [] });
-  });
-
   it('provision: throws NotFoundError when the version is missing', async () => {
     getById.mockResolvedValue(null);
     await expect(svc.provision({ ...actor, schema })).rejects.toThrow(/not found/i);

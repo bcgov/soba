@@ -48,9 +48,24 @@ function mergeSobaWorkspaceTags(existing: unknown, workspaceId: string): string[
   return [...out];
 }
 
-/** Build the Form.io form document for an upsert: deterministic identity + SOBA tenancy metadata. */
-function buildSchemaBody(input: UpsertSchemaInput): Record<string, unknown> {
-  const base = JSON.parse(JSON.stringify(input.schema ?? {})) as Record<string, unknown>;
+/** Form.io-managed identity/audit fields the client must never set (write) or receive (read). */
+const ENGINE_MANAGED_FIELDS = ['_id', 'machineName', 'created', 'modified', 'owner', 'project'];
+
+/** Remove engine-managed fields from a schema document (returns a shallow clone). */
+export function stripEngineManagedFields(doc: Record<string, unknown>): Record<string, unknown> {
+  const cleaned: Record<string, unknown> = { ...doc };
+  for (const key of ENGINE_MANAGED_FIELDS) {
+    delete cleaned[key];
+  }
+  return cleaned;
+}
+
+/** Build the Form.io form document for an upsert: strip engine-managed fields, then apply
+ *  deterministic identity + SOBA tenancy metadata. */
+export function buildSchemaBody(input: UpsertSchemaInput): Record<string, unknown> {
+  const base = stripEngineManagedFields(
+    JSON.parse(JSON.stringify(input.schema ?? {})) as Record<string, unknown>,
+  );
   const name = sobaEngineName(input.formVersionId);
 
   const prevProps =
@@ -65,7 +80,7 @@ function buildSchemaBody(input: UpsertSchemaInput): Record<string, unknown> {
     (typeof base.title === 'string' && base.title.trim()) ||
     'Form';
 
-  const body: Record<string, unknown> = {
+  return {
     ...base,
     name,
     path: name,
@@ -77,11 +92,6 @@ function buildSchemaBody(input: UpsertSchemaInput): Record<string, unknown> {
     },
     tags: mergeSobaWorkspaceTags(base.tags, input.workspaceId),
   };
-
-  delete body._id;
-  delete body.machineName;
-
-  return body;
 }
 
 export class FormioEngineAdapter implements FormEngineAdapter {
@@ -139,14 +149,14 @@ export class FormioEngineAdapter implements FormEngineAdapter {
     return { engineRef: String(engineRef) };
   }
 
-  /** Read the Form.io document by engine ref. Returns null if not found. */
+  /** Read the Form.io document by engine ref, stripped of engine-managed fields. Null if not found. */
   async readSchema(engineRef: string): Promise<Record<string, unknown> | null> {
     const client = await getAuthenticatedFormioClient(this.pluginConfig);
     if (!client) {
       throw new Error('Form.io admin client unavailable; cannot read form schema');
     }
     const doc = (await client.loadForm(engineRef)) as Record<string, unknown> | null;
-    return doc ?? null;
+    return doc ? stripEngineManagedFields(doc) : null;
   }
 
   /** Delete the Form.io document by engine ref (compensation / cleanup). */

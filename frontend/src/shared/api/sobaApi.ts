@@ -22,6 +22,9 @@ export {
   getSobaFormioForms,
   getSobaFormVersions,
   updateSobaFormVersionVisibility,
+  createFormVersion,
+  saveFormVersionSchema,
+  getFormVersionSchema,
 } from './sobaApiForms';
 
 export type BuildMeta = {

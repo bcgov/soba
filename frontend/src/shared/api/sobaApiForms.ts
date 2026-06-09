@@ -6,6 +6,7 @@ import type {
   CreateSobaFormioFormResponse,
   SobaResponseFormType,
   SobaFormWithVersionResponse,
+  SobaFormVersionType,
 } from '../../types/forms';
 import type { ListSubmissionsResponse, SubmissionResponse } from '@/src/types/submissions';
 
@@ -310,11 +311,58 @@ export async function getSobaFormVersions(
   token: string,
   formId: string,
   workspaceId?: string,
-): Promise<{ items: [] }> {
+): Promise<{ items: SobaFormVersionType[] }> {
   const response = await fetch(`${getSobaApiBaseUrl()}/form-versions?formId=${formId}&limit=100`, {
     method: 'GET',
     cache: 'no-store',
     headers: getHeaders(token, workspaceId),
   });
+  return parseJson(response);
+}
+
+/** Create a new (empty) form version draft for a form. */
+export async function createFormVersion(
+  token: string,
+  formId: string,
+  visibility?: string[],
+  workspaceId?: string,
+): Promise<SobaFormVersionType> {
+  const response = await fetch(`${getSobaApiBaseUrl()}/form-versions`, {
+    method: 'POST',
+    cache: 'no-store',
+    headers: getHeaders(token, workspaceId, true),
+    body: JSON.stringify({ formId, visibility }),
+  });
+  return parseJson(response);
+}
+
+/** Save a form version's schema; the server provisions it in the engine (Form.io). */
+export async function saveFormVersionSchema(
+  token: string,
+  id: string,
+  schema: FormType,
+  workspaceId?: string,
+): Promise<SobaFormVersionType> {
+  const response = await fetch(`${getSobaApiBaseUrl()}/form-versions/${id}/schema`, {
+    method: 'POST',
+    cache: 'no-store',
+    headers: getHeaders(token, workspaceId, true),
+    body: JSON.stringify({ schema }),
+  });
+  return parseJson(response);
+}
+
+/** Read a form version's schema back from the engine (null if not yet provisioned). */
+export async function getFormVersionSchema(
+  token: string,
+  id: string,
+  workspaceId?: string,
+): Promise<FormType | null> {
+  const response = await fetch(`${getSobaApiBaseUrl()}/form-versions/${id}/schema`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: getHeaders(token, workspaceId),
+  });
+  if (response.status === 404) return null;
   return parseJson(response);
 }

@@ -27,19 +27,16 @@ import FormTeamTab from './FormTeamTab';
 import { useAppSelector } from '@/lib/store';
 
 import {
-  createFormioForm,
   createSobaFormioForm,
-  getFormioForm,
-  getSobaFormVersionFromFormioId,
-  updateFormioForm,
+  createFormVersion,
+  saveFormVersionSchema,
+  getFormVersionSchema,
+  getSobaForm,
   getSobaFormVersions,
+  publishSobaFormVersion,
   updateSobaFormVersionVisibility,
 } from '@/src/shared/api/sobaApi';
-import type {
-  SobaFormWithVersionResponse,
-  SobaFormType,
-  SobaFormVersionType,
-} from '@/src/types/forms';
+import type { SobaFormType, SobaFormVersionType } from '@/src/types/forms';
 
 const FormioFormRenderer = dynamic<FormProps>(
   () => import('@formio/react').then((mod) => mod.Form),
@@ -72,7 +69,7 @@ function FormForm({ id }: { id?: string[] }) {
   const [formSlug, setFormSlug] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formSchema, setFormSchema] = useState<FormType | null>(null);
-  const [loadedSoba, setLoadedSoba] = useState<SobaFormWithVersionResponse | null>(null);
+  const [currentVersion, setCurrentVersion] = useState<SobaFormVersionType | null>(null);
   const [visibility, setVisibility] = useState<string[]>([]);
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
 
@@ -99,47 +96,42 @@ function FormForm({ id }: { id?: string[] }) {
   const [agreedDisclaimer, setAgreedDisclaimer] = useState(false);
 
   useEffect(() => {
-    const formioId = id?.[0];
-    if (formioId && token) {
+    const formId = id?.[0];
+    if (formId && token) {
       async function loadForm() {
         setLoading(true);
         try {
-          const [sobaResp, formioResp] = await Promise.all([
-            getSobaFormVersionFromFormioId(
-              token as string,
-              formioId as string,
-              activeWorkspaceId || undefined,
-            ),
-            getFormioForm(token as string, formioId as string, activeWorkspaceId || undefined),
+          const ws = activeWorkspaceId || undefined;
+          const [form, versionsData] = await Promise.all([
+            getSobaForm(token as string, formId as string, ws),
+            getSobaFormVersions(token as string, formId as string, ws),
           ]);
 
-          const parsed = sobaResp as SobaFormWithVersionResponse;
-          setLoadedSoba(parsed ?? null);
-
-          setFormSchema(formioResp as FormType);
-          setFormName(parsed?.name ?? (formioResp as unknown as { title?: string })?.title ?? '');
-          setFormSlug(parsed?.slug ?? (formioResp as unknown as { path?: string })?.path ?? '');
-          setFormDesc(
-            parsed?.description ??
-              (formioResp as unknown as { description?: string })?.description ??
-              '',
-          );
-          setVisibility(parsed?.formVersion?.visibility ?? []);
+          setFormName(form?.name ?? '');
+          setFormSlug(form?.slug ?? '');
+          setFormDesc(form?.description ?? '');
           setSlugManuallyEdited(true);
-          setIsDirty(false);
 
-          if (parsed && parsed.id) {
-            try {
-              const versionsData = await getSobaFormVersions(
-                token as string,
-                parsed.id,
-                activeWorkspaceId || undefined,
-              );
-              setVersions(versionsData.items || []);
-            } catch (err) {
-              console.error('Failed to load form versions:', err);
-            }
+          const items = versionsData.items || [];
+          setVersions(items);
+
+          // Default to the highest versionNo (the current/latest version).
+          const current = items.reduce<SobaFormVersionType | null>(
+            (acc, v) => (!acc || v.versionNo > acc.versionNo ? v : acc),
+            null,
+          );
+          setCurrentVersion(current);
+          setSelectedVersionId('current');
+          setIsHistoryView(false);
+          setVisibility(current?.visibility ?? []);
+
+          if (current?.id) {
+            const schema = await getFormVersionSchema(token as string, current.id, ws);
+            setFormSchema((schema as FormType) ?? null);
+          } else {
+            setFormSchema(null);
           }
+          setIsDirty(false);
         } catch (e: unknown) {
           console.error('Error loading form data', e);
           setAlertText('Failed to load form: ' + (e as Error).message);
@@ -175,32 +167,35 @@ function FormForm({ id }: { id?: string[] }) {
     setIsDirty(true);
   };
 
+  const loadVersionSchema = async (version: SobaFormVersionType) => {
+    setLoading(true);
+    try {
+      const schema = await getFormVersionSchema(
+        token as string,
+        version.id,
+        activeWorkspaceId || undefined,
+      );
+      setFormSchema((schema as FormType) ?? null);
+      setVisibility(version.visibility ?? []);
+      setIsDirty(false);
+    } catch (err) {
+      console.error('Failed to load version schema:', err);
+      setAlertText('Failed to load version schema.');
+      setAlertVariant('danger');
+      setShowAlert(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleVersionChange = async (versionId: string) => {
-    if (!token || !loadedSoba) return;
+    if (!token) return;
 
     if (versionId === 'current') {
       setIsHistoryView(false);
       setSelectedVersionId('current');
       setHistoricalVersionNo(null);
-
-      setLoading(true);
-      try {
-        const formioId = id?.[0];
-        if (formioId) {
-          const formioResp = await getFormioForm(
-            token as string,
-            formioId as string,
-            activeWorkspaceId || undefined,
-          );
-          setFormSchema(formioResp as FormType);
-          setVisibility(loadedSoba.formVersion?.visibility ?? []);
-          setIsDirty(false);
-        }
-      } catch (err) {
-        console.error('Failed to reload current draft:', err);
-      } finally {
-        setLoading(false);
-      }
+      if (currentVersion) await loadVersionSchema(currentVersion);
       return;
     }
 
@@ -210,81 +205,40 @@ function FormForm({ id }: { id?: string[] }) {
     setIsHistoryView(true);
     setSelectedVersionId(versionId);
     setHistoricalVersionNo(targetVersion.versionNo);
-
-    if (targetVersion.engineSchemaRef) {
-      setLoading(true);
-      try {
-        const formioResp = await getFormioForm(
-          token as string,
-          targetVersion.engineSchemaRef,
-          activeWorkspaceId || undefined,
-        );
-        setFormSchema(formioResp as FormType);
-        setVisibility(targetVersion.visibility ?? []);
-        setIsDirty(false);
-      } catch (err) {
-        console.error('Failed to load historical form schema:', err);
-        setAlertText('Failed to load version schema.');
-        setAlertVariant('danger');
-        setShowAlert(true);
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      setFormSchema(null);
-    }
+    await loadVersionSchema(targetVersion);
   };
 
-  const isCurrentPublished = loadedSoba?.formVersion?.state === 'published';
+  const isCurrentPublished = currentVersion?.state === 'published';
 
   const createNewVersion = async () => {
-    if (isSaving || loading || !token || !loadedSoba) return;
+    if (isSaving || loading || !token) return;
+    const formId = id?.[0];
+    if (!formId) return;
     setIsSaving(true);
     setLoading(true);
 
     try {
-      const nextVersionNo =
-        Math.max(...versions.map((v: SobaFormVersionType) => v.versionNo), 0) + 1;
-      const cleanSchema = { ...(formSchema ?? {}) };
-      delete cleanSchema._id;
-      delete cleanSchema.machineName;
+      // FLAG (engine cleaning): these deletes are now redundant — the engine strips engine-managed
+      // fields on save (adapter.upsertSchema). Candidate for removal; left as a no-harm safeguard.
+      const cleanSchema = { ...(formSchema ?? {}) } as FormType;
+      delete (cleanSchema as Record<string, unknown>)._id;
+      delete (cleanSchema as Record<string, unknown>).machineName;
 
-      const slug = formSlug || titleToSlug(formName);
-      // temporary fix - need unique suffix to avoid Form.io path/name collisions across forms;
-      // removed when server-side provisioning (soba-{formVersionId}) lands.
-      const uniqueSuffix = crypto.randomUUID().slice(0, 8);
-      cleanSchema.name = `${formName}-v${nextVersionNo}-${uniqueSuffix}`;
-      cleanSchema.path = `${slug}-v${nextVersionNo}-${uniqueSuffix}`;
-      cleanSchema.title = `${formName} (v${nextVersionNo})`;
+      const ws = activeWorkspaceId || undefined;
+      const newVersion = await createFormVersion(token as string, formId, visibility, ws);
+      await saveFormVersionSchema(token as string, newVersion.id, cleanSchema, ws);
 
-      const createdFormio = await createFormioForm(
-        token as string,
-        cleanSchema as FormType,
-        loadedSoba.id,
-        false, // publish is false for new draft
-        visibility,
-        activeWorkspaceId || undefined,
-      );
-
-      const formioIdForNav = (createdFormio as FormType)._id;
-
-      setAlertText(`Version ${nextVersionNo} draft created successfully!`);
-      setAlertVariant('success');
-      setShowAlert(true);
+      // Refresh the version list and select the new draft in-page.
+      const versionsData = await getSobaFormVersions(token as string, formId, ws);
+      setVersions(versionsData.items || []);
+      setCurrentVersion(newVersion);
+      setSelectedVersionId('current');
+      setIsHistoryView(false);
       setIsDirty(false);
 
-      if (formioIdForNav) {
-        // Fetch the newly created SOBA form version immediately
-        const newSobaData = await getSobaFormVersionFromFormioId(
-          token as string,
-          formioIdForNav,
-          activeWorkspaceId || undefined,
-        );
-        if (!loadedSoba?.formVersion || !loadedSoba.formVersion.id) {
-          setLoadedSoba(newSobaData as SobaFormWithVersionResponse);
-          router.push(`/${lang}/designer/${formioIdForNav}`);
-        }
-      }
+      setAlertText(`Version ${newVersion.versionNo} draft created successfully!`);
+      setAlertVariant('success');
+      setShowAlert(true);
     } catch (e: unknown) {
       console.error('Error creating new form version:', e);
       setAlertText('Failed to create new version.');
@@ -314,84 +268,35 @@ function FormForm({ id }: { id?: string[] }) {
     if (isSaving || loading) return;
     setIsSaving(true);
     const slug = formSlug || titleToSlug(formName);
-    const data: SobaFormType = {
-      name: formName,
-      slug,
-      description: formDesc,
-    };
+    const ws = activeWorkspaceId || undefined;
+    const schema = (formSchema ?? {}) as FormType;
 
     try {
-      const formioData = { ...(formSchema ?? {}) } as FormType;
-      formioData.name = titleToSlug(formName);
-      formioData.path = slug
-        .toLowerCase()
-        .replace(/[^a-z\-\/]/g, '')
-        .replace(/^[\/-]+|[\/-]+$/g, '');
-      formioData.title = formName;
-
-      let formioIdForNav: string | undefined | null = null;
-
-      if (loadedSoba?.formVersion && loadedSoba.formVersion.id) {
-        // UPDATE Logic
-        const existingFormioId =
-          (formioData as Record<string, unknown>)._id ??
-          (formioData as { id?: string }).id ??
-          id?.[0];
-        const formioIdToUse = existingFormioId ? String(existingFormioId) : String(id?.[0] ?? '');
-        formioIdForNav = formioIdToUse;
-
-        await updateFormioForm(
-          token as string,
-          formioIdToUse,
-          formioData,
-          String(loadedSoba.formVersion.id),
-          publish,
-          activeWorkspaceId || undefined,
-        );
-        await updateSobaFormVersionVisibility(
-          token as string,
-          String(loadedSoba.formVersion.id),
-          visibility,
-          activeWorkspaceId || undefined,
-        );
+      if (currentVersion?.id) {
+        // UPDATE: re-provision the current version's schema + visibility (server owns name/path).
+        await saveFormVersionSchema(token as string, currentVersion.id, schema, ws);
+        await updateSobaFormVersionVisibility(token as string, currentVersion.id, visibility, ws);
+        if (publish) {
+          await publishSobaFormVersion(token as string, currentVersion.id, ws);
+        }
       } else {
-        // CREATE Logic
-        const uniqueSuffix = crypto.randomUUID().slice(0, 8);
-        formioData.name = `${formioData.name}-${uniqueSuffix}`;
-        formioData.path = `${formioData.path}-${uniqueSuffix}`; //temporary fix path unique in formio
-
-        const sobaFormData = await createSobaFormioForm(
-          token as string,
-          data,
-          activeWorkspaceId || undefined,
-        );
-        const createdFormio = await createFormioForm(
-          token as string,
-          formioData as FormType,
-          sobaFormData.id,
-          publish,
-          visibility,
-          activeWorkspaceId || undefined,
-        );
-        formioIdForNav = (createdFormio as FormType)._id;
+        // CREATE: one-call create (form + empty v1), then provision the schema.
+        const data: SobaFormType = { name: formName, slug, description: formDesc, visibility };
+        const created = await createSobaFormioForm(token as string, data, ws);
+        const versionId = created.formVersion?.id;
+        if (versionId) {
+          await saveFormVersionSchema(token as string, versionId, schema, ws);
+          if (publish) {
+            await publishSobaFormVersion(token as string, versionId, ws);
+          }
+        }
+        router.push(`/${lang}/designer/${created.id}`);
       }
 
       setAlertText(publish ? 'Form published successfully!' : dict.form.saved);
       setAlertVariant('success');
       setShowAlert(true);
       setIsDirty(false);
-
-      if ((!id || id.length === 0) && formioIdForNav) {
-        // Fetch the newly created SOBA form version immediately
-        // so that if the user clicks Save again, it triggers UPDATE logic.
-        const newSobaData = await getSobaFormVersionFromFormioId(
-          token as string,
-          formioIdForNav,
-          activeWorkspaceId || undefined,
-        );
-        setLoadedSoba(newSobaData as SobaFormWithVersionResponse);
-        router.push(`/${lang}/designer/${formioIdForNav}`);
-      }
     } catch (e: unknown) {
       console.error('error saving form', e);
       setAlertText(dict.form.saveError);
@@ -443,12 +348,10 @@ function FormForm({ id }: { id?: string[] }) {
                 >
                   <option value="current">
                     {dict.form.currentDraft || 'Current Draft'}{' '}
-                    {loadedSoba?.formVersion?.versionNo
-                      ? `(v${loadedSoba.formVersion.versionNo})`
-                      : ''}
+                    {currentVersion?.versionNo ? `(v${currentVersion.versionNo})` : ''}
                   </option>
                   {versions
-                    .filter((v) => v.id !== loadedSoba?.formVersion?.id)
+                    .filter((v) => v.id !== currentVersion?.id)
                     .map((v) => (
                       <option key={v.id} value={v.id}>
                         v{v.versionNo} ({v.state})

@@ -24,6 +24,10 @@ const CustomActionButtons = ({
   submitModeEnabled?: boolean;
 }) => {
   const formId = form._id;
+  // 'manage' opens the designer keyed on the SOBA formId; submit/submissions still use the
+  // Form.io _id until the Submissions-on-SOBA-ids stage.
+  const sobaFormId =
+    (form as { _sobaForm?: { form?: { id?: string } } })._sobaForm?.form?.id ?? formId;
 
   const actions = [];
   if (designModeEnabled) actions.push({ name: 'manage', title: 'Manage' });
@@ -43,8 +47,9 @@ const CustomActionButtons = ({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              if (!formId) return;
-              onAction(action.name, formId);
+              const targetId = action.name === 'manage' ? sobaFormId : formId;
+              if (!targetId) return;
+              onAction(action.name, targetId);
             }}
             className="btn btn-link p-0 m-0"
             style={{ textDecoration: 'underline', color: '#00538A' }}
@@ -80,6 +85,7 @@ function FormList({
     name?: string;
     path?: string;
     _sobaForm?: {
+      form?: { id?: string };
       formVersion?: { versionNo?: number; state?: string; createdAt?: string; createdBy: string };
     };
   };
@@ -171,13 +177,14 @@ function FormList({
         width: '40%',
         render: (form: TableForm) => {
           const formId = form._id;
+          const sobaFormId = form._sobaForm?.form?.id ?? formId;
           return designModeEnabled ? (
             <a
               href="#"
               data-testid={'form-link-' + formId}
               onClick={(e) => {
                 e.preventDefault();
-                handleAction('manage', formId!);
+                handleAction('manage', sobaFormId!);
               }}
               className="text-decoration-underline"
               style={{ cursor: 'pointer', color: '#00538A' }}
