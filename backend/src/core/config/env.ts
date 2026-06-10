@@ -141,7 +141,8 @@ export function createEnvReader(source: EnvSource) {
     getDbStatementTimeoutMs: () => getNumberEnvFrom(source, 'DB_STATEMENT_TIMEOUT_MS') ?? 60000,
     getDbLockTimeoutMs: () => getNumberEnvFrom(source, 'DB_LOCK_TIMEOUT_MS') ?? 10000,
     getDbMigrationReadyAttempts: () => getNumberEnvFrom(source, 'DB_MIGRATION_READY_ATTEMPTS') ?? 5,
-    getDbMigrationReadySleepMs: () => getNumberEnvFrom(source, 'DB_MIGRATION_READY_SLEEP_MS') ?? 5000,
+    getDbMigrationReadySleepMs: () =>
+      getNumberEnvFrom(source, 'DB_MIGRATION_READY_SLEEP_MS') ?? 5000,
     // Pipeline performance fix: Revert if needed.
     getOutboxPollIntervalMs: () => getNumberEnvFrom(source, 'OUTBOX_POLL_INTERVAL_MS'),
     getOutboxBatchSize: () => getNumberEnvFrom(source, 'OUTBOX_BATCH_SIZE'),
