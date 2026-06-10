@@ -7,7 +7,11 @@ import type {
   SobaResponseFormType,
   SobaFormVersionType,
 } from '../../types/forms';
-import type { ListSubmissionsResponse, SubmissionResponse } from '@/src/types/submissions';
+import type {
+  ListSubmissionsResponse,
+  SubmissionResponse,
+  SubmissionListItem,
+} from '@/src/types/submissions';
 
 function getHeaders(token: string, workspaceId?: string, isJson: boolean = false): HeadersInit {
   const headers: Record<string, string> = {
@@ -176,6 +180,35 @@ export async function getSobaSubmissions(
     cache: 'no-store',
     headers: getHeaders(token, workspaceId),
   });
+  return parseJson(response);
+}
+
+/** Fetch a single submission's metadata (form/version, status, timestamps). */
+export async function getSobaSubmission(
+  token: string,
+  id: string,
+  workspaceId?: string,
+): Promise<SubmissionListItem> {
+  const response = await fetch(`${getSobaApiBaseUrl()}/submissions/${id}`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: getHeaders(token, workspaceId),
+  });
+  return parseJson(response);
+}
+
+/** Read a submission's answer document back from the engine (null if not yet provisioned). */
+export async function getSobaSubmissionData(
+  token: string,
+  id: string,
+  workspaceId?: string,
+): Promise<{ data?: Record<string, unknown> } | null> {
+  const response = await fetch(`${getSobaApiBaseUrl()}/submissions/${id}/data`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: getHeaders(token, workspaceId),
+  });
+  if (response.status === 404) return null;
   return parseJson(response);
 }
 

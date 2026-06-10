@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
+import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { getSobaSubmissions } from '@/src/shared/api/sobaApiForms';
 import type { SubmissionListItem } from '@/src/types/submissions';
 import { DataTable, Column } from '@/src/components/DataTable';
@@ -15,6 +17,9 @@ interface SubmissionListProps {
 export function SubmissionList({ formId }: SubmissionListProps = {}) {
   const { authenticated, token, initializing } = useKeycloak();
   const dict = useDictionary();
+  const router = useRouter();
+  const pathname = usePathname();
+  const locale = getLocaleFromPath(pathname);
   const [submissions, setSubmissions] = useState<SubmissionListItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -55,7 +60,19 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
       key: 'id',
       label: dict.submission?.columns?.id || 'Submission ID',
       render: (sub) => (
-        <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">{sub.id}</code>
+        <a
+          href="#"
+          data-testid={`submission-view-${sub.id}`}
+          onClick={(e) => {
+            e.preventDefault();
+            router.push(`/${locale}/submission/${sub.id}`);
+          }}
+          className="text-decoration-underline"
+          style={{ cursor: 'pointer', color: '#00538A' }}
+          title={dict.submission?.view || 'View'}
+        >
+          <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">{sub.id}</code>
+        </a>
       ),
     },
     {

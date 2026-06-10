@@ -165,6 +165,9 @@
     "error": "Could not load submissions.",
     "refresh": "Refresh",
     "view": "View",
+    "submittedOn": "Submitted",
+    "noContent": "No submitted answers to display.",
+    "notFound": "Submission not found.",
     "workflow": "Workflow",
     "columns": {
       "id": "Submission ID",

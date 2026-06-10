@@ -165,6 +165,9 @@
     "error": "Impossible de charger les soumissions.",
     "refresh": "Actualiser",
     "view": "Voir",
+    "submittedOn": "Soumis le",
+    "noContent": "Aucune réponse soumise à afficher.",
+    "notFound": "Soumission introuvable.",
     "workflow": "Flux de travail",
     "columns": {
       "id": "ID de Soumission",
