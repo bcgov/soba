@@ -10,6 +10,7 @@ import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { FaMagnifyingGlass, FaX } from 'react-icons/fa6';
 import { getSobaForms } from '@/src/shared/api/sobaApi';
 import type { SobaFormSummary } from '@/src/shared/api/sobaApiForms';
+import { formatLongDate } from '@/src/shared/util/dateFormat';
 import { useAppSelector } from '@/lib/store';
 
 const CustomActionButtons = ({
@@ -73,8 +74,6 @@ function FormList({
   const dictForm = dict.form;
   const { authenticated, token, initializing } = useKeycloak();
 
-  // The form row used in the table is the PG-backed summary DTO.
-  type TableForm = SobaFormSummary;
   const router = useRouter();
   const pathname = usePathname();
 
@@ -154,13 +153,13 @@ function FormList({
     [router, locale],
   );
 
-  const columns: Column<TableForm>[] = useMemo(
+  const columns: Column<SobaFormSummary>[] = useMemo(
     () => [
       {
         key: 'name',
         label: dictFormList?.columns?.name || dictForm?.nameLabel || 'Form Name',
         width: '40%',
-        render: (form: TableForm) => {
+        render: (form: SobaFormSummary) => {
           return designModeEnabled ? (
             <a
               href="#"
@@ -183,7 +182,7 @@ function FormList({
         key: 'actions',
         label: dictFormList?.columns?.actions || 'Actions',
         align: 'start',
-        render: (form: TableForm) => (
+        render: (form: SobaFormSummary) => (
           <CustomActionButtons
             form={form}
             onAction={handleAction}
@@ -195,7 +194,7 @@ function FormList({
       {
         key: 'created',
         label: dictFormList?.columns?.createdBy || 'Created By',
-        render: (form: TableForm) => {
+        render: (form: SobaFormSummary) => {
           if (!form.createdBy) return <span className="text-muted small">—</span>;
           return <span className="small">{form.createdBy}</span>;
         },
@@ -203,15 +202,9 @@ function FormList({
       {
         key: 'updated',
         label: dictFormList?.columns?.createdAt || 'Created Date',
-        render: (form: TableForm) => {
-          if (!form.createdAt) return <span className="small"></span>;
-          const dString = new Intl.DateTimeFormat('en-US', {
-            month: 'long', // "May"
-            day: 'numeric', // "25"
-            year: 'numeric', // "2026"
-          }).format(new Date(form.createdAt));
-          return <span className="small">{dString}</span>;
-        },
+        render: (form: SobaFormSummary) => (
+          <span className="small">{formatLongDate(form.createdAt)}</span>
+        ),
       },
     ],
     [handleAction, dictFormList, dictForm, designModeEnabled, submitModeEnabled],
@@ -273,8 +266,8 @@ function FormList({
         </InputGroup>
       </div>
 
-      <DataTable<TableForm>
-        data={paginatedForms as TableForm[]}
+      <DataTable<SobaFormSummary>
+        data={paginatedForms as SobaFormSummary[]}
         columns={columns}
         loading={loading}
         error={error}

@@ -1,7 +1,6 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import dynamic from 'next/dynamic';
 import { useEffect, useRef, useState } from 'react';
 import { FormioProvider, Submission } from '@formio/react';
 import type { FormType } from '@formio/react';
@@ -10,6 +9,8 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFormioRenderError';
 import { useFormioV5FormChrome } from '@/lib/hooks/useFormioV5FormChrome';
 import { FormioV5FormRenderErrorBoundary } from '@/src/features/formio-v5/ui/FormioV5FormRenderErrorBoundary';
+import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
+import { ReadOnlyFormView } from '@/src/features/formio-v5/ui/ReadOnlyFormView';
 import {
   getSobaFormVersions,
   getFormVersionSchema,
@@ -18,11 +19,6 @@ import {
 } from '@/src/shared/api/sobaApi';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useAppSelector } from '@/lib/store';
-
-const Form = dynamic(() => import('@formio/react').then((m) => m.Form), {
-  ssr: false,
-  loading: () => <p className="text-muted small">Loading form renderer…</p>,
-});
 
 type FormRenderLabels = {
   loading: string;
@@ -134,33 +130,34 @@ function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: Fo
           {labels.submitSuccess}
         </Alert>
       ) : null}
-      <div className="formio-v5-chrome" data-soba-formio-chrome>
-        <FormioV5FormRenderErrorBoundary
-          fallback={
-            <Alert variant="danger" role="alert">
-              {labels.rendererError}
-            </Alert>
-          }
-        >
-          <FormioProvider>
-            <Form
-              key={submitted ? 'readonly' : 'edit'}
-              className="formio-v5-form-root"
-              src=""
-              form={schema}
-              submission={submitted ?? undefined}
-              options={submitted ? { readOnly: true } : undefined}
-              onFormReady={(instance) => {
-                formInstanceRef.current = instance;
-              }}
-              onError={(err) => {
-                setRenderError(normalizeFormioRenderError(err, labels.loadError));
-              }}
-              onSubmit={submitForm}
-            />
-          </FormioProvider>
-        </FormioV5FormRenderErrorBoundary>
-      </div>
+      <FormioV5FormRenderErrorBoundary
+        fallback={
+          <Alert variant="danger" role="alert">
+            {labels.rendererError}
+          </Alert>
+        }
+      >
+        {submitted ? (
+          <ReadOnlyFormView schema={schema} submission={submitted} />
+        ) : (
+          <div className="formio-v5-chrome" data-soba-formio-chrome>
+            <FormioProvider>
+              <DynamicForm
+                className="formio-v5-form-root"
+                src=""
+                form={schema}
+                onFormReady={(instance) => {
+                  formInstanceRef.current = instance;
+                }}
+                onError={(err) => {
+                  setRenderError(normalizeFormioRenderError(err, labels.loadError));
+                }}
+                onSubmit={submitForm}
+              />
+            </FormioProvider>
+          </div>
+        )}
+      </FormioV5FormRenderErrorBoundary>
     </>
   );
 }

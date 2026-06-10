@@ -1,25 +1,20 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
-import { FormioProvider } from '@formio/react';
 import type { FormType, Submission } from '@formio/react';
 import { Alert, Spinner } from 'react-bootstrap';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useAppSelector } from '@/lib/store';
+import { ReadOnlyFormView } from '@/src/features/formio-v5/ui/ReadOnlyFormView';
+import { formatLongDate } from '@/src/shared/util/dateFormat';
 import {
   getSobaSubmission,
   getFormVersionSchema,
   getSobaSubmissionData,
 } from '@/src/shared/api/sobaApiForms';
 import type { SubmissionListItem } from '@/src/types/submissions';
-
-const Form = dynamic(() => import('@formio/react').then((m) => m.Form), {
-  ssr: false,
-  loading: () => <p className="text-muted small">Loading…</p>,
-});
 
 export function SubmissionView() {
   const params = useParams();
@@ -96,12 +91,7 @@ export function SubmissionView() {
                 <>
                   {' · '}
                   <span data-testid="submission-view-submitted">
-                    {dictSub?.submittedOn || 'Submitted'}{' '}
-                    {new Intl.DateTimeFormat('en-US', {
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric',
-                    }).format(new Date(submission.submittedAt))}
+                    {dictSub?.submittedOn || 'Submitted'} {formatLongDate(submission.submittedAt)}
                   </span>
                 </>
               ) : null}
@@ -109,17 +99,7 @@ export function SubmissionView() {
           </div>
 
           {schema ? (
-            <div className="formio-v5-chrome" data-soba-formio-chrome data-testid="submission-view-form">
-              <FormioProvider>
-                <Form
-                  className="formio-v5-form-root"
-                  src=""
-                  form={schema}
-                  submission={{ data }}
-                  options={{ readOnly: true }}
-                />
-              </FormioProvider>
-            </div>
+            <ReadOnlyFormView schema={schema} submission={{ data }} testId="submission-view-form" />
           ) : (
             <Alert variant="secondary" role="alert" data-testid="submission-view-nocontent">
               {dictSub?.noContent || 'No submitted answers to display.'}

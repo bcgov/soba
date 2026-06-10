@@ -14,14 +14,14 @@ import {
 } from 'react-bootstrap';
 import { FaInfoCircle } from 'react-icons/fa';
 import { Modal as CommonModal } from '@/src/components/Modal';
-import dynamic from 'next/dynamic';
 import styles from './FormForm.module.css';
 
-import type { FormProps, FormType } from '@formio/react';
+import type { FormType } from '@formio/react';
 
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import FormDesigner from '@/src/features/designer/ui/FormDesigner';
+import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
 import FormSettingsTab from './FormSettingsTab';
 import FormTeamTab from './FormTeamTab';
 import { useAppSelector } from '@/lib/store';
@@ -37,13 +37,6 @@ import {
   updateSobaFormVersionVisibility,
 } from '@/src/shared/api/sobaApi';
 import type { SobaFormType, SobaFormVersionType } from '@/src/types/forms';
-
-const FormioFormRenderer = dynamic<FormProps>(
-  () => import('@formio/react').then((mod) => mod.Form),
-  {
-    ssr: false,
-  },
-);
 
 /** Converts a human-readable title into a URL-safe slug. */
 function titleToSlug(title: string): string {
@@ -591,7 +584,7 @@ function FormForm({ id }: { id?: string[] }) {
         }
       >
         {formSchema ? (
-          <FormioFormRenderer src="" form={formSchema} />
+          <DynamicForm src="" form={formSchema} />
         ) : (
           <p className="text-center p-5 text-muted">
             {dict.form.noFormLayout || 'No form layout designed yet.'}

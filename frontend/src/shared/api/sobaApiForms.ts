@@ -80,19 +80,6 @@ export async function getSobaForm(
   return parseJson(response);
 }
 
-export async function getSobaFormVersion(
-  token: string,
-  id: string,
-  workspaceId?: string,
-): Promise<SobaResponseFormType> {
-  const response = await fetch(`${getSobaApiBaseUrl()}/form-versions/${id}`, {
-    method: 'GET',
-    cache: 'no-store',
-    headers: getHeaders(token, workspaceId),
-  });
-  return parseJson(response);
-}
-
 /** Create the SOBA submission shell (a PG row); its answer data is saved via saveSobaFormSubmission. */
 export async function createSobaFormSubmission(
   token: string,

@@ -53,8 +53,6 @@ interface FormioComp {
 const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = null }) => {
   const { authenticated, initializing } = useKeycloak();
   const dict = useDictionary();
-  // JSON-mode builder renders immediately — no Form.io proxy connection or auth plugin needed.
-  const [engineReady] = useState(true);
   const builderRef = useRef<FormioBuilderInstance | null>(null);
 
   /**
@@ -225,7 +223,7 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
     }
   }, [importJson, onUpdateModel, sanitizeForm]);
 
-  if (initializing || !engineReady) {
+  if (initializing) {
     return <div className="p-10 text-center">Loading Designer...</div>;
   }
 
