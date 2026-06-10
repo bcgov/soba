@@ -114,30 +114,31 @@ export function buildSchemaBody(input: UpsertSchemaInput): Record<string, unknow
   };
 }
 
-/** Reserved key planted inside a submission's `data` to correlate the Form.io document to a SOBA
- *  submission revision (Form.io can be queried by `data.<field>`, so this is reliably lookup-able). */
-const SOBA_SUBMISSION_KEY = '_sobaRevisionKey';
+/**
+ * Form.io strips submission `data` keys that aren't form components, so the correlation key lives in
+ * submission `metadata` (preserved intact) as a single STRING field — Form.io can filter metadata by
+ * string but not by number, so the deterministic key is a string, not the numeric `soba_revision_no`.
+ */
+const SOBA_REVISION_KEY_FIELD = 'soba_revision_key';
 
 /** Deterministic per-revision idempotency key for a submission save. */
 const sobaSubmissionRevisionKey = (submissionId: string, revisionNo: number): string =>
   `soba-${submissionId}-r${revisionNo}`;
 
-/** Build the Form.io submission document for a create: the answer data plus a planted correlation
- *  key (for idempotency) and SOBA tenancy metadata. */
+/** Build the Form.io submission document for a create: the answer data plus SOBA correlation/tenancy
+ *  metadata (the per-revision key in metadata, queryable for idempotency). */
 export function buildSubmissionBody(input: CreateSubmissionInput): Record<string, unknown> {
   const answers =
     typeof input.data === 'object' && input.data !== null && !Array.isArray(input.data)
       ? (JSON.parse(JSON.stringify(input.data)) as Record<string, unknown>)
       : {};
   return {
-    data: {
-      ...answers,
-      [SOBA_SUBMISSION_KEY]: sobaSubmissionRevisionKey(input.submissionId, input.revisionNo),
-    },
+    data: answers,
     metadata: {
       soba_workspace_id: input.workspaceId,
       soba_submission_id: input.submissionId,
       soba_revision_no: input.revisionNo,
+      [SOBA_REVISION_KEY_FIELD]: sobaSubmissionRevisionKey(input.submissionId, input.revisionNo),
     },
   };
 }
@@ -234,7 +235,7 @@ export class FormioEngineAdapter implements FormEngineAdapter {
 
     // Idempotency: a retried save (same submission + revision) must converge on one document.
     const existing = (await client.loadSubmissions(input.engineFormRef, {
-      params: { [`data.${SOBA_SUBMISSION_KEY}`]: key },
+      params: { [`metadata.${SOBA_REVISION_KEY_FIELD}`]: key },
     })) as Array<Record<string, unknown>>;
     if (existing.length > 0 && existing[0]?._id != null && existing[0]._id !== '') {
       return { engineRef: String(existing[0]._id) };
@@ -252,7 +253,7 @@ export class FormioEngineAdapter implements FormEngineAdapter {
   }
 
   /** Read a Form.io submission by form ref + submission ref, stripped of engine-managed fields and
-   *  the planted correlation key. Null if not found. */
+   *  the SOBA correlation `metadata` (internal bookkeeping, not answer content). Null if not found. */
   async readSubmission(
     engineFormRef: string,
     engineRef: string,
@@ -267,11 +268,7 @@ export class FormioEngineAdapter implements FormEngineAdapter {
     > | null;
     if (!doc) return null;
     const cleaned = stripEngineManagedFields(doc);
-    if (cleaned.data && typeof cleaned.data === 'object' && !Array.isArray(cleaned.data)) {
-      const data = { ...(cleaned.data as Record<string, unknown>) };
-      delete data[SOBA_SUBMISSION_KEY];
-      cleaned.data = data;
-    }
+    delete cleaned.metadata;
     return cleaned;
   }
 }

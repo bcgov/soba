@@ -45,22 +45,22 @@ const createInput = {
 describe('FormioEngineAdapter submission methods', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('buildSubmissionBody wraps answers under data with the planted correlation key + metadata', () => {
+  it('buildSubmissionBody keeps answers clean in data and puts the correlation key in metadata', () => {
     const body = buildSubmissionBody(createInput);
-    const data = body.data as Record<string, unknown>;
-    expect(data.firstName).toBe('Ada');
-    expect(data._sobaRevisionKey).toBe('soba-s1-r3');
+    // Form.io strips non-component data keys, so the correlation key must NOT be in data.
+    expect(body.data).toEqual({ firstName: 'Ada' });
     expect(body.metadata).toEqual({
       soba_workspace_id: 'ws1',
       soba_submission_id: 's1',
       soba_revision_no: 3,
+      soba_revision_key: 'soba-s1-r3',
     });
   });
 
   it('buildSubmissionBody does not mutate the input data', () => {
     const data = { firstName: 'Ada' };
     buildSubmissionBody({ ...createInput, data });
-    expect('_sobaRevisionKey' in data).toBe(false);
+    expect(data).toEqual({ firstName: 'Ada' });
   });
 
   it('creates a new submission document and returns its engine ref', async () => {
@@ -75,7 +75,7 @@ describe('FormioEngineAdapter submission methods', () => {
 
     expect(res).toEqual({ engineRef: 'sub-new' });
     expect(client.loadSubmissions).toHaveBeenCalledWith('form-ref-1', {
-      params: { 'data._sobaRevisionKey': 'soba-s1-r3' },
+      params: { 'metadata.soba_revision_key': 'soba-s1-r3' },
     });
     const body = client.saveSubmission.mock.calls[0][1] as Record<string, unknown>;
     expect(body._id).toBeUndefined(); // POST (new doc), not PUT
@@ -110,13 +110,14 @@ describe('FormioEngineAdapter submission methods', () => {
     await expect(adapter.createSubmission(createInput)).rejects.toThrow(/admin client/i);
   });
 
-  it('readSubmission strips engine-managed fields and the planted correlation key', async () => {
+  it('readSubmission strips engine-managed fields and the SOBA metadata', async () => {
     const client = makeClient({
       loadSubmission: jest.fn().mockResolvedValue({
         _id: 'sub-1',
         owner: 'o',
         created: 'c',
-        data: { firstName: 'Ada', _sobaRevisionKey: 'soba-s1-r3' },
+        data: { firstName: 'Ada' },
+        metadata: { soba_revision_key: 'soba-s1-r3', headers: { host: 'x' } },
       }),
     });
     mockedGetClient.mockResolvedValue(client);
