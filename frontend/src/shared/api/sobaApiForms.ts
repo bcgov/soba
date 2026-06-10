@@ -133,7 +133,7 @@ export async function saveSobaFormSubmission(
   return parseJson<SubmissionResponse>(response);
 }
 
-/** Compact form row for the designer/submit list: the form plus its representative version. */
+/** Compact form row for the designer/submit list. */
 export type SobaFormSummary = {
   id: string;
   slug: string;
@@ -141,13 +141,7 @@ export type SobaFormSummary = {
   status: string;
   createdAt: string;
   updatedAt: string;
-  currentVersion: {
-    id: string;
-    versionNo: number;
-    state: string;
-    createdAt: string;
-    createdBy: string | null;
-  } | null;
+  createdBy: string | null;
 };
 
 /** List forms (PG-backed) with each form's representative version, for the designer/submit list. */

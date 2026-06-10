@@ -83,16 +83,6 @@ export const ListFormsQuerySchema = z
   })
   .openapi('Forms_ListFormsQuery');
 
-export const CurrentVersionSummarySchema = z
-  .object({
-    id: z.string(),
-    versionNo: z.number().int(),
-    state: z.string(),
-    createdAt: z.string(),
-    createdBy: z.string().nullable(),
-  })
-  .openapi('Forms_CurrentVersionSummary');
-
 export const FormListItemSchema = z
   .object({
     id: z.string(),
@@ -101,7 +91,7 @@ export const FormListItemSchema = z
     status: z.string(),
     createdAt: z.string(),
     updatedAt: z.string(),
-    currentVersion: CurrentVersionSummarySchema.nullable(),
+    createdBy: z.string().nullable(),
   })
   .openapi('Forms_FormListItem');
 

@@ -137,40 +137,6 @@ const toFormVersionListItemDto = (item: {
   updatedBy: item.updatedBy,
 });
 
-/** Compact version summary attached to each form list item for the designer/submit list. */
-const toCurrentVersionDto = (item: {
-  id: string;
-  versionNo: number;
-  state: string;
-  createdAt: Date;
-  createdBy: string | null;
-}) => ({
-  id: item.id,
-  versionNo: item.versionNo,
-  state: item.state,
-  createdAt: item.createdAt.toISOString(),
-  createdBy: item.createdBy,
-});
-
-/** Per form, the version to surface in the list: the published one, else the highest versionNo. */
-function pickRepresentativeVersions<V extends { formId: string; versionNo: number; state: string }>(
-  versions: V[],
-): Map<string, V> {
-  const byForm = new Map<string, V>();
-  for (const v of versions) {
-    const cur = byForm.get(v.formId);
-    if (!cur) {
-      byForm.set(v.formId, v);
-      continue;
-    }
-    const curPublished = cur.state === 'published';
-    const vPublished = v.state === 'published';
-    if (vPublished && !curPublished) byForm.set(v.formId, v);
-    else if (vPublished === curPublished && v.versionNo > cur.versionNo) byForm.set(v.formId, v);
-  }
-  return byForm;
-}
-
 export function createFormsApiService(
   formService: FormService,
   formVersionService: FormVersionService,
@@ -229,26 +195,8 @@ export function createFormsApiService(
       const lastItem = result.items[result.items.length - 1];
       const nextCursor = buildNextCursor(lastItem, result.hasMore, cursorMode);
 
-      // Attach each form's representative version (published else highest versionNo); the list only
-      // includes forms that have at least one (non-deleted) version.
-      const versionsResult = await formVersionService.list({
-        workspaceId: ctx.workspaceId,
-        actorId: ctx.actorId,
-        limit: 1000,
-        sort: 'id:desc',
-        cursorMode: 'id',
-      });
-      const repByForm = pickRepresentativeVersions(versionsResult.items);
-
-      const items = result.items
-        .filter((item) => repByForm.has(item.id))
-        .map((item) => ({
-          ...toFormListItemDto(item),
-          currentVersion: toCurrentVersionDto(repByForm.get(item.id)!),
-        }));
-
       return {
-        items,
+        items: result.items.map((item) => toFormListItemDto(item)),
         page: {
           limit: query.limit,
           hasMore: result.hasMore,

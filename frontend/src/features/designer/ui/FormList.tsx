@@ -196,22 +196,20 @@ function FormList({
         key: 'created',
         label: dictFormList?.columns?.createdBy || 'Created By',
         render: (form: TableForm) => {
-          const version = form.currentVersion;
-          if (!version?.createdBy) return <span className="text-muted small">—</span>;
-          return <span className="small">{version.createdBy}</span>;
+          if (!form.createdBy) return <span className="text-muted small">—</span>;
+          return <span className="small">{form.createdBy}</span>;
         },
       },
       {
         key: 'updated',
         label: dictFormList?.columns?.createdAt || 'Created Date',
         render: (form: TableForm) => {
-          const version = form.currentVersion;
-          if (!version?.createdAt) return <span className="small"></span>;
+          if (!form.createdAt) return <span className="small"></span>;
           const dString = new Intl.DateTimeFormat('en-US', {
             month: 'long', // "May"
             day: 'numeric', // "25"
             year: 'numeric', // "2026"
-          }).format(new Date(version.createdAt));
+          }).format(new Date(form.createdAt));
           return <span className="small">{dString}</span>;
         },
       },
