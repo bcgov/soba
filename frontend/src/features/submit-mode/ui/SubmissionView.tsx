@@ -30,7 +30,8 @@ export function SubmissionView() {
 
   const [submission, setSubmission] = useState<SubmissionListItem | null>(null);
   const [schema, setSchema] = useState<FormType | null>(null);
-  const [data, setData] = useState<Submission['data']>({});
+  // null = no engine document (submission has no saved answers); {} = empty answers on a real doc.
+  const [content, setContent] = useState<{ data?: Record<string, unknown> } | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -42,13 +43,13 @@ export function SubmissionView() {
         const sub = await getSobaSubmission(token, submissionId, ws);
         if (!active) return;
         setSubmission(sub);
-        const [loadedSchema, content] = await Promise.all([
+        const [loadedSchema, fetchedContent] = await Promise.all([
           getFormVersionSchema(token, sub.formVersionId, ws),
           getSobaSubmissionData(token, submissionId, ws),
         ]);
         if (!active) return;
         if (loadedSchema) setSchema(loadedSchema);
-        setData((content?.data ?? {}) as Submission['data']);
+        setContent(fetchedContent);
       } catch {
         if (active) setNotFound(true);
       } finally {
@@ -98,8 +99,12 @@ export function SubmissionView() {
             </div>
           </div>
 
-          {schema ? (
-            <ReadOnlyFormView schema={schema} submission={{ data }} testId="submission-view-form" />
+          {schema && content !== null ? (
+            <ReadOnlyFormView
+              schema={schema}
+              submission={{ data: (content.data ?? {}) as Submission['data'] }}
+              testId="submission-view-form"
+            />
           ) : (
             <Alert variant="secondary" role="alert" data-testid="submission-view-nocontent">
               {dictSub?.noContent || 'No submitted answers to display.'}
