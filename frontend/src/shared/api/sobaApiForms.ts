@@ -129,8 +129,29 @@ export async function saveSobaFormSubmission(
   return parseJson<SubmissionResponse>(response);
 }
 
-export async function getSobaFormioForms(token: string, workspaceId?: string): Promise<FormType[]> {
-  const response = await fetch(`${getSobaApiBaseUrl()}/forms/formio/form`, {
+/** Compact form row for the designer/submit list: the form plus its representative version. */
+export type SobaFormSummary = {
+  id: string;
+  slug: string;
+  name: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  currentVersion: {
+    id: string;
+    versionNo: number;
+    state: string;
+    createdAt: string;
+    createdBy: string | null;
+  } | null;
+};
+
+/** List forms (PG-backed) with each form's representative version, for the designer/submit list. */
+export async function getSobaForms(
+  token: string,
+  workspaceId?: string,
+): Promise<{ items: SobaFormSummary[] }> {
+  const response = await fetch(`${getSobaApiBaseUrl()}/forms?limit=100`, {
     method: 'GET',
     cache: 'no-store',
     headers: getHeaders(token, workspaceId),

@@ -5,7 +5,6 @@ import {
   createFormVersion,
   updateForm,
   getForm,
-  getFormByEngineRef,
   getFormVersion,
   listForms,
   listFormVersions,
@@ -18,13 +17,11 @@ import {
   restoreFormVersion,
   provisionFormVersionSchema,
   getFormVersionSchema,
-  listFormioForms,
 } from './controller';
 import {
   CreateFormBodySchema,
   CreateFormVersionBodySchema,
   FormIdParamsSchema,
-  FormEngineRefParamsSchema,
   FormVersionIdParamsSchema,
   ListFormsQuerySchema,
   ListFormVersionsQuerySchema,
@@ -38,12 +35,6 @@ import {
 const router = express.Router();
 
 router.get('/forms', validateRequest({ query: ListFormsQuerySchema }), listForms);
-router.get('/forms/formio/form', validateRequest({ query: ListFormsQuerySchema }), listFormioForms);
-router.get(
-  '/forms/engine/:engineRef',
-  validateRequest({ params: FormEngineRefParamsSchema }),
-  getFormByEngineRef,
-);
 router.post('/forms', validateRequest({ body: CreateFormBodySchema }), createForm);
 router.get('/forms/:id', validateRequest({ params: FormIdParamsSchema }), getForm);
 router.patch(

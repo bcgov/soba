@@ -16,15 +16,12 @@ import { resolveActor } from './core/middleware/actor';
 import { requireSobaAdmin } from './core/middleware/requireSobaAdmin';
 import { adminRouter } from './core/api/admin';
 import { globalRateLimit, apiRateLimit, publicRateLimit } from './core/middleware/rateLimit';
-import { getFormEngineRouteDefinitions } from './core/integrations/plugins/PluginRegistry';
-import { createPluginConfigReader } from './core/config/pluginConfig';
 import { initializePassport } from './core/auth/passport';
 import {
   checkJwtOptional,
   resolveActorOptional,
   checkFormVisibility,
 } from './core/middleware/formVisibility';
-import { getFormByEngineRef } from './core/api/forms/controller';
 import { createSubmission, saveSubmission } from './core/api/submissions/controller';
 
 const app = express();
@@ -68,21 +65,6 @@ app.use(passport.initialize());
 
 app.use(globalRateLimit);
 
-// ——— Form-engine proxy/routes under /api/v1 (protected; when PLUGIN_<CODE>_ROUTES_ALLOWED=true) ———
-const formEngineRouteDefs = getFormEngineRouteDefinitions();
-for (const def of formEngineRouteDefs) {
-  const path = `/api/v1${def.routeBasePath.startsWith('/') ? '' : '/'}${def.routeBasePath}`;
-  app.use(
-    path,
-    apiRateLimit,
-    express.json(),
-    checkJwt(),
-    resolveActor,
-    def.createRouter(createPluginConfigReader(def.code)),
-  );
-  log.info({ code: def.code, path }, 'Form-engine routes mounted');
-}
-
 // ——— Public routes (no authentication) ———
 app.get('/api/docs/openapi.json', publicRateLimit, (_req, res) => {
   res.json(buildOpenApiSpec());
@@ -108,34 +90,8 @@ const publicSubmissionMiddleware = [
   checkFormVisibility,
 ];
 
-publicSubmissionRouter.get(
-  '/forms/engine/:engineRef',
-  ...publicSubmissionMiddleware,
-  getFormByEngineRef,
-);
 publicSubmissionRouter.post('/submissions', ...publicSubmissionMiddleware, createSubmission);
 publicSubmissionRouter.post('/submissions/:id/save', ...publicSubmissionMiddleware, saveSubmission);
-
-const formioDef = formEngineRouteDefs.find((d) => d.code === 'formio-v5');
-if (formioDef) {
-  const formioRouter = formioDef.createRouter(createPluginConfigReader('formio-v5'));
-  publicSubmissionRouter.get(
-    '/formio-v5/form/:id',
-    ...publicSubmissionMiddleware,
-    (req, res, next) => {
-      req.url = `/form/${req.params.id}`;
-      formioRouter(req, res, next);
-    },
-  );
-  publicSubmissionRouter.post(
-    '/formio-v5/form/:formId/submission',
-    ...publicSubmissionMiddleware,
-    (req, res, next) => {
-      req.url = `/form/${req.params.formId}/submission`;
-      formioRouter(req, res, next);
-    },
-  );
-}
 
 app.use('/api/v1', publicSubmissionRouter);
 

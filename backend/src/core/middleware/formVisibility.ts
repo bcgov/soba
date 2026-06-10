@@ -76,18 +76,6 @@ export async function checkFormVisibility(req: Request, res: Response, next: Nex
           .where(and(eq(formVersions.id, submission.formVersionId), isNull(formVersions.deletedAt)))
           .limit(1);
       }
-    } else {
-      // GET /forms/engine/:engineRef
-      // GET /formio-v5/form/:id
-      // POST /formio-v5/form/:formId/submission
-      const engineRef = req.params.engineRef || req.params.id || req.params.formId;
-      if (engineRef) {
-        [formVersion] = await db
-          .select()
-          .from(formVersions)
-          .where(and(eq(formVersions.engineSchemaRef, engineRef), isNull(formVersions.deletedAt)))
-          .limit(1);
-      }
     }
 
     if (!formVersion) {

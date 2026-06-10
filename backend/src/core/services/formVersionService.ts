@@ -8,7 +8,6 @@ import {
   getPublishedVersionForForm,
   listFormVersionsForWorkspace,
   updateFormVersionDraft,
-  getFormVersionByEngineRef,
 } from '../db/repos/formVersionRepo';
 import { getFormById, getFormEngineCodeForForm } from '../db/repos/formRepo';
 import { createFormEngineAdapter } from '../integrations/form-engine/FormEngineRegistry';
@@ -295,10 +294,6 @@ export class FormVersionService {
     if (typeof adapter.readSchema !== 'function') return null;
 
     return adapter.readSchema(version.engineSchemaRef);
-  }
-
-  async getByEngineRef(workspaceId: string, engineRef: string) {
-    return getFormVersionByEngineRef(workspaceId, engineRef);
   }
 
   async get(workspaceId: string, formVersionId: string) {

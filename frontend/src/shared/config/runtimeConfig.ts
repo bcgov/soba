@@ -94,9 +94,3 @@ export function getCachedFrontendRuntimeConfig(): FrontendRuntimeConfig | null {
 export function getSobaApiBaseUrl(): string {
   return cachedConfig?.api.baseUrl ?? getBootstrapApiBaseUrl();
 }
-
-/** Form.io v5 proxy mounted under v1 API (matches backend PLUGIN_FORMIO_V5_PROXY_PATH default). */
-export function getFormioProxyBaseUrl(): string {
-  const base = getSobaApiBaseUrl().replace(/\/$/, '');
-  return `${base}/formio-v5`;
-}

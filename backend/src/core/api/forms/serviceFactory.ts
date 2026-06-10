@@ -1,8 +1,6 @@
 import { FormService } from '../../services/formService';
 import { FormVersionService } from '../../services/formVersionService';
 import { decodeCursorAndMode, buildNextCursor, type CursorSort } from '../shared/pagination';
-import { createPluginConfigReader } from '../../config/pluginConfig';
-import { getAuthenticatedFormioClient } from '../../../plugins/formio-v5/formioV5Client';
 
 export interface FormsContextInput {
   workspaceId: string;
@@ -40,9 +38,6 @@ interface UpdateFormInput {
   description?: string | null;
   status?: string;
 }
-
-/** Minimal Form.io form document fields used when merging SOBA metadata into list results. */
-type FormioListedForm = Record<string, unknown> & { _id: string };
 
 const toFormDto = (item: {
   id: string;
@@ -142,6 +137,40 @@ const toFormVersionListItemDto = (item: {
   updatedBy: item.updatedBy,
 });
 
+/** Compact version summary attached to each form list item for the designer/submit list. */
+const toCurrentVersionDto = (item: {
+  id: string;
+  versionNo: number;
+  state: string;
+  createdAt: Date;
+  createdBy: string | null;
+}) => ({
+  id: item.id,
+  versionNo: item.versionNo,
+  state: item.state,
+  createdAt: item.createdAt.toISOString(),
+  createdBy: item.createdBy,
+});
+
+/** Per form, the version to surface in the list: the published one, else the highest versionNo. */
+function pickRepresentativeVersions<V extends { formId: string; versionNo: number; state: string }>(
+  versions: V[],
+): Map<string, V> {
+  const byForm = new Map<string, V>();
+  for (const v of versions) {
+    const cur = byForm.get(v.formId);
+    if (!cur) {
+      byForm.set(v.formId, v);
+      continue;
+    }
+    const curPublished = cur.state === 'published';
+    const vPublished = v.state === 'published';
+    if (vPublished && !curPublished) byForm.set(v.formId, v);
+    else if (vPublished === curPublished && v.versionNo > cur.versionNo) byForm.set(v.formId, v);
+  }
+  return byForm;
+}
+
 export function createFormsApiService(
   formService: FormService,
   formVersionService: FormVersionService,
@@ -180,19 +209,6 @@ export function createFormsApiService(
       return row ? toFormDto(row) : null;
     },
 
-    getFormByEngineRef: async (ctx: FormsContextInput, engineRef: string) => {
-      const version = await formVersionService.getByEngineRef(ctx.workspaceId, engineRef);
-      if (!version) return null;
-
-      const form = await formService.get(ctx.workspaceId, version.formId);
-      if (!form) return null;
-
-      return {
-        ...toFormDto(form),
-        formVersion: toFormVersionDto(version),
-      };
-    },
-
     list: async (ctx: FormsContextInput, query: ListFormsQueryInput) => {
       const { cursorMode, sort, afterId, afterUpdatedAt } = decodeCursorAndMode({
         cursor: query.cursor,
@@ -213,8 +229,26 @@ export function createFormsApiService(
       const lastItem = result.items[result.items.length - 1];
       const nextCursor = buildNextCursor(lastItem, result.hasMore, cursorMode);
 
+      // Attach each form's representative version (published else highest versionNo); the list only
+      // includes forms that have at least one (non-deleted) version.
+      const versionsResult = await formVersionService.list({
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        limit: 1000,
+        sort: 'id:desc',
+        cursorMode: 'id',
+      });
+      const repByForm = pickRepresentativeVersions(versionsResult.items);
+
+      const items = result.items
+        .filter((item) => repByForm.has(item.id))
+        .map((item) => ({
+          ...toFormListItemDto(item),
+          currentVersion: toCurrentVersionDto(repByForm.get(item.id)!),
+        }));
+
       return {
-        items: result.items.map((item) => toFormListItemDto(item)),
+        items,
         page: {
           limit: query.limit,
           hasMore: result.hasMore,
@@ -227,75 +261,6 @@ export function createFormsApiService(
         },
         sort,
       };
-    },
-
-    listFormioForms: async (ctx: FormsContextInput, query: ListFormsQueryInput) => {
-      const { cursorMode, sort, afterId, afterUpdatedAt } = decodeCursorAndMode({
-        cursor: query.cursor,
-        sort: query.sort,
-      });
-
-      const sobaFormsResult = await formService.list({
-        workspaceId: ctx.workspaceId,
-        actorId: ctx.actorId,
-        limit: query.limit,
-        q: query.q,
-        status: query.status,
-        sort,
-        cursorMode,
-        afterId,
-        afterUpdatedAt,
-      });
-
-      if (sobaFormsResult.items.length === 0) {
-        return [];
-      }
-
-      const formVersionsResult = await formVersionService.list({
-        workspaceId: ctx.workspaceId,
-        actorId: ctx.actorId,
-        limit: 1000,
-        sort: 'id:desc',
-        cursorMode: 'id',
-      });
-
-      const formMap = new Map(sobaFormsResult.items.map((f) => [f.id, f]));
-      const refToSobaMap = new Map();
-      const formToRefMap = new Map();
-      const refsToFetch: string[] = [];
-
-      for (const v of formVersionsResult.items) {
-        if (v.engineSchemaRef && formMap.has(v.formId) && !formToRefMap.has(v.formId)) {
-          formToRefMap.set(v.formId, v.engineSchemaRef);
-          refToSobaMap.set(v.engineSchemaRef, {
-            form: formMap.get(v.formId),
-            formVersion: v,
-          });
-          refsToFetch.push(v.engineSchemaRef);
-        }
-      }
-
-      if (refsToFetch.length === 0) {
-        return [];
-      }
-
-      const config = createPluginConfigReader('formio-v5');
-      const client = await getAuthenticatedFormioClient(config);
-      if (!client) {
-        return [];
-      }
-
-      const formioForms = (await client.loadForms({
-        params: { _id__in: refsToFetch.join(',') },
-      })) as FormioListedForm[];
-
-      return formioForms.map((f) => {
-        const sobaData = refToSobaMap.get(f._id);
-        return {
-          ...f,
-          _sobaForm: sobaData,
-        };
-      });
     },
 
     getFormVersion: async (ctx: FormsContextInput, formVersionId: string) => {

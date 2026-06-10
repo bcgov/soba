@@ -30,17 +30,6 @@ type SaveFormVersionParams = z.infer<typeof SaveFormVersionParamsSchema>;
 type ListFormsQuery = z.infer<typeof ListFormsQuerySchema>;
 type ListFormVersionsQuery = z.infer<typeof ListFormVersionsQuerySchema>;
 
-export const getFormByEngineRef = asyncHandler(
-  async (req: Request<{ engineRef: string }>, res: Response) => {
-    const ctx = req.coreContext!;
-    const result = await formsApiService.getFormByEngineRef(ctx, req.params.engineRef);
-    if (!result) {
-      throw new NotFoundError('Form not found');
-    }
-    res.json(result);
-  },
-);
-
 export const createForm = asyncHandler(
   async (req: Request<unknown, unknown, CreateFormBody>, res: Response) => {
     const ctx = req.coreContext!;
@@ -195,10 +184,4 @@ export const deleteForm = asyncHandler(async (req: Request<FormIdParams>, res: R
     throw new NotFoundError('Form not found');
   }
   res.status(204).send();
-});
-
-export const listFormioForms = asyncHandler(async (req: Request, res: Response) => {
-  const ctx = req.coreContext!;
-  const result = await formsApiService.listFormioForms(ctx, req.query as unknown as ListFormsQuery);
-  res.json(result);
 });

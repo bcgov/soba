@@ -15,7 +15,7 @@ export {
   getSobaFormVersion,
   createSobaFormSubmission,
   saveSobaFormSubmission,
-  getSobaFormioForms,
+  getSobaForms,
   getSobaFormVersions,
   updateSobaFormVersionVisibility,
   createFormVersion,

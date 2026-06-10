@@ -35,12 +35,6 @@ export const FormVersionIdParamsSchema = z
   })
   .openapi('Forms_FormVersionIdParams');
 
-export const FormEngineRefParamsSchema = z
-  .object({
-    engineRef: z.string().min(1),
-  })
-  .openapi('Forms_FormEngineRefParams');
-
 export const UpdateFormVersionBodySchema = z
   .object({
     // state changes go through dedicated action endpoints (publish/unpublish/delete/restore);
@@ -89,6 +83,16 @@ export const ListFormsQuerySchema = z
   })
   .openapi('Forms_ListFormsQuery');
 
+export const CurrentVersionSummarySchema = z
+  .object({
+    id: z.string(),
+    versionNo: z.number().int(),
+    state: z.string(),
+    createdAt: z.string(),
+    createdBy: z.string().nullable(),
+  })
+  .openapi('Forms_CurrentVersionSummary');
+
 export const FormListItemSchema = z
   .object({
     id: z.string(),
@@ -97,6 +101,7 @@ export const FormListItemSchema = z
     status: z.string(),
     createdAt: z.string(),
     updatedAt: z.string(),
+    currentVersion: CurrentVersionSummarySchema.nullable(),
   })
   .openapi('Forms_FormListItem');
 
@@ -216,26 +221,6 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'get',
-    path: '/forms/formio/form',
-    tags: ['core.forms'],
-    security: [{ bearerAuth: [] }],
-    request: {
-      query: ListFormsQuerySchema,
-    },
-    responses: {
-      200: {
-        description: 'List forms in Formio format with Soba metadata',
-        content: {
-          'application/json': {
-            schema: z.array(z.record(z.string(), z.unknown())),
-          },
-        },
-      },
-    },
-  });
-
-  registry.registerPath({
-    method: 'get',
     path: '/forms/{id}',
     tags: ['core.forms'],
     security: [{ bearerAuth: [] }],
@@ -248,29 +233,6 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         content: {
           'application/json': {
             schema: FormResponseSchema,
-          },
-        },
-      },
-      404: {
-        description: 'Form not found',
-      },
-    },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: '/forms/engine/{engineRef}',
-    tags: ['core.forms'],
-    security: [{ bearerAuth: [] }],
-    request: {
-      params: FormEngineRefParamsSchema,
-    },
-    responses: {
-      200: {
-        description: 'Get form by engine schema ref',
-        content: {
-          'application/json': {
-            schema: FormWithVersionResponseSchema,
           },
         },
       },

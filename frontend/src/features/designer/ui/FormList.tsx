@@ -8,9 +8,9 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { useRouter, usePathname } from 'next/navigation';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { FaMagnifyingGlass, FaX } from 'react-icons/fa6';
-import { getSobaFormioForms } from '@/src/shared/api/sobaApi';
+import { getSobaForms } from '@/src/shared/api/sobaApi';
+import type { SobaFormSummary } from '@/src/shared/api/sobaApiForms';
 import { useAppSelector } from '@/lib/store';
-import type { FormType } from '@formio/react';
 
 const CustomActionButtons = ({
   form,
@@ -18,16 +18,13 @@ const CustomActionButtons = ({
   designModeEnabled,
   submitModeEnabled,
 }: {
-  form: FormType;
+  form: SobaFormSummary;
   onAction: (name: string, id: string) => void;
   designModeEnabled?: boolean;
   submitModeEnabled?: boolean;
 }) => {
-  const formId = form._id;
-  // All actions (manage/submit/submissions) are keyed on the SOBA formId; the Form.io _id is never
-  // used for routing.
-  const sobaFormId =
-    (form as { _sobaForm?: { form?: { id?: string } } })._sobaForm?.form?.id ?? formId;
+  // All actions (manage/submit/submissions) are keyed on the SOBA formId.
+  const sobaFormId = form.id;
 
   const actions = [];
   if (designModeEnabled) actions.push({ name: 'manage', title: 'Manage' });
@@ -43,7 +40,7 @@ const CustomActionButtons = ({
           <button
             key={action.name}
             type="button"
-            data-test-id={action.name + '-' + formId + '-button'}
+            data-test-id={action.name + '-' + sobaFormId + '-button'}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -76,22 +73,12 @@ function FormList({
   const dictForm = dict.form;
   const { authenticated, token, initializing } = useKeycloak();
 
-  // Helper type for the form object used in the table
-  type TableForm = FormType & {
-    _id?: string;
-    id?: string;
-    title?: string;
-    name?: string;
-    path?: string;
-    _sobaForm?: {
-      form?: { id?: string };
-      formVersion?: { versionNo?: number; state?: string; createdAt?: string; createdBy: string };
-    };
-  };
+  // The form row used in the table is the PG-backed summary DTO.
+  type TableForm = SobaFormSummary;
   const router = useRouter();
   const pathname = usePathname();
 
-  const [forms, setForms] = useState<FormType[]>([]);
+  const [forms, setForms] = useState<SobaFormSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -109,9 +96,9 @@ function FormList({
       const loadForms = async () => {
         setLoading(true);
         try {
-          const data = await getSobaFormioForms(token as string, activeWorkspaceId);
+          const data = await getSobaForms(token as string, activeWorkspaceId);
           if (isMounted) {
-            setForms(Array.isArray(data) ? data : []);
+            setForms(Array.isArray(data.items) ? data.items : []);
           }
         } catch (err: unknown) {
           console.error('Error fetching forms:', err);
@@ -136,9 +123,8 @@ function FormList({
     const query = searchQuery.toLowerCase();
     return forms.filter(
       (f) =>
-        (f.title || '').toLowerCase().includes(query) ||
         (f.name || '').toLowerCase().includes(query) ||
-        (f.path || '').toLowerCase().includes(query),
+        (f.slug || '').toLowerCase().includes(query),
     );
   }, [forms, searchQuery]);
 
@@ -175,23 +161,21 @@ function FormList({
         label: dictFormList?.columns?.name || dictForm?.nameLabel || 'Form Name',
         width: '40%',
         render: (form: TableForm) => {
-          const formId = form._id;
-          const sobaFormId = form._sobaForm?.form?.id ?? formId;
           return designModeEnabled ? (
             <a
               href="#"
-              data-testid={'form-link-' + formId}
+              data-testid={'form-link-' + form.id}
               onClick={(e) => {
                 e.preventDefault();
-                handleAction('manage', sobaFormId!);
+                handleAction('manage', form.id);
               }}
               className="text-decoration-underline"
               style={{ cursor: 'pointer', color: '#00538A' }}
             >
-              {form.title || form.name || dictForm?.nameLabel || 'Untitled Form'}
+              {form.name || dictForm?.nameLabel || 'Untitled Form'}
             </a>
           ) : (
-            <span>{form.title || form.name || dictForm?.nameLabel || 'Untitled Form'}</span>
+            <span>{form.name || dictForm?.nameLabel || 'Untitled Form'}</span>
           );
         },
       },
@@ -212,8 +196,8 @@ function FormList({
         key: 'created',
         label: dictFormList?.columns?.createdBy || 'Created By',
         render: (form: TableForm) => {
-          const version = form._sobaForm?.formVersion;
-          if (!version) return <span className="text-muted small">v1</span>;
+          const version = form.currentVersion;
+          if (!version?.createdBy) return <span className="text-muted small">—</span>;
           return <span className="small">{version.createdBy}</span>;
         },
       },
@@ -221,13 +205,13 @@ function FormList({
         key: 'updated',
         label: dictFormList?.columns?.createdAt || 'Created Date',
         render: (form: TableForm) => {
-          const version = form._sobaForm?.formVersion;
-          if (!version || !version?.createdAt) return <span className="small"></span>;
+          const version = form.currentVersion;
+          if (!version?.createdAt) return <span className="small"></span>;
           const dString = new Intl.DateTimeFormat('en-US', {
             month: 'long', // "May"
             day: 'numeric', // "25"
             year: 'numeric', // "2026"
-          }).format(new Date(version?.createdAt));
+          }).format(new Date(version.createdAt));
           return <span className="small">{dString}</span>;
         },
       },
@@ -305,7 +289,7 @@ function FormList({
         onPageChange={setCurrentPage}
         onPageSizeChange={setPageSize}
         pageSizeOptions={[5, 10, 25, 50]}
-        keyExtractor={(form) => form._id || form.id || form.path || ''}
+        keyExtractor={(form) => form.id}
       />
 
       <style jsx global>{`
