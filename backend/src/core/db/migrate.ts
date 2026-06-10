@@ -12,8 +12,8 @@ const quoteIdentifier = (identifier: string) => `"${identifier.replace(/"/g, '""
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const withRetry = async <T>(label: string, task: () => Promise<T>): Promise<T> => {
-  const attempts = env.getNumberEnv('DB_MIGRATION_READY_ATTEMPTS') ?? 5;
-  const sleepMs = env.getNumberEnv('DB_MIGRATION_READY_SLEEP_MS') ?? 5000;
+  const attempts = env.getDbMigrationReadyAttempts();
+  const sleepMs = env.getDbMigrationReadySleepMs();
 
   let lastError: unknown;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
