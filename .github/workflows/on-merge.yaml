@@ -92,12 +92,15 @@ jobs:
         run: |
           SECRET_NAME="${CLUSTER}-pguser-app"
           echo "secret_name=$SECRET_NAME" >> "$GITHUB_OUTPUT"
-          DB_URI=$(oc get secret "$SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.uri}' | base64 -d)
-          echo "::add-mask::$DB_URI"
-          echo "uri<<URI_EOF" >> "$GITHUB_OUTPUT"
-          printf '%s' "$DB_URI" >> "$GITHUB_OUTPUT"
-          echo "" >> "$GITHUB_OUTPUT"
-          echo "URI_EOF" >> "$GITHUB_OUTPUT"
+
+      # Pipeline performance fix: Revert if needed.
+      - name: Wait for dev database readiness
+        uses: ./.github/actions/wait-for-postgres
+        with:
+          secret_name: ${{ steps.db.outputs.secret_name }}
+          namespace: ${{ secrets.OC_NAMESPACE }}
+          label: dev database
+      # Pipeline performance fix: Revert if needed.
 
       - name: Generate values override and deploy
         env:
@@ -106,10 +109,8 @@ jobs:
           TAG: sha-${{ needs.build.outputs.short_sha }}
           SHORT_SHA: ${{ needs.build.outputs.short_sha }}
           DOMAIN: ${{ vars.OC_DOMAIN }}
-          DATABASE_URI: ${{ steps.db.outputs.uri }}
         run: |
           REPO_LC=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
-          DB_URI_ESC=$(printf '%s' "$DATABASE_URI" | sed "s/'/''/g")
 
           cat > /tmp/values-override.yaml <<OVERRIDE
           backend:
@@ -127,20 +128,21 @@ jobs:
           global:
             domain: "${DOMAIN}"
           database:
-            uri: '${DB_URI_ESC}'
+            existingSecretName: "${{ steps.db.outputs.secret_name }}"
+            existingSecretKey: "uri"
           OVERRIDE
 
+          # Pipeline performance fix: Revert if needed.
           helm upgrade --install "soba-dev" ./deployments/helm/soba \
             --namespace "${NAMESPACE}" \
+            --wait \
+            --wait-for-jobs \
             --timeout 660s \
             -f deployments/helm/soba/values-dev.yaml \
             -f /tmp/values-override.yaml
+          # Pipeline performance fix: Revert if needed.
 
           REVISION=$(helm status "soba-dev" -n "${NAMESPACE}" -o json | jq -r '.version')
-          echo "Waiting for migration job (revision ${REVISION})..."
-          oc wait --for=condition=complete "job/soba-dev-migrate-${REVISION}" \
-            -n "${NAMESPACE}" --timeout=600s
-
           # Clean up old migration jobs and keep only current revision
           oc get jobs -n "${NAMESPACE}" -o name \
             | grep "soba-dev-migrate-" \
@@ -158,6 +160,17 @@ jobs:
 
           echo "Waiting for mongodb rollout..."
           oc rollout status statefulset/soba-dev-mongodb -n "${NAMESPACE}" --timeout=300s
+
+      # Pipeline performance fix: Revert if needed.
+      # Temporarily disabled openshift diagnostics; uncomment to restore.
+      # - name: Deployment diagnostics
+      #   if: failure()
+      #   uses: ./.github/actions/openshift-diagnostics
+      #   with:
+      #     release: soba-dev
+      #     namespace: ${{ secrets.OC_NAMESPACE }}
+      #     database_secret_name: ${{ steps.db.outputs.secret_name }}
+      # Pipeline performance fix: Revert if needed.
 
   Tests:
     name: Integration Tests

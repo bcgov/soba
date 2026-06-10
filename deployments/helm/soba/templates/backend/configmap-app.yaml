@@ -40,3 +40,11 @@ data:
   {{- end }}
   DB_ADMIN_DATABASE: {{ .Values.database.adminDatabase | quote }}
   DB_POOL_MAX: {{ .Values.database.poolMax | quote }}
+  # Pipeline performance fix: Revert if needed.
+  DB_CONNECTION_TIMEOUT_MS: {{ .Values.database.connectionTimeoutMs | quote }}
+  DB_QUERY_TIMEOUT_MS: {{ .Values.database.queryTimeoutMs | quote }}
+  DB_STATEMENT_TIMEOUT_MS: {{ .Values.database.statementTimeoutMs | quote }}
+  DB_LOCK_TIMEOUT_MS: {{ .Values.database.lockTimeoutMs | quote }}
+  DB_MIGRATION_READY_ATTEMPTS: {{ .Values.database.migrationReadyAttempts | quote }}
+  DB_MIGRATION_READY_SLEEP_MS: {{ .Values.database.migrationReadySleepMs | quote }}
+  # Pipeline performance fix: Revert if needed.

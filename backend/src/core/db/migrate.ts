@@ -8,6 +8,29 @@ import { db, pool } from './client';
 
 const quoteIdentifier = (identifier: string) => `"${identifier.replace(/"/g, '""')}"`;
 
+// Pipeline performance fix: Revert if needed.
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const withRetry = async <T>(label: string, task: () => Promise<T>): Promise<T> => {
+  const attempts = env.getDbMigrationReadyAttempts();
+  const sleepMs = env.getDbMigrationReadySleepMs();
+
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await task();
+    } catch (error) {
+      lastError = error;
+      console.error(`${label} failed on attempt ${attempt}/${attempts}`, error);
+      if (attempt < attempts) {
+        await sleep(sleepMs);
+      }
+    }
+  }
+
+  throw lastError;
+};
+
 const ensureDatabaseExists = async () => {
   const databaseUrl = env.getDatabaseUrl();
 
@@ -24,6 +47,10 @@ const ensureDatabaseExists = async () => {
   const adminPool = new Pool({
     connectionString: adminUrl.toString(),
     max: 1,
+    connectionTimeoutMillis: env.getDbConnectionTimeoutMs(),
+    query_timeout: env.getDbQueryTimeoutMs(),
+    statement_timeout: env.getDbStatementTimeoutMs(),
+    lock_timeout: env.getDbLockTimeoutMs(),
   });
 
   try {
@@ -42,11 +69,15 @@ const ensureDatabaseExists = async () => {
 };
 
 const run = async () => {
-  await ensureDatabaseExists();
+  await withRetry('Database setup', ensureDatabaseExists);
+  await withRetry('Database readiness check', async () => {
+    await pool.query('SELECT 1');
+  });
   await migrate(db, { migrationsFolder: 'drizzle' });
   console.log('Migrations complete.');
   await pool.end();
 };
+// Pipeline performance fix: Revert if needed.
 
 run().catch(async (error) => {
   console.error('Migration failed', error);

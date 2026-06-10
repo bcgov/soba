@@ -165,6 +165,10 @@ frontend:
 database:
   # Option 1: full URI (takes precedence)
   uri: ""
+  # Pipeline performance fix: Revert if needed.
+  existingSecretName: ""
+  existingSecretKey: "uri"
+  # Pipeline performance fix: Revert if needed.
   # Option 2: components (used when uri is empty)
   host: ""
   port: "5432"
@@ -173,6 +177,14 @@ database:
   name: soba
   adminDatabase: postgres
   poolMax: "10"
+  # Pipeline performance fix: Revert if needed.
+  connectionTimeoutMs: "10000"
+  queryTimeoutMs: "60000"
+  statementTimeoutMs: "60000"
+  lockTimeoutMs: "10000"
+  migrationReadyAttempts: "5"
+  migrationReadySleepMs: "5000"
+  # Pipeline performance fix: Revert if needed.
 
 # -- Form.io ---------------------------------------------------------------
 formio:

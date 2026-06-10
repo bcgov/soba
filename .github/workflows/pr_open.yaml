@@ -52,9 +52,9 @@ jobs:
 
   set-vars:
     name: Set variables
-    needs: [qa, changes]
-    if: needs.changes.outputs.deploy == 'true'
     runs-on: ubuntu-latest
+    needs: [qa, changes]
+    if: ${{ needs.changes.outputs.deploy == 'true' && !startsWith(github.head_ref, 'release/') && github.head_ref != 'main' }}
     outputs:
       JOB_NAME: ${{ steps.vars.outputs.JOB_NAME }}
       URL: ${{ steps.vars.outputs.URL }}
@@ -145,12 +145,15 @@ jobs:
         run: |
           SECRET_NAME="${CLUSTER}-pguser-app-${PR_NUM}"
           echo "secret_name=$SECRET_NAME" >> "$GITHUB_OUTPUT"
-          DB_URI=$(oc get secret "$SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.uri}' | base64 -d)
-          echo "::add-mask::$DB_URI"
-          echo "uri<<URI_EOF" >> "$GITHUB_OUTPUT"
-          printf '%s' "$DB_URI" >> "$GITHUB_OUTPUT"
-          echo "" >> "$GITHUB_OUTPUT"
-          echo "URI_EOF" >> "$GITHUB_OUTPUT"
+
+      # Pipeline performance fix: Revert if needed.
+      - name: Wait for PR database readiness
+        uses: ./.github/actions/wait-for-postgres
+        with:
+          secret_name: ${{ steps.db.outputs.secret_name }}
+          namespace: ${{ secrets.OC_NAMESPACE }}
+          label: PR database
+      # Pipeline performance fix: Revert if needed.
 
       - name: Generate values override and deploy
         env:
@@ -160,11 +163,10 @@ jobs:
           TAG: sha-${{ needs.build.outputs.short_sha }}
           DOMAIN: ${{ vars.OC_DOMAIN }}
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
-          DATABASE_URI: ${{ steps.db.outputs.uri }}
         run: |
+          # Pipeline performance fix: Revert if needed.
+          set -euo pipefail
           REPO_LC=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
-          # Escape single quotes for YAML: ' -> ''
-          DB_URI_ESC=$(printf '%s' "$DATABASE_URI" | sed "s/'/''/g")
 
           cat > /tmp/values-override.yaml <<OVERRIDE
           backend:
@@ -182,37 +184,49 @@ jobs:
             routeHost: "soba-pr-${PR_NUM}.${DOMAIN}"
             routePath: ""
           database:
-            uri: '${DB_URI_ESC}'
+            existingSecretName: "${{ steps.db.outputs.secret_name }}"
+            existingSecretKey: "uri"
           OVERRIDE
 
+          # Pipeline performance fix: Revert if needed.
           helm upgrade --install "${RELEASE}" ./deployments/helm/soba \
             --namespace "${NAMESPACE}" \
+            --wait \
+            --wait-for-jobs \
             --timeout 660s \
             -f deployments/helm/soba/values-pr.yaml \
             -f /tmp/values-override.yaml
+          # Pipeline performance fix: Revert if needed.
 
           REVISION=$(helm status "${RELEASE}" -n "${NAMESPACE}" -o json | jq -r '.version')
-          echo "Waiting for migration job (revision ${REVISION})..."
-          oc wait --for=condition=complete "job/${RELEASE}-migrate-${REVISION}" \
-            -n "${NAMESPACE}" --timeout=600s
-
           # Clean up old migration jobs and keep only current revision
           oc get jobs -n "${NAMESPACE}" -o name \
             | grep "${RELEASE}-migrate-" \
             | grep -v -- "-migrate-${REVISION}$" \
             | xargs -r oc delete -n "${NAMESPACE}" 2>/dev/null || true
 
-          echo "Waiting for backend rollout..."
-          oc rollout status deployment/${RELEASE}-backend -n "${NAMESPACE}" --timeout=300s
+          for rollout in \
+            "deployment/${RELEASE}-backend:backend" \
+            "deployment/${RELEASE}-frontend:frontend" \
+            "deployment/${RELEASE}-formio:formio" \
+            "statefulset/${RELEASE}-mongodb:mongodb"; do
+            resource="${rollout%%:*}"
+            label="${rollout##*:}"
+            echo "Waiting for ${label} rollout..."
+            oc rollout status "${resource}" -n "${NAMESPACE}" --timeout=300s
+          done
+          # Pipeline performance fix: Revert if needed.
 
-          echo "Waiting for frontend rollout..."
-          oc rollout status deployment/${RELEASE}-frontend -n "${NAMESPACE}" --timeout=300s
-
-          echo "Waiting for formio rollout..."
-          oc rollout status deployment/${RELEASE}-formio -n "${NAMESPACE}" --timeout=300s
-
-          echo "Waiting for mongodb rollout..."
-          oc rollout status statefulset/${RELEASE}-mongodb -n "${NAMESPACE}" --timeout=300s
+      # Pipeline performance fix: Revert if needed.
+      # Temporarily disabled openshift diagnostics; uncomment to restore.
+      # - name: Deployment diagnostics
+      #   if: failure()
+      #   uses: ./.github/actions/openshift-diagnostics
+      #   with:
+      #     release: soba-${{ needs.set-vars.outputs.JOB_NAME }}
+      #     namespace: ${{ secrets.OC_NAMESPACE }}
+      #     database_secret_name: ${{ steps.db.outputs.secret_name }}
+      # Pipeline performance fix: Revert if needed.
 
       - name: Release Comment on PR
         uses: marocchino/sticky-pull-request-comment@v2

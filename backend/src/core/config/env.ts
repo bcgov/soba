@@ -135,6 +135,15 @@ export function createEnvReader(source: EnvSource) {
     getCsvEnv: (key: string) => getCsvEnvFrom(source, key),
     getDatabaseUrl: () => resolveDatabaseUrl(source),
     getDbAdminDatabase: () => getOptionalEnvFrom(source, 'DB_ADMIN_DATABASE'),
+    // Pipeline performance fix: Revert if needed.
+    getDbConnectionTimeoutMs: () => getNumberEnvFrom(source, 'DB_CONNECTION_TIMEOUT_MS') ?? 10000,
+    getDbQueryTimeoutMs: () => getNumberEnvFrom(source, 'DB_QUERY_TIMEOUT_MS') ?? 60000,
+    getDbStatementTimeoutMs: () => getNumberEnvFrom(source, 'DB_STATEMENT_TIMEOUT_MS') ?? 60000,
+    getDbLockTimeoutMs: () => getNumberEnvFrom(source, 'DB_LOCK_TIMEOUT_MS') ?? 10000,
+    getDbMigrationReadyAttempts: () => getNumberEnvFrom(source, 'DB_MIGRATION_READY_ATTEMPTS') ?? 5,
+    getDbMigrationReadySleepMs: () =>
+      getNumberEnvFrom(source, 'DB_MIGRATION_READY_SLEEP_MS') ?? 5000,
+    // Pipeline performance fix: Revert if needed.
     getOutboxPollIntervalMs: () => getNumberEnvFrom(source, 'OUTBOX_POLL_INTERVAL_MS'),
     getOutboxBatchSize: () => getNumberEnvFrom(source, 'OUTBOX_BATCH_SIZE'),
     getSystemSobaUserEmail: () => getOptionalEnvFrom(source, 'SYSTEM_SOBA_USER_EMAIL'),
@@ -180,6 +189,14 @@ export const env = {
   getCsvEnv,
   getDatabaseUrl: () => resolveDatabaseUrl(process.env),
   getDbAdminDatabase: () => getOptionalEnv('DB_ADMIN_DATABASE'),
+  // Pipeline performance fix: Revert if needed.
+  getDbConnectionTimeoutMs: () => getNumberEnv('DB_CONNECTION_TIMEOUT_MS') ?? 10000,
+  getDbQueryTimeoutMs: () => getNumberEnv('DB_QUERY_TIMEOUT_MS') ?? 60000,
+  getDbStatementTimeoutMs: () => getNumberEnv('DB_STATEMENT_TIMEOUT_MS') ?? 60000,
+  getDbLockTimeoutMs: () => getNumberEnv('DB_LOCK_TIMEOUT_MS') ?? 10000,
+  getDbMigrationReadyAttempts: () => getNumberEnv('DB_MIGRATION_READY_ATTEMPTS') ?? 5,
+  getDbMigrationReadySleepMs: () => getNumberEnv('DB_MIGRATION_READY_SLEEP_MS') ?? 5000,
+  // Pipeline performance fix: Revert if needed.
   getOutboxPollIntervalMs: () => getNumberEnv('OUTBOX_POLL_INTERVAL_MS'),
   getOutboxBatchSize: () => getNumberEnv('OUTBOX_BATCH_SIZE'),
   getSystemSobaUserEmail: () => getOptionalEnv('SYSTEM_SOBA_USER_EMAIL'),
