@@ -155,10 +155,10 @@ function FormForm({ id }: { id?: string[] }) {
     setIsDirty(true);
   };
 
-  const updateFormSchema = (data: FormType) => {
+  const updateFormSchema = useCallback((data: FormType) => {
     setFormSchema(data);
     setIsDirty(true);
-  };
+  }, []);
 
   const loadVersionSchema = async (version: SobaFormVersionType) => {
     setLoading(true);

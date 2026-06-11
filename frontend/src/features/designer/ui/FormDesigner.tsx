@@ -9,7 +9,11 @@ import '@formio/js/dist/formio.full.min.css';
 
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import type { FormType } from '@formio/react';
+import type {
+  FormType,
+  FormBuilderProps,
+  FormioProvider as FormioProviderComponent,
+} from '@formio/react';
 import './FormDesigner.module.css';
 import Form from 'react-bootstrap/Form';
 import { Modal as CommonModal } from '@/src/components/Modal';
@@ -27,7 +31,7 @@ const FormBuilder = dynamic(
     return mod.FormBuilder;
   },
   { ssr: false },
-) as React.ComponentType<Record<string, unknown>>;
+) as React.ComponentType<FormBuilderProps>;
 
 const FormioProvider = dynamic(
   async () => {
@@ -35,7 +39,7 @@ const FormioProvider = dynamic(
     return mod.FormioProvider;
   },
   { ssr: false },
-) as React.ComponentType<Record<string, unknown>>;
+) as React.ComponentType<React.ComponentProps<typeof FormioProviderComponent>>;
 
 interface DesignerProps {
   onUpdateModel: (data: FormType) => void;
