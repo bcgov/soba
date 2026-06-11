@@ -8,6 +8,9 @@ on:
       pr_branch:
         required: true
         type: string
+      BASE_URL:
+        required: false
+        type: string
     secrets:
       Username:
         required: true
@@ -42,6 +45,7 @@ jobs:
           KEYCLOAK_PASSWORD: ${{ secrets.Password }}
           MFA_CODE: ${{ secrets.MFA_CODE }}
           DEP_ENV: ${{ inputs.DEP_ENV }}
+          BASE_URL: ${{ inputs.BASE_URL }}
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v6

@@ -10,7 +10,8 @@ test.describe.serial("Landing page tests", () => {
   });
 
   test.afterAll(async () => {
-    //Logout after tests
+    //Logout after tests — logout lives inside the user dropdown, so open it first
+    await sharedPage.click('[data-testid="user-dropdown"]');
     await sharedPage.click('[data-testid="logout-button"]');
     await sharedPage.context().close();
   });
@@ -21,18 +22,22 @@ test.describe.serial("Landing page tests", () => {
       sharedPage.locator('[data-testid="login-button"]'),
     ).toBeVisible();
     await login(sharedPage);
+    // The user dropdown only renders once authenticated, so it confirms login
     await expect(
-      sharedPage.locator('[data-testid="nav-menu-button"]'),
+      sharedPage.locator('[data-testid="user-dropdown"]'),
     ).toBeVisible();
   });
 
   test("Checks the navigation links", async () => {
-    await sharedPage.locator('[data-testid="nav-menu-button"]').click();
-    const designLink = sharedPage.locator('a[href="/en/designer"]');
-    await designLink.isVisible();
-    const formsLink = sharedPage.locator('a[href="/en/forms"]');
-    await formsLink.isVisible();
-    const APIMetaLink = sharedPage.locator('a[href="/en/meta"]');
-    await APIMetaLink.isVisible();
+    // The SideNav is always visible for authenticated users (no menu toggle).
+    await expect(
+      sharedPage.locator('[data-testid="forms-nav"]'),
+    ).toBeVisible();
+    await expect(
+      sharedPage.locator('[data-testid="feedback-nav"]'),
+    ).toBeVisible();
+    await expect(
+      sharedPage.locator('[data-testid="help-nav"]'),
+    ).toBeVisible();
   });
 });
