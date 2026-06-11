@@ -40,7 +40,9 @@ export default async function RootLayout({
         >
           <SideNav showAppLinks={showAppLinks} showHome={showHome} />
         </aside>
-        <main className="flex-grow-1 p-5 overflow-auto">{children}</main>
+        <main id="main-content" tabIndex={-1} className="flex-grow-1 p-5 overflow-auto">
+          {children}
+        </main>
       </div>
       <Footer hideAcknowledgement={true} contact={React.createElement('span', null, '')} />
     </DictionaryProvider>

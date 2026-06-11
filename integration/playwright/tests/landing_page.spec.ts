@@ -10,7 +10,8 @@ test.describe.serial("Landing page tests", () => {
   });
 
   test.afterAll(async () => {
-    //Logout after tests
+    //Logout after tests — logout lives inside the user dropdown, so open it first
+    await sharedPage.click('[data-testid="user-dropdown"]');
     await sharedPage.click('[data-testid="logout-button"]');
     await sharedPage.context().close();
   });
