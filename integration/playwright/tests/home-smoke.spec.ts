@@ -9,8 +9,9 @@ test("page exposes core accessibility landmarks and skip navigation", async ({
   await expect(page.getByRole("banner")).toBeVisible();
   await expect(page.locator("main#main-content")).toBeVisible();
   const skipLink = page.locator('a[href="#main-content"]').first();
-  await expect(skipLink).toBeVisible();
+  await expect(skipLink).toBeAttached();
   await skipLink.focus();
+  await expect(skipLink).toBeVisible();
   await expect(skipLink).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator("main#main-content")).toBeFocused();
