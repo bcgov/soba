@@ -4,19 +4,14 @@ import {
   appendFormVersionRevision,
   createEmptyFormVersionDraft,
   getFormVersionById,
+  getFormVersionByIdIncludingDeleted,
+  getPublishedVersionForForm,
   listFormVersionsForWorkspace,
-  markFormVersionDeleted,
   updateFormVersionDraft,
-  getFormVersionByEngineRef,
 } from '../db/repos/formVersionRepo';
-import { db } from '../db/client';
-import { QueueAdapter } from '../integrations/queue/QueueAdapter';
 import { getFormById, getFormEngineCodeForForm } from '../db/repos/formRepo';
-import { buildFormVersionCreateTopic } from '../integrations/form-engine/formEngineTopics';
-import {
-  FormVersionCreatePayloadSchema,
-  type FormVersionCreatePayload,
-} from '../integrations/queue/events';
+import { createFormEngineAdapter } from '../integrations/form-engine/FormEngineRegistry';
+import { db } from '../db/client';
 import { NotFoundError, ValidationError } from '../errors';
 
 interface CreateDraftInput {
@@ -24,6 +19,7 @@ interface CreateDraftInput {
   actorId: string;
   actorDisplayLabel: string | null;
   formId: string;
+  visibility?: string[];
 }
 
 interface UpdateDraftInput {
@@ -31,7 +27,7 @@ interface UpdateDraftInput {
   actorId: string;
   actorDisplayLabel: string | null;
   formVersionId: string;
-  state?: string;
+  visibility?: string[];
 }
 
 interface SaveInput {
@@ -41,12 +37,11 @@ interface SaveInput {
   formVersionId: string;
   eventType: string;
   note?: string;
-  enqueueProvision?: boolean;
   formioFormDefinition?: Record<string, unknown>;
   engineSchemaRef?: string | null;
 }
 
-interface DeleteInput {
+interface VersionActionInput {
   workspaceId: string;
   actorId: string;
   actorDisplayLabel: string | null;
@@ -65,16 +60,62 @@ interface ListInput {
   afterUpdatedAt?: Date;
 }
 
-export class FormVersionService {
-  constructor(private readonly queueAdapter: QueueAdapter) {}
+type LifecycleState = 'draft' | 'published' | 'archived' | 'deleted';
 
+const ALLOWED_TRANSITIONS: Record<LifecycleState, LifecycleState[]> = {
+  draft: ['published', 'deleted'],
+  published: ['archived', 'deleted'],
+  archived: ['published', 'deleted'],
+  deleted: ['draft'],
+};
+
+/** Throws if a form version may not move from `from` to `to`. */
+function assertTransition(from: string, to: LifecycleState): void {
+  const allowed = ALLOWED_TRANSITIONS[from as LifecycleState] ?? [];
+  if (!allowed.includes(to)) {
+    throw new ValidationError(`Cannot change form version state from '${from}' to '${to}'`);
+  }
+}
+
+/**
+ * Stamp patch for a target state: sets the matching timestamp/actor columns and nulls the rest,
+ * so the stamps always match `state` (only `published` has publishedAt/By, only `deleted` has deletedAt/By).
+ */
+function stateStamps(
+  to: LifecycleState,
+  actor: { actorId: string; actorDisplayLabel: string | null },
+): {
+  state: LifecycleState;
+  publishedAt: Date | null;
+  publishedBy: string | null;
+  deletedAt: Date | null;
+  deletedBy: string | null;
+} {
+  const patch = {
+    state: to,
+    publishedAt: null as Date | null,
+    publishedBy: null as string | null,
+    deletedAt: null as Date | null,
+    deletedBy: null as string | null,
+  };
+  if (to === 'published') {
+    patch.publishedAt = new Date();
+    patch.publishedBy = actor.actorId;
+  } else if (to === 'deleted') {
+    patch.deletedAt = new Date();
+    patch.deletedBy = actor.actorDisplayLabel;
+  }
+  return patch;
+}
+
+export class FormVersionService {
   async createDraft(input: CreateDraftInput) {
     return createEmptyFormVersionDraft(input);
   }
 
   async updateDraft(input: UpdateDraftInput) {
     return updateFormVersionDraft(input.workspaceId, input.formVersionId, input.actorDisplayLabel, {
-      state: input.state,
+      visibility: input.visibility,
     });
   }
 
@@ -93,70 +134,166 @@ export class FormVersionService {
         tx,
       );
       if (!revised) return null;
-      // Persist engineSchemaRef into the main formVersion row if supplied
+      // Persist engineSchemaRef into the main formVersion row if supplied.
+      // A ref means the Form.io document exists, so the version is in sync ('ready').
       if (input.engineSchemaRef != null) {
         await updateFormVersionDraft(
           input.workspaceId,
           input.formVersionId,
           input.actorDisplayLabel,
-          { engineSchemaRef: input.engineSchemaRef },
+          { engineSchemaRef: input.engineSchemaRef, engineSyncStatus: 'ready' },
           tx,
         );
       }
 
-      if (input.eventType === 'publish') {
-        await updateFormVersionDraft(
-          input.workspaceId,
-          input.formVersionId,
-          input.actorDisplayLabel,
-          { state: 'published' },
-          tx,
-        );
-      }
       return revised;
     });
 
     if (!updated) throw new NotFoundError('Form version not found');
 
-    if (input.enqueueProvision) {
-      const formEngineCode = updated.formId
-        ? await getFormEngineCodeForForm(input.workspaceId, updated.formId)
-        : null;
-      if (!formEngineCode) {
-        throw new ValidationError(
-          'Cannot enqueue form version provision without a valid form engine',
-        );
-      }
-      const formRecord =
-        updated.formId != null ? await getFormById(input.workspaceId, updated.formId) : null;
-      const payload: FormVersionCreatePayload = FormVersionCreatePayloadSchema.parse({
-        formVersionId: input.formVersionId,
-        engineCode: formEngineCode,
-        formId: updated.formId ?? undefined,
-        formioFormDefinition: input.formioFormDefinition,
-        formSlug: formRecord?.slug,
-        formName: formRecord?.name,
-      });
-      await this.queueAdapter.enqueue({
-        topic: buildFormVersionCreateTopic(formEngineCode),
-        aggregateType: 'form_version',
-        aggregateId: input.formVersionId,
-        workspaceId: input.workspaceId,
-        payload,
-        actorId: input.actorId,
-        actorDisplayLabel: input.actorDisplayLabel,
-      });
-    }
-
     return updated;
   }
 
-  async delete(input: DeleteInput) {
-    return markFormVersionDeleted(input.workspaceId, input.formVersionId, input.actorDisplayLabel);
+  async delete(input: VersionActionInput) {
+    const version = await getFormVersionByIdIncludingDeleted(
+      input.workspaceId,
+      input.formVersionId,
+    );
+    if (!version) throw new NotFoundError('Form version not found');
+    assertTransition(version.state, 'deleted');
+    return updateFormVersionDraft(
+      input.workspaceId,
+      input.formVersionId,
+      input.actorDisplayLabel,
+      stateStamps('deleted', input),
+    );
   }
 
-  async getByEngineRef(workspaceId: string, engineRef: string) {
-    return getFormVersionByEngineRef(workspaceId, engineRef);
+  async publish(input: VersionActionInput) {
+    const version = await getFormVersionById(input.workspaceId, input.formVersionId);
+    if (!version) throw new NotFoundError('Form version not found');
+    if (version.state === 'published') return version; // idempotent
+    assertTransition(version.state, 'published');
+    if (version.engineSyncStatus !== 'ready') {
+      throw new ValidationError('Form version is not ready to publish');
+    }
+    return db.transaction(async (tx) => {
+      const current = await getPublishedVersionForForm(input.workspaceId, version.formId, tx);
+      if (current && current.id !== version.id) {
+        await updateFormVersionDraft(
+          input.workspaceId,
+          current.id,
+          input.actorDisplayLabel,
+          stateStamps('archived', input),
+          tx,
+        );
+      }
+      return updateFormVersionDraft(
+        input.workspaceId,
+        input.formVersionId,
+        input.actorDisplayLabel,
+        stateStamps('published', input),
+        tx,
+      );
+    });
+  }
+
+  async unpublish(input: VersionActionInput) {
+    const version = await getFormVersionById(input.workspaceId, input.formVersionId);
+    if (!version) throw new NotFoundError('Form version not found');
+    assertTransition(version.state, 'archived');
+    return updateFormVersionDraft(
+      input.workspaceId,
+      input.formVersionId,
+      input.actorDisplayLabel,
+      stateStamps('archived', input),
+    );
+  }
+
+  async restore(input: VersionActionInput) {
+    const version = await getFormVersionByIdIncludingDeleted(
+      input.workspaceId,
+      input.formVersionId,
+    );
+    if (!version) throw new NotFoundError('Form version not found');
+    assertTransition(version.state, 'draft');
+    return updateFormVersionDraft(
+      input.workspaceId,
+      input.formVersionId,
+      input.actorDisplayLabel,
+      stateStamps('draft', input),
+    );
+  }
+
+  /**
+   * Provision (create-or-update) the form version's schema in the form engine, server-side via the
+   * admin client. Sets engineSyncStatus 'provisioning' → 'ready' (with engineSchemaRef) or 'error'.
+   */
+  async provision(input: {
+    workspaceId: string;
+    actorId: string;
+    actorDisplayLabel: string | null;
+    formVersionId: string;
+    schema: Record<string, unknown>;
+  }) {
+    const version = await getFormVersionById(input.workspaceId, input.formVersionId);
+    if (!version) throw new NotFoundError('Form version not found');
+
+    const engineCode = await getFormEngineCodeForForm(input.workspaceId, version.formId);
+    if (!engineCode) {
+      throw new ValidationError('Form has no form engine configured');
+    }
+
+    const form = await getFormById(input.workspaceId, version.formId);
+    const adapter = createFormEngineAdapter(engineCode);
+    if (typeof adapter.upsertSchema !== 'function') {
+      throw new ValidationError(`Form engine '${engineCode}' does not support schema provisioning`);
+    }
+
+    await updateFormVersionDraft(input.workspaceId, input.formVersionId, input.actorDisplayLabel, {
+      engineSyncStatus: 'provisioning',
+      engineSyncError: null,
+    });
+
+    try {
+      const { engineRef } = await adapter.upsertSchema({
+        formVersionId: input.formVersionId,
+        workspaceId: input.workspaceId,
+        schema: input.schema,
+        title: form?.name,
+      });
+      return updateFormVersionDraft(
+        input.workspaceId,
+        input.formVersionId,
+        input.actorDisplayLabel,
+        { engineSchemaRef: engineRef, engineSyncStatus: 'ready', engineSyncError: null },
+      );
+    } catch (err) {
+      await updateFormVersionDraft(
+        input.workspaceId,
+        input.formVersionId,
+        input.actorDisplayLabel,
+        {
+          engineSyncStatus: 'error',
+          engineSyncError: err instanceof Error ? err.message : String(err),
+        },
+      );
+      throw err;
+    }
+  }
+
+  /** Reads the form version's schema back from the form engine (null if unprovisioned). */
+  async getSchema(input: { workspaceId: string; formVersionId: string }) {
+    const version = await getFormVersionById(input.workspaceId, input.formVersionId);
+    if (!version || !version.engineSchemaRef) return null;
+
+    const engineCode = await getFormEngineCodeForForm(input.workspaceId, version.formId);
+    if (!engineCode) return null;
+
+    const adapter = createFormEngineAdapter(engineCode);
+    if (typeof adapter.readSchema !== 'function') return null;
+
+    return adapter.readSchema(version.engineSchemaRef);
   }
 
   async get(workspaceId: string, formVersionId: string) {

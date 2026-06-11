@@ -59,6 +59,9 @@ export function createSubmissionsApiService(submissionService: SubmissionService
       return row ? toSubmissionDto(row) : null;
     },
 
+    getData: (ctx: SubmissionsContextInput, submissionId: string) =>
+      submissionService.getContent({ workspaceId: ctx.workspaceId, submissionId }),
+
     list: async (ctx: SubmissionsContextInput, query: ListSubmissionsQueryInput) => {
       const { cursorMode, sort, afterId, afterUpdatedAt } = decodeCursorAndMode({
         cursor: query.cursor,
@@ -130,7 +133,7 @@ export function createSubmissionsApiService(submissionService: SubmissionService
     save: (
       ctx: SubmissionsContextInput,
       submissionId: string,
-      input: { eventType?: string; note?: string; enqueueProvision?: boolean },
+      input: { data: Record<string, unknown>; eventType?: string; note?: string },
     ) =>
       submissionService
         .save({
@@ -138,9 +141,9 @@ export function createSubmissionsApiService(submissionService: SubmissionService
           actorId: ctx.actorId,
           actorDisplayLabel: ctx.actorDisplayLabel,
           submissionId,
+          data: input.data,
           eventType: input.eventType || 'edit_submission',
           note: input.note,
-          enqueueProvision: input.enqueueProvision ?? true,
         })
         .then((row) => toSubmissionDto(row)),
 

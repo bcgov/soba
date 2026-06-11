@@ -1,29 +1,50 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
+import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { getSobaSubmissions } from '@/src/shared/api/sobaApiForms';
-import type { SubmissionListItem } from '../types';
+import type { SubmissionListItem } from '@/src/types/submissions';
+import { DataTable, Column } from '@/src/components/DataTable';
+import { useAppSelector } from '@/lib/store';
 
-export function SubmissionList() {
+interface SubmissionListProps {
+  formId?: string;
+}
+
+export function SubmissionList({ formId }: SubmissionListProps = {}) {
   const { authenticated, token, initializing } = useKeycloak();
   const dict = useDictionary();
+  const router = useRouter();
+  const pathname = usePathname();
+  const locale = getLocaleFromPath(pathname);
   const [submissions, setSubmissions] = useState<SubmissionListItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
+  const { activeWorkspaceId } = useAppSelector((state) => state.workspace);
+
   useEffect(() => {
     if (authenticated && token) {
-      getSobaSubmissions(token)
-        .then((data) => {
+      const fetchSubmissions = async () => {
+        try {
+          // `formId` is the SOBA formId (routed from FormList); list submissions for it directly.
+          const params = formId ? { formId } : undefined;
+          const data = await getSobaSubmissions(token, params, activeWorkspaceId || undefined);
           setSubmissions(data.items || []);
-        })
-        .catch((err) => console.error('Failed to fetch submissions', err))
-        .finally(() => setIsLoaded(true));
-    }
-  }, [authenticated, token]);
+        } catch (err) {
+          console.error('Failed to fetch submissions', err);
+        } finally {
+          setIsLoaded(true);
+        }
+      };
 
-  const loading = authenticated && token && !isLoaded;
+      fetchSubmissions();
+    }
+  }, [authenticated, token, formId, activeWorkspaceId]);
+
+  const loading = !!(authenticated && token && !isLoaded);
 
   if (initializing || (authenticated && !token)) {
     return <div className="p-4">{dict.form?.loading || 'Loading submissions...'}</div>;
@@ -33,80 +54,81 @@ export function SubmissionList() {
     return null;
   }
 
+  // Define columns for DataTable
+  const columns: Column<SubmissionListItem>[] = [
+    {
+      key: 'id',
+      label: dict.submission?.columns?.id || 'Submission ID',
+      render: (sub) => (
+        <a
+          href="#"
+          data-testid={`submission-view-${sub.id}`}
+          onClick={(e) => {
+            e.preventDefault();
+            router.push(`/${locale}/submission/${sub.id}`);
+          }}
+          className="text-decoration-underline"
+          style={{ cursor: 'pointer', color: '#00538A' }}
+          title={dict.submission?.view || 'View'}
+        >
+          <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">{sub.id}</code>
+        </a>
+      ),
+    },
+    {
+      key: 'formName',
+      label: dict.submission?.columns?.formName || dict.form?.nameLabel || 'Form Name',
+      render: (sub) => (
+        <span className="text-gray-800 font-semibold">
+          {sub.formName || dict.form?.nameLabel || 'Untitled Form'}
+        </span>
+      ),
+    },
+    {
+      key: 'formId',
+      label: dict.submission?.columns?.formId || 'Form ID',
+      render: (sub) => <span className="text-gray-500 font-mono text-xs">{sub.formId}</span>,
+    },
+    {
+      key: 'versionNo',
+      label: dict.submission?.columns?.version || 'Version',
+      render: (sub) => (
+        <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-bold">
+          v{sub.versionNo || 1}
+        </span>
+      ),
+    },
+    {
+      key: 'workflowState',
+      label: dict.submission?.columns?.status || 'Status',
+      render: (sub) => (
+        <span
+          className={`px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full border ${
+            sub.workflowState === 'submitted'
+              ? 'bg-green-50 text-green-700 border-green-200'
+              : 'bg-amber-50 text-amber-700 border-amber-200'
+          }`}
+        >
+          {sub.workflowState.toUpperCase()}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <section>
       <div>
         <h2>{dict.submission?.submissions || 'Submissions'}</h2>
       </div>
-
-      {loading ? (
-        <div>
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      ) : submissions.length === 0 ? (
-        <div>
-          <p className="text-gray-500">{dict.submission?.empty || 'No submissions found yet.'}</p>
-        </div>
-      ) : (
-        <div>
-          <table>
-            <thead>
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  Submission ID
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  Form Name
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  Form ID
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  Version
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-100">
-              {submissions.map((sub) => (
-                <tr key={sub.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">
-                      {sub.id}
-                    </code>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-semibold">
-                    {sub.formName || 'Untitled Form'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono text-xs">
-                    {sub.formId}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-bold">
-                      v{sub.versionNo || 1}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span
-                      className={`px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full border ${
-                        sub.workflowState === 'submitted'
-                          ? 'bg-green-50 text-green-700 border-green-200'
-                          : 'bg-amber-50 text-amber-700 border-amber-200'
-                      }`}
-                    >
-                      {sub.workflowState.toUpperCase()}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable<SubmissionListItem>
+        data={submissions}
+        columns={columns}
+        loading={loading}
+        emptyMessage={dict.submission?.empty || 'No submissions found yet.'}
+        loadingMessage={dict.form?.loading || 'Loading submissions...'}
+        keyExtractor={(sub) => sub.id}
+        itemName={dict.submission?.submissions || 'submissions'}
+      />
     </section>
   );
 }
-
-export default SubmissionList;

@@ -32,9 +32,9 @@ export const SaveSubmissionParamsSchema = z
 
 export const SaveSubmissionBodySchema = z
   .object({
+    data: z.record(z.string(), z.unknown()),
     eventType: z.string().min(1).optional(),
     note: z.string().optional(),
-    enqueueProvision: z.boolean().optional(),
   })
   .openapi('Submissions_SaveSubmissionBody');
 
@@ -142,6 +142,27 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
   });
 
   registry.registerPath({
+    method: 'get',
+    path: '/submissions/{id}/data',
+    tags: ['core.submissions'],
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: UpdateSubmissionParamsSchema,
+    },
+    responses: {
+      200: {
+        description: 'Submission answer document (engine document, engine-managed fields stripped)',
+        content: {
+          'application/json': { schema: z.record(z.string(), z.unknown()) },
+        },
+      },
+      404: {
+        description: 'Submission or its engine content not found',
+      },
+    },
+  });
+
+  registry.registerPath({
     method: 'post',
     path: '/submissions',
     tags: ['core.submissions'],
@@ -202,7 +223,7 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
     request: {
       params: SaveSubmissionParamsSchema,
       body: {
-        required: false,
+        required: true,
         content: {
           'application/json': {
             schema: SaveSubmissionBodySchema,
@@ -212,7 +233,7 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
     },
     responses: {
       200: {
-        description: 'Saved submission draft',
+        description: 'Saved submission (new engine document recorded as a revision)',
         content: { 'application/json': { schema: SubmissionResponseSchema } },
       },
       400: {

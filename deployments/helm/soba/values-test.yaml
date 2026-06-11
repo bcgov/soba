@@ -44,17 +44,6 @@ mongodb:
   persistence:
     size: 2Gi
 
-outboxWorker:
-  enabled: true
-  replicas: 2
-  resources:
-    requests:
-      cpu: 50m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
 vault:
   enabled: true
   role: acf456-nonprod

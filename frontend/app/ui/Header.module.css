@@ -1,0 +1,33 @@
+.userDrop {
+  color: var(--app-text);
+  background: var(--app-surface);
+  border-color: var(--app-border);
+}
+
+.userDrop:hover {
+  color: var(--app-text) !important;
+  background: var(--app-surface) !important;
+  border-color: var(--app-border) !important;
+}
+
+.userDrop:active {
+  color: var(--app-text) !important;
+  background: var(--app-surface) !important;
+  border-color: var(--app-border) !important;
+}
+
+.userDrop:focus {
+  color: var(--app-text) !important;
+  background: var(--app-surface) !important;
+  border-color: var(--app-border) !important;
+}
+
+.limitText {
+  max-width: 50px;
+  overflow: hidden;
+  display: inline-block;
+}
+
+.userDrop:after {
+  vertical-align: 0.5em;
+}

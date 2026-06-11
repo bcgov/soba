@@ -144,8 +144,6 @@ export function createEnvReader(source: EnvSource) {
     getDbMigrationReadySleepMs: () =>
       getNumberEnvFrom(source, 'DB_MIGRATION_READY_SLEEP_MS') ?? 5000,
     // Pipeline performance fix: Revert if needed.
-    getOutboxPollIntervalMs: () => getNumberEnvFrom(source, 'OUTBOX_POLL_INTERVAL_MS'),
-    getOutboxBatchSize: () => getNumberEnvFrom(source, 'OUTBOX_BATCH_SIZE'),
     getSystemSobaUserEmail: () => getOptionalEnvFrom(source, 'SYSTEM_SOBA_USER_EMAIL'),
     getSystemSobaSubject: () => getOptionalEnvFrom(source, 'SOBA_SYSTEM_SUBJECT'),
     getWorkspacePluginsAllowed: () => getRequiredEnvFrom(source, 'WORKSPACE_PLUGINS_ALLOWED'),
@@ -197,8 +195,6 @@ export const env = {
   getDbMigrationReadyAttempts: () => getNumberEnv('DB_MIGRATION_READY_ATTEMPTS') ?? 5,
   getDbMigrationReadySleepMs: () => getNumberEnv('DB_MIGRATION_READY_SLEEP_MS') ?? 5000,
   // Pipeline performance fix: Revert if needed.
-  getOutboxPollIntervalMs: () => getNumberEnv('OUTBOX_POLL_INTERVAL_MS'),
-  getOutboxBatchSize: () => getNumberEnv('OUTBOX_BATCH_SIZE'),
   getSystemSobaUserEmail: () => getOptionalEnv('SYSTEM_SOBA_USER_EMAIL'),
   /** Subject for the system SOBA user identity (provider=system). Default in code: soba-system. */
   getSystemSobaSubject: () => getOptionalEnv('SOBA_SYSTEM_SUBJECT'),

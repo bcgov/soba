@@ -9,6 +9,8 @@ import {
   updateForm,
   getFormByEngineSchemaRef,
 } from '../db/repos/formRepo';
+import { createEmptyFormVersionDraft } from '../db/repos/formVersionRepo';
+import { db } from '../db/client';
 import { env } from '../config/env';
 import {
   getFormEnginePlugins,
@@ -43,6 +45,7 @@ interface CreateInput {
   name: string;
   description?: string;
   formEngineCode?: string;
+  visibility?: string[];
 }
 
 interface UpdateInput {
@@ -57,7 +60,10 @@ interface UpdateInput {
 }
 
 export class FormService {
-  async create(input: CreateInput): Promise<FormRecord> {
+  async create(input: CreateInput): Promise<{
+    form: FormRecord;
+    version: Awaited<ReturnType<typeof createEmptyFormVersionDraft>>;
+  }> {
     const plugins = getFormEnginePlugins();
     if (plugins.length === 0) {
       throw new ValidationError('No form engine plugins installed.');
@@ -76,14 +82,31 @@ export class FormService {
     }
     resolveFormEnginePlugin(engineCode);
 
-    return createForm({
-      workspaceId: input.workspaceId,
-      actorId: input.actorId,
-      actorDisplayLabel: input.actorDisplayLabel,
-      slug: input.slug,
-      name: input.name,
-      description: input.description,
-      formEngineCode: engineCode,
+    // One-call create: form + an empty v1 draft in a single transaction.
+    return db.transaction(async (tx) => {
+      const form = await createForm(
+        {
+          workspaceId: input.workspaceId,
+          actorId: input.actorId,
+          actorDisplayLabel: input.actorDisplayLabel,
+          slug: input.slug,
+          name: input.name,
+          description: input.description,
+          formEngineCode: engineCode,
+        },
+        tx,
+      );
+      const version = await createEmptyFormVersionDraft(
+        {
+          workspaceId: input.workspaceId,
+          formId: form.id,
+          actorId: input.actorId,
+          actorDisplayLabel: input.actorDisplayLabel,
+          visibility: input.visibility,
+        },
+        tx,
+      );
+      return { form, version };
     });
   }
 

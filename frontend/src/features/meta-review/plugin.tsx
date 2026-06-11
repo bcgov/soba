@@ -1,5 +1,4 @@
-import type { AppPlugin } from '@/src/app/plugins/types';
-import { EmptyHomeSection } from '@/src/app/plugins/EmptyHomeSection';
+import type { AppPlugin } from '@/src/types/plugins';
 import { FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 
 export const metaReviewPlugin: AppPlugin = {
@@ -16,5 +15,4 @@ export const metaReviewPlugin: AppPlugin = {
       label,
     };
   },
-  HomeSection: EmptyHomeSection,
 };

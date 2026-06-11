@@ -3,10 +3,11 @@ import type { FeaturesMetaPayload } from '@/src/shared/config/featuresMeta';
 /** Feature `code` values aligned with `GET /meta/features` and `soba.feature`. */
 export const FEATURE_CODES = {
   WORKSPACES: 'workspaces',
-  DESIGN_MODE: 'designer',
+  DESIGN_MODE: 'design-mode',
   SUBMIT_MODE: 'submit-mode',
   /** Dev/review: API meta & health inspection (matches `soba.feature` seed code `meta`). */
   META: 'meta',
+  MARKETING: 'marketing',
 } as const;
 
 export type FeatureCode = (typeof FEATURE_CODES)[keyof typeof FEATURE_CODES];

@@ -1,5 +1,4 @@
-import type { AppPlugin } from '@/src/app/plugins/types';
-import SubmissionList from '@/src/features/submit-mode/ui/SubmissionList';
+import type { AppPlugin } from '@/src/types/plugins';
 import { FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 
 export const submitModePlugin: AppPlugin = {
@@ -12,5 +11,4 @@ export const submitModePlugin: AppPlugin = {
     href: `/${locale}/forms`,
     label: dictionary.header.submit,
   }),
-  HomeSection: SubmissionList,
 };

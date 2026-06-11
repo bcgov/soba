@@ -3,44 +3,24 @@ import { isFeaturesMetaPayload } from '@/src/shared/config/featuresMeta';
 import { getSobaApiBaseUrl } from '../config/runtimeConfig';
 import { parseJson } from './sobaHelpers';
 
-export type { SobaFormType } from '../../types/forms';
+import type { SobaFormType } from '../../types/forms';
+import type { WorkspaceItem, WorkspacesResponse } from '../../types/workspaces';
+import type { CurrentUserResponse } from '../../types/user';
+
+export type { SobaFormType, WorkspaceItem, WorkspacesResponse, CurrentUserResponse };
 export {
   createSobaFormioForm,
-  createFormioForm,
-  updateFormioForm,
-  getFormioForm,
   publishSobaFormVersion,
-  saveSobaFormVersion,
   getSobaForm,
-  getSobaFormVersion,
-  getSobaFormVersionFromFormioId,
   createSobaFormSubmission,
-  getSobaFormioForms,
+  saveSobaFormSubmission,
+  getSobaForms,
+  getSobaFormVersions,
+  updateSobaFormVersionVisibility,
+  createFormVersion,
+  saveFormVersionSchema,
+  getFormVersionSchema,
 } from './sobaApiForms';
-
-export type WorkspaceItem = {
-  id: string;
-  name: string;
-  slug: string | null;
-  kind: string;
-  role: string;
-  status: string;
-};
-
-export type WorkspacesResponse = {
-  items: WorkspaceItem[];
-  page: {
-    limit: number;
-    hasMore: boolean;
-    nextCursor: string | null;
-    cursorMode: 'id' | 'ts_id';
-  };
-  filters: {
-    kind?: string;
-    status?: string;
-  };
-  sort: string;
-};
 
 export type BuildMeta = {
   name: string;
@@ -49,19 +29,6 @@ export type BuildMeta = {
   gitSha: string;
   gitTag: string;
   imageTag: string;
-};
-
-export type CurrentUserResponse = {
-  actor: {
-    id: string;
-    displayLabel: string | null;
-    status: string;
-  };
-  profile: {
-    displayName: string | null;
-    email: string | null;
-    preferredUsername: string | null;
-  };
 };
 
 export async function fetchHealth(): Promise<{ status: string }> {

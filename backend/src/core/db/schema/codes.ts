@@ -27,6 +27,3 @@ export const workspaceMembershipStatus = sobaSchema.table(
   codeColumns(),
   (table) => [primaryKey({ columns: [table.code, table.source] })],
 );
-export const outboxStatus = sobaSchema.table('outbox_status', codeColumns(), (table) => [
-  primaryKey({ columns: [table.code, table.source] }),
-]);

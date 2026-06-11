@@ -16,9 +16,13 @@ import { resolveActor } from './core/middleware/actor';
 import { requireSobaAdmin } from './core/middleware/requireSobaAdmin';
 import { adminRouter } from './core/api/admin';
 import { globalRateLimit, apiRateLimit, publicRateLimit } from './core/middleware/rateLimit';
-import { getFormEngineRouteDefinitions } from './core/integrations/plugins/PluginRegistry';
-import { createPluginConfigReader } from './core/config/pluginConfig';
 import { initializePassport } from './core/auth/passport';
+import {
+  checkJwtOptional,
+  resolveActorOptional,
+  checkFormVisibility,
+} from './core/middleware/formVisibility';
+import { createSubmission, saveSubmission } from './core/api/submissions/controller';
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
@@ -61,21 +65,6 @@ app.use(passport.initialize());
 
 app.use(globalRateLimit);
 
-// ——— Form-engine proxy/routes under /api/v1 (protected; when PLUGIN_<CODE>_ROUTES_ALLOWED=true) ———
-const formEngineRouteDefs = getFormEngineRouteDefinitions();
-for (const def of formEngineRouteDefs) {
-  const path = `/api/v1${def.routeBasePath.startsWith('/') ? '' : '/'}${def.routeBasePath}`;
-  app.use(
-    path,
-    apiRateLimit,
-    express.json(),
-    checkJwt(),
-    resolveActor,
-    def.createRouter(createPluginConfigReader(def.code)),
-  );
-  log.info({ code: def.code, path }, 'Form-engine routes mounted');
-}
-
 // ——— Public routes (no authentication) ———
 app.get('/api/docs/openapi.json', publicRateLimit, (_req, res) => {
   res.json(buildOpenApiSpec());
@@ -90,6 +79,21 @@ app.use(
     },
   }),
 );
+
+// ——— Public Submission Routes (Optionally Authenticated) ———
+const publicSubmissionRouter = express.Router();
+const publicSubmissionMiddleware = [
+  apiRateLimit,
+  express.json(),
+  checkJwtOptional(),
+  resolveActorOptional,
+  checkFormVisibility,
+];
+
+publicSubmissionRouter.post('/submissions', ...publicSubmissionMiddleware, createSubmission);
+publicSubmissionRouter.post('/submissions/:id/save', ...publicSubmissionMiddleware, saveSubmission);
+
+app.use('/api/v1', publicSubmissionRouter);
 
 // ——— Core v1 API ———
 app.use('/api/v1/meta', publicRateLimit, express.json(), metaRouter);

@@ -5,6 +5,10 @@
     "context": "."
   },
   "runArgs": ["--add-host=host.docker.internal:host-gateway"],
+  "containerEnv": {
+    "PNPM_STORE_DIR": "/home/node/.local/share/pnpm/store",
+    "npm_config_package_import_method": "copy"
+  },
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},

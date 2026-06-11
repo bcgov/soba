@@ -1,105 +1,163 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import dynamic from 'next/dynamic';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FormioProvider, Submission } from '@formio/react';
-import { InlineAlert } from '@bcgov/design-system-react-components';
+import type { FormType } from '@formio/react';
+import { Alert } from 'react-bootstrap';
 import { useDictionary } from '@/app/[lang]/Providers';
-import { getFormioProxyBaseUrl } from '@/src/shared/config/runtimeConfig';
 import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFormioRenderError';
-import { setupFormioClient } from '@/src/features/formio-v5/setupFormioClient';
-import { useFormioV5FormChrome } from '@/src/features/formio-v5/useFormioV5FormChrome';
+import { useFormioV5FormChrome } from '@/lib/hooks/useFormioV5FormChrome';
 import { FormioV5FormRenderErrorBoundary } from '@/src/features/formio-v5/ui/FormioV5FormRenderErrorBoundary';
-import { getSobaFormVersionFromFormioId, createSobaFormSubmission } from '@/src/shared/api/sobaApi';
+import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
+import { ReadOnlyFormView } from '@/src/features/formio-v5/ui/ReadOnlyFormView';
+import {
+  getSobaFormVersions,
+  getFormVersionSchema,
+  createSobaFormSubmission,
+  saveSobaFormSubmission,
+} from '@/src/shared/api/sobaApi';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import type { SobaFormWithVersionResponse } from '@/src/types/forms';
-
-const Form = dynamic(() => import('@formio/react').then((m) => m.Form), {
-  ssr: false,
-  loading: () => (
-    <p className="text-sm text-[var(--typography-color-secondary)]">Loading form renderer…</p>
-  ),
-});
+import { useAppSelector } from '@/lib/store';
 
 type FormRenderLabels = {
+  loading: string;
   loadError: string;
+  unavailable: string;
   rendererError: string;
   submitSuccess: string;
 };
 
-function FormioV5FormRenderBody({
-  src,
-  base,
-  labels,
-}: {
-  src: string;
-  base: string;
-  labels: FormRenderLabels;
-}) {
-  const [renderError, setRenderError] = useState<string | null>(null);
+/**
+ * Renders the currently published version of a form (keyed on the SOBA formId) in JSON mode and
+ * persists submissions through the SOBA API. The Form.io engine is never contacted from the browser.
+ */
+function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: FormRenderLabels }) {
   const { token } = useKeycloak();
-  const params = useParams();
-  const formIdRaw = params?.formId;
-  const formId = typeof formIdRaw === 'string' ? decodeURIComponent(formIdRaw) : '';
-  const [sobaForm, setSobaForm] = useState<SobaFormWithVersionResponse | null>(null);
+  const { activeWorkspaceId } = useAppSelector((state) => state.workspace);
+  const ws = activeWorkspaceId || undefined;
+
+  const [schema, setSchema] = useState<FormType | null>(null);
+  const [formVersionId, setFormVersionId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [renderError, setRenderError] = useState<string | null>(null);
   const [successAlert, setSuccessAlert] = useState(false);
+  const [submitted, setSubmitted] = useState<Submission | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  // The Form.io webform instance; in JSON mode (no `src`) we must signal it when our own
+  // persistence finishes, or its submit button spins forever.
+  const formInstanceRef = useRef<{
+    emit: (event: string, ...args: unknown[]) => void;
+  } | null>(null);
 
   useFormioV5FormChrome(true);
 
-  const submitForm = async (submission: Submission, saved?: boolean | undefined) => {
-     if (saved) {
-      const res = await createSobaFormSubmission(
-        token as string,
-        sobaForm?.id ?? '',
-        sobaForm?.formVersion?.id ?? '',
-      );
-      if (res && res.id) {
-        setSuccessAlert(true);
+  useEffect(() => {
+    if (!token || loaded) return;
+    let active = true;
+    void (async () => {
+      try {
+        // Submissions can only be made to the currently published version.
+        const { items } = await getSobaFormVersions(token, formId, ws);
+        const published = (items || []).find((v) => v.state === 'published');
+        if (!published) {
+          if (active) setLoadError(labels.unavailable);
+          return;
+        }
+        const loadedSchema = await getFormVersionSchema(token, published.id, ws);
+        if (!loadedSchema) {
+          if (active) setLoadError(labels.unavailable);
+          return;
+        }
+        if (active) {
+          setFormVersionId(published.id);
+          setSchema(loadedSchema);
+        }
+      } catch (err) {
+        if (active) setLoadError(normalizeFormioRenderError(err, labels.loadError));
+      } finally {
+        if (active) setLoaded(true);
       }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [token, formId, ws, loaded, labels.loadError, labels.unavailable]);
+
+  const submitForm = async (submission: Submission) => {
+    if (!token || !formVersionId) return;
+    try {
+      const created = await createSobaFormSubmission(token, formId, formVersionId, {}, ws);
+      await saveSobaFormSubmission(
+        token,
+        created.id,
+        (submission?.data ?? {}) as Record<string, unknown>,
+        'submit',
+        ws,
+      );
+      setSuccessAlert(true);
+      // Tell the webform the submission is complete so its submit button stops spinning,
+      // then re-render the form read-only with the submitted answers.
+      formInstanceRef.current?.emit('submitDone', submission);
+      setSubmitted(submission);
+    } catch (err) {
+      setRenderError(normalizeFormioRenderError(err, labels.rendererError));
+      formInstanceRef.current?.emit('submitError', labels.rendererError);
     }
   };
 
-  useEffect(() => {
-    if (sobaForm === null) {
-      getSobaFormVersionFromFormioId(token as string, formId).then((res) => {
-        setSobaForm(res);
-      });
-    }
-  }, [sobaForm, token, formId]);
+  if (loadError) {
+    return (
+      <Alert variant="danger" role="alert">
+        {loadError}
+      </Alert>
+    );
+  }
+
+  if (!schema) {
+    return <p className="text-muted small">{labels.loading}</p>;
+  }
 
   return (
     <>
       {renderError ? (
-        <InlineAlert variant="danger" role="alert">
+        <Alert variant="danger" role="alert">
           {renderError}
-        </InlineAlert>
+        </Alert>
       ) : null}
       {successAlert ? (
-        <InlineAlert variant="success" role="alert">
+        <Alert variant="success" role="alert">
           {labels.submitSuccess}
-        </InlineAlert>
+        </Alert>
       ) : null}
-      <div className="formio-v5-chrome" data-soba-formio-chrome>
-        <FormioV5FormRenderErrorBoundary
-          fallback={
-            <InlineAlert variant="danger" role="alert">
-              {labels.rendererError}
-            </InlineAlert>
-          }
-        >
-          <FormioProvider baseUrl={base} projectUrl={base}>
-            <Form
-              className="formio-v5-form-root"
-              src={src}
-              onError={(err) => {
-                setRenderError(normalizeFormioRenderError(err, labels.loadError));
-              }}
-              onSubmit={submitForm}
-            />
-          </FormioProvider>
-        </FormioV5FormRenderErrorBoundary>
-      </div>
+      <FormioV5FormRenderErrorBoundary
+        fallback={
+          <Alert variant="danger" role="alert">
+            {labels.rendererError}
+          </Alert>
+        }
+      >
+        {submitted ? (
+          <ReadOnlyFormView schema={schema} submission={submitted} />
+        ) : (
+          <div className="formio-v5-chrome" data-soba-formio-chrome>
+            <FormioProvider>
+              <DynamicForm
+                className="formio-v5-form-root"
+                src=""
+                form={schema}
+                onFormReady={(instance) => {
+                  formInstanceRef.current = instance;
+                }}
+                onError={(err) => {
+                  setRenderError(normalizeFormioRenderError(err, labels.loadError));
+                }}
+                onSubmit={submitForm}
+              />
+            </FormioProvider>
+          </div>
+        )}
+      </FormioV5FormRenderErrorBoundary>
     </>
   );
 }
@@ -111,29 +169,23 @@ export default function FormioV5FormRenderClient() {
   const dict = useDictionary();
   const labels = dict.formioV5.formRender;
 
-  const base = useMemo(() => getFormioProxyBaseUrl().replace(/\/$/, ''), []);
-  const src = formId ? `${base}/form/${encodeURIComponent(formId)}` : '';
-
-  useEffect(() => {
-    setupFormioClient();
-  }, []);
-
   if (!formId) {
     return (
-      <InlineAlert variant="danger" role="alert">
+      <Alert variant="danger" role="alert">
         {labels.missingId}
-      </InlineAlert>
+      </Alert>
     );
   }
 
   return (
-    <div className="mt-4 space-y-4">
+    <div className="mt-3">
       <FormioV5FormRenderBody
         key={formId}
-        src={src}
-        base={base}
+        formId={formId}
         labels={{
+          loading: dict.form?.loading || 'Loading…',
           loadError: labels.loadError,
+          unavailable: labels.unavailable,
           rendererError: labels.rendererError,
           submitSuccess: labels.submitSuccess,
         }}

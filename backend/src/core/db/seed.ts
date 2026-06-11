@@ -8,7 +8,6 @@ import {
   FeatureStatus,
   FormStatus,
   FormVersionState,
-  OutboxStatus,
   RoleStatus,
   Roles,
   WorkspaceMembershipRole,
@@ -22,7 +21,8 @@ import {
   formStatus,
   formVersionState,
   identityProviders,
-  outboxStatus,
+  idpGroupMembers,
+  idpGroups,
   roleStatus,
   roles,
   userIdentities,
@@ -47,12 +47,13 @@ const ensureIdentityProvider = async (
     where: eq(identityProviders.code, code),
   });
   if (existing) {
-    if (existing.name !== name || existing.isActive !== isActive) {
+    if (existing.name !== name || existing.isActive !== isActive || existing.hint !== code) {
       await db
         .update(identityProviders)
         .set({
           name,
           isActive,
+          hint: code,
           updatedBy: createdByLabel ?? null,
           updatedAt: new Date(),
         })
@@ -68,6 +69,7 @@ const ensureIdentityProvider = async (
     .values({
       code,
       name,
+      hint: code,
       isActive,
       createdBy: createdByLabel ?? null,
       updatedBy: createdByLabel ?? null,
@@ -79,16 +81,40 @@ const ensureIdentityProvider = async (
 /** Codes match BC Gov Keycloak `identity_provider` (lowercased in app). See idp-bcgov-sso plugin. */
 const SEED_BC_GOV_IDENTITY_PROVIDERS = [
   { code: 'idir', name: 'IDIR', isActive: false },
-  { code: 'azureidir', name: 'Azure IDIR', isActive: true },
-  { code: 'bceidbasic', name: 'BCeID Basic', isActive: false },
+  { code: 'azureidir', name: 'IDIR - MFA', isActive: true },
   { code: 'bceidbusiness', name: 'BCeID Business', isActive: false },
-  { code: 'bcservicescard', name: 'BC Services Card', isActive: false },
-  { code: 'bcsc', name: 'BC Services Card', isActive: false },
 ] as const;
 
 const seedBcgovSsoIdentityProviders = async (createdByLabel: string) => {
   for (const { code, name, isActive } of SEED_BC_GOV_IDENTITY_PROVIDERS) {
     await ensureIdentityProvider(code, name, isActive, createdByLabel);
+  }
+};
+
+/** Logical IDP groups. Reusable primitive (future Form Access); members FK identity_provider. */
+const SEED_IDP_GROUPS = [
+  { code: 'bcgov', name: 'BC Government', members: ['idir', 'azureidir'] },
+  { code: 'bceid', name: 'BCeID', members: ['bceidbusiness'] },
+] as const;
+
+const seedIdpGroups = async (createdByLabel: string) => {
+  for (const { code, name, members } of SEED_IDP_GROUPS) {
+    await db
+      .insert(idpGroups)
+      .values({
+        code,
+        name,
+        source: CODE_SOURCE_CORE,
+        createdBy: createdByLabel,
+        updatedBy: createdByLabel,
+      })
+      .onConflictDoNothing();
+    for (const identityProviderCode of members) {
+      await db
+        .insert(idpGroupMembers)
+        .values({ groupCode: code, identityProviderCode })
+        .onConflictDoNothing();
+    }
   }
 };
 
@@ -171,15 +197,30 @@ const seedCodeTables = async () => {
       isActive: true,
     },
     {
-      code: FormVersionState.deleted,
+      code: FormVersionState.archived,
       source: CODE_SOURCE_CORE,
-      display: 'Deleted',
+      display: 'Archived',
       sortOrder: 2,
       isActive: true,
     },
+    {
+      code: FormVersionState.deleted,
+      source: CODE_SOURCE_CORE,
+      display: 'Deleted',
+      sortOrder: 3,
+      isActive: true,
+    },
   ];
+  // Upsert so re-seeding keeps existing rows in sync (e.g. display/sortOrder changes),
+  // rather than skipping them as onConflictDoNothing would.
   for (const row of formVersionStateRows) {
-    await db.insert(formVersionState).values(row).onConflictDoNothing();
+    await db
+      .insert(formVersionState)
+      .values(row)
+      .onConflictDoUpdate({
+        target: [formVersionState.code, formVersionState.source],
+        set: { display: row.display, sortOrder: row.sortOrder, isActive: row.isActive },
+      });
   }
   const workspaceMembershipRoleRows = [
     {
@@ -240,32 +281,6 @@ const seedCodeTables = async () => {
   for (const row of workspaceMembershipStatusRows) {
     await db.insert(workspaceMembershipStatus).values(row).onConflictDoNothing();
   }
-  const outboxStatusRows = [
-    {
-      code: OutboxStatus.pending,
-      source: CODE_SOURCE_CORE,
-      display: 'Pending',
-      sortOrder: 0,
-      isActive: true,
-    },
-    {
-      code: OutboxStatus.processing,
-      source: CODE_SOURCE_CORE,
-      display: 'Processing',
-      sortOrder: 1,
-      isActive: true,
-    },
-    {
-      code: OutboxStatus.done,
-      source: CODE_SOURCE_CORE,
-      display: 'Done',
-      sortOrder: 2,
-      isActive: true,
-    },
-  ];
-  for (const row of outboxStatusRows) {
-    await db.insert(outboxStatus).values(row).onConflictDoNothing();
-  }
 };
 
 const seedFeatures = async () => {
@@ -299,7 +314,7 @@ const seedFeatures = async () => {
       status: FeatureStatus.enabled,
     },
     {
-      code: 'designer',
+      code: 'design-mode',
       name: 'Design mode',
       description: 'Form management and design surfaces',
       version: null,
@@ -309,6 +324,13 @@ const seedFeatures = async () => {
       code: 'submit-mode',
       name: 'Submit mode',
       description: 'Submitter-facing surfaces',
+      version: null,
+      status: FeatureStatus.enabled,
+    },
+    {
+      code: 'marketing',
+      name: 'Marketing',
+      description: 'Show Marketing screen on landing',
       version: null,
       status: FeatureStatus.enabled,
     },
@@ -368,6 +390,7 @@ const seed = async () => {
   await seedCodeTables();
 
   await seedBcgovSsoIdentityProviders(SEED_USER_STAMP);
+  await seedIdpGroups(SEED_USER_STAMP);
 
   const systemSubject = env.getSystemSobaSubject() ?? DEFAULT_SYSTEM_SUBJECT;
   const systemProvider = await ensureIdentityProvider(

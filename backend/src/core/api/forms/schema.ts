@@ -4,18 +4,22 @@ import { CursorSortSchema } from '../shared/pagination';
 
 extendZodWithOpenApi(z);
 
+export const FormVisibilityEnum = z.enum(['public', 'azureidir']);
+
 export const CreateFormBodySchema = z
   .object({
     slug: z.string().trim().min(1),
     name: z.string().trim().min(1),
     description: z.string().optional(),
     formEngineCode: z.string().trim().min(1).optional(),
+    visibility: z.array(FormVisibilityEnum).optional(),
   })
   .openapi('Forms_CreateFormBody');
 
 export const CreateFormVersionBodySchema = z
   .object({
     formId: z.string().min(1),
+    visibility: z.array(FormVisibilityEnum).optional(),
   })
   .openapi('Forms_CreateFormVersionBody');
 
@@ -31,15 +35,11 @@ export const FormVersionIdParamsSchema = z
   })
   .openapi('Forms_FormVersionIdParams');
 
-export const FormEngineRefParamsSchema = z
-  .object({
-    engineRef: z.string().min(1),
-  })
-  .openapi('Forms_FormEngineRefParams');
-
 export const UpdateFormVersionBodySchema = z
   .object({
-    state: z.string().min(1).optional(),
+    // state changes go through dedicated action endpoints (publish/unpublish/delete/restore);
+    // this PATCH only updates visibility.
+    visibility: z.array(FormVisibilityEnum).optional(),
   })
   .openapi('Forms_UpdateFormVersionBody');
 
@@ -62,11 +62,16 @@ export const SaveFormVersionBodySchema = z
   .object({
     eventType: z.string().min(1).optional(),
     note: z.string().optional(),
-    enqueueProvision: z.boolean().optional(),
     formioFormDefinition: z.record(z.string(), z.unknown()).optional(),
     engine_schema_ref: z.string().min(1).optional(),
   })
   .openapi('Forms_SaveFormVersionBody');
+
+export const ProvisionSchemaBodySchema = z
+  .object({
+    schema: z.record(z.string(), z.unknown()),
+  })
+  .openapi('Forms_ProvisionSchemaBody');
 
 export const ListFormsQuerySchema = z
   .object({
@@ -86,6 +91,7 @@ export const FormListItemSchema = z
     status: z.string(),
     createdAt: z.string(),
     updatedAt: z.string(),
+    createdBy: z.string().nullable(),
   })
   .openapi('Forms_FormListItem');
 
@@ -111,6 +117,7 @@ export const FormVersionResponseSchema = z
     engineSchemaRef: z.string().nullable(),
     currentRevisionNo: z.number().int(),
     publishedAt: z.string().nullable(),
+    visibility: z.array(z.string()),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -155,6 +162,7 @@ export const FormVersionListItemSchema = z
     state: z.string(),
     engineSyncStatus: z.string(),
     engineSchemaRef: z.string().nullable(),
+    visibility: z.array(z.string()),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -203,26 +211,6 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'get',
-    path: '/forms/formio/form',
-    tags: ['core.forms'],
-    security: [{ bearerAuth: [] }],
-    request: {
-      query: ListFormsQuerySchema,
-    },
-    responses: {
-      200: {
-        description: 'List forms in Formio format with Soba metadata',
-        content: {
-          'application/json': {
-            schema: z.array(z.record(z.string(), z.unknown())),
-          },
-        },
-      },
-    },
-  });
-
-  registry.registerPath({
-    method: 'get',
     path: '/forms/{id}',
     tags: ['core.forms'],
     security: [{ bearerAuth: [] }],
@@ -235,29 +223,6 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         content: {
           'application/json': {
             schema: FormResponseSchema,
-          },
-        },
-      },
-      404: {
-        description: 'Form not found',
-      },
-    },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: '/forms/engine/{engineRef}',
-    tags: ['core.forms'],
-    security: [{ bearerAuth: [] }],
-    request: {
-      params: FormEngineRefParamsSchema,
-    },
-    responses: {
-      200: {
-        description: 'Get form by engine schema ref',
-        content: {
-          'application/json': {
-            schema: FormWithVersionResponseSchema,
           },
         },
       },
@@ -284,10 +249,10 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
     },
     responses: {
       201: {
-        description: 'Created form',
+        description: 'Created form with its initial v1 draft',
         content: {
           'application/json': {
-            schema: FormResponseSchema,
+            schema: FormWithVersionResponseSchema,
           },
         },
       },
@@ -487,6 +452,61 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
       404: {
         description: 'Form not found',
       },
+    },
+  });
+
+  for (const action of ['publish', 'unpublish', 'restore'] as const) {
+    registry.registerPath({
+      method: 'post',
+      path: `/form-versions/{id}/${action}`,
+      tags: ['core.forms'],
+      security: [{ bearerAuth: [] }],
+      request: { params: FormVersionIdParamsSchema },
+      responses: {
+        200: {
+          description: `Form version ${action} action`,
+          content: { 'application/json': { schema: FormVersionResponseSchema } },
+        },
+        400: { description: 'Invalid state transition' },
+        404: { description: 'Form version not found' },
+      },
+    });
+  }
+
+  registry.registerPath({
+    method: 'get',
+    path: '/form-versions/{id}/schema',
+    tags: ['core.forms'],
+    security: [{ bearerAuth: [] }],
+    request: { params: FormVersionIdParamsSchema },
+    responses: {
+      200: {
+        description: 'Form version schema (engine document; engine-managed fields stripped)',
+        content: { 'application/json': { schema: z.record(z.string(), z.unknown()) } },
+      },
+      404: { description: 'Form version or schema not found' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/form-versions/{id}/schema',
+    tags: ['core.forms'],
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: FormVersionIdParamsSchema,
+      body: {
+        required: true,
+        content: { 'application/json': { schema: ProvisionSchemaBodySchema } },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Provisioned form version (schema saved to the engine)',
+        content: { 'application/json': { schema: FormVersionResponseSchema } },
+      },
+      400: { description: 'Engine rejected the schema' },
+      404: { description: 'Form version not found' },
     },
   });
 };

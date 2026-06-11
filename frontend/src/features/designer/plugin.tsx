@@ -1,6 +1,5 @@
-import type { AppPlugin } from '@/src/app/plugins/types';
+import type { AppPlugin } from '@/src/types/plugins';
 import { FEATURE_CODES } from '@/src/shared/featureFlags/flags';
-import FormList from '@/src/features/designer/ui/FormList';
 
 export const designerPlugin: AppPlugin = {
   id: 'form-designer',
@@ -12,5 +11,4 @@ export const designerPlugin: AppPlugin = {
     href: `/${locale}/designer`,
     label: dictionary.header.designer,
   }),
-  HomeSection: FormList,
 };

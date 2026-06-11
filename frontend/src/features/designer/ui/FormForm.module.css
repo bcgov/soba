@@ -1,0 +1,24 @@
+/**
+ * FormForm Specific Styles
+ * Handling floating actions and UI layout for the form designer page.
+ */
+
+.floatingActions {
+  position: fixed;
+  bottom: 30px;
+  left: 30px;
+  z-index: 1050;
+}
+
+.floatingAlert {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1060;
+  min-width: 300px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.designerWrapper {
+  min-height: 500px;
+}

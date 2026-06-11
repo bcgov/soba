@@ -5,8 +5,13 @@
 .env.*
 !.env.example
 !.env.*.example
+
+# Personal shell config (copy from .devcontainer/bashrc.example to ~/.bashrc in the container)
+.bashrc
+.bashrc.local
 .pnpm-store
 node_modules
+.devcontainer/.deps-installed
 
 # Test coverage
 coverage/

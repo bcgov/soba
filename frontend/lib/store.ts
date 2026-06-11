@@ -5,10 +5,13 @@ import keycloakReducer, { KeycloakState } from './slices/keycloakSlice';
 import currentUserReducer, { CurrentUserState } from './slices/currentUserSlice';
 import notificationReducer, { NotificationState } from './slices/notificationSlice';
 
+import workspaceReducer, { WorkspaceState } from './slices/workspaceSlice';
+
 const reducer = {
   keycloak: keycloakReducer,
   currentUser: currentUserReducer,
   notification: notificationReducer,
+  workspace: workspaceReducer,
 };
 
 const makeStore = () =>
@@ -28,6 +31,7 @@ export type RootState = {
   keycloak: KeycloakState;
   currentUser: CurrentUserState;
   notification: NotificationState;
+  workspace: WorkspaceState;
 };
 export type RootDispatch = AppDispatch;
 

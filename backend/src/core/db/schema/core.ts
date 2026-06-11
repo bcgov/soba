@@ -1,7 +1,17 @@
-import { boolean, index, jsonb, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  index,
+  jsonb,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 import { auditColumns, idColumn } from './audit';
 import { sobaSchema } from './sobaSchema';
+import { CODE_SOURCE_CORE } from './codes';
 import { roles } from './roles';
 
 export { sobaSchema };
@@ -13,6 +23,32 @@ export const identityProviders = sobaSchema.table('identity_provider', {
   isActive: boolean('is_active').notNull().default(true),
   ...auditColumns(),
 });
+
+/**
+ * Logical grouping of identity providers (e.g. `bcgov` = idir + azureidir).
+ * Reusable primitive; `source` = 'core' or a feature code (mirrors code tables).
+ */
+export const idpGroups = sobaSchema.table('idp_group', {
+  code: text('code').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  isActive: boolean('is_active').notNull().default(true),
+  source: text('source').notNull().default(CODE_SOURCE_CORE),
+  ...auditColumns(),
+});
+
+export const idpGroupMembers = sobaSchema.table(
+  'idp_group_member',
+  {
+    groupCode: text('group_code')
+      .notNull()
+      .references(() => idpGroups.code),
+    identityProviderCode: text('identity_provider_code')
+      .notNull()
+      .references(() => identityProviders.code),
+  },
+  (table) => [primaryKey({ columns: [table.groupCode, table.identityProviderCode] })],
+);
 
 export const appUsers = sobaSchema.table(
   'app_user',

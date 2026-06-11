@@ -4,6 +4,7 @@ import {
   createSubmission,
   deleteSubmission,
   getSubmission,
+  getSubmissionData,
   listSubmissions,
   saveSubmission,
   updateSubmission,
@@ -21,6 +22,11 @@ const router = express.Router();
 
 router.get('/', validateRequest({ query: ListSubmissionsQuerySchema }), listSubmissions);
 router.get('/:id', validateRequest({ params: UpdateSubmissionParamsSchema }), getSubmission);
+router.get(
+  '/:id/data',
+  validateRequest({ params: UpdateSubmissionParamsSchema }),
+  getSubmissionData,
+);
 
 router.post('/', validateRequest({ body: CreateSubmissionBodySchema }), createSubmission);
 router.patch(

@@ -1,6 +1,8 @@
-import { DsPageHeading } from '@/app/ui/DsPageHeading';
-import FormioV5FormListLoader from '@/src/features/formio-v5/ui/FormioV5FormListLoader';
 import { getDictionary, resolveLocale } from '../dictionaries';
+import FormList from '@/src/features/designer/ui/FormList';
+import { AuthRedirect } from '@/src/app/ui/AuthRedirect';
+import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
+import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 
 type PageProps = {
   params: Promise<{ lang: string }>;
@@ -16,15 +18,20 @@ export async function generateMetadata({ params }: PageProps) {
   };
 }
 
-/** Form.io v5 form list; open a row to fill at /{locale}/forms/[formId]. */
 export default async function Page({ params }: PageProps) {
+  const featuresMeta = await loadFeaturesMeta();
+  const isFeatureAllowed = createIsFeatureAllowed(featuresMeta);
+
   const param = await params;
   const locale = resolveLocale(param.lang);
-  const dict = await getDictionary(locale);
   return (
-    <section className="p-4" aria-labelledby="forms-list-heading">
-      <DsPageHeading id="forms-list-heading">{dict.formioV5.formList.tableHeading}</DsPageHeading>
-      <FormioV5FormListLoader />
-    </section>
+    <AuthRedirect to={`/${locale}`} ifLogged={false}>
+      <div>
+        <FormList
+          designModeEnabled={isFeatureAllowed(FEATURE_CODES.DESIGN_MODE)}
+          submitModeEnabled={isFeatureAllowed(FEATURE_CODES.SUBMIT_MODE)}
+        />
+      </div>
+    </AuthRedirect>
   );
 }

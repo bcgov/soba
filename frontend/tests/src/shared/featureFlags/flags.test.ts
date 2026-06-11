@@ -4,7 +4,7 @@ import type { FeaturesMetaPayload } from '@/src/shared/config/featuresMeta';
 const sampleMeta: FeaturesMetaPayload = {
   features: [
     {
-      code: 'designer',
+      code: 'design-mode',
       name: 'Design mode',
       description: null,
       version: null,
@@ -39,7 +39,7 @@ describe('createIsFeatureAllowed', () => {
     vi.stubEnv('NEXT_PUBLIC_SOBA_FEATURES_ALLOWED', '');
     const { createIsFeatureAllowed } = await import('@/src/shared/featureFlags/flags');
     const allow = createIsFeatureAllowed(sampleMeta);
-    expect(allow('designer')).toBe(false);
+    expect(allow('design-mode')).toBe(false);
     expect(allow('submit-mode')).toBe(false);
     expect(allow('off-mode')).toBe(false);
   });
@@ -48,7 +48,7 @@ describe('createIsFeatureAllowed', () => {
     vi.stubEnv('NEXT_PUBLIC_SOBA_FEATURES_ALLOWED', '*');
     const { createIsFeatureAllowed } = await import('@/src/shared/featureFlags/flags');
     const allow = createIsFeatureAllowed(sampleMeta);
-    expect(allow('designer')).toBe(true);
+    expect(allow('design-mode')).toBe(true);
     expect(allow('submit-mode')).toBe(true);
     expect(allow('off-mode')).toBe(false);
   });
@@ -57,7 +57,7 @@ describe('createIsFeatureAllowed', () => {
     vi.stubEnv('NEXT_PUBLIC_SOBA_FEATURES_ALLOWED', 'ALL');
     const { createIsFeatureAllowed } = await import('@/src/shared/featureFlags/flags');
     const allow = createIsFeatureAllowed(sampleMeta);
-    expect(allow('designer')).toBe(true);
+    expect(allow('design-mode')).toBe(true);
     expect(allow('submit-mode')).toBe(true);
   });
 
@@ -65,7 +65,7 @@ describe('createIsFeatureAllowed', () => {
     vi.stubEnv('NEXT_PUBLIC_SOBA_FEATURES_ALLOWED', 'submit-mode');
     const { createIsFeatureAllowed } = await import('@/src/shared/featureFlags/flags');
     const allow = createIsFeatureAllowed(sampleMeta);
-    expect(allow('designer')).toBe(false);
+    expect(allow('design-mode')).toBe(false);
     expect(allow('submit-mode')).toBe(true);
   });
 

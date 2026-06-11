@@ -5,7 +5,6 @@ import {
   createFormVersion,
   updateForm,
   getForm,
-  getFormByEngineRef,
   getFormVersion,
   listForms,
   listFormVersions,
@@ -13,16 +12,20 @@ import {
   deleteFormVersion,
   saveFormVersion,
   updateFormVersion,
-  listFormioForms,
+  publishFormVersion,
+  unpublishFormVersion,
+  restoreFormVersion,
+  provisionFormVersionSchema,
+  getFormVersionSchema,
 } from './controller';
 import {
   CreateFormBodySchema,
   CreateFormVersionBodySchema,
   FormIdParamsSchema,
-  FormEngineRefParamsSchema,
   FormVersionIdParamsSchema,
   ListFormsQuerySchema,
   ListFormVersionsQuerySchema,
+  ProvisionSchemaBodySchema,
   SaveFormVersionBodySchema,
   SaveFormVersionParamsSchema,
   UpdateFormBodySchema,
@@ -32,12 +35,6 @@ import {
 const router = express.Router();
 
 router.get('/forms', validateRequest({ query: ListFormsQuerySchema }), listForms);
-router.get('/forms/formio/form', validateRequest({ query: ListFormsQuerySchema }), listFormioForms);
-router.get(
-  '/forms/engine/:engineRef',
-  validateRequest({ params: FormEngineRefParamsSchema }),
-  getFormByEngineRef,
-);
 router.post('/forms', validateRequest({ body: CreateFormBodySchema }), createForm);
 router.get('/forms/:id', validateRequest({ params: FormIdParamsSchema }), getForm);
 router.patch(
@@ -79,6 +76,31 @@ router.post(
     body: SaveFormVersionBodySchema,
   }),
   saveFormVersion,
+);
+router.post(
+  '/form-versions/:id/publish',
+  validateRequest({ params: FormVersionIdParamsSchema }),
+  publishFormVersion,
+);
+router.post(
+  '/form-versions/:id/unpublish',
+  validateRequest({ params: FormVersionIdParamsSchema }),
+  unpublishFormVersion,
+);
+router.post(
+  '/form-versions/:id/restore',
+  validateRequest({ params: FormVersionIdParamsSchema }),
+  restoreFormVersion,
+);
+router.get(
+  '/form-versions/:id/schema',
+  validateRequest({ params: FormVersionIdParamsSchema }),
+  getFormVersionSchema,
+);
+router.post(
+  '/form-versions/:id/schema',
+  validateRequest({ params: FormVersionIdParamsSchema, body: ProvisionSchemaBodySchema }),
+  provisionFormVersionSchema,
 );
 router.delete(
   '/form-versions/:id',
