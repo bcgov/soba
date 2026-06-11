@@ -1,9 +1,13 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import type { useKeycloak as useKeycloakHook } from '@/lib/hooks/useKeycloak';
 
 // Use a mutable keycloakState so tests can set it per-case.
-let keycloakState = { authenticated: false, initializing: true } as any;
+let keycloakState: Partial<ReturnType<typeof useKeycloakHook>> = {
+  authenticated: false,
+  initializing: true,
+};
 vi.mock('@/lib/hooks/useKeycloak', () => ({
   useKeycloak: () => keycloakState,
 }));
