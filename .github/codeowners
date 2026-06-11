@@ -1,0 +1,15 @@
+# Code owners for the SOBA repository.
+#
+# Owners listed here are automatically requested for review when someone opens
+# a pull request that modifies matching files. Uncomment and fill in the GitHub
+# handles for your team before relying on this.
+#
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Matched against repo root (asterisk)
+# *                         @owner1 @owner2
+
+# Matched against directories
+# /.github/workflows/       @owner1 @owner2
+# /backend/                 @owner1 @owner2
+# /frontend/                @owner1 @owner2
