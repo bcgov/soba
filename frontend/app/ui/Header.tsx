@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import bcgovLogo from '../../public/bcgov-logo.png';
@@ -38,9 +38,7 @@ function Header({ headerNavItems }: HeaderProps) {
     status: workspaceStatus,
   } = useAppSelector((state) => state.workspace);
 
-  const [menuOpen, setMenuOpen] = useState(false);
   const headerChromeRef = useRef<HTMLDivElement>(null);
-  const wasMenuOpenRef = useRef(false);
   const intervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   useEffect(() => {
@@ -72,19 +70,6 @@ function Header({ headerNavItems }: HeaderProps) {
       dispatch(loadWorkspaces(token));
     }
   }, [authenticated, token, workspaceStatus, dispatch]);
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      setMenuOpen((open) => (open ? false : open));
-    });
-  }, [pathname]);
-
-  useEffect(() => {
-    if (wasMenuOpenRef.current && !menuOpen) {
-      document.getElementById('nav-menu-button')?.focus();
-    }
-    wasMenuOpenRef.current = menuOpen;
-  }, [menuOpen]);
 
   const handleLogout = () => {
     dispatch(clearCurrentUser());
