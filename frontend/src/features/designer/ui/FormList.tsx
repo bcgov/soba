@@ -10,7 +10,7 @@ import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { FaMagnifyingGlass, FaX } from 'react-icons/fa6';
 import { getSobaForms } from '@/src/shared/api/sobaApi';
 import type { SobaFormSummary } from '@/src/shared/api/sobaApiForms';
-import { formatLongDate } from '@/src/shared/util/dateFormat';
+import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import { useAppSelector } from '@/lib/store';
 
 const CustomActionButtons = ({
@@ -153,6 +153,8 @@ function FormList({
     [router, locale],
   );
 
+  const formatLongDate = useFormatLongDate();
+
   const columns: Column<SobaFormSummary>[] = useMemo(
     () => [
       {
@@ -207,7 +209,7 @@ function FormList({
         ),
       },
     ],
-    [handleAction, dictFormList, dictForm, designModeEnabled, submitModeEnabled],
+    [handleAction, dictFormList, dictForm, designModeEnabled, submitModeEnabled, formatLongDate],
   );
 
   if (initializing)

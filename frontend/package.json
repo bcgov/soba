@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@bcgov/bc-sans": "^2.1.0",
+    "@bcgov/design-system-react-components": "^0.7.0",
     "@bcgov/design-tokens": "^3.2.0",
     "@formatjs/intl-localematcher": "^0.8.1",
     "@formio/js": "5.4.0-api98.1",
@@ -32,6 +33,7 @@
     "next-redux-wrapper": "^8.1.0",
     "qrcode.react": "^4.2.0",
     "react": "19.2.3",
+    "react-aria-components": "1.16.0",
     "react-bootstrap": "^2.10.10",
     "react-dom": "19.2.3",
     "react-icons": "^5.5.0",

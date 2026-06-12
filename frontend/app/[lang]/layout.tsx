@@ -31,7 +31,7 @@ export default async function RootLayout({
   const showHome = isFeatureAllowed(FEATURE_CODES.MARKETING);
 
   return (
-    <DictionaryProvider dictionary={dictionary}>
+    <DictionaryProvider dictionary={dictionary} locale={locale}>
       <Header headerNavItems={headerNavItems} overlayNavItems={overlayNavItems} />
       <div className="d-flex w-100">
         <aside

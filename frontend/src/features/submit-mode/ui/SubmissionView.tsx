@@ -8,7 +8,7 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useAppSelector } from '@/lib/store';
 import { ReadOnlyFormView } from '@/src/features/formio-v5/ui/ReadOnlyFormView';
-import { formatLongDate } from '@/src/shared/util/dateFormat';
+import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import {
   getSobaSubmission,
   getFormVersionSchema,
@@ -23,6 +23,7 @@ export function SubmissionView() {
   const { authenticated, token, initializing } = useKeycloak();
   const { activeWorkspaceId } = useAppSelector((state) => state.workspace);
   const ws = activeWorkspaceId || undefined;
+  const formatLongDate = useFormatLongDate();
 
   const submissionIdRaw = params?.submissionId;
   const submissionId =
