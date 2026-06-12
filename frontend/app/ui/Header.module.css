@@ -23,8 +23,8 @@
 }
 
 .limitText {
-  max-width: 50px;
-  overflow: hidden;
+  max-width: 100px;
+  /* overflow: hidden; */
   display: inline-block;
 }
 
