@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Alert, Button } from 'react-bootstrap';
+import { Alert } from 'react-bootstrap';
+import { Button } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
 import {
   fetchBuildMeta,
@@ -175,7 +176,7 @@ export default function MetaReviewClient() {
   return (
     <div>
       <div className="mb-4 d-flex flex-wrap align-items-center gap-3">
-        <Button type="button" variant="secondary" onClick={() => void loadCore()}>
+        <Button type="button" variant="secondary" onPress={() => void loadCore()}>
           {labels.refresh}
         </Button>
         <p className="text-muted small mb-0">GET /health, /health/ready, /meta/*</p>
@@ -195,8 +196,8 @@ export default function MetaReviewClient() {
           type="button"
           variant="secondary"
           className="mb-2"
-          onClick={() => void loadCodes()}
-          disabled={codes.status === 'loading'}
+          onPress={() => void loadCodes()}
+          isDisabled={codes.status === 'loading'}
         >
           {labels.loadCodes}
         </Button>
@@ -209,8 +210,8 @@ export default function MetaReviewClient() {
           type="button"
           variant="secondary"
           className="mb-2"
-          onClick={() => void loadRoles()}
-          disabled={roles.status === 'loading'}
+          onPress={() => void loadRoles()}
+          isDisabled={roles.status === 'loading'}
         >
           {labels.loadRoles}
         </Button>

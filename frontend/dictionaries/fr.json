@@ -10,7 +10,8 @@
     "forms": "Formulaires",
     "feedback": "Retour d'information",
     "help": "Aidé",
-    "welcomeTo": "Bienvenue sur"
+    "welcomeTo": "Bienvenue sur",
+    "loading": "Chargement…"
   },
   "header": {
     "workspaces": "Espaces de travail",

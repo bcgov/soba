@@ -4,7 +4,6 @@ import { useRouter, useParams } from 'next/navigation';
 import {
   Alert,
   Button,
-  Spinner,
   Form as BSForm,
   Row,
   Col,
@@ -12,6 +11,7 @@ import {
   Tabs,
   Tab,
 } from 'react-bootstrap';
+import { ProgressCircle } from '@bcgov/design-system-react-components';
 import { FaInfoCircle } from 'react-icons/fa';
 import { Modal as CommonModal } from '@/src/components/Modal';
 import styles from './FormForm.module.css';
@@ -414,9 +414,7 @@ function FormForm({ id }: { id?: string[] }) {
         {id && id[0] ? (
           loading ? (
             <div className="my-4 text-center">
-              <Spinner animation="border" role="status">
-                <span className="visually-hidden">{dict.form.loading}</span>
-              </Spinner>
+              <ProgressCircle isIndeterminate aria-label={dict.form.loading} />
             </div>
           ) : formSchema ? (
             <FormDesigner onUpdateModel={updateFormSchema} initialModel={formSchema} />

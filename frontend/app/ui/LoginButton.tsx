@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from 'react-bootstrap';
+import { Button } from '@bcgov/design-system-react-components';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 
 interface LoginButtonProps {
@@ -16,7 +16,7 @@ export function LoginButton({ label = 'Log in' }: LoginButtonProps) {
       type="button"
       variant="primary"
       data-testid="login-button"
-      onClick={() => login()}
+      onPress={() => login()}
     >
       {label}
     </Button>

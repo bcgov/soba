@@ -10,7 +10,8 @@
     "forms": "Forms",
     "feedback": "Feedback",
     "help": "Help",
-    "welcomeTo": "Welcome to"
+    "welcomeTo": "Welcome to",
+    "loading": "Loading…"
   },
   "header": {
     "workspaces": "Workspaces",

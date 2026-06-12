@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Table, Spinner } from 'react-bootstrap';
+import { Table } from 'react-bootstrap';
+import { ProgressCircle } from '@bcgov/design-system-react-components';
 
 export interface Column<T> {
   key: string;
@@ -66,7 +67,12 @@ export function DataTable<T>({
           {loading ? (
             <tr>
               <td colSpan={columns.length} className="text-center py-5">
-                <Spinner animation="border" variant="primary" size="sm" className="me-2" />
+                <ProgressCircle
+                  isIndeterminate
+                  size="small"
+                  aria-label={loadingMessage}
+                  className="me-2"
+                />
                 {loadingMessage}
               </td>
             </tr>

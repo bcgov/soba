@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Spinner, Container, Form, InputGroup, Button } from 'react-bootstrap';
+import { Container, Form, InputGroup, Button } from 'react-bootstrap';
+import { Button as DSButton, ProgressCircle } from '@bcgov/design-system-react-components';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
@@ -215,7 +216,7 @@ function FormList({
   if (initializing)
     return (
       <div className="p-5 text-center">
-        <Spinner animation="border" />
+        <ProgressCircle isIndeterminate aria-label={dict.general.loading} />
       </div>
     );
   if (!authenticated) return <div className="p-5 text-center">{dict.general.notAuthenticated}</div>;
@@ -227,20 +228,13 @@ function FormList({
       </div>
       <div className="mb-3 d-flex justify-content-between align-items-center">
         {designModeEnabled && (
-          <Button
+          <DSButton
             variant="primary"
             data-testid="create-form-button"
-            onClick={() => router.push(`/${locale}/designer`)}
-            style={{
-              backgroundColor: '#003366',
-              borderColor: '#003366',
-              borderRadius: '4px',
-              padding: '6px 16px',
-              fontWeight: '500',
-            }}
+            onPress={() => router.push(`/${locale}/designer`)}
           >
             Create
-          </Button>
+          </DSButton>
         )}
 
         <InputGroup style={{ maxWidth: '300px' }}>
@@ -274,7 +268,7 @@ function FormList({
         loading={loading}
         error={error}
         emptyMessage="No forms found matching your criteria."
-        loadingMessage="Loading forms..."
+        loadingMessage={dict.general.loading}
         itemName="items"
         pageSize={pageSize}
         currentPage={currentPage}

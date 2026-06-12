@@ -3,7 +3,8 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { FormType, Submission } from '@formio/react';
-import { Alert, Spinner } from 'react-bootstrap';
+import { Alert } from 'react-bootstrap';
+import { ProgressCircle } from '@bcgov/design-system-react-components';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useAppSelector } from '@/lib/store';
@@ -65,7 +66,7 @@ export function SubmissionView() {
   if (initializing || (authenticated && !token)) {
     return (
       <div className="p-5 text-center">
-        <Spinner animation="border" />
+        <ProgressCircle isIndeterminate aria-label={dict.general.loading} />
       </div>
     );
   }

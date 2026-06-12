@@ -13,7 +13,8 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect } from 'react';
-import { Alert, Button } from 'react-bootstrap';
+import { Alert } from 'react-bootstrap';
+import { Button } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
 
 export default function FormIdRouteError({
@@ -38,7 +39,7 @@ export default function FormIdRouteError({
     <div className="mt-4" role="alert">
       <Alert variant="danger">{labels.title}</Alert>
       <div className="d-flex flex-wrap gap-3">
-        <Button type="button" variant="primary" onClick={() => reset()}>
+        <Button type="button" variant="primary" onPress={() => reset()}>
           {labels.tryAgain}
         </Button>
         <Link
