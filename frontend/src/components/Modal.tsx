@@ -1,5 +1,7 @@
+'use client';
+
 import React from 'react';
-import { Modal as BSModal } from 'react-bootstrap';
+import { Modal as BCModal, Dialog, Heading, ButtonGroup } from '@bcgov/design-system-react-components';
 
 export interface ModalProps {
   show: boolean;
@@ -8,27 +10,40 @@ export interface ModalProps {
   children: React.ReactNode;
   size?: 'sm' | 'lg' | 'xl';
   footer?: React.ReactNode;
-  scrollable?: boolean;
 }
 
-export function Modal({
-  show,
-  title,
-  onClose,
-  children,
-  size = 'lg',
-  footer,
-  scrollable = true,
-}: ModalProps) {
+// The design-system Modal is a fixed ~600px by default; map our legacy `size`
+// prop onto an explicit width so existing callers keep their intended sizing.
+const WIDTH_BY_SIZE: Record<NonNullable<ModalProps['size']>, string> = {
+  sm: '24rem',
+  lg: '50rem',
+  xl: '71rem',
+};
+
+/**
+ * App modal wrapper, now backed by the BC Design System `Modal`/`Dialog`.
+ *
+ * The public API (`show`/`title`/`onClose`/`size`/`footer`) is unchanged, so
+ * callers are untouched. Overflow/scrolling and the close button (X) are
+ * handled by the design-system components; the legacy `scrollable` prop was a
+ * no-op everywhere it was used and has been dropped.
+ */
+export function Modal({ show, title, onClose, children, size = 'lg', footer }: ModalProps) {
   return (
-    <BSModal show={show} onHide={onClose} size={size} centered scrollable={scrollable} data-test-id={title + '-modal'}>
-      <BSModal.Header closeButton>
-        <BSModal.Title>{title}</BSModal.Title>
-      </BSModal.Header>
-      <BSModal.Body className="bg-light">
-        <div className="p-3 bg-white border rounded">{children}</div>
-      </BSModal.Body>
-      {footer && <BSModal.Footer>{footer}</BSModal.Footer>}
-    </BSModal>
+    <BCModal
+      isOpen={show}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose();
+      }}
+      isDismissable
+      data-testid={`${title}-modal`}
+      style={{ width: WIDTH_BY_SIZE[size], maxWidth: '100vw' }}
+    >
+      <Dialog isCloseable aria-label={title}>
+        <Heading slot="title">{title}</Heading>
+        {children}
+        {footer && <ButtonGroup ariaLabel="Dialog actions">{footer}</ButtonGroup>}
+      </Dialog>
+    </BCModal>
   );
 }

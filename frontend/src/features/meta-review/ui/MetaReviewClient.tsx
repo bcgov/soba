@@ -1,8 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Alert } from 'react-bootstrap';
-import { Button } from '@bcgov/design-system-react-components';
+import { Button, InlineAlert } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
 import {
   fetchBuildMeta,
@@ -36,9 +35,9 @@ function JsonBlock({ state }: { state: SectionState }) {
   if (state.status === 'error') {
     return (
       <div className="mt-2">
-        <Alert variant="danger" role="alert">
+        <InlineAlert variant="danger" role="alert">
           {state.message}
-        </Alert>
+        </InlineAlert>
       </div>
     );
   }
@@ -170,7 +169,9 @@ export default function MetaReviewClient() {
   }, []);
 
   if (!labels) {
-    return <Alert variant="warning">Missing dictionary keys for this page (metaPage).</Alert>;
+    return (
+      <InlineAlert variant="warning">Missing dictionary keys for this page (metaPage).</InlineAlert>
+    );
   }
 
   return (

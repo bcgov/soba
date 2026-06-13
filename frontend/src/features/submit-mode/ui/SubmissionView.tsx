@@ -3,8 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { FormType, Submission } from '@formio/react';
-import { Alert } from 'react-bootstrap';
-import { ProgressCircle } from '@bcgov/design-system-react-components';
+import { ProgressCircle, InlineAlert } from '@bcgov/design-system-react-components';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useAppSelector } from '@/lib/store';
@@ -77,9 +76,9 @@ export function SubmissionView() {
       {!loaded ? (
         <p className="text-muted small">{dictSub?.loading || 'Loading…'}</p>
       ) : notFound || !submission ? (
-        <Alert variant="danger" role="alert" data-testid="submission-view-notfound">
+        <InlineAlert variant="danger" role="alert" data-testid="submission-view-notfound">
           {dictSub?.notFound || 'Submission not found.'}
-        </Alert>
+        </InlineAlert>
       ) : (
         <>
           <div className="mb-3" data-testid="submission-view-header">
@@ -108,9 +107,9 @@ export function SubmissionView() {
               testId="submission-view-form"
             />
           ) : (
-            <Alert variant="secondary" role="alert" data-testid="submission-view-nocontent">
+            <InlineAlert variant="info" role="alert" data-testid="submission-view-nocontent">
               {dictSub?.noContent || 'No submitted answers to display.'}
-            </Alert>
+            </InlineAlert>
           )}
         </>
       )}

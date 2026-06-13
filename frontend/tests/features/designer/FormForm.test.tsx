@@ -7,11 +7,23 @@ vi.mock('@/lib/hooks/useKeycloak', () => ({
 }));
 
 vi.mock('@/app/[lang]/Providers', () => ({
-  useDictionary: () => ({ form: {}, general: { notAuthenticated: 'Not authed' }, locale: 'en' }),
+  useDictionary: () => ({
+    form: {
+      loading: 'Loading',
+      apiKey: 'API Key',
+      nameLabel: 'Form Name',
+      descriptionLabel: 'Description',
+    },
+    general: { notAuthenticated: 'Not authed' },
+    locale: 'en',
+  }),
 }));
 
-vi.mock('@/lib/store', async () => ({
-  useAppSelector: (fn: (s: unknown) => unknown) => fn({ workspace: { activeWorkspaceId: 'ws1' } }),
+const { mockDispatch } = vi.hoisted(() => ({ mockDispatch: vi.fn() }));
+vi.mock('@/lib/store', () => ({
+  useAppSelector: (fn: (s: unknown) => unknown) =>
+    fn({ workspace: { activeWorkspaceId: 'ws1' }, notification: { notifications: [] } }),
+  useAppDispatch: () => mockDispatch,
 }));
 
 // Mock the soba API functions used by FormForm

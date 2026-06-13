@@ -44,17 +44,3 @@ a {
   border-color: var(--surface-color-border-default);
 }
 
-.bc-gov-header {
-  background: var(--surface-color-background-white);
-  border-bottom: 1px solid var(--surface-color-border-default);
-}
-
-.bc-gov-header .navbar-brand {
-  font-weight: 700;
-  color: var(--typography-color-primary);
-  font-size: 1rem;
-}
-
-.bc-gov-header .navbar-brand:hover {
-  color: var(--app-primary);
-}

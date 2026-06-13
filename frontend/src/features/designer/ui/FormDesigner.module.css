@@ -5,7 +5,7 @@
  * with literal class names that should not be hashed by CSS Modules.
  */
 
-/* Fix Tailwind v4 conflict making sidebar components invisible */
+/* Safeguard: keep Form.io builder sidebar components visible. */
 :global(.formio-builder-components span),
 :global(.formcomponent),
 :global([ref='sidebar-component']) {
@@ -41,4 +41,18 @@
 :global(.builder-sidebar::-webkit-scrollbar-thumb) {
   background: #ccc;
   border-radius: 4px;
+}
+
+/* The DS TextArea is `display: inline-flex` and only fills width via its own
+   `align-self: stretch`, which needs a flex parent — so make the wrapper a flex
+   column. It also has no intrinsic height, so give the JSON editors real room
+   (still resizable + monospace). */
+:global(.json-textarea) {
+  display: flex;
+  flex-direction: column;
+}
+:global(.json-textarea) textarea {
+  min-height: 320px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }

@@ -1,10 +1,9 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-import bcgovLogo from '../../public/bcgov-logo.png';
 import { usePathname, useRouter } from 'next/navigation';
-import { Form, Dropdown, Navbar, Container } from 'react-bootstrap';
+import { Dropdown } from 'react-bootstrap';
+import { Select, Header as BCHeader } from '@bcgov/design-system-react-components';
 import { FaUser } from 'react-icons/fa6';
 import { useAppDispatch } from '@/lib/store';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
@@ -27,7 +26,6 @@ function Header({ headerNavItems }: HeaderProps) {
   const dict = useDictionary();
 
   const locale = dict.locale === 'en' || dict.locale === 'fr' ? dict.locale : 'en';
-  const homeHref = `/${locale}/`;
   const pathname = usePathname();
   const router = useRouter();
   const { authenticated, idTokenParsed, token, logout, init, refresh } = useKeycloak();
@@ -105,37 +103,31 @@ function Header({ headerNavItems }: HeaderProps) {
       return (
         <div className="d-flex align-items-center justify-content-end gap-3">
           {workspaces.length > 1 && (
-            <Form.Select
-              size="sm"
+            <Select
+              size="small"
               id="workspace-select"
               data-testid="workspace-select"
-              value={activeWorkspaceId || ''}
-              onChange={(e) => dispatch(setActiveWorkspaceId(e.target.value))}
-              style={{ width: 'auto', maxWidth: '200px' }}
-              className="mr-2"
               aria-label="Select Workspace"
-            >
-              {workspaces.map((ws) => (
-                <option key={ws.id} value={ws.id}>
-                  {ws.name} ({ws.kind})
-                </option>
-              ))}
-            </Form.Select>
+              className="mr-2"
+              selectedKey={activeWorkspaceId || null}
+              onSelectionChange={(key) => dispatch(setActiveWorkspaceId(String(key)))}
+              items={workspaces.map((ws) => ({ id: ws.id, label: `${ws.name} (${ws.kind})` }))}
+            />
           )}
 
-          <Form.Select
-            size="sm"
-            value={locale}
+          <Select
+            size="small"
             id="lang-selector"
             data-testid="lang-selector"
-            onChange={(e) => handleLanguageChange(e.target.value)}
-            style={{ width: 'auto' }}
-            className="mr-2"
             aria-label="Select Language"
-          >
-            <option value="en">EN</option>
-            <option value="fr">FR</option>
-          </Form.Select>
+            className="mr-2"
+            selectedKey={locale}
+            onSelectionChange={(key) => handleLanguageChange(String(key))}
+            items={[
+              { id: 'en', label: 'EN' },
+              { id: 'fr', label: 'FR' },
+            ]}
+          />
 
           {displayName ? (
             <Dropdown>
@@ -167,80 +159,58 @@ function Header({ headerNavItems }: HeaderProps) {
     }
     return (
       <div className="d-flex align-items-center justify-content-end gap-3">
-        <Form.Select
-          size="sm"
+        <Select
+          size="small"
           id="lang-selector"
-          value={locale}
           data-testid="lang-selector"
-          onChange={(e) => handleLanguageChange(e.target.value)}
-          style={{ width: 'auto' }}
-          className="mr-2"
           aria-label="Select Language"
-        >
-          <option value="en">EN</option>
-          <option value="fr">FR</option>
-        </Form.Select>
+          className="mr-2"
+          selectedKey={locale}
+          onSelectionChange={(key) => handleLanguageChange(String(key))}
+          items={[
+            { id: 'en', label: 'EN' },
+            { id: 'fr', label: 'FR' },
+          ]}
+        />
         <LoginButton data-testid="header-login-button" label={dict.general.login} />
       </div>
     );
   };
 
   return (
-    <>
-      <div ref={headerChromeRef}>
-        <header>
-          <a href="#main-content" className="visually-hidden-focusable">
+    <div ref={headerChromeRef} data-testid="app-header">
+      <BCHeader
+        logoLinkElement={
+          <Link href="/" data-testid="bcgov-header-logo" title="Government of British Columbia" />
+        }
+        title={dict.general.title}
+        titleElement="h1"
+        skipLinks={[
+          <a key="skip-to-main" href="#main-content">
             {dict.header.skipToMain}
-          </a>
-          <Navbar className="bc-gov-header py-2" expand="md" data-testid="app-header">
-            <Container fluid="xl" className="px-3 px-sm-4 gap-3">
-              <Link
-                href={homeHref}
-                data-testid="bcgov-header-logo"
-                title="Government of British Columbia"
-                className="navbar-brand mb-0 d-flex align-items-center gap-2"
-              >
-                <Image
-                  src={bcgovLogo}
-                  alt="BC Gov logo"
-                  height={40}
-                  width={160}
-                  style={{ height: '2.5rem', width: 'auto', marginRight: '0.5rem' }}
-                  aria-hidden="true"
-                  priority
-                  draggable={false}
-                  className="border-end text-decoration-none"
-                />
-                {dict.general.title}
-              </Link>
-              <h1 className="visually-hidden">{dict.general.title}</h1>
-              {headerNavItems.length > 0 ? (
-                <nav
-                  aria-label="Primary"
-                  data-testid="primary-nav"
-                  className="me-auto d-none d-md-block"
-                >
-                  <ul className="list-unstyled d-flex align-items-center gap-3 mb-0">
-                    {headerNavItems.map((item) => (
-                      <li key={item.id}>
-                        <Link href={item.href} className="text-decoration-underline">
-                          {item.label}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </nav>
-              ) : null}
-              <div
-                className={`d-flex flex-shrink-0 align-items-center justify-content-end gap-3 ${headerNavItems.length > 0 ? 'ms-auto' : 'ms-auto'}`}
-              >
-                {authActions()}
-              </div>
-            </Container>
-          </Navbar>
-        </header>
-      </div>
-    </>
+          </a>,
+        ]}
+      >
+        <div className="d-flex align-items-center gap-3">
+          {headerNavItems.length > 0 ? (
+            <nav aria-label="Primary" data-testid="primary-nav" className="d-none d-md-block">
+              <ul className="list-unstyled d-flex align-items-center gap-3 mb-0">
+                {headerNavItems.map((item) => (
+                  <li key={item.id}>
+                    <Link href={item.href} className="text-decoration-underline">
+                      {item.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ) : null}
+          <div className="d-flex flex-shrink-0 align-items-center justify-content-end gap-3">
+            {authActions()}
+          </div>
+        </div>
+      </BCHeader>
+    </div>
   );
 }
 

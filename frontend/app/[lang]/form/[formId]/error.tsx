@@ -13,8 +13,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect } from 'react';
-import { Alert } from 'react-bootstrap';
-import { Button } from '@bcgov/design-system-react-components';
+import { Button, InlineAlert } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
 
 export default function FormIdRouteError({
@@ -37,13 +36,13 @@ export default function FormIdRouteError({
 
   return (
     <div className="mt-4" role="alert">
-      <Alert variant="danger">{labels.title}</Alert>
+      <InlineAlert variant="danger">{labels.title}</InlineAlert>
       <div className="d-flex flex-wrap gap-3">
         <Button type="button" variant="primary" onPress={() => reset()}>
           {labels.tryAgain}
         </Button>
         <Link
-          className="text-[var(--theme-primary-blue)] underline hover:no-underline"
+          className="text-decoration-underline"
           href={`/${locale}/forms`}
         >
           {labels.backToList}

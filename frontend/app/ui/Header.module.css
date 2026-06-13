@@ -1,7 +1,14 @@
 .userDrop {
-  color: var(--app-text);
-  background: var(--app-surface);
-  border-color: var(--app-border);
+  /* Flex layout keeps the person icon, name, and caret aligned regardless of
+     Bootstrap `.btn` defaults or Form.io's injected global CSS. */
+  display: inline-flex;
+  align-items: center;
+  /* `!important` pins the white surface on the base state too (not just
+     :hover/:focus), so Bootstrap's `.btn-primary` blue can't win the cascade
+     depending on stylesheet injection order across pages. */
+  color: var(--app-text) !important;
+  background: var(--app-surface) !important;
+  border-color: var(--app-border) !important;
 }
 
 .userDrop:hover {
@@ -26,8 +33,4 @@
   max-width: 100px;
   /* overflow: hidden; */
   display: inline-block;
-}
-
-.userDrop:after {
-  vertical-align: 0.5em;
 }
