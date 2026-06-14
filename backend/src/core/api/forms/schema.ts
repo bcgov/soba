@@ -8,7 +8,6 @@ export const FormVisibilityEnum = z.enum(['public', 'azureidir']);
 
 export const CreateFormBodySchema = z
   .object({
-    slug: z.string().trim().min(1),
     name: z.string().trim().min(1),
     description: z.string().optional(),
     formEngineCode: z.string().trim().min(1).optional(),
@@ -45,7 +44,6 @@ export const UpdateFormVersionBodySchema = z
 
 export const UpdateFormBodySchema = z
   .object({
-    slug: z.string().trim().min(1).optional(),
     name: z.string().trim().min(1).optional(),
     description: z.string().nullable().optional(),
     status: z.string().trim().min(1).optional(),
@@ -86,7 +84,6 @@ export const ListFormsQuerySchema = z
 export const FormListItemSchema = z
   .object({
     id: z.string(),
-    slug: z.string(),
     name: z.string(),
     status: z.string(),
     createdAt: z.string(),
@@ -98,7 +95,6 @@ export const FormListItemSchema = z
 export const FormResponseSchema = z
   .object({
     id: z.string(),
-    slug: z.string(),
     name: z.string(),
     description: z.string().nullable(),
     status: z.string(),

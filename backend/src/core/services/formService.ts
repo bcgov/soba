@@ -41,7 +41,6 @@ interface CreateInput {
   workspaceId: string;
   actorId: string;
   actorDisplayLabel: string | null;
-  slug: string;
   name: string;
   description?: string;
   formEngineCode?: string;
@@ -53,7 +52,6 @@ interface UpdateInput {
   actorId: string;
   actorDisplayLabel: string | null;
   formId: string;
-  slug?: string;
   name?: string;
   description?: string | null;
   status?: string;
@@ -89,7 +87,6 @@ export class FormService {
           workspaceId: input.workspaceId,
           actorId: input.actorId,
           actorDisplayLabel: input.actorDisplayLabel,
-          slug: input.slug,
           name: input.name,
           description: input.description,
           formEngineCode: engineCode,

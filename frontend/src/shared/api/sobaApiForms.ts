@@ -123,7 +123,6 @@ export async function saveSobaFormSubmission(
 /** Compact form row for the designer/submit list. */
 export type SobaFormSummary = {
   id: string;
-  slug: string;
   name: string;
   status: string;
   createdAt: string;

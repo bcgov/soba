@@ -112,11 +112,7 @@ function FormList({
   const filteredForms = useMemo(() => {
     if (!searchQuery.trim()) return forms;
     const query = searchQuery.toLowerCase();
-    return forms.filter(
-      (f) =>
-        (f.name || '').toLowerCase().includes(query) ||
-        (f.slug || '').toLowerCase().includes(query),
-    );
+    return forms.filter((f) => (f.name || '').toLowerCase().includes(query));
   }, [forms, searchQuery]);
 
   // Removed unused totalPages

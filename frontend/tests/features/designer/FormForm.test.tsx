@@ -28,7 +28,7 @@ vi.mock('@/lib/store', () => ({
 
 // Mock the soba API functions used by FormForm
 vi.mock('@/src/shared/api/sobaApi', () => ({
-  getSobaForm: vi.fn().mockResolvedValue({ id: 'f1', name: 'Test', slug: 'test', description: '' }),
+  getSobaForm: vi.fn().mockResolvedValue({ id: 'f1', name: 'Test', description: '' }),
   getSobaFormVersions: vi.fn().mockResolvedValue({ items: [] }),
   getFormVersionSchema: vi.fn().mockResolvedValue(null),
 }));

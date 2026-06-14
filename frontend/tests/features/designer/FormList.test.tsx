@@ -42,7 +42,6 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
       {
         id: 'f1',
         name: 'Form One',
-        slug: 'form-one',
         status: 'active',
         createdBy: 'alice',
         createdAt: new Date().toISOString(),
@@ -51,7 +50,6 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
       {
         id: 'f2',
         name: 'Form Two',
-        slug: 'form-two',
         status: 'active',
         createdBy: 'bob',
         createdAt: new Date().toISOString(),

@@ -38,17 +38,6 @@ import {
 } from '@/src/shared/api/sobaApi';
 import type { SobaFormType, SobaFormVersionType } from '@/src/types/forms';
 
-/** Converts a human-readable title into a URL-safe slug. */
-function titleToSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
 function FormForm({ id }: { id?: string[] }) {
   const dict = useDictionary();
   const router = useRouter();
@@ -60,12 +49,10 @@ function FormForm({ id }: { id?: string[] }) {
   const { addNotification } = useNotificationStore();
   const [activeTab, setActiveTab] = useState('designer');
   const [formName, setFormName] = useState('');
-  const [formSlug, setFormSlug] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formSchema, setFormSchema] = useState<FormType | null>(null);
   const [currentVersion, setCurrentVersion] = useState<SobaFormVersionType | null>(null);
   const [visibility, setVisibility] = useState<string[]>([]);
-  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
 
   const [versions, setVersions] = useState<SobaFormVersionType[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
@@ -97,9 +84,7 @@ function FormForm({ id }: { id?: string[] }) {
           ]);
 
           setFormName(form?.name ?? '');
-          setFormSlug(form?.slug ?? '');
           setFormDesc(form?.description ?? '');
-          setSlugManuallyEdited(true);
 
           const items = versionsData.items || [];
           setVersions(items);
@@ -135,16 +120,10 @@ function FormForm({ id }: { id?: string[] }) {
     }
   }, [id, token, activeWorkspaceId, dict.form.loadFormError, addNotification]);
 
-  const handleNameChange = useCallback(
-    (name: string) => {
-      setFormName(name);
-      if (!slugManuallyEdited) {
-        setFormSlug(titleToSlug(name));
-      }
-      setIsDirty(true);
-    },
-    [slugManuallyEdited],
-  );
+  const handleNameChange = useCallback((name: string) => {
+    setFormName(name);
+    setIsDirty(true);
+  }, []);
 
   const updateFormSchema = useCallback((data: FormType) => {
     setFormSchema(data);
@@ -251,7 +230,6 @@ function FormForm({ id }: { id?: string[] }) {
   const saveForm = async (publish: boolean = false) => {
     if (isSaving || loading) return;
     setIsSaving(true);
-    const slug = formSlug || titleToSlug(formName);
     const ws = activeWorkspaceId || undefined;
     const schema = (formSchema ?? {}) as FormType;
 
@@ -265,7 +243,7 @@ function FormForm({ id }: { id?: string[] }) {
         }
       } else {
         // CREATE: one-call create (form + empty v1), then provision the schema.
-        const data: SobaFormType = { name: formName, slug, description: formDesc, visibility };
+        const data: SobaFormType = { name: formName, description: formDesc, visibility };
         const created = await createSobaFormioForm(token as string, data, ws);
         const versionId = created.formVersion?.id;
         if (versionId) {
