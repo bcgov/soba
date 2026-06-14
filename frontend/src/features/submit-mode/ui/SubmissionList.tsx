@@ -41,8 +41,8 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
           const params = formId ? { formId } : undefined;
           const data = await getSobaSubmissions(token, params, activeWorkspaceId || undefined);
           setSubmissions(data.items || []);
-        } catch (err) {
-          console.error('Failed to fetch submissions', err);
+        } catch {
+          // Submissions failed to load; the empty state is shown to the user.
         } finally {
           setIsLoaded(true);
         }

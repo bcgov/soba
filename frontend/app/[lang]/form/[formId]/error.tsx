@@ -12,12 +12,10 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect } from 'react';
 import { Button, InlineAlert } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
 
 export default function FormIdRouteError({
-  error,
   reset,
 }: {
   error: Error & { digest?: string };
@@ -27,12 +25,6 @@ export default function FormIdRouteError({
   const locale = typeof params?.lang === 'string' ? params.lang : 'en';
   const dict = useDictionary();
   const labels = dict.formioV5.formRender.segmentError;
-
-  useEffect(() => {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('[forms/[formId]/error]', error);
-    }
-  }, [error]);
 
   return (
     <div className="mt-4" role="alert">

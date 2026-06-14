@@ -92,7 +92,6 @@ function FormList({
             setForms(Array.isArray(data.items) ? data.items : []);
           }
         } catch (err: unknown) {
-          console.error('Error fetching forms:', err);
           if (isMounted && err && typeof err === 'object' && 'message' in err) {
             setError((err as { message: string }).message);
           }

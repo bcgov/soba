@@ -5,7 +5,7 @@ import type { FormProps } from '@formio/react';
 import { useFormioV5FormChrome } from '@/lib/hooks/useFormioV5FormChrome';
 
 function FormioV5FormChrome({ children }: { children: React.ReactNode }) {
-  useFormioV5FormChrome(true);
+  useFormioV5FormChrome('render');
   return children;
 }
 

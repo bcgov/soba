@@ -127,10 +127,10 @@ function FormForm({ id }: { id?: string[] }) {
           }
           setIsDirty(false);
         } catch (e: unknown) {
-          console.error('Error loading form data', e);
           addNotification({
             text: `${dict.form.loadFormError || 'Failed to load form:'} ${(e as Error).message}`,
             type: 'error',
+            consoleError: e,
           });
         } finally {
           setLoading(false);
@@ -173,10 +173,10 @@ function FormForm({ id }: { id?: string[] }) {
       setVisibility(version.visibility ?? []);
       setIsDirty(false);
     } catch (err) {
-      console.error('Failed to load version schema:', err);
       addNotification({
         text: dict.form.loadVersionSchemaError || 'Failed to load version schema.',
         type: 'error',
+        consoleError: err,
       });
     } finally {
       setLoading(false);
@@ -233,10 +233,10 @@ function FormForm({ id }: { id?: string[] }) {
         type: 'success',
       });
     } catch (e: unknown) {
-      console.error('Error creating new form version:', e);
       addNotification({
         text: dict.form.createVersionError || 'Failed to create new version.',
         type: 'error',
+        consoleError: e,
       });
     } finally {
       setIsSaving(false);
@@ -293,8 +293,7 @@ function FormForm({ id }: { id?: string[] }) {
       });
       setIsDirty(false);
     } catch (e: unknown) {
-      console.error('error saving form', e);
-      addNotification({ text: dict.form.saveError, type: 'error' });
+      addNotification({ text: dict.form.saveError, type: 'error', consoleError: e });
     } finally {
       setIsSaving(false);
     }

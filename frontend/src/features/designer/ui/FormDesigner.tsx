@@ -4,8 +4,7 @@ import React, { useMemo, useRef, useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 
-// Import CSS
-import '@formio/js/dist/formio.full.min.css';
+import { useFormioV5FormChrome } from '@/lib/hooks/useFormioV5FormChrome';
 
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
@@ -59,6 +58,8 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
   const { authenticated, initializing } = useKeycloak();
   const dict = useDictionary();
   const { addNotification } = useNotificationStore();
+  // Inject the Form.io builder CSS (layered) only while the builder is mounted.
+  useFormioV5FormChrome('build');
   const builderRef = useRef<FormioBuilderInstance | null>(null);
 
   /**
@@ -204,7 +205,8 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
       const schema = (builderRef.current as FormioBuilderInstance).form || {};
       const json = JSON.stringify(schema, null, 2);
       setExportJson(json);
-      navigator.clipboard.writeText(json).catch((err) => console.error('Failed to copy', err));
+      // Best-effort clipboard copy; the JSON is shown in the modal regardless.
+      navigator.clipboard.writeText(json).catch(() => {});
       setShowExportModal(true);
     }
   }, []);
