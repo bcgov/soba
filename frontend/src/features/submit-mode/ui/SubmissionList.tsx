@@ -53,13 +53,11 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
     }
   }, [authenticated, token, formId, activeWorkspaceId]);
 
-  const loading = !!(authenticated && token && !isLoaded);
+  const loading = initializing || (authenticated && (!token || !isLoaded));
 
-  if (initializing || (authenticated && !token)) {
-    return <div className="p-4">{dict.form?.loading || 'Loading submissions...'}</div>;
-  }
-
-  if (!authenticated) {
+  // Auth gate only — loading (including Keycloak init) is shown inside the table
+  // body so the page heading stays visible throughout.
+  if (!authenticated && !initializing) {
     return null;
   }
 

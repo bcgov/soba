@@ -15,6 +15,7 @@ import type {
 } from '@formio/react';
 import './FormDesigner.module.css';
 import { Modal as CommonModal } from '@/src/components/Modal';
+import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { TextArea, Button, InlineAlert } from '@bcgov/design-system-react-components';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
@@ -232,7 +233,7 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
   }, [importJson, onUpdateModel, sanitizeForm, addNotification, dict.form.invalidJson]);
 
   if (initializing) {
-    return <div className="p-5 text-center">Loading Designer...</div>;
+    return <CenteredProgress label={dict.form.loading} />;
   }
 
   if (!authenticated) {

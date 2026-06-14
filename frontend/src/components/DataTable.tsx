@@ -2,8 +2,9 @@
 
 import React from 'react';
 import { Table } from 'react-bootstrap';
-import { ProgressCircle, Select, Button } from '@bcgov/design-system-react-components';
+import { Select, Button } from '@bcgov/design-system-react-components';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa6';
+import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 
 export interface Column<T> {
   key: string;
@@ -71,11 +72,8 @@ export function DataTable<T>({
         <tbody style={{ borderTop: 'none' }}>
           {loading ? (
             <tr>
-              <td colSpan={columns.length} className="py-5">
-                <div className="d-flex align-items-center justify-content-center gap-2">
-                  <ProgressCircle isIndeterminate size="small" aria-label={loadingMessage} />
-                  <span>{loadingMessage}</span>
-                </div>
+              <td colSpan={columns.length} className="p-0">
+                <CenteredProgress label={loadingMessage} data-testid="datatable-loading" />
               </td>
             </tr>
           ) : data.length === 0 ? (

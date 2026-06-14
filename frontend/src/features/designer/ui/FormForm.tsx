@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Tabs, Tab } from 'react-bootstrap';
 import {
-  ProgressCircle,
   InlineAlert,
   Button,
   Form,
@@ -16,6 +15,7 @@ import {
   AlertDialog,
 } from '@bcgov/design-system-react-components';
 import { FaInfoCircle } from 'react-icons/fa';
+import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { Modal as CommonModal } from '@/src/components/Modal';
 import styles from './FormForm.module.css';
 
@@ -379,9 +379,7 @@ function FormForm({ id }: { id?: string[] }) {
       <div className={styles.designerWrapper}>
         {id && id[0] ? (
           loading ? (
-            <div className="my-4 text-center">
-              <ProgressCircle isIndeterminate aria-label={dict.form.loading} />
-            </div>
+            <CenteredProgress label={dict.form.loading} />
           ) : formSchema ? (
             <FormDesigner onUpdateModel={updateFormSchema} initialModel={formSchema} />
           ) : (

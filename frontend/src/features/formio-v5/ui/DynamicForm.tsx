@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import type { FormProps } from '@formio/react';
 import { useFormioV5FormChrome } from '@/lib/hooks/useFormioV5FormChrome';
+import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 
 function FormioV5FormChrome({ children }: { children: React.ReactNode }) {
   useFormioV5FormChrome('render');
@@ -16,7 +17,7 @@ function FormioV5FormChrome({ children }: { children: React.ReactNode }) {
  */
 const FormioForm = dynamic<FormProps>(() => import('@formio/react').then((m) => m.Form), {
   ssr: false,
-  loading: () => <p className="text-muted small">Loading form renderer…</p>,
+  loading: () => <CenteredProgress />,
 });
 
 export function DynamicForm(props: FormProps) {

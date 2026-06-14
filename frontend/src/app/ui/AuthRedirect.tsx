@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
-import { ProgressCircle } from '@bcgov/design-system-react-components';
+import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 
 export function AuthRedirect({
   to,
@@ -28,14 +28,7 @@ export function AuthRedirect({
   }, [shouldRedirect, router, to]);
 
   if (initializing || shouldRedirect) {
-    return (
-      <div
-        className="d-flex justify-content-center align-items-center"
-        style={{ minHeight: '50vh' }}
-      >
-        <ProgressCircle isIndeterminate aria-label={dict.general.loading} />
-      </div>
-    );
+    return <CenteredProgress label={dict.general.loading} minHeight="50vh" />;
   }
 
   return <>{children}</>;

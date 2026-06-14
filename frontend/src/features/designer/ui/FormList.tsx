@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Container } from 'react-bootstrap';
-import { Button as DSButton, ProgressCircle, TextField } from '@bcgov/design-system-react-components';
+import { Button as DSButton, TextField } from '@bcgov/design-system-react-components';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { DsPageHeading } from '@/app/ui/DsPageHeading';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
@@ -208,13 +208,11 @@ function FormList({
     ],
   );
 
-  if (initializing)
-    return (
-      <div className="p-5 text-center">
-        <ProgressCircle isIndeterminate aria-label={dict.general.loading} />
-      </div>
-    );
-  if (!authenticated) return <div className="p-5 text-center">{dict.general.notAuthenticated}</div>;
+  // Auth gate only — loading (including Keycloak init) is shown inside the table
+  // body so the page heading stays visible throughout.
+  if (!authenticated && !initializing) {
+    return <div className="p-5 text-center">{dict.general.notAuthenticated}</div>;
+  }
 
   return (
     <Container fluid className="py-4 px-lg-5">
@@ -263,7 +261,7 @@ function FormList({
       <DataTable<SobaFormSummary>
         data={paginatedForms as SobaFormSummary[]}
         columns={columns}
-        loading={loading}
+        loading={loading || initializing}
         error={error}
         emptyMessage="No forms found matching your criteria."
         loadingMessage={dict.general.loading}

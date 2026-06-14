@@ -3,7 +3,8 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { FormType, Submission } from '@formio/react';
-import { ProgressCircle, InlineAlert } from '@bcgov/design-system-react-components';
+import { InlineAlert } from '@bcgov/design-system-react-components';
+import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useAppSelector } from '@/lib/store';
@@ -63,18 +64,14 @@ export function SubmissionView() {
   }, [authenticated, token, submissionId, ws, loaded]);
 
   if (initializing || (authenticated && !token)) {
-    return (
-      <div className="p-5 text-center">
-        <ProgressCircle isIndeterminate aria-label={dict.general.loading} />
-      </div>
-    );
+    return <CenteredProgress label={dict.general.loading} />;
   }
   if (!authenticated) return null;
 
   return (
     <div className="mt-3" data-testid="submission-view">
       {!loaded ? (
-        <p className="text-muted small">{dictSub?.loading || 'Loading…'}</p>
+        <CenteredProgress label={dictSub?.loading || dict.general.loading} />
       ) : notFound || !submission ? (
         <InlineAlert variant="danger" role="alert" data-testid="submission-view-notfound">
           {dictSub?.notFound || 'Submission not found.'}
