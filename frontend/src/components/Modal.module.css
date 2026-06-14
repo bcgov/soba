@@ -1,0 +1,35 @@
+/*
+ * Baseline layout for app "form" dialogs (import/export, preview, etc.).
+ *
+ * The BC Design System plain `Dialog` only stacks its children with no internal
+ * structure, which is why these looked basic. We give them the same region
+ * model the DS `AlertDialog` uses — header / body / footer separated by thin
+ * borders — reusing the same design tokens so the spacing matches the rest of
+ * the system (e.g. the disclaimer dialog).
+ */
+
+.header {
+  padding: var(--layout-padding-medium) var(--layout-padding-large);
+  border-bottom: var(--layout-border-width-small) solid var(--surface-color-border-default);
+}
+
+.title {
+  margin: 0;
+  font: var(--typography-bold-h5);
+  color: var(--typography-color-primary);
+}
+
+/*
+ * Body sits between the two thin borders. It's a flex column so passed-in
+ * content stretches to the full width of the padded area by default.
+ */
+.body {
+  display: flex;
+  flex-direction: column;
+  padding: var(--layout-padding-medium) var(--layout-padding-large);
+  border-bottom: var(--layout-border-width-small) solid var(--surface-color-border-default);
+}
+
+.footer {
+  padding: var(--layout-padding-medium) var(--layout-padding-large);
+}

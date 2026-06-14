@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Modal as BCModal, Dialog, Heading, ButtonGroup } from '@bcgov/design-system-react-components';
+import styles from './Modal.module.css';
 
 export interface ModalProps {
   show: boolean;
@@ -40,9 +41,17 @@ export function Modal({ show, title, onClose, children, size = 'lg', footer }: M
       style={{ width: WIDTH_BY_SIZE[size], maxWidth: '100vw' }}
     >
       <Dialog isCloseable aria-label={title}>
-        <Heading slot="title">{title}</Heading>
-        {children}
-        {footer && <ButtonGroup ariaLabel="Dialog actions">{footer}</ButtonGroup>}
+        <div className={styles.header}>
+          <Heading slot="title" className={styles.title}>
+            {title}
+          </Heading>
+        </div>
+        <div className={styles.body}>{children}</div>
+        {footer && (
+          <div className={styles.footer}>
+            <ButtonGroup ariaLabel="Dialog actions">{footer}</ButtonGroup>
+          </div>
+        )}
       </Dialog>
     </BCModal>
   );
