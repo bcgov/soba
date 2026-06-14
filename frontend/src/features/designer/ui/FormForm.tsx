@@ -299,12 +299,12 @@ function FormForm({ id }: { id?: string[] }) {
     }
   };
 
-  if (!authenticated) {
-    return <div>You must be logged in</div>;
+  if (initializing) {
+    return <CenteredProgress label={dict.form.loading} />;
   }
 
-  if (initializing) {
-    return <div>Forms initializing</div>;
+  if (!authenticated) {
+    return <div className="p-5 text-center">{dict.general.notAuthenticated}</div>;
   }
 
   const renderDesignerContent = () => (
@@ -417,13 +417,13 @@ function FormForm({ id }: { id?: string[] }) {
           </Button>
         )}
         <Button
-          variant="secondary"
+          variant="primary"
           onPress={saveFormDraft}
           isDisabled={isHistoryView || isCurrentPublished || isSaving || loading || !agreedDisclaimer}
         >
           {isSaving ? dict.form.saving || 'Saving...' : dict.form.save || 'Save'}
         </Button>
-        <Button variant="secondary" onPress={() => setShowPreview(true)} isDisabled={isSaving || loading}>
+        <Button variant="tertiary" onPress={() => setShowPreview(true)} isDisabled={isSaving || loading}>
           {dict.form.preview || 'Preview'}
         </Button>
         {id && id[0] && (
@@ -504,7 +504,7 @@ function FormForm({ id }: { id?: string[] }) {
           onSelect={(k) => setActiveTab(k || 'designer')}
           className="mb-3"
         >
-          <Tab eventKey="designer" title="Designer">
+          <Tab eventKey="designer" title={dict.form.designerTab || 'Designer'}>
             {renderDesignerContent()}
           </Tab>
           <Tab eventKey="settings" title={dict.form.settingsTab || 'Settings'}>

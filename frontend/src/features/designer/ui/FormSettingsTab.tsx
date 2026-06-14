@@ -13,7 +13,7 @@ export default function FormSettingsTab({ dict }: FormSettingsTabProps) {
 
   return (
     <div className="p-3 border rounded-bottom bg-white border-top-0">
-      <h5 className="mb-3">{dict.form.settingsTab || 'Settings'}</h5>
+      <h3 className="h5 mb-3">{dict.form.settingsTab || 'Settings'}</h3>
       <TextField
         label={dict.form.apiKey}
         description={dict.form.apiKeyPlaceholder}
