@@ -362,11 +362,16 @@ function FormForm({ id }: { id?: string[] }) {
             {dict.form.disclaimerLabel ||
               'I agree to the disclaimer and statement of responsibility'}
           </Checkbox>
-          <FaInfoCircle
-            className="text-info"
-            style={{ cursor: 'pointer' }}
-            onClick={() => setShowDisclaimerModal(true)}
-          />
+          <Button
+            variant="tertiary"
+            size="small"
+            isIconButton
+            data-testid="view-disclaimer-button"
+            aria-label={dict.form.viewDisclaimer || 'View disclaimer'}
+            onPress={() => setShowDisclaimerModal(true)}
+          >
+            <FaInfoCircle className="text-info" aria-hidden="true" />
+          </Button>
         </div>
       </Form>
 

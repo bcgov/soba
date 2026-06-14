@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
 import { I18nProvider } from 'react-aria-components';
 import makeStore from '@/lib/store';
@@ -21,6 +21,15 @@ export default function AppProviders({
   children: React.ReactNode;
 }) {
   const store = useMemo(() => makeStore(), []);
+
+  // The root layout renders a static `<html lang="en">` (it sits above the
+  // `[lang]` segment and can't know the locale). Keep the document language in
+  // sync with the active locale so assistive tech announces `/fr` pages in French.
+  useEffect(() => {
+    if (locale) {
+      document.documentElement.lang = locale;
+    }
+  }, [locale]);
 
   return (
     <I18nProvider locale={locale}>

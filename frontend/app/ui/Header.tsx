@@ -132,7 +132,7 @@ function Header({ headerNavItems }: HeaderProps) {
           {displayName ? (
             <Dropdown>
               <Dropdown.Toggle className={styles.userDrop} data-testid="user-dropdown" id="dropdown-user">
-                <FaUser className="align-text-top" />
+                <FaUser className="align-text-top" aria-hidden="true" />
                 <span className={styles.limitText + ' ms-2 me-2'}>{displayName}</span>
               </Dropdown.Toggle>
               <Dropdown.Menu>

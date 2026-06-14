@@ -21,6 +21,7 @@ export interface DataTableProps<T> {
   emptyMessage?: string;
   loadingMessage?: string;
   itemName?: string;
+  caption?: string;
   pageSize?: number;
   currentPage?: number;
   totalItems?: number;
@@ -38,6 +39,7 @@ export function DataTable<T>({
   emptyMessage = 'No items found.',
   loadingMessage = 'Loading...',
   itemName = 'items',
+  caption,
   pageSize = 10,
   currentPage = 1,
   totalItems,
@@ -51,11 +53,13 @@ export function DataTable<T>({
   return (
     <div className="bg-white rounded overflow-hidden" style={{ border: 'none' }}>
       <Table hover responsive className="mb-0 align-middle" style={{ border: 'none' }}>
-        <thead style={{ backgroundColor: '#EBEBEB', borderBottom: 'none' }}>
+        {caption ? <caption className="visually-hidden">{caption}</caption> : null}
+        <thead style={{ backgroundColor: 'var(--app-bg)', borderBottom: 'none' }}>
           <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
+                scope="col"
                 className={`px-4 py-3 text-dark fw-bold border-0 text-${col.align || 'start'}`}
                 style={col.width ? { width: col.width } : undefined}
               >
@@ -82,7 +86,7 @@ export function DataTable<T>({
             </tr>
           ) : (
             data.map((item) => (
-              <tr key={keyExtractor(item)} style={{ borderBottom: '1px solid #dee2e6' }}>
+              <tr key={keyExtractor(item)} style={{ borderBottom: '1px solid var(--app-border)' }}>
                 {columns.map((col) => (
                   <td
                     key={`${keyExtractor(item)}-${col.key}`}
@@ -102,7 +106,7 @@ export function DataTable<T>({
       {!loading && data.length > 0 && totalItems !== undefined && (
         <div
           className="px-4 py-3 d-flex justify-content-between align-items-center"
-          style={{ backgroundColor: '#EBEBEB', color: '#333' }}
+          style={{ backgroundColor: 'var(--app-bg)', color: 'var(--app-text)' }}
         >
           <div className="d-flex align-items-center gap-2">
             <span>Items per page:</span>

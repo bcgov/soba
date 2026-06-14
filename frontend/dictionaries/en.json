@@ -8,10 +8,12 @@
     "description": "Next Gen Forms",
     "notAuthenticated": "You are not authenticated. Please login to access this section.",
     "forms": "Forms",
+    "formDesigner": "Form Designer",
     "feedback": "Feedback",
     "help": "Help",
     "welcomeTo": "Welcome to",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "comingSoon": "This feature is coming soon."
   },
   "header": {
     "workspaces": "Workspaces",
@@ -120,6 +122,7 @@
     "visibilityAzureIDIR": "IDIR - MFA",
     "disclaimerLabel": "I agree to the disclaimer and statement of responsibility",
     "disclaimerTitle": "Disclaimer",
+    "viewDisclaimer": "View disclaimer",
     "disclaimerText1": "It is your responsibility to comply with Privacy laws governing the collection, use and disclosure of personally identifiable information.",
     "disclaimerText2": "Access to this form designer tool does not inherently grant permission to collect, use or disclose any personally identifiable information.",
     "disclaimerText3": "It is your responsibility to obtain consent to collect information as required by law.",

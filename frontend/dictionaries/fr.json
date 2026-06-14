@@ -8,10 +8,12 @@
     "description": "Formulaires de Nouvelle Génération",
     "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à cette section.",
     "forms": "Formulaires",
+    "formDesigner": "Concepteur de formulaires",
     "feedback": "Retour d'information",
     "help": "Aidé",
     "welcomeTo": "Bienvenue sur",
-    "loading": "Chargement…"
+    "loading": "Chargement…",
+    "comingSoon": "Cette fonctionnalité sera bientôt disponible."
   },
   "header": {
     "workspaces": "Espaces de travail",
@@ -120,6 +122,7 @@
     "visibilityAzureIDIR": "IDIR - MFA",
     "disclaimerLabel": "J'accepte l'avis de non-responsabilité et la déclaration de responsabilité",
     "disclaimerTitle": "Avis de non-responsabilité",
+    "viewDisclaimer": "Voir l'avis de non-responsabilité",
     "disclaimerText1": "Il est de votre responsabilité de vous conformer aux lois sur la protection de la vie privée régissant la collecte, l'utilisation et la divulgation d'informations personnellement identifiables.",
     "disclaimerText2": "L'accès à cet outil de conception de formulaires n'accorde pas intrinsèquement l'autorisation de collecter, d'utiliser ou de divulguer des informations personnellement identifiables.",
     "disclaimerText3": "Il est de votre responsabilité d'obtenir le consentement pour recueillir des informations comme l'exige la loi.",
