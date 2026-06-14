@@ -29,6 +29,13 @@
   border-color: var(--app-border) !important;
 }
 
+.userDrop:focus-visible {
+  /* Keyboard focus needs a clearly visible ring; the surface-pinning rules
+     above otherwise leave focus indistinguishable from the resting state. */
+  outline: 2px solid var(--app-focus-ring) !important;
+  outline-offset: 2px;
+}
+
 .limitText {
   max-width: 100px;
   /* overflow: hidden; */

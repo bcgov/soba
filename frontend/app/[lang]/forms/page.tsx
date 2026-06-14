@@ -26,12 +26,12 @@ export default async function Page({ params }: PageProps) {
   const locale = resolveLocale(param.lang);
   return (
     <AuthRedirect to={`/${locale}`} ifLogged={false}>
-      <div>
+      <section aria-labelledby="forms-heading">
         <FormList
           designModeEnabled={isFeatureAllowed(FEATURE_CODES.DESIGN_MODE)}
           submitModeEnabled={isFeatureAllowed(FEATURE_CODES.SUBMIT_MODE)}
         />
-      </div>
+      </section>
     </AuthRedirect>
   );
 }

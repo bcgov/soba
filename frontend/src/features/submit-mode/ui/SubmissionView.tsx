@@ -3,11 +3,13 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { FormType, Submission } from '@formio/react';
-import { ProgressCircle, InlineAlert } from '@bcgov/design-system-react-components';
+import { InlineAlert } from '@bcgov/design-system-react-components';
+import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useAppSelector } from '@/lib/store';
 import { ReadOnlyFormView } from '@/src/features/formio-v5/ui/ReadOnlyFormView';
+import { WorkflowStateBadge } from './WorkflowStateBadge';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import {
   getSobaSubmission,
@@ -63,18 +65,14 @@ export function SubmissionView() {
   }, [authenticated, token, submissionId, ws, loaded]);
 
   if (initializing || (authenticated && !token)) {
-    return (
-      <div className="p-5 text-center">
-        <ProgressCircle isIndeterminate aria-label={dict.general.loading} />
-      </div>
-    );
+    return <CenteredProgress label={dict.general.loading} />;
   }
   if (!authenticated) return null;
 
   return (
     <div className="mt-3" data-testid="submission-view">
       {!loaded ? (
-        <p className="text-muted small">{dictSub?.loading || 'Loading…'}</p>
+        <CenteredProgress label={dictSub?.loading || dict.general.loading} />
       ) : notFound || !submission ? (
         <InlineAlert variant="danger" role="alert" data-testid="submission-view-notfound">
           {dictSub?.notFound || 'Submission not found.'}
@@ -82,13 +80,14 @@ export function SubmissionView() {
       ) : (
         <>
           <div className="mb-3" data-testid="submission-view-header">
-            <h2 className="h5 mb-1">{submission.formName || dict.form?.nameLabel || 'Submission'}</h2>
+            <h3 className="h5 mb-1">{submission.formName || dict.form?.nameLabel || 'Submission'}</h3>
             <div className="small text-muted">
               <span data-testid="submission-view-version">v{submission.versionNo ?? 1}</span>
               {' · '}
-              <span data-testid="submission-view-status">
-                {(submission.workflowState || '').toUpperCase()}
-              </span>
+              <WorkflowStateBadge
+                state={submission.workflowState}
+                data-testid="submission-view-status"
+              />
               {submission.submittedAt ? (
                 <>
                   {' · '}

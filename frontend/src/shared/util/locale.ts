@@ -1,7 +1,7 @@
 /**
  * Supported locales
  */
-export const knownLocales = ['en', 'fr'] as const;
+const knownLocales = ['en', 'fr'] as const;
 
 /**
  * Small client-side utility to extract locale (en|fr) from a pathname.

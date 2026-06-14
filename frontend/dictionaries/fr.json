@@ -8,16 +8,17 @@
     "description": "Formulaires de Nouvelle Génération",
     "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à cette section.",
     "forms": "Formulaires",
+    "formDesigner": "Concepteur de formulaires",
     "feedback": "Retour d'information",
     "help": "Aidé",
     "welcomeTo": "Bienvenue sur",
-    "loading": "Chargement…"
+    "loading": "Chargement…",
+    "comingSoon": "Cette fonctionnalité sera bientôt disponible."
   },
   "header": {
     "workspaces": "Espaces de travail",
     "design": "Conception",
     "submit": "Soumettre",
-    "metaReview": "Méta API",
     "themeToggle": "Basculer le theme de couleur",
     "skipToMain": "Aller au contenu principal",
     "designer": "Générateur de Formulaire",
@@ -26,23 +27,6 @@
     "mobileNavLabel": "Navigation",
     "openMenuAria": "Ouvrir le menu de navigation",
     "closeMenuAria": "Fermer le menu de navigation"
-  },
-  "metaPage": {
-    "title": "Méta API et santé",
-    "refresh": "Actualiser",
-    "loadCodes": "Charger les codes de référence",
-    "loadRoles": "Charger les rôles",
-    "sections": {
-      "health": "Santé",
-      "readiness": "Disponibilité",
-      "build": "Build",
-      "features": "Fonctionnalités",
-      "frontendConfig": "Config frontale",
-      "plugins": "Plugins",
-      "formEngines": "Moteurs de formulaire",
-      "codes": "Codes de référence",
-      "roles": "Rôles"
-    }
   },
   "base": {
     "copyToClipboard": {
@@ -107,8 +91,6 @@
     "namePlaceholder": "Entrez le nom du formulaire",
     "slugLabel": "Slug du Formulaire",
     "slugPlaceholder": "Entrez le slug du formulaire",
-    "descriptionLabel": "Description",
-    "descriptionPlaceholder": "Entrez la description du formulaire",
     "loading": "Chargement du formulaire...",
     "schemaNotAvailable": "Schéma du formulaire non disponible.",
     "edit": "Modifier",
@@ -119,11 +101,6 @@
     "visibilityPublic": "Publique",
     "visibilityAzureIDIR": "IDIR - MFA",
     "disclaimerLabel": "J'accepte l'avis de non-responsabilité et la déclaration de responsabilité",
-    "disclaimerTitle": "Avis de non-responsabilité",
-    "disclaimerText1": "Il est de votre responsabilité de vous conformer aux lois sur la protection de la vie privée régissant la collecte, l'utilisation et la divulgation d'informations personnellement identifiables.",
-    "disclaimerText2": "L'accès à cet outil de conception de formulaires n'accorde pas intrinsèquement l'autorisation de collecter, d'utiliser ou de divulguer des informations personnellement identifiables.",
-    "disclaimerText3": "Il est de votre responsabilité d'obtenir le consentement pour recueillir des informations comme l'exige la loi.",
-    "disclaimerText4": "Si vous utilisez BCeID ou BC Services Card comme options d'accès au formulaire, vous DEVEZ aviser l'équipe de gestion des informations d'identité (IDIM) par courriel (IDIM.Consulting@gov.bc.ca) de votre intention d'utiliser BCeID ou BC Services Card.",
     "exportJson": "Exporter JSON",
     "importJson": "Importer JSON",
     "importSchema": "Importer le schéma",
@@ -135,9 +112,6 @@
     "designerTab": "Concepteur",
     "settingsTab": "Paramètres",
     "teamTab": "Équipe",
-    "settingsPlaceholder": "Les paramètres du formulaire seront disponibles ici.",
-    "teamManagement": "Gestion d'équipe",
-    "teamPlaceholder": "Les outils de gestion d'équipe seront disponibles ici.",
     "readOnlyMode": "Mode lecture seule :",
     "viewingHistoricalVersion": "Vous consultez la version historique",
     "savePublishDisabled": "Les options Sauvegarder et Publier sont désactivées.",
@@ -161,12 +135,11 @@
     "formPreview": "Aperçu du formulaire",
     "untitledForm": "Formulaire sans titre",
     "closePreview": "Fermer l'aperçu",
-    "noFormLayout": "Aucune mise en page de formulaire n'a encore été conçue.",
-    "apiKey": "Clé API",
-    "apiKeyPlaceholder": "Entrez votre clé API"
+    "noFormLayout": "Aucune mise en page de formulaire n'a encore été conçue."
   },
   "submission": {
     "submissions": "Soumissions",
+    "pageTitle": "Soumission",
     "loading": "Chargement des soumissions…",
     "empty": "Aucune soumission dans cet espace pour l’instant.",
     "error": "Impossible de charger les soumissions.",

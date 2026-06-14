@@ -2,10 +2,11 @@
 
 import dynamic from 'next/dynamic';
 import React from 'react';
+import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 
 const FormForm = dynamic(() => import('./FormForm'), {
   ssr: false,
-  loading: () => <div className="p-5 text-center">Loading Form Designer...</div>,
+  loading: () => <CenteredProgress />,
 });
 
 export default function FormDesignerLoader({ id }: { id?: string[] }) {

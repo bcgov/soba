@@ -29,10 +29,10 @@ describe('FormDesigner', () => {
     vi.clearAllMocks();
   });
 
-  it('shows loading message when initializing', () => {
+  it('shows the loading indicator when initializing', () => {
     keycloakState = { authenticated: false, initializing: true };
     render(<FormDesigner onUpdateModel={() => {}} initialModel={null} />);
-    expect(screen.getByText('Loading Designer...')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
   it('shows login required when not authenticated', () => {

@@ -2,7 +2,7 @@ import Keycloak from 'keycloak-js';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { AppDispatch } from '../store';
-import { loadFrontendRuntimeConfig } from '../runtimeConfig';
+import { loadFrontendRuntimeConfig } from '@/src/shared/config/runtimeConfig';
 
 // Keep the Keycloak instance out of Redux state (non-serializable).
 // Store it in a module-level variable instead.

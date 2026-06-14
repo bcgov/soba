@@ -11,7 +11,7 @@ vi.mock('@/lib/hooks/useKeycloak', () => ({
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
     locale: 'en',
-    general: { notAuthenticated: 'Not authed' },
+    general: { notAuthenticated: 'Not authed', forms: 'Forms' },
     form: { nameLabel: 'Form Name' },
     submission: {
       formList: {
@@ -76,7 +76,7 @@ describe('FormList', () => {
     await act(async () => {
       render(<FormList />);
     });
-    expect(screen.getByText('Forms')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Forms' })).toBeInTheDocument();
     // DS TextField puts data-testid on its wrapper; query the input by its
     // accessible label instead.
     const input = screen.getByLabelText('Search');

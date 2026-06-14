@@ -1,5 +1,6 @@
 import { getDictionary, hasLocale, Locale } from '../dictionaries';
 import FormDesignerLoader from '@/src/features/designer/ui/FormDesignerLoader';
+import { DsPageHeading } from '@/app/ui/DsPageHeading';
 import { notFound } from 'next/navigation';
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
@@ -20,7 +21,6 @@ export async function generateMetadata({ params }: PageProps) {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default async function Page({ params }: PageProps) {
   const featuresMeta = await loadFeaturesMeta();
   const isFeatureAllowed = createIsFeatureAllowed(featuresMeta);
@@ -28,8 +28,14 @@ export default async function Page({ params }: PageProps) {
     notFound();
   }
 
+  const { lang } = await params;
+  const dict = await getDictionary((hasLocale(lang) ? lang : 'en') as Locale);
+
   return (
     <section className="p-4" aria-labelledby="designer-heading">
+      <DsPageHeading id="designer-heading" className="visually-hidden">
+        {dict.general.formDesigner}
+      </DsPageHeading>
       <FormDesignerLoader id={[]} />
     </section>
   );

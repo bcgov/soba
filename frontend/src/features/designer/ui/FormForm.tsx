@@ -3,19 +3,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Tabs, Tab } from 'react-bootstrap';
 import {
-  ProgressCircle,
   InlineAlert,
   Button,
   Form,
   TextField,
-  TextArea,
   Select,
   CheckboxGroup,
   Checkbox,
-  Modal as BCModal,
-  AlertDialog,
 } from '@bcgov/design-system-react-components';
-import { FaInfoCircle } from 'react-icons/fa';
+import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { Modal as CommonModal } from '@/src/components/Modal';
 import styles from './FormForm.module.css';
 
@@ -86,7 +82,6 @@ function FormForm({ id }: { id?: string[] }) {
   const [isDirty, setIsDirty] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
-  const [showDisclaimerModal, setShowDisclaimerModal] = useState(false);
   const [agreedDisclaimer, setAgreedDisclaimer] = useState(false);
 
   useEffect(() => {
@@ -150,11 +145,6 @@ function FormForm({ id }: { id?: string[] }) {
     },
     [slugManuallyEdited],
   );
-
-  const updateDescription = (value: string) => {
-    setFormDesc(value);
-    setIsDirty(true);
-  };
 
   const updateFormSchema = useCallback((data: FormType) => {
     setFormSchema(data);
@@ -299,12 +289,12 @@ function FormForm({ id }: { id?: string[] }) {
     }
   };
 
-  if (!authenticated) {
-    return <div>You must be logged in</div>;
+  if (initializing) {
+    return <CenteredProgress label={dict.form.loading} />;
   }
 
-  if (initializing) {
-    return <div>Forms initializing</div>;
+  if (!authenticated) {
+    return <div className="p-5 text-center">{dict.general.notAuthenticated}</div>;
   }
 
   const renderDesignerContent = () => (
@@ -353,30 +343,21 @@ function FormForm({ id }: { id?: string[] }) {
           ))}
         </CheckboxGroup>
 
-        <div className="d-flex align-items-center gap-2">
-          <Checkbox
-            isSelected={agreedDisclaimer}
-            onChange={setAgreedDisclaimer}
-            isDisabled={isHistoryView || isCurrentPublished}
-          >
-            {dict.form.disclaimerLabel ||
-              'I agree to the disclaimer and statement of responsibility'}
-          </Checkbox>
-          <FaInfoCircle
-            className="text-info"
-            style={{ cursor: 'pointer' }}
-            onClick={() => setShowDisclaimerModal(true)}
-          />
-        </div>
+        <Checkbox
+          isSelected={agreedDisclaimer}
+          onChange={setAgreedDisclaimer}
+          isDisabled={isHistoryView || isCurrentPublished}
+        >
+          {dict.form.disclaimerLabel ||
+            'I agree to the disclaimer and statement of responsibility'}
+        </Checkbox>
       </Form>
 
       {/* Form Builder */}
       <div className={styles.designerWrapper}>
         {id && id[0] ? (
           loading ? (
-            <div className="my-4 text-center">
-              <ProgressCircle isIndeterminate aria-label={dict.form.loading} />
-            </div>
+            <CenteredProgress label={dict.form.loading} />
           ) : formSchema ? (
             <FormDesigner onUpdateModel={updateFormSchema} initialModel={formSchema} />
           ) : (
@@ -387,15 +368,8 @@ function FormForm({ id }: { id?: string[] }) {
         )}
       </div>
 
-      {/* Description */}
-      <div className="mt-4 mb-5 pb-5" style={{ maxWidth: '640px' }}>
-        <TextArea
-          label={dict.form.descriptionLabel}
-          value={formDesc}
-          onChange={updateDescription}
-          isDisabled={isHistoryView || isCurrentPublished}
-        />
-      </div>
+      {/* Spacer so the builder clears the fixed action bar */}
+      <div className="mb-5 pb-5" />
 
       <div
         className={`${styles.floatingActions} shadow-lg p-3 rounded-pill d-flex gap-2 bg-white border`}
@@ -414,13 +388,13 @@ function FormForm({ id }: { id?: string[] }) {
           </Button>
         )}
         <Button
-          variant="secondary"
+          variant="primary"
           onPress={saveFormDraft}
           isDisabled={isHistoryView || isCurrentPublished || isSaving || loading || !agreedDisclaimer}
         >
           {isSaving ? dict.form.saving || 'Saving...' : dict.form.save || 'Save'}
         </Button>
-        <Button variant="secondary" onPress={() => setShowPreview(true)} isDisabled={isSaving || loading}>
+        <Button variant="tertiary" onPress={() => setShowPreview(true)} isDisabled={isSaving || loading}>
           {dict.form.preview || 'Preview'}
         </Button>
         {id && id[0] && (
@@ -501,7 +475,7 @@ function FormForm({ id }: { id?: string[] }) {
           onSelect={(k) => setActiveTab(k || 'designer')}
           className="mb-3"
         >
-          <Tab eventKey="designer" title="Designer">
+          <Tab eventKey="designer" title={dict.form.designerTab || 'Designer'}>
             {renderDesignerContent()}
           </Tab>
           <Tab eventKey="settings" title={dict.form.settingsTab || 'Settings'}>
@@ -535,43 +509,6 @@ function FormForm({ id }: { id?: string[] }) {
           </p>
         )}
       </CommonModal>
-
-      {/* Disclaimer Dialog */}
-      <BCModal
-        isOpen={showDisclaimerModal}
-        onOpenChange={(open) => {
-          if (!open) setShowDisclaimerModal(false);
-        }}
-        isDismissable
-      >
-        <AlertDialog
-          variant="info"
-          title={dict.form.disclaimerTitle || 'Disclaimer'}
-          isCloseable
-          buttons={
-            <Button variant="primary" onPress={() => setShowDisclaimerModal(false)}>
-              {dict.form.close || 'Close'}
-            </Button>
-          }
-        >
-          <p>
-            {dict.form.disclaimerText1 ||
-              'It is your responsibility to comply with Privacy laws governing the collection, use and disclosure of personally identifiable information.'}
-          </p>
-          <p>
-            {dict.form.disclaimerText2 ||
-              'Access to this form designer tool does not inherently grant permission to collect, use or disclose any personally identifiable information.'}
-          </p>
-          <p>
-            {dict.form.disclaimerText3 ||
-              'It is your responsibility to obtain consent to collect information as required by law.'}
-          </p>
-          <p>
-            {dict.form.disclaimerText4 ||
-              'If you use BCeID or BC Services Card as form access options, you MUST notify the Identity Information Management (IDIM) team by email (IDIM.Consulting@gov.bc.ca) your intent to leverage BCeID or BC Services Card.'}
-          </p>
-        </AlertDialog>
-      </BCModal>
     </>
   );
 }

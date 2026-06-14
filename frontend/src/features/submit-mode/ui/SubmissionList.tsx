@@ -2,13 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Container } from 'react-bootstrap';
-import { useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { getSobaSubmissions } from '@/src/shared/api/sobaApiForms';
 import type { SubmissionListItem } from '@/src/types/submissions';
 import { DataTable, Column } from '@/src/components/DataTable';
+import { DsPageHeading } from '@/app/ui/DsPageHeading';
+import { WorkflowStateBadge } from './WorkflowStateBadge';
 import { useAppSelector } from '@/lib/store';
 
 interface SubmissionListProps {
@@ -18,7 +21,6 @@ interface SubmissionListProps {
 export function SubmissionList({ formId }: SubmissionListProps = {}) {
   const { authenticated, token, initializing } = useKeycloak();
   const dict = useDictionary();
-  const router = useRouter();
   const pathname = usePathname();
   const locale = getLocaleFromPath(pathname);
   const [submissions, setSubmissions] = useState<SubmissionListItem[]>([]);
@@ -52,13 +54,11 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
     }
   }, [authenticated, token, formId, activeWorkspaceId]);
 
-  const loading = !!(authenticated && token && !isLoaded);
+  const loading = initializing || (authenticated && (!token || !isLoaded));
 
-  if (initializing || (authenticated && !token)) {
-    return <div className="p-4">{dict.form?.loading || 'Loading submissions...'}</div>;
-  }
-
-  if (!authenticated) {
+  // Auth gate only — loading (including Keycloak init) is shown inside the table
+  // body so the page heading stays visible throughout.
+  if (!authenticated && !initializing) {
     return null;
   }
 
@@ -68,19 +68,14 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
       key: 'id',
       label: dict.submission?.columns?.id || 'Submission ID',
       render: (sub) => (
-        <a
-          href="#"
+        <Link
+          href={`/${locale}/submission/${sub.id}`}
           data-testid={`submission-view-${sub.id}`}
-          onClick={(e) => {
-            e.preventDefault();
-            router.push(`/${locale}/submission/${sub.id}`);
-          }}
-          className="text-decoration-underline font-monospace small"
-          style={{ cursor: 'pointer', color: '#00538A' }}
+          className="text-decoration-underline font-monospace small link-primary"
           title={dict.submission?.view || 'View'}
         >
           {sub.id}
-        </a>
+        </Link>
       ),
     },
     {
@@ -103,23 +98,15 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
     {
       key: 'workflowState',
       label: dict.submission?.columns?.status || 'Status',
-      render: (sub) => (
-        <span
-          className={`badge rounded-pill ${
-            sub.workflowState === 'submitted' ? 'text-bg-success' : 'text-bg-secondary'
-          }`}
-        >
-          {sub.workflowState.toUpperCase()}
-        </span>
-      ),
+      render: (sub) => <WorkflowStateBadge state={sub.workflowState} />,
     },
   ];
 
   return (
     <Container fluid className="py-4 px-lg-5">
-      <div>
-        <h1>{dict.submission?.submissions || 'Submissions'}</h1>
-      </div>
+      <DsPageHeading id="submissions-heading">
+        {dict.submission?.submissions || 'Submissions'}
+      </DsPageHeading>
       <DataTable<SubmissionListItem>
         data={paginatedSubmissions}
         columns={columns}
@@ -128,6 +115,7 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
         loadingMessage={dict.submission?.loading || 'Loading submissions...'}
         keyExtractor={(sub) => sub.id}
         itemName={dict.submission?.submissions || 'submissions'}
+        caption={dict.submission?.submissions || 'Submissions'}
         totalItems={submissions.length}
         pageSize={pageSize}
         currentPage={currentPage}

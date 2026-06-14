@@ -30,7 +30,9 @@ describe('DataTable', () => {
       />,
     );
 
-    expect(screen.getByText('Please wait...')).toBeInTheDocument();
+    // No visible loading text by design — the spinner carries the message as its
+    // screen-reader accessible name (aria-label) inside a role="status" region.
+    expect(screen.getByRole('progressbar', { name: 'Please wait...' })).toBeInTheDocument();
   });
 
   it('renders rows and calls paging callbacks', async () => {

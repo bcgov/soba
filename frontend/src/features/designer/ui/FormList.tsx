@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Container } from 'react-bootstrap';
-import { Button as DSButton, ProgressCircle, TextField } from '@bcgov/design-system-react-components';
+import { Button as DSButton, TextField } from '@bcgov/design-system-react-components';
 import { DataTable, type Column } from '@/src/components/DataTable';
+import { DsPageHeading } from '@/app/ui/DsPageHeading';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
+import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { FaMagnifyingGlass, FaX } from 'react-icons/fa6';
@@ -154,18 +156,13 @@ function FormList({
         width: '40%',
         render: (form: SobaFormSummary) => {
           return designModeEnabled ? (
-            <a
-              href="#"
+            <Link
+              href={`/${locale}/designer/${form.id}`}
               data-testid={'form-link-' + form.id}
-              onClick={(e) => {
-                e.preventDefault();
-                handleAction('manage', form.id);
-              }}
-              className="text-decoration-underline"
-              style={{ cursor: 'pointer', color: '#00538A' }}
+              className="text-decoration-underline link-primary"
             >
               {form.name || dictForm?.nameLabel || 'Untitled Form'}
-            </a>
+            </Link>
           ) : (
             <span>{form.name || dictForm?.nameLabel || 'Untitled Form'}</span>
           );
@@ -200,22 +197,26 @@ function FormList({
         ),
       },
     ],
-    [handleAction, dictFormList, dictForm, designModeEnabled, submitModeEnabled, formatLongDate],
+    [
+      handleAction,
+      locale,
+      dictFormList,
+      dictForm,
+      designModeEnabled,
+      submitModeEnabled,
+      formatLongDate,
+    ],
   );
 
-  if (initializing)
-    return (
-      <div className="p-5 text-center">
-        <ProgressCircle isIndeterminate aria-label={dict.general.loading} />
-      </div>
-    );
-  if (!authenticated) return <div className="p-5 text-center">{dict.general.notAuthenticated}</div>;
+  // Auth gate only — loading (including Keycloak init) is shown inside the table
+  // body so the page heading stays visible throughout.
+  if (!authenticated && !initializing) {
+    return <div className="p-5 text-center">{dict.general.notAuthenticated}</div>;
+  }
 
   return (
     <Container fluid className="py-4 px-lg-5">
-      <div>
-        <h1>Forms</h1>
-      </div>
+      <DsPageHeading id="forms-heading">{dict.general.forms}</DsPageHeading>
       <div className="mb-3 d-flex justify-content-between align-items-center">
         {designModeEnabled && (
           <DSButton
@@ -260,11 +261,12 @@ function FormList({
       <DataTable<SobaFormSummary>
         data={paginatedForms as SobaFormSummary[]}
         columns={columns}
-        loading={loading}
+        loading={loading || initializing}
         error={error}
         emptyMessage="No forms found matching your criteria."
         loadingMessage={dict.general.loading}
         itemName="items"
+        caption={dict.general.forms}
         pageSize={pageSize}
         currentPage={currentPage}
         totalItems={filteredForms.length}

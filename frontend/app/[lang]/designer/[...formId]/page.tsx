@@ -1,5 +1,6 @@
 import { getDictionary, hasLocale, Locale } from '../../dictionaries';
 import FormDesignerLoader from '@/src/features/designer/ui/FormDesignerLoader';
+import { DsPageHeading } from '@/app/ui/DsPageHeading';
 import { notFound } from 'next/navigation';
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
@@ -28,10 +29,14 @@ export default async function Page({ params }: PageProps) {
     notFound();
   }
 
-  const { formId } = await params;
+  const { lang, formId } = await params;
+  const dict = await getDictionary((hasLocale(lang) ? lang : 'en') as Locale);
 
   return (
     <section className="p-4" aria-labelledby="designer-heading">
+      <DsPageHeading id="designer-heading" className="visually-hidden">
+        {dict.general.formDesigner}
+      </DsPageHeading>
       <FormDesignerLoader id={formId} />
     </section>
   );
