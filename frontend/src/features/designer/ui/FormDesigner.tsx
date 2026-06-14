@@ -47,14 +47,6 @@ interface DesignerProps {
   initialModel?: FormType | null;
 }
 
-interface FormioComp {
-  widget?: Record<string, unknown> | string | null;
-  components?: FormioComp[];
-  columns?: Array<{ components?: FormioComp[] }>;
-  rows?: Array<Array<{ components?: FormioComp[] }>>;
-  [key: string]: unknown;
-}
-
 const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = null }) => {
   const { authenticated, initializing } = useKeycloak();
   const dict = useDictionary();
@@ -64,49 +56,11 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
   const builderRef = useRef<FormioBuilderInstance | null>(null);
 
   /**
-   * RECURSIVE SANITIZER
-   * Prevents the internal dialog crash by ensuring the 'widget' property
-   * is always a valid object before the builder renders.
-   *
-   * FLAG (engine cleaning): question whether this is still needed. A schema that is valid for the
-   * engine should load in the builder without client-side fix-ups. If it doesn't, that's an
-   * engine/builder concern — candidate for removal, or for the engine adapter to return a
-   * render-ready schema.
+   * Lazy initializer so this runs once and gives the builder's `form` prop a
+   * stable reference (satisfies ESLint's `react-hooks/refs` rule). We assume a
+   * valid Form.io v5 schema from the engine, so no client-side fix-ups.
    */
-  const sanitizeForm = useCallback((input?: FormType | null): FormType => {
-    if (!input) return { components: [] };
-    try {
-      const copy = JSON.parse(JSON.stringify(input)) as FormType;
-      const clean = (comps: FormioComp[]) => {
-        comps.forEach((c) => {
-          if (!c.widget || typeof c.widget !== 'object') {
-            c.widget = { type: 'input' };
-          }
-          if (c.components) clean(c.components);
-          if (c.columns) {
-            c.columns.forEach((col) => {
-              if (col.components) clean(col.components);
-            });
-          }
-        });
-      };
-
-      if (copy.components) {
-        clean(copy.components as FormioComp[]);
-      }
-      return copy;
-    } catch {
-      return { components: [] };
-    }
-  }, []);
-
-  /**
-   * STABLE STATE INITIALIZATION
-   * Using a lazy initializer function inside useState ensures this only runs once.
-   * This provides a stable reference to pass into the 'form' prop, satisfying
-   * ESLint's 'react-hooks/refs' rule while keeping the Dialog fixed.
-   */
-  const [stableForm, setStableForm] = useState<FormType>(() => sanitizeForm(initialModel));
+  const [stableForm, setStableForm] = useState<FormType>(() => initialModel ?? { components: [] });
 
   const opt = useMemo(
     () => ({
@@ -220,7 +174,7 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
       let cleanedJson = importJson.replace(/"type"\s*:\s*"simple(.*?)advanced"/g, '"type": "$1"');
       cleanedJson = cleanedJson.replace(/"type"\s*:\s*"simple(.*?)"/g, '"type": "$1"');
       const parsed = JSON.parse(cleanedJson);
-      setStableForm(sanitizeForm(parsed));
+      setStableForm(parsed);
       if (builderRef.current) {
         (builderRef.current as FormioBuilderInstance).form = parsed;
       }
@@ -230,7 +184,7 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
     } catch {
       addNotification({ text: dict.form.invalidJson || 'Invalid JSON format.', type: 'error' });
     }
-  }, [importJson, onUpdateModel, sanitizeForm, addNotification, dict.form.invalidJson]);
+  }, [importJson, onUpdateModel, addNotification, dict.form.invalidJson]);
 
   if (initializing) {
     return <CenteredProgress label={dict.form.loading} />;
