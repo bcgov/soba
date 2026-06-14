@@ -170,6 +170,7 @@
   },
   "submission": {
     "submissions": "Soumissions",
+    "pageTitle": "Soumission",
     "loading": "Chargement des soumissions…",
     "empty": "Aucune soumission dans cet espace pour l’instant.",
     "error": "Impossible de charger les soumissions.",

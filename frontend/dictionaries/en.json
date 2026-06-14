@@ -170,6 +170,7 @@
   },
   "submission": {
     "submissions": "Submissions",
+    "pageTitle": "Submission",
     "loading": "Loading submissions…",
     "empty": "No submissions in this workspace yet.",
     "error": "Could not load submissions.",

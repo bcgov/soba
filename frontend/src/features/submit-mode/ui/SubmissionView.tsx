@@ -9,6 +9,7 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useAppSelector } from '@/lib/store';
 import { ReadOnlyFormView } from '@/src/features/formio-v5/ui/ReadOnlyFormView';
+import { WorkflowStateBadge } from './WorkflowStateBadge';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import {
   getSobaSubmission,
@@ -79,13 +80,14 @@ export function SubmissionView() {
       ) : (
         <>
           <div className="mb-3" data-testid="submission-view-header">
-            <h2 className="h5 mb-1">{submission.formName || dict.form?.nameLabel || 'Submission'}</h2>
+            <h3 className="h5 mb-1">{submission.formName || dict.form?.nameLabel || 'Submission'}</h3>
             <div className="small text-muted">
               <span data-testid="submission-view-version">v{submission.versionNo ?? 1}</span>
               {' · '}
-              <span data-testid="submission-view-status">
-                {(submission.workflowState || '').toUpperCase()}
-              </span>
+              <WorkflowStateBadge
+                state={submission.workflowState}
+                data-testid="submission-view-status"
+              />
               {submission.submittedAt ? (
                 <>
                   {' · '}

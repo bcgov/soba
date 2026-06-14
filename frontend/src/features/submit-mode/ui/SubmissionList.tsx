@@ -11,6 +11,7 @@ import { getSobaSubmissions } from '@/src/shared/api/sobaApiForms';
 import type { SubmissionListItem } from '@/src/types/submissions';
 import { DataTable, Column } from '@/src/components/DataTable';
 import { DsPageHeading } from '@/app/ui/DsPageHeading';
+import { WorkflowStateBadge } from './WorkflowStateBadge';
 import { useAppSelector } from '@/lib/store';
 
 interface SubmissionListProps {
@@ -97,15 +98,7 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
     {
       key: 'workflowState',
       label: dict.submission?.columns?.status || 'Status',
-      render: (sub) => (
-        <span
-          className={`badge rounded-pill ${
-            sub.workflowState === 'submitted' ? 'text-bg-success' : 'text-bg-secondary'
-          }`}
-        >
-          {sub.workflowState.toUpperCase()}
-        </span>
-      ),
+      render: (sub) => <WorkflowStateBadge state={sub.workflowState} />,
     },
   ];
 
