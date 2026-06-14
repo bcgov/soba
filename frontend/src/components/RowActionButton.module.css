@@ -1,0 +1,9 @@
+/*
+ * The row's primary/default action (form name, submission id) — bolder than the
+ * secondary action links so the main thing to click reads first. Targets the
+ * BCDS button directly because it manages its own className; `!important` beats
+ * the button's `font` shorthand (which carries its own weight).
+ */
+.main :global(.bcds-react-aria-Button) {
+  font-weight: 700 !important;
+}

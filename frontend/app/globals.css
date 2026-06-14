@@ -13,6 +13,10 @@
   --app-primary-text: var(--typography-color-primary-invert);
   --app-focus-ring: var(--surface-color-border-active);
   --app-danger: var(--typography-color-danger);
+  /* Darker grey surface for table headers/footers + the selected nav item. */
+  --app-surface-muted: var(--theme-gray-30);
+  /* Subtle grey for hover and zebra striping. */
+  --app-hover: var(--theme-gray-20);
 }
 
 body {

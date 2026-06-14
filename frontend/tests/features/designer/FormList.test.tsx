@@ -99,7 +99,7 @@ describe('FormList', () => {
     });
     await waitFor(() => expect(screen.getByText('Form One')).toBeInTheDocument());
     const btn = container!.querySelector(
-      '[data-test-id="manage-f1-button"]',
+      '[data-testid="manage-f1-button"]',
     ) as HTMLButtonElement | null;
     expect(btn).toBeTruthy();
     await userEvent.click(btn!);

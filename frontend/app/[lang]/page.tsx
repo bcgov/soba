@@ -1,6 +1,5 @@
 import { getDictionary, resolveLocale } from './dictionaries';
 import { AuthRedirect } from '@/src/app/ui/AuthRedirect';
-import { LoginButton } from '@/app/ui/LoginButton';
 
 type PageProps = {
   params: Promise<{ lang: string }>;
@@ -25,9 +24,6 @@ export default async function Page({ params }: PageProps) {
     <AuthRedirect to={`/${locale}/forms`} ifLogged={true}>
       <div className="text-center h1 mt-5">
         {dict.general.welcomeTo} {dict.general.title}!
-      </div>
-      <div className="d-flex justify-content-center mt-4">
-        <LoginButton label={dict.general.login} />
       </div>
     </AuthRedirect>
   );

@@ -172,7 +172,7 @@ function Header({ headerNavItems }: HeaderProps) {
             { id: 'fr', label: 'FR' },
           ]}
         />
-        <LoginButton data-testid="header-login-button" label={dict.general.login} />
+        <LoginButton data-testid="login-button" label={dict.general.login} />
       </div>
     );
   };

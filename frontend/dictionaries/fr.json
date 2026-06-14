@@ -2,7 +2,6 @@
   "locale": "fr",
   "general": {
     "login": "Connecter",
-    "loggedAs": "Connecter á",
     "logout": "Déconnexion",
     "title": "Common Hosted Forms 2.0",
     "description": "Formulaires de Nouvelle Génération",
@@ -19,30 +18,14 @@
     "workspaces": "Espaces de travail",
     "design": "Conception",
     "submit": "Soumettre",
-    "themeToggle": "Basculer le theme de couleur",
     "skipToMain": "Aller au contenu principal",
-    "designer": "Générateur de Formulaire",
-    "menu": "Menu",
-    "closeMenu": "Fermer le menu",
-    "mobileNavLabel": "Navigation",
-    "openMenuAria": "Ouvrir le menu de navigation",
-    "closeMenuAria": "Fermer le menu de navigation"
-  },
-  "base": {
-    "copyToClipboard": {
-      "copyToClipboard": "Copier dans le presse-papiers",
-      "linkToClipboard": "Lien copié dans le presse-papiers!",
-      "errCopyToClipboard": "Erreur lors de la copie dans le presse-papiers."
-    }
+    "designer": "Générateur de Formulaire"
   },
   "formioV5": {
     "formList": {
       "tableHeading": "Formulaires",
       "loading": "Chargement des formulaires…",
       "empty": "Aucun formulaire renvoyé par le proxy Form.io. Créez un formulaire dans Form.io ou vérifiez la configuration de l’API.",
-      "refresh": "Actualiser",
-      "needLogin": "Connectez-vous pour charger les formulaires.",
-      "unauthorized": "Non autorisé — la session a peut-être expiré. Reconnectez-vous.",
       "columns": {
         "title": "Titre",
         "name": "Nom",
@@ -64,20 +47,6 @@
       "submitSuccess": "Formulaire soumis avec succès."
     }
   },
-  "forms": {
-    "manage": {
-      "share": {
-        "shareForm": "Partager le Formulaire",
-        "shareLink": "Lien de Partage",
-        "copyQRCode": "Copiez le lien ou scannez le code QR pour partager ce formulaire.",
-        "warningMessage": "Ce formulaire n'a pas été publié. Le lien ne fonctionnera pas tant que le formulaire n'est pas publié.",
-        "copyURLToClipboard": "Copier l'URL dans le presse-papiers",
-        "openThisForm": "Ouvrir ce formulaire",
-        "downloadQRCode": "Télécharger le code QR",
-        "close": "Fermer"
-      }
-    }
-  },
   "form": {
     "saved": "Formulaire enregistré avec succès.",
     "saveError": "Erreur lors de l'enregistrement du formulaire.",
@@ -88,16 +57,10 @@
     "loadVersionSchemaError": "Échec du chargement du schéma de version.",
     "invalidJson": "Format JSON invalide.",
     "nameLabel": "Nom du Formulaire",
-    "namePlaceholder": "Entrez le nom du formulaire",
-    "slugLabel": "Slug du Formulaire",
-    "slugPlaceholder": "Entrez le slug du formulaire",
     "loading": "Chargement du formulaire...",
     "schemaNotAvailable": "Schéma du formulaire non disponible.",
-    "edit": "Modifier",
-    "input": "Soumettre les données",
     "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à ce formulaire.",
     "visibilityLabel": "Visibilité / Contrôle d'accès",
-    "selectVisibility": "Sélectionner la visibilité",
     "visibilityPublic": "Publique",
     "visibilityAzureIDIR": "IDIR - MFA",
     "disclaimerLabel": "J'accepte l'avis de non-responsabilité et la déclaration de responsabilité",
@@ -106,7 +69,6 @@
     "importSchema": "Importer le schéma",
     "copiedToClipboard": "Copié dans le presse-papiers !",
     "pasteSchema": "Collez votre schéma JSON Form.io ici. Cela remplacera la conception actuelle du formulaire.",
-    "pasteJsonPlaceholder": "Collez le JSON ici...",
     "cancel": "Annuler",
     "close": "Fermer",
     "designerTab": "Concepteur",
@@ -143,7 +105,6 @@
     "loading": "Chargement des soumissions…",
     "empty": "Aucune soumission dans cet espace pour l’instant.",
     "error": "Impossible de charger les soumissions.",
-    "refresh": "Actualiser",
     "view": "Voir",
     "submittedOn": "Soumis le",
     "noContent": "Aucune réponse soumise à afficher.",

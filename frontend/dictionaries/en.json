@@ -2,7 +2,6 @@
   "locale": "en",
   "general": {
     "login": "Login",
-    "loggedAs": "Logged in as",
     "logout": "Logout",
     "title": "Common Hosted Forms 2.0",
     "description": "Next Gen Forms",
@@ -19,30 +18,14 @@
     "workspaces": "Workspaces",
     "design": "Design",
     "submit": "Submit",
-    "themeToggle": "Toggle color theme",
     "skipToMain": "Skip to main content",
-    "designer": "Designer",
-    "menu": "Menu",
-    "closeMenu": "Close Menu",
-    "mobileNavLabel": "Navigation",
-    "openMenuAria": "Open navigation menu",
-    "closeMenuAria": "Close navigation menu"
-  },
-  "base": {
-    "copyToClipboard": {
-      "copyToClipboard": "Copy to Clipboard",
-      "linkToClipboard": "Link copied to clipboard!",
-      "errCopyToClipboard": "Error copying to clipboard."
-    }
+    "designer": "Designer"
   },
   "formioV5": {
     "formList": {
       "tableHeading": "Forms",
       "loading": "Loading forms…",
       "empty": "No forms were returned from the Form.io proxy. Create a form in Form.io or check API configuration.",
-      "refresh": "Refresh",
-      "needLogin": "Sign in to load forms.",
-      "unauthorized": "Unauthorized — your session may have expired. Try signing in again.",
       "columns": {
         "title": "Title",
         "name": "Name",
@@ -64,20 +47,6 @@
       "submitSuccess": "Form submitted successfully."
     }
   },
-  "forms": {
-    "manage": {
-      "share": {
-        "shareForm": "Share Form",
-        "shareLink": "Share Link",
-        "copyQRCode": "Copy the link or scan the QR code to share this form.",
-        "warningMessage": "This form has not been published. The link will not work until the form is published.",
-        "copyURLToClipboard": "Copy URL to Clipboard",
-        "openThisForm": "Open this form",
-        "downloadQRCode": "Download QR Code",
-        "close": "Close"
-      }
-    }
-  },
   "form": {
     "saved": "Form saved successfully.",
     "saveError": "Error saving form.",
@@ -88,16 +57,10 @@
     "loadVersionSchemaError": "Failed to load version schema.",
     "invalidJson": "Invalid JSON format.",
     "nameLabel": "Form Name",
-    "namePlaceholder": "Enter form name",
-    "slugLabel": "Form Slug",
-    "slugPlaceholder": "Enter form slug",
     "loading": "Loading form...",
     "schemaNotAvailable": "Form schema not available.",
-    "edit": "Edit",
-    "input": "Submit Data",
     "notAuthenticated": "You are not authenticated. Please login to access this form.",
     "visibilityLabel": "Visibility / Access Control",
-    "selectVisibility": "Select Visibility",
     "visibilityPublic": "Public",
     "visibilityAzureIDIR": "IDIR - MFA",
     "disclaimerLabel": "I agree to the disclaimer and statement of responsibility",
@@ -106,7 +69,6 @@
     "importSchema": "Import Schema",
     "copiedToClipboard": "Copied to clipboard!",
     "pasteSchema": "Paste your Form.io JSON schema here. This will replace the current form design.",
-    "pasteJsonPlaceholder": "Paste JSON here...",
     "cancel": "Cancel",
     "close": "Close",
     "designerTab": "Designer",
@@ -143,7 +105,6 @@
     "loading": "Loading submissions…",
     "empty": "No submissions in this workspace yet.",
     "error": "Could not load submissions.",
-    "refresh": "Refresh",
     "view": "View",
     "submittedOn": "Submitted",
     "noContent": "No submitted answers to display.",

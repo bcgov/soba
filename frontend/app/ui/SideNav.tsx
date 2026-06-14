@@ -66,9 +66,9 @@ export function SideNav({ showAppLinks, showHome }: SideNavProps) {
             <Link
               href={item.href}
               data-testid={item.testId}
-              className={`nav-link d-flex align-items-center gap-3 px-3 py-2 text-decoration-none rounded ${
-                item.isActive ? 'bg-primary text-white' : 'text-dark hover-bg-light'
-              }`}
+              className={`nav-link d-flex align-items-center gap-3 px-3 py-2 text-decoration-none rounded text-dark ${
+                styles.navLink
+              } ${item.isActive ? styles.navActive : ''}`}
               title={item.title}
             >
               <div className="d-flex justify-content-center" style={{ width: '24px' }}>
