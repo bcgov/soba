@@ -7,14 +7,10 @@ import {
   Button,
   Form,
   TextField,
-  TextArea,
   Select,
   CheckboxGroup,
   Checkbox,
-  Modal as BCModal,
-  AlertDialog,
 } from '@bcgov/design-system-react-components';
-import { FaInfoCircle } from 'react-icons/fa';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { Modal as CommonModal } from '@/src/components/Modal';
 import styles from './FormForm.module.css';
@@ -86,7 +82,6 @@ function FormForm({ id }: { id?: string[] }) {
   const [isDirty, setIsDirty] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
-  const [showDisclaimerModal, setShowDisclaimerModal] = useState(false);
   const [agreedDisclaimer, setAgreedDisclaimer] = useState(false);
 
   useEffect(() => {
@@ -150,11 +145,6 @@ function FormForm({ id }: { id?: string[] }) {
     },
     [slugManuallyEdited],
   );
-
-  const updateDescription = (value: string) => {
-    setFormDesc(value);
-    setIsDirty(true);
-  };
 
   const updateFormSchema = useCallback((data: FormType) => {
     setFormSchema(data);
@@ -353,26 +343,14 @@ function FormForm({ id }: { id?: string[] }) {
           ))}
         </CheckboxGroup>
 
-        <div className="d-flex align-items-center gap-2">
-          <Checkbox
-            isSelected={agreedDisclaimer}
-            onChange={setAgreedDisclaimer}
-            isDisabled={isHistoryView || isCurrentPublished}
-          >
-            {dict.form.disclaimerLabel ||
-              'I agree to the disclaimer and statement of responsibility'}
-          </Checkbox>
-          <Button
-            variant="tertiary"
-            size="small"
-            isIconButton
-            data-testid="view-disclaimer-button"
-            aria-label={dict.form.viewDisclaimer || 'View disclaimer'}
-            onPress={() => setShowDisclaimerModal(true)}
-          >
-            <FaInfoCircle className="text-info" aria-hidden="true" />
-          </Button>
-        </div>
+        <Checkbox
+          isSelected={agreedDisclaimer}
+          onChange={setAgreedDisclaimer}
+          isDisabled={isHistoryView || isCurrentPublished}
+        >
+          {dict.form.disclaimerLabel ||
+            'I agree to the disclaimer and statement of responsibility'}
+        </Checkbox>
       </Form>
 
       {/* Form Builder */}
@@ -390,15 +368,8 @@ function FormForm({ id }: { id?: string[] }) {
         )}
       </div>
 
-      {/* Description */}
-      <div className="mt-4 mb-5 pb-5" style={{ maxWidth: '640px' }}>
-        <TextArea
-          label={dict.form.descriptionLabel}
-          value={formDesc}
-          onChange={updateDescription}
-          isDisabled={isHistoryView || isCurrentPublished}
-        />
-      </div>
+      {/* Spacer so the builder clears the fixed action bar */}
+      <div className="mb-5 pb-5" />
 
       <div
         className={`${styles.floatingActions} shadow-lg p-3 rounded-pill d-flex gap-2 bg-white border`}
@@ -538,43 +509,6 @@ function FormForm({ id }: { id?: string[] }) {
           </p>
         )}
       </CommonModal>
-
-      {/* Disclaimer Dialog */}
-      <BCModal
-        isOpen={showDisclaimerModal}
-        onOpenChange={(open) => {
-          if (!open) setShowDisclaimerModal(false);
-        }}
-        isDismissable
-      >
-        <AlertDialog
-          variant="info"
-          title={dict.form.disclaimerTitle || 'Disclaimer'}
-          isCloseable
-          buttons={
-            <Button variant="primary" onPress={() => setShowDisclaimerModal(false)}>
-              {dict.form.close || 'Close'}
-            </Button>
-          }
-        >
-          <p>
-            {dict.form.disclaimerText1 ||
-              'It is your responsibility to comply with Privacy laws governing the collection, use and disclosure of personally identifiable information.'}
-          </p>
-          <p>
-            {dict.form.disclaimerText2 ||
-              'Access to this form designer tool does not inherently grant permission to collect, use or disclose any personally identifiable information.'}
-          </p>
-          <p>
-            {dict.form.disclaimerText3 ||
-              'It is your responsibility to obtain consent to collect information as required by law.'}
-          </p>
-          <p>
-            {dict.form.disclaimerText4 ||
-              'If you use BCeID or BC Services Card as form access options, you MUST notify the Identity Information Management (IDIM) team by email (IDIM.Consulting@gov.bc.ca) your intent to leverage BCeID or BC Services Card.'}
-          </p>
-        </AlertDialog>
-      </BCModal>
     </>
   );
 }
