@@ -4,8 +4,7 @@ import React, { useMemo, useRef, useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 
-// Import CSS
-import '@formio/js/dist/formio.full.min.css';
+import { useFormioV5FormChrome } from '@/lib/hooks/useFormioV5FormChrome';
 
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
@@ -15,8 +14,9 @@ import type {
   FormioProvider as FormioProviderComponent,
 } from '@formio/react';
 import './FormDesigner.module.css';
-import Form from 'react-bootstrap/Form';
 import { Modal as CommonModal } from '@/src/components/Modal';
+import { TextArea, Button, InlineAlert } from '@bcgov/design-system-react-components';
+import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
 // Import Types
 import type { FormBuilder as FormioBuilderInstance } from '@formio/js';
@@ -57,6 +57,9 @@ interface FormioComp {
 const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = null }) => {
   const { authenticated, initializing } = useKeycloak();
   const dict = useDictionary();
+  const { addNotification } = useNotificationStore();
+  // Inject the Form.io builder CSS (layered) only while the builder is mounted.
+  useFormioV5FormChrome('build');
   const builderRef = useRef<FormioBuilderInstance | null>(null);
 
   /**
@@ -202,7 +205,8 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
       const schema = (builderRef.current as FormioBuilderInstance).form || {};
       const json = JSON.stringify(schema, null, 2);
       setExportJson(json);
-      navigator.clipboard.writeText(json).catch((err) => console.error('Failed to copy', err));
+      // Best-effort clipboard copy; the JSON is shown in the modal regardless.
+      navigator.clipboard.writeText(json).catch(() => {});
       setShowExportModal(true);
     }
   }, []);
@@ -223,20 +227,20 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
       setShowImportModal(false);
       setImportJson('');
     } catch {
-      alert('Invalid JSON format');
+      addNotification({ text: dict.form.invalidJson || 'Invalid JSON format.', type: 'error' });
     }
-  }, [importJson, onUpdateModel, sanitizeForm]);
+  }, [importJson, onUpdateModel, sanitizeForm, addNotification, dict.form.invalidJson]);
 
   if (initializing) {
-    return <div className="p-10 text-center">Loading Designer...</div>;
+    return <div className="p-5 text-center">Loading Designer...</div>;
   }
 
   if (!authenticated) {
-    return <div className="p-10 text-center">Login Required</div>;
+    return <div className="p-5 text-center">Login Required</div>;
   }
 
   return (
-    <section className="p-4 w-full min-h-screen position-relative">
+    <section className="p-4 w-100 min-vh-100 position-relative">
       {sidebarEl &&
         createPortal(
           <div className="p-2 mt-2 border-top bg-light">
@@ -272,26 +276,23 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
         onClose={() => setShowExportModal(false)}
         size="lg"
         footer={
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => setShowExportModal(false)}
-          >
+          <Button variant="secondary" onPress={() => setShowExportModal(false)}>
             {dict.form.close || 'Close'}
-          </button>
+          </Button>
         }
       >
-        <div className="alert alert-success py-2 mb-2">
-          {dict.form.copiedToClipboard || 'Copied to clipboard!'}
+        <div className="d-flex flex-column gap-3">
+          <InlineAlert variant="success">
+            {dict.form.copiedToClipboard || 'Copied to clipboard!'}
+          </InlineAlert>
+          <div className="json-textarea">
+            <TextArea
+              aria-label={dict.form.exportJson || 'Export Form JSON'}
+              value={exportJson}
+              isReadOnly
+            />
+          </div>
         </div>
-        <Form.Control
-          as="textarea"
-          style={{ height: '400px' }}
-          className="form-control font-monospace"
-          rows={15}
-          value={exportJson}
-          readOnly
-        />
       </CommonModal>
 
       {/* Import Modal */}
@@ -302,32 +303,25 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
         size="lg"
         footer={
           <>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setShowImportModal(false)}
-            >
+            <Button variant="secondary" onPress={() => setShowImportModal(false)}>
               {dict.form.cancel || 'Cancel'}
-            </button>
-            <button type="button" className="btn btn-primary" onClick={handleImport}>
+            </Button>
+            <Button variant="primary" onPress={handleImport}>
               {dict.form.importSchema || 'Import Schema'}
-            </button>
+            </Button>
           </>
         }
       >
-        <p className="text-muted small">
-          {dict.form.pasteSchema ||
-            'Paste your Form.io JSON schema here. This will replace the current form design.'}
-        </p>
-        <Form.Control
-          as="textarea"
-          className="form-control font-monospace"
-          style={{ height: '400px' }}
-          rows={15}
-          value={importJson}
-          onChange={(e) => setImportJson(e.target.value)}
-          placeholder={dict.form.pasteJsonPlaceholder || 'Paste JSON here...'}
-        />
+        <div className="json-textarea">
+          <TextArea
+            label={
+              dict.form.pasteSchema ||
+              'Paste your Form.io JSON schema here. This will replace the current form design.'
+            }
+            value={importJson}
+            onChange={setImportJson}
+          />
+        </div>
       </CommonModal>
     </section>
   );

@@ -4,10 +4,9 @@ import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { FormioProvider, Submission } from '@formio/react';
 import type { FormType } from '@formio/react';
-import { Alert } from 'react-bootstrap';
+import { InlineAlert } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFormioRenderError';
-import { useFormioV5FormChrome } from '@/lib/hooks/useFormioV5FormChrome';
 import { FormioV5FormRenderErrorBoundary } from '@/src/features/formio-v5/ui/FormioV5FormRenderErrorBoundary';
 import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
 import { ReadOnlyFormView } from '@/src/features/formio-v5/ui/ReadOnlyFormView';
@@ -49,8 +48,6 @@ function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: Fo
   const formInstanceRef = useRef<{
     emit: (event: string, ...args: unknown[]) => void;
   } | null>(null);
-
-  useFormioV5FormChrome(true);
 
   useEffect(() => {
     if (!token || loaded) return;
@@ -108,9 +105,9 @@ function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: Fo
 
   if (loadError) {
     return (
-      <Alert variant="danger" role="alert">
+      <InlineAlert variant="danger" role="alert">
         {loadError}
-      </Alert>
+      </InlineAlert>
     );
   }
 
@@ -121,20 +118,20 @@ function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: Fo
   return (
     <>
       {renderError ? (
-        <Alert variant="danger" role="alert">
+        <InlineAlert variant="danger" role="alert">
           {renderError}
-        </Alert>
+        </InlineAlert>
       ) : null}
       {successAlert ? (
-        <Alert variant="success" role="alert">
+        <InlineAlert variant="success" role="alert">
           {labels.submitSuccess}
-        </Alert>
+        </InlineAlert>
       ) : null}
       <FormioV5FormRenderErrorBoundary
         fallback={
-          <Alert variant="danger" role="alert">
+          <InlineAlert variant="danger" role="alert">
             {labels.rendererError}
-          </Alert>
+          </InlineAlert>
         }
       >
         {submitted ? (
@@ -171,9 +168,9 @@ export default function FormioV5FormRenderClient() {
 
   if (!formId) {
     return (
-      <Alert variant="danger" role="alert">
+      <InlineAlert variant="danger" role="alert">
         {labels.missingId}
-      </Alert>
+      </InlineAlert>
     );
   }
 

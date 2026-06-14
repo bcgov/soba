@@ -4,13 +4,14 @@
     "login": "Connecter",
     "loggedAs": "Connecter á",
     "logout": "Déconnexion",
-    "title": "CHEFS 2",
+    "title": "Common Hosted Forms 2.0",
     "description": "Formulaires de Nouvelle Génération",
     "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à cette section.",
     "forms": "Formulaires",
     "feedback": "Retour d'information",
     "help": "Aidé",
-    "welcomeTo": "Bienvenue sur"
+    "welcomeTo": "Bienvenue sur",
+    "loading": "Chargement…"
   },
   "header": {
     "workspaces": "Espaces de travail",
@@ -96,6 +97,12 @@
   "form": {
     "saved": "Formulaire enregistré avec succès.",
     "saveError": "Erreur lors de l'enregistrement du formulaire.",
+    "published": "Formulaire publié avec succès !",
+    "versionDraftCreated": "Brouillon de la version {version} créé avec succès !",
+    "createVersionError": "Échec de la création d'une nouvelle version.",
+    "loadFormError": "Échec du chargement du formulaire :",
+    "loadVersionSchemaError": "Échec du chargement du schéma de version.",
+    "invalidJson": "Format JSON invalide.",
     "nameLabel": "Nom du Formulaire",
     "namePlaceholder": "Entrez le nom du formulaire",
     "slugLabel": "Slug du Formulaire",

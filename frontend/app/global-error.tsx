@@ -13,7 +13,7 @@ export default function GlobalError({
 }) {
   return (
     <html lang="en">
-      <body className="antialiased">
+      <body>
         <h1>Something went wrong</h1>
         {error.digest ? <p>Reference: {error.digest}</p> : null}
         <button type="button" onClick={() => reset()}>

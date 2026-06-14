@@ -3,7 +3,8 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import { Spinner } from 'react-bootstrap';
+import { useDictionary } from '@/app/[lang]/Providers';
+import { ProgressCircle } from '@bcgov/design-system-react-components';
 
 export function AuthRedirect({
   to,
@@ -15,6 +16,7 @@ export function AuthRedirect({
   children: React.ReactNode;
 }) {
   const { authenticated, initializing } = useKeycloak();
+  const dict = useDictionary();
   const router = useRouter();
   const shouldRedirect =
     !initializing && ((ifLogged && authenticated) || (!ifLogged && !authenticated));
@@ -31,7 +33,7 @@ export function AuthRedirect({
         className="d-flex justify-content-center align-items-center"
         style={{ minHeight: '50vh' }}
       >
-        <Spinner animation="border" />
+        <ProgressCircle isIndeterminate aria-label={dict.general.loading} />
       </div>
     );
   }

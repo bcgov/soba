@@ -16,6 +16,12 @@ vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({ locale: 'en', form: {} }),
 }));
 
+const { mockDispatch } = vi.hoisted(() => ({ mockDispatch: vi.fn() }));
+vi.mock('@/lib/store', () => ({
+  useAppSelector: (fn: (s: unknown) => unknown) => fn({ notification: { notifications: [] } }),
+  useAppDispatch: () => mockDispatch,
+}));
+
 import FormDesigner from '@/src/features/designer/ui/FormDesigner';
 
 describe('FormDesigner', () => {

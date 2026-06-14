@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { act } from 'react';
 
 // Mocks
@@ -76,7 +77,9 @@ describe('FormList', () => {
       render(<FormList />);
     });
     expect(screen.getByText('Forms')).toBeInTheDocument();
-    const input = screen.getByTestId('search-forms-text');
+    // DS TextField puts data-testid on its wrapper; query the input by its
+    // accessible label instead.
+    const input = screen.getByLabelText('Search');
     expect(input).toBeInTheDocument();
   });
 
@@ -99,7 +102,7 @@ describe('FormList', () => {
       '[data-test-id="manage-f1-button"]',
     ) as HTMLButtonElement | null;
     expect(btn).toBeTruthy();
-    fireEvent.click(btn!);
+    await userEvent.click(btn!);
     expect(mockPush).toHaveBeenCalledWith('/en/designer/f1');
   });
 
@@ -108,7 +111,7 @@ describe('FormList', () => {
       render(<FormList />);
     });
     await waitFor(() => expect(screen.getByText('Form One')).toBeInTheDocument());
-    const input = screen.getByTestId('search-forms-text');
+    const input = screen.getByLabelText('Search');
     fireEvent.change(input, { target: { value: 'two' } });
     expect(screen.queryByText('Form One')).not.toBeInTheDocument();
     expect(screen.getByText('Form Two')).toBeInTheDocument();

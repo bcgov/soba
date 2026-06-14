@@ -27,6 +27,8 @@ const slice = createSlice({
       const id = String(++nextId);
       state.notifications.push({ id, ...action.payload });
       if (action.payload.consoleError) {
+        // The single sanctioned logging sink for the app (see no-console rule).
+        // eslint-disable-next-line no-console
         console.error(action.payload.text, action.payload.consoleError);
       }
     },

@@ -20,11 +20,11 @@
   },
   "dependencies": {
     "@bcgov/bc-sans": "^2.1.0",
+    "@bcgov/design-system-react-components": "^0.7.0",
     "@bcgov/design-tokens": "^3.2.0",
     "@formatjs/intl-localematcher": "^0.8.1",
     "@formio/js": "5.4.0-api98.1",
     "@formio/react": "6.2.1-api98.0",
-    "@fortawesome/fontawesome-free": "^7.2.0",
     "@reduxjs/toolkit": "^2.11.2",
     "bootstrap": "^5.3.8",
     "keycloak-js": "^26.2.3",
@@ -33,16 +33,21 @@
     "next-redux-wrapper": "^8.1.0",
     "qrcode.react": "^4.2.0",
     "react": "19.2.3",
+    "react-aria-components": "1.16.0",
     "react-bootstrap": "^2.10.10",
     "react-dom": "19.2.3",
     "react-icons": "^5.5.0",
     "react-redux": "^9.2.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^16.0.0",
+    "@testing-library/user-event": "^14.5.2",
     "@types/negotiator": "^0.6.4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.2",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "eslint-plugin-prettier": "^5.5.5",
@@ -50,15 +55,11 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.0",
     "globals": "^17.3.0",
+    "jsdom": "^24.0.0",
     "nodemon": "^3.1.11",
     "prettier": "^3.8.1",
     "typescript": "^5",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.0.18",
-    "@testing-library/jest-dom": "^6.4.2",
-    "@testing-library/react": "^16.0.0",
-    "@testing-library/user-event": "^14.5.2",
-  "@vitejs/plugin-react": "^4.0.0",
-    "jsdom": "^24.0.0"
+    "vitest": "^4.0.18"
   }
 }

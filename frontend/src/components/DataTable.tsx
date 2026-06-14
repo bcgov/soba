@@ -1,7 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Table, Spinner } from 'react-bootstrap';
+import { Table } from 'react-bootstrap';
+import { ProgressCircle, Select, Button } from '@bcgov/design-system-react-components';
+import { FaChevronLeft, FaChevronRight } from 'react-icons/fa6';
 
 export interface Column<T> {
   key: string;
@@ -65,9 +67,11 @@ export function DataTable<T>({
         <tbody style={{ borderTop: 'none' }}>
           {loading ? (
             <tr>
-              <td colSpan={columns.length} className="text-center py-5">
-                <Spinner animation="border" variant="primary" size="sm" className="me-2" />
-                {loadingMessage}
+              <td colSpan={columns.length} className="py-5">
+                <div className="d-flex align-items-center justify-content-center gap-2">
+                  <ProgressCircle isIndeterminate size="small" aria-label={loadingMessage} />
+                  <span>{loadingMessage}</span>
+                </div>
               </td>
             </tr>
           ) : data.length === 0 ? (
@@ -103,25 +107,14 @@ export function DataTable<T>({
           <div className="d-flex align-items-center gap-2">
             <span>Items per page:</span>
             {onPageSizeChange ? (
-              <select
-                value={pageSize}
+              <Select
+                aria-label="Items per page"
                 data-testid="datatable-page-size-select"
-                onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                className="form-select form-select-sm"
-                style={{
-                  width: '70px',
-                  display: 'inline-block',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  fontWeight: '500',
-                }}
-              >
-                {pageSizeOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
+                size="small"
+                selectedKey={pageSize}
+                onSelectionChange={(key) => onPageSizeChange(Number(key))}
+                items={pageSizeOptions.map((opt) => ({ id: opt, label: String(opt) }))}
+              />
             ) : (
               <span className="fw-medium">{pageSize}</span>
             )}
@@ -136,47 +129,41 @@ export function DataTable<T>({
             <div className="d-flex align-items-center gap-1">
               <span>{currentPage}</span>
               {onPageChange && totalPages > 1 && (
-                <select
-                  value={currentPage}
+                <Select
+                  aria-label="Page"
                   data-testid="datatable-page-select-select"
-                  onChange={(e) => onPageChange(Number(e.target.value))}
-                  className="form-select form-select-sm"
-                  style={{
-                    width: '50px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    padding: '0 10px 0 0',
-                  }}
-                >
-                  {[...Array(totalPages)].map((_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      {i + 1}
-                    </option>
-                  ))}
-                </select>
+                  size="small"
+                  selectedKey={currentPage}
+                  onSelectionChange={(key) => onPageChange(Number(key))}
+                  items={[...Array(totalPages)].map((_, i) => ({ id: i + 1, label: String(i + 1) }))}
+                />
               )}
               <span>of {totalPages} page(s)</span>
             </div>
 
             <div className="d-flex gap-2">
-              <button
-                onClick={() => onPageChange && onPageChange(currentPage - 1)}
+              <Button
+                variant="tertiary"
+                size="small"
+                isIconButton
+                onPress={() => onPageChange && onPageChange(currentPage - 1)}
                 data-testid="datatable-prev-page-button"
-                disabled={currentPage === 1}
-                className="btn btn-link p-0 text-dark"
-                style={{ textDecoration: 'none', opacity: currentPage === 1 ? 0.5 : 1 }}
+                aria-label="Previous page"
+                isDisabled={currentPage === 1}
               >
-                &lt;
-              </button>
-              <button
-                onClick={() => onPageChange && onPageChange(currentPage + 1)}
+                <FaChevronLeft />
+              </Button>
+              <Button
+                variant="tertiary"
+                size="small"
+                isIconButton
+                onPress={() => onPageChange && onPageChange(currentPage + 1)}
                 data-testid="datatable-next-page-button"
-                disabled={currentPage === totalPages}
-                className="btn btn-link p-0 text-dark"
-                style={{ textDecoration: 'none', opacity: currentPage === totalPages ? 0.5 : 1 }}
+                aria-label="Next page"
+                isDisabled={currentPage === totalPages}
               >
-                &gt;
-              </button>
+                <FaChevronRight />
+              </Button>
             </div>
           </div>
         </div>

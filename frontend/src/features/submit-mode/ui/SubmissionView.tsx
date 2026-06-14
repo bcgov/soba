@@ -3,12 +3,12 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { FormType, Submission } from '@formio/react';
-import { Alert, Spinner } from 'react-bootstrap';
+import { ProgressCircle, InlineAlert } from '@bcgov/design-system-react-components';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useAppSelector } from '@/lib/store';
 import { ReadOnlyFormView } from '@/src/features/formio-v5/ui/ReadOnlyFormView';
-import { formatLongDate } from '@/src/shared/util/dateFormat';
+import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import {
   getSobaSubmission,
   getFormVersionSchema,
@@ -23,6 +23,7 @@ export function SubmissionView() {
   const { authenticated, token, initializing } = useKeycloak();
   const { activeWorkspaceId } = useAppSelector((state) => state.workspace);
   const ws = activeWorkspaceId || undefined;
+  const formatLongDate = useFormatLongDate();
 
   const submissionIdRaw = params?.submissionId;
   const submissionId =
@@ -64,7 +65,7 @@ export function SubmissionView() {
   if (initializing || (authenticated && !token)) {
     return (
       <div className="p-5 text-center">
-        <Spinner animation="border" />
+        <ProgressCircle isIndeterminate aria-label={dict.general.loading} />
       </div>
     );
   }
@@ -75,9 +76,9 @@ export function SubmissionView() {
       {!loaded ? (
         <p className="text-muted small">{dictSub?.loading || 'Loading…'}</p>
       ) : notFound || !submission ? (
-        <Alert variant="danger" role="alert" data-testid="submission-view-notfound">
+        <InlineAlert variant="danger" role="alert" data-testid="submission-view-notfound">
           {dictSub?.notFound || 'Submission not found.'}
-        </Alert>
+        </InlineAlert>
       ) : (
         <>
           <div className="mb-3" data-testid="submission-view-header">
@@ -106,9 +107,9 @@ export function SubmissionView() {
               testId="submission-view-form"
             />
           ) : (
-            <Alert variant="secondary" role="alert" data-testid="submission-view-nocontent">
+            <InlineAlert variant="info" role="alert" data-testid="submission-view-nocontent">
               {dictSub?.noContent || 'No submitted answers to display.'}
-            </Alert>
+            </InlineAlert>
           )}
         </>
       )}

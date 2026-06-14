@@ -5,7 +5,7 @@
  * with literal class names that should not be hashed by CSS Modules.
  */
 
-/* Fix Tailwind v4 conflict making sidebar components invisible */
+/* Safeguard: keep Form.io builder sidebar components visible. */
 :global(.formio-builder-components span),
 :global(.formcomponent),
 :global([ref='sidebar-component']) {
@@ -41,4 +41,39 @@
 :global(.builder-sidebar::-webkit-scrollbar-thumb) {
   background: #ccc;
   border-radius: 4px;
+}
+
+/* The DS TextArea is `display: inline-flex` and only fills width via its own
+   `align-self: stretch`, which needs a flex parent — so make the wrapper a flex
+   column. It also has no intrinsic height, so give the JSON editors real room
+   (still resizable + monospace). */
+:global(.json-textarea) {
+  display: flex;
+  flex-direction: column;
+}
+:global(.json-textarea) textarea {
+  min-height: 320px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Form.io builder per-component action buttons (Edit / Move / Edit JSON / Paste /
+   Copy / Remove). Form.io styles these as compact 18x18 boxes, but the app's
+   unlayered Bootstrap `.btn` wins over Form.io's layered rules and inflates the
+   padding/size, pushing the icon out of its colored box. Re-assert Form.io's
+   compact geometry here (unlayered + higher specificity beats Bootstrap) and
+   center the icon. */
+:global(.component-btn-group .component-settings-button) {
+  width: 18px;
+  height: 18px;
+  padding: 2px;
+  border-radius: 0;
+  font-size: 10px;
+  line-height: 1.2em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Drop Form.io's blurry blue glow: when the toolbar is hidden on hover-out
+     (`display: none`), that 10px box-shadow leaves a repaint ghost behind. */
+  box-shadow: none;
 }

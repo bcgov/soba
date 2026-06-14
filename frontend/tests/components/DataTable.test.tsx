@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { DataTable } from '@/src/components/DataTable';
 
@@ -55,12 +56,16 @@ describe('DataTable', () => {
 
     expect(screen.getByText('Alice')).toBeInTheDocument();
 
-    const nextBtn = screen.getByTestId('datatable-next-page-button');
-    fireEvent.click(nextBtn);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByTestId('datatable-next-page-button'));
     expect(onPageChange).toHaveBeenCalled();
 
+    // DS Select is a button + popup listbox (not a native <select>): open it,
+    // then pick an option.
     const pageSizeSelect = screen.getByTestId('datatable-page-size-select');
-    fireEvent.change(pageSizeSelect, { target: { value: '10' } });
+    await user.click(within(pageSizeSelect).getByRole('button'));
+    await user.click(await screen.findByRole('option', { name: '10' }));
     expect(onPageSizeChange).toHaveBeenCalled();
   });
 });

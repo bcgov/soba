@@ -12,12 +12,10 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect } from 'react';
-import { Alert, Button } from 'react-bootstrap';
+import { Button, InlineAlert } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
 
 export default function FormIdRouteError({
-  error,
   reset,
 }: {
   error: Error & { digest?: string };
@@ -28,21 +26,15 @@ export default function FormIdRouteError({
   const dict = useDictionary();
   const labels = dict.formioV5.formRender.segmentError;
 
-  useEffect(() => {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('[forms/[formId]/error]', error);
-    }
-  }, [error]);
-
   return (
     <div className="mt-4" role="alert">
-      <Alert variant="danger">{labels.title}</Alert>
+      <InlineAlert variant="danger">{labels.title}</InlineAlert>
       <div className="d-flex flex-wrap gap-3">
-        <Button type="button" variant="primary" onClick={() => reset()}>
+        <Button type="button" variant="primary" onPress={() => reset()}>
           {labels.tryAgain}
         </Button>
         <Link
-          className="text-[var(--theme-primary-blue)] underline hover:no-underline"
+          className="text-decoration-underline"
           href={`/${locale}/forms`}
         >
           {labels.backToList}

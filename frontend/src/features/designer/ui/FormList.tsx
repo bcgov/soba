@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Spinner, Container, Form, InputGroup, Button } from 'react-bootstrap';
+import { Container } from 'react-bootstrap';
+import { Button as DSButton, ProgressCircle, TextField } from '@bcgov/design-system-react-components';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
@@ -10,7 +11,7 @@ import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { FaMagnifyingGlass, FaX } from 'react-icons/fa6';
 import { getSobaForms } from '@/src/shared/api/sobaApi';
 import type { SobaFormSummary } from '@/src/shared/api/sobaApiForms';
-import { formatLongDate } from '@/src/shared/util/dateFormat';
+import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import { useAppSelector } from '@/lib/store';
 
 const CustomActionButtons = ({
@@ -36,28 +37,19 @@ const CustomActionButtons = ({
 
   return (
     <div className="d-flex gap-2 justify-content-start">
-      {actions.map((action) => {
-        return (
-          <button
-            key={action.name}
-            type="button"
-            data-test-id={action.name + '-' + sobaFormId + '-button'}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (!sobaFormId) return;
-              onAction(action.name, sobaFormId);
-            }}
-            className="btn btn-link p-0 m-0"
-            style={{ textDecoration: 'underline', color: '#00538A' }}
-            title={action.title}
-          >
-            <div className="position-relative d-inline-flex align-items-center justify-content-center">
-              {action.title}
-            </div>
-          </button>
-        );
-      })}
+      {actions.map((action) => (
+        <DSButton
+          key={action.name}
+          variant="link"
+          data-test-id={action.name + '-' + sobaFormId + '-button'}
+          onPress={() => {
+            if (!sobaFormId) return;
+            onAction(action.name, sobaFormId);
+          }}
+        >
+          {action.title}
+        </DSButton>
+      ))}
     </div>
   );
 };
@@ -100,7 +92,6 @@ function FormList({
             setForms(Array.isArray(data.items) ? data.items : []);
           }
         } catch (err: unknown) {
-          console.error('Error fetching forms:', err);
           if (isMounted && err && typeof err === 'object' && 'message' in err) {
             setError((err as { message: string }).message);
           }
@@ -152,6 +143,8 @@ function FormList({
     },
     [router, locale],
   );
+
+  const formatLongDate = useFormatLongDate();
 
   const columns: Column<SobaFormSummary>[] = useMemo(
     () => [
@@ -207,13 +200,13 @@ function FormList({
         ),
       },
     ],
-    [handleAction, dictFormList, dictForm, designModeEnabled, submitModeEnabled],
+    [handleAction, dictFormList, dictForm, designModeEnabled, submitModeEnabled, formatLongDate],
   );
 
   if (initializing)
     return (
       <div className="p-5 text-center">
-        <Spinner animation="border" />
+        <ProgressCircle isIndeterminate aria-label={dict.general.loading} />
       </div>
     );
   if (!authenticated) return <div className="p-5 text-center">{dict.general.notAuthenticated}</div>;
@@ -225,45 +218,43 @@ function FormList({
       </div>
       <div className="mb-3 d-flex justify-content-between align-items-center">
         {designModeEnabled && (
-          <Button
+          <DSButton
             variant="primary"
             data-testid="create-form-button"
-            onClick={() => router.push(`/${locale}/designer`)}
-            style={{
-              backgroundColor: '#003366',
-              borderColor: '#003366',
-              borderRadius: '4px',
-              padding: '6px 16px',
-              fontWeight: '500',
-            }}
+            onPress={() => router.push(`/${locale}/designer`)}
           >
             Create
-          </Button>
+          </DSButton>
         )}
 
-        <InputGroup style={{ maxWidth: '300px' }}>
-          <Form.Control
-            placeholder="Search"
+        <div style={{ width: '300px', maxWidth: '100%' }}>
+          <TextField
+            aria-label="Search"
             data-testid="search-forms-text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="border-end-0"
+            onChange={setSearchQuery}
+            iconLeft={<FaMagnifyingGlass />}
+            iconRight={
+              searchQuery ? (
+                <button
+                  type="button"
+                  data-testid="search-forms-button"
+                  aria-label="Clear search"
+                  onClick={() => setSearchQuery('')}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    padding: 0,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                  }}
+                >
+                  <FaX size={12} />
+                </button>
+              ) : undefined
+            }
           />
-          {searchQuery && (
-            <Button
-              variant="outline-secondary"
-              data-testid="search-forms-button"
-              className="border-start-0 border-end-0 bg-white"
-              onClick={() => setSearchQuery('')}
-              style={{ borderColor: '#dee2e6' }}
-            >
-              <FaX size={12} />
-            </Button>
-          )}
-          <InputGroup.Text className="bg-white" style={{ cursor: 'pointer' }}>
-            <FaMagnifyingGlass className="text-muted" />
-          </InputGroup.Text>
-        </InputGroup>
+        </div>
       </div>
 
       <DataTable<SobaFormSummary>
@@ -272,7 +263,7 @@ function FormList({
         loading={loading}
         error={error}
         emptyMessage="No forms found matching your criteria."
-        loadingMessage="Loading forms..."
+        loadingMessage={dict.general.loading}
         itemName="items"
         pageSize={pageSize}
         currentPage={currentPage}
