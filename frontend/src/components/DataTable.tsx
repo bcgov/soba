@@ -67,14 +67,11 @@ export function DataTable<T>({
         <tbody style={{ borderTop: 'none' }}>
           {loading ? (
             <tr>
-              <td colSpan={columns.length} className="text-center py-5">
-                <ProgressCircle
-                  isIndeterminate
-                  size="small"
-                  aria-label={loadingMessage}
-                  className="me-2"
-                />
-                {loadingMessage}
+              <td colSpan={columns.length} className="py-5">
+                <div className="d-flex align-items-center justify-content-center gap-2">
+                  <ProgressCircle isIndeterminate size="small" aria-label={loadingMessage} />
+                  <span>{loadingMessage}</span>
+                </div>
               </td>
             </tr>
           ) : data.length === 0 ? (

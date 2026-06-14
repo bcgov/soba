@@ -73,4 +73,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* Drop Form.io's blurry blue glow: when the toolbar is hidden on hover-out
+     (`display: none`), that 10px box-shadow leaves a repaint ghost behind. */
+  box-shadow: none;
 }
