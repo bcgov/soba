@@ -71,6 +71,18 @@ export const ProvisionSchemaBodySchema = z
   })
   .openapi('Forms_ProvisionSchemaBody');
 
+export const NormalizeSchemaBodySchema = z
+  .object({
+    schema: z.record(z.string(), z.unknown()),
+  })
+  .openapi('Forms_NormalizeSchemaBody');
+
+export const NormalizeSchemaResponseSchema = z
+  .object({
+    schema: z.record(z.string(), z.unknown()),
+  })
+  .openapi('Forms_NormalizeSchemaResponse');
+
 export const ListFormsQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -254,6 +266,36 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
       },
       400: {
         description: 'Validation or business rule error',
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/forms/normalize',
+    tags: ['core.forms'],
+    security: [{ bearerAuth: [] }],
+    request: {
+      body: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: NormalizeSchemaBodySchema,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Schema normalized to a clean, builder-ready form definition',
+        content: {
+          'application/json': {
+            schema: NormalizeSchemaResponseSchema,
+          },
+        },
+      },
+      400: {
+        description: 'Invalid schema body',
       },
     },
   });

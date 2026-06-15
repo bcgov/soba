@@ -18,7 +18,8 @@ vi.mock('@/app/[lang]/Providers', () => ({
 
 const { mockDispatch } = vi.hoisted(() => ({ mockDispatch: vi.fn() }));
 vi.mock('@/lib/store', () => ({
-  useAppSelector: (fn: (s: unknown) => unknown) => fn({ notification: { notifications: [] } }),
+  useAppSelector: (fn: (s: unknown) => unknown) =>
+    fn({ notification: { notifications: [] }, workspace: { activeWorkspaceId: 'ws1' } }),
   useAppDispatch: () => mockDispatch,
 }));
 

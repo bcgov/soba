@@ -149,6 +149,9 @@ export function createFormsApiService(
       return { ...toFormDto(form), formVersion: toFormVersionDto(version) };
     },
 
+    normalizeSchema: (_ctx: FormsContextInput, schema: Record<string, unknown>) =>
+      formService.normalizeSchema(schema),
+
     updateForm: async (ctx: FormsContextInput, formId: string, input: UpdateFormInput) => {
       const row = await formService.update({
         workspaceId: ctx.workspaceId,

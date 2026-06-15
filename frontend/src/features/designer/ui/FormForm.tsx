@@ -337,12 +337,24 @@ function FormForm({ id }: { id?: string[] }) {
           loading ? (
             <CenteredProgress label={dict.form.loading} />
           ) : formSchema ? (
-            <FormDesigner onUpdateModel={updateFormSchema} initialModel={formSchema} />
+            <FormDesigner
+              onUpdateModel={updateFormSchema}
+              initialModel={formSchema}
+              formName={formName}
+              versionNo={currentVersion?.versionNo ?? null}
+              state={currentVersion?.state ?? null}
+              isDirty={isDirty}
+            />
           ) : (
             <div className="my-4">{dict.form.schemaNotAvailable}</div>
           )
         ) : (
-          <FormDesigner onUpdateModel={updateFormSchema} initialModel={null} />
+          <FormDesigner
+            onUpdateModel={updateFormSchema}
+            initialModel={null}
+            formName={formName}
+            isDirty={isDirty}
+          />
         )}
       </div>
 

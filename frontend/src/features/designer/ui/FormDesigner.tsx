@@ -14,10 +14,11 @@ import type {
   FormioProvider as FormioProviderComponent,
 } from '@formio/react';
 import './FormDesigner.module.css';
-import { Modal as CommonModal } from '@/src/components/Modal';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
-import { TextArea, Button, InlineAlert } from '@bcgov/design-system-react-components';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
+import { useAppSelector } from '@/lib/store';
+import { normalizeFormSchema } from '@/src/shared/api/sobaApi';
+import { buildExportFilename } from '@/src/features/designer/exportFilename';
 
 // Import Types
 import type { FormBuilder as FormioBuilderInstance } from '@formio/js';
@@ -45,12 +46,26 @@ const FormioProvider = dynamic(
 interface DesignerProps {
   onUpdateModel: (data: FormType) => void;
   initialModel?: FormType | null;
+  /** Metadata for the export filename (lives in the parent FormForm). */
+  formName?: string;
+  versionNo?: number | null;
+  state?: string | null;
+  isDirty?: boolean;
 }
 
-const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = null }) => {
-  const { authenticated, initializing } = useKeycloak();
+const FormDesigner: React.FC<DesignerProps> = ({
+  onUpdateModel,
+  initialModel = null,
+  formName = '',
+  versionNo = null,
+  state = null,
+  isDirty = false,
+}) => {
+  const { authenticated, initializing, token } = useKeycloak();
+  const { activeWorkspaceId } = useAppSelector((s) => s.workspace);
   const dict = useDictionary();
   const { addNotification } = useNotificationStore();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   // Inject the Form.io builder CSS (layered) only while the builder is mounted.
   useFormioV5FormChrome('build');
   const builderRef = useRef<FormioBuilderInstance | null>(null);
@@ -60,7 +75,7 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
    * stable reference (satisfies ESLint's `react-hooks/refs` rule). We assume a
    * valid Form.io v5 schema from the engine, so no client-side fix-ups.
    */
-  const [stableForm, setStableForm] = useState<FormType>(() => initialModel ?? { components: [] });
+  const [stableForm] = useState<FormType>(() => initialModel ?? { components: [] });
 
   const opt = useMemo(
     () => ({
@@ -149,42 +164,81 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
     }
   }, []);
 
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [exportJson, setExportJson] = useState('');
+  // Form.io's `builder.form` getter returns the initial definition, not live edits, so we
+  // track the latest schema from onChange — export reads this so unsaved changes are included.
+  const liveSchemaRef = useRef<FormType | null>(null);
+  const handleChange = useCallback(
+    (schema: FormType) => {
+      liveSchemaRef.current = schema;
+      onUpdateModel(schema);
+    },
+    [onUpdateModel],
+  );
 
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [importJson, setImportJson] = useState('');
-
-  const handleExport = useCallback(() => {
-    if (builderRef.current) {
-      const schema = (builderRef.current as FormioBuilderInstance).form || {};
-      const json = JSON.stringify(schema, null, 2);
-      setExportJson(json);
-      // Best-effort clipboard copy; the JSON is shown in the modal regardless.
-      navigator.clipboard.writeText(json).catch(() => {});
-      setShowExportModal(true);
-    }
-  }, []);
-
-  const handleImport = useCallback(() => {
+  // Export the live builder design (may be unsaved): normalize it on the server (same operation
+  // as import) to a clean, portable form definition, then download.
+  const handleExport = useCallback(async () => {
+    if (!token) return;
     try {
-      // FLAG (engine-dependent): this rewrites legacy CHEFS-1 component types to Form.io types.
-      // It is a backend/engine-dependent transformation that should live in the engine adapter or a
-      // server-side import path, not in the designer. Move when the import flow is built.
-      let cleanedJson = importJson.replace(/"type"\s*:\s*"simple(.*?)advanced"/g, '"type": "$1"');
-      cleanedJson = cleanedJson.replace(/"type"\s*:\s*"simple(.*?)"/g, '"type": "$1"');
-      const parsed = JSON.parse(cleanedJson);
-      setStableForm(parsed);
-      if (builderRef.current) {
-        (builderRef.current as FormioBuilderInstance).form = parsed;
-      }
-      if (onUpdateModel) onUpdateModel(parsed);
-      setShowImportModal(false);
-      setImportJson('');
+      const schema = (liveSchemaRef.current ?? stableForm) as Record<string, unknown>;
+      const clean = await normalizeFormSchema(token, schema, activeWorkspaceId || undefined);
+      const blob = new Blob([JSON.stringify(clean, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = buildExportFilename(formName, versionNo, state, isDirty);
+      a.click();
+      URL.revokeObjectURL(url);
     } catch {
       addNotification({ text: dict.form.invalidJson || 'Invalid JSON format.', type: 'error' });
     }
-  }, [importJson, onUpdateModel, addNotification, dict.form.invalidJson]);
+  }, [
+    token,
+    activeWorkspaceId,
+    formName,
+    versionNo,
+    state,
+    isDirty,
+    stableForm,
+    addNotification,
+    dict.form.invalidJson,
+  ]);
+
+  const handleImportClick = useCallback(() => fileInputRef.current?.click(), []);
+
+  // Upload a schema file → server applies the CHEFS-1 transform → load the result into the builder.
+  const handleFileSelected = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = ''; // reset so selecting the same file again still fires onChange
+      if (!file || !token) return;
+      try {
+        const raw = JSON.parse(await file.text()) as Record<string, unknown>;
+        const transformed = (await normalizeFormSchema(
+          token,
+          raw,
+          activeWorkspaceId || undefined,
+        )) as FormType;
+        // Update the EXISTING builder in place. Re-creating @formio/react's FormBuilder
+        // (by changing `initialForm`/`key`) orphans the underlying instance, and its
+        // unguarded `updateComponent` handler then reads `builder.instance.form` on the
+        // dead instance — crashing the component-edit dialog. `setForm` avoids all that.
+        const instance = (
+          builderRef.current as unknown as {
+            instance?: { setForm?: (form: unknown) => Promise<unknown> };
+          } | null
+        )?.instance;
+        if (instance?.setForm) {
+          await instance.setForm(transformed);
+        }
+        liveSchemaRef.current = transformed;
+        if (onUpdateModel) onUpdateModel(transformed);
+      } catch {
+        addNotification({ text: dict.form.invalidJson || 'Invalid JSON format.', type: 'error' });
+      }
+    },
+    [token, activeWorkspaceId, onUpdateModel, addNotification, dict.form.invalidJson],
+  );
 
   if (initializing) {
     return <CenteredProgress label={dict.form.loading} />;
@@ -207,7 +261,7 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
             </button>
             <button
               className="d-block btn btn-sm btn-outline-secondary w-100"
-              onClick={() => setShowImportModal(true)}
+              onClick={handleImportClick}
             >
               {dict.form.importJson || 'Import JSON'}
             </button>
@@ -215,69 +269,23 @@ const FormDesigner: React.FC<DesignerProps> = ({ onUpdateModel, initialModel = n
           sidebarEl,
         )}
 
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json,.json"
+        className="d-none"
+        data-testid="designer-import-file"
+        onChange={handleFileSelected}
+      />
+
       <FormioProvider>
         <FormBuilder
           initialForm={stableForm}
           options={opt}
-          onChange={onUpdateModel}
+          onChange={handleChange}
           onBuilderReady={handleBuilderReady}
         />
       </FormioProvider>
-
-      {/* Export Modal */}
-      <CommonModal
-        show={showExportModal}
-        title={dict.form.exportJson || 'Export Form JSON'}
-        onClose={() => setShowExportModal(false)}
-        size="lg"
-        footer={
-          <Button variant="secondary" onPress={() => setShowExportModal(false)}>
-            {dict.form.close || 'Close'}
-          </Button>
-        }
-      >
-        <div className="d-flex flex-column gap-3">
-          <InlineAlert variant="success">
-            {dict.form.copiedToClipboard || 'Copied to clipboard!'}
-          </InlineAlert>
-          <div className="json-textarea">
-            <TextArea
-              aria-label={dict.form.exportJson || 'Export Form JSON'}
-              value={exportJson}
-              isReadOnly
-            />
-          </div>
-        </div>
-      </CommonModal>
-
-      {/* Import Modal */}
-      <CommonModal
-        show={showImportModal}
-        title={dict.form.importJson || 'Import Form JSON'}
-        onClose={() => setShowImportModal(false)}
-        size="lg"
-        footer={
-          <>
-            <Button variant="secondary" onPress={() => setShowImportModal(false)}>
-              {dict.form.cancel || 'Cancel'}
-            </Button>
-            <Button variant="primary" onPress={handleImport}>
-              {dict.form.importSchema || 'Import Schema'}
-            </Button>
-          </>
-        }
-      >
-        <div className="json-textarea">
-          <TextArea
-            label={
-              dict.form.pasteSchema ||
-              'Paste your Form.io JSON schema here. This will replace the current form design.'
-            }
-            value={importJson}
-            onChange={setImportJson}
-          />
-        </div>
-      </CommonModal>
     </section>
   );
 };

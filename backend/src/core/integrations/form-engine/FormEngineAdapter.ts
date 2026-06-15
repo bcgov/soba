@@ -53,4 +53,10 @@ export interface FormEngineAdapter {
     engineFormRef: string,
     engineRef: string,
   ): Promise<Record<string, unknown> | null>;
+  /**
+   * Normalize a schema (imported file or exported design) into a clean, portable,
+   * builder-ready form definition for this engine. Pure transform — no engine call.
+   * Returns the schema unchanged if the engine has nothing to do.
+   */
+  normalizeSchema?(schema: Record<string, unknown>): Record<string, unknown>;
 }

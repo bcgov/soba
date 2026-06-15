@@ -5,6 +5,7 @@ import {
   CreateFormVersionBodySchema,
   FormIdParamsSchema,
   FormVersionIdParamsSchema,
+  NormalizeSchemaBodySchema,
   ListFormsQuerySchema,
   ListFormVersionsQuerySchema,
   ProvisionSchemaBodySchema,
@@ -29,12 +30,21 @@ type SaveFormVersionBody = z.infer<typeof SaveFormVersionBodySchema>;
 type SaveFormVersionParams = z.infer<typeof SaveFormVersionParamsSchema>;
 type ListFormsQuery = z.infer<typeof ListFormsQuerySchema>;
 type ListFormVersionsQuery = z.infer<typeof ListFormVersionsQuerySchema>;
+type NormalizeSchemaBody = z.infer<typeof NormalizeSchemaBodySchema>;
 
 export const createForm = asyncHandler(
   async (req: Request<unknown, unknown, CreateFormBody>, res: Response) => {
     const ctx = req.coreContext!;
     const result = await formsApiService.createForm(ctx, req.body);
     res.status(201).json(result);
+  },
+);
+
+export const normalizeFormSchema = asyncHandler(
+  async (req: Request<unknown, unknown, NormalizeSchemaBody>, res: Response) => {
+    const ctx = req.coreContext!;
+    const schema = formsApiService.normalizeSchema(ctx, req.body.schema);
+    res.json({ schema });
   },
 );
 

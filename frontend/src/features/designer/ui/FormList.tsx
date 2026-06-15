@@ -194,7 +194,6 @@ function FormList({
     ],
     [
       handleAction,
-      locale,
       dictFormList,
       dictForm,
       designModeEnabled,

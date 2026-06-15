@@ -43,20 +43,6 @@
   border-radius: 4px;
 }
 
-/* The DS TextArea is `display: inline-flex` and only fills width via its own
-   `align-self: stretch`, which needs a flex parent — so make the wrapper a flex
-   column. It also has no intrinsic height, so give the JSON editors real room
-   (still resizable + monospace). */
-:global(.json-textarea) {
-  display: flex;
-  flex-direction: column;
-}
-:global(.json-textarea) textarea {
-  min-height: 320px;
-  resize: vertical;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-
 /* Form.io builder per-component action buttons (Edit / Move / Edit JSON / Paste /
    Copy / Remove). Form.io styles these as compact 18x18 boxes, but the app's
    unlayered Bootstrap `.btn` wins over Form.io's layered rules and inflates the

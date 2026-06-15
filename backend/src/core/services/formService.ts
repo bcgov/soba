@@ -13,6 +13,7 @@ import { createEmptyFormVersionDraft } from '../db/repos/formVersionRepo';
 import { db } from '../db/client';
 import { env } from '../config/env';
 import {
+  createFormEngineAdapter,
   getFormEnginePlugins,
   resolveFormEnginePlugin,
 } from '../integrations/form-engine/FormEngineRegistry';
@@ -109,6 +110,25 @@ export class FormService {
 
   async update(input: UpdateInput): Promise<FormRecord | null> {
     return updateForm(input);
+  }
+
+  /**
+   * Normalize a schema (import file or export) into a clean, portable, builder-ready form
+   * definition using the default form engine. Returns it unchanged if the engine can't normalize.
+   */
+  normalizeSchema(schema: Record<string, unknown>): Record<string, unknown> {
+    const plugins = getFormEnginePlugins();
+    if (plugins.length === 0) {
+      throw new ValidationError('No form engine plugins installed.');
+    }
+    const defaultCode =
+      env.getFormEngineDefaultCode() ??
+      (plugins.some((p) => p.code === 'formio-v5') ? 'formio-v5' : plugins[0].code);
+    const adapter = createFormEngineAdapter(defaultCode);
+    if (typeof adapter.normalizeSchema !== 'function') {
+      return schema;
+    }
+    return adapter.normalizeSchema(schema);
   }
 
   async get(workspaceId: string, formId: string): Promise<FormRecord | null> {
