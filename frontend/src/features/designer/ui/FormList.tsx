@@ -5,9 +5,9 @@ import { Container } from 'react-bootstrap';
 import { Button as DSButton, TextField } from '@bcgov/design-system-react-components';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { DsPageHeading } from '@/app/ui/DsPageHeading';
+import { RowActionButton } from '@/src/components/RowActionButton';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
-import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { FaMagnifyingGlass, FaX } from 'react-icons/fa6';
@@ -40,17 +40,16 @@ const CustomActionButtons = ({
   return (
     <div className="d-flex gap-2 justify-content-start">
       {actions.map((action) => (
-        <DSButton
+        <RowActionButton
           key={action.name}
-          variant="link"
-          data-test-id={action.name + '-' + sobaFormId + '-button'}
+          data-testid={action.name + '-' + sobaFormId + '-button'}
           onPress={() => {
             if (!sobaFormId) return;
             onAction(action.name, sobaFormId);
           }}
         >
           {action.title}
-        </DSButton>
+        </RowActionButton>
       ))}
     </div>
   );
@@ -113,11 +112,7 @@ function FormList({
   const filteredForms = useMemo(() => {
     if (!searchQuery.trim()) return forms;
     const query = searchQuery.toLowerCase();
-    return forms.filter(
-      (f) =>
-        (f.name || '').toLowerCase().includes(query) ||
-        (f.slug || '').toLowerCase().includes(query),
-    );
+    return forms.filter((f) => (f.name || '').toLowerCase().includes(query));
   }, [forms, searchQuery]);
 
   // Removed unused totalPages
@@ -156,13 +151,13 @@ function FormList({
         width: '40%',
         render: (form: SobaFormSummary) => {
           return designModeEnabled ? (
-            <Link
-              href={`/${locale}/designer/${form.id}`}
+            <RowActionButton
+              main
               data-testid={'form-link-' + form.id}
-              className="text-decoration-underline link-primary"
+              onPress={() => handleAction('manage', form.id)}
             >
               {form.name || dictForm?.nameLabel || 'Untitled Form'}
-            </Link>
+            </RowActionButton>
           ) : (
             <span>{form.name || dictForm?.nameLabel || 'Untitled Form'}</span>
           );
@@ -199,7 +194,6 @@ function FormList({
     ],
     [
       handleAction,
-      locale,
       dictFormList,
       dictForm,
       designModeEnabled,
@@ -275,15 +269,6 @@ function FormList({
         pageSizeOptions={[5, 10, 25, 50]}
         keyExtractor={(form) => form.id}
       />
-
-      <style jsx global>{`
-        .hover\:text-primary:hover {
-          color: var(--bs-primary) !important;
-        }
-        .table-hover tbody tr:hover {
-          background-color: rgba(0, 123, 255, 0.03) !important;
-        }
-      `}</style>
     </Container>
   );
 }

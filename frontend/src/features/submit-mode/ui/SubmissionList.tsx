@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Container } from 'react-bootstrap';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
@@ -11,6 +10,7 @@ import { getSobaSubmissions } from '@/src/shared/api/sobaApiForms';
 import type { SubmissionListItem } from '@/src/types/submissions';
 import { DataTable, Column } from '@/src/components/DataTable';
 import { DsPageHeading } from '@/app/ui/DsPageHeading';
+import { RowActionButton } from '@/src/components/RowActionButton';
 import { WorkflowStateBadge } from './WorkflowStateBadge';
 import { useAppSelector } from '@/lib/store';
 
@@ -21,6 +21,7 @@ interface SubmissionListProps {
 export function SubmissionList({ formId }: SubmissionListProps = {}) {
   const { authenticated, token, initializing } = useKeycloak();
   const dict = useDictionary();
+  const router = useRouter();
   const pathname = usePathname();
   const locale = getLocaleFromPath(pathname);
   const [submissions, setSubmissions] = useState<SubmissionListItem[]>([]);
@@ -68,14 +69,13 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
       key: 'id',
       label: dict.submission?.columns?.id || 'Submission ID',
       render: (sub) => (
-        <Link
-          href={`/${locale}/submission/${sub.id}`}
+        <RowActionButton
+          main
           data-testid={`submission-view-${sub.id}`}
-          className="text-decoration-underline font-monospace small link-primary"
-          title={dict.submission?.view || 'View'}
+          onPress={() => router.push(`/${locale}/submission/${sub.id}`)}
         >
           {sub.id}
-        </Link>
+        </RowActionButton>
       ),
     },
     {

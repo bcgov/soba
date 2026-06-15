@@ -7,6 +7,7 @@ import {
 import { PluginConfigReader } from '../../core/config/pluginConfig';
 import { ValidationError } from '../../core/errors';
 import { getAuthenticatedFormioClient } from './formioV5Client';
+import { normalizeSchema as normalizeFormioSchema } from './normalizeSchema';
 
 export interface FormioV5Config {
   apiBaseUrl: string;
@@ -218,6 +219,11 @@ export class FormioEngineAdapter implements FormEngineAdapter {
       throw new Error('Form.io admin client unavailable; cannot delete form schema');
     }
     await client.deleteForm(engineRef);
+  }
+
+  /** Normalize a schema (import or export) to a clean, portable, builder-ready form definition. */
+  normalizeSchema(schema: Record<string, unknown>): Record<string, unknown> {
+    return normalizeFormioSchema(schema);
   }
 
   /**

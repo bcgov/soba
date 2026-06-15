@@ -1,9 +1,15 @@
 .sideNav {
   height: 100%;
-  border-right: 1px solid var(--app-border, #dee2e6);
+  border-right: 1px solid var(--app-border);
 }
 
-/* Add custom hover background */
-:global(.hover-bg-light:hover) {
-  background-color: #f8f9fa;
+/* Subtle hover for nav items (no strong colour). */
+.navLink:hover {
+  background-color: var(--app-hover);
+}
+
+/* Selected item: a quiet grey + bold, never a contrasting brand colour. */
+.navActive {
+  background-color: var(--app-surface-muted);
+  font-weight: 600;
 }

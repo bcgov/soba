@@ -43,6 +43,13 @@
       "when": 1772598000000,
       "tag": "0005_remove_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1772599000000,
+      "tag": "0006_drop_form_slug",
+      "breakpoints": true
     }
   ]
 }

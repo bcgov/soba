@@ -43,6 +43,25 @@ export async function createSobaFormioForm(
   return parseJson(response);
 }
 
+/**
+ * POST a Form.io schema to the server to normalize it into a clean, portable, builder-ready
+ * form definition. Used both for import (file upload) and export (download).
+ */
+export async function normalizeFormSchema(
+  token: string,
+  schema: Record<string, unknown>,
+  workspaceId?: string,
+): Promise<Record<string, unknown>> {
+  const response = await fetch(`${getSobaApiBaseUrl()}/forms/normalize`, {
+    method: 'POST',
+    cache: 'no-store',
+    headers: getHeaders(token, workspaceId, true),
+    body: JSON.stringify({ schema }),
+  });
+  const data = await parseJson<{ schema: Record<string, unknown> }>(response);
+  return data.schema;
+}
+
 export async function publishSobaFormVersion(token: string, id: string, workspaceId?: string) {
   const response = await fetch(`${getSobaApiBaseUrl()}/form-versions/${id}/publish`, {
     method: 'POST',
@@ -123,7 +142,6 @@ export async function saveSobaFormSubmission(
 /** Compact form row for the designer/submit list. */
 export type SobaFormSummary = {
   id: string;
-  slug: string;
   name: string;
   status: string;
   createdAt: string;

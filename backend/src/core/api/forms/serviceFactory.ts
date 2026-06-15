@@ -25,7 +25,6 @@ interface ListFormVersionsQueryInput {
 }
 
 interface CreateFormInput {
-  slug: string;
   name: string;
   description?: string;
   formEngineCode?: string;
@@ -33,7 +32,6 @@ interface CreateFormInput {
 }
 
 interface UpdateFormInput {
-  slug?: string;
   name?: string;
   description?: string | null;
   status?: string;
@@ -41,7 +39,6 @@ interface UpdateFormInput {
 
 const toFormDto = (item: {
   id: string;
-  slug: string;
   name: string;
   description: string | null;
   status: string;
@@ -51,7 +48,6 @@ const toFormDto = (item: {
   updatedBy: string | null;
 }) => ({
   id: item.id,
-  slug: item.slug,
   name: item.name,
   description: item.description,
   status: item.status,
@@ -63,7 +59,6 @@ const toFormDto = (item: {
 
 const toFormListItemDto = (item: {
   id: string;
-  slug: string;
   name: string;
   status: string;
   createdAt: Date;
@@ -72,7 +67,6 @@ const toFormListItemDto = (item: {
   updatedBy: string | null;
 }) => ({
   id: item.id,
-  slug: item.slug,
   name: item.name,
   status: item.status,
   createdAt: item.createdAt.toISOString(),
@@ -147,7 +141,6 @@ export function createFormsApiService(
         workspaceId: ctx.workspaceId,
         actorId: ctx.actorId,
         actorDisplayLabel: ctx.actorDisplayLabel,
-        slug: input.slug,
         name: input.name,
         description: input.description,
         formEngineCode: input.formEngineCode,
@@ -156,13 +149,15 @@ export function createFormsApiService(
       return { ...toFormDto(form), formVersion: toFormVersionDto(version) };
     },
 
+    normalizeSchema: (_ctx: FormsContextInput, schema: Record<string, unknown>) =>
+      formService.normalizeSchema(schema),
+
     updateForm: async (ctx: FormsContextInput, formId: string, input: UpdateFormInput) => {
       const row = await formService.update({
         workspaceId: ctx.workspaceId,
         actorId: ctx.actorId,
         actorDisplayLabel: ctx.actorDisplayLabel,
         formId,
-        slug: input.slug,
         name: input.name,
         description: input.description,
         status: input.status,

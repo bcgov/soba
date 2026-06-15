@@ -5,6 +5,7 @@ import { Table } from 'react-bootstrap';
 import { Select, Button } from '@bcgov/design-system-react-components';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa6';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
+import styles from './DataTable.module.css';
 
 export interface Column<T> {
   key: string;
@@ -52,16 +53,16 @@ export function DataTable<T>({
   const totalPages = totalItems ? Math.ceil(totalItems / pageSize) : 1;
 
   return (
-    <div className="bg-white rounded overflow-hidden" style={{ border: 'none' }}>
-      <Table hover responsive className="mb-0 align-middle" style={{ border: 'none' }}>
+    <div className={`bg-white rounded overflow-hidden ${styles.container}`}>
+      <Table responsive className={`mb-0 align-middle ${styles.table}`}>
         {caption ? <caption className="visually-hidden">{caption}</caption> : null}
-        <thead style={{ backgroundColor: 'var(--app-bg)', borderBottom: 'none' }}>
+        <thead className={styles.thead}>
           <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
                 scope="col"
-                className={`px-4 py-3 text-dark fw-bold border-0 text-${col.align || 'start'}`}
+                className={`px-4 py-2 text-dark fw-bold text-${col.align || 'start'}`}
                 style={col.width ? { width: col.width } : undefined}
               >
                 {col.label}
@@ -69,7 +70,7 @@ export function DataTable<T>({
             ))}
           </tr>
         </thead>
-        <tbody style={{ borderTop: 'none' }}>
+        <tbody className={styles.tbody}>
           {loading ? (
             <tr>
               <td colSpan={columns.length} className="p-0">
@@ -84,11 +85,11 @@ export function DataTable<T>({
             </tr>
           ) : (
             data.map((item) => (
-              <tr key={keyExtractor(item)} style={{ borderBottom: '1px solid var(--app-border)' }}>
+              <tr key={keyExtractor(item)} className={styles.row}>
                 {columns.map((col) => (
                   <td
                     key={`${keyExtractor(item)}-${col.key}`}
-                    className={`px-4 py-3 text-${col.align || 'start'}`}
+                    className={`px-4 py-2 text-${col.align || 'start'}`}
                   >
                     {col.render
                       ? col.render(item)
@@ -103,8 +104,7 @@ export function DataTable<T>({
 
       {!loading && data.length > 0 && totalItems !== undefined && (
         <div
-          className="px-4 py-3 d-flex justify-content-between align-items-center"
-          style={{ backgroundColor: 'var(--app-bg)', color: 'var(--app-text)' }}
+          className={`px-4 py-3 d-flex justify-content-between align-items-center ${styles.pagination}`}
         >
           <div className="d-flex align-items-center gap-2">
             <span>Items per page:</span>

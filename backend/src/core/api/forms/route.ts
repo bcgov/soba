@@ -2,6 +2,7 @@ import express from 'express';
 import { validateRequest } from '../shared/validation';
 import {
   createForm,
+  normalizeFormSchema,
   createFormVersion,
   updateForm,
   getForm,
@@ -23,6 +24,7 @@ import {
   CreateFormVersionBodySchema,
   FormIdParamsSchema,
   FormVersionIdParamsSchema,
+  NormalizeSchemaBodySchema,
   ListFormsQuerySchema,
   ListFormVersionsQuerySchema,
   ProvisionSchemaBodySchema,
@@ -36,6 +38,11 @@ const router = express.Router();
 
 router.get('/forms', validateRequest({ query: ListFormsQuerySchema }), listForms);
 router.post('/forms', validateRequest({ body: CreateFormBodySchema }), createForm);
+router.post(
+  '/forms/normalize',
+  validateRequest({ body: NormalizeSchemaBodySchema }),
+  normalizeFormSchema,
+);
 router.get('/forms/:id', validateRequest({ params: FormIdParamsSchema }), getForm);
 router.patch(
   '/forms/:id',

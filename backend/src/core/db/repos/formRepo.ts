@@ -18,7 +18,6 @@ export interface ListFormsForWorkspaceInput {
 
 export interface FormListRow {
   id: string;
-  slug: string;
   name: string;
   status: string;
   createdAt: Date;
@@ -31,7 +30,6 @@ export interface FormRecord {
   id: string;
   workspaceId: string;
   formEngineCode: string;
-  slug: string;
   name: string;
   description: string | null;
   status: string;
@@ -48,7 +46,6 @@ interface CreateFormInput {
   actorId: string;
   actorDisplayLabel: string | null;
   formEngineCode: string;
-  slug: string;
   name: string;
   description?: string;
 }
@@ -58,7 +55,6 @@ interface UpdateFormInput {
   actorId: string;
   actorDisplayLabel: string | null;
   formId: string;
-  slug?: string;
   name?: string;
   description?: string | null;
   status?: string;
@@ -75,7 +71,7 @@ export const listFormsForWorkspace = async (
 
   if (input.q) {
     const searchPattern = `%${input.q}%`;
-    whereClauses.push(or(ilike(forms.name, searchPattern), ilike(forms.slug, searchPattern)));
+    whereClauses.push(ilike(forms.name, searchPattern));
   }
 
   if (input.cursorMode === 'id' && input.afterId) {
@@ -94,7 +90,6 @@ export const listFormsForWorkspace = async (
   const rows = await db
     .select({
       id: forms.id,
-      slug: forms.slug,
       name: forms.name,
       status: forms.status,
       createdAt: forms.createdAt,
@@ -140,7 +135,6 @@ export const getFormByEngineSchemaRef = async (
       id: forms.id,
       workspaceId: forms.workspaceId,
       formEngineCode: forms.formEngineCode,
-      slug: forms.slug,
       name: forms.name,
       description: forms.description,
       status: forms.status,
@@ -173,7 +167,6 @@ export const createForm = async (input: CreateFormInput, tx?: DbOrTx): Promise<F
     .values({
       workspaceId: input.workspaceId,
       formEngineCode: input.formEngineCode,
-      slug: input.slug,
       name: input.name,
       description: input.description,
       status: 'active',
@@ -189,7 +182,6 @@ export const updateForm = async (input: UpdateFormInput): Promise<FormRecord | n
   const updated = await db
     .update(forms)
     .set({
-      slug: input.slug,
       name: input.name,
       description: input.description,
       status: input.status,
