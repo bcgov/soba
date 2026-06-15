@@ -247,13 +247,13 @@ jobs:
             "deployment/${RELEASE}-backend:backend" \
             "deployment/${RELEASE}-frontend:frontend" \
             "deployment/${RELEASE}-formio:formio" \
+            "deployment/${RELEASE}-temporal-worker" \
             "statefulset/${RELEASE}-mongodb:mongodb"; do
             resource="${rollout%%:*}"
             label="${rollout##*:}"
             echo "Waiting for ${label} rollout..."
             oc rollout status "${resource}" -n "${NAMESPACE}" --timeout=300s
           done
-          # Pipeline performance fix: Revert if needed.
 
       # Pipeline performance fix: Revert if needed.
       # Temporarily disabled openshift diagnostics; uncomment to restore.
@@ -265,9 +265,6 @@ jobs:
       #     namespace: ${{ secrets.OC_NAMESPACE }}
       #     database_secret_name: ${{ steps.db.outputs.secret_name }}
       # Pipeline performance fix: Revert if needed.
-
-          echo "Waiting for temporal-worker rollout..."
-          oc rollout status deployment/${RELEASE}-temporal-worker -n "${NAMESPACE}" --timeout=300s
 
       - name: Release Comment on PR
         uses: marocchino/sticky-pull-request-comment@v2
