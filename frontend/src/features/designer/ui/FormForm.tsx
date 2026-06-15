@@ -38,7 +38,7 @@ import {
 } from '@/src/shared/api/sobaApi';
 import type { SobaFormType, SobaFormVersionType } from '@/src/types/forms';
 
-function FormForm({ id }: { id?: string[] }) {
+function FormForm({ formId }: { formId?: string }) {
   const dict = useDictionary();
   const router = useRouter();
   const params = useParams();
@@ -72,7 +72,6 @@ function FormForm({ id }: { id?: string[] }) {
   const [agreedDisclaimer, setAgreedDisclaimer] = useState(false);
 
   useEffect(() => {
-    const formId = id?.[0];
     if (formId && token) {
       async function loadForm() {
         setLoading(true);
@@ -118,7 +117,7 @@ function FormForm({ id }: { id?: string[] }) {
       }
       loadForm();
     }
-  }, [id, token, activeWorkspaceId, dict.form.loadFormError, addNotification]);
+  }, [formId, token, activeWorkspaceId, dict.form.loadFormError, addNotification]);
 
   const handleNameChange = useCallback((name: string) => {
     setFormName(name);
@@ -176,7 +175,6 @@ function FormForm({ id }: { id?: string[] }) {
 
   const createNewVersion = async () => {
     if (isSaving || loading || !token) return;
-    const formId = id?.[0];
     if (!formId) return;
     setIsSaving(true);
     setLoading(true);
@@ -333,7 +331,7 @@ function FormForm({ id }: { id?: string[] }) {
 
       {/* Form Builder */}
       <div className={styles.designerWrapper}>
-        {id && id[0] ? (
+        {formId ? (
           loading ? (
             <CenteredProgress label={dict.form.loading} />
           ) : formSchema ? (
@@ -364,7 +362,7 @@ function FormForm({ id }: { id?: string[] }) {
       <div
         className={`${styles.floatingActions} shadow-lg p-3 rounded-pill d-flex gap-2 bg-white border`}
       >
-        {id && id[0] && (
+        {formId && (
           <Button
             variant="secondary"
             onPress={createNewVersion}
@@ -387,7 +385,7 @@ function FormForm({ id }: { id?: string[] }) {
         <Button variant="tertiary" onPress={() => setShowPreview(true)} isDisabled={isSaving || loading}>
           {dict.form.preview || 'Preview'}
         </Button>
-        {id && id[0] && (
+        {formId && (
           <span
             className="d-inline-flex"
             title={
@@ -458,7 +456,7 @@ function FormForm({ id }: { id?: string[] }) {
         </div>
       )}
 
-      {id && id[0] ? (
+      {formId ? (
         <Tabs
           id="form-designer-tabs"
           activeKey={activeTab}

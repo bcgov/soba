@@ -9,6 +9,6 @@ const FormForm = dynamic(() => import('./FormForm'), {
   loading: () => <CenteredProgress />,
 });
 
-export default function FormDesignerLoader({ id }: { id?: string[] }) {
-  return <FormForm id={id} />;
+export default function FormDesignerLoader({ formId }: { formId?: string }) {
+  return <FormForm formId={formId} />;
 }

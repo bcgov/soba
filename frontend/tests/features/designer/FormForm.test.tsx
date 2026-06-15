@@ -53,7 +53,7 @@ describe('FormForm', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('renders designer tab content when authenticated and not initializing', async () => {
-    render(<FormForm id={['f1']} />);
+    render(<FormForm formId="f1" />);
     // The designer area includes a form name input; assert it renders with loaded value
     await waitFor(() => expect(screen.getByDisplayValue('Test')).toBeInTheDocument());
   });
