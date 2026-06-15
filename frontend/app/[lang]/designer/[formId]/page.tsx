@@ -6,8 +6,7 @@ import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 
 type PageProps = {
-  // `[...formId]` is a catch-all segment, so Next.js provides `formId` as a string[].
-  params: Promise<{ lang: string; formId: string[] }>;
+  params: Promise<{ lang: string; formId: string }>;
 };
 
 export async function generateMetadata({ params }: PageProps) {
@@ -37,7 +36,7 @@ export default async function Page({ params }: PageProps) {
       <DsPageHeading id="designer-heading" className="visually-hidden">
         {dict.general.formDesigner}
       </DsPageHeading>
-      <FormDesignerLoader id={formId} />
+      <FormDesignerLoader formId={formId} />
     </section>
   );
 }

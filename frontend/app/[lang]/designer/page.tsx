@@ -36,7 +36,7 @@ export default async function Page({ params }: PageProps) {
       <DsPageHeading id="designer-heading" className="visually-hidden">
         {dict.general.formDesigner}
       </DsPageHeading>
-      <FormDesignerLoader id={[]} />
+      <FormDesignerLoader />
     </section>
   );
 }

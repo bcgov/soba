@@ -5,7 +5,7 @@ import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 
 type PageProps = {
-  params: Promise<{ lang: string; id: string }>;
+  params: Promise<{ lang: string; formId: string }>;
 };
 
 export async function generateMetadata({ params }: PageProps) {
@@ -27,10 +27,10 @@ export default async function Page({ params }: PageProps) {
     notFound();
   }
 
-  const { id } = await params;
+  const { formId } = await params;
   return (
     <section className="p-4" aria-labelledby="submissions-heading">
-      <SubmissionList formId={id} />
+      <SubmissionList formId={formId} />
     </section>
   );
 }
