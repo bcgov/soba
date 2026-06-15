@@ -10,8 +10,8 @@ import {
 } from '../schema';
 import { getCacheAdapter } from '../../integrations/plugins/PluginRegistry';
 import { membershipKey } from '../../integrations/cache/cacheKeys';
-import { getSystemUser } from '../../services/systemUser';
 import { profileHelpers } from '../../auth/jwtClaims';
+import { ForbiddenError } from '../../errors';
 import type { NormalizedProfile, IdpAttributes } from '../../auth/jwtClaims';
 
 /** Second int for `pg_advisory_xact_lock`; must not collide with workspaceRepo / sobaAdminRepo lock ids. */
@@ -25,9 +25,6 @@ export const findOrCreateUserByIdentity = async (
   profile?: NormalizedProfile | null,
   idpAttributes?: IdpAttributes | null,
 ) => {
-  const systemUser = await getSystemUser();
-  const systemDisplayLabel = systemUser?.displayLabel ?? null;
-
   return db.transaction(async (tx) => {
     const normalizedProvider = providerCode.toLowerCase();
     const providerRow = await tx
@@ -35,20 +32,14 @@ export const findOrCreateUserByIdentity = async (
       .from(identityProviders)
       .where(eq(identityProviders.code, normalizedProvider))
       .limit(1);
-    let provider = providerRow[0];
+    const provider = providerRow[0];
 
-    if (!provider) {
-      const created = await tx
-        .insert(identityProviders)
-        .values({
-          code: normalizedProvider,
-          name: normalizedProvider.toUpperCase(),
-          isActive: true,
-          createdBy: systemDisplayLabel,
-          updatedBy: systemDisplayLabel,
-        })
-        .returning();
-      provider = created[0];
+    // Only identity providers present AND active in identity_provider may authenticate.
+    // Unknown or deactivated IdPs are rejected; we no longer implicitly create providers.
+    if (!provider || !provider.isActive) {
+      throw new ForbiddenError(
+        `Identity provider '${normalizedProvider}' is not enabled for sign-in`,
+      );
     }
 
     // Same shape as workspaceRepo.ensureHomeWorkspace: hashtext(single ::text param), fixed namespace int.

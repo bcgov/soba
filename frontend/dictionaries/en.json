@@ -2,57 +2,30 @@
   "locale": "en",
   "general": {
     "login": "Login",
-    "loggedAs": "Logged in as",
     "logout": "Logout",
-    "title": "SOBA",
+    "title": "Common Hosted Forms 2.0",
     "description": "Next Gen Forms",
-    "notAuthenticated": "You are not authenticated. Please login to access this section."
+    "notAuthenticated": "You are not authenticated. Please login to access this section.",
+    "forms": "Forms",
+    "formDesigner": "Form Designer",
+    "feedback": "Feedback",
+    "help": "Help",
+    "welcomeTo": "Welcome to",
+    "loading": "Loading…",
+    "comingSoon": "This feature is coming soon."
   },
   "header": {
     "workspaces": "Workspaces",
     "design": "Design",
     "submit": "Submit",
-    "metaReview": "API meta",
-    "themeToggle": "Toggle color theme",
     "skipToMain": "Skip to main content",
-    "menu": "Menu",
-    "closeMenu": "Close Menu",
-    "mobileNavLabel": "Navigation",
-    "openMenuAria": "Open navigation menu",
-    "closeMenuAria": "Close navigation menu"
-  },
-  "metaPage": {
-    "title": "API meta & health",
-    "refresh": "Refresh",
-    "loadCodes": "Load reference codes",
-    "loadRoles": "Load roles",
-    "sections": {
-      "health": "Health",
-      "readiness": "Readiness",
-      "build": "Build",
-      "features": "Features",
-      "frontendConfig": "Frontend config",
-      "plugins": "Plugins",
-      "formEngines": "Form engines",
-      "codes": "Reference codes",
-      "roles": "Roles"
-    }
-  },
-  "base": {
-    "copyToClipboard": {
-      "copyToClipboard": "Copy to Clipboard",
-      "linkToClipboard": "Link copied to clipboard!",
-      "errCopyToClipboard": "Error copying to clipboard."
-    }
+    "designer": "Designer"
   },
   "formioV5": {
     "formList": {
       "tableHeading": "Forms",
       "loading": "Loading forms…",
       "empty": "No forms were returned from the Form.io proxy. Create a form in Form.io or check API configuration.",
-      "refresh": "Refresh",
-      "needLogin": "Sign in to load forms.",
-      "unauthorized": "Unauthorized — your session may have expired. Try signing in again.",
       "columns": {
         "title": "Title",
         "name": "Name",
@@ -63,54 +36,93 @@
       "pageTitle": "Form",
       "backToList": "Back to form list",
       "missingId": "No form was selected.",
+      "unavailable": "This form is not currently available for submission.",
       "loadError": "The form could not be loaded. Check the browser network tab and API logs.",
       "rendererError": "The form renderer stopped unexpectedly. Try again or return to the list.",
       "segmentError": {
         "title": "Something went wrong loading this form page.",
         "tryAgain": "Try again",
         "backToList": "Back to form list"
-      }
+      },
+      "submitSuccess": "Form submitted successfully."
     }
   },
-  "submitDemo": {
-    "tableHeading": "SOBA forms",
-    "loading": "Loading…",
-    "empty": "No SOBA forms in this workspace yet.",
-    "generate": "Generate demo SOBA form",
-    "generating": "Creating…",
-    "refresh": "Refresh",
-    "needLogin": "Sign in to view SOBA forms.",
-    "noWorkspace": "No workspace found for your account.",
-    "loadError": "Could not load forms.",
-    "generateError": "Could not create the demo form.",
-    "pollTimeout": "Provisioning is still running. Try refresh in a few seconds.",
-    "openForm": "Open in viewer",
-    "syncPending": "Pending",
-    "syncProvisioning": "Provisioning",
-    "syncReady": "Ready",
-    "syncFailed": "Failed",
+  "form": {
+    "saved": "Form saved successfully.",
+    "saveError": "Error saving form.",
+    "published": "Form published successfully!",
+    "versionDraftCreated": "Version {version} draft created successfully!",
+    "createVersionError": "Failed to create new version.",
+    "loadFormError": "Failed to load form:",
+    "loadVersionSchemaError": "Failed to load version schema.",
+    "invalidJson": "Invalid JSON format.",
+    "nameLabel": "Form Name",
+    "loading": "Loading form...",
+    "schemaNotAvailable": "Form schema not available.",
+    "notAuthenticated": "You are not authenticated. Please login to access this form.",
+    "visibilityLabel": "Visibility / Access Control",
+    "visibilityPublic": "Public",
+    "visibilityAzureIDIR": "IDIR - MFA",
+    "disclaimerLabel": "I agree to the disclaimer and statement of responsibility",
+    "exportJson": "Export JSON",
+    "importJson": "Import JSON",
+    "designerTab": "Designer",
+    "settingsTab": "Settings",
+    "teamTab": "Team",
+    "readOnlyMode": "Read-Only Mode:",
+    "viewingHistoricalVersion": "You are viewing historical version",
+    "savePublishDisabled": "Save and Publish options are disabled.",
+    "switchToCurrentDraft": "Switch to Current Draft",
+    "publishedVersion": "Published Version:",
+    "publishedVersionCannotBeModified": "This version is published and cannot be modified directly. Create a new version draft to make changes.",
+    "formVersion": "Form Version",
+    "currentDraft": "Current Draft",
+    "creating": "Creating...",
+    "restoreAsNewVersion": "Restore as New Version",
+    "newVersion": "New Version",
+    "saving": "Saving...",
+    "save": "Save",
+    "preview": "Preview",
+    "mustAgreeDisclaimer": "Must agree to disclaimer",
+    "cannotPublishHistory": "Cannot publish history",
+    "versionAlreadyPublished": "Version already published",
+    "saveChangesBeforePublishing": "Save changes before publishing",
+    "publishForm": "Publish form",
+    "publish": "Publish",
+    "formPreview": "Form Preview",
+    "untitledForm": "Untitled Form",
+    "closePreview": "Close Preview",
+    "noFormLayout": "No form layout designed yet."
+  },
+  "submission": {
+    "submissions": "Submissions",
+    "pageTitle": "Submission",
+    "loading": "Loading submissions…",
+    "empty": "No submissions in this workspace yet.",
+    "error": "Could not load submissions.",
+    "submittedOn": "Submitted",
+    "noContent": "No submitted answers to display.",
+    "notFound": "Submission not found.",
+    "workflow": "Workflow",
     "columns": {
-      "name": "Name",
-      "slug": "Slug",
-      "sync": "Form.io sync",
-      "open": "Open"
-    }
-  },
-  "forms": {
-    "manage": {
-      "share": {
-        "shareForm": "Share Form",
-        "shareLink": "Share Link",
-        "copyQRCode": "Copy the link or scan the QR code to share this form.",
-        "warningMessage": "This form has not been published. The link will not work until the form is published.",
-        "copyURLToClipboard": "Copy URL to Clipboard",
-        "openThisForm": "Open this form",
-        "downloadQRCode": "Download QR Code",
-        "close": "Close"
+      "id": "Submission ID",
+      "formName": "Form Name",
+      "formId": "Form ID",
+      "version": "Version",
+      "status": "Status",
+      "user": "User"
+    },
+    "formList": {
+      "columns": {
+        "name": "Form Name",
+        "version": "Version",
+        "path": "Path",
+        "actions": "Actions",
+        "createdBy": "Created By",
+        "createdAt": "Created Date"
       }
     }
   },
-  
   "Basic": "Basic",
   "Text Field": "Text Field",
   "Text Area": "Text Area",
@@ -121,7 +133,6 @@
   "Select": "Select",
   "Radio": "Radio",
   "Button": "Button",
-
   "Advanced": "Advanced",
   "Email": "Email",
   "Url": "Url",
@@ -134,7 +145,6 @@
   "Currency": "Currency",
   "Survey": "Survey",
   "Signature": "Signature",
-
   "Layout": "Layout",
   "HTML Element": "HTML Element",
   "Content": "Content",
@@ -144,14 +154,12 @@
   "Table": "Table",
   "Tabs": "Tabs",
   "Well": "Well",
-
   "Data": "Data",
   "Hidden": "Hidden",
   "Container": "Container",
   "Data Map": "Data Map",
   "Data Grid": "Data Grid",
   "Edit Grid": "Edit Grid",
-
   "Submit": "Submit",
   "Drag and Drop a form component": "Drag and Drop a form component"
 }

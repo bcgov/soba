@@ -1,0 +1,175 @@
+'use client';
+
+import React from 'react';
+import { Table } from 'react-bootstrap';
+import { Select, Button } from '@bcgov/design-system-react-components';
+import { FaChevronLeft, FaChevronRight } from 'react-icons/fa6';
+import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
+import styles from './DataTable.module.css';
+
+export interface Column<T> {
+  key: string;
+  label: string;
+  width?: string;
+  align?: 'start' | 'center' | 'end';
+  render?: (item: T) => React.ReactNode;
+}
+
+export interface DataTableProps<T> {
+  data: T[];
+  columns: Column<T>[];
+  loading?: boolean;
+  error?: string | null;
+  emptyMessage?: string;
+  loadingMessage?: string;
+  itemName?: string;
+  caption?: string;
+  pageSize?: number;
+  currentPage?: number;
+  totalItems?: number;
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (size: number) => void;
+  pageSizeOptions?: number[];
+  keyExtractor: (item: T) => string;
+}
+
+export function DataTable<T>({
+  data,
+  columns,
+  loading = false,
+  error = null,
+  emptyMessage = 'No items found.',
+  loadingMessage = 'Loading...',
+  itemName = 'items',
+  caption,
+  pageSize = 10,
+  currentPage = 1,
+  totalItems,
+  onPageChange,
+  onPageSizeChange,
+  pageSizeOptions = [5, 10, 25, 50],
+  keyExtractor,
+}: DataTableProps<T>) {
+  const totalPages = totalItems ? Math.ceil(totalItems / pageSize) : 1;
+
+  return (
+    <div className={`bg-white rounded overflow-hidden ${styles.container}`}>
+      <Table responsive className={`mb-0 align-middle ${styles.table}`}>
+        {caption ? <caption className="visually-hidden">{caption}</caption> : null}
+        <thead className={styles.thead}>
+          <tr>
+            {columns.map((col) => (
+              <th
+                key={col.key}
+                scope="col"
+                className={`px-4 py-2 text-dark fw-bold text-${col.align || 'start'}`}
+                style={col.width ? { width: col.width } : undefined}
+              >
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className={styles.tbody}>
+          {loading ? (
+            <tr>
+              <td colSpan={columns.length} className="p-0">
+                <CenteredProgress label={loadingMessage} data-testid="datatable-loading" />
+              </td>
+            </tr>
+          ) : data.length === 0 ? (
+            <tr>
+              <td colSpan={columns.length} className="text-center py-5 text-muted">
+                {error ? `Error: ${error}` : emptyMessage}
+              </td>
+            </tr>
+          ) : (
+            data.map((item) => (
+              <tr key={keyExtractor(item)} className={styles.row}>
+                {columns.map((col) => (
+                  <td
+                    key={`${keyExtractor(item)}-${col.key}`}
+                    className={`px-4 py-2 text-${col.align || 'start'}`}
+                  >
+                    {col.render
+                      ? col.render(item)
+                      : ((item as Record<string, unknown>)[col.key] as React.ReactNode)}
+                  </td>
+                ))}
+              </tr>
+            ))
+          )}
+        </tbody>
+      </Table>
+
+      {!loading && data.length > 0 && totalItems !== undefined && (
+        <div
+          className={`px-4 py-3 d-flex justify-content-between align-items-center ${styles.pagination}`}
+        >
+          <div className="d-flex align-items-center gap-2">
+            <span>Items per page:</span>
+            {onPageSizeChange ? (
+              <Select
+                aria-label="Items per page"
+                data-testid="datatable-page-size-select"
+                size="small"
+                selectedKey={pageSize}
+                onSelectionChange={(key) => onPageSizeChange(Number(key))}
+                items={pageSizeOptions.map((opt) => ({ id: opt, label: String(opt) }))}
+              />
+            ) : (
+              <span className="fw-medium">{pageSize}</span>
+            )}
+          </div>
+
+          <div>
+            {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, totalItems)} of{' '}
+            {totalItems} {itemName}
+          </div>
+
+          <div className="d-flex align-items-center gap-3">
+            <div className="d-flex align-items-center gap-1">
+              <span>{currentPage}</span>
+              {onPageChange && totalPages > 1 && (
+                <Select
+                  aria-label="Page"
+                  data-testid="datatable-page-select-select"
+                  size="small"
+                  selectedKey={currentPage}
+                  onSelectionChange={(key) => onPageChange(Number(key))}
+                  items={[...Array(totalPages)].map((_, i) => ({ id: i + 1, label: String(i + 1) }))}
+                />
+              )}
+              <span>of {totalPages} page(s)</span>
+            </div>
+
+            <div className="d-flex gap-2">
+              <Button
+                variant="tertiary"
+                size="small"
+                isIconButton
+                onPress={() => onPageChange && onPageChange(currentPage - 1)}
+                data-testid="datatable-prev-page-button"
+                aria-label="Previous page"
+                isDisabled={currentPage === 1}
+              >
+                <FaChevronLeft />
+              </Button>
+              <Button
+                variant="tertiary"
+                size="small"
+                isIconButton
+                onPress={() => onPageChange && onPageChange(currentPage + 1)}
+                data-testid="datatable-next-page-button"
+                aria-label="Next page"
+                isDisabled={currentPage === totalPages}
+              >
+                <FaChevronRight />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,33 +1,14 @@
 import type { Locale } from '@/app/[lang]/dictionaries';
-import { designModePlugin } from '@/src/features/design-mode/plugin';
-import { metaReviewPlugin } from '@/src/features/meta-review/plugin';
+import { designerPlugin } from '@/src/features/designer/plugin';
 import { submitModePlugin } from '@/src/features/submit-mode/plugin';
 import { workspacesPlugin } from '@/src/features/workspaces/plugin';
-import type { AppPlugin, PluginNavItem } from '@/src/app/plugins/types';
+import type { AppPlugin, PluginNavItem, Dictionary } from '@/src/types/plugins';
 
-type Dictionary = {
-  locale: string;
-  header: {
-    workspaces: string;
-    design: string;
-    submit: string;
-    metaReview?: string;
-    themeToggle?: string;
-  };
-};
-
-const allPlugins: AppPlugin[] = [
-  workspacesPlugin,
-  designModePlugin,
-  submitModePlugin,
-  metaReviewPlugin,
-];
+const allPlugins: AppPlugin[] = [workspacesPlugin, designerPlugin, submitModePlugin];
 
 function getEnabledPlugins(isFeatureAllowed: (code: string) => boolean): AppPlugin[] {
   return allPlugins
-    .filter(
-      (plugin) => plugin.featureCode === undefined || isFeatureAllowed(plugin.featureCode),
-    )
+    .filter((plugin) => plugin.featureCode === undefined || isFeatureAllowed(plugin.featureCode))
     .sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
 }
 
@@ -60,11 +41,4 @@ export function getOverlayNavigationItems(
   isFeatureAllowed: (code: string) => boolean,
 ): PluginNavItem[] {
   return navItemsFromPlugins(getEnabledPlugins(isFeatureAllowed), locale, dictionary);
-}
-
-export function getHomeSections(isFeatureAllowed: (code: string) => boolean) {
-  return getEnabledPlugins(isFeatureAllowed).map((plugin) => ({
-    id: plugin.id,
-    Section: plugin.HomeSection,
-  }));
 }

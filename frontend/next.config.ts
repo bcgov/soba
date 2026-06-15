@@ -3,6 +3,10 @@ import { join } from 'path';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  basePath: process.env.BASE_PATH || '',
+  // React Aria ships ESM that needs transpiling for the App Router server
+  // graph; without this, SSR fails with "createContext is not a function".
+  transpilePackages: ['react-aria-components', '@bcgov/design-system-react-components'],
   // Required for standalone in monorepo: trace deps from workspace root
   outputFileTracingRoot: join(__dirname, '..'),
   turbopack: {

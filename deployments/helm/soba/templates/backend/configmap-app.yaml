@@ -23,8 +23,6 @@ data:
   FORM_ENGINE_DEFAULT_CODE: {{ .Values.backend.config.formEngineDefaultCode | quote }}
   CACHE_DEFAULT_CODE: {{ .Values.backend.config.cacheDefaultCode | quote }}
   MESSAGEBUS_DEFAULT_CODE: {{ .Values.backend.config.messagebusDefaultCode | quote }}
-  OUTBOX_POLL_INTERVAL_MS: {{ .Values.backend.config.outboxPollIntervalMs | quote }}
-  OUTBOX_BATCH_SIZE: {{ .Values.backend.config.outboxBatchSize | quote }}
   SOBA_SYSTEM_SUBJECT: {{ .Values.backend.config.sobaSystemSubject | quote }}
   WORKSPACE_PLUGINS_ALLOWED: {{ .Values.backend.config.workspacePluginsAllowed | quote }}
   WORKSPACE_PLUGINS_STRICT_MODE: {{ .Values.backend.config.workspacePluginsStrictMode | quote }}
@@ -40,3 +38,11 @@ data:
   {{- end }}
   DB_ADMIN_DATABASE: {{ .Values.database.adminDatabase | quote }}
   DB_POOL_MAX: {{ .Values.database.poolMax | quote }}
+  # Pipeline performance fix: Revert if needed.
+  DB_CONNECTION_TIMEOUT_MS: {{ .Values.database.connectionTimeoutMs | quote }}
+  DB_QUERY_TIMEOUT_MS: {{ .Values.database.queryTimeoutMs | quote }}
+  DB_STATEMENT_TIMEOUT_MS: {{ .Values.database.statementTimeoutMs | quote }}
+  DB_LOCK_TIMEOUT_MS: {{ .Values.database.lockTimeoutMs | quote }}
+  DB_MIGRATION_READY_ATTEMPTS: {{ .Values.database.migrationReadyAttempts | quote }}
+  DB_MIGRATION_READY_SLEEP_MS: {{ .Values.database.migrationReadySleepMs | quote }}
+  # Pipeline performance fix: Revert if needed.

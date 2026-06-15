@@ -1,0 +1,24 @@
+# SOBA devcontainer — personal memory tuning
+# Copy to your container home (not the repo):
+#   cp .devcontainer/bashrc.example ~/.bashrc && source ~/.bashrc
+#
+# ~/.bashrc lives at /home/node/.bashrc inside the container. It is NOT in git
+# and is reset when you rebuild the container — keep a copy or re-run cp above.
+
+# Default Node heap for commands run in this shell (override per machine).
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=2048}"
+
+# Frontend: Next.js dev with hot reload (bypasses inline NODE_OPTIONS in package.json).
+soba-fe() {
+  NODE_OPTIONS=--max-old-space-size=1536 pnpm --dir /workspaces/soba/frontend exec next dev --hostname 0.0.0.0
+}
+
+# Backend unit tests (stable serial run).
+soba-test-be() {
+  NODE_OPTIONS=--max-old-space-size=1024 pnpm --dir /workspaces/soba/backend exec jest --runInBand
+}
+
+# --- Larger machine? Try these values instead ---
+# export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=4096}"
+# soba-fe() { NODE_OPTIONS=--max-old-space-size=3072 pnpm --dir /workspaces/soba/frontend exec next dev --hostname 0.0.0.0; }
+# soba-test-be() { NODE_OPTIONS=--max-old-space-size=1536 pnpm --dir /workspaces/soba/backend exec jest --maxWorkers=2; }

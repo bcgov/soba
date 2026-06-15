@@ -2,6 +2,7 @@ import express from 'express';
 import { validateRequest } from '../shared/validation';
 import {
   createForm,
+  normalizeFormSchema,
   createFormVersion,
   updateForm,
   getForm,
@@ -12,14 +13,21 @@ import {
   deleteFormVersion,
   saveFormVersion,
   updateFormVersion,
+  publishFormVersion,
+  unpublishFormVersion,
+  restoreFormVersion,
+  provisionFormVersionSchema,
+  getFormVersionSchema,
 } from './controller';
 import {
   CreateFormBodySchema,
   CreateFormVersionBodySchema,
   FormIdParamsSchema,
   FormVersionIdParamsSchema,
+  NormalizeSchemaBodySchema,
   ListFormsQuerySchema,
   ListFormVersionsQuerySchema,
+  ProvisionSchemaBodySchema,
   SaveFormVersionBodySchema,
   SaveFormVersionParamsSchema,
   UpdateFormBodySchema,
@@ -30,6 +38,11 @@ const router = express.Router();
 
 router.get('/forms', validateRequest({ query: ListFormsQuerySchema }), listForms);
 router.post('/forms', validateRequest({ body: CreateFormBodySchema }), createForm);
+router.post(
+  '/forms/normalize',
+  validateRequest({ body: NormalizeSchemaBodySchema }),
+  normalizeFormSchema,
+);
 router.get('/forms/:id', validateRequest({ params: FormIdParamsSchema }), getForm);
 router.patch(
   '/forms/:id',
@@ -70,6 +83,31 @@ router.post(
     body: SaveFormVersionBodySchema,
   }),
   saveFormVersion,
+);
+router.post(
+  '/form-versions/:id/publish',
+  validateRequest({ params: FormVersionIdParamsSchema }),
+  publishFormVersion,
+);
+router.post(
+  '/form-versions/:id/unpublish',
+  validateRequest({ params: FormVersionIdParamsSchema }),
+  unpublishFormVersion,
+);
+router.post(
+  '/form-versions/:id/restore',
+  validateRequest({ params: FormVersionIdParamsSchema }),
+  restoreFormVersion,
+);
+router.get(
+  '/form-versions/:id/schema',
+  validateRequest({ params: FormVersionIdParamsSchema }),
+  getFormVersionSchema,
+);
+router.post(
+  '/form-versions/:id/schema',
+  validateRequest({ params: FormVersionIdParamsSchema, body: ProvisionSchemaBodySchema }),
+  provisionFormVersionSchema,
 );
 router.delete(
   '/form-versions/:id',

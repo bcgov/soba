@@ -1,51 +1,60 @@
-'use client'
+'use client';
 
-import { useEffect } from 'react'
-import { useNotificationStore } from '@/lib/hooks/useNotificationStore'
+import { useEffect } from 'react';
+import { InlineAlert } from '@bcgov/design-system-react-components';
+import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
+import type { NotificationType } from '@/lib/slices/notificationSlice';
 
-const typeStyles: Record<string, string> = {
-  info: 'bg-blue-600',
-  success: 'bg-green-600',
-  warning: 'bg-yellow-500',
-  error: 'bg-red-600',
+const AUTO_DISMISS_MS = 4000;
+
+// Notification types map 1:1 to InlineAlert variants except `error` -> `danger`.
+type AlertVariant = 'info' | 'success' | 'warning' | 'danger';
+function toVariant(type?: NotificationType): AlertVariant {
+  return type === 'error' ? 'danger' : (type ?? 'info');
 }
 
-const AUTO_DISMISS_MS = 4000
-
 interface NotificationItemProps {
-  id: string
-  text: string
-  type?: string
-  onRemove: (id: string) => void
+  id: string;
+  text: string;
+  type?: NotificationType;
+  onRemove: (id: string) => void;
 }
 
 function NotificationItem({ id, text, type, onRemove }: NotificationItemProps) {
   useEffect(() => {
-    const timer = setTimeout(() => onRemove(id), AUTO_DISMISS_MS)
-    return () => clearTimeout(timer)
-  }, [id, onRemove])
+    const timer = setTimeout(() => onRemove(id), AUTO_DISMISS_MS);
+    return () => clearTimeout(timer);
+  }, [id, onRemove]);
 
   return (
-    <div className={`flex items-center gap-3 rounded px-4 py-2 text-sm text-white shadow-lg ${typeStyles[type ?? ''] ?? 'bg-gray-800'}`}>
-      <span>{text}</span>
-      <button
-        onClick={() => onRemove(id)}
-        className="ml-2 opacity-70 hover:opacity-100"
-        aria-label="Dismiss"
-      >
-        ✕
-      </button>
-    </div>
-  )
+    <InlineAlert variant={toVariant(type)} isCloseable onClose={() => onRemove(id)}>
+      {text}
+    </InlineAlert>
+  );
 }
 
 function NotificationToast() {
-  const { notifications, removeNotification } = useNotificationStore()
+  const { notifications, removeNotification } = useNotificationStore();
 
-  if (notifications.length === 0) return null
+  if (notifications.length === 0) return null;
 
+  // Fixed, top-centered stack. The DS InlineAlert provides all visual styling;
+  // the only custom style here is the positioning of the overlay container,
+  // which the design system does not provide.
   return (
-    <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-2">
+    <div
+      data-testid="notification-toast"
+      className="d-flex flex-column gap-2"
+      style={{
+        position: 'fixed',
+        // Sit just below the DS Header (min-height 65px) rather than overlapping it.
+        top: 'calc(65px + 1rem)',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 1060,
+        width: 'min(92vw, 480px)',
+      }}
+    >
       {notifications.map((n) => (
         <NotificationItem
           key={n.id}
@@ -56,8 +65,7 @@ function NotificationToast() {
         />
       ))}
     </div>
-  )
+  );
 }
 
-export default NotificationToast
-export { NotificationToast }
+export { NotificationToast };

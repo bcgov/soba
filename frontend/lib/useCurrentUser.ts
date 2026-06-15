@@ -8,7 +8,12 @@ export function useCurrentUser() {
   const lastToken = useAppSelector((state) => state.currentUser.lastToken);
 
   const displayName = useMemo(() => {
-    return data?.actor.displayLabel ?? data?.profile.displayName ?? data?.profile.preferredUsername ?? null;
+    return (
+      data?.actor.displayLabel ??
+      data?.profile.displayName ??
+      data?.profile.preferredUsername ??
+      null
+    );
   }, [data]);
 
   return {

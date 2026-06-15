@@ -5,8 +5,10 @@ export const FEATURE_CODES = {
   WORKSPACES: 'workspaces',
   DESIGN_MODE: 'design-mode',
   SUBMIT_MODE: 'submit-mode',
-  /** Dev/review: API meta & health inspection (matches `soba.feature` seed code `meta`). */
+  /** Backend `soba.feature` seed code `meta` (API meta & health). Mirrored here so
+   * the frontend feature enumeration stays in sync even without a dedicated UI. */
   META: 'meta',
+  MARKETING: 'marketing',
 } as const;
 
 export type FeatureCode = (typeof FEATURE_CODES)[keyof typeof FEATURE_CODES];
@@ -46,10 +48,7 @@ export function parseFrontendFeaturesAllowlist(raw: string | undefined): Fronten
   if (raw === undefined || raw.trim() === '') {
     return new Set();
   }
-  const tokens = raw
-    .split(',')
-    .map(normalizeFeatureCode)
-    .filter(Boolean);
+  const tokens = raw.split(',').map(normalizeFeatureCode).filter(Boolean);
   if (tokens.length === 0) {
     return new Set();
   }

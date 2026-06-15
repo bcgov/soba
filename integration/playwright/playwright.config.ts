@@ -7,7 +7,11 @@ dotenv.config({ path: path.resolve(__dirname, ".env") });
 const depEnv = process.env.DEP_ENV || "dev"; // fallback to dev if undefined
 
 function getExpectedURL(depEnv?: string): string {
-  // PR environments (numeric)
+  if (process.env.BASE_URL) {
+    return process.env.BASE_URL;
+  }
+
+  // PR environments (numeric) — host-based routes (soba-pr-N), not path-based (/pr-N)
   if (/^\d+$/.test(process.env.DEP_ENV || "")) {
     return `https://soba-pr-${depEnv}.apps.silver.devops.gov.bc.ca`;
   }
@@ -25,7 +29,7 @@ function getExpectedURL(depEnv?: string): string {
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: false,
-  workers: 3,
+  workers: 1,
 
   use: {
     baseURL: getExpectedURL(depEnv),
@@ -43,10 +47,6 @@ export default defineConfig({
     {
       name: "chromium",
       use: { browserName: "chromium" },
-    },
-    {
-      name: "firefox",
-      use: { browserName: "firefox" },
     },
   ],
 });

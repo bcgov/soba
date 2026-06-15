@@ -10,7 +10,6 @@ export const forms = sobaSchema.table(
       .notNull()
       .references(() => workspaces.id),
     formEngineCode: text('form_engine_code').notNull(),
-    slug: text('slug').notNull(),
     name: text('name').notNull(),
     description: text('description'),
     status: text('status').notNull(),
@@ -18,7 +17,7 @@ export const forms = sobaSchema.table(
     ...softDeleteColumns(),
   },
   (table) => ({
-    workspaceSlugUnique: uniqueIndex('form_workspace_slug_uq').on(table.workspaceId, table.slug),
+    workspaceNameUnique: uniqueIndex('form_workspace_name_uq').on(table.workspaceId, table.name),
     workspaceIdx: index('form_workspace_idx').on(table.workspaceId),
   }),
 );
@@ -41,6 +40,7 @@ export const formVersions = sobaSchema.table(
     currentRevisionNo: integer('current_revision_no').notNull().default(0),
     publishedAt: timestamp('published_at', { withTimezone: true }),
     publishedBy: uuid('published_by').references(() => appUsers.id),
+    visibility: text('visibility').array(),
     ...auditColumns(),
     ...softDeleteColumns(),
   },

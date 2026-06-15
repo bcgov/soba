@@ -31,6 +31,17 @@ export const getSubmission = asyncHandler(
   },
 );
 
+export const getSubmissionData = asyncHandler(
+  async (req: Request<UpdateSubmissionParams>, res: Response) => {
+    const ctx = req.coreContext!;
+    const result = await submissionsApiService.getData(ctx, req.params.id);
+    if (!result) {
+      throw new NotFoundError('Submission content not found');
+    }
+    res.json(result);
+  },
+);
+
 export const listSubmissions = asyncHandler(async (req: Request, res: Response) => {
   const ctx = req.coreContext!;
   const result = await submissionsApiService.list(
@@ -43,7 +54,12 @@ export const listSubmissions = asyncHandler(async (req: Request, res: Response) 
 export const createSubmission = asyncHandler(
   async (req: Request<unknown, unknown, CreateSubmissionBody>, res: Response) => {
     const ctx = req.coreContext!;
-    const result = await submissionsApiService.create(ctx, req.body.formId, req.body.formVersionId);
+    const result = await submissionsApiService.create(
+      ctx,
+      req.body.formId,
+      req.body.formVersionId,
+      req.body.workflowState,
+    );
     res.status(201).json(result);
   },
 );

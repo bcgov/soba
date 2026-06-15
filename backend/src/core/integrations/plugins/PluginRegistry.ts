@@ -8,15 +8,12 @@ import path from 'path';
 import { z } from 'zod';
 import { env } from '../../config/env';
 import { getWorkspacePluginsConfig } from '../../config/workspacePlugins';
-import { createPluginConfigReader, type PluginConfigReader } from '../../config/pluginConfig';
+import { createPluginConfigReader } from '../../config/pluginConfig';
 import type {
   WorkspaceResolver,
   WorkspaceResolverDefinition,
 } from '../workspace/WorkspaceResolver';
-import type {
-  FormEnginePluginDefinition,
-  FormEngineRouteDefinition,
-} from '../form-engine/FormEnginePluginDefinition';
+import type { FormEnginePluginDefinition } from '../form-engine/FormEnginePluginDefinition';
 import type { FeatureApiDefinition } from './FeatureApiDefinition';
 import type { CacheAdapter, CachePluginDefinition } from '../cache/CacheAdapter';
 import type {
@@ -38,8 +35,6 @@ const FormEnginePluginDefinitionSchema = z.object({
     version: z.string().optional(),
   }),
   createAdapter: z.any(),
-  routeBasePath: z.union([z.string(), z.function()]).optional(),
-  createRouter: z.any().optional(),
 });
 
 const FeatureApiDefinitionSchema = z.object({
@@ -300,34 +295,6 @@ export function getFormEnginePluginDefinitions(): FormEnginePluginDefinition[] {
   return discovered
     .map((p) => p.formEngineDefinition)
     .filter((d): d is FormEnginePluginDefinition => Boolean(d));
-}
-
-/** Returns true when PLUGIN_<CODE>_ROUTES_ALLOWED is explicitly 'true' (case-insensitive). */
-function isFormEngineRoutesAllowed(config: PluginConfigReader): boolean {
-  const raw = config.getOptional('ROUTES_ALLOWED');
-  return raw?.trim().toLowerCase() === 'true';
-}
-
-/**
- * Form engine definitions that contribute HTTP routes and have routes allowed via
- * PLUGIN_<CODE>_ROUTES_ALLOWED=true. Used to mount proxy/routes in the app.
- */
-export function getFormEngineRouteDefinitions(): FormEngineRouteDefinition[] {
-  const definitions = getFormEnginePluginDefinitions();
-  const result: FormEngineRouteDefinition[] = [];
-  for (const def of definitions) {
-    if (def.routeBasePath === undefined || def.createRouter === undefined) continue;
-    const config = createPluginConfigReader(def.code);
-    if (!isFormEngineRoutesAllowed(config)) continue;
-    const routeBasePath =
-      typeof def.routeBasePath === 'function' ? def.routeBasePath(config) : def.routeBasePath;
-    result.push({
-      code: def.code,
-      routeBasePath,
-      createRouter: def.createRouter,
-    });
-  }
-  return result;
 }
 
 export function getCachePluginDefinitions(): CachePluginDefinition[] {

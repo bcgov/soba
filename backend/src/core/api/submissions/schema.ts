@@ -8,6 +8,7 @@ export const CreateSubmissionBodySchema = z
   .object({
     formId: z.string().min(1),
     formVersionId: z.string().min(1),
+    workflowState: z.string().min(1).optional(),
   })
   .openapi('Submissions_CreateSubmissionBody');
 
@@ -31,9 +32,9 @@ export const SaveSubmissionParamsSchema = z
 
 export const SaveSubmissionBodySchema = z
   .object({
+    data: z.record(z.string(), z.unknown()),
     eventType: z.string().min(1).optional(),
     note: z.string().optional(),
-    enqueueProvision: z.boolean().optional(),
   })
   .openapi('Submissions_SaveSubmissionBody');
 
@@ -44,6 +45,7 @@ export const ListSubmissionsQuerySchema = z
     formId: z.string().min(1).optional(),
     formVersionId: z.string().min(1).optional(),
     workflowState: z.string().trim().min(1).optional(),
+    createdBy: z.string().trim().min(1).optional(),
     sort: CursorSortSchema.default('id:desc'),
   })
   .openapi('Submissions_ListSubmissionsQuery');
@@ -52,7 +54,9 @@ export const SubmissionListItemSchema = z
   .object({
     id: z.string(),
     formId: z.string(),
+    formName: z.string().optional(),
     formVersionId: z.string(),
+    versionNo: z.number().int().optional(),
     workflowState: z.string(),
     engineSyncStatus: z.string(),
     submittedAt: z.string().nullable(),
@@ -88,6 +92,7 @@ export const ListSubmissionsResponseSchema = z
       formId: z.string().optional(),
       formVersionId: z.string().optional(),
       workflowState: z.string().optional(),
+      createdBy: z.string().optional(),
     }),
     sort: CursorSortSchema,
   })
@@ -132,6 +137,27 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
       },
       404: {
         description: 'Submission not found',
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/submissions/{id}/data',
+    tags: ['core.submissions'],
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: UpdateSubmissionParamsSchema,
+    },
+    responses: {
+      200: {
+        description: 'Submission answer document (engine document, engine-managed fields stripped)',
+        content: {
+          'application/json': { schema: z.record(z.string(), z.unknown()) },
+        },
+      },
+      404: {
+        description: 'Submission or its engine content not found',
       },
     },
   });
@@ -197,7 +223,7 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
     request: {
       params: SaveSubmissionParamsSchema,
       body: {
-        required: false,
+        required: true,
         content: {
           'application/json': {
             schema: SaveSubmissionBodySchema,
@@ -207,7 +233,7 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
     },
     responses: {
       200: {
-        description: 'Saved submission draft',
+        description: 'Saved submission (new engine document recorded as a revision)',
         content: { 'application/json': { schema: SubmissionResponseSchema } },
       },
       400: {

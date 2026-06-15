@@ -4,17 +4,14 @@ import {
   appendSubmissionRevision,
   createEmptySubmission,
   getSubmissionById,
+  getSubmissionRecordById,
   listSubmissionsForWorkspace,
   markSubmissionDeleted,
   updateSubmissionDraft,
 } from '../db/repos/submissionRepo';
-import { QueueAdapter } from '../integrations/queue/QueueAdapter';
+import { getFormVersionById } from '../db/repos/formVersionRepo';
 import { getFormEngineCodeForForm } from '../db/repos/formRepo';
-import { buildSubmissionCreateTopic } from '../integrations/form-engine/formEngineTopics';
-import {
-  SubmissionCreatePayloadSchema,
-  type SubmissionCreatePayload,
-} from '../integrations/queue/events';
+import { createFormEngineAdapter } from '../integrations/form-engine/FormEngineRegistry';
 import { NotFoundError, ValidationError } from '../errors';
 
 interface CreateInput {
@@ -23,6 +20,7 @@ interface CreateInput {
   actorDisplayLabel: string | null;
   formId: string;
   formVersionId: string;
+  workflowState?: string;
 }
 
 interface UpdateInput {
@@ -40,7 +38,7 @@ interface SaveInput {
   submissionId: string;
   eventType: string;
   note?: string;
-  enqueueProvision?: boolean;
+  data: Record<string, unknown>;
 }
 
 interface DeleteInput {
@@ -57,6 +55,7 @@ interface ListInput {
   formId?: string;
   formVersionId?: string;
   workflowState?: string;
+  createdBy?: string;
   sort: SubmissionListSort;
   cursorMode: SubmissionCursorMode;
   afterId?: string;
@@ -64,8 +63,6 @@ interface ListInput {
 }
 
 export class SubmissionService {
-  constructor(private readonly queueAdapter: QueueAdapter) {}
-
   async create(input: CreateInput) {
     return createEmptySubmission(input);
   }
@@ -76,44 +73,64 @@ export class SubmissionService {
     });
   }
 
+  /**
+   * Record a save: create a new (immutable) submission document in the form engine, then advance the
+   * PG submission + append a revision capturing the before→after engine refs. Mirrors the forms
+   * provisioning flow — status 'provisioning' → 'ready' (in appendSubmissionRevision) or 'error'.
+   */
   async save(input: SaveInput) {
-    const updated = await appendSubmissionRevision({
-      workspaceId: input.workspaceId,
-      submissionId: input.submissionId,
-      actorId: input.actorId,
-      actorDisplayLabel: input.actorDisplayLabel,
-      eventType: input.eventType,
-      changeNote: input.note,
-    });
+    const submission = await getSubmissionRecordById(input.workspaceId, input.submissionId);
+    if (!submission) throw new NotFoundError('Submission not found');
 
-    if (!updated) throw new NotFoundError('Submission not found');
-
-    if (input.enqueueProvision) {
-      const formEngineCode = updated.formId
-        ? await getFormEngineCodeForForm(input.workspaceId, updated.formId)
-        : null;
-      if (!formEngineCode) {
-        throw new ValidationError(
-          'Cannot enqueue submission provision without a valid form engine',
-        );
-      }
-      const payload: SubmissionCreatePayload = SubmissionCreatePayloadSchema.parse({
-        submissionId: input.submissionId,
-        engineCode: formEngineCode,
-        formVersionId: updated.formVersionId ?? undefined,
-      });
-      await this.queueAdapter.enqueue({
-        topic: buildSubmissionCreateTopic(formEngineCode),
-        aggregateType: 'submission',
-        aggregateId: input.submissionId,
-        workspaceId: input.workspaceId,
-        payload,
-        actorId: input.actorId,
-        actorDisplayLabel: input.actorDisplayLabel,
-      });
+    const version = await getFormVersionById(input.workspaceId, submission.formVersionId);
+    if (!version || !version.engineSchemaRef) {
+      throw new ValidationError('Form version is not provisioned in the engine');
     }
 
-    return updated;
+    const engineCode = await getFormEngineCodeForForm(input.workspaceId, submission.formId);
+    if (!engineCode) {
+      throw new ValidationError('Form has no form engine configured');
+    }
+
+    const adapter = createFormEngineAdapter(engineCode);
+    if (typeof adapter.createSubmission !== 'function') {
+      throw new ValidationError(`Form engine '${engineCode}' does not support submissions`);
+    }
+
+    await updateSubmissionDraft(input.workspaceId, input.submissionId, input.actorDisplayLabel, {
+      engineSyncStatus: 'provisioning',
+      engineSyncError: null,
+    });
+
+    try {
+      const { engineRef } = await adapter.createSubmission({
+        engineFormRef: version.engineSchemaRef,
+        submissionId: input.submissionId,
+        revisionNo: submission.currentRevisionNo + 1,
+        workspaceId: input.workspaceId,
+        data: input.data,
+      });
+
+      const updated = await appendSubmissionRevision({
+        workspaceId: input.workspaceId,
+        submissionId: input.submissionId,
+        actorId: input.actorId,
+        actorDisplayLabel: input.actorDisplayLabel,
+        eventType: input.eventType,
+        changeNote: input.note,
+        afterEngineSubmissionRef: engineRef,
+      });
+
+      if (!updated) throw new NotFoundError('Submission not found');
+
+      return updated;
+    } catch (err) {
+      await updateSubmissionDraft(input.workspaceId, input.submissionId, input.actorDisplayLabel, {
+        engineSyncStatus: 'error',
+        engineSyncError: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
   }
 
   async delete(input: DeleteInput) {
@@ -124,7 +141,26 @@ export class SubmissionService {
     return getSubmissionById(workspaceId, submissionId);
   }
 
+  /** Reads the submission's current answer document back from the form engine (null if unprovisioned). */
+  async getContent(input: { workspaceId: string; submissionId: string }) {
+    const submission = await getSubmissionRecordById(input.workspaceId, input.submissionId);
+    if (!submission || !submission.engineSubmissionRef) return null;
+
+    const version = await getFormVersionById(input.workspaceId, submission.formVersionId);
+    if (!version || !version.engineSchemaRef) return null;
+
+    const engineCode = await getFormEngineCodeForForm(input.workspaceId, submission.formId);
+    if (!engineCode) return null;
+
+    const adapter = createFormEngineAdapter(engineCode);
+    if (typeof adapter.readSubmission !== 'function') return null;
+
+    return adapter.readSubmission(version.engineSchemaRef, submission.engineSubmissionRef);
+  }
+
   async list(input: ListInput) {
-    return listSubmissionsForWorkspace(input);
+    return listSubmissionsForWorkspace({
+      ...input,
+    });
   }
 }

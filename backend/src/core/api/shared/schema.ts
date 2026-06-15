@@ -7,5 +7,3 @@ export const ApiErrorSchema = z.object({
 export const IdParamSchema = z.object({
   id: z.string().min(1),
 });
-
-export const EnqueueProvisionSchema = z.boolean().optional();

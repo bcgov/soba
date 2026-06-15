@@ -1,6 +1,6 @@
 import { FormioCommunityEditionAPIv5Client } from '../../../src/plugins/formio-v5/formioV5Client';
 
-/** Covers admin 440 refresh and the `opts.token` branch still used by the proxy until that forwarding is removed. */
+/** Covers admin JWT 440 refresh: the client clears its token, re-logs in once, and retries. */
 describe('FormioCommunityEditionAPIv5Client 440 recovery', () => {
   const baseUrl = 'http://formio.test';
   const origFetch = global.fetch;
@@ -48,31 +48,5 @@ describe('FormioCommunityEditionAPIv5Client 440 recovery', () => {
     expect(urls[0]).toBe(`${baseUrl}/form`);
     expect(urls[1]).toBe(`${baseUrl}/admin/login`);
     expect(urls[2]).toBe(`${baseUrl}/form`);
-  });
-
-  it('does not call login when caller-supplied token gets 440', async () => {
-    const client = new FormioCommunityEditionAPIv5Client({
-      baseUrl,
-      username: 'admin@test',
-      password: 'secret',
-    });
-    (client as unknown as { token: string | null }).token = 'admin-jwt';
-
-    global.fetch = jest.fn().mockResolvedValueOnce({
-      ok: false,
-      status: 440,
-      text: () => Promise.resolve('expired'),
-    } as Response);
-
-    await expect(
-      client.loadForms(undefined, { token: 'user-supplied-expired' }),
-    ).rejects.toMatchObject({ status: 440, name: 'FormioApiError' });
-
-    expect(jest.mocked(global.fetch)).toHaveBeenCalledTimes(1);
-    expect(String(jest.mocked(global.fetch).mock.calls[0][0])).toBe(`${baseUrl}/form`);
-    const init = jest.mocked(global.fetch).mock.calls[0][1] as RequestInit & {
-      headers: Record<string, string>;
-    };
-    expect(init.headers['x-jwt-token']).toBe('user-supplied-expired');
   });
 });

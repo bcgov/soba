@@ -1,6 +1,6 @@
-@import 'tailwindcss';
 @import '@bcgov/bc-sans/css/BC_Sans.css';
 @import '@bcgov/design-tokens/css/variables.css';
+@import 'bootstrap/dist/css/bootstrap.min.css';
 
 :root {
   --app-bg: var(--surface-color-background-light-gray);
@@ -13,13 +13,10 @@
   --app-primary-text: var(--typography-color-primary-invert);
   --app-focus-ring: var(--surface-color-border-active);
   --app-danger: var(--typography-color-danger);
-}
-
-@theme inline {
-  --color-background: var(--app-bg);
-  --color-foreground: var(--app-text);
-  --font-sans: 'BC Sans';
-  --font-mono: 'BC Sans';
+  /* Darker grey surface for table headers/footers + the selected nav item. */
+  --app-surface-muted: var(--theme-gray-30);
+  /* Subtle grey for hover and zebra striping. */
+  --app-hover: var(--theme-gray-20);
 }
 
 body {
@@ -36,3 +33,18 @@ a {
   outline: 3px solid var(--app-focus-ring);
   outline-offset: 2px;
 }
+
+.subHeader {
+  background: var(--surface-color-forms-default);
+  border-bottom-color: var(--surface-color-border-default);
+  border-bottom-style: solid;
+  border-bottom-width: var(--layout-border-width-small);
+  height: 40px;
+}
+
+.subHeader a {
+  display: inline-block;
+  height: 24px;
+  border-color: var(--surface-color-border-default);
+}
+
