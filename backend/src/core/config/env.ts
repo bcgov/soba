@@ -167,6 +167,8 @@ export function createEnvReader(source: EnvSource) {
     getTemporalAddress: () => getOptionalEnvFrom(source, 'TEMPORAL_ADDRESS') ?? 'localhost:7233',
     getTemporalNamespace: () => getOptionalEnvFrom(source, 'TEMPORAL_NAMESPACE') ?? 'default',
     getTemporalTaskQueue: () => getOptionalEnvFrom(source, 'TEMPORAL_TASK_QUEUE') ?? 'soba',
+    getTemporalWorkerHealthPort: () =>
+      getNumberEnvFrom(source, 'TEMPORAL_WORKER_HEALTH_PORT') ?? 9090,
   };
 }
 
@@ -216,4 +218,5 @@ export const env = {
   getTemporalAddress: () => getOptionalEnv('TEMPORAL_ADDRESS') ?? 'localhost:7233',
   getTemporalNamespace: () => getOptionalEnv('TEMPORAL_NAMESPACE') ?? 'default',
   getTemporalTaskQueue: () => getOptionalEnv('TEMPORAL_TASK_QUEUE') ?? 'soba',
+  getTemporalWorkerHealthPort: () => getNumberEnv('TEMPORAL_WORKER_HEALTH_PORT') ?? 9090,
 };

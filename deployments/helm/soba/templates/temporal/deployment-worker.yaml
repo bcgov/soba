@@ -32,6 +32,10 @@ spec:
         - name: temporal-worker
           image: "{{ .Values.temporalWorker.image.repository }}:{{ .Values.temporalWorker.image.tag }}"
           imagePullPolicy: {{ .Values.temporalWorker.image.pullPolicy }}
+          ports:
+            - name: health
+              containerPort: {{ .Values.temporalWorker.healthPort | default 9090 }}
+              protocol: TCP
           envFrom:
             - configMapRef:
                 name: {{ include "soba.fullname" . }}-temporal
@@ -51,14 +55,32 @@ spec:
             - secretRef:
                 name: {{ include "soba.fullname" . }}-formio
             {{- end }}
-          {{- if .Values.database.existingSecretName }}
           env:
+            - name: TEMPORAL_WORKER_HEALTH_PORT
+              value: {{ .Values.temporalWorker.healthPort | default 9090 | quote }}
+            {{- if .Values.database.existingSecretName }}
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: {{ include "soba.dbSecretName" . }}
                   key: {{ include "soba.dbSecretKey" . }}
-          {{- end }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
           resources:
             {{- toYaml .Values.temporalWorker.resources | nindent 12 }}
 {{- end }}

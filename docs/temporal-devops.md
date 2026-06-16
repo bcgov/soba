@@ -120,13 +120,16 @@ The SOBA Helm chart under `deployments/helm/soba` now includes:
   - `TEMPORAL_ADDRESS`
   - `TEMPORAL_NAMESPACE`
   - `TEMPORAL_TASK_QUEUE`
-- a `templates/temporal/deployment-worker.yaml` that deploys the SOBA worker as its own Deployment
+- a `templates/temporal/deployment-worker.yaml` that deploys the SOBA worker as its own Deployment, with:
+  - secret wiring that matches the backend (DB via `existingSecretName`/`secretKeyRef`, Form.io gated behind Vault)
+  - HTTP health endpoints (`/readyz`, `/healthz`) on `temporalWorker.healthPort` (default `9090`) backed by readiness and liveness probes
 
 Current enablement pattern:
 
 - `values.yaml`: disabled by default
 - `values-pr.yaml`: enabled
 - `values-dev.yaml`: enabled
+- `values-test.yaml` / `values-prod.yaml`: not yet enabled (see TEST/PROD follow-up)
 
 ### 5. PR cleanup removes PR-specific Temporal namespaces
 
@@ -211,43 +214,46 @@ This is the most complete and correct Temporal deployment path in the repository
 
 ## Current Gaps and Operational Notes
 
-### 1. `develop` deployment is not yet at PR parity
+### 1. `develop` deployment is now at PR parity
 
-The `develop` deployment workflow in `.github/workflows/on-merge.yaml` currently builds images and deploys SOBA, but it does not yet mirror the full PR Temporal flow.
+The `develop` deployment workflow in `.github/workflows/on-merge.yaml` now mirrors the full PR Temporal flow. Both `pr_open.yaml` and `on-merge.yaml` call the shared composite action `.github/actions/temporal-deploy`, which:
 
-Important gaps:
+- installs or upgrades the shared `temporal` release (idempotent `helm upgrade --install`)
+- waits for schema jobs (only when present, so real failures are no longer masked by `|| true`)
+- waits for `temporal-frontend` and `temporal-admintools` rollouts
+- ensures the environment's Temporal namespace exists (`soba-pr-<N>` for PRs, `soba-dev` for dev)
 
-- it does not install or upgrade the shared `temporal` release
-- it does not ensure the `soba-dev` Temporal namespace exists
-- it does not override the `temporalWorker` image tag to the just-built SHA
-- it does not wait for the SOBA Temporal worker rollout
+In addition, `on-merge.yaml` now:
 
-Because `values-dev.yaml` enables the worker, the dev deployment currently depends on:
+- overrides the `temporalWorker` image tag to the just-built `sha-<short_sha>`
+- injects `temporal.address` (`temporal-frontend.<namespace>.svc.cluster.local:7233`) and `temporal.namespace` (`soba-dev`) into the Helm values override
+- waits for the `soba-dev-temporal-worker` rollout
 
-- a pre-existing shared Temporal installation
-- whatever `temporalWorker.image.tag` resolves to in values rather than the just-built image
+Worker rollout is now meaningful: the worker exposes HTTP health endpoints (`/readyz`, `/healthz`) and the Deployment has a readiness probe, so `oc rollout status` only succeeds once the worker has actually connected to the Temporal frontend.
 
-This should be fixed independently of the future chart upgrade.
+### 2. Secret rotation recovery (runbook)
 
-### 2. Secret rotation requires pod restarts
+The shared Temporal server caches its Postgres credentials. After the Crunchy `temporal` user password rotates, `temporal-frontend` and `temporal-matching` keep running with the stale credentials until restarted.
 
-During troubleshooting in `acf456-dev`, Temporal returned `503` in the Web UI because `temporal-frontend` and later `temporal-matching` were still running with stale database credentials after the Postgres secret changed.
-
-Symptoms included:
+Symptoms:
 
 - `pq: password authentication failed for user "temporal"`
 - Temporal Web UI `503` from `/api/v1/namespaces`
 - `Not enough hosts to serve the request`
 
-Operational fix:
+Automated handling:
 
-- restart `deployment/temporal-frontend`
-- restart `deployment/temporal-matching`
+- the `.github/actions/temporal-deploy` action detects this during the namespace-ensure step. If the `temporal operator namespace` command fails (the stale-credential symptom), it automatically runs `oc rollout restart` on `temporal-frontend` and `temporal-matching`, waits for them, and retries.
 
-Recommendation:
+Manual recovery (if needed outside CI):
 
-- document this as the first operational response after any Temporal DB password rotation
-- consider adding an explicit operational runbook section for stale-secret recovery
+```bash
+oc rollout restart deployment/temporal-frontend deployment/temporal-matching -n acf456-dev
+oc rollout status deployment/temporal-frontend -n acf456-dev --timeout=300s
+oc rollout status deployment/temporal-matching -n acf456-dev --timeout=300s
+```
+
+This is the first operational response after any Temporal DB password rotation.
 
 ### 3. The shared server is namespace-scoped, not cluster-global
 
@@ -406,18 +412,17 @@ When the stable chart version is adopted, validate all of the following in a non
 - the Web UI returns `200` from `/api/v1/namespaces`
 - PR cleanup still deletes the PR-specific Temporal namespace cleanly
 
-### Required change 7. Bring `develop` deployment up to the same standard
+### Required change 7. Bring `develop` deployment up to the same standard (DONE)
 
-This is not strictly tied to the stable chart release, but it should be done as part of the same effort so dev behavior matches PR behavior.
+This has been completed independently of the chart upgrade. `on-merge.yaml` now:
 
-`on-merge.yaml` should be updated to:
+- installs or reconciles the shared `temporal` release (via `.github/actions/temporal-deploy`)
+- ensures `soba-dev` exists as a Temporal namespace
+- injects the built `temporal-worker` image tag into the Helm override
+- injects `temporal.address` and `temporal.namespace`
+- waits for `soba-dev-temporal-worker` rollout
 
-- install or reconcile the shared `temporal` release
-- ensure `soba-dev` exists as a Temporal namespace
-- inject the built `temporal-worker` image tag into the Helm override
-- wait for `soba-dev-temporal-worker` rollout
-
-Without this, developers and testers can see different behavior in PR versus dev.
+The install + namespace-ensure logic is shared with `pr_open.yaml` through the composite action so the two paths cannot drift.
 
 ## Recommended Rollout Plan for the Stable Chart Upgrade
 
@@ -429,6 +434,40 @@ Without this, developers and testers can see different behavior in PR versus dev
 6. Verify Web UI, PR namespace creation, worker polling, and cleanup behavior.
 7. After validation, update `TEMPORAL_CHART_VERSION` to the stable version.
 8. Update `on-merge.yaml` so dev matches PR behavior.
+
+## TEST and PROD Enablement (Follow-up Phase)
+
+Temporal is currently wired only for PR and `develop` (dev). TEST and PROD do not yet deploy the worker or the shared server. This is intentionally deferred, but documented here so the path is clear.
+
+### TEST (`release-to-test.yaml`)
+
+`values-test.yaml` has no `temporal`/`temporalWorker` blocks, and `release-to-test.yaml` has no Temporal steps. To reach PR/dev parity:
+
+- add `temporal` (with `allowed: "true"`, `namespace: "soba-test"`, `taskQueue: "soba"`) and `temporalWorker` (`enabled: true`, image, resources) blocks to `values-test.yaml`
+- call the shared composite action in `release-to-test.yaml`:
+  ```yaml
+  - name: Deploy shared Temporal and ensure test namespace
+    uses: ./.github/actions/temporal-deploy
+    with:
+      namespace: ${{ secrets.OC_NAMESPACE }}
+      temporal_namespace: soba-test
+      retention: "14d"
+      chart_version: ${{ vars.TEMPORAL_CHART_VERSION || '0.74.0' }}
+  ```
+- inject `temporal.address`/`temporal.namespace` and the built `temporalWorker.image` tag into the values override (mirror `on-merge.yaml`)
+- add `deployment/soba-test-temporal-worker` to the rollout-status waits
+
+### PROD
+
+There is no PROD deploy workflow in the repository yet, so PROD Temporal enablement is a larger effort:
+
+- create a PROD deploy workflow (mirroring `release-to-test.yaml`)
+- add `temporal`/`temporalWorker` blocks to `values-prod.yaml`
+- the single shared `deployments/helm/temporal/values.yaml` is sized for non-production (single-replica frontend/history/matching, small resource limits). PROD should use a production-grade Temporal server values file: HA replicas for `frontend`, `history`, and `matching`, higher resource requests/limits, longer namespace retention, and a defined backup posture for the `temporal` and `temporal_visibility` databases.
+
+### Per-environment Temporal server values
+
+Today all environments share one `deployments/helm/temporal/values.yaml`. As TEST and especially PROD come online, split this into per-environment values files (for example `values-dev.yaml`, `values-test.yaml`, `values-prod.yaml` under `deployments/helm/temporal/`) and pass the right one to the composite action via its `values_file` input.
 
 ## Verification Commands
 

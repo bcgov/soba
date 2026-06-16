@@ -237,6 +237,8 @@ temporalWorker:
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
+  # Port for the worker's HTTP health endpoints (/readyz, /healthz)
+  healthPort: 9090
   resources:
     requests:
       cpu: 25m
