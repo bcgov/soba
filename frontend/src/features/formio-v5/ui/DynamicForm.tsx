@@ -15,10 +15,19 @@ function FormioV5FormChrome({ children }: { children: React.ReactNode }) {
  * renderer, and the read-only submission viewer so the dynamic-import boilerplate lives in one place.
  * V5 renderer styles are injected only while this component is mounted.
  */
-const FormioForm = dynamic<FormProps>(() => import('@formio/react').then((m) => m.Form), {
-  ssr: false,
-  loading: () => <CenteredProgress />,
-});
+const FormioForm = dynamic<FormProps>(
+  async () => {
+    const mod = await import('@formio/react');
+    const BcGovFormioComponents = await import('@bcgov/formio-components');
+    const { Formio } = await import('@formio/js');
+    Formio.use(BcGovFormioComponents.default || BcGovFormioComponents);
+    return mod.Form;
+  },
+  {
+    ssr: false,
+    loading: () => <CenteredProgress />,
+  },
+);
 
 export function DynamicForm(props: FormProps) {
   return (
