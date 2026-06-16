@@ -8,6 +8,48 @@
       "when": 1772593537043,
       "tag": "0000_daily_zombie",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772594000000,
+      "tag": "0001_add_visibility_to_form_version",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772595000000,
+      "tag": "0002_rename_designer_feature_code",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1772596000000,
+      "tag": "0003_add_idp_groups",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1772597000000,
+      "tag": "0004_remove_unused_identity_providers",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1772598000000,
+      "tag": "0005_remove_outbox",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1772599000000,
+      "tag": "0006_drop_form_slug",
+      "breakpoints": true
     }
   ]
 }

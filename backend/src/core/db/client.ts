@@ -7,11 +7,21 @@ import { drizzleQueryLogger } from './queryLogger';
 // Env is loaded by process entrypoints before db modules are imported.
 const databaseUrl = env.getDatabaseUrl();
 const dbPoolMax = env.getNumberEnv('DB_POOL_MAX') ?? 10;
+// Pipeline performance fix: Revert if needed.
+const dbConnectionTimeoutMs = env.getDbConnectionTimeoutMs();
+const dbQueryTimeoutMs = env.getDbQueryTimeoutMs();
+const dbStatementTimeoutMs = env.getDbStatementTimeoutMs();
+const dbLockTimeoutMs = env.getDbLockTimeoutMs();
 
 const pool = new Pool({
   connectionString: databaseUrl,
   max: dbPoolMax,
+  connectionTimeoutMillis: dbConnectionTimeoutMs,
+  query_timeout: dbQueryTimeoutMs,
+  statement_timeout: dbStatementTimeoutMs,
+  lock_timeout: dbLockTimeoutMs,
 });
+// Pipeline performance fix: Revert if needed.
 
 export const db = drizzle(pool, { schema, logger: drizzleQueryLogger });
 export type Db = typeof db;

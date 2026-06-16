@@ -1,6 +1,10 @@
 # Test / UAT environment — two replicas, moderate resources
 backend:
   replicas: 2
+  sso:
+    jwksUri: https://test.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/certs
+    jwtIssuer: https://test.loginproxy.gov.bc.ca/auth/realms/standard
+    jwtAudience: connected-services-submit-6349
   resources:
     requests:
       cpu: 100m
@@ -40,13 +44,8 @@ mongodb:
   persistence:
     size: 2Gi
 
-outboxWorker:
+vault:
   enabled: true
-  replicas: 2
-  resources:
-    requests:
-      cpu: 50m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+  role: acf456-nonprod
+  secretPath: acf456-nonprod/soba-test
+  serviceAccountName: acf456-vault

@@ -25,14 +25,13 @@ interface ListFormVersionsQueryInput {
 }
 
 interface CreateFormInput {
-  slug: string;
   name: string;
   description?: string;
   formEngineCode?: string;
+  visibility?: string[];
 }
 
 interface UpdateFormInput {
-  slug?: string;
   name?: string;
   description?: string | null;
   status?: string;
@@ -40,36 +39,40 @@ interface UpdateFormInput {
 
 const toFormDto = (item: {
   id: string;
-  slug: string;
   name: string;
   description: string | null;
   status: string;
   createdAt: Date;
   updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
 }) => ({
   id: item.id,
-  slug: item.slug,
   name: item.name,
   description: item.description,
   status: item.status,
   createdAt: item.createdAt.toISOString(),
   updatedAt: item.updatedAt.toISOString(),
+  createdBy: item.createdBy,
+  updatedBy: item.updatedBy,
 });
 
 const toFormListItemDto = (item: {
   id: string;
-  slug: string;
   name: string;
   status: string;
   createdAt: Date;
   updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
 }) => ({
   id: item.id,
-  slug: item.slug,
   name: item.name,
   status: item.status,
   createdAt: item.createdAt.toISOString(),
   updatedAt: item.updatedAt.toISOString(),
+  createdBy: item.createdBy,
+  updatedBy: item.updatedBy,
 });
 
 const toFormVersionDto = (item: {
@@ -81,8 +84,11 @@ const toFormVersionDto = (item: {
   engineSchemaRef: string | null;
   currentRevisionNo: number;
   publishedAt: Date | null;
+  visibility: string[] | null;
   createdAt: Date;
   updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
 }) => ({
   id: item.id,
   formId: item.formId,
@@ -92,8 +98,11 @@ const toFormVersionDto = (item: {
   engineSchemaRef: item.engineSchemaRef,
   currentRevisionNo: item.currentRevisionNo,
   publishedAt: item.publishedAt?.toISOString() ?? null,
+  visibility: item.visibility ?? [],
   createdAt: item.createdAt.toISOString(),
   updatedAt: item.updatedAt.toISOString(),
+  createdBy: item.createdBy,
+  updatedBy: item.updatedBy,
 });
 
 const toFormVersionListItemDto = (item: {
@@ -103,8 +112,11 @@ const toFormVersionListItemDto = (item: {
   state: string;
   engineSyncStatus: string;
   engineSchemaRef: string | null;
+  visibility: string[] | null;
   createdAt: Date;
   updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
 }) => ({
   id: item.id,
   formId: item.formId,
@@ -112,8 +124,11 @@ const toFormVersionListItemDto = (item: {
   state: item.state,
   engineSyncStatus: item.engineSyncStatus,
   engineSchemaRef: item.engineSchemaRef,
+  visibility: item.visibility ?? [],
   createdAt: item.createdAt.toISOString(),
   updatedAt: item.updatedAt.toISOString(),
+  createdBy: item.createdBy,
+  updatedBy: item.updatedBy,
 });
 
 export function createFormsApiService(
@@ -121,18 +136,21 @@ export function createFormsApiService(
   formVersionService: FormVersionService,
 ) {
   return {
-    createForm: async (ctx: FormsContextInput, input: CreateFormInput) =>
-      toFormDto(
-        await formService.create({
-          workspaceId: ctx.workspaceId,
-          actorId: ctx.actorId,
-          actorDisplayLabel: ctx.actorDisplayLabel,
-          slug: input.slug,
-          name: input.name,
-          description: input.description,
-          formEngineCode: input.formEngineCode,
-        }),
-      ),
+    createForm: async (ctx: FormsContextInput, input: CreateFormInput) => {
+      const { form, version } = await formService.create({
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
+        name: input.name,
+        description: input.description,
+        formEngineCode: input.formEngineCode,
+        visibility: input.visibility,
+      });
+      return { ...toFormDto(form), formVersion: toFormVersionDto(version) };
+    },
+
+    normalizeSchema: (_ctx: FormsContextInput, schema: Record<string, unknown>) =>
+      formService.normalizeSchema(schema),
 
     updateForm: async (ctx: FormsContextInput, formId: string, input: UpdateFormInput) => {
       const row = await formService.update({
@@ -140,7 +158,6 @@ export function createFormsApiService(
         actorId: ctx.actorId,
         actorDisplayLabel: ctx.actorDisplayLabel,
         formId,
-        slug: input.slug,
         name: input.name,
         description: input.description,
         status: input.status,
@@ -230,23 +247,24 @@ export function createFormsApiService(
       };
     },
 
-    createDraft: async (ctx: FormsContextInput, formId: string) =>
+    createDraft: async (ctx: FormsContextInput, formId: string, visibility?: string[]) =>
       toFormVersionDto(
         await formVersionService.createDraft({
           workspaceId: ctx.workspaceId,
           actorId: ctx.actorId,
           actorDisplayLabel: ctx.actorDisplayLabel,
           formId,
+          visibility,
         }),
       ),
 
-    updateDraft: async (ctx: FormsContextInput, formVersionId: string, state?: string) => {
+    updateDraft: async (ctx: FormsContextInput, formVersionId: string, visibility?: string[]) => {
       const row = await formVersionService.updateDraft({
         workspaceId: ctx.workspaceId,
         actorId: ctx.actorId,
         actorDisplayLabel: ctx.actorDisplayLabel,
         formVersionId,
-        state,
+        visibility,
       });
       return row ? toFormVersionDto(row) : null;
     },
@@ -257,8 +275,8 @@ export function createFormsApiService(
       input: {
         eventType?: string;
         note?: string;
-        enqueueProvision?: boolean;
         formioFormDefinition?: Record<string, unknown>;
+        engine_schema_ref?: string;
       },
     ) =>
       formVersionService
@@ -269,8 +287,8 @@ export function createFormsApiService(
           formVersionId,
           eventType: input.eventType || 'save_draft',
           note: input.note,
-          enqueueProvision: input.enqueueProvision ?? true,
           formioFormDefinition: input.formioFormDefinition,
+          engineSchemaRef: input.engine_schema_ref || null,
         })
         .then((row) => toFormVersionDto(row)),
 
@@ -281,6 +299,54 @@ export function createFormsApiService(
         actorDisplayLabel: ctx.actorDisplayLabel,
         formVersionId,
       }),
+
+    publish: async (ctx: FormsContextInput, formVersionId: string) => {
+      const row = await formVersionService.publish({
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
+        formVersionId,
+      });
+      return row ? toFormVersionDto(row) : null;
+    },
+
+    unpublish: async (ctx: FormsContextInput, formVersionId: string) => {
+      const row = await formVersionService.unpublish({
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
+        formVersionId,
+      });
+      return row ? toFormVersionDto(row) : null;
+    },
+
+    restore: async (ctx: FormsContextInput, formVersionId: string) => {
+      const row = await formVersionService.restore({
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
+        formVersionId,
+      });
+      return row ? toFormVersionDto(row) : null;
+    },
+
+    provision: async (
+      ctx: FormsContextInput,
+      formVersionId: string,
+      schema: Record<string, unknown>,
+    ) => {
+      const row = await formVersionService.provision({
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
+        formVersionId,
+        schema,
+      });
+      return row ? toFormVersionDto(row) : null;
+    },
+
+    getSchema: (ctx: FormsContextInput, formVersionId: string) =>
+      formVersionService.getSchema({ workspaceId: ctx.workspaceId, formVersionId }),
 
     deleteForm: (ctx: FormsContextInput, formId: string) =>
       formService.delete({

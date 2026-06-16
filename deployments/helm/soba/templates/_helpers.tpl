@@ -104,3 +104,22 @@ See frontend SOBA_API_INTERNAL_URL in runtimeConfig. Override with frontend.inte
 {{- define "soba.sobaApiInternalBaseUrl" -}}
 {{- printf "http://%s-backend.%s.svc.cluster.local:%v/api/v1" (include "soba.fullname" .) .Release.Namespace (.Values.backend.service.port) }}
 {{- end }}
+
+{{/*
+Database secret name and key.
+*/}}
+{{- define "soba.dbSecretName" -}}
+{{- if .Values.database.existingSecretName }}
+{{- .Values.database.existingSecretName }}
+{{- else }}
+{{- printf "%s-db" (include "soba.fullname" .) }}
+{{- end }}
+{{- end }}
+
+{{- define "soba.dbSecretKey" -}}
+{{- if .Values.database.existingSecretName }}
+{{- .Values.database.existingSecretKey }}
+{{- else }}
+DATABASE_URL
+{{- end }}
+{{- end }}

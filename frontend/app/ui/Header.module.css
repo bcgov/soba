@@ -1,0 +1,43 @@
+.userDrop {
+  /* Flex layout keeps the person icon, name, and caret aligned regardless of
+     Bootstrap `.btn` defaults or Form.io's injected global CSS. */
+  display: inline-flex;
+  align-items: center;
+  /* `!important` pins the white surface on the base state too (not just
+     :hover/:focus), so Bootstrap's `.btn-primary` blue can't win the cascade
+     depending on stylesheet injection order across pages. */
+  color: var(--app-text) !important;
+  background: var(--app-surface) !important;
+  border-color: var(--app-border) !important;
+}
+
+.userDrop:hover {
+  color: var(--app-text) !important;
+  background: var(--app-surface) !important;
+  border-color: var(--app-border) !important;
+}
+
+.userDrop:active {
+  color: var(--app-text) !important;
+  background: var(--app-surface) !important;
+  border-color: var(--app-border) !important;
+}
+
+.userDrop:focus {
+  color: var(--app-text) !important;
+  background: var(--app-surface) !important;
+  border-color: var(--app-border) !important;
+}
+
+.userDrop:focus-visible {
+  /* Keyboard focus needs a clearly visible ring; the surface-pinning rules
+     above otherwise leave focus indistinguishable from the resting state. */
+  outline: 2px solid var(--app-focus-ring) !important;
+  outline-offset: 2px;
+}
+
+.limitText {
+  max-width: 100px;
+  /* overflow: hidden; */
+  display: inline-block;
+}

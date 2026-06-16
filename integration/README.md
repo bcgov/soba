@@ -16,7 +16,7 @@ Devcontainer setup now prepares integration tests automatically:
 After the container is created/rebuilt, tests should be ready to run:
 
 ```bash
-pnpm -C integration test
+pnpm -C integration/playwright test
 ```
 
 ## Run manually (outside devcontainer)
@@ -24,14 +24,14 @@ pnpm -C integration test
 Install dependencies and browser once:
 
 ```bash
-pnpm -C integration install --frozen-lockfile
-pnpm -C integration exec playwright install chromium
+npm ci --prefix integration/playwright
+npm exec --prefix integration/playwright -- playwright install chromium
 ```
 
 Run tests:
 
 ```bash
-pnpm -C integration test
+pnpm -C integration/playwright test
 ```
 
 By default these tests target:

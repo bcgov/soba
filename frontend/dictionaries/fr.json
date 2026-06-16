@@ -2,57 +2,30 @@
   "locale": "fr",
   "general": {
     "login": "Connecter",
-    "loggedAs": "Connecter á",
     "logout": "Déconnexion",
-    "title": "SOBA",
+    "title": "Common Hosted Forms 2.0",
     "description": "Formulaires de Nouvelle Génération",
-    "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à cette section."
+    "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à cette section.",
+    "forms": "Formulaires",
+    "formDesigner": "Concepteur de formulaires",
+    "feedback": "Retour d'information",
+    "help": "Aidé",
+    "welcomeTo": "Bienvenue sur",
+    "loading": "Chargement…",
+    "comingSoon": "Cette fonctionnalité sera bientôt disponible."
   },
   "header": {
     "workspaces": "Espaces de travail",
     "design": "Conception",
     "submit": "Soumettre",
-    "metaReview": "Méta API",
-    "themeToggle": "Basculer le theme de couleur",
     "skipToMain": "Aller au contenu principal",
-    "menu": "Menu",
-    "closeMenu": "Fermer le menu",
-    "mobileNavLabel": "Navigation",
-    "openMenuAria": "Ouvrir le menu de navigation",
-    "closeMenuAria": "Fermer le menu de navigation"
-  },
-  "metaPage": {
-    "title": "Méta API et santé",
-    "refresh": "Actualiser",
-    "loadCodes": "Charger les codes de référence",
-    "loadRoles": "Charger les rôles",
-    "sections": {
-      "health": "Santé",
-      "readiness": "Disponibilité",
-      "build": "Build",
-      "features": "Fonctionnalités",
-      "frontendConfig": "Config frontale",
-      "plugins": "Plugins",
-      "formEngines": "Moteurs de formulaire",
-      "codes": "Codes de référence",
-      "roles": "Rôles"
-    }
-  },
-  "base": {
-    "copyToClipboard": {
-      "copyToClipboard": "Copier dans le presse-papiers",
-      "linkToClipboard": "Lien copié dans le presse-papiers!",
-      "errCopyToClipboard": "Erreur lors de la copie dans le presse-papiers."
-    }
+    "designer": "Générateur de Formulaire"
   },
   "formioV5": {
     "formList": {
       "tableHeading": "Formulaires",
       "loading": "Chargement des formulaires…",
       "empty": "Aucun formulaire renvoyé par le proxy Form.io. Créez un formulaire dans Form.io ou vérifiez la configuration de l’API.",
-      "refresh": "Actualiser",
-      "needLogin": "Connectez-vous pour charger les formulaires.",
-      "unauthorized": "Non autorisé — la session a peut-être expiré. Reconnectez-vous.",
       "columns": {
         "title": "Titre",
         "name": "Nom",
@@ -63,54 +36,93 @@
       "pageTitle": "Formulaire",
       "backToList": "Retour à la liste",
       "missingId": "Aucun formulaire sélectionné.",
+      "unavailable": "Ce formulaire n’est pas disponible pour soumission actuellement.",
       "loadError": "Le formulaire n’a pas pu être chargé. Vérifiez l’onglet réseau du navigateur et les journaux de l’API.",
       "rendererError": "Le moteur de formulaire s’est arrêté de façon inattendue. Réessayez ou revenez à la liste.",
       "segmentError": {
         "title": "Un problème est survenu lors du chargement de cette page de formulaire.",
         "tryAgain": "Réessayer",
         "backToList": "Retour à la liste"
-      }
+      },
+      "submitSuccess": "Formulaire soumis avec succès."
     }
   },
-  "submitDemo": {
-    "tableHeading": "Formulaires SOBA",
-    "loading": "Chargement…",
-    "empty": "Aucun formulaire SOBA dans cet espace pour l’instant.",
-    "generate": "Générer un formulaire SOBA de démo",
-    "generating": "Création…",
-    "refresh": "Actualiser",
-    "needLogin": "Connectez-vous pour voir les formulaires SOBA.",
-    "noWorkspace": "Aucun espace de travail trouvé pour votre compte.",
-    "loadError": "Impossible de charger les formulaires.",
-    "generateError": "Impossible de créer le formulaire de démo.",
-    "pollTimeout": "Le provisionnement continue. Réessayez actualiser dans quelques secondes.",
-    "openForm": "Ouvrir dans la visionneuse",
-    "syncPending": "En attente",
-    "syncProvisioning": "Provisionnement",
-    "syncReady": "Prêt",
-    "syncFailed": "Échec",
+  "form": {
+    "saved": "Formulaire enregistré avec succès.",
+    "saveError": "Erreur lors de l'enregistrement du formulaire.",
+    "published": "Formulaire publié avec succès !",
+    "versionDraftCreated": "Brouillon de la version {version} créé avec succès !",
+    "createVersionError": "Échec de la création d'une nouvelle version.",
+    "loadFormError": "Échec du chargement du formulaire :",
+    "loadVersionSchemaError": "Échec du chargement du schéma de version.",
+    "invalidJson": "Format JSON invalide.",
+    "nameLabel": "Nom du Formulaire",
+    "loading": "Chargement du formulaire...",
+    "schemaNotAvailable": "Schéma du formulaire non disponible.",
+    "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à ce formulaire.",
+    "visibilityLabel": "Visibilité / Contrôle d'accès",
+    "visibilityPublic": "Publique",
+    "visibilityAzureIDIR": "IDIR - MFA",
+    "disclaimerLabel": "J'accepte l'avis de non-responsabilité et la déclaration de responsabilité",
+    "exportJson": "Exporter JSON",
+    "importJson": "Importer JSON",
+    "designerTab": "Concepteur",
+    "settingsTab": "Paramètres",
+    "teamTab": "Équipe",
+    "readOnlyMode": "Mode lecture seule :",
+    "viewingHistoricalVersion": "Vous consultez la version historique",
+    "savePublishDisabled": "Les options Sauvegarder et Publier sont désactivées.",
+    "switchToCurrentDraft": "Passer au brouillon actuel",
+    "publishedVersion": "Version publiée :",
+    "publishedVersionCannotBeModified": "Cette version est publiée et ne peut être modifiée directement. Créez un nouveau brouillon de version pour apporter des modifications.",
+    "formVersion": "Version du formulaire",
+    "currentDraft": "Brouillon actuel",
+    "creating": "Création...",
+    "restoreAsNewVersion": "Restaurer comme nouvelle version",
+    "newVersion": "Nouvelle version",
+    "saving": "Sauvegarde...",
+    "save": "Sauvegarder",
+    "preview": "Aperçu",
+    "mustAgreeDisclaimer": "Doit accepter l'avis de non-responsabilité",
+    "cannotPublishHistory": "Impossible de publier l'historique",
+    "versionAlreadyPublished": "Version déjà publiée",
+    "saveChangesBeforePublishing": "Enregistrez les modifications avant de publier",
+    "publishForm": "Publier le formulaire",
+    "publish": "Publier",
+    "formPreview": "Aperçu du formulaire",
+    "untitledForm": "Formulaire sans titre",
+    "closePreview": "Fermer l'aperçu",
+    "noFormLayout": "Aucune mise en page de formulaire n'a encore été conçue."
+  },
+  "submission": {
+    "submissions": "Soumissions",
+    "pageTitle": "Soumission",
+    "loading": "Chargement des soumissions…",
+    "empty": "Aucune soumission dans cet espace pour l’instant.",
+    "error": "Impossible de charger les soumissions.",
+    "submittedOn": "Soumis le",
+    "noContent": "Aucune réponse soumise à afficher.",
+    "notFound": "Soumission introuvable.",
+    "workflow": "Flux de travail",
     "columns": {
-      "name": "Nom",
-      "slug": "Identifiant",
-      "sync": "Sync Form.io",
-      "open": "Ouvrir"
-    }
-  },
-  "forms": {
-    "manage": {
-      "share": {
-        "shareForm": "Partager le Formulaire",
-        "shareLink": "Lien de Partage",
-        "copyQRCode": "Copiez le lien ou scannez le code QR pour partager ce formulaire.",
-        "warningMessage": "Ce formulaire n'a pas été publié. Le lien ne fonctionnera pas tant que le formulaire n'est pas publié.",
-        "copyURLToClipboard": "Copier l'URL dans le presse-papiers",
-        "openThisForm": "Ouvrir ce formulaire",
-        "downloadQRCode": "Télécharger le code QR",
-        "close": "Fermer"
+      "id": "ID de Soumission",
+      "formName": "Nom du Formulaire",
+      "formId": "ID du Formulaire",
+      "version": "Version",
+      "status": "Statut",
+      "user": "Utilisateur"
+    },
+    "formList": {
+      "columns": {
+        "name": "Nom du Formulaire",
+        "version": "Version",
+        "path": "Chemin",
+        "actions": "Actions",
+        "createdBy": "Créé par",
+        "createdAt": "Date de création"
       }
     }
   },
-  
   "Basic": "Basique",
   "Text Field": "Champ de Texte",
   "Text Area": "Zone de Texte",
@@ -121,7 +133,6 @@
   "Select": "Sélectionner",
   "Radio": "Bouton Radio",
   "Button": "Bouton",
-
   "Advanced": "Avancé",
   "Email": "Email",
   "Url": "Url",
@@ -134,7 +145,6 @@
   "Currency": "Devise",
   "Survey": "Sondage",
   "Signature": "Signature",
-
   "Layout": "Disposition",
   "HTML Element": "Élément HTML",
   "Content": "Contenu",
@@ -144,14 +154,12 @@
   "Table": "Tableau",
   "Tabs": "Onglets",
   "Well": "Panneau",
-
   "Data": "Données",
   "Hidden": "Caché",
   "Container": "Conteneur",
   "Data Map": "Carte de Données",
   "Data Grid": "Grille de Données",
   "Edit Grid": "Modifier la Grille de Données",
-
   "Submit": "Soumettre",
   "Drag and Drop a form component": "Glisser-déposer un composant de formulaire"
 }

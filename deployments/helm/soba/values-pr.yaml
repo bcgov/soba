@@ -66,18 +66,7 @@ mongodb:
       memory: 512Mi
   persistence:
     size: 1Gi
-
-outboxWorker:
-  enabled: true
-  replicas: 1
-  resources:
-    requests:
-      cpu: 25m
-      memory: 128Mi
-    limits:
-      cpu: 100m
-      memory: 256Mi
-
+    
 temporal:
   allowed: "true"
   address: ""
@@ -98,3 +87,9 @@ temporalWorker:
     limits:
       cpu: 100m
       memory: 512Mi
+
+vault:
+  enabled: true
+  role: acf456-nonprod
+  secretPath: acf456-nonprod/soba-dev
+  serviceAccountName: acf456-vault

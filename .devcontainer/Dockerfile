@@ -3,8 +3,14 @@ FROM mcr.microsoft.com/devcontainers/typescript-node:4-24-bookworm
 
 ARG TARGETARCH
 
-# Enable pnpm via corepack (frontend uses pnpm)
-RUN corepack enable pnpm
+# Enable pnpm via corepack (matches package.json packageManager)
+RUN corepack enable pnpm \
+    && corepack prepare pnpm@10.28.2 --activate
+
+# Keep pnpm store on container disk (not virtiofs workspace mount)
+ENV PNPM_STORE_DIR=/home/node/.local/share/pnpm/store
+RUN mkdir -p /home/node/.local/share/pnpm/store \
+    && chown -R node:node /home/node/.local
 
 # ── Add third-party APT repositories ────────────────────────────────────────
 # PostgreSQL 17 client (matches production-style Postgres)

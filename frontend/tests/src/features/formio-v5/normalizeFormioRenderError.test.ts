@@ -18,9 +18,9 @@ describe('normalizeFormioRenderError', () => {
   });
 
   it('reads single object { error }', () => {
-    expect(
-      normalizeFormioRenderError({ error: 'Bad request', formattedKeyOrPath: '' }, fb),
-    ).toBe('Bad request');
+    expect(normalizeFormioRenderError({ error: 'Bad request', formattedKeyOrPath: '' }, fb)).toBe(
+      'Bad request',
+    );
   });
 
   it('reads { message } when error missing', () => {
@@ -32,6 +32,6 @@ describe('normalizeFormioRenderError', () => {
   });
 
   it('returns fallback for unrecognized object', () => {
-    expect(normalizeFormioRenderError({ foo: 1 }, fb)).toBe(fb);
+    expect(normalizeFormioRenderError({ test: 1 }, fb)).toBe(fb);
   });
 });

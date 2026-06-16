@@ -1,4 +1,4 @@
-# Run backend, outbox worker (same backend image), and frontend from images built with: make build
+# Run backend and frontend from images built with: make build
 # Prerequisites: dev services running (postgres, mongo, formio), e.g.:
 #   docker compose -f .devcontainer/docker-compose.yml up -d
 # First-time DB: with Postgres up: cd backend && pnpm db:migrate && pnpm db:seed
@@ -18,21 +18,6 @@ services:
     environment:
       DATABASE_URL: postgres://postgres:postgres@host.docker.internal:5432/soba
       # Form.io sidecar runs in sibling compose (host :3001). localhost here is this container.
-      PLUGIN_FORMIO_V5_API_BASE_URL: http://host.docker.internal:3001
-      PLUGIN_FORMIO_V5_ADMIN_API_URL: http://host.docker.internal:3001
-      PLUGIN_FORMIO_V5_RENDER_API_URL: http://host.docker.internal:3001
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
-  outbox-worker:
-    image: soba/backend:local
-    command: ["node", "backend/dist/src/core/workers/outboxWorker.js"]
-    env_file:
-      - ../backend/.env
-      - ../backend/.env.local
-    environment:
-      DATABASE_URL: postgres://postgres:postgres@host.docker.internal:5432/soba
       PLUGIN_FORMIO_V5_API_BASE_URL: http://host.docker.internal:3001
       PLUGIN_FORMIO_V5_ADMIN_API_URL: http://host.docker.internal:3001
       PLUGIN_FORMIO_V5_RENDER_API_URL: http://host.docker.internal:3001

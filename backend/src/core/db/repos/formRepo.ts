@@ -1,6 +1,6 @@
 import { and, desc, eq, ilike, isNull, lt, or } from 'drizzle-orm';
-import { db } from '../client';
-import { forms } from '../schema';
+import { db, type DbOrTx } from '../client';
+import { forms, formVersions } from '../schema';
 
 export type FormListSort = 'id:desc' | 'updatedAt:desc';
 export type FormCursorMode = 'id' | 'ts_id';
@@ -18,18 +18,18 @@ export interface ListFormsForWorkspaceInput {
 
 export interface FormListRow {
   id: string;
-  slug: string;
   name: string;
   status: string;
   createdAt: Date;
   updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
 }
 
 export interface FormRecord {
   id: string;
   workspaceId: string;
   formEngineCode: string;
-  slug: string;
   name: string;
   description: string | null;
   status: string;
@@ -46,7 +46,6 @@ interface CreateFormInput {
   actorId: string;
   actorDisplayLabel: string | null;
   formEngineCode: string;
-  slug: string;
   name: string;
   description?: string;
 }
@@ -56,7 +55,6 @@ interface UpdateFormInput {
   actorId: string;
   actorDisplayLabel: string | null;
   formId: string;
-  slug?: string;
   name?: string;
   description?: string | null;
   status?: string;
@@ -73,7 +71,7 @@ export const listFormsForWorkspace = async (
 
   if (input.q) {
     const searchPattern = `%${input.q}%`;
-    whereClauses.push(or(ilike(forms.name, searchPattern), ilike(forms.slug, searchPattern)));
+    whereClauses.push(ilike(forms.name, searchPattern));
   }
 
   if (input.cursorMode === 'id' && input.afterId) {
@@ -92,11 +90,12 @@ export const listFormsForWorkspace = async (
   const rows = await db
     .select({
       id: forms.id,
-      slug: forms.slug,
       name: forms.name,
       status: forms.status,
       createdAt: forms.createdAt,
       updatedAt: forms.updatedAt,
+      createdBy: forms.createdBy,
+      updatedBy: forms.updatedBy,
     })
     .from(forms)
     .where(and(...whereClauses))
@@ -127,13 +126,47 @@ export const getFormById = async (
   return row[0] ?? null;
 };
 
-export const createForm = async (input: CreateFormInput): Promise<FormRecord> => {
-  const created = await db
+export const getFormByEngineSchemaRef = async (
+  workspaceId: string,
+  engineSchemaRef: string,
+): Promise<FormRecord | null> => {
+  const rows = await db
+    .select({
+      id: forms.id,
+      workspaceId: forms.workspaceId,
+      formEngineCode: forms.formEngineCode,
+      name: forms.name,
+      description: forms.description,
+      status: forms.status,
+      createdAt: forms.createdAt,
+      updatedAt: forms.updatedAt,
+      createdBy: forms.createdBy,
+      updatedBy: forms.updatedBy,
+      deletedAt: forms.deletedAt,
+      deletedBy: forms.deletedBy,
+    })
+    .from(forms)
+    .innerJoin(formVersions, eq(formVersions.formId, forms.id))
+    .where(
+      and(
+        eq(forms.workspaceId, workspaceId),
+        eq(formVersions.engineSchemaRef, engineSchemaRef),
+        isNull(forms.deletedAt),
+        isNull(formVersions.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
+};
+
+export const createForm = async (input: CreateFormInput, tx?: DbOrTx): Promise<FormRecord> => {
+  const d = tx ?? db;
+  const created = await d
     .insert(forms)
     .values({
       workspaceId: input.workspaceId,
       formEngineCode: input.formEngineCode,
-      slug: input.slug,
       name: input.name,
       description: input.description,
       status: 'active',
@@ -149,7 +182,6 @@ export const updateForm = async (input: UpdateFormInput): Promise<FormRecord | n
   const updated = await db
     .update(forms)
     .set({
-      slug: input.slug,
       name: input.name,
       description: input.description,
       status: input.status,

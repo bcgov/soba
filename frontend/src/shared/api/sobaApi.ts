@@ -1,30 +1,27 @@
 import type { FeaturesMetaPayload } from '@/src/shared/config/featuresMeta';
 import { isFeaturesMetaPayload } from '@/src/shared/config/featuresMeta';
 import { getSobaApiBaseUrl } from '../config/runtimeConfig';
+import { parseJson } from './sobaHelpers';
 
-export type WorkspaceItem = {
-  id: string;
-  name: string;
-  slug: string | null;
-  kind: string;
-  role: string;
-  status: string;
-};
+import type { SobaFormType } from '../../types/forms';
+import type { WorkspaceItem, WorkspacesResponse } from '../../types/workspaces';
+import type { CurrentUserResponse } from '../../types/user';
 
-export type WorkspacesResponse = {
-  items: WorkspaceItem[];
-  page: {
-    limit: number;
-    hasMore: boolean;
-    nextCursor: string | null;
-    cursorMode: 'id' | 'ts_id';
-  };
-  filters: {
-    kind?: string;
-    status?: string;
-  };
-  sort: string;
-};
+export type { SobaFormType, WorkspaceItem, WorkspacesResponse, CurrentUserResponse };
+export {
+  createSobaFormioForm,
+  normalizeFormSchema,
+  publishSobaFormVersion,
+  getSobaForm,
+  createSobaFormSubmission,
+  saveSobaFormSubmission,
+  getSobaForms,
+  getSobaFormVersions,
+  updateSobaFormVersionVisibility,
+  createFormVersion,
+  saveFormVersionSchema,
+  getFormVersionSchema,
+} from './sobaApiForms';
 
 export type BuildMeta = {
   name: string;
@@ -34,26 +31,6 @@ export type BuildMeta = {
   gitTag: string;
   imageTag: string;
 };
-
-export type CurrentUserResponse = {
-  actor: {
-    id: string;
-    displayLabel: string | null;
-    status: string;
-  };
-  profile: {
-    displayName: string | null;
-    email: string | null;
-    preferredUsername: string | null;
-  };
-};
-
-async function parseJson<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    throw new Error(`Request failed (${response.status})`);
-  }
-  return (await response.json()) as T;
-}
 
 export async function fetchHealth(): Promise<{ status: string }> {
   const response = await fetch(`${getSobaApiBaseUrl()}/health`, {

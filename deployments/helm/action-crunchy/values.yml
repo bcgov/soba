@@ -23,9 +23,14 @@ crunchy:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '9187'
     dataVolumeClaimSpec:
-      storage: 210Mi
+      # NOTE: PVCs can only grow, never shrink. The live pg-soba cluster (shared by dev +
+      # all PR envs in this namespace) was provisioned at 5Gi pgdata / 512Mi wal, so any
+      # value below the existing PVC size is rejected by the API ("can not be less than
+      # previous value") and breaks on_merge. Keep these >= the live sizes; check with:
+      #   oc get pvc -n <ns> -l postgres-operator.crunchydata.com/cluster=pg-soba-crunchy
+      storage: 5Gi
       storageClassName: netapp-block-standard
-      walStorage: 255Mi
+      walStorage: 512Mi
     requests:
       cpu: 50m
       memory: 128Mi

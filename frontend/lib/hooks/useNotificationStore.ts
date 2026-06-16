@@ -1,7 +1,12 @@
-'use client'
+'use client';
 
+import { useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
-import { addNotification, removeNotification, clearNotifications } from '../slices/notificationSlice';
+import {
+  addNotification,
+  removeNotification,
+  clearNotifications,
+} from '../slices/notificationSlice';
 import type { NotificationType } from '../slices/notificationSlice';
 
 export interface AddNotificationPayload {
@@ -14,10 +19,18 @@ export function useNotificationStore() {
   const dispatch = useAppDispatch();
   const notifications = useAppSelector((state) => state.notification.notifications);
 
+  // Memoized so callers can safely list these in effect dependency arrays.
+  const add = useCallback(
+    (payload: AddNotificationPayload) => dispatch(addNotification(payload)),
+    [dispatch],
+  );
+  const remove = useCallback((id: string) => dispatch(removeNotification(id)), [dispatch]);
+  const clear = useCallback(() => dispatch(clearNotifications()), [dispatch]);
+
   return {
     notifications,
-    addNotification: (payload: AddNotificationPayload) => dispatch(addNotification(payload)),
-    removeNotification: (id: string) => dispatch(removeNotification(id)),
-    clearNotifications: () => dispatch(clearNotifications()),
+    addNotification: add,
+    removeNotification: remove,
+    clearNotifications: clear,
   };
 }
