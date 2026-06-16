@@ -30,6 +30,9 @@ import type { FormBuilder as FormioBuilderInstance } from '@formio/js';
 const FormBuilder = dynamic(
   async () => {
     const mod = await import('@formio/react');
+    const BcGovFormioComponents = await import('@bcgov/formio-components');
+    const { Formio } = await import('@formio/js');
+    Formio.use(BcGovFormioComponents.default || BcGovFormioComponents);
     return mod.FormBuilder;
   },
   { ssr: false },
@@ -88,61 +91,21 @@ const FormDesigner: React.FC<DesignerProps> = ({
           title: 'Basic',
           weight: 0,
           default: true,
-          components: {
-            textfield: true,
-            textarea: true,
-            email: true,
-            password: true,
-            number: true,
-            checkbox: true,
-            selectboxes: true,
-            select: true,
-            radio: true,
-            button: true,
-          },
         },
         advanced: {
           title: 'Advanced',
           weight: 10,
           default: false,
-          components: {
-            email: true,
-            url: true,
-            phoneNumber: true,
-            tags: true,
-            address: true,
-            dateTime: true,
-            content: true,
-            htmlelement: true,
-            currency: true,
-            signature: true,
-          },
         },
         data: {
           title: 'Data',
           weight: 20,
           default: false,
-          components: {
-            datagrid: true,
-            editgrid: true,
-            container: true,
-            tree: true,
-          },
         },
         layout: {
           title: 'Layout',
           weight: 30,
           default: false,
-          components: {
-            htmlelement: true,
-            content: true,
-            columns: true,
-            fieldset: true,
-            panel: true,
-            table: true,
-            tabs: true,
-            well: true,
-          },
         },
         premium: false,
       },
