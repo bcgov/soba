@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Button as DSButton } from '@bcgov/design-system-react-components';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { ListPageLayout, ListPageToolbar, ListPageAuthGate } from '@/src/components/ListPageLayout';
 import { ListPageSearchField } from '@/src/components/ListPageSearchField';
@@ -18,6 +19,7 @@ import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import type { WorkspaceItem } from '@/src/types/workspaces';
 import { WorkspaceRoleBadge } from './WorkspaceRoleBadge';
 import { DefaultWorkspaceSwitch } from './DefaultWorkspaceSwitch';
+import { isWorkspaceManageRole, userCanCreateWorkspace } from '../workspaceRoles';
 
 const WorkspaceActionButtons = ({
   workspace,
@@ -30,7 +32,10 @@ const WorkspaceActionButtons = ({
   showFormsAction?: boolean;
   dictActions: { manage: string; forms: string };
 }) => {
-  const actions = [{ name: 'manage', title: dictActions.manage }];
+  const actions = [];
+  if (isWorkspaceManageRole(workspace.role)) {
+    actions.push({ name: 'manage', title: dictActions.manage });
+  }
   if (showFormsAction) {
     actions.push({ name: 'forms', title: dictActions.forms });
   }
@@ -210,6 +215,7 @@ function WorkspaceList({ showFormsAction = true }: { showFormsAction?: boolean }
   );
 
   const loading = workspaceStatus === 'loading' || workspaceStatus === 'idle';
+  const showCreateAction = userCanCreateWorkspace(workspaces);
 
   if (!authenticated && !initializing) {
     return <ListPageAuthGate>{dict.general.notAuthenticated}</ListPageAuthGate>;
@@ -218,7 +224,16 @@ function WorkspaceList({ showFormsAction = true }: { showFormsAction?: boolean }
   return (
     <ListPageLayout>
       <DsPageHeading id="workspaces-heading">{dictWorkspaces.tableHeading}</DsPageHeading>
-      <ListPageToolbar align="end">
+      <ListPageToolbar align={showCreateAction ? 'between' : 'end'}>
+        {showCreateAction ? (
+          <DSButton
+            variant="primary"
+            data-testid="create-workspace-button"
+            onPress={() => router.push(`/${locale}/workspace`)}
+          >
+            {dictWorkspaces.createAction}
+          </DSButton>
+        ) : null}
         <ListPageSearchField
           value={searchQuery}
           onChange={handleSearchChange}

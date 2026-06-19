@@ -1,9 +1,9 @@
-import { getDictionary, resolveLocale } from '../../dictionaries';
+import { getDictionary, resolveLocale } from '../dictionaries';
 import { AuthRedirect } from '@/src/app/ui/AuthRedirect';
 import WorkspaceFormLoader from '@/src/features/workspaces/ui/WorkspaceFormLoader';
 
 type PageProps = {
-  params: Promise<{ lang: string; workspaceId: string }>;
+  params: Promise<{ lang: string }>;
 };
 
 export async function generateMetadata({ params }: PageProps) {
@@ -11,7 +11,7 @@ export async function generateMetadata({ params }: PageProps) {
   const locale = resolveLocale(param.lang);
   const dict = await getDictionary(locale);
   return {
-    title: `${dict.workspaces.manageHeading} | ${dict.general.title}`,
+    title: `${dict.workspaces.createHeading} | ${dict.general.title}`,
     description: dict.general.description,
   };
 }
@@ -23,7 +23,7 @@ export default async function Page({ params }: PageProps) {
   return (
     <AuthRedirect to={`/${locale}`} ifLogged={false}>
       <section aria-labelledby="workspace-form-heading">
-        <WorkspaceFormLoader workspaceId={param.workspaceId} />
+        <WorkspaceFormLoader />
       </section>
     </AuthRedirect>
   );

@@ -21,3 +21,11 @@ export type WorkspacesResponse = {
   };
   sort: string;
 };
+
+export type CreateWorkspaceBody = {
+  name: string;
+};
+
+export type UpdateWorkspaceBody = {
+  name: string;
+};

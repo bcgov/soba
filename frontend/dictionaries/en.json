@@ -19,6 +19,18 @@
   "workspaces": {
     "tableHeading": "Workspaces",
     "manageHeading": "Manage Workspace",
+    "createHeading": "Create Workspace",
+    "nameLabel": "Name",
+    "save": "Save",
+    "create": "Create",
+    "cancel": "Cancel",
+    "createAction": "Create",
+    "saveError": "Failed to save workspace.",
+    "createError": "Failed to create workspace.",
+    "loadError": "Failed to load workspace.",
+    "manageForbidden": "Only workspace owners or admins can manage this workspace.",
+    "createForbidden": "Only workspace owners or admins can create workspaces.",
+    "defaultWorkspaceFormLabel": "Set as default workspace",
     "empty": "No workspaces found matching your criteria.",
     "active": "Active",
     "columns": {

@@ -41,6 +41,7 @@ export function SideNav({ showAppLinks, showHome }: SideNavProps) {
         icon: <FaBuilding size={20} />,
         isActive:
           pathname.startsWith(`/${locale}/workspaces`) ||
+          pathname === `/${locale}/workspace` ||
           pathname.startsWith(`/${locale}/workspace/`),
       },
       {

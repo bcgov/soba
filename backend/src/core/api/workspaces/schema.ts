@@ -53,6 +53,18 @@ export const WorkspaceIdParamsSchema = z
   })
   .openapi('Workspaces_WorkspaceIdParams');
 
+export const CreateWorkspaceBodySchema = z
+  .object({
+    name: z.string().trim().min(1),
+  })
+  .openapi('Workspaces_CreateWorkspaceBody');
+
+export const UpdateWorkspaceBodySchema = z
+  .object({
+    name: z.string().trim().min(1),
+  })
+  .openapi('Workspaces_UpdateWorkspaceBody');
+
 export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
@@ -117,6 +129,62 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       403: { description: 'Actor is not a member of the workspace' },
+      404: { description: 'Workspace not found' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/workspaces',
+    tags: ['core.workspaces'],
+    security: [{ bearerAuth: [] }],
+    request: {
+      body: {
+        content: {
+          'application/json': {
+            schema: CreateWorkspaceBodySchema,
+          },
+        },
+      },
+    },
+    responses: {
+      201: {
+        description: 'Workspace created',
+        content: {
+          'application/json': {
+            schema: WorkspaceItemSchema,
+          },
+        },
+      },
+      400: { description: 'Invalid body' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/workspaces/{id}',
+    tags: ['core.workspaces'],
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: WorkspaceIdParamsSchema,
+      body: {
+        content: {
+          'application/json': {
+            schema: UpdateWorkspaceBodySchema,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Workspace updated',
+        content: {
+          'application/json': {
+            schema: WorkspaceItemSchema,
+          },
+        },
+      },
+      403: { description: 'Only workspace owners can rename this workspace' },
       404: { description: 'Workspace not found' },
     },
   });

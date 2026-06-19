@@ -61,6 +61,7 @@ export const WORKSPACE_OWNERS_GROUP_NAME = 'Workspace owners';
 /** Membership source when created automatically as user's home workspace. */
 export const WorkspaceMembershipSource = {
   auto_home: 'auto_home',
+  user_created: 'user_created',
 } as const;
 export type WorkspaceMembershipSourceCode =
   (typeof WorkspaceMembershipSource)[keyof typeof WorkspaceMembershipSource];

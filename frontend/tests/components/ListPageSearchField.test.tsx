@@ -7,7 +7,7 @@ import { ListPageSearchField } from '@/src/components/ListPageSearchField';
 describe('ListPageSearchField', () => {
   it('renders search input and clears value', async () => {
     const onChange = vi.fn();
-    const { rerender } = render(
+    render(
       <ListPageSearchField value="team" onChange={onChange} testIdPrefix="workspaces" />,
     );
 

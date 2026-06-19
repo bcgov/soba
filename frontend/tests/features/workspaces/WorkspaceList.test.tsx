@@ -22,6 +22,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
       active: 'Active',
       columns: { name: 'Name', actions: 'Actions', roles: 'Roles', default: 'Default' },
       actions: { manage: 'Manage', forms: 'Forms' },
+      createAction: 'Create',
       defaultWorkspaceLabel: 'Set {name} as default workspace',
       defaultWorkspaceError: 'Failed to update default workspace.',
     },
@@ -125,12 +126,13 @@ describe('WorkspaceList', () => {
       const res = render(<WorkspaceList />);
       container = res.container;
     });
+    expect(container!.querySelector('[data-testid="manage-ws2-button"]')).toBeNull();
     const btn = container!.querySelector(
-      '[data-testid="manage-ws2-button"]',
+      '[data-testid="manage-ws1-button"]',
     ) as HTMLButtonElement | null;
     expect(btn).toBeTruthy();
     await userEvent.click(btn!);
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/en/workspace/ws2'));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/en/workspace/ws1'));
   });
 
   it('navigates to forms on Forms action', async () => {
@@ -163,5 +165,13 @@ describe('WorkspaceList', () => {
     });
     expect(screen.getByTestId('default-workspace-ws1')).toBeInTheDocument();
     expect(screen.getByTestId('default-workspace-ws2')).toBeInTheDocument();
+  });
+
+  it('navigates to create page on Create action', async () => {
+    await act(async () => {
+      render(<WorkspaceList />);
+    });
+    await userEvent.click(screen.getByTestId('create-workspace-button'));
+    expect(mockPush).toHaveBeenCalledWith('/en/workspace');
   });
 });

@@ -7,7 +7,7 @@ import { parseJson } from './sobaHelpers';
 import { sobaFetch } from './sobaFetch';
 
 import type { SobaFormType } from '../../types/forms';
-import type { WorkspaceItem, WorkspacesResponse } from '../../types/workspaces';
+import type { WorkspaceItem, WorkspacesResponse, CreateWorkspaceBody, UpdateWorkspaceBody } from '../../types/workspaces';
 import type { CurrentUserResponse } from '../../types/user';
 import type { PatchCurrentUserBody } from '../../types/user';
 
@@ -155,5 +155,22 @@ export async function patchCurrentUser(
   body: PatchCurrentUserBody,
 ): Promise<CurrentUserResponse> {
   const response = await sobaFetch('/me', { token, method: 'PATCH', json: body });
+  return parseJson(response);
+}
+
+export async function createWorkspace(
+  token: string,
+  body: CreateWorkspaceBody,
+): Promise<WorkspaceItem> {
+  const response = await sobaFetch('/workspaces', { token, method: 'POST', json: body });
+  return parseJson(response);
+}
+
+export async function updateWorkspace(
+  token: string,
+  id: string,
+  body: UpdateWorkspaceBody,
+): Promise<WorkspaceItem> {
+  const response = await sobaFetch(`/workspaces/${id}`, { token, method: 'PATCH', json: body });
   return parseJson(response);
 }
