@@ -97,7 +97,7 @@ export const profileHelpers = {
     const p = profileFromSource(source);
     const prefs = p.preferences;
     if (!prefs || typeof prefs !== 'object') return null;
-    const id = (prefs as ProfilePreferences).defaultWorkspaceId;
+    const id = prefs.defaultWorkspaceId;
     return typeof id === 'string' && id.length > 0 ? id : null;
   },
 };

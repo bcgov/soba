@@ -10,7 +10,7 @@ type ListPageSearchFieldProps = {
   testIdPrefix: string;
 };
 
-export function ListPageSearchField({ value, onChange, testIdPrefix }: ListPageSearchFieldProps) {
+export function ListPageSearchField({ value, onChange, testIdPrefix }: Readonly<ListPageSearchFieldProps>) {
   return (
     <div className={styles.searchField}>
       <TextField

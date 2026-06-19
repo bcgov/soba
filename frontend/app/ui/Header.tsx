@@ -31,10 +31,10 @@ type HeaderProps = {
 function LanguageSelector({
   locale,
   onChange,
-}: {
+}: Readonly<{
   locale: string;
   onChange: (locale: string) => void;
-}) {
+}>) {
   return (
     <select
       id="lang-selector"
@@ -122,7 +122,7 @@ function Header({ headerNavItems }: HeaderProps) {
     if (!target) return;
 
     establishingWorkspaceRef.current = true;
-    void dispatch(selectActiveWorkspace({ token, workspaceId: target.id }))
+    dispatch(selectActiveWorkspace({ token, workspaceId: target.id }))
       .unwrap()
       .catch((error) => {
         addNotification({
@@ -158,7 +158,7 @@ function Header({ headerNavItems }: HeaderProps) {
     if (!token || key == null) return;
     const workspaceId = String(key);
     if (workspaceId === activeWorkspaceId) return;
-    void dispatch(selectActiveWorkspace({ token, workspaceId }))
+    dispatch(selectActiveWorkspace({ token, workspaceId }))
       .unwrap()
       .then(() => {
         router.push(`/${locale}/forms`);
@@ -188,14 +188,32 @@ function Header({ headerNavItems }: HeaderProps) {
       typeof idTokenParsed?.display_name === 'string' && idTokenParsed.display_name.trim().length > 0
         ? idTokenParsed.display_name
         : null;
-    const displayName =
-      typeof backendDisplayName === 'string' && backendDisplayName.trim().length > 0
-        ? backendDisplayName
-        : isCurrentTokenUser && currentUser.hasError
-          ? (keycloakDisplayName ?? 'Authenticated User')
-          : isCurrentTokenUser && currentUser.isLoaded
-            ? 'Authenticated User'
-            : null;
+    let displayName: string | null;
+    if (typeof backendDisplayName === 'string' && backendDisplayName.trim().length > 0) {
+      displayName = backendDisplayName;
+    } else if (isCurrentTokenUser && currentUser.hasError) {
+      displayName = keycloakDisplayName ?? 'Authenticated User';
+    } else if (isCurrentTokenUser && currentUser.isLoaded) {
+      displayName = 'Authenticated User';
+    } else {
+      displayName = null;
+    }
+
+    const authenticatedUserMenu = displayName ? (
+      <Dropdown>
+        <Dropdown.Toggle className={styles.userDrop} data-testid="user-dropdown" id="dropdown-user">
+          <FaUser className="align-text-top" aria-hidden="true" />
+          <span className={styles.limitText + ' ms-2 me-2'}>{displayName}</span>
+        </Dropdown.Toggle>
+        <Dropdown.Menu>
+          <Dropdown.Item onClick={handleLogout} data-testid="logout-button">
+            {dict.general.logout}
+          </Dropdown.Item>
+        </Dropdown.Menu>
+      </Dropdown>
+    ) : (
+      <span aria-hidden="true" className={styles.userNameSkeleton} />
+    );
 
     return (
       <div className="d-flex align-items-center justify-content-end gap-3">
@@ -215,21 +233,7 @@ function Header({ headerNavItems }: HeaderProps) {
         <LanguageSelector locale={locale} onChange={handleLanguageChange} />
 
         {authenticated ? (
-          displayName ? (
-            <Dropdown>
-              <Dropdown.Toggle className={styles.userDrop} data-testid="user-dropdown" id="dropdown-user">
-                <FaUser className="align-text-top" aria-hidden="true" />
-                <span className={styles.limitText + ' ms-2 me-2'}>{displayName}</span>
-              </Dropdown.Toggle>
-              <Dropdown.Menu>
-                <Dropdown.Item onClick={handleLogout} data-testid="logout-button">
-                  {dict.general.logout}
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
-          ) : (
-            <span aria-hidden="true" className={styles.userNameSkeleton} />
-          )
+          authenticatedUserMenu
         ) : (
           <LoginButton data-testid="login-button" label={dict.general.login} />
         )}

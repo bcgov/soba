@@ -37,7 +37,7 @@ const corsExposedHeaders = ['x-soba-workspace-id'];
 const corsOrigin = process.env.CORS_ORIGIN;
 if (process.env.NODE_ENV === 'development') {
   log.info('Allowing CORS for development environment');
-  app.use(cors({ exposedHeaders: corsExposedHeaders }));
+  app.use(cors({ origin: 'http://localhost:3000', exposedHeaders: corsExposedHeaders }));
 } else if (corsOrigin) {
   const origins = corsOrigin
     .split(',')

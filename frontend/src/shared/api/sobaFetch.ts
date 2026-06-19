@@ -33,7 +33,8 @@ function buildUrl(path: string, options: SobaFetchOptions): string {
     params.set('workspaceId', options.workspaceId);
   }
   const qs = params.toString();
-  return `${getSobaApiBaseUrl()}${path}${qs ? `?${qs}` : ''}`;
+  const queryString = qs ? `?${qs}` : '';
+  return `${getSobaApiBaseUrl()}${path}${queryString}`;
 }
 
 /**

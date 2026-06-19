@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { act } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { act } from 'react';
 
 const mockDispatch = vi.fn();
 const mockUnwrap = vi.fn().mockResolvedValue({

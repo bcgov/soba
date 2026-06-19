@@ -58,11 +58,12 @@ export function resolveRedirect(
     return null;
   }
 
-  const landing = session.needsOnboarding
-    ? onboarding
-    : session.canCreateWorkspace && !session.hasWorkspaces
-      ? workspaces
-      : forms;
+  let landing = forms;
+  if (session.needsOnboarding) {
+    landing = onboarding;
+  } else if (session.canCreateWorkspace && !session.hasWorkspaces) {
+    landing = workspaces;
+  }
 
   if (kind === 'home') {
     return landing;

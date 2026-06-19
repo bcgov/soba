@@ -12,6 +12,6 @@ type WorkspaceFormLoaderProps = {
   workspaceId?: string;
 };
 
-export default function WorkspaceFormLoader({ workspaceId }: WorkspaceFormLoaderProps) {
+export default function WorkspaceFormLoader({ workspaceId }: Readonly<WorkspaceFormLoaderProps>) {
   return <WorkspaceForm workspaceId={workspaceId} />;
 }

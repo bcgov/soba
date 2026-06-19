@@ -53,6 +53,20 @@ function selectChain(result: unknown) {
   };
 }
 
+// A complete membership row for mocking getWorkspaceForUser (buildCoreContext only
+// needs a truthy value; the full shape keeps it type-safe without a cast).
+function membershipRow(id: string) {
+  return {
+    id,
+    kind: 'team',
+    name: 'Workspace',
+    slug: null,
+    status: 'active',
+    membershipId: 'membership-1',
+    role: 'owner',
+  };
+}
+
 function makeReq(overrides: Partial<Request> = {}): Request {
   return {
     actorId: 'actor1',
@@ -83,7 +97,7 @@ beforeEach(() => {
 
 describe('workspaceFromQuery', () => {
   it('resolves the workspace from the query param and echoes the header', async () => {
-    jest.mocked(getWorkspaceForUser).mockResolvedValue({ id: 'ws1' } as never);
+    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws1'));
     const req = makeReq({ query: { workspaceId: 'ws1' } as Request['query'] });
     const res = makeRes();
     const next = jest.fn() as unknown as NextFunction;
@@ -112,7 +126,7 @@ describe('workspaceFromQuery', () => {
   });
 
   it('rejects with Forbidden when the actor is not a member', async () => {
-    jest.mocked(getWorkspaceForUser).mockResolvedValue(null as never);
+    jest.mocked(getWorkspaceForUser).mockResolvedValue(null);
     const req = makeReq({ query: { workspaceId: 'ws1' } as Request['query'] });
     const res = makeRes();
     const next = jest.fn() as unknown as NextFunction;
@@ -199,7 +213,7 @@ describe('workspaceListScope', () => {
   const formsListScope = workspaceListScope({ anchorOrder: ['formId', 'workspaceId'] });
 
   it('scopes to workspace from workspaceId anchor and echoes the header', async () => {
-    jest.mocked(getWorkspaceForUser).mockResolvedValue({ id: 'ws1' } as never);
+    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws1'));
     const req = makeReq({ query: { workspaceId: 'ws1' } as Request['query'] });
     const res = makeRes();
     const next = jest.fn() as unknown as NextFunction;
@@ -218,7 +232,7 @@ describe('workspaceListScope', () => {
 
   it('derives workspace from formId anchor and echoes the header', async () => {
     jest.mocked(getFormListContext).mockResolvedValue({ workspaceId: 'ws-form' });
-    jest.mocked(getWorkspaceForUser).mockResolvedValue({ id: 'ws-form' } as never);
+    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws-form'));
     const req = makeReq({ query: { formId: 'form1' } as Request['query'] });
     const res = makeRes();
     const next = jest.fn() as unknown as NextFunction;
@@ -237,7 +251,7 @@ describe('workspaceListScope', () => {
   });
 
   it('rejects with Forbidden when the actor is not a member of the resolved workspace', async () => {
-    jest.mocked(getWorkspaceForUser).mockResolvedValue(null as never);
+    jest.mocked(getWorkspaceForUser).mockResolvedValue(null);
     const req = makeReq({ query: { workspaceId: 'ws1' } as Request['query'] });
     const res = makeRes();
     const next = jest.fn() as unknown as NextFunction;
@@ -274,7 +288,7 @@ describe('workspaceFromResource', () => {
 
   it('derives the workspace from the resource and echoes the header', async () => {
     getWorkspaceIdForForm.mockResolvedValue('ws9');
-    jest.mocked(getWorkspaceForUser).mockResolvedValue({ id: 'ws9' } as never);
+    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws9'));
     const req = makeReq({ params: { id: 'form1' } as Request['params'] });
     const res = makeRes();
     const next = jest.fn() as unknown as NextFunction;
@@ -302,7 +316,7 @@ describe('workspaceFromResource', () => {
 
   it('returns 403 (ForbiddenError) when the actor is not a member of the resource workspace', async () => {
     getWorkspaceIdForForm.mockResolvedValue('ws9');
-    jest.mocked(getWorkspaceForUser).mockResolvedValue(null as never);
+    jest.mocked(getWorkspaceForUser).mockResolvedValue(null);
     const req = makeReq({ params: { id: 'form1' } as Request['params'] });
     const res = makeRes();
     const next = jest.fn() as unknown as NextFunction;

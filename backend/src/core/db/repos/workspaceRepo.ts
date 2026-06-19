@@ -15,8 +15,11 @@ import {
   workspaceMemberships,
   workspaces,
 } from '../schema';
-import { invalidateMembershipCache } from './membershipRepo';
-import { getWorkspaceForUser, isWorkspaceManageRole } from './membershipRepo';
+import {
+  getWorkspaceForUser,
+  invalidateMembershipCache,
+  isWorkspaceManageRole,
+} from './membershipRepo';
 
 const WORKSPACE_KIND_TEAM = 'team';
 const WORKSPACE_STATUS_ACTIVE = 'active';

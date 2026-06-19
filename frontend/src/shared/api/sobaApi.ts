@@ -8,8 +8,7 @@ import { sobaFetch } from './sobaFetch';
 
 import type { SobaFormType } from '../../types/forms';
 import type { WorkspaceItem, WorkspacesResponse, CreateWorkspaceBody, UpdateWorkspaceBody } from '../../types/workspaces';
-import type { CurrentUserResponse } from '../../types/user';
-import type { PatchCurrentUserBody } from '../../types/user';
+import type { CurrentUserResponse, PatchCurrentUserBody } from '../../types/user';
 
 export type { SobaFormType, WorkspaceItem, WorkspacesResponse, CurrentUserResponse };
 export {

@@ -30,11 +30,11 @@ export function useAppSession(): AppSessionSnapshot {
   }, [authenticated, token, currentUserStatus, dispatch]);
 
   return useMemo(() => {
-    const sessionReady = !authenticated
-      ? !initializing
-      : !initializing &&
+    const sessionReady = authenticated
+      ? !initializing &&
         workspaceStatus === 'succeeded' &&
-        currentUserStatus === 'succeeded';
+        currentUserStatus === 'succeeded'
+      : !initializing;
 
     const sessionFailed =
       authenticated && (workspaceStatus === 'failed' || currentUserStatus === 'failed');

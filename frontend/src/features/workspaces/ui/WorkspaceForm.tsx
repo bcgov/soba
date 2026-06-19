@@ -30,7 +30,7 @@ type WorkspaceFormProps = {
   workspaceId?: string;
 };
 
-function WorkspaceForm({ workspaceId }: WorkspaceFormProps) {
+function WorkspaceForm({ workspaceId }: Readonly<WorkspaceFormProps>) {
   const isCreate = !workspaceId;
   const dict = useDictionary();
   const dictWorkspaces = dict.workspaces;
@@ -53,11 +53,11 @@ function WorkspaceForm({ workspaceId }: WorkspaceFormProps) {
   const [loading, setLoading] = useState(!isCreate);
   const [saving, setSaving] = useState(false);
 
-  const isDefault = defaultTouched
-    ? isDefaultChoice
-    : isCreate
-      ? false
-      : savedDefaultId === workspaceId;
+  let savedDefaultMatches = false;
+  if (!isCreate) {
+    savedDefaultMatches = savedDefaultId === workspaceId;
+  }
+  const isDefault = defaultTouched ? isDefaultChoice : savedDefaultMatches;
 
   useEffect(() => {
     if (authenticated && token && currentUserStatus === 'idle') {
@@ -145,7 +145,7 @@ function WorkspaceForm({ workspaceId }: WorkspaceFormProps) {
         const created = await createWorkspace(token, { name: trimmedName });
         savedId = created.id;
       } else if (trimmedName !== loadedName) {
-        await updateWorkspace(token, workspaceId!, { name: trimmedName });
+        await updateWorkspace(token, workspaceId, { name: trimmedName });
       }
 
       const nextDefaultId = isDefault ? savedId : null;
@@ -203,7 +203,7 @@ function WorkspaceForm({ workspaceId }: WorkspaceFormProps) {
       <Form
         onSubmit={(event) => {
           event.preventDefault();
-          void handleSave();
+          handleSave().catch(() => undefined);
         }}
         className={styles.fieldStack}
       >

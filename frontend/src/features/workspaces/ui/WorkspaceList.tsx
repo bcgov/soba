@@ -55,7 +55,7 @@ const WorkspaceActionButtons = ({
   );
 };
 
-function WorkspaceList({ showFormsAction = true }: { showFormsAction?: boolean }) {
+function WorkspaceList({ showFormsAction = true }: Readonly<{ showFormsAction?: boolean }>) {
   const dict = useDictionary();
   const dictWorkspaces = dict.workspaces;
   const { authenticated, token, initializing } = useKeycloak();
@@ -117,7 +117,7 @@ function WorkspaceList({ showFormsAction = true }: { showFormsAction?: boolean }
   const handleSelect = useCallback(
     (workspaceId: string, destination: 'forms' | 'manage') => {
       if (!token) return;
-      void dispatch(selectActiveWorkspace({ token, workspaceId }))
+      dispatch(selectActiveWorkspace({ token, workspaceId }))
         .unwrap()
         .then(() => {
           if (destination === 'forms') {

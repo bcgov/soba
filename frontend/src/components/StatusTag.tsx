@@ -30,7 +30,7 @@ export function StatusTag({
   label,
   variant = 'neutral',
   'data-testid': testId,
-}: StatusTagProps) {
+}: Readonly<StatusTagProps>) {
   return (
     <TagGroup aria-label={label} data-testid={testId}>
       <TagList

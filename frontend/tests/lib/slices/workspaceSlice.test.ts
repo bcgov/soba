@@ -27,7 +27,7 @@ const baseState: WorkspaceState = {
 
 describe('workspaceSlice', () => {
   beforeEach(() => {
-    window.sessionStorage.clear();
+    globalThis.sessionStorage.clear();
   });
 
   it('pickWorkspaceToEstablish selects the sole workspace', () => {
@@ -98,18 +98,18 @@ describe('workspaceSlice', () => {
   });
 
   it('clearWorkspaceState resets state and clears the per-tab store', () => {
-    window.sessionStorage.setItem(STORAGE_KEY, 'w1');
+    globalThis.sessionStorage.setItem(STORAGE_KEY, 'w1');
     const next = workspaceReducer(
       { ...baseState, activeWorkspaceId: 'w1', workspaces: [workspace('w1')] },
       clearWorkspaceState(),
     );
     expect(next.activeWorkspaceId).toBeNull();
     expect(next.workspaces).toEqual([]);
-    expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(globalThis.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
   it('hydrates activeWorkspaceId from the per-tab store on init', async () => {
-    window.sessionStorage.setItem(STORAGE_KEY, 'wsHydrated');
+    globalThis.sessionStorage.setItem(STORAGE_KEY, 'wsHydrated');
     vi.resetModules();
     const mod = await import('@/lib/slices/workspaceSlice');
     const state = mod.default(undefined, { type: '@@redux/INIT' });

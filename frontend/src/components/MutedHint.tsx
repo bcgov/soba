@@ -7,7 +7,7 @@ type MutedHintProps = {
 };
 
 /** Secondary inline hint (e.g. workspace “Active” label beside a row link). */
-export function MutedHint({ children }: MutedHintProps) {
+export function MutedHint({ children }: Readonly<MutedHintProps>) {
   return (
     <Text size="small" color="secondary" elementType="span">
       {children}

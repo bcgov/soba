@@ -21,7 +21,7 @@ export function DefaultWorkspaceSwitch({
   defaultWorkspaceId,
   ariaLabelTemplate,
   errorMessage,
-}: DefaultWorkspaceSwitchProps) {
+}: Readonly<DefaultWorkspaceSwitchProps>) {
   const dispatch = useAppDispatch();
   const { token } = useKeycloak();
   const { addNotification } = useNotificationStore();
@@ -31,7 +31,7 @@ export function DefaultWorkspaceSwitch({
   const handleChange = (selected: boolean) => {
     if (!token || pending) return;
     setPending(true);
-    void dispatch(
+    dispatch(
       updateDefaultWorkspace({
         token,
         defaultWorkspaceId: selected ? workspaceId : null,

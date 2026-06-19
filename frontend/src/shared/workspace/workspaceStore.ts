@@ -9,9 +9,9 @@
 const STORAGE_KEY = 'soba.workspaceId';
 
 function getStorage(): Storage | null {
-  if (typeof window === 'undefined') return null;
+  if (typeof globalThis.window === 'undefined') return null;
   try {
-    return window.sessionStorage;
+    return globalThis.sessionStorage;
   } catch {
     // Access to sessionStorage can throw (e.g. sandboxed iframes, privacy modes).
     return null;

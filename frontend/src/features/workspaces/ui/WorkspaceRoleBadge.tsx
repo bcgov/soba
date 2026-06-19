@@ -12,7 +12,7 @@ function formatRoleLabel(role: string): string {
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
 
-export function WorkspaceRoleBadge({ role, 'data-testid': testId }: WorkspaceRoleBadgeProps) {
+export function WorkspaceRoleBadge({ role, 'data-testid': testId }: Readonly<WorkspaceRoleBadgeProps>) {
   const label = formatRoleLabel(role || '');
   const id = `workspace-role-${(role || 'unknown').toLowerCase()}-${testId ?? 'badge'}`;
   return (

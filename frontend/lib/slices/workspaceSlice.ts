@@ -27,7 +27,7 @@ export function pickWorkspaceToEstablish(
     const preferred = workspaces.find((w) => w.id === defaultWorkspaceId);
     if (preferred) return preferred;
   }
-  if (workspaces.length === 1) return workspaces[0]!;
+  if (workspaces.length === 1) return workspaces[0];
   return workspaces.find((w) => w.kind === 'personal') ?? null;
 }
 

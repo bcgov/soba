@@ -138,7 +138,9 @@ export async function getSobaSubmissions(
   const query: Record<string, string> = {};
   if (params) {
     for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined) query[key] = String(value);
+      if (value !== undefined) {
+        query[key] = typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
+      }
     }
   }
   const response = await sobaFetch('/submissions', {

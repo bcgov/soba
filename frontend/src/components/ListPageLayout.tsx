@@ -12,16 +12,16 @@ type ListPageToolbarProps = {
   align?: 'between' | 'end';
 };
 
-export function ListPageLayout({ children }: ListPageLayoutProps) {
+export function ListPageLayout({ children }: Readonly<ListPageLayoutProps>) {
   return <div className={styles.container}>{children}</div>;
 }
 
-export function ListPageToolbar({ children, align = 'between' }: ListPageToolbarProps) {
+export function ListPageToolbar({ children, align = 'between' }: Readonly<ListPageToolbarProps>) {
   return (
     <div className={align === 'end' ? styles.toolbarEnd : styles.toolbar}>{children}</div>
   );
 }
 
-export function ListPageAuthGate({ children }: { children: ReactNode }) {
+export function ListPageAuthGate({ children }: Readonly<{ children: ReactNode }>) {
   return <div className={styles.authGate}>{children}</div>;
 }

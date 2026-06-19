@@ -18,7 +18,7 @@ type AppAccessGuardProps = {
 };
 
 /** Central session bootstrap and route access policy for localized app routes. */
-export function AppAccessGuard({ locale, children }: AppAccessGuardProps) {
+export function AppAccessGuard({ locale, children }: Readonly<AppAccessGuardProps>) {
   const dict = useDictionary();
   const router = useRouter();
   const pathname = usePathname();
@@ -57,7 +57,9 @@ export function AppAccessGuard({ locale, children }: AppAccessGuardProps) {
           <Button
             type="button"
             variant="primary"
-            onPress={() => void handleRetry()}
+            onPress={() => {
+              handleRetry().catch(() => undefined);
+            }}
             data-testid="session-error-retry"
           >
             {dict.general.tryAgain}
