@@ -12,7 +12,9 @@
     "help": "Help",
     "welcomeTo": "Welcome to",
     "loading": "Loading…",
-    "comingSoon": "This feature is coming soon."
+    "comingSoon": "This feature is coming soon.",
+    "selectWorkspace": "Select a workspace to view forms.",
+    "workspaceSwitchError": "Failed to switch workspace."
   },
   "header": {
     "workspaces": "Workspaces",

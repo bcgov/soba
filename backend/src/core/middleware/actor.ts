@@ -10,6 +10,13 @@ import { isSobaAdmin, upsertSobaAdminFromIdp } from '../db/repos/sobaAdminRepo';
 import { ValidationError } from '../errors';
 import { profileHelpers } from '../auth/jwtClaims';
 
+/**
+ * Read the resolved actor id, falling back to the dev/test `x-soba-user-id` bypass header.
+ * Used by actor-only routes that don't resolve a workspace context.
+ */
+export const getActorId = (req: Request): string | null =>
+  req.actorId ?? req.header('x-soba-user-id') ?? null;
+
 export function resolveActor(req: Request, res: Response, next: NextFunction): void {
   if (req.actorId || req.header('x-soba-user-id')) {
     const actorId = req.actorId ?? req.header('x-soba-user-id') ?? null;

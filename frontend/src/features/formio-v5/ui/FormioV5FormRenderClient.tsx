@@ -2,7 +2,7 @@
 
 import { useParams, useRouter, usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { FormioProvider, Submission } from '@formio/react';
+import { Submission } from '@formio/react';
 import type { FormType } from '@formio/react';
 import { InlineAlert } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
@@ -18,7 +18,6 @@ import {
   saveSobaFormSubmission,
 } from '@/src/shared/api/sobaApi';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import { useAppSelector } from '@/lib/store';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
 type FormRenderLabels = {
@@ -35,11 +34,9 @@ type FormRenderLabels = {
  */
 function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: FormRenderLabels }) {
   const { token } = useKeycloak();
-  const { activeWorkspaceId } = useAppSelector((state) => state.workspace);
   const { addNotification } = useNotificationStore();
   const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
-  const ws = activeWorkspaceId || undefined;
 
   const [schema, setSchema] = useState<FormType | null>(null);
   const [formVersionId, setFormVersionId] = useState<string | null>(null);
@@ -58,13 +55,13 @@ function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: Fo
     void (async () => {
       try {
         // Submissions can only be made to the currently published version.
-        const { items } = await getSobaFormVersions(token, formId, ws);
+        const { items } = await getSobaFormVersions(token, formId);
         const published = (items || []).find((v) => v.state === 'published');
         if (!published) {
           if (active) setLoadError(labels.unavailable);
           return;
         }
-        const loadedSchema = await getFormVersionSchema(token, published.id, ws);
+        const loadedSchema = await getFormVersionSchema(token, published.id);
         if (!loadedSchema) {
           if (active) setLoadError(labels.unavailable);
           return;
@@ -82,18 +79,17 @@ function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: Fo
     return () => {
       active = false;
     };
-  }, [token, formId, ws, loaded, labels.loadError, labels.unavailable]);
+  }, [token, formId, loaded, labels.loadError, labels.unavailable]);
 
   const submitForm = async (submission: Submission) => {
     if (!token || !formVersionId) return;
     try {
-      const created = await createSobaFormSubmission(token, formId, formVersionId, {}, ws);
+      const created = await createSobaFormSubmission(token, formId, formVersionId, {});
       await saveSobaFormSubmission(
         token,
         created.id,
         (submission?.data ?? {}) as Record<string, unknown>,
         'submit',
-        ws,
       );
       addNotification({ text: labels.submitSuccess, type: 'success' });
       // Go straight to the saved submission's read-only view — the same page the
@@ -133,23 +129,21 @@ function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: Fo
         }
       >
         <div className="formio-v5-chrome" data-soba-formio-chrome>
-          <FormioProvider>
-            <DynamicForm
-              className="formio-v5-form-root"
-              src=""
-              form={schema}
-              // We own all submit messaging (success toast + redirect, inline error),
-              // so suppress Form.io's built-in green "Submission Complete" alert.
-              options={{ noAlerts: true }}
-              onFormReady={(instance) => {
-                formInstanceRef.current = instance;
-              }}
-              onError={(err) => {
-                setRenderError(normalizeFormioRenderError(err, labels.loadError));
-              }}
-              onSubmit={submitForm}
-            />
-          </FormioProvider>
+          <DynamicForm
+            className="formio-v5-form-root"
+            src=""
+            form={schema}
+            // We own all submit messaging (success toast + redirect, inline error),
+            // so suppress Form.io's built-in green "Submission Complete" alert.
+            options={{ noAlerts: true }}
+            onFormReady={(instance) => {
+              formInstanceRef.current = instance;
+            }}
+            onError={(err) => {
+              setRenderError(normalizeFormioRenderError(err, labels.loadError));
+            }}
+            onSubmit={submitForm}
+          />
         </div>
       </FormioV5FormRenderErrorBoundary>
     </>

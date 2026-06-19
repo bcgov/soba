@@ -7,9 +7,15 @@ import { Select, Header as BCHeader } from '@bcgov/design-system-react-component
 import { FaUser } from 'react-icons/fa6';
 import { useAppDispatch } from '@/lib/store';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
+import { useClientMounted } from '@/lib/hooks/useClientMounted';
 import { useCurrentUser } from '@/lib/useCurrentUser';
+import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { clearCurrentUser, loadCurrentUser } from '@/lib/slices/currentUserSlice';
-import { loadWorkspaces, setActiveWorkspaceId } from '@/lib/slices/workspaceSlice';
+import {
+  loadWorkspaces,
+  pickWorkspaceToEstablish,
+  selectActiveWorkspace,
+} from '@/lib/slices/workspaceSlice';
 import { useAppSelector } from '@/lib/store';
 import { useDictionary } from '../[lang]/Providers';
 import { LoginButton } from './LoginButton';
@@ -21,9 +27,34 @@ type HeaderProps = {
   overlayNavItems: PluginNavItem[];
 };
 
+/** Native select avoids React Aria auto-ids that can mismatch between SSR and hydration. */
+function LanguageSelector({
+  locale,
+  onChange,
+}: {
+  locale: string;
+  onChange: (locale: string) => void;
+}) {
+  return (
+    <select
+      id="lang-selector"
+      data-testid="lang-selector"
+      aria-label="Select Language"
+      className="form-select form-select-sm mr-2"
+      style={{ width: 'auto' }}
+      value={locale}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      <option value="en">EN</option>
+      <option value="fr">FR</option>
+    </select>
+  );
+}
+
 function Header({ headerNavItems }: HeaderProps) {
   const dispatch = useAppDispatch();
   const dict = useDictionary();
+  const { addNotification } = useNotificationStore();
 
   const locale = dict.locale === 'en' || dict.locale === 'fr' ? dict.locale : 'en';
   const pathname = usePathname();
@@ -38,6 +69,8 @@ function Header({ headerNavItems }: HeaderProps) {
 
   const headerChromeRef = useRef<HTMLDivElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const establishingWorkspaceRef = useRef(false);
+  const clientMounted = useClientMounted();
 
   useEffect(() => {
     init();
@@ -69,9 +102,70 @@ function Header({ headerNavItems }: HeaderProps) {
     }
   }, [authenticated, token, workspaceStatus, dispatch]);
 
+  // Establish the tab workspace through the backend so sobaFetch can capture the echoed
+  // x-soba-workspace-id header into sessionStorage (soba.workspaceId). Without this,
+  // users with a single workspace never see the chooser and nothing writes the store.
+  useEffect(() => {
+    if (
+      !authenticated ||
+      !token ||
+      workspaceStatus !== 'succeeded' ||
+      activeWorkspaceId ||
+      establishingWorkspaceRef.current
+    ) {
+      return;
+    }
+
+    const target = pickWorkspaceToEstablish(workspaces);
+    if (!target) return;
+
+    establishingWorkspaceRef.current = true;
+    void dispatch(selectActiveWorkspace({ token, workspaceId: target.id }))
+      .unwrap()
+      .catch((error) => {
+        addNotification({
+          text: dict.general.workspaceSwitchError,
+          type: 'error',
+          consoleError: error,
+        });
+      })
+      .finally(() => {
+        establishingWorkspaceRef.current = false;
+      });
+  }, [
+    authenticated,
+    token,
+    workspaceStatus,
+    activeWorkspaceId,
+    workspaces,
+    dispatch,
+    addNotification,
+    dict.general.workspaceSwitchError,
+  ]);
+
   const handleLogout = () => {
     dispatch(clearCurrentUser());
     logout();
+  };
+
+  // Round-trip through GET /workspaces/:id so the backend verifies membership before we
+  // persist the tab workspace to sessionStorage and Redux, then open the forms list.
+  const handleWorkspaceChange = (key: string | number | null) => {
+    if (!token || key == null) return;
+    const workspaceId = String(key);
+    if (workspaceId === activeWorkspaceId) return;
+    void dispatch(selectActiveWorkspace({ token, workspaceId }))
+      .unwrap()
+      .then(() => {
+        router.push(`/${locale}/forms`);
+      })
+      .catch((error) => {
+        addNotification({
+          text: dict.general.workspaceSwitchError,
+          type: 'error',
+          consoleError: error,
+        });
+      });
   };
 
   const handleLanguageChange = (newLocale: string) => {
@@ -84,52 +178,40 @@ function Header({ headerNavItems }: HeaderProps) {
   };
 
   const authActions = () => {
-    if (authenticated) {
-      const isCurrentTokenUser = currentUser.token === token;
-      const backendDisplayName = isCurrentTokenUser ? currentUser.displayName : null;
-      const keycloakDisplayName =
-        typeof idTokenParsed?.display_name === 'string' &&
-        idTokenParsed.display_name.trim().length > 0
-          ? idTokenParsed.display_name
-          : null;
-      const displayName =
-        typeof backendDisplayName === 'string' && backendDisplayName.trim().length > 0
-          ? backendDisplayName
-          : isCurrentTokenUser && currentUser.hasError
-            ? (keycloakDisplayName ?? 'Authenticated User')
-            : isCurrentTokenUser && currentUser.isLoaded
-              ? 'Authenticated User'
-              : null;
-      return (
-        <div className="d-flex align-items-center justify-content-end gap-3">
-          {workspaces.length > 1 && (
-            <Select
-              size="small"
-              id="workspace-select"
-              data-testid="workspace-select"
-              aria-label="Select Workspace"
-              className="mr-2"
-              selectedKey={activeWorkspaceId || null}
-              onSelectionChange={(key) => dispatch(setActiveWorkspaceId(String(key)))}
-              items={workspaces.map((ws) => ({ id: ws.id, label: `${ws.name} (${ws.kind})` }))}
-            />
-          )}
+    const isCurrentTokenUser = currentUser.token === token;
+    const backendDisplayName = isCurrentTokenUser ? currentUser.displayName : null;
+    const keycloakDisplayName =
+      typeof idTokenParsed?.display_name === 'string' && idTokenParsed.display_name.trim().length > 0
+        ? idTokenParsed.display_name
+        : null;
+    const displayName =
+      typeof backendDisplayName === 'string' && backendDisplayName.trim().length > 0
+        ? backendDisplayName
+        : isCurrentTokenUser && currentUser.hasError
+          ? (keycloakDisplayName ?? 'Authenticated User')
+          : isCurrentTokenUser && currentUser.isLoaded
+            ? 'Authenticated User'
+            : null;
 
+    return (
+      <div className="d-flex align-items-center justify-content-end gap-3">
+        {authenticated && clientMounted && workspaces.length > 1 ? (
           <Select
             size="small"
-            id="lang-selector"
-            data-testid="lang-selector"
-            aria-label="Select Language"
+            id="workspace-select"
+            data-testid="workspace-select"
+            aria-label="Select Workspace"
             className="mr-2"
-            selectedKey={locale}
-            onSelectionChange={(key) => handleLanguageChange(String(key))}
-            items={[
-              { id: 'en', label: 'EN' },
-              { id: 'fr', label: 'FR' },
-            ]}
+            selectedKey={activeWorkspaceId || null}
+            onSelectionChange={handleWorkspaceChange}
+            items={workspaces.map((ws) => ({ id: ws.id, label: `${ws.name} (${ws.kind})` }))}
           />
+        ) : null}
 
-          {displayName ? (
+        <LanguageSelector locale={locale} onChange={handleLanguageChange} />
+
+        {authenticated ? (
+          displayName ? (
             <Dropdown>
               <Dropdown.Toggle className={styles.userDrop} data-testid="user-dropdown" id="dropdown-user">
                 <FaUser className="align-text-top" aria-hidden="true" />
@@ -153,26 +235,10 @@ function Header({ headerNavItems }: HeaderProps) {
                 opacity: 0.6,
               }}
             />
-          )}
-        </div>
-      );
-    }
-    return (
-      <div className="d-flex align-items-center justify-content-end gap-3">
-        <Select
-          size="small"
-          id="lang-selector"
-          data-testid="lang-selector"
-          aria-label="Select Language"
-          className="mr-2"
-          selectedKey={locale}
-          onSelectionChange={(key) => handleLanguageChange(String(key))}
-          items={[
-            { id: 'en', label: 'EN' },
-            { id: 'fr', label: 'FR' },
-          ]}
-        />
-        <LoginButton data-testid="login-button" label={dict.general.login} />
+          )
+        ) : (
+          <LoginButton data-testid="login-button" label={dict.general.login} />
+        )}
       </div>
     );
   };

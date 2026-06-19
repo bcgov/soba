@@ -32,10 +32,12 @@ app.set('trust proxy', env.getTrustProxySetting());
 
 initializePassport();
 
+// The browser can only read the echoed workspace header if it's explicitly exposed.
+const corsExposedHeaders = ['x-soba-workspace-id'];
 const corsOrigin = process.env.CORS_ORIGIN;
 if (process.env.NODE_ENV === 'development') {
   log.info('Allowing CORS for development environment');
-  app.use(cors());
+  app.use(cors({ exposedHeaders: corsExposedHeaders }));
 } else if (corsOrigin) {
   const origins = corsOrigin
     .split(',')
@@ -46,6 +48,7 @@ if (process.env.NODE_ENV === 'development') {
     cors({
       origin: origins.length === 1 ? origins[0] : origins,
       credentials: true,
+      exposedHeaders: corsExposedHeaders,
     }),
   );
 } else {

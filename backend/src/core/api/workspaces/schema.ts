@@ -1,6 +1,7 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import { CursorSortSchema } from '../shared/pagination';
+import { WorkspaceScopedQuerySchema } from '../shared/schema';
 
 extendZodWithOpenApi(z);
 
@@ -46,6 +47,12 @@ export const CurrentWorkspaceResponseSchema = WorkspaceItemSchema.openapi(
   'Workspaces_CurrentWorkspaceResponse',
 );
 
+export const WorkspaceIdParamsSchema = z
+  .object({
+    id: z.string().min(1),
+  })
+  .openapi('Workspaces_WorkspaceIdParams');
+
 export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
@@ -73,9 +80,12 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
     path: '/workspaces/current',
     tags: ['core.workspaces'],
     security: [{ bearerAuth: [] }],
+    request: {
+      query: WorkspaceScopedQuerySchema,
+    },
     responses: {
       200: {
-        description: 'Current workspace from request context',
+        description: 'Current workspace resolved from the workspaceId query parameter',
         content: {
           'application/json': {
             schema: CurrentWorkspaceResponseSchema,
@@ -85,6 +95,29 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
       404: {
         description: 'Current workspace not found',
       },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/workspaces/{id}',
+    tags: ['core.workspaces'],
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: WorkspaceIdParamsSchema,
+    },
+    responses: {
+      200: {
+        description:
+          'Select a workspace by id (verifies membership; echoes x-soba-workspace-id response header)',
+        content: {
+          'application/json': {
+            schema: CurrentWorkspaceResponseSchema,
+          },
+        },
+      },
+      403: { description: 'Actor is not a member of the workspace' },
+      404: { description: 'Workspace not found' },
     },
   });
 };

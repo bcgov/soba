@@ -8,15 +8,10 @@ import { useFormioV5FormChrome } from '@/lib/hooks/useFormioV5FormChrome';
 
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import type {
-  FormType,
-  FormBuilderProps,
-  FormioProvider as FormioProviderComponent,
-} from '@formio/react';
+import type { FormType, FormBuilderProps } from '@formio/react';
 import './FormDesigner.module.css';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { useAppSelector } from '@/lib/store';
 import { normalizeFormSchema } from '@/src/shared/api/sobaApi';
 import { buildExportFilename } from '@/src/features/designer/exportFilename';
 
@@ -34,14 +29,6 @@ const FormBuilder = dynamic(
   },
   { ssr: false },
 ) as React.ComponentType<FormBuilderProps>;
-
-const FormioProvider = dynamic(
-  async () => {
-    const mod = await import('@formio/react');
-    return mod.FormioProvider;
-  },
-  { ssr: false },
-) as React.ComponentType<React.ComponentProps<typeof FormioProviderComponent>>;
 
 interface DesignerProps {
   onUpdateModel: (data: FormType) => void;
@@ -62,7 +49,6 @@ const FormDesigner: React.FC<DesignerProps> = ({
   isDirty = false,
 }) => {
   const { authenticated, initializing, token } = useKeycloak();
-  const { activeWorkspaceId } = useAppSelector((s) => s.workspace);
   const dict = useDictionary();
   const { addNotification } = useNotificationStore();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -181,7 +167,7 @@ const FormDesigner: React.FC<DesignerProps> = ({
     if (!token) return;
     try {
       const schema = (liveSchemaRef.current ?? stableForm) as Record<string, unknown>;
-      const clean = await normalizeFormSchema(token, schema, activeWorkspaceId || undefined);
+      const clean = await normalizeFormSchema(token, schema);
       const blob = new Blob([JSON.stringify(clean, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -192,17 +178,7 @@ const FormDesigner: React.FC<DesignerProps> = ({
     } catch {
       addNotification({ text: dict.form.invalidJson || 'Invalid JSON format.', type: 'error' });
     }
-  }, [
-    token,
-    activeWorkspaceId,
-    formName,
-    versionNo,
-    state,
-    isDirty,
-    stableForm,
-    addNotification,
-    dict.form.invalidJson,
-  ]);
+  }, [token, formName, versionNo, state, isDirty, stableForm, addNotification, dict.form.invalidJson]);
 
   const handleImportClick = useCallback(() => fileInputRef.current?.click(), []);
 
@@ -214,11 +190,7 @@ const FormDesigner: React.FC<DesignerProps> = ({
       if (!file || !token) return;
       try {
         const raw = JSON.parse(await file.text()) as Record<string, unknown>;
-        const transformed = (await normalizeFormSchema(
-          token,
-          raw,
-          activeWorkspaceId || undefined,
-        )) as FormType;
+        const transformed = (await normalizeFormSchema(token, raw)) as FormType;
         // Update the EXISTING builder in place. Re-creating @formio/react's FormBuilder
         // (by changing `initialForm`/`key`) orphans the underlying instance, and its
         // unguarded `updateComponent` handler then reads `builder.instance.form` on the
@@ -237,7 +209,7 @@ const FormDesigner: React.FC<DesignerProps> = ({
         addNotification({ text: dict.form.invalidJson || 'Invalid JSON format.', type: 'error' });
       }
     },
-    [token, activeWorkspaceId, onUpdateModel, addNotification, dict.form.invalidJson],
+    [token, onUpdateModel, addNotification, dict.form.invalidJson],
   );
 
   if (initializing) {
@@ -278,14 +250,12 @@ const FormDesigner: React.FC<DesignerProps> = ({
         onChange={handleFileSelected}
       />
 
-      <FormioProvider>
-        <FormBuilder
-          initialForm={stableForm}
-          options={opt}
-          onChange={handleChange}
-          onBuilderReady={handleBuilderReady}
-        />
-      </FormioProvider>
+      <FormBuilder
+        initialForm={stableForm}
+        options={opt}
+        onChange={handleChange}
+        onBuilderReady={handleBuilderReady}
+      />
     </section>
   );
 };

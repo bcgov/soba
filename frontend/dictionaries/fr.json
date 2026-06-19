@@ -12,7 +12,9 @@
     "help": "Aidé",
     "welcomeTo": "Bienvenue sur",
     "loading": "Chargement…",
-    "comingSoon": "Cette fonctionnalité sera bientôt disponible."
+    "comingSoon": "Cette fonctionnalité sera bientôt disponible.",
+    "selectWorkspace": "Sélectionnez un espace de travail pour afficher les formulaires.",
+    "workspaceSwitchError": "Échec du changement d'espace de travail."
   },
   "header": {
     "workspaces": "Espaces de travail",

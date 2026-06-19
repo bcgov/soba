@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Container } from 'react-bootstrap';
-import { Button as DSButton, TextField } from '@bcgov/design-system-react-components';
+import { Button as DSButton, TextField, InlineAlert } from '@bcgov/design-system-react-components';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { DsPageHeading } from '@/app/ui/DsPageHeading';
 import { RowActionButton } from '@/src/components/RowActionButton';
@@ -107,6 +107,8 @@ function FormList({
         isMounted = false;
       };
     }
+    // No workspace selected for this tab: forms are workspace-scoped, so we render a
+    // "select a workspace" prompt (below) instead of calling the API.
   }, [authenticated, token, activeWorkspaceId]);
 
   const filteredForms = useMemo(() => {
@@ -252,23 +254,29 @@ function FormList({
         </div>
       </div>
 
-      <DataTable<SobaFormSummary>
-        data={paginatedForms as SobaFormSummary[]}
-        columns={columns}
-        loading={loading || initializing}
-        error={error}
-        emptyMessage="No forms found matching your criteria."
-        loadingMessage={dict.general.loading}
-        itemName="items"
-        caption={dict.general.forms}
-        pageSize={pageSize}
-        currentPage={currentPage}
-        totalItems={filteredForms.length}
-        onPageChange={setCurrentPage}
-        onPageSizeChange={setPageSize}
-        pageSizeOptions={[5, 10, 25, 50]}
-        keyExtractor={(form) => form.id}
-      />
+      {authenticated && !initializing && !activeWorkspaceId ? (
+        <InlineAlert variant="info" data-testid="forms-select-workspace">
+          {dict.general.selectWorkspace}
+        </InlineAlert>
+      ) : (
+        <DataTable<SobaFormSummary>
+          data={paginatedForms as SobaFormSummary[]}
+          columns={columns}
+          loading={loading || initializing}
+          error={error}
+          emptyMessage="No forms found matching your criteria."
+          loadingMessage={dict.general.loading}
+          itemName="items"
+          caption={dict.general.forms}
+          pageSize={pageSize}
+          currentPage={currentPage}
+          totalItems={filteredForms.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[5, 10, 25, 50]}
+          keyExtractor={(form) => form.id}
+        />
+      )}
     </Container>
   );
 }

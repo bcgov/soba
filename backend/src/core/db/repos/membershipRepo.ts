@@ -142,6 +142,19 @@ export const getWorkspaceForUser = async (workspaceId: string, userId: string) =
 };
 
 /**
+ * All workspace ids the user is an active member of. Used to scope cross-workspace list/search
+ * queries when no specific `workspaceId` filter is supplied.
+ */
+export const getActiveWorkspaceIdsForUser = async (userId: string): Promise<string[]> => {
+  const rows = await db
+    .select({ workspaceId: workspaceMemberships.workspaceId })
+    .from(workspaceMemberships)
+    .where(and(eq(workspaceMemberships.userId, userId), eq(workspaceMemberships.status, 'active')));
+
+  return rows.map((row) => row.workspaceId);
+};
+
+/**
  * Invalidate cached membership for a workspace/user after insert/update/delete.
  * Call from code that mutates workspace memberships (e.g. workspaceRepo, seed).
  */

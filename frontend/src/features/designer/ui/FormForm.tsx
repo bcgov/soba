@@ -76,10 +76,9 @@ function FormForm({ formId }: { formId?: string }) {
       async function loadForm() {
         setLoading(true);
         try {
-          const ws = activeWorkspaceId || undefined;
           const [form, versionsData] = await Promise.all([
-            getSobaForm(token as string, formId as string, ws),
-            getSobaFormVersions(token as string, formId as string, ws),
+            getSobaForm(token as string, formId as string),
+            getSobaFormVersions(token as string, formId as string),
           ]);
 
           setFormName(form?.name ?? '');
@@ -99,7 +98,7 @@ function FormForm({ formId }: { formId?: string }) {
           setVisibility(current?.visibility ?? []);
 
           if (current?.id) {
-            const schema = await getFormVersionSchema(token as string, current.id, ws);
+            const schema = await getFormVersionSchema(token as string, current.id);
             setFormSchema((schema as FormType) ?? null);
           } else {
             setFormSchema(null);
@@ -117,7 +116,7 @@ function FormForm({ formId }: { formId?: string }) {
       }
       loadForm();
     }
-  }, [formId, token, activeWorkspaceId, dict.form.loadFormError, addNotification]);
+  }, [formId, token, dict.form.loadFormError, addNotification]);
 
   const handleNameChange = useCallback((name: string) => {
     setFormName(name);
@@ -132,11 +131,7 @@ function FormForm({ formId }: { formId?: string }) {
   const loadVersionSchema = async (version: SobaFormVersionType) => {
     setLoading(true);
     try {
-      const schema = await getFormVersionSchema(
-        token as string,
-        version.id,
-        activeWorkspaceId || undefined,
-      );
+      const schema = await getFormVersionSchema(token as string, version.id);
       setFormSchema((schema as FormType) ?? null);
       setVisibility(version.visibility ?? []);
       setIsDirty(false);
@@ -181,12 +176,11 @@ function FormForm({ formId }: { formId?: string }) {
 
     try {
       // The engine strips engine-managed fields on save, so the raw schema can be submitted as-is.
-      const ws = activeWorkspaceId || undefined;
-      const newVersion = await createFormVersion(token as string, formId, visibility, ws);
-      await saveFormVersionSchema(token as string, newVersion.id, (formSchema ?? {}) as FormType, ws);
+      const newVersion = await createFormVersion(token as string, formId, visibility);
+      await saveFormVersionSchema(token as string, newVersion.id, (formSchema ?? {}) as FormType);
 
       // Refresh the version list and select the new draft in-page.
-      const versionsData = await getSobaFormVersions(token as string, formId, ws);
+      const versionsData = await getSobaFormVersions(token as string, formId);
       setVersions(versionsData.items || []);
       setCurrentVersion(newVersion);
       setSelectedVersionId('current');
@@ -228,26 +222,29 @@ function FormForm({ formId }: { formId?: string }) {
   const saveForm = async (publish: boolean = false) => {
     if (isSaving || loading) return;
     setIsSaving(true);
-    const ws = activeWorkspaceId || undefined;
     const schema = (formSchema ?? {}) as FormType;
 
     try {
       if (currentVersion?.id) {
         // UPDATE: re-provision the current version's schema + visibility (server owns name/path).
-        await saveFormVersionSchema(token as string, currentVersion.id, schema, ws);
-        await updateSobaFormVersionVisibility(token as string, currentVersion.id, visibility, ws);
+        await saveFormVersionSchema(token as string, currentVersion.id, schema);
+        await updateSobaFormVersionVisibility(token as string, currentVersion.id, visibility);
         if (publish) {
-          await publishSobaFormVersion(token as string, currentVersion.id, ws);
+          await publishSobaFormVersion(token as string, currentVersion.id);
         }
       } else {
-        // CREATE: one-call create (form + empty v1), then provision the schema.
+        // CREATE: one-call create (form + empty v1), scoped to the active workspace, then provision.
         const data: SobaFormType = { name: formName, description: formDesc, visibility };
-        const created = await createSobaFormioForm(token as string, data, ws);
+        const created = await createSobaFormioForm(
+          token as string,
+          data,
+          activeWorkspaceId || undefined,
+        );
         const versionId = created.formVersion?.id;
         if (versionId) {
-          await saveFormVersionSchema(token as string, versionId, schema, ws);
+          await saveFormVersionSchema(token as string, versionId, schema);
           if (publish) {
-            await publishSobaFormVersion(token as string, versionId, ws);
+            await publishSobaFormVersion(token as string, versionId);
           }
         }
         router.push(`/${lang}/designer/${created.id}`);

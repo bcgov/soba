@@ -461,7 +461,10 @@ async function main() {
     listedPersonal.id,
   );
 
-  const currentWorkspaceResult = await callAuthedJson(TOKEN, '/api/v1/workspaces/current');
+  const currentWorkspaceResult = await callAuthedJson(
+    TOKEN,
+    `/api/v1/workspaces/current?workspaceId=${verify.personalWorkspace!.workspaceId}`,
+  );
   if (!currentWorkspaceResult.ok) {
     const err =
       currentWorkspaceResult.body &&
@@ -480,7 +483,10 @@ async function main() {
     currentWorkspace.id,
   );
 
-  const membersResult = await callAuthedJson(TOKEN, '/api/v1/members?limit=100&status=active');
+  const membersResult = await callAuthedJson(
+    TOKEN,
+    `/api/v1/members?limit=100&status=active&workspaceId=${verify.personalWorkspace!.workspaceId}`,
+  );
   if (!membersResult.ok) {
     const err =
       membersResult.body && typeof membersResult.body === 'object' && 'error' in membersResult.body

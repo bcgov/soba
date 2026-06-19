@@ -1,6 +1,4 @@
 import express from 'express';
-import { coreContextMiddleware } from '../middleware/requestContext';
-import { requireCoreContext } from '../middleware/requireCoreContext';
 import { coreErrorHandler } from '../middleware/errorHandler';
 import { registerAdminOpenApi } from './admin';
 import { registerHealthOpenApi } from './health';
@@ -32,8 +30,8 @@ registerOpenApiPaths((registry) => {
   registerHealthOpenApi(registry);
 });
 
-router.use(coreContextMiddleware);
-router.use(requireCoreContext);
+// Workspace context is resolved per route (see workspaceContext middleware), not globally.
+// resolveActor runs at the app level so req.actorId is available to all routes here.
 const authenticatedDomains = [
   workspacesDomain,
   formsDomain,

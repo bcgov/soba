@@ -7,7 +7,6 @@ import { InlineAlert } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
-import { useAppSelector } from '@/lib/store';
 import { ReadOnlyFormView } from '@/src/features/formio-v5/ui/ReadOnlyFormView';
 import { WorkflowStateBadge } from './WorkflowStateBadge';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
@@ -23,8 +22,6 @@ export function SubmissionView() {
   const dict = useDictionary();
   const dictSub = dict.submission;
   const { authenticated, token, initializing } = useKeycloak();
-  const { activeWorkspaceId } = useAppSelector((state) => state.workspace);
-  const ws = activeWorkspaceId || undefined;
   const formatLongDate = useFormatLongDate();
 
   const submissionIdRaw = params?.submissionId;
@@ -43,12 +40,12 @@ export function SubmissionView() {
     let active = true;
     void (async () => {
       try {
-        const sub = await getSobaSubmission(token, submissionId, ws);
+        const sub = await getSobaSubmission(token, submissionId);
         if (!active) return;
         setSubmission(sub);
         const [loadedSchema, fetchedContent] = await Promise.all([
-          getFormVersionSchema(token, sub.formVersionId, ws),
-          getSobaSubmissionData(token, submissionId, ws),
+          getFormVersionSchema(token, sub.formVersionId),
+          getSobaSubmissionData(token, submissionId),
         ]);
         if (!active) return;
         if (loadedSchema) setSchema(loadedSchema);
@@ -62,7 +59,7 @@ export function SubmissionView() {
     return () => {
       active = false;
     };
-  }, [authenticated, token, submissionId, ws, loaded]);
+  }, [authenticated, token, submissionId, loaded]);
 
   if (initializing || (authenticated && !token)) {
     return <CenteredProgress label={dict.general.loading} />;
