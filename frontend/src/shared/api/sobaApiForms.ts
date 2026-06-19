@@ -132,15 +132,13 @@ export async function getSobaForms(
 
 export async function getSobaSubmissions(
   token: string,
-  params?: Record<string, unknown>,
+  params?: Record<string, string | number | boolean>,
   workspaceId?: string,
 ): Promise<ListSubmissionsResponse> {
   const query: Record<string, string> = {};
   if (params) {
     for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined) {
-        query[key] = typeof value === 'object' ? JSON.stringify(value) : String(value);
-      }
+      query[key] = String(value);
     }
   }
   const response = await sobaFetch('/submissions', {
