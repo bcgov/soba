@@ -74,6 +74,7 @@ vi.mock('@/lib/store', () => ({
           actor: { id: 'user-1', displayLabel: 'User', status: 'active' },
           profile: { displayName: 'User', email: null, preferredUsername: null },
           preferences: { defaultWorkspaceId: 'ws1' },
+          capabilities: { canCreateWorkspace: true },
         },
         status: 'succeeded',
       },

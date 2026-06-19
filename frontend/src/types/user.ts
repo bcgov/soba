@@ -12,6 +12,9 @@ export type CurrentUserResponse = {
   preferences: {
     defaultWorkspaceId: string | null;
   };
+  capabilities: {
+    canCreateWorkspace: boolean;
+  };
 };
 
 export type PatchCurrentUserBody = {

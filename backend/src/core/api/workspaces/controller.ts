@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { workspacesApiService } from './service';
 import { asyncHandler } from '../shared/asyncHandler';
 import { NotFoundError, ValidationError } from '../../errors';
-import { getActorId } from '../../middleware/actor';
+import { getActorId, getActorIdpCode } from '../../middleware/actor';
 import type { Request } from 'express';
 import {
   ListWorkspacesQuerySchema,
@@ -34,7 +34,11 @@ export const createWorkspace = asyncHandler(async (req: Request, res: Response) 
   if (!actorId) {
     throw new ValidationError('Missing actor identity (actorId or x-soba-user-id)');
   }
-  const result = await workspacesApiService.create(actorId, req.body as CreateWorkspaceBody);
+  const result = await workspacesApiService.create(
+    actorId,
+    getActorIdpCode(req),
+    req.body as CreateWorkspaceBody,
+  );
   res.status(201).json(result);
 });
 

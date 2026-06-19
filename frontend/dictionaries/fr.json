@@ -16,6 +16,10 @@
     "selectWorkspace": "Sélectionnez un espace de travail pour afficher les formulaires.",
     "workspaceSwitchError": "Échec du changement d'espace de travail."
   },
+  "onboarding": {
+    "heading": "Bienvenue",
+    "placeholder": "Les informations d'intégration aux espaces de travail apparaîtront ici."
+  },
   "workspaces": {
     "tableHeading": "Espaces de travail",
     "manageHeading": "Gérer l'espace de travail",
@@ -29,7 +33,7 @@
     "createError": "Échec de la création de l'espace de travail.",
     "loadError": "Échec du chargement de l'espace de travail.",
     "manageForbidden": "Seuls les propriétaires ou administrateurs peuvent gérer cet espace de travail.",
-    "createForbidden": "Seuls les propriétaires ou administrateurs peuvent créer des espaces de travail.",
+    "createForbidden": "Seuls les utilisateurs du fournisseur d'identité du gouvernement de la C.-B. peuvent créer des espaces de travail.",
     "defaultWorkspaceFormLabel": "Définir comme espace de travail par défaut",
     "empty": "Aucun espace de travail ne correspond à vos critères.",
     "active": "Actif",

@@ -1,5 +1,5 @@
 import { getDictionary, resolveLocale } from '../dictionaries';
-import WorkspaceFormLoader from '@/src/features/workspaces/ui/WorkspaceFormLoader';
+import OnboardingPage from '@/src/features/onboarding/ui/OnboardingPage';
 
 type PageProps = {
   params: Promise<{ lang: string }>;
@@ -10,15 +10,15 @@ export async function generateMetadata({ params }: PageProps) {
   const locale = resolveLocale(param.lang);
   const dict = await getDictionary(locale);
   return {
-    title: `${dict.workspaces.createHeading} | ${dict.general.title}`,
+    title: `${dict.onboarding.heading} | ${dict.general.title}`,
     description: dict.general.description,
   };
 }
 
 export default function Page() {
   return (
-    <section aria-labelledby="workspace-form-heading">
-      <WorkspaceFormLoader />
+    <section aria-labelledby="onboarding-heading">
+      <OnboardingPage />
     </section>
   );
 }

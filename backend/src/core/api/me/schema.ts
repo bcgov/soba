@@ -25,11 +25,18 @@ export const MePreferencesSchema = z
   })
   .openapi('Me_Preferences');
 
+export const MeCapabilitiesSchema = z
+  .object({
+    canCreateWorkspace: z.boolean(),
+  })
+  .openapi('Me_Capabilities');
+
 export const MeResponseSchema = z
   .object({
     actor: MeActorSchema,
     profile: MeProfileSchema,
     preferences: MePreferencesSchema,
+    capabilities: MeCapabilitiesSchema,
   })
   .openapi('Me_Response');
 

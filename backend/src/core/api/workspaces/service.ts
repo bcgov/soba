@@ -1,10 +1,10 @@
 import {
   getWorkspaceForUser,
   listWorkspacesForUser,
-  userHasWorkspaceManageMembership,
   type WorkspaceListCursorMode,
   type WorkspaceListSort,
 } from '../../db/repos/membershipRepo';
+import { canCreateWorkspaceByIdp } from '../../db/repos/idpGroupRepo';
 import { createTeamWorkspace, updateWorkspaceName } from '../../db/repos/workspaceRepo';
 import { ForbiddenError } from '../../errors';
 import { decodeCursorAndMode, buildNextCursor, type CursorSort } from '../shared/pagination';
@@ -87,10 +87,12 @@ export class WorkspacesApiService {
     };
   }
 
-  async create(actorId: string, body: { name: string }) {
-    const canCreate = await userHasWorkspaceManageMembership(actorId);
+  async create(actorId: string, idpCode: string | null, body: { name: string }) {
+    const canCreate = await canCreateWorkspaceByIdp(idpCode);
     if (!canCreate) {
-      throw new ForbiddenError('Only workspace owners or admins can create workspaces');
+      throw new ForbiddenError(
+        'Only users authenticated through a BC Government identity provider can create workspaces',
+      );
     }
     const workspaceId = await createTeamWorkspace(actorId, body.name);
     const row = await getWorkspaceForUser(workspaceId, actorId);

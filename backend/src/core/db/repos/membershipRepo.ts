@@ -43,7 +43,7 @@ export const findOrCreateUserByIdentity = async (
       );
     }
 
-    // Same shape as workspaceRepo.ensureHomeWorkspace: hashtext(single ::text param), fixed namespace int.
+    // Advisory lock shape shared with findOrCreateUserByIdentity: hashtext(single ::text param), fixed namespace int.
     const identityLockPayload = `${provider.code}\u001f${subject}`;
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext(${identityLockPayload}::text), ${ADV_LOCK_FIND_OR_CREATE_IDENTITY})`,

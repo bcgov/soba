@@ -41,7 +41,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
       createError: 'Failed to create workspace.',
       loadError: 'Failed to load workspace.',
       manageForbidden: 'Only workspace owners or admins can manage this workspace.',
-      createForbidden: 'Only workspace owners or admins can create workspaces.',
+      createForbidden: 'Only BC Government identity provider users can create workspaces.',
       defaultWorkspaceFormLabel: 'Set as default workspace',
     },
   }),
@@ -59,6 +59,7 @@ vi.mock('@/lib/store', () => ({
       currentUser: {
         data: {
           preferences: { defaultWorkspaceId: 'ws1' },
+          capabilities: { canCreateWorkspace: true },
         },
         status: 'succeeded',
       },

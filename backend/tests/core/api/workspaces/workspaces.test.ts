@@ -1,9 +1,12 @@
 import { ForbiddenError } from '../../../../src/core/errors';
 
+jest.mock('../../../../src/core/db/repos/idpGroupRepo', () => ({
+  canCreateWorkspaceByIdp: jest.fn(),
+}));
+
 jest.mock('../../../../src/core/db/repos/membershipRepo', () => ({
   getWorkspaceForUser: jest.fn(),
   listWorkspacesForUser: jest.fn(),
-  userHasWorkspaceManageMembership: jest.fn(),
 }));
 
 jest.mock('../../../../src/core/db/repos/workspaceRepo', () => ({
@@ -12,6 +15,7 @@ jest.mock('../../../../src/core/db/repos/workspaceRepo', () => ({
 }));
 
 import { workspacesApiService } from '../../../../src/core/api/workspaces/service';
+import * as idpGroupRepo from '../../../../src/core/db/repos/idpGroupRepo';
 import * as membershipRepo from '../../../../src/core/db/repos/membershipRepo';
 import * as workspaceRepo from '../../../../src/core/db/repos/workspaceRepo';
 
@@ -34,11 +38,13 @@ describe('WorkspacesApiService', () => {
   });
 
   it('create provisions a team workspace and returns the workspace item', async () => {
-    jest.mocked(membershipRepo.userHasWorkspaceManageMembership).mockResolvedValue(true);
+    jest.mocked(idpGroupRepo.canCreateWorkspaceByIdp).mockResolvedValue(true);
     jest.mocked(workspaceRepo.createTeamWorkspace).mockResolvedValue(workspaceId);
     jest.mocked(membershipRepo.getWorkspaceForUser).mockResolvedValue(workspaceRow);
 
-    const result = await workspacesApiService.create(actorId, { name: 'Team Alpha' });
+    const result = await workspacesApiService.create(actorId, 'idir', { name: 'Team Alpha' });
+
+    expect(idpGroupRepo.canCreateWorkspaceByIdp).toHaveBeenCalledWith('idir');
 
     expect(workspaceRepo.createTeamWorkspace).toHaveBeenCalledWith(actorId, 'Team Alpha');
     expect(result).toEqual({
@@ -51,11 +57,11 @@ describe('WorkspacesApiService', () => {
     });
   });
 
-  it('create throws ForbiddenError when actor has no owner or admin membership', async () => {
-    jest.mocked(membershipRepo.userHasWorkspaceManageMembership).mockResolvedValue(false);
+  it('create throws ForbiddenError when IdP is not in the bcgov group', async () => {
+    jest.mocked(idpGroupRepo.canCreateWorkspaceByIdp).mockResolvedValue(false);
 
     await expect(
-      workspacesApiService.create(actorId, { name: 'Team Alpha' }),
+      workspacesApiService.create(actorId, 'bceidbusiness', { name: 'Team Alpha' }),
     ).rejects.toBeInstanceOf(ForbiddenError);
 
     expect(workspaceRepo.createTeamWorkspace).not.toHaveBeenCalled();

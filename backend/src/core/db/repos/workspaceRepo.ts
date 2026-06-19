@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import {
   Roles,
@@ -18,14 +18,10 @@ import {
 import { invalidateMembershipCache } from './membershipRepo';
 import { getWorkspaceForUser, isWorkspaceManageRole } from './membershipRepo';
 
-const WORKSPACE_KIND_PERSONAL = 'personal';
 const WORKSPACE_KIND_TEAM = 'team';
 const WORKSPACE_STATUS_ACTIVE = 'active';
 const GROUP_STATUS_ACTIVE = 'active';
 const MEMBERSHIP_STATUS_ACTIVE = 'active';
-
-/** Second int for `pg_advisory_xact_lock`; must not collide with membershipRepo / sobaAdminRepo lock ids. */
-const ADV_LOCK_ENSURE_HOME_WORKSPACE = 1_892_478_311;
 
 /**
  * Returns the workspace group that confers the workspace-owner role, if present.
@@ -75,83 +71,6 @@ export const canManageWorkspaceOwners = async (
     )
     .limit(1);
   return rows.length > 0;
-};
-
-/**
- * Ensures the user has a personal workspace where they are in the owners group.
- * If none exists, creates workspace, membership (owner, auto_home), owners group, and group membership.
- * Serialized per user so concurrent API calls cannot create duplicate home workspaces.
- */
-export const ensureHomeWorkspace = async (userId: string) => {
-  return db.transaction(async (tx) => {
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext(${userId}::text), ${ADV_LOCK_ENSURE_HOME_WORKSPACE})`,
-    );
-
-    const existing = await tx
-      .select({
-        workspaceId: workspaces.id,
-        source: workspaceMemberships.source,
-      })
-      .from(workspaces)
-      .innerJoin(
-        workspaceMemberships,
-        and(
-          eq(workspaceMemberships.workspaceId, workspaces.id),
-          eq(workspaceMemberships.userId, userId),
-          eq(workspaceMemberships.status, WorkspaceMembershipStatus.active),
-        ),
-      )
-      .innerJoin(
-        workspaceGroupMemberships,
-        and(
-          eq(workspaceGroupMemberships.workspaceId, workspaces.id),
-          eq(workspaceGroupMemberships.workspaceMembershipId, workspaceMemberships.id),
-        ),
-      )
-      .innerJoin(
-        workspaceGroups,
-        and(
-          eq(workspaceGroups.id, workspaceGroupMemberships.groupId),
-          eq(workspaceGroups.workspaceId, workspaces.id),
-          eq(workspaceGroups.roleCode, Roles.workspace_owner),
-        ),
-      )
-      .where(eq(workspaces.kind, WORKSPACE_KIND_PERSONAL));
-
-    const preferred = existing.find((r) => r.source === WorkspaceMembershipSource.auto_home);
-    const found = preferred ?? existing[0];
-    if (found) {
-      return found.workspaceId;
-    }
-
-    const userRow = await tx
-      .select({ displayLabel: appUsers.displayLabel })
-      .from(appUsers)
-      .where(eq(appUsers.id, userId))
-      .limit(1);
-    const displayLabel = userRow[0]?.displayLabel ?? null;
-
-    const workspaceId = uuidv7();
-    await tx.insert(workspaces).values({
-      id: workspaceId,
-      kind: WORKSPACE_KIND_PERSONAL,
-      name: 'Personal Workspace',
-      status: WORKSPACE_STATUS_ACTIVE,
-      createdBy: displayLabel,
-      updatedBy: displayLabel,
-    });
-
-    await bootstrapWorkspaceOwner(
-      tx,
-      workspaceId,
-      userId,
-      displayLabel,
-      WorkspaceMembershipSource.auto_home,
-    );
-
-    return workspaceId;
-  });
 };
 
 const bootstrapWorkspaceOwner = async (

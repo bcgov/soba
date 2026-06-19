@@ -1,6 +1,5 @@
 import { getDictionary, resolveLocale } from '../dictionaries';
 import WorkspaceList from '@/src/features/workspaces/ui/WorkspaceList';
-import { AuthRedirect } from '@/src/app/ui/AuthRedirect';
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 
@@ -18,22 +17,18 @@ export async function generateMetadata({ params }: PageProps) {
   };
 }
 
-export default async function Page({ params }: PageProps) {
+export default async function Page() {
   const featuresMeta = await loadFeaturesMeta();
   const isFeatureAllowed = createIsFeatureAllowed(featuresMeta);
 
-  const param = await params;
-  const locale = resolveLocale(param.lang);
   return (
-    <AuthRedirect to={`/${locale}`} ifLogged={false}>
-      <section aria-labelledby="workspaces-heading">
-        <WorkspaceList
-          showFormsAction={
-            isFeatureAllowed(FEATURE_CODES.SUBMIT_MODE) ||
-            isFeatureAllowed(FEATURE_CODES.DESIGN_MODE)
-          }
-        />
-      </section>
-    </AuthRedirect>
+    <section aria-labelledby="workspaces-heading">
+      <WorkspaceList
+        showFormsAction={
+          isFeatureAllowed(FEATURE_CODES.SUBMIT_MODE) ||
+          isFeatureAllowed(FEATURE_CODES.DESIGN_MODE)
+        }
+      />
+    </section>
   );
 }

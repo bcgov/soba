@@ -16,6 +16,10 @@
     "selectWorkspace": "Select a workspace to view forms.",
     "workspaceSwitchError": "Failed to switch workspace."
   },
+  "onboarding": {
+    "heading": "Welcome",
+    "placeholder": "Workspace onboarding information will appear here."
+  },
   "workspaces": {
     "tableHeading": "Workspaces",
     "manageHeading": "Manage Workspace",
@@ -29,7 +33,7 @@
     "createError": "Failed to create workspace.",
     "loadError": "Failed to load workspace.",
     "manageForbidden": "Only workspace owners or admins can manage this workspace.",
-    "createForbidden": "Only workspace owners or admins can create workspaces.",
+    "createForbidden": "Only BC Government identity provider users can create workspaces.",
     "defaultWorkspaceFormLabel": "Set as default workspace",
     "empty": "No workspaces found matching your criteria.",
     "active": "Active",

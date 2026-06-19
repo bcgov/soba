@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { findAppUserById, updateAppUserProfile } from '../../db/repos/appUserRepo';
 import { toAppUserView } from '../../db/appUserView';
+import { canCreateWorkspaceByIdp } from '../../db/repos/idpGroupRepo';
 import { actorBelongsToWorkspace } from '../../db/repos/membershipRepo';
 import { profileHelpers, type StoredProfile } from '../../auth/jwtClaims';
 import { ForbiddenError } from '../../errors';
@@ -19,12 +20,16 @@ export class MeApiService {
     return belongs ? stored : null;
   }
 
-  private async toResponse(user: NonNullable<Awaited<ReturnType<typeof findAppUserById>>>) {
+  private async toResponse(
+    user: NonNullable<Awaited<ReturnType<typeof findAppUserById>>>,
+    idpCode: string | null,
+  ) {
     const view = toAppUserView(user);
     const defaultWorkspaceId = await this.resolveDefaultWorkspaceId(
       view.id,
       user.profile as StoredProfile,
     );
+    const canCreateWorkspace = await canCreateWorkspaceByIdp(idpCode);
     return {
       actor: {
         id: view.id,
@@ -39,16 +44,19 @@ export class MeApiService {
       preferences: {
         defaultWorkspaceId,
       },
+      capabilities: {
+        canCreateWorkspace,
+      },
     };
   }
 
-  async get(actorId: string) {
+  async get(actorId: string, idpCode: string | null) {
     const user = await findAppUserById(actorId);
     if (!user) return null;
-    return this.toResponse(user);
+    return this.toResponse(user, idpCode);
   }
 
-  async patch(actorId: string, body: PatchMeBody) {
+  async patch(actorId: string, idpCode: string | null, body: PatchMeBody) {
     const user = await findAppUserById(actorId);
     if (!user) return null;
 
@@ -80,7 +88,7 @@ export class MeApiService {
     const updatedBy = view.displayLabel ?? actorId;
     const updated = await updateAppUserProfile(actorId, nextProfile, updatedBy);
     if (!updated) return null;
-    return this.toResponse(updated);
+    return this.toResponse(updated, idpCode);
   }
 }
 

@@ -8,6 +8,7 @@ import shellStyles from '../ui/AppShell.module.css';
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 import { getHeaderNavigationItems, getOverlayNavigationItems } from '@/src/app/plugins/registry';
+import { AppAccessGuard } from '@/src/app/routing/AppAccessGuard';
 import React from 'react';
 
 export default async function RootLayout({
@@ -39,7 +40,7 @@ export default async function RootLayout({
           <SideNav showAppLinks={showAppLinks} showHome={showHome} />
         </aside>
         <main id="main-content" tabIndex={-1} className="flex-grow-1 p-5 overflow-auto">
-          {children}
+          <AppAccessGuard locale={locale}>{children}</AppAccessGuard>
         </main>
       </div>
       <Footer hideAcknowledgement={true} contact={React.createElement('span', null, '')} />

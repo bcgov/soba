@@ -19,7 +19,7 @@ import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import type { WorkspaceItem } from '@/src/types/workspaces';
 import { WorkspaceRoleBadge } from './WorkspaceRoleBadge';
 import { DefaultWorkspaceSwitch } from './DefaultWorkspaceSwitch';
-import { isWorkspaceManageRole, userCanCreateWorkspace } from '../workspaceRoles';
+import { isWorkspaceManageRole } from '../workspaceRoles';
 
 const WorkspaceActionButtons = ({
   workspace,
@@ -215,7 +215,7 @@ function WorkspaceList({ showFormsAction = true }: { showFormsAction?: boolean }
   );
 
   const loading = workspaceStatus === 'loading' || workspaceStatus === 'idle';
-  const showCreateAction = userCanCreateWorkspace(workspaces);
+  const showCreateAction = currentUser?.capabilities?.canCreateWorkspace === true;
 
   if (!authenticated && !initializing) {
     return <ListPageAuthGate>{dict.general.notAuthenticated}</ListPageAuthGate>;

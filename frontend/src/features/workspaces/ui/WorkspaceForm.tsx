@@ -23,7 +23,7 @@ import {
   selectWorkspace,
   updateWorkspace,
 } from '@/src/shared/api/sobaApi';
-import { isWorkspaceManageRole, userCanCreateWorkspace } from '../workspaceRoles';
+import { isWorkspaceManageRole } from '../workspaceRoles';
 import styles from './WorkspaceForm.module.css';
 
 type WorkspaceFormProps = {
@@ -43,7 +43,6 @@ function WorkspaceForm({ workspaceId }: WorkspaceFormProps) {
   const { data: currentUser, status: currentUserStatus } = useAppSelector(
     (state) => state.currentUser,
   );
-  const { workspaces, status: workspaceStatus } = useAppSelector((state) => state.workspace);
 
   const savedDefaultId = currentUser?.preferences?.defaultWorkspaceId ?? null;
 
@@ -67,16 +66,10 @@ function WorkspaceForm({ workspaceId }: WorkspaceFormProps) {
   }, [authenticated, token, currentUserStatus, dispatch]);
 
   useEffect(() => {
-    if (authenticated && token && workspaceStatus === 'idle') {
-      dispatch(loadWorkspaces(token));
-    }
-  }, [authenticated, token, workspaceStatus, dispatch]);
-
-  useEffect(() => {
-    if (!authenticated || initializing || workspaceStatus === 'loading' || workspaceStatus === 'idle') {
+    if (!authenticated || initializing || currentUserStatus !== 'succeeded') {
       return;
     }
-    if (isCreate && !userCanCreateWorkspace(workspaces)) {
+    if (isCreate && !currentUser?.capabilities?.canCreateWorkspace) {
       addNotification({
         text: dictWorkspaces.createForbidden,
         type: 'error',
@@ -85,8 +78,8 @@ function WorkspaceForm({ workspaceId }: WorkspaceFormProps) {
     }
   }, [
     isCreate,
-    workspaces,
-    workspaceStatus,
+    currentUser,
+    currentUserStatus,
     authenticated,
     initializing,
     addNotification,

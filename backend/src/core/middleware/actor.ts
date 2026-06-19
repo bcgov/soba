@@ -17,6 +17,10 @@ import { profileHelpers } from '../auth/jwtClaims';
 export const getActorId = (req: Request): string | null =>
   req.actorId ?? req.header('x-soba-user-id') ?? null;
 
+/** Identity provider code for the current session (from the verified JWT). */
+export const getActorIdpCode = (req: Request): string | null =>
+  req.user?.providerCode?.toLowerCase() ?? null;
+
 export function resolveActor(req: Request, res: Response, next: NextFunction): void {
   if (req.actorId || req.header('x-soba-user-id')) {
     const actorId = req.actorId ?? req.header('x-soba-user-id') ?? null;
