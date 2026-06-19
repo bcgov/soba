@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { db } from '../client';
 import {
@@ -13,7 +13,7 @@ import { membershipKey } from '../../integrations/cache/cacheKeys';
 import { profileHelpers } from '../../auth/jwtClaims';
 import { ForbiddenError } from '../../errors';
 import type { NormalizedProfile, IdpAttributes } from '../../auth/jwtClaims';
-import { WorkspaceMembershipRole, WorkspaceMembershipStatus } from '../codes';
+import { WorkspaceMembershipRole } from '../codes';
 
 /** Second int for `pg_advisory_xact_lock`; must not collide with workspaceRepo / sobaAdminRepo lock ids. */
 const ADV_LOCK_FIND_OR_CREATE_IDENTITY = 2_147_483_622;
@@ -145,25 +145,6 @@ export const getWorkspaceForUser = async (workspaceId: string, userId: string) =
 /** Owner or admin membership roles may manage or mutate workspace settings. */
 export const isWorkspaceManageRole = (role: string): boolean =>
   role === WorkspaceMembershipRole.owner || role === WorkspaceMembershipRole.admin;
-
-/** True when the user has an active owner or admin membership in at least one workspace. */
-export const userHasWorkspaceManageMembership = async (userId: string): Promise<boolean> => {
-  const rows = await db
-    .select({ id: workspaceMemberships.id })
-    .from(workspaceMemberships)
-    .where(
-      and(
-        eq(workspaceMemberships.userId, userId),
-        eq(workspaceMemberships.status, WorkspaceMembershipStatus.active),
-        inArray(workspaceMemberships.role, [
-          WorkspaceMembershipRole.owner,
-          WorkspaceMembershipRole.admin,
-        ]),
-      ),
-    )
-    .limit(1);
-  return rows.length > 0;
-};
 
 /**
  * All workspace ids the user is an active member of. Used to scope cross-workspace list/search

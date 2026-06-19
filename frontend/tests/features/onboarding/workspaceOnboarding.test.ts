@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  isWorkspaceOnboardingReady,
-  needsWorkspaceOnboarding,
-} from '@/src/features/onboarding/workspaceOnboarding';
+import { needsWorkspaceOnboarding } from '@/src/features/onboarding/workspaceOnboarding';
 
 const readyContext = {
   authenticated: true,
@@ -55,17 +52,5 @@ describe('workspaceOnboarding', () => {
         },
       }),
     ).toBe(false);
-  });
-
-  it('isWorkspaceOnboardingReady waits for workspace and current user loads', () => {
-    expect(
-      isWorkspaceOnboardingReady({
-        authenticated: true,
-        initializing: false,
-        workspaceStatus: 'loading',
-        currentUserStatus: 'succeeded',
-      }),
-    ).toBe(false);
-    expect(isWorkspaceOnboardingReady(readyContext)).toBe(true);
   });
 });

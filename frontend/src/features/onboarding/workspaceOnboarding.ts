@@ -24,16 +24,3 @@ export function needsWorkspaceOnboarding({
   if (workspaces.length > 0) return false;
   return currentUser?.capabilities?.canCreateWorkspace !== true;
 }
-
-export function isWorkspaceOnboardingReady({
-  authenticated,
-  initializing,
-  workspaceStatus,
-  currentUserStatus,
-}: Pick<
-  WorkspaceOnboardingInput,
-  'authenticated' | 'initializing' | 'workspaceStatus' | 'currentUserStatus'
->): boolean {
-  if (!authenticated || initializing) return false;
-  return workspaceStatus === 'succeeded' && currentUserStatus === 'succeeded';
-}

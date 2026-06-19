@@ -13,7 +13,6 @@ export type AppSessionSnapshot = {
 
 const WORKSPACE_APP_SEGMENTS = new Set(['forms', 'designer', 'form', 'submissions', 'submission']);
 const WORKSPACE_SEGMENTS = new Set(['workspaces', 'workspace']);
-const PUBLIC_SEGMENTS = new Set(['help', 'feedback']);
 
 /** Classify the localized route (pathname includes `/{locale}/...`). */
 export function classifyRoute(pathname: string): RouteKind {
@@ -26,7 +25,6 @@ export function classifyRoute(pathname: string): RouteKind {
   if (route === 'onboarding') return 'onboarding';
   if (WORKSPACE_APP_SEGMENTS.has(route)) return 'workspace-app';
   if (WORKSPACE_SEGMENTS.has(route)) return 'workspaces';
-  if (PUBLIC_SEGMENTS.has(route)) return 'public';
   return 'public';
 }
 
