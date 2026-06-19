@@ -9,7 +9,7 @@
 const STORAGE_KEY = 'soba.workspaceId';
 
 function getStorage(): Storage | null {
-  if (typeof globalThis.window === 'undefined') return null;
+  if (!('window' in globalThis)) return null;
   try {
     return globalThis.sessionStorage;
   } catch {

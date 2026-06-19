@@ -139,7 +139,7 @@ export async function getSobaSubmissions(
   if (params) {
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined) {
-        query[key] = typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
+        query[key] = typeof value === 'object' ? JSON.stringify(value) : String(value);
       }
     }
   }

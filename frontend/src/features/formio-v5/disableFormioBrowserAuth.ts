@@ -9,7 +9,7 @@
  * pulled in through the Redux store during SSR.
  */
 export function disableFormioBrowserAuth(): void {
-  if (typeof globalThis.window === 'undefined') return;
+  if (!('window' in globalThis)) return;
 
   localStorage.removeItem('formioToken');
   localStorage.removeItem('formioUser');
