@@ -16,6 +16,24 @@
     "selectWorkspace": "Sélectionnez un espace de travail pour afficher les formulaires.",
     "workspaceSwitchError": "Échec du changement d'espace de travail."
   },
+  "workspaces": {
+    "tableHeading": "Espaces de travail",
+    "manageHeading": "Gérer l'espace de travail",
+    "empty": "Aucun espace de travail ne correspond à vos critères.",
+    "active": "Actif",
+    "columns": {
+      "name": "Nom",
+      "actions": "Actions",
+      "roles": "Rôles",
+      "default": "Par défaut"
+    },
+    "actions": {
+      "manage": "Gérer",
+      "forms": "Formulaires"
+    },
+    "defaultWorkspaceLabel": "Définir {name} comme espace de travail par défaut",
+    "defaultWorkspaceError": "Échec de la mise à jour de l'espace de travail par défaut."
+  },
   "header": {
     "workspaces": "Espaces de travail",
     "design": "Conception",

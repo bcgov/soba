@@ -34,6 +34,22 @@ describe('workspaceSlice', () => {
     expect(pickWorkspaceToEstablish([workspace('only')])).toEqual(workspace('only'));
   });
 
+  it('pickWorkspaceToEstablish prefers stored default workspace when valid', () => {
+    const personal = workspace('p1');
+    personal.kind = 'personal';
+    const enterprise = workspace('e1');
+    enterprise.kind = 'enterprise';
+    expect(pickWorkspaceToEstablish([personal, enterprise], 'e1')).toEqual(enterprise);
+  });
+
+  it('pickWorkspaceToEstablish ignores invalid default workspace id', () => {
+    const personal = workspace('p1');
+    personal.kind = 'personal';
+    const enterprise = workspace('e1');
+    enterprise.kind = 'enterprise';
+    expect(pickWorkspaceToEstablish([personal, enterprise], 'missing')).toEqual(personal);
+  });
+
   it('pickWorkspaceToEstablish prefers personal when several exist', () => {
     const personal = workspace('p1');
     personal.kind = 'personal';

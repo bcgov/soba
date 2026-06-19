@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useDictionary } from '../[lang]/Providers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import { FaWpforms, FaCommentDots, FaCircleQuestion, FaHouse } from 'react-icons/fa6';
+import { FaWpforms, FaCommentDots, FaCircleQuestion, FaHouse, FaBuilding } from 'react-icons/fa6';
 import styles from './SideNav.module.css';
 
 interface SideNavProps {
@@ -34,6 +34,13 @@ export function SideNav({ showAppLinks, showHome }: SideNavProps) {
   }
   if (showAppLinks) {
     navItems.push(
+      {
+        href: `/${locale}/workspaces`,
+        title: dict.header.workspaces,
+        testId: 'workspaces-nav',
+        icon: <FaBuilding size={20} />,
+        isActive: pathname.startsWith(`/${locale}/workspaces`),
+      },
       {
         href: `/${locale}/forms`,
         title: dict.general.forms,

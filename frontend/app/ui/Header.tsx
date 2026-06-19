@@ -111,12 +111,15 @@ function Header({ headerNavItems }: HeaderProps) {
       !token ||
       workspaceStatus !== 'succeeded' ||
       activeWorkspaceId ||
-      establishingWorkspaceRef.current
+      establishingWorkspaceRef.current ||
+      currentUser.status === 'idle' ||
+      currentUser.status === 'loading'
     ) {
       return;
     }
 
-    const target = pickWorkspaceToEstablish(workspaces);
+    const defaultWorkspaceId = currentUser.data?.preferences?.defaultWorkspaceId ?? null;
+    const target = pickWorkspaceToEstablish(workspaces, defaultWorkspaceId);
     if (!target) return;
 
     establishingWorkspaceRef.current = true;
@@ -138,6 +141,8 @@ function Header({ headerNavItems }: HeaderProps) {
     workspaceStatus,
     activeWorkspaceId,
     workspaces,
+    currentUser.status,
+    currentUser.data?.preferences?.defaultWorkspaceId,
     dispatch,
     addNotification,
     dict.general.workspaceSwitchError,
@@ -195,7 +200,7 @@ function Header({ headerNavItems }: HeaderProps) {
 
     return (
       <div className="d-flex align-items-center justify-content-end gap-3">
-        {authenticated && clientMounted && workspaces.length > 1 ? (
+        {authenticated && clientMounted && workspaces.length > 0 ? (
           <Select
             size="small"
             id="workspace-select"

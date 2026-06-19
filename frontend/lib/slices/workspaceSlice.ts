@@ -18,8 +18,15 @@ const initialState: WorkspaceState = {
 };
 
 /** When this tab has no active workspace yet, pick one to establish via the backend. */
-export function pickWorkspaceToEstablish(workspaces: WorkspaceItem[]): WorkspaceItem | null {
+export function pickWorkspaceToEstablish(
+  workspaces: WorkspaceItem[],
+  defaultWorkspaceId?: string | null,
+): WorkspaceItem | null {
   if (workspaces.length === 0) return null;
+  if (defaultWorkspaceId) {
+    const preferred = workspaces.find((w) => w.id === defaultWorkspaceId);
+    if (preferred) return preferred;
+  }
   if (workspaces.length === 1) return workspaces[0]!;
   return workspaces.find((w) => w.kind === 'personal') ?? null;
 }

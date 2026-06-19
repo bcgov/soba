@@ -19,12 +19,25 @@ export const MeProfileSchema = z
   })
   .openapi('Me_Profile');
 
+export const MePreferencesSchema = z
+  .object({
+    defaultWorkspaceId: z.string().uuid().nullable().optional(),
+  })
+  .openapi('Me_Preferences');
+
 export const MeResponseSchema = z
   .object({
     actor: MeActorSchema,
     profile: MeProfileSchema,
+    preferences: MePreferencesSchema,
   })
   .openapi('Me_Response');
+
+export const PatchMeBodySchema = z
+  .object({
+    preferences: MePreferencesSchema,
+  })
+  .openapi('Me_PatchBody');
 
 export const registerMeOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
@@ -40,6 +53,41 @@ export const registerMeOpenApi = (registry: OpenAPIRegistry) => {
             schema: MeResponseSchema,
           },
         },
+      },
+      404: {
+        description: 'Current actor not found',
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/me',
+    tags: ['core.me'],
+    security: [{ bearerAuth: [] }],
+    request: {
+      body: {
+        content: {
+          'application/json': {
+            schema: PatchMeBodySchema,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Updated current actor preferences',
+        content: {
+          'application/json': {
+            schema: MeResponseSchema,
+          },
+        },
+      },
+      400: {
+        description: 'Invalid request body',
+      },
+      403: {
+        description: 'Not a member of the requested workspace',
       },
       404: {
         description: 'Current actor not found',

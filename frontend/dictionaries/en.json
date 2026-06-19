@@ -16,6 +16,24 @@
     "selectWorkspace": "Select a workspace to view forms.",
     "workspaceSwitchError": "Failed to switch workspace."
   },
+  "workspaces": {
+    "tableHeading": "Workspaces",
+    "manageHeading": "Manage Workspace",
+    "empty": "No workspaces found matching your criteria.",
+    "active": "Active",
+    "columns": {
+      "name": "Name",
+      "actions": "Actions",
+      "roles": "Roles",
+      "default": "Default"
+    },
+    "actions": {
+      "manage": "Manage",
+      "forms": "Forms"
+    },
+    "defaultWorkspaceLabel": "Set {name} as default workspace",
+    "defaultWorkspaceError": "Failed to update default workspace."
+  },
   "header": {
     "workspaces": "Workspaces",
     "design": "Design",
