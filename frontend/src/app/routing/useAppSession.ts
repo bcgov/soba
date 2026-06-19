@@ -36,6 +36,9 @@ export function useAppSession(): AppSessionSnapshot {
         workspaceStatus === 'succeeded' &&
         currentUserStatus === 'succeeded';
 
+    const sessionFailed =
+      authenticated && (workspaceStatus === 'failed' || currentUserStatus === 'failed');
+
     const needsOnboarding = needsWorkspaceOnboarding({
       authenticated,
       initializing,
@@ -49,6 +52,7 @@ export function useAppSession(): AppSessionSnapshot {
       authenticated,
       initializing,
       sessionReady,
+      sessionFailed,
       needsOnboarding,
       canCreateWorkspace: currentUser?.capabilities?.canCreateWorkspace === true,
       hasWorkspaces: workspaces.length > 0,

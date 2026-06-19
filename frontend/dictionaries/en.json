@@ -12,6 +12,8 @@
     "help": "Help",
     "welcomeTo": "Welcome to",
     "loading": "Loading…",
+    "sessionError": "We couldn't load your session. Please try again.",
+    "tryAgain": "Try again",
     "comingSoon": "This feature is coming soon.",
     "selectWorkspace": "Select a workspace to view forms.",
     "workspaceSwitchError": "Failed to switch workspace."
