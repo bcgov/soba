@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Container } from 'react-bootstrap';
 import { InlineAlert } from '@bcgov/design-system-react-components';
 import { useRouter, usePathname } from 'next/navigation';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
@@ -10,6 +9,7 @@ import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { getSobaSubmissions } from '@/src/shared/api/sobaApiForms';
 import type { SubmissionListItem } from '@/src/types/submissions';
 import { DataTable, Column } from '@/src/components/DataTable';
+import { ListPageLayout } from '@/src/components/ListPageLayout';
 import { DsPageHeading } from '@/app/ui/DsPageHeading';
 import { RowActionButton } from '@/src/components/RowActionButton';
 import { WorkflowStateBadge } from './WorkflowStateBadge';
@@ -106,7 +106,7 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
   ];
 
   return (
-    <Container fluid className="py-4 px-lg-5">
+    <ListPageLayout>
       <DsPageHeading id="submissions-heading">
         {dict.submission?.submissions || 'Submissions'}
       </DsPageHeading>
@@ -134,6 +134,6 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
           }}
         />
       )}
-    </Container>
+    </ListPageLayout>
   );
 }

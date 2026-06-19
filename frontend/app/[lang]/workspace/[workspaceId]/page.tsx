@@ -1,7 +1,6 @@
-import Link from 'next/link';
 import { getDictionary, resolveLocale } from '../../dictionaries';
-import { DsPageHeading } from '@/app/ui/DsPageHeading';
 import { AuthRedirect } from '@/src/app/ui/AuthRedirect';
+import { WorkspaceManagePlaceholder } from '@/src/features/workspaces/ui/WorkspaceManagePlaceholder';
 
 type PageProps = {
   params: Promise<{ lang: string; workspaceId: string }>;
@@ -24,16 +23,13 @@ export default async function Page({ params }: PageProps) {
 
   return (
     <AuthRedirect to={`/${locale}`} ifLogged={false}>
-      <section className="p-4" aria-labelledby="manage-workspace-heading">
-        <DsPageHeading id="manage-workspace-heading">{dict.workspaces.manageHeading}</DsPageHeading>
-        <p className="mt-3 text-muted" data-testid="manage-workspace-coming-soon">
-          {dict.general.comingSoon}
-        </p>
-        <p className="mt-3">
-          <Link href={`/${locale}/workspaces`} data-testid="back-to-workspaces">
-            {dict.workspaces.tableHeading}
-          </Link>
-        </p>
+      <section aria-labelledby="manage-workspace-heading">
+        <WorkspaceManagePlaceholder
+          locale={locale}
+          manageHeading={dict.workspaces.manageHeading}
+          comingSoon={dict.general.comingSoon}
+          backLabel={dict.workspaces.tableHeading}
+        />
       </section>
     </AuthRedirect>
   );

@@ -1,16 +1,16 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Container } from 'react-bootstrap';
-import { Button as DSButton, TextField, InlineAlert } from '@bcgov/design-system-react-components';
+import { Button as DSButton, InlineAlert } from '@bcgov/design-system-react-components';
 import { DataTable, type Column } from '@/src/components/DataTable';
+import { ListPageLayout, ListPageToolbar, ListPageAuthGate } from '@/src/components/ListPageLayout';
+import { ListPageSearchField } from '@/src/components/ListPageSearchField';
 import { DsPageHeading } from '@/app/ui/DsPageHeading';
 import { RowActionButton } from '@/src/components/RowActionButton';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useRouter, usePathname } from 'next/navigation';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
-import { FaMagnifyingGlass, FaX } from 'react-icons/fa6';
 import { getSobaForms } from '@/src/shared/api/sobaApi';
 import type { SobaFormSummary } from '@/src/shared/api/sobaApiForms';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
@@ -123,12 +123,15 @@ function FormList({
     return filteredForms.slice(start, start + pageSize);
   }, [filteredForms, currentPage, pageSize]);
 
-  useEffect(() => {
-    const setP = () => {
-      setCurrentPage(1);
-    };
-    setP();
-  }, [searchQuery, pageSize]);
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  }, []);
+
+  const handlePageSizeChange = useCallback((size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  }, []);
 
   const handleAction = useCallback(
     (name: string, id: string) => {
@@ -207,14 +210,16 @@ function FormList({
   // Auth gate only — loading (including Keycloak init) is shown inside the table
   // body so the page heading stays visible throughout.
   if (!authenticated && !initializing) {
-    return <div className="p-5 text-center">{dict.general.notAuthenticated}</div>;
+    return (
+      <ListPageAuthGate>{dict.general.notAuthenticated}</ListPageAuthGate>
+    );
   }
 
   return (
-    <Container fluid className="py-4 px-lg-5">
+    <ListPageLayout>
       <DsPageHeading id="forms-heading">{dict.general.forms}</DsPageHeading>
-      <div className="mb-3 d-flex justify-content-between align-items-center">
-        {designModeEnabled && (
+      <ListPageToolbar align={designModeEnabled ? 'between' : 'end'}>
+        {designModeEnabled ? (
           <DSButton
             variant="primary"
             data-testid="create-form-button"
@@ -222,37 +227,14 @@ function FormList({
           >
             Create
           </DSButton>
-        )}
+        ) : null}
 
-        <div style={{ width: '300px', maxWidth: '100%' }}>
-          <TextField
-            aria-label="Search"
-            data-testid="search-forms-text"
-            value={searchQuery}
-            onChange={setSearchQuery}
-            iconLeft={<FaMagnifyingGlass />}
-            iconRight={
-              searchQuery ? (
-                <button
-                  type="button"
-                  data-testid="search-forms-button"
-                  aria-label="Clear search"
-                  onClick={() => setSearchQuery('')}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    padding: 0,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                  }}
-                >
-                  <FaX size={12} />
-                </button>
-              ) : undefined
-            }
-          />
-        </div>
-      </div>
+        <ListPageSearchField
+          value={searchQuery}
+          onChange={handleSearchChange}
+          testIdPrefix="forms"
+        />
+      </ListPageToolbar>
 
       {authenticated && !initializing && !activeWorkspaceId ? (
         <InlineAlert variant="info" data-testid="forms-select-workspace">
@@ -272,12 +254,12 @@ function FormList({
           currentPage={currentPage}
           totalItems={filteredForms.length}
           onPageChange={setCurrentPage}
-          onPageSizeChange={setPageSize}
+          onPageSizeChange={handlePageSizeChange}
           pageSizeOptions={[5, 10, 25, 50]}
           keyExtractor={(form) => form.id}
         />
       )}
-    </Container>
+    </ListPageLayout>
   );
 }
 

@@ -40,8 +40,7 @@ function LanguageSelector({
       id="lang-selector"
       data-testid="lang-selector"
       aria-label="Select Language"
-      className="form-select form-select-sm mr-2"
-      style={{ width: 'auto' }}
+      className={`form-select form-select-sm mr-2 ${styles.langSelect}`}
       value={locale}
       onChange={(e) => onChange(e.target.value)}
     >
@@ -229,17 +228,7 @@ function Header({ headerNavItems }: HeaderProps) {
               </Dropdown.Menu>
             </Dropdown>
           ) : (
-            <span
-              aria-hidden="true"
-              className="d-none d-md-inline-block"
-              style={{
-                width: '11rem',
-                height: '1.25rem',
-                background: 'var(--app-border)',
-                borderRadius: '4px',
-                opacity: 0.6,
-              }}
-            />
+            <span aria-hidden="true" className={styles.userNameSkeleton} />
           )
         ) : (
           <LoginButton data-testid="login-button" label={dict.general.login} />

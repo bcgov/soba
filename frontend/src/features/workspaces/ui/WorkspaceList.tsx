@@ -1,16 +1,16 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Container } from 'react-bootstrap';
-import { TextField } from '@bcgov/design-system-react-components';
 import { DataTable, type Column } from '@/src/components/DataTable';
+import { ListPageLayout, ListPageToolbar, ListPageAuthGate } from '@/src/components/ListPageLayout';
+import { ListPageSearchField } from '@/src/components/ListPageSearchField';
+import { MutedHint } from '@/src/components/MutedHint';
 import { DsPageHeading } from '@/app/ui/DsPageHeading';
 import { RowActionButton } from '@/src/components/RowActionButton';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useRouter, usePathname } from 'next/navigation';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
-import { FaMagnifyingGlass, FaX } from 'react-icons/fa6';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { loadWorkspaces, selectActiveWorkspace } from '@/lib/slices/workspaceSlice';
 import { loadCurrentUser } from '@/lib/slices/currentUserSlice';
@@ -104,11 +104,6 @@ function WorkspaceList({ showFormsAction = true }: { showFormsAction?: boolean }
     setCurrentPage(1);
   }, []);
 
-  const handleClearSearch = useCallback(() => {
-    setSearchQuery('');
-    setCurrentPage(1);
-  }, []);
-
   const handlePageSizeChange = useCallback((size: number) => {
     setPageSize(size);
     setCurrentPage(1);
@@ -164,7 +159,7 @@ function WorkspaceList({ showFormsAction = true }: { showFormsAction?: boolean }
               {workspace.name}
             </RowActionButton>
             {workspace.id === activeWorkspaceId ? (
-              <span className="text-muted small">({dictWorkspaces.active})</span>
+              <MutedHint>({dictWorkspaces.active})</MutedHint>
             ) : null}
           </span>
         ),
@@ -217,42 +212,19 @@ function WorkspaceList({ showFormsAction = true }: { showFormsAction?: boolean }
   const loading = workspaceStatus === 'loading' || workspaceStatus === 'idle';
 
   if (!authenticated && !initializing) {
-    return <div className="p-5 text-center">{dict.general.notAuthenticated}</div>;
+    return <ListPageAuthGate>{dict.general.notAuthenticated}</ListPageAuthGate>;
   }
 
   return (
-    <Container fluid className="py-4 px-lg-5">
+    <ListPageLayout>
       <DsPageHeading id="workspaces-heading">{dictWorkspaces.tableHeading}</DsPageHeading>
-      <div className="mb-3 d-flex justify-content-end align-items-center">
-        <div style={{ width: '300px', maxWidth: '100%' }}>
-          <TextField
-            aria-label="Search"
-            data-testid="search-workspaces-text"
-            value={searchQuery}
-            onChange={handleSearchChange}
-            iconLeft={<FaMagnifyingGlass />}
-            iconRight={
-              searchQuery ? (
-                <button
-                  type="button"
-                  data-testid="search-workspaces-button"
-                  aria-label="Clear search"
-                  onClick={handleClearSearch}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    padding: 0,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                  }}
-                >
-                  <FaX size={12} />
-                </button>
-              ) : undefined
-            }
-          />
-        </div>
-      </div>
+      <ListPageToolbar align="end">
+        <ListPageSearchField
+          value={searchQuery}
+          onChange={handleSearchChange}
+          testIdPrefix="workspaces"
+        />
+      </ListPageToolbar>
 
       <DataTable<WorkspaceItem>
         data={paginatedWorkspaces}
@@ -271,7 +243,7 @@ function WorkspaceList({ showFormsAction = true }: { showFormsAction?: boolean }
         pageSizeOptions={[5, 10, 25, 50]}
         keyExtractor={(workspace) => workspace.id}
       />
-    </Container>
+    </ListPageLayout>
   );
 }
 
