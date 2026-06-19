@@ -25,11 +25,12 @@ export class MeApiService {
     idpCode: string | null,
   ) {
     const view = toAppUserView(user);
-    const defaultWorkspaceId = await this.resolveDefaultWorkspaceId(
-      view.id,
-      user.profile as StoredProfile,
-    );
-    const canCreateWorkspace = await canCreateWorkspaceByIdp(idpCode);
+    // Independent lookups — run concurrently so /me (a bootstrap hot path) pays
+    // one DB round-trip of latency, not two.
+    const [defaultWorkspaceId, canCreateWorkspace] = await Promise.all([
+      this.resolveDefaultWorkspaceId(view.id, user.profile as StoredProfile),
+      canCreateWorkspaceByIdp(idpCode),
+    ]);
     return {
       actor: {
         id: view.id,
