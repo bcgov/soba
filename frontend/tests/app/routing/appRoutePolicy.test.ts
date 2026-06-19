@@ -47,6 +47,12 @@ describe('resolveRedirect', () => {
     expect(resolveRedirect('/en', 'en', readySession)).toBe('/en/forms');
   });
 
+  it('sends a brand-new creator from home to workspaces, matching onboarding', () => {
+    const newCreator = { ...readySession, hasWorkspaces: false, canCreateWorkspace: true };
+    expect(resolveRedirect('/en', 'en', newCreator)).toBe('/en/workspaces');
+    expect(resolveRedirect('/en/onboarding', 'en', newCreator)).toBe('/en/workspaces');
+  });
+
   it('keeps onboarding users on onboarding and redirects others away', () => {
     const onboarding = { ...readySession, needsOnboarding: true };
     expect(resolveRedirect('/en/onboarding', 'en', onboarding)).toBeNull();

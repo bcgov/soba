@@ -60,18 +60,18 @@ export function resolveRedirect(
     return null;
   }
 
+  const landing = session.needsOnboarding
+    ? onboarding
+    : session.canCreateWorkspace && !session.hasWorkspaces
+      ? workspaces
+      : forms;
+
   if (kind === 'home') {
-    return session.needsOnboarding ? onboarding : forms;
+    return landing;
   }
 
   if (kind === 'onboarding') {
-    if (session.needsOnboarding) {
-      return null;
-    }
-    if (session.canCreateWorkspace && !session.hasWorkspaces) {
-      return workspaces;
-    }
-    return forms;
+    return session.needsOnboarding ? null : landing;
   }
 
   if (session.needsOnboarding && kind !== 'public') {
