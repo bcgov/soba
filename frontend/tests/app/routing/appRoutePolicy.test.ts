@@ -53,6 +53,13 @@ describe('resolveRedirect', () => {
     expect(resolveRedirect('/en/forms', 'en', onboarding)).toBe('/en/onboarding');
   });
 
+  it('funnels onboarding users off workspace routes but not public ones', () => {
+    const onboarding = { ...readySession, needsOnboarding: true };
+    expect(resolveRedirect('/en/workspaces', 'en', onboarding)).toBe('/en/onboarding');
+    expect(resolveRedirect('/en/workspace/ws1', 'en', onboarding)).toBe('/en/onboarding');
+    expect(resolveRedirect('/en/help', 'en', onboarding)).toBeNull();
+  });
+
   it('redirects off onboarding when access is available', () => {
     expect(resolveRedirect('/en/onboarding', 'en', readySession)).toBe('/en/forms');
     expect(

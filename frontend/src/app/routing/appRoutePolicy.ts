@@ -74,7 +74,7 @@ export function resolveRedirect(
     return forms;
   }
 
-  if (kind === 'workspace-app' && session.needsOnboarding) {
+  if (session.needsOnboarding && kind !== 'public') {
     return onboarding;
   }
 
