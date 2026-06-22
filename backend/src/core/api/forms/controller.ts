@@ -164,6 +164,7 @@ export const getFormVersionSchema = asyncHandler(
     if (!result) {
       throw new NotFoundError('Form version schema not found');
     }
+    result._id = req.params.id;
     res.json(result);
   },
 );

@@ -54,6 +54,11 @@ const MessageBusPluginDefinitionSchema = z.object({
   createAdapter: z.any(),
 });
 
+const StoragePluginDefinitionSchema = z.object({
+  code: z.string().min(1),
+  createAdapter: z.any(),
+});
+
 const IdpPluginDefinitionSchema = z.object({
   code: z.string().min(1),
   createAuthMiddleware: z.any(),
@@ -68,6 +73,7 @@ interface CachedPlugin {
   cacheDefinition?: CachePluginDefinition;
   messagebusDefinition?: MessageBusPluginDefinition;
   idpDefinition?: IdpPluginDefinition;
+  storageDefinition?: { code: string; createAdapter: unknown };
 }
 
 let cache: CachedPlugin[] | null = null;
@@ -186,6 +192,19 @@ function discoverAndCache(): CachedPlugin[] {
       } else {
         console.warn(
           `[PluginRegistry] invalid idpPluginDefinition in '${pluginDir}':`,
+          parsed.error.message,
+        );
+      }
+    }
+
+    const storageDef = (obj as Record<string, unknown>).storagePluginDefinition;
+    if (storageDef !== undefined) {
+      const parsed = StoragePluginDefinitionSchema.safeParse(storageDef);
+      if (parsed.success) {
+        entry.storageDefinition = storageDef as { code: string; createAdapter: unknown };
+      } else {
+        console.warn(
+          `[PluginRegistry] invalid storagePluginDefinition in '${pluginDir}':`,
           parsed.error.message,
         );
       }
@@ -314,6 +333,51 @@ export function getMessageBusPluginDefinitions(): MessageBusPluginDefinition[] {
 export function getIdpPluginDefinitions(): IdpPluginDefinition[] {
   const discovered = discoverAndCache();
   return discovered.map((p) => p.idpDefinition).filter((d): d is IdpPluginDefinition => Boolean(d));
+}
+
+export function getStoragePluginDefinitions() {
+  const discovered = discoverAndCache();
+  return discovered
+    .map((p) => p.storageDefinition)
+    .filter((d): d is { code: string; createAdapter: unknown } => Boolean(d));
+}
+
+let storageAdapterInstance: unknown | null = null;
+
+export function getStorageAdapter(): unknown {
+  if (!storageAdapterInstance) {
+    const code = env.getStorageDefaultCode?.() ?? 'local-storage';
+    const definitions = getStoragePluginDefinitions();
+    const definition = definitions.find((d) => d.code === code);
+    if (!definition) {
+      throw new Error(
+        `No storage plugin is installed for code '${code}'. Available: ${definitions.map((d) => d.code).join(', ') || '<none>'}`,
+      );
+    }
+    // createPluginConfigReader returns a PluginConfigReader; we don't know the exact type of createAdapter
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    storageAdapterInstance = (definition as any).createAdapter(
+      createPluginConfigReader(definition.code),
+    );
+  }
+  return storageAdapterInstance;
+}
+
+const storageAdapterInstancesByCode = new Map<string, unknown>();
+
+export function getStorageAdapterFor(code: string): unknown {
+  if (storageAdapterInstancesByCode.has(code)) return storageAdapterInstancesByCode.get(code);
+  const definitions = getStoragePluginDefinitions();
+  const definition = definitions.find((d) => d.code === code);
+  if (!definition) {
+    throw new Error(
+      `No storage plugin is installed for code '${code}'. Available: ${definitions.map((d) => d.code).join(', ') || '<none>'}`,
+    );
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const adapter = (definition as any).createAdapter(createPluginConfigReader(definition.code));
+  storageAdapterInstancesByCode.set(code, adapter);
+  return adapter;
 }
 
 let cacheAdapterInstance: CacheAdapter | null = null;

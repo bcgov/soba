@@ -9,6 +9,7 @@ import { meDomain } from './me';
 import { membersDomain } from './members';
 import { metaDomain } from './meta';
 import { submissionsDomain } from './submissions';
+import { filesDomain } from './files';
 import { workspacesDomain } from './workspaces';
 import { registerOpenApiPaths } from './shared/openapi';
 
@@ -20,6 +21,7 @@ const coreDomains = [
   membersDomain,
   metaDomain,
   submissionsDomain,
+  filesDomain,
   workspacesDomain,
 ];
 
@@ -40,6 +42,7 @@ const authenticatedDomains = [
   meDomain,
   membersDomain,
   submissionsDomain,
+  filesDomain,
 ];
 for (const domain of authenticatedDomains) {
   router.use(domain.path, domain.router);
