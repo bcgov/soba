@@ -34,9 +34,6 @@ export async function uploadFileHandler(req: Request, res: Response) {
   const uploaded: Array<Record<string, unknown>> = [];
 
   for (const file of files) {
-    console.log(
-      `File Name: ${file.originalname}, Buffer Present: ${!!file.buffer}, Buffer Size: ${file.buffer?.length ?? 0} bytes`,
-    );
     try {
       const result = await adapter.uploadFile({
         workspaceId: String(workspaceId),

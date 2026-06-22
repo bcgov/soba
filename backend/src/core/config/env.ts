@@ -221,4 +221,12 @@ export const env = {
   getTemporalNamespace: () => getOptionalEnv('TEMPORAL_NAMESPACE') ?? 'default',
   getTemporalTaskQueue: () => getOptionalEnv('TEMPORAL_TASK_QUEUE') ?? 'soba',
   getTemporalWorkerHealthPort: () => getNumberEnv('TEMPORAL_WORKER_HEALTH_PORT') ?? 9090,
+  getLargestMaxFileSize: () =>
+    getNumberEnv('PLUGIN_LOCAL_STORAGE_MAX_FILE_SIZE_MB') ||
+    getNumberEnv('PLUGIN_S3_COMPATIBLE_MAX_FILE_SIZE_MB')
+      ? Math.max(
+          getNumberEnv('PLUGIN_LOCAL_STORAGE_MAX_FILE_SIZE_MB'),
+          getNumberEnv('PLUGIN_S3_COMPATIBLE_MAX_FILE_SIZE_MB'),
+        )
+      : 10,
 };

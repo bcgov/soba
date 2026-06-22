@@ -9,9 +9,14 @@ import {
   presignHandler,
 } from './controller';
 import { ListFilesQuerySchema, PresignBodySchema } from './schema';
+import { env } from '../../config/env';
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const MAX_SIZE = env.getLargestMaxFileSize();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_SIZE * 1024 * 1024 },
+}); // Limit file size to MAX_SIZE MB
 
 // All routes are namespaced by plugin code: /:plugin/
 // Accept any file fields (Form.io may name them differently per component).

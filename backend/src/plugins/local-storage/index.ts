@@ -41,7 +41,7 @@ function createLocalStorageAdapter(config: PluginConfigReader): StorageEngineAda
       await ensureBase();
       const subdir = input.workspaceId ? path.join(basePath, input.workspaceId) : basePath;
       await fs.promises.mkdir(subdir, { recursive: true });
-      const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}-${path.basename(
+      const filename = `${Date.now()}-${input.workspaceId}-${path.basename(
         input.filename || 'file',
       )}`;
       const dest = path.join(subdir, filename);

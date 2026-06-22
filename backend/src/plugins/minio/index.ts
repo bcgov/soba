@@ -73,7 +73,7 @@ function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
     },
 
     async uploadFile(input: UploadFileInput): Promise<UploadFileResult> {
-      const key = `${input.workspaceId ?? 'default'}/${Date.now()}-${Math.random().toString(36).slice(2)}-${input.filename}`;
+      const key = `${input.workspaceId ?? 'default'}/${Date.now()}-${input.workspaceId}-${input.filename}`;
       if (input.buffer) {
         const stream = Readable.from(input.buffer);
         await client.putObject(bucket, key, stream, input.buffer.length, {
