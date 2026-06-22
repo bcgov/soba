@@ -14,8 +14,6 @@ jest.mock('../../../src/core/api/submissions/service', () => ({
 
 import { filesRouter } from '../../../src/core/api/files/route';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 describe('files API (integration) - local-storage plugin', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'files-api-test-'));
   process.env.PLUGIN_LOCAL_STORAGE_BASE_PATH = tmp;
@@ -35,9 +33,9 @@ describe('files API (integration) - local-storage plugin', () => {
       console.error('UPLOAD ERROR BODY:', uploadRes.body);
     }
     expect(uploadRes.status).toBe(200);
-    expect(uploadRes.body).toHaveProperty('uploaded');
-    expect(Array.isArray(uploadRes.body.uploaded)).toBe(true);
-    const engineFileRef = uploadRes.body.uploaded[0].engineFileRef;
+    expect(uploadRes.body).toHaveProperty('url');
+    expect(uploadRes.body.url.length).toBeGreaterThan(0);
+    const engineFileRef = uploadRes.body.id;
 
     const listRes = await request(app).get('/files/local-storage');
     expect(listRes.status).toBe(200);
