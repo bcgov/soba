@@ -13,11 +13,13 @@ on:
       - "frontend/**"
       - ".github/workflows/on-merge.yaml"
       - ".github/workflows/build-images.yaml"
+      - ".github/workflows/sonarcloud.yaml"
       - ".gitignore"
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "deployments/**"
+      - "sonar-project.properties"
 
 permissions: {}
 
@@ -26,6 +28,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  sonarcloud:
+    name: SonarCloud
+    uses: ./.github/workflows/sonarcloud.yaml
+    with:
+      ref: ${{ github.sha }}
+      branch_name: ${{ github.ref_name }}
+    secrets: inherit
+    permissions:
+      contents: read
+      pull-requests: read
+
   build:
     name: Build & Push
     uses: ./.github/workflows/build-images.yaml

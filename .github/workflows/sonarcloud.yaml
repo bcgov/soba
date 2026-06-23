@@ -1,0 +1,121 @@
+# Reusable SonarQube Cloud analysis.
+name: SonarCloud
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/sonarcloud.yaml"
+      - ".gitignore"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "deployments/**"
+      - "sonar-project.properties"
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches:
+      - main
+      - "release/sprint-*"
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/sonarcloud.yaml"
+      - ".gitignore"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "deployments/**"
+      - "sonar-project.properties"
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref or SHA to scan"
+        required: false
+        default: ""
+        type: string
+      branch_name:
+        description: "Branch name for branch analysis"
+        required: false
+        default: ""
+        type: string
+      pull_request_key:
+        description: "Pull request number for PR analysis"
+        required: false
+        default: ""
+        type: string
+      pull_request_branch:
+        description: "Pull request source branch"
+        required: false
+        default: ""
+        type: string
+      pull_request_base:
+        description: "Pull request target branch"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  scan:
+    name: SonarCloud Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: SonarCloud PR scan
+        if: ${{ inputs.pull_request_key != '' || github.event_name == 'pull_request' }}
+        uses: SonarSource/sonarqube-scan-action@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+        with:
+          args: >
+            -Dsonar.pullrequest.key=${{ inputs.pull_request_key || github.event.pull_request.number }}
+            -Dsonar.pullrequest.branch=${{ inputs.pull_request_branch || github.event.pull_request.head.ref }}
+            -Dsonar.pullrequest.base=${{ inputs.pull_request_base || github.event.pull_request.base.ref }}
+            -Dsonar.qualitygate.wait=true
+
+      - name: SonarCloud branch scan
+        if: ${{ inputs.pull_request_key == '' && github.event_name != 'pull_request' }}
+        uses: SonarSource/sonarqube-scan-action@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+        with:
+          args: >
+            -Dsonar.branch.name=${{ inputs.branch_name || github.ref_name }}
+            -Dsonar.qualitygate.wait=true

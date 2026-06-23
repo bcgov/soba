@@ -38,6 +38,7 @@ jobs:
               - '.github/workflows/pr_open.yaml'
               - '.github/workflows/build-images.yaml'
               - '.github/workflows/qa.yaml'
+              - '.github/workflows/sonarcloud.yaml'
               - '.gitignore'
               - 'package.json'
               - 'pnpm-lock.yaml'
@@ -49,6 +50,19 @@ jobs:
     uses: ./.github/workflows/qa.yaml
     permissions:
       contents: read
+
+  sonarcloud:
+    name: SonarCloud
+    uses: ./.github/workflows/sonarcloud.yaml
+    with:
+      ref: ${{ github.event.pull_request.head.sha }}
+      pull_request_key: ${{ github.event.pull_request.number }}
+      pull_request_branch: ${{ github.event.pull_request.head.ref }}
+      pull_request_base: ${{ github.event.pull_request.base.ref }}
+    secrets: inherit
+    permissions:
+      contents: read
+      pull-requests: read
 
   set-vars:
     name: Set variables
