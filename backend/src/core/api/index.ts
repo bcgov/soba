@@ -9,9 +9,10 @@ import { meDomain } from './me';
 import { membersDomain } from './members';
 import { metaDomain } from './meta';
 import { submissionsDomain } from './submissions';
-import { filesDomain } from './files';
+import { filesDomain } from '../../features/files';
 import { workspacesDomain } from './workspaces';
 import { registerOpenApiPaths } from './shared/openapi';
+import { env } from '../config/env';
 
 // Meta is mounted at app level at /api/v1/meta and is public (no JWT, no core context).
 // Workspaces is mounted first at / so GET /workspaces and GET /workspaces/current are matched before forms.
@@ -21,29 +22,40 @@ const coreDomains = [
   membersDomain,
   metaDomain,
   submissionsDomain,
-  filesDomain,
   workspacesDomain,
 ];
 
-const router = express.Router();
-registerOpenApiPaths((registry) => {
-  for (const domain of coreDomains) {
-    domain.registerOpenApi(registry);
-  }
-  registerAdminOpenApi(registry);
-  registerHealthOpenApi(registry);
-});
-
-router.use(coreContextMiddleware);
-router.use(requireCoreContext);
 const authenticatedDomains = [
   workspacesDomain,
   formsDomain,
   meDomain,
   membersDomain,
   submissionsDomain,
-  filesDomain,
 ];
+
+const featureDomains = [];
+
+const enabledFeatures = env.getEnabledFeatures();
+if (enabledFeatures.includes('files')) {
+  featureDomains.push(filesDomain);
+  authenticatedDomains.push(filesDomain);
+}
+
+registerOpenApiPaths((registry) => {
+  for (const domain of coreDomains) {
+    domain.registerOpenApi(registry);
+  }
+  for (const domain of featureDomains) {
+    domain.registerOpenApi(registry);
+  }
+  registerAdminOpenApi(registry);
+  registerHealthOpenApi(registry);
+});
+
+const router = express.Router();
+router.use(coreContextMiddleware);
+router.use(requireCoreContext);
+
 for (const domain of authenticatedDomains) {
   router.use(domain.path, domain.router);
 }

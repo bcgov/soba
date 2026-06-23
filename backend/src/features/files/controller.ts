@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Request, Response } from 'express';
-import { getStorageAdapterFor } from '../../integrations/plugins/PluginRegistry';
-import { submissionsApiService } from '../submissions/service';
-import { formsApiService } from '../forms/service';
-import { actorBelongsToWorkspace } from '../../db/repos/membershipRepo';
+import { getStorageAdapterFor } from '../../core/integrations/plugins/PluginRegistry';
+import { submissionsApiService } from '../../core/api/submissions/service';
+import { formsApiService } from '../../core/api/forms/service';
+import { actorBelongsToWorkspace } from '../../core/db/repos/membershipRepo';
 
 export async function uploadFileHandler(req: Request, res: Response) {
   const pluginCode = req.params.plugin;

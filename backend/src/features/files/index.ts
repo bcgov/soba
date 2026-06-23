@@ -2,7 +2,7 @@ export { filesRouter } from './route';
 export { registerFilesOpenApi } from './schema';
 import { filesRouter } from './route';
 import { registerFilesOpenApi } from './schema';
-import type { CoreDomain } from '../shared/openapi';
+import type { CoreDomain } from '../../core/api/shared/openapi';
 
 export const filesDomain: CoreDomain = {
   path: '/files',

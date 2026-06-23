@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { validateRequest } from '../shared/validation';
+import { validateRequest } from '../../core/api/shared/validation';
 import {
   uploadFileHandler,
   downloadFileHandler,
@@ -9,7 +9,7 @@ import {
   presignHandler,
 } from './controller';
 import { ListFilesQuerySchema, PresignBodySchema } from './schema';
-import { env } from '../../config/env';
+import { env } from '../../core/config/env';
 
 const router = express.Router();
 const MAX_SIZE = env.getLargestMaxFileSize();

@@ -12,7 +12,7 @@ jest.mock('../../../src/core/api/submissions/service', () => ({
   },
 }));
 
-import { filesRouter } from '../../../src/core/api/files/route';
+import { filesRouter } from '../../../src/features/files/route';
 
 describe('files API (integration) - local-storage plugin', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'files-api-test-'));

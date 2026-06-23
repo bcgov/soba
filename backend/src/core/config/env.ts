@@ -229,4 +229,9 @@ export const env = {
           getNumberEnv('PLUGIN_S3_COMPATIBLE_MAX_FILE_SIZE_MB'),
         )
       : 10,
+  getEnabledFeatures: () => {
+    const raw = getOptionalEnv('ENABLED_FEATURES');
+    if (!raw) return [];
+    return parseCsvValue(raw);
+  },
 };
