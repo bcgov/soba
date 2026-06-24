@@ -97,7 +97,7 @@ jobs:
 
       - name: SonarCloud PR scan
         if: ${{ inputs.pull_request_key != '' || github.event_name == 'pull_request' }}
-        uses: SonarSource/sonarqube-scan-action@v7
+        uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -111,7 +111,7 @@ jobs:
 
       - name: SonarCloud branch scan
         if: ${{ inputs.pull_request_key == '' && github.event_name != 'pull_request' }}
-        uses: SonarSource/sonarqube-scan-action@v7
+        uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
