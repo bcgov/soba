@@ -38,7 +38,6 @@ jobs:
               - '.github/workflows/pr_open.yaml'
               - '.github/workflows/build-images.yaml'
               - '.github/workflows/qa.yaml'
-              - '.github/workflows/sonarcloud.yaml'
               - '.gitignore'
               - 'package.json'
               - 'pnpm-lock.yaml'
