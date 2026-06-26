@@ -173,53 +173,9 @@ jobs:
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
         run: |
           # Pipeline performance fix: Revert if needed.
-          # TEMP DEPLOY LOGGING START: remove this block after debugging PR deploy failures.
-          # Original:
-          # set -euo pipefail
-          set -Eeuo pipefail
-
-          PHASE="initializing deploy"
-
-          log() {
-            echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] ${*}"
-          }
-
-          diagnose_failure() {
-            exit_code=$?
-            log "::error::Deploy SOBA failed during phase: ${PHASE} (exit code: ${exit_code})"
-            log "Release=${RELEASE} PR=${PR_NUM} Tag=${TAG} Domain=${DOMAIN}"
-
-            echo "::group::Helm release status"
-            helm status "${RELEASE}" -n "${NAMESPACE}" || true
-            echo "::endgroup::"
-
-            echo "::group::Helm release history"
-            helm history "${RELEASE}" -n "${NAMESPACE}" || true
-            echo "::endgroup::"
-
-            echo "::group::Recent OpenShift events"
-            oc get events -n "${NAMESPACE}" --sort-by=.lastTimestamp | tail -n 80 || true
-            echo "::endgroup::"
-
-            echo "::group::Release resources"
-            oc get all,pvc,secret,configmap -n "${NAMESPACE}" -l "app.kubernetes.io/instance=${RELEASE}" || true
-            echo "::endgroup::"
-
-            exit "${exit_code}"
-          }
-
-          trap diagnose_failure ERR
-
-          log "Starting Deploy SOBA for release ${RELEASE} using image tag ${TAG}."
-          # TEMP DEPLOY LOGGING END
-
-          PHASE="normalizing repository name"
+          set -euo pipefail
           REPO_LC=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
 
-          # TEMP DEPLOY LOGGING START: phase marker for override generation.
-          PHASE="generating Helm values override"
-          log "Generating Helm values override."
-          # TEMP DEPLOY LOGGING END
           cat > /tmp/values-override.yaml <<OVERRIDE
           backend:
             image:
@@ -248,16 +204,7 @@ jobs:
 
           OVERRIDE
 
-          # TEMP DEPLOY LOGGING START: print generated override with secret name masked.
-          log "Generated values override:"
-          sed -e 's/existingSecretName: .*/existingSecretName: "***"/' /tmp/values-override.yaml
-          # TEMP DEPLOY LOGGING END
-
           # Pipeline performance fix: Revert if needed.
-          # TEMP DEPLOY LOGGING START: phase marker for Helm deploy.
-          PHASE="running helm upgrade/install"
-          log "Running helm upgrade --install for ${RELEASE}."
-          # TEMP DEPLOY LOGGING END
           helm upgrade --install "${RELEASE}" ./deployments/helm/soba \
             --namespace "${NAMESPACE}" \
             --wait \
@@ -267,28 +214,13 @@ jobs:
             -f /tmp/values-override.yaml
           # Pipeline performance fix: Revert if needed.
 
-          # TEMP DEPLOY LOGGING START: phase marker for Helm revision lookup.
-          PHASE="reading Helm revision"
-          log "Reading deployed Helm revision."
-          # TEMP DEPLOY LOGGING END
           REVISION=$(helm status "${RELEASE}" -n "${NAMESPACE}" -o json | jq -r '.version')
-          # TEMP DEPLOY LOGGING START: revision logging.
-          log "Helm release ${RELEASE} is at revision ${REVISION}."
-          # TEMP DEPLOY LOGGING END
-
-          # TEMP DEPLOY LOGGING START: phase marker for migration cleanup.
-          PHASE="cleaning old migration jobs"
-          log "Cleaning old migration jobs for ${RELEASE}, keeping revision ${REVISION}."
-          # TEMP DEPLOY LOGGING END
           # Clean up old migration jobs and keep only current revision
           oc get jobs -n "${NAMESPACE}" -o name \
             | grep "${RELEASE}-migrate-" \
             | grep -v -- "-migrate-${REVISION}$" \
             | xargs -r oc delete -n "${NAMESPACE}" 2>/dev/null || true
 
-          # TEMP DEPLOY LOGGING START: phase marker for rollout waits.
-          PHASE="waiting for application rollouts"
-          # TEMP DEPLOY LOGGING END
           for rollout in \
             "deployment/${RELEASE}-backend:backend" \
             "deployment/${RELEASE}-frontend:frontend" \
@@ -297,29 +229,9 @@ jobs:
             "statefulset/${RELEASE}-mongodb:mongodb"; do
             resource="${rollout%%:*}"
             label="${rollout##*:}"
-            # TEMP DEPLOY LOGGING START: richer per-rollout logging and diagnostics.
-            PHASE="waiting for ${label} rollout (${resource})"
-            # Original:
-            # echo "Waiting for ${label} rollout..."
-            # oc rollout status "${resource}" -n "${NAMESPACE}" --timeout=300s
-            log "Waiting for ${label} rollout (${resource})."
-            if ! oc rollout status "${resource}" -n "${NAMESPACE}" --timeout=300s; then
-              log "::error::${label} rollout failed or timed out."
-              echo "::group::Describe ${resource}"
-              oc describe "${resource}" -n "${NAMESPACE}" || true
-              echo "::endgroup::"
-              echo "::group::Pods for ${label}"
-              oc get pods -n "${NAMESPACE}" -l "app.kubernetes.io/instance=${RELEASE}" -o wide || true
-              echo "::endgroup::"
-              exit 1
-            fi
-            # TEMP DEPLOY LOGGING END
+            echo "Waiting for ${label} rollout..."
+            oc rollout status "${resource}" -n "${NAMESPACE}" --timeout=300s
           done
-
-          # TEMP DEPLOY LOGGING START: successful completion marker.
-          PHASE="completed deploy"
-          log "Deploy SOBA completed successfully for ${RELEASE}."
-          # TEMP DEPLOY LOGGING END
 
       # Pipeline performance fix: Revert if needed.
       # Temporarily disabled openshift diagnostics; uncomment to restore.
