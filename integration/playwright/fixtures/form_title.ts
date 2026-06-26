@@ -6,7 +6,7 @@ type MyFixtures = {
 
 export const test = base.extend<MyFixtures>({
   title: async ({}, use) => {
-    const value = "chefs2-" + Math.random().toString(16).slice(2);
+    const value = `chefs2-${Date.now()}`;
     await use(value);
   },
 });
