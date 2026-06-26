@@ -35,20 +35,6 @@ test.describe.serial("Landing page tests", () => {
     form_name = title;
     console.log("Form name is: " + form_name);
     await sharedPage.waitForTimeout(1000);
-    //commenting since it has changes coming
-    /* 
-    await sharedPage.click('[data-testid="dropdown-visibility"]');
-    await expect(
-      sharedPage.locator('[data-testid="check-public"]'),
-    ).toBeVisible();
-    await expect(
-      sharedPage.locator('[data-testid="check-azureidir"]'),
-    ).toBeVisible();
-    await sharedPage.click('[data-testid="check-azureidir"]');
-    await expect(
-      sharedPage.locator('[data-testid="disclaimer-checkbox"]'),
-    ).toBeVisible();
-    */
   });
   test("Checks form creation", async () => {
     const source = sharedPage.locator("text=Text Field"); // component from builder palette
