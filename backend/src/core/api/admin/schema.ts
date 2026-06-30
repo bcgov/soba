@@ -44,11 +44,13 @@ export const SobaAdminUserIdParamsSchema = z
   })
   .openapi('Admin_SobaAdminUserIdParams');
 
+const TAG = 'core.admin';
+
 export const registerAdminOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
     path: '/admin/soba-admins',
-    tags: ['core.admin'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       query: ListSobaAdminsQuerySchema,
@@ -69,7 +71,7 @@ export const registerAdminOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'post',
     path: '/admin/soba-admins',
-    tags: ['core.admin'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       body: {
@@ -90,7 +92,7 @@ export const registerAdminOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'delete',
     path: '/admin/soba-admins/{userId}',
-    tags: ['core.admin'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     responses: {
       204: { description: 'Direct grant removed (or no-op if not direct)' },

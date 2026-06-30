@@ -31,6 +31,8 @@ export default defineConfig([
     rules: {
       'sonarjs/cognitive-complexity': ['error', 15],
       'sonarjs/no-duplicate-string': ['error', { threshold: 3 }],
+      // S3358: ternary operators should not be nested.
+      'sonarjs/no-nested-conditional': 'error',
     },
   },
   {

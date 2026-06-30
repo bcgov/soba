@@ -20,12 +20,14 @@ type SaveSubmissionBody = z.infer<typeof SaveSubmissionBodySchema>;
 type SaveSubmissionParams = z.infer<typeof SaveSubmissionParamsSchema>;
 type ListSubmissionsQuery = z.infer<typeof ListSubmissionsQuerySchema>;
 
+const SUBMISSION_NOT_FOUND = 'Submission not found';
+
 export const getSubmission = asyncHandler(
   async (req: Request<UpdateSubmissionParams>, res: Response) => {
     const ctx = req.coreContext!;
     const result = await submissionsApiService.get(ctx, req.params.id);
     if (!result) {
-      throw new NotFoundError('Submission not found');
+      throw new NotFoundError(SUBMISSION_NOT_FOUND);
     }
     res.json(result);
   },
@@ -69,7 +71,7 @@ export const updateSubmission = asyncHandler(
     const ctx = req.coreContext!;
     const result = await submissionsApiService.update(ctx, req.params.id, req.body.workflowState);
     if (!result) {
-      throw new NotFoundError('Submission not found');
+      throw new NotFoundError(SUBMISSION_NOT_FOUND);
     }
     res.json(result);
   },
@@ -88,7 +90,7 @@ export const deleteSubmission = asyncHandler(
     const ctx = req.coreContext!;
     const result = await submissionsApiService.delete(ctx, req.params.id);
     if (!result) {
-      throw new NotFoundError('Submission not found');
+      throw new NotFoundError(SUBMISSION_NOT_FOUND);
     }
     res.status(204).send();
   },

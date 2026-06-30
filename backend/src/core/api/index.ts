@@ -48,12 +48,14 @@ registerOpenApiPaths((registry) => {
   for (const domain of featureDomains) {
     domain.registerOpenApi(registry);
   }
-  for (const domain of authenticatedDomains) {
-    router.use(domain.path, domain.router);
-  }
   registerAdminOpenApi(registry);
   registerHealthOpenApi(registry);
 });
 
+// Mount routers at module load — not inside the lazy registerOpenApiPaths callback (which only
+// runs when buildOpenApiSpec() is first called), or routes would not attach at startup.
+for (const domain of authenticatedDomains) {
+  router.use(domain.path, domain.router);
+}
 router.use(coreErrorHandler);
 export { router as coreRouter };

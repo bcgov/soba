@@ -212,11 +212,18 @@ export const ListFormVersionsResponseSchema = z
   })
   .openapi('Forms_ListFormVersionsResponse');
 
+const TAG = 'core.forms';
+const FORM_PATH = '/forms/{id}';
+const FORM_VERSION_PATH = '/form-versions/{id}';
+const FORM_NOT_FOUND = 'Form not found';
+const FORM_VERSION_NOT_FOUND = 'Form version not found';
+const VALIDATION_ERROR = 'Validation or business rule error';
+
 export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
     path: '/forms',
-    tags: ['core.forms'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       query: ListFormsQuerySchema,
@@ -238,8 +245,8 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'get',
-    path: '/forms/{id}',
-    tags: ['core.forms'],
+    path: FORM_PATH,
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       params: FormIdParamsSchema,
@@ -254,7 +261,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       404: {
-        description: 'Form not found',
+        description: FORM_NOT_FOUND,
       },
     },
   });
@@ -262,7 +269,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'post',
     path: '/forms',
-    tags: ['core.forms'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       query: WorkspaceScopedQuerySchema,
@@ -285,7 +292,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       400: {
-        description: 'Validation or business rule error',
+        description: VALIDATION_ERROR,
       },
     },
   });
@@ -293,7 +300,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'post',
     path: '/forms/normalize',
-    tags: ['core.forms'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       body: {
@@ -322,8 +329,8 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'patch',
-    path: '/forms/{id}',
-    tags: ['core.forms'],
+    path: FORM_PATH,
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       params: FormIdParamsSchema,
@@ -346,7 +353,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       404: {
-        description: 'Form not found',
+        description: FORM_NOT_FOUND,
       },
     },
   });
@@ -354,7 +361,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
     path: '/form-versions',
-    tags: ['core.forms'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       query: ListFormVersionsQuerySchema,
@@ -376,8 +383,8 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'get',
-    path: '/form-versions/{id}',
-    tags: ['core.forms'],
+    path: FORM_VERSION_PATH,
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       params: FormVersionIdParamsSchema,
@@ -392,7 +399,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       404: {
-        description: 'Form version not found',
+        description: FORM_VERSION_NOT_FOUND,
       },
     },
   });
@@ -400,7 +407,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'post',
     path: '/form-versions',
-    tags: ['core.forms'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       body: {
@@ -418,15 +425,15 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         content: { 'application/json': { schema: FormVersionResponseSchema } },
       },
       400: {
-        description: 'Validation or business rule error',
+        description: VALIDATION_ERROR,
       },
     },
   });
 
   registry.registerPath({
     method: 'patch',
-    path: '/form-versions/{id}',
-    tags: ['core.forms'],
+    path: FORM_VERSION_PATH,
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       params: FormVersionIdParamsSchema,
@@ -445,7 +452,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         content: { 'application/json': { schema: FormVersionResponseSchema } },
       },
       404: {
-        description: 'Form version not found',
+        description: FORM_VERSION_NOT_FOUND,
       },
     },
   });
@@ -453,7 +460,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'post',
     path: '/form-versions/{id}/save',
-    tags: ['core.forms'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       params: SaveFormVersionParamsSchema,
@@ -472,15 +479,15 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         content: { 'application/json': { schema: FormVersionResponseSchema } },
       },
       400: {
-        description: 'Validation or business rule error',
+        description: VALIDATION_ERROR,
       },
     },
   });
 
   registry.registerPath({
     method: 'delete',
-    path: '/form-versions/{id}',
-    tags: ['core.forms'],
+    path: FORM_VERSION_PATH,
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       params: FormVersionIdParamsSchema,
@@ -490,15 +497,15 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         description: 'Form version marked as deleted',
       },
       404: {
-        description: 'Form version not found',
+        description: FORM_VERSION_NOT_FOUND,
       },
     },
   });
 
   registry.registerPath({
     method: 'delete',
-    path: '/forms/{id}',
-    tags: ['core.forms'],
+    path: FORM_PATH,
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       params: FormIdParamsSchema,
@@ -508,7 +515,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         description: 'Form marked as deleted',
       },
       404: {
-        description: 'Form not found',
+        description: FORM_NOT_FOUND,
       },
     },
   });
@@ -517,7 +524,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
     registry.registerPath({
       method: 'post',
       path: `/form-versions/{id}/${action}`,
-      tags: ['core.forms'],
+      tags: [TAG],
       security: [{ bearerAuth: [] }],
       request: { params: FormVersionIdParamsSchema },
       responses: {
@@ -526,7 +533,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
           content: { 'application/json': { schema: FormVersionResponseSchema } },
         },
         400: { description: 'Invalid state transition' },
-        404: { description: 'Form version not found' },
+        404: { description: FORM_VERSION_NOT_FOUND },
       },
     });
   }
@@ -534,7 +541,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
     path: '/form-versions/{id}/schema',
-    tags: ['core.forms'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: { params: FormVersionIdParamsSchema },
     responses: {
@@ -549,7 +556,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'post',
     path: '/form-versions/{id}/schema',
-    tags: ['core.forms'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       params: FormVersionIdParamsSchema,
@@ -564,7 +571,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         content: { 'application/json': { schema: FormVersionResponseSchema } },
       },
       400: { description: 'Engine rejected the schema' },
-      404: { description: 'Form version not found' },
+      404: { description: FORM_VERSION_NOT_FOUND },
     },
   });
 };

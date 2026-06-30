@@ -25,6 +25,8 @@ const eslintConfig = defineConfig([
       // Minimal SonarCloud parity for the smells that have bitten us, at Sonar Way thresholds.
       'sonarjs/cognitive-complexity': ['error', 15],
       'sonarjs/no-duplicate-string': ['error', { threshold: 3 }],
+      // S3358: ternary operators should not be nested.
+      'sonarjs/no-nested-conditional': 'error',
     },
   },
   // Tests and test/build config legitimately use/wrap console and repeat fixture literals.

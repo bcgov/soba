@@ -96,13 +96,9 @@ function normalizeProfile(decoded: Record<string, unknown>): NormalizedProfile {
 }
 
 function getProviderCode(decoded: Record<string, unknown>): string {
-  const idp: string =
-    typeof decoded.identity_provider === 'string'
-      ? decoded.identity_provider
-      : typeof (decoded as Record<string, unknown>).idpType === 'string'
-        ? ((decoded as Record<string, unknown>).idpType as string)
-        : 'idir';
-  return idp;
+  if (typeof decoded.identity_provider === 'string') return decoded.identity_provider;
+  if (typeof decoded.idpType === 'string') return decoded.idpType;
+  return 'idir';
 }
 
 function getSubject(decoded: Record<string, unknown>): string {
