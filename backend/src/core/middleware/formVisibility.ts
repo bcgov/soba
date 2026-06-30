@@ -46,107 +46,136 @@ export function resolveActorOptional(req: Request, res: Response, next: NextFunc
   return resolveActor(req, res, next);
 }
 
+type FormVersionRow = typeof formVersions.$inferSelect;
+type VisibilityDenial = { status: number; body: { error: string; message: string } };
+
+/** Identify the target form version: from the submission body (POST /submissions) or, for
+ *  POST /submissions/:id/save, via the referenced submission. Null when none can be resolved. */
+async function loadTargetFormVersion(req: Request): Promise<FormVersionRow | null> {
+  if (req.body && req.body.formVersionId) {
+    const [formVersion] = await db
+      .select()
+      .from(formVersions)
+      .where(and(eq(formVersions.id, req.body.formVersionId), isNull(formVersions.deletedAt)))
+      .limit(1);
+    return formVersion ?? null;
+  }
+
+  if (req.params.id && req.path.includes('/submissions/')) {
+    const [submission] = await db
+      .select()
+      .from(submissions)
+      .where(and(eq(submissions.id, req.params.id), isNull(submissions.deletedAt)))
+      .limit(1);
+    if (!submission) return null;
+    const [formVersion] = await db
+      .select()
+      .from(formVersions)
+      .where(and(eq(formVersions.id, submission.formVersionId), isNull(formVersions.deletedAt)))
+      .limit(1);
+    return formVersion ?? null;
+  }
+
+  return null;
+}
+
+/** Authorize the request against the form version's visibility. Returns a denial to send, or null
+ *  when access is granted (including public forms). */
+async function authorizeFormVisibility(
+  req: Request,
+  formVersion: FormVersionRow,
+): Promise<VisibilityDenial | null> {
+  const allowedIdps = formVersion.visibility || [];
+  if (allowedIdps.includes('public')) return null;
+
+  if (!req.user) {
+    return {
+      status: 401,
+      body: { error: 'Unauthorized', message: 'Authentication required for this form' },
+    };
+  }
+
+  if (allowedIdps.length > 0) {
+    // Match a discrete provider-code token (e.g. 'azureidir') or any IDP group the user belongs to.
+    const userIdp = (req.user.providerCode || req.idpType || '').toLowerCase();
+    const userGroups = await listGroupsForIdp(userIdp);
+    const matched = allowedIdps.some((token) => token === userIdp || userGroups.includes(token));
+    if (!matched) {
+      return {
+        status: 403,
+        body: {
+          error: 'Forbidden',
+          message: `User identity provider '${userIdp}' is not authorized to access this form`,
+        },
+      };
+    }
+    return null;
+  }
+
+  // Empty visibility list: default to a workspace membership check.
+  const membership = req.actorId
+    ? await getWorkspaceForUser(formVersion.workspaceId, req.actorId)
+    : null;
+  if (!membership) {
+    return {
+      status: 403,
+      body: {
+        error: 'Forbidden',
+        message: 'User does not belong to the workspace containing this form',
+      },
+    };
+  }
+  return null;
+}
+
+/** Resolve the actor identity for downstream audit constraints: the authenticated user, or the
+ *  seeded system user for unauthenticated/public submissions. */
+async function resolveVisibilityActor(
+  req: Request,
+): Promise<{ actorId: string | undefined; actorDisplayLabel: string | null }> {
+  if (req.user) {
+    return {
+      actorId: req.actorId,
+      actorDisplayLabel: req.user.profile?.displayLabel || req.user.profile?.displayName || null,
+    };
+  }
+
+  const systemIdentity = await db
+    .select({ userId: userIdentities.userId })
+    .from(userIdentities)
+    .where(
+      and(
+        eq(userIdentities.identityProviderCode, 'system'),
+        eq(userIdentities.subject, 'soba-system'),
+      ),
+    )
+    .limit(1);
+
+  if (systemIdentity[0]) {
+    return { actorId: systemIdentity[0].userId, actorDisplayLabel: 'Public Submitter' };
+  }
+
+  return { actorId: req.actorId, actorDisplayLabel: null };
+}
+
 /**
  * Verifies if the request meets the form version's visibility settings.
  * If authorized, populates the request's coreContext to satisfy database audit constraints.
  */
 export async function checkFormVisibility(req: Request, res: Response, next: NextFunction) {
   try {
-    let formVersion = null;
-
-    // 1. Identify which Form Version we are querying/submitting
-    if (req.body && req.body.formVersionId) {
-      // POST /submissions
-      [formVersion] = await db
-        .select()
-        .from(formVersions)
-        .where(and(eq(formVersions.id, req.body.formVersionId), isNull(formVersions.deletedAt)))
-        .limit(1);
-    } else if (req.params.id && req.path.includes('/submissions/')) {
-      // POST /submissions/:id/save
-      const [submission] = await db
-        .select()
-        .from(submissions)
-        .where(and(eq(submissions.id, req.params.id), isNull(submissions.deletedAt)))
-        .limit(1);
-      if (submission) {
-        [formVersion] = await db
-          .select()
-          .from(formVersions)
-          .where(and(eq(formVersions.id, submission.formVersionId), isNull(formVersions.deletedAt)))
-          .limit(1);
-      }
-    }
-
+    const formVersion = await loadTargetFormVersion(req);
     if (!formVersion) {
       // Form version not found, let it proceed to standard 404 handlers downstream
       return next();
     }
 
-    const allowedIdps = formVersion.visibility || [];
-    const isPublic = allowedIdps.includes('public');
-
-    // 2. Perform authorization checks
-    if (!isPublic) {
-      if (!req.user) {
-        return res.status(401).json({
-          error: 'Unauthorized',
-          message: 'Authentication required for this form',
-        });
-      }
-
-      const userIdp = (req.user.providerCode || req.idpType || '').toLowerCase();
-      let matched = false;
-
-      if (allowedIdps.length > 0) {
-        // Match a discrete provider-code token (e.g. 'azureidir') or any IDP group the user belongs to.
-        const userGroups = await listGroupsForIdp(userIdp);
-        matched = allowedIdps.some((token) => token === userIdp || userGroups.includes(token));
-        if (!matched) {
-          return res.status(403).json({
-            error: 'Forbidden',
-            message: `User identity provider '${userIdp}' is not authorized to access this form`,
-          });
-        }
-      } else {
-        // If visibility list is empty, default to workspace membership check
-        const membership = req.actorId
-          ? await getWorkspaceForUser(formVersion.workspaceId, req.actorId)
-          : null;
-        if (!membership) {
-          return res.status(403).json({
-            error: 'Forbidden',
-            message: 'User does not belong to the workspace containing this form',
-          });
-        }
-      }
+    const denial = await authorizeFormVisibility(req, formVersion);
+    if (denial) {
+      return res.status(denial.status).json(denial.body);
     }
 
-    // 3. Resolve the actorId and coreContext for downstream handlers
-    let actorId = req.actorId;
-    let actorDisplayLabel = null;
-
-    if (req.user) {
-      actorId = req.actorId;
-      actorDisplayLabel = req.user.profile?.displayLabel || req.user.profile?.displayName || null;
-    } else {
-      // For unauthenticated/public submissions, resolve to the default seeded system user for DB constraints
-      const systemIdentity = await db
-        .select({ userId: userIdentities.userId })
-        .from(userIdentities)
-        .where(
-          and(
-            eq(userIdentities.identityProviderCode, 'system'),
-            eq(userIdentities.subject, 'soba-system'),
-          ),
-        )
-        .limit(1);
-
-      if (systemIdentity[0]) {
-        actorId = systemIdentity[0].userId;
-        actorDisplayLabel = 'Public Submitter';
-      }
-    }
+    const { actorId, actorDisplayLabel } = await resolveVisibilityActor(req);
 
     req.coreContext = {
       workspaceId: formVersion.workspaceId,

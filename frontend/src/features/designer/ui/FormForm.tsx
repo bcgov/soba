@@ -292,6 +292,50 @@ function FormForm({ formId }: { formId?: string }) {
     );
   }
 
+  const renderFormBuilder = () => {
+    if (!formId) {
+      return (
+        <FormDesigner
+          onUpdateModel={updateFormSchema}
+          initialModel={null}
+          formName={formName}
+          isDirty={isDirty}
+        />
+      );
+    }
+    if (loading) {
+      return <CenteredProgress label={dict.form.loading} />;
+    }
+    if (!formSchema) {
+      return <div className="my-4">{dict.form.schemaNotAvailable}</div>;
+    }
+    return (
+      <FormDesigner
+        onUpdateModel={updateFormSchema}
+        initialModel={formSchema}
+        formName={formName}
+        versionNo={currentVersion?.versionNo ?? null}
+        state={currentVersion?.state ?? null}
+        isDirty={isDirty}
+      />
+    );
+  };
+
+  const newVersionLabel = isSaving
+    ? dict.form.creating || 'Creating...'
+    : isHistoryView
+      ? dict.form.restoreAsNewVersion || 'Restore as New Version'
+      : dict.form.newVersion || 'New Version';
+
+  const getPublishTitle = (): string => {
+    if (!agreedDisclaimer) return dict.form.mustAgreeDisclaimer || 'Must agree to disclaimer';
+    if (isHistoryView) return dict.form.cannotPublishHistory || 'Cannot publish history';
+    if (isCurrentPublished)
+      return dict.form.versionAlreadyPublished || 'Version already published';
+    if (isDirty) return dict.form.saveChangesBeforePublishing || 'Save changes before publishing';
+    return dict.form.publishForm || 'Publish form';
+  };
+
   const renderDesignerContent = () => (
     <>
       <Form
@@ -349,31 +393,7 @@ function FormForm({ formId }: { formId?: string }) {
       </Form>
 
       {/* Form Builder */}
-      <div className={styles.designerWrapper}>
-        {formId ? (
-          loading ? (
-            <CenteredProgress label={dict.form.loading} />
-          ) : formSchema ? (
-            <FormDesigner
-              onUpdateModel={updateFormSchema}
-              initialModel={formSchema}
-              formName={formName}
-              versionNo={currentVersion?.versionNo ?? null}
-              state={currentVersion?.state ?? null}
-              isDirty={isDirty}
-            />
-          ) : (
-            <div className="my-4">{dict.form.schemaNotAvailable}</div>
-          )
-        ) : (
-          <FormDesigner
-            onUpdateModel={updateFormSchema}
-            initialModel={null}
-            formName={formName}
-            isDirty={isDirty}
-          />
-        )}
-      </div>
+      <div className={styles.designerWrapper}>{renderFormBuilder()}</div>
 
       {/* Spacer so the builder clears the fixed action bar */}
       <div className="mb-5 pb-5" />
@@ -387,11 +407,7 @@ function FormForm({ formId }: { formId?: string }) {
             onPress={createNewVersion}
             isDisabled={isSaving || loading}
           >
-            {isSaving
-              ? dict.form.creating || 'Creating...'
-              : isHistoryView
-                ? dict.form.restoreAsNewVersion || 'Restore as New Version'
-                : dict.form.newVersion || 'New Version'}
+            {newVersionLabel}
           </Button>
         )}
         <Button
@@ -407,17 +423,7 @@ function FormForm({ formId }: { formId?: string }) {
         {formId && (
           <span
             className="d-inline-flex"
-            title={
-              !agreedDisclaimer
-                ? dict.form.mustAgreeDisclaimer || 'Must agree to disclaimer'
-                : isHistoryView
-                  ? dict.form.cannotPublishHistory || 'Cannot publish history'
-                  : isCurrentPublished
-                    ? dict.form.versionAlreadyPublished || 'Version already published'
-                    : isDirty
-                      ? dict.form.saveChangesBeforePublishing || 'Save changes before publishing'
-                      : dict.form.publishForm || 'Publish form'
-            }
+            title={getPublishTitle()}
           >
             <Button
               variant="primary"

@@ -41,6 +41,9 @@ import {
 
 const router = express.Router();
 
+const FORMS_ID_PATH = '/forms/:id';
+const FORM_VERSIONS_ID_PATH = '/form-versions/:id';
+
 const formResource = workspaceFromResource({ kind: 'form', idFrom: 'paramsId' });
 const formVersionResource = workspaceFromResource({ kind: 'formVersion', idFrom: 'paramsId' });
 // Creating a version resolves the workspace from the parent form id in the request body.
@@ -64,9 +67,9 @@ router.post(
   validateRequest({ body: NormalizeSchemaBodySchema }),
   normalizeFormSchema,
 );
-router.get('/forms/:id', validateRequest({ params: FormIdParamsSchema }), formResource, getForm);
+router.get(FORMS_ID_PATH, validateRequest({ params: FormIdParamsSchema }), formResource, getForm);
 router.patch(
-  '/forms/:id',
+  FORMS_ID_PATH,
   validateRequest({
     params: FormIdParamsSchema,
     body: UpdateFormBodySchema,
@@ -81,7 +84,7 @@ router.get(
   listFormVersions,
 );
 router.get(
-  '/form-versions/:id',
+  FORM_VERSIONS_ID_PATH,
   validateRequest({ params: FormVersionIdParamsSchema }),
   formVersionResource,
   getFormVersion,
@@ -94,7 +97,7 @@ router.post(
   createFormVersion,
 );
 router.patch(
-  '/form-versions/:id',
+  FORM_VERSIONS_ID_PATH,
   validateRequest({
     params: FormVersionIdParamsSchema,
     body: UpdateFormVersionBodySchema,
@@ -142,13 +145,13 @@ router.post(
   provisionFormVersionSchema,
 );
 router.delete(
-  '/form-versions/:id',
+  FORM_VERSIONS_ID_PATH,
   validateRequest({ params: FormVersionIdParamsSchema }),
   formVersionResource,
   deleteFormVersion,
 );
 router.delete(
-  '/forms/:id',
+  FORMS_ID_PATH,
   validateRequest({ params: FormIdParamsSchema }),
   formResource,
   deleteForm,

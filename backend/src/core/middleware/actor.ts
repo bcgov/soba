@@ -4,6 +4,7 @@
  * Must run after checkJwt() so that req.idpPluginCode and req.authPayload are set.
  */
 import { Request, Response, NextFunction } from 'express';
+const X_SOBA_USER_ID = 'x-soba-user-id';
 import { getIdpPlugins } from '../auth/idpRegistry';
 import { findOrCreateUserByIdentity } from '../db/repos/membershipRepo';
 import { isSobaAdmin, upsertSobaAdminFromIdp } from '../db/repos/sobaAdminRepo';
@@ -15,15 +16,15 @@ import { profileHelpers } from '../auth/jwtClaims';
  * Used by actor-only routes that don't resolve a workspace context.
  */
 export const getActorId = (req: Request): string | null =>
-  req.actorId ?? req.header('x-soba-user-id') ?? null;
+  req.actorId ?? req.header(X_SOBA_USER_ID) ?? null;
 
 /** Identity provider code for the current session (from the verified JWT). */
 export const getActorIdpCode = (req: Request): string | null =>
   req.user?.providerCode?.toLowerCase() ?? null;
 
 export function resolveActor(req: Request, res: Response, next: NextFunction): void {
-  if (req.actorId || req.header('x-soba-user-id')) {
-    const actorId = req.actorId ?? req.header('x-soba-user-id') ?? null;
+  if (req.actorId || req.header(X_SOBA_USER_ID)) {
+    const actorId = req.actorId ?? req.header(X_SOBA_USER_ID) ?? null;
     if (actorId) {
       isSobaAdmin(actorId)
         .then((admin) => {
