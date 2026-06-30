@@ -2,12 +2,12 @@ import express from 'express';
 import { coreErrorHandler } from '../middleware/errorHandler';
 import { registerAdminOpenApi } from './admin';
 import { registerHealthOpenApi } from './health';
+import { filesDomain } from '../../features/files';
 import { formsDomain } from './forms';
 import { meDomain } from './me';
 import { membersDomain } from './members';
 import { metaDomain } from './meta';
 import { submissionsDomain } from './submissions';
-import { filesDomain } from '../../features/files';
 import { workspacesDomain } from './workspaces';
 import { registerOpenApiPaths } from './shared/openapi';
 import { env } from '../config/env';
@@ -22,7 +22,8 @@ const coreDomains = [
   submissionsDomain,
   workspacesDomain,
 ];
-
+// Workspace context is resolved per route (see workspaceContext middleware), not globally.
+// resolveActor runs at the app level so req.actorId is available to all routes here.
 const authenticatedDomains = [
   workspacesDomain,
   formsDomain,
@@ -38,6 +39,7 @@ if (enabledFeatures.includes('files')) {
   featureDomains.push(filesDomain);
   authenticatedDomains.push(filesDomain);
 }
+const router = express.Router();
 
 registerOpenApiPaths((registry) => {
   for (const domain of coreDomains) {
@@ -46,26 +48,12 @@ registerOpenApiPaths((registry) => {
   for (const domain of featureDomains) {
     domain.registerOpenApi(registry);
   }
+  for (const domain of authenticatedDomains) {
+    router.use(domain.path, domain.router);
+  }
   registerAdminOpenApi(registry);
   registerHealthOpenApi(registry);
 });
 
-const router = express.Router();
-router.use(coreContextMiddleware);
-router.use(requireCoreContext);
-
-// Workspace context is resolved per route (see workspaceContext middleware), not globally.
-// resolveActor runs at the app level so req.actorId is available to all routes here.
-const authenticatedDomains = [
-  workspacesDomain,
-  formsDomain,
-  meDomain,
-  membersDomain,
-  submissionsDomain,
-];
-for (const domain of authenticatedDomains) {
-  router.use(domain.path, domain.router);
-}
 router.use(coreErrorHandler);
-
 export { router as coreRouter };

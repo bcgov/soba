@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 extendZodWithOpenApi(z);
 
+const PLUGIN_NOT_FOUND_DESC = 'Plugin not found';
+
 export const ListFilesQuerySchema = z
   .object({
     pageToken: z.string().optional(),
@@ -68,7 +70,7 @@ export function registerFilesOpenApi(registry: OpenAPIRegistry) {
         content: { 'application/json': { schema: FileItemSchema } },
       },
       400: { description: 'Invalid request' },
-      404: { description: 'Plugin not found' },
+      404: { description: PLUGIN_NOT_FOUND_DESC },
     },
   });
 
@@ -86,7 +88,7 @@ export function registerFilesOpenApi(registry: OpenAPIRegistry) {
         description: 'List files',
         content: { 'application/json': { schema: ListFilesResponseSchema } },
       },
-      404: { description: 'Plugin not found' },
+      404: { description: PLUGIN_NOT_FOUND_DESC },
     },
   });
 
@@ -140,7 +142,7 @@ export function registerFilesOpenApi(registry: OpenAPIRegistry) {
           },
         },
       },
-      404: { description: 'Plugin not found' },
+      404: { description: PLUGIN_NOT_FOUND_DESC },
     },
   });
 }

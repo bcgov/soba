@@ -5,14 +5,48 @@ import { submissionsApiService } from '../../core/api/submissions/service';
 import { formsApiService } from '../../core/api/forms/service';
 import { actorBelongsToWorkspace } from '../../core/db/repos/membershipRepo';
 
+const PLUGIN_NOT_FOUND = 'plugin not found';
+
+/** Resolve the storage adapter for the given plugin, or send a 404 and return null. */
+function resolveAdapter(pluginCode: string, res: Response): any | null {
+  try {
+    return getStorageAdapterFor(pluginCode);
+  } catch {
+    res.status(404).json({ error: PLUGIN_NOT_FOUND });
+    return null;
+  }
+}
+
+/**
+ * Resolve the submission id to attach uploads to, creating a draft submission when none is given.
+ * Sends a 404 and returns null when the referenced form version cannot be found.
+ */
+async function resolveTargetSubmissionId(
+  ctx: { workspaceId: string; actorId: string },
+  params: { formVersionId: string; formId?: string; submissionId?: string },
+  res: Response,
+): Promise<string | null> {
+  if (params.submissionId) return params.submissionId;
+
+  const serviceCtx = { ...ctx, actorDisplayLabel: null };
+  let formId = params.formId;
+  if (!formId) {
+    const formVersion = await formsApiService.getFormVersion(serviceCtx, params.formVersionId);
+    if (!formVersion) {
+      res.status(404).json({ error: 'formVersion not found' });
+      return null;
+    }
+    formId = formVersion.formId;
+  }
+
+  const created = await submissionsApiService.create(serviceCtx, formId, params.formVersionId);
+  return created.id;
+}
+
 export async function uploadFileHandler(req: Request, res: Response) {
   const pluginCode = req.params.plugin;
-  let adapter: any;
-  try {
-    adapter = getStorageAdapterFor(pluginCode);
-  } catch {
-    return res.status(404).json({ error: 'plugin not found' });
-  }
+  const adapter = resolveAdapter(pluginCode, res);
+  if (!adapter) return;
 
   const files = (req as any).files as any[] | undefined;
   if (!files || files.length === 0) return res.status(400).json({ error: 'no files' });
@@ -60,31 +94,12 @@ export async function uploadFileHandler(req: Request, res: Response) {
 
   // Attach to submission: create submission if needed, then save a revision with files data
   try {
-    let createdSubmission: any = null;
-    let targetSubmissionId = submissionId;
-
-    if (!targetSubmissionId) {
-      let formId = (req as any).body.formId;
-      if (!formId) {
-        const formVersion = await formsApiService.getFormVersion(
-          { workspaceId: String(workspaceId), actorId: actorId ?? '', actorDisplayLabel: null },
-          formVersionId,
-        );
-        if (!formVersion) {
-          return res.status(404).json({ error: 'formVersion not found' });
-        }
-        formId = formVersion.formId;
-      }
-
-      // create draft submission
-      const created = await submissionsApiService.create(
-        { workspaceId: String(workspaceId), actorId: actorId ?? '', actorDisplayLabel: null },
-        formId,
-        formVersionId,
-      );
-      createdSubmission = created;
-      targetSubmissionId = createdSubmission.id;
-    }
+    const targetSubmissionId = await resolveTargetSubmissionId(
+      { workspaceId: String(workspaceId), actorId: actorId ?? '' },
+      { formVersionId, formId: (req as any).body.formId, submissionId },
+      res,
+    );
+    if (!targetSubmissionId) return;
 
     // Save: call save to push to engine and append revision. Store files in data.files array.
     const savePayload = {
@@ -93,7 +108,7 @@ export async function uploadFileHandler(req: Request, res: Response) {
     };
     const saved = await submissionsApiService.save(
       { workspaceId: String(workspaceId), actorId: actorId ?? '', actorDisplayLabel: null },
-      targetSubmissionId as string,
+      targetSubmissionId,
       savePayload,
     );
 
@@ -119,13 +134,8 @@ export async function uploadFileHandler(req: Request, res: Response) {
 }
 
 export async function downloadFileHandler(req: Request, res: Response) {
-  const pluginCode = req.params.plugin;
-  let adapter: any;
-  try {
-    adapter = getStorageAdapterFor(pluginCode);
-  } catch {
-    return res.status(404).json({ error: 'plugin not found' });
-  }
+  const adapter = resolveAdapter(req.params.plugin, res);
+  if (!adapter) return;
   const id = req.params.id;
   const file = await adapter.getFile(id);
   if (!file) return res.status(404).end();
@@ -141,39 +151,24 @@ export async function downloadFileHandler(req: Request, res: Response) {
 }
 
 export async function deleteFileHandler(req: Request, res: Response) {
-  const pluginCode = req.params.plugin;
-  let adapter: any;
-  try {
-    adapter = getStorageAdapterFor(pluginCode);
-  } catch {
-    return res.status(404).json({ error: 'plugin not found' });
-  }
+  const adapter = resolveAdapter(req.params.plugin, res);
+  if (!adapter) return;
   const id = req.params.id;
   await adapter.deleteFile(id);
   return res.status(204).end();
 }
 
 export async function listFilesHandler(req: Request, res: Response) {
-  const pluginCode = req.params.plugin;
-  let adapter: any;
-  try {
-    adapter = getStorageAdapterFor(pluginCode);
-  } catch {
-    return res.status(404).json({ error: 'plugin not found' });
-  }
+  const adapter = resolveAdapter(req.params.plugin, res);
+  if (!adapter) return;
   const workspaceId = String((req as any).workspace?.id ?? 'default');
   const list = (await adapter.listFiles?.(workspaceId)) ?? { items: [] };
   return res.json(list);
 }
 
 export async function presignHandler(req: Request, res: Response) {
-  const pluginCode = req.params.plugin;
-  let adapter: any;
-  try {
-    adapter = getStorageAdapterFor(pluginCode);
-  } catch {
-    return res.status(404).json({ error: 'plugin not found' });
-  }
+  const adapter = resolveAdapter(req.params.plugin, res);
+  if (!adapter) return;
   const body = req.body;
   if (typeof adapter.generatePresignedUrl !== 'function') {
     return res.status(501).json({ error: 'presign not supported' });
