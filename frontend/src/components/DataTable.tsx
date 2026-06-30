@@ -64,6 +64,41 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
   const totalPages = totalItems ? Math.ceil(totalItems / pageSize) : 1;
 
+  const renderBody = () => {
+    if (loading) {
+      return (
+        <tr>
+          <td colSpan={columns.length} className="p-0">
+            <CenteredProgress label={loadingMessage} data-testid="datatable-loading" />
+          </td>
+        </tr>
+      );
+    }
+    if (data.length === 0) {
+      return (
+        <tr>
+          <td colSpan={columns.length} className="text-center py-5 text-muted">
+            {error ? `Error: ${error}` : emptyMessage}
+          </td>
+        </tr>
+      );
+    }
+    return data.map((item) => (
+      <tr key={keyExtractor(item)} className={styles.row}>
+        {columns.map((col) => (
+          <td
+            key={`${keyExtractor(item)}-${col.key}`}
+            className={`px-4 py-2 text-${col.align || 'start'}`}
+          >
+            {col.render
+              ? col.render(item)
+              : ((item as Record<string, unknown>)[col.key] as React.ReactNode)}
+          </td>
+        ))}
+      </tr>
+    ));
+  };
+
   return (
     <div className={`bg-white rounded overflow-hidden ${styles.container}`}>
       <Table responsive className={`mb-0 align-middle ${styles.table}`}>
@@ -77,36 +112,7 @@ export function DataTable<T>({
             ))}
           </tr>
         </thead>
-        <tbody className={styles.tbody}>
-          {loading ? (
-            <tr>
-              <td colSpan={columns.length} className="p-0">
-                <CenteredProgress label={loadingMessage} data-testid="datatable-loading" />
-              </td>
-            </tr>
-          ) : data.length === 0 ? (
-            <tr>
-              <td colSpan={columns.length} className="text-center py-5 text-muted">
-                {error ? `Error: ${error}` : emptyMessage}
-              </td>
-            </tr>
-          ) : (
-            data.map((item) => (
-              <tr key={keyExtractor(item)} className={styles.row}>
-                {columns.map((col) => (
-                  <td
-                    key={`${keyExtractor(item)}-${col.key}`}
-                    className={`px-4 py-2 text-${col.align || 'start'}`}
-                  >
-                    {col.render
-                      ? col.render(item)
-                      : ((item as Record<string, unknown>)[col.key] as React.ReactNode)}
-                  </td>
-                ))}
-              </tr>
-            ))
-          )}
-        </tbody>
+        <tbody className={styles.tbody}>{renderBody()}</tbody>
       </Table>
 
       {!loading && data.length > 0 && totalItems !== undefined && (

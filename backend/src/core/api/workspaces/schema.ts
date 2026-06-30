@@ -65,11 +65,13 @@ export const UpdateWorkspaceBodySchema = z
   })
   .openapi('Workspaces_UpdateWorkspaceBody');
 
+const TAG = 'core.workspaces';
+
 export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
     path: '/workspaces',
-    tags: ['core.workspaces'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       query: ListWorkspacesQuerySchema,
@@ -90,7 +92,7 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
     path: '/workspaces/current',
-    tags: ['core.workspaces'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       query: WorkspaceScopedQuerySchema,
@@ -113,7 +115,7 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
     path: '/workspaces/{id}',
-    tags: ['core.workspaces'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       params: WorkspaceIdParamsSchema,
@@ -136,7 +138,7 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'post',
     path: '/workspaces',
-    tags: ['core.workspaces'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       body: {
@@ -163,7 +165,7 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'patch',
     path: '/workspaces/{id}',
-    tags: ['core.workspaces'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       params: WorkspaceIdParamsSchema,

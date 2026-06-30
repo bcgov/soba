@@ -111,11 +111,15 @@ export const ListSubmissionsResponseSchema = z
   })
   .openapi('Submissions_ListSubmissionsResponse');
 
+const TAG = 'core.submissions';
+const SUBMISSION_PATH = '/submissions/{id}';
+const SUBMISSION_NOT_FOUND = 'Submission not found';
+
 export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
     path: '/submissions',
-    tags: ['core.submissions'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       query: ListSubmissionsQuerySchema,
@@ -137,8 +141,8 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'get',
-    path: '/submissions/{id}',
-    tags: ['core.submissions'],
+    path: SUBMISSION_PATH,
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       params: UpdateSubmissionParamsSchema,
@@ -149,7 +153,7 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
         content: { 'application/json': { schema: SubmissionResponseSchema } },
       },
       404: {
-        description: 'Submission not found',
+        description: SUBMISSION_NOT_FOUND,
       },
     },
   });
@@ -157,7 +161,7 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
     path: '/submissions/{id}/data',
-    tags: ['core.submissions'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       params: UpdateSubmissionParamsSchema,
@@ -178,7 +182,7 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'post',
     path: '/submissions',
-    tags: ['core.submissions'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       body: {
@@ -203,8 +207,8 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'patch',
-    path: '/submissions/{id}',
-    tags: ['core.submissions'],
+    path: SUBMISSION_PATH,
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       params: UpdateSubmissionParamsSchema,
@@ -223,7 +227,7 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
         content: { 'application/json': { schema: SubmissionResponseSchema } },
       },
       404: {
-        description: 'Submission not found',
+        description: SUBMISSION_NOT_FOUND,
       },
     },
   });
@@ -231,7 +235,7 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'post',
     path: '/submissions/{id}/save',
-    tags: ['core.submissions'],
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       params: SaveSubmissionParamsSchema,
@@ -257,8 +261,8 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'delete',
-    path: '/submissions/{id}',
-    tags: ['core.submissions'],
+    path: SUBMISSION_PATH,
+    tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
       params: UpdateSubmissionParamsSchema,
@@ -268,7 +272,7 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
         description: 'Submission marked as deleted',
       },
       404: {
-        description: 'Submission not found',
+        description: SUBMISSION_NOT_FOUND,
       },
     },
   });

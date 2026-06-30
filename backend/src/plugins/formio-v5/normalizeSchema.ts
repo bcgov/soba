@@ -20,6 +20,38 @@ function isPlainObject(v: unknown): v is Node {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
+/** Strip a non-object `widget` (`""` / `null` / string) and any flattened `widget.*` keys from a
+ *  single component, so the builder falls back to its default widget. Mutates in place. */
+function repairComponentWidget(c: Node): void {
+  if ('widget' in c && !isPlainObject(c.widget)) delete c.widget;
+  for (const key of Object.keys(c)) {
+    if (key.startsWith('widget.')) delete c[key];
+  }
+}
+
+/** Repair widgets in each component of a table row (a row is an array of cells). */
+function repairWidgetsInRow(row: unknown[]): void {
+  for (const cell of row) {
+    if (isPlainObject(cell)) repairWidgets(cell.components);
+  }
+}
+
+/** Recurse widget repair into every nested component container a component may carry:
+ *  direct `components`, `columns[].components`, and table `rows[][].components`. */
+function repairNestedComponents(c: Node): void {
+  repairWidgets(c.components);
+  if (Array.isArray(c.columns)) {
+    for (const col of c.columns) {
+      if (isPlainObject(col)) repairWidgets(col.components);
+    }
+  }
+  if (Array.isArray(c.rows)) {
+    for (const row of c.rows) {
+      if (Array.isArray(row)) repairWidgetsInRow(row);
+    }
+  }
+}
+
 /**
  * Drop component `widget`s that aren't a valid object (`""` / `null` / string) plus any
  * flattened `widget.*` keys, so the builder falls back to each component's default widget.
@@ -30,20 +62,8 @@ function repairWidgets(comps: unknown): void {
   if (!Array.isArray(comps)) return;
   for (const c of comps) {
     if (!isPlainObject(c)) continue;
-    if ('widget' in c && !isPlainObject(c.widget)) delete c.widget;
-    for (const key of Object.keys(c)) {
-      if (key.startsWith('widget.')) delete c[key];
-    }
-    repairWidgets(c.components);
-    if (Array.isArray(c.columns)) {
-      for (const col of c.columns) if (isPlainObject(col)) repairWidgets(col.components);
-    }
-    if (Array.isArray(c.rows)) {
-      for (const row of c.rows) {
-        if (!Array.isArray(row)) continue;
-        for (const cell of row) if (isPlainObject(cell)) repairWidgets(cell.components);
-      }
-    }
+    repairComponentWidget(c);
+    repairNestedComponents(c);
   }
 }
 

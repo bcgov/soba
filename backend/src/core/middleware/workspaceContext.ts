@@ -31,6 +31,8 @@ import { getSubmissionListContext, getWorkspaceIdForSubmission } from '../db/rep
 import type { CoreRequestContext } from './requestContext';
 
 export const WORKSPACE_HEADER = 'x-soba-workspace-id';
+const RESOURCE_NOT_FOUND = 'Resource not found';
+const MISSING_ACTOR_IDENTITY = 'Missing actor identity (actorId or x-soba-user-id)';
 
 export type ListAnchorKind = 'workspaceId' | 'formId' | 'formVersionId' | 'submissionId';
 
@@ -89,7 +91,7 @@ export const resolveListWorkspaceScope = async (
       const submissionId = readQueryString(query, 'submissionId')!;
       const context = await getSubmissionListContext(submissionId);
       if (!context) {
-        throw new NotFoundError('Resource not found');
+        throw new NotFoundError(RESOURCE_NOT_FOUND);
       }
       assertHierarchyMatch('formVersionId', context.formVersionId, qFormVersionId);
       assertHierarchyMatch('formId', context.formId, qFormId);
@@ -100,7 +102,7 @@ export const resolveListWorkspaceScope = async (
       const formVersionId = readQueryString(query, 'formVersionId')!;
       const context = await getFormVersionListContext(formVersionId);
       if (!context) {
-        throw new NotFoundError('Resource not found');
+        throw new NotFoundError(RESOURCE_NOT_FOUND);
       }
       assertHierarchyMatch('formId', context.formId, qFormId);
       assertHierarchyMatch('workspaceId', context.workspaceId, qWorkspaceId);
@@ -110,7 +112,7 @@ export const resolveListWorkspaceScope = async (
       const formId = readQueryString(query, 'formId')!;
       const context = await getFormListContext(formId);
       if (!context) {
-        throw new NotFoundError('Resource not found');
+        throw new NotFoundError(RESOURCE_NOT_FOUND);
       }
       assertHierarchyMatch('workspaceId', context.workspaceId, qWorkspaceId);
       return { workspaceId: context.workspaceId, anchorKind };
@@ -163,7 +165,7 @@ export const workspaceFromQuery = async (
   try {
     const actorId = getActorId(req);
     if (!actorId) {
-      throw new ValidationError('Missing actor identity (actorId or x-soba-user-id)');
+      throw new ValidationError(MISSING_ACTOR_IDENTITY);
     }
     const raw = req.query.workspaceId;
     const workspaceId = typeof raw === 'string' ? raw : '';
@@ -187,7 +189,7 @@ export const workspaceListScope = (config: { anchorOrder: ListAnchorKind[] }) =>
     try {
       const actorId = getActorId(req);
       if (!actorId) {
-        throw new ValidationError('Missing actor identity (actorId or x-soba-user-id)');
+        throw new ValidationError(MISSING_ACTOR_IDENTITY);
       }
 
       const query: ListScopeQuery = {};
@@ -265,7 +267,7 @@ export const workspaceFromResource = (config: {
     try {
       const actorId = getActorId(req);
       if (!actorId) {
-        throw new ValidationError('Missing actor identity (actorId or x-soba-user-id)');
+        throw new ValidationError(MISSING_ACTOR_IDENTITY);
       }
       const resourceId = readResourceId(req, config.idFrom);
       if (!resourceId) {
@@ -273,7 +275,7 @@ export const workspaceFromResource = (config: {
       }
       const workspaceId = await lookupWorkspaceId(config.kind, resourceId);
       if (!workspaceId) {
-        throw new NotFoundError('Resource not found');
+        throw new NotFoundError(RESOURCE_NOT_FOUND);
       }
       req.coreContext = await buildCoreContext(actorId, workspaceId, `resource:${config.kind}`);
       echoWorkspace(res, workspaceId);
