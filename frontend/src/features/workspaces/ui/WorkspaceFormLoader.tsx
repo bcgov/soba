@@ -1,17 +1,7 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
+import { clientOnly } from '@/src/shared/ui/clientOnly';
 
-const WorkspaceForm = dynamic(() => import('./WorkspaceForm'), {
-  ssr: false,
-  loading: () => <CenteredProgress />,
-});
+const WorkspaceFormLoader = clientOnly(() => import('./WorkspaceForm'));
 
-type WorkspaceFormLoaderProps = {
-  workspaceId?: string;
-};
-
-export default function WorkspaceFormLoader({ workspaceId }: Readonly<WorkspaceFormLoaderProps>) {
-  return <WorkspaceForm workspaceId={workspaceId} />;
-}
+export default WorkspaceFormLoader;

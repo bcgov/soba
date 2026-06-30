@@ -17,6 +17,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { appUsers } from '../db/schema';
 import { getWorkspaceForUser } from '../db/repos/membershipRepo';
+import { getWorkspaceById } from '../db/repos/workspaceRepo';
 import { getCacheAdapter } from '../integrations/plugins/PluginRegistry';
 import { membershipKey } from '../integrations/cache/cacheKeys';
 import { ForbiddenError, NotFoundError, ValidationError } from '../errors';
@@ -231,9 +232,13 @@ const lookupWorkspaceId = async (
       return getWorkspaceIdForFormVersion(resourceId);
     case 'submission':
       return getWorkspaceIdForSubmission(resourceId);
-    case 'workspace':
-      // The resource is the workspace itself; membership is verified by buildCoreContext.
-      return resourceId;
+    case 'workspace': {
+      // The resource is the workspace itself. Confirm it exists so a missing workspace
+      // yields 404 (matching workspaces/schema.ts); membership is then verified by
+      // buildCoreContext, which yields 403 for an existing workspace the actor can't access.
+      const workspace = await getWorkspaceById(resourceId);
+      return workspace ? resourceId : null;
+    }
   }
 };
 

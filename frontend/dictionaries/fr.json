@@ -57,7 +57,13 @@
     "design": "Conception",
     "submit": "Soumettre",
     "skipToMain": "Aller au contenu principal",
-    "designer": "Générateur de Formulaire"
+    "designer": "Générateur de Formulaire",
+    "selectLanguage": "Choisir la langue",
+    "selectWorkspace": "Choisir l'espace de travail",
+    "languages": {
+      "en": "EN",
+      "fr": "FR"
+    }
   },
   "formioV5": {
     "formList": {
@@ -88,6 +94,8 @@
   "form": {
     "saved": "Formulaire enregistré avec succès.",
     "saveError": "Erreur lors de l'enregistrement du formulaire.",
+    "noActiveWorkspace": "Sélectionnez un espace de travail avant de créer un formulaire.",
+    "noActiveWorkspaceError": "Sélectionnez un espace de travail avant d'enregistrer ce formulaire.",
     "published": "Formulaire publié avec succès !",
     "versionDraftCreated": "Brouillon de la version {version} créé avec succès !",
     "createVersionError": "Échec de la création d'une nouvelle version.",

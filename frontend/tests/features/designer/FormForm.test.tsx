@@ -13,16 +13,25 @@ vi.mock('@/app/[lang]/Providers', () => ({
       apiKey: 'API Key',
       nameLabel: 'Form Name',
       descriptionLabel: 'Description',
+      noActiveWorkspace: 'Select a workspace before creating a form.',
+      noActiveWorkspaceError: 'Select a workspace before saving this form.',
     },
     general: { notAuthenticated: 'Not authed' },
     locale: 'en',
   }),
 }));
 
-const { mockDispatch } = vi.hoisted(() => ({ mockDispatch: vi.fn() }));
+const { mockDispatch, mockWorkspaceState } = vi.hoisted(() => ({
+  mockDispatch: vi.fn(),
+  mockWorkspaceState: {
+    activeWorkspaceId: 'ws1' as string | null,
+    status: 'succeeded' as string,
+    workspaces: [{ id: 'ws1' }] as { id: string }[],
+  },
+}));
 vi.mock('@/lib/store', () => ({
   useAppSelector: (fn: (s: unknown) => unknown) =>
-    fn({ workspace: { activeWorkspaceId: 'ws1' }, notification: { notifications: [] } }),
+    fn({ workspace: mockWorkspaceState, notification: { notifications: [] } }),
   useAppDispatch: () => mockDispatch,
 }));
 
@@ -50,11 +59,24 @@ vi.mock('next/navigation', () => ({
 import FormForm from '@/src/features/designer/ui/FormForm';
 
 describe('FormForm', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockWorkspaceState.activeWorkspaceId = 'ws1';
+    mockWorkspaceState.status = 'succeeded';
+    mockWorkspaceState.workspaces = [{ id: 'ws1' }];
+  });
 
   it('renders designer tab content when authenticated and not initializing', async () => {
     render(<FormForm formId="f1" />);
     // The designer area includes a form name input; assert it renders with loaded value
     await waitFor(() => expect(screen.getByDisplayValue('Test')).toBeInTheDocument());
+  });
+
+  it('blocks new-form designer access when the user has no workspaces', async () => {
+    mockWorkspaceState.activeWorkspaceId = null;
+    mockWorkspaceState.workspaces = [];
+    render(<FormForm />);
+    expect(screen.getByTestId('designer-select-workspace')).toBeInTheDocument();
+    expect(screen.queryByTestId('form-designer')).not.toBeInTheDocument();
   });
 });

@@ -43,6 +43,8 @@ const router = express.Router();
 
 const formResource = workspaceFromResource({ kind: 'form', idFrom: 'paramsId' });
 const formVersionResource = workspaceFromResource({ kind: 'formVersion', idFrom: 'paramsId' });
+// Creating a version resolves the workspace from the parent form id in the request body.
+const formFromBodyResource = workspaceFromResource({ kind: 'form', idFrom: 'bodyFormId' });
 
 router.get(
   '/forms',
@@ -88,7 +90,7 @@ router.get(
 router.post(
   '/form-versions',
   validateRequest({ body: CreateFormVersionBodySchema }),
-  workspaceFromResource({ kind: 'form', idFrom: 'bodyFormId' }),
+  formFromBodyResource,
   createFormVersion,
 );
 router.patch(

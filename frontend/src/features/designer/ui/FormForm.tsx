@@ -45,7 +45,11 @@ function FormForm({ formId }: { formId?: string }) {
   const lang = params.lang as string;
 
   const { authenticated, token, initializing } = useKeycloak();
-  const { activeWorkspaceId } = useAppSelector((state) => state.workspace);
+  const {
+    activeWorkspaceId,
+    status: workspaceStatus,
+    workspaces,
+  } = useAppSelector((state) => state.workspace);
   const { addNotification } = useNotificationStore();
   const [activeTab, setActiveTab] = useState('designer');
   const [formName, setFormName] = useState('');
@@ -219,8 +223,28 @@ function FormForm({ formId }: { formId?: string }) {
     await saveForm(false);
   };
 
+  // CREATE: one-call create (form + empty v1), scoped to the active workspace, then provision.
+  const createAndProvisionForm = async (schema: FormType, publish: boolean) => {
+    const data: SobaFormType = { name: formName, description: formDesc, visibility };
+    const created = await createSobaFormioForm(token as string, data, activeWorkspaceId || undefined);
+    const versionId = created.formVersion?.id;
+    if (versionId) {
+      await saveFormVersionSchema(token as string, versionId, schema);
+      if (publish) {
+        await publishSobaFormVersion(token as string, versionId);
+      }
+    }
+    router.push(`/${lang}/designer/${created.id}`);
+  };
+
   const saveForm = async (publish: boolean = false) => {
     if (isSaving || loading) return;
+    // Creating a form is workspace-scoped: without an active workspace the backend
+    // rejects the request with a generic error, so surface a clear message instead.
+    if (!formId && !activeWorkspaceId) {
+      addNotification({ text: dict.form.noActiveWorkspaceError, type: 'error' });
+      return;
+    }
     setIsSaving(true);
     const schema = (formSchema ?? {}) as FormType;
 
@@ -233,21 +257,7 @@ function FormForm({ formId }: { formId?: string }) {
           await publishSobaFormVersion(token as string, currentVersion.id);
         }
       } else {
-        // CREATE: one-call create (form + empty v1), scoped to the active workspace, then provision.
-        const data: SobaFormType = { name: formName, description: formDesc, visibility };
-        const created = await createSobaFormioForm(
-          token as string,
-          data,
-          activeWorkspaceId || undefined,
-        );
-        const versionId = created.formVersion?.id;
-        if (versionId) {
-          await saveFormVersionSchema(token as string, versionId, schema);
-          if (publish) {
-            await publishSobaFormVersion(token as string, versionId);
-          }
-        }
-        router.push(`/${lang}/designer/${created.id}`);
+        await createAndProvisionForm(schema, publish);
       }
 
       addNotification({
@@ -268,6 +278,18 @@ function FormForm({ formId }: { formId?: string }) {
 
   if (!authenticated) {
     return <div className="p-5 text-center">{dict.general.notAuthenticated}</div>;
+  }
+
+  // New-form mode requires a workspace to own the form. Once workspaces have loaded and
+  // the user has none, block designer access with a clear prompt instead of a save failure.
+  if (!formId && workspaceStatus === 'succeeded' && workspaces.length === 0) {
+    return (
+      <div className="p-4">
+        <InlineAlert variant="info" data-testid="designer-select-workspace">
+          {dict.form.noActiveWorkspace}
+        </InlineAlert>
+      </div>
+    );
   }
 
   const renderDesignerContent = () => (

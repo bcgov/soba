@@ -34,25 +34,26 @@ initializePassport();
 
 // The browser can only read the echoed workspace header if it's explicitly exposed.
 const corsExposedHeaders = ['x-soba-workspace-id'];
-const corsOrigin = process.env.CORS_ORIGIN;
-if (process.env.NODE_ENV === 'development') {
-  log.info('Allowing CORS for development environment');
-  app.use(cors({ origin: 'http://localhost:3000', exposedHeaders: corsExposedHeaders }));
-} else if (corsOrigin) {
-  const origins = corsOrigin
-    .split(',')
-    .map((o) => o.trim())
-    .filter(Boolean);
-  log.info({ origins }, 'Allowing CORS for configured origins');
+// CORS is always restricted to an explicit allowlist of trusted origins (never `*`).
+// Production origins come from CORS_ORIGIN; in development we fall back to CORS_DEV_ORIGIN
+// (configurable per developer via .env) when CORS_ORIGIN is unset.
+const configuredOrigins = env.getCorsOrigins() ?? [];
+let allowedOrigins = configuredOrigins;
+if (allowedOrigins.length === 0 && env.isDevelopment()) {
+  allowedOrigins = env.getCorsDevOrigins() ?? [];
+}
+
+if (allowedOrigins.length > 0) {
+  log.info({ origins: allowedOrigins }, 'Allowing CORS for configured origins');
   app.use(
     cors({
-      origin: origins.length === 1 ? origins[0] : origins,
+      origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
       credentials: true,
       exposedHeaders: corsExposedHeaders,
     }),
   );
 } else {
-  log.info('No CORS_ORIGIN set; cross-origin requests will be blocked');
+  log.info('No CORS origins configured; cross-origin requests will be blocked');
 }
 
 app.use(

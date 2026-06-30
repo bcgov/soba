@@ -223,6 +223,7 @@ function FormList({
           <DSButton
             variant="primary"
             data-testid="create-form-button"
+            isDisabled={!activeWorkspaceId}
             onPress={() => router.push(`/${locale}/designer`)}
           >
             Create

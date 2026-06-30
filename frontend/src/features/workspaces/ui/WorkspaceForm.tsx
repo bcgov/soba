@@ -148,7 +148,18 @@ function WorkspaceForm({ workspaceId }: Readonly<WorkspaceFormProps>) {
         await updateWorkspace(token, workspaceId, { name: trimmedName });
       }
 
-      const nextDefaultId = isDefault ? savedId : null;
+      // Only change the stored default when the user's intent is explicit. An untouched
+      // switch must preserve the existing default — otherwise creating a second
+      // (non-default) workspace would clear the first one's default.
+      let nextDefaultId: string | null;
+      if (isDefault) {
+        nextDefaultId = savedId;
+      } else if (!isCreate && savedDefaultMatches) {
+        // The user turned the switch off on the workspace that is currently the default.
+        nextDefaultId = null;
+      } else {
+        nextDefaultId = savedDefaultId;
+      }
       if (nextDefaultId !== savedDefaultId) {
         await dispatch(
           updateDefaultWorkspace({
@@ -176,6 +187,7 @@ function WorkspaceForm({ workspaceId }: Readonly<WorkspaceFormProps>) {
     workspaceId,
     loadedName,
     isDefault,
+    savedDefaultMatches,
     savedDefaultId,
     dispatch,
     router,

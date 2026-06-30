@@ -36,10 +36,6 @@
   outline-offset: 2px;
 }
 
-.langSelect {
-  width: auto;
-}
-
 .userNameSkeleton {
   display: none;
   width: 11rem;

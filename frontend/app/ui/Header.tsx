@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Dropdown } from 'react-bootstrap';
-import { Select, Header as BCHeader } from '@bcgov/design-system-react-components';
+import { Header as BCHeader } from '@bcgov/design-system-react-components';
 import { FaUser } from 'react-icons/fa6';
 import { useAppDispatch } from '@/lib/store';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
@@ -19,6 +19,8 @@ import {
 import { useAppSelector } from '@/lib/store';
 import { useDictionary } from '../[lang]/Providers';
 import { LoginButton } from './LoginButton';
+import { LanguageSelector, type LanguageOption } from './LanguageSelector';
+import { WorkspaceSelector } from './WorkspaceSelector';
 import type { PluginNavItem } from '@/src/types/plugins';
 import styles from './Header.module.css';
 
@@ -27,35 +29,15 @@ type HeaderProps = {
   overlayNavItems: PluginNavItem[];
 };
 
-/** Native select avoids React Aria auto-ids that can mismatch between SSR and hydration. */
-function LanguageSelector({
-  locale,
-  onChange,
-}: Readonly<{
-  locale: string;
-  onChange: (locale: string) => void;
-}>) {
-  return (
-    <select
-      id="lang-selector"
-      data-testid="lang-selector"
-      aria-label="Select Language"
-      className={`form-select form-select-sm mr-2 ${styles.langSelect}`}
-      value={locale}
-      onChange={(e) => onChange(e.target.value)}
-    >
-      <option value="en">EN</option>
-      <option value="fr">FR</option>
-    </select>
-  );
-}
-
 function Header({ headerNavItems }: HeaderProps) {
   const dispatch = useAppDispatch();
   const dict = useDictionary();
   const { addNotification } = useNotificationStore();
 
   const locale = dict.locale === 'en' || dict.locale === 'fr' ? dict.locale : 'en';
+  const languageOptions: LanguageOption[] = Object.entries(dict.header.languages).map(
+    ([value, label]) => ({ value, label }),
+  );
   const pathname = usePathname();
   const router = useRouter();
   const { authenticated, idTokenParsed, token, logout, init, refresh } = useKeycloak();
@@ -218,19 +200,20 @@ function Header({ headerNavItems }: HeaderProps) {
     return (
       <div className="d-flex align-items-center justify-content-end gap-3">
         {authenticated && clientMounted && workspaces.length > 0 ? (
-          <Select
-            size="small"
-            id="workspace-select"
-            data-testid="workspace-select"
-            aria-label="Select Workspace"
-            className="mr-2"
-            selectedKey={activeWorkspaceId || null}
-            onSelectionChange={handleWorkspaceChange}
-            items={workspaces.map((ws) => ({ id: ws.id, label: `${ws.name} (${ws.kind})` }))}
+          <WorkspaceSelector
+            workspaces={workspaces}
+            activeWorkspaceId={activeWorkspaceId}
+            label={dict.header.selectWorkspace}
+            onChange={handleWorkspaceChange}
           />
         ) : null}
 
-        <LanguageSelector locale={locale} onChange={handleLanguageChange} />
+        <LanguageSelector
+          locale={locale}
+          label={dict.header.selectLanguage}
+          options={languageOptions}
+          onChange={handleLanguageChange}
+        />
 
         {authenticated ? (
           authenticatedUserMenu

@@ -143,6 +143,23 @@ describe('WorkspaceForm', () => {
     });
   });
 
+  it('create without toggling default preserves the existing default', async () => {
+    // currentUser already has defaultWorkspaceId 'ws1'. Creating a second workspace
+    // without touching the switch must NOT PATCH /me (which would clear the default).
+    await act(async () => {
+      render(<WorkspaceForm />);
+    });
+    await userEvent.type(screen.getByRole('textbox'), 'Second Team');
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => {
+      expect(mockCreateWorkspace).toHaveBeenCalledWith('token', { name: 'Second Team' });
+      expect(mockPush).toHaveBeenCalledWith('/en/workspaces');
+    });
+    // Only updateDefaultWorkspace calls .unwrap(); loadWorkspaces does not.
+    expect(mockUnwrap).not.toHaveBeenCalled();
+  });
+
   it('cancel navigates back without saving', async () => {
     await act(async () => {
       render(<WorkspaceForm />);

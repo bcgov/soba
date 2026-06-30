@@ -1,3 +1,5 @@
+import { ROUTE_KIND_BY_SEGMENT } from './routeSegments';
+
 export type RouteKind = 'home' | 'onboarding' | 'workspace-app' | 'workspaces' | 'public';
 
 export type AppSessionSnapshot = {
@@ -11,9 +13,6 @@ export type AppSessionSnapshot = {
   hasWorkspaces: boolean;
 };
 
-const WORKSPACE_APP_SEGMENTS = new Set(['forms', 'designer', 'form', 'submissions', 'submission']);
-const WORKSPACE_SEGMENTS = new Set(['workspaces', 'workspace']);
-
 /** Classify the localized route (pathname includes `/{locale}/...`). */
 export function classifyRoute(pathname: string): RouteKind {
   const segments = pathname.split('/').filter(Boolean);
@@ -22,10 +21,7 @@ export function classifyRoute(pathname: string): RouteKind {
   }
 
   const route = segments[1] ?? '';
-  if (route === 'onboarding') return 'onboarding';
-  if (WORKSPACE_APP_SEGMENTS.has(route)) return 'workspace-app';
-  if (WORKSPACE_SEGMENTS.has(route)) return 'workspaces';
-  return 'public';
+  return ROUTE_KIND_BY_SEGMENT[route] ?? 'public';
 }
 
 /**

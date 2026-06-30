@@ -57,7 +57,13 @@
     "design": "Design",
     "submit": "Submit",
     "skipToMain": "Skip to main content",
-    "designer": "Designer"
+    "designer": "Designer",
+    "selectLanguage": "Select Language",
+    "selectWorkspace": "Select Workspace",
+    "languages": {
+      "en": "EN",
+      "fr": "FR"
+    }
   },
   "formioV5": {
     "formList": {
@@ -88,6 +94,8 @@
   "form": {
     "saved": "Form saved successfully.",
     "saveError": "Error saving form.",
+    "noActiveWorkspace": "Select a workspace before creating a form.",
+    "noActiveWorkspaceError": "Select a workspace before saving this form.",
     "published": "Form published successfully!",
     "versionDraftCreated": "Version {version} draft created successfully!",
     "createVersionError": "Failed to create new version.",

@@ -30,6 +30,10 @@ jest.mock('../../../src/core/db/repos/submissionRepo', () => ({
   getWorkspaceIdForSubmission: jest.fn(),
 }));
 
+jest.mock('../../../src/core/db/repos/workspaceRepo', () => ({
+  getWorkspaceById: jest.fn(),
+}));
+
 import type { NextFunction, Request, Response } from 'express';
 import {
   workspaceFromQuery,
@@ -41,6 +45,7 @@ import { getWorkspaceForUser } from '../../../src/core/db/repos/membershipRepo';
 import { getFormListContext } from '../../../src/core/db/repos/formRepo';
 import { getFormVersionListContext } from '../../../src/core/db/repos/formVersionRepo';
 import { getSubmissionListContext } from '../../../src/core/db/repos/submissionRepo';
+import { getWorkspaceById } from '../../../src/core/db/repos/workspaceRepo';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../src/core/errors';
 
 function selectChain(result: unknown) {
@@ -325,5 +330,54 @@ describe('workspaceFromResource', () => {
 
     expect(next).toHaveBeenCalledWith(expect.any(ForbiddenError));
     expect(res.set).not.toHaveBeenCalled();
+  });
+});
+
+describe('workspaceFromResource (kind: workspace)', () => {
+  const middleware = workspaceFromResource({ kind: 'workspace', idFrom: 'paramsId' });
+
+  beforeEach(() => {
+    jest.mocked(getWorkspaceById).mockReset();
+  });
+
+  it('returns 404 when the workspace does not exist (not 403)', async () => {
+    jest.mocked(getWorkspaceById).mockResolvedValue(null);
+    const req = makeReq({ params: { id: 'missing-ws' } as Request['params'] });
+    const res = makeRes();
+    const next = jest.fn() as unknown as NextFunction;
+
+    await middleware(req, res as Response, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(NotFoundError));
+    expect(getWorkspaceForUser).not.toHaveBeenCalled();
+    expect(res.set).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when the workspace exists but the actor is not a member', async () => {
+    jest.mocked(getWorkspaceById).mockResolvedValue({ id: 'ws1' });
+    jest.mocked(getWorkspaceForUser).mockResolvedValue(null);
+    const req = makeReq({ params: { id: 'ws1' } as Request['params'] });
+    const res = makeRes();
+    const next = jest.fn() as unknown as NextFunction;
+
+    await middleware(req, res as Response, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(ForbiddenError));
+    expect(res.set).not.toHaveBeenCalled();
+  });
+
+  it('resolves and echoes the header when the workspace exists and the actor is a member', async () => {
+    jest.mocked(getWorkspaceById).mockResolvedValue({ id: 'ws1' });
+    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws1'));
+    const req = makeReq({ params: { id: 'ws1' } as Request['params'] });
+    const res = makeRes();
+    const next = jest.fn() as unknown as NextFunction;
+
+    await middleware(req, res as Response, next);
+
+    expect(req.coreContext?.workspaceId).toBe('ws1');
+    expect(req.coreContext?.workspaceSource).toBe('resource:workspace');
+    expect(res.set).toHaveBeenCalledWith('x-soba-workspace-id', 'ws1');
+    expect(next).toHaveBeenCalledWith();
   });
 });

@@ -1,14 +1,7 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import React from 'react';
-import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
+import { clientOnly } from '@/src/shared/ui/clientOnly';
 
-const FormForm = dynamic(() => import('./FormForm'), {
-  ssr: false,
-  loading: () => <CenteredProgress />,
-});
+const FormDesignerLoader = clientOnly(() => import('./FormForm'));
 
-export default function FormDesignerLoader({ formId }: { formId?: string }) {
-  return <FormForm formId={formId} />;
-}
+export default FormDesignerLoader;

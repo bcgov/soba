@@ -26,6 +26,16 @@ const WORKSPACE_STATUS_ACTIVE = 'active';
 const GROUP_STATUS_ACTIVE = 'active';
 const MEMBERSHIP_STATUS_ACTIVE = 'active';
 
+/** Returns the workspace's id if it exists, otherwise null. Used to distinguish 404 from 403. */
+export const getWorkspaceById = async (workspaceId: string): Promise<{ id: string } | null> => {
+  const rows = await db
+    .select({ id: workspaces.id })
+    .from(workspaces)
+    .where(eq(workspaces.id, workspaceId))
+    .limit(1);
+  return rows[0] ?? null;
+};
+
 /**
  * Returns the workspace group that confers the workspace-owner role, if present.
  */
