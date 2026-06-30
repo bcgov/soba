@@ -66,16 +66,19 @@ export function SubmissionView() {
   }
   if (!authenticated) return null;
 
-  return (
-    <div className="mt-3" data-testid="submission-view">
-      {!loaded ? (
-        <CenteredProgress label={dictSub?.loading || dict.general.loading} />
-      ) : notFound || !submission ? (
+  const renderContent = () => {
+    if (!loaded) {
+      return <CenteredProgress label={dictSub?.loading || dict.general.loading} />;
+    }
+    if (notFound || !submission) {
+      return (
         <InlineAlert variant="danger" role="alert" data-testid="submission-view-notfound">
           {dictSub?.notFound || 'Submission not found.'}
         </InlineAlert>
-      ) : (
-        <>
+      );
+    }
+    return (
+      <>
           <div className="mb-3" data-testid="submission-view-header">
             <h3 className="h5 mb-1">{submission.formName || dict.form?.nameLabel || 'Submission'}</h3>
             <div className="small text-muted">
@@ -107,8 +110,13 @@ export function SubmissionView() {
               {dictSub?.noContent || 'No submitted answers to display.'}
             </InlineAlert>
           )}
-        </>
-      )}
+      </>
+    );
+  };
+
+  return (
+    <div className="mt-3" data-testid="submission-view">
+      {renderContent()}
     </div>
   );
 }

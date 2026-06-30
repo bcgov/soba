@@ -321,11 +321,11 @@ function FormForm({ formId }: { formId?: string }) {
     );
   };
 
-  const newVersionLabel = isSaving
-    ? dict.form.creating || 'Creating...'
-    : isHistoryView
-      ? dict.form.restoreAsNewVersion || 'Restore as New Version'
-      : dict.form.newVersion || 'New Version';
+  const getNewVersionLabel = (): string => {
+    if (isSaving) return dict.form.creating || 'Creating...';
+    if (isHistoryView) return dict.form.restoreAsNewVersion || 'Restore as New Version';
+    return dict.form.newVersion || 'New Version';
+  };
 
   const getPublishTitle = (): string => {
     if (!agreedDisclaimer) return dict.form.mustAgreeDisclaimer || 'Must agree to disclaimer';
@@ -407,7 +407,7 @@ function FormForm({ formId }: { formId?: string }) {
             onPress={createNewVersion}
             isDisabled={isSaving || loading}
           >
-            {newVersionLabel}
+            {getNewVersionLabel()}
           </Button>
         )}
         <Button

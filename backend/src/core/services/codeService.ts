@@ -101,12 +101,8 @@ export class CodeService {
       ...(onlyEnabled ? [enabledSourceCondition(table)] : []),
       ...(options?.activeOnly === true ? [eq(table.isActive, true)] : []),
     ];
-    const where =
-      conditions.length === 0
-        ? undefined
-        : conditions.length === 1
-          ? conditions[0]
-          : and(...conditions);
+    // and() returns undefined for an empty list and the single condition for one, so it covers all cases.
+    const where = and(...conditions);
     const rows = await db
       .select({
         code: table.code,

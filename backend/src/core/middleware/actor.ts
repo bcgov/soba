@@ -66,11 +66,9 @@ export function resolveActor(req: Request, res: Response, next: NextFunction): v
       req.actorId = actorId;
 
       const refresh =
-        mapped.sobaAdmin === true
-          ? upsertSobaAdminFromIdp(actorId, pluginCode, true, actorDisplayLabel)
-          : mapped.sobaAdmin === false
-            ? upsertSobaAdminFromIdp(actorId, pluginCode, false, actorDisplayLabel)
-            : Promise.resolve();
+        typeof mapped.sobaAdmin === 'boolean'
+          ? upsertSobaAdminFromIdp(actorId, pluginCode, mapped.sobaAdmin, actorDisplayLabel)
+          : Promise.resolve();
 
       return refresh.then(() => isSobaAdmin(actorId));
     })
