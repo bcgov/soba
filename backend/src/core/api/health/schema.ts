@@ -29,7 +29,7 @@ export const HealthReadinessResponseSchema = z
     status: z.enum(['ready', 'unhealthy']),
     db: z.enum(['ok', 'unreachable']),
     formEngines: z.record(z.string(), FormEngineReadinessResultSchema),
-    storage: StorageReadinessResultSchema,
+    storage: z.record(z.string(), StorageReadinessResultSchema),
   })
   .openapi('Health_ReadinessResponse');
 

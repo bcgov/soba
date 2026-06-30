@@ -84,7 +84,6 @@ function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
         await client.putObject(bucket, key, input.stream as Readable, input.size, {
           'Content-Type': input.contentType || 'application/octet-stream',
         });
-        console.log('stream', bucket, key, input.size);
       } else if (input.sourceUrl) {
         // Implementation could fetch the source URL and stream into putObject.
         throw new Error('sourceUrl uploads are not supported by s3-compatible adapter');

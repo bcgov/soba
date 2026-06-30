@@ -16,7 +16,9 @@ import { filesRouter } from '../../../src/features/files/route';
 
 describe('files API (integration) - local-storage plugin', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'files-api-test-'));
-  process.env.PLUGIN_LOCAL_STORAGE_BASE_PATH = tmp;
+  process.env.STORAGE_PROFILES = 'default';
+  process.env.STORAGE_PROFILE_DEFAULT_BACKEND = 'local-storage';
+  process.env.STORAGE_PROFILE_DEFAULT_BASE_PATH = tmp;
 
   const app = express();
   app.use(express.json());

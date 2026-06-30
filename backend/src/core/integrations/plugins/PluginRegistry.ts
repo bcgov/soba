@@ -8,7 +8,11 @@ import path from 'path';
 import { z } from 'zod';
 import { env } from '../../config/env';
 import { getWorkspacePluginsConfig } from '../../config/workspacePlugins';
-import { createPluginConfigReader } from '../../config/pluginConfig';
+import {
+  createPluginConfigReader,
+  createStorageProfileConfigReader,
+} from '../../config/pluginConfig';
+import { getStorageProfilesConfig } from '../../config/storageProfiles';
 import type {
   WorkspaceResolver,
   WorkspaceResolverDefinition,
@@ -358,40 +362,53 @@ export function getMessageBusAdapter(): MessageBusAdapter {
   return messageBusAdapterInstance;
 }
 
-let storageAdapterInstance: StorageEngineAdapter | null = null;
+const storageAdapterByProfile = new Map<string, StorageEngineAdapter>();
 
 /**
- * Single active storage adapter. Only one storage backend runs at a time; it is selected by
- * STORAGE_DEFAULT_CODE (default 'local-storage'). Set a different code (e.g. 's3-compatible')
- * per deployment to switch backends without code changes.
+ * Storage adapter for a profile (default 'default'). A profile is an independently-configured
+ * instance of a storage backend plugin, so multiple backends can run at once (e.g. one S3 for
+ * platform files, another for form uploads). Each profile's backend code and config come from
+ * STORAGE_PROFILE_<PROFILE>_*; adapters are instantiated once per profile and cached.
  */
-export function getStorageAdapter(): StorageEngineAdapter {
-  if (!storageAdapterInstance) {
-    const code = env.getStorageDefaultCode() ?? 'local-storage';
-    const definitions = getStoragePluginDefinitions();
-    const definition = definitions.find((d) => d.code === code);
-    if (!definition) {
-      throw new Error(
-        `No storage plugin is installed for code '${code}'. Available: ${definitions.map((d) => d.code).join(', ') || '<none>'}`,
-      );
-    }
-    storageAdapterInstance = definition.createAdapter(createPluginConfigReader(definition.code));
+export function getStorageAdapter(profile: string = 'default'): StorageEngineAdapter {
+  const cached = storageAdapterByProfile.get(profile);
+  if (cached) return cached;
+
+  const profiles = getStorageProfilesConfig();
+  const profileConfig = profiles[profile];
+  if (!profileConfig) {
+    throw new Error(
+      `No storage profile '${profile}' is configured. Available: ${Object.keys(profiles).join(', ') || '<none>'}`,
+    );
   }
-  return storageAdapterInstance;
+  const definitions = getStoragePluginDefinitions();
+  const definition = definitions.find((d) => d.code === profileConfig.backend);
+  if (!definition) {
+    throw new Error(
+      `Storage profile '${profile}' uses backend '${profileConfig.backend}', which is not installed. Available: ${definitions.map((d) => d.code).join(', ') || '<none>'}`,
+    );
+  }
+  const adapter = definition.createAdapter(createStorageProfileConfigReader(profile));
+  storageAdapterByProfile.set(profile, adapter);
+  return adapter;
 }
 
 /**
- * Readiness of the single active storage backend. Returns { ok: true } when the adapter exposes no
- * readinessCheck; never throws — an unreachable or unconfigured backend yields { ok: false, message }.
+ * Readiness of every configured storage profile, keyed by profile name. Never throws — a profile
+ * that is unreachable or misconfigured yields { ok: false, message }; one with no readinessCheck
+ * yields { ok: true }.
  */
-export async function checkStorageReadiness(): Promise<StorageEngineReadinessResult> {
-  try {
-    const adapter = getStorageAdapter();
-    if (typeof adapter.readinessCheck === 'function') {
-      return await adapter.readinessCheck();
+export async function checkStorageReadiness(): Promise<
+  Record<string, StorageEngineReadinessResult>
+> {
+  const results: Record<string, StorageEngineReadinessResult> = {};
+  for (const profile of Object.keys(getStorageProfilesConfig())) {
+    try {
+      const adapter = getStorageAdapter(profile);
+      results[profile] = (await adapter.readinessCheck?.()) ?? { ok: true };
+    } catch (err) {
+      results[profile] = { ok: false, message: err instanceof Error ? err.message : String(err) };
     }
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, message: err instanceof Error ? err.message : String(err) };
   }
+  return results;
 }

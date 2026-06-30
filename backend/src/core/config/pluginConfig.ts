@@ -36,13 +36,8 @@ export interface PluginConfigReader {
   getCsv(key: string): string[];
 }
 
-export function createPluginConfigReaderFrom(
-  reader: PluginConfigEnvReader,
-  pluginCode: string,
-): PluginConfigReader {
-  const prefix = `PLUGIN_${normalizeKey(pluginCode)}_`;
+function buildConfigReader(reader: PluginConfigEnvReader, prefix: string): PluginConfigReader {
   const toEnvKey = (key: string) => `${prefix}${normalizeKey(key)}`;
-
   return {
     getRequired: (key: string) => reader.getRequiredEnv(toEnvKey(key)),
     getOptional: (key: string, defaultValue?: string) =>
@@ -53,6 +48,29 @@ export function createPluginConfigReaderFrom(
   };
 }
 
+export function createPluginConfigReaderFrom(
+  reader: PluginConfigEnvReader,
+  pluginCode: string,
+): PluginConfigReader {
+  return buildConfigReader(reader, `PLUGIN_${normalizeKey(pluginCode)}_`);
+}
+
 export const createPluginConfigReader = (pluginCode: string): PluginConfigReader => {
   return createPluginConfigReaderFrom(env, pluginCode);
+};
+
+/**
+ * Config reader for a storage profile: keys resolve to STORAGE_PROFILE_<PROFILE>_<KEY>. A profile is
+ * a named, independently-configured instance of a storage backend plugin, so the same backend (e.g.
+ * 's3-compatible') can be configured differently per profile.
+ */
+export function createStorageProfileConfigReaderFrom(
+  reader: PluginConfigEnvReader,
+  profile: string,
+): PluginConfigReader {
+  return buildConfigReader(reader, `STORAGE_PROFILE_${normalizeKey(profile)}_`);
+}
+
+export const createStorageProfileConfigReader = (profile: string): PluginConfigReader => {
+  return createStorageProfileConfigReaderFrom(env, profile);
 };

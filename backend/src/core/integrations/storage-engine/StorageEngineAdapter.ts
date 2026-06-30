@@ -136,7 +136,7 @@ export interface StorageEngineAdapter {
 
 /**
  * Definition a storage plugin exports as `storagePluginDefinition`. Discovered by the plugin
- * registry; the single active backend is selected by STORAGE_DEFAULT_CODE.
+ * registry and instantiated per storage profile (see STORAGE_PROFILE_<PROFILE>_BACKEND).
  */
 export interface StoragePluginDefinition {
   readonly code: string;

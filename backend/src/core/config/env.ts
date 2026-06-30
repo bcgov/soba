@@ -156,7 +156,10 @@ export function createEnvReader(source: EnvSource) {
     getCacheDefaultCode: () => getOptionalEnvFrom(source, 'CACHE_DEFAULT_CODE'),
     getMessageBusDefaultCode: () => getOptionalEnvFrom(source, 'MESSAGEBUS_DEFAULT_CODE'),
     getFormEngineDefaultCode: () => getOptionalEnvFrom(source, 'FORM_ENGINE_DEFAULT_CODE'),
-    getStorageDefaultCode: () => getOptionalEnvFrom(source, 'STORAGE_DEFAULT_CODE'),
+    getStorageProfiles: () => {
+      const raw = getOptionalEnvFrom(source, 'STORAGE_PROFILES');
+      return raw ? parseCsvValue(raw) : [];
+    },
     getRateLimitWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_WINDOW_MS'),
     getRateLimitMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_MAX'),
     getRateLimitApiWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_API_WINDOW_MS'),
@@ -212,7 +215,10 @@ export const env = {
   getCacheDefaultCode: () => getOptionalEnv('CACHE_DEFAULT_CODE'),
   getMessageBusDefaultCode: () => getOptionalEnv('MESSAGEBUS_DEFAULT_CODE'),
   getFormEngineDefaultCode: () => getOptionalEnv('FORM_ENGINE_DEFAULT_CODE'),
-  getStorageDefaultCode: () => getOptionalEnv('STORAGE_DEFAULT_CODE'),
+  getStorageProfiles: () => {
+    const raw = getOptionalEnv('STORAGE_PROFILES');
+    return raw ? parseCsvValue(raw) : [];
+  },
   getRateLimitWindowMs: () => getNumberEnv('RATE_LIMIT_WINDOW_MS'),
   getRateLimitMax: () => getNumberEnv('RATE_LIMIT_MAX'),
   getRateLimitApiWindowMs: () => getNumberEnv('RATE_LIMIT_API_WINDOW_MS'),
@@ -229,14 +235,8 @@ export const env = {
   getTemporalNamespace: () => getOptionalEnv('TEMPORAL_NAMESPACE') ?? 'default',
   getTemporalTaskQueue: () => getOptionalEnv('TEMPORAL_TASK_QUEUE') ?? 'soba',
   getTemporalWorkerHealthPort: () => getNumberEnv('TEMPORAL_WORKER_HEALTH_PORT') ?? 9090,
-  getLargestMaxFileSize: () =>
-    getNumberEnv('PLUGIN_LOCAL_STORAGE_MAX_FILE_SIZE_MB') ||
-    getNumberEnv('PLUGIN_S3_COMPATIBLE_MAX_FILE_SIZE_MB')
-      ? Math.max(
-          getNumberEnv('PLUGIN_LOCAL_STORAGE_MAX_FILE_SIZE_MB'),
-          getNumberEnv('PLUGIN_S3_COMPATIBLE_MAX_FILE_SIZE_MB'),
-        )
-      : 10,
+  // Max upload size accepted by the files API. Feature-level (not per storage backend).
+  getFilesMaxFileSizeMb: () => getNumberEnv('FILES_MAX_FILE_SIZE_MB') || 10,
   getEnabledFeatures: () => {
     const raw = getOptionalEnv('ENABLED_FEATURES');
     if (!raw) return [];

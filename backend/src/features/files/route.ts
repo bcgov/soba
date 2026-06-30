@@ -12,7 +12,7 @@ import { ListFilesQuerySchema, PresignBodySchema } from './schema';
 import { env } from '../../core/config/env';
 
 const router = express.Router();
-const MAX_SIZE = env.getLargestMaxFileSize();
+const MAX_SIZE = env.getFilesMaxFileSizeMb();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_SIZE * 1024 * 1024 },

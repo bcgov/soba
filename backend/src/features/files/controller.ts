@@ -1,19 +1,18 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Request, Response } from 'express';
 import { getStorageAdapter } from '../../core/integrations/plugins/PluginRegistry';
-import { env } from '../../core/config/env';
 import { submissionsApiService } from '../../core/api/submissions/service';
 import { formsApiService } from '../../core/api/forms/service';
 import { actorBelongsToWorkspace } from '../../core/db/repos/membershipRepo';
 import type { StorageEngineAdapter } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 
-/** Active storage plugin code — a single configured backend (default 'local-storage'). */
-const activeStorageCode = (): string => env.getStorageDefaultCode() ?? 'local-storage';
+/** Storage profile this feature reads/writes. Other file features select their own profile. */
+const FILE_STORAGE_PROFILE = 'default';
 
-/** Resolve the single configured storage adapter, or send a 500 and return null. */
+/** Resolve this feature's storage adapter, or send a 500 and return null. */
 function resolveAdapter(res: Response): StorageEngineAdapter | null {
   try {
-    return getStorageAdapter();
+    return getStorageAdapter(FILE_STORAGE_PROFILE);
   } catch {
     res.status(500).json({ error: 'storage not configured' });
     return null;
@@ -49,7 +48,6 @@ async function resolveTargetSubmissionId(
 export async function uploadFileHandler(req: Request, res: Response) {
   const adapter = resolveAdapter(res);
   if (!adapter) return;
-  const storageCode = activeStorageCode();
 
   const files = (req as any).files as any[] | undefined;
   if (!files || files.length === 0) return res.status(400).json({ error: 'no files' });
@@ -106,7 +104,7 @@ export async function uploadFileHandler(req: Request, res: Response) {
 
     // Save: call save to push to engine and append revision. Store files in data.files array.
     const savePayload = {
-      data: { files: uploaded, _plugin: storageCode },
+      data: { files: uploaded, _plugin: FILE_STORAGE_PROFILE },
       eventType: 'file_upload',
     };
     const saved = await submissionsApiService.save(
@@ -127,8 +125,8 @@ export async function uploadFileHandler(req: Request, res: Response) {
       name: firstFile.filename,
       originalName: firstFile.filename,
       size: firstFile.size,
-      storage: storageCode,
-      url: `/api/v1/files/${storageCode}/${firstFile.engineFileRef}`,
+      storage: FILE_STORAGE_PROFILE,
+      url: `/api/v1/files/${FILE_STORAGE_PROFILE}/${firstFile.engineFileRef}`,
       submissionId: saved?.id,
     });
   } catch (err: any) {
