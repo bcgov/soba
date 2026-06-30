@@ -13,6 +13,7 @@ import { membershipKey } from '../../integrations/cache/cacheKeys';
 import { profileHelpers } from '../../auth/jwtClaims';
 import { ForbiddenError } from '../../errors';
 import type { NormalizedProfile, IdpAttributes } from '../../auth/jwtClaims';
+import { WorkspaceMembershipRole } from '../codes';
 
 /** Second int for `pg_advisory_xact_lock`; must not collide with workspaceRepo / sobaAdminRepo lock ids. */
 const ADV_LOCK_FIND_OR_CREATE_IDENTITY = 2_147_483_622;
@@ -42,7 +43,7 @@ export const findOrCreateUserByIdentity = async (
       );
     }
 
-    // Same shape as workspaceRepo.ensureHomeWorkspace: hashtext(single ::text param), fixed namespace int.
+    // Advisory lock shape shared with findOrCreateUserByIdentity: hashtext(single ::text param), fixed namespace int.
     const identityLockPayload = `${provider.code}\u001f${subject}`;
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext(${identityLockPayload}::text), ${ADV_LOCK_FIND_OR_CREATE_IDENTITY})`,
@@ -139,6 +140,23 @@ export const getWorkspaceForUser = async (workspaceId: string, userId: string) =
     .limit(1);
 
   return row[0] ?? null;
+};
+
+/** Owner or admin membership roles may manage or mutate workspace settings. */
+export const isWorkspaceManageRole = (role: string): boolean =>
+  role === WorkspaceMembershipRole.owner || role === WorkspaceMembershipRole.admin;
+
+/**
+ * All workspace ids the user is an active member of. Used to scope cross-workspace list/search
+ * queries when no specific `workspaceId` filter is supplied.
+ */
+export const getActiveWorkspaceIdsForUser = async (userId: string): Promise<string[]> => {
+  const rows = await db
+    .select({ workspaceId: workspaceMemberships.workspaceId })
+    .from(workspaceMemberships)
+    .where(and(eq(workspaceMemberships.userId, userId), eq(workspaceMemberships.status, 'active')));
+
+  return rows.map((row) => row.workspaceId);
 };
 
 /**

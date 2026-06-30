@@ -45,7 +45,11 @@ function FormForm({ formId }: { formId?: string }) {
   const lang = params.lang as string;
 
   const { authenticated, token, initializing } = useKeycloak();
-  const { activeWorkspaceId } = useAppSelector((state) => state.workspace);
+  const {
+    activeWorkspaceId,
+    status: workspaceStatus,
+    workspaces,
+  } = useAppSelector((state) => state.workspace);
   const { addNotification } = useNotificationStore();
   const [activeTab, setActiveTab] = useState('designer');
   const [formName, setFormName] = useState('');
@@ -76,10 +80,9 @@ function FormForm({ formId }: { formId?: string }) {
       async function loadForm() {
         setLoading(true);
         try {
-          const ws = activeWorkspaceId || undefined;
           const [form, versionsData] = await Promise.all([
-            getSobaForm(token as string, formId as string, ws),
-            getSobaFormVersions(token as string, formId as string, ws),
+            getSobaForm(token as string, formId as string),
+            getSobaFormVersions(token as string, formId as string),
           ]);
 
           setFormName(form?.name ?? '');
@@ -99,7 +102,7 @@ function FormForm({ formId }: { formId?: string }) {
           setVisibility(current?.visibility ?? []);
 
           if (current?.id) {
-            const schema = await getFormVersionSchema(token as string, current.id, ws);
+            const schema = await getFormVersionSchema(token as string, current.id);
             setFormSchema((schema as FormType) ?? null);
           } else {
             setFormSchema(null);
@@ -117,7 +120,7 @@ function FormForm({ formId }: { formId?: string }) {
       }
       loadForm();
     }
-  }, [formId, token, activeWorkspaceId, dict.form.loadFormError, addNotification]);
+  }, [formId, token, dict.form.loadFormError, addNotification]);
 
   const handleNameChange = useCallback((name: string) => {
     setFormName(name);
@@ -132,11 +135,7 @@ function FormForm({ formId }: { formId?: string }) {
   const loadVersionSchema = async (version: SobaFormVersionType) => {
     setLoading(true);
     try {
-      const schema = await getFormVersionSchema(
-        token as string,
-        version.id,
-        activeWorkspaceId || undefined,
-      );
+      const schema = await getFormVersionSchema(token as string, version.id);
       setFormSchema((schema as FormType) ?? null);
       setVisibility(version.visibility ?? []);
       setIsDirty(false);
@@ -181,12 +180,11 @@ function FormForm({ formId }: { formId?: string }) {
 
     try {
       // The engine strips engine-managed fields on save, so the raw schema can be submitted as-is.
-      const ws = activeWorkspaceId || undefined;
-      const newVersion = await createFormVersion(token as string, formId, visibility, ws);
-      await saveFormVersionSchema(token as string, newVersion.id, (formSchema ?? {}) as FormType, ws);
+      const newVersion = await createFormVersion(token as string, formId, visibility);
+      await saveFormVersionSchema(token as string, newVersion.id, (formSchema ?? {}) as FormType);
 
       // Refresh the version list and select the new draft in-page.
-      const versionsData = await getSobaFormVersions(token as string, formId, ws);
+      const versionsData = await getSobaFormVersions(token as string, formId);
       setVersions(versionsData.items || []);
       setCurrentVersion(newVersion);
       setSelectedVersionId('current');
@@ -225,32 +223,41 @@ function FormForm({ formId }: { formId?: string }) {
     await saveForm(false);
   };
 
+  // CREATE: one-call create (form + empty v1), scoped to the active workspace, then provision.
+  const createAndProvisionForm = async (schema: FormType, publish: boolean) => {
+    const data: SobaFormType = { name: formName, description: formDesc, visibility };
+    const created = await createSobaFormioForm(token as string, data, activeWorkspaceId || undefined);
+    const versionId = created.formVersion?.id;
+    if (versionId) {
+      await saveFormVersionSchema(token as string, versionId, schema);
+      if (publish) {
+        await publishSobaFormVersion(token as string, versionId);
+      }
+    }
+    router.push(`/${lang}/designer/${created.id}`);
+  };
+
   const saveForm = async (publish: boolean = false) => {
     if (isSaving || loading) return;
+    // Creating a form is workspace-scoped: without an active workspace the backend
+    // rejects the request with a generic error, so surface a clear message instead.
+    if (!formId && !activeWorkspaceId) {
+      addNotification({ text: dict.form.noActiveWorkspaceError, type: 'error' });
+      return;
+    }
     setIsSaving(true);
-    const ws = activeWorkspaceId || undefined;
     const schema = (formSchema ?? {}) as FormType;
 
     try {
       if (currentVersion?.id) {
         // UPDATE: re-provision the current version's schema + visibility (server owns name/path).
-        await saveFormVersionSchema(token as string, currentVersion.id, schema, ws);
-        await updateSobaFormVersionVisibility(token as string, currentVersion.id, visibility, ws);
+        await saveFormVersionSchema(token as string, currentVersion.id, schema);
+        await updateSobaFormVersionVisibility(token as string, currentVersion.id, visibility);
         if (publish) {
-          await publishSobaFormVersion(token as string, currentVersion.id, ws);
+          await publishSobaFormVersion(token as string, currentVersion.id);
         }
       } else {
-        // CREATE: one-call create (form + empty v1), then provision the schema.
-        const data: SobaFormType = { name: formName, description: formDesc, visibility };
-        const created = await createSobaFormioForm(token as string, data, ws);
-        const versionId = created.formVersion?.id;
-        if (versionId) {
-          await saveFormVersionSchema(token as string, versionId, schema, ws);
-          if (publish) {
-            await publishSobaFormVersion(token as string, versionId, ws);
-          }
-        }
-        router.push(`/${lang}/designer/${created.id}`);
+        await createAndProvisionForm(schema, publish);
       }
 
       addNotification({
@@ -271,6 +278,18 @@ function FormForm({ formId }: { formId?: string }) {
 
   if (!authenticated) {
     return <div className="p-5 text-center">{dict.general.notAuthenticated}</div>;
+  }
+
+  // New-form mode requires a workspace to own the form. Once workspaces have loaded and
+  // the user has none, block designer access with a clear prompt instead of a save failure.
+  if (!formId && workspaceStatus === 'succeeded' && workspaces.length === 0) {
+    return (
+      <div className="p-4">
+        <InlineAlert variant="info" data-testid="designer-select-workspace">
+          {dict.form.noActiveWorkspace}
+        </InlineAlert>
+      </div>
+    );
   }
 
   const renderDesignerContent = () => (

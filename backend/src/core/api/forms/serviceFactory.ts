@@ -8,7 +8,15 @@ export interface FormsContextInput {
   actorDisplayLabel: string | null;
 }
 
+/** Scope for list/search: single workspace resolved from a scope anchor. */
+export interface FormsListScopeInput {
+  workspaceIds: string[];
+  actorId: string;
+}
+
 interface ListFormsQueryInput {
+  workspaceId?: string;
+  formId?: string;
   limit: number;
   cursor?: string;
   q?: string;
@@ -17,9 +25,11 @@ interface ListFormsQueryInput {
 }
 
 interface ListFormVersionsQueryInput {
+  workspaceId?: string;
+  formId?: string;
+  formVersionId?: string;
   limit: number;
   cursor?: string;
-  formId?: string;
   state?: string;
   sort?: CursorSort;
 }
@@ -170,15 +180,16 @@ export function createFormsApiService(
       return row ? toFormDto(row) : null;
     },
 
-    list: async (ctx: FormsContextInput, query: ListFormsQueryInput) => {
+    list: async (scope: FormsListScopeInput, query: ListFormsQueryInput) => {
       const { cursorMode, sort, afterId, afterUpdatedAt } = decodeCursorAndMode({
         cursor: query.cursor,
         sort: query.sort,
       });
       const result = await formService.list({
-        workspaceId: ctx.workspaceId,
-        actorId: ctx.actorId,
+        workspaceIds: scope.workspaceIds,
+        actorId: scope.actorId,
         limit: query.limit,
+        formId: query.formId,
         q: query.q,
         status: query.status,
         sort,
@@ -199,6 +210,8 @@ export function createFormsApiService(
           cursorMode,
         },
         filters: {
+          workspaceId: query.workspaceId,
+          formId: query.formId,
           q: query.q,
           status: query.status,
         },
@@ -211,16 +224,17 @@ export function createFormsApiService(
       return row ? toFormVersionDto(row) : null;
     },
 
-    listFormVersions: async (ctx: FormsContextInput, query: ListFormVersionsQueryInput) => {
+    listFormVersions: async (scope: FormsListScopeInput, query: ListFormVersionsQueryInput) => {
       const { cursorMode, sort, afterId, afterUpdatedAt } = decodeCursorAndMode({
         cursor: query.cursor,
         sort: query.sort,
       });
       const result = await formVersionService.list({
-        workspaceId: ctx.workspaceId,
-        actorId: ctx.actorId,
+        workspaceIds: scope.workspaceIds,
+        actorId: scope.actorId,
         limit: query.limit,
         formId: query.formId,
+        formVersionId: query.formVersionId,
         state: query.state,
         sort,
         cursorMode,
@@ -240,7 +254,9 @@ export function createFormsApiService(
           cursorMode,
         },
         filters: {
+          workspaceId: query.workspaceId,
           formId: query.formId,
+          formVersionId: query.formVersionId,
           state: query.state,
         },
         sort,

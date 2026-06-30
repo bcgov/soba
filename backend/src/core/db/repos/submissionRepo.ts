@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, lt, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lt, or } from 'drizzle-orm';
 import { db } from '../client';
 import { submissionRevisions, submissions, forms, formVersions } from '../schema';
 
@@ -45,10 +45,12 @@ export type SubmissionListSort = 'id:desc' | 'updatedAt:desc';
 export type SubmissionCursorMode = 'id' | 'ts_id';
 
 export interface ListSubmissionsInput {
-  workspaceId: string;
+  /** Workspace resolved from the list scope anchor. */
+  workspaceIds: string[];
   limit: number;
   formId?: string;
   formVersionId?: string;
+  submissionId?: string;
   workflowState?: string;
   createdBy?: string;
   sort: SubmissionListSort;
@@ -128,11 +130,43 @@ export const getSubmissionById = async (
   return row[0] ?? null;
 };
 
+/**
+ * Resolve list-scope context for a submission by id alone. Returns null for missing/deleted submissions.
+ */
+export const getSubmissionListContext = async (
+  submissionId: string,
+): Promise<{ workspaceId: string; formId: string; formVersionId: string } | null> => {
+  const row = await db
+    .select({
+      workspaceId: submissions.workspaceId,
+      formId: submissions.formId,
+      formVersionId: submissions.formVersionId,
+    })
+    .from(submissions)
+    .where(and(eq(submissions.id, submissionId), isNull(submissions.deletedAt)))
+    .limit(1);
+
+  return row[0] ?? null;
+};
+
+/**
+ * Resolve the workspace that owns a submission, by submission id alone. Used to derive request
+ * workspace context for deep links. Neutral: returns null for missing/deleted submissions (caller
+ * maps to 404); access is still enforced downstream via membership.
+ */
+export const getWorkspaceIdForSubmission = async (submissionId: string): Promise<string | null> => {
+  const context = await getSubmissionListContext(submissionId);
+  return context?.workspaceId ?? null;
+};
+
 export const listSubmissionsForWorkspace = async (
   input: ListSubmissionsInput,
 ): Promise<{ items: SubmissionListRow[]; hasMore: boolean }> => {
+  if (input.workspaceIds.length === 0) {
+    return { items: [], hasMore: false };
+  }
   const whereClauses = [
-    eq(submissions.workspaceId, input.workspaceId),
+    inArray(submissions.workspaceId, input.workspaceIds),
     isNull(submissions.deletedAt),
   ];
 
@@ -142,6 +176,10 @@ export const listSubmissionsForWorkspace = async (
 
   if (input.formVersionId) {
     whereClauses.push(eq(submissions.formVersionId, input.formVersionId));
+  }
+
+  if (input.submissionId) {
+    whereClauses.push(eq(submissions.id, input.submissionId));
   }
 
   if (input.workflowState) {

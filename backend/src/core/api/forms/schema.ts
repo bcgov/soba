@@ -1,6 +1,13 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import { CursorSortSchema } from '../shared/pagination';
+import {
+  workspaceIdQueryField,
+  formIdQueryField,
+  formVersionIdQueryField,
+  requireAtLeastOneQueryField,
+  WorkspaceScopedQuerySchema,
+} from '../shared/schema';
 
 extendZodWithOpenApi(z);
 
@@ -83,15 +90,19 @@ export const NormalizeSchemaResponseSchema = z
   })
   .openapi('Forms_NormalizeSchemaResponse');
 
-export const ListFormsQuerySchema = z
-  .object({
+export const ListFormsQuerySchema = requireAtLeastOneQueryField(
+  z.object({
+    workspaceId: workspaceIdQueryField.optional(),
+    formId: formIdQueryField,
     limit: z.coerce.number().int().min(1).max(100).default(20),
     cursor: z.string().min(1).optional(),
     q: z.string().trim().min(1).optional(),
     status: z.string().trim().min(1).optional(),
     sort: CursorSortSchema.default('id:desc'),
-  })
-  .openapi('Forms_ListFormsQuery');
+  }),
+  ['workspaceId', 'formId'],
+  'At least one of workspaceId or formId is required',
+).openapi('Forms_ListFormsQuery');
 
 export const FormListItemSchema = z
   .object({
@@ -145,6 +156,8 @@ export const ListFormsResponseSchema = z
       cursorMode: z.enum(['id', 'ts_id']),
     }),
     filters: z.object({
+      workspaceId: z.string().optional(),
+      formId: z.string().optional(),
       q: z.string().optional(),
       status: z.string().optional(),
     }),
@@ -152,15 +165,19 @@ export const ListFormsResponseSchema = z
   })
   .openapi('Forms_ListFormsResponse');
 
-export const ListFormVersionsQuerySchema = z
-  .object({
+export const ListFormVersionsQuerySchema = requireAtLeastOneQueryField(
+  z.object({
+    workspaceId: workspaceIdQueryField.optional(),
+    formId: formIdQueryField,
+    formVersionId: formVersionIdQueryField,
     limit: z.coerce.number().int().min(1).max(100).default(20),
     cursor: z.string().min(1).optional(),
-    formId: z.string().min(1).optional(),
     state: z.string().trim().min(1).optional(),
     sort: CursorSortSchema.default('id:desc'),
-  })
-  .openapi('Forms_ListFormVersionsQuery');
+  }),
+  ['workspaceId', 'formId', 'formVersionId'],
+  'At least one of workspaceId, formId, or formVersionId is required',
+).openapi('Forms_ListFormVersionsQuery');
 
 export const FormVersionListItemSchema = z
   .object({
@@ -186,7 +203,9 @@ export const ListFormVersionsResponseSchema = z
       cursorMode: z.enum(['id', 'ts_id']),
     }),
     filters: z.object({
+      workspaceId: z.string().optional(),
       formId: z.string().optional(),
+      formVersionId: z.string().optional(),
       state: z.string().optional(),
     }),
     sort: CursorSortSchema,
@@ -212,7 +231,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       400: {
-        description: 'Invalid query or cursor',
+        description: 'Missing scope anchor, inconsistent hierarchy ids, invalid query, or cursor',
       },
     },
   });
@@ -246,6 +265,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
     tags: ['core.forms'],
     security: [{ bearerAuth: [] }],
     request: {
+      query: WorkspaceScopedQuerySchema,
       body: {
         required: true,
         content: {
@@ -349,7 +369,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       400: {
-        description: 'Invalid query or cursor',
+        description: 'Missing scope anchor, inconsistent hierarchy ids, invalid query, or cursor',
       },
     },
   });

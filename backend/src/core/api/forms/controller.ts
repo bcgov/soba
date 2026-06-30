@@ -69,8 +69,11 @@ export const getForm = asyncHandler(async (req: Request<FormIdParams>, res: Resp
 });
 
 export const listForms = asyncHandler(async (req: Request, res: Response) => {
-  const ctx = req.coreContext!;
-  const result = await formsApiService.list(ctx, req.query as unknown as ListFormsQuery);
+  const scope = req.listScope!;
+  const result = await formsApiService.list(
+    { workspaceIds: scope.workspaceIds, actorId: scope.actorId },
+    req.query as unknown as ListFormsQuery,
+  );
   res.json(result);
 });
 
@@ -86,9 +89,9 @@ export const getFormVersion = asyncHandler(
 );
 
 export const listFormVersions = asyncHandler(async (req: Request, res: Response) => {
-  const ctx = req.coreContext!;
+  const scope = req.listScope!;
   const result = await formsApiService.listFormVersions(
-    ctx,
+    { workspaceIds: scope.workspaceIds, actorId: scope.actorId },
     req.query as unknown as ListFormVersionsQuery,
   );
   res.json(result);

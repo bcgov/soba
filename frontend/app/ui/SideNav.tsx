@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useDictionary } from '../[lang]/Providers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import { FaWpforms, FaCommentDots, FaCircleQuestion, FaHouse } from 'react-icons/fa6';
+import { FaWpforms, FaCommentDots, FaCircleQuestion, FaHouse, FaBuilding } from 'react-icons/fa6';
 import styles from './SideNav.module.css';
 
 interface SideNavProps {
@@ -34,6 +34,16 @@ export function SideNav({ showAppLinks, showHome }: SideNavProps) {
   }
   if (showAppLinks) {
     navItems.push(
+      {
+        href: `/${locale}/workspaces`,
+        title: dict.header.workspaces,
+        testId: 'workspaces-nav',
+        icon: <FaBuilding size={20} />,
+        isActive:
+          pathname.startsWith(`/${locale}/workspaces`) ||
+          pathname === `/${locale}/workspace` ||
+          pathname.startsWith(`/${locale}/workspace/`),
+      },
       {
         href: `/${locale}/forms`,
         title: dict.general.forms,
@@ -71,7 +81,7 @@ export function SideNav({ showAppLinks, showHome }: SideNavProps) {
               } ${item.isActive ? styles.navActive : ''}`}
               title={item.title}
             >
-              <div className="d-flex justify-content-center" style={{ width: '24px' }}>
+              <div className={styles.navIcon}>
                 {item.icon}
               </div>
               <span className="d-none d-md-block fw-medium">{item.title}</span>

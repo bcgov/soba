@@ -4,6 +4,7 @@ import tseslint from 'typescript-eslint';
 import json from '@eslint/json';
 import css from '@eslint/css';
 import pluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
+import sonarjs from 'eslint-plugin-sonarjs';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
@@ -24,8 +25,19 @@ export default defineConfig([
   },
   { files: ['**/*.css'], plugins: { css }, language: 'css/css', extends: ['css/recommended'] },
   {
+    // Minimal SonarCloud parity for the smells that have bitten us, at Sonar Way thresholds.
+    files: ['**/*.{ts,mts,cts}'],
+    plugins: { sonarjs },
+    rules: {
+      'sonarjs/cognitive-complexity': ['error', 15],
+      'sonarjs/no-duplicate-string': ['error', { threshold: 3 }],
+    },
+  },
+  {
     files: ['tests/**/*.ts'],
     rules: {
+      // Test files legitimately repeat fixture literals; keep no-duplicate-string for source only.
+      'sonarjs/no-duplicate-string': 'off',
       'max-nested-callbacks': ['error', { max: 4 }],
       'no-restricted-syntax': [
         'error',
@@ -37,5 +49,12 @@ export default defineConfig([
       ],
     },
   },
-  globalIgnores(['dist', 'node_modules', 'package-lock.json', 'coverage']),
+  globalIgnores([
+    'dist',
+    'node_modules',
+    'package-lock.json',
+    'coverage',
+    // Generated ESLint bulk-suppressions baseline; not hand-edited, so don't lint it.
+    'eslint-suppressions.json',
+  ]),
 ]);

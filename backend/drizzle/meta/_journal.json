@@ -50,6 +50,13 @@
       "when": 1772599000000,
       "tag": "0006_drop_form_slug",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1772600000000,
+      "tag": "0007_seed_core_data",
+      "breakpoints": true
     }
   ]
 }

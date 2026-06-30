@@ -33,6 +33,18 @@ export interface DataTableProps<T> {
   keyExtractor: (item: T) => string;
 }
 
+const COLUMN_WIDTH_CLASS: Record<string, string> = {
+  '40%': styles.colWidth40,
+};
+
+function columnHeaderClass<T>(col: Column<T>): string {
+  const align = col.align || 'start';
+  const widthClass = col.width ? COLUMN_WIDTH_CLASS[col.width] : undefined;
+  return ['px-4', 'py-2', 'text-dark', 'fw-bold', `text-${align}`, widthClass]
+    .filter(Boolean)
+    .join(' ');
+}
+
 export function DataTable<T>({
   data,
   columns,
@@ -59,12 +71,7 @@ export function DataTable<T>({
         <thead className={styles.thead}>
           <tr>
             {columns.map((col) => (
-              <th
-                key={col.key}
-                scope="col"
-                className={`px-4 py-2 text-dark fw-bold text-${col.align || 'start'}`}
-                style={col.width ? { width: col.width } : undefined}
-              >
+              <th key={col.key} scope="col" className={columnHeaderClass(col)}>
                 {col.label}
               </th>
             ))}

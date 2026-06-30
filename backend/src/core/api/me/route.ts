@@ -1,8 +1,11 @@
 import express from 'express';
-import { getCurrentActor } from './controller';
+import { validateRequest } from '../shared/validation';
+import { getCurrentActor, patchCurrentActor } from './controller';
+import { PatchMeBodySchema } from './schema';
 
 const router = express.Router();
 
 router.get('/me', getCurrentActor);
+router.patch('/me', validateRequest({ body: PatchMeBodySchema }), patchCurrentActor);
 
 export { router as meRouter };

@@ -45,6 +45,15 @@ describe('jwtClaims', () => {
   it('profileHelpers.getDisplayLabel returns null when source null and no fallback', () => {
     expect(profileHelpers.getDisplayLabel(null)).toBeNull();
   });
+
+  it('profileHelpers.getDefaultWorkspaceId reads preferences.defaultWorkspaceId', () => {
+    expect(
+      profileHelpers.getDefaultWorkspaceId({
+        preferences: { defaultWorkspaceId: 'ws-1' },
+      }),
+    ).toBe('ws-1');
+    expect(profileHelpers.getDefaultWorkspaceId({ preferences: {} })).toBeNull();
+  });
 });
 
 describe('bcgov-sso IdpClaimMapper', () => {

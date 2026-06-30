@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { disableFormioBrowserAuth } from '@/src/features/formio-v5/disableFormioBrowserAuth';
 
 /**
  * Form.io renderer/builder stylesheet, injected only while a Form.io component
@@ -28,6 +29,8 @@ const STYLESHEET = '/formio-v5/formio.full.min.css';
 export function useFormioV5FormChrome(variant: Variant | null): void {
   useEffect(() => {
     if (!variant || typeof document === 'undefined') return;
+
+    disableFormioBrowserAuth();
     // Shared id: a builder + its preview renderer on the same page reuse one
     // injected stylesheet; the first to mount owns cleanup.
     const id = 'soba-formio-styles';

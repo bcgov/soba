@@ -1,6 +1,13 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import { CursorSortSchema } from '../shared/pagination';
+import {
+  workspaceIdQueryField,
+  formIdQueryField,
+  formVersionIdQueryField,
+  submissionIdQueryField,
+  requireAtLeastOneQueryField,
+} from '../shared/schema';
 
 extendZodWithOpenApi(z);
 
@@ -38,17 +45,21 @@ export const SaveSubmissionBodySchema = z
   })
   .openapi('Submissions_SaveSubmissionBody');
 
-export const ListSubmissionsQuerySchema = z
-  .object({
+export const ListSubmissionsQuerySchema = requireAtLeastOneQueryField(
+  z.object({
+    workspaceId: workspaceIdQueryField.optional(),
+    formId: formIdQueryField,
+    formVersionId: formVersionIdQueryField,
+    submissionId: submissionIdQueryField,
     limit: z.coerce.number().int().min(1).max(100).default(20),
     cursor: z.string().min(1).optional(),
-    formId: z.string().min(1).optional(),
-    formVersionId: z.string().min(1).optional(),
     workflowState: z.string().trim().min(1).optional(),
     createdBy: z.string().trim().min(1).optional(),
     sort: CursorSortSchema.default('id:desc'),
-  })
-  .openapi('Submissions_ListSubmissionsQuery');
+  }),
+  ['workspaceId', 'formId', 'formVersionId', 'submissionId'],
+  'At least one of workspaceId, formId, formVersionId, or submissionId is required',
+).openapi('Submissions_ListSubmissionsQuery');
 
 export const SubmissionListItemSchema = z
   .object({
@@ -89,8 +100,10 @@ export const ListSubmissionsResponseSchema = z
       cursorMode: z.enum(['id', 'ts_id']),
     }),
     filters: z.object({
+      workspaceId: z.string().optional(),
       formId: z.string().optional(),
       formVersionId: z.string().optional(),
+      submissionId: z.string().optional(),
       workflowState: z.string().optional(),
       createdBy: z.string().optional(),
     }),
@@ -117,7 +130,7 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       400: {
-        description: 'Invalid query or cursor',
+        description: 'Missing scope anchor, inconsistent hierarchy ids, invalid query, or cursor',
       },
     },
   });

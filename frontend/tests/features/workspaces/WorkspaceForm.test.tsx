@@ -1,0 +1,187 @@
+import React, { act } from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+const mockPush = vi.fn();
+const {
+  mockCreateWorkspace,
+  mockUpdateWorkspace,
+  mockSelectWorkspace,
+  mockDispatch,
+  mockUnwrap,
+} = vi.hoisted(() => ({
+  mockCreateWorkspace: vi.fn(),
+  mockUpdateWorkspace: vi.fn(),
+  mockSelectWorkspace: vi.fn(),
+  mockDispatch: vi.fn(),
+  mockUnwrap: vi.fn().mockResolvedValue({}),
+}));
+
+vi.mock('@/lib/hooks/useKeycloak', () => ({
+  useKeycloak: () => ({ authenticated: true, token: 'token', initializing: false }),
+}));
+
+vi.mock('@/app/[lang]/Providers', () => ({
+  useDictionary: () => ({
+    locale: 'en',
+    general: {
+      notAuthenticated: 'Not authed',
+      loading: 'Loading…',
+    },
+    workspaces: {
+      createHeading: 'Create Workspace',
+      manageHeading: 'Manage Workspace',
+      nameLabel: 'Name',
+      save: 'Save',
+      create: 'Create',
+      cancel: 'Cancel',
+      saveError: 'Failed to save workspace.',
+      createError: 'Failed to create workspace.',
+      loadError: 'Failed to load workspace.',
+      manageForbidden: 'Only workspace owners or admins can manage this workspace.',
+      createForbidden: 'Only BC Government identity provider users can create workspaces.',
+      defaultWorkspaceFormLabel: 'Set as default workspace',
+    },
+  }),
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockPush }),
+  usePathname: () => '/en/workspace',
+}));
+
+vi.mock('@/lib/store', () => ({
+  useAppDispatch: () => mockDispatch,
+  useAppSelector: (fn: (s: unknown) => unknown) =>
+    fn({
+      currentUser: {
+        data: {
+          preferences: { defaultWorkspaceId: 'ws1' },
+          capabilities: { canCreateWorkspace: true },
+        },
+        status: 'succeeded',
+      },
+      workspace: {
+        status: 'succeeded',
+        workspaces: [{ id: 'ws1', role: 'owner' }],
+      },
+    }),
+}));
+
+vi.mock('@/lib/hooks/useNotificationStore', () => ({
+  useNotificationStore: () => ({ addNotification: vi.fn() }),
+}));
+
+vi.mock('@/src/shared/api/sobaApi', () => ({
+  createWorkspace: mockCreateWorkspace,
+  updateWorkspace: mockUpdateWorkspace,
+  selectWorkspace: mockSelectWorkspace,
+}));
+
+import WorkspaceForm from '@/src/features/workspaces/ui/WorkspaceForm';
+
+describe('WorkspaceForm', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDispatch.mockReturnValue({ unwrap: mockUnwrap });
+    mockCreateWorkspace.mockResolvedValue({
+      id: 'ws-new',
+      name: 'New Team',
+      slug: null,
+      kind: 'team',
+      role: 'owner',
+      status: 'active',
+    });
+    mockSelectWorkspace.mockResolvedValue({
+      id: 'ws2',
+      name: 'Team Workspace',
+      slug: null,
+      kind: 'team',
+      role: 'owner',
+      status: 'active',
+    });
+    mockUpdateWorkspace.mockResolvedValue({
+      id: 'ws2',
+      name: 'Renamed',
+      slug: null,
+      kind: 'team',
+      role: 'owner',
+      status: 'active',
+    });
+  });
+
+  it('create mode renders empty name and does not load workspace', async () => {
+    await act(async () => {
+      render(<WorkspaceForm />);
+    });
+    expect(screen.getByRole('heading', { name: 'Create Workspace' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox')).toHaveValue('');
+    expect(mockSelectWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('manage mode loads workspace name', async () => {
+    await act(async () => {
+      render(<WorkspaceForm workspaceId="ws2" />);
+    });
+    await waitFor(() => expect(screen.getByDisplayValue('Team Workspace')).toBeInTheDocument());
+    expect(mockSelectWorkspace).toHaveBeenCalledWith('token', 'ws2');
+  });
+
+  it('save on create posts workspace and optional default preference', async () => {
+    await act(async () => {
+      render(<WorkspaceForm />);
+    });
+    await userEvent.type(screen.getByRole('textbox'), 'New Team');
+    await userEvent.click(screen.getByTestId('workspace-default-switch'));
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => {
+      expect(mockCreateWorkspace).toHaveBeenCalledWith('token', { name: 'New Team' });
+      expect(mockDispatch).toHaveBeenCalled();
+      expect(mockPush).toHaveBeenCalledWith('/en/workspaces');
+    });
+  });
+
+  it('create without toggling default preserves the existing default', async () => {
+    // currentUser already has defaultWorkspaceId 'ws1'. Creating a second workspace
+    // without touching the switch must NOT PATCH /me (which would clear the default).
+    await act(async () => {
+      render(<WorkspaceForm />);
+    });
+    await userEvent.type(screen.getByRole('textbox'), 'Second Team');
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => {
+      expect(mockCreateWorkspace).toHaveBeenCalledWith('token', { name: 'Second Team' });
+      expect(mockPush).toHaveBeenCalledWith('/en/workspaces');
+    });
+    // Only updateDefaultWorkspace calls .unwrap(); loadWorkspaces does not.
+    expect(mockUnwrap).not.toHaveBeenCalled();
+  });
+
+  it('cancel navigates back without saving', async () => {
+    await act(async () => {
+      render(<WorkspaceForm />);
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(mockCreateWorkspace).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith('/en/workspaces');
+  });
+
+  it('save on manage patches workspace when name changes', async () => {
+    await act(async () => {
+      render(<WorkspaceForm workspaceId="ws2" />);
+    });
+    await waitFor(() => expect(screen.getByDisplayValue('Team Workspace')).toBeInTheDocument());
+    const nameInput = screen.getByRole('textbox');
+    await userEvent.clear(nameInput);
+    await userEvent.type(nameInput, 'Renamed');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(mockUpdateWorkspace).toHaveBeenCalledWith('token', 'ws2', { name: 'Renamed' });
+      expect(mockPush).toHaveBeenCalledWith('/en/workspaces');
+    });
+  });
+});

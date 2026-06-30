@@ -67,6 +67,22 @@ describe('validateRequest supertest', () => {
     expect(res.body).toEqual({ id: 'abc-123' });
   });
 
+  it('preserves cross-cutting query params not declared in the schema', async () => {
+    const app = express();
+    app.use(express.json());
+    app.get(
+      '/forms',
+      validateRequest({ query: z.object({ limit: z.coerce.number().default(20) }) }),
+      (req, res) => {
+        res.status(200).json({ query: req.query });
+      },
+    );
+    const res = await request(app).get('/forms?limit=100&workspaceId=ws-123');
+    expect(res.status).toBe(200);
+    // Schema-declared field is coerced; the cross-cutting workspaceId survives key-stripping.
+    expect(res.body.query).toEqual({ limit: 100, workspaceId: 'ws-123' });
+  });
+
   it('returns 400 when params fail schema', async () => {
     const app = express();
     app.use(express.json());

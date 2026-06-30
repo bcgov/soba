@@ -49,11 +49,12 @@ interface DeleteInput {
 }
 
 interface ListInput {
-  workspaceId: string;
+  workspaceIds: string[];
   actorId: string;
   limit: number;
   formId?: string;
   formVersionId?: string;
+  submissionId?: string;
   workflowState?: string;
   createdBy?: string;
   sort: SubmissionListSort;

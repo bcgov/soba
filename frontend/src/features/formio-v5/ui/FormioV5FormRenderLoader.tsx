@@ -1,13 +1,7 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
+import { clientOnly } from '@/src/shared/ui/clientOnly';
 
-const FormioV5FormRenderClient = dynamic(() => import('./FormioV5FormRenderClient'), {
-  ssr: false,
-  loading: () => <CenteredProgress />,
-});
+const FormioV5FormRenderLoader = clientOnly(() => import('./FormioV5FormRenderClient'));
 
-export default function FormioV5FormRenderLoader() {
-  return <FormioV5FormRenderClient />;
-}
+export default FormioV5FormRenderLoader;
