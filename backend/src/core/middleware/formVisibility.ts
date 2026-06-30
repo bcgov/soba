@@ -155,6 +155,10 @@ export async function checkFormVisibility(req: Request, res: Response, next: Nex
       workspaceSource: 'public-access',
     };
 
+    // Echo the resolved workspace so the frontend's per-tab store can capture it (same contract
+    // as the authenticated workspace middleware).
+    res.set('x-soba-workspace-id', formVersion.workspaceId);
+
     next();
   } catch (error) {
     next(error);

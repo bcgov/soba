@@ -12,14 +12,58 @@
     "help": "Help",
     "welcomeTo": "Welcome to",
     "loading": "Loading…",
-    "comingSoon": "This feature is coming soon."
+    "sessionError": "We couldn't load your session. Please try again.",
+    "tryAgain": "Try again",
+    "comingSoon": "This feature is coming soon.",
+    "selectWorkspace": "Select a workspace to view forms.",
+    "workspaceSwitchError": "Failed to switch workspace."
+  },
+  "onboarding": {
+    "heading": "Welcome",
+    "placeholder": "Workspace onboarding information will appear here."
+  },
+  "workspaces": {
+    "tableHeading": "Workspaces",
+    "manageHeading": "Manage Workspace",
+    "createHeading": "Create Workspace",
+    "nameLabel": "Name",
+    "save": "Save",
+    "create": "Create",
+    "cancel": "Cancel",
+    "createAction": "Create",
+    "saveError": "Failed to save workspace.",
+    "createError": "Failed to create workspace.",
+    "loadError": "Failed to load workspace.",
+    "manageForbidden": "Only workspace owners or admins can manage this workspace.",
+    "createForbidden": "Only BC Government identity provider users can create workspaces.",
+    "defaultWorkspaceFormLabel": "Set as default workspace",
+    "empty": "No workspaces found matching your criteria.",
+    "active": "Active",
+    "columns": {
+      "name": "Name",
+      "actions": "Actions",
+      "roles": "Roles",
+      "default": "Default"
+    },
+    "actions": {
+      "manage": "Manage",
+      "forms": "Forms"
+    },
+    "defaultWorkspaceLabel": "Set {name} as default workspace",
+    "defaultWorkspaceError": "Failed to update default workspace."
   },
   "header": {
     "workspaces": "Workspaces",
     "design": "Design",
     "submit": "Submit",
     "skipToMain": "Skip to main content",
-    "designer": "Designer"
+    "designer": "Designer",
+    "selectLanguage": "Select Language",
+    "selectWorkspace": "Select Workspace",
+    "languages": {
+      "en": "EN",
+      "fr": "FR"
+    }
   },
   "formioV5": {
     "formList": {
@@ -50,6 +94,8 @@
   "form": {
     "saved": "Form saved successfully.",
     "saveError": "Error saving form.",
+    "noActiveWorkspace": "Select a workspace before creating a form.",
+    "noActiveWorkspaceError": "Select a workspace before saving this form.",
     "published": "Form published successfully!",
     "versionDraftCreated": "Version {version} draft created successfully!",
     "createVersionError": "Failed to create new version.",

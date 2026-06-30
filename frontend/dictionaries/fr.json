@@ -12,14 +12,58 @@
     "help": "Aidé",
     "welcomeTo": "Bienvenue sur",
     "loading": "Chargement…",
-    "comingSoon": "Cette fonctionnalité sera bientôt disponible."
+    "sessionError": "Nous n'avons pas pu charger votre session. Veuillez réessayer.",
+    "tryAgain": "Réessayer",
+    "comingSoon": "Cette fonctionnalité sera bientôt disponible.",
+    "selectWorkspace": "Sélectionnez un espace de travail pour afficher les formulaires.",
+    "workspaceSwitchError": "Échec du changement d'espace de travail."
+  },
+  "onboarding": {
+    "heading": "Bienvenue",
+    "placeholder": "Les informations d'intégration aux espaces de travail apparaîtront ici."
+  },
+  "workspaces": {
+    "tableHeading": "Espaces de travail",
+    "manageHeading": "Gérer l'espace de travail",
+    "createHeading": "Créer un espace de travail",
+    "nameLabel": "Nom",
+    "save": "Enregistrer",
+    "create": "Créer",
+    "cancel": "Annuler",
+    "createAction": "Créer",
+    "saveError": "Échec de l'enregistrement de l'espace de travail.",
+    "createError": "Échec de la création de l'espace de travail.",
+    "loadError": "Échec du chargement de l'espace de travail.",
+    "manageForbidden": "Seuls les propriétaires ou administrateurs peuvent gérer cet espace de travail.",
+    "createForbidden": "Seuls les utilisateurs du fournisseur d'identité du gouvernement de la C.-B. peuvent créer des espaces de travail.",
+    "defaultWorkspaceFormLabel": "Définir comme espace de travail par défaut",
+    "empty": "Aucun espace de travail ne correspond à vos critères.",
+    "active": "Actif",
+    "columns": {
+      "name": "Nom",
+      "actions": "Actions",
+      "roles": "Rôles",
+      "default": "Par défaut"
+    },
+    "actions": {
+      "manage": "Gérer",
+      "forms": "Formulaires"
+    },
+    "defaultWorkspaceLabel": "Définir {name} comme espace de travail par défaut",
+    "defaultWorkspaceError": "Échec de la mise à jour de l'espace de travail par défaut."
   },
   "header": {
     "workspaces": "Espaces de travail",
     "design": "Conception",
     "submit": "Soumettre",
     "skipToMain": "Aller au contenu principal",
-    "designer": "Générateur de Formulaire"
+    "designer": "Générateur de Formulaire",
+    "selectLanguage": "Choisir la langue",
+    "selectWorkspace": "Choisir l'espace de travail",
+    "languages": {
+      "en": "EN",
+      "fr": "FR"
+    }
   },
   "formioV5": {
     "formList": {
@@ -50,6 +94,8 @@
   "form": {
     "saved": "Formulaire enregistré avec succès.",
     "saveError": "Erreur lors de l'enregistrement du formulaire.",
+    "noActiveWorkspace": "Sélectionnez un espace de travail avant de créer un formulaire.",
+    "noActiveWorkspaceError": "Sélectionnez un espace de travail avant d'enregistrer ce formulaire.",
     "published": "Formulaire publié avec succès !",
     "versionDraftCreated": "Brouillon de la version {version} créé avec succès !",
     "createVersionError": "Échec de la création d'une nouvelle version.",

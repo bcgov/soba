@@ -43,9 +43,9 @@ export const getSubmissionData = asyncHandler(
 );
 
 export const listSubmissions = asyncHandler(async (req: Request, res: Response) => {
-  const ctx = req.coreContext!;
+  const scope = req.listScope!;
   const result = await submissionsApiService.list(
-    ctx,
+    { workspaceIds: scope.workspaceIds, actorId: scope.actorId },
     req.query as unknown as ListSubmissionsQuery,
   );
   res.json(result);

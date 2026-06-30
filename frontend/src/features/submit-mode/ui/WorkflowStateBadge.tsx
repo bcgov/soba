@@ -1,5 +1,7 @@
 'use client';
 
+import { StatusTag, workflowStateToVariant } from '@/src/components/StatusTag';
+
 type WorkflowStateBadgeProps = {
   state?: string;
   'data-testid'?: string;
@@ -7,14 +9,17 @@ type WorkflowStateBadgeProps = {
 
 /**
  * The submission workflow-state pill, shared by the submissions list and the
- * single-submission viewer so the status looks identical in both places. The
- * state text is always rendered (not color-only) for accessibility.
+ * single-submission viewer so the status looks identical in both places.
  */
 export function WorkflowStateBadge({ state, 'data-testid': testId }: WorkflowStateBadgeProps) {
-  const variant = (state || '').toLowerCase() === 'submitted' ? 'text-bg-success' : 'text-bg-secondary';
+  const label = (state || '').toUpperCase();
+  const id = `workflow-state-${(state || 'unknown').toLowerCase()}-${testId ?? 'badge'}`;
   return (
-    <span className={`badge rounded-pill ${variant}`} data-testid={testId}>
-      {(state || '').toUpperCase()}
-    </span>
+    <StatusTag
+      id={id}
+      label={label}
+      variant={workflowStateToVariant(state)}
+      data-testid={testId}
+    />
   );
 }

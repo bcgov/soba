@@ -11,7 +11,11 @@ vi.mock('@/lib/hooks/useKeycloak', () => ({
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
     locale: 'en',
-    general: { notAuthenticated: 'Not authed', forms: 'Forms' },
+    general: {
+      notAuthenticated: 'Not authed',
+      forms: 'Forms',
+      selectWorkspace: 'Select a workspace to view forms.',
+    },
     form: { nameLabel: 'Form Name' },
     submission: {
       formList: {
@@ -59,8 +63,11 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
   }),
 }));
 
+const { mockWorkspaceState } = vi.hoisted(() => ({
+  mockWorkspaceState: { activeWorkspaceId: 'ws1' as string | null },
+}));
 vi.mock('@/lib/store', async () => ({
-  useAppSelector: (fn: (s: unknown) => unknown) => fn({ workspace: { activeWorkspaceId: 'ws1' } }),
+  useAppSelector: (fn: (s: unknown) => unknown) => fn({ workspace: mockWorkspaceState }),
 }));
 
 import FormList from '@/src/features/designer/ui/FormList';
@@ -68,6 +75,7 @@ import FormList from '@/src/features/designer/ui/FormList';
 describe('FormList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockWorkspaceState.activeWorkspaceId = 'ws1';
   });
 
   it('renders the header and search input', async () => {
@@ -102,6 +110,15 @@ describe('FormList', () => {
     expect(btn).toBeTruthy();
     await userEvent.click(btn!);
     expect(mockPush).toHaveBeenCalledWith('/en/designer/f1');
+  });
+
+  it('disables the Create button when there is no active workspace', async () => {
+    mockWorkspaceState.activeWorkspaceId = null;
+    await act(async () => {
+      render(<FormList />);
+    });
+    const createBtn = screen.getByTestId('create-form-button');
+    expect(createBtn).toBeDisabled();
   });
 
   it('search works to filter forms', async () => {

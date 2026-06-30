@@ -1,6 +1,7 @@
 import { eq, sql } from 'drizzle-orm';
 import { db } from '../client';
 import { appUsers } from '../schema';
+import type { StoredProfile } from '../../auth/jwtClaims';
 
 /**
  * Returns the app_user id for the given email, or null if not found.
@@ -19,4 +20,22 @@ export async function findUserIdByEmail(email: string): Promise<string | null> {
 export async function findAppUserById(userId: string) {
   const row = await db.select().from(appUsers).where(eq(appUsers.id, userId)).limit(1);
   return row[0] ?? null;
+}
+
+/** Shallow-merge profile JSON and update audit columns. Returns updated row or null. */
+export async function updateAppUserProfile(
+  userId: string,
+  profile: StoredProfile,
+  updatedBy: string,
+) {
+  const rows = await db
+    .update(appUsers)
+    .set({
+      profile,
+      updatedBy,
+      updatedAt: new Date(),
+    })
+    .where(eq(appUsers.id, userId))
+    .returning();
+  return rows[0] ?? null;
 }

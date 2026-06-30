@@ -4,9 +4,11 @@ import { getDictionary } from './dictionaries';
 import { Header } from '../ui/Header';
 import { Footer } from '../ui/Footer';
 import { SideNav } from '../ui/SideNav';
+import shellStyles from '../ui/AppShell.module.css';
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 import { getHeaderNavigationItems, getOverlayNavigationItems } from '@/src/app/plugins/registry';
+import { AppAccessGuard } from '@/src/app/routing/AppAccessGuard';
 import React from 'react';
 
 export default async function RootLayout({
@@ -34,14 +36,11 @@ export default async function RootLayout({
     <DictionaryProvider dictionary={dictionary} locale={locale}>
       <Header headerNavItems={headerNavItems} overlayNavItems={overlayNavItems} />
       <div className="d-flex w-100">
-        <aside
-          className="p-2 d-flex flex-column flex-shrink-0"
-          style={{ minWidth: '70px', maxWidth: '240px' }}
-        >
+        <aside className={`p-2 d-flex flex-column flex-shrink-0 ${shellStyles.aside}`}>
           <SideNav showAppLinks={showAppLinks} showHome={showHome} />
         </aside>
         <main id="main-content" tabIndex={-1} className="flex-grow-1 p-5 overflow-auto">
-          {children}
+          <AppAccessGuard locale={locale}>{children}</AppAccessGuard>
         </main>
       </div>
       <Footer hideAcknowledgement={true} contact={React.createElement('span', null, '')} />

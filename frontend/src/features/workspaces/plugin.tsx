@@ -6,7 +6,7 @@ export const workspacesPlugin: AppPlugin = {
   order: 10,
   getNavItem: ({ locale, dictionary }) => ({
     id: 'workspaces',
-    href: `/${locale}/`,
+    href: `/${locale}/workspaces`,
     label: dictionary.header.workspaces,
   }),
 };

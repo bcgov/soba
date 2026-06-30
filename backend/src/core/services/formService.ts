@@ -27,9 +27,10 @@ interface DeleteInput {
 }
 
 interface ListInput {
-  workspaceId: string;
+  workspaceIds: string[];
   actorId: string;
   limit: number;
+  formId?: string;
   q?: string;
   status?: string;
   sort: FormListSort;

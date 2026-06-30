@@ -30,9 +30,10 @@ function selectChain(result: unknown) {
 }
 
 function makeRes() {
-  const res: Partial<Response> & { status: jest.Mock; json: jest.Mock } = {
+  const res: Partial<Response> & { status: jest.Mock; json: jest.Mock; set: jest.Mock } = {
     status: jest.fn().mockReturnThis(),
     json: jest.fn().mockReturnThis(),
+    set: jest.fn().mockReturnThis(),
   };
   return res;
 }
@@ -62,6 +63,7 @@ describe('checkFormVisibility IDP matching', () => {
     await checkFormVisibility(req, res as Response, next);
 
     expect(res.status).not.toHaveBeenCalled();
+    expect(res.set).toHaveBeenCalledWith('x-soba-workspace-id', 'ws1');
     expect(next).toHaveBeenCalledWith();
   });
 

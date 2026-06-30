@@ -1,0 +1,7 @@
+{
+  "src/features/designer/ui/FormForm.tsx": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  }
+}

@@ -12,11 +12,19 @@ export interface SubmissionsContextInput {
   actorDisplayLabel: string | null;
 }
 
+/** Scope for list/search: single workspace resolved from a scope anchor. */
+export interface SubmissionsListScopeInput {
+  workspaceIds: string[];
+  actorId: string;
+}
+
 interface ListSubmissionsQueryInput {
-  limit: number;
-  cursor?: string;
+  workspaceId?: string;
   formId?: string;
   formVersionId?: string;
+  submissionId?: string;
+  limit: number;
+  cursor?: string;
   workflowState?: string;
   createdBy?: string;
   sort?: CursorSort;
@@ -62,17 +70,18 @@ export function createSubmissionsApiService(submissionService: SubmissionService
     getData: (ctx: SubmissionsContextInput, submissionId: string) =>
       submissionService.getContent({ workspaceId: ctx.workspaceId, submissionId }),
 
-    list: async (ctx: SubmissionsContextInput, query: ListSubmissionsQueryInput) => {
+    list: async (scope: SubmissionsListScopeInput, query: ListSubmissionsQueryInput) => {
       const { cursorMode, sort, afterId, afterUpdatedAt } = decodeCursorAndMode({
         cursor: query.cursor,
         sort: query.sort,
       });
       const result = await submissionService.list({
-        workspaceId: ctx.workspaceId,
-        actorId: ctx.actorId,
+        workspaceIds: scope.workspaceIds,
+        actorId: scope.actorId,
         limit: query.limit,
         formId: query.formId,
         formVersionId: query.formVersionId,
+        submissionId: query.submissionId,
         workflowState: query.workflowState,
         createdBy: query.createdBy,
         sort,
@@ -93,8 +102,10 @@ export function createSubmissionsApiService(submissionService: SubmissionService
           cursorMode,
         },
         filters: {
+          workspaceId: query.workspaceId,
           formId: query.formId,
           formVersionId: query.formVersionId,
+          submissionId: query.submissionId,
           workflowState: query.workflowState,
           createdBy: query.createdBy,
         },

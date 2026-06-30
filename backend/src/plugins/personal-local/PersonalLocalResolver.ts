@@ -6,7 +6,6 @@ import {
 } from '../../core/integrations/workspace/WorkspaceResolver';
 import { PluginConfigReader } from '../../core/config/pluginConfig';
 import { getWorkspaceForUser } from '../../core/db/repos/membershipRepo';
-import { ensureHomeWorkspace } from '../../core/db/repos/workspaceRepo';
 
 export interface PersonalLocalResolverSettings {
   cookieKey: string;
@@ -53,8 +52,7 @@ export class PersonalLocalResolver implements WorkspaceResolver {
       }
     }
 
-    const homeWorkspaceId = await ensureHomeWorkspace(input.actorId);
-    return { workspaceId: homeWorkspaceId, source: this.code };
+    return null;
   }
 }
 

@@ -2,6 +2,11 @@
  * Normalized profile stored in app_user.profile.
  * Core only defines the common shape; plugins set displayLabel when mapping from their token.
  */
+/** User-owned preferences stored in app_user.profile.preferences */
+export interface ProfilePreferences {
+  defaultWorkspaceId?: string | null;
+}
+
 export interface NormalizedProfile {
   displayName?: string | null;
   email?: string | null;
@@ -10,6 +15,8 @@ export interface NormalizedProfile {
   lastName?: string | null;
   /** Single display label for user stamps/audit; set by IdP plugin when mapping. */
   displayLabel?: string | null;
+  /** User-owned settings (default workspace, etc.). IdP fields above remain read-only via PATCH /me. */
+  preferences?: ProfilePreferences;
   /** Optional extras for backward compatibility with stored profiles (e.g. name, idir_username, bceid_username). Core does not use these for displayLabel precedence. */
   [key: string]: unknown;
 }
@@ -85,5 +92,12 @@ export const profileHelpers = {
     if (name && name.length > 0) return name;
     if (preferred && preferred.length > 0) return preferred;
     return fallbackSub ?? null;
+  },
+  getDefaultWorkspaceId(source: StoredProfile | IdpAttributes | null | undefined): string | null {
+    const p = profileFromSource(source);
+    const prefs = p.preferences;
+    if (!prefs || typeof prefs !== 'object') return null;
+    const id = prefs.defaultWorkspaceId;
+    return typeof id === 'string' && id.length > 0 ? id : null;
   },
 };

@@ -6,7 +6,10 @@ jest.mock('../../../../src/core/db/client', () => ({
   },
 }));
 
-import { listGroupsForIdp } from '../../../../src/core/db/repos/idpGroupRepo';
+import {
+  listGroupsForIdp,
+  canCreateWorkspaceByIdp,
+} from '../../../../src/core/db/repos/idpGroupRepo';
 
 describe('idpGroupRepo.listGroupsForIdp', () => {
   beforeEach(() => {
@@ -29,5 +32,27 @@ describe('idpGroupRepo.listGroupsForIdp', () => {
 
     expect(groups).toEqual([]);
     expect(selectMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('idpGroupRepo.canCreateWorkspaceByIdp', () => {
+  beforeEach(() => {
+    selectMock.mockReset();
+  });
+
+  it('returns true when idp belongs to the bcgov group', async () => {
+    const where = jest.fn().mockResolvedValue([{ groupCode: 'bcgov' }]);
+    const from = jest.fn().mockReturnValue({ where });
+    selectMock.mockReturnValue({ from });
+
+    await expect(canCreateWorkspaceByIdp('idir')).resolves.toBe(true);
+  });
+
+  it('returns false when idp is not in the bcgov group', async () => {
+    const where = jest.fn().mockResolvedValue([{ groupCode: 'bceid' }]);
+    const from = jest.fn().mockReturnValue({ where });
+    selectMock.mockReturnValue({ from });
+
+    await expect(canCreateWorkspaceByIdp('bceidbusiness')).resolves.toBe(false);
   });
 });

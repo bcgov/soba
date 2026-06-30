@@ -1,0 +1,33 @@
+.container {
+  width: 100%;
+  padding: 1.5rem 1rem;
+}
+
+@media (min-width: 992px) {
+  .container {
+    padding-left: 3rem;
+    padding-right: 3rem;
+  }
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.toolbarEnd {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.authGate {
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--app-text);
+}

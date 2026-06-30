@@ -49,10 +49,11 @@ interface VersionActionInput {
 }
 
 interface ListInput {
-  workspaceId: string;
+  workspaceIds: string[];
   actorId: string;
   limit: number;
   formId?: string;
+  formVersionId?: string;
   state?: string;
   sort: FormVersionListSort;
   cursorMode: FormVersionCursorMode;

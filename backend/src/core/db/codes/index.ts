@@ -58,9 +58,17 @@ export type FeatureStatusCode = (typeof FeatureStatus)[keyof typeof FeatureStatu
 /** Display name for the workspace owners group (role_code = Roles.workspace_owner). */
 export const WORKSPACE_OWNERS_GROUP_NAME = 'Workspace owners';
 
+/** Logical IDP groups (see idp_group / idp_group_member). */
+export const IdpGroups = {
+  bcgov: 'bcgov',
+  bceid: 'bceid',
+} as const;
+export type IdpGroupCode = (typeof IdpGroups)[keyof typeof IdpGroups];
+
 /** Membership source when created automatically as user's home workspace. */
 export const WorkspaceMembershipSource = {
   auto_home: 'auto_home',
+  user_created: 'user_created',
 } as const;
 export type WorkspaceMembershipSourceCode =
   (typeof WorkspaceMembershipSource)[keyof typeof WorkspaceMembershipSource];

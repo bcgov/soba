@@ -36,8 +36,22 @@
   outline-offset: 2px;
 }
 
+.userNameSkeleton {
+  display: none;
+  width: 11rem;
+  height: 1.25rem;
+  background: var(--app-border);
+  border-radius: 4px;
+  opacity: 0.6;
+}
+
+@media (min-width: 768px) {
+  .userNameSkeleton {
+    display: inline-block;
+  }
+}
+
 .limitText {
   max-width: 100px;
-  /* overflow: hidden; */
   display: inline-block;
 }
