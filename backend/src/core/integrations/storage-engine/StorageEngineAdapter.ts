@@ -1,3 +1,5 @@
+import type { PluginConfigReader } from '../../config/pluginConfig';
+
 /**
  * Result of a storage engine readiness check; no credentials or sensitive config are exposed.
  */
@@ -130,4 +132,13 @@ export interface StorageEngineAdapter {
   normalizeMetadata?(
     metadata: Record<string, unknown> | undefined,
   ): Record<string, unknown> | undefined;
+}
+
+/**
+ * Definition a storage plugin exports as `storagePluginDefinition`. Discovered by the plugin
+ * registry; the single active backend is selected by STORAGE_DEFAULT_CODE.
+ */
+export interface StoragePluginDefinition {
+  readonly code: string;
+  createAdapter(config: PluginConfigReader): StorageEngineAdapter;
 }

@@ -1,7 +1,7 @@
 /**
  * Single plugin discovery and cache. Scans plugins dir once (lazy), validates with Zod,
  * exposes workspace resolvers, form engine definitions, plugin API definitions,
- * cache plugins, and messagebus plugins.
+ * cache plugins, messagebus plugins, and storage plugins.
  */
 import fs from 'fs';
 import path from 'path';
@@ -21,6 +21,11 @@ import type {
   MessageBusPluginDefinition,
 } from '../messagebus/MessageBusAdapter';
 import type { IdpPluginDefinition } from '../../auth/IdpPlugin';
+import type {
+  StorageEngineAdapter,
+  StorageEngineReadinessResult,
+  StoragePluginDefinition,
+} from '../storage-engine/StorageEngineAdapter';
 
 const WorkspaceResolverDefinitionSchema = z.object({
   code: z.string().min(1),
@@ -72,8 +77,8 @@ interface CachedPlugin {
   apiDefinition?: FeatureApiDefinition;
   cacheDefinition?: CachePluginDefinition;
   messagebusDefinition?: MessageBusPluginDefinition;
+  storageDefinition?: StoragePluginDefinition;
   idpDefinition?: IdpPluginDefinition;
-  storageDefinition?: { code: string; createAdapter: unknown };
 }
 
 let cache: CachedPlugin[] | null = null;
@@ -88,6 +93,86 @@ function getPluginsRoot(): string {
     return path.resolve(__dirname, '..', '..', '..', 'plugins');
   }
   return path.resolve(process.cwd(), 'src', 'plugins');
+}
+
+/**
+ * Read `obj[key]`, validate it with `schema`, and return it typed as `T`. Returns undefined when the
+ * key is absent or invalid (logging a warning in the latter case) so a malformed plugin export is
+ * skipped rather than fatal.
+ */
+function parsePluginDefinition<T>(
+  obj: Record<string, unknown>,
+  pluginDir: string,
+  key: string,
+  schema: z.ZodTypeAny,
+): T | undefined {
+  const value = obj[key];
+  if (value === undefined) return undefined;
+  const parsed = schema.safeParse(value);
+  if (parsed.success) return value as T;
+  console.warn(`[PluginRegistry] invalid ${key} in '${pluginDir}':`, parsed.error.message);
+  return undefined;
+}
+
+/** Load and validate a single plugin module into a CachedPlugin entry. Null when the module fails to
+ *  load (logged); individual malformed definitions are skipped by parsePluginDefinition. */
+function loadPlugin(pluginsRoot: string, pluginDir: string): CachedPlugin | null {
+  const modulePath = path.join(pluginsRoot, pluginDir);
+  let raw: unknown;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    raw = require(modulePath);
+  } catch (err) {
+    console.warn(`[PluginRegistry] failed to load plugin '${pluginDir}':`, err);
+    return null;
+  }
+
+  const obj = raw !== null && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  return {
+    dir: pluginDir,
+    workspaceDefinition: parsePluginDefinition<WorkspaceResolverDefinition>(
+      obj,
+      pluginDir,
+      'workspacePluginDefinition',
+      WorkspaceResolverDefinitionSchema,
+    ),
+    formEngineDefinition: parsePluginDefinition<FormEnginePluginDefinition>(
+      obj,
+      pluginDir,
+      'formEnginePluginDefinition',
+      FormEnginePluginDefinitionSchema,
+    ),
+    apiDefinition: parsePluginDefinition<FeatureApiDefinition>(
+      obj,
+      pluginDir,
+      'pluginApiDefinition',
+      FeatureApiDefinitionSchema,
+    ),
+    cacheDefinition: parsePluginDefinition<CachePluginDefinition>(
+      obj,
+      pluginDir,
+      'cachePluginDefinition',
+      CachePluginDefinitionSchema,
+    ),
+    messagebusDefinition: parsePluginDefinition<MessageBusPluginDefinition>(
+      obj,
+      pluginDir,
+      'messagebusPluginDefinition',
+      MessageBusPluginDefinitionSchema,
+    ),
+    storageDefinition: parsePluginDefinition<StoragePluginDefinition>(
+      obj,
+      pluginDir,
+      'storagePluginDefinition',
+      StoragePluginDefinitionSchema,
+    ),
+    idpDefinition: parsePluginDefinition<IdpPluginDefinition>(
+      obj,
+      pluginDir,
+      'idpPluginDefinition',
+      IdpPluginDefinitionSchema,
+    ),
+  };
 }
 
 function discoverAndCache(): CachedPlugin[] {
@@ -106,111 +191,8 @@ function discoverAndCache(): CachedPlugin[] {
 
   const result: CachedPlugin[] = [];
   for (const pluginDir of pluginDirs) {
-    const modulePath = path.join(pluginsRoot, pluginDir);
-    let raw: unknown;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      raw = require(modulePath);
-    } catch (err) {
-      console.warn(`[PluginRegistry] failed to load plugin '${pluginDir}':`, err);
-      continue;
-    }
-
-    const entry: CachedPlugin = { dir: pluginDir };
-
-    const obj = raw !== null && typeof raw === 'object' ? raw : {};
-    const workspaceDef = (obj as Record<string, unknown>).workspacePluginDefinition;
-    if (workspaceDef !== undefined) {
-      const parsed = WorkspaceResolverDefinitionSchema.safeParse(workspaceDef);
-      if (parsed.success) {
-        entry.workspaceDefinition = workspaceDef as WorkspaceResolverDefinition;
-      } else {
-        console.warn(
-          `[PluginRegistry] invalid workspacePluginDefinition in '${pluginDir}':`,
-          parsed.error.message,
-        );
-      }
-    }
-
-    const formEngineDef = (obj as Record<string, unknown>).formEnginePluginDefinition;
-    if (formEngineDef !== undefined) {
-      const parsed = FormEnginePluginDefinitionSchema.safeParse(formEngineDef);
-      if (parsed.success) {
-        entry.formEngineDefinition = formEngineDef as FormEnginePluginDefinition;
-      } else {
-        console.warn(
-          `[PluginRegistry] invalid formEnginePluginDefinition in '${pluginDir}':`,
-          parsed.error.message,
-        );
-      }
-    }
-
-    const apiDef = (obj as Record<string, unknown>).pluginApiDefinition;
-    if (apiDef !== undefined) {
-      const parsed = FeatureApiDefinitionSchema.safeParse(apiDef);
-      if (parsed.success) {
-        entry.apiDefinition = apiDef as FeatureApiDefinition;
-      } else {
-        console.warn(
-          `[PluginRegistry] invalid pluginApiDefinition in '${pluginDir}':`,
-          parsed.error.message,
-        );
-      }
-    }
-
-    const cacheDef = (obj as Record<string, unknown>).cachePluginDefinition;
-    if (cacheDef !== undefined) {
-      const parsed = CachePluginDefinitionSchema.safeParse(cacheDef);
-      if (parsed.success) {
-        entry.cacheDefinition = cacheDef as CachePluginDefinition;
-      } else {
-        console.warn(
-          `[PluginRegistry] invalid cachePluginDefinition in '${pluginDir}':`,
-          parsed.error.message,
-        );
-      }
-    }
-
-    const messagebusDef = (obj as Record<string, unknown>).messagebusPluginDefinition;
-    if (messagebusDef !== undefined) {
-      const parsed = MessageBusPluginDefinitionSchema.safeParse(messagebusDef);
-      if (parsed.success) {
-        entry.messagebusDefinition = messagebusDef as MessageBusPluginDefinition;
-      } else {
-        console.warn(
-          `[PluginRegistry] invalid messagebusPluginDefinition in '${pluginDir}':`,
-          parsed.error.message,
-        );
-      }
-    }
-
-    const idpDef = (obj as Record<string, unknown>).idpPluginDefinition;
-    if (idpDef !== undefined) {
-      const parsed = IdpPluginDefinitionSchema.safeParse(idpDef);
-      if (parsed.success) {
-        entry.idpDefinition = idpDef as IdpPluginDefinition;
-      } else {
-        console.warn(
-          `[PluginRegistry] invalid idpPluginDefinition in '${pluginDir}':`,
-          parsed.error.message,
-        );
-      }
-    }
-
-    const storageDef = (obj as Record<string, unknown>).storagePluginDefinition;
-    if (storageDef !== undefined) {
-      const parsed = StoragePluginDefinitionSchema.safeParse(storageDef);
-      if (parsed.success) {
-        entry.storageDefinition = storageDef as { code: string; createAdapter: unknown };
-      } else {
-        console.warn(
-          `[PluginRegistry] invalid storagePluginDefinition in '${pluginDir}':`,
-          parsed.error.message,
-        );
-      }
-    }
-
-    result.push(entry);
+    const entry = loadPlugin(pluginsRoot, pluginDir);
+    if (entry) result.push(entry);
   }
 
   cache = result;
@@ -330,54 +312,16 @@ export function getMessageBusPluginDefinitions(): MessageBusPluginDefinition[] {
     .filter((d): d is MessageBusPluginDefinition => Boolean(d));
 }
 
-export function getIdpPluginDefinitions(): IdpPluginDefinition[] {
-  const discovered = discoverAndCache();
-  return discovered.map((p) => p.idpDefinition).filter((d): d is IdpPluginDefinition => Boolean(d));
-}
-
-export function getStoragePluginDefinitions() {
+export function getStoragePluginDefinitions(): StoragePluginDefinition[] {
   const discovered = discoverAndCache();
   return discovered
     .map((p) => p.storageDefinition)
-    .filter((d): d is { code: string; createAdapter: unknown } => Boolean(d));
+    .filter((d): d is StoragePluginDefinition => Boolean(d));
 }
 
-let storageAdapterInstance: unknown | null = null;
-
-export function getStorageAdapter(): unknown {
-  if (!storageAdapterInstance) {
-    const code = env.getStorageDefaultCode?.() ?? 'local-storage';
-    const definitions = getStoragePluginDefinitions();
-    const definition = definitions.find((d) => d.code === code);
-    if (!definition) {
-      throw new Error(
-        `No storage plugin is installed for code '${code}'. Available: ${definitions.map((d) => d.code).join(', ') || '<none>'}`,
-      );
-    }
-    // createPluginConfigReader returns a PluginConfigReader; we don't know the exact type of createAdapter
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    storageAdapterInstance = (definition as any).createAdapter(
-      createPluginConfigReader(definition.code),
-    );
-  }
-  return storageAdapterInstance;
-}
-
-const storageAdapterInstancesByCode = new Map<string, unknown>();
-
-export function getStorageAdapterFor(code: string): unknown {
-  if (storageAdapterInstancesByCode.has(code)) return storageAdapterInstancesByCode.get(code);
-  const definitions = getStoragePluginDefinitions();
-  const definition = definitions.find((d) => d.code === code);
-  if (!definition) {
-    throw new Error(
-      `No storage plugin is installed for code '${code}'. Available: ${definitions.map((d) => d.code).join(', ') || '<none>'}`,
-    );
-  }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const adapter = (definition as any).createAdapter(createPluginConfigReader(definition.code));
-  storageAdapterInstancesByCode.set(code, adapter);
-  return adapter;
+export function getIdpPluginDefinitions(): IdpPluginDefinition[] {
+  const discovered = discoverAndCache();
+  return discovered.map((p) => p.idpDefinition).filter((d): d is IdpPluginDefinition => Boolean(d));
 }
 
 let cacheAdapterInstance: CacheAdapter | null = null;
@@ -412,4 +356,42 @@ export function getMessageBusAdapter(): MessageBusAdapter {
     messageBusAdapterInstance = definition.createAdapter(createPluginConfigReader(definition.code));
   }
   return messageBusAdapterInstance;
+}
+
+let storageAdapterInstance: StorageEngineAdapter | null = null;
+
+/**
+ * Single active storage adapter. Only one storage backend runs at a time; it is selected by
+ * STORAGE_DEFAULT_CODE (default 'local-storage'). Set a different code (e.g. 's3-compatible')
+ * per deployment to switch backends without code changes.
+ */
+export function getStorageAdapter(): StorageEngineAdapter {
+  if (!storageAdapterInstance) {
+    const code = env.getStorageDefaultCode() ?? 'local-storage';
+    const definitions = getStoragePluginDefinitions();
+    const definition = definitions.find((d) => d.code === code);
+    if (!definition) {
+      throw new Error(
+        `No storage plugin is installed for code '${code}'. Available: ${definitions.map((d) => d.code).join(', ') || '<none>'}`,
+      );
+    }
+    storageAdapterInstance = definition.createAdapter(createPluginConfigReader(definition.code));
+  }
+  return storageAdapterInstance;
+}
+
+/**
+ * Readiness of the single active storage backend. Returns { ok: true } when the adapter exposes no
+ * readinessCheck; never throws — an unreachable or unconfigured backend yields { ok: false, message }.
+ */
+export async function checkStorageReadiness(): Promise<StorageEngineReadinessResult> {
+  try {
+    const adapter = getStorageAdapter();
+    if (typeof adapter.readinessCheck === 'function') {
+      return await adapter.readinessCheck();
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : String(err) };
+  }
 }

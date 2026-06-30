@@ -2,6 +2,7 @@ import * as Minio from 'minio';
 import { Readable } from 'stream';
 import type {
   StorageEngineAdapter,
+  StoragePluginDefinition,
   UploadFileInput,
   UploadFileResult,
   GetFileResult,
@@ -167,7 +168,7 @@ function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
   };
 }
 
-export const storagePluginDefinition = {
+export const storagePluginDefinition: StoragePluginDefinition = {
   code: 's3-compatible',
   createAdapter: createMinioAdapter,
 };

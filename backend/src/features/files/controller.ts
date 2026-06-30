@@ -1,18 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Request, Response } from 'express';
-import { getStorageAdapterFor } from '../../core/integrations/plugins/PluginRegistry';
+import { getStorageAdapter } from '../../core/integrations/plugins/PluginRegistry';
+import { env } from '../../core/config/env';
 import { submissionsApiService } from '../../core/api/submissions/service';
 import { formsApiService } from '../../core/api/forms/service';
 import { actorBelongsToWorkspace } from '../../core/db/repos/membershipRepo';
+import type { StorageEngineAdapter } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 
-const PLUGIN_NOT_FOUND = 'plugin not found';
+/** Active storage plugin code — a single configured backend (default 'local-storage'). */
+const activeStorageCode = (): string => env.getStorageDefaultCode() ?? 'local-storage';
 
-/** Resolve the storage adapter for the given plugin, or send a 404 and return null. */
-function resolveAdapter(pluginCode: string, res: Response): any | null {
+/** Resolve the single configured storage adapter, or send a 500 and return null. */
+function resolveAdapter(res: Response): StorageEngineAdapter | null {
   try {
-    return getStorageAdapterFor(pluginCode);
+    return getStorageAdapter();
   } catch {
-    res.status(404).json({ error: PLUGIN_NOT_FOUND });
+    res.status(500).json({ error: 'storage not configured' });
     return null;
   }
 }
@@ -44,9 +47,9 @@ async function resolveTargetSubmissionId(
 }
 
 export async function uploadFileHandler(req: Request, res: Response) {
-  const pluginCode = req.params.plugin;
-  const adapter = resolveAdapter(pluginCode, res);
+  const adapter = resolveAdapter(res);
   if (!adapter) return;
+  const storageCode = activeStorageCode();
 
   const files = (req as any).files as any[] | undefined;
   if (!files || files.length === 0) return res.status(400).json({ error: 'no files' });
@@ -103,7 +106,7 @@ export async function uploadFileHandler(req: Request, res: Response) {
 
     // Save: call save to push to engine and append revision. Store files in data.files array.
     const savePayload = {
-      data: { files: uploaded, _plugin: pluginCode },
+      data: { files: uploaded, _plugin: storageCode },
       eventType: 'file_upload',
     };
     const saved = await submissionsApiService.save(
@@ -124,8 +127,8 @@ export async function uploadFileHandler(req: Request, res: Response) {
       name: firstFile.filename,
       originalName: firstFile.filename,
       size: firstFile.size,
-      storage: pluginCode,
-      url: `/api/v1/files/${pluginCode}/${firstFile.engineFileRef}`,
+      storage: storageCode,
+      url: `/api/v1/files/${storageCode}/${firstFile.engineFileRef}`,
       submissionId: saved?.id,
     });
   } catch (err: any) {
@@ -134,7 +137,7 @@ export async function uploadFileHandler(req: Request, res: Response) {
 }
 
 export async function downloadFileHandler(req: Request, res: Response) {
-  const adapter = resolveAdapter(req.params.plugin, res);
+  const adapter = resolveAdapter(res);
   if (!adapter) return;
   const id = req.params.id;
   const file = await adapter.getFile(id);
@@ -151,7 +154,7 @@ export async function downloadFileHandler(req: Request, res: Response) {
 }
 
 export async function deleteFileHandler(req: Request, res: Response) {
-  const adapter = resolveAdapter(req.params.plugin, res);
+  const adapter = resolveAdapter(res);
   if (!adapter) return;
   const id = req.params.id;
   await adapter.deleteFile(id);
@@ -159,7 +162,7 @@ export async function deleteFileHandler(req: Request, res: Response) {
 }
 
 export async function listFilesHandler(req: Request, res: Response) {
-  const adapter = resolveAdapter(req.params.plugin, res);
+  const adapter = resolveAdapter(res);
   if (!adapter) return;
   const workspaceId = String((req as any).workspace?.id ?? 'default');
   const list = (await adapter.listFiles?.(workspaceId)) ?? { items: [] };
@@ -167,7 +170,7 @@ export async function listFilesHandler(req: Request, res: Response) {
 }
 
 export async function presignHandler(req: Request, res: Response) {
-  const adapter = resolveAdapter(req.params.plugin, res);
+  const adapter = resolveAdapter(res);
   if (!adapter) return;
   const body = req.body;
   if (typeof adapter.generatePresignedUrl !== 'function') {

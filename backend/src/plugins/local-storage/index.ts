@@ -4,6 +4,7 @@ import path from 'path';
 // use fs.promises.mkdir with recursive instead of fs-extra
 import type {
   StorageEngineAdapter,
+  StoragePluginDefinition,
   UploadFileInput,
   UploadFileResult,
   GetFileResult,
@@ -123,7 +124,7 @@ function createLocalStorageAdapter(config: PluginConfigReader): StorageEngineAda
   };
 }
 
-export const storagePluginDefinition = {
+export const storagePluginDefinition: StoragePluginDefinition = {
   code: 'local-storage',
   createAdapter: createLocalStorageAdapter,
 };

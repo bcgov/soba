@@ -34,11 +34,6 @@
       "count": 1
     }
   },
-  "src/core/integrations/plugins/PluginRegistry.ts": {
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
   "src/core/middleware/actor.ts": {
     "sonarjs/no-duplicate-string": {
       "count": 1
