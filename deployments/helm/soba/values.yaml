@@ -74,6 +74,30 @@ backend:
     pluginPersonalLocalCookieKey: soba_workspace_id
     pluginPersonalLocalAllowHeaderOverride: "true"
 
+  # -- configmap-storage: files feature + storage profiles (STORAGE_* + FILES_*)
+  storage:
+    # Active storage profiles (comma-separated). Each needs a *Backend below.
+    profiles: "default"
+    # Backend for the 'default' profile. 'storage-memory' is in-process and ephemeral — no PVC,
+    # no external service, lost on restart, per-replica. Fine for ephemeral (PR/dev) namespaces.
+    # For durable, multi-replica environments override to 's3-compatible' and set the endpoint/
+    # bucket below (credentials come from a Secret).
+    defaultBackend: storage-memory
+    # Profile the /files API reads/writes, and the max upload size it accepts (MB).
+    filesStorageProfile: "default"
+    filesMaxFileSizeMb: "10"
+
+    # local-storage only: writable filesystem path for the default profile. Rendered only when set.
+    defaultBasePath: ""
+
+    # s3-compatible only — non-credential keys, rendered only when set. ACCESS_KEY/SECRET_KEY are
+    # NOT here; supply them via a Secret. A full URL endpoint (https://host:port) also carries the
+    # port and SSL flag, so defaultPort/defaultUseSsl can stay empty in that case.
+    defaultEndpoint: ""
+    defaultBucketName: ""
+    defaultPort: ""
+    defaultUseSsl: ""
+
   # -- configmap-formio: PLUGIN_FORMIO_V5_* (non-secret values)
   formio:
     routesAllowed: "true"

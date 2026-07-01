@@ -71,6 +71,8 @@ spec:
                 name: {{ include "soba.fullname" . }}-backend-sso
             - configMapRef:
                 name: {{ include "soba.fullname" . }}-backend-ratelimit
+            - configMapRef:
+                name: {{ include "soba.fullname" . }}-backend-storage
             {{- if not .Values.database.existingSecretName }}
             - secretRef:
                 name: {{ include "soba.fullname" . }}-db

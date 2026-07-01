@@ -11,7 +11,7 @@ let cached: Record<string, StorageProfileConfig> | null = null;
 
 /**
  * Storage profiles from env: each profile in STORAGE_PROFILES needs a STORAGE_PROFILE_<P>_BACKEND,
- * with its config under the same prefix. Empty STORAGE_PROFILES defaults to a single local-storage
+ * with its config under the same prefix. Empty STORAGE_PROFILES defaults to a single storage-memory
  * 'default' in development, and throws elsewhere (so a missing prod config fails loudly).
  */
 export function getStorageProfilesConfig(): Record<string, StorageProfileConfig> {
@@ -34,9 +34,9 @@ export function getStorageProfilesConfig(): Record<string, StorageProfileConfig>
     }
     log.warn(
       "[storage-profiles] STORAGE_PROFILES is empty; defaulting to a single 'default' profile on " +
-        'local-storage. This fallback is development-only and fails hard in other environments.',
+        'storage-memory. This fallback is development-only and fails hard in other environments.',
     );
-    profiles.default = { backend: 'local-storage' };
+    profiles.default = { backend: 'storage-memory' };
   }
   cached = profiles;
   return cached;
