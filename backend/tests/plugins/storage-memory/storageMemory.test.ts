@@ -49,7 +49,7 @@ describe('storage-memory adapter', () => {
     expect(await readStream(meta.downloadStream)).toBe('hello world');
 
     const list = await (adapter as any).listFiles('w1');
-    expect(list.items.length).toBe(1);
+    expect(list.items).toHaveLength(1);
     expect(list.items[0].engineFileRef).toBe(result.engineFileRef);
 
     await (adapter as any).deleteFile(result.engineFileRef);
