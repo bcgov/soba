@@ -1,3 +1,4 @@
+import { env } from '../../core/config/env';
 import { getStorageAdapter } from '../../core/integrations/plugins/PluginRegistry';
 import { actorBelongsToWorkspace } from '../../core/db/repos/membershipRepo';
 import {
@@ -9,9 +10,6 @@ import {
 } from '../../core/db/repos/fileRepo';
 import type { GetFileResult } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 import { extractChefsFileIds } from './fileReferences';
-
-/** Storage profile this feature reads/writes. Other file features would select their own profile. */
-const FILE_STORAGE_PROFILE = 'default';
 
 // TODO(permissions): workspace membership is a coarse stand-in. Replace with real permission
 // checks (per-file / role / submission ownership) once the permissions system exists.
@@ -28,8 +26,8 @@ export interface UploadFileParams {
 export const filesService = {
   /** Store the bytes and record a file row. The returned record's id is the public reference. */
   async upload(params: UploadFileParams): Promise<FileRecord> {
-    const adapter = getStorageAdapter(FILE_STORAGE_PROFILE);
-    const result = await adapter.uploadFile({
+    const profile = env.getFilesStorageProfile();
+    const result = await getStorageAdapter(profile).uploadFile({
       workspaceId: params.workspaceId,
       submissionId: params.submissionId ?? undefined,
       filename: params.filename,
@@ -39,7 +37,7 @@ export const filesService = {
     });
     return createFileRecord({
       workspaceId: params.workspaceId,
-      profile: FILE_STORAGE_PROFILE,
+      profile,
       backendRef: result.engineFileRef,
       filename: params.filename,
       contentType: params.contentType ?? null,

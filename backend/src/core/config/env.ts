@@ -237,4 +237,6 @@ export const env = {
   getTemporalWorkerHealthPort: () => getNumberEnv('TEMPORAL_WORKER_HEALTH_PORT') ?? 9090,
   // Max upload size accepted by the files API. Feature-level (not per storage backend).
   getFilesMaxFileSizeMb: () => getNumberEnv('FILES_MAX_FILE_SIZE_MB') || 10,
+  // Storage profile the files feature reads/writes. Defaults to 'default'.
+  getFilesStorageProfile: () => getOptionalEnv('FILES_STORAGE_PROFILE') ?? 'default',
 };

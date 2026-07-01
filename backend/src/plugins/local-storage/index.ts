@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 // use fs.promises.mkdir with recursive instead of fs-extra
 import type {
   StorageEngineAdapter,
@@ -12,20 +12,20 @@ import type {
 } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 import type { PluginConfigReader } from '../../core/config/pluginConfig';
 
+function engineRefFor(relPath: string) {
+  return `local:${relPath}`;
+}
+
+function parseEngineRef(ref: string) {
+  if (!ref.startsWith('local:')) return null;
+  return ref.slice('local:'.length);
+}
+
 function createLocalStorageAdapter(config: PluginConfigReader): StorageEngineAdapter {
   const basePath = config.getOptional('BASE_PATH') ?? './data/storage';
 
   async function ensureBase() {
     await fs.promises.mkdir(basePath, { recursive: true });
-  }
-
-  function engineRefFor(relPath: string) {
-    return `local:${relPath}`;
-  }
-
-  function parseEngineRef(ref: string) {
-    if (!ref.startsWith('local:')) return null;
-    return ref.slice('local:'.length);
   }
 
   return {

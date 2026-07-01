@@ -70,9 +70,9 @@ export function ensureBcgovFormioRegistered(): Promise<{ filesEnabled: boolean }
           getWorkspaceId: () => getWorkspaceId() ?? '',
           // Placeholder: SOBA has no submission id at upload time yet (submission editing TBD).
           getSubmissionId: () =>
-            typeof window !== 'undefined'
-              ? (window.sessionStorage.getItem('soba.submissionId') ?? '')
-              : '',
+            typeof globalThis.sessionStorage === 'undefined'
+              ? ''
+              : (globalThis.sessionStorage.getItem('soba.submissionId') ?? ''),
         }),
       );
     }

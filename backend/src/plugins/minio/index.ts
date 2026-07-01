@@ -1,5 +1,5 @@
 import * as Minio from 'minio';
-import { Readable } from 'stream';
+import { Readable } from 'node:stream';
 import type {
   StorageEngineAdapter,
   StoragePluginDefinition,
@@ -22,6 +22,12 @@ import type { PluginConfigReader } from '../../core/config/pluginConfig';
  * - SECRET_KEY
  * - BUCKET_NAME or BUCKET
  */
+function parseEngineRef(ref: string) {
+  if (!ref.startsWith('s3:')) return null;
+  const parts = ref.split(':');
+  return { bucket: parts[1], key: parts.slice(2).join(':') };
+}
+
 function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
   const endpointRaw = config.getRequired('ENDPOINT');
   let endPointHost: string;
@@ -55,12 +61,6 @@ function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
 
   function engineRefFor(key: string) {
     return `s3:${bucket}:${key}`;
-  }
-
-  function parseEngineRef(ref: string) {
-    if (!ref.startsWith('s3:')) return null;
-    const parts = ref.split(':');
-    return { bucket: parts[1], key: parts.slice(2).join(':') };
   }
 
   return {
