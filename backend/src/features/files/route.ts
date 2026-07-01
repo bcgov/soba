@@ -1,29 +1,36 @@
 import express from 'express';
 import multer from 'multer';
-import { validateRequest } from '../../core/api/shared/validation';
+import { env } from '../../core/config/env';
+import { requireFeature } from '../../core/middleware/requireFeature';
+import { workspaceFromQuery } from '../../core/middleware/workspaceContext';
 import {
   uploadFileHandler,
   downloadFileHandler,
   deleteFileHandler,
-  listFilesHandler,
-  presignHandler,
+  getFilesConfigHandler,
 } from './controller';
-import { ListFilesQuerySchema, PresignBodySchema } from './schema';
-import { env } from '../../core/config/env';
 
 const router = express.Router();
-const MAX_SIZE = env.getFilesMaxFileSizeMb();
+
+const maxSizeMb = env.getFilesMaxFileSizeMb();
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_SIZE * 1024 * 1024 },
-}); // Limit file size to MAX_SIZE MB
+  limits: { fileSize: maxSizeMb * 1024 * 1024 },
+});
 
-// All routes are namespaced by plugin code: /:plugin/
-// Accept any file fields (Form.io may name them differently per component).
-router.post('/:plugin', upload.any(), uploadFileHandler);
-router.get('/:plugin', validateRequest({ query: ListFilesQuerySchema }), listFilesHandler);
-router.get('/:plugin/:id', downloadFileHandler);
-router.delete('/:plugin/:id', deleteFileHandler);
-router.post('/:plugin/presign', validateRequest({ body: PresignBodySchema }), presignHandler);
+// Gate the whole feature on the `soba.feature` 'files' flag.
+router.use(requireFeature('files'));
+
+// Upload: workspace comes from the ?workspaceId query; workspaceFromQuery enforces membership.
+// Accept any file field name (Form.io's fileKey is configurable; the component uploads one at a time).
+router.post('/', workspaceFromQuery, upload.any(), uploadFileHandler);
+
+// Client-facing config (size limit + blocked extensions). Must be declared before '/:id'.
+router.get('/config', getFilesConfigHandler);
+
+// Download / delete: workspace is derived from the file row and checked against the actor,
+// so no workspace query param is required.
+router.get('/:id', downloadFileHandler);
+router.delete('/:id', deleteFileHandler);
 
 export { router as filesRouter };

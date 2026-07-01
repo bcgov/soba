@@ -11,6 +11,8 @@ import {
 import { submissionsApiService } from './service';
 import { asyncHandler } from '../shared/asyncHandler';
 import { NotFoundError } from '../../errors';
+import { filesService } from '../../../features/files/service';
+import { log } from '../../logging';
 import type { Request } from 'express';
 
 type CreateSubmissionBody = z.infer<typeof CreateSubmissionBodySchema>;
@@ -81,6 +83,19 @@ export const saveSubmission = asyncHandler(
   async (req: Request<SaveSubmissionParams, unknown, SaveSubmissionBody>, res: Response) => {
     const ctx = req.coreContext!;
     const result = await submissionsApiService.save(ctx, req.params.id, req.body);
+
+    // Tag the uploaded files with this submission. Best-effort — must not fail the save.
+    // TODO(events): couples submissions to the files feature; move to a 'submission.saved' event
+    // over the message bus when we have one.
+    try {
+      await filesService.associateWithSubmission(req.params.id, ctx.workspaceId, req.body.data);
+    } catch (err) {
+      log.warn(
+        { err, submissionId: req.params.id },
+        'Failed to associate uploaded files with submission',
+      );
+    }
+
     res.json(result);
   },
 );

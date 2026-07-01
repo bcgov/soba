@@ -10,10 +10,11 @@ import { metaDomain } from './meta';
 import { submissionsDomain } from './submissions';
 import { workspacesDomain } from './workspaces';
 import { registerOpenApiPaths } from './shared/openapi';
-import { env } from '../config/env';
 
 // Meta is mounted at app level at /api/v1/meta and is public (no JWT, no core context).
 // Workspaces is mounted first at / so GET /workspaces and GET /workspaces/current are matched before forms.
+// Feature domains (e.g. files) are mounted unconditionally; each gates itself on its soba.feature flag
+// via requireFeature(...) inside its own router.
 const coreDomains = [
   formsDomain,
   meDomain,
@@ -21,6 +22,7 @@ const coreDomains = [
   metaDomain,
   submissionsDomain,
   workspacesDomain,
+  filesDomain,
 ];
 // Workspace context is resolved per route (see workspaceContext middleware), not globally.
 // resolveActor runs at the app level so req.actorId is available to all routes here.
@@ -30,22 +32,13 @@ const authenticatedDomains = [
   meDomain,
   membersDomain,
   submissionsDomain,
+  filesDomain,
 ];
 
-const featureDomains = [];
-
-const enabledFeatures = env.getEnabledFeatures();
-if (enabledFeatures.includes('files')) {
-  featureDomains.push(filesDomain);
-  authenticatedDomains.push(filesDomain);
-}
 const router = express.Router();
 
 registerOpenApiPaths((registry) => {
   for (const domain of coreDomains) {
-    domain.registerOpenApi(registry);
-  }
-  for (const domain of featureDomains) {
     domain.registerOpenApi(registry);
   }
   registerAdminOpenApi(registry);

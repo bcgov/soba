@@ -365,10 +365,8 @@ export function getMessageBusAdapter(): MessageBusAdapter {
 const storageAdapterByProfile = new Map<string, StorageEngineAdapter>();
 
 /**
- * Storage adapter for a profile (default 'default'). A profile is an independently-configured
- * instance of a storage backend plugin, so multiple backends can run at once (e.g. one S3 for
- * platform files, another for form uploads). Each profile's backend code and config come from
- * STORAGE_PROFILE_<PROFILE>_*; adapters are instantiated once per profile and cached.
+ * Storage adapter for a profile (default 'default'). Profiles let multiple backends run at once
+ * (e.g. separate S3 buckets); each is configured under STORAGE_PROFILE_<PROFILE>_* and cached.
  */
 export function getStorageAdapter(profile: string = 'default'): StorageEngineAdapter {
   const cached = storageAdapterByProfile.get(profile);

@@ -10,11 +10,9 @@ export interface StorageProfileConfig {
 let cached: Record<string, StorageProfileConfig> | null = null;
 
 /**
- * Parse storage profiles from env. Each profile listed in STORAGE_PROFILES must declare
- * STORAGE_PROFILE_<PROFILE>_BACKEND; its backend-specific config lives under the same prefix.
- * When STORAGE_PROFILES is empty, development falls back to a single 'default' profile on
- * 'local-storage' (zero-config local dev); any other environment fails hard, so a forgotten
- * production config errors loudly instead of silently writing to ephemeral local disk.
+ * Storage profiles from env: each profile in STORAGE_PROFILES needs a STORAGE_PROFILE_<P>_BACKEND,
+ * with its config under the same prefix. Empty STORAGE_PROFILES defaults to a single local-storage
+ * 'default' in development, and throws elsewhere (so a missing prod config fails loudly).
  */
 export function getStorageProfilesConfig(): Record<string, StorageProfileConfig> {
   if (cached) return cached;

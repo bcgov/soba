@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import type { FormProps } from '@formio/react';
 import { useFormioV5FormChrome } from '@/lib/hooks/useFormioV5FormChrome';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
+import { ensureBcgovFormioRegistered } from '@/src/features/formio-v5/registerBcgovFormio';
 
 function FormioV5FormChrome({ children }: { children: React.ReactNode }) {
   useFormioV5FormChrome('render');
@@ -17,10 +18,8 @@ function FormioV5FormChrome({ children }: { children: React.ReactNode }) {
  */
 const FormioForm = dynamic<FormProps>(
   async () => {
-    const mod = await import('@formio/react');
-    const BcGovFormioComponents = await import('@bcgov/formio-components');
-    const { Formio } = await import('@formio/js');
-    Formio.use(BcGovFormioComponents.default || BcGovFormioComponents);
+    // Register the bcgov components + CHEFS provider (feature-gated) before the form renders.
+    const [mod] = await Promise.all([import('@formio/react'), ensureBcgovFormioRegistered()]);
     return mod.Form;
   },
   {

@@ -60,9 +60,8 @@ export const createPluginConfigReader = (pluginCode: string): PluginConfigReader
 };
 
 /**
- * Config reader for a storage profile: keys resolve to STORAGE_PROFILE_<PROFILE>_<KEY>. A profile is
- * a named, independently-configured instance of a storage backend plugin, so the same backend (e.g.
- * 's3-compatible') can be configured differently per profile.
+ * Config reader for a storage profile: keys resolve to STORAGE_PROFILE_<PROFILE>_<KEY>, so the same
+ * backend (e.g. 's3-compatible') can be configured differently per profile.
  */
 export function createStorageProfileConfigReaderFrom(
   reader: PluginConfigEnvReader,

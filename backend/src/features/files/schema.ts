@@ -3,146 +3,94 @@ import { z } from 'zod';
 
 extendZodWithOpenApi(z);
 
-const PLUGIN_NOT_FOUND_DESC = 'Plugin not found';
+const NOT_FOUND_DESC = 'Not found';
 
-export const ListFilesQuerySchema = z
+export const FileUploadResponseSchema = z
   .object({
-    pageToken: z.string().optional(),
+    id: z.string(),
+    name: z.string(),
+    originalName: z.string(),
+    size: z.number().nullable(),
+    type: z.string().nullable(),
   })
-  .openapi('Files_ListFilesQuery');
+  .openapi('Files_UploadResponse');
 
-export const PresignBodySchema = z
+export const FilesConfigResponseSchema = z
   .object({
-    operation: z.enum(['get', 'put']),
-    engineFileRef: z.string().optional(),
-    filename: z.string().optional(),
-    expiresIn: z.number().optional(),
-    contentType: z.string().optional(),
+    maxFileSizeMb: z.number(),
+    blockedExtensions: z.array(z.string()),
   })
-  .openapi('Files_PresignBody');
-
-export const FileItemSchema = z
-  .object({
-    engineFileRef: z.string(),
-    filename: z.string().optional(),
-    contentType: z.string().optional(),
-    size: z.number().optional(),
-    publicUrl: z.string().optional(),
-    createdAt: z.string().optional(),
-  })
-  .openapi('Files_FileItem');
-
-export const ListFilesResponseSchema = z
-  .object({
-    items: z.array(FileItemSchema),
-    nextPageToken: z.string().optional(),
-  })
-  .openapi('Files_ListFilesResponse');
+  .openapi('Files_Config');
 
 export function registerFilesOpenApi(registry: OpenAPIRegistry) {
   const tag = 'core.files';
 
   registry.registerPath({
+    method: 'get',
+    path: '/files/config',
+    tags: [tag],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: {
+        description: 'Files feature config (upload size limit + always-blocked extensions)',
+        content: { 'application/json': { schema: FilesConfigResponseSchema } },
+      },
+    },
+  });
+
+  registry.registerPath({
     method: 'post',
-    path: '/files/{plugin}',
+    path: '/files',
     tags: [tag],
     security: [{ bearerAuth: [] }],
     request: {
-      // upload is multipart/form-data; require formVersionId (and optional submissionId & formId)
+      // Workspace to store under; membership is enforced.
+      query: z.object({ workspaceId: z.string().min(1) }).openapi('Files_UploadQuery'),
       body: {
         required: true,
         content: {
+          // multipart/form-data: the binary file field (fileKey; default 'file'), plus:
           'multipart/form-data': {
             schema: z.object({
-              formId: z.string().optional(),
-              formVersionId: z.string().min(1),
+              fileName: z.string().optional(),
+              dir: z.string().optional(),
               submissionId: z.string().optional(),
-              // files are binary fields; not easily represented here
             }),
           },
         },
       },
-      params: z.object({ plugin: z.string().min(1) }).openapi('Files_PluginParam'),
     },
     responses: {
       200: {
-        description: 'Uploaded file metadata',
-        content: { 'application/json': { schema: FileItemSchema } },
+        description: 'Uploaded file metadata (Form.io file value)',
+        content: { 'application/json': { schema: FileUploadResponseSchema } },
       },
       400: { description: 'Invalid request' },
-      404: { description: PLUGIN_NOT_FOUND_DESC },
+      415: { description: 'File type not allowed (blocked extension)' },
     },
   });
 
   registry.registerPath({
     method: 'get',
-    path: '/files/{plugin}',
+    path: '/files/{id}',
     tags: [tag],
     security: [{ bearerAuth: [] }],
-    request: {
-      params: z.object({ plugin: z.string().min(1) }).openapi('Files_PluginParam'),
-      query: ListFilesQuerySchema,
-    },
+    request: { params: z.object({ id: z.string().min(1) }).openapi('Files_GetParams') },
     responses: {
-      200: {
-        description: 'List files',
-        content: { 'application/json': { schema: ListFilesResponseSchema } },
-      },
-      404: { description: PLUGIN_NOT_FOUND_DESC },
-    },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: '/files/{plugin}/{id}',
-    tags: [tag],
-    security: [{ bearerAuth: [] }],
-    request: {
-      params: z
-        .object({ plugin: z.string().min(1), id: z.string().min(1) })
-        .openapi('Files_GetParams'),
-    },
-    responses: {
-      200: { description: 'File download (redirect or stream)', content: {} },
-      404: { description: 'Not found' },
+      200: { description: 'File contents (stream or redirect)', content: {} },
+      404: { description: NOT_FOUND_DESC },
     },
   });
 
   registry.registerPath({
     method: 'delete',
-    path: '/files/{plugin}/{id}',
+    path: '/files/{id}',
     tags: [tag],
     security: [{ bearerAuth: [] }],
-    request: {
-      params: z
-        .object({ plugin: z.string().min(1), id: z.string().min(1) })
-        .openapi('Files_DeleteParams'),
-    },
+    request: { params: z.object({ id: z.string().min(1) }).openapi('Files_DeleteParams') },
     responses: {
       204: { description: 'Deleted' },
-      404: { description: 'Not found' },
-    },
-  });
-
-  registry.registerPath({
-    method: 'post',
-    path: '/files/{plugin}/presign',
-    tags: [tag],
-    security: [{ bearerAuth: [] }],
-    request: {
-      params: z.object({ plugin: z.string().min(1) }).openapi('Files_PluginParam'),
-      body: { required: true, content: { 'application/json': { schema: PresignBodySchema } } },
-    },
-    responses: {
-      200: {
-        description: 'Presigned URL payload',
-        content: {
-          'application/json': {
-            schema: z.object({ url: z.string(), method: z.string(), expiresIn: z.number() }),
-          },
-        },
-      },
-      404: { description: PLUGIN_NOT_FOUND_DESC },
+      404: { description: NOT_FOUND_DESC },
     },
   });
 }
