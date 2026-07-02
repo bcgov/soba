@@ -84,6 +84,80 @@ function getPluginsRoot(): string {
   return path.resolve(process.cwd(), 'src', 'plugins');
 }
 
+/**
+ * Read `obj[key]`, validate it with `schema`, and return it typed as `T`. Returns undefined when the
+ * key is absent or invalid (logging a warning in the latter case) so a malformed plugin export is
+ * skipped rather than fatal.
+ */
+function parsePluginDefinition<T>(
+  obj: Record<string, unknown>,
+  pluginDir: string,
+  key: string,
+  schema: z.ZodTypeAny,
+): T | undefined {
+  const value = obj[key];
+  if (value === undefined) return undefined;
+  const parsed = schema.safeParse(value);
+  if (parsed.success) return value as T;
+  console.warn(`[PluginRegistry] invalid ${key} in '${pluginDir}':`, parsed.error.message);
+  return undefined;
+}
+
+/** Load and validate a single plugin module into a CachedPlugin entry. Null when the module fails to
+ *  load (logged); individual malformed definitions are skipped by parsePluginDefinition. */
+function loadPlugin(pluginsRoot: string, pluginDir: string): CachedPlugin | null {
+  const modulePath = path.join(pluginsRoot, pluginDir);
+  let raw: unknown;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    raw = require(modulePath);
+  } catch (err) {
+    console.warn(`[PluginRegistry] failed to load plugin '${pluginDir}':`, err);
+    return null;
+  }
+
+  const obj = raw !== null && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  return {
+    dir: pluginDir,
+    workspaceDefinition: parsePluginDefinition<WorkspaceResolverDefinition>(
+      obj,
+      pluginDir,
+      'workspacePluginDefinition',
+      WorkspaceResolverDefinitionSchema,
+    ),
+    formEngineDefinition: parsePluginDefinition<FormEnginePluginDefinition>(
+      obj,
+      pluginDir,
+      'formEnginePluginDefinition',
+      FormEnginePluginDefinitionSchema,
+    ),
+    apiDefinition: parsePluginDefinition<FeatureApiDefinition>(
+      obj,
+      pluginDir,
+      'pluginApiDefinition',
+      FeatureApiDefinitionSchema,
+    ),
+    cacheDefinition: parsePluginDefinition<CachePluginDefinition>(
+      obj,
+      pluginDir,
+      'cachePluginDefinition',
+      CachePluginDefinitionSchema,
+    ),
+    messagebusDefinition: parsePluginDefinition<MessageBusPluginDefinition>(
+      obj,
+      pluginDir,
+      'messagebusPluginDefinition',
+      MessageBusPluginDefinitionSchema,
+    ),
+    idpDefinition: parsePluginDefinition<IdpPluginDefinition>(
+      obj,
+      pluginDir,
+      'idpPluginDefinition',
+      IdpPluginDefinitionSchema,
+    ),
+  };
+}
+
 function discoverAndCache(): CachedPlugin[] {
   if (cache) return cache;
 
@@ -100,98 +174,8 @@ function discoverAndCache(): CachedPlugin[] {
 
   const result: CachedPlugin[] = [];
   for (const pluginDir of pluginDirs) {
-    const modulePath = path.join(pluginsRoot, pluginDir);
-    let raw: unknown;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      raw = require(modulePath);
-    } catch (err) {
-      console.warn(`[PluginRegistry] failed to load plugin '${pluginDir}':`, err);
-      continue;
-    }
-
-    const entry: CachedPlugin = { dir: pluginDir };
-
-    const obj = raw !== null && typeof raw === 'object' ? raw : {};
-    const workspaceDef = (obj as Record<string, unknown>).workspacePluginDefinition;
-    if (workspaceDef !== undefined) {
-      const parsed = WorkspaceResolverDefinitionSchema.safeParse(workspaceDef);
-      if (parsed.success) {
-        entry.workspaceDefinition = workspaceDef as WorkspaceResolverDefinition;
-      } else {
-        console.warn(
-          `[PluginRegistry] invalid workspacePluginDefinition in '${pluginDir}':`,
-          parsed.error.message,
-        );
-      }
-    }
-
-    const formEngineDef = (obj as Record<string, unknown>).formEnginePluginDefinition;
-    if (formEngineDef !== undefined) {
-      const parsed = FormEnginePluginDefinitionSchema.safeParse(formEngineDef);
-      if (parsed.success) {
-        entry.formEngineDefinition = formEngineDef as FormEnginePluginDefinition;
-      } else {
-        console.warn(
-          `[PluginRegistry] invalid formEnginePluginDefinition in '${pluginDir}':`,
-          parsed.error.message,
-        );
-      }
-    }
-
-    const apiDef = (obj as Record<string, unknown>).pluginApiDefinition;
-    if (apiDef !== undefined) {
-      const parsed = FeatureApiDefinitionSchema.safeParse(apiDef);
-      if (parsed.success) {
-        entry.apiDefinition = apiDef as FeatureApiDefinition;
-      } else {
-        console.warn(
-          `[PluginRegistry] invalid pluginApiDefinition in '${pluginDir}':`,
-          parsed.error.message,
-        );
-      }
-    }
-
-    const cacheDef = (obj as Record<string, unknown>).cachePluginDefinition;
-    if (cacheDef !== undefined) {
-      const parsed = CachePluginDefinitionSchema.safeParse(cacheDef);
-      if (parsed.success) {
-        entry.cacheDefinition = cacheDef as CachePluginDefinition;
-      } else {
-        console.warn(
-          `[PluginRegistry] invalid cachePluginDefinition in '${pluginDir}':`,
-          parsed.error.message,
-        );
-      }
-    }
-
-    const messagebusDef = (obj as Record<string, unknown>).messagebusPluginDefinition;
-    if (messagebusDef !== undefined) {
-      const parsed = MessageBusPluginDefinitionSchema.safeParse(messagebusDef);
-      if (parsed.success) {
-        entry.messagebusDefinition = messagebusDef as MessageBusPluginDefinition;
-      } else {
-        console.warn(
-          `[PluginRegistry] invalid messagebusPluginDefinition in '${pluginDir}':`,
-          parsed.error.message,
-        );
-      }
-    }
-
-    const idpDef = (obj as Record<string, unknown>).idpPluginDefinition;
-    if (idpDef !== undefined) {
-      const parsed = IdpPluginDefinitionSchema.safeParse(idpDef);
-      if (parsed.success) {
-        entry.idpDefinition = idpDef as IdpPluginDefinition;
-      } else {
-        console.warn(
-          `[PluginRegistry] invalid idpPluginDefinition in '${pluginDir}':`,
-          parsed.error.message,
-        );
-      }
-    }
-
-    result.push(entry);
+    const entry = loadPlugin(pluginsRoot, pluginDir);
+    if (entry) result.push(entry);
   }
 
   cache = result;

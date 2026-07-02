@@ -1,12 +1,7 @@
 'use client';
 
-import dynamic from 'next/dynamic';
+import { clientOnly } from '@/src/shared/ui/clientOnly';
 
-const FormioV5FormRenderClient = dynamic(() => import('./FormioV5FormRenderClient'), {
-  ssr: false,
-  loading: () => <p className="text-sm text-[var(--typography-color-secondary)]">Loading…</p>,
-});
+const FormioV5FormRenderLoader = clientOnly(() => import('./FormioV5FormRenderClient'));
 
-export default function FormioV5FormRenderLoader() {
-  return <FormioV5FormRenderClient />;
-}
+export default FormioV5FormRenderLoader;

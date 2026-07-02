@@ -1,16 +1,10 @@
 import type { Locale } from '@/app/[lang]/dictionaries';
 import { designerPlugin } from '@/src/features/designer/plugin';
-import { metaReviewPlugin } from '@/src/features/meta-review/plugin';
 import { submitModePlugin } from '@/src/features/submit-mode/plugin';
 import { workspacesPlugin } from '@/src/features/workspaces/plugin';
 import type { AppPlugin, PluginNavItem, Dictionary } from '@/src/types/plugins';
 
-const allPlugins: AppPlugin[] = [
-  workspacesPlugin,
-  designerPlugin,
-  submitModePlugin,
-  metaReviewPlugin,
-];
+const allPlugins: AppPlugin[] = [workspacesPlugin, designerPlugin, submitModePlugin];
 
 function getEnabledPlugins(isFeatureAllowed: (code: string) => boolean): AppPlugin[] {
   return allPlugins

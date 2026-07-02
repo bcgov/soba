@@ -1,9 +1,6 @@
 @import '@bcgov/bc-sans/css/BC_Sans.css';
 @import '@bcgov/design-tokens/css/variables.css';
 @import 'bootstrap/dist/css/bootstrap.min.css';
-@import '@formio/js/dist/formio.full.min.css';
-@import '@formio/js/dist/formio.builder.min.css';
-@import '@fortawesome/fontawesome-free/css/all.min.css';
 
 :root {
   --app-bg: var(--surface-color-background-light-gray);
@@ -16,6 +13,10 @@
   --app-primary-text: var(--typography-color-primary-invert);
   --app-focus-ring: var(--surface-color-border-active);
   --app-danger: var(--typography-color-danger);
+  /* Darker grey surface for table headers/footers + the selected nav item. */
+  --app-surface-muted: var(--theme-gray-30);
+  /* Subtle grey for hover and zebra striping. */
+  --app-hover: var(--theme-gray-20);
 }
 
 body {
@@ -47,17 +48,3 @@ a {
   border-color: var(--surface-color-border-default);
 }
 
-.bc-gov-header {
-  background: var(--surface-color-background-white);
-  border-bottom: 1px solid var(--surface-color-border-default);
-}
-
-.bc-gov-header .navbar-brand {
-  font-weight: 700;
-  color: var(--typography-color-primary);
-  font-size: 1rem;
-}
-
-.bc-gov-header .navbar-brand:hover {
-  color: var(--app-primary);
-}

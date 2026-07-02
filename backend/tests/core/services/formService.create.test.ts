@@ -28,7 +28,6 @@ const baseCreate = {
   workspaceId: 'ws1',
   actorId: 'a1',
   actorDisplayLabel: 'A',
-  slug: 'my-form',
   name: 'My Form',
 };
 
@@ -47,13 +46,12 @@ describe('FormService.create', () => {
       workspaceId: 'ws1',
       actorId: 'a1',
       actorDisplayLabel: 'A',
-      slug: 'my-form',
       name: 'My Form',
       visibility: ['public'],
     });
 
     expect(createForm).toHaveBeenCalledWith(
-      expect.objectContaining({ slug: 'my-form', formEngineCode: 'formio-v5' }),
+      expect.objectContaining({ name: 'My Form', formEngineCode: 'formio-v5' }),
       expect.anything(),
     );
     expect(createDraft).toHaveBeenCalledWith(

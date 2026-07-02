@@ -3,12 +3,13 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { FormType, Submission } from '@formio/react';
-import { Alert, Spinner } from 'react-bootstrap';
+import { InlineAlert } from '@bcgov/design-system-react-components';
+import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
-import { useAppSelector } from '@/lib/store';
 import { ReadOnlyFormView } from '@/src/features/formio-v5/ui/ReadOnlyFormView';
-import { formatLongDate } from '@/src/shared/util/dateFormat';
+import { WorkflowStateBadge } from './WorkflowStateBadge';
+import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import {
   getSobaSubmission,
   getFormVersionSchema,
@@ -21,8 +22,7 @@ export function SubmissionView() {
   const dict = useDictionary();
   const dictSub = dict.submission;
   const { authenticated, token, initializing } = useKeycloak();
-  const { activeWorkspaceId } = useAppSelector((state) => state.workspace);
-  const ws = activeWorkspaceId || undefined;
+  const formatLongDate = useFormatLongDate();
 
   const submissionIdRaw = params?.submissionId;
   const submissionId =
@@ -40,12 +40,12 @@ export function SubmissionView() {
     let active = true;
     void (async () => {
       try {
-        const sub = await getSobaSubmission(token, submissionId, ws);
+        const sub = await getSobaSubmission(token, submissionId);
         if (!active) return;
         setSubmission(sub);
         const [loadedSchema, fetchedContent] = await Promise.all([
-          getFormVersionSchema(token, sub.formVersionId, ws),
-          getSobaSubmissionData(token, submissionId, ws),
+          getFormVersionSchema(token, sub.formVersionId),
+          getSobaSubmissionData(token, submissionId),
         ]);
         if (!active) return;
         if (loadedSchema) setSchema(loadedSchema);
@@ -59,35 +59,35 @@ export function SubmissionView() {
     return () => {
       active = false;
     };
-  }, [authenticated, token, submissionId, ws, loaded]);
+  }, [authenticated, token, submissionId, loaded]);
 
   if (initializing || (authenticated && !token)) {
-    return (
-      <div className="p-5 text-center">
-        <Spinner animation="border" />
-      </div>
-    );
+    return <CenteredProgress label={dict.general.loading} />;
   }
   if (!authenticated) return null;
 
-  return (
-    <div className="mt-3" data-testid="submission-view">
-      {!loaded ? (
-        <p className="text-muted small">{dictSub?.loading || 'Loading…'}</p>
-      ) : notFound || !submission ? (
-        <Alert variant="danger" role="alert" data-testid="submission-view-notfound">
+  const renderContent = () => {
+    if (!loaded) {
+      return <CenteredProgress label={dictSub?.loading || dict.general.loading} />;
+    }
+    if (notFound || !submission) {
+      return (
+        <InlineAlert variant="danger" role="alert" data-testid="submission-view-notfound">
           {dictSub?.notFound || 'Submission not found.'}
-        </Alert>
-      ) : (
-        <>
+        </InlineAlert>
+      );
+    }
+    return (
+      <>
           <div className="mb-3" data-testid="submission-view-header">
-            <h2 className="h5 mb-1">{submission.formName || dict.form?.nameLabel || 'Submission'}</h2>
+            <h3 className="h5 mb-1">{submission.formName || dict.form?.nameLabel || 'Submission'}</h3>
             <div className="small text-muted">
               <span data-testid="submission-view-version">v{submission.versionNo ?? 1}</span>
               {' · '}
-              <span data-testid="submission-view-status">
-                {(submission.workflowState || '').toUpperCase()}
-              </span>
+              <WorkflowStateBadge
+                state={submission.workflowState}
+                data-testid="submission-view-status"
+              />
               {submission.submittedAt ? (
                 <>
                   {' · '}
@@ -106,12 +106,17 @@ export function SubmissionView() {
               testId="submission-view-form"
             />
           ) : (
-            <Alert variant="secondary" role="alert" data-testid="submission-view-nocontent">
+            <InlineAlert variant="info" role="alert" data-testid="submission-view-nocontent">
               {dictSub?.noContent || 'No submitted answers to display.'}
-            </Alert>
+            </InlineAlert>
           )}
-        </>
-      )}
+      </>
+    );
+  };
+
+  return (
+    <div className="mt-3" data-testid="submission-view">
+      {renderContent()}
     </div>
   );
 }

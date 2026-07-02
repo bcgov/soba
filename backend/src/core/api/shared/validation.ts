@@ -88,7 +88,15 @@ export const validateRequest = (schemas: RequestSchemas): RequestHandler => {
     }
     if (result.data.body !== undefined) req.body = result.data.body;
     if (result.data.params !== undefined) req.params = result.data.params as Request['params'];
-    if (result.data.query !== undefined) req.query = result.data.query as Request['query'];
+    if (result.data.query !== undefined) {
+      // Merge over the original query so cross-cutting params not declared in the route schema
+      // (e.g. `workspaceId`, consumed by the workspace-context middleware) survive Zod's
+      // default key-stripping. Validated/coerced fields take precedence.
+      req.query = {
+        ...req.query,
+        ...(result.data.query as Record<string, unknown>),
+      } as Request['query'];
+    }
     next();
   };
 };

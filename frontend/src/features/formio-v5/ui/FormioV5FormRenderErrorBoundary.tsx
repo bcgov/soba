@@ -20,12 +20,6 @@ export class FormioV5FormRenderErrorBoundary extends Component<Props, State> {
     return { error };
   }
 
-  componentDidCatch(error: Error): void {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('[FormioV5FormRenderErrorBoundary]', error);
-    }
-  }
-
   render(): ReactNode {
     if (this.state.error) return this.props.fallback;
     return this.props.children;

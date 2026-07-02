@@ -1,3 +1,4 @@
+import * as http from 'node:http';
 import { NativeConnection, Runtime, Worker } from '@temporalio/worker';
 import { env } from '../core/config/env';
 import { log } from '../core/logging';
@@ -6,6 +7,31 @@ import { createTemporalPinoLogger } from './temporalPinoLogger';
 
 const workerLog = log.child({ component: 'temporal-worker' });
 
+/**
+ * Minimal health server so Kubernetes can gate the rollout on the worker actually
+ * connecting to Temporal. `/readyz` returns 200 only once the worker is created
+ * (connection established) and polling; otherwise 503. `/healthz` reports process
+ * liveness. If the worker cannot reach the Temporal frontend, `NativeConnection.connect`
+ * throws and the process exits, so the readiness probe never passes and the deploy fails.
+ */
+function startHealthServer(isReady: () => boolean): http.Server {
+  const port = env.getTemporalWorkerHealthPort();
+  const server = http.createServer((req, res) => {
+    if (req.url === '/readyz') {
+      const ready = isReady();
+      res.writeHead(ready ? 200 : 503).end(ready ? 'ready' : 'starting');
+      return;
+    }
+    if (req.url === '/healthz') {
+      res.writeHead(200).end('ok');
+      return;
+    }
+    res.writeHead(404).end();
+  });
+  server.listen(port, () => workerLog.info({ port }, 'Worker health server listening'));
+  return server;
+}
+
 export async function run() {
   if (!env.getTemporalAllowed()) {
     workerLog.info(
@@ -13,6 +39,9 @@ export async function run() {
     );
     return;
   }
+
+  let ready = false;
+  const healthServer = startHealthServer(() => ready);
 
   Runtime.install({
     logger: createTemporalPinoLogger(workerLog),
@@ -45,15 +74,19 @@ export async function run() {
     process.once('SIGINT', onShutdownSignal);
     process.once('SIGTERM', onShutdownSignal);
 
+    ready = true;
     workerLog.info('Worker started, polling for tasks');
     try {
       await worker.run();
     } finally {
+      ready = false;
       process.off('SIGINT', onShutdownSignal);
       process.off('SIGTERM', onShutdownSignal);
     }
   } finally {
+    ready = false;
     workerLog.info('Worker shut down, closing connection');
     await connection.close();
+    healthServer.close();
   }
 }

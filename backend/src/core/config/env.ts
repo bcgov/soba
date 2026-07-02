@@ -163,10 +163,16 @@ export function createEnvReader(source: EnvSource) {
     getRateLimitPublicWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_PUBLIC_WINDOW_MS'),
     getRateLimitPublicMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_PUBLIC_MAX'),
     getTrustProxySetting: () => resolveTrustProxySetting(source),
+    /** Production CORS allowlist (comma-separated trusted origins). */
+    getCorsOrigins: () => getCsvEnvFrom(source, 'CORS_ORIGIN'),
+    /** Development CORS fallback origins, used when CORS_ORIGIN is unset in development. */
+    getCorsDevOrigins: () => getCsvEnvFrom(source, 'CORS_DEV_ORIGIN'),
     getTemporalAllowed: () => getBooleanEnvFrom(source, 'TEMPORAL_ALLOWED') ?? false,
     getTemporalAddress: () => getOptionalEnvFrom(source, 'TEMPORAL_ADDRESS') ?? 'localhost:7233',
     getTemporalNamespace: () => getOptionalEnvFrom(source, 'TEMPORAL_NAMESPACE') ?? 'default',
     getTemporalTaskQueue: () => getOptionalEnvFrom(source, 'TEMPORAL_TASK_QUEUE') ?? 'soba',
+    getTemporalWorkerHealthPort: () =>
+      getNumberEnvFrom(source, 'TEMPORAL_WORKER_HEALTH_PORT') ?? 9090,
   };
 }
 
@@ -212,8 +218,13 @@ export const env = {
   getRateLimitPublicWindowMs: () => getNumberEnv('RATE_LIMIT_PUBLIC_WINDOW_MS'),
   getRateLimitPublicMax: () => getNumberEnv('RATE_LIMIT_PUBLIC_MAX'),
   getTrustProxySetting: () => resolveTrustProxySetting(process.env),
+  /** Production CORS allowlist (comma-separated trusted origins). */
+  getCorsOrigins: () => getCsvEnv('CORS_ORIGIN'),
+  /** Development CORS fallback origins, used when CORS_ORIGIN is unset in development. */
+  getCorsDevOrigins: () => getCsvEnv('CORS_DEV_ORIGIN'),
   getTemporalAllowed: () => getBooleanEnv('TEMPORAL_ALLOWED') ?? false,
   getTemporalAddress: () => getOptionalEnv('TEMPORAL_ADDRESS') ?? 'localhost:7233',
   getTemporalNamespace: () => getOptionalEnv('TEMPORAL_NAMESPACE') ?? 'default',
   getTemporalTaskQueue: () => getOptionalEnv('TEMPORAL_TASK_QUEUE') ?? 'soba',
+  getTemporalWorkerHealthPort: () => getNumberEnv('TEMPORAL_WORKER_HEALTH_PORT') ?? 9090,
 };

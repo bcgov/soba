@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { InlineAlert } from '@bcgov/design-system-react-components';
 import { useRouter, usePathname } from 'next/navigation';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
@@ -8,6 +9,10 @@ import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { getSobaSubmissions } from '@/src/shared/api/sobaApiForms';
 import type { SubmissionListItem } from '@/src/types/submissions';
 import { DataTable, Column } from '@/src/components/DataTable';
+import { ListPageLayout } from '@/src/components/ListPageLayout';
+import { DsPageHeading } from '@/app/ui/DsPageHeading';
+import { RowActionButton } from '@/src/components/RowActionButton';
+import { WorkflowStateBadge } from './WorkflowStateBadge';
 import { useAppSelector } from '@/lib/store';
 
 interface SubmissionListProps {
@@ -22,19 +27,26 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
   const locale = getLocaleFromPath(pathname);
   const [submissions, setSubmissions] = useState<SubmissionListItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { activeWorkspaceId } = useAppSelector((state) => state.workspace);
 
+  const paginatedSubmissions = useMemo(
+    () => submissions.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [submissions, currentPage, pageSize],
+  );
+
   useEffect(() => {
-    if (authenticated && token) {
+    if (authenticated && token && activeWorkspaceId) {
       const fetchSubmissions = async () => {
         try {
           // `formId` is the SOBA formId (routed from FormList); list submissions for it directly.
           const params = formId ? { formId } : undefined;
-          const data = await getSobaSubmissions(token, params, activeWorkspaceId || undefined);
+          const data = await getSobaSubmissions(token, params, activeWorkspaceId);
           setSubmissions(data.items || []);
-        } catch (err) {
-          console.error('Failed to fetch submissions', err);
+        } catch {
+          // Submissions failed to load; the empty state is shown to the user.
         } finally {
           setIsLoaded(true);
         }
@@ -42,15 +54,15 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
 
       fetchSubmissions();
     }
+    // No workspace selected for this tab: submissions are workspace-scoped, so we render a
+    // "select a workspace" prompt (below) instead of calling the API.
   }, [authenticated, token, formId, activeWorkspaceId]);
 
-  const loading = !!(authenticated && token && !isLoaded);
+  const loading = initializing || (authenticated && (!token || !isLoaded));
 
-  if (initializing || (authenticated && !token)) {
-    return <div className="p-4">{dict.form?.loading || 'Loading submissions...'}</div>;
-  }
-
-  if (!authenticated) {
+  // Auth gate only — loading (including Keycloak init) is shown inside the table
+  // body so the page heading stays visible throughout.
+  if (!authenticated && !initializing) {
     return null;
   }
 
@@ -60,75 +72,68 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
       key: 'id',
       label: dict.submission?.columns?.id || 'Submission ID',
       render: (sub) => (
-        <a
-          href="#"
+        <RowActionButton
+          main
           data-testid={`submission-view-${sub.id}`}
-          onClick={(e) => {
-            e.preventDefault();
-            router.push(`/${locale}/submission/${sub.id}`);
-          }}
-          className="text-decoration-underline"
-          style={{ cursor: 'pointer', color: '#00538A' }}
-          title={dict.submission?.view || 'View'}
+          onPress={() => router.push(`/${locale}/submission/${sub.id}`)}
         >
-          <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">{sub.id}</code>
-        </a>
+          {sub.id}
+        </RowActionButton>
       ),
     },
     {
       key: 'formName',
       label: dict.submission?.columns?.formName || dict.form?.nameLabel || 'Form Name',
       render: (sub) => (
-        <span className="text-gray-800 font-semibold">
-          {sub.formName || dict.form?.nameLabel || 'Untitled Form'}
-        </span>
+        <span className="fw-semibold">{sub.formName || dict.form?.nameLabel || 'Untitled Form'}</span>
       ),
     },
     {
       key: 'formId',
       label: dict.submission?.columns?.formId || 'Form ID',
-      render: (sub) => <span className="text-gray-500 font-mono text-xs">{sub.formId}</span>,
+      render: (sub) => <span className="text-muted small font-monospace">{sub.formId}</span>,
     },
     {
       key: 'versionNo',
       label: dict.submission?.columns?.version || 'Version',
-      render: (sub) => (
-        <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-bold">
-          v{sub.versionNo || 1}
-        </span>
-      ),
+      render: (sub) => <span className="small">v{sub.versionNo || 1}</span>,
     },
     {
       key: 'workflowState',
       label: dict.submission?.columns?.status || 'Status',
-      render: (sub) => (
-        <span
-          className={`px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full border ${
-            sub.workflowState === 'submitted'
-              ? 'bg-green-50 text-green-700 border-green-200'
-              : 'bg-amber-50 text-amber-700 border-amber-200'
-          }`}
-        >
-          {sub.workflowState.toUpperCase()}
-        </span>
-      ),
+      render: (sub) => <WorkflowStateBadge state={sub.workflowState} />,
     },
   ];
 
   return (
-    <section>
-      <div>
-        <h2>{dict.submission?.submissions || 'Submissions'}</h2>
-      </div>
-      <DataTable<SubmissionListItem>
-        data={submissions}
-        columns={columns}
-        loading={loading}
-        emptyMessage={dict.submission?.empty || 'No submissions found yet.'}
-        loadingMessage={dict.form?.loading || 'Loading submissions...'}
-        keyExtractor={(sub) => sub.id}
-        itemName={dict.submission?.submissions || 'submissions'}
-      />
-    </section>
+    <ListPageLayout>
+      <DsPageHeading id="submissions-heading">
+        {dict.submission?.submissions || 'Submissions'}
+      </DsPageHeading>
+      {authenticated && !initializing && !activeWorkspaceId ? (
+        <InlineAlert variant="info" data-testid="submissions-select-workspace">
+          {dict.general.selectWorkspace}
+        </InlineAlert>
+      ) : (
+        <DataTable<SubmissionListItem>
+          data={paginatedSubmissions}
+          columns={columns}
+          loading={loading}
+          emptyMessage={dict.submission?.empty || 'No submissions found yet.'}
+          loadingMessage={dict.submission?.loading || 'Loading submissions...'}
+          keyExtractor={(sub) => sub.id}
+          itemName={dict.submission?.submissions || 'submissions'}
+          caption={dict.submission?.submissions || 'Submissions'}
+          totalItems={submissions.length}
+          pageSize={pageSize}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
+        />
+      )}
+    </ListPageLayout>
   );
 }

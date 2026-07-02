@@ -1,6 +1,5 @@
 'use client';
 
-import { FormioProvider } from '@formio/react';
 import type { FormType, Submission } from '@formio/react';
 import { DynamicForm } from './DynamicForm';
 
@@ -19,15 +18,13 @@ export function ReadOnlyFormView({
 }) {
   return (
     <div className="formio-v5-chrome" data-soba-formio-chrome data-testid={testId}>
-      <FormioProvider>
-        <DynamicForm
-          className="formio-v5-form-root"
-          src=""
-          form={schema}
-          submission={submission}
-          options={{ readOnly: true }}
-        />
-      </FormioProvider>
+      <DynamicForm
+        className="formio-v5-form-root"
+        src=""
+        form={schema}
+        submission={submission}
+        options={{ readOnly: true }}
+      />
     </div>
   );
 }

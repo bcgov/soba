@@ -1,5 +1,5 @@
 import type { NormalizedProfile, IdpAttributes } from '../core/auth/jwtClaims';
-import type { CoreRequestContext } from '../core/middleware/requestContext';
+import type { CoreRequestContext, CoreListScope } from '../core/middleware/requestContext';
 
 declare global {
   namespace Express {
@@ -20,6 +20,7 @@ declare global {
       idpType?: string;
       idpPluginCode?: string;
       coreContext?: CoreRequestContext;
+      listScope?: CoreListScope;
       actorId?: string;
       isSobaAdmin?: boolean;
     }

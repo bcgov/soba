@@ -87,10 +87,6 @@ export async function loadFrontendRuntimeConfig(): Promise<FrontendRuntimeConfig
   return configPromise;
 }
 
-export function getCachedFrontendRuntimeConfig(): FrontendRuntimeConfig | null {
-  return cachedConfig;
-}
-
 export function getSobaApiBaseUrl(): string {
   return cachedConfig?.api.baseUrl ?? getBootstrapApiBaseUrl();
 }

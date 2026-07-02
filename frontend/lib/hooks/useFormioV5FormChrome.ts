@@ -1,37 +1,48 @@
 'use client';
 
 import { useEffect } from 'react';
-
-const STYLES = [
-  { id: 'soba-formio-bootstrap', href: '/formio-v5/bootstrap.min.css' },
-  { id: 'soba-formio-form', href: '/formio-v5/formio.form.min.css' },
-] as const;
+import { disableFormioBrowserAuth } from '@/src/features/formio-v5/disableFormioBrowserAuth';
 
 /**
- * Injects Form.io renderer stylesheets only while the form renderer is mounted.
- * Static copies live under `public/formio-v5/` (maintain by hand when upgrading Bootstrap / @formio/js).
- * Scoped operationally to this feature (not global layout); selectors in the CSS
- * are still Form.io/Bootstrap-prefixed where possible, but some rules are global by design.
+ * Form.io renderer/builder stylesheet, injected only while a Form.io component
+ * (renderer or builder) is mounted. The static copy lives under `public/formio-v5/`
+ * (maintain by hand when upgrading @formio/js, including `public/formio-v5/fonts/`).
+ *
+ * Both the renderer and the builder load the FULL stylesheet: only it contains the
+ * `bootstrap-icons` @font-face + icon classes (calendar, etc.). The renderer-only
+ * `formio.form.min.css` has no icons, so submitters lost icons like the calendar.
+ * (The renderer could be slimmed later with an extracted icons-only stylesheet.)
+ * It does not bundle Bootstrap — it relies on the app's own (unlayered) Bootstrap.
+ *
+ * It's loaded into a low-priority `formio` cascade layer via a `<style>` doing
+ * `@import url(...) layer(formio)` (a `<link>` can't be assigned a layer). Unlayered
+ * app CSS always beats layered CSS, so Form.io can't leak into / restyle the app
+ * chrome (header, nav, the signed-in dropdown).
+ *
+ * `variant` only gates enablement (kept for call-site clarity / future per-mode
+ * slimming); pass `null` to inject nothing.
  */
-export function useFormioV5FormChrome(enabled: boolean): void {
-  useEffect(() => {
-    if (!enabled || typeof document === 'undefined') return;
+type Variant = 'render' | 'build';
 
-    const added: HTMLLinkElement[] = [];
-    for (const { id, href } of STYLES) {
-      if (document.getElementById(id)) continue;
-      const link = document.createElement('link');
-      link.id = id;
-      link.rel = 'stylesheet';
-      link.href = href;
-      document.head.appendChild(link);
-      added.push(link);
-    }
+const STYLESHEET = '/formio-v5/formio.full.min.css';
+
+export function useFormioV5FormChrome(variant: Variant | null): void {
+  useEffect(() => {
+    if (!variant || typeof document === 'undefined') return;
+
+    disableFormioBrowserAuth();
+    // Shared id: a builder + its preview renderer on the same page reuse one
+    // injected stylesheet; the first to mount owns cleanup.
+    const id = 'soba-formio-styles';
+    if (document.getElementById(id)) return;
+
+    const style = document.createElement('style');
+    style.id = id;
+    style.textContent = `@import url("${STYLESHEET}") layer(formio);`;
+    document.head.appendChild(style);
 
     return () => {
-      for (const link of added) {
-        link.remove();
-      }
+      style.remove();
     };
-  }, [enabled]);
+  }, [variant]);
 }

@@ -1,7 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Table, Spinner } from 'react-bootstrap';
+import { Table } from 'react-bootstrap';
+import { Select, Button } from '@bcgov/design-system-react-components';
+import { FaChevronLeft, FaChevronRight } from 'react-icons/fa6';
+import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
+import styles from './DataTable.module.css';
 
 export interface Column<T> {
   key: string;
@@ -19,6 +23,7 @@ export interface DataTableProps<T> {
   emptyMessage?: string;
   loadingMessage?: string;
   itemName?: string;
+  caption?: string;
   pageSize?: number;
   currentPage?: number;
   totalItems?: number;
@@ -26,6 +31,18 @@ export interface DataTableProps<T> {
   onPageSizeChange?: (size: number) => void;
   pageSizeOptions?: number[];
   keyExtractor: (item: T) => string;
+}
+
+const COLUMN_WIDTH_CLASS: Record<string, string> = {
+  '40%': styles.colWidth40,
+};
+
+function columnHeaderClass<T>(col: Column<T>): string {
+  const align = col.align || 'start';
+  const widthClass = col.width ? COLUMN_WIDTH_CLASS[col.width] : undefined;
+  return ['px-4', 'py-2', 'text-dark', 'fw-bold', `text-${align}`, widthClass]
+    .filter(Boolean)
+    .join(' ');
 }
 
 export function DataTable<T>({
@@ -36,6 +53,7 @@ export function DataTable<T>({
   emptyMessage = 'No items found.',
   loadingMessage = 'Loading...',
   itemName = 'items',
+  caption,
   pageSize = 10,
   currentPage = 1,
   totalItems,
@@ -46,82 +64,72 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
   const totalPages = totalItems ? Math.ceil(totalItems / pageSize) : 1;
 
+  const renderBody = () => {
+    if (loading) {
+      return (
+        <tr>
+          <td colSpan={columns.length} className="p-0">
+            <CenteredProgress label={loadingMessage} data-testid="datatable-loading" />
+          </td>
+        </tr>
+      );
+    }
+    if (data.length === 0) {
+      return (
+        <tr>
+          <td colSpan={columns.length} className="text-center py-5 text-muted">
+            {error ? `Error: ${error}` : emptyMessage}
+          </td>
+        </tr>
+      );
+    }
+    return data.map((item) => (
+      <tr key={keyExtractor(item)} className={styles.row}>
+        {columns.map((col) => (
+          <td
+            key={`${keyExtractor(item)}-${col.key}`}
+            className={`px-4 py-2 text-${col.align || 'start'}`}
+          >
+            {col.render
+              ? col.render(item)
+              : ((item as Record<string, unknown>)[col.key] as React.ReactNode)}
+          </td>
+        ))}
+      </tr>
+    ));
+  };
+
   return (
-    <div className="bg-white rounded overflow-hidden" style={{ border: 'none' }}>
-      <Table hover responsive className="mb-0 align-middle" style={{ border: 'none' }}>
-        <thead style={{ backgroundColor: '#EBEBEB', borderBottom: 'none' }}>
+    <div className={`bg-white rounded overflow-hidden ${styles.container}`}>
+      <Table responsive className={`mb-0 align-middle ${styles.table}`}>
+        {caption ? <caption className="visually-hidden">{caption}</caption> : null}
+        <thead className={styles.thead}>
           <tr>
             {columns.map((col) => (
-              <th
-                key={col.key}
-                className={`px-4 py-3 text-dark fw-bold border-0 text-${col.align || 'start'}`}
-                style={col.width ? { width: col.width } : undefined}
-              >
+              <th key={col.key} scope="col" className={columnHeaderClass(col)}>
                 {col.label}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody style={{ borderTop: 'none' }}>
-          {loading ? (
-            <tr>
-              <td colSpan={columns.length} className="text-center py-5">
-                <Spinner animation="border" variant="primary" size="sm" className="me-2" />
-                {loadingMessage}
-              </td>
-            </tr>
-          ) : data.length === 0 ? (
-            <tr>
-              <td colSpan={columns.length} className="text-center py-5 text-muted">
-                {error ? `Error: ${error}` : emptyMessage}
-              </td>
-            </tr>
-          ) : (
-            data.map((item) => (
-              <tr key={keyExtractor(item)} style={{ borderBottom: '1px solid #dee2e6' }}>
-                {columns.map((col) => (
-                  <td
-                    key={`${keyExtractor(item)}-${col.key}`}
-                    className={`px-4 py-3 text-${col.align || 'start'}`}
-                  >
-                    {col.render
-                      ? col.render(item)
-                      : ((item as Record<string, unknown>)[col.key] as React.ReactNode)}
-                  </td>
-                ))}
-              </tr>
-            ))
-          )}
-        </tbody>
+        <tbody className={styles.tbody}>{renderBody()}</tbody>
       </Table>
 
       {!loading && data.length > 0 && totalItems !== undefined && (
         <div
-          className="px-4 py-3 d-flex justify-content-between align-items-center"
-          style={{ backgroundColor: '#EBEBEB', color: '#333' }}
+          className={`px-4 py-3 d-flex justify-content-between align-items-center ${styles.pagination}`}
         >
           <div className="d-flex align-items-center gap-2">
             <span>Items per page:</span>
             {onPageSizeChange ? (
-              <select
-                value={pageSize}
+              <Select
+                aria-label="Items per page"
                 data-testid="datatable-page-size-select"
-                onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                className="form-select form-select-sm"
-                style={{
-                  width: '70px',
-                  display: 'inline-block',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  fontWeight: '500',
-                }}
-              >
-                {pageSizeOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
+                size="small"
+                selectedKey={pageSize}
+                onSelectionChange={(key) => onPageSizeChange(Number(key))}
+                items={pageSizeOptions.map((opt) => ({ id: opt, label: String(opt) }))}
+              />
             ) : (
               <span className="fw-medium">{pageSize}</span>
             )}
@@ -136,47 +144,41 @@ export function DataTable<T>({
             <div className="d-flex align-items-center gap-1">
               <span>{currentPage}</span>
               {onPageChange && totalPages > 1 && (
-                <select
-                  value={currentPage}
+                <Select
+                  aria-label="Page"
                   data-testid="datatable-page-select-select"
-                  onChange={(e) => onPageChange(Number(e.target.value))}
-                  className="form-select form-select-sm"
-                  style={{
-                    width: '50px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    padding: '0 10px 0 0',
-                  }}
-                >
-                  {[...Array(totalPages)].map((_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      {i + 1}
-                    </option>
-                  ))}
-                </select>
+                  size="small"
+                  selectedKey={currentPage}
+                  onSelectionChange={(key) => onPageChange(Number(key))}
+                  items={[...Array(totalPages)].map((_, i) => ({ id: i + 1, label: String(i + 1) }))}
+                />
               )}
               <span>of {totalPages} page(s)</span>
             </div>
 
             <div className="d-flex gap-2">
-              <button
-                onClick={() => onPageChange && onPageChange(currentPage - 1)}
+              <Button
+                variant="tertiary"
+                size="small"
+                isIconButton
+                onPress={() => onPageChange && onPageChange(currentPage - 1)}
                 data-testid="datatable-prev-page-button"
-                disabled={currentPage === 1}
-                className="btn btn-link p-0 text-dark"
-                style={{ textDecoration: 'none', opacity: currentPage === 1 ? 0.5 : 1 }}
+                aria-label="Previous page"
+                isDisabled={currentPage === 1}
               >
-                &lt;
-              </button>
-              <button
-                onClick={() => onPageChange && onPageChange(currentPage + 1)}
+                <FaChevronLeft />
+              </Button>
+              <Button
+                variant="tertiary"
+                size="small"
+                isIconButton
+                onPress={() => onPageChange && onPageChange(currentPage + 1)}
                 data-testid="datatable-next-page-button"
-                disabled={currentPage === totalPages}
-                className="btn btn-link p-0 text-dark"
-                style={{ textDecoration: 'none', opacity: currentPage === totalPages ? 0.5 : 1 }}
+                aria-label="Next page"
+                isDisabled={currentPage === totalPages}
               >
-                &gt;
-              </button>
+                <FaChevronRight />
+              </Button>
             </div>
           </div>
         </div>

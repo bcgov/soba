@@ -52,8 +52,8 @@
       "name": "SOBA Frontend (Chrome)",
       "type": "chrome",
       "request": "launch",
-      "url": "http://localhost:5173",
-      "webRoot": "${workspaceFolder}/frontend/src"
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}/frontend"
     }
   ]
 }

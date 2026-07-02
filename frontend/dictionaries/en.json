@@ -2,52 +2,67 @@
   "locale": "en",
   "general": {
     "login": "Login",
-    "loggedAs": "Logged in as",
     "logout": "Logout",
-    "title": "CHEFS 2",
+    "title": "Common Hosted Forms 2.0",
     "description": "Next Gen Forms",
     "notAuthenticated": "You are not authenticated. Please login to access this section.",
     "forms": "Forms",
+    "formDesigner": "Form Designer",
     "feedback": "Feedback",
     "help": "Help",
-    "welcomeTo": "Welcome to"
+    "welcomeTo": "Welcome to",
+    "loading": "Loading…",
+    "sessionError": "We couldn't load your session. Please try again.",
+    "tryAgain": "Try again",
+    "comingSoon": "This feature is coming soon.",
+    "selectWorkspace": "Select a workspace to view forms.",
+    "workspaceSwitchError": "Failed to switch workspace."
+  },
+  "onboarding": {
+    "heading": "Welcome",
+    "placeholder": "Workspace onboarding information will appear here."
+  },
+  "workspaces": {
+    "tableHeading": "Workspaces",
+    "manageHeading": "Manage Workspace",
+    "createHeading": "Create Workspace",
+    "nameLabel": "Name",
+    "save": "Save",
+    "create": "Create",
+    "cancel": "Cancel",
+    "createAction": "Create",
+    "saveError": "Failed to save workspace.",
+    "createError": "Failed to create workspace.",
+    "loadError": "Failed to load workspace.",
+    "manageForbidden": "Only workspace owners or admins can manage this workspace.",
+    "createForbidden": "Only BC Government identity provider users can create workspaces.",
+    "defaultWorkspaceFormLabel": "Set as default workspace",
+    "empty": "No workspaces found matching your criteria.",
+    "active": "Active",
+    "columns": {
+      "name": "Name",
+      "actions": "Actions",
+      "roles": "Roles",
+      "default": "Default"
+    },
+    "actions": {
+      "manage": "Manage",
+      "forms": "Forms"
+    },
+    "defaultWorkspaceLabel": "Set {name} as default workspace",
+    "defaultWorkspaceError": "Failed to update default workspace."
   },
   "header": {
     "workspaces": "Workspaces",
     "design": "Design",
     "submit": "Submit",
-    "metaReview": "API meta",
-    "themeToggle": "Toggle color theme",
     "skipToMain": "Skip to main content",
     "designer": "Designer",
-    "menu": "Menu",
-    "closeMenu": "Close Menu",
-    "mobileNavLabel": "Navigation",
-    "openMenuAria": "Open navigation menu",
-    "closeMenuAria": "Close navigation menu"
-  },
-  "metaPage": {
-    "title": "API meta & health",
-    "refresh": "Refresh",
-    "loadCodes": "Load reference codes",
-    "loadRoles": "Load roles",
-    "sections": {
-      "health": "Health",
-      "readiness": "Readiness",
-      "build": "Build",
-      "features": "Features",
-      "frontendConfig": "Frontend config",
-      "plugins": "Plugins",
-      "formEngines": "Form engines",
-      "codes": "Reference codes",
-      "roles": "Roles"
-    }
-  },
-  "base": {
-    "copyToClipboard": {
-      "copyToClipboard": "Copy to Clipboard",
-      "linkToClipboard": "Link copied to clipboard!",
-      "errCopyToClipboard": "Error copying to clipboard."
+    "selectLanguage": "Select Language",
+    "selectWorkspace": "Select Workspace",
+    "languages": {
+      "en": "EN",
+      "fr": "FR"
     }
   },
   "formioV5": {
@@ -55,9 +70,6 @@
       "tableHeading": "Forms",
       "loading": "Loading forms…",
       "empty": "No forms were returned from the Form.io proxy. Create a form in Form.io or check API configuration.",
-      "refresh": "Refresh",
-      "needLogin": "Sign in to load forms.",
-      "unauthorized": "Unauthorized — your session may have expired. Try signing in again.",
       "columns": {
         "title": "Title",
         "name": "Name",
@@ -79,58 +91,30 @@
       "submitSuccess": "Form submitted successfully."
     }
   },
-  "forms": {
-    "manage": {
-      "share": {
-        "shareForm": "Share Form",
-        "shareLink": "Share Link",
-        "copyQRCode": "Copy the link or scan the QR code to share this form.",
-        "warningMessage": "This form has not been published. The link will not work until the form is published.",
-        "copyURLToClipboard": "Copy URL to Clipboard",
-        "openThisForm": "Open this form",
-        "downloadQRCode": "Download QR Code",
-        "close": "Close"
-      }
-    }
-  },
   "form": {
     "saved": "Form saved successfully.",
     "saveError": "Error saving form.",
+    "noActiveWorkspace": "Select a workspace before creating a form.",
+    "noActiveWorkspaceError": "Select a workspace before saving this form.",
+    "published": "Form published successfully!",
+    "versionDraftCreated": "Version {version} draft created successfully!",
+    "createVersionError": "Failed to create new version.",
+    "loadFormError": "Failed to load form:",
+    "loadVersionSchemaError": "Failed to load version schema.",
+    "invalidJson": "Invalid JSON format.",
     "nameLabel": "Form Name",
-    "namePlaceholder": "Enter form name",
-    "slugLabel": "Form Slug",
-    "slugPlaceholder": "Enter form slug",
-    "descriptionLabel": "Description",
-    "descriptionPlaceholder": "Enter form description",
     "loading": "Loading form...",
     "schemaNotAvailable": "Form schema not available.",
-    "edit": "Edit",
-    "input": "Submit Data",
     "notAuthenticated": "You are not authenticated. Please login to access this form.",
     "visibilityLabel": "Visibility / Access Control",
-    "selectVisibility": "Select Visibility",
     "visibilityPublic": "Public",
     "visibilityAzureIDIR": "IDIR - MFA",
     "disclaimerLabel": "I agree to the disclaimer and statement of responsibility",
-    "disclaimerTitle": "Disclaimer",
-    "disclaimerText1": "It is your responsibility to comply with Privacy laws governing the collection, use and disclosure of personally identifiable information.",
-    "disclaimerText2": "Access to this form designer tool does not inherently grant permission to collect, use or disclose any personally identifiable information.",
-    "disclaimerText3": "It is your responsibility to obtain consent to collect information as required by law.",
-    "disclaimerText4": "If you use BCeID or BC Services Card as form access options, you MUST notify the Identity Information Management (IDIM) team by email (IDIM.Consulting@gov.bc.ca) your intent to leverage BCeID or BC Services Card.",
     "exportJson": "Export JSON",
     "importJson": "Import JSON",
-    "importSchema": "Import Schema",
-    "copiedToClipboard": "Copied to clipboard!",
-    "pasteSchema": "Paste your Form.io JSON schema here. This will replace the current form design.",
-    "pasteJsonPlaceholder": "Paste JSON here...",
-    "cancel": "Cancel",
-    "close": "Close",
     "designerTab": "Designer",
     "settingsTab": "Settings",
     "teamTab": "Team",
-    "settingsPlaceholder": "Form settings will be available here.",
-    "teamManagement": "Team Management",
-    "teamPlaceholder": "Team management tools will be available here.",
     "readOnlyMode": "Read-Only Mode:",
     "viewingHistoricalVersion": "You are viewing historical version",
     "savePublishDisabled": "Save and Publish options are disabled.",
@@ -154,17 +138,14 @@
     "formPreview": "Form Preview",
     "untitledForm": "Untitled Form",
     "closePreview": "Close Preview",
-    "noFormLayout": "No form layout designed yet.",
-    "apiKey": "API Key",
-    "apiKeyPlaceholder": "Enter your api key"
+    "noFormLayout": "No form layout designed yet."
   },
   "submission": {
     "submissions": "Submissions",
+    "pageTitle": "Submission",
     "loading": "Loading submissions…",
     "empty": "No submissions in this workspace yet.",
     "error": "Could not load submissions.",
-    "refresh": "Refresh",
-    "view": "View",
     "submittedOn": "Submitted",
     "noContent": "No submitted answers to display.",
     "notFound": "Submission not found.",

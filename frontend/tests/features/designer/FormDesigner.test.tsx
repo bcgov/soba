@@ -16,6 +16,13 @@ vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({ locale: 'en', form: {} }),
 }));
 
+const { mockDispatch } = vi.hoisted(() => ({ mockDispatch: vi.fn() }));
+vi.mock('@/lib/store', () => ({
+  useAppSelector: (fn: (s: unknown) => unknown) =>
+    fn({ notification: { notifications: [] }, workspace: { activeWorkspaceId: 'ws1' } }),
+  useAppDispatch: () => mockDispatch,
+}));
+
 import FormDesigner from '@/src/features/designer/ui/FormDesigner';
 
 describe('FormDesigner', () => {
@@ -23,10 +30,10 @@ describe('FormDesigner', () => {
     vi.clearAllMocks();
   });
 
-  it('shows loading message when initializing', () => {
+  it('shows the loading indicator when initializing', () => {
     keycloakState = { authenticated: false, initializing: true };
     render(<FormDesigner onUpdateModel={() => {}} initialModel={null} />);
-    expect(screen.getByText('Loading Designer...')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
   it('shows login required when not authenticated', () => {

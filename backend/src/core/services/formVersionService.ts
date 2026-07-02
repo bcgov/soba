@@ -14,6 +14,8 @@ import { createFormEngineAdapter } from '../integrations/form-engine/FormEngineR
 import { db } from '../db/client';
 import { NotFoundError, ValidationError } from '../errors';
 
+const FORM_VERSION_NOT_FOUND = 'Form version not found';
+
 interface CreateDraftInput {
   workspaceId: string;
   actorId: string;
@@ -49,10 +51,11 @@ interface VersionActionInput {
 }
 
 interface ListInput {
-  workspaceId: string;
+  workspaceIds: string[];
   actorId: string;
   limit: number;
   formId?: string;
+  formVersionId?: string;
   state?: string;
   sort: FormVersionListSort;
   cursorMode: FormVersionCursorMode;
@@ -149,7 +152,7 @@ export class FormVersionService {
       return revised;
     });
 
-    if (!updated) throw new NotFoundError('Form version not found');
+    if (!updated) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
 
     return updated;
   }
@@ -159,7 +162,7 @@ export class FormVersionService {
       input.workspaceId,
       input.formVersionId,
     );
-    if (!version) throw new NotFoundError('Form version not found');
+    if (!version) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
     assertTransition(version.state, 'deleted');
     return updateFormVersionDraft(
       input.workspaceId,
@@ -171,7 +174,7 @@ export class FormVersionService {
 
   async publish(input: VersionActionInput) {
     const version = await getFormVersionById(input.workspaceId, input.formVersionId);
-    if (!version) throw new NotFoundError('Form version not found');
+    if (!version) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
     if (version.state === 'published') return version; // idempotent
     assertTransition(version.state, 'published');
     if (version.engineSyncStatus !== 'ready') {
@@ -200,7 +203,7 @@ export class FormVersionService {
 
   async unpublish(input: VersionActionInput) {
     const version = await getFormVersionById(input.workspaceId, input.formVersionId);
-    if (!version) throw new NotFoundError('Form version not found');
+    if (!version) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
     assertTransition(version.state, 'archived');
     return updateFormVersionDraft(
       input.workspaceId,
@@ -215,7 +218,7 @@ export class FormVersionService {
       input.workspaceId,
       input.formVersionId,
     );
-    if (!version) throw new NotFoundError('Form version not found');
+    if (!version) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
     assertTransition(version.state, 'draft');
     return updateFormVersionDraft(
       input.workspaceId,
@@ -237,7 +240,7 @@ export class FormVersionService {
     schema: Record<string, unknown>;
   }) {
     const version = await getFormVersionById(input.workspaceId, input.formVersionId);
-    if (!version) throw new NotFoundError('Form version not found');
+    if (!version) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
 
     const engineCode = await getFormEngineCodeForForm(input.workspaceId, version.formId);
     if (!engineCode) {

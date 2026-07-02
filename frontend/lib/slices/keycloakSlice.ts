@@ -2,7 +2,9 @@ import Keycloak from 'keycloak-js';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { AppDispatch } from '../store';
-import { loadFrontendRuntimeConfig } from '../runtimeConfig';
+import { clearWorkspaceState } from './workspaceSlice';
+import { loadFrontendRuntimeConfig } from '@/src/shared/config/runtimeConfig';
+import { disableFormioBrowserAuth } from '@/src/features/formio-v5/disableFormioBrowserAuth';
 
 // Keep the Keycloak instance out of Redux state (non-serializable).
 // Store it in a module-level variable instead.
@@ -44,7 +46,7 @@ export const initKeycloak = createAsyncThunk<InitResult, void, { rejectValue: st
       };
     }
 
-    delete localStorage.formioToken; // clear any stale token before init
+    disableFormioBrowserAuth();
     const runtimeConfig = await loadFrontendRuntimeConfig();
     const kc = new Keycloak({
       url: runtimeConfig.auth.keycloak.url,
@@ -68,8 +70,6 @@ export const initKeycloak = createAsyncThunk<InitResult, void, { rejectValue: st
       if (kc.idTokenParsed) {
         await kc.updateToken(30);
       }
-
-      localStorage.setItem('formioToken', kc.token ?? '');
 
       return {
         token: kc.token ?? undefined,
@@ -166,6 +166,8 @@ export const logout = () => (dispatch: AppDispatch) => {
     kc.logout();
   }
   kcInstance = null;
+  disableFormioBrowserAuth();
+  dispatch(clearWorkspaceState());
   dispatch(clear());
 };
 
@@ -178,7 +180,6 @@ export const refreshToken = () => async (dispatch: AppDispatch) => {
       dispatch(setToken(kc.token ?? undefined));
       dispatch(setIdTokenParsed(kc.idTokenParsed as Keycloak.KeycloakTokenParsed | undefined));
       dispatch(setAuthenticated(!!kc.authenticated));
-      localStorage.setItem('formioToken', kc.token ?? '');
     }
   } catch {
     // token refresh failed

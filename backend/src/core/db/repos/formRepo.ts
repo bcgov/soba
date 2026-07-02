@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, isNull, lt, or } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNull, lt, or } from 'drizzle-orm';
 import { db, type DbOrTx } from '../client';
 import { forms, formVersions } from '../schema';
 
@@ -6,8 +6,10 @@ export type FormListSort = 'id:desc' | 'updatedAt:desc';
 export type FormCursorMode = 'id' | 'ts_id';
 
 export interface ListFormsForWorkspaceInput {
-  workspaceId: string;
+  /** Workspace resolved from the list scope anchor. */
+  workspaceIds: string[];
   limit: number;
+  formId?: string;
   q?: string;
   status?: string;
   sort: FormListSort;
@@ -18,7 +20,6 @@ export interface ListFormsForWorkspaceInput {
 
 export interface FormListRow {
   id: string;
-  slug: string;
   name: string;
   status: string;
   createdAt: Date;
@@ -31,7 +32,6 @@ export interface FormRecord {
   id: string;
   workspaceId: string;
   formEngineCode: string;
-  slug: string;
   name: string;
   description: string | null;
   status: string;
@@ -48,7 +48,6 @@ interface CreateFormInput {
   actorId: string;
   actorDisplayLabel: string | null;
   formEngineCode: string;
-  slug: string;
   name: string;
   description?: string;
 }
@@ -58,7 +57,6 @@ interface UpdateFormInput {
   actorId: string;
   actorDisplayLabel: string | null;
   formId: string;
-  slug?: string;
   name?: string;
   description?: string | null;
   status?: string;
@@ -67,15 +65,22 @@ interface UpdateFormInput {
 export const listFormsForWorkspace = async (
   input: ListFormsForWorkspaceInput,
 ): Promise<{ items: FormListRow[]; hasMore: boolean }> => {
-  const whereClauses = [eq(forms.workspaceId, input.workspaceId), isNull(forms.deletedAt)];
+  if (input.workspaceIds.length === 0) {
+    return { items: [], hasMore: false };
+  }
+  const whereClauses = [inArray(forms.workspaceId, input.workspaceIds), isNull(forms.deletedAt)];
 
   if (input.status) {
     whereClauses.push(eq(forms.status, input.status));
   }
 
+  if (input.formId) {
+    whereClauses.push(eq(forms.id, input.formId));
+  }
+
   if (input.q) {
     const searchPattern = `%${input.q}%`;
-    whereClauses.push(or(ilike(forms.name, searchPattern), ilike(forms.slug, searchPattern)));
+    whereClauses.push(ilike(forms.name, searchPattern));
   }
 
   if (input.cursorMode === 'id' && input.afterId) {
@@ -94,7 +99,6 @@ export const listFormsForWorkspace = async (
   const rows = await db
     .select({
       id: forms.id,
-      slug: forms.slug,
       name: forms.name,
       status: forms.status,
       createdAt: forms.createdAt,
@@ -140,7 +144,6 @@ export const getFormByEngineSchemaRef = async (
       id: forms.id,
       workspaceId: forms.workspaceId,
       formEngineCode: forms.formEngineCode,
-      slug: forms.slug,
       name: forms.name,
       description: forms.description,
       status: forms.status,
@@ -173,7 +176,6 @@ export const createForm = async (input: CreateFormInput, tx?: DbOrTx): Promise<F
     .values({
       workspaceId: input.workspaceId,
       formEngineCode: input.formEngineCode,
-      slug: input.slug,
       name: input.name,
       description: input.description,
       status: 'active',
@@ -189,7 +191,6 @@ export const updateForm = async (input: UpdateFormInput): Promise<FormRecord | n
   const updated = await db
     .update(forms)
     .set({
-      slug: input.slug,
       name: input.name,
       description: input.description,
       status: input.status,
@@ -226,6 +227,31 @@ export const markFormDeleted = async (
     .returning();
 
   return updated[0] ?? null;
+};
+
+/**
+ * Resolve list-scope context for a form by id alone. Returns null for missing/deleted forms.
+ */
+export const getFormListContext = async (
+  formId: string,
+): Promise<{ workspaceId: string } | null> => {
+  const row = await db
+    .select({ workspaceId: forms.workspaceId })
+    .from(forms)
+    .where(and(eq(forms.id, formId), isNull(forms.deletedAt)))
+    .limit(1);
+
+  return row[0] ?? null;
+};
+
+/**
+ * Resolve the workspace that owns a form, by form id alone. Used to derive request workspace
+ * context for deep links. Neutral: returns null for missing/deleted forms (caller maps to 404);
+ * access is still enforced downstream via membership.
+ */
+export const getWorkspaceIdForForm = async (formId: string): Promise<string | null> => {
+  const context = await getFormListContext(formId);
+  return context?.workspaceId ?? null;
 };
 
 export const getFormEngineCodeForForm = async (

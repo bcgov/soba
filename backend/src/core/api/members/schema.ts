@@ -1,6 +1,7 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import { CursorSortSchema } from '../shared/pagination';
+import { workspaceIdQueryField } from '../shared/schema';
 
 extendZodWithOpenApi(z);
 
@@ -16,6 +17,7 @@ export const MemberItemSchema = z
 
 export const ListMembersQuerySchema = z
   .object({
+    workspaceId: workspaceIdQueryField,
     limit: z.coerce.number().int().min(1).max(100).default(20),
     cursor: z.string().min(1).optional(),
     role: z.string().trim().min(1).optional(),

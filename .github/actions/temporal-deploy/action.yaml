@@ -1,0 +1,94 @@
+name: Deploy Shared Temporal
+description: >-
+  Idempotently install or upgrade the shared, namespace-scoped Temporal server and
+  ensure a Temporal namespace exists. Includes stale-credential recovery for the
+  Temporal control plane after a Postgres secret rotation.
+
+inputs:
+  namespace:
+    description: OpenShift namespace to deploy the shared Temporal server into.
+    required: true
+  temporal_namespace:
+    description: Temporal namespace to ensure exists (e.g. soba-pr-45 or soba-dev).
+    required: true
+  retention:
+    description: Retention period for the Temporal namespace.
+    required: false
+    default: "3d"
+  chart_version:
+    description: Temporal Helm chart version.
+    required: false
+    default: "0.74.0"
+  values_file:
+    description: Path to the Temporal Helm values file.
+    required: false
+    default: deployments/helm/temporal/values.yaml
+
+runs:
+  using: composite
+  steps:
+    - name: Deploy shared Temporal (idempotent)
+      shell: bash
+      env:
+        NAMESPACE: ${{ inputs.namespace }}
+        TEMPORAL_CHART_VERSION: ${{ inputs.chart_version }}
+        VALUES_FILE: ${{ inputs.values_file }}
+      run: |
+        set -euo pipefail
+
+        helm upgrade --install temporal temporal \
+          --repo https://go.temporal.io/helm-charts \
+          --version "${TEMPORAL_CHART_VERSION}" \
+          --namespace "${NAMESPACE}" \
+          --timeout 900s \
+          -f "${VALUES_FILE}"
+
+        # Surface real schema-job failures instead of masking them. Completed jobs
+        # may already be gone (TTL/hook cleanup), so only wait when jobs exist.
+        echo "Checking for Temporal schema jobs..."
+        SCHEMA_JOBS="$(oc get job -l app.kubernetes.io/instance=temporal -n "${NAMESPACE}" -o name || true)"
+        if [ -n "${SCHEMA_JOBS}" ]; then
+          echo "Waiting for schema jobs to complete..."
+          oc wait --for=condition=complete job \
+            -l app.kubernetes.io/instance=temporal \
+            -n "${NAMESPACE}" --timeout=600s
+        else
+          echo "No schema jobs present; skipping wait."
+        fi
+
+        echo "Waiting for Temporal frontend..."
+        oc rollout status deployment/temporal-frontend -n "${NAMESPACE}" --timeout=300s
+
+        echo "Waiting for Temporal admintools..."
+        oc rollout status deployment/temporal-admintools -n "${NAMESPACE}" --timeout=300s
+
+    - name: Ensure Temporal namespace exists (with stale-credential recovery)
+      shell: bash
+      env:
+        NAMESPACE: ${{ inputs.namespace }}
+        TEMPORAL_NS: ${{ inputs.temporal_namespace }}
+        RETENTION: ${{ inputs.retention }}
+      run: |
+        set -euo pipefail
+
+        ensure_namespace() {
+          oc exec deployment/temporal-admintools -n "${NAMESPACE}" -- \
+            sh -c "temporal operator namespace describe -n ${TEMPORAL_NS} 2>/dev/null || \
+                   temporal operator namespace create -n ${TEMPORAL_NS} --retention ${RETENTION}"
+        }
+
+        if ensure_namespace; then
+          echo "Temporal namespace ${TEMPORAL_NS} is ready."
+          exit 0
+        fi
+
+        # A failure here usually means the control plane is serving with stale DB
+        # credentials after a Postgres secret rotation (pq: password authentication
+        # failed -> Web UI 503). Restart the affected components and retry.
+        echo "Temporal control plane unhealthy; restarting frontend and matching to clear stale credentials..."
+        oc rollout restart deployment/temporal-frontend deployment/temporal-matching -n "${NAMESPACE}"
+        oc rollout status deployment/temporal-frontend -n "${NAMESPACE}" --timeout=300s
+        oc rollout status deployment/temporal-matching -n "${NAMESPACE}" --timeout=300s
+
+        echo "Retrying Temporal namespace ensure..."
+        ensure_namespace

@@ -1,6 +1,5 @@
 import { getDictionary, resolveLocale } from '../dictionaries';
 import FormList from '@/src/features/designer/ui/FormList';
-import { AuthRedirect } from '@/src/app/ui/AuthRedirect';
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 
@@ -18,20 +17,16 @@ export async function generateMetadata({ params }: PageProps) {
   };
 }
 
-export default async function Page({ params }: PageProps) {
+export default async function Page() {
   const featuresMeta = await loadFeaturesMeta();
   const isFeatureAllowed = createIsFeatureAllowed(featuresMeta);
 
-  const param = await params;
-  const locale = resolveLocale(param.lang);
   return (
-    <AuthRedirect to={`/${locale}`} ifLogged={false}>
-      <div>
-        <FormList
-          designModeEnabled={isFeatureAllowed(FEATURE_CODES.DESIGN_MODE)}
-          submitModeEnabled={isFeatureAllowed(FEATURE_CODES.SUBMIT_MODE)}
-        />
-      </div>
-    </AuthRedirect>
+    <section aria-labelledby="forms-heading">
+      <FormList
+        designModeEnabled={isFeatureAllowed(FEATURE_CODES.DESIGN_MODE)}
+        submitModeEnabled={isFeatureAllowed(FEATURE_CODES.SUBMIT_MODE)}
+      />
+    </section>
   );
 }

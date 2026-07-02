@@ -2,52 +2,67 @@
   "locale": "fr",
   "general": {
     "login": "Connecter",
-    "loggedAs": "Connecter á",
     "logout": "Déconnexion",
-    "title": "CHEFS 2",
+    "title": "Common Hosted Forms 2.0",
     "description": "Formulaires de Nouvelle Génération",
     "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à cette section.",
     "forms": "Formulaires",
+    "formDesigner": "Concepteur de formulaires",
     "feedback": "Retour d'information",
     "help": "Aidé",
-    "welcomeTo": "Bienvenue sur"
+    "welcomeTo": "Bienvenue sur",
+    "loading": "Chargement…",
+    "sessionError": "Nous n'avons pas pu charger votre session. Veuillez réessayer.",
+    "tryAgain": "Réessayer",
+    "comingSoon": "Cette fonctionnalité sera bientôt disponible.",
+    "selectWorkspace": "Sélectionnez un espace de travail pour afficher les formulaires.",
+    "workspaceSwitchError": "Échec du changement d'espace de travail."
+  },
+  "onboarding": {
+    "heading": "Bienvenue",
+    "placeholder": "Les informations d'intégration aux espaces de travail apparaîtront ici."
+  },
+  "workspaces": {
+    "tableHeading": "Espaces de travail",
+    "manageHeading": "Gérer l'espace de travail",
+    "createHeading": "Créer un espace de travail",
+    "nameLabel": "Nom",
+    "save": "Enregistrer",
+    "create": "Créer",
+    "cancel": "Annuler",
+    "createAction": "Créer",
+    "saveError": "Échec de l'enregistrement de l'espace de travail.",
+    "createError": "Échec de la création de l'espace de travail.",
+    "loadError": "Échec du chargement de l'espace de travail.",
+    "manageForbidden": "Seuls les propriétaires ou administrateurs peuvent gérer cet espace de travail.",
+    "createForbidden": "Seuls les utilisateurs du fournisseur d'identité du gouvernement de la C.-B. peuvent créer des espaces de travail.",
+    "defaultWorkspaceFormLabel": "Définir comme espace de travail par défaut",
+    "empty": "Aucun espace de travail ne correspond à vos critères.",
+    "active": "Actif",
+    "columns": {
+      "name": "Nom",
+      "actions": "Actions",
+      "roles": "Rôles",
+      "default": "Par défaut"
+    },
+    "actions": {
+      "manage": "Gérer",
+      "forms": "Formulaires"
+    },
+    "defaultWorkspaceLabel": "Définir {name} comme espace de travail par défaut",
+    "defaultWorkspaceError": "Échec de la mise à jour de l'espace de travail par défaut."
   },
   "header": {
     "workspaces": "Espaces de travail",
     "design": "Conception",
     "submit": "Soumettre",
-    "metaReview": "Méta API",
-    "themeToggle": "Basculer le theme de couleur",
     "skipToMain": "Aller au contenu principal",
     "designer": "Générateur de Formulaire",
-    "menu": "Menu",
-    "closeMenu": "Fermer le menu",
-    "mobileNavLabel": "Navigation",
-    "openMenuAria": "Ouvrir le menu de navigation",
-    "closeMenuAria": "Fermer le menu de navigation"
-  },
-  "metaPage": {
-    "title": "Méta API et santé",
-    "refresh": "Actualiser",
-    "loadCodes": "Charger les codes de référence",
-    "loadRoles": "Charger les rôles",
-    "sections": {
-      "health": "Santé",
-      "readiness": "Disponibilité",
-      "build": "Build",
-      "features": "Fonctionnalités",
-      "frontendConfig": "Config frontale",
-      "plugins": "Plugins",
-      "formEngines": "Moteurs de formulaire",
-      "codes": "Codes de référence",
-      "roles": "Rôles"
-    }
-  },
-  "base": {
-    "copyToClipboard": {
-      "copyToClipboard": "Copier dans le presse-papiers",
-      "linkToClipboard": "Lien copié dans le presse-papiers!",
-      "errCopyToClipboard": "Erreur lors de la copie dans le presse-papiers."
+    "selectLanguage": "Choisir la langue",
+    "selectWorkspace": "Choisir l'espace de travail",
+    "languages": {
+      "en": "EN",
+      "fr": "FR"
     }
   },
   "formioV5": {
@@ -55,9 +70,6 @@
       "tableHeading": "Formulaires",
       "loading": "Chargement des formulaires…",
       "empty": "Aucun formulaire renvoyé par le proxy Form.io. Créez un formulaire dans Form.io ou vérifiez la configuration de l’API.",
-      "refresh": "Actualiser",
-      "needLogin": "Connectez-vous pour charger les formulaires.",
-      "unauthorized": "Non autorisé — la session a peut-être expiré. Reconnectez-vous.",
       "columns": {
         "title": "Titre",
         "name": "Nom",
@@ -79,58 +91,30 @@
       "submitSuccess": "Formulaire soumis avec succès."
     }
   },
-  "forms": {
-    "manage": {
-      "share": {
-        "shareForm": "Partager le Formulaire",
-        "shareLink": "Lien de Partage",
-        "copyQRCode": "Copiez le lien ou scannez le code QR pour partager ce formulaire.",
-        "warningMessage": "Ce formulaire n'a pas été publié. Le lien ne fonctionnera pas tant que le formulaire n'est pas publié.",
-        "copyURLToClipboard": "Copier l'URL dans le presse-papiers",
-        "openThisForm": "Ouvrir ce formulaire",
-        "downloadQRCode": "Télécharger le code QR",
-        "close": "Fermer"
-      }
-    }
-  },
   "form": {
     "saved": "Formulaire enregistré avec succès.",
     "saveError": "Erreur lors de l'enregistrement du formulaire.",
+    "noActiveWorkspace": "Sélectionnez un espace de travail avant de créer un formulaire.",
+    "noActiveWorkspaceError": "Sélectionnez un espace de travail avant d'enregistrer ce formulaire.",
+    "published": "Formulaire publié avec succès !",
+    "versionDraftCreated": "Brouillon de la version {version} créé avec succès !",
+    "createVersionError": "Échec de la création d'une nouvelle version.",
+    "loadFormError": "Échec du chargement du formulaire :",
+    "loadVersionSchemaError": "Échec du chargement du schéma de version.",
+    "invalidJson": "Format JSON invalide.",
     "nameLabel": "Nom du Formulaire",
-    "namePlaceholder": "Entrez le nom du formulaire",
-    "slugLabel": "Slug du Formulaire",
-    "slugPlaceholder": "Entrez le slug du formulaire",
-    "descriptionLabel": "Description",
-    "descriptionPlaceholder": "Entrez la description du formulaire",
     "loading": "Chargement du formulaire...",
     "schemaNotAvailable": "Schéma du formulaire non disponible.",
-    "edit": "Modifier",
-    "input": "Soumettre les données",
     "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à ce formulaire.",
     "visibilityLabel": "Visibilité / Contrôle d'accès",
-    "selectVisibility": "Sélectionner la visibilité",
     "visibilityPublic": "Publique",
     "visibilityAzureIDIR": "IDIR - MFA",
     "disclaimerLabel": "J'accepte l'avis de non-responsabilité et la déclaration de responsabilité",
-    "disclaimerTitle": "Avis de non-responsabilité",
-    "disclaimerText1": "Il est de votre responsabilité de vous conformer aux lois sur la protection de la vie privée régissant la collecte, l'utilisation et la divulgation d'informations personnellement identifiables.",
-    "disclaimerText2": "L'accès à cet outil de conception de formulaires n'accorde pas intrinsèquement l'autorisation de collecter, d'utiliser ou de divulguer des informations personnellement identifiables.",
-    "disclaimerText3": "Il est de votre responsabilité d'obtenir le consentement pour recueillir des informations comme l'exige la loi.",
-    "disclaimerText4": "Si vous utilisez BCeID ou BC Services Card comme options d'accès au formulaire, vous DEVEZ aviser l'équipe de gestion des informations d'identité (IDIM) par courriel (IDIM.Consulting@gov.bc.ca) de votre intention d'utiliser BCeID ou BC Services Card.",
     "exportJson": "Exporter JSON",
     "importJson": "Importer JSON",
-    "importSchema": "Importer le schéma",
-    "copiedToClipboard": "Copié dans le presse-papiers !",
-    "pasteSchema": "Collez votre schéma JSON Form.io ici. Cela remplacera la conception actuelle du formulaire.",
-    "pasteJsonPlaceholder": "Collez le JSON ici...",
-    "cancel": "Annuler",
-    "close": "Fermer",
     "designerTab": "Concepteur",
     "settingsTab": "Paramètres",
     "teamTab": "Équipe",
-    "settingsPlaceholder": "Les paramètres du formulaire seront disponibles ici.",
-    "teamManagement": "Gestion d'équipe",
-    "teamPlaceholder": "Les outils de gestion d'équipe seront disponibles ici.",
     "readOnlyMode": "Mode lecture seule :",
     "viewingHistoricalVersion": "Vous consultez la version historique",
     "savePublishDisabled": "Les options Sauvegarder et Publier sont désactivées.",
@@ -154,17 +138,14 @@
     "formPreview": "Aperçu du formulaire",
     "untitledForm": "Formulaire sans titre",
     "closePreview": "Fermer l'aperçu",
-    "noFormLayout": "Aucune mise en page de formulaire n'a encore été conçue.",
-    "apiKey": "Clé API",
-    "apiKeyPlaceholder": "Entrez votre clé API"
+    "noFormLayout": "Aucune mise en page de formulaire n'a encore été conçue."
   },
   "submission": {
     "submissions": "Soumissions",
+    "pageTitle": "Soumission",
     "loading": "Chargement des soumissions…",
     "empty": "Aucune soumission dans cet espace pour l’instant.",
     "error": "Impossible de charger les soumissions.",
-    "refresh": "Actualiser",
-    "view": "Voir",
     "submittedOn": "Soumis le",
     "noContent": "Aucune réponse soumise à afficher.",
     "notFound": "Soumission introuvable.",

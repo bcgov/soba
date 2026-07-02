@@ -1,13 +1,7 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import React from 'react';
+import { clientOnly } from '@/src/shared/ui/clientOnly';
 
-const FormForm = dynamic(() => import('./FormForm'), {
-  ssr: false,
-  loading: () => <div className="p-10 text-center">Loading Form Designer...</div>,
-});
+const FormDesignerLoader = clientOnly(() => import('./FormForm'));
 
-export default function FormDesignerLoader({ id }: { id?: string[] }) {
-  return <FormForm id={id} />;
-}
+export default FormDesignerLoader;

@@ -7,6 +7,7 @@ import {
 import { PluginConfigReader } from '../../core/config/pluginConfig';
 import { ValidationError } from '../../core/errors';
 import { getAuthenticatedFormioClient } from './formioV5Client';
+import { normalizeSchema as normalizeFormioSchema } from './normalizeSchema';
 
 export interface FormioV5Config {
   apiBaseUrl: string;
@@ -33,19 +34,22 @@ const loadConfig = (config: PluginConfigReader): FormioV5Config => {
 /** Deterministic Form.io identity for a SOBA form version (unique per project; the idempotency key). */
 const sobaEngineName = (formVersionId: string): string => `soba-${formVersionId}`;
 
+/** Normalize an existing `tags` value (array or comma-separated string) to trimmed candidate tokens. */
+function extractTagCandidates(existing: unknown): string[] {
+  if (Array.isArray(existing)) {
+    return existing.map((t) => (t == null ? '' : String(t).trim()));
+  }
+  if (typeof existing === 'string') {
+    return existing.split(',').map((part) => part.trim());
+  }
+  return [];
+}
+
 /** Tenancy tags: always include `soba` and the workspace id; preserve any existing tags. */
 function mergeSobaWorkspaceTags(existing: unknown, workspaceId: string): string[] {
   const out = new Set<string>(['soba', workspaceId]);
-  if (Array.isArray(existing)) {
-    for (const t of existing) {
-      const s = t == null ? '' : String(t).trim();
-      if (s) out.add(s);
-    }
-  } else if (typeof existing === 'string' && existing.trim()) {
-    for (const part of existing.split(',')) {
-      const s = part.trim();
-      if (s) out.add(s);
-    }
+  for (const candidate of extractTagCandidates(existing)) {
+    if (candidate) out.add(candidate);
   }
   return [...out];
 }
@@ -218,6 +222,11 @@ export class FormioEngineAdapter implements FormEngineAdapter {
       throw new Error('Form.io admin client unavailable; cannot delete form schema');
     }
     await client.deleteForm(engineRef);
+  }
+
+  /** Normalize a schema (import or export) to a clean, portable, builder-ready form definition. */
+  normalizeSchema(schema: Record<string, unknown>): Record<string, unknown> {
+    return normalizeFormioSchema(schema);
   }
 
   /**

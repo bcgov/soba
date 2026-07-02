@@ -9,4 +9,16 @@ export type CurrentUserResponse = {
     email: string | null;
     preferredUsername: string | null;
   };
+  preferences: {
+    defaultWorkspaceId: string | null;
+  };
+  capabilities: {
+    canCreateWorkspace: boolean;
+  };
+};
+
+export type PatchCurrentUserBody = {
+  preferences: {
+    defaultWorkspaceId?: string | null;
+  };
 };

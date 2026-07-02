@@ -18,6 +18,7 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "deployments/**"
+      - "sonar-project.properties"
 
 permissions: {}
 
@@ -84,6 +85,14 @@ jobs:
           insecure_skip_tls_verify: true
           namespace: ${{ secrets.OC_NAMESPACE }}
 
+      - name: Deploy shared Temporal and ensure dev namespace
+        uses: ./.github/actions/temporal-deploy
+        with:
+          namespace: ${{ secrets.OC_NAMESPACE }}
+          temporal_namespace: soba-dev
+          retention: "7d"
+          chart_version: ${{ vars.TEMPORAL_CHART_VERSION || '0.74.0' }}
+
       - name: Get DB config from Crunchy secret
         id: db
         env:
@@ -125,11 +134,18 @@ jobs:
             image:
               repository: "ghcr.io/${REPO_LC}/frontend"
               tag: "${TAG}"
+          temporalWorker:
+            image:
+              repository: "ghcr.io/${REPO_LC}/temporal-worker"
+              tag: "${TAG}"
           global:
             domain: "${DOMAIN}"
           database:
             existingSecretName: "${{ steps.db.outputs.secret_name }}"
             existingSecretKey: "uri"
+          temporal:
+            address: "temporal-frontend.${NAMESPACE}.svc.cluster.local:7233"
+            namespace: "soba-dev"
           OVERRIDE
 
           # Pipeline performance fix: Revert if needed.
@@ -160,6 +176,9 @@ jobs:
 
           echo "Waiting for mongodb rollout..."
           oc rollout status statefulset/soba-dev-mongodb -n "${NAMESPACE}" --timeout=300s
+
+          echo "Waiting for temporal-worker rollout..."
+          oc rollout status deployment/soba-dev-temporal-worker -n "${NAMESPACE}" --timeout=300s
 
       # Pipeline performance fix: Revert if needed.
       # Temporarily disabled openshift diagnostics; uncomment to restore.

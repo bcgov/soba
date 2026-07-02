@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../client';
+import { IdpGroups } from '../codes';
 import { idpGroupMembers, idpGroups } from '../schema';
 
 export interface IdpGroupRow {
@@ -18,6 +19,14 @@ export const listGroupsForIdp = async (idpCode: string): Promise<string[]> => {
     .from(idpGroupMembers)
     .where(eq(idpGroupMembers.identityProviderCode, normalized));
   return rows.map((r) => r.groupCode);
+};
+
+/** True when the identity provider belongs to the BC Government IDP group. */
+export const canCreateWorkspaceByIdp = async (
+  idpCode: string | null | undefined,
+): Promise<boolean> => {
+  const groups = await listGroupsForIdp(idpCode ?? '');
+  return groups.includes(IdpGroups.bcgov);
 };
 
 /** All IDP groups (for meta / UI). */

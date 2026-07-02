@@ -1,8 +1,11 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
+import { I18nProvider } from 'react-aria-components';
 import makeStore from '@/lib/store';
+import { setActiveWorkspaceId } from '@/lib/slices/workspaceSlice';
+import { setWorkspaceResolvedListener } from '@/src/shared/workspace/workspaceSync';
 import { getDictionary } from '@/app/[lang]/dictionaries';
 import { NotificationToast } from '@/app/ui/base/NotificationToast';
 
@@ -12,20 +15,42 @@ const DictionaryContext = React.createContext<Dictionary | null>(null);
 
 export default function AppProviders({
   dictionary,
+  locale,
   children,
 }: {
   dictionary: Dictionary;
+  locale: string;
   children: React.ReactNode;
 }) {
   const store = useMemo(() => makeStore(), []);
 
+  // sobaFetch can't import the store (would create an import cycle), so it notifies
+  // through a registry. Mirror the backend-resolved workspace into Redux here.
+  useEffect(() => {
+    setWorkspaceResolvedListener((workspaceId) => {
+      store.dispatch(setActiveWorkspaceId(workspaceId));
+    });
+    return () => setWorkspaceResolvedListener(null);
+  }, [store]);
+
+  // The root layout renders a static `<html lang="en">` (it sits above the
+  // `[lang]` segment and can't know the locale). Keep the document language in
+  // sync with the active locale so assistive tech announces `/fr` pages in French.
+  useEffect(() => {
+    if (locale) {
+      document.documentElement.lang = locale;
+    }
+  }, [locale]);
+
   return (
-    <DictionaryContext.Provider value={dictionary}>
-      <Provider store={store}>
-        {children}
-        <NotificationToast />
-      </Provider>
-    </DictionaryContext.Provider>
+    <I18nProvider locale={locale}>
+      <DictionaryContext.Provider value={dictionary}>
+        <Provider store={store}>
+          {children}
+          <NotificationToast />
+        </Provider>
+      </DictionaryContext.Provider>
+    </I18nProvider>
   );
 }
 

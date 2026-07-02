@@ -1,4 +1,5 @@
 import { SubmissionView } from '@/src/features/submit-mode/ui/SubmissionView';
+import { DsPageHeading } from '@/app/ui/DsPageHeading';
 import { getDictionary, hasLocale, Locale } from '../../dictionaries';
 import { notFound } from 'next/navigation';
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
@@ -15,7 +16,7 @@ export async function generateMetadata({ params }: PageProps) {
   }
   const dict = await getDictionary(param.lang as Locale);
   return {
-    title: `Submission | ${dict.general.title}`,
+    title: `${dict.submission.pageTitle} | ${dict.general.title}`,
     description: dict.general.description,
   };
 }
@@ -27,9 +28,11 @@ export default async function Page({ params }: PageProps) {
     notFound();
   }
 
-  await params;
+  const { lang } = await params;
+  const dict = await getDictionary((hasLocale(lang) ? lang : 'en') as Locale);
   return (
     <section className="p-4" aria-labelledby="submission-view-heading">
+      <DsPageHeading id="submission-view-heading">{dict.submission.pageTitle}</DsPageHeading>
       <SubmissionView />
     </section>
   );
