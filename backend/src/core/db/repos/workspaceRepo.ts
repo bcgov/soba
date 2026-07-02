@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import {
+  FORM_ADMINS_GROUP_NAME,
   Roles,
   WORKSPACE_OWNERS_GROUP_NAME,
   WorkspaceMembershipRole,
@@ -11,6 +12,7 @@ import { db } from '../client';
 import {
   appUsers,
   workspaceGroupMemberships,
+  workspaceGroupRoles,
   workspaceGroups,
   workspaceMemberships,
   workspaces,
@@ -41,14 +43,16 @@ export const getWorkspaceById = async (workspaceId: string): Promise<{ id: strin
  */
 export const getWorkspaceOwnersGroup = async (workspaceId: string) => {
   const rows = await db
-    .select()
+    .select({ id: workspaceGroups.id })
     .from(workspaceGroups)
-    .where(
+    .innerJoin(
+      workspaceGroupRoles,
       and(
-        eq(workspaceGroups.workspaceId, workspaceId),
-        eq(workspaceGroups.roleCode, Roles.workspace_owner),
+        eq(workspaceGroupRoles.groupId, workspaceGroups.id),
+        eq(workspaceGroupRoles.roleCode, Roles.workspace_owner),
       ),
     )
+    .where(eq(workspaceGroups.workspaceId, workspaceId))
     .limit(1);
   return rows[0] ?? null;
 };
@@ -86,8 +90,50 @@ export const canManageWorkspaceOwners = async (
   return rows.length > 0;
 };
 
+type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Creates a workspace group with a single role and adds one user member. */
+const addGroupWithMember = async (
+  tx: DbTx,
+  args: {
+    workspaceId: string;
+    name: string;
+    roleCode: string;
+    membershipId: string;
+    displayLabel: string | null;
+  },
+) => {
+  const groupId = uuidv7();
+  await tx.insert(workspaceGroups).values({
+    id: groupId,
+    workspaceId: args.workspaceId,
+    name: args.name,
+    status: GROUP_STATUS_ACTIVE,
+    createdBy: args.displayLabel,
+    updatedBy: args.displayLabel,
+  });
+  await tx.insert(workspaceGroupRoles).values({
+    id: uuidv7(),
+    workspaceId: args.workspaceId,
+    groupId,
+    roleCode: args.roleCode,
+    status: GROUP_STATUS_ACTIVE,
+    createdBy: args.displayLabel,
+    updatedBy: args.displayLabel,
+  });
+  await tx.insert(workspaceGroupMemberships).values({
+    id: uuidv7(),
+    workspaceId: args.workspaceId,
+    workspaceMembershipId: args.membershipId,
+    groupId,
+    status: MEMBERSHIP_STATUS_ACTIVE,
+    createdBy: args.displayLabel,
+    updatedBy: args.displayLabel,
+  });
+};
+
 const bootstrapWorkspaceOwner = async (
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  tx: DbTx,
   workspaceId: string,
   userId: string,
   displayLabel: string | null,
@@ -106,25 +152,20 @@ const bootstrapWorkspaceOwner = async (
     updatedBy: displayLabel,
   });
 
-  const ownersGroupId = uuidv7();
-  await tx.insert(workspaceGroups).values({
-    id: ownersGroupId,
+  await addGroupWithMember(tx, {
     workspaceId,
     name: WORKSPACE_OWNERS_GROUP_NAME,
-    status: GROUP_STATUS_ACTIVE,
     roleCode: Roles.workspace_owner,
-    createdBy: displayLabel,
-    updatedBy: displayLabel,
+    membershipId,
+    displayLabel,
   });
 
-  await tx.insert(workspaceGroupMemberships).values({
-    id: uuidv7(),
+  await addGroupWithMember(tx, {
     workspaceId,
-    workspaceMembershipId: membershipId,
-    groupId: ownersGroupId,
-    status: MEMBERSHIP_STATUS_ACTIVE,
-    createdBy: displayLabel,
-    updatedBy: displayLabel,
+    name: FORM_ADMINS_GROUP_NAME,
+    roleCode: Roles.form_admin,
+    membershipId,
+    displayLabel,
   });
 
   invalidateMembershipCache(workspaceId, userId);
