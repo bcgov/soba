@@ -12,6 +12,11 @@ import {
   deleteFormVersion,
   saveFormVersion,
   updateFormVersion,
+  publishFormVersion,
+  unpublishFormVersion,
+  restoreFormVersion,
+  provisionFormVersionSchema,
+  getFormVersionSchema,
 } from './controller';
 import {
   CreateFormBodySchema,
@@ -20,6 +25,7 @@ import {
   FormVersionIdParamsSchema,
   ListFormsQuerySchema,
   ListFormVersionsQuerySchema,
+  ProvisionSchemaBodySchema,
   SaveFormVersionBodySchema,
   SaveFormVersionParamsSchema,
   UpdateFormBodySchema,
@@ -70,6 +76,31 @@ router.post(
     body: SaveFormVersionBodySchema,
   }),
   saveFormVersion,
+);
+router.post(
+  '/form-versions/:id/publish',
+  validateRequest({ params: FormVersionIdParamsSchema }),
+  publishFormVersion,
+);
+router.post(
+  '/form-versions/:id/unpublish',
+  validateRequest({ params: FormVersionIdParamsSchema }),
+  unpublishFormVersion,
+);
+router.post(
+  '/form-versions/:id/restore',
+  validateRequest({ params: FormVersionIdParamsSchema }),
+  restoreFormVersion,
+);
+router.get(
+  '/form-versions/:id/schema',
+  validateRequest({ params: FormVersionIdParamsSchema }),
+  getFormVersionSchema,
+);
+router.post(
+  '/form-versions/:id/schema',
+  validateRequest({ params: FormVersionIdParamsSchema, body: ProvisionSchemaBodySchema }),
+  provisionFormVersionSchema,
 );
 router.delete(
   '/form-versions/:id',

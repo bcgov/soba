@@ -36,13 +36,6 @@ type FormioForm = any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FormioSubmission = any;
 
-/**
- * Optional override for Form.io CE `x-jwt-token`. `FormioEngineAdapter` never sets this (outbox uses admin JWT only).
- * The HTTP proxy forwards `x-jwt-token` today; that is planned for removal so proxied traffic will match the adapter.
- * Unit tests may set `token` directly to cover 440 behaviour.
- */
-export type FormioRequestOptions = { token?: string };
-
 export interface FormioCommunityEditionAPIv5Options {
   baseUrl: string;
   username: string;
@@ -128,9 +121,8 @@ export class FormioCommunityEditionAPIv5Client {
     url: string,
     method: string,
     body: string | undefined,
-    opts?: FormioRequestOptions,
   ): Promise<{ ok: boolean; status: number; text: string }> {
-    const token = opts?.token ?? this.token ?? undefined;
+    const token = this.token ?? undefined;
     const headers: Record<string, string> = {
       Accept: 'application/json',
       'Content-Type': 'application/json',
@@ -146,28 +138,18 @@ export class FormioCommunityEditionAPIv5Client {
   }
 
   /**
-   * Uses **`opts.token`** for `x-jwt-token` when the caller set it; otherwise **`this.token`** (admin JWT from `login()`).
+   * Authenticates with `this.token` (the admin JWT from `login()`) as `x-jwt-token`.
    *
-   * **Engine adapter / outbox** never pass `opts.token` — they only use the admin JWT. **HTTP proxy** routes may pass
-   * it when forwarding `x-jwt-token` (temporary; removal planned). After that change, non-test callers will match the adapter.
-   *
-   * **HTTP 440:** If `opts.token` was **not** provided, we treat this as admin JWT expiry: clear `this.token`, `login()`
-   * once, retry the same request. If `opts.token` **was** provided, we do not swap in admin credentials (440 surfaces to the caller).
-   * `refreshedFor440` allows at most one admin refresh per `request()` call.
+   * **HTTP 440** is treated as admin JWT expiry: clear `this.token`, `login()` once, and retry the same
+   * request. `refreshedFor440` allows at most one admin refresh per `request()` call.
    */
-  private async request<T>(
-    path: string,
-    method: string,
-    body?: unknown,
-    opts?: FormioRequestOptions,
-  ): Promise<T> {
+  private async request<T>(path: string, method: string, body?: unknown): Promise<T> {
     const url = `${this._baseUrl}${path}`;
     const serializedBody = body !== undefined ? JSON.stringify(body) : undefined;
-    const usedCallerToken = opts?.token !== undefined;
     let refreshedFor440 = false;
 
     while (true) {
-      const { ok, status, text } = await this.performFetch(url, method, serializedBody, opts);
+      const { ok, status, text } = await this.performFetch(url, method, serializedBody);
       if (ok) {
         if (status === 204 || !text) return undefined as T;
         try {
@@ -176,7 +158,7 @@ export class FormioCommunityEditionAPIv5Client {
           return undefined as T;
         }
       }
-      if (!refreshedFor440 && status === 440 && !usedCallerToken && this.hasAdminCredentials()) {
+      if (!refreshedFor440 && status === 440 && this.hasAdminCredentials()) {
         this.token = null;
         await this.login();
         refreshedFor440 = true;
@@ -186,46 +168,31 @@ export class FormioCommunityEditionAPIv5Client {
     }
   }
 
-  async loadForms(query?: FormioQuery, opts?: FormioRequestOptions): Promise<FormioForm[]> {
+  async loadForms(query?: FormioQuery): Promise<FormioForm[]> {
     const qs = buildQueryString(query);
-    const result = await this.request<FormioForm[] | FormioForm>(
-      `/form${qs}`,
-      'GET',
-      undefined,
-      opts,
-    );
+    const result = await this.request<FormioForm[] | FormioForm>(`/form${qs}`, 'GET');
     return Array.isArray(result) ? result : [];
   }
 
-  async loadForm(
-    formId: string,
-    query?: FormioQuery,
-    opts?: FormioRequestOptions,
-  ): Promise<FormioForm | null> {
+  async loadForm(formId: string, query?: FormioQuery): Promise<FormioForm | null> {
     const qs = buildQueryString(query);
-    return this.request<FormioForm | null>(`/form/${formId}${qs}`, 'GET', undefined, opts);
+    return this.request<FormioForm | null>(`/form/${formId}${qs}`, 'GET');
   }
 
-  async saveForm(data: FormioForm, opts?: FormioRequestOptions): Promise<FormioForm> {
-    if (data._id) return this.request<FormioForm>(`/form/${data._id}`, 'PUT', data, opts);
-    return this.request<FormioForm>('/form', 'POST', data, opts);
+  async saveForm(data: FormioForm): Promise<FormioForm> {
+    if (data._id) return this.request<FormioForm>(`/form/${data._id}`, 'PUT', data);
+    return this.request<FormioForm>('/form', 'POST', data);
   }
 
-  async deleteForm(formId: string, opts?: FormioRequestOptions): Promise<void> {
-    await this.request(`/form/${formId}`, 'DELETE', undefined, opts);
+  async deleteForm(formId: string): Promise<void> {
+    await this.request(`/form/${formId}`, 'DELETE');
   }
 
-  async loadSubmissions(
-    formId: string,
-    query?: FormioQuery,
-    opts?: FormioRequestOptions,
-  ): Promise<FormioSubmission[]> {
+  async loadSubmissions(formId: string, query?: FormioQuery): Promise<FormioSubmission[]> {
     const qs = buildQueryString(query);
     const result = await this.request<FormioSubmission[] | FormioSubmission>(
       `/form/${formId}/submission${qs}`,
       'GET',
-      undefined,
-      opts,
     );
     return Array.isArray(result) ? result : [];
   }
@@ -234,63 +201,40 @@ export class FormioCommunityEditionAPIv5Client {
     formId: string,
     submissionId: string,
     query?: FormioQuery,
-    opts?: FormioRequestOptions,
   ): Promise<FormioSubmission | null> {
     const qs = buildQueryString(query);
     return this.request<FormioSubmission | null>(
       `/form/${formId}/submission/${submissionId}${qs}`,
       'GET',
-      undefined,
-      opts,
     );
   }
 
-  async saveSubmission(
-    formId: string,
-    data: FormioSubmission,
-    opts?: FormioRequestOptions,
-  ): Promise<FormioSubmission> {
+  async saveSubmission(formId: string, data: FormioSubmission): Promise<FormioSubmission> {
     if (data._id) {
-      return this.request<FormioSubmission>(
-        `/form/${formId}/submission/${data._id}`,
-        'PUT',
-        data,
-        opts,
-      );
+      return this.request<FormioSubmission>(`/form/${formId}/submission/${data._id}`, 'PUT', data);
     }
-    return this.request<FormioSubmission>(`/form/${formId}/submission`, 'POST', data, opts);
+    return this.request<FormioSubmission>(`/form/${formId}/submission`, 'POST', data);
   }
 
-  async deleteSubmission(
-    formId: string,
-    submissionId: string,
-    opts?: FormioRequestOptions,
-  ): Promise<void> {
-    await this.request(`/form/${formId}/submission/${submissionId}`, 'DELETE', undefined, opts);
+  async deleteSubmission(formId: string, submissionId: string): Promise<void> {
+    await this.request(`/form/${formId}/submission/${submissionId}`, 'DELETE');
   }
 
-  async loadRoles(
-    query?: FormioQuery,
-    opts?: FormioRequestOptions,
-  ): Promise<{ _id: string; title?: string; name?: string }[]> {
+  async loadRoles(query?: FormioQuery): Promise<{ _id: string; title?: string; name?: string }[]> {
     const qs = buildQueryString(query);
     const result = await this.request<{ _id: string; title?: string; name?: string }[]>(
       `/role${qs}`,
       'GET',
-      undefined,
-      opts,
     );
     return Array.isArray(result) ? result : [];
   }
 
-  async loadProject(
-    opts?: FormioRequestOptions,
-  ): Promise<Record<string, unknown> & { access?: unknown[] }> {
-    const project = await this.request<Record<string, unknown>>('', 'GET', undefined, opts);
+  async loadProject(): Promise<Record<string, unknown> & { access?: unknown[] }> {
+    const project = await this.request<Record<string, unknown>>('', 'GET');
     if (project && typeof project === 'object' && !Array.isArray(project)) {
       return project as Record<string, unknown> & { access?: unknown[] };
     }
-    const accessInfo = await this.loadAccessInfo(opts).catch(() => ({}));
+    const accessInfo = await this.loadAccessInfo().catch(() => ({}));
     return {
       access: [],
       ...(accessInfo && typeof accessInfo === 'object' && !Array.isArray(accessInfo)
@@ -299,16 +243,16 @@ export class FormioCommunityEditionAPIv5Client {
     } as Record<string, unknown> & { access?: unknown[] };
   }
 
-  async currentUser(opts?: FormioRequestOptions): Promise<Record<string, unknown> | null> {
-    return this.request<Record<string, unknown> | null>('/current', 'GET', undefined, opts);
+  async currentUser(): Promise<Record<string, unknown> | null> {
+    return this.request<Record<string, unknown> | null>('/current', 'GET');
   }
 
-  async loadAccessInfo(opts?: FormioRequestOptions): Promise<Record<string, unknown>> {
-    return this.request<Record<string, unknown>>('/access', 'GET', undefined, opts);
+  async loadAccessInfo(): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>('/access', 'GET');
   }
 
-  async logout(opts?: FormioRequestOptions): Promise<unknown> {
-    return this.request('/logout', 'GET', undefined, opts);
+  async logout(): Promise<unknown> {
+    return this.request('/logout', 'GET');
   }
 
   /**

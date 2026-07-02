@@ -1,0 +1,44 @@
+/**
+ * FormDesigner Specific Styles
+ * Targetting Form.io internal classes to fix layout and visibility issues.
+ * All rules are wrapped in :global() because Form.io generates these DOM nodes
+ * with literal class names that should not be hashed by CSS Modules.
+ */
+
+/* Fix Tailwind v4 conflict making sidebar components invisible */
+:global(.formio-builder-components span),
+:global(.formcomponent),
+:global([ref='sidebar-component']) {
+  visibility: visible !important;
+}
+
+/* Ensure sidebar accordion works without Bootstrap JS */
+:global(.builder-sidebar .accordion-collapse:not(.show)) {
+  display: none;
+}
+:global(.builder-sidebar .accordion-collapse.show) {
+  display: block;
+}
+
+/* Fix drag-copy cursor */
+:global(.drag-copy) {
+  cursor: grab !important;
+}
+
+:global(.builder-sidebar) {
+  position: sticky;
+  top: 1rem;
+  align-self: flex-start;
+  max-height: none;
+  padding-right: 0.5rem;
+  z-index: 10;
+}
+
+/* Custom scrollbar for the sidebar */
+:global(.builder-sidebar::-webkit-scrollbar) {
+  width: 4px;
+}
+:global(.builder-sidebar::-webkit-scrollbar-thumb) {
+  background: #ccc;
+  border-radius: 4px;
+}

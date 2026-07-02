@@ -1,30 +1,21 @@
 #!/bin/bash
 set -e
 
-# Non-interactive so pnpm/npm never prompt during image build
-export CI=true
-
 echo "══════════════════════════════════════════════════════════════"
 echo "  SOBA — Dev Container Setup"
 echo "══════════════════════════════════════════════════════════════"
 echo ""
 
-# -- Install root dependencies ─────────────────────────────────────────────
-echo "==> Installing root dependencies..."
-pnpm install
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/.."
 
-# -- Install integration dependencies + Playwright Chromium ────────────────
-if [ -f integration/package.json ]; then
-  echo "==> Installing integration test dependencies..."
-  pnpm -C integration install --frozen-lockfile
+# shellcheck source=scripts/pnpm-setup.sh
+source "$SCRIPT_DIR/scripts/pnpm-setup.sh"
 
-  echo "==> Installing Playwright Chromium (integration)..."
-  pnpm -C integration exec playwright install chromium
-else
-  echo "==> integration/package.json not found, skipping integration setup..."
-fi
+echo "==> Configuring pnpm..."
+configure_pnpm
 
-# ── Set up environment file ─────────────────────────────────────────────────
+# ── Set up environment files (before install) ─────────────────────────────────
 if [ -f backend/.env.example ] && [ ! -f backend/.env ]; then
   echo "==> Creating backend/.env from .env.example..."
   cp backend/.env.example backend/.env
@@ -33,7 +24,6 @@ else
   echo "==> backend/.env already exists or no .env.example, skipping..."
 fi
 
-# ── Set up local overrides file (create once, never overwrite) ──────────────
 if [ ! -f backend/.env.local ]; then
   echo "==> Creating backend/.env.local from .env.local.example..."
   cp backend/.env.local.example backend/.env.local
@@ -42,13 +32,25 @@ else
   echo "==> backend/.env.local already exists, skipping..."
 fi
 
-# ── Set up frontend environment file ───────────────────────────────────────
 if [ -f frontend/.env.example ] && [ ! -f frontend/.env ]; then
   echo "==> Creating frontend/.env from .env.example..."
   cp frontend/.env.example frontend/.env
   echo "    Values are for localhost; edit frontend/.env for other environments"
 else
   echo "==> frontend/.env already exists or no .env.example, skipping..."
+fi
+
+install_workspace_deps full
+
+# ── Integration test dependencies + Playwright Chromium ─────────────────────
+if [ -f integration/playwright/package.json ]; then
+  echo "==> Installing integration test dependencies..."
+  npm ci --prefix integration/playwright
+
+  echo "==> Installing Playwright Chromium (integration)..."
+  npm exec --prefix integration/playwright -- playwright install chromium
+else
+  echo "==> integration/playwright/package.json not found, skipping integration setup..."
 fi
 
 # ── Print summary ───────────────────────────────────────────────────────────
@@ -81,4 +83,7 @@ echo "    kubectl $(kubectl version --client --short 2>/dev/null || kubectl vers
 echo "    oc $(oc version --client 2>/dev/null | head -1 || echo 'n/a')"
 echo "    k6 $(k6 version 2>/dev/null || echo 'n/a')"
 echo "    gh $(gh --version 2>/dev/null | head -1 || echo 'n/a')"
+echo ""
+echo "  Troubleshooting:"
+echo "    pnpm clean:workspace && pnpm install"
 echo ""

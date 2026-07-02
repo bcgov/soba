@@ -7,6 +7,7 @@ export const FEATURE_CODES = {
   SUBMIT_MODE: 'submit-mode',
   /** Dev/review: API meta & health inspection (matches `soba.feature` seed code `meta`). */
   META: 'meta',
+  MARKETING: 'marketing',
 } as const;
 
 export type FeatureCode = (typeof FEATURE_CODES)[keyof typeof FEATURE_CODES];
@@ -46,10 +47,7 @@ export function parseFrontendFeaturesAllowlist(raw: string | undefined): Fronten
   if (raw === undefined || raw.trim() === '') {
     return new Set();
   }
-  const tokens = raw
-    .split(',')
-    .map(normalizeFeatureCode)
-    .filter(Boolean);
+  const tokens = raw.split(',').map(normalizeFeatureCode).filter(Boolean);
   if (tokens.length === 0) {
     return new Set();
   }

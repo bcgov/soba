@@ -3,6 +3,7 @@ import { join } from 'path';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  basePath: process.env.BASE_PATH || '',
   // Required for standalone in monorepo: trace deps from workspace root
   outputFileTracingRoot: join(__dirname, '..'),
   turbopack: {

@@ -208,15 +208,6 @@ describe('env', () => {
     expect(reader.getPluginsPath()).toBe('/fallback');
   });
 
-  it('createEnvReader getOutboxPollIntervalMs and getOutboxBatchSize return numbers from simulated env', () => {
-    const reader = createEnvReader({
-      OUTBOX_POLL_INTERVAL_MS: '5000',
-      OUTBOX_BATCH_SIZE: '10',
-    });
-    expect(reader.getOutboxPollIntervalMs()).toBe(5000);
-    expect(reader.getOutboxBatchSize()).toBe(10);
-  });
-
   it('resolveTrustProxySetting returns false in development when TRUST_PROXY_HOPS unset', () => {
     expect(resolveTrustProxySetting({ NODE_ENV: 'development' })).toBe(false);
   });

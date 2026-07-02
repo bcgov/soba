@@ -12,7 +12,7 @@ function createInMemoryMessageBusAdapter(config: PluginConfigReader): MessageBus
     async publish(topic: string, payload: Record<string, unknown>): Promise<void> {
       void topic;
       void payload;
-      // No-op for in-memory default; worker keeps polling outbox.
+      // No-op for the in-memory default; a real backend (e.g. Redis) can deliver to subscribers.
     },
 
     subscribe(

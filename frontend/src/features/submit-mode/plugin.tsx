@@ -1,5 +1,4 @@
-import type { AppPlugin } from '@/src/app/plugins/types';
-import { EmptyHomeSection } from '@/src/app/plugins/EmptyHomeSection';
+import type { AppPlugin } from '@/src/types/plugins';
 import { FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 
 export const submitModePlugin: AppPlugin = {
@@ -9,8 +8,7 @@ export const submitModePlugin: AppPlugin = {
   order: 30,
   getNavItem: ({ locale, dictionary }) => ({
     id: 'submit-mode',
-    href: `/${locale}/submit`,
+    href: `/${locale}/forms`,
     label: dictionary.header.submit,
   }),
-  HomeSection: EmptyHomeSection,
 };

@@ -34,6 +34,17 @@ type InitResult = {
 export const initKeycloak = createAsyncThunk<InitResult, void, { rejectValue: string }>(
   'keycloak/init',
   async (_, { rejectWithValue }) => {
+    if (kcInstance) {
+      // If we already have an instance (e.g. after a layout remount from a language change),
+      // just restore the state from it without re-initializing.
+      return {
+        token: kcInstance.token ?? undefined,
+        idTokenParsed: kcInstance.idTokenParsed as Keycloak.KeycloakTokenParsed | undefined,
+        authenticated: !!kcInstance.authenticated,
+      };
+    }
+
+    delete localStorage.formioToken; // clear any stale token before init
     const runtimeConfig = await loadFrontendRuntimeConfig();
     const kc = new Keycloak({
       url: runtimeConfig.auth.keycloak.url,
@@ -54,6 +65,12 @@ export const initKeycloak = createAsyncThunk<InitResult, void, { rejectValue: st
       // store instance in module-level variable (not in Redux state)
       kcInstance = kc;
 
+      if (kc.idTokenParsed) {
+        await kc.updateToken(30);
+      }
+
+      localStorage.setItem('formioToken', kc.token ?? '');
+
       return {
         token: kc.token ?? undefined,
         idTokenParsed: kc.idTokenParsed as Keycloak.KeycloakTokenParsed | undefined,
@@ -62,15 +79,6 @@ export const initKeycloak = createAsyncThunk<InitResult, void, { rejectValue: st
     } catch (err: unknown) {
       return rejectWithValue((err as { message?: string })?.message || String(err));
     }
-  },
-  {
-    /**
-     * `Header` calls `init()` from an effect; client navigations can remount the tree and re-run it.
-     * Each `kc.init({ onLoad: 'check-sso' })` may fall back to a full IdP redirect (e.g. when silent
-     * SSO / storage access fails in Firefox), which feels like a full-page “blink”. If we already
-     * have an instance (logout clears it), skip re-init entirely.
-     */
-    condition: () => kcInstance == null,
   },
 );
 
@@ -142,7 +150,10 @@ export const login = () => async (dispatch: AppDispatch) => {
   } catch {
     // fallback to direct login redirect
     try {
-      kc?.login();
+      const opts = {
+        redirectUri: typeof window !== 'undefined' ? window.location.origin : undefined,
+      };
+      kc?.login(opts);
     } catch {
       // no-op
     }
@@ -162,11 +173,12 @@ export const refreshToken = () => async (dispatch: AppDispatch) => {
   const kc: Keycloak.KeycloakInstance | null = kcInstance;
   if (!kc) return;
   try {
-    const refreshed = await kc.updateToken(30);
+    const refreshed = await kc.updateToken(0);
     if (refreshed) {
       dispatch(setToken(kc.token ?? undefined));
       dispatch(setIdTokenParsed(kc.idTokenParsed as Keycloak.KeycloakTokenParsed | undefined));
       dispatch(setAuthenticated(!!kc.authenticated));
+      localStorage.setItem('formioToken', kc.token ?? '');
     }
   } catch {
     // token refresh failed

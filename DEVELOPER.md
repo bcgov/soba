@@ -38,7 +38,7 @@ The project uses a VS Code devcontainer (`.devcontainer/`). Open the repo in VS 
 | **kubectl**                   | `kubectl version --client` | Kubernetes CLI                       |
 | **Helm**                      | `helm version`             | Kubernetes package manager           |
 
-[Playwright](https://playwright.dev) (Chromium) is installed for the integration app via `pnpm -C integration exec playwright install chromium`. VS Code extensions: ESLint, Prettier, Docker, PostgreSQL, Kubernetes Tools.
+[Playwright](https://playwright.dev) (Chromium) is installed for the integration app via `npm exec --prefix integration/playwright -- playwright install chromium`. VS Code extensions: ESLint, Prettier, Docker, PostgreSQL, Kubernetes Tools.
 
 ### Host architecture (ARM vs AMD)
 
@@ -88,8 +88,12 @@ The repo is a **[pnpm](https://pnpm.io) workspace** (faster installs, shared sto
 | `pnpm lint:fix:frontend` / `pnpm lint:fix:backend` | Lint fix one app                                                |
 | `pnpm check`                                       | Type/style checks for both apps                                 |
 | `pnpm check:frontend` / `pnpm check:backend`       | Check one app                                                   |
+| `pnpm clean:workspace`                             | Remove deps, build outputs, and test artifacts (keeps `.env`)   |
+| `pnpm clean:workspace:full`                        | Same as above, plus remove gitignored env files                 |
 
-Package manager is pinned in `package.json` (`packageManager`: `pnpm@10.28.2`). The `integration` app lives outside the workspace and has its own `pnpm-lock.yaml`; use `pnpm -C integration <script>` for integration-specific commands.
+Package manager is pinned in `package.json` (`packageManager`: `pnpm@10.28.2`). The `integration` app lives outside the workspace and has its own `pnpm-lock.yaml`; use `pnpm -C integration/playwright <script>` for integration-specific commands.
+
+**Troubleshooting installs:** If `pnpm install` fails with `EINVAL` on a VM-backed workspace mount (Docker Desktop, Rancher, Cursor remote), run `pnpm clean:workspace && pnpm install` from the repo root.
 
 ---
 
@@ -108,10 +112,10 @@ VS Code config lives in `.vscode/launch.json` and `.vscode/tasks.json`.
 
 **Tasks (`tasks.json`):** Run from Command Palette → “Tasks: Run Task”.
 
-| Task                         | Purpose                                              |
-| ---------------------------- | ---------------------------------------------------- |
-| **Dev Services: Up**         | Start MongoDB, PostgreSQL, Form.io, Temporal, etc.    |
-| **Dev Services: Down**       | Stop and remove the dev service containers           |
+| Task                   | Purpose                                            |
+| ---------------------- | -------------------------------------------------- |
+| **Dev Services: Up**   | Start MongoDB, PostgreSQL, Form.io, Temporal, etc. |
+| **Dev Services: Down** | Stop and remove the dev service containers         |
 
 You can also run `docker compose -f .devcontainer/docker-compose.yml up -d` in a terminal, or right-click `docker-compose.yml` and use **Compose Up**.
 
@@ -213,9 +217,9 @@ Form rendering and submission storage are delegated to a **form engine** plugin.
 
 Form engine plugins can optionally expose **HTTP routes** (e.g. a Form.io CE proxy) by setting **`routeBasePath`** and **`createRouter(config)`**; routes are mounted only when **`PLUGIN_<CODE>_ROUTES_ALLOWED=true`** (explicit per-engine). For formio-v5, set **`PLUGIN_FORMIO_V5_ROUTES_ALLOWED=true`** to mount the proxy at **`/api/v1/formio-v5`** (path from **`PLUGIN_FORMIO_V5_PROXY_PATH`**, default `/formio-v5`). The proxy is **protected** (same auth as v1 API: app JWT in `Authorization: Bearer`). It forwards to Form.io CE and optionally passes through **`x-jwt-token`**; otherwise it uses the server-side admin client. Health remains on the adapter and is reported via `/api/v1/health`. See [In Detail — Configuration of plugins and features](#configuration-of-plugins-and-features).
 
-### Outbox
+### Form engine cross-references
 
-To keep **transactions consistent across PostgreSQL and the form engine** (e.g. Form.io/Mongo), we use an **outbox pattern**: domain writes and a corresponding outbox event are used so a worker can reliably sync to the form engine and record the engine’s reference back in Postgres. We need this for **form_version** (sync schema → form engine, store `engine_schema_ref`) and **submission** (sync submission → form engine, store `engine_submission_ref`). See [In Detail — Outbox pattern](#outbox-pattern).
+Data lives in **two systems**: domain metadata/draft state in **PostgreSQL** and the form definition/submission payloads in the **form engine** (e.g. Form.io/Mongo). To match records across them we store the engine's reference on the domain row: `form_version.engine_schema_ref` (the Form.io form id/path) and `submission.engine_submission_ref`. The client creates the resource in the form engine and passes the returned reference to the SOBA save endpoint, which persists it. See [In Detail — Form engine cross-references](#form-engine-cross-references).
 
 ### Auth plugins and responsibilities
 
@@ -225,13 +229,13 @@ To keep **transactions consistent across PostgreSQL and the form engine** (e.g. 
 
 Schema and queries live in TypeScript; migrations are SQL in `backend/drizzle/`. The app uses **drizzle-orm** at runtime; **drizzle-kit** (run via `npx` from `backend/`) handles schema introspection and migration generation. Config: `backend/drizzle.config.ts` (reads `DATABASE_URL` from `.env`).
 
-| Command                    | Where           | Purpose                                                                   |
-| -------------------------- | --------------- | ------------------------------------------------------------------------- |
+| Command                    | Where                   | Purpose                                                                   |
+| -------------------------- | ----------------------- | ------------------------------------------------------------------------- |
 | `pnpm db:migrate`          | repo root or `backend/` | Ensure DB exists, then run all pending migrations from `drizzle/`         |
 | `pnpm db:seed`             | repo root or `backend/` | Seed data (run after migrate)                                             |
-| `pnpm db:init`             | repo root       | Migrate then seed (convenience for local setup)                           |
-| `npx drizzle-kit generate` | `backend/`      | Generate a new migration from schema changes (writes SQL into `drizzle/`) |
-| `npx drizzle-kit studio`   | `backend/`      | Open Drizzle Studio (DB GUI); requires `DATABASE_URL`                     |
+| `pnpm db:init`             | repo root               | Migrate then seed (convenience for local setup)                           |
+| `npx drizzle-kit generate` | `backend/`              | Generate a new migration from schema changes (writes SQL into `drizzle/`) |
+| `npx drizzle-kit studio`   | `backend/`              | Open Drizzle Studio (DB GUI); requires `DATABASE_URL`                     |
 
 Schema modules: `backend/src/core/db/schema/` (e.g. `core.ts`, `forms.ts`, `roles.ts`, `feature.ts`, `codes.ts`). After changing schema, run `drizzle-kit generate`, then `pnpm db:migrate` to apply.
 
@@ -243,7 +247,7 @@ Schema modules: `backend/src/core/db/schema/` (e.g. `core.ts`, `forms.ts`, `role
 
 - **Runtime:** [Next.js](https://nextjs.org) 16, React 19, TypeScript
 - **State:** [Redux Toolkit](https://redux-toolkit.js.org), react-redux, next-redux-wrapper
-- **UI:** [BC Gov design system](https://github.com/bcgov/design-system) (`@bcgov/design-system-react-components`, `@bcgov/design-tokens`, `@bcgov/bc-sans`), [Tailwind CSS](https://tailwindcss.com), Bootstrap
+- **UI:** Bootstrap
 - **Auth:** [Keycloak](https://www.keycloak.org) (keycloak-js) — BC Gov SSO
 - **Testing:** [Vitest](https://vitest.dev)
 
@@ -263,7 +267,7 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 - **App Router:** `app/` holds layouts and pages; `app/layout.tsx` is the root (html/body, globals.css); `app/[lang]/layout.tsx` wraps locale routes with `DictionaryProvider`, `Header`, and main content. The home page is `app/[lang]/page.tsx`; locale is required (e.g. `/en`, `/fr`).
 - **Where code lives:** `app/` — pages, layouts, shared UI (`app/ui/`). `src/` — features (`src/features/`), shared API/config (`src/shared/`), app-level plugins and types (`src/app/`). `lib/` — Redux store, slices, hooks, runtime config loader. Path aliases: `@/lib`, `@/app`, `@/src`.
-- **Adding pages:** Add under `app/[lang]/` (e.g. `app/[lang]/submit/page.tsx`) or new segments; use the locale layout for nav and dictionary.
+- **Adding pages:** Add under `app/[lang]/` (e.g. `app/[lang]/forms/page.tsx`) or new segments; use the locale layout for nav and dictionary.
 
 ### Runtime config and env
 
@@ -289,13 +293,18 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 ### Plugins and home sections
 
-- **AppPlugin:** id, optional `featureCode`, order, getNavItem, HomeSection. The **registry** (`src/app/plugins/registry.ts`) lists plugins, filters with `createIsFeatureAllowed(meta)` from `src/shared/featureFlags/flags.ts`, and exposes `getNavigationItems(..., isFeatureAllowed)` and `getHomeSections(isFeatureAllowed)`. The workspaces plugin is the reference implementation (no `featureCode` — always on). See [In Detail — Plugins (frontend)](#plugins-frontend).
+- **AppPlugin:** id, optional `featureCode`, order, getNavItem. The **registry** (`src/app/plugins/registry.ts`) lists plugins, filters with `createIsFeatureAllowed(meta)` from `src/shared/featureFlags/flags.ts`, and exposes `getNavigationItems(..., isFeatureAllowed)`. The workspaces plugin is the reference implementation (no `featureCode` — always on). See [In Detail — Plugins (frontend)](#plugins-frontend).
 
 ### Feature flags
 
 - **Platform:** `GET /meta/features` returns each row with **`platformAllowed`** (from `soba.feature` status). Loaded via `src/shared/config/featuresMeta.ts` (`loadFeaturesMeta`).
-- **Per-frontend deployment:** **`NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`** — comma-separated codes (same as meta, e.g. `workspaces`, `design-mode`, `submit-mode`), or **`*`** / **`all`** alone to allow every platform-allowed feature. **Empty/unset** = no codes allowed at the frontend layer (intersected with `platformAllowed`). Use a subset for submit-only or design-only Next.js images that share one API.
+- **Per-frontend deployment:** **`NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`** — comma-separated codes (same as meta, e.g. `workspaces`, `design-mode`, `submit-mode`, `marketing`), or **`*`** / **`all`** alone to allow every platform-allowed feature. **Empty/unset** = no codes allowed at the frontend layer (intersected with `platformAllowed`). Use a subset for submit-only or design-only Next.js images that share one API.
 - **`createIsFeatureAllowed(meta)`** returns `isFeatureAllowed(code)` = `platformAllowed && frontendAllowlist`. Constants: `FEATURE_CODES` in `src/shared/featureFlags/flags.ts`.
+
+### IDP groups
+
+- **Concept:** `soba.identity_provider` holds discrete IdPs (e.g. `idir`, `azureidir`). `soba.idp_group` + `soba.idp_group_member` group them logically so business functions can treat several IdPs the same (e.g. `bcgov` = `idir` + `azureidir`). Seeded groups: `bcgov` (BC Government), `bceid` (BCeID), `bc-citizens` (BC Citizens). This is a reusable primitive for future pluggable Form Access.
+- **Resolution:** `idpGroupRepo.listGroupsForIdp(code)` returns the group codes an IdP belongs to. Form visibility matches a stored token when it equals the user's IdP code or one of the user's group codes.
 
 ### i18n / dictionaries
 
@@ -303,7 +312,7 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 ### UI and styling
 
-- **BC Gov:** `@bcgov/design-system-react-components` (Button, Header, Text, etc.), design tokens, `@bcgov/bc-sans`. **Tailwind** and **Bootstrap** are available. Prefer design-system components and tokens for consistency.
+ `@bcgov/bc-sans`. **Bootstrap** is used.
 
 ### Forms
 
@@ -326,7 +335,7 @@ Integration tests live in the **integration** app (repo root). An integration te
 
 **Tech:** [Playwright](https://playwright.dev) (Chromium). Tests target the running frontend and backend (default: `http://localhost:3000`, `http://localhost:4000/api/v1`; override with `E2E_BASE_URL`, `E2E_API_BASE_URL`).
 
-**Run tests:** From repo root, `pnpm -C integration test`. In the devcontainer, dependencies and Playwright Chromium are installed by post-create; otherwise run `pnpm -C integration install` and `pnpm -C integration exec playwright install chromium` once.
+**Run tests:** From repo root, `pnpm -C integration/playwright test`. In the devcontainer, dependencies and Playwright Chromium are installed by post-create; otherwise run `npm ci --prefix integration/playwright` and `npm exec --prefix integration/playwright -- playwright install chromium` once.
 
 **Frontend and `data-testid`:** Integration tests locate elements by `data-testid`. Frontend developers **must** add `data-testid` to:
 
@@ -343,17 +352,14 @@ Use stable, semantic values (e.g. `workspace-page`, `login-button`, `workspace-i
 
 Optional deeper dives for onboarding: plugin/feature configuration, auth flow, feature and code management, and testing approach.
 
-### Outbox pattern
+### Form engine cross-references
 
-We use a **transactional outbox** so that work that spans PostgreSQL and the form engine (e.g. Form.io/Mongo) is reliable: we persist the intent in our DB, then a worker processes it and calls the external service.
+Form data spans two systems: domain metadata and draft state in **PostgreSQL**, and the form definition plus submission payloads in the **form engine** (e.g. Form.io/Mongo). We keep a reference to the engine record on each domain row so the two systems can be matched:
 
-- **Table:** `soba.integration_outbox` — one row per event (topic, aggregateType, aggregateId, workspaceId, payload, status, attemptCount, nextAttemptAt, lastError). Status flows: pending → processing → done (or failed with backoff).
-- **Flow:** When the app creates or updates a form version or submission that must exist in the form engine, it enqueues an event (via `QueueAdapter` → `DbOutboxQueueAdapter` → `enqueueOutboxEvent`). The **outbox worker** (`backend/src/core/workers/outboxWorker.ts`) polls, claims a batch (by status and nextAttemptAt), and passes each item to **SyncService**. SyncService resolves the form engine from the payload or aggregate, calls the form engine adapter (e.g. `createFormVersionSchema` or `createSubmissionRecord`), then updates the domain row in Postgres with the engine’s reference.
-- **Where we need it:** We need the outbox for two aggregates so the engine ref is written back into our DB after the form engine has accepted the data:
-  - **form_version.engine_schema_ref** — After a form version is created or published, we sync its schema to the form engine; the engine returns a reference (e.g. Form.io form path or ID). We store that in `form_version.engine_schema_ref` so we can render or submit against it.
-  - **submission.engine_submission_ref** — After a submission is created, we provision a record in the form engine; the engine returns a reference. We store that in `submission.engine_submission_ref`.
+- **form_version.engine_schema_ref** — the form engine's reference for the form schema (e.g. Form.io form id/path), used to render or submit against it.
+- **submission.engine_submission_ref** — the form engine's reference for a submission record.
 
-Without the outbox, we would have to call the form engine synchronously inside the request and risk partial commits (Postgres updated but form engine unreachable, or the reverse). The outbox lets us commit the domain write and the outbox row together (or in a single logical step), and let the worker eventually sync and fill in the refs with retries and backoff.
+The client creates/updates the resource in the form engine directly (the formio-v5 proxy, mounted when `PLUGIN_FORMIO_V5_ROUTES_ALLOWED=true`), then sends the returned id to the SOBA save endpoint (`POST /form-versions/{id}/save` with `engine_schema_ref`), which stores it on the `form_version` row. `engine_sync_status` records the sync state for the row.
 
 The Form.io CE client (`backend/src/plugins/formio-v5/formioV5Client.ts`) automatically re-logs in and retries once on **HTTP 440** when the request used the server **admin** JWT only; if the Formio proxy forwarded an end-user **`x-jwt-token`**, 440 is not auto-retried and that session must be refreshed.
 
@@ -383,7 +389,7 @@ Auth-related env: `IDP_PLUGINS`, `IDP_PLUGIN_DEFAULT_*`, and per-IdP `PLUGIN_<ID
 ### Enable/Disable features, add codes + roles for feature
 
 - **Feature status:** Rows in `soba.feature` have a `status` column; values come from `soba.feature_status` (e.g. `enabled`, `disabled`, `experimental`, `deprecated`). Application code uses `isFeatureEnabled(status)` (e.g. in `featureRepo`) so only `enabled` is treated as on. Seed inserts core feature rows and status codes; to add a feature, add a row to `feature` and (if needed) to `feature_status` (with `source = 'core'` or the feature code).
-- **Adding codes:** Code tables (e.g. `form_status`, `form_version_state`, `workspace_membership_role`, `feature_status`, `outbox_status`) use composite `(code, source)`. Core uses `source = 'core'`. To add codes for a feature: insert into the appropriate code table with `source = '<feature_code>'`. Seed and app code should use constants from a single place (e.g. `backend/src/core/db/codes/`) for core codes.
+- **Adding codes:** Code tables (e.g. `form_status`, `form_version_state`, `workspace_membership_role`, `feature_status`) use composite `(code, source)`. Core uses `source = 'core'`. To add codes for a feature: insert into the appropriate code table with `source = '<feature_code>'`. Seed and app code should use constants from a single place (e.g. `backend/src/core/db/codes/`) for core codes.
 - **Adding roles for a feature:** Table `soba.role` has `source` and `feature_code`. Core roles have `source = 'core'`. To add a feature-specific role: insert with `source = 'feature'` and `feature_code = '<feature_code>'`. Role listing/filtering (e.g. in meta or roleRepo) can filter by source or feature so the UI only shows applicable roles.
 
 ### App structure (frontend)
@@ -423,8 +429,8 @@ Auth-related env: `IDP_PLUGINS`, `IDP_PLUGIN_DEFAULT_*`, and per-IdP `PLUGIN_<ID
 
 ### Plugins (frontend)
 
-- **Adding a plugin:** (1) Optionally add a row to `soba.feature` if the surface is platform-gated; use a stable `code` and reference it as `featureCode` on the plugin when the plugin should hide when that feature is not allowed. Omit `featureCode` for always-on shell (e.g. workspaces). (2) Create a feature folder under `src/features/<name>/` with a component for the home section and a `plugin.tsx` that exports an `AppPlugin`: id, optional featureCode, order, getNavItem, HomeSection. (3) Register the plugin in `src/app/plugins/registry.ts`. Nav and home sections include it when `isFeatureAllowed(featureCode)` is true (or when `featureCode` is omitted).
-- **getNavItem** returns { id, href, label } for the Header nav; href typically includes locale (e.g. `/${locale}/`). **HomeSection** is the React component rendered on the home page for this plugin.
+- **Adding a plugin:** (1) Optionally add a row to `soba.feature` if the surface is platform-gated; use a stable `code` and reference it as `featureCode` on the plugin when the plugin should hide when that feature is not allowed. Omit `featureCode` for always-on shell (e.g. workspaces). (2) Create a feature folder under `src/features/<name>/` with a component for the home section and a `plugin.tsx` that exports an `AppPlugin`: id, optional featureCode, order, getNavItem. (3) Register the plugin in `src/app/plugins/registry.ts`. Nav and home sections include it when `isFeatureAllowed(featureCode)` is true (or when `featureCode` is omitted).
+- **getNavItem** returns { id, href, label } for the Header nav; href typically includes locale (e.g. `/${locale}/`).
 
 ### Testing
 

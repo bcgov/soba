@@ -3,6 +3,8 @@ global:
   namespace: ""
   # Set true to remove "keep" policy on Secrets/PVCs (e.g. PR teardown)
   forceCleanup: false
+  routeHost: ""
+  routePath: ""
 
 # -- Backend (Express API) ------------------------------------------------
 backend:
@@ -64,8 +66,6 @@ backend:
     formEngineDefaultCode: formio-v5
     cacheDefaultCode: cache-memory
     messagebusDefaultCode: messagebus-memory
-    outboxPollIntervalMs: "5000"
-    outboxBatchSize: "25"
     sobaSystemSubject: soba-system
     workspacePluginsAllowed: "enterprise-cstar,personal-local"
     workspacePluginsStrictMode: "false"
@@ -96,24 +96,6 @@ backend:
     apiMax: "60"
     publicWindowMs: "60000"
     publicMax: "200"
-
-# -- Outbox worker (same backend image, runs integration_outbox consumer)
-# claimOutboxBatch uses FOR UPDATE SKIP LOCKED — safe to run replicas > 1.
-# enabled defaults to true if omitted (see deployment-outbox-worker template).
-outboxWorker:
-  enabled: true
-  replicas: 1
-  resources:
-    requests:
-      cpu: 25m
-      memory: 128Mi
-    limits:
-      cpu: 250m
-      memory: 256Mi
-  livenessProbe:
-    enabled: false
-    initialDelaySeconds: 60
-    periodSeconds: 60
 
 # -- Frontend (Next.js) ---------------------------------------------------
 frontend:
@@ -163,6 +145,10 @@ frontend:
 database:
   # Option 1: full URI (takes precedence)
   uri: ""
+  # Pipeline performance fix: Revert if needed.
+  existingSecretName: ""
+  existingSecretKey: "uri"
+  # Pipeline performance fix: Revert if needed.
   # Option 2: components (used when uri is empty)
   host: ""
   port: "5432"
@@ -171,6 +157,14 @@ database:
   name: soba
   adminDatabase: postgres
   poolMax: "10"
+  # Pipeline performance fix: Revert if needed.
+  connectionTimeoutMs: "10000"
+  queryTimeoutMs: "60000"
+  statementTimeoutMs: "60000"
+  lockTimeoutMs: "10000"
+  migrationReadyAttempts: "5"
+  migrationReadySleepMs: "5000"
+  # Pipeline performance fix: Revert if needed.
 
 # -- Form.io ---------------------------------------------------------------
 formio:
@@ -227,3 +221,12 @@ mongodb:
   persistence:
     size: 1Gi
     storageClassName: ""
+
+# -- Vault Agent Injector
+vault:
+  enabled: false
+  role: ""
+  authPath: auth/k8s-silver
+  namespace: platform-services
+  secretPath: ""
+  serviceAccountName: ""

@@ -1,14 +1,12 @@
 import {
   FormEngineAdapter,
+  type CreateSubmissionInput,
   type FormEngineReadinessResult,
-  FormVersionProvisionInput,
-  SubmissionProvisionInput,
+  type UpsertSchemaInput,
 } from '../../core/integrations/form-engine/FormEngineAdapter';
 import { PluginConfigReader } from '../../core/config/pluginConfig';
+import { ValidationError } from '../../core/errors';
 import { getAuthenticatedFormioClient } from './formioV5Client';
-import { getTempDemoFormDefinition } from './tempDemoFormDefinition';
-
-const placeholderRef = (prefix: string, id: string) => `${prefix}-${id}`;
 
 export interface FormioV5Config {
   apiBaseUrl: string;
@@ -32,23 +30,12 @@ const loadConfig = (config: PluginConfigReader): FormioV5Config => {
   };
 };
 
-function sanitizePathSegment(raw: string): string {
-  const s = raw
-    .replace(/[^a-z0-9-]/gi, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-  return s.length > 0 ? s.toLowerCase() : 'form';
-}
+/** Deterministic Form.io identity for a SOBA form version (unique per project; the idempotency key). */
+const sobaEngineName = (formVersionId: string): string => `soba-${formVersionId}`;
 
-function cloneFormDefinition(def: Record<string, unknown>): Record<string, unknown> {
-  return JSON.parse(JSON.stringify(def)) as Record<string, unknown>;
-}
-
-/** Tags for tenancy: `soba` plus workspace id (SOBA tenant) for Form.io filtering. */
+/** Tenancy tags: always include `soba` and the workspace id; preserve any existing tags. */
 function mergeSobaWorkspaceTags(existing: unknown, workspaceId: string): string[] {
-  const out = new Set<string>();
-  out.add('soba');
-  out.add(workspaceId);
+  const out = new Set<string>(['soba', workspaceId]);
   if (Array.isArray(existing)) {
     for (const t of existing) {
       const s = t == null ? '' : String(t).trim();
@@ -63,6 +50,99 @@ function mergeSobaWorkspaceTags(existing: unknown, workspaceId: string): string[
   return [...out];
 }
 
+/**
+ * Map a Form.io rejection that carries a 4xx status into a ValidationError (HTTP 400), so a
+ * malformed/rejected schema surfaces as a client error rather than a 500. Re-throws anything else
+ * (network/5xx) unchanged.
+ */
+function rethrowEngineRejection(err: unknown): never {
+  const status =
+    typeof err === 'object' && err !== null && 'status' in err
+      ? Number((err as { status: unknown }).status)
+      : NaN;
+  if (Number.isFinite(status) && status >= 400 && status < 500) {
+    const message =
+      err instanceof Error && err.message ? err.message : 'Form engine rejected the schema';
+    throw new ValidationError(`Form engine rejected the schema: ${message}`);
+  }
+  throw err;
+}
+
+/** Form.io-managed identity/audit fields the client must never set (write) or receive (read). */
+const ENGINE_MANAGED_FIELDS = ['_id', 'machineName', 'created', 'modified', 'owner', 'project'];
+
+/** Remove engine-managed fields from a schema document (returns a shallow clone). */
+export function stripEngineManagedFields(doc: Record<string, unknown>): Record<string, unknown> {
+  const cleaned: Record<string, unknown> = { ...doc };
+  for (const key of ENGINE_MANAGED_FIELDS) {
+    delete cleaned[key];
+  }
+  return cleaned;
+}
+
+/** Build the Form.io form document for an upsert: strip engine-managed fields, then apply
+ *  deterministic identity + SOBA tenancy metadata. */
+export function buildSchemaBody(input: UpsertSchemaInput): Record<string, unknown> {
+  const base = stripEngineManagedFields(
+    JSON.parse(JSON.stringify(input.schema ?? {})) as Record<string, unknown>,
+  );
+  const name = sobaEngineName(input.formVersionId);
+
+  const prevProps =
+    typeof base.properties === 'object' &&
+    base.properties !== null &&
+    !Array.isArray(base.properties)
+      ? (base.properties as Record<string, unknown>)
+      : {};
+
+  const title =
+    (input.title && input.title.trim()) ||
+    (typeof base.title === 'string' && base.title.trim()) ||
+    'Form';
+
+  return {
+    ...base,
+    name,
+    path: name,
+    title,
+    properties: {
+      ...prevProps,
+      soba_workspace_id: input.workspaceId,
+      soba_form_version_id: input.formVersionId,
+    },
+    tags: mergeSobaWorkspaceTags(base.tags, input.workspaceId),
+  };
+}
+
+/**
+ * Form.io strips submission `data` keys that aren't form components, so the correlation key lives in
+ * submission `metadata` (preserved intact) as a single STRING field — Form.io can filter metadata by
+ * string but not by number, so the deterministic key is a string, not the numeric `soba_revision_no`.
+ */
+const SOBA_REVISION_KEY_FIELD = 'soba_revision_key';
+
+/** Deterministic per-revision idempotency key for a submission save. */
+const sobaSubmissionRevisionKey = (submissionId: string, revisionNo: number): string =>
+  `soba-${submissionId}-r${revisionNo}`;
+
+/** Build the Form.io submission document for a create: the answer data plus SOBA correlation/tenancy
+ *  metadata (the per-revision key in metadata, queryable for idempotency). */
+export function buildSubmissionBody(input: CreateSubmissionInput): Record<string, unknown> {
+  const answers =
+    typeof input.data === 'object' && input.data !== null && !Array.isArray(input.data)
+      ? (JSON.parse(JSON.stringify(input.data)) as Record<string, unknown>)
+      : {};
+  return {
+    data: answers,
+    metadata: {
+      soba_workspace_id: input.workspaceId,
+      soba_submission_id: input.submissionId,
+      soba_revision_no: input.revisionNo,
+      [SOBA_REVISION_KEY_FIELD]: sobaSubmissionRevisionKey(input.submissionId, input.revisionNo),
+    },
+  };
+}
+
 export class FormioEngineAdapter implements FormEngineAdapter {
   private readonly config: FormioV5Config;
   private readonly pluginConfig: PluginConfigReader;
@@ -70,59 +150,6 @@ export class FormioEngineAdapter implements FormEngineAdapter {
   constructor(pluginConfig: PluginConfigReader) {
     this.pluginConfig = pluginConfig;
     this.config = loadConfig(pluginConfig);
-  }
-
-  async createFormVersionSchema(input: FormVersionProvisionInput): Promise<{ engineRef: string }> {
-    const client = await getAuthenticatedFormioClient(this.pluginConfig);
-    if (!client) {
-      return { engineRef: placeholderRef('formio-schema', input.formVersionId) };
-    }
-
-    const baseRaw =
-      input.formioFormDefinition != null
-        ? cloneFormDefinition(input.formioFormDefinition)
-        : getTempDemoFormDefinition();
-
-    const vid = input.formVersionId.replace(/-/g, '');
-    const short = vid.slice(0, 8);
-    const slug = sanitizePathSegment(input.formSlug ?? 'soba-form');
-    const displayName = (input.formName ?? 'Form').trim() || 'Form';
-    const path = `${slug}-${short}`;
-
-    const prevProps =
-      typeof baseRaw.properties === 'object' &&
-      baseRaw.properties !== null &&
-      !Array.isArray(baseRaw.properties)
-        ? (baseRaw.properties as Record<string, unknown>)
-        : {};
-
-    const body: Record<string, unknown> = {
-      ...baseRaw,
-      title: displayName,
-      name: slug,
-      path,
-      properties: {
-        ...prevProps,
-        soba_workspace_id: input.workspaceId,
-        soba_form_version_id: input.formVersionId,
-      },
-    };
-
-    delete body._id;
-    delete body.machineName;
-
-    body.tags = mergeSobaWorkspaceTags(body.tags, input.workspaceId);
-
-    const created = await client.saveForm(body);
-    const id = created && typeof created === 'object' && '_id' in created ? created._id : null;
-    if (id == null || id === '') {
-      throw new Error('Form.io saveForm did not return _id');
-    }
-    return { engineRef: String(id) };
-  }
-
-  async createSubmissionRecord(input: SubmissionProvisionInput): Promise<{ engineRef: string }> {
-    return { engineRef: placeholderRef('formio-submission', input.submissionId) };
   }
 
   async readinessCheck(): Promise<FormEngineReadinessResult> {
@@ -139,5 +166,109 @@ export class FormioEngineAdapter implements FormEngineAdapter {
         message: err instanceof Error ? err.message : String(err),
       };
     }
+  }
+
+  /**
+   * Idempotent create-or-update of the Form.io document for a form version, keyed by the
+   * deterministic name `soba-{formVersionId}`. Retries converge on a single document.
+   */
+  async upsertSchema(input: UpsertSchemaInput): Promise<{ engineRef: string }> {
+    const client = await getAuthenticatedFormioClient(this.pluginConfig);
+    if (!client) {
+      throw new Error('Form.io admin client unavailable; cannot upsert form schema');
+    }
+
+    const body = buildSchemaBody(input);
+    const name = sobaEngineName(input.formVersionId);
+
+    // Find an existing document by the deterministic name so a retry updates instead of duplicating.
+    const existing = (await client.loadForms({ params: { name } })) as Array<
+      Record<string, unknown>
+    >;
+    const existingId = existing.length > 0 ? existing[0]._id : undefined;
+    if (existingId) {
+      body._id = existingId;
+    }
+
+    const saved = (await client.saveForm(body).catch(rethrowEngineRejection)) as Record<
+      string,
+      unknown
+    > | null;
+    const engineRef = saved?._id;
+    if (engineRef == null || engineRef === '') {
+      throw new Error('Form.io saveForm did not return an _id');
+    }
+    return { engineRef: String(engineRef) };
+  }
+
+  /** Read the Form.io document by engine ref, stripped of engine-managed fields. Null if not found. */
+  async readSchema(engineRef: string): Promise<Record<string, unknown> | null> {
+    const client = await getAuthenticatedFormioClient(this.pluginConfig);
+    if (!client) {
+      throw new Error('Form.io admin client unavailable; cannot read form schema');
+    }
+    const doc = (await client.loadForm(engineRef)) as Record<string, unknown> | null;
+    return doc ? stripEngineManagedFields(doc) : null;
+  }
+
+  /** Delete the Form.io document by engine ref (compensation / cleanup). */
+  async deleteSchema(engineRef: string): Promise<void> {
+    const client = await getAuthenticatedFormioClient(this.pluginConfig);
+    if (!client) {
+      throw new Error('Form.io admin client unavailable; cannot delete form schema');
+    }
+    await client.deleteForm(engineRef);
+  }
+
+  /**
+   * Create a new Form.io submission document under the form `engineFormRef`. Idempotent per
+   * `(submissionId, revisionNo)`: a retried save with the same target revision finds the existing
+   * document (via the planted correlation key) instead of creating a duplicate.
+   */
+  async createSubmission(input: CreateSubmissionInput): Promise<{ engineRef: string }> {
+    const client = await getAuthenticatedFormioClient(this.pluginConfig);
+    if (!client) {
+      throw new Error('Form.io admin client unavailable; cannot create submission');
+    }
+
+    const key = sobaSubmissionRevisionKey(input.submissionId, input.revisionNo);
+
+    // Idempotency: a retried save (same submission + revision) must converge on one document.
+    const existing = (await client.loadSubmissions(input.engineFormRef, {
+      params: { [`metadata.${SOBA_REVISION_KEY_FIELD}`]: key },
+    })) as Array<Record<string, unknown>>;
+    if (existing.length > 0 && existing[0]?._id != null && existing[0]._id !== '') {
+      return { engineRef: String(existing[0]._id) };
+    }
+
+    const body = buildSubmissionBody(input);
+    const saved = (await client
+      .saveSubmission(input.engineFormRef, body)
+      .catch(rethrowEngineRejection)) as Record<string, unknown> | null;
+    const engineRef = saved?._id;
+    if (engineRef == null || engineRef === '') {
+      throw new Error('Form.io saveSubmission did not return an _id');
+    }
+    return { engineRef: String(engineRef) };
+  }
+
+  /** Read a Form.io submission by form ref + submission ref, stripped of engine-managed fields and
+   *  the SOBA correlation `metadata` (internal bookkeeping, not answer content). Null if not found. */
+  async readSubmission(
+    engineFormRef: string,
+    engineRef: string,
+  ): Promise<Record<string, unknown> | null> {
+    const client = await getAuthenticatedFormioClient(this.pluginConfig);
+    if (!client) {
+      throw new Error('Form.io admin client unavailable; cannot read submission');
+    }
+    const doc = (await client.loadSubmission(engineFormRef, engineRef)) as Record<
+      string,
+      unknown
+    > | null;
+    if (!doc) return null;
+    const cleaned = stripEngineManagedFields(doc);
+    delete cleaned.metadata;
+    return cleaned;
   }
 }

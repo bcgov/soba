@@ -1,0 +1,49 @@
+# Reusable static analysis and unit tests (pnpm qa).
+name: QA
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  qa:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Frontend · type-check
+            command: pnpm --filter frontend run type-check
+          - name: Frontend · lint
+            command: pnpm --filter frontend run lint
+          - name: Backend · type-check
+            command: pnpm --filter backend run type-check
+          - name: Backend · lint
+            command: pnpm --filter backend run lint
+          - name: Frontend · unit tests
+            command: pnpm --filter frontend run test
+          - name: Backend · unit tests
+            command: pnpm --filter backend run test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.28.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run check
+        run: ${{ matrix.command }}

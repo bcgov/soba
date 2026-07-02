@@ -1,8 +1,4 @@
-import {
-  ApiErrorSchema,
-  IdParamSchema,
-  EnqueueProvisionSchema,
-} from '../../../../src/core/api/shared/schema';
+import { ApiErrorSchema, IdParamSchema } from '../../../../src/core/api/shared/schema';
 
 describe('api shared schema', () => {
   it('IdParamSchema parses valid id', () => {
@@ -32,17 +28,5 @@ describe('api shared schema', () => {
 
   it('ApiErrorSchema rejects non-string error', () => {
     expect(() => ApiErrorSchema.parse({ error: 123 })).toThrow();
-  });
-
-  it('EnqueueProvisionSchema parses true', () => {
-    expect(EnqueueProvisionSchema.parse(true)).toBe(true);
-  });
-
-  it('EnqueueProvisionSchema parses undefined', () => {
-    expect(EnqueueProvisionSchema.parse(undefined)).toBeUndefined();
-  });
-
-  it('EnqueueProvisionSchema optional accepts boolean', () => {
-    expect(EnqueueProvisionSchema.parse(false)).toBe(false);
   });
 });

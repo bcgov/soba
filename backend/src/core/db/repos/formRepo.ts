@@ -1,6 +1,6 @@
 import { and, desc, eq, ilike, isNull, lt, or } from 'drizzle-orm';
-import { db } from '../client';
-import { forms } from '../schema';
+import { db, type DbOrTx } from '../client';
+import { forms, formVersions } from '../schema';
 
 export type FormListSort = 'id:desc' | 'updatedAt:desc';
 export type FormCursorMode = 'id' | 'ts_id';
@@ -23,6 +23,8 @@ export interface FormListRow {
   status: string;
   createdAt: Date;
   updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
 }
 
 export interface FormRecord {
@@ -97,6 +99,8 @@ export const listFormsForWorkspace = async (
       status: forms.status,
       createdAt: forms.createdAt,
       updatedAt: forms.updatedAt,
+      createdBy: forms.createdBy,
+      updatedBy: forms.updatedBy,
     })
     .from(forms)
     .where(and(...whereClauses))
@@ -127,8 +131,44 @@ export const getFormById = async (
   return row[0] ?? null;
 };
 
-export const createForm = async (input: CreateFormInput): Promise<FormRecord> => {
-  const created = await db
+export const getFormByEngineSchemaRef = async (
+  workspaceId: string,
+  engineSchemaRef: string,
+): Promise<FormRecord | null> => {
+  const rows = await db
+    .select({
+      id: forms.id,
+      workspaceId: forms.workspaceId,
+      formEngineCode: forms.formEngineCode,
+      slug: forms.slug,
+      name: forms.name,
+      description: forms.description,
+      status: forms.status,
+      createdAt: forms.createdAt,
+      updatedAt: forms.updatedAt,
+      createdBy: forms.createdBy,
+      updatedBy: forms.updatedBy,
+      deletedAt: forms.deletedAt,
+      deletedBy: forms.deletedBy,
+    })
+    .from(forms)
+    .innerJoin(formVersions, eq(formVersions.formId, forms.id))
+    .where(
+      and(
+        eq(forms.workspaceId, workspaceId),
+        eq(formVersions.engineSchemaRef, engineSchemaRef),
+        isNull(forms.deletedAt),
+        isNull(formVersions.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
+};
+
+export const createForm = async (input: CreateFormInput, tx?: DbOrTx): Promise<FormRecord> => {
+  const d = tx ?? db;
+  const created = await d
     .insert(forms)
     .values({
       workspaceId: input.workspaceId,

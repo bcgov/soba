@@ -4,7 +4,6 @@ import {
   featureStatus,
   formStatus,
   formVersionState,
-  outboxStatus,
   workspaceMembershipRole,
   workspaceMembershipStatus,
 } from '../db/schema';
@@ -32,14 +31,12 @@ const CODE_TABLES: Record<
   | typeof formVersionState
   | typeof workspaceMembershipRole
   | typeof workspaceMembershipStatus
-  | typeof outboxStatus
 > = {
   feature_status: featureStatus,
   form_status: formStatus,
   form_version_state: formVersionState,
   workspace_membership_role: workspaceMembershipRole,
   workspace_membership_status: workspaceMembershipStatus,
-  outbox_status: outboxStatus,
 };
 
 type CodeTable = (typeof CODE_TABLES)[keyof typeof CODE_TABLES];
