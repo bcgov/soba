@@ -31,7 +31,6 @@ export async function login(page: Page) {
   await page.fill('input[name="otc"]', token);
   await page.click('input[type="submit"]');
   await page.click('input[type="submit"]');
-  await expect(page.locator("#idSIButton9")).toBeVisible();
   await page.locator("#idSIButton9").click();
   //Visibility of the user dropdown confirms successful login (logout now lives inside it)
   await expect(page.locator('[data-testid="user-dropdown"]')).toBeVisible();
