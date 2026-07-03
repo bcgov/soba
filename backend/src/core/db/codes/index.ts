@@ -86,6 +86,9 @@ export const WORKSPACE_OWNERS_GROUP_NAME = 'Workspace owners';
 /** Display name for the group that grants form admin on all forms in a workspace. */
 export const FORM_ADMINS_GROUP_NAME = 'Form administrators';
 
+/** Display name for the group that grants form submit access in a workspace. */
+export const FORM_SUBMITTERS_GROUP_NAME = 'Form submitters';
+
 /** Logical IDP groups (see idp_group / idp_group_member). */
 export const IdpGroups = {
   bcgov: 'bcgov',

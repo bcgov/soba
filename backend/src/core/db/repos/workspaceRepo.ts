@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import {
   FORM_ADMINS_GROUP_NAME,
+  FORM_SUBMITTERS_GROUP_NAME,
   Roles,
   WORKSPACE_OWNERS_GROUP_NAME,
   WorkspaceMembershipRole,
@@ -92,17 +93,11 @@ export const canManageWorkspaceOwners = async (
 
 type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-/** Creates a workspace group with a single role and adds one user member. */
-const addGroupWithMember = async (
+/** Creates a workspace group carrying a single role; returns the new group id. */
+const createGroupWithRole = async (
   tx: DbTx,
-  args: {
-    workspaceId: string;
-    name: string;
-    roleCode: string;
-    membershipId: string;
-    displayLabel: string | null;
-  },
-) => {
+  args: { workspaceId: string; name: string; roleCode: string; displayLabel: string | null },
+): Promise<string> => {
   const groupId = uuidv7();
   await tx.insert(workspaceGroups).values({
     id: groupId,
@@ -121,11 +116,19 @@ const addGroupWithMember = async (
     createdBy: args.displayLabel,
     updatedBy: args.displayLabel,
   });
+  return groupId;
+};
+
+/** Adds a workspace member (by membership id) to a group. */
+const addUserToGroup = async (
+  tx: DbTx,
+  args: { workspaceId: string; groupId: string; membershipId: string; displayLabel: string | null },
+) => {
   await tx.insert(workspaceGroupMemberships).values({
     id: uuidv7(),
     workspaceId: args.workspaceId,
     workspaceMembershipId: args.membershipId,
-    groupId,
+    groupId: args.groupId,
     status: MEMBERSHIP_STATUS_ACTIVE,
     createdBy: args.displayLabel,
     updatedBy: args.displayLabel,
@@ -152,19 +155,27 @@ const bootstrapWorkspaceOwner = async (
     updatedBy: displayLabel,
   });
 
-  await addGroupWithMember(tx, {
+  const ownersGroupId = await createGroupWithRole(tx, {
     workspaceId,
     name: WORKSPACE_OWNERS_GROUP_NAME,
     roleCode: Roles.workspace_owner,
-    membershipId,
     displayLabel,
   });
+  await addUserToGroup(tx, { workspaceId, groupId: ownersGroupId, membershipId, displayLabel });
 
-  await addGroupWithMember(tx, {
+  const formAdminsGroupId = await createGroupWithRole(tx, {
     workspaceId,
     name: FORM_ADMINS_GROUP_NAME,
     roleCode: Roles.form_admin,
-    membershipId,
+    displayLabel,
+  });
+  await addUserToGroup(tx, { workspaceId, groupId: formAdminsGroupId, membershipId, displayLabel });
+
+  // Submitter group starts empty; members are added when submitter access is configured.
+  await createGroupWithRole(tx, {
+    workspaceId,
+    name: FORM_SUBMITTERS_GROUP_NAME,
+    roleCode: Roles.form_submitter,
     displayLabel,
   });
 
@@ -172,7 +183,8 @@ const bootstrapWorkspaceOwner = async (
 };
 
 /**
- * Creates a user-owned team workspace with owner membership and owners group.
+ * Creates a user-owned team workspace: owner membership plus the owners, form-admin, and
+ * form-submitter groups.
  */
 export const createTeamWorkspace = async (userId: string, name: string) => {
   return db.transaction(async (tx) => {
