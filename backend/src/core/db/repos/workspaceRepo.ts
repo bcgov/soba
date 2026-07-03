@@ -1,13 +1,11 @@
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import {
   FORM_ADMINS_GROUP_NAME,
   FORM_SUBMITTERS_GROUP_NAME,
   Roles,
-  WORKSPACE_OWNERS_GROUP_NAME,
   WorkspaceMembershipRole,
   WorkspaceMembershipSource,
-  WorkspaceMembershipStatus,
 } from '../codes';
 import { db } from '../client';
 import {
@@ -37,58 +35,6 @@ export const getWorkspaceById = async (workspaceId: string): Promise<{ id: strin
     .where(eq(workspaces.id, workspaceId))
     .limit(1);
   return rows[0] ?? null;
-};
-
-/**
- * Returns the workspace group that confers the workspace-owner role, if present.
- */
-export const getWorkspaceOwnersGroup = async (workspaceId: string) => {
-  const rows = await db
-    .select({ id: workspaceGroups.id })
-    .from(workspaceGroups)
-    .innerJoin(
-      workspaceGroupRoles,
-      and(
-        eq(workspaceGroupRoles.groupId, workspaceGroups.id),
-        eq(workspaceGroupRoles.roleCode, Roles.workspace_owner),
-      ),
-    )
-    .where(eq(workspaceGroups.workspaceId, workspaceId))
-    .limit(1);
-  return rows[0] ?? null;
-};
-
-/**
- * True if the actor is in this workspace's owners group (or is a platform admin, not implemented).
- * Use when enforcing: only workspace owners can add/remove members from the owners group.
- */
-export const canManageWorkspaceOwners = async (
-  workspaceId: string,
-  actorId: string,
-): Promise<boolean> => {
-  const ownersGroup = await getWorkspaceOwnersGroup(workspaceId);
-  if (!ownersGroup) return false;
-  const rows = await db
-    .select({ id: workspaceGroupMemberships.id })
-    .from(workspaceGroupMemberships)
-    .innerJoin(
-      workspaceMemberships,
-      and(
-        eq(workspaceMemberships.id, workspaceGroupMemberships.workspaceMembershipId),
-        eq(workspaceMemberships.workspaceId, workspaceId),
-        eq(workspaceMemberships.userId, actorId),
-        eq(workspaceMemberships.status, WorkspaceMembershipStatus.active),
-      ),
-    )
-    .where(
-      and(
-        eq(workspaceGroupMemberships.workspaceId, workspaceId),
-        eq(workspaceGroupMemberships.groupId, ownersGroup.id),
-        eq(workspaceGroupMemberships.status, MEMBERSHIP_STATUS_ACTIVE),
-      ),
-    )
-    .limit(1);
-  return rows.length > 0;
 };
 
 type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -155,14 +101,6 @@ const bootstrapWorkspaceOwner = async (
     updatedBy: displayLabel,
   });
 
-  const ownersGroupId = await createGroupWithRole(tx, {
-    workspaceId,
-    name: WORKSPACE_OWNERS_GROUP_NAME,
-    roleCode: Roles.workspace_owner,
-    displayLabel,
-  });
-  await addUserToGroup(tx, { workspaceId, groupId: ownersGroupId, membershipId, displayLabel });
-
   const formAdminsGroupId = await createGroupWithRole(tx, {
     workspaceId,
     name: FORM_ADMINS_GROUP_NAME,
@@ -183,8 +121,7 @@ const bootstrapWorkspaceOwner = async (
 };
 
 /**
- * Creates a user-owned team workspace: owner membership plus the owners, form-admin, and
- * form-submitter groups.
+ * Creates a user-owned team workspace: owner membership plus the form-admin and form-submitter groups.
  */
 export const createTeamWorkspace = async (userId: string, name: string) => {
   return db.transaction(async (tx) => {

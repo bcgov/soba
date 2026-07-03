@@ -78,6 +78,13 @@
       "when": 1772603000000,
       "tag": "0010_group_member_kinds",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1772604000000,
+      "tag": "0011_remove_workspace_owner_role",
+      "breakpoints": true
     }
   ]
 }

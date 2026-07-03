@@ -4,7 +4,6 @@
  */
 
 export const Roles = {
-  workspace_owner: 'workspace_owner',
   // Form roles. form_admin holds the `*` wildcard permission.
   form_admin: 'form_admin',
   form_designer: 'form_designer',
@@ -79,9 +78,6 @@ export const FeatureStatus = {
   deprecated: 'deprecated',
 } as const;
 export type FeatureStatusCode = (typeof FeatureStatus)[keyof typeof FeatureStatus];
-
-/** Display name for the workspace owners group. */
-export const WORKSPACE_OWNERS_GROUP_NAME = 'Workspace owners';
 
 /** Display name for the group that grants form admin on all forms in a workspace. */
 export const FORM_ADMINS_GROUP_NAME = 'Form administrators';
