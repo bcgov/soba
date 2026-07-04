@@ -175,16 +175,6 @@ describe('env', () => {
     );
   });
 
-  it('createEnvReader getWorkspacePluginsAllowed returns required value from simulated env', () => {
-    const reader = createEnvReader({ WORKSPACE_PLUGINS_ALLOWED: 'personal-local' });
-    expect(reader.getWorkspacePluginsAllowed()).toBe('personal-local');
-  });
-
-  it('createEnvReader getWorkspacePluginsStrictModeRaw returns value from simulated env', () => {
-    const reader = createEnvReader({ WORKSPACE_PLUGINS_STRICT_MODE: 'false' });
-    expect(reader.getWorkspacePluginsStrictModeRaw()).toBe('false');
-  });
-
   it('createEnvReader isDevelopment returns true when NODE_ENV is development', () => {
     const reader = createEnvReader({ NODE_ENV: 'development' });
     expect(reader.isDevelopment()).toBe(true);

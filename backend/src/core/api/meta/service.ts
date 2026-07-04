@@ -1,7 +1,6 @@
 import packageJson from '../../../../package.json';
 import { env } from '../../config/env';
 import { authEnv } from '../../config/authEnv';
-import { getWorkspacePluginsConfig } from '../../config/workspacePlugins';
 import { getFormEnginePlugins } from '../../integrations/form-engine/FormEngineRegistry';
 import { getPluginCatalog } from '../../integrations/plugins/PluginRegistry';
 import { isFeatureEnabled, listFeatures } from '../../db/repos/featureRepo';
@@ -21,20 +20,13 @@ function parseKeycloakIssuer(issuer: string): { url: string; realm: string } {
 
 export class MetaApiService {
   getPlugins() {
-    const config = getWorkspacePluginsConfig();
     const plugins = getPluginCatalog();
     const activeFormEngineCode =
       env.getFormEngineDefaultCode() ?? getFormEnginePlugins()[0]?.code ?? 'formio-v5';
     const activeCacheCode = env.getCacheDefaultCode() ?? 'cache-memory';
     const activeMessageBusCode = env.getMessageBusDefaultCode() ?? 'messagebus-memory';
-    const activeCodes = new Set([
-      activeFormEngineCode,
-      activeCacheCode,
-      activeMessageBusCode,
-      ...config.allowedPlugins,
-    ]);
+    const activeCodes = new Set([activeFormEngineCode, activeCacheCode, activeMessageBusCode]);
     return {
-      allowedPluginCodes: config.allowedPlugins,
       plugins: plugins.map((plugin) => ({
         ...plugin,
         enabled: activeCodes.has(plugin.code),

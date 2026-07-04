@@ -67,12 +67,6 @@ backend:
     cacheDefaultCode: cache-memory
     messagebusDefaultCode: messagebus-memory
     sobaSystemSubject: soba-system
-    workspacePluginsAllowed: "enterprise-cstar,personal-local"
-    workspacePluginsStrictMode: "false"
-    pluginEnterpriseCstarHeaderKeys: "x-enterprise-workspace-id,x-cstar-tenant-id"
-    pluginEnterpriseCstarRequireExternalHeader: "false"
-    pluginPersonalLocalCookieKey: soba_workspace_id
-    pluginPersonalLocalAllowHeaderOverride: "true"
 
   # -- configmap-formio: PLUGIN_FORMIO_V5_* (non-secret values)
   formio:
