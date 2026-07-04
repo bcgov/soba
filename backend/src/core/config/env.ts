@@ -146,9 +146,6 @@ export function createEnvReader(source: EnvSource) {
     // Pipeline performance fix: Revert if needed.
     getSystemSobaUserEmail: () => getOptionalEnvFrom(source, 'SYSTEM_SOBA_USER_EMAIL'),
     getSystemSobaSubject: () => getOptionalEnvFrom(source, 'SOBA_SYSTEM_SUBJECT'),
-    getWorkspacePluginsAllowed: () => getRequiredEnvFrom(source, 'WORKSPACE_PLUGINS_ALLOWED'),
-    getWorkspacePluginsStrictModeRaw: () =>
-      getRequiredEnvFrom(source, 'WORKSPACE_PLUGINS_STRICT_MODE'),
     isDevelopment: () => getOptionalEnvFrom(source, 'NODE_ENV') === 'development',
     getPluginsPath: () =>
       getOptionalEnvFrom(source, 'PLUGINS_PATH') ??
@@ -204,8 +201,6 @@ export const env = {
   getSystemSobaUserEmail: () => getOptionalEnv('SYSTEM_SOBA_USER_EMAIL'),
   /** Subject for the system SOBA user identity (provider=system). Default in code: soba-system. */
   getSystemSobaSubject: () => getOptionalEnv('SOBA_SYSTEM_SUBJECT'),
-  getWorkspacePluginsAllowed: () => getRequiredEnv('WORKSPACE_PLUGINS_ALLOWED'),
-  getWorkspacePluginsStrictModeRaw: () => getRequiredEnv('WORKSPACE_PLUGINS_STRICT_MODE'),
   isDevelopment: () => getOptionalEnv('NODE_ENV') === 'development',
   getPluginsPath: () => getOptionalEnv('PLUGINS_PATH') ?? getOptionalEnv('WORKSPACE_PLUGINS_PATH'),
   getCacheDefaultCode: () => getOptionalEnv('CACHE_DEFAULT_CODE'),

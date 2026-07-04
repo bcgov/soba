@@ -154,8 +154,24 @@ Creating a workspace writes, in one transaction:
 
 ## CSTAR tenants
 
-Everything above describes internal workspaces. Enterprise/CSTAR tenant workspaces
-(`kind = 'enterprise'`) are provisioned from the CSTAR Tenant Management System and synced in through the
-`enterprise-cstar` plugin — their groups and role assignments originate there, not here. The same tables
-hold the data, so don't assume anything on an internal workspace was driven by CSTAR. (The enterprise
-resolver path is currently dormant.)
+Everything above is internal workspaces. Enterprise/CSTAR tenant workspaces (`kind = 'enterprise'`) are
+meant to be provisioned from the CSTAR Tenant Management System and synced in — groups and role assignments
+come from there. They land in the same `workspace` / `workspace_group` / `workspace_membership` tables, so
+don't assume a row was created locally.
+
+The `enterprise-cstar` resolver plugin and `enterprise_binding` repo were removed in 2026-07 (dormant:
+`resolve()` was never called, workspace context is resolved per-route by `workspaceContext` now). The
+binding/sync tables are kept for a future sync and are currently empty: `enterprise_workspace_binding`,
+`enterprise_group_binding`, `enterprise_membership_binding`, `enterprise_sync_cursor`, `enterprise_sync_log`.
+
+Notes for whoever builds the sync (checked against the CSTAR codebase):
+
+- Pull only — no webhooks or events. A poller on our side fetches and reconciles.
+- No `updated_since` or cursor params. Watermark client-side on each entity's `updatedDateTime` +
+  `isDeleted`, stashed in `enterprise_sync_cursor.cursor_value`.
+- CSTAR is group-centric: roles go Role → Group → User (`GroupSharedServiceRole`). Bind CSTAR `Group.id` to
+  `workspace_group_id`; our group→role catalog does the rest.
+- Identity: `provider_identity_subject` = CSTAR `SSOUser.ssoUserId`, `provider_identity_type` = `idpType`
+  (`idir` / `bceidbusiness` / `azureidir`; no Basic BCeID).
+- Auth to CSTAR as a registered shared service (JWT audience = our `clientIdentifier`).
+- Nothing maps CSTAR `SharedServiceRole` → our role yet. Check whether group binding covers it or add a table.
