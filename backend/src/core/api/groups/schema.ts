@@ -94,12 +94,29 @@ export const ListGroupsResponseSchema = z
   })
   .openapi('Groups_ListGroupsResponse');
 
+export const SetSubmitterAudienceBodySchema = z
+  .discriminatedUnion('mode', [
+    z.object({ mode: z.literal('public') }),
+    z.object({ mode: z.literal('protected'), idps: z.array(z.string().trim().min(1)).max(20) }),
+  ])
+  .openapi('Groups_SetSubmitterAudienceBody');
+
+export const SubmitterAudienceSchema = z
+  .object({
+    mode: z.enum(['public', 'protected', 'none']),
+    idps: z.array(z.string()),
+    users: z.array(z.object({ membershipId: z.string(), displayLabel: z.string().nullable() })),
+    available: z.array(z.object({ code: z.string(), name: z.string() })),
+  })
+  .openapi('Groups_SubmitterAudience');
+
 const TAG = 'core.groups';
 const GROUPS_PATH = '/workspaces/{id}/groups';
 const GROUP_PATH = '/workspaces/{id}/groups/{groupId}';
 const GROUP_ROLES_PATH = '/workspaces/{id}/groups/{groupId}/roles';
 const GROUP_MEMBERS_PATH = '/workspaces/{id}/groups/{groupId}/members';
 const GROUP_MEMBER_PATH = '/workspaces/{id}/groups/{groupId}/members/{memberId}';
+const SUBMITTER_AUDIENCE_PATH = '/workspaces/{id}/submitter-audience';
 
 const ERR_MANAGE = 'Workspace management requires an owner or admin role';
 const ERR_WORKSPACE_NOT_FOUND = 'Workspace not found';
@@ -224,6 +241,39 @@ export const registerGroupsOpenApi = (registry: OpenAPIRegistry) => {
       200: jsonResponse(OK_UPDATED_GROUP, GroupSchema),
       403: { description: ERR_MANAGE },
       404: { description: 'Workspace, group, or member not found' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: SUBMITTER_AUDIENCE_PATH,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: { params: WorkspaceGroupParamsSchema },
+    responses: {
+      200: jsonResponse(
+        'The workspace submit audience (public / protected)',
+        SubmitterAudienceSchema,
+      ),
+      403: { description: 'Actor is not a member of the workspace' },
+      404: { description: ERR_WORKSPACE_NOT_FOUND },
+    },
+  });
+
+  registry.registerPath({
+    method: 'put',
+    path: SUBMITTER_AUDIENCE_PATH,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: WorkspaceGroupParamsSchema,
+      body: jsonBody(SetSubmitterAudienceBodySchema),
+    },
+    responses: {
+      200: jsonResponse('Updated submit audience', SubmitterAudienceSchema),
+      400: { description: 'Protected needs a principal, or an invalid provider was given' },
+      403: { description: ERR_MANAGE },
+      404: { description: ERR_WORKSPACE_NOT_FOUND },
     },
   });
 };

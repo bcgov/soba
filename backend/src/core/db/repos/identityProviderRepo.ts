@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { db } from '../client';
 import { identityProviders } from '../schema';
 
@@ -21,4 +21,13 @@ export const getIdentityProvider = async (code: string): Promise<IdentityProvide
     .where(eq(identityProviders.code, code))
     .limit(1);
   return rows[0] ?? null;
+};
+
+/** Active login-enabled providers (the assignable submitter audiences), by name. */
+export const listLoginIdentityProviders = async (): Promise<{ code: string; name: string }[]> => {
+  return db
+    .select({ code: identityProviders.code, name: identityProviders.name })
+    .from(identityProviders)
+    .where(and(eq(identityProviders.isActive, true), eq(identityProviders.isLoginProvider, true)))
+    .orderBy(asc(identityProviders.name));
 };

@@ -9,7 +9,7 @@ import {
   workspaceGroups,
   workspaceMemberships,
 } from '../schema';
-import { GroupMemberKind } from '../codes';
+import { GroupMemberKind, PUBLIC_PROVIDER_CODE } from '../codes';
 
 const GROUP_STATUS_ACTIVE = 'active';
 const GROUP_STATUS_INACTIVE = 'inactive';
@@ -34,6 +34,23 @@ const groupRoleRows = (args: {
     createdBy: args.displayLabel,
     updatedBy: args.displayLabel,
   }));
+
+/** A single identity-provider membership insert row. */
+const idpMemberRow = (args: {
+  workspaceId: string;
+  groupId: string;
+  code: string;
+  displayLabel: string | null;
+}) => ({
+  id: uuidv7(),
+  workspaceId: args.workspaceId,
+  memberKind: GroupMemberKind.idp,
+  identityProviderCode: args.code,
+  groupId: args.groupId,
+  status: MEMBERSHIP_STATUS_ACTIVE,
+  createdBy: args.displayLabel,
+  updatedBy: args.displayLabel,
+});
 
 /** Creates a workspace group carrying the given roles; returns the new group id. */
 export const createGroupWithRole = async (
@@ -238,6 +255,96 @@ export const getWorkspaceGroupMeta = async (
   return rows[0] ?? null;
 };
 
+/** The id of a workspace's active system group (e.g. form_submitters), or null. */
+export const getSystemGroupId = async (
+  workspaceId: string,
+  systemCode: string,
+): Promise<string | null> => {
+  const rows = await db
+    .select({ id: workspaceGroups.id })
+    .from(workspaceGroups)
+    .where(
+      and(
+        eq(workspaceGroups.workspaceId, workspaceId),
+        eq(workspaceGroups.systemCode, systemCode),
+        eq(workspaceGroups.status, GROUP_STATUS_ACTIVE),
+      ),
+    )
+    .limit(1);
+  return rows[0]?.id ?? null;
+};
+
+/**
+ * Replaces a submitter group's public/idp audience in one transaction. `public` clears every member
+ * (public is exclusive); otherwise the idp members are reconciled to `idps` — user members are left
+ * untouched so a future direct-user audience isn't clobbered.
+ */
+export const setSubmitterAudience = async (args: {
+  workspaceId: string;
+  groupId: string;
+  public: boolean;
+  idps: string[];
+  displayLabel: string | null;
+}): Promise<void> => {
+  await db.transaction(async (tx) => {
+    if (args.public) {
+      await tx
+        .delete(workspaceGroupMemberships)
+        .where(eq(workspaceGroupMemberships.groupId, args.groupId));
+      await tx.insert(workspaceGroupMemberships).values(
+        idpMemberRow({
+          workspaceId: args.workspaceId,
+          groupId: args.groupId,
+          code: PUBLIC_PROVIDER_CODE,
+          displayLabel: args.displayLabel,
+        }),
+      );
+      return;
+    }
+
+    const current = await tx
+      .select({ code: workspaceGroupMemberships.identityProviderCode })
+      .from(workspaceGroupMemberships)
+      .where(
+        and(
+          eq(workspaceGroupMemberships.groupId, args.groupId),
+          eq(workspaceGroupMemberships.memberKind, GroupMemberKind.idp),
+          eq(workspaceGroupMemberships.status, MEMBERSHIP_STATUS_ACTIVE),
+        ),
+      );
+    const currentCodes = current.map((r) => r.code).filter((c): c is string => c != null);
+    const desired = new Set(args.idps);
+
+    // Drop public and any idp no longer wanted; add the new ones. Users are left as-is.
+    const toRemove = currentCodes.filter((c) => c === PUBLIC_PROVIDER_CODE || !desired.has(c));
+    if (toRemove.length) {
+      await tx
+        .delete(workspaceGroupMemberships)
+        .where(
+          and(
+            eq(workspaceGroupMemberships.groupId, args.groupId),
+            eq(workspaceGroupMemberships.memberKind, GroupMemberKind.idp),
+            inArray(workspaceGroupMemberships.identityProviderCode, toRemove),
+          ),
+        );
+    }
+    const currentSet = new Set(currentCodes);
+    const toAdd = args.idps.filter((c) => !currentSet.has(c));
+    if (toAdd.length) {
+      await tx.insert(workspaceGroupMemberships).values(
+        toAdd.map((code) =>
+          idpMemberRow({
+            workspaceId: args.workspaceId,
+            groupId: args.groupId,
+            code,
+            displayLabel: args.displayLabel,
+          }),
+        ),
+      );
+    }
+  });
+};
+
 /** Count of active `user` members whose workspace membership is also active. */
 export const countActiveUserMembers = async (groupId: string): Promise<number> => {
   const rows = await db
@@ -355,16 +462,7 @@ export const addGroupIdpMember = async (args: {
   code: string;
   displayLabel: string | null;
 }): Promise<void> => {
-  await db.insert(workspaceGroupMemberships).values({
-    id: uuidv7(),
-    workspaceId: args.workspaceId,
-    memberKind: GroupMemberKind.idp,
-    identityProviderCode: args.code,
-    groupId: args.groupId,
-    status: MEMBERSHIP_STATUS_ACTIVE,
-    createdBy: args.displayLabel,
-    updatedBy: args.displayLabel,
-  });
+  await db.insert(workspaceGroupMemberships).values(idpMemberRow(args));
 };
 
 /** Removes a member (any kind) from a group by its row id; false when it wasn't present. */

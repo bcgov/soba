@@ -23,6 +23,8 @@ import FormDesigner from '@/src/features/designer/ui/FormDesigner';
 import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
 import FormSettingsTab from './FormSettingsTab';
 import FormTeamTab from './FormTeamTab';
+import { FormSubmitterAudience } from './FormSubmitterAudience';
+import { isWorkspaceManageRole } from '@/src/features/workspaces/workspaceRoles';
 import { useAppSelector } from '@/lib/store';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
@@ -51,6 +53,8 @@ function FormForm({ formId }: { formId?: string }) {
     workspaces,
   } = useAppSelector((state) => state.workspace);
   const { addNotification } = useNotificationStore();
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
+  const canManageWorkspace = !!activeWorkspace && isWorkspaceManageRole(activeWorkspace.role);
   const [activeTab, setActiveTab] = useState('designer');
   const [formName, setFormName] = useState('');
   const [formDesc, setFormDesc] = useState('');
@@ -368,6 +372,12 @@ function FormForm({ formId }: { formId?: string }) {
             ]}
           />
         )}
+
+        <FormSubmitterAudience
+          workspaceId={activeWorkspaceId}
+          token={token ?? undefined}
+          canManage={canManageWorkspace}
+        />
 
         <CheckboxGroup
           label={dict.form.visibilityLabel || 'Visibility / Access Control'}
