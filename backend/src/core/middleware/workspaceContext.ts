@@ -153,6 +153,7 @@ export const buildCoreContext = async (
     actorId,
     actorDisplayLabel: userRow[0]?.displayLabel ?? null,
     workspaceSource: source,
+    role: membership.role,
   };
 };
 

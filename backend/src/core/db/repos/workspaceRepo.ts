@@ -1,31 +1,47 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import {
   FORM_ADMINS_GROUP_NAME,
   FORM_SUBMITTERS_GROUP_NAME,
   Roles,
+  SystemGroup,
   WorkspaceMembershipRole,
   WorkspaceMembershipSource,
 } from '../codes';
 import { db } from '../client';
-import {
-  appUsers,
-  workspaceGroupMemberships,
-  workspaceGroupRoles,
-  workspaceGroups,
-  workspaceMemberships,
-  workspaces,
-} from '../schema';
+import { appUsers, workspaceMemberships, workspaces } from '../schema';
+import { ConflictError } from '../../errors';
 import {
   getWorkspaceForUser,
   invalidateMembershipCache,
   isWorkspaceManageRole,
 } from './membershipRepo';
+import { addUserToGroup, createGroupWithRole } from './workspaceGroupRepo';
 
 const WORKSPACE_KIND_TEAM = 'team';
 const WORKSPACE_STATUS_ACTIVE = 'active';
-const GROUP_STATUS_ACTIVE = 'active';
 const MEMBERSHIP_STATUS_ACTIVE = 'active';
+const WORKSPACE_NAME_TAKEN = 'A workspace with this name already exists';
+
+/** True if a workspace of this kind already uses this name (optionally excluding one workspace). */
+const workspaceNameExistsForKind = async (
+  kind: string,
+  name: string,
+  exceptId?: string,
+): Promise<boolean> => {
+  const rows = await db
+    .select({ id: workspaces.id })
+    .from(workspaces)
+    .where(
+      and(
+        eq(workspaces.kind, kind),
+        eq(workspaces.name, name),
+        ...(exceptId ? [ne(workspaces.id, exceptId)] : []),
+      ),
+    )
+    .limit(1);
+  return Boolean(rows[0]);
+};
 
 /** Returns the workspace's id if it exists, otherwise null. Used to distinguish 404 from 403. */
 export const getWorkspaceById = async (workspaceId: string): Promise<{ id: string } | null> => {
@@ -38,48 +54,6 @@ export const getWorkspaceById = async (workspaceId: string): Promise<{ id: strin
 };
 
 type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-/** Creates a workspace group carrying a single role; returns the new group id. */
-const createGroupWithRole = async (
-  tx: DbTx,
-  args: { workspaceId: string; name: string; roleCode: string; displayLabel: string | null },
-): Promise<string> => {
-  const groupId = uuidv7();
-  await tx.insert(workspaceGroups).values({
-    id: groupId,
-    workspaceId: args.workspaceId,
-    name: args.name,
-    status: GROUP_STATUS_ACTIVE,
-    createdBy: args.displayLabel,
-    updatedBy: args.displayLabel,
-  });
-  await tx.insert(workspaceGroupRoles).values({
-    id: uuidv7(),
-    workspaceId: args.workspaceId,
-    groupId,
-    roleCode: args.roleCode,
-    status: GROUP_STATUS_ACTIVE,
-    createdBy: args.displayLabel,
-    updatedBy: args.displayLabel,
-  });
-  return groupId;
-};
-
-/** Adds a workspace member (by membership id) to a group. */
-const addUserToGroup = async (
-  tx: DbTx,
-  args: { workspaceId: string; groupId: string; membershipId: string; displayLabel: string | null },
-) => {
-  await tx.insert(workspaceGroupMemberships).values({
-    id: uuidv7(),
-    workspaceId: args.workspaceId,
-    workspaceMembershipId: args.membershipId,
-    groupId: args.groupId,
-    status: MEMBERSHIP_STATUS_ACTIVE,
-    createdBy: args.displayLabel,
-    updatedBy: args.displayLabel,
-  });
-};
 
 const bootstrapWorkspaceOwner = async (
   tx: DbTx,
@@ -104,7 +78,8 @@ const bootstrapWorkspaceOwner = async (
   const formAdminsGroupId = await createGroupWithRole(tx, {
     workspaceId,
     name: FORM_ADMINS_GROUP_NAME,
-    roleCode: Roles.form_admin,
+    roleCodes: [Roles.form_admin],
+    systemCode: SystemGroup.form_admins,
     displayLabel,
   });
   await addUserToGroup(tx, { workspaceId, groupId: formAdminsGroupId, membershipId, displayLabel });
@@ -113,7 +88,8 @@ const bootstrapWorkspaceOwner = async (
   await createGroupWithRole(tx, {
     workspaceId,
     name: FORM_SUBMITTERS_GROUP_NAME,
-    roleCode: Roles.form_submitter,
+    roleCodes: [Roles.form_submitter],
+    systemCode: SystemGroup.form_submitters,
     displayLabel,
   });
 
@@ -124,6 +100,9 @@ const bootstrapWorkspaceOwner = async (
  * Creates a user-owned team workspace: owner membership plus the form-admin and form-submitter groups.
  */
 export const createTeamWorkspace = async (userId: string, name: string) => {
+  if (await workspaceNameExistsForKind(WORKSPACE_KIND_TEAM, name)) {
+    throw new ConflictError(WORKSPACE_NAME_TAKEN);
+  }
   return db.transaction(async (tx) => {
     const userRow = await tx
       .select({ displayLabel: appUsers.displayLabel })
@@ -164,6 +143,10 @@ export const updateWorkspaceName = async (
 ): Promise<boolean> => {
   const membership = await getWorkspaceForUser(workspaceId, actorId);
   if (!membership || !isWorkspaceManageRole(membership.role)) return false;
+
+  if (await workspaceNameExistsForKind(membership.kind, name, workspaceId)) {
+    throw new ConflictError(WORKSPACE_NAME_TAKEN);
+  }
 
   const userRow = await db
     .select({ displayLabel: appUsers.displayLabel })

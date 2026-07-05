@@ -9,6 +9,7 @@ jest.mock('../../../src/core/db/client', () => ({
 
 jest.mock('../../../src/core/db/repos/formRepo', () => ({
   createForm: jest.fn(),
+  formNameExistsInWorkspace: jest.fn(),
 }));
 
 jest.mock('../../../src/core/db/repos/formVersionRepo', () => ({
@@ -21,6 +22,7 @@ jest.mock('../../../src/core/integrations/form-engine/FormEngineRegistry', () =>
 }));
 
 const createForm = formRepo.createForm as unknown as jest.Mock;
+const nameExists = formRepo.formNameExistsInWorkspace as unknown as jest.Mock;
 const createDraft = versionRepo.createEmptyFormVersionDraft as unknown as jest.Mock;
 const getPlugins = registry.getFormEnginePlugins as unknown as jest.Mock;
 
@@ -35,6 +37,7 @@ describe('FormService.create', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     getPlugins.mockReturnValue([{ code: 'formio-v5' }]);
+    nameExists.mockResolvedValue(false);
   });
 
   it('creates the form and an empty v1 draft in one transaction', async () => {

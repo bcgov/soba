@@ -3,6 +3,7 @@ import { coreErrorHandler } from '../middleware/errorHandler';
 import { registerAdminOpenApi } from './admin';
 import { registerHealthOpenApi } from './health';
 import { formsDomain } from './forms';
+import { groupsDomain } from './groups';
 import { meDomain } from './me';
 import { membersDomain } from './members';
 import { metaDomain } from './meta';
@@ -14,6 +15,7 @@ import { registerOpenApiPaths } from './shared/openapi';
 // Workspaces is mounted first at / so GET /workspaces and GET /workspaces/current are matched before forms.
 const coreDomains = [
   formsDomain,
+  groupsDomain,
   meDomain,
   membersDomain,
   metaDomain,
@@ -34,6 +36,7 @@ registerOpenApiPaths((registry) => {
 // resolveActor runs at the app level so req.actorId is available to all routes here.
 const authenticatedDomains = [
   workspacesDomain,
+  groupsDomain,
   formsDomain,
   meDomain,
   membersDomain,

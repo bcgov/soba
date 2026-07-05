@@ -8,6 +8,8 @@ export interface CoreRequestContext {
   actorId: string;
   actorDisplayLabel: string | null;
   workspaceSource: string;
+  /** The actor's workspace membership role (owner/admin/member/viewer); gates workspace management. */
+  role: string;
 }
 
 /**

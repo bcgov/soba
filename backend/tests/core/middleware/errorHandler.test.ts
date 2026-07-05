@@ -16,6 +16,17 @@ describe('errorHandler', () => {
     expect(result.body.error).toBe('Invalid input');
   });
 
+  it('errorToHttpResponse maps a Postgres unique violation to 409', () => {
+    const result = errorToHttpResponse({ code: '23505', message: 'duplicate key' });
+    expect(result.statusCode).toBe(409);
+    expect(result.body.error).toBe('Resource already exists');
+  });
+
+  it('errorToHttpResponse maps a unique violation wrapped on the cause chain to 409', () => {
+    const wrapped = Object.assign(new Error('query failed'), { cause: { code: '23505' } });
+    expect(errorToHttpResponse(wrapped).statusCode).toBe(409);
+  });
+
   it('errorToHttpResponse returns 500 and message for generic Error', () => {
     const result = errorToHttpResponse(new Error('Something broke'));
     expect(result.statusCode).toBe(500);

@@ -25,7 +25,6 @@ const workspaceId = '11111111-1111-7111-8111-111111111111';
 const workspaceRow = {
   id: workspaceId,
   name: 'Team Alpha',
-  slug: null,
   kind: 'team',
   role: 'owner',
   status: 'active',
@@ -50,7 +49,6 @@ describe('WorkspacesApiService', () => {
     expect(result).toEqual({
       id: workspaceId,
       name: 'Team Alpha',
-      slug: null,
       kind: 'team',
       role: 'owner',
       status: 'active',

@@ -114,6 +114,7 @@ describe('workspaceFromQuery', () => {
       actorId: 'actor1',
       actorDisplayLabel: 'Actor One',
       workspaceSource: 'query',
+      role: 'owner',
     });
     expect(res.set).toHaveBeenCalledWith('x-soba-workspace-id', 'ws1');
     expect(next).toHaveBeenCalledWith();

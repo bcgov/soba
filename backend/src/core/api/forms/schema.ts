@@ -146,6 +146,10 @@ export const FormWithVersionResponseSchema = FormResponseSchema.extend({
   formVersion: FormVersionResponseSchema.nullable(),
 }).openapi('Forms_FormWithVersionResponse');
 
+export const FormWithPermissionsResponseSchema = FormResponseSchema.extend({
+  permissions: z.array(z.string()),
+}).openapi('Forms_FormWithPermissionsResponse');
+
 export const ListFormsResponseSchema = z
   .object({
     items: z.array(FormListItemSchema),
@@ -218,6 +222,7 @@ const FORM_VERSION_PATH = '/form-versions/{id}';
 const FORM_NOT_FOUND = 'Form not found';
 const FORM_VERSION_NOT_FOUND = 'Form version not found';
 const VALIDATION_ERROR = 'Validation or business rule error';
+const FORM_NAME_TAKEN = 'A form with this name already exists';
 
 export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
@@ -256,7 +261,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         description: 'Get form by id',
         content: {
           'application/json': {
-            schema: FormResponseSchema,
+            schema: FormWithPermissionsResponseSchema,
           },
         },
       },
@@ -293,6 +298,9 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
       },
       400: {
         description: VALIDATION_ERROR,
+      },
+      409: {
+        description: FORM_NAME_TAKEN,
       },
     },
   });
@@ -354,6 +362,9 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
       },
       404: {
         description: FORM_NOT_FOUND,
+      },
+      409: {
+        description: FORM_NAME_TAKEN,
       },
     },
   });

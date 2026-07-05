@@ -5,6 +5,7 @@ import { db } from '../db/client';
 import { formVersions, submissions, userIdentities } from '../db/schema';
 import { getWorkspaceForUser } from '../db/repos/membershipRepo';
 import { listGroupsForIdp } from '../db/repos/idpGroupRepo';
+import { WorkspaceMembershipRole } from '../db/codes';
 import { resolveActor } from './actor';
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
@@ -182,6 +183,8 @@ export async function checkFormVisibility(req: Request, res: Response, next: Nex
       actorId: actorId || '00000000-0000-0000-0000-000000000000',
       actorDisplayLabel,
       workspaceSource: 'public-access',
+      // Public submitters have no membership; a non-manage role keeps them off workspace-admin routes.
+      role: WorkspaceMembershipRole.member,
     };
 
     // Echo the resolved workspace so the frontend's per-tab store can capture it (same contract

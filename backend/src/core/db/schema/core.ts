@@ -127,13 +127,13 @@ export const workspaces = sobaSchema.table(
     id: idColumn(),
     kind: text('kind').notNull(),
     name: text('name').notNull(),
-    slug: text('slug'),
     status: text('status').notNull(),
     parentWorkspaceId: uuid('parent_workspace_id').references(() => workspaces.id),
     ...auditColumns(),
   },
   (table) => ({
-    slugUnique: uniqueIndex('workspace_slug_uq').on(table.slug),
+    // Names are unique per kind (e.g. two 'team' workspaces can't share a name).
+    kindNameUnique: uniqueIndex('workspace_kind_name_uq').on(table.kind, table.name),
     parentIdx: index('workspace_parent_idx').on(table.parentWorkspaceId),
   }),
 );
@@ -178,13 +178,15 @@ export const workspaceGroups = sobaSchema.table(
     name: text('name').notNull(),
     description: text('description'),
     status: text('status').notNull(),
+    /** Set for the two bootstrap groups (form_admins/form_submitters); null for user-created groups. */
+    systemCode: text('system_code'),
     ...auditColumns(),
   },
   (table) => ({
-    workspaceNameUnique: uniqueIndex('workspace_group_workspace_name_uq').on(
-      table.workspaceId,
-      table.name,
-    ),
+    // Active groups only, so a soft-deleted group frees its name for reuse.
+    workspaceNameUnique: uniqueIndex('workspace_group_workspace_name_uq')
+      .on(table.workspaceId, table.name)
+      .where(sql`${table.status} = 'active'`),
     workspaceExternalUnique: uniqueIndex('workspace_group_workspace_external_uq').on(
       table.workspaceId,
       table.externalGroupId,

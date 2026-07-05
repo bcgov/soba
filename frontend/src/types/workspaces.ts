@@ -1,7 +1,6 @@
 export type WorkspaceItem = {
   id: string;
   name: string;
-  slug: string | null;
   kind: string;
   role: string;
   status: string;

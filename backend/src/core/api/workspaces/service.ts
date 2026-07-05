@@ -44,7 +44,6 @@ export class WorkspacesApiService {
       items: items.map((r) => ({
         id: r.id,
         name: r.name,
-        slug: r.slug,
         kind: r.kind,
         role: r.role,
         status: r.status,
@@ -72,7 +71,6 @@ export class WorkspacesApiService {
   private toWorkspaceItem(row: {
     id: string;
     name: string;
-    slug: string | null;
     kind: string;
     role: string;
     status: string;
@@ -80,7 +78,6 @@ export class WorkspacesApiService {
     return {
       id: row.id,
       name: row.name,
-      slug: row.slug,
       kind: row.kind,
       role: row.role,
       status: row.status,

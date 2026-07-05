@@ -1,5 +1,6 @@
 import { FormService } from '../../services/formService';
 import { FormVersionService } from '../../services/formVersionService';
+import { resolveFormPermissions } from '../../db/repos/formAccessRepo';
 import { decodeCursorAndMode, buildNextCursor, type CursorSort } from '../shared/pagination';
 
 export interface FormsContextInput {
@@ -177,7 +178,10 @@ export function createFormsApiService(
 
     getForm: async (ctx: FormsContextInput, formId: string) => {
       const row = await formService.get(ctx.workspaceId, formId);
-      return row ? toFormDto(row) : null;
+      if (!row) return null;
+      // Caller's permissions on this form, so the UI can gate actions. Workspace-scoped today.
+      const permissions = await resolveFormPermissions(ctx.actorId, ctx.workspaceId);
+      return { ...toFormDto(row), permissions: [...permissions].sort() };
     },
 
     list: async (scope: FormsListScopeInput, query: ListFormsQueryInput) => {

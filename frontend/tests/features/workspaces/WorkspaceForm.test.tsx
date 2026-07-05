@@ -88,7 +88,6 @@ describe('WorkspaceForm', () => {
     mockCreateWorkspace.mockResolvedValue({
       id: 'ws-new',
       name: 'New Team',
-      slug: null,
       kind: 'team',
       role: 'owner',
       status: 'active',
@@ -96,7 +95,6 @@ describe('WorkspaceForm', () => {
     mockSelectWorkspace.mockResolvedValue({
       id: 'ws2',
       name: 'Team Workspace',
-      slug: null,
       kind: 'team',
       role: 'owner',
       status: 'active',
@@ -104,7 +102,6 @@ describe('WorkspaceForm', () => {
     mockUpdateWorkspace.mockResolvedValue({
       id: 'ws2',
       name: 'Renamed',
-      slug: null,
       kind: 'team',
       role: 'owner',
       status: 'active',

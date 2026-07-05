@@ -3,6 +3,7 @@ import {
   FormCursorMode,
   FormRecord,
   FormListSort,
+  formNameExistsInWorkspace,
   getFormById,
   listFormsForWorkspace,
   markFormDeleted,
@@ -17,7 +18,9 @@ import {
   getFormEnginePlugins,
   resolveFormEnginePlugin,
 } from '../integrations/form-engine/FormEngineRegistry';
-import { ValidationError } from '../errors';
+import { ConflictError, ValidationError } from '../errors';
+
+const FORM_NAME_TAKEN = 'A form with this name already exists';
 
 interface DeleteInput {
   workspaceId: string;
@@ -82,6 +85,10 @@ export class FormService {
     }
     resolveFormEnginePlugin(engineCode);
 
+    if (await formNameExistsInWorkspace(input.workspaceId, input.name)) {
+      throw new ConflictError(FORM_NAME_TAKEN);
+    }
+
     // One-call create: form + an empty v1 draft in a single transaction.
     return db.transaction(async (tx) => {
       const form = await createForm(
@@ -110,6 +117,12 @@ export class FormService {
   }
 
   async update(input: UpdateInput): Promise<FormRecord | null> {
+    if (
+      input.name !== undefined &&
+      (await formNameExistsInWorkspace(input.workspaceId, input.name, input.formId))
+    ) {
+      throw new ConflictError(FORM_NAME_TAKEN);
+    }
     return updateForm(input);
   }
 

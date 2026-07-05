@@ -9,7 +9,6 @@ export const WorkspaceItemSchema = z
   .object({
     id: z.string(),
     name: z.string(),
-    slug: z.string().nullable(),
     kind: z.string(),
     role: z.string(),
     status: z.string(),
@@ -66,6 +65,7 @@ export const UpdateWorkspaceBodySchema = z
   .openapi('Workspaces_UpdateWorkspaceBody');
 
 const TAG = 'core.workspaces';
+const WORKSPACE_NAME_TAKEN = 'A workspace with this name already exists';
 
 export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
@@ -159,6 +159,7 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       400: { description: 'Invalid body' },
+      409: { description: WORKSPACE_NAME_TAKEN },
     },
   });
 
@@ -188,6 +189,7 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
       },
       403: { description: 'Only workspace owners can rename this workspace' },
       404: { description: 'Workspace not found' },
+      409: { description: WORKSPACE_NAME_TAKEN },
     },
   });
 };

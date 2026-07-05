@@ -92,6 +92,16 @@ export const IdpGroups = {
 } as const;
 export type IdpGroupCode = (typeof IdpGroups)[keyof typeof IdpGroups];
 
+/** Pseudo identity provider that grants public (unauthenticated) submit access. */
+export const PUBLIC_PROVIDER_CODE = 'public';
+
+/** Marks the two bootstrap groups carrying team-guard protections (see workspace_group.system_code). */
+export const SystemGroup = {
+  form_admins: 'form_admins',
+  form_submitters: 'form_submitters',
+} as const;
+export type SystemGroupCode = (typeof SystemGroup)[keyof typeof SystemGroup];
+
 /** Kind of a workspace group member (see workspace_group_membership.member_kind). */
 export const GroupMemberKind = {
   user: 'user',

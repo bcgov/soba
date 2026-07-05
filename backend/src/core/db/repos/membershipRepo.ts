@@ -122,7 +122,6 @@ export const getWorkspaceForUser = async (workspaceId: string, userId: string) =
       id: workspaces.id,
       kind: workspaces.kind,
       name: workspaces.name,
-      slug: workspaces.slug,
       status: workspaces.status,
       membershipId: workspaceMemberships.id,
       role: workspaceMemberships.role,
@@ -188,7 +187,6 @@ export interface ListWorkspacesForUserInput {
 export interface WorkspaceListRow {
   id: string;
   name: string;
-  slug: string | null;
   kind: string;
   role: string;
   status: string;
@@ -224,7 +222,6 @@ export const listWorkspacesForUser = async (
     .select({
       id: workspaces.id,
       name: workspaces.name,
-      slug: workspaces.slug,
       kind: workspaces.kind,
       role: workspaceMemberships.role,
       status: workspaces.status,

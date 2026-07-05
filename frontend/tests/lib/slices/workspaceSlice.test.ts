@@ -12,7 +12,6 @@ const STORAGE_KEY = 'soba.workspaceId';
 const workspace = (id: string) => ({
   id,
   name: `Workspace ${id}`,
-  slug: id,
   kind: 'personal',
   role: 'owner',
   status: 'active',
