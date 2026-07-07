@@ -212,24 +212,23 @@ Key form-version routes: `POST /:id/publish`, `POST /:id/unpublish`, `POST /:id/
 
 ### Plugin implementations
 
-The backend uses a **plugin architecture** so that workspace resolution, form engines, auth (IdP), cache, message bus, and optional feature APIs can be swapped or extended without changing core. Plugins are discovered from `backend/src/plugins/` (each directory is a plugin module). Configuration is via env (e.g. which plugins are enabled, plugin-specific keys). For auth, Passport is now the protected-route entry point, but IdP plugins still provide provider-specific token verification and claim mapping. See [In Detail — Configuration of plugins and features](#configuration-of-plugins-and-features).
+The backend uses a **plugin architecture** so that form engines, auth (IdP), cache, message bus, and optional feature APIs can be swapped or extended without changing core. Plugins are discovered from `backend/src/plugins/` (each directory is a plugin module). Configuration is via env (e.g. which plugins are enabled, plugin-specific keys). For auth, Passport is now the protected-route entry point, but IdP plugins still provide provider-specific token verification and claim mapping. See [In Detail — Configuration of plugins and features](#configuration-of-plugins-and-features).
 
 **Plugin types and current implementations:**
 
 | Type                   | Purpose                                | Implementations                                                     |
 | ---------------------- | -------------------------------------- | ------------------------------------------------------------------- |
-| **Workspace resolver** | Resolve current workspace for requests | `personal-local`, `enterprise-cstar`                                |
 | **Form engine**        | Render/store forms and submissions     | `formio-v5` (Form.io v5)                                            |
 | **IdP (auth)**         | JWT validation, claim mapping          | `idp-bcgov-sso` (BC Gov Keycloak), `idp-github`                     |
 | **Cache**              | Key-value cache                        | `cache-memory`; future: Redis                                       |
 | **Message bus**        | Async messaging                        | `messagebus-memory`; future: Redis, NATS                            |
-| **Feature API**        | Optional REST API per plugin           | e.g. `personal-local` (exports `pluginApiDefinition`; not mounted in `app.ts` yet) |
+| **Feature API**        | Optional REST API per plugin           | none; `pluginApiDefinition` extension point stays for plugins with REST endpoints |
 
-Workspace and IdP plugins are ordered via env (`WORKSPACE_PLUGINS_ALLOWED`, `IDP_PLUGINS`); the first successful resolver or IdP wins. For IdP auth, Passport orchestrates the ordered plugin attempts and the winning plugin still supplies the mapped identity used by core. IdP env prefixes follow plugin codes (e.g. `bcgov-sso` → `PLUGIN_BCGOV_SSO_*`, `idp-github` → `PLUGIN_IDP_GITHUB_*`).
+IdP plugins are ordered via env (`IDP_PLUGINS`); the first successful IdP wins. Passport orchestrates the ordered plugin attempts and the winning plugin supplies the mapped identity used by core. IdP env prefixes follow plugin codes (e.g. `bcgov-sso` → `PLUGIN_BCGOV_SSO_*`, `idp-github` → `PLUGIN_IDP_GITHUB_*`).
 
 ### Workspace context
 
-Resolved per request by workspace plugins in `coreContextMiddleware`. **`personal-local`** (default alongside `enterprise-cstar`): reads workspace from cookie `PLUGIN_PERSONAL_LOCAL_COOKIE_KEY` (default `soba_workspace_id`) or header **`x-workspace-id`** when `PLUGIN_PERSONAL_LOCAL_ALLOW_HEADER_OVERRIDE=true`; falls back to auto-created home workspace. The frontend sends `x-workspace-id` on protected form/submission API calls.
+Resolved per route by the `workspaceContext` middleware, not a plugin chain. List/create routes read the `workspaceId` query param; deep-link routes derive it from the target resource. Both check membership and echo the workspace back in the `x-soba-workspace-id` response header.
 
 ### Features
 

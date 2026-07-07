@@ -7,16 +7,11 @@ import fs from 'fs';
 import path from 'path';
 import { z } from 'zod';
 import { env } from '../../config/env';
-import { getWorkspacePluginsConfig } from '../../config/workspacePlugins';
 import {
   createPluginConfigReader,
   createStorageProfileConfigReader,
 } from '../../config/pluginConfig';
 import { getStorageProfilesConfig } from '../../config/storageProfiles';
-import type {
-  WorkspaceResolver,
-  WorkspaceResolverDefinition,
-} from '../workspace/WorkspaceResolver';
 import type { FormEnginePluginDefinition } from '../form-engine/FormEnginePluginDefinition';
 import type { FeatureApiDefinition } from './FeatureApiDefinition';
 import type { CacheAdapter, CachePluginDefinition } from '../cache/CacheAdapter';
@@ -30,11 +25,6 @@ import type {
   StorageEngineReadinessResult,
   StoragePluginDefinition,
 } from '../storage-engine/StorageEngineAdapter';
-
-const WorkspaceResolverDefinitionSchema = z.object({
-  code: z.string().min(1),
-  createResolver: z.any(),
-});
 
 const FormEnginePluginDefinitionSchema = z.object({
   code: z.string().min(1),
@@ -76,7 +66,6 @@ const IdpPluginDefinitionSchema = z.object({
 
 interface CachedPlugin {
   dir: string;
-  workspaceDefinition?: WorkspaceResolverDefinition;
   formEngineDefinition?: FormEnginePluginDefinition;
   apiDefinition?: FeatureApiDefinition;
   cacheDefinition?: CachePluginDefinition;
@@ -134,12 +123,6 @@ function loadPlugin(pluginsRoot: string, pluginDir: string): CachedPlugin | null
   const obj = raw !== null && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   return {
     dir: pluginDir,
-    workspaceDefinition: parsePluginDefinition<WorkspaceResolverDefinition>(
-      obj,
-      pluginDir,
-      'workspacePluginDefinition',
-      WorkspaceResolverDefinitionSchema,
-    ),
     formEngineDefinition: parsePluginDefinition<FormEnginePluginDefinition>(
       obj,
       pluginDir,
@@ -203,57 +186,16 @@ function discoverAndCache(): CachedPlugin[] {
   return cache;
 }
 
-let workspaceResolversCache: WorkspaceResolver[] | null = null;
-
-export function getWorkspaceResolvers(): WorkspaceResolver[] {
-  if (workspaceResolversCache) return workspaceResolversCache;
-  const config = getWorkspacePluginsConfig();
-  const discovered = discoverAndCache();
-  const definitions = discovered
-    .map((p) => p.workspaceDefinition)
-    .filter((d): d is WorkspaceResolverDefinition => Boolean(d));
-
-  const discoveredCodes = definitions.map((d) => d.code);
-  const unknownCodes = config.allowedPlugins.filter((code) => !discoveredCodes.includes(code));
-  if (unknownCodes.length > 0) {
-    const message = `Unknown workspace plugins configured: ${unknownCodes.join(', ')}`;
-    if (config.strictMode) throw new Error(message);
-    console.warn(message);
-  }
-
-  const selected = definitions.filter((d) => config.allowedPlugins.includes(d.code));
-  workspaceResolversCache = selected
-    .map((d) => d.createResolver(createPluginConfigReader(d.code)))
-    .sort((a, b) => a.priority - b.priority);
-
-  const enabledList = workspaceResolversCache.map((r) => r.code).join(', ') || '<none>';
-  console.log(
-    `[workspace-plugins] strictMode=${config.strictMode} enabled=${enabledList} order=${workspaceResolversCache
-      .map((r) => `${r.code}:${r.priority}`)
-      .join(' -> ')}`,
-  );
-
-  if (workspaceResolversCache.length === 0) {
-    throw new Error('No workspace resolvers enabled. Check WORKSPACE_PLUGINS_ALLOWED.');
-  }
-
-  return workspaceResolversCache;
-}
-
 export interface PluginCatalogEntry {
   code: string;
-  enabled: boolean;
-  hasWorkspaceResolver: boolean;
   hasApi: boolean;
   apiBasePath?: string;
 }
 
 export function getPluginCatalog(): PluginCatalogEntry[] {
-  const config = getWorkspacePluginsConfig();
   const discovered = discoverAndCache();
   return discovered.map((p) => {
     const code =
-      p.workspaceDefinition?.code ??
       p.apiDefinition?.code ??
       p.formEngineDefinition?.code ??
       p.cacheDefinition?.code ??
@@ -261,8 +203,6 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
       p.dir;
     return {
       code,
-      enabled: config.allowedPlugins.includes(code),
-      hasWorkspaceResolver: Boolean(p.workspaceDefinition),
       hasApi: Boolean(p.apiDefinition),
       apiBasePath: p.apiDefinition?.basePath,
     };
@@ -270,12 +210,8 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
 }
 
 export function getEnabledPluginApiDefinitions(): FeatureApiDefinition[] {
-  const config = getWorkspacePluginsConfig();
   const discovered = discoverAndCache();
-  return discovered
-    .filter((p) => p.workspaceDefinition && p.apiDefinition)
-    .filter((p) => config.allowedPlugins.includes(p.workspaceDefinition!.code))
-    .map((p) => p.apiDefinition!);
+  return discovered.filter((p) => p.apiDefinition).map((p) => p.apiDefinition!);
 }
 
 export interface FormEnginePluginCatalogEntry {

@@ -23,8 +23,6 @@ function setDefaultEnv(key: string, value: string): void {
 // Unit tests mock repos; no live DB connection is required at import time.
 // Ensure no tests depend on active/running infrastructure (e.g. database, Redis, etc.).
 setDefaultEnv('DATABASE_URL', 'postgres://postgres:postgres@localhost:5432/soba_test');
-setDefaultEnv('WORKSPACE_PLUGINS_ALLOWED', 'enterprise-cstar,personal-local');
-setDefaultEnv('WORKSPACE_PLUGINS_STRICT_MODE', 'false');
 setDefaultEnv('IDP_PLUGIN_DEFAULT_SSO_JWKS_URI', 'https://example.test/jwks');
 setDefaultEnv('IDP_PLUGIN_DEFAULT_SSO_JWT_ISSUER', 'https://example.test/realms/test');
 setDefaultEnv('IDP_PLUGIN_DEFAULT_SSO_JWT_AUDIENCE', 'test-client');

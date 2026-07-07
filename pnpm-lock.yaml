@@ -176,9 +176,6 @@ importers:
       '@bcgov/design-tokens':
         specifier: ^3.2.0
         version: 3.2.0
-      '@bcgov/formio-components':
-        specifier: github:usingtechnology/formio-components#feat/bcgov-file-storage-provider
-        version: https://codeload.github.com/usingtechnology/formio-components/tar.gz/f60777e2418bdc9d18d33fb37bbd2dedb3326c31(@formio/js@5.4.0-api98.1(@popperjs/core@2.11.8))
       '@formatjs/intl-localematcher':
         specifier: ^0.8.1
         version: 0.8.5
@@ -194,6 +191,9 @@ importers:
       bootstrap:
         specifier: ^5.3.8
         version: 5.3.8(@popperjs/core@2.11.8)
+      formio-components@0.0.1:
+        specifier: link:bcgov/formio-components@0.0.1
+        version: link:bcgov/formio-components@0.0.1
       keycloak-js:
         specifier: ^26.2.3
         version: 26.2.4
@@ -516,12 +516,6 @@ packages:
 
   '@bcgov/design-tokens@3.2.0':
     resolution: {integrity: sha512-2D3mPFKTpNLeIp8ER9y8oDKxXE8+rBfcvuF4yFd7uUvDm0izZNFhambUi6sN3OdkmuZoGQO7AjlMtOQzsHtxzA==}
-
-  '@bcgov/formio-components@https://codeload.github.com/usingtechnology/formio-components/tar.gz/f60777e2418bdc9d18d33fb37bbd2dedb3326c31':
-    resolution: {tarball: https://codeload.github.com/usingtechnology/formio-components/tar.gz/f60777e2418bdc9d18d33fb37bbd2dedb3326c31}
-    version: 0.0.1
-    peerDependencies:
-      '@formio/js': ^5.0.0-rc.76
 
   '@bcoe/v8-coverage@0.2.3':
     resolution: {integrity: sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==}
@@ -6271,10 +6265,6 @@ snapshots:
       - '@react-spectrum/provider'
 
   '@bcgov/design-tokens@3.2.0': {}
-
-  '@bcgov/formio-components@https://codeload.github.com/usingtechnology/formio-components/tar.gz/f60777e2418bdc9d18d33fb37bbd2dedb3326c31(@formio/js@5.4.0-api98.1(@popperjs/core@2.11.8))':
-    dependencies:
-      '@formio/js': 5.4.0-api98.1(@popperjs/core@2.11.8)
 
   '@bcoe/v8-coverage@0.2.3': {}
 

@@ -32,6 +32,7 @@ const ensureSystemIdentityProvider = async () => {
       name: SYSTEM_PROVIDER_NAME,
       hint: SYSTEM_PROVIDER_CODE,
       isActive: true,
+      isLoginProvider: false,
       createdBy: SEED_USER_STAMP,
       updatedBy: SEED_USER_STAMP,
     })

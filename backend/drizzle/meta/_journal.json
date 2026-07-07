@@ -62,7 +62,35 @@
       "idx": 8,
       "version": "7",
       "when": 1772601000000,
-      "tag": "0008_add_files_feature",
+      "tag": "0008_rbac_catalog",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1772602000000,
+      "tag": "0009_workspace_group_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1772603000000,
+      "tag": "0010_group_member_kinds",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1772604000000,
+      "tag": "0011_remove_workspace_owner_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1772604000000,
+      "tag": "0012_add_files_feature",
       "breakpoints": true
     }
   ]

@@ -67,12 +67,6 @@ backend:
     cacheDefaultCode: cache-memory
     messagebusDefaultCode: messagebus-memory
     sobaSystemSubject: soba-system
-    workspacePluginsAllowed: "enterprise-cstar,personal-local"
-    workspacePluginsStrictMode: "false"
-    pluginEnterpriseCstarHeaderKeys: "x-enterprise-workspace-id,x-cstar-tenant-id"
-    pluginEnterpriseCstarRequireExternalHeader: "false"
-    pluginPersonalLocalCookieKey: soba_workspace_id
-    pluginPersonalLocalAllowHeaderOverride: "true"
 
   # -- configmap-storage: files feature + storage profiles (STORAGE_* + FILES_*)
   storage:
