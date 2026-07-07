@@ -65,10 +65,10 @@ function membershipRow(id: string) {
     id,
     kind: 'team',
     name: 'Workspace',
-    slug: null,
     status: 'active',
     membershipId: 'membership-1',
     role: 'owner',
+    disclaimerAcceptedAt: null,
   };
 }
 

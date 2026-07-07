@@ -2,49 +2,47 @@ import express from 'express';
 import { coreErrorHandler } from '../middleware/errorHandler';
 import { registerAdminOpenApi } from './admin';
 import { registerHealthOpenApi } from './health';
-import { formsDomain } from './forms';
+import { designFormsRouter, registerFormsOpenApi } from './forms';
+import { designSubmissionsRouter, registerSubmissionsOpenApi } from './submissions';
+import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
 import { groupsDomain } from './groups';
 import { meDomain } from './me';
 import { membersDomain } from './members';
-import { metaDomain } from './meta';
-import { submissionsDomain } from './submissions';
 import { workspacesDomain } from './workspaces';
 import { registerOpenApiPaths } from './shared/openapi';
 
-// Meta is mounted at app level at /api/v1/meta and is public (no JWT, no core context).
-// Workspaces is mounted first at / so GET /workspaces and GET /workspaces/current are matched before forms.
-const coreDomains = [
-  formsDomain,
-  groupsDomain,
-  meDomain,
-  membersDomain,
-  metaDomain,
-  submissionsDomain,
-  workspacesDomain,
-];
-
-const router = express.Router();
+// Three API surfaces, each mounted under its own base path with its own auth (see app.ts):
+//  - designRouter  (/api/v1/design): staff form authoring + submission management.
+//  - submitRouter  (/api/v1/submit): public-capable form read/submit/confirmation.
+//  - coreRouter    (/api/v1):        workspace/account management (not a toggled feature).
 registerOpenApiPaths((registry) => {
-  for (const domain of coreDomains) {
-    domain.registerOpenApi(registry);
-  }
+  registerFormsOpenApi(registry);
+  registerSubmissionsOpenApi(registry);
+  registerSubmitOpenApi(registry);
+  groupsDomain.registerOpenApi(registry);
+  meDomain.registerOpenApi(registry);
+  membersDomain.registerOpenApi(registry);
+  workspacesDomain.registerOpenApi(registry);
   registerAdminOpenApi(registry);
   registerHealthOpenApi(registry);
 });
 
-// Workspace context is resolved per route (see workspaceContext middleware), not globally.
-// resolveActor runs at the app level so req.actorId is available to all routes here.
-const authenticatedDomains = [
-  workspacesDomain,
-  groupsDomain,
-  formsDomain,
-  meDomain,
-  membersDomain,
-  submissionsDomain,
-];
-for (const domain of authenticatedDomains) {
-  router.use(domain.path, domain.router);
-}
-router.use(coreErrorHandler);
+// Design feature: form authoring + submission management.
+const designRouter = express.Router();
+designRouter.use('/', designFormsRouter);
+designRouter.use('/submissions', designSubmissionsRouter);
+designRouter.use(coreErrorHandler);
 
-export { router as coreRouter };
+// Submit feature: public form read + submission create/save + confirmation read.
+const submitRouter = express.Router();
+submitRouter.use('/', submitRoutes);
+submitRouter.use(coreErrorHandler);
+
+// Core: workspace/account management.
+const coreRouter = express.Router();
+for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain]) {
+  coreRouter.use(domain.path, domain.router);
+}
+coreRouter.use(coreErrorHandler);
+
+export { designRouter, submitRouter, coreRouter };

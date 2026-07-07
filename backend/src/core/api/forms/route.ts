@@ -5,6 +5,8 @@ import {
   workspaceListScope,
   workspaceFromResource,
 } from '../../middleware/workspaceContext';
+import { requireFormPermissions } from '../../middleware/requireFormPermissions';
+import { Permissions } from '../../db/codes';
 import {
   createForm,
   normalizeFormSchema,
@@ -17,7 +19,6 @@ import {
   deleteForm,
   deleteFormVersion,
   saveFormVersion,
-  updateFormVersion,
   publishFormVersion,
   unpublishFormVersion,
   restoreFormVersion,
@@ -36,13 +37,17 @@ import {
   SaveFormVersionBodySchema,
   SaveFormVersionParamsSchema,
   UpdateFormBodySchema,
-  UpdateFormVersionBodySchema,
 } from './schema';
 
+// Design-mode form authoring: mounted under /api/v1/design with mandatory auth. Every route is
+// staff-only — membership is resolved strictly and gated by form permissions (no audience logic;
+// that lives in the submit feature).
 const router = express.Router();
 
-const FORMS_ID_PATH = '/forms/:id';
-const FORM_VERSIONS_ID_PATH = '/form-versions/:id';
+const FORMS_PATH = '/forms';
+const FORMS_ID_PATH = `${FORMS_PATH}/:id`;
+const FORM_VERSIONS_PATH = '/form-versions';
+const FORM_VERSIONS_ID_PATH = `${FORM_VERSIONS_PATH}/:id`;
 
 const formResource = workspaceFromResource({ kind: 'form', idFrom: 'paramsId' });
 const formVersionResource = workspaceFromResource({ kind: 'formVersion', idFrom: 'paramsId' });
@@ -50,111 +55,115 @@ const formVersionResource = workspaceFromResource({ kind: 'formVersion', idFrom:
 const formFromBodyResource = workspaceFromResource({ kind: 'form', idFrom: 'bodyFormId' });
 
 router.get(
-  '/forms',
+  FORMS_PATH,
   validateRequest({ query: ListFormsQuerySchema }),
   workspaceListScope({ anchorOrder: ['formId', 'workspaceId'] }),
+  requireFormPermissions([Permissions.form_read]),
   listForms,
 );
+// Membership-only (workspace resolved from the query); the disclaimer gate lives in the service.
 router.post(
-  '/forms',
+  FORMS_PATH,
   validateRequest({ body: CreateFormBodySchema }),
   workspaceFromQuery,
   createForm,
 );
 // Schema-shaping utility; actor-only (no workspace context).
 router.post(
-  '/forms/normalize',
+  `${FORMS_PATH}/normalize`,
   validateRequest({ body: NormalizeSchemaBodySchema }),
   normalizeFormSchema,
 );
-router.get(FORMS_ID_PATH, validateRequest({ params: FormIdParamsSchema }), formResource, getForm);
+router.get(
+  FORMS_ID_PATH,
+  validateRequest({ params: FormIdParamsSchema }),
+  formResource,
+  requireFormPermissions([Permissions.form_read]),
+  getForm,
+);
 router.patch(
   FORMS_ID_PATH,
-  validateRequest({
-    params: FormIdParamsSchema,
-    body: UpdateFormBodySchema,
-  }),
+  validateRequest({ params: FormIdParamsSchema, body: UpdateFormBodySchema }),
   formResource,
+  requireFormPermissions([Permissions.form_update]),
   updateForm,
 );
 router.get(
-  '/form-versions',
+  FORM_VERSIONS_PATH,
   validateRequest({ query: ListFormVersionsQuerySchema }),
   workspaceListScope({ anchorOrder: ['formVersionId', 'formId', 'workspaceId'] }),
+  requireFormPermissions([Permissions.form_read]),
   listFormVersions,
 );
 router.get(
   FORM_VERSIONS_ID_PATH,
   validateRequest({ params: FormVersionIdParamsSchema }),
   formVersionResource,
+  requireFormPermissions([Permissions.form_read]),
   getFormVersion,
 );
-
 router.post(
-  '/form-versions',
+  FORM_VERSIONS_PATH,
   validateRequest({ body: CreateFormVersionBodySchema }),
   formFromBodyResource,
+  requireFormPermissions([Permissions.design_create]),
   createFormVersion,
 );
-router.patch(
-  FORM_VERSIONS_ID_PATH,
-  validateRequest({
-    params: FormVersionIdParamsSchema,
-    body: UpdateFormVersionBodySchema,
-  }),
-  formVersionResource,
-  updateFormVersion,
-);
 router.post(
-  '/form-versions/:id/save',
-  validateRequest({
-    params: SaveFormVersionParamsSchema,
-    body: SaveFormVersionBodySchema,
-  }),
+  `${FORM_VERSIONS_ID_PATH}/save`,
+  validateRequest({ params: SaveFormVersionParamsSchema, body: SaveFormVersionBodySchema }),
   formVersionResource,
+  requireFormPermissions([Permissions.design_update]),
   saveFormVersion,
 );
 router.post(
-  '/form-versions/:id/publish',
+  `${FORM_VERSIONS_ID_PATH}/publish`,
   validateRequest({ params: FormVersionIdParamsSchema }),
   formVersionResource,
+  requireFormPermissions([Permissions.design_update]),
   publishFormVersion,
 );
 router.post(
-  '/form-versions/:id/unpublish',
+  `${FORM_VERSIONS_ID_PATH}/unpublish`,
   validateRequest({ params: FormVersionIdParamsSchema }),
   formVersionResource,
+  requireFormPermissions([Permissions.design_update]),
   unpublishFormVersion,
 );
 router.post(
-  '/form-versions/:id/restore',
+  `${FORM_VERSIONS_ID_PATH}/restore`,
   validateRequest({ params: FormVersionIdParamsSchema }),
   formVersionResource,
+  requireFormPermissions([Permissions.design_update]),
   restoreFormVersion,
 );
 router.get(
-  '/form-versions/:id/schema',
+  `${FORM_VERSIONS_ID_PATH}/schema`,
   validateRequest({ params: FormVersionIdParamsSchema }),
   formVersionResource,
+  requireFormPermissions([Permissions.form_read]),
   getFormVersionSchema,
 );
 router.post(
-  '/form-versions/:id/schema',
+  `${FORM_VERSIONS_ID_PATH}/schema`,
   validateRequest({ params: FormVersionIdParamsSchema, body: ProvisionSchemaBodySchema }),
   formVersionResource,
+  requireFormPermissions([Permissions.design_update]),
   provisionFormVersionSchema,
 );
 router.delete(
   FORM_VERSIONS_ID_PATH,
   validateRequest({ params: FormVersionIdParamsSchema }),
   formVersionResource,
+  requireFormPermissions([Permissions.design_delete]),
   deleteFormVersion,
 );
 router.delete(
   FORMS_ID_PATH,
   validateRequest({ params: FormIdParamsSchema }),
   formResource,
+  requireFormPermissions([Permissions.form_delete]),
   deleteForm,
 );
 
-export { router as formVersionsRouter };
+export { router as designFormsRouter };

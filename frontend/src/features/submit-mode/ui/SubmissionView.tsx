@@ -11,17 +11,18 @@ import { ReadOnlyFormView } from '@/src/features/formio-v5/ui/ReadOnlyFormView';
 import { WorkflowStateBadge } from './WorkflowStateBadge';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import {
-  getSobaSubmission,
-  getFormVersionSchema,
-  getSobaSubmissionData,
-} from '@/src/shared/api/sobaApiForms';
+  getSubmitSubmission,
+  getSubmitSubmissionSchema,
+  getSubmitSubmissionData,
+} from '@/src/shared/api/sobaApi';
 import type { SubmissionListItem } from '@/src/types/submissions';
 
 export function SubmissionView() {
   const params = useParams();
   const dict = useDictionary();
   const dictSub = dict.submission;
-  const { authenticated, token, initializing } = useKeycloak();
+  // Token optional: a public submitter can view a submission on a public-audience form.
+  const { token, initializing } = useKeycloak();
   const formatLongDate = useFormatLongDate();
 
   const submissionIdRaw = params?.submissionId;
@@ -36,16 +37,20 @@ export function SubmissionView() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    if (!authenticated || !token || loaded) return;
+    // Wait for auth to settle so a signed-in caller sends their token; anonymous proceeds with none.
+    if (initializing || loaded) return;
     let active = true;
     void (async () => {
       try {
-        const sub = await getSobaSubmission(token, submissionId);
+        // The confirmation view is submit-mode: read through the submit APIs regardless of sign-in so
+        // audience members who aren't workspace members can still view. Token passed when present.
+        const authToken = token ?? undefined;
+        const sub = await getSubmitSubmission(authToken, submissionId);
         if (!active) return;
         setSubmission(sub);
         const [loadedSchema, fetchedContent] = await Promise.all([
-          getFormVersionSchema(token, sub.formVersionId),
-          getSobaSubmissionData(token, submissionId),
+          getSubmitSubmissionSchema(authToken, submissionId),
+          getSubmitSubmissionData(authToken, submissionId),
         ]);
         if (!active) return;
         if (loadedSchema) setSchema(loadedSchema);
@@ -59,12 +64,11 @@ export function SubmissionView() {
     return () => {
       active = false;
     };
-  }, [authenticated, token, submissionId, loaded]);
+  }, [token, initializing, submissionId, loaded]);
 
-  if (initializing || (authenticated && !token)) {
+  if (initializing) {
     return <CenteredProgress label={dict.general.loading} />;
   }
-  if (!authenticated) return null;
 
   const renderContent = () => {
     if (!loaded) {

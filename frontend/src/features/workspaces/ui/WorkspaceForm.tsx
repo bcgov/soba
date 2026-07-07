@@ -50,6 +50,8 @@ function WorkspaceForm({ workspaceId }: Readonly<WorkspaceFormProps>) {
 
   const [name, setName] = useState('');
   const [loadedName, setLoadedName] = useState('');
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
+  const [loadedDisclaimer, setLoadedDisclaimer] = useState(false);
   const [defaultTouched, setDefaultTouched] = useState(false);
   const [isDefaultChoice, setIsDefaultChoice] = useState(false);
   const [loading, setLoading] = useState(!isCreate);
@@ -108,6 +110,8 @@ function WorkspaceForm({ workspaceId }: Readonly<WorkspaceFormProps>) {
         }
         setName(workspace.name);
         setLoadedName(workspace.name);
+        setDisclaimerAccepted(workspace.disclaimerAccepted);
+        setLoadedDisclaimer(workspace.disclaimerAccepted);
       })
       .catch((error) => {
         if (cancelled) return;
@@ -145,10 +149,10 @@ function WorkspaceForm({ workspaceId }: Readonly<WorkspaceFormProps>) {
       let savedId = workspaceId ?? null;
 
       if (isCreate) {
-        const created = await createWorkspace(token, { name: trimmedName });
+        const created = await createWorkspace(token, { name: trimmedName, disclaimerAccepted });
         savedId = created.id;
-      } else if (trimmedName !== loadedName) {
-        await updateWorkspace(token, workspaceId, { name: trimmedName });
+      } else if (trimmedName !== loadedName || disclaimerAccepted !== loadedDisclaimer) {
+        await updateWorkspace(token, workspaceId, { name: trimmedName, disclaimerAccepted });
       }
 
       // Only change the stored default when the user's intent is explicit. An untouched
@@ -189,6 +193,8 @@ function WorkspaceForm({ workspaceId }: Readonly<WorkspaceFormProps>) {
     isCreate,
     workspaceId,
     loadedName,
+    disclaimerAccepted,
+    loadedDisclaimer,
     isDefault,
     savedDefaultMatches,
     savedDefaultId,
@@ -237,6 +243,15 @@ function WorkspaceForm({ workspaceId }: Readonly<WorkspaceFormProps>) {
       >
         {defaultLabel}
       </Switch>
+      <Switch
+        isSelected={disclaimerAccepted}
+        onChange={setDisclaimerAccepted}
+        isDisabled={saving}
+        aria-label={dictWorkspaces.disclaimerLabel}
+        data-testid="workspace-disclaimer-switch"
+      >
+        {dictWorkspaces.disclaimerLabel}
+      </Switch>
       <div className={styles.actions}>
         <Button
           type="submit"
@@ -278,6 +293,7 @@ function WorkspaceForm({ workspaceId }: Readonly<WorkspaceFormProps>) {
           <Tab eventKey="team" title={dictWorkspaces.teamTab}>
             <div className={styles.tabContent}>
               <FormSubmitterAudience
+                key={workspaceId ?? 'none'}
                 workspaceId={workspaceId ?? null}
                 token={token ?? undefined}
                 canManage

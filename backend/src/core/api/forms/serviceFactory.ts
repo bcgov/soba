@@ -39,7 +39,6 @@ interface CreateFormInput {
   name: string;
   description?: string;
   formEngineCode?: string;
-  visibility?: string[];
 }
 
 interface UpdateFormInput {
@@ -95,7 +94,6 @@ const toFormVersionDto = (item: {
   engineSchemaRef: string | null;
   currentRevisionNo: number;
   publishedAt: Date | null;
-  visibility: string[] | null;
   createdAt: Date;
   updatedAt: Date;
   createdBy: string | null;
@@ -109,7 +107,6 @@ const toFormVersionDto = (item: {
   engineSchemaRef: item.engineSchemaRef,
   currentRevisionNo: item.currentRevisionNo,
   publishedAt: item.publishedAt?.toISOString() ?? null,
-  visibility: item.visibility ?? [],
   createdAt: item.createdAt.toISOString(),
   updatedAt: item.updatedAt.toISOString(),
   createdBy: item.createdBy,
@@ -123,7 +120,6 @@ const toFormVersionListItemDto = (item: {
   state: string;
   engineSyncStatus: string;
   engineSchemaRef: string | null;
-  visibility: string[] | null;
   createdAt: Date;
   updatedAt: Date;
   createdBy: string | null;
@@ -135,7 +131,6 @@ const toFormVersionListItemDto = (item: {
   state: item.state,
   engineSyncStatus: item.engineSyncStatus,
   engineSchemaRef: item.engineSchemaRef,
-  visibility: item.visibility ?? [],
   createdAt: item.createdAt.toISOString(),
   updatedAt: item.updatedAt.toISOString(),
   createdBy: item.createdBy,
@@ -155,7 +150,6 @@ export function createFormsApiService(
         name: input.name,
         description: input.description,
         formEngineCode: input.formEngineCode,
-        visibility: input.visibility,
       });
       return { ...toFormDto(form), formVersion: toFormVersionDto(version) };
     },
@@ -267,27 +261,15 @@ export function createFormsApiService(
       };
     },
 
-    createDraft: async (ctx: FormsContextInput, formId: string, visibility?: string[]) =>
+    createDraft: async (ctx: FormsContextInput, formId: string) =>
       toFormVersionDto(
         await formVersionService.createDraft({
           workspaceId: ctx.workspaceId,
           actorId: ctx.actorId,
           actorDisplayLabel: ctx.actorDisplayLabel,
           formId,
-          visibility,
         }),
       ),
-
-    updateDraft: async (ctx: FormsContextInput, formVersionId: string, visibility?: string[]) => {
-      const row = await formVersionService.updateDraft({
-        workspaceId: ctx.workspaceId,
-        actorId: ctx.actorId,
-        actorDisplayLabel: ctx.actorDisplayLabel,
-        formVersionId,
-        visibility,
-      });
-      return row ? toFormVersionDto(row) : null;
-    },
 
     save: (
       ctx: FormsContextInput,

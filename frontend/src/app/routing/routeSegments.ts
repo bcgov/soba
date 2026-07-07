@@ -15,9 +15,13 @@ export const ROUTE_KIND_BY_SEGMENT: Readonly<Record<string, RouteKind>> = {
   onboarding: 'onboarding', // app/[lang]/onboarding
   forms: WORKSPACE_APP, // app/[lang]/forms
   designer: WORKSPACE_APP, // app/[lang]/designer
-  form: WORKSPACE_APP, // app/[lang]/form
-  submissions: WORKSPACE_APP, // app/[lang]/submissions
-  submission: WORKSPACE_APP, // app/[lang]/submission
+  // Public fill/submit route: reachable without signing in; the backend authorizes against the
+  // form's Form submitters audience (a non-public form returns 401 and the renderer shows an error).
+  form: 'public', // app/[lang]/form/[formId]
+  submissions: WORKSPACE_APP, // app/[lang]/submissions (staff management table)
+  // Single-submission view: public so an anonymous submitter sees their confirmation; the backend
+  // authorizes the read against the form's audience (public-form submissions are public data).
+  submission: 'public', // app/[lang]/submission/[submissionId]
   workspaces: 'workspaces', // app/[lang]/workspaces
   workspace: 'workspaces', // app/[lang]/workspace
 };

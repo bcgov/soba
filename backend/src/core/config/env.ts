@@ -153,6 +153,9 @@ export function createEnvReader(source: EnvSource) {
     getCacheDefaultCode: () => getOptionalEnvFrom(source, 'CACHE_DEFAULT_CODE'),
     getMessageBusDefaultCode: () => getOptionalEnvFrom(source, 'MESSAGEBUS_DEFAULT_CODE'),
     getFormEngineDefaultCode: () => getOptionalEnvFrom(source, 'FORM_ENGINE_DEFAULT_CODE'),
+    /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
+    getDefaultSubmitterProvider: () =>
+      getOptionalEnvFrom(source, 'DEFAULT_SUBMITTER_PROVIDER') ?? 'azureidir',
     getRateLimitWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_WINDOW_MS'),
     getRateLimitMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_MAX'),
     getRateLimitApiWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_API_WINDOW_MS'),
@@ -206,6 +209,8 @@ export const env = {
   getCacheDefaultCode: () => getOptionalEnv('CACHE_DEFAULT_CODE'),
   getMessageBusDefaultCode: () => getOptionalEnv('MESSAGEBUS_DEFAULT_CODE'),
   getFormEngineDefaultCode: () => getOptionalEnv('FORM_ENGINE_DEFAULT_CODE'),
+  /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
+  getDefaultSubmitterProvider: () => getOptionalEnv('DEFAULT_SUBMITTER_PROVIDER') ?? 'azureidir',
   getRateLimitWindowMs: () => getNumberEnv('RATE_LIMIT_WINDOW_MS'),
   getRateLimitMax: () => getNumberEnv('RATE_LIMIT_MAX'),
   getRateLimitApiWindowMs: () => getNumberEnv('RATE_LIMIT_API_WINDOW_MS'),

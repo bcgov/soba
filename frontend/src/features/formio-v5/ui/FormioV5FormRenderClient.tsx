@@ -12,8 +12,7 @@ import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFo
 import { FormioV5FormRenderErrorBoundary } from '@/src/features/formio-v5/ui/FormioV5FormRenderErrorBoundary';
 import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
 import {
-  getSobaFormVersions,
-  getFormVersionSchema,
+  getSubmitForm,
   createSobaFormSubmission,
   saveSobaFormSubmission,
 } from '@/src/shared/api/sobaApi';
@@ -33,7 +32,8 @@ type FormRenderLabels = {
  * persists submissions through the SOBA API. The Form.io engine is never contacted from the browser.
  */
 function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: FormRenderLabels }) {
-  const { token } = useKeycloak();
+  // Token is optional: a public-audience form is readable and submittable without signing in.
+  const { token, initializing } = useKeycloak();
   const { addNotification } = useNotificationStore();
   const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
@@ -50,25 +50,20 @@ function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: Fo
   } | null>(null);
 
   useEffect(() => {
-    if (!token || loaded) return;
+    // Wait for auth to settle so an authenticated caller sends their token; anonymous proceeds with none.
+    if (initializing || loaded) return;
     let active = true;
     void (async () => {
       try {
-        // Submissions can only be made to the currently published version.
-        const { items } = await getSobaFormVersions(token, formId);
-        const published = (items || []).find((v) => v.state === 'published');
-        if (!published) {
-          if (active) setLoadError(labels.unavailable);
-          return;
-        }
-        const loadedSchema = await getFormVersionSchema(token, published.id);
-        if (!loadedSchema) {
+        // One call returns the published version + schema; submissions go to that version.
+        const bundle = await getSubmitForm(token ?? undefined, formId);
+        if (!bundle.publishedVersion || !bundle.schema) {
           if (active) setLoadError(labels.unavailable);
           return;
         }
         if (active) {
-          setFormVersionId(published.id);
-          setSchema(loadedSchema);
+          setFormVersionId(bundle.publishedVersion.id);
+          setSchema(bundle.schema as FormType);
         }
       } catch (err) {
         if (active) setLoadError(normalizeFormioRenderError(err, labels.loadError));
@@ -79,14 +74,14 @@ function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: Fo
     return () => {
       active = false;
     };
-  }, [token, formId, loaded, labels.loadError, labels.unavailable]);
+  }, [token, initializing, formId, loaded, labels.loadError, labels.unavailable]);
 
   const submitForm = async (submission: Submission) => {
-    if (!token || !formVersionId) return;
+    if (!formVersionId) return;
     try {
-      const created = await createSobaFormSubmission(token, formId, formVersionId, {});
+      const created = await createSobaFormSubmission(token ?? undefined, formId, formVersionId, {});
       await saveSobaFormSubmission(
-        token,
+        token ?? undefined,
         created.id,
         (submission?.data ?? {}) as Record<string, unknown>,
         'submit',

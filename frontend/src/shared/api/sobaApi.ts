@@ -11,20 +11,30 @@ import type { WorkspaceItem, WorkspacesResponse, CreateWorkspaceBody, UpdateWork
 import type { CurrentUserResponse, PatchCurrentUserBody } from '../../types/user';
 
 export type { SobaFormType, WorkspaceItem, WorkspacesResponse, CurrentUserResponse };
+// Design-mode (staff, /design/*)
 export {
   createSobaFormioForm,
   normalizeFormSchema,
   publishSobaFormVersion,
   getSobaForm,
-  createSobaFormSubmission,
-  saveSobaFormSubmission,
   getSobaForms,
+  getSobaSubmissions,
+  getSobaSubmission,
+  getSobaSubmissionData,
   getSobaFormVersions,
-  updateSobaFormVersionVisibility,
   createFormVersion,
   saveFormVersionSchema,
   getFormVersionSchema,
-} from './sobaApiForms';
+} from './sobaApiDesign';
+// Submit-mode (public-capable, /submit/*)
+export {
+  getSubmitForm,
+  getSubmitSubmissionSchema,
+  createSobaFormSubmission,
+  saveSobaFormSubmission,
+  getSubmitSubmission,
+  getSubmitSubmissionData,
+} from './sobaApiSubmit';
 
 export type BuildMeta = {
   name: string;

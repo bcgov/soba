@@ -132,7 +132,8 @@ export const workspaces = sobaSchema.table(
     ...auditColumns(),
   },
   (table) => ({
-    // Names are unique per kind (e.g. two 'team' workspaces can't share a name).
+    // Names are unique per kind (e.g. two 'team' workspaces can't share a name). Not status-scoped
+    // like the group/form name indexes because workspaces are never soft-deleted.
     kindNameUnique: uniqueIndex('workspace_kind_name_uq').on(table.kind, table.name),
     parentIdx: index('workspace_parent_idx').on(table.parentWorkspaceId),
   }),
@@ -167,6 +168,18 @@ export const workspaceMemberships = sobaSchema.table(
   }),
 );
 
+/** One row per workspace once its disclaimer is accepted; absence gates form creation. */
+export const workspaceDisclaimerAcceptances = sobaSchema.table('workspace_disclaimer_acceptance', {
+  workspaceId: uuid('workspace_id')
+    .primaryKey()
+    .references(() => workspaces.id),
+  acceptedByUserId: uuid('accepted_by_user_id')
+    .notNull()
+    .references(() => appUsers.id),
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }).notNull(),
+  ...auditColumns(),
+});
+
 export const workspaceGroups = sobaSchema.table(
   'workspace_group',
   {
@@ -191,6 +204,10 @@ export const workspaceGroups = sobaSchema.table(
       table.workspaceId,
       table.externalGroupId,
     ),
+    // At most one system group per code per workspace (guards the bootstrap tagging).
+    systemCodeUnique: uniqueIndex('workspace_group_system_code_uq')
+      .on(table.workspaceId, table.systemCode)
+      .where(sql`${table.systemCode} is not null`),
     workspaceIdx: index('workspace_group_workspace_idx').on(table.workspaceId),
   }),
 );

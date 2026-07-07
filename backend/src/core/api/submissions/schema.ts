@@ -112,13 +112,13 @@ export const ListSubmissionsResponseSchema = z
   .openapi('Submissions_ListSubmissionsResponse');
 
 const TAG = 'core.submissions';
-const SUBMISSION_PATH = '/submissions/{id}';
+const SUBMISSION_PATH = '/design/submissions/{id}';
 const SUBMISSION_NOT_FOUND = 'Submission not found';
 
 export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
-    path: '/submissions',
+    path: '/design/submissions',
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
@@ -160,7 +160,7 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'get',
-    path: '/submissions/{id}/data',
+    path: '/design/submissions/{id}/data',
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
@@ -175,32 +175,6 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
       },
       404: {
         description: 'Submission or its engine content not found',
-      },
-    },
-  });
-
-  registry.registerPath({
-    method: 'post',
-    path: '/submissions',
-    tags: [TAG],
-    security: [{ bearerAuth: [] }],
-    request: {
-      body: {
-        required: true,
-        content: {
-          'application/json': {
-            schema: CreateSubmissionBodySchema,
-          },
-        },
-      },
-    },
-    responses: {
-      201: {
-        description: 'Created submission draft',
-        content: { 'application/json': { schema: SubmissionResponseSchema } },
-      },
-      400: {
-        description: 'Validation or business rule error',
       },
     },
   });
@@ -228,33 +202,6 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
       },
       404: {
         description: SUBMISSION_NOT_FOUND,
-      },
-    },
-  });
-
-  registry.registerPath({
-    method: 'post',
-    path: '/submissions/{id}/save',
-    tags: [TAG],
-    security: [{ bearerAuth: [] }],
-    request: {
-      params: SaveSubmissionParamsSchema,
-      body: {
-        required: true,
-        content: {
-          'application/json': {
-            schema: SaveSubmissionBodySchema,
-          },
-        },
-      },
-    },
-    responses: {
-      200: {
-        description: 'Saved submission (new engine document recorded as a revision)',
-        content: { 'application/json': { schema: SubmissionResponseSchema } },
-      },
-      400: {
-        description: 'Validation or business rule error',
       },
     },
   });

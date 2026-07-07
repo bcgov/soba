@@ -1,27 +1,28 @@
 import express from 'express';
 import { validateRequest } from '../shared/validation';
 import { workspaceListScope, workspaceFromResource } from '../../middleware/workspaceContext';
+import { requireFormPermissions } from '../../middleware/requireFormPermissions';
+import { Permissions } from '../../db/codes';
 import {
-  createSubmission,
   deleteSubmission,
   getSubmission,
   getSubmissionData,
   listSubmissions,
-  saveSubmission,
   updateSubmission,
 } from './controller';
 import {
-  CreateSubmissionBodySchema,
   ListSubmissionsQuerySchema,
-  SaveSubmissionBodySchema,
-  SaveSubmissionParamsSchema,
   UpdateSubmissionBodySchema,
   UpdateSubmissionParamsSchema,
 } from './schema';
 
+// Design-mode submission management: mounted under /api/v1/design/submissions with mandatory auth.
+// Staff-only (list/read/update/delete). Creating/saving a submission and the public confirmation read
+// live in the submit feature.
 const router = express.Router();
 
 const submissionResource = workspaceFromResource({ kind: 'submission', idFrom: 'paramsId' });
+const ID_PATH = '/:id';
 
 router.get(
   '/',
@@ -29,46 +30,39 @@ router.get(
   workspaceListScope({
     anchorOrder: ['submissionId', 'formVersionId', 'formId', 'workspaceId'],
   }),
+  requireFormPermissions([Permissions.submission_read]),
   listSubmissions,
 );
 router.get(
-  '/:id',
+  ID_PATH,
   validateRequest({ params: UpdateSubmissionParamsSchema }),
   submissionResource,
+  requireFormPermissions([Permissions.submission_read]),
   getSubmission,
 );
 router.get(
-  '/:id/data',
+  `${ID_PATH}/data`,
   validateRequest({ params: UpdateSubmissionParamsSchema }),
   submissionResource,
+  requireFormPermissions([Permissions.submission_read]),
   getSubmissionData,
 );
-
-// POST '/' and POST '/:id/save' are served by the optionally-authenticated public submission
-// router mounted earlier in app.ts (workspace derived from the form's visibility there).
-router.post('/', validateRequest({ body: CreateSubmissionBodySchema }), createSubmission);
 router.patch(
-  '/:id',
+  ID_PATH,
   validateRequest({
     params: UpdateSubmissionParamsSchema,
     body: UpdateSubmissionBodySchema,
   }),
   submissionResource,
+  requireFormPermissions([Permissions.submission_update]),
   updateSubmission,
 );
-router.post(
-  '/:id/save',
-  validateRequest({
-    params: SaveSubmissionParamsSchema,
-    body: SaveSubmissionBodySchema,
-  }),
-  saveSubmission,
-);
 router.delete(
-  '/:id',
+  ID_PATH,
   validateRequest({ params: UpdateSubmissionParamsSchema }),
   submissionResource,
+  requireFormPermissions([Permissions.submission_delete]),
   deleteSubmission,
 );
 
-export { router as submissionsRouter };
+export { router as designSubmissionsRouter };

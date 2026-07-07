@@ -9,12 +9,14 @@ import {
   workspaceGroups,
   workspaceMemberships,
 } from '../schema';
-import { GroupMemberKind, PUBLIC_PROVIDER_CODE } from '../codes';
-
-const GROUP_STATUS_ACTIVE = 'active';
-const GROUP_STATUS_INACTIVE = 'inactive';
-const MEMBERSHIP_STATUS_ACTIVE = 'active';
-const MEMBERSHIP_STATUS_INACTIVE = 'inactive';
+import {
+  GroupMemberKind,
+  PUBLIC_PROVIDER_CODE,
+  WorkspaceGroupMembershipStatus,
+  WorkspaceGroupRoleStatus,
+  WorkspaceGroupStatus,
+  WorkspaceMembershipStatus,
+} from '../codes';
 
 type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -30,7 +32,7 @@ const groupRoleRows = (args: {
     workspaceId: args.workspaceId,
     groupId: args.groupId,
     roleCode,
-    status: GROUP_STATUS_ACTIVE,
+    status: WorkspaceGroupRoleStatus.active,
     createdBy: args.displayLabel,
     updatedBy: args.displayLabel,
   }));
@@ -47,7 +49,7 @@ const idpMemberRow = (args: {
   memberKind: GroupMemberKind.idp,
   identityProviderCode: args.code,
   groupId: args.groupId,
-  status: MEMBERSHIP_STATUS_ACTIVE,
+  status: WorkspaceGroupMembershipStatus.active,
   createdBy: args.displayLabel,
   updatedBy: args.displayLabel,
 });
@@ -71,7 +73,7 @@ export const createGroupWithRole = async (
     name: args.name,
     description: args.description ?? null,
     systemCode: args.systemCode ?? null,
-    status: GROUP_STATUS_ACTIVE,
+    status: WorkspaceGroupStatus.active,
     createdBy: args.displayLabel,
     updatedBy: args.displayLabel,
   });
@@ -91,7 +93,7 @@ export const addUserToGroup = async (
     workspaceId: args.workspaceId,
     workspaceMembershipId: args.membershipId,
     groupId: args.groupId,
-    status: MEMBERSHIP_STATUS_ACTIVE,
+    status: WorkspaceGroupMembershipStatus.active,
     createdBy: args.displayLabel,
     updatedBy: args.displayLabel,
   });
@@ -120,7 +122,7 @@ export const listWorkspaceGroups = async (
 ): Promise<WorkspaceGroupRow[]> => {
   const groupWhere = and(
     eq(workspaceGroups.workspaceId, workspaceId),
-    eq(workspaceGroups.status, GROUP_STATUS_ACTIVE),
+    eq(workspaceGroups.status, WorkspaceGroupStatus.active),
     ...(groupId ? [eq(workspaceGroups.id, groupId)] : []),
   );
   const groups = await db
@@ -144,7 +146,7 @@ export const listWorkspaceGroups = async (
     .where(
       and(
         inArray(workspaceGroupRoles.groupId, groupIds),
-        eq(workspaceGroupRoles.status, GROUP_STATUS_ACTIVE),
+        eq(workspaceGroupRoles.status, WorkspaceGroupRoleStatus.active),
       ),
     )
     .orderBy(asc(workspaceGroupRoles.roleCode));
@@ -167,8 +169,8 @@ export const listWorkspaceGroups = async (
       and(
         inArray(workspaceGroupMemberships.groupId, groupIds),
         eq(workspaceGroupMemberships.memberKind, GroupMemberKind.user),
-        eq(workspaceGroupMemberships.status, MEMBERSHIP_STATUS_ACTIVE),
-        eq(workspaceMemberships.status, MEMBERSHIP_STATUS_ACTIVE),
+        eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
+        eq(workspaceMemberships.status, WorkspaceMembershipStatus.active),
       ),
     )
     .orderBy(asc(appUsers.displayLabel));
@@ -189,7 +191,7 @@ export const listWorkspaceGroups = async (
       and(
         inArray(workspaceGroupMemberships.groupId, groupIds),
         eq(workspaceGroupMemberships.memberKind, GroupMemberKind.idp),
-        eq(workspaceGroupMemberships.status, MEMBERSHIP_STATUS_ACTIVE),
+        eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
       ),
     )
     .orderBy(asc(identityProviders.name));
@@ -248,7 +250,7 @@ export const getWorkspaceGroupMeta = async (
       and(
         eq(workspaceGroups.id, groupId),
         eq(workspaceGroups.workspaceId, workspaceId),
-        eq(workspaceGroups.status, GROUP_STATUS_ACTIVE),
+        eq(workspaceGroups.status, WorkspaceGroupStatus.active),
       ),
     )
     .limit(1);
@@ -267,7 +269,7 @@ export const getSystemGroupId = async (
       and(
         eq(workspaceGroups.workspaceId, workspaceId),
         eq(workspaceGroups.systemCode, systemCode),
-        eq(workspaceGroups.status, GROUP_STATUS_ACTIVE),
+        eq(workspaceGroups.status, WorkspaceGroupStatus.active),
       ),
     )
     .limit(1);
@@ -309,7 +311,7 @@ export const setSubmitterAudience = async (args: {
         and(
           eq(workspaceGroupMemberships.groupId, args.groupId),
           eq(workspaceGroupMemberships.memberKind, GroupMemberKind.idp),
-          eq(workspaceGroupMemberships.status, MEMBERSHIP_STATUS_ACTIVE),
+          eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
         ),
       );
     const currentCodes = current.map((r) => r.code).filter((c): c is string => c != null);
@@ -345,6 +347,25 @@ export const setSubmitterAudience = async (args: {
   });
 };
 
+/** The kind ('user'/'idp') of an active member row in the group, or null when it isn't present. */
+export const activeGroupMemberKind = async (
+  groupId: string,
+  memberId: string,
+): Promise<string | null> => {
+  const rows = await db
+    .select({ memberKind: workspaceGroupMemberships.memberKind })
+    .from(workspaceGroupMemberships)
+    .where(
+      and(
+        eq(workspaceGroupMemberships.id, memberId),
+        eq(workspaceGroupMemberships.groupId, groupId),
+        eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
+      ),
+    )
+    .limit(1);
+  return rows[0]?.memberKind ?? null;
+};
+
 /** Count of active `user` members whose workspace membership is also active. */
 export const countActiveUserMembers = async (groupId: string): Promise<number> => {
   const rows = await db
@@ -358,8 +379,8 @@ export const countActiveUserMembers = async (groupId: string): Promise<number> =
       and(
         eq(workspaceGroupMemberships.groupId, groupId),
         eq(workspaceGroupMemberships.memberKind, GroupMemberKind.user),
-        eq(workspaceGroupMemberships.status, MEMBERSHIP_STATUS_ACTIVE),
-        eq(workspaceMemberships.status, MEMBERSHIP_STATUS_ACTIVE),
+        eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
+        eq(workspaceMemberships.status, WorkspaceMembershipStatus.active),
       ),
     );
   return rows.length;
@@ -378,7 +399,7 @@ export const groupNameExistsInWorkspace = async (
       and(
         eq(workspaceGroups.workspaceId, workspaceId),
         eq(workspaceGroups.name, name),
-        eq(workspaceGroups.status, GROUP_STATUS_ACTIVE),
+        eq(workspaceGroups.status, WorkspaceGroupStatus.active),
         ...(exceptGroupId ? [ne(workspaceGroups.id, exceptGroupId)] : []),
       ),
     )
@@ -398,7 +419,7 @@ export const membershipInWorkspace = async (
       and(
         eq(workspaceMemberships.id, membershipId),
         eq(workspaceMemberships.workspaceId, workspaceId),
-        eq(workspaceMemberships.status, MEMBERSHIP_STATUS_ACTIVE),
+        eq(workspaceMemberships.status, WorkspaceMembershipStatus.active),
       ),
     )
     .limit(1);
@@ -455,15 +476,20 @@ export const addGroupMember = async (args: {
   await addUserToGroup(db, args);
 };
 
-/** Adds an identity-provider member to a group. */
-export const addGroupIdpMember = async (args: {
+/** Adds an identity-provider member to a group (executor lets it join a bootstrap transaction). */
+export const addIdpToGroup = async (
+  executor: DbOrTx,
+  args: { workspaceId: string; groupId: string; code: string; displayLabel: string | null },
+): Promise<void> => {
+  await executor.insert(workspaceGroupMemberships).values(idpMemberRow(args));
+};
+
+export const addGroupIdpMember = (args: {
   workspaceId: string;
   groupId: string;
   code: string;
   displayLabel: string | null;
-}): Promise<void> => {
-  await db.insert(workspaceGroupMemberships).values(idpMemberRow(args));
-};
+}): Promise<void> => addIdpToGroup(db, args);
 
 /** Removes a member (any kind) from a group by its row id; false when it wasn't present. */
 export const removeGroupMember = async (args: {
@@ -490,7 +516,7 @@ export const countGroupMembers = async (groupId: string): Promise<number> => {
     .where(
       and(
         eq(workspaceGroupMemberships.groupId, groupId),
-        eq(workspaceGroupMemberships.status, MEMBERSHIP_STATUS_ACTIVE),
+        eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
       ),
     );
   return rows.length;
@@ -506,7 +532,7 @@ export const hasIdpMember = async (groupId: string, code: string): Promise<boole
         eq(workspaceGroupMemberships.groupId, groupId),
         eq(workspaceGroupMemberships.memberKind, GroupMemberKind.idp),
         eq(workspaceGroupMemberships.identityProviderCode, code),
-        eq(workspaceGroupMemberships.status, MEMBERSHIP_STATUS_ACTIVE),
+        eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
       ),
     )
     .limit(1);
@@ -546,15 +572,15 @@ export const softDeleteWorkspaceGroup = async (args: {
   await db.transaction(async (tx) => {
     await tx
       .update(workspaceGroupMemberships)
-      .set({ status: MEMBERSHIP_STATUS_INACTIVE, ...stamp })
+      .set({ status: WorkspaceGroupMembershipStatus.inactive, ...stamp })
       .where(eq(workspaceGroupMemberships.groupId, args.groupId));
     await tx
       .update(workspaceGroupRoles)
-      .set({ status: GROUP_STATUS_INACTIVE, ...stamp })
+      .set({ status: WorkspaceGroupRoleStatus.inactive, ...stamp })
       .where(eq(workspaceGroupRoles.groupId, args.groupId));
     await tx
       .update(workspaceGroups)
-      .set({ status: GROUP_STATUS_INACTIVE, ...stamp })
+      .set({ status: WorkspaceGroupStatus.inactive, ...stamp })
       .where(eq(workspaceGroups.id, args.groupId));
   });
 };

@@ -12,7 +12,7 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { useRouter, usePathname } from 'next/navigation';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { getSobaForms } from '@/src/shared/api/sobaApi';
-import type { SobaFormSummary } from '@/src/shared/api/sobaApiForms';
+import type { SobaFormSummary } from '@/src/shared/api/sobaApiDesign';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import { useAppSelector } from '@/lib/store';
 
@@ -80,7 +80,10 @@ function FormList({
 
   const locale = getLocaleFromPath(pathname);
 
-  const { activeWorkspaceId } = useAppSelector((state) => state.workspace);
+  const { activeWorkspaceId, workspaces } = useAppSelector((state) => state.workspace);
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
+  // No accepted workspace disclaimer → block form creation, mirroring the form designer.
+  const needsDisclaimer = !!activeWorkspace && !activeWorkspace.disclaimerAccepted;
 
   useEffect(() => {
     if (authenticated && token && activeWorkspaceId) {
@@ -223,7 +226,7 @@ function FormList({
           <DSButton
             variant="primary"
             data-testid="create-form-button"
-            isDisabled={!activeWorkspaceId}
+            isDisabled={!activeWorkspaceId || needsDisclaimer}
             onPress={() => router.push(`/${locale}/designer`)}
           >
             Create
@@ -236,6 +239,17 @@ function FormList({
           testIdPrefix="forms"
         />
       </ListPageToolbar>
+
+      {needsDisclaimer ? (
+        <InlineAlert
+          variant="warning"
+          title={
+            dict.form.disclaimerRequired ||
+            'Accept the workspace disclaimer in workspace Settings before creating a form.'
+          }
+          data-testid="forms-disclaimer-required-alert"
+        />
+      ) : null}
 
       {authenticated && !initializing && !activeWorkspaceId ? (
         <InlineAlert variant="info" data-testid="forms-select-workspace">

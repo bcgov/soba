@@ -2,7 +2,6 @@ export type SobaFormType = {
   name: string;
   description: string;
   formEngineCode?: string;
-  visibility?: string[];
 };
 
 export type CreateSobaFormioFormResponse = {
@@ -31,7 +30,19 @@ export type SobaFormVersionType = {
   engineSchemaRef?: string | null;
   currentRevisionNo: number;
   publishedAt?: string | null;
-  visibility?: string[];
   createdAt: string;
   updatedAt: string;
+};
+
+// Submit-mode payload: the published form + version + schema needed to render the public fill page.
+export type SubmitFormBundle = {
+  form: { id: string; name: string; description: string | null };
+  publishedVersion: {
+    id: string;
+    formId: string;
+    versionNo: number;
+    state: string;
+    publishedAt: string | null;
+  };
+  schema: Record<string, unknown> | null;
 };

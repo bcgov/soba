@@ -8,7 +8,11 @@ export interface CoreRequestContext {
   actorId: string;
   actorDisplayLabel: string | null;
   workspaceSource: string;
-  /** The actor's workspace membership role (owner/admin/member/viewer); gates workspace management. */
+  /**
+   * The actor's workspace membership role (owner/admin/member/viewer); gates workspace management.
+   * Cached with the membership (see buildCoreContext); any role change must call
+   * invalidateMembershipCache(workspaceId, userId) or a demoted admin keeps authority until the TTL.
+   */
   role: string;
 }
 

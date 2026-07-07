@@ -12,7 +12,6 @@ import {
   SaveFormVersionBodySchema,
   SaveFormVersionParamsSchema,
   UpdateFormBodySchema,
-  UpdateFormVersionBodySchema,
 } from './schema';
 import { formsApiService } from './service';
 import { asyncHandler } from '../shared/asyncHandler';
@@ -24,7 +23,6 @@ type CreateFormVersionBody = z.infer<typeof CreateFormVersionBodySchema>;
 type FormIdParams = z.infer<typeof FormIdParamsSchema>;
 type FormVersionIdParams = z.infer<typeof FormVersionIdParamsSchema>;
 type UpdateFormBody = z.infer<typeof UpdateFormBodySchema>;
-type UpdateFormVersionBody = z.infer<typeof UpdateFormVersionBodySchema>;
 type ProvisionSchemaBody = z.infer<typeof ProvisionSchemaBodySchema>;
 type SaveFormVersionBody = z.infer<typeof SaveFormVersionBodySchema>;
 type SaveFormVersionParams = z.infer<typeof SaveFormVersionParamsSchema>;
@@ -103,19 +101,8 @@ export const listFormVersions = asyncHandler(async (req: Request, res: Response)
 export const createFormVersion = asyncHandler(
   async (req: Request<unknown, unknown, CreateFormVersionBody>, res: Response) => {
     const ctx = req.coreContext!;
-    const result = await formsApiService.createDraft(ctx, req.body.formId, req.body.visibility);
+    const result = await formsApiService.createDraft(ctx, req.body.formId);
     res.status(201).json(result);
-  },
-);
-
-export const updateFormVersion = asyncHandler(
-  async (req: Request<FormVersionIdParams, unknown, UpdateFormVersionBody>, res: Response) => {
-    const ctx = req.coreContext!;
-    const result = await formsApiService.updateDraft(ctx, req.params.id, req.body.visibility);
-    if (!result) {
-      throw new NotFoundError(FORM_VERSION_NOT_FOUND);
-    }
-    res.json(result);
   },
 );
 

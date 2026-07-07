@@ -1,5 +1,6 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
+import { GROUP_NAME_TAKEN } from '../../messages';
 
 extendZodWithOpenApi(z);
 
@@ -122,7 +123,6 @@ const ERR_MANAGE = 'Workspace management requires an owner or admin role';
 const ERR_WORKSPACE_NOT_FOUND = 'Workspace not found';
 const ERR_WORKSPACE_OR_GROUP_NOT_FOUND = 'Workspace or group not found';
 const OK_UPDATED_GROUP = 'Updated group';
-const ERR_NAME_TAKEN = 'A group with this name already exists';
 
 const jsonBody = (schema: z.ZodTypeAny) => ({
   content: { 'application/json': { schema } },
@@ -161,7 +161,7 @@ export const registerGroupsOpenApi = (registry: OpenAPIRegistry) => {
       400: { description: 'Invalid body or unknown role code' },
       403: { description: ERR_MANAGE },
       404: { description: ERR_WORKSPACE_NOT_FOUND },
-      409: { description: ERR_NAME_TAKEN },
+      409: { description: GROUP_NAME_TAKEN },
     },
   });
 
@@ -179,7 +179,7 @@ export const registerGroupsOpenApi = (registry: OpenAPIRegistry) => {
       400: { description: 'Invalid body' },
       403: { description: ERR_MANAGE },
       404: { description: ERR_WORKSPACE_OR_GROUP_NOT_FOUND },
-      409: { description: ERR_NAME_TAKEN },
+      409: { description: GROUP_NAME_TAKEN },
     },
   });
 

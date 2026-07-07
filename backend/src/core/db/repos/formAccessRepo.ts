@@ -6,10 +6,14 @@ import {
   workspaceGroupRoles,
   workspaceMemberships,
 } from '../schema';
-import { GroupMemberKind, Permissions } from '../codes';
+import {
+  GroupMemberKind,
+  Permissions,
+  WorkspaceGroupMembershipStatus,
+  WorkspaceGroupRoleStatus,
+  WorkspaceMembershipStatus,
+} from '../codes';
 import { getWorkspaceIdForForm } from './formRepo';
-
-const STATUS_ACTIVE = 'active';
 
 /**
  * Permission codes the user holds across a workspace's forms, from the roles of the workspace groups
@@ -35,11 +39,11 @@ export const resolveFormPermissions = async (
       and(
         eq(workspaceGroupMemberships.workspaceId, workspaceId),
         eq(workspaceGroupMemberships.memberKind, GroupMemberKind.user),
-        eq(workspaceGroupMemberships.status, STATUS_ACTIVE),
-        eq(workspaceGroupRoles.status, STATUS_ACTIVE),
+        eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
+        eq(workspaceGroupRoles.status, WorkspaceGroupRoleStatus.active),
         eq(workspaceMemberships.workspaceId, workspaceId),
         eq(workspaceMemberships.userId, actorId),
-        eq(workspaceMemberships.status, STATUS_ACTIVE),
+        eq(workspaceMemberships.status, WorkspaceMembershipStatus.active),
       ),
     );
 

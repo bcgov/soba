@@ -1,6 +1,7 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import { CursorSortSchema } from '../shared/pagination';
+import { WORKSPACE_NAME_TAKEN } from '../../messages';
 import { WorkspaceScopedQuerySchema } from '../shared/schema';
 
 extendZodWithOpenApi(z);
@@ -12,6 +13,7 @@ export const WorkspaceItemSchema = z
     kind: z.string(),
     role: z.string(),
     status: z.string(),
+    disclaimerAccepted: z.boolean(),
   })
   .openapi('Workspaces_WorkspaceItem');
 
@@ -55,22 +57,28 @@ export const WorkspaceIdParamsSchema = z
 export const CreateWorkspaceBodySchema = z
   .object({
     name: z.string().trim().min(1),
+    disclaimerAccepted: z.boolean().optional(),
   })
   .openapi('Workspaces_CreateWorkspaceBody');
 
 export const UpdateWorkspaceBodySchema = z
   .object({
-    name: z.string().trim().min(1),
+    name: z.string().trim().min(1).optional(),
+    disclaimerAccepted: z.boolean().optional(),
+  })
+  .refine((body) => body.name !== undefined || body.disclaimerAccepted !== undefined, {
+    message: 'Provide a field to update',
   })
   .openapi('Workspaces_UpdateWorkspaceBody');
 
 const TAG = 'core.workspaces';
-const WORKSPACE_NAME_TAKEN = 'A workspace with this name already exists';
+const WORKSPACES_PATH = '/workspaces';
+const WORKSPACE_PATH = `${WORKSPACES_PATH}/{id}`;
 
 export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
-    path: '/workspaces',
+    path: WORKSPACES_PATH,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
@@ -91,7 +99,7 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'get',
-    path: '/workspaces/current',
+    path: `${WORKSPACES_PATH}/current`,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
@@ -114,7 +122,7 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'get',
-    path: '/workspaces/{id}',
+    path: WORKSPACE_PATH,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
@@ -137,7 +145,7 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'post',
-    path: '/workspaces',
+    path: WORKSPACES_PATH,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
@@ -165,7 +173,7 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'patch',
-    path: '/workspaces/{id}',
+    path: WORKSPACE_PATH,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {

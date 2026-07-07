@@ -11,6 +11,7 @@ import {
   getFormByEngineSchemaRef,
 } from '../db/repos/formRepo';
 import { createEmptyFormVersionDraft } from '../db/repos/formVersionRepo';
+import { isWorkspaceDisclaimerAccepted } from '../db/repos/workspaceRepo';
 import { db } from '../db/client';
 import { env } from '../config/env';
 import {
@@ -19,8 +20,7 @@ import {
   resolveFormEnginePlugin,
 } from '../integrations/form-engine/FormEngineRegistry';
 import { ConflictError, ValidationError } from '../errors';
-
-const FORM_NAME_TAKEN = 'A form with this name already exists';
+import { FORM_NAME_TAKEN } from '../messages';
 
 interface DeleteInput {
   workspaceId: string;
@@ -49,7 +49,6 @@ interface CreateInput {
   name: string;
   description?: string;
   formEngineCode?: string;
-  visibility?: string[];
 }
 
 interface UpdateInput {
@@ -67,6 +66,10 @@ export class FormService {
     form: FormRecord;
     version: Awaited<ReturnType<typeof createEmptyFormVersionDraft>>;
   }> {
+    // Gate: the workspace disclaimer must be accepted before any form can be created.
+    if (!(await isWorkspaceDisclaimerAccepted(input.workspaceId))) {
+      throw new ConflictError('Accept the workspace disclaimer before creating forms');
+    }
     const plugins = getFormEnginePlugins();
     if (plugins.length === 0) {
       throw new ValidationError('No form engine plugins installed.');
@@ -108,7 +111,6 @@ export class FormService {
           formId: form.id,
           actorId: input.actorId,
           actorDisplayLabel: input.actorDisplayLabel,
-          visibility: input.visibility,
         },
         tx,
       );

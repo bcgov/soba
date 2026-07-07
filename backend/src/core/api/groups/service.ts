@@ -1,8 +1,10 @@
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
-import { PUBLIC_PROVIDER_CODE, SystemGroup } from '../../db/codes';
+import { GroupMemberKind, PUBLIC_PROVIDER_CODE, SystemGroup } from '../../db/codes';
+import { GROUP_NAME_TAKEN } from '../../messages';
 import { listRoles } from '../../db/repos/roleRepo';
 import { getIdentityProvider } from '../../db/repos/identityProviderRepo';
 import {
+  activeGroupMemberKind,
   addGroupIdpMember,
   addGroupMember,
   countActiveUserMembers,
@@ -60,7 +62,7 @@ async function assertNameFree(
   exceptGroupId?: string,
 ): Promise<void> {
   if (await groupNameExistsInWorkspace(workspaceId, name, exceptGroupId)) {
-    throw new ConflictError('A group with this name already exists');
+    throw new ConflictError(GROUP_NAME_TAKEN);
   }
 }
 
@@ -147,8 +149,13 @@ export class GroupsApiService {
 
   async removeMember(ctx: GroupsContextInput, groupId: string, memberId: string) {
     const systemCode = await requireGroup(ctx.workspaceId, groupId);
-    if (systemCode === SystemGroup.form_admins && (await countActiveUserMembers(groupId)) <= 1) {
-      throw new ConflictError('Form administrators must keep at least one member');
+    // Guard the last admin only when the target is actually an active user member of that group,
+    // so a bogus member id still gets a 404 rather than a misleading 409.
+    if (systemCode === SystemGroup.form_admins) {
+      const kind = await activeGroupMemberKind(groupId, memberId);
+      if (kind === GroupMemberKind.user && (await countActiveUserMembers(groupId)) <= 1) {
+        throw new ConflictError('Form administrators must keep at least one member');
+      }
     }
     const removed = await removeGroupMember({ groupId, memberId });
     if (!removed) {

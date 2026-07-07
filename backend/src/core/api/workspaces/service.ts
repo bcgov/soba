@@ -5,7 +5,7 @@ import {
   type WorkspaceListSort,
 } from '../../db/repos/membershipRepo';
 import { canCreateWorkspaceByIdp } from '../../db/repos/idpGroupRepo';
-import { createTeamWorkspace, updateWorkspaceName } from '../../db/repos/workspaceRepo';
+import { createTeamWorkspace, updateWorkspace } from '../../db/repos/workspaceRepo';
 import { ForbiddenError } from '../../errors';
 import { decodeCursorAndMode, buildNextCursor, type CursorSort } from '../shared/pagination';
 
@@ -47,6 +47,7 @@ export class WorkspacesApiService {
         kind: r.kind,
         role: r.role,
         status: r.status,
+        disclaimerAccepted: r.disclaimerAcceptedAt != null,
       })),
       page: {
         limit: query.limit,
@@ -74,6 +75,7 @@ export class WorkspacesApiService {
     kind: string;
     role: string;
     status: string;
+    disclaimerAcceptedAt: Date | null;
   }) {
     return {
       id: row.id,
@@ -81,17 +83,26 @@ export class WorkspacesApiService {
       kind: row.kind,
       role: row.role,
       status: row.status,
+      disclaimerAccepted: row.disclaimerAcceptedAt != null,
     };
   }
 
-  async create(actorId: string, idpCode: string | null, body: { name: string }) {
+  async create(
+    actorId: string,
+    idpCode: string | null,
+    body: { name: string; disclaimerAccepted?: boolean },
+  ) {
     const canCreate = await canCreateWorkspaceByIdp(idpCode);
     if (!canCreate) {
       throw new ForbiddenError(
         'Only users authenticated through a BC Government identity provider can create workspaces',
       );
     }
-    const workspaceId = await createTeamWorkspace(actorId, body.name);
+    const workspaceId = await createTeamWorkspace(
+      actorId,
+      body.name,
+      body.disclaimerAccepted ?? false,
+    );
     const row = await getWorkspaceForUser(workspaceId, actorId);
     if (!row) {
       throw new Error('Created workspace could not be loaded');
@@ -99,10 +110,14 @@ export class WorkspacesApiService {
     return this.toWorkspaceItem(row);
   }
 
-  async updateName(workspaceId: string, actorId: string, body: { name: string }) {
-    const updated = await updateWorkspaceName(workspaceId, actorId, body.name);
+  async update(
+    workspaceId: string,
+    actorId: string,
+    body: { name?: string; disclaimerAccepted?: boolean },
+  ) {
+    const updated = await updateWorkspace(workspaceId, actorId, body);
     if (!updated) {
-      throw new ForbiddenError('Only workspace owners or admins can rename this workspace');
+      throw new ForbiddenError('Only workspace owners or admins can manage this workspace');
     }
     const row = await getWorkspaceForUser(workspaceId, actorId);
     if (!row) return null;
