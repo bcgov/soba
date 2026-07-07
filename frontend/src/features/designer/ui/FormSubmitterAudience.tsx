@@ -14,11 +14,11 @@ import { getSubmitterAudience, setSubmitterAudience } from '@/src/shared/api/sob
 import type { SubmitterAudience } from '@/src/types/groups';
 import styles from './FormSubmitterAudience.module.css';
 
-type Props = {
+type Props = Readonly<{
   workspaceId: string | null;
   token?: string;
   canManage: boolean;
-};
+}>;
 
 export function FormSubmitterAudience({ workspaceId, token, canManage }: Props) {
   const t = useDictionary().form;

@@ -175,7 +175,10 @@ export function createFormsApiService(
       if (!row) return null;
       // Caller's permissions on this form, so the UI can gate actions. Workspace-scoped today.
       const permissions = await resolveFormPermissions(ctx.actorId, ctx.workspaceId);
-      return { ...toFormDto(row), permissions: [...permissions].sort() };
+      return {
+        ...toFormDto(row),
+        permissions: [...permissions].sort((a, b) => a.localeCompare(b)),
+      };
     },
 
     list: async (scope: FormsListScopeInput, query: ListFormsQueryInput) => {

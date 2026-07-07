@@ -176,7 +176,7 @@ async function addIdpMember(
     throw new ValidationError('Identity providers can only be assigned to Form submitters');
   }
   const provider = await getIdentityProvider(code);
-  if (!provider || !provider.isActive) {
+  if (!provider?.isActive) {
     throw new ValidationError('Unknown identity provider');
   }
   const isPublic = code === PUBLIC_PROVIDER_CODE;
