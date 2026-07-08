@@ -22,6 +22,8 @@ export const HealthReadinessResponseSchema = z
     status: z.enum(['ready', 'unhealthy']),
     db: z.enum(['ok', 'unreachable']),
     formEngines: z.record(z.string(), FormEngineReadinessResultSchema),
+    virusScanner: z.enum(['ok', 'unreachable']),
+    tempStorage: z.enum(['ok', 'unreachable']),
   })
   .openapi('Health_ReadinessResponse');
 

@@ -2,7 +2,7 @@ import packageJson from '../../../../package.json';
 import { env } from '../../config/env';
 import { authEnv } from '../../config/authEnv';
 import { getFormEnginePlugins } from '../../integrations/form-engine/FormEngineRegistry';
-import { getPluginCatalog } from '../../integrations/plugins/PluginRegistry';
+import { getActivePluginCodes, getPluginCatalog } from '../../integrations/plugins/PluginRegistry';
 import { isFeatureEnabled, listFeatures } from '../../db/repos/featureRepo';
 import { roleService } from '../../services/roleService';
 
@@ -21,11 +21,12 @@ function parseKeycloakIssuer(issuer: string): { url: string; realm: string } {
 export class MetaApiService {
   getPlugins() {
     const plugins = getPluginCatalog();
+    // Selectable plugin types (cache, messagebus, virus-scan, temp-storage) come
+    // straight from the registry so 'enabled' matches what it actually loads.
+    // Form engine is owned by its own registry, so it is resolved separately.
     const activeFormEngineCode =
       env.getFormEngineDefaultCode() ?? getFormEnginePlugins()[0]?.code ?? 'formio-v5';
-    const activeCacheCode = env.getCacheDefaultCode() ?? 'cache-memory';
-    const activeMessageBusCode = env.getMessageBusDefaultCode() ?? 'messagebus-memory';
-    const activeCodes = new Set([activeFormEngineCode, activeCacheCode, activeMessageBusCode]);
+    const activeCodes = new Set([activeFormEngineCode, ...getActivePluginCodes()]);
     return {
       plugins: plugins.map((plugin) => ({
         ...plugin,

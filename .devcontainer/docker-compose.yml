@@ -83,6 +83,26 @@ services:
       - "8088:8080"
     restart: unless-stopped
 
+  # Opt-in local ClamAV. OFF by default — dev uses VIRUSSCAN_DEFAULT_CODE=virusscan-noop.
+  # Start it only when testing real scanning:
+  #   docker compose -f .devcontainer/docker-compose.yml --profile clamav up -d
+  # then set VIRUSSCAN_DEFAULT_CODE=virusscan-clamav + PLUGIN_VIRUSSCAN_CLAMAV_HOST=host.docker.internal.
+  # First boot downloads definitions from the mirror and can take a few minutes.
+  clamav:
+    image: ghcr.io/bcgov/chefs-clamav:latest
+    # chefs-clamav is a UBI9/x86_64 image; emulate on arm64 (Apple Silicon).
+    platform: linux/amd64
+    profiles: ["clamav"]
+    ports:
+      - "3310:3310"
+    healthcheck:
+      test: ["CMD", "/opt/app-root/clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+    restart: unless-stopped
+
 volumes:
   mongodb_data:
   postgres_data:

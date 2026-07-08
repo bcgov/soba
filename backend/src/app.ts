@@ -7,7 +7,7 @@ import cors from 'cors';
 import passport from 'passport';
 import { checkJwt } from './core/middleware/auth';
 import { coreRouter } from './core/api';
-import { healthRouter } from './core/api/health';
+import { healthRouter, logStartupHealth } from './core/api/health';
 import { metaRouter } from './core/api/meta';
 import { buildOpenApiSpec } from './core/api/shared/openapi';
 import swaggerUi from 'swagger-ui-express';
@@ -115,4 +115,5 @@ app.use(
 
 app.listen(port, () => {
   log.info({ port }, 'Express is listening');
+  void logStartupHealth();
 });
