@@ -66,7 +66,23 @@ backend:
     formEngineDefaultCode: formio-v5
     cacheDefaultCode: cache-memory
     messagebusDefaultCode: messagebus-memory
+    # Deployments scan for real against the shared clamav (below). Local dev
+    # defaults to virusscan-noop via .env, not this chart.
+    virusScanDefaultCode: virusscan-clamav
+    # Temp storage plugin. tempstorage-mount uses the shared PVC below (never
+    # os.tmpdir()) — the default for real deployments. PRs override to
+    # tempstorage-os (see values-pr.yaml).
+    tempStorageDefaultCode: tempstorage-mount
     sobaSystemSubject: soba-system
+
+  # -- Shared temp storage PVC (RWX so it survives horizontal scaling).
+  # Only provisioned/mounted when config.tempStorageDefaultCode is
+  # tempstorage-mount; mountPath doubles as the plugin's DIR. Ignored otherwise.
+  tempStorage:
+    mountPath: /app/tmp
+    accessMode: ReadWriteMany
+    size: 1Gi
+    storageClassName: ""
 
   # -- configmap-formio: PLUGIN_FORMIO_V5_* (non-secret values)
   formio:
@@ -215,6 +231,20 @@ mongodb:
   persistence:
     size: 1Gi
     storageClassName: ""
+
+# -- ClamAV endpoint (alias to the separately-deployed clamav) ----------------
+# ClamAV runs as its own chart (deployments/helm/clamav), one per namespace.
+# The backend always targets an in-namespace ExternalName Service <release>-clamav
+# on the URL <release>-clamav:port, so backend config never changes per env — only
+# externalName (the real clamav Service) does. The alias Service + the backend
+# wiring are created only when backend.config.virusScanDefaultCode == virusscan-clamav.
+clamav:
+  # Real clamav Service the <release>-clamav alias points at. Empty defaults to
+  # the clamav Service in THIS namespace; override for cross-namespace (e.g. a PR
+  # running in the dev namespace that points at dev's clamav).
+  externalName: ""
+  port: 3310
+  timeoutMs: "60000"
 
 # -- Temporal (shared server, env vars for backend + worker) ------------------
 temporal:

@@ -123,3 +123,21 @@ Database secret name and key.
 DATABASE_URL
 {{- end }}
 {{- end }}
+
+{{/*
+Truthy ("true") only when the tempstorage-mount plugin is selected. Gates the
+shared temp PVC, its volume mount, and PLUGIN_TEMPSTORAGE_MOUNT_DIR together so
+they cannot drift apart. Any other code (e.g. tempstorage-os) needs no PVC.
+*/}}
+{{- define "soba.tempStorageUsesMount" -}}
+{{- if eq .Values.backend.config.tempStorageDefaultCode "tempstorage-mount" -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Truthy ("true") only when the backend scans with clamav. Gates the clamav
+ExternalName alias Service and the PLUGIN_VIRUSSCAN_CLAMAV_* env together so they
+can't drift from the selected plugin.
+*/}}
+{{- define "soba.virusScanUsesClamav" -}}
+{{- if eq .Values.backend.config.virusScanDefaultCode "virusscan-clamav" -}}true{{- end -}}
+{{- end }}

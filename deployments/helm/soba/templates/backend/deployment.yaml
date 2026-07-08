@@ -102,3 +102,14 @@ spec:
             timeoutSeconds: {{ .Values.backend.readinessProbe.timeoutSeconds }}
           resources:
             {{- toYaml .Values.backend.resources | nindent 12 }}
+          {{- if include "soba.tempStorageUsesMount" . }}
+          volumeMounts:
+            - name: app-tmp
+              mountPath: {{ .Values.backend.tempStorage.mountPath }}
+          {{- end }}
+      {{- if include "soba.tempStorageUsesMount" . }}
+      volumes:
+        - name: app-tmp
+          persistentVolumeClaim:
+            claimName: {{ include "soba.fullname" . }}-backend-tmp
+      {{- end }}
