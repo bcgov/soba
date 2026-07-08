@@ -35,6 +35,8 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
     return;
   }
 
+  const profile = req.params.storageProfile || undefined;
+
   const record = await filesService.upload({
     workspaceId: ctx.workspaceId,
     actorId: ctx.actorId,
@@ -43,6 +45,7 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
     size: uploaded.size,
     buffer: uploaded.buffer,
     submissionId,
+    useProfile: profile,
   });
 
   // The chefs provider builds each file's URL as `${filesUrl}/${id}`, so it only needs the id

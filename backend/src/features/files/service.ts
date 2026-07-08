@@ -21,12 +21,13 @@ export interface UploadFileParams {
   size?: number;
   buffer: Buffer;
   submissionId?: string | null;
+  useProfile?: string | undefined;
 }
 
 export const filesService = {
   /** Store the bytes and record a file row. The returned record's id is the public reference. */
   async upload(params: UploadFileParams): Promise<FileRecord> {
-    const profile = env.getFilesStorageProfile();
+    const profile = params.useProfile ?? env.getFilesStorageProfile();
     const result = await getStorageAdapter(profile).uploadFile({
       workspaceId: params.workspaceId,
       submissionId: params.submissionId ?? undefined,

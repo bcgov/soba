@@ -25,6 +25,9 @@ router.use(requireFeature('files'));
 // Accept any file field name (Form.io's fileKey is configurable; the component uploads one at a time).
 router.post('/', workspaceFromQuery, upload.any(), uploadFileHandler);
 
+// this makes it so that multiple profiles can work at once, but it isn't supported by the FE currently
+router.post('/:storageProfile', workspaceFromQuery, upload.any(), uploadFileHandler);
+
 // Client-facing config (size limit + blocked extensions). Must be declared before '/:id'.
 router.get('/config', getFilesConfigHandler);
 
