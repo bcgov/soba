@@ -1,11 +1,11 @@
 /** Disk-backed TempStorageAdapter shared by tempstorage-os and tempstorage-mount;
  *  they differ only in base dir. */
-import { randomUUID } from 'crypto';
-import { createReadStream as fsCreateReadStream, createWriteStream, mkdirSync } from 'fs';
-import { rm } from 'fs/promises';
-import path from 'path';
-import { pipeline } from 'stream/promises';
-import { Readable } from 'stream';
+import { randomUUID } from 'node:crypto';
+import { createReadStream as fsCreateReadStream, createWriteStream, mkdirSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
+import { Readable } from 'node:stream';
 import type { TempResource, TempStorageAdapter, TempWriteOptions } from './TempStorageAdapter';
 
 export function createDiskTempStorageAdapter(baseDir: string): TempStorageAdapter {

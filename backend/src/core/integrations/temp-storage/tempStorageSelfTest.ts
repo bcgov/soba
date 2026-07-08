@@ -1,4 +1,4 @@
-import type { Readable } from 'stream';
+import type { Readable } from 'node:stream';
 import type { TempStorageAdapter } from './TempStorageAdapter';
 
 const PROBE = Buffer.from('soba-temp-storage-self-test');

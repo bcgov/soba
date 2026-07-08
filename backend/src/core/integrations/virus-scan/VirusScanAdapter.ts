@@ -2,7 +2,7 @@
  * Pluggable virus-scan adapter. Implementations are provided by plugins
  * (e.g. virusscan-clamav, virusscan-noop) and selected via VIRUSSCAN_DEFAULT_CODE.
  */
-import type { Readable } from 'stream';
+import type { Readable } from 'node:stream';
 import type { PluginConfigReader } from '../../config/pluginConfig';
 
 /** Outcome of a scan. `error` means the scan could not complete (verdict is unknown). */

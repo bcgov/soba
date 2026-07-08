@@ -4,7 +4,7 @@
  * base dir), selected via TEMPSTORAGE_DEFAULT_CODE. Stream-based, but every
  * resource also has a real filesystem `path`.
  */
-import type { Readable } from 'stream';
+import type { Readable } from 'node:stream';
 import type { PluginConfigReader } from '../../config/pluginConfig';
 
 /** A staged transient resource, backed by a real filesystem path. */

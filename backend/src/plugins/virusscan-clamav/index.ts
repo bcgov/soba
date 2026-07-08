@@ -1,4 +1,4 @@
-import { Readable } from 'stream';
+import { Readable } from 'node:stream';
 import NodeClam from 'clamscan';
 import { parseNumberEnvValue } from '../../core/config/env';
 import type {
@@ -59,12 +59,10 @@ function createClamavVirusScanAdapter(config: PluginConfigReader): VirusScanAdap
   // Memoize the client; clear a failed init so the next call retries.
   let clamPromise: Promise<NodeClam> | null = null;
   const getClam = (): Promise<NodeClam> => {
-    if (!clamPromise) {
-      clamPromise = new NodeClam().init(initOptions).catch((err) => {
-        clamPromise = null;
-        throw err;
-      });
-    }
+    clamPromise ??= new NodeClam().init(initOptions).catch((err) => {
+      clamPromise = null;
+      throw err;
+    });
     return clamPromise;
   };
 

@@ -2,7 +2,7 @@ import type { VirusScanAdapter } from './VirusScanAdapter';
 
 // EICAR test signature, assembled at runtime so this file doesn't trip endpoint AV.
 const EICAR_TEST_STRING = [
-  'X5O!P%@AP[4\\PZX54(P^)7CC)7}',
+  String.raw`X5O!P%@AP[4\PZX54(P^)7CC)7}`,
   '$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!',
   '$H+H*',
 ].join('');
