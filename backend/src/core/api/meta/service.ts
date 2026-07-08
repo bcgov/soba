@@ -21,9 +21,7 @@ function parseKeycloakIssuer(issuer: string): { url: string; realm: string } {
 export class MetaApiService {
   getPlugins() {
     const plugins = getPluginCatalog();
-    // Selectable plugin types (cache, messagebus, virus-scan, temp-storage) come
-    // straight from the registry so 'enabled' matches what it actually loads.
-    // Form engine is owned by its own registry, so it is resolved separately.
+    // Selectable types come from the registry; form engine has its own registry.
     const activeFormEngineCode =
       env.getFormEngineDefaultCode() ?? getFormEnginePlugins()[0]?.code ?? 'formio-v5';
     const activeCodes = new Set([activeFormEngineCode, ...getActivePluginCodes()]);

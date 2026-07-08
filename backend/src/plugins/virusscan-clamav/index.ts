@@ -19,12 +19,8 @@ interface ClamScanResponse {
   viruses: string[];
 }
 
-/**
- * clamd speaks a raw TCP protocol, not HTTP, so the "URL" is just a host:port
- * endpoint (typically a k8s Service, e.g. `soba-clamav:3310`). An optional
- * scheme (`tcp://`) and trailing path are tolerated and ignored; a missing port
- * falls back to `defaultPort`.
- */
+/** clamd is raw TCP, not HTTP — the "URL" is a host:port endpoint. Tolerates a
+ *  tcp:// scheme and trailing path; missing port falls back to defaultPort. */
 export function parseClamavUrl(raw: string, defaultPort: number): { host: string; port: number } {
   const withoutScheme = raw.trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
   const hostPort = withoutScheme.split('/')[0];
@@ -54,14 +50,13 @@ function createClamavVirusScanAdapter(config: PluginConfigReader): VirusScanAdap
   const timeoutRaw = config.getOptional('TIMEOUT_MS');
   const timeout = timeoutRaw ? parseNumberEnvValue(timeoutRaw) : DEFAULT_TIMEOUT_MS;
 
-  // clamd runs remotely (TCP); never fall back to a local binary that isn't there.
+  // Remote clamd over TCP; no local-binary fallback.
   const initOptions: NodeClam.Options = {
     clamdscan: { host, port, timeout, localFallback: false },
     preference: 'clamdscan',
   };
 
-  // Lazily initialize and memoize the client. A failed init is cleared so the
-  // next call retries rather than caching the failure for the process lifetime.
+  // Memoize the client; clear a failed init so the next call retries.
   let clamPromise: Promise<NodeClam> | null = null;
   const getClam = (): Promise<NodeClam> => {
     if (!clamPromise) {

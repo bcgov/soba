@@ -18,8 +18,7 @@ export async function readinessHandler(_req: Request, res: Response): Promise<vo
   const formEngines = await checkFormEngineReadiness();
   const allEnginesOk = Object.values(formEngines).every((r) => r.ok);
 
-  // Non-gating: reported for observability but does not fail the probe, so a
-  // virus-scanner or temp-storage outage never takes the API offline.
+  // Non-gating: reported, but never fails the probe.
   let virusScannerOk = false;
   try {
     virusScannerOk = await getVirusScanAdapter().ping();

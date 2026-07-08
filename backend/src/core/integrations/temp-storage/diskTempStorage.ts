@@ -1,8 +1,5 @@
-/**
- * Shared disk-backed TempStorageAdapter used by the tempstorage-os and
- * tempstorage-mount plugins. The only difference between them is the base
- * directory, so the logic lives here once.
- */
+/** Disk-backed TempStorageAdapter shared by tempstorage-os and tempstorage-mount;
+ *  they differ only in base dir. */
 import { randomUUID } from 'crypto';
 import { createReadStream as fsCreateReadStream, createWriteStream, mkdirSync } from 'fs';
 import { rm } from 'fs/promises';

@@ -9,12 +9,8 @@ import type { PluginConfigReader } from '../../core/config/pluginConfig';
 
 const CODE = 'tempstorage-os';
 
-/**
- * Disk temp storage under the OS temp directory (os.tmpdir()). Fine for a single
- * pod or local dev; deployments that scale horizontally should use
- * tempstorage-mount against a shared volume instead.
- * Config: SUBDIR (optional) names the subdirectory under os.tmpdir() (default "soba").
- */
+/** Disk temp storage under os.tmpdir()/SUBDIR (default "soba"). Local/single-pod;
+ *  scaled deployments use tempstorage-mount. Config: SUBDIR. */
 function createOsTempStorageAdapter(config: PluginConfigReader): TempStorageAdapter {
   const subdir = config.getOptional('SUBDIR') ?? 'soba';
   return createDiskTempStorageAdapter(path.join(os.tmpdir(), subdir));

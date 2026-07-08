@@ -1,13 +1,8 @@
 /**
- * Pluggable temp storage for staging transient bytes (e.g. an upload awaiting a
- * virus scan). Implementations are provided by plugins (tempstorage-os for local
- * dev / PRs, tempstorage-mount for other deployments) and selected via
- * TEMPSTORAGE_DEFAULT_CODE. Both are disk-backed; the difference is the base
- * directory (os.tmpdir() vs a shared mount).
- *
- * The API is stream-centric so consumers don't have to touch the filesystem, but
- * every resource also carries a real `path` for external tools (e.g. clamd's
- * file scan).
+ * Pluggable temp storage for staging transient bytes (e.g. an upload before a
+ * virus scan). Plugins tempstorage-os / tempstorage-mount (both disk, different
+ * base dir), selected via TEMPSTORAGE_DEFAULT_CODE. Stream-based, but every
+ * resource also has a real filesystem `path`.
  */
 import type { Readable } from 'stream';
 import type { PluginConfigReader } from '../../config/pluginConfig';
@@ -19,7 +14,7 @@ export interface TempResource {
 }
 
 export interface TempWriteOptions {
-  /** Filename prefix for disk-backed adapters; ignored by in-memory. */
+  /** Filename prefix. */
   prefix?: string;
 }
 

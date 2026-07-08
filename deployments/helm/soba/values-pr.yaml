@@ -1,10 +1,12 @@
 # PR environment — minimal resources, single replica, internal Form.io + MongoDB
 backend:
   replicas: 1
-  # TEMP (revert before merge to develop): mount to exercise the PVC path in this
-  # PR. Normally PRs use tempstorage-os (single replica, no shared PVC).
+  # PRs normally run lightweight like local dev: noop scanning + OS temp (no clamav
+  # dependency, no shared PVC). This PR TEMPORARILY overrides both to the real
+  # backends to exercise them against dev's clamav — revert to noop/os before merge.
   config:
-    tempStorageDefaultCode: tempstorage-mount
+    virusScanDefaultCode: virusscan-clamav # TEMP; normally virusscan-noop
+    tempStorageDefaultCode: tempstorage-mount # TEMP; normally tempstorage-os
   sso:
     jwksUri: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/certs
     jwtIssuer: https://dev.loginproxy.gov.bc.ca/auth/realms/standard

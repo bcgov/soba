@@ -143,8 +143,7 @@ function loadPlugin(pluginsRoot: string, pluginDir: string): CachedPlugin | null
 
   const obj = raw !== null && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   const entry: CachedPlugin = { dir: pluginDir };
-  // Populate the heterogeneous fields dynamically through a writable view; each
-  // value's shape is guarded at runtime by its Zod schema.
+  // Dynamic-key write; each value's shape is guarded at runtime by its schema.
   const writable = entry as unknown as Record<string, unknown>;
   for (const { field, exportKey, schema } of DEFINITION_KINDS) {
     writable[field] = parseDefinition(obj, pluginDir, exportKey, schema);
@@ -246,12 +245,8 @@ export function getIdpPluginDefinitions(): IdpPluginDefinition[] {
 
 // --- Selectable adapters ----------------------------------------------------
 
-/**
- * Single source of truth for which plugin code is active per selectable type.
- * The adapter getters below and the /meta/plugins "enabled" flag both resolve
- * through this, so reporting can never drift from what actually loads. Add a new
- * selectable type here once and both stay in sync.
- */
+// Active plugin code per selectable type. The adapter getters and /meta/plugins
+// both resolve through this, so they can't drift. Add a type here once.
 const SELECTABLE_PLUGIN_DEFAULTS = {
   cache: { label: 'cache', configured: () => env.getCacheDefaultCode(), fallback: 'cache-memory' },
   messagebus: {
@@ -291,11 +286,8 @@ interface AdapterDefinition<T> {
   createAdapter: (config: PluginConfigReader) => T;
 }
 
-/**
- * A lazily-instantiated singleton getter for a selectable adapter type: resolve
- * the active code, find its definition, and construct it once — throwing a
- * helpful error listing the installed codes when none matches.
- */
+/** Memoized getter for a selectable adapter: resolve the active code, find its
+ *  definition, construct once. Throws (listing installed codes) if none matches. */
 function lazyAdapter<T>(
   type: SelectablePluginType,
   getDefinitions: () => AdapterDefinition<T>[],
