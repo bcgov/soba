@@ -6,6 +6,7 @@ import { designFormsRouter, registerFormsOpenApi } from './forms';
 import { designSubmissionsRouter, registerSubmissionsOpenApi } from './submissions';
 import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
 import { groupsDomain } from './groups';
+import { filesDomain } from '../../features/files';
 import { meDomain } from './me';
 import { membersDomain } from './members';
 import { workspacesDomain } from './workspaces';
@@ -23,6 +24,7 @@ registerOpenApiPaths((registry) => {
   meDomain.registerOpenApi(registry);
   membersDomain.registerOpenApi(registry);
   workspacesDomain.registerOpenApi(registry);
+  filesDomain.registerOpenApi(registry);
   registerAdminOpenApi(registry);
   registerHealthOpenApi(registry);
 });
@@ -40,7 +42,7 @@ submitRouter.use(coreErrorHandler);
 
 // Core: workspace/account management.
 const coreRouter = express.Router();
-for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain]) {
+for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain, filesDomain]) {
   coreRouter.use(domain.path, domain.router);
 }
 coreRouter.use(coreErrorHandler);

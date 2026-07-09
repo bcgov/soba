@@ -1,12 +1,17 @@
 /**
  * Single plugin discovery and cache. Scans plugins dir once (lazy), validates with Zod,
- * exposes form engine definitions, plugin API definitions, cache plugins, and messagebus plugins.
+ * exposes workspace resolvers, form engine definitions, plugin API definitions,
+ * cache plugins, messagebus plugins, and storage plugins.
  */
 import fs from 'fs';
 import path from 'path';
 import { z } from 'zod';
 import { env } from '../../config/env';
-import { createPluginConfigReader } from '../../config/pluginConfig';
+import {
+  createPluginConfigReader,
+  createStorageProfileConfigReader,
+} from '../../config/pluginConfig';
+import { getStorageProfilesConfig } from '../../config/storageProfiles';
 import type { FormEnginePluginDefinition } from '../form-engine/FormEnginePluginDefinition';
 import type { FeatureApiDefinition } from './FeatureApiDefinition';
 import type { CacheAdapter, CachePluginDefinition } from '../cache/CacheAdapter';
@@ -15,6 +20,11 @@ import type {
   MessageBusPluginDefinition,
 } from '../messagebus/MessageBusAdapter';
 import type { IdpPluginDefinition } from '../../auth/IdpPlugin';
+import type {
+  StorageEngineAdapter,
+  StorageEngineReadinessResult,
+  StoragePluginDefinition,
+} from '../storage-engine/StorageEngineAdapter';
 
 const FormEnginePluginDefinitionSchema = z.object({
   code: z.string().min(1),
@@ -43,6 +53,11 @@ const MessageBusPluginDefinitionSchema = z.object({
   createAdapter: z.any(),
 });
 
+const StoragePluginDefinitionSchema = z.object({
+  code: z.string().min(1),
+  createAdapter: z.any(),
+});
+
 const IdpPluginDefinitionSchema = z.object({
   code: z.string().min(1),
   createAuthMiddleware: z.any(),
@@ -55,6 +70,7 @@ interface CachedPlugin {
   apiDefinition?: FeatureApiDefinition;
   cacheDefinition?: CachePluginDefinition;
   messagebusDefinition?: MessageBusPluginDefinition;
+  storageDefinition?: StoragePluginDefinition;
   idpDefinition?: IdpPluginDefinition;
 }
 
@@ -130,6 +146,12 @@ function loadPlugin(pluginsRoot: string, pluginDir: string): CachedPlugin | null
       pluginDir,
       'messagebusPluginDefinition',
       MessageBusPluginDefinitionSchema,
+    ),
+    storageDefinition: parsePluginDefinition<StoragePluginDefinition>(
+      obj,
+      pluginDir,
+      'storagePluginDefinition',
+      StoragePluginDefinitionSchema,
     ),
     idpDefinition: parsePluginDefinition<IdpPluginDefinition>(
       obj,
@@ -230,6 +252,13 @@ export function getMessageBusPluginDefinitions(): MessageBusPluginDefinition[] {
     .filter((d): d is MessageBusPluginDefinition => Boolean(d));
 }
 
+export function getStoragePluginDefinitions(): StoragePluginDefinition[] {
+  const discovered = discoverAndCache();
+  return discovered
+    .map((p) => p.storageDefinition)
+    .filter((d): d is StoragePluginDefinition => Boolean(d));
+}
+
 export function getIdpPluginDefinitions(): IdpPluginDefinition[] {
   const discovered = discoverAndCache();
   return discovered.map((p) => p.idpDefinition).filter((d): d is IdpPluginDefinition => Boolean(d));
@@ -267,4 +296,53 @@ export function getMessageBusAdapter(): MessageBusAdapter {
     messageBusAdapterInstance = definition.createAdapter(createPluginConfigReader(definition.code));
   }
   return messageBusAdapterInstance;
+}
+
+const storageAdapterByProfile = new Map<string, StorageEngineAdapter>();
+
+/**
+ * Storage adapter for a profile (default 'default'). Profiles let multiple backends run at once
+ * (e.g. separate S3 buckets); each is configured under STORAGE_PROFILE_<PROFILE>_* and cached.
+ */
+export function getStorageAdapter(profile: string = 'default'): StorageEngineAdapter {
+  const cached = storageAdapterByProfile.get(profile);
+  if (cached) return cached;
+
+  const profiles = getStorageProfilesConfig();
+  const profileConfig = profiles[profile];
+  if (!profileConfig) {
+    throw new Error(
+      `No storage profile '${profile}' is configured. Available: ${Object.keys(profiles).join(', ') || '<none>'}`,
+    );
+  }
+  const definitions = getStoragePluginDefinitions();
+  const definition = definitions.find((d) => d.code === profileConfig.backend);
+  if (!definition) {
+    throw new Error(
+      `Storage profile '${profile}' uses backend '${profileConfig.backend}', which is not installed. Available: ${definitions.map((d) => d.code).join(', ') || '<none>'}`,
+    );
+  }
+  const adapter = definition.createAdapter(createStorageProfileConfigReader(profile));
+  storageAdapterByProfile.set(profile, adapter);
+  return adapter;
+}
+
+/**
+ * Readiness of every configured storage profile, keyed by profile name. Never throws — a profile
+ * that is unreachable or misconfigured yields { ok: false, message }; one with no readinessCheck
+ * yields { ok: true }.
+ */
+export async function checkStorageReadiness(): Promise<
+  Record<string, StorageEngineReadinessResult>
+> {
+  const results: Record<string, StorageEngineReadinessResult> = {};
+  for (const profile of Object.keys(getStorageProfilesConfig())) {
+    try {
+      const adapter = getStorageAdapter(profile);
+      results[profile] = (await adapter.readinessCheck?.()) ?? { ok: true };
+    } catch (err) {
+      results[profile] = { ok: false, message: err instanceof Error ? err.message : String(err) };
+    }
+  }
+  return results;
 }
