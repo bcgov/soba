@@ -15,7 +15,8 @@
     "target": "es2017",
     "rootDirs": ["src/", "config/"],
     "typeRoots": ["./node_modules/@types", "./typings"],
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["jest", "supertest", "express", "passport", "swagger-ui-express"]
   },
   "include": [
     "src/**/*.ts",

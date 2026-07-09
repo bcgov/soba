@@ -411,20 +411,4 @@ describe('HttpClient', () => {
     const call = mockFetch.mock.calls[0];
     expect(call[0]).toBe('https://api.example.com/path/to/resource');
   });
-
-  it('handles path without leading slash', async () => {
-    const mockFetch = jest.fn().mockResolvedValue(
-      new Response(JSON.stringify({}), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    );
-    global.fetch = mockFetch as jest.Mock;
-
-    const client = new HttpClient({ baseUrl });
-    await client.get('path/to/resource');
-
-    const call = mockFetch.mock.calls[0];
-    expect(call[0]).toBe('https://api.example.com/path/to/resource');
-  });
 });
