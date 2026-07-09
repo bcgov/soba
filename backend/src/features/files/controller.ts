@@ -35,7 +35,7 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
     return;
   }
 
-  const profile = req.params.storageProfile || undefined;
+  const profile = req.header('storageProfile') || undefined;
 
   const record = await filesService.upload({
     workspaceId: ctx.workspaceId,
