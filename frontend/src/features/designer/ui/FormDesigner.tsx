@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useMemo, useRef, useCallback, useState } from 'react';
+import React, { useMemo, useRef, useCallback, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
+import { ensureBcgovFormioRegistered } from '@/src/features/formio-v5/registerBcgovFormio';
 
 import { useFormioV5FormChrome } from '@/lib/hooks/useFormioV5FormChrome';
 
@@ -24,7 +25,8 @@ import type { FormBuilder as FormioBuilderInstance } from '@formio/js';
  */
 const FormBuilder = dynamic(
   async () => {
-    const mod = await import('@formio/react');
+    // Feature-gated registration of the bcgov components + CHEFS provider before the builder loads.
+    const [mod] = await Promise.all([import('@formio/react'), ensureBcgovFormioRegistered()]);
     return mod.FormBuilder;
   },
   { ssr: false },
@@ -63,6 +65,19 @@ const FormDesigner: React.FC<DesignerProps> = ({
    */
   const [stableForm] = useState<FormType>(() => initialModel ?? { components: [] });
 
+  // Whether any bcgov component is enabled (today just BC File Upload, gated on `files`).
+  // Controls whether the 'BC Gov' builder group shows.
+  const [bcgovEnabled, setBcgovEnabled] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void ensureBcgovFormioRegistered().then((r) => {
+      if (active) setBcgovEnabled(r.filesEnabled);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const opt = useMemo(
     () => ({
       language: dict.locale,
@@ -74,66 +89,30 @@ const FormDesigner: React.FC<DesignerProps> = ({
           title: 'Basic',
           weight: 0,
           default: true,
-          components: {
-            textfield: true,
-            textarea: true,
-            email: true,
-            password: true,
-            number: true,
-            checkbox: true,
-            selectboxes: true,
-            select: true,
-            radio: true,
-            button: true,
-          },
         },
         advanced: {
           title: 'Advanced',
           weight: 10,
           default: false,
-          components: {
-            email: true,
-            url: true,
-            phoneNumber: true,
-            tags: true,
-            address: true,
-            dateTime: true,
-            content: true,
-            htmlelement: true,
-            currency: true,
-            signature: true,
-          },
         },
         data: {
           title: 'Data',
           weight: 20,
           default: false,
-          components: {
-            datagrid: true,
-            editgrid: true,
-            container: true,
-            tree: true,
-          },
         },
         layout: {
           title: 'Layout',
           weight: 30,
           default: false,
-          components: {
-            htmlelement: true,
-            content: true,
-            columns: true,
-            fieldset: true,
-            panel: true,
-            table: true,
-            tabs: true,
-            well: true,
-          },
         },
+        // Only shown when there is at least one enabled bcgov component (currently BC File Upload).
+        ...(bcgovEnabled
+          ? { bcgov: { title: 'BC Gov', weight: 5, default: false } }
+          : {}),
         premium: false,
       },
     }),
-    [dict],
+    [dict, bcgovEnabled],
   );
 
   const [sidebarEl, setSidebarEl] = useState<HTMLElement | null>(null);

@@ -96,6 +96,7 @@ export type FeatureStatusCode = (typeof FeatureStatus)[keyof typeof FeatureStatu
 export const Features = {
   design_mode: 'design-mode',
   submit_mode: 'submit-mode',
+  files: 'files',
 } as const;
 export type FeatureCode = (typeof Features)[keyof typeof Features];
 

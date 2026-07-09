@@ -156,6 +156,10 @@ export function createEnvReader(source: EnvSource) {
     /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
     getDefaultSubmitterProvider: () =>
       getOptionalEnvFrom(source, 'DEFAULT_SUBMITTER_PROVIDER') ?? 'azureidir',
+    getStorageProfiles: () => {
+      const raw = getOptionalEnvFrom(source, 'STORAGE_PROFILES');
+      return raw ? parseCsvValue(raw) : [];
+    },
     getRateLimitWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_WINDOW_MS'),
     getRateLimitMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_MAX'),
     getRateLimitApiWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_API_WINDOW_MS'),
@@ -211,6 +215,10 @@ export const env = {
   getFormEngineDefaultCode: () => getOptionalEnv('FORM_ENGINE_DEFAULT_CODE'),
   /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
   getDefaultSubmitterProvider: () => getOptionalEnv('DEFAULT_SUBMITTER_PROVIDER') ?? 'azureidir',
+  getStorageProfiles: () => {
+    const raw = getOptionalEnv('STORAGE_PROFILES');
+    return raw ? parseCsvValue(raw) : [];
+  },
   getRateLimitWindowMs: () => getNumberEnv('RATE_LIMIT_WINDOW_MS'),
   getRateLimitMax: () => getNumberEnv('RATE_LIMIT_MAX'),
   getRateLimitApiWindowMs: () => getNumberEnv('RATE_LIMIT_API_WINDOW_MS'),
@@ -227,4 +235,8 @@ export const env = {
   getTemporalNamespace: () => getOptionalEnv('TEMPORAL_NAMESPACE') ?? 'default',
   getTemporalTaskQueue: () => getOptionalEnv('TEMPORAL_TASK_QUEUE') ?? 'soba',
   getTemporalWorkerHealthPort: () => getNumberEnv('TEMPORAL_WORKER_HEALTH_PORT') ?? 9090,
+  // Max upload size accepted by the files API. Feature-level (not per storage backend).
+  getFilesMaxFileSizeMb: () => getNumberEnv('FILES_MAX_FILE_SIZE_MB') || 10,
+  // Storage profile the files feature reads/writes. Defaults to 'default'.
+  getFilesStorageProfile: () => getOptionalEnv('FILES_STORAGE_PROFILE') ?? 'default',
 };

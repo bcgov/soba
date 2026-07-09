@@ -11,6 +11,7 @@ import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFormioRenderError';
 import { FormioV5FormRenderErrorBoundary } from '@/src/features/formio-v5/ui/FormioV5FormRenderErrorBoundary';
 import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
+import { loadFilesConfig, toBcgovFileOption } from '@/src/features/formio-v5/loadFilesConfig';
 import {
   getSubmitForm,
   createSobaFormSubmission,
@@ -40,6 +41,8 @@ function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: Fo
 
   const [schema, setSchema] = useState<FormType | null>(null);
   const [formVersionId, setFormVersionId] = useState<string | null>(null);
+  // Host file constraints (blocked extensions + max size) pushed to the BCGovFile component.
+  const [bcgovFileOption, setBcgovFileOption] = useState<Record<string, unknown>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -75,6 +78,17 @@ function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: Fo
       active = false;
     };
   }, [token, initializing, formId, loaded, labels.loadError, labels.unavailable]);
+
+  useEffect(() => {
+    if (!token) return;
+    let active = true;
+    void loadFilesConfig(token).then((config) => {
+      if (active) setBcgovFileOption(toBcgovFileOption(config));
+    });
+    return () => {
+      active = false;
+    };
+  }, [token]);
 
   const submitForm = async (submission: Submission) => {
     if (!formVersionId) return;
@@ -130,7 +144,7 @@ function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: Fo
             form={schema}
             // We own all submit messaging (success toast + redirect, inline error),
             // so suppress Form.io's built-in green "Submission Complete" alert.
-            options={{ noAlerts: true }}
+            options={{ noAlerts: true, ...bcgovFileOption }}
             onFormReady={(instance) => {
               formInstanceRef.current = instance;
             }}

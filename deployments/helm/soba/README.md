@@ -79,7 +79,8 @@ templates/
 │   ├── configmap-app.yaml       # General app config
 │   ├── configmap-formio.yaml    # Form.io plugin config
 │   ├── configmap-sso.yaml       # SSO / JWT config
-│   └── configmap-ratelimit.yaml # Rate limiting config
+│   ├── configmap-ratelimit.yaml # Rate limiting config
+│   └── configmap-storage.yaml   # Files feature + storage profiles config
 ├── frontend/
 │   ├── deployment.yaml
 │   ├── service.yaml
