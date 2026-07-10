@@ -5,6 +5,7 @@ export const FEATURE_CODES = {
   WORKSPACES: 'workspaces',
   DESIGN_MODE: 'design-mode',
   SUBMIT_MODE: 'submit-mode',
+  CDOGS: 'cdogs',
   /** Backend `soba.feature` seed code `meta` (API meta & health). Mirrored here so
    * the frontend feature enumeration stays in sync even without a dedicated UI. */
   META: 'meta',

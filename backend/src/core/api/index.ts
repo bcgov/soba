@@ -8,11 +8,13 @@ import { membersDomain } from './members';
 import { metaDomain } from './meta';
 import { submissionsDomain } from './submissions';
 import { workspacesDomain } from './workspaces';
+import { documentGenerationDomain } from './document-generation';
 import { registerOpenApiPaths } from './shared/openapi';
 
 // Meta is mounted at app level at /api/v1/meta and is public (no JWT, no core context).
 // Workspaces is mounted first at / so GET /workspaces and GET /workspaces/current are matched before forms.
 const coreDomains = [
+  documentGenerationDomain,
   formsDomain,
   meDomain,
   membersDomain,
@@ -33,6 +35,7 @@ registerOpenApiPaths((registry) => {
 // Workspace context is resolved per route (see workspaceContext middleware), not globally.
 // resolveActor runs at the app level so req.actorId is available to all routes here.
 const authenticatedDomains = [
+  documentGenerationDomain,
   workspacesDomain,
   formsDomain,
   meDomain,
