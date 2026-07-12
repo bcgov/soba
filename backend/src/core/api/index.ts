@@ -14,8 +14,7 @@ import { registerOpenApiPaths } from './shared/openapi';
 
 // API surfaces, each mounted under its own base path with its own auth (see app.ts):
 //  - designRouter  (/api/v1/design): staff form authoring + submission management.
-//  - submitRouter  (/api/v1/submit): public-capable form read/submit/confirmation.
-//  - filesRouter   (/api/v1/files):  public-capable attachment upload/download/delete.
+//  - submitRouter  (/api/v1/submit): public-capable form read/submit/confirmation + file attachments.
 //  - coreRouter    (/api/v1):        workspace/account management (not a toggled feature).
 registerOpenApiPaths((registry) => {
   registerFormsOpenApi(registry);
@@ -36,16 +35,13 @@ designRouter.use('/', designFormsRouter);
 designRouter.use('/submissions', designSubmissionsRouter);
 designRouter.use(coreErrorHandler);
 
-// Submit feature: public form read + submission create/save + confirmation read.
+// Submit feature: public form read + submission create/save + confirmation read, plus submitter file
+// attachments at /files (upload/download/delete), authorized per operation by the Form submitters
+// audience / submission ownership. The files feature flag is enforced inside filesDomain.router.
 const submitRouter = express.Router();
 submitRouter.use('/', submitRoutes);
+submitRouter.use('/files', filesDomain.router);
 submitRouter.use(coreErrorHandler);
-
-// Files feature: public-capable attachment upload/download/delete, authorized per operation by the
-// Form submitters audience / submission ownership. Its own base path in app.ts, not under core.
-const filesRouter = express.Router();
-filesRouter.use(filesDomain.router);
-filesRouter.use(coreErrorHandler);
 
 // Core: workspace/account management.
 const coreRouter = express.Router();
@@ -54,4 +50,4 @@ for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain]) 
 }
 coreRouter.use(coreErrorHandler);
 
-export { designRouter, submitRouter, coreRouter, filesRouter };
+export { designRouter, submitRouter, coreRouter };

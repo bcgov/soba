@@ -1,7 +1,6 @@
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 import { getKeycloakInstance } from '@/lib/slices/keycloakSlice';
-import { getWorkspaceId } from '@/src/shared/workspace/workspaceStore';
 import { getActiveSubmissionId } from './activeSubmission';
 import { getSobaApiBaseUrl, loadFrontendRuntimeConfig } from '@/src/shared/config/runtimeConfig';
 
@@ -28,7 +27,7 @@ let registrationPromise: Promise<{ filesEnabled: boolean }> | null = null;
 /**
  * Register the BC Gov Form.io components and, when the `files` feature is on, the CHEFS storage
  * provider. Idempotent. Enablement comes from GET /meta/features, so nothing bcgov loads when the
- * feature is off. The provider is injected with the app's api base, token, and workspace id.
+ * feature is off. The provider is injected with the app's api base, token, and the submission id.
  */
 export function ensureBcgovFormioRegistered(): Promise<{ filesEnabled: boolean }> {
   if (registrationPromise) return registrationPromise;
@@ -57,7 +56,7 @@ export function ensureBcgovFormioRegistered(): Promise<{ filesEnabled: boolean }
           // A getter so getSobaApiBaseUrl() is read per request (after runtime config has loaded).
           filesUrl: () => {
             const apiUrl = getSobaApiBaseUrl();
-            return `${apiUrl}/files`;
+            return `${apiUrl}/submit/files`;
           },
           getToken: async () => {
             const kc = getKeycloakInstance();
@@ -68,8 +67,8 @@ export function ensureBcgovFormioRegistered(): Promise<{ filesEnabled: boolean }
             }
             return kc?.token ?? '';
           },
-          getWorkspaceId: () => getWorkspaceId() ?? '',
-          // The submission currently being filled (set by the fill page); uploads are tagged with it.
+          // The submission currently being filled (set by the fill page); uploads are tagged with it,
+          // and the backend derives the workspace from it — so no workspace id is passed.
           getSubmissionId: () => getActiveSubmissionId() ?? '',
         }),
       );

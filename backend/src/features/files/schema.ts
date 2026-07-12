@@ -7,6 +7,7 @@ const NOT_FOUND_DESC = 'Not found';
 const AUTH_REQUIRED = 'Authentication required (form is not public)';
 // Public-capable surface: anonymous (public audience) or a bearer token for an authenticated member.
 const PUBLIC_SECURITY = [{}, { bearerAuth: [] }];
+const FILES_PATH = '/submit/files';
 
 export const FileUploadResponseSchema = z
   .object({
@@ -23,7 +24,7 @@ export function registerFilesOpenApi(registry: OpenAPIRegistry) {
 
   registry.registerPath({
     method: 'post',
-    path: '/files',
+    path: FILES_PATH,
     tags: [tag],
     security: PUBLIC_SECURITY,
     request: {
@@ -58,7 +59,7 @@ export function registerFilesOpenApi(registry: OpenAPIRegistry) {
 
   registry.registerPath({
     method: 'get',
-    path: '/files/{id}',
+    path: `${FILES_PATH}/{id}`,
     tags: [tag],
     security: PUBLIC_SECURITY,
     request: { params: z.object({ id: z.string().min(1) }).openapi('Files_GetParams') },
@@ -72,7 +73,7 @@ export function registerFilesOpenApi(registry: OpenAPIRegistry) {
 
   registry.registerPath({
     method: 'delete',
-    path: '/files/{id}',
+    path: `${FILES_PATH}/{id}`,
     tags: [tag],
     security: PUBLIC_SECURITY,
     request: { params: z.object({ id: z.string().min(1) }).openapi('Files_DeleteParams') },
