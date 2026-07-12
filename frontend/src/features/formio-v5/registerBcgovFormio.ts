@@ -2,6 +2,7 @@ import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 import { getKeycloakInstance } from '@/lib/slices/keycloakSlice';
 import { getWorkspaceId } from '@/src/shared/workspace/workspaceStore';
+import { getActiveSubmissionId } from './activeSubmission';
 import { getSobaApiBaseUrl, loadFrontendRuntimeConfig } from '@/src/shared/config/runtimeConfig';
 
 interface ChefsProviderConfig {
@@ -68,11 +69,8 @@ export function ensureBcgovFormioRegistered(): Promise<{ filesEnabled: boolean }
             return kc?.token ?? '';
           },
           getWorkspaceId: () => getWorkspaceId() ?? '',
-          // Placeholder: SOBA has no submission id at upload time yet (submission editing TBD).
-          getSubmissionId: () =>
-            'sessionStorage' in globalThis
-              ? (globalThis.sessionStorage.getItem('soba.submissionId') ?? '')
-              : '',
+          // The submission currently being filled (set by the fill page); uploads are tagged with it.
+          getSubmissionId: () => getActiveSubmissionId() ?? '',
         }),
       );
     }

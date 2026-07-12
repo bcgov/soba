@@ -6,7 +6,7 @@ import rTracer from 'cls-rtracer';
 import cors from 'cors';
 import passport from 'passport';
 import { checkJwt } from './core/middleware/auth';
-import { designRouter, submitRouter, coreRouter } from './core/api';
+import { designRouter, submitRouter, coreRouter, filesRouter } from './core/api';
 import { healthRouter } from './core/api/health';
 import { metaRouter } from './core/api/meta';
 import { buildOpenApiSpec } from './core/api/shared/openapi';
@@ -96,6 +96,18 @@ app.use(
   resolveActorOrPublic,
   requireFeature(Features.submit_mode),
   submitRouter,
+);
+
+// Files feature (public-capable): anonymous resolves to the public user; each file operation is
+// authorized by the Form submitters audience / submission ownership. The files flag is enforced
+// inside the router (requireFeature), which 404s when files are disabled.
+app.use(
+  '/api/v1/files',
+  apiRateLimit,
+  express.json(),
+  checkJwt({ allowPublic: true }),
+  resolveActorOrPublic,
+  filesRouter,
 );
 
 // Design feature (staff): mandatory auth. 404s when design-mode is disabled.

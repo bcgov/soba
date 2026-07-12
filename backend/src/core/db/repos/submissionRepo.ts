@@ -183,6 +183,18 @@ export const getWorkspaceIdForSubmission = async (submissionId: string): Promise
   return context?.workspaceId ?? null;
 };
 
+/** Resolve a submission's workspace + workflow state by id alone (for the file-upload gate). */
+export const getSubmissionWorkspaceAndState = async (
+  submissionId: string,
+): Promise<{ workspaceId: string; workflowState: string } | null> => {
+  const rows = await db
+    .select({ workspaceId: submissions.workspaceId, workflowState: submissions.workflowState })
+    .from(submissions)
+    .where(and(eq(submissions.id, submissionId), isNull(submissions.deletedAt)))
+    .limit(1);
+  return rows[0] ?? null;
+};
+
 export const listSubmissionsForWorkspace = async (
   input: ListSubmissionsInput,
 ): Promise<{ items: SubmissionListRow[]; hasMore: boolean }> => {

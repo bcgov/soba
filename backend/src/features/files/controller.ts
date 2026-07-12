@@ -1,6 +1,17 @@
 import { Request, Response } from 'express';
 import { filesService } from './service';
-import { getFilesConfig, isBlockedExtension } from './config';
+import { isBlockedExtension } from './config';
+import { getActorIdpCode } from '../../core/middleware/actor';
+import type { CallerIdentity } from '../../core/db/repos/formSubmitAccessRepo';
+
+/** The caller identity for audience checks (`public` for anonymous). */
+const callerFrom = (req: Request): CallerIdentity => ({
+  actorId: req.actorId ?? null,
+  idpCode: getActorIdpCode(req) ?? req.idpType?.toLowerCase() ?? null,
+});
+
+/** 401 for anonymous, 403 for an authenticated caller — the standard denial split. */
+const deniedStatus = (req: Request): number => (req.user ? 403 : 401);
 
 /** Minimal shape of a multer memory-storage file (this project has no @types/multer). */
 interface UploadedFile {
@@ -11,11 +22,8 @@ interface UploadedFile {
 }
 
 export async function uploadFileHandler(req: Request, res: Response): Promise<void> {
-  const ctx = req.coreContext;
-  if (!ctx) {
-    res.status(400).json({ error: 'workspace context required' });
-    return;
-  }
+  // requireUploadAccess has resolved + authorized the submission's workspace into coreContext.
+  const ctx = req.coreContext!;
 
   const files = (req as Request & { files?: UploadedFile[] }).files;
   const uploaded = Array.isArray(files) ? files[0] : undefined;
@@ -60,14 +68,13 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
 }
 
 export async function downloadFileHandler(req: Request, res: Response): Promise<void> {
-  const actorId = req.actorId;
-  if (!actorId) {
-    res.status(401).end();
+  const result = await filesService.getForCaller(req.params.id, callerFrom(req));
+  if (result === 'notfound') {
+    res.status(404).end();
     return;
   }
-  const result = await filesService.getForActor(req.params.id, actorId);
-  if (!result) {
-    res.status(404).end();
+  if (result === 'denied') {
+    res.status(deniedStatus(req)).end();
     return;
   }
   const { record, file } = result;
@@ -90,17 +97,15 @@ export async function downloadFileHandler(req: Request, res: Response): Promise<
   res.status(500).json({ error: 'no download available' });
 }
 
-/** Client-facing files config (upload size limit + always-blocked extensions). */
-export function getFilesConfigHandler(_req: Request, res: Response): void {
-  res.json(getFilesConfig());
-}
-
 export async function deleteFileHandler(req: Request, res: Response): Promise<void> {
-  const actorId = req.actorId;
-  if (!actorId) {
-    res.status(401).end();
+  const outcome = await filesService.deleteForCaller(req.params.id, callerFrom(req));
+  if (outcome === 'deleted') {
+    res.status(204).end();
     return;
   }
-  const outcome = await filesService.deleteForActor(req.params.id, actorId);
-  res.status(outcome === 'notfound' ? 404 : 204).end();
+  if (outcome === 'notfound') {
+    res.status(404).end();
+    return;
+  }
+  res.status(deniedStatus(req)).end();
 }

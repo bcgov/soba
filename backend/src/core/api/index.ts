@@ -12,9 +12,10 @@ import { membersDomain } from './members';
 import { workspacesDomain } from './workspaces';
 import { registerOpenApiPaths } from './shared/openapi';
 
-// Three API surfaces, each mounted under its own base path with its own auth (see app.ts):
+// API surfaces, each mounted under its own base path with its own auth (see app.ts):
 //  - designRouter  (/api/v1/design): staff form authoring + submission management.
 //  - submitRouter  (/api/v1/submit): public-capable form read/submit/confirmation.
+//  - filesRouter   (/api/v1/files):  public-capable attachment upload/download/delete.
 //  - coreRouter    (/api/v1):        workspace/account management (not a toggled feature).
 registerOpenApiPaths((registry) => {
   registerFormsOpenApi(registry);
@@ -40,11 +41,17 @@ const submitRouter = express.Router();
 submitRouter.use('/', submitRoutes);
 submitRouter.use(coreErrorHandler);
 
+// Files feature: public-capable attachment upload/download/delete, authorized per operation by the
+// Form submitters audience / submission ownership. Its own base path in app.ts, not under core.
+const filesRouter = express.Router();
+filesRouter.use(filesDomain.router);
+filesRouter.use(coreErrorHandler);
+
 // Core: workspace/account management.
 const coreRouter = express.Router();
-for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain, filesDomain]) {
+for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain]) {
   coreRouter.use(domain.path, domain.router);
 }
 coreRouter.use(coreErrorHandler);
 
-export { designRouter, submitRouter, coreRouter };
+export { designRouter, submitRouter, coreRouter, filesRouter };

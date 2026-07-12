@@ -4,6 +4,9 @@ import { z } from 'zod';
 extendZodWithOpenApi(z);
 
 const NOT_FOUND_DESC = 'Not found';
+const AUTH_REQUIRED = 'Authentication required (form is not public)';
+// Public-capable surface: anonymous (public audience) or a bearer token for an authenticated member.
+const PUBLIC_SECURITY = [{}, { bearerAuth: [] }];
 
 export const FileUploadResponseSchema = z
   .object({
@@ -15,46 +18,25 @@ export const FileUploadResponseSchema = z
   })
   .openapi('Files_UploadResponse');
 
-export const FilesConfigResponseSchema = z
-  .object({
-    maxFileSizeMb: z.number(),
-    blockedExtensions: z.array(z.string()),
-  })
-  .openapi('Files_Config');
-
 export function registerFilesOpenApi(registry: OpenAPIRegistry) {
   const tag = 'core.files';
-
-  registry.registerPath({
-    method: 'get',
-    path: '/files/config',
-    tags: [tag],
-    security: [{ bearerAuth: [] }],
-    responses: {
-      200: {
-        description: 'Files feature config (upload size limit + always-blocked extensions)',
-        content: { 'application/json': { schema: FilesConfigResponseSchema } },
-      },
-    },
-  });
 
   registry.registerPath({
     method: 'post',
     path: '/files',
     tags: [tag],
-    security: [{ bearerAuth: [] }],
+    security: PUBLIC_SECURITY,
     request: {
-      // Workspace to store under; membership is enforced.
-      query: z.object({ workspaceId: z.string().min(1) }).openapi('Files_UploadQuery'),
       body: {
         required: true,
         content: {
-          // multipart/form-data: the binary file field (fileKey; default 'file'), plus:
+          // multipart/form-data: the binary file field (fileKey; default 'file'), plus the required
+          // submissionId the upload is authorized and associated against.
           'multipart/form-data': {
             schema: z.object({
+              submissionId: z.string(),
               fileName: z.string().optional(),
               dir: z.string().optional(),
-              submissionId: z.string().optional(),
             }),
           },
         },
@@ -65,7 +47,11 @@ export function registerFilesOpenApi(registry: OpenAPIRegistry) {
         description: 'Uploaded file metadata (Form.io file value)',
         content: { 'application/json': { schema: FileUploadResponseSchema } },
       },
-      400: { description: 'Invalid request' },
+      400: { description: 'Missing submissionId or file' },
+      401: { description: AUTH_REQUIRED },
+      403: { description: 'Not in the form submitters audience' },
+      404: { description: 'Submission not found' },
+      409: { description: 'Submission is not accepting file uploads' },
       415: { description: 'File type not allowed (blocked extension)' },
     },
   });
@@ -74,10 +60,12 @@ export function registerFilesOpenApi(registry: OpenAPIRegistry) {
     method: 'get',
     path: '/files/{id}',
     tags: [tag],
-    security: [{ bearerAuth: [] }],
+    security: PUBLIC_SECURITY,
     request: { params: z.object({ id: z.string().min(1) }).openapi('Files_GetParams') },
     responses: {
       200: { description: 'File contents (stream or redirect)', content: {} },
+      401: { description: AUTH_REQUIRED },
+      403: { description: 'Not authorized to access this file' },
       404: { description: NOT_FOUND_DESC },
     },
   });
@@ -86,10 +74,12 @@ export function registerFilesOpenApi(registry: OpenAPIRegistry) {
     method: 'delete',
     path: '/files/{id}',
     tags: [tag],
-    security: [{ bearerAuth: [] }],
+    security: PUBLIC_SECURITY,
     request: { params: z.object({ id: z.string().min(1) }).openapi('Files_DeleteParams') },
     responses: {
       204: { description: 'Deleted' },
+      401: { description: AUTH_REQUIRED },
+      403: { description: 'Not authorized to delete this file' },
       404: { description: NOT_FOUND_DESC },
     },
   });

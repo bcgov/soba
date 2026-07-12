@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { metaApiService } from './service';
 import { asyncHandler } from '../shared/asyncHandler';
 import { codeService } from '../../services/codeService';
+import { getFilesConfig } from '../../../features/files/config';
 
 export const getPluginsMeta = (_req: Request, res: Response) => {
   res.json(metaApiService.getPlugins());
@@ -21,6 +22,11 @@ export const getBuildMeta = (_req: Request, res: Response) => {
 
 export const getFrontendConfigMeta = (_req: Request, res: Response) => {
   res.json(metaApiService.getFrontendConfig());
+};
+
+/** Files feature config (upload size limit + always-blocked extensions); gated by the files feature. */
+export const getFilesConfigMeta = (_req: Request, res: Response) => {
+  res.json(getFilesConfig());
 };
 
 export const getCodesMeta = asyncHandler(async (req: Request, res: Response) => {

@@ -74,10 +74,37 @@ export const requireFormAccess = (required: PermissionCode) => {
 };
 
 /**
+ * Authorize a caller against a workspace's Form submitters audience (or their staff permissions) for
+ * `permission`, then populate the public-submit req.coreContext — anonymous callers are attributed to
+ * the seeded public user (already resolved as req.actorId). Shared by the submit routes and file
+ * uploads. Throws 401 (anonymous) / 403 (authenticated non-member) on denial.
+ */
+export const authorizeSubmitterForWorkspace = async (
+  req: Request,
+  res: Response,
+  workspaceId: string,
+  permission: PermissionCode,
+): Promise<void> => {
+  const allowed = await hasFormSubmitAccess(workspaceId, resolveCaller(req), permission);
+  if (!allowed) {
+    throw accessDenial(req, 'Not authorized to submit this form');
+  }
+  req.coreContext = {
+    workspaceId,
+    actorId: req.actorId ?? '',
+    actorDisplayLabel:
+      req.user?.profile?.displayLabel || req.user?.profile?.displayName || PUBLIC_SUBMITTER_LABEL,
+    workspaceSource: 'public-submit',
+    // Public submitters have no membership; a non-manage role keeps them off workspace-admin routes.
+    role: WorkspaceMembershipRole.member,
+  };
+  res.set(WORKSPACE_HEADER, workspaceId);
+};
+
+/**
  * Authorizes a submission (open / save / submit) against the target form's workspace Form submitters
  * audience (or the caller's staff permissions), then populates req.coreContext for the downstream
- * controller — anonymous submissions are attributed to the seeded public user (already resolved as
- * req.actorId).
+ * controller.
  */
 export const requireFormSubmitAccess = async (
   req: Request,
@@ -86,26 +113,12 @@ export const requireFormSubmitAccess = async (
 ): Promise<void> => {
   try {
     const target = await resolveSubmitTarget(req);
-
-    const allowed = await hasFormSubmitAccess(
+    await authorizeSubmitterForWorkspace(
+      req,
+      res,
       target.workspaceId,
-      resolveCaller(req),
       Permissions.submission_create,
     );
-    if (!allowed) {
-      throw accessDenial(req, 'Not authorized to submit this form');
-    }
-
-    req.coreContext = {
-      workspaceId: target.workspaceId,
-      actorId: req.actorId ?? '',
-      actorDisplayLabel:
-        req.user?.profile?.displayLabel || req.user?.profile?.displayName || PUBLIC_SUBMITTER_LABEL,
-      workspaceSource: 'public-submit',
-      // Public submitters have no membership; a non-manage role keeps them off workspace-admin routes.
-      role: WorkspaceMembershipRole.member,
-    };
-    res.set(WORKSPACE_HEADER, target.workspaceId);
     next();
   } catch (error) {
     next(error);

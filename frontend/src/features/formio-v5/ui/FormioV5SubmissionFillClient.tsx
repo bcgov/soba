@@ -11,7 +11,11 @@ import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFormioRenderError';
 import { FormioV5FormRenderErrorBoundary } from '@/src/features/formio-v5/ui/FormioV5FormRenderErrorBoundary';
 import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
-import { loadFilesConfig, toBcgovFileOption } from '@/src/features/formio-v5/loadFilesConfig';
+import { useBcgovFileOption } from '@/src/features/formio-v5/useBcgovFileOption';
+import {
+  setActiveSubmissionId,
+  clearActiveSubmissionId,
+} from '@/src/features/formio-v5/activeSubmission';
 import { getSubmitFillBundle, submitSobaFormSubmission } from '@/src/shared/api/sobaApi';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
@@ -44,8 +48,8 @@ function SubmissionFillBody({
 
   const [schema, setSchema] = useState<FormType | null>(null);
   const [initialData, setInitialData] = useState<Record<string, unknown>>({});
-  // Host file constraints (blocked extensions + max size) pushed to the BCGovFile component.
-  const [bcgovFileOption, setBcgovFileOption] = useState<Record<string, unknown>>({});
+  // Host file constraints (blocked extensions + max size) for the BCGovFile component; {} when files off.
+  const bcgovFileOption = useBcgovFileOption();
   const [loadError, setLoadError] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
   // Load the bundle once. A ref (not state) guard dedupes StrictMode's dev double-invoke, so /fill
@@ -85,16 +89,12 @@ function SubmissionFillBody({
     })();
   }, [initializing, token, submissionId, locale, router, labels.loadError, labels.unavailable]);
 
+  // Expose the submission being filled to the CHEFS upload provider; clear it when leaving so a stale
+  // id can't tag an unrelated upload (e.g. a designer preview).
   useEffect(() => {
-    if (!token) return;
-    let active = true;
-    void loadFilesConfig(token).then((config) => {
-      if (active) setBcgovFileOption(toBcgovFileOption(config));
-    });
-    return () => {
-      active = false;
-    };
-  }, [token]);
+    setActiveSubmissionId(submissionId);
+    return () => clearActiveSubmissionId();
+  }, [submissionId]);
 
   const submitForm = async (submission: Submission) => {
     try {

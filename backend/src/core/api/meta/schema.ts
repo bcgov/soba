@@ -137,6 +137,13 @@ export const RolesMetaResponseSchema = z
   })
   .openapi('Meta_RolesResponse');
 
+export const FilesConfigMetaResponseSchema = z
+  .object({
+    maxFileSizeMb: z.number(),
+    blockedExtensions: z.array(z.string()),
+  })
+  .openapi('Meta_FilesConfigResponse');
+
 export const registerMetaOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
@@ -274,6 +281,23 @@ export const registerMetaOpenApi = (registry: OpenAPIRegistry) => {
           },
         },
       },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/meta/files-config',
+    tags: ['core.meta'],
+    responses: {
+      200: {
+        description: 'Files feature config (upload size limit + always-blocked extensions)',
+        content: {
+          'application/json': {
+            schema: FilesConfigMetaResponseSchema,
+          },
+        },
+      },
+      404: { description: 'Files feature is disabled' },
     },
   });
 };

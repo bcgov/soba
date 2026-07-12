@@ -51,12 +51,17 @@ jest.mock('../../../src/core/db/repos/fileRepo', () => {
   };
 });
 
-jest.mock('../../../src/core/db/repos/membershipRepo', () => ({
-  actorBelongsToWorkspace: jest.fn(),
+// Authorization lookups are mocked; the storage + service logic is exercised for real.
+jest.mock('../../../src/core/db/repos/formSubmitAccessRepo', () => ({
+  hasFormSubmitAccess: jest.fn(),
+}));
+jest.mock('../../../src/core/db/repos/submissionRepo', () => ({
+  getSubmissionRecordById: jest.fn(),
 }));
 
 import { filesService } from '../../../src/features/files/service';
-import { actorBelongsToWorkspace } from '../../../src/core/db/repos/membershipRepo';
+import { hasFormSubmitAccess } from '../../../src/core/db/repos/formSubmitAccessRepo';
+import { getSubmissionRecordById } from '../../../src/core/db/repos/submissionRepo';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'files-svc-'));
 process.env.STORAGE_PROFILES = 'default';
@@ -64,7 +69,22 @@ process.env.FILES_STORAGE_PROFILE = 'default';
 process.env.STORAGE_PROFILE_DEFAULT_BACKEND = 'local-storage';
 process.env.STORAGE_PROFILE_DEFAULT_BASE_PATH = tmp;
 
-const membershipMock = actorBelongsToWorkspace as jest.Mock;
+const audienceMock = hasFormSubmitAccess as jest.Mock;
+const submissionMock = getSubmissionRecordById as jest.Mock;
+
+const owner = { actorId: 'actor1', idpCode: 'idir' };
+const intruder = { actorId: 'intruder', idpCode: 'idir' };
+
+const uploadFor = (submissionId: string | null, filename = 'a.txt') =>
+  filesService.upload({
+    workspaceId: 'ws1',
+    actorId: 'actor1',
+    filename,
+    contentType: 'text/plain',
+    size: 3,
+    buffer: Buffer.from('abc'),
+    submissionId,
+  });
 
 async function readAll(stream: NodeJS.ReadableStream): Promise<string> {
   const chunks: Buffer[] = [];
@@ -73,36 +93,29 @@ async function readAll(stream: NodeJS.ReadableStream): Promise<string> {
 }
 
 describe('filesService', () => {
-  beforeEach(() => membershipMock.mockReset());
+  beforeEach(() => {
+    audienceMock.mockReset();
+    submissionMock.mockReset();
+  });
 
-  it('uploads, then a workspace member can download and delete', async () => {
-    membershipMock.mockResolvedValue(true);
-
-    const record = await filesService.upload({
-      workspaceId: 'ws1',
-      actorId: 'actor1',
-      filename: 'a.txt',
-      contentType: 'text/plain',
-      size: 3,
-      buffer: Buffer.from('abc'),
-    });
+  it('an audience member downloads, and the owner deletes an un-submitted attachment', async () => {
+    const record = await uploadFor('sub1');
     expect(record.id).toBeTruthy();
-    expect(record.backendRef).toBeTruthy();
 
-    const got = await filesService.getForActor(record.id, 'actor1');
-    if (!got || !got.file.downloadStream) throw new Error('expected file with a download stream');
+    audienceMock.mockResolvedValue(true); // submission_read granted
+    const got = await filesService.getForCaller(record.id, owner);
+    if (got === 'notfound' || got === 'denied' || !got.file.downloadStream) {
+      throw new Error('expected a file with a download stream');
+    }
     expect(got.record.filename).toBe('a.txt');
-    // Consume the stream (as the controller would pipe it) and verify content.
     expect(await readAll(got.file.downloadStream)).toBe('abc');
 
-    expect(await filesService.deleteForActor(record.id, 'actor1')).toBe('deleted');
-    // After delete the record is gone.
-    membershipMock.mockResolvedValue(true);
-    expect(await filesService.getForActor(record.id, 'actor1')).toBeNull();
+    // Un-submitted: the submission's owner (submittedBy) may delete.
+    submissionMock.mockResolvedValue({ workflowState: 'draft', submittedBy: 'actor1' });
+    expect(await filesService.deleteForCaller(record.id, owner)).toBe('deleted');
   });
 
   it('associates only same-workspace files referenced in submission data', async () => {
-    membershipMock.mockResolvedValue(true);
     const f1 = await filesService.upload({
       workspaceId: 'ws1',
       actorId: 'a',
@@ -134,17 +147,44 @@ describe('filesService', () => {
     expect(await filesService.associateWithSubmission('sub1', 'ws1', data)).toBe(2);
   });
 
-  it('denies download and delete to a non-member', async () => {
-    membershipMock.mockResolvedValue(true);
-    const record = await filesService.upload({
-      workspaceId: 'ws1',
-      actorId: 'actor1',
-      filename: 'b.txt',
-      buffer: Buffer.from('xyz'),
-    });
+  it('denies download to a caller not in the submitters audience', async () => {
+    const record = await uploadFor('sub1', 'b.txt');
+    audienceMock.mockResolvedValue(false);
+    expect(await filesService.getForCaller(record.id, intruder)).toBe('denied');
+  });
 
-    membershipMock.mockResolvedValue(false);
-    expect(await filesService.getForActor(record.id, 'intruder')).toBeNull();
-    expect(await filesService.deleteForActor(record.id, 'intruder')).toBe('notfound');
+  it('treats a file with no owning submission as notfound (submission-scoped)', async () => {
+    const record = await uploadFor(null, 'c.txt');
+    audienceMock.mockResolvedValue(true);
+    expect(await filesService.getForCaller(record.id, owner)).toBe('notfound');
+  });
+
+  it('lets only the owner delete an un-submitted attachment', async () => {
+    const record = await uploadFor('sub1', 'd.txt');
+    submissionMock.mockResolvedValue({ workflowState: 'draft', submittedBy: 'actor1' });
+    expect(await filesService.deleteForCaller(record.id, intruder)).toBe('denied');
+  });
+
+  it("a submitted submission's file: only staff with submission_update may delete", async () => {
+    const record = await uploadFor('sub1', 'e.txt');
+    submissionMock.mockResolvedValue({ workflowState: 'submitted', submittedBy: 'actor1' });
+
+    audienceMock.mockResolvedValue(false); // no submission_update
+    expect(await filesService.deleteForCaller(record.id, owner)).toBe('denied');
+
+    audienceMock.mockResolvedValue(true); // staff holds submission_update
+    expect(await filesService.deleteForCaller(record.id, owner)).toBe('deleted');
+  });
+
+  it('an owner not in the submit audience cannot delete (bounds anonymous cross-workspace)', async () => {
+    const record = await uploadFor('sub1', 'f.txt');
+    submissionMock.mockResolvedValue({ workflowState: 'draft', submittedBy: 'actor1' });
+    audienceMock.mockResolvedValue(false); // id matches submittedBy, but not in the workspace audience
+    expect(await filesService.deleteForCaller(record.id, owner)).toBe('denied');
+  });
+
+  it('delete of a file with no owning submission is notfound', async () => {
+    const record = await uploadFor(null, 'g.txt');
+    expect(await filesService.deleteForCaller(record.id, owner)).toBe('notfound');
   });
 });

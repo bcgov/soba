@@ -3,7 +3,7 @@ import { env } from '../../core/config/env';
 
 /**
  * Extensions rejected on upload regardless of a form's fileTypes. Enforced server-side; also sent
- * to the client via GET /files/config so it can block them before upload.
+ * to the client via GET /meta/files-config so it can block them before upload.
  */
 export const BLOCKED_FILE_EXTENSIONS: readonly string[] = [
   '.exe',
