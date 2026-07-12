@@ -49,16 +49,18 @@ export const filesService = {
   },
 
   /**
-   * Fetch a file for a caller, scoped to its owning submission: the file must belong to a submission,
-   * and the caller must have submission_read on that submission's workspace (Form submitters audience
-   * or staff). 'notfound' when missing / no owning submission; 'denied' when unauthorized.
+   * Fetch a file for a caller, scoped to its owning submission: the file must belong to a still-present
+   * submission, and the caller must have submission_read on that submission's workspace (Form submitters
+   * audience or staff). 'notfound' when missing / no live owning submission; 'denied' when unauthorized.
    */
   async getForCaller(
     id: string,
     caller: CallerIdentity,
   ): Promise<{ record: FileRecord; file: GetFileResult } | 'notfound' | 'denied'> {
     const record = await getFileRecordById(id);
-    if (!record || !record.submissionId) return 'notfound';
+    if (!record?.submissionId) return 'notfound';
+    const submission = await getSubmissionRecordById(record.workspaceId, record.submissionId);
+    if (!submission) return 'notfound';
     const allowed = await hasFormSubmitAccess(
       record.workspaceId,
       caller,
@@ -93,7 +95,7 @@ export const filesService = {
     caller: CallerIdentity,
   ): Promise<'deleted' | 'notfound' | 'denied'> {
     const record = await getFileRecordById(id);
-    if (!record || !record.submissionId) return 'notfound';
+    if (!record?.submissionId) return 'notfound';
     const submission = await getSubmissionRecordById(record.workspaceId, record.submissionId);
     if (!submission) return 'notfound';
     const allowed =

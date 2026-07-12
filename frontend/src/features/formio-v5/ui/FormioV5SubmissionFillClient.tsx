@@ -36,10 +36,10 @@ type FillLabels = {
 function SubmissionFillBody({
   submissionId,
   labels,
-}: {
+}: Readonly<{
   submissionId: string;
   labels: FillLabels;
-}) {
+}>) {
   // Token is optional: a public-audience submission is fillable without signing in.
   const { token, initializing } = useKeycloak();
   const { addNotification } = useNotificationStore();

@@ -61,8 +61,8 @@ export const openSubmission = asyncHandler(
 
 /**
  * Tag the submission's uploaded files with its id. Best-effort — must not fail the save/submit.
- * TODO(events): couples submissions to the files feature; move to a 'submission.saved' event over the
- * message bus when we have one.
+ * Couples submissions to the files feature; a 'submission.saved' event over a message bus would
+ * decouple it once one exists.
  */
 const associateSubmissionFiles = async (
   submissionId: string,

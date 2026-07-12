@@ -5,6 +5,7 @@ import { requireFeature } from '../../core/middleware/requireFeature';
 import { Features } from '../../core/db/codes';
 import { requireUploadAccess } from './uploadAccess';
 import { uploadFileHandler, downloadFileHandler, deleteFileHandler } from './controller';
+import { asyncHandler } from '../../core/api/shared/asyncHandler';
 
 const router = express.Router();
 
@@ -20,11 +21,11 @@ router.use(requireFeature(Features.files));
 // Upload: multer parses the multipart body first, then requireUploadAccess resolves the workspace from
 // the `submissionId` field and authorizes it against the Form submitters audience. Accept any file
 // field name (Form.io's fileKey is configurable; the component uploads one at a time).
-router.post('/', upload.any(), requireUploadAccess, uploadFileHandler);
+router.post('/', upload.any(), requireUploadAccess, asyncHandler(uploadFileHandler));
 
-// Download / delete: workspace is derived from the file row and checked against the actor,
-// so no workspace query param is required.
-router.get('/:id', downloadFileHandler);
-router.delete('/:id', deleteFileHandler);
+// Download / delete: authorized against the file's owning submission (audience / ownership). Wrapped
+// in asyncHandler so an unexpected failure reaches the router's error handler instead of hanging.
+router.get('/:id', asyncHandler(downloadFileHandler));
+router.delete('/:id', asyncHandler(deleteFileHandler));
 
 export { router as filesRouter };

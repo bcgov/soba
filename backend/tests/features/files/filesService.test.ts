@@ -102,7 +102,8 @@ describe('filesService', () => {
     const record = await uploadFor('sub1');
     expect(record.id).toBeTruthy();
 
-    audienceMock.mockResolvedValue(true); // submission_read granted
+    audienceMock.mockResolvedValue(true); // submission_read + submission_create granted
+    submissionMock.mockResolvedValue({ workflowState: 'draft', submittedBy: 'actor1' });
     const got = await filesService.getForCaller(record.id, owner);
     if (got === 'notfound' || got === 'denied' || !got.file.downloadStream) {
       throw new Error('expected a file with a download stream');
@@ -111,7 +112,6 @@ describe('filesService', () => {
     expect(await readAll(got.file.downloadStream)).toBe('abc');
 
     // Un-submitted: the submission's owner (submittedBy) may delete.
-    submissionMock.mockResolvedValue({ workflowState: 'draft', submittedBy: 'actor1' });
     expect(await filesService.deleteForCaller(record.id, owner)).toBe('deleted');
   });
 
@@ -149,8 +149,16 @@ describe('filesService', () => {
 
   it('denies download to a caller not in the submitters audience', async () => {
     const record = await uploadFor('sub1', 'b.txt');
+    submissionMock.mockResolvedValue({ workflowState: 'draft', submittedBy: 'actor1' });
     audienceMock.mockResolvedValue(false);
     expect(await filesService.getForCaller(record.id, intruder)).toBe('denied');
+  });
+
+  it('returns notfound when the owning submission no longer exists (download)', async () => {
+    const record = await uploadFor('sub1', 'h.txt');
+    submissionMock.mockResolvedValue(null); // submission soft-deleted / gone
+    audienceMock.mockResolvedValue(true);
+    expect(await filesService.getForCaller(record.id, owner)).toBe('notfound');
   });
 
   it('treats a file with no owning submission as notfound (submission-scoped)', async () => {
