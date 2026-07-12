@@ -91,7 +91,9 @@
         "tryAgain": "Réessayer",
         "backToList": "Retour à la liste"
       },
-      "submitSuccess": "Formulaire soumis avec succès."
+      "submitSuccess": "Formulaire soumis avec succès.",
+      "starting": "Démarrage de votre soumission…",
+      "startError": "La soumission n’a pas pu être démarrée. Veuillez réessayer."
     }
   },
   "form": {

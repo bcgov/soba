@@ -1,5 +1,5 @@
 import { DsPageHeading } from '@/app/ui/DsPageHeading';
-import FormioV5FormRenderLoader from '@/src/features/formio-v5/ui/FormioV5FormRenderLoader';
+import StartSubmission from '@/src/features/submit-mode/ui/StartSubmission';
 import { getDictionary, resolveLocale } from '../../dictionaries';
 import { notFound } from 'next/navigation';
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
@@ -35,7 +35,7 @@ export default async function Page({ params }: PageProps) {
       <DsPageHeading id="formio-v5-render-heading">
         {dict.formioV5.formRender.pageTitle}
       </DsPageHeading>
-      <FormioV5FormRenderLoader />
+      <StartSubmission />
     </section>
   );
 }

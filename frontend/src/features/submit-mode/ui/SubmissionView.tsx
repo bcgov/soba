@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormType, Submission } from '@formio/react';
 import { InlineAlert } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
@@ -35,36 +35,33 @@ export function SubmissionView() {
   const [content, setContent] = useState<{ data?: Record<string, unknown> } | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  // Guard the load with a ref (not the `loaded` state) so StrictMode's dev double-invoke fetches once.
+  const loadStartedRef = useRef(false);
 
   useEffect(() => {
     // Wait for auth to settle so a signed-in caller sends their token; anonymous proceeds with none.
-    if (initializing || loaded) return;
-    let active = true;
+    if (initializing || loadStartedRef.current) return;
+    loadStartedRef.current = true;
     void (async () => {
       try {
         // The confirmation view is submit-mode: read through the submit APIs regardless of sign-in so
         // audience members who aren't workspace members can still view. Token passed when present.
         const authToken = token ?? undefined;
         const sub = await getSubmitSubmission(authToken, submissionId);
-        if (!active) return;
         setSubmission(sub);
         const [loadedSchema, fetchedContent] = await Promise.all([
           getSubmitSubmissionSchema(authToken, submissionId),
           getSubmitSubmissionData(authToken, submissionId),
         ]);
-        if (!active) return;
         if (loadedSchema) setSchema(loadedSchema);
         setContent(fetchedContent);
       } catch {
-        if (active) setNotFound(true);
+        setNotFound(true);
       } finally {
-        if (active) setLoaded(true);
+        setLoaded(true);
       }
     })();
-    return () => {
-      active = false;
-    };
-  }, [token, initializing, submissionId, loaded]);
+  }, [initializing, token, submissionId]);
 
   if (initializing) {
     return <CenteredProgress label={dict.general.loading} />;

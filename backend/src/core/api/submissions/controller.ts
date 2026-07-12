@@ -1,12 +1,10 @@
 import { Response } from 'express';
 import { z } from 'zod';
 import {
-  CreateSubmissionBodySchema,
   ListSubmissionsQuerySchema,
-  SaveSubmissionBodySchema,
-  SaveSubmissionParamsSchema,
-  UpdateSubmissionBodySchema,
-  UpdateSubmissionParamsSchema,
+  OpenSubmissionBodySchema,
+  SubmissionDataBodySchema,
+  SubmissionIdParamsSchema,
 } from './schema';
 import { submissionsApiService } from './service';
 import { asyncHandler } from '../shared/asyncHandler';
@@ -15,17 +13,15 @@ import { filesService } from '../../../features/files/service';
 import { log } from '../../logging';
 import type { Request } from 'express';
 
-type CreateSubmissionBody = z.infer<typeof CreateSubmissionBodySchema>;
-type UpdateSubmissionBody = z.infer<typeof UpdateSubmissionBodySchema>;
-type UpdateSubmissionParams = z.infer<typeof UpdateSubmissionParamsSchema>;
-type SaveSubmissionBody = z.infer<typeof SaveSubmissionBodySchema>;
-type SaveSubmissionParams = z.infer<typeof SaveSubmissionParamsSchema>;
+type OpenSubmissionBody = z.infer<typeof OpenSubmissionBodySchema>;
+type SubmissionIdParams = z.infer<typeof SubmissionIdParamsSchema>;
+type SubmissionDataBody = z.infer<typeof SubmissionDataBodySchema>;
 type ListSubmissionsQuery = z.infer<typeof ListSubmissionsQuerySchema>;
 
 const SUBMISSION_NOT_FOUND = 'Submission not found';
 
 export const getSubmission = asyncHandler(
-  async (req: Request<UpdateSubmissionParams>, res: Response) => {
+  async (req: Request<SubmissionIdParams>, res: Response) => {
     const ctx = req.coreContext!;
     const result = await submissionsApiService.get(ctx, req.params.id);
     if (!result) {
@@ -36,7 +32,7 @@ export const getSubmission = asyncHandler(
 );
 
 export const getSubmissionData = asyncHandler(
-  async (req: Request<UpdateSubmissionParams>, res: Response) => {
+  async (req: Request<SubmissionIdParams>, res: Response) => {
     const ctx = req.coreContext!;
     const result = await submissionsApiService.getData(ctx, req.params.id);
     if (!result) {
@@ -55,53 +51,51 @@ export const listSubmissions = asyncHandler(async (req: Request, res: Response) 
   res.json(result);
 });
 
-export const createSubmission = asyncHandler(
-  async (req: Request<unknown, unknown, CreateSubmissionBody>, res: Response) => {
+export const openSubmission = asyncHandler(
+  async (req: Request<unknown, unknown, OpenSubmissionBody>, res: Response) => {
     const ctx = req.coreContext!;
-    const result = await submissionsApiService.create(
-      ctx,
-      req.body.formId,
-      req.body.formVersionId,
-      req.body.workflowState,
-    );
+    const result = await submissionsApiService.open(ctx, req.body.formId);
     res.status(201).json(result);
   },
 );
 
-export const updateSubmission = asyncHandler(
-  async (req: Request<UpdateSubmissionParams, unknown, UpdateSubmissionBody>, res: Response) => {
+/**
+ * Tag the submission's uploaded files with its id. Best-effort — must not fail the save/submit.
+ * TODO(events): couples submissions to the files feature; move to a 'submission.saved' event over the
+ * message bus when we have one.
+ */
+const associateSubmissionFiles = async (
+  submissionId: string,
+  workspaceId: string,
+  data: Record<string, unknown>,
+): Promise<void> => {
+  try {
+    await filesService.associateWithSubmission(submissionId, workspaceId, data);
+  } catch (err) {
+    log.warn({ err, submissionId }, 'Failed to associate uploaded files with submission');
+  }
+};
+
+export const saveSubmission = asyncHandler(
+  async (req: Request<SubmissionIdParams, unknown, SubmissionDataBody>, res: Response) => {
     const ctx = req.coreContext!;
-    const result = await submissionsApiService.update(ctx, req.params.id, req.body.workflowState);
-    if (!result) {
-      throw new NotFoundError(SUBMISSION_NOT_FOUND);
-    }
+    const result = await submissionsApiService.save(ctx, req.params.id, req.body.data);
+    await associateSubmissionFiles(req.params.id, ctx.workspaceId, req.body.data);
     res.json(result);
   },
 );
 
-export const saveSubmission = asyncHandler(
-  async (req: Request<SaveSubmissionParams, unknown, SaveSubmissionBody>, res: Response) => {
+export const submitSubmission = asyncHandler(
+  async (req: Request<SubmissionIdParams, unknown, SubmissionDataBody>, res: Response) => {
     const ctx = req.coreContext!;
-    const result = await submissionsApiService.save(ctx, req.params.id, req.body);
-
-    // Tag the uploaded files with this submission. Best-effort — must not fail the save.
-    // TODO(events): couples submissions to the files feature; move to a 'submission.saved' event
-    // over the message bus when we have one.
-    try {
-      await filesService.associateWithSubmission(req.params.id, ctx.workspaceId, req.body.data);
-    } catch (err) {
-      log.warn(
-        { err, submissionId: req.params.id },
-        'Failed to associate uploaded files with submission',
-      );
-    }
-
+    const result = await submissionsApiService.submit(ctx, req.params.id, req.body.data);
+    await associateSubmissionFiles(req.params.id, ctx.workspaceId, req.body.data);
     res.json(result);
   },
 );
 
 export const deleteSubmission = asyncHandler(
-  async (req: Request<UpdateSubmissionParams>, res: Response) => {
+  async (req: Request<SubmissionIdParams>, res: Response) => {
     const ctx = req.coreContext!;
     const result = await submissionsApiService.delete(ctx, req.params.id);
     if (!result) {

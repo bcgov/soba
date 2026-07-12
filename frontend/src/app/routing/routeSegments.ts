@@ -1,7 +1,10 @@
 import type { RouteKind } from './appRoutePolicy';
 
-// Single literal for the repeated kind so the map below doesn't duplicate it per segment.
+// One const per repeated kind so the map below doesn't duplicate the literal per segment
+// (keeps SonarCloud's string-duplication rule satisfied).
 const WORKSPACE_APP: RouteKind = 'workspace-app';
+const WORKSPACES: RouteKind = 'workspaces';
+const PUBLIC: RouteKind = 'public';
 
 /**
  * Single source of truth mapping each top-level route segment (the folder directly under
@@ -17,11 +20,13 @@ export const ROUTE_KIND_BY_SEGMENT: Readonly<Record<string, RouteKind>> = {
   designer: WORKSPACE_APP, // app/[lang]/designer
   // Public fill/submit route: reachable without signing in; the backend authorizes against the
   // form's Form submitters audience (a non-public form returns 401 and the renderer shows an error).
-  form: 'public', // app/[lang]/form/[formId]
+  form: PUBLIC, // app/[lang]/form/[formId]
+  // Public fill route for an already-opened submission (resume by id); same audience authorization.
+  submit: PUBLIC, // app/[lang]/submit/[submissionId]
   submissions: WORKSPACE_APP, // app/[lang]/submissions (staff management table)
   // Single-submission view: public so an anonymous submitter sees their confirmation; the backend
   // authorizes the read against the form's audience (public-form submissions are public data).
-  submission: 'public', // app/[lang]/submission/[submissionId]
-  workspaces: 'workspaces', // app/[lang]/workspaces
-  workspace: 'workspaces', // app/[lang]/workspace
+  submission: PUBLIC, // app/[lang]/submission/[submissionId]
+  workspaces: WORKSPACES, // app/[lang]/workspaces
+  workspace: WORKSPACES, // app/[lang]/workspace
 };

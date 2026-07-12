@@ -23,6 +23,7 @@ describe('classifyRoute', () => {
     // The fill/submit route and single-submission view are public so anonymous submitters can reach
     // a public-audience form and see their confirmation; the backend authorizes the data.
     expect(classifyRoute('/en/form/abc')).toBe('public');
+    expect(classifyRoute('/en/submit/sub1')).toBe('public');
     expect(classifyRoute('/en/submission/sub1')).toBe('public');
     // The submissions management table stays staff-only.
     expect(classifyRoute('/en/submissions/f1')).toBe('workspace-app');

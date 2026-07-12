@@ -91,7 +91,9 @@
         "tryAgain": "Try again",
         "backToList": "Back to form list"
       },
-      "submitSuccess": "Form submitted successfully."
+      "submitSuccess": "Form submitted successfully.",
+      "starting": "Starting your submission…",
+      "startError": "The submission could not be started. Please try again."
     }
   },
   "form": {

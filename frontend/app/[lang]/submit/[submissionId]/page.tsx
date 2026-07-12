@@ -1,6 +1,6 @@
-import { SubmissionView } from '@/src/features/submit-mode/ui/SubmissionView';
 import { DsPageHeading } from '@/app/ui/DsPageHeading';
-import { getDictionary, hasLocale, Locale } from '../../dictionaries';
+import FormioV5SubmissionFillLoader from '@/src/features/formio-v5/ui/FormioV5SubmissionFillLoader';
+import { getDictionary, resolveLocale } from '../../dictionaries';
 import { notFound } from 'next/navigation';
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
@@ -11,12 +11,11 @@ type PageProps = {
 
 export async function generateMetadata({ params }: PageProps) {
   const param = await params;
-  if (!hasLocale(param.lang)) {
-    param.lang = 'en';
-  }
-  const dict = await getDictionary(param.lang as Locale);
+  const locale = resolveLocale(param.lang);
+  const dict = await getDictionary(locale);
+  const t = dict.formioV5.formRender.pageTitle;
   return {
-    title: `${dict.submission.pageTitle} | ${dict.general.title}`,
+    title: `${t} | ${dict.general.title}`,
     description: dict.general.description,
   };
 }
@@ -28,12 +27,15 @@ export default async function Page({ params }: PageProps) {
     notFound();
   }
 
-  const { lang, submissionId } = await params;
-  const dict = await getDictionary((hasLocale(lang) ? lang : 'en') as Locale);
+  const { lang } = await params;
+  const locale = resolveLocale(lang);
+  const dict = await getDictionary(locale);
   return (
-    <section className="p-4" aria-labelledby="submission-view-heading">
-      <DsPageHeading id="submission-view-heading">{dict.submission.pageTitle}</DsPageHeading>
-      <SubmissionView key={submissionId} />
+    <section className="p-4" aria-labelledby="submission-fill-heading">
+      <DsPageHeading id="submission-fill-heading">
+        {dict.formioV5.formRender.pageTitle}
+      </DsPageHeading>
+      <FormioV5SubmissionFillLoader />
     </section>
   );
 }

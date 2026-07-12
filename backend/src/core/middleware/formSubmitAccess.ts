@@ -1,39 +1,16 @@
-import { and, eq, isNull } from 'drizzle-orm';
-import { db } from '../db/client';
-import { formVersions } from '../db/schema';
 import { hasFormSubmitAccess, type CallerIdentity } from '../db/repos/formSubmitAccessRepo';
 import { getWorkspaceIdForSubmission } from '../db/repos/submissionRepo';
+import { getWorkspaceIdForForm } from '../db/repos/formRepo';
 import {
   Permissions,
   PUBLIC_SUBMITTER_LABEL,
   WorkspaceMembershipRole,
   type PermissionCode,
 } from '../db/codes';
-import { ForbiddenError, UnauthorizedError, ValidationError } from '../errors';
+import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from '../errors';
 import { getActorIdpCode } from './actor';
 import { WORKSPACE_HEADER } from './workspaceContext';
 import type { Request, Response, NextFunction } from 'express';
-
-type FormVersionRow = typeof formVersions.$inferSelect;
-
-/**
- * Guards the create path (POST /submissions), which names its target in the body: only the currently
- * published version accepts new submissions, and the body's formId must match that version. A save
- * (POST /submissions/:id/save) resolves its version from the existing submission and is exempt.
- */
-export const assertCreateTargetConsistent = (
-  formVersion: Pick<FormVersionRow, 'state' | 'formId'>,
-  body: { formVersionId?: unknown; formId?: unknown } | undefined,
-): void => {
-  const bodyFormVersionId = body?.formVersionId;
-  if (typeof bodyFormVersionId !== 'string' || !bodyFormVersionId) return;
-  if (formVersion.state !== 'published') {
-    throw new ValidationError('Form version is not accepting submissions');
-  }
-  if (body?.formId !== formVersion.formId) {
-    throw new ValidationError('formId does not match the target form version');
-  }
-};
 
 /** The caller's identity for audience checks: resolved actor id and provider code (`public` if anon). */
 const resolveCaller = (req: Request): CallerIdentity => ({
@@ -45,36 +22,32 @@ const resolveCaller = (req: Request): CallerIdentity => ({
 const accessDenial = (req: Request, message: string): Error =>
   req.user ? new ForbiddenError(message) : new UnauthorizedError(message);
 
-/** The workspace to authorize a submission against, plus — for a create — the target form version. */
+/** The workspace a submission request authorizes against. */
 interface SubmitTarget {
   workspaceId: string;
-  /** Present only for POST /submissions (create), where the create must be validated against it. */
-  formVersion?: FormVersionRow;
 }
 
 /**
- * Resolve what a submission request authorizes against. POST /submissions carries the target version in
- * the body (loaded in full for the create-consistency check). POST /submissions/:id/save carries only
- * the submission id and just needs its workspace — the service reloads the submission + version itself,
- * so a single workspace lookup here avoids loading rows twice. Null when nothing resolves.
+ * Resolve the workspace a submission request authorizes against. POST /submissions (open) names its
+ * form in the body; the published version is resolved server-side by the service, so here we only need
+ * the form's workspace. POST /submissions/:id/{save,submit} carry the submission id. Throws 404 when the
+ * named form or submission doesn't exist, so the downstream controller never runs without a context.
  */
-const resolveSubmitTarget = async (req: Request): Promise<SubmitTarget | null> => {
-  const bodyFormVersionId = (req.body as { formVersionId?: unknown } | undefined)?.formVersionId;
-  if (typeof bodyFormVersionId === 'string' && bodyFormVersionId) {
-    const [formVersion] = await db
-      .select()
-      .from(formVersions)
-      .where(and(eq(formVersions.id, bodyFormVersionId), isNull(formVersions.deletedAt)))
-      .limit(1);
-    return formVersion ? { workspaceId: formVersion.workspaceId, formVersion } : null;
+const resolveSubmitTarget = async (req: Request): Promise<SubmitTarget> => {
+  const bodyFormId = (req.body as { formId?: unknown } | undefined)?.formId;
+  if (typeof bodyFormId === 'string' && bodyFormId) {
+    const workspaceId = await getWorkspaceIdForForm(bodyFormId);
+    if (!workspaceId) throw new NotFoundError('Form not found');
+    return { workspaceId };
   }
 
   if (req.params.id) {
     const workspaceId = await getWorkspaceIdForSubmission(req.params.id);
-    return workspaceId ? { workspaceId } : null;
+    if (!workspaceId) throw new NotFoundError('Submission not found');
+    return { workspaceId };
   }
 
-  return null;
+  throw new ValidationError('Missing submission target');
 };
 
 /**
@@ -101,10 +74,10 @@ export const requireFormAccess = (required: PermissionCode) => {
 };
 
 /**
- * Authorizes a submission (POST /submissions, POST /submissions/:id/save) against the target form
- * version's workspace Form submitters audience (or the caller's staff permissions), then populates
- * req.coreContext for the downstream controller — anonymous submissions are attributed to the seeded
- * public user (already resolved as req.actorId). Replaces the retired visibility check.
+ * Authorizes a submission (open / save / submit) against the target form's workspace Form submitters
+ * audience (or the caller's staff permissions), then populates req.coreContext for the downstream
+ * controller — anonymous submissions are attributed to the seeded public user (already resolved as
+ * req.actorId).
  */
 export const requireFormSubmitAccess = async (
   req: Request,
@@ -113,10 +86,6 @@ export const requireFormSubmitAccess = async (
 ): Promise<void> => {
   try {
     const target = await resolveSubmitTarget(req);
-    if (!target) {
-      // No resolvable target; let the controller/service produce the standard 404/validation error.
-      return next();
-    }
 
     const allowed = await hasFormSubmitAccess(
       target.workspaceId,
@@ -125,13 +94,6 @@ export const requireFormSubmitAccess = async (
     );
     if (!allowed) {
       throw accessDenial(req, 'Not authorized to submit this form');
-    }
-
-    if (target.formVersion) {
-      assertCreateTargetConsistent(
-        target.formVersion,
-        req.body as { formVersionId?: unknown; formId?: unknown },
-      );
     }
 
     req.coreContext = {

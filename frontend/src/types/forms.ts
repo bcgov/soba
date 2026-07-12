@@ -35,14 +35,10 @@ export type SobaFormVersionType = {
 };
 
 // Submit-mode payload: the published form + version + schema needed to render the public fill page.
-export type SubmitFormBundle = {
-  form: { id: string; name: string; description: string | null };
-  publishedVersion: {
-    id: string;
-    formId: string;
-    versionNo: number;
-    state: string;
-    publishedAt: string | null;
-  };
+/** The one payload the fill page needs: workflow state + schema + any saved answers (resume). */
+export type SubmitFillBundle = {
+  workflowState: string;
   schema: Record<string, unknown> | null;
+  // The submission's answer document; null for a just-opened submission (no saved answers yet).
+  content: { data?: Record<string, unknown> } | null;
 };

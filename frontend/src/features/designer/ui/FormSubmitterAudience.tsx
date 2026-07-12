@@ -29,16 +29,18 @@ export function FormSubmitterAudience({ workspaceId, token, canManage }: Props) 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const triggerRef = useRef<HTMLSpanElement>(null);
+  // Dedupe StrictMode's dev double-invoke; re-fetch only when the active workspace changes.
+  const fetchedWorkspaceRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!workspaceId || !token) return;
-    let active = true;
-    getSubmitterAudience(token, workspaceId)
-      .then((a) => active && setAudience(a))
-      .catch(() => active && setError(t.submitterAudienceLoadError));
-    return () => {
-      active = false;
-    };
+    const ws = workspaceId;
+    if (fetchedWorkspaceRef.current === ws) return;
+    fetchedWorkspaceRef.current = ws;
+    getSubmitterAudience(token, ws)
+      // Ignore a superseded response if the active workspace changed while this was in flight.
+      .then((a) => fetchedWorkspaceRef.current === ws && setAudience(a))
+      .catch(() => fetchedWorkspaceRef.current === ws && setError(t.submitterAudienceLoadError));
   }, [workspaceId, token, t.submitterAudienceLoadError]);
 
   // Seed the editable state from the saved audience whenever the panel opens.

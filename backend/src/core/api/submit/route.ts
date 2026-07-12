@@ -3,19 +3,18 @@ import { validateRequest } from '../shared/validation';
 import { openWorkspaceFromResource } from '../../middleware/workspaceContext';
 import { requireFormAccess, requireFormSubmitAccess } from '../../middleware/formSubmitAccess';
 import { Permissions } from '../../db/codes';
-import { getSubmitForm, getSubmitSubmissionSchema } from './controller';
+import { getSubmitSubmissionSchema, getSubmitFillBundle } from './controller';
 import {
-  createSubmission,
+  openSubmission,
   getSubmission,
   getSubmissionData,
   saveSubmission,
+  submitSubmission,
 } from '../submissions/controller';
-import { FormIdParamsSchema } from '../forms/schema';
 import {
-  CreateSubmissionBodySchema,
-  SaveSubmissionBodySchema,
-  SaveSubmissionParamsSchema,
-  UpdateSubmissionParamsSchema,
+  OpenSubmissionBodySchema,
+  SubmissionDataBodySchema,
+  SubmissionIdParamsSchema,
 } from '../submissions/schema';
 
 // Submit-mode: mounted under /api/v1/submit with optional auth (anonymous resolves to the public user).
@@ -23,45 +22,41 @@ import {
 // so non-members and anonymous callers can read a published form, submit to it, and view the confirmation.
 const router = express.Router();
 
-const openFormResource = openWorkspaceFromResource({ kind: 'form', idFrom: 'paramsId' });
 const openSubmissionResource = openWorkspaceFromResource({
   kind: 'submission',
   idFrom: 'paramsId',
 });
 
-// The published form + schema needed to render the fill page.
-router.get(
-  '/forms/:id',
-  validateRequest({ params: FormIdParamsSchema }),
-  openFormResource,
-  requireFormAccess(Permissions.form_read),
-  getSubmitForm,
-);
-
 router.post(
   '/submissions',
-  validateRequest({ body: CreateSubmissionBodySchema }),
+  validateRequest({ body: OpenSubmissionBodySchema }),
   requireFormSubmitAccess,
-  createSubmission,
+  openSubmission,
 );
 router.post(
   '/submissions/:id/save',
-  validateRequest({ params: SaveSubmissionParamsSchema, body: SaveSubmissionBodySchema }),
+  validateRequest({ params: SubmissionIdParamsSchema, body: SubmissionDataBodySchema }),
   requireFormSubmitAccess,
   saveSubmission,
+);
+router.post(
+  '/submissions/:id/submit',
+  validateRequest({ params: SubmissionIdParamsSchema, body: SubmissionDataBodySchema }),
+  requireFormSubmitAccess,
+  submitSubmission,
 );
 
 // Confirmation read (a public form's submissions are public data; the UUID is the practical capability).
 router.get(
   '/submissions/:id',
-  validateRequest({ params: UpdateSubmissionParamsSchema }),
+  validateRequest({ params: SubmissionIdParamsSchema }),
   openSubmissionResource,
   requireFormAccess(Permissions.submission_read),
   getSubmission,
 );
 router.get(
   '/submissions/:id/data',
-  validateRequest({ params: UpdateSubmissionParamsSchema }),
+  validateRequest({ params: SubmissionIdParamsSchema }),
   openSubmissionResource,
   requireFormAccess(Permissions.submission_read),
   getSubmissionData,
@@ -70,10 +65,19 @@ router.get(
 // The submission's own form-version schema, for rendering its read-only confirmation.
 router.get(
   '/submissions/:id/schema',
-  validateRequest({ params: UpdateSubmissionParamsSchema }),
+  validateRequest({ params: SubmissionIdParamsSchema }),
   openSubmissionResource,
   requireFormAccess(Permissions.submission_read),
   getSubmitSubmissionSchema,
+);
+
+// The one bundle the fill page needs: workflow state + schema + any saved answers (resume).
+router.get(
+  '/submissions/:id/fill',
+  validateRequest({ params: SubmissionIdParamsSchema }),
+  openSubmissionResource,
+  requireFormAccess(Permissions.submission_read),
+  getSubmitFillBundle,
 );
 
 export { router as submitRouter };

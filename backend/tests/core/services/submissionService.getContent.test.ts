@@ -10,7 +10,7 @@ jest.mock('../../../src/core/db/repos/submissionRepo', () => ({
   getSubmissionRecordById: jest.fn(),
   updateSubmissionDraft: jest.fn(),
   appendSubmissionRevision: jest.fn(),
-  createEmptySubmission: jest.fn(),
+  openSubmission: jest.fn(),
   getSubmissionById: jest.fn(),
   listSubmissionsForWorkspace: jest.fn(),
   markSubmissionDeleted: jest.fn(),

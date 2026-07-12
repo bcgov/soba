@@ -113,58 +113,17 @@ export function createSubmissionsApiService(submissionService: SubmissionService
       };
     },
 
-    create: async (
-      ctx: SubmissionsContextInput,
-      formId: string,
-      formVersionId: string,
-      workflowState?: string,
-    ) =>
-      toSubmissionDto(
-        await submissionService.create({
-          workspaceId: ctx.workspaceId,
-          actorId: ctx.actorId,
-          actorDisplayLabel: ctx.actorDisplayLabel,
-          formId,
-          formVersionId,
-          workflowState,
-        }),
-      ),
+    open: async (ctx: SubmissionsContextInput, formId: string) =>
+      toSubmissionDto(await submissionService.open({ ...ctx, formId })),
 
-    update: async (ctx: SubmissionsContextInput, submissionId: string, workflowState?: string) => {
-      const row = await submissionService.update({
-        workspaceId: ctx.workspaceId,
-        actorId: ctx.actorId,
-        actorDisplayLabel: ctx.actorDisplayLabel,
-        submissionId,
-        workflowState,
-      });
-      return row ? toSubmissionDto(row) : null;
-    },
+    save: (ctx: SubmissionsContextInput, submissionId: string, data: Record<string, unknown>) =>
+      submissionService.save({ ...ctx, submissionId, data }).then((row) => toSubmissionDto(row)),
 
-    save: (
-      ctx: SubmissionsContextInput,
-      submissionId: string,
-      input: { data: Record<string, unknown>; eventType?: string; note?: string },
-    ) =>
-      submissionService
-        .save({
-          workspaceId: ctx.workspaceId,
-          actorId: ctx.actorId,
-          actorDisplayLabel: ctx.actorDisplayLabel,
-          submissionId,
-          data: input.data,
-          eventType: input.eventType || 'edit_submission',
-          note: input.note,
-        })
-        .then((row) => toSubmissionDto(row)),
+    submit: (ctx: SubmissionsContextInput, submissionId: string, data: Record<string, unknown>) =>
+      submissionService.submit({ ...ctx, submissionId, data }).then((row) => toSubmissionDto(row)),
 
     delete: (ctx: SubmissionsContextInput, submissionId: string) =>
-      submissionService.delete({
-        workspaceId: ctx.workspaceId,
-        actorId: ctx.actorId,
-        actorDisplayLabel: ctx.actorDisplayLabel,
-        submissionId,
-      }),
+      submissionService.delete({ ...ctx, submissionId }),
   };
 }
 

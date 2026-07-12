@@ -12,15 +12,11 @@ import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFo
 import { FormioV5FormRenderErrorBoundary } from '@/src/features/formio-v5/ui/FormioV5FormRenderErrorBoundary';
 import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
 import { loadFilesConfig, toBcgovFileOption } from '@/src/features/formio-v5/loadFilesConfig';
-import {
-  getSubmitForm,
-  createSobaFormSubmission,
-  saveSobaFormSubmission,
-} from '@/src/shared/api/sobaApi';
+import { getSubmitFillBundle, submitSobaFormSubmission } from '@/src/shared/api/sobaApi';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
-type FormRenderLabels = {
+type FillLabels = {
   loading: string;
   loadError: string;
   unavailable: string;
@@ -29,55 +25,65 @@ type FormRenderLabels = {
 };
 
 /**
- * Renders the currently published version of a form (keyed on the SOBA formId) in JSON mode and
- * persists submissions through the SOBA API. The Form.io engine is never contacted from the browser.
+ * Renders an already-opened submission for filling, keyed on its id. The submission record exists
+ * before this mounts (opened in the start step), so this component only renders + submits — it never
+ * creates. Loads the submission's own version schema and any saved answers, so a refresh resumes.
  */
-function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: FormRenderLabels }) {
-  // Token is optional: a public-audience form is readable and submittable without signing in.
+function SubmissionFillBody({
+  submissionId,
+  labels,
+}: {
+  submissionId: string;
+  labels: FillLabels;
+}) {
+  // Token is optional: a public-audience submission is fillable without signing in.
   const { token, initializing } = useKeycloak();
   const { addNotification } = useNotificationStore();
   const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
 
   const [schema, setSchema] = useState<FormType | null>(null);
-  const [formVersionId, setFormVersionId] = useState<string | null>(null);
+  const [initialData, setInitialData] = useState<Record<string, unknown>>({});
   // Host file constraints (blocked extensions + max size) pushed to the BCGovFile component.
   const [bcgovFileOption, setBcgovFileOption] = useState<Record<string, unknown>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  // The Form.io webform instance; in JSON mode (no `src`) we must signal it on a failed
-  // save, or its submit button spins forever. On success we navigate away instead.
+  // Load the bundle once. A ref (not state) guard dedupes StrictMode's dev double-invoke, so /fill
+  // isn't fetched twice; no unmount/active flag, so the one in-flight load always applies its result.
+  const loadStartedRef = useRef(false);
+  // The Form.io webform instance; in JSON mode (no `src`) we must signal it on a failed submit,
+  // or its submit button spins forever. On success we navigate away instead.
   const formInstanceRef = useRef<{
     emit: (event: string, ...args: unknown[]) => void;
   } | null>(null);
 
   useEffect(() => {
     // Wait for auth to settle so an authenticated caller sends their token; anonymous proceeds with none.
-    if (initializing || loaded) return;
-    let active = true;
+    if (initializing || loadStartedRef.current) return;
+    loadStartedRef.current = true;
     void (async () => {
       try {
-        // One call returns the published version + schema; submissions go to that version.
-        const bundle = await getSubmitForm(token ?? undefined, formId);
-        if (!bundle.publishedVersion || !bundle.schema) {
-          if (active) setLoadError(labels.unavailable);
+        const authToken = token ?? undefined;
+        // One call: workflow state + schema + any saved answers. `content` is null for a just-opened
+        // submission, so there's no separate (404-ing) data fetch.
+        const bundle = await getSubmitFillBundle(authToken, submissionId);
+        // An already-submitted submission isn't fillable; send them to its confirmation.
+        if (bundle.workflowState === 'submitted') {
+          router.replace(`/${locale}/submission/${submissionId}`);
           return;
         }
-        if (active) {
-          setFormVersionId(bundle.publishedVersion.id);
-          setSchema(bundle.schema as FormType);
+        if (!bundle.schema) {
+          setLoadError(labels.unavailable);
+          return;
         }
+        setSchema(bundle.schema as FormType);
+        // Resume: prefill with any saved answers (a just-opened submission has none).
+        setInitialData((bundle.content?.data ?? {}) as Record<string, unknown>);
       } catch (err) {
-        if (active) setLoadError(normalizeFormioRenderError(err, labels.loadError));
-      } finally {
-        if (active) setLoaded(true);
+        setLoadError(normalizeFormioRenderError(err, labels.loadError));
       }
     })();
-    return () => {
-      active = false;
-    };
-  }, [token, initializing, formId, loaded, labels.loadError, labels.unavailable]);
+  }, [initializing, token, submissionId, locale, router, labels.loadError, labels.unavailable]);
 
   useEffect(() => {
     if (!token) return;
@@ -91,20 +97,16 @@ function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: Fo
   }, [token]);
 
   const submitForm = async (submission: Submission) => {
-    if (!formVersionId) return;
     try {
-      const created = await createSobaFormSubmission(token ?? undefined, formId, formVersionId, {});
-      await saveSobaFormSubmission(
+      await submitSobaFormSubmission(
         token ?? undefined,
-        created.id,
+        submissionId,
         (submission?.data ?? {}) as Record<string, unknown>,
-        'submit',
       );
       addNotification({ text: labels.submitSuccess, type: 'success' });
-      // Go straight to the saved submission's read-only view — the same page the
-      // submissions table links to. Navigating away unmounts the form, so there's
-      // no need to emit `submitDone` and no flash of Form.io's own success screen.
-      router.push(`/${locale}/submission/${created.id}`);
+      // Straight to the read-only confirmation; navigating away unmounts the form, so there's no
+      // need to emit `submitDone` and no flash of Form.io's own success screen.
+      router.push(`/${locale}/submission/${submissionId}`);
     } catch (err) {
       setRenderError(normalizeFormioRenderError(err, labels.rendererError));
       formInstanceRef.current?.emit('submitError', labels.rendererError);
@@ -113,7 +115,7 @@ function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: Fo
 
   if (loadError) {
     return (
-      <InlineAlert variant="danger" role="alert">
+      <InlineAlert variant="danger" role="alert" data-testid="submission-fill-error">
         {loadError}
       </InlineAlert>
     );
@@ -126,7 +128,7 @@ function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: Fo
   return (
     <>
       {renderError ? (
-        <InlineAlert variant="danger" role="alert">
+        <InlineAlert variant="danger" role="alert" data-testid="submission-fill-render-error">
           {renderError}
         </InlineAlert>
       ) : null}
@@ -137,13 +139,14 @@ function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: Fo
           </InlineAlert>
         }
       >
-        <div className="formio-v5-chrome" data-soba-formio-chrome>
+        <div className="formio-v5-chrome" data-soba-formio-chrome data-testid="submission-fill">
           <DynamicForm
             className="formio-v5-form-root"
             src=""
             form={schema}
-            // We own all submit messaging (success toast + redirect, inline error),
-            // so suppress Form.io's built-in green "Submission Complete" alert.
+            submission={{ data: initialData as Submission['data'] }}
+            // We own all submit messaging (success toast + redirect, inline error), so suppress
+            // Form.io's built-in green "Submission Complete" alert.
             options={{ noAlerts: true, ...bcgovFileOption }}
             onFormReady={(instance) => {
               formInstanceRef.current = instance;
@@ -159,14 +162,14 @@ function FormioV5FormRenderBody({ formId, labels }: { formId: string; labels: Fo
   );
 }
 
-export default function FormioV5FormRenderClient() {
+export default function FormioV5SubmissionFillClient() {
   const params = useParams();
-  const formIdRaw = params?.formId;
-  const formId = typeof formIdRaw === 'string' ? decodeURIComponent(formIdRaw) : '';
+  const raw = params?.submissionId;
+  const submissionId = typeof raw === 'string' ? decodeURIComponent(raw) : '';
   const dict = useDictionary();
   const labels = dict.formioV5.formRender;
 
-  if (!formId) {
+  if (!submissionId) {
     return (
       <InlineAlert variant="danger" role="alert">
         {labels.missingId}
@@ -176,9 +179,9 @@ export default function FormioV5FormRenderClient() {
 
   return (
     <div className="mt-3">
-      <FormioV5FormRenderBody
-        key={formId}
-        formId={formId}
+      <SubmissionFillBody
+        key={submissionId}
+        submissionId={submissionId}
         labels={{
           loading: dict.form?.loading || 'Loading…',
           loadError: labels.loadError,

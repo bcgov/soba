@@ -4,16 +4,16 @@
 import { sobaFetch } from './sobaFetch';
 import { parseJson } from './sobaHelpers';
 import { FormType } from '@formio/react';
-import type { SubmitFormBundle } from '../../types/forms';
+import type { SubmitFillBundle } from '../../types/forms';
 import type { SubmissionResponse, SubmissionListItem } from '@/src/types/submissions';
 
-/** The published form + its version + schema, for rendering the public fill page (one call). */
-export async function getSubmitForm(
+/** The one payload the fill page needs: workflow state + schema + any saved answers (resume). */
+export async function getSubmitFillBundle(
   token: string | undefined,
-  formId: string,
-): Promise<SubmitFormBundle> {
-  const response = await sobaFetch(`/submit/forms/${formId}`, { token });
-  return parseJson<SubmitFormBundle>(response);
+  submissionId: string,
+): Promise<SubmitFillBundle> {
+  const response = await sobaFetch(`/submit/submissions/${submissionId}/fill`, { token });
+  return parseJson<SubmitFillBundle>(response);
 }
 
 /** A submission's own form-version schema, for its read-only confirmation view. */
@@ -27,34 +27,50 @@ export async function getSubmitSubmissionSchema(
 }
 
 /**
- * Create the SOBA submission shell (a PG row); its answer data is saved via saveSobaFormSubmission.
- * Token is optional: anonymous submissions to a public-audience form are attributed to the public user.
+ * Open a SOBA submission (a PG row in the `opened` state); its answer data is written later via
+ * saveSobaFormSubmission (draft) or submitSobaFormSubmission (submit). Token is optional: anonymous
+ * submissions to a public-audience form are attributed to the public user.
  */
-export async function createSobaFormSubmission(
+export async function openSobaFormSubmission(
   token: string | undefined,
   formId: string,
-  formVersionId: string,
-  options?: Record<string, unknown>,
 ): Promise<SubmissionResponse> {
   const response = await sobaFetch('/submit/submissions', {
     token,
     method: 'POST',
-    json: { formId, formVersionId, ...options },
+    json: { formId },
   });
   return parseJson<SubmissionResponse>(response);
 }
 
-/** Save a submission's answer data; the server writes a new engine document and records a revision. */
+/**
+ * Save a submission's answer data as a draft; the server writes a new engine document + revision.
+ * Reserved for the (deferred) draft-save UI — the fill flow is resume-only for now, so nothing calls
+ * this yet. Kept as the client half of POST /submit/submissions/:id/save.
+ */
 export async function saveSobaFormSubmission(
   token: string | undefined,
   submissionId: string,
   data: Record<string, unknown>,
-  eventType: string = 'submit',
 ): Promise<SubmissionResponse> {
   const response = await sobaFetch(`/submit/submissions/${submissionId}/save`, {
     token,
     method: 'POST',
-    json: { data, eventType },
+    json: { data },
+  });
+  return parseJson<SubmissionResponse>(response);
+}
+
+/** Submit a submission's answer data; the server records the submit and marks it submitted. */
+export async function submitSobaFormSubmission(
+  token: string | undefined,
+  submissionId: string,
+  data: Record<string, unknown>,
+): Promise<SubmissionResponse> {
+  const response = await sobaFetch(`/submit/submissions/${submissionId}/submit`, {
+    token,
+    method: 'POST',
+    json: { data },
   });
   return parseJson<SubmissionResponse>(response);
 }

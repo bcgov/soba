@@ -28,10 +28,11 @@ export {
 } from './sobaApiDesign';
 // Submit-mode (public-capable, /submit/*)
 export {
-  getSubmitForm,
+  getSubmitFillBundle,
   getSubmitSubmissionSchema,
-  createSobaFormSubmission,
+  openSobaFormSubmission,
   saveSobaFormSubmission,
+  submitSobaFormSubmission,
   getSubmitSubmission,
   getSubmitSubmissionData,
 } from './sobaApiSubmit';

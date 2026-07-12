@@ -84,6 +84,25 @@ export const FormVersionState = {
 } as const;
 export type FormVersionStateCode = (typeof FormVersionState)[keyof typeof FormVersionState];
 
+/** Submission lifecycle state (submission.workflow_state). Backend-owned; clients never set it. */
+export const SubmissionWorkflowState = {
+  opened: 'opened',
+  draft: 'draft',
+  submitted: 'submitted',
+  deleted: 'deleted',
+} as const;
+export type SubmissionWorkflowStateCode =
+  (typeof SubmissionWorkflowState)[keyof typeof SubmissionWorkflowState];
+
+/** Submission lifecycle event (submission_revision.event_type). Mirrors the state flow. */
+export const SubmissionEventType = {
+  opened: 'opened',
+  saved: 'saved',
+  submitted: 'submitted',
+} as const;
+export type SubmissionEventTypeCode =
+  (typeof SubmissionEventType)[keyof typeof SubmissionEventType];
+
 export const FeatureStatus = {
   enabled: 'enabled',
   disabled: 'disabled',

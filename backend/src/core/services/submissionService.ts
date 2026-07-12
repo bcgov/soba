@@ -2,33 +2,25 @@ import {
   SubmissionCursorMode,
   SubmissionListSort,
   appendSubmissionRevision,
-  createEmptySubmission,
+  openSubmission,
   getSubmissionById,
   getSubmissionRecordById,
   listSubmissionsForWorkspace,
   markSubmissionDeleted,
   updateSubmissionDraft,
 } from '../db/repos/submissionRepo';
-import { getFormVersionById } from '../db/repos/formVersionRepo';
+import { getFormVersionById, getPublishedVersionForForm } from '../db/repos/formVersionRepo';
 import { getFormEngineCodeForForm } from '../db/repos/formRepo';
 import { createFormEngineAdapter } from '../integrations/form-engine/FormEngineRegistry';
 import { NotFoundError, ValidationError } from '../errors';
+import { SubmissionEventType, type SubmissionEventTypeCode } from '../db/codes';
+import { resolveSubmissionTransition } from './submissionLifecycle';
 
 interface CreateInput {
   workspaceId: string;
   actorId: string;
   actorDisplayLabel: string | null;
   formId: string;
-  formVersionId: string;
-  workflowState?: string;
-}
-
-interface UpdateInput {
-  workspaceId: string;
-  actorId: string;
-  actorDisplayLabel: string | null;
-  submissionId: string;
-  workflowState?: string;
 }
 
 interface SaveInput {
@@ -36,8 +28,6 @@ interface SaveInput {
   actorId: string;
   actorDisplayLabel: string | null;
   submissionId: string;
-  eventType: string;
-  note?: string;
   data: Record<string, unknown>;
 }
 
@@ -64,24 +54,35 @@ interface ListInput {
 }
 
 export class SubmissionService {
-  async create(input: CreateInput) {
-    return createEmptySubmission(input);
+  /** Open a new submission against the form's currently published version (the only submittable one). */
+  async open(input: CreateInput) {
+    const version = await getPublishedVersionForForm(input.workspaceId, input.formId);
+    if (!version) throw new NotFoundError('Form has no published version');
+    return openSubmission({ ...input, formVersionId: version.id });
   }
 
-  async update(input: UpdateInput) {
-    return updateSubmissionDraft(input.workspaceId, input.submissionId, input.actorDisplayLabel, {
-      workflowState: input.workflowState,
-    });
+  /** Save the current answer data as a draft (opened → draft; draft stays draft). */
+  async save(input: SaveInput) {
+    return this.record(input, SubmissionEventType.saved);
+  }
+
+  /** Submit the answer data (opened/draft → submitted). */
+  async submit(input: SaveInput) {
+    return this.record(input, SubmissionEventType.submitted);
   }
 
   /**
-   * Record a save: create a new (immutable) submission document in the form engine, then advance the
-   * PG submission + append a revision capturing the before→after engine refs. Mirrors the forms
-   * provisioning flow — status 'provisioning' → 'ready' (in appendSubmissionRevision) or 'error'.
+   * Record a save/submit: gate the transition (lifecycle policy) up front, create a new (immutable)
+   * submission document in the form engine, then advance the PG submission + append a revision
+   * capturing the before→after engine refs. Mirrors the forms provisioning flow — status
+   * 'provisioning' → 'ready' (in appendSubmissionRevision) or 'error'.
    */
-  async save(input: SaveInput) {
+  private async record(input: SaveInput, eventType: SubmissionEventTypeCode) {
     const submission = await getSubmissionRecordById(input.workspaceId, input.submissionId);
     if (!submission) throw new NotFoundError('Submission not found');
+
+    // Decide the resulting state first, so a terminal submission is rejected (409) before any write.
+    const workflowState = resolveSubmissionTransition(submission.workflowState, eventType);
 
     const version = await getFormVersionById(input.workspaceId, submission.formVersionId);
     if (!version || !version.engineSchemaRef) {
@@ -117,8 +118,8 @@ export class SubmissionService {
         submissionId: input.submissionId,
         actorId: input.actorId,
         actorDisplayLabel: input.actorDisplayLabel,
-        eventType: input.eventType,
-        changeNote: input.note,
+        eventType,
+        workflowState,
         afterEngineSubmissionRef: engineRef,
       });
 
