@@ -33,7 +33,6 @@ The `Dockerfile` builds a Node.js 24 image with:
 Runs once when the devcontainer is first created:
 
 - Configures pnpm (copy import method, store off virtiofs) for reliable installs on all architectures
-- Creates `backend/.env`, `backend/.env.local`, and `frontend/.env` from examples if missing (safety net)
 - Cleans dependency trees, then runs `pnpm install` at the repo root (workspace: frontend + backend)
 - Integration (Playwright) tests are opt-in and **not** installed here — see `integration/README.md`
 

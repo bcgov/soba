@@ -12,6 +12,7 @@ cd "$SCRIPT_DIR/.."
 # and on a template change back up the current file before applying the new one.
 # shellcheck source=scripts/env-sync.sh
 source "$SCRIPT_DIR/scripts/env-sync.sh"
+echo "==> Syncing env files with templates..."
 sync_env_file backend/.env.example backend/.env backend/.env.hash
 sync_env_file backend/.env.local.example backend/.env.local backend/.env.local.hash
 sync_env_file frontend/.env.example frontend/.env frontend/.env.hash
