@@ -22,5 +22,3 @@ integration/test-results/
 integration/playwright-report/
 integration/.playwright/
 integration/.cache/
-
-.devcontainer/devcontainer.json

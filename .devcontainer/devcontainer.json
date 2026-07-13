@@ -7,7 +7,11 @@
   "runArgs": ["--add-host=host.docker.internal:host-gateway"],
   "containerEnv": {
     "PNPM_STORE_DIR": "/home/node/.local/share/pnpm/store",
-    "npm_config_package_import_method": "copy"
+    "npm_config_package_import_method": "copy",
+    "NODE_OPTIONS": "${localEnv:DEVCONTAINER_NODE_OPTIONS:}"
+  },
+  "hostRequirements": {
+    "memory": "4gb"
   },
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},

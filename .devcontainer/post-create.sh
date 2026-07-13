@@ -42,17 +42,6 @@ fi
 
 install_workspace_deps full
 
-# ── Integration test dependencies + Playwright Chromium ─────────────────────
-if [ -f integration/playwright/package.json ]; then
-  echo "==> Installing integration test dependencies..."
-  npm ci --prefix integration/playwright
-
-  echo "==> Installing Playwright Chromium (integration)..."
-  npm exec --prefix integration/playwright -- playwright install chromium
-else
-  echo "==> integration/playwright/package.json not found, skipping integration setup..."
-fi
-
 # ── Print summary ───────────────────────────────────────────────────────────
 echo ""
 echo "══════════════════════════════════════════════════════════════"
@@ -63,6 +52,8 @@ echo "  Quick start:"
 echo "    Backend:  pnpm dev (in backend/)   (or use launch config 'SOBA Backend')"
 echo "    Frontend: pnpm dev (in frontend/)        (or use launch config 'SOBA Frontend')"
 echo "    Both:     use compound 'SOBA (Backend + Frontend)'"
+echo ""
+echo "  Integration (Playwright) e2e: opt-in — see integration/README.md"
 echo ""
 echo "  Endpoints:"
 echo "    Backend API:  http://localhost:4000"

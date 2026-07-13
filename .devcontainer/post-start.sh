@@ -8,17 +8,13 @@ echo "════════════════════════�
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/.."
 
-# Refresh backend/.env from .env.example on each devcontainer start
-if [ -f backend/.env.example ]; then
-  cp backend/.env.example backend/.env
-  echo "  Refreshed backend/.env from .env.example"
-fi
-
-# Refresh frontend/.env from .env.example on each devcontainer start
-if [ -f frontend/.env.example ]; then
-  cp frontend/.env.example frontend/.env
-  echo "  Refreshed frontend/.env from .env.example"
-fi
+# Keep active env files in step with their *.example templates: create if missing,
+# and on a template change back up the current file before applying the new one.
+# shellcheck source=scripts/env-sync.sh
+source "$SCRIPT_DIR/scripts/env-sync.sh"
+sync_env_file backend/.env.example backend/.env backend/.env.hash
+sync_env_file backend/.env.local.example backend/.env.local backend/.env.local.hash
+sync_env_file frontend/.env.example frontend/.env frontend/.env.hash
 
 # shellcheck source=scripts/pnpm-setup.sh
 source "$SCRIPT_DIR/scripts/pnpm-setup.sh"
