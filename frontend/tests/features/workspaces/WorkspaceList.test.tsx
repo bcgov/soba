@@ -53,7 +53,6 @@ vi.mock('@/lib/store', () => ({
           {
             id: 'ws1',
             name: 'Personal Workspace',
-            slug: 'personal',
             kind: 'personal',
             role: 'owner',
             status: 'active',
@@ -61,7 +60,6 @@ vi.mock('@/lib/store', () => ({
           {
             id: 'ws2',
             name: 'Team Workspace',
-            slug: 'team',
             kind: 'enterprise',
             role: 'member',
             status: 'active',

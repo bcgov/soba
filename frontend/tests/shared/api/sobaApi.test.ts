@@ -11,7 +11,6 @@ function mockResponse() {
     json: async () => ({
       id: 'w1',
       name: 'WS',
-      slug: 'ws',
       kind: 'personal',
       role: 'owner',
       status: 'active',

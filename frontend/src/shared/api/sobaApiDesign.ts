@@ -1,3 +1,5 @@
+// Design-mode API service: form authoring + submission management. All calls hit /design/* and
+// require a staff token. Public form read/submit lives in sobaApiSubmit.
 import { sobaFetch } from './sobaFetch';
 import { parseJson } from './sobaHelpers';
 import { FormType } from '@formio/react';
@@ -7,11 +9,7 @@ import type {
   SobaResponseFormType,
   SobaFormVersionType,
 } from '../../types/forms';
-import type {
-  ListSubmissionsResponse,
-  SubmissionResponse,
-  SubmissionListItem,
-} from '@/src/types/submissions';
+import type { ListSubmissionsResponse, SubmissionListItem } from '@/src/types/submissions';
 
 export async function createSobaFormioForm(
   token: string,
@@ -20,7 +18,7 @@ export async function createSobaFormioForm(
 ): Promise<CreateSobaFormioFormResponse> {
   data.formEngineCode = 'formio-v5';
 
-  const response = await sobaFetch('/forms', {
+  const response = await sobaFetch('/design/forms', {
     token,
     method: 'POST',
     json: data,
@@ -37,7 +35,7 @@ export async function normalizeFormSchema(
   token: string,
   schema: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const response = await sobaFetch('/forms/normalize', {
+  const response = await sobaFetch('/design/forms/normalize', {
     token,
     method: 'POST',
     json: { schema },
@@ -47,64 +45,16 @@ export async function normalizeFormSchema(
 }
 
 export async function publishSobaFormVersion(token: string, id: string) {
-  const response = await sobaFetch(`/form-versions/${id}/publish`, {
+  const response = await sobaFetch(`/design/form-versions/${id}/publish`, {
     token,
     method: 'POST',
-  });
-  return parseJson(response);
-}
-
-export async function updateSobaFormVersionVisibility(
-  token: string,
-  id: string,
-  visibility: string[],
-) {
-  const response = await sobaFetch(`/form-versions/${id}`, {
-    token,
-    method: 'PATCH',
-    json: { visibility },
   });
   return parseJson(response);
 }
 
 export async function getSobaForm(token: string, id: string): Promise<SobaResponseFormType> {
-  const response = await sobaFetch(`/forms/${id}`, { token });
+  const response = await sobaFetch(`/design/forms/${id}`, { token });
   return parseJson(response);
-}
-
-/** Create the SOBA submission shell (a PG row); its answer data is saved via saveSobaFormSubmission. */
-export async function createSobaFormSubmission(
-  token: string,
-  formId: string,
-  formVersionId: string,
-  options?: Record<string, unknown>,
-): Promise<SubmissionResponse> {
-  const sobaFormSubmissionData = {
-    formId,
-    formVersionId,
-    ...options,
-  };
-  const response = await sobaFetch('/submissions', {
-    token,
-    method: 'POST',
-    json: sobaFormSubmissionData,
-  });
-  return parseJson<SubmissionResponse>(response);
-}
-
-/** Save a submission's answer data; the server writes a new engine document and records a revision. */
-export async function saveSobaFormSubmission(
-  token: string,
-  submissionId: string,
-  data: Record<string, unknown>,
-  eventType: string = 'submit',
-): Promise<SubmissionResponse> {
-  const response = await sobaFetch(`/submissions/${submissionId}/save`, {
-    token,
-    method: 'POST',
-    json: { data, eventType },
-  });
-  return parseJson<SubmissionResponse>(response);
 }
 
 /** Compact form row for the designer/submit list. */
@@ -122,7 +72,7 @@ export async function getSobaForms(
   token: string,
   workspaceId?: string,
 ): Promise<{ items: SobaFormSummary[] }> {
-  const response = await sobaFetch('/forms', {
+  const response = await sobaFetch('/design/forms', {
     token,
     workspaceId,
     query: { limit: 100 },
@@ -141,7 +91,7 @@ export async function getSobaSubmissions(
       query[key] = String(value);
     }
   }
-  const response = await sobaFetch('/submissions', {
+  const response = await sobaFetch('/design/submissions', {
     token,
     workspaceId,
     query,
@@ -149,18 +99,18 @@ export async function getSobaSubmissions(
   return parseJson(response);
 }
 
-/** Fetch a single submission's metadata (form/version, status, timestamps). */
+/** Staff read of a single submission's metadata (management/review). */
 export async function getSobaSubmission(token: string, id: string): Promise<SubmissionListItem> {
-  const response = await sobaFetch(`/submissions/${id}`, { token });
+  const response = await sobaFetch(`/design/submissions/${id}`, { token });
   return parseJson(response);
 }
 
-/** Read a submission's answer document back from the engine (null if not yet provisioned). */
+/** Staff read of a submission's answer document (null if not yet provisioned). */
 export async function getSobaSubmissionData(
   token: string,
   id: string,
 ): Promise<{ data?: Record<string, unknown> } | null> {
-  const response = await sobaFetch(`/submissions/${id}/data`, { token });
+  const response = await sobaFetch(`/design/submissions/${id}/data`, { token });
   if (response.status === 404) return null;
   return parseJson(response);
 }
@@ -169,7 +119,7 @@ export async function getSobaFormVersions(
   token: string,
   formId: string,
 ): Promise<{ items: SobaFormVersionType[] }> {
-  const response = await sobaFetch('/form-versions', {
+  const response = await sobaFetch('/design/form-versions', {
     token,
     query: { formId, limit: 100 },
   });
@@ -180,12 +130,11 @@ export async function getSobaFormVersions(
 export async function createFormVersion(
   token: string,
   formId: string,
-  visibility?: string[],
 ): Promise<SobaFormVersionType> {
-  const response = await sobaFetch('/form-versions', {
+  const response = await sobaFetch('/design/form-versions', {
     token,
     method: 'POST',
-    json: { formId, visibility },
+    json: { formId },
   });
   return parseJson(response);
 }
@@ -196,7 +145,7 @@ export async function saveFormVersionSchema(
   id: string,
   schema: FormType,
 ): Promise<SobaFormVersionType> {
-  const response = await sobaFetch(`/form-versions/${id}/schema`, {
+  const response = await sobaFetch(`/design/form-versions/${id}/schema`, {
     token,
     method: 'POST',
     json: { schema },
@@ -206,7 +155,7 @@ export async function saveFormVersionSchema(
 
 /** Read a form version's schema back from the engine (null if not yet provisioned). */
 export async function getFormVersionSchema(token: string, id: string): Promise<FormType | null> {
-  const response = await sobaFetch(`/form-versions/${id}/schema`, { token });
+  const response = await sobaFetch(`/design/form-versions/${id}/schema`, { token });
   if (response.status === 404) return null;
   return parseJson(response);
 }

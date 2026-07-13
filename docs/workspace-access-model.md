@@ -41,6 +41,41 @@ They don't overlap: being a workspace admin grants no form permissions, and vice
 
 That role is the only source of workspace-management authority. It's never read for form permissions.
 
+### Managing groups and members
+
+Groups, their roles, and their members are managed through the group APIs, gated by
+`requireWorkspaceManage` (owner/admin only, via `req.coreContext.role`):
+
+| method | path | effect |
+|--------|------|--------|
+| `GET`    | `/workspaces/:id/groups` | list active groups with their roles and `user` members (any member) |
+| `POST`   | `/workspaces/:id/groups` | create a group carrying `roleCodes` |
+| `PATCH`  | `/workspaces/:id/groups/:groupId` | rename / re-describe a group |
+| `DELETE` | `/workspaces/:id/groups/:groupId` | soft-delete a group |
+| `PUT`    | `/workspaces/:id/groups/:groupId/roles` | replace a group's role set |
+| `POST`   | `/workspaces/:id/groups/:groupId/members` | add a workspace member (by `membershipId`) |
+| `DELETE` | `/workspaces/:id/groups/:groupId/members/:membershipId` | remove a member |
+
+Group names are unique among **active** groups in a workspace. Delete is a soft-delete: the group and
+its roles and memberships are set to `inactive` in one transaction, so the resolver (which only reads
+active roles/memberships) stops granting through it, and the name frees up for reuse.
+
+Only `user` members are managed here; `idp`/`idp_group` members and per-form overrides are a later
+phase. The repo (`workspaceGroupRepo.ts`) is shared with workspace bootstrap.
+
+**Protected groups.** The two bootstrap groups carry a hidden `workspace_group.system_code`
+(`form_admins`/`form_submitters`) so protections don't depend on the renameable name. Both can be
+renamed but not deleted, and their roles can't be changed; *Form administrators* must always keep at
+least one active user member (the last member can't be removed). Attempts return 409. The group DTO
+exposes a `system` boolean so the UI can hide those actions.
+
+**Members are typed.** Each member is `{id, kind:'user', …}` or `{id, kind:'idp', code, label}`, added
+via `POST …/members` with `{kind:'user', membershipId}` or `{kind:'idp', code}` and removed by row id.
+Only *Form submitters* accepts `idp` members (all other groups are user-only); an `idp` must be an active
+login provider or `public`, never `system`. `public` is exclusive — it can only be the group's sole
+member (blocks all other adds, and can't be added to a non-empty group). This is the workspace-level
+submit audience; enforcement (retiring `form_version.visibility`) is a later stage.
+
 ## Form access (RBAC)
 
 Form permissions come from **groups**. A workspace has groups, each group carries one or more roles, and
@@ -141,6 +176,10 @@ It's workspace-scoped: a user's form permissions are the same for every form in 
 there's no per-form override yet. `effectiveFormPermissions(actorId, formId)` is a thin wrapper that
 looks up the form's workspace and calls the same function. `hasAllPermissions(perms, required)` does the
 check and treats `*` as a match for anything.
+
+`GET /forms/:id` returns the caller's resolved codes as `permissions` (a sorted array, `['*']` for
+admins) so the UI can gate actions. This reads the same resolver, so it upgrades automatically when
+per-form resolution lands.
 
 ## What a new workspace looks like
 

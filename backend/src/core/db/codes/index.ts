@@ -56,6 +56,19 @@ export const WorkspaceMembershipStatus = {
 export type WorkspaceMembershipStatusCode =
   (typeof WorkspaceMembershipStatus)[keyof typeof WorkspaceMembershipStatus];
 
+/** Status of a workspace (workspace.status). */
+export const WorkspaceStatus = {
+  active: 'active',
+  inactive: 'inactive',
+} as const;
+export type WorkspaceStatusCode = (typeof WorkspaceStatus)[keyof typeof WorkspaceStatus];
+
+/** Kind of a workspace (workspace.kind); names are unique per kind. */
+export const WorkspaceKind = {
+  team: 'team',
+} as const;
+export type WorkspaceKindCode = (typeof WorkspaceKind)[keyof typeof WorkspaceKind];
+
 export const FormStatus = {
   active: 'active',
   archived: 'archived',
@@ -71,6 +84,25 @@ export const FormVersionState = {
 } as const;
 export type FormVersionStateCode = (typeof FormVersionState)[keyof typeof FormVersionState];
 
+/** Submission lifecycle state (submission.workflow_state). Backend-owned; clients never set it. */
+export const SubmissionWorkflowState = {
+  opened: 'opened',
+  draft: 'draft',
+  submitted: 'submitted',
+  deleted: 'deleted',
+} as const;
+export type SubmissionWorkflowStateCode =
+  (typeof SubmissionWorkflowState)[keyof typeof SubmissionWorkflowState];
+
+/** Submission lifecycle event (submission_revision.event_type). Mirrors the state flow. */
+export const SubmissionEventType = {
+  opened: 'opened',
+  saved: 'saved',
+  submitted: 'submitted',
+} as const;
+export type SubmissionEventTypeCode =
+  (typeof SubmissionEventType)[keyof typeof SubmissionEventType];
+
 export const FeatureStatus = {
   enabled: 'enabled',
   disabled: 'disabled',
@@ -78,6 +110,14 @@ export const FeatureStatus = {
   deprecated: 'deprecated',
 } as const;
 export type FeatureStatusCode = (typeof FeatureStatus)[keyof typeof FeatureStatus];
+
+/** Feature codes gating a mounted API surface (see requireFeature); mirrors the frontend FEATURE_CODES. */
+export const Features = {
+  design_mode: 'design-mode',
+  submit_mode: 'submit-mode',
+  files: 'files',
+} as const;
+export type FeatureCode = (typeof Features)[keyof typeof Features];
 
 /** Display name for the group that grants form admin on all forms in a workspace. */
 export const FORM_ADMINS_GROUP_NAME = 'Form administrators';
@@ -92,6 +132,30 @@ export const IdpGroups = {
 } as const;
 export type IdpGroupCode = (typeof IdpGroups)[keyof typeof IdpGroups];
 
+/** Seeded login identity providers (see identity_provider). `public` is the pseudo-provider below. */
+export const IdentityProviders = {
+  idir: 'idir',
+  azureidir: 'azureidir',
+  bceidbusiness: 'bceidbusiness',
+} as const;
+export type IdentityProviderCode = (typeof IdentityProviders)[keyof typeof IdentityProviders];
+
+/** Pseudo identity provider that grants public (unauthenticated) submit access. */
+export const PUBLIC_PROVIDER_CODE = 'public';
+
+/** Identity subject of the seeded public user (provider=public). */
+export const PUBLIC_SUBJECT = 'soba-public';
+
+/** Display label for the seeded public user and the anonymous-submission attribution fallback. */
+export const PUBLIC_SUBMITTER_LABEL = 'Public Submitter';
+
+/** Marks the two bootstrap groups carrying team-guard protections (see workspace_group.system_code). */
+export const SystemGroup = {
+  form_admins: 'form_admins',
+  form_submitters: 'form_submitters',
+} as const;
+export type SystemGroupCode = (typeof SystemGroup)[keyof typeof SystemGroup];
+
 /** Kind of a workspace group member (see workspace_group_membership.member_kind). */
 export const GroupMemberKind = {
   user: 'user',
@@ -99,6 +163,30 @@ export const GroupMemberKind = {
   idp_group: 'idp_group',
 } as const;
 export type GroupMemberKindCode = (typeof GroupMemberKind)[keyof typeof GroupMemberKind];
+
+/** Status of a workspace group (workspace_group.status). */
+export const WorkspaceGroupStatus = {
+  active: 'active',
+  inactive: 'inactive',
+} as const;
+export type WorkspaceGroupStatusCode =
+  (typeof WorkspaceGroupStatus)[keyof typeof WorkspaceGroupStatus];
+
+/** Status of a workspace group membership (workspace_group_membership.status). */
+export const WorkspaceGroupMembershipStatus = {
+  active: 'active',
+  inactive: 'inactive',
+} as const;
+export type WorkspaceGroupMembershipStatusCode =
+  (typeof WorkspaceGroupMembershipStatus)[keyof typeof WorkspaceGroupMembershipStatus];
+
+/** Status of a role assigned to a workspace group (workspace_group_role.status). */
+export const WorkspaceGroupRoleStatus = {
+  active: 'active',
+  inactive: 'inactive',
+} as const;
+export type WorkspaceGroupRoleStatusCode =
+  (typeof WorkspaceGroupRoleStatus)[keyof typeof WorkspaceGroupRoleStatus];
 
 /** Membership source when created automatically as user's home workspace. */
 export const WorkspaceMembershipSource = {

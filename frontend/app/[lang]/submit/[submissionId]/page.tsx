@@ -1,0 +1,41 @@
+import { DsPageHeading } from '@/app/ui/DsPageHeading';
+import FormioV5SubmissionFillLoader from '@/src/features/formio-v5/ui/FormioV5SubmissionFillLoader';
+import { getDictionary, resolveLocale } from '../../dictionaries';
+import { notFound } from 'next/navigation';
+import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
+import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
+
+type PageProps = {
+  params: Promise<{ lang: string; submissionId: string }>;
+};
+
+export async function generateMetadata({ params }: PageProps) {
+  const param = await params;
+  const locale = resolveLocale(param.lang);
+  const dict = await getDictionary(locale);
+  const t = dict.formioV5.formRender.pageTitle;
+  return {
+    title: `${t} | ${dict.general.title}`,
+    description: dict.general.description,
+  };
+}
+
+export default async function Page({ params }: Readonly<PageProps>) {
+  const featuresMeta = await loadFeaturesMeta();
+  const isFeatureAllowed = createIsFeatureAllowed(featuresMeta);
+  if (!isFeatureAllowed(FEATURE_CODES.SUBMIT_MODE)) {
+    notFound();
+  }
+
+  const { lang } = await params;
+  const locale = resolveLocale(lang);
+  const dict = await getDictionary(locale);
+  return (
+    <section className="p-4" aria-labelledby="submission-fill-heading">
+      <DsPageHeading id="submission-fill-heading">
+        {dict.formioV5.formRender.pageTitle}
+      </DsPageHeading>
+      <FormioV5SubmissionFillLoader />
+    </section>
+  );
+}

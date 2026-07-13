@@ -1,6 +1,7 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import { CursorSortSchema } from '../shared/pagination';
+import { FORM_NAME_TAKEN } from '../../messages';
 import {
   workspaceIdQueryField,
   formIdQueryField,
@@ -11,21 +12,17 @@ import {
 
 extendZodWithOpenApi(z);
 
-export const FormVisibilityEnum = z.enum(['public', 'azureidir']);
-
 export const CreateFormBodySchema = z
   .object({
     name: z.string().trim().min(1),
     description: z.string().optional(),
     formEngineCode: z.string().trim().min(1).optional(),
-    visibility: z.array(FormVisibilityEnum).optional(),
   })
   .openapi('Forms_CreateFormBody');
 
 export const CreateFormVersionBodySchema = z
   .object({
     formId: z.string().min(1),
-    visibility: z.array(FormVisibilityEnum).optional(),
   })
   .openapi('Forms_CreateFormVersionBody');
 
@@ -40,14 +37,6 @@ export const FormVersionIdParamsSchema = z
     id: z.string().min(1),
   })
   .openapi('Forms_FormVersionIdParams');
-
-export const UpdateFormVersionBodySchema = z
-  .object({
-    // state changes go through dedicated action endpoints (publish/unpublish/delete/restore);
-    // this PATCH only updates visibility.
-    visibility: z.array(FormVisibilityEnum).optional(),
-  })
-  .openapi('Forms_UpdateFormVersionBody');
 
 export const UpdateFormBodySchema = z
   .object({
@@ -136,7 +125,6 @@ export const FormVersionResponseSchema = z
     engineSchemaRef: z.string().nullable(),
     currentRevisionNo: z.number().int(),
     publishedAt: z.string().nullable(),
-    visibility: z.array(z.string()),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -145,6 +133,10 @@ export const FormVersionResponseSchema = z
 export const FormWithVersionResponseSchema = FormResponseSchema.extend({
   formVersion: FormVersionResponseSchema.nullable(),
 }).openapi('Forms_FormWithVersionResponse');
+
+export const FormWithPermissionsResponseSchema = FormResponseSchema.extend({
+  permissions: z.array(z.string()),
+}).openapi('Forms_FormWithPermissionsResponse');
 
 export const ListFormsResponseSchema = z
   .object({
@@ -187,7 +179,6 @@ export const FormVersionListItemSchema = z
     state: z.string(),
     engineSyncStatus: z.string(),
     engineSchemaRef: z.string().nullable(),
-    visibility: z.array(z.string()),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -213,8 +204,10 @@ export const ListFormVersionsResponseSchema = z
   .openapi('Forms_ListFormVersionsResponse');
 
 const TAG = 'core.forms';
-const FORM_PATH = '/forms/{id}';
-const FORM_VERSION_PATH = '/form-versions/{id}';
+const FORMS_PATH = '/design/forms';
+const FORM_PATH = `${FORMS_PATH}/{id}`;
+const FORM_VERSIONS_PATH = '/design/form-versions';
+const FORM_VERSION_PATH = `${FORM_VERSIONS_PATH}/{id}`;
 const FORM_NOT_FOUND = 'Form not found';
 const FORM_VERSION_NOT_FOUND = 'Form version not found';
 const VALIDATION_ERROR = 'Validation or business rule error';
@@ -222,7 +215,7 @@ const VALIDATION_ERROR = 'Validation or business rule error';
 export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
-    path: '/forms',
+    path: FORMS_PATH,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
@@ -256,7 +249,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         description: 'Get form by id',
         content: {
           'application/json': {
-            schema: FormResponseSchema,
+            schema: FormWithPermissionsResponseSchema,
           },
         },
       },
@@ -268,7 +261,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'post',
-    path: '/forms',
+    path: FORMS_PATH,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
@@ -294,12 +287,15 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
       400: {
         description: VALIDATION_ERROR,
       },
+      409: {
+        description: FORM_NAME_TAKEN,
+      },
     },
   });
 
   registry.registerPath({
     method: 'post',
-    path: '/forms/normalize',
+    path: `${FORMS_PATH}/normalize`,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
@@ -355,12 +351,15 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
       404: {
         description: FORM_NOT_FOUND,
       },
+      409: {
+        description: FORM_NAME_TAKEN,
+      },
     },
   });
 
   registry.registerPath({
     method: 'get',
-    path: '/form-versions',
+    path: FORM_VERSIONS_PATH,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
@@ -406,7 +405,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'post',
-    path: '/form-versions',
+    path: FORM_VERSIONS_PATH,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
@@ -431,35 +430,8 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
   });
 
   registry.registerPath({
-    method: 'patch',
-    path: FORM_VERSION_PATH,
-    tags: [TAG],
-    security: [{ bearerAuth: [] }],
-    request: {
-      params: FormVersionIdParamsSchema,
-      body: {
-        required: false,
-        content: {
-          'application/json': {
-            schema: UpdateFormVersionBodySchema,
-          },
-        },
-      },
-    },
-    responses: {
-      200: {
-        description: 'Updated form version draft',
-        content: { 'application/json': { schema: FormVersionResponseSchema } },
-      },
-      404: {
-        description: FORM_VERSION_NOT_FOUND,
-      },
-    },
-  });
-
-  registry.registerPath({
     method: 'post',
-    path: '/form-versions/{id}/save',
+    path: `${FORM_VERSION_PATH}/save`,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
@@ -523,7 +495,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
   for (const action of ['publish', 'unpublish', 'restore'] as const) {
     registry.registerPath({
       method: 'post',
-      path: `/form-versions/{id}/${action}`,
+      path: `${FORM_VERSION_PATH}/${action}`,
       tags: [TAG],
       security: [{ bearerAuth: [] }],
       request: { params: FormVersionIdParamsSchema },
@@ -540,7 +512,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'get',
-    path: '/form-versions/{id}/schema',
+    path: `${FORM_VERSION_PATH}/schema`,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: { params: FormVersionIdParamsSchema },
@@ -555,7 +527,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'post',
-    path: '/form-versions/{id}/schema',
+    path: `${FORM_VERSION_PATH}/schema`,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {

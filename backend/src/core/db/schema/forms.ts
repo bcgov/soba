@@ -1,4 +1,5 @@
 import { index, text, timestamp, uniqueIndex, uuid, integer } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { auditColumns, idColumn, softDeleteColumns } from './audit';
 import { appUsers, sobaSchema, workspaces } from './core';
 
@@ -17,7 +18,10 @@ export const forms = sobaSchema.table(
     ...softDeleteColumns(),
   },
   (table) => ({
-    workspaceNameUnique: uniqueIndex('form_workspace_name_uq').on(table.workspaceId, table.name),
+    // Non-deleted forms only, so a soft-deleted form frees its name for reuse.
+    workspaceNameUnique: uniqueIndex('form_workspace_name_uq')
+      .on(table.workspaceId, table.name)
+      .where(sql`${table.deletedAt} is null`),
     workspaceIdx: index('form_workspace_idx').on(table.workspaceId),
   }),
 );
@@ -40,7 +44,6 @@ export const formVersions = sobaSchema.table(
     currentRevisionNo: integer('current_revision_no').notNull().default(0),
     publishedAt: timestamp('published_at', { withTimezone: true }),
     publishedBy: uuid('published_by').references(() => appUsers.id),
-    visibility: text('visibility').array(),
     ...auditColumns(),
     ...softDeleteColumns(),
   },

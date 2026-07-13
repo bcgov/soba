@@ -5,6 +5,7 @@ import {
   appUsers,
   identityProviders,
   userIdentities,
+  workspaceDisclaimerAcceptances,
   workspaceMemberships,
   workspaces,
 } from '../schema';
@@ -122,10 +123,10 @@ export const getWorkspaceForUser = async (workspaceId: string, userId: string) =
       id: workspaces.id,
       kind: workspaces.kind,
       name: workspaces.name,
-      slug: workspaces.slug,
       status: workspaces.status,
       membershipId: workspaceMemberships.id,
       role: workspaceMemberships.role,
+      disclaimerAcceptedAt: workspaceDisclaimerAcceptances.acceptedAt,
     })
     .from(workspaces)
     .innerJoin(
@@ -135,6 +136,10 @@ export const getWorkspaceForUser = async (workspaceId: string, userId: string) =
         eq(workspaceMemberships.userId, userId),
         eq(workspaceMemberships.status, 'active'),
       ),
+    )
+    .leftJoin(
+      workspaceDisclaimerAcceptances,
+      eq(workspaceDisclaimerAcceptances.workspaceId, workspaces.id),
     )
     .where(eq(workspaces.id, workspaceId))
     .limit(1);
@@ -162,6 +167,8 @@ export const getActiveWorkspaceIdsForUser = async (userId: string): Promise<stri
 /**
  * Invalidate cached membership for a workspace/user after insert/update/delete.
  * Call from code that mutates workspace memberships (e.g. workspaceRepo, seed).
+ * The cached row includes `role`, which gates management — a role change that skips this
+ * leaves a demoted admin with authority until the cache TTL expires.
  */
 export const invalidateMembershipCache = (workspaceId: string, userId: string): void => {
   try {
@@ -188,10 +195,10 @@ export interface ListWorkspacesForUserInput {
 export interface WorkspaceListRow {
   id: string;
   name: string;
-  slug: string | null;
   kind: string;
   role: string;
   status: string;
+  disclaimerAcceptedAt: Date | null;
   updatedAt: Date;
 }
 
@@ -224,14 +231,18 @@ export const listWorkspacesForUser = async (
     .select({
       id: workspaces.id,
       name: workspaces.name,
-      slug: workspaces.slug,
       kind: workspaces.kind,
       role: workspaceMemberships.role,
       status: workspaces.status,
+      disclaimerAcceptedAt: workspaceDisclaimerAcceptances.acceptedAt,
       updatedAt: workspaces.updatedAt,
     })
     .from(workspaceMemberships)
     .innerJoin(workspaces, eq(workspaces.id, workspaceMemberships.workspaceId))
+    .leftJoin(
+      workspaceDisclaimerAcceptances,
+      eq(workspaceDisclaimerAcceptances.workspaceId, workspaces.id),
+    )
     .where(and(...whereClauses))
     .orderBy(
       input.cursorMode === 'ts_id' || input.sort === 'updatedAt:desc'

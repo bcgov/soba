@@ -1,6 +1,5 @@
 import { env } from '../../core/config/env';
 import { getStorageAdapter } from '../../core/integrations/plugins/PluginRegistry';
-import { actorBelongsToWorkspace } from '../../core/db/repos/membershipRepo';
 import {
   associateFilesWithSubmission,
   createFileRecord,
@@ -8,11 +7,12 @@ import {
   getFileRecordById,
   type FileRecord,
 } from '../../core/db/repos/fileRepo';
+import { getSubmissionRecordById } from '../../core/db/repos/submissionRepo';
+import { hasFormSubmitAccess, type CallerIdentity } from '../../core/db/repos/formSubmitAccessRepo';
+import { Permissions, SubmissionWorkflowState } from '../../core/db/codes';
 import type { GetFileResult } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 import { extractChefsFileIds } from './fileReferences';
 
-// TODO(permissions): workspace membership is a coarse stand-in. Replace with real permission
-// checks (per-file / role / submission ownership) once the permissions system exists.
 export interface UploadFileParams {
   workspaceId: string;
   actorId: string;
@@ -49,18 +49,26 @@ export const filesService = {
   },
 
   /**
-   * Fetch a file the actor may read. Returns null if it's missing or the actor isn't in its
-   * workspace — callers 404 both, so existence isn't leaked.
+   * Fetch a file for a caller, scoped to its owning submission: the file must belong to a still-present
+   * submission, and the caller must have submission_read on that submission's workspace (Form submitters
+   * audience or staff). 'notfound' when missing / no live owning submission; 'denied' when unauthorized.
    */
-  async getForActor(
+  async getForCaller(
     id: string,
-    actorId: string,
-  ): Promise<{ record: FileRecord; file: GetFileResult } | null> {
+    caller: CallerIdentity,
+  ): Promise<{ record: FileRecord; file: GetFileResult } | 'notfound' | 'denied'> {
     const record = await getFileRecordById(id);
-    if (!record) return null;
-    if (!(await actorBelongsToWorkspace(record.workspaceId, actorId))) return null;
+    if (!record?.submissionId) return 'notfound';
+    const submission = await getSubmissionRecordById(record.workspaceId, record.submissionId);
+    if (!submission) return 'notfound';
+    const allowed = await hasFormSubmitAccess(
+      record.workspaceId,
+      caller,
+      Permissions.submission_read,
+    );
+    if (!allowed) return 'denied';
     const file = await getStorageAdapter(record.profile).getFile(record.backendRef);
-    if (!file) return null;
+    if (!file) return 'notfound';
     return { record, file };
   },
 
@@ -77,11 +85,28 @@ export const filesService = {
     return associateFilesWithSubmission(fileIds, submissionId, workspaceId);
   },
 
-  /** Delete a file the actor is authorized for. 'notfound' when missing or not authorized. */
-  async deleteForActor(id: string, actorId: string): Promise<'deleted' | 'notfound'> {
+  /**
+   * Delete a file per its owning submission: while un-submitted, only the submission's owner
+   * (submittedBy) may delete; once submitted, only staff with submission_update. 'notfound' when
+   * missing; 'denied' when the caller isn't authorized.
+   */
+  async deleteForCaller(
+    id: string,
+    caller: CallerIdentity,
+  ): Promise<'deleted' | 'notfound' | 'denied'> {
     const record = await getFileRecordById(id);
-    if (!record) return 'notfound';
-    if (!(await actorBelongsToWorkspace(record.workspaceId, actorId))) return 'notfound';
+    if (!record?.submissionId) return 'notfound';
+    const submission = await getSubmissionRecordById(record.workspaceId, record.submissionId);
+    if (!submission) return 'notfound';
+    const allowed =
+      submission.workflowState === SubmissionWorkflowState.submitted
+        ? await hasFormSubmitAccess(record.workspaceId, caller, Permissions.submission_update)
+        : // Un-submitted: the submission owner may delete, but only where they're actually in the
+          // submit audience — this bounds anonymous (shared public id) to forms they can submit to.
+          !!caller.actorId &&
+          submission.submittedBy === caller.actorId &&
+          (await hasFormSubmitAccess(record.workspaceId, caller, Permissions.submission_create));
+    if (!allowed) return 'denied';
     await getStorageAdapter(record.profile).deleteFile(record.backendRef);
     await deleteFileRecordById(id);
     return 'deleted';

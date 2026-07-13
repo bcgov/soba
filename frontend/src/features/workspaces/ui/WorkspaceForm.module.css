@@ -10,3 +10,7 @@
   gap: 1.25rem;
   max-width: 32rem;
 }
+
+.tabContent {
+  padding-top: 1rem;
+}

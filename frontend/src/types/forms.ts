@@ -2,7 +2,6 @@ export type SobaFormType = {
   name: string;
   description: string;
   formEngineCode?: string;
-  visibility?: string[];
 };
 
 export type CreateSobaFormioFormResponse = {
@@ -31,7 +30,15 @@ export type SobaFormVersionType = {
   engineSchemaRef?: string | null;
   currentRevisionNo: number;
   publishedAt?: string | null;
-  visibility?: string[];
   createdAt: string;
   updatedAt: string;
+};
+
+// Submit-mode payload: the published form + version + schema needed to render the public fill page.
+/** The one payload the fill page needs: workflow state + schema + any saved answers (resume). */
+export type SubmitFillBundle = {
+  workflowState: string;
+  schema: Record<string, unknown> | null;
+  // The submission's answer document; null for a just-opened submission (no saved answers yet).
+  content: { data?: Record<string, unknown> } | null;
 };

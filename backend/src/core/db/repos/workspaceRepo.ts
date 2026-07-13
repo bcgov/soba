@@ -1,31 +1,53 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import {
   FORM_ADMINS_GROUP_NAME,
   FORM_SUBMITTERS_GROUP_NAME,
   Roles,
+  SystemGroup,
+  WorkspaceKind,
   WorkspaceMembershipRole,
   WorkspaceMembershipSource,
+  WorkspaceMembershipStatus,
+  WorkspaceStatus,
 } from '../codes';
-import { db } from '../client';
+import { env } from '../../config/env';
+import { db, type DbOrTx } from '../client';
 import {
   appUsers,
-  workspaceGroupMemberships,
-  workspaceGroupRoles,
-  workspaceGroups,
+  workspaceDisclaimerAcceptances,
   workspaceMemberships,
   workspaces,
 } from '../schema';
+import { ConflictError } from '../../errors';
+import { WORKSPACE_NAME_TAKEN } from '../../messages';
 import {
   getWorkspaceForUser,
   invalidateMembershipCache,
   isWorkspaceManageRole,
 } from './membershipRepo';
+import { addIdpToGroup, addUserToGroup, createGroupWithRole } from './workspaceGroupRepo';
+import { getIdentityProvider } from './identityProviderRepo';
 
-const WORKSPACE_KIND_TEAM = 'team';
-const WORKSPACE_STATUS_ACTIVE = 'active';
-const GROUP_STATUS_ACTIVE = 'active';
-const MEMBERSHIP_STATUS_ACTIVE = 'active';
+/** True if a workspace of this kind already uses this name (optionally excluding one workspace). */
+const workspaceNameExistsForKind = async (
+  kind: string,
+  name: string,
+  exceptId?: string,
+): Promise<boolean> => {
+  const rows = await db
+    .select({ id: workspaces.id })
+    .from(workspaces)
+    .where(
+      and(
+        eq(workspaces.kind, kind),
+        eq(workspaces.name, name),
+        ...(exceptId ? [ne(workspaces.id, exceptId)] : []),
+      ),
+    )
+    .limit(1);
+  return Boolean(rows[0]);
+};
 
 /** Returns the workspace's id if it exists, otherwise null. Used to distinguish 404 from 403. */
 export const getWorkspaceById = async (workspaceId: string): Promise<{ id: string } | null> => {
@@ -38,48 +60,6 @@ export const getWorkspaceById = async (workspaceId: string): Promise<{ id: strin
 };
 
 type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-/** Creates a workspace group carrying a single role; returns the new group id. */
-const createGroupWithRole = async (
-  tx: DbTx,
-  args: { workspaceId: string; name: string; roleCode: string; displayLabel: string | null },
-): Promise<string> => {
-  const groupId = uuidv7();
-  await tx.insert(workspaceGroups).values({
-    id: groupId,
-    workspaceId: args.workspaceId,
-    name: args.name,
-    status: GROUP_STATUS_ACTIVE,
-    createdBy: args.displayLabel,
-    updatedBy: args.displayLabel,
-  });
-  await tx.insert(workspaceGroupRoles).values({
-    id: uuidv7(),
-    workspaceId: args.workspaceId,
-    groupId,
-    roleCode: args.roleCode,
-    status: GROUP_STATUS_ACTIVE,
-    createdBy: args.displayLabel,
-    updatedBy: args.displayLabel,
-  });
-  return groupId;
-};
-
-/** Adds a workspace member (by membership id) to a group. */
-const addUserToGroup = async (
-  tx: DbTx,
-  args: { workspaceId: string; groupId: string; membershipId: string; displayLabel: string | null },
-) => {
-  await tx.insert(workspaceGroupMemberships).values({
-    id: uuidv7(),
-    workspaceId: args.workspaceId,
-    workspaceMembershipId: args.membershipId,
-    groupId: args.groupId,
-    status: MEMBERSHIP_STATUS_ACTIVE,
-    createdBy: args.displayLabel,
-    updatedBy: args.displayLabel,
-  });
-};
 
 const bootstrapWorkspaceOwner = async (
   tx: DbTx,
@@ -94,7 +74,7 @@ const bootstrapWorkspaceOwner = async (
     workspaceId,
     userId,
     role: WorkspaceMembershipRole.owner,
-    status: MEMBERSHIP_STATUS_ACTIVE,
+    status: WorkspaceMembershipStatus.active,
     source,
     acceptedAt: new Date(),
     createdBy: displayLabel,
@@ -104,26 +84,48 @@ const bootstrapWorkspaceOwner = async (
   const formAdminsGroupId = await createGroupWithRole(tx, {
     workspaceId,
     name: FORM_ADMINS_GROUP_NAME,
-    roleCode: Roles.form_admin,
+    roleCodes: [Roles.form_admin],
+    systemCode: SystemGroup.form_admins,
     displayLabel,
   });
   await addUserToGroup(tx, { workspaceId, groupId: formAdminsGroupId, membershipId, displayLabel });
 
-  // Submitter group starts empty; members are added when submitter access is configured.
-  await createGroupWithRole(tx, {
+  // Submitters default to protected by the standard login provider; the audience is editable later.
+  const formSubmittersGroupId = await createGroupWithRole(tx, {
     workspaceId,
     name: FORM_SUBMITTERS_GROUP_NAME,
-    roleCode: Roles.form_submitter,
+    roleCodes: [Roles.form_submitter],
+    systemCode: SystemGroup.form_submitters,
     displayLabel,
   });
+  // Only seed the default audience when the provider is a usable login provider; a missing/disabled
+  // one just leaves the audience unset rather than failing workspace creation.
+  const submitterProvider = env.getDefaultSubmitterProvider();
+  const defaultProvider = await getIdentityProvider(submitterProvider);
+  if (defaultProvider?.isActive && defaultProvider.isLoginProvider) {
+    await addIdpToGroup(tx, {
+      workspaceId,
+      groupId: formSubmittersGroupId,
+      code: submitterProvider,
+      displayLabel,
+    });
+  }
 
   invalidateMembershipCache(workspaceId, userId);
 };
 
 /**
- * Creates a user-owned team workspace: owner membership plus the form-admin and form-submitter groups.
+ * Creates a user-owned team workspace: owner membership plus the form-admin and form-submitter groups,
+ * optionally recording the creator's disclaimer acceptance in the same transaction.
  */
-export const createTeamWorkspace = async (userId: string, name: string) => {
+export const createTeamWorkspace = async (
+  userId: string,
+  name: string,
+  disclaimerAccepted = false,
+) => {
+  if (await workspaceNameExistsForKind(WorkspaceKind.team, name)) {
+    throw new ConflictError(WORKSPACE_NAME_TAKEN);
+  }
   return db.transaction(async (tx) => {
     const userRow = await tx
       .select({ displayLabel: appUsers.displayLabel })
@@ -135,9 +137,9 @@ export const createTeamWorkspace = async (userId: string, name: string) => {
     const workspaceId = uuidv7();
     await tx.insert(workspaces).values({
       id: workspaceId,
-      kind: WORKSPACE_KIND_TEAM,
+      kind: WorkspaceKind.team,
       name,
-      status: WORKSPACE_STATUS_ACTIVE,
+      status: WorkspaceStatus.active,
       createdBy: displayLabel,
       updatedBy: displayLabel,
     });
@@ -150,17 +152,64 @@ export const createTeamWorkspace = async (userId: string, name: string) => {
       WorkspaceMembershipSource.user_created,
     );
 
+    if (disclaimerAccepted) {
+      await tx.insert(workspaceDisclaimerAcceptances).values({
+        workspaceId,
+        acceptedByUserId: userId,
+        acceptedAt: new Date(),
+        createdBy: displayLabel,
+        updatedBy: displayLabel,
+      });
+    }
+
     return workspaceId;
   });
 };
 
-/**
- * Renames a workspace when the actor is in the owners group.
- */
-export const updateWorkspaceName = async (
+/** True once the workspace's disclaimer has been accepted (gates form creation). */
+export const isWorkspaceDisclaimerAccepted = async (workspaceId: string): Promise<boolean> => {
+  const rows = await db
+    .select({ workspaceId: workspaceDisclaimerAcceptances.workspaceId })
+    .from(workspaceDisclaimerAcceptances)
+    .where(eq(workspaceDisclaimerAcceptances.workspaceId, workspaceId))
+    .limit(1);
+  return Boolean(rows[0]);
+};
+
+const setWorkspaceDisclaimer = async (
+  executor: DbOrTx,
   workspaceId: string,
   actorId: string,
-  name: string,
+  displayLabel: string | null,
+  accepted: boolean,
+): Promise<void> => {
+  if (!accepted) {
+    await executor
+      .delete(workspaceDisclaimerAcceptances)
+      .where(eq(workspaceDisclaimerAcceptances.workspaceId, workspaceId));
+    return;
+  }
+  const now = new Date();
+  await executor
+    .insert(workspaceDisclaimerAcceptances)
+    .values({
+      workspaceId,
+      acceptedByUserId: actorId,
+      acceptedAt: now,
+      createdBy: displayLabel,
+      updatedBy: displayLabel,
+    })
+    .onConflictDoUpdate({
+      target: workspaceDisclaimerAcceptances.workspaceId,
+      set: { acceptedByUserId: actorId, acceptedAt: now, updatedBy: displayLabel, updatedAt: now },
+    });
+};
+
+/** Updates a workspace's name and/or disclaimer acceptance; false when the actor can't manage it. */
+export const updateWorkspace = async (
+  workspaceId: string,
+  actorId: string,
+  input: { name?: string; disclaimerAccepted?: boolean },
 ): Promise<boolean> => {
   const membership = await getWorkspaceForUser(workspaceId, actorId);
   if (!membership || !isWorkspaceManageRole(membership.role)) return false;
@@ -172,11 +221,29 @@ export const updateWorkspaceName = async (
     .limit(1);
   const displayLabel = userRow[0]?.displayLabel ?? null;
 
-  const rows = await db
-    .update(workspaces)
-    .set({ name, updatedBy: displayLabel, updatedAt: new Date() })
-    .where(eq(workspaces.id, workspaceId))
-    .returning({ id: workspaces.id });
+  if (input.name !== undefined) {
+    if (await workspaceNameExistsForKind(membership.kind, input.name, workspaceId)) {
+      throw new ConflictError(WORKSPACE_NAME_TAKEN);
+    }
+  }
 
-  return rows.length > 0;
+  await db.transaction(async (tx) => {
+    if (input.name !== undefined) {
+      await tx
+        .update(workspaces)
+        .set({ name: input.name, updatedBy: displayLabel, updatedAt: new Date() })
+        .where(eq(workspaces.id, workspaceId));
+    }
+    if (input.disclaimerAccepted !== undefined) {
+      await setWorkspaceDisclaimer(
+        tx,
+        workspaceId,
+        actorId,
+        displayLabel,
+        input.disclaimerAccepted,
+      );
+    }
+  });
+
+  return true;
 };

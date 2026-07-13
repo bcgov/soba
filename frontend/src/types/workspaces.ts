@@ -1,10 +1,10 @@
 export type WorkspaceItem = {
   id: string;
   name: string;
-  slug: string | null;
   kind: string;
   role: string;
   status: string;
+  disclaimerAccepted: boolean;
 };
 
 export type WorkspacesResponse = {
@@ -24,8 +24,10 @@ export type WorkspacesResponse = {
 
 export type CreateWorkspaceBody = {
   name: string;
+  disclaimerAccepted?: boolean;
 };
 
 export type UpdateWorkspaceBody = {
-  name: string;
+  name?: string;
+  disclaimerAccepted?: boolean;
 };

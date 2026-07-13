@@ -8,8 +8,6 @@ import {
   Form,
   TextField,
   Select,
-  CheckboxGroup,
-  Checkbox,
 } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { Modal as CommonModal } from '@/src/components/Modal';
@@ -23,6 +21,8 @@ import FormDesigner from '@/src/features/designer/ui/FormDesigner';
 import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
 import FormSettingsTab from './FormSettingsTab';
 import FormTeamTab from './FormTeamTab';
+import { FormSubmitterAudience } from './FormSubmitterAudience';
+import { isWorkspaceManageRole } from '@/src/features/workspaces/workspaceRoles';
 import { useAppSelector } from '@/lib/store';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
@@ -34,7 +34,6 @@ import {
   getSobaForm,
   getSobaFormVersions,
   publishSobaFormVersion,
-  updateSobaFormVersionVisibility,
 } from '@/src/shared/api/sobaApi';
 import type { SobaFormType, SobaFormVersionType } from '@/src/types/forms';
 
@@ -51,29 +50,26 @@ function FormForm({ formId }: { formId?: string }) {
     workspaces,
   } = useAppSelector((state) => state.workspace);
   const { addNotification } = useNotificationStore();
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
+  const canManageWorkspace = !!activeWorkspace && isWorkspaceManageRole(activeWorkspace.role);
+  // A new form can't be created until the workspace disclaimer is accepted (backend gate).
+  const needsDisclaimer = !formId && !!activeWorkspace && !activeWorkspace.disclaimerAccepted;
   const [activeTab, setActiveTab] = useState('designer');
   const [formName, setFormName] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formSchema, setFormSchema] = useState<FormType | null>(null);
   const [currentVersion, setCurrentVersion] = useState<SobaFormVersionType | null>(null);
-  const [visibility, setVisibility] = useState<string[]>([]);
 
   const [versions, setVersions] = useState<SobaFormVersionType[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [isHistoryView, setIsHistoryView] = useState(false);
   const [historicalVersionNo, setHistoricalVersionNo] = useState<number | null>(null);
 
-  const VISIBILITY_OPTIONS = [
-    { value: 'public', label: dict.form.visibilityPublic || 'Public' },
-    { value: 'azureidir', label: dict.form.visibilityAzureIDIR || 'IDIR - MFA' },
-  ];
-
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
-  const [agreedDisclaimer, setAgreedDisclaimer] = useState(false);
 
   useEffect(() => {
     if (formId && token) {
@@ -99,7 +95,6 @@ function FormForm({ formId }: { formId?: string }) {
           setCurrentVersion(current);
           setSelectedVersionId('current');
           setIsHistoryView(false);
-          setVisibility(current?.visibility ?? []);
 
           if (current?.id) {
             const schema = await getFormVersionSchema(token as string, current.id);
@@ -137,7 +132,6 @@ function FormForm({ formId }: { formId?: string }) {
     try {
       const schema = await getFormVersionSchema(token as string, version.id);
       setFormSchema((schema as FormType) ?? null);
-      setVisibility(version.visibility ?? []);
       setIsDirty(false);
     } catch (err) {
       addNotification({
@@ -180,7 +174,7 @@ function FormForm({ formId }: { formId?: string }) {
 
     try {
       // The engine strips engine-managed fields on save, so the raw schema can be submitted as-is.
-      const newVersion = await createFormVersion(token as string, formId, visibility);
+      const newVersion = await createFormVersion(token as string, formId);
       await saveFormVersionSchema(token as string, newVersion.id, (formSchema ?? {}) as FormType);
 
       // Refresh the version list and select the new draft in-page.
@@ -209,12 +203,6 @@ function FormForm({ formId }: { formId?: string }) {
     }
   };
 
-  const handleVisibilityChange = (values: string[]) => {
-    if (isHistoryView || isCurrentPublished) return;
-    setVisibility(values);
-    setIsDirty(true);
-  };
-
   const saveFormPublish = async () => {
     await saveForm(true);
   };
@@ -225,7 +213,7 @@ function FormForm({ formId }: { formId?: string }) {
 
   // CREATE: one-call create (form + empty v1), scoped to the active workspace, then provision.
   const createAndProvisionForm = async (schema: FormType, publish: boolean) => {
-    const data: SobaFormType = { name: formName, description: formDesc, visibility };
+    const data: SobaFormType = { name: formName, description: formDesc };
     const created = await createSobaFormioForm(token as string, data, activeWorkspaceId || undefined);
     const versionId = created.formVersion?.id;
     if (versionId) {
@@ -250,9 +238,8 @@ function FormForm({ formId }: { formId?: string }) {
 
     try {
       if (currentVersion?.id) {
-        // UPDATE: re-provision the current version's schema + visibility (server owns name/path).
+        // UPDATE: re-provision the current version's schema (server owns name/path).
         await saveFormVersionSchema(token as string, currentVersion.id, schema);
-        await updateSobaFormVersionVisibility(token as string, currentVersion.id, visibility);
         if (publish) {
           await publishSobaFormVersion(token as string, currentVersion.id);
         }
@@ -328,7 +315,6 @@ function FormForm({ formId }: { formId?: string }) {
   };
 
   const getPublishTitle = (): string => {
-    if (!agreedDisclaimer) return dict.form.mustAgreeDisclaimer || 'Must agree to disclaimer';
     if (isHistoryView) return dict.form.cannotPublishHistory || 'Cannot publish history';
     if (isCurrentPublished)
       return dict.form.versionAlreadyPublished || 'Version already published';
@@ -369,27 +355,23 @@ function FormForm({ formId }: { formId?: string }) {
           />
         )}
 
-        <CheckboxGroup
-          label={dict.form.visibilityLabel || 'Visibility / Access Control'}
-          value={visibility}
-          onChange={handleVisibilityChange}
-          isDisabled={isHistoryView || isCurrentPublished}
-        >
-          {VISIBILITY_OPTIONS.map((opt) => (
-            <Checkbox key={opt.value} value={opt.value}>
-              {opt.label}
-            </Checkbox>
-          ))}
-        </CheckboxGroup>
+        <FormSubmitterAudience
+          key={activeWorkspaceId ?? 'none'}
+          workspaceId={activeWorkspaceId}
+          token={token ?? undefined}
+          canManage={canManageWorkspace}
+        />
 
-        <Checkbox
-          isSelected={agreedDisclaimer}
-          onChange={setAgreedDisclaimer}
-          isDisabled={isHistoryView || isCurrentPublished}
-        >
-          {dict.form.disclaimerLabel ||
-            'I agree to the disclaimer and statement of responsibility'}
-        </Checkbox>
+        {needsDisclaimer && (
+          <InlineAlert
+            variant="warning"
+            title={
+              dict.form.disclaimerRequired ||
+              'Accept the workspace disclaimer in workspace Settings before creating a form.'
+            }
+            data-testid="disclaimer-required-alert"
+          />
+        )}
       </Form>
 
       {/* Form Builder */}
@@ -413,7 +395,7 @@ function FormForm({ formId }: { formId?: string }) {
         <Button
           variant="primary"
           onPress={saveFormDraft}
-          isDisabled={isHistoryView || isCurrentPublished || isSaving || loading || !agreedDisclaimer}
+          isDisabled={isHistoryView || isCurrentPublished || isSaving || loading || needsDisclaimer}
         >
           {isSaving ? dict.form.saving || 'Saving...' : dict.form.save || 'Save'}
         </Button>
@@ -433,8 +415,7 @@ function FormForm({ formId }: { formId?: string }) {
                 isCurrentPublished ||
                 isDirty ||
                 isSaving ||
-                loading ||
-                !agreedDisclaimer
+                loading
               }
             >
               {dict.form.publish || 'Publish'}

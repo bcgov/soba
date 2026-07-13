@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { Tabs, Tab } from 'react-bootstrap';
 import {
   Button,
   Form,
   Switch,
   TextField,
 } from '@bcgov/design-system-react-components';
+import { FormSubmitterAudience } from '@/src/features/designer/ui/FormSubmitterAudience';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { ListPageLayout } from '@/src/components/ListPageLayout';
 import { DsPageHeading } from '@/app/ui/DsPageHeading';
@@ -48,10 +50,13 @@ function WorkspaceForm({ workspaceId }: Readonly<WorkspaceFormProps>) {
 
   const [name, setName] = useState('');
   const [loadedName, setLoadedName] = useState('');
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
+  const [loadedDisclaimer, setLoadedDisclaimer] = useState(false);
   const [defaultTouched, setDefaultTouched] = useState(false);
   const [isDefaultChoice, setIsDefaultChoice] = useState(false);
   const [loading, setLoading] = useState(!isCreate);
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('settings');
 
   let savedDefaultMatches = false;
   if (!isCreate) {
@@ -105,6 +110,8 @@ function WorkspaceForm({ workspaceId }: Readonly<WorkspaceFormProps>) {
         }
         setName(workspace.name);
         setLoadedName(workspace.name);
+        setDisclaimerAccepted(workspace.disclaimerAccepted);
+        setLoadedDisclaimer(workspace.disclaimerAccepted);
       })
       .catch((error) => {
         if (cancelled) return;
@@ -142,10 +149,10 @@ function WorkspaceForm({ workspaceId }: Readonly<WorkspaceFormProps>) {
       let savedId = workspaceId ?? null;
 
       if (isCreate) {
-        const created = await createWorkspace(token, { name: trimmedName });
+        const created = await createWorkspace(token, { name: trimmedName, disclaimerAccepted });
         savedId = created.id;
-      } else if (trimmedName !== loadedName) {
-        await updateWorkspace(token, workspaceId, { name: trimmedName });
+      } else if (trimmedName !== loadedName || disclaimerAccepted !== loadedDisclaimer) {
+        await updateWorkspace(token, workspaceId, { name: trimmedName, disclaimerAccepted });
       }
 
       // Only change the stored default when the user's intent is explicit. An untouched
@@ -186,6 +193,8 @@ function WorkspaceForm({ workspaceId }: Readonly<WorkspaceFormProps>) {
     isCreate,
     workspaceId,
     loadedName,
+    disclaimerAccepted,
+    loadedDisclaimer,
     isDefault,
     savedDefaultMatches,
     savedDefaultId,
@@ -209,53 +218,90 @@ function WorkspaceForm({ workspaceId }: Readonly<WorkspaceFormProps>) {
   const saveLabel = isCreate ? dictWorkspaces.create : dictWorkspaces.save;
   const defaultLabel = dictWorkspaces.defaultWorkspaceFormLabel;
 
+  const settingsForm = (
+    <Form
+      onSubmit={(event) => {
+        event.preventDefault();
+        handleSave().catch(() => undefined);
+      }}
+      className={styles.fieldStack}
+    >
+      <TextField
+        label={dictWorkspaces.nameLabel}
+        value={name}
+        onChange={setName}
+        isRequired
+        isDisabled={saving}
+        data-testid="workspace-name"
+      />
+      <Switch
+        isSelected={isDefault}
+        onChange={handleDefaultChange}
+        isDisabled={saving}
+        aria-label={defaultLabel}
+        data-testid="workspace-default-switch"
+      >
+        {defaultLabel}
+      </Switch>
+      <Switch
+        isSelected={disclaimerAccepted}
+        onChange={setDisclaimerAccepted}
+        isDisabled={saving}
+        aria-label={dictWorkspaces.disclaimerLabel}
+        data-testid="workspace-disclaimer-switch"
+      >
+        {dictWorkspaces.disclaimerLabel}
+      </Switch>
+      <div className={styles.actions}>
+        <Button
+          type="submit"
+          variant="primary"
+          isDisabled={saving || !name.trim()}
+          data-testid="workspace-save"
+        >
+          {saving ? dict.general.loading : saveLabel}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          onPress={handleCancel}
+          isDisabled={saving}
+          data-testid="workspace-cancel"
+        >
+          {dictWorkspaces.cancel}
+        </Button>
+      </div>
+    </Form>
+  );
+
   return (
     <ListPageLayout>
       <DsPageHeading id="workspace-form-heading">{heading}</DsPageHeading>
-      <Form
-        onSubmit={(event) => {
-          event.preventDefault();
-          handleSave().catch(() => undefined);
-        }}
-        className={styles.fieldStack}
-      >
-        <TextField
-          label={dictWorkspaces.nameLabel}
-          value={name}
-          onChange={setName}
-          isRequired
-          isDisabled={saving}
-          data-testid="workspace-name"
-        />
-        <Switch
-          isSelected={isDefault}
-          onChange={handleDefaultChange}
-          isDisabled={saving}
-          aria-label={defaultLabel}
-          data-testid="workspace-default-switch"
+      {isCreate ? (
+        settingsForm
+      ) : (
+        <Tabs
+          id="workspace-manage-tabs"
+          activeKey={activeTab}
+          onSelect={(k) => setActiveTab(k || 'settings')}
+          className="mb-3"
+          mountOnEnter
         >
-          {defaultLabel}
-        </Switch>
-        <div className={styles.actions}>
-          <Button
-            type="submit"
-            variant="primary"
-            isDisabled={saving || !name.trim()}
-            data-testid="workspace-save"
-          >
-            {saving ? dict.general.loading : saveLabel}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onPress={handleCancel}
-            isDisabled={saving}
-            data-testid="workspace-cancel"
-          >
-            {dictWorkspaces.cancel}
-          </Button>
-        </div>
-      </Form>
+          <Tab eventKey="settings" title={dictWorkspaces.settingsTab}>
+            <div className={styles.tabContent}>{settingsForm}</div>
+          </Tab>
+          <Tab eventKey="team" title={dictWorkspaces.teamTab}>
+            <div className={styles.tabContent}>
+              <FormSubmitterAudience
+                key={workspaceId ?? 'none'}
+                workspaceId={workspaceId ?? null}
+                token={token ?? undefined}
+                canManage
+              />
+            </div>
+          </Tab>
+        </Tabs>
+      )}
     </ListPageLayout>
   );
 }

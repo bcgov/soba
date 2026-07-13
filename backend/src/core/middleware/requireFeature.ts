@@ -1,31 +1,24 @@
-import { Request, Response, NextFunction } from 'express';
-import { getFeatureByCode, isFeatureEnabled } from '../db/repos/featureRepo';
-import { getCacheAdapter } from '../integrations/plugins/PluginRegistry';
-
-const FEATURE_CACHE_TTL_MS = 30_000;
+import type { NextFunction, Request, Response } from 'express';
+import { NotFoundError } from '../errors';
+import { isFeatureEnabledCached } from '../db/repos/featureRepo';
+import type { FeatureCode } from '../db/codes';
 
 /**
- * Gate a route on a `soba.feature` flag. 404s when the feature is absent or not 'enabled' (a
- * disabled feature looks like a missing route). Cached briefly, so toggles apply within the TTL.
+ * Gates a mounted feature surface (e.g. /api/v1/design, /api/v1/submit): when the feature is disabled
+ * the whole surface responds 404, as if the routes did not exist. Status is cached (see featureRepo),
+ * so a feature can be toggled without a restart. Runs after auth so it never leaks feature state to
+ * an unauthorized caller before the surface's own authorization.
  */
-export const requireFeature =
-  (code: string) =>
-  async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const requireFeature = (code: FeatureCode) => {
+  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     try {
-      const cache = getCacheAdapter();
-      const cacheKey = `feature-enabled:${code}`;
-      let enabled = await cache.get<boolean>(cacheKey);
-      if (enabled === null) {
-        const feature = await getFeatureByCode(code);
-        enabled = Boolean(feature && isFeatureEnabled(feature.status));
-        await cache.set(cacheKey, enabled, FEATURE_CACHE_TTL_MS);
-      }
+      const enabled = await isFeatureEnabledCached(code, Date.now());
       if (!enabled) {
-        res.status(404).json({ error: 'Not Found', statusCode: 404 });
-        return;
+        throw new NotFoundError('Not found');
       }
       next();
     } catch (error) {
       next(error);
     }
   };
+};

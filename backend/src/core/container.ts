@@ -13,6 +13,7 @@ const formService = new FormService();
 const formVersionService = new FormVersionService();
 const submissionService = new SubmissionService();
 
+export { formService, formVersionService };
 export const formsApiService = createFormsApiService(formService, formVersionService);
 export const submissionsApiService = createSubmissionsApiService(submissionService);
 

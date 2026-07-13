@@ -1,16 +1,13 @@
 /**
- * Per-route workspace context resolution.
+ * Per-route workspace context resolution. Workspace context is derived explicitly per route:
+ * - `workspaceFromQuery`: read the `workspaceId` query param.
+ * - `workspaceListScope`: resolve workspace from a scope anchor (workspace or resource hierarchy id).
+ * - `workspaceFromResource`: derive the workspace from the target resource.
+ * The `open*` variants build a membership-optional context for the public-capable submit surface,
+ * leaving authorization to a downstream guard (requireFormAccess).
  *
- * Replaces the global resolver-plugin chain. Workspace context is derived explicitly per route:
- * - `workspaceFromQuery`: workspace-scoped list/create routes read the `workspaceId` query param.
- * - `workspaceListScope`: list/search routes resolve workspace from a scope anchor (workspace or
- *   resource hierarchy id), verify membership, and restrict results to that single workspace.
- * - `workspaceFromResource`: resource (deep-link) routes derive the workspace from the target
- *   resource (form / form version / submission / workspace).
- *
- * All verify the actor's membership and echo the resolved workspace via the `x-soba-workspace-id`
- * response header so the frontend's per-tab store can capture it. Deep-link access is membership-only
- * for now (visibility-aware public access is a separate change).
+ * All echo the resolved workspace via the `x-soba-workspace-id` response header so the frontend's
+ * per-tab store can capture it.
  */
 import type { NextFunction, Request, Response } from 'express';
 import { eq } from 'drizzle-orm';
@@ -21,6 +18,7 @@ import { getWorkspaceById } from '../db/repos/workspaceRepo';
 import { getCacheAdapter } from '../integrations/plugins/PluginRegistry';
 import { membershipKey } from '../integrations/cache/cacheKeys';
 import { ForbiddenError, NotFoundError, ValidationError } from '../errors';
+import { WorkspaceMembershipRole } from '../db/codes';
 import { getActorId } from './actor';
 import { getFormListContext, getWorkspaceIdForForm } from '../db/repos/formRepo';
 import {
@@ -123,6 +121,25 @@ export const resolveListWorkspaceScope = async (
   }
 };
 
+/** Membership lookup for `workspaceId`/`actorId`, cached when the adapter supports getOrSet. */
+const loadMembership = (workspaceId: string, actorId: string) => {
+  const cache = getCacheAdapter();
+  const getOrSet = cache.getOrSet?.bind(cache);
+  return getOrSet
+    ? getOrSet(membershipKey(workspaceId, actorId), () => getWorkspaceForUser(workspaceId, actorId))
+    : getWorkspaceForUser(workspaceId, actorId);
+};
+
+/** The actor's display label (null if the user row is gone). */
+const loadActorDisplayLabel = async (actorId: string): Promise<string | null> => {
+  const userRow = await db
+    .select({ displayLabel: appUsers.displayLabel })
+    .from(appUsers)
+    .where(eq(appUsers.id, actorId))
+    .limit(1);
+  return userRow[0]?.displayLabel ?? null;
+};
+
 /**
  * Build the core request context for an already-resolved workspace: verify membership (cached) and
  * load the actor display label. Throws ForbiddenError when the actor is not a member.
@@ -132,27 +149,69 @@ export const buildCoreContext = async (
   workspaceId: string,
   source: string,
 ): Promise<CoreRequestContext> => {
-  const cache = getCacheAdapter();
-  const cacheKey = membershipKey(workspaceId, actorId);
-  const getOrSet = cache.getOrSet?.bind(cache);
-  const membership = getOrSet
-    ? await getOrSet(cacheKey, () => getWorkspaceForUser(workspaceId, actorId))
-    : await getWorkspaceForUser(workspaceId, actorId);
+  const membership = await loadMembership(workspaceId, actorId);
   if (!membership) {
     throw new ForbiddenError('Actor does not belong to workspace');
   }
-
-  const userRow = await db
-    .select({ displayLabel: appUsers.displayLabel })
-    .from(appUsers)
-    .where(eq(appUsers.id, actorId))
-    .limit(1);
-
   return {
     workspaceId,
     actorId,
-    actorDisplayLabel: userRow[0]?.displayLabel ?? null,
+    actorDisplayLabel: await loadActorDisplayLabel(actorId),
     workspaceSource: source,
+    role: membership.role,
+  };
+};
+
+/**
+ * Build a context for the submit surface WITHOUT requiring membership: the workspace is resolved so the
+ * route's own authorization (the Form submitters audience) decides access. Members get their real role;
+ * non-members (incl. the public user) get a non-manage role so they can never reach workspace-admin
+ * routes. Shares the cached membership lookup with buildCoreContext.
+ */
+const buildSubmitContext = async (
+  actorId: string,
+  workspaceId: string,
+  source: string,
+): Promise<CoreRequestContext> => {
+  const membership = await loadMembership(workspaceId, actorId);
+  return {
+    workspaceId,
+    actorId,
+    actorDisplayLabel: await loadActorDisplayLabel(actorId),
+    workspaceSource: source,
+    role: membership?.role ?? WorkspaceMembershipRole.member,
+  };
+};
+
+/**
+ * Resource (deep-link) read routes reachable by non-members/anonymous: derive the workspace from the
+ * target resource (404 if missing) and build a membership-optional context. Authorization is left to a
+ * downstream guard (requireFormAccess) rather than to membership.
+ */
+export const openWorkspaceFromResource = (config: {
+  kind: WorkspaceResourceKind;
+  idFrom: ResourceIdSource;
+}) => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const actorId = getActorId(req);
+      if (!actorId) {
+        throw new ValidationError(MISSING_ACTOR_IDENTITY);
+      }
+      const resourceId = readResourceId(req, config.idFrom);
+      if (!resourceId) {
+        throw new ValidationError('Missing resource identifier for workspace resolution');
+      }
+      const workspaceId = await lookupWorkspaceId(config.kind, resourceId);
+      if (!workspaceId) {
+        throw new NotFoundError(RESOURCE_NOT_FOUND);
+      }
+      req.coreContext = await buildSubmitContext(actorId, workspaceId, `submit:${config.kind}`);
+      echoWorkspace(res, workspaceId);
+      next();
+    } catch (error) {
+      next(error);
+    }
   };
 };
 

@@ -4,7 +4,12 @@ env.loadEnv();
 
 import { and, eq } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
-import { WorkspaceMembershipStatus } from './codes';
+import {
+  PUBLIC_PROVIDER_CODE,
+  PUBLIC_SUBJECT,
+  PUBLIC_SUBMITTER_LABEL,
+  WorkspaceMembershipStatus,
+} from './codes';
 import { db, pool } from './client';
 import { appUsers, identityProviders, userIdentities } from './schema';
 
@@ -13,6 +18,40 @@ const SYSTEM_PROVIDER_NAME = 'SOBA Internal System';
 const DEFAULT_SYSTEM_SUBJECT = 'soba-system';
 const SYSTEM_DISPLAY_LABEL = 'SOBA System';
 const SEED_USER_STAMP = 'SOBA System (seed)';
+
+/**
+ * Ensures the `public` app_user + identity exist, so anonymous submissions have a real actor to
+ * attribute to. The `public` identity provider itself is created by migration.
+ */
+const ensurePublicUser = async () => {
+  const existing = await db.query.userIdentities.findFirst({
+    where: and(
+      eq(userIdentities.identityProviderCode, PUBLIC_PROVIDER_CODE),
+      eq(userIdentities.subject, PUBLIC_SUBJECT),
+    ),
+  });
+  if (existing) return existing.userId;
+
+  const publicUserId = uuidv7();
+  await db.insert(appUsers).values({
+    id: publicUserId,
+    displayLabel: PUBLIC_SUBMITTER_LABEL,
+    profile: { displayName: PUBLIC_SUBMITTER_LABEL },
+    status: WorkspaceMembershipStatus.active,
+    createdBy: SEED_USER_STAMP,
+    updatedBy: SEED_USER_STAMP,
+  });
+  await db.insert(userIdentities).values({
+    id: uuidv7(),
+    userId: publicUserId,
+    identityProviderCode: PUBLIC_PROVIDER_CODE,
+    subject: PUBLIC_SUBJECT,
+    externalUserId: PUBLIC_SUBJECT,
+    createdBy: SEED_USER_STAMP,
+    updatedBy: SEED_USER_STAMP,
+  });
+  return publicUserId;
+};
 
 /**
  * Ensures the internal `system` identity provider exists. Required for the system
@@ -74,6 +113,8 @@ const seed = async () => {
       updatedBy: SEED_USER_STAMP,
     });
   }
+
+  await ensurePublicUser();
 
   console.log(`Seed complete. System user subject: ${systemSubject}`);
   await pool.end();

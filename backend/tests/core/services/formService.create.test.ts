@@ -2,6 +2,7 @@ import { FormService } from '../../../src/core/services/formService';
 import * as formRepo from '../../../src/core/db/repos/formRepo';
 import * as versionRepo from '../../../src/core/db/repos/formVersionRepo';
 import * as registry from '../../../src/core/integrations/form-engine/FormEngineRegistry';
+import * as workspaceRepo from '../../../src/core/db/repos/workspaceRepo';
 
 jest.mock('../../../src/core/db/client', () => ({
   db: { transaction: (cb: (tx: unknown) => unknown) => cb({}) },
@@ -9,10 +10,15 @@ jest.mock('../../../src/core/db/client', () => ({
 
 jest.mock('../../../src/core/db/repos/formRepo', () => ({
   createForm: jest.fn(),
+  formNameExistsInWorkspace: jest.fn(),
 }));
 
 jest.mock('../../../src/core/db/repos/formVersionRepo', () => ({
   createEmptyFormVersionDraft: jest.fn(),
+}));
+
+jest.mock('../../../src/core/db/repos/workspaceRepo', () => ({
+  isWorkspaceDisclaimerAccepted: jest.fn(),
 }));
 
 jest.mock('../../../src/core/integrations/form-engine/FormEngineRegistry', () => ({
@@ -21,6 +27,8 @@ jest.mock('../../../src/core/integrations/form-engine/FormEngineRegistry', () =>
 }));
 
 const createForm = formRepo.createForm as unknown as jest.Mock;
+const nameExists = formRepo.formNameExistsInWorkspace as unknown as jest.Mock;
+const disclaimerAccepted = workspaceRepo.isWorkspaceDisclaimerAccepted as unknown as jest.Mock;
 const createDraft = versionRepo.createEmptyFormVersionDraft as unknown as jest.Mock;
 const getPlugins = registry.getFormEnginePlugins as unknown as jest.Mock;
 
@@ -35,6 +43,14 @@ describe('FormService.create', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     getPlugins.mockReturnValue([{ code: 'formio-v5' }]);
+    nameExists.mockResolvedValue(false);
+    disclaimerAccepted.mockResolvedValue(true);
+  });
+
+  it('rejects creation when the workspace disclaimer is not accepted', async () => {
+    disclaimerAccepted.mockResolvedValue(false);
+    await expect(new FormService().create(baseCreate)).rejects.toMatchObject({ statusCode: 409 });
+    expect(createForm).not.toHaveBeenCalled();
   });
 
   it('creates the form and an empty v1 draft in one transaction', async () => {
@@ -47,7 +63,6 @@ describe('FormService.create', () => {
       actorId: 'a1',
       actorDisplayLabel: 'A',
       name: 'My Form',
-      visibility: ['public'],
     });
 
     expect(createForm).toHaveBeenCalledWith(
@@ -55,7 +70,7 @@ describe('FormService.create', () => {
       expect.anything(),
     );
     expect(createDraft).toHaveBeenCalledWith(
-      expect.objectContaining({ formId: 'f1', visibility: ['public'] }),
+      expect.objectContaining({ formId: 'f1' }),
       expect.anything(),
     );
     expect(res).toEqual({

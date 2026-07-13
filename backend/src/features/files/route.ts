@@ -2,13 +2,10 @@ import express from 'express';
 import multer from 'multer';
 import { env } from '../../core/config/env';
 import { requireFeature } from '../../core/middleware/requireFeature';
-import { workspaceFromQuery } from '../../core/middleware/workspaceContext';
-import {
-  uploadFileHandler,
-  downloadFileHandler,
-  deleteFileHandler,
-  getFilesConfigHandler,
-} from './controller';
+import { Features } from '../../core/db/codes';
+import { requireUploadAccess } from './uploadAccess';
+import { uploadFileHandler, downloadFileHandler, deleteFileHandler } from './controller';
+import { asyncHandler } from '../../core/api/shared/asyncHandler';
 
 const router = express.Router();
 
@@ -18,19 +15,17 @@ const upload = multer({
   limits: { fileSize: maxSizeMb * 1024 * 1024 },
 });
 
-// Gate the whole feature on the `soba.feature` 'files' flag.
-router.use(requireFeature('files'));
+// Gate the whole feature on the `soba.feature` files flag.
+router.use(requireFeature(Features.files));
 
-// Upload: workspace comes from the ?workspaceId query; workspaceFromQuery enforces membership.
-// Accept any file field name (Form.io's fileKey is configurable; the component uploads one at a time).
-router.post('/', workspaceFromQuery, upload.any(), uploadFileHandler);
+// Upload: multer parses the multipart body first, then requireUploadAccess resolves the workspace from
+// the `submissionId` field and authorizes it against the Form submitters audience. Accept any file
+// field name (Form.io's fileKey is configurable; the component uploads one at a time).
+router.post('/', upload.any(), requireUploadAccess, asyncHandler(uploadFileHandler));
 
-// Client-facing config (size limit + blocked extensions). Must be declared before '/:id'.
-router.get('/config', getFilesConfigHandler);
-
-// Download / delete: workspace is derived from the file row and checked against the actor,
-// so no workspace query param is required.
-router.get('/:id', downloadFileHandler);
-router.delete('/:id', deleteFileHandler);
+// Download / delete: authorized against the file's owning submission (audience / ownership). Wrapped
+// in asyncHandler so an unexpected failure reaches the router's error handler instead of hanging.
+router.get('/:id', asyncHandler(downloadFileHandler));
+router.delete('/:id', asyncHandler(deleteFileHandler));
 
 export { router as filesRouter };

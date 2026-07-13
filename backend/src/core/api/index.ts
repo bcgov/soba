@@ -2,53 +2,52 @@ import express from 'express';
 import { coreErrorHandler } from '../middleware/errorHandler';
 import { registerAdminOpenApi } from './admin';
 import { registerHealthOpenApi } from './health';
+import { designFormsRouter, registerFormsOpenApi } from './forms';
+import { designSubmissionsRouter, registerSubmissionsOpenApi } from './submissions';
+import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
+import { groupsDomain } from './groups';
 import { filesDomain } from '../../features/files';
-import { formsDomain } from './forms';
 import { meDomain } from './me';
 import { membersDomain } from './members';
-import { metaDomain } from './meta';
-import { submissionsDomain } from './submissions';
 import { workspacesDomain } from './workspaces';
 import { registerOpenApiPaths } from './shared/openapi';
 
-// Meta is mounted at app level at /api/v1/meta and is public (no JWT, no core context).
-// Workspaces is mounted first at / so GET /workspaces and GET /workspaces/current are matched before forms.
-// Feature domains (e.g. files) are mounted unconditionally; each gates itself on its soba.feature flag
-// via requireFeature(...) inside its own router.
-const coreDomains = [
-  formsDomain,
-  meDomain,
-  membersDomain,
-  metaDomain,
-  submissionsDomain,
-  workspacesDomain,
-  filesDomain,
-];
-// Workspace context is resolved per route (see workspaceContext middleware), not globally.
-// resolveActor runs at the app level so req.actorId is available to all routes here.
-const authenticatedDomains = [
-  workspacesDomain,
-  formsDomain,
-  meDomain,
-  membersDomain,
-  submissionsDomain,
-  filesDomain,
-];
-
-const router = express.Router();
-
+// API surfaces, each mounted under its own base path with its own auth (see app.ts):
+//  - designRouter  (/api/v1/design): staff form authoring + submission management.
+//  - submitRouter  (/api/v1/submit): public-capable form read/submit/confirmation + file attachments.
+//  - coreRouter    (/api/v1):        workspace/account management (not a toggled feature).
 registerOpenApiPaths((registry) => {
-  for (const domain of coreDomains) {
-    domain.registerOpenApi(registry);
-  }
+  registerFormsOpenApi(registry);
+  registerSubmissionsOpenApi(registry);
+  registerSubmitOpenApi(registry);
+  groupsDomain.registerOpenApi(registry);
+  meDomain.registerOpenApi(registry);
+  membersDomain.registerOpenApi(registry);
+  workspacesDomain.registerOpenApi(registry);
+  filesDomain.registerOpenApi(registry);
   registerAdminOpenApi(registry);
   registerHealthOpenApi(registry);
 });
 
-// Mount routers at module load — not inside the lazy registerOpenApiPaths callback (which only
-// runs when buildOpenApiSpec() is first called), or routes would not attach at startup.
-for (const domain of authenticatedDomains) {
-  router.use(domain.path, domain.router);
+// Design feature: form authoring + submission management.
+const designRouter = express.Router();
+designRouter.use('/', designFormsRouter);
+designRouter.use('/submissions', designSubmissionsRouter);
+designRouter.use(coreErrorHandler);
+
+// Submit feature: public form read + submission create/save + confirmation read, plus submitter file
+// attachments at /files (upload/download/delete), authorized per operation by the Form submitters
+// audience / submission ownership. The files feature flag is enforced inside filesDomain.router.
+const submitRouter = express.Router();
+submitRouter.use('/', submitRoutes);
+submitRouter.use('/files', filesDomain.router);
+submitRouter.use(coreErrorHandler);
+
+// Core: workspace/account management.
+const coreRouter = express.Router();
+for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain]) {
+  coreRouter.use(domain.path, domain.router);
 }
-router.use(coreErrorHandler);
-export { router as coreRouter };
+coreRouter.use(coreErrorHandler);
+
+export { designRouter, submitRouter, coreRouter };

@@ -10,6 +10,8 @@ import { findOrCreateUserByIdentity } from '../db/repos/membershipRepo';
 import { isSobaAdmin, upsertSobaAdminFromIdp } from '../db/repos/sobaAdminRepo';
 import { ValidationError } from '../errors';
 import { profileHelpers } from '../auth/jwtClaims';
+import { getPublicUser } from '../services/publicUser';
+import { PUBLIC_PROVIDER_CODE } from '../db/codes';
 
 /**
  * Read the resolved actor id, falling back to the dev/test `x-soba-user-id` bypass header.
@@ -23,18 +25,15 @@ export const getActorIdpCode = (req: Request): string | null =>
   req.user?.providerCode?.toLowerCase() ?? null;
 
 export function resolveActor(req: Request, res: Response, next: NextFunction): void {
-  if (req.actorId || req.header(X_SOBA_USER_ID)) {
-    const actorId = req.actorId ?? req.header(X_SOBA_USER_ID) ?? null;
-    if (actorId) {
-      isSobaAdmin(actorId)
-        .then((admin) => {
-          req.isSobaAdmin = admin;
-          next();
-        })
-        .catch(next);
-      return;
-    }
-    return next();
+  const actorId = getActorId(req);
+  if (actorId) {
+    isSobaAdmin(actorId)
+      .then((admin) => {
+        req.isSobaAdmin = admin;
+        next();
+      })
+      .catch(next);
+    return;
   }
 
   const pluginCode = (req as Request & { idpPluginCode?: string }).idpPluginCode;
@@ -74,6 +73,32 @@ export function resolveActor(req: Request, res: Response, next: NextFunction): v
     })
     .then((admin) => {
       req.isSobaAdmin = admin;
+      next();
+    })
+    .catch(next);
+}
+
+/**
+ * Actor resolver for routes mounted with `checkJwt({ allowPublic: true })`: resolves the authenticated
+ * actor when a token/identity is present, otherwise attributes the request to the seeded public user
+ * (idp `public`). The route's own authorization (e.g. the Form submitters audience) decides access;
+ * the public user is a member of no workspace, so staff-only routes still reject it.
+ */
+export function resolveActorOrPublic(req: Request, res: Response, next: NextFunction): void {
+  const hasIdentity =
+    req.actorId || req.header(X_SOBA_USER_ID) || (req.idpPluginCode && req.authPayload);
+  if (hasIdentity) {
+    return resolveActor(req, res, next);
+  }
+
+  getPublicUser()
+    .then((publicUser) => {
+      if (!publicUser) {
+        return next(new Error('Public user is not seeded; run the seed step'));
+      }
+      req.actorId = publicUser.id;
+      req.idpType = PUBLIC_PROVIDER_CODE;
+      req.isSobaAdmin = false;
       next();
     })
     .catch(next);

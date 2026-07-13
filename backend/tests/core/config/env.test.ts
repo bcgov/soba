@@ -90,6 +90,15 @@ describe('env', () => {
     expect(reader.getOptionalEnv('EMPTY')).toBeUndefined();
   });
 
+  it('createEnvReader getDefaultSubmitterProvider defaults to azureidir when unset', () => {
+    expect(createEnvReader({}).getDefaultSubmitterProvider()).toBe('azureidir');
+    expect(
+      createEnvReader({
+        DEFAULT_SUBMITTER_PROVIDER: 'bceidbusiness',
+      }).getDefaultSubmitterProvider(),
+    ).toBe('bceidbusiness');
+  });
+
   it('createEnvReader getBooleanEnv returns true/false/undefined from simulated env', () => {
     const reader = createEnvReader({ B1: 'true', B2: 'false' });
     expect(reader.getBooleanEnv('B1')).toBe(true);

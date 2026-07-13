@@ -11,39 +11,25 @@ import {
 
 extendZodWithOpenApi(z);
 
-export const CreateSubmissionBodySchema = z
+export const OpenSubmissionBodySchema = z
   .object({
     formId: z.string().min(1),
-    formVersionId: z.string().min(1),
-    workflowState: z.string().min(1).optional(),
   })
-  .openapi('Submissions_CreateSubmissionBody');
+  .openapi('Submissions_OpenSubmissionBody');
 
-export const UpdateSubmissionParamsSchema = z
+// The submission id path param, shared by every /:id route (read/save/submit/delete).
+export const SubmissionIdParamsSchema = z
   .object({
     id: z.string().min(1),
   })
-  .openapi('Submissions_UpdateSubmissionParams');
+  .openapi('Submissions_SubmissionIdParams');
 
-export const UpdateSubmissionBodySchema = z
-  .object({
-    workflowState: z.string().min(1).optional(),
-  })
-  .openapi('Submissions_UpdateSubmissionBody');
-
-export const SaveSubmissionParamsSchema = z
-  .object({
-    id: z.string().min(1),
-  })
-  .openapi('Submissions_SaveSubmissionParams');
-
-export const SaveSubmissionBodySchema = z
+// The answer-data body, shared by save (draft) and submit.
+export const SubmissionDataBodySchema = z
   .object({
     data: z.record(z.string(), z.unknown()),
-    eventType: z.string().min(1).optional(),
-    note: z.string().optional(),
   })
-  .openapi('Submissions_SaveSubmissionBody');
+  .openapi('Submissions_SubmissionDataBody');
 
 export const ListSubmissionsQuerySchema = requireAtLeastOneQueryField(
   z.object({
@@ -112,13 +98,13 @@ export const ListSubmissionsResponseSchema = z
   .openapi('Submissions_ListSubmissionsResponse');
 
 const TAG = 'core.submissions';
-const SUBMISSION_PATH = '/submissions/{id}';
+const SUBMISSION_PATH = '/design/submissions/{id}';
 const SUBMISSION_NOT_FOUND = 'Submission not found';
 
 export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
-    path: '/submissions',
+    path: '/design/submissions',
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
@@ -145,7 +131,7 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
-      params: UpdateSubmissionParamsSchema,
+      params: SubmissionIdParamsSchema,
     },
     responses: {
       200: {
@@ -160,11 +146,11 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'get',
-    path: '/submissions/{id}/data',
+    path: '/design/submissions/{id}/data',
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
-      params: UpdateSubmissionParamsSchema,
+      params: SubmissionIdParamsSchema,
     },
     responses: {
       200: {
@@ -180,92 +166,12 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
   });
 
   registry.registerPath({
-    method: 'post',
-    path: '/submissions',
-    tags: [TAG],
-    security: [{ bearerAuth: [] }],
-    request: {
-      body: {
-        required: true,
-        content: {
-          'application/json': {
-            schema: CreateSubmissionBodySchema,
-          },
-        },
-      },
-    },
-    responses: {
-      201: {
-        description: 'Created submission draft',
-        content: { 'application/json': { schema: SubmissionResponseSchema } },
-      },
-      400: {
-        description: 'Validation or business rule error',
-      },
-    },
-  });
-
-  registry.registerPath({
-    method: 'patch',
-    path: SUBMISSION_PATH,
-    tags: [TAG],
-    security: [{ bearerAuth: [] }],
-    request: {
-      params: UpdateSubmissionParamsSchema,
-      body: {
-        required: false,
-        content: {
-          'application/json': {
-            schema: UpdateSubmissionBodySchema,
-          },
-        },
-      },
-    },
-    responses: {
-      200: {
-        description: 'Updated submission draft',
-        content: { 'application/json': { schema: SubmissionResponseSchema } },
-      },
-      404: {
-        description: SUBMISSION_NOT_FOUND,
-      },
-    },
-  });
-
-  registry.registerPath({
-    method: 'post',
-    path: '/submissions/{id}/save',
-    tags: [TAG],
-    security: [{ bearerAuth: [] }],
-    request: {
-      params: SaveSubmissionParamsSchema,
-      body: {
-        required: true,
-        content: {
-          'application/json': {
-            schema: SaveSubmissionBodySchema,
-          },
-        },
-      },
-    },
-    responses: {
-      200: {
-        description: 'Saved submission (new engine document recorded as a revision)',
-        content: { 'application/json': { schema: SubmissionResponseSchema } },
-      },
-      400: {
-        description: 'Validation or business rule error',
-      },
-    },
-  });
-
-  registry.registerPath({
     method: 'delete',
     path: SUBMISSION_PATH,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
-      params: UpdateSubmissionParamsSchema,
+      params: SubmissionIdParamsSchema,
     },
     responses: {
       204: {

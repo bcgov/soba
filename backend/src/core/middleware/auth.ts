@@ -8,8 +8,11 @@ const unauthorizedResponse = {
   statusCode: 401,
 };
 
-/** Passport-backed composite IdP auth middleware. */
-export const checkJwt = (): RequestHandler => {
+/**
+ * Passport-backed IdP auth middleware. `allowPublic` lets an absent/invalid token through
+ * unauthenticated (req.user stays unset) for the public submit surface; otherwise rejects with 401.
+ */
+export const checkJwt = (opts: { allowPublic?: boolean } = {}): RequestHandler => {
   return (req, res, next) => {
     passport.authenticate(
       SOBA_PASSPORT_STRATEGY,
@@ -17,6 +20,7 @@ export const checkJwt = (): RequestHandler => {
       (err: unknown, user: Express.User | false | null, info?: { error?: unknown }) => {
         if (err) return next(err);
         if (!user) {
+          if (opts.allowPublic) return next();
           if (info?.error) return next(info.error);
           return res.status(401).json(unauthorizedResponse);
         }

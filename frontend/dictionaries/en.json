@@ -26,6 +26,8 @@
     "tableHeading": "Workspaces",
     "manageHeading": "Manage Workspace",
     "createHeading": "Create Workspace",
+    "settingsTab": "Settings",
+    "teamTab": "Team",
     "nameLabel": "Name",
     "save": "Save",
     "create": "Create",
@@ -37,6 +39,7 @@
     "manageForbidden": "Only workspace owners or admins can manage this workspace.",
     "createForbidden": "Only BC Government identity provider users can create workspaces.",
     "defaultWorkspaceFormLabel": "Set as default workspace",
+    "disclaimerLabel": "I agree to the disclaimer and statement of responsibility",
     "empty": "No workspaces found matching your criteria.",
     "active": "Active",
     "columns": {
@@ -88,7 +91,9 @@
         "tryAgain": "Try again",
         "backToList": "Back to form list"
       },
-      "submitSuccess": "Form submitted successfully."
+      "submitSuccess": "Form submitted successfully.",
+      "starting": "Starting your submission…",
+      "startError": "The submission could not be started. Please try again."
     }
   },
   "form": {
@@ -106,10 +111,18 @@
     "loading": "Loading form...",
     "schemaNotAvailable": "Form schema not available.",
     "notAuthenticated": "You are not authenticated. Please login to access this form.",
-    "visibilityLabel": "Visibility / Access Control",
-    "visibilityPublic": "Public",
-    "visibilityAzureIDIR": "IDIR - MFA",
+    "submitterAudienceLabel": "Who can submit",
+    "submitterAudiencePublic": "Public",
+    "submitterAudienceProtected": "Protected",
+    "submitterAudienceProviders": "Allowed logins",
+    "submitterAudienceNotSet": "Not set",
+    "submitterAudiencePeople": "people",
+    "submitterAudienceSave": "Save",
+    "submitterAudienceCancel": "Cancel",
+    "submitterAudienceLoadError": "Could not load submit access",
+    "submitterAudienceSaveError": "Could not save submit access",
     "disclaimerLabel": "I agree to the disclaimer and statement of responsibility",
+    "disclaimerRequired": "Accept the workspace disclaimer in workspace Settings before creating a form.",
     "exportJson": "Export JSON",
     "importJson": "Import JSON",
     "designerTab": "Designer",

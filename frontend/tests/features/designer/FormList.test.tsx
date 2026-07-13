@@ -16,7 +16,10 @@ vi.mock('@/app/[lang]/Providers', () => ({
       forms: 'Forms',
       selectWorkspace: 'Select a workspace to view forms.',
     },
-    form: { nameLabel: 'Form Name' },
+    form: {
+      nameLabel: 'Form Name',
+      disclaimerRequired: 'Accept the workspace disclaimer before creating a form.',
+    },
     submission: {
       formList: {
         columns: {
@@ -64,7 +67,13 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
 }));
 
 const { mockWorkspaceState } = vi.hoisted(() => ({
-  mockWorkspaceState: { activeWorkspaceId: 'ws1' as string | null },
+  mockWorkspaceState: {
+    activeWorkspaceId: 'ws1' as string | null,
+    workspaces: [{ id: 'ws1', disclaimerAccepted: true }] as Array<{
+      id: string;
+      disclaimerAccepted: boolean;
+    }>,
+  },
 }));
 vi.mock('@/lib/store', async () => ({
   useAppSelector: (fn: (s: unknown) => unknown) => fn({ workspace: mockWorkspaceState }),
@@ -76,6 +85,7 @@ describe('FormList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockWorkspaceState.activeWorkspaceId = 'ws1';
+    mockWorkspaceState.workspaces = [{ id: 'ws1', disclaimerAccepted: true }];
   });
 
   it('renders the header and search input', async () => {
@@ -119,6 +129,15 @@ describe('FormList', () => {
     });
     const createBtn = screen.getByTestId('create-form-button');
     expect(createBtn).toBeDisabled();
+  });
+
+  it('warns and disables Create when the workspace disclaimer is not accepted', async () => {
+    mockWorkspaceState.workspaces = [{ id: 'ws1', disclaimerAccepted: false }];
+    await act(async () => {
+      render(<FormList />);
+    });
+    expect(screen.getByTestId('forms-disclaimer-required-alert')).toBeInTheDocument();
+    expect(screen.getByTestId('create-form-button')).toBeDisabled();
   });
 
   it('search works to filter forms', async () => {

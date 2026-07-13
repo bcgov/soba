@@ -4,19 +4,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const mockPush = vi.fn();
-const {
-  mockCreateWorkspace,
-  mockUpdateWorkspace,
-  mockSelectWorkspace,
-  mockDispatch,
-  mockUnwrap,
-} = vi.hoisted(() => ({
-  mockCreateWorkspace: vi.fn(),
-  mockUpdateWorkspace: vi.fn(),
-  mockSelectWorkspace: vi.fn(),
-  mockDispatch: vi.fn(),
-  mockUnwrap: vi.fn().mockResolvedValue({}),
-}));
+const { mockCreateWorkspace, mockUpdateWorkspace, mockSelectWorkspace, mockDispatch, mockUnwrap } =
+  vi.hoisted(() => ({
+    mockCreateWorkspace: vi.fn(),
+    mockUpdateWorkspace: vi.fn(),
+    mockSelectWorkspace: vi.fn(),
+    mockDispatch: vi.fn(),
+    mockUnwrap: vi.fn().mockResolvedValue({}),
+  }));
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
   useKeycloak: () => ({ authenticated: true, token: 'token', initializing: false }),
@@ -32,6 +27,8 @@ vi.mock('@/app/[lang]/Providers', () => ({
     workspaces: {
       createHeading: 'Create Workspace',
       manageHeading: 'Manage Workspace',
+      settingsTab: 'Settings',
+      teamTab: 'Team',
       nameLabel: 'Name',
       save: 'Save',
       create: 'Create',
@@ -42,6 +39,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
       manageForbidden: 'Only workspace owners or admins can manage this workspace.',
       createForbidden: 'Only BC Government identity provider users can create workspaces.',
       defaultWorkspaceFormLabel: 'Set as default workspace',
+      disclaimerLabel: 'I agree to the disclaimer and statement of responsibility',
     },
   }),
 }));
@@ -88,7 +86,6 @@ describe('WorkspaceForm', () => {
     mockCreateWorkspace.mockResolvedValue({
       id: 'ws-new',
       name: 'New Team',
-      slug: null,
       kind: 'team',
       role: 'owner',
       status: 'active',
@@ -96,18 +93,18 @@ describe('WorkspaceForm', () => {
     mockSelectWorkspace.mockResolvedValue({
       id: 'ws2',
       name: 'Team Workspace',
-      slug: null,
       kind: 'team',
       role: 'owner',
       status: 'active',
+      disclaimerAccepted: false,
     });
     mockUpdateWorkspace.mockResolvedValue({
       id: 'ws2',
       name: 'Renamed',
-      slug: null,
       kind: 'team',
       role: 'owner',
       status: 'active',
+      disclaimerAccepted: false,
     });
   });
 
@@ -128,6 +125,15 @@ describe('WorkspaceForm', () => {
     expect(mockSelectWorkspace).toHaveBeenCalledWith('token', 'ws2');
   });
 
+  it('manage mode shows Settings and Team tabs', async () => {
+    await act(async () => {
+      render(<WorkspaceForm workspaceId="ws2" />);
+    });
+    await waitFor(() => expect(mockSelectWorkspace).toHaveBeenCalled());
+    expect(screen.getByRole('tab', { name: 'Settings' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Team' })).toBeInTheDocument();
+  });
+
   it('save on create posts workspace and optional default preference', async () => {
     await act(async () => {
       render(<WorkspaceForm />);
@@ -137,9 +143,28 @@ describe('WorkspaceForm', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
 
     await waitFor(() => {
-      expect(mockCreateWorkspace).toHaveBeenCalledWith('token', { name: 'New Team' });
+      expect(mockCreateWorkspace).toHaveBeenCalledWith('token', {
+        name: 'New Team',
+        disclaimerAccepted: false,
+      });
       expect(mockDispatch).toHaveBeenCalled();
       expect(mockPush).toHaveBeenCalledWith('/en/workspaces');
+    });
+  });
+
+  it('save on create sends the disclaimer acceptance', async () => {
+    await act(async () => {
+      render(<WorkspaceForm />);
+    });
+    await userEvent.type(screen.getByRole('textbox'), 'New Team');
+    await userEvent.click(screen.getByTestId('workspace-disclaimer-switch'));
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => {
+      expect(mockCreateWorkspace).toHaveBeenCalledWith('token', {
+        name: 'New Team',
+        disclaimerAccepted: true,
+      });
     });
   });
 
@@ -153,7 +178,10 @@ describe('WorkspaceForm', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
 
     await waitFor(() => {
-      expect(mockCreateWorkspace).toHaveBeenCalledWith('token', { name: 'Second Team' });
+      expect(mockCreateWorkspace).toHaveBeenCalledWith('token', {
+        name: 'Second Team',
+        disclaimerAccepted: false,
+      });
       expect(mockPush).toHaveBeenCalledWith('/en/workspaces');
     });
     // Only updateDefaultWorkspace calls .unwrap(); loadWorkspaces does not.
@@ -180,8 +208,27 @@ describe('WorkspaceForm', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
-      expect(mockUpdateWorkspace).toHaveBeenCalledWith('token', 'ws2', { name: 'Renamed' });
+      expect(mockUpdateWorkspace).toHaveBeenCalledWith('token', 'ws2', {
+        name: 'Renamed',
+        disclaimerAccepted: false,
+      });
       expect(mockPush).toHaveBeenCalledWith('/en/workspaces');
+    });
+  });
+
+  it('save on manage sends the disclaimer acceptance', async () => {
+    await act(async () => {
+      render(<WorkspaceForm workspaceId="ws2" />);
+    });
+    await waitFor(() => expect(screen.getByDisplayValue('Team Workspace')).toBeInTheDocument());
+    await userEvent.click(screen.getByTestId('workspace-disclaimer-switch'));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(mockUpdateWorkspace).toHaveBeenCalledWith('token', 'ws2', {
+        name: 'Team Workspace',
+        disclaimerAccepted: true,
+      });
     });
   });
 });

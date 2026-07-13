@@ -1,6 +1,12 @@
-import { and, desc, eq, inArray, isNull, lt, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lt, ne, or } from 'drizzle-orm';
 import { db } from '../client';
 import { submissionRevisions, submissions, forms, formVersions } from '../schema';
+import {
+  SubmissionEventType,
+  SubmissionWorkflowState,
+  type SubmissionEventTypeCode,
+  type SubmissionWorkflowStateCode,
+} from '../codes';
 
 export type SubmissionRecord = typeof submissions.$inferSelect;
 
@@ -27,7 +33,6 @@ interface CreateSubmissionInput {
   formVersionId: string;
   actorId: string;
   actorDisplayLabel: string | null;
-  workflowState?: string;
 }
 
 interface SaveSubmissionInput {
@@ -35,8 +40,9 @@ interface SaveSubmissionInput {
   submissionId: string;
   actorId: string;
   actorDisplayLabel: string | null;
-  eventType: string;
-  changeNote?: string;
+  eventType: SubmissionEventTypeCode;
+  /** Target workflow state for this event, decided by the lifecycle policy (see submissionLifecycle). */
+  workflowState: SubmissionWorkflowStateCode;
   /** Engine ref of the newly-created submission document for this revision (the "after" ref). */
   afterEngineSubmissionRef: string;
 }
@@ -59,22 +65,40 @@ export interface ListSubmissionsInput {
   afterUpdatedAt?: Date;
 }
 
-export const createEmptySubmission = async (input: CreateSubmissionInput) => {
-  const created = await db
-    .insert(submissions)
-    .values({
-      workspaceId: input.workspaceId,
-      formId: input.formId,
-      formVersionId: input.formVersionId,
-      workflowState: input.workflowState || 'draft',
-      engineSyncStatus: 'pending',
-      currentRevisionNo: 0,
-      createdBy: input.actorDisplayLabel,
-      updatedBy: input.actorDisplayLabel,
-    })
-    .returning();
+/**
+ * Open a submission: insert the row in the `opened` state and its revision-0 `opened` event in one
+ * transaction, so every submission has a full history from the moment a fill begins. `submittedBy`
+ * captures the actor who started it (the seeded public user for anonymous fills).
+ */
+export const openSubmission = async (input: CreateSubmissionInput) => {
+  return db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(submissions)
+      .values({
+        workspaceId: input.workspaceId,
+        formId: input.formId,
+        formVersionId: input.formVersionId,
+        workflowState: SubmissionWorkflowState.opened,
+        submittedBy: input.actorId,
+        engineSyncStatus: 'pending',
+        currentRevisionNo: 0,
+        createdBy: input.actorDisplayLabel,
+        updatedBy: input.actorDisplayLabel,
+      })
+      .returning();
 
-  return created[0];
+    await tx.insert(submissionRevisions).values({
+      workspaceId: input.workspaceId,
+      submissionId: created.id,
+      revisionNo: 0,
+      eventType: SubmissionEventType.opened,
+      beforeEngineSubmissionRef: null,
+      afterEngineSubmissionRef: null,
+      changedBy: input.actorId,
+    });
+
+    return created;
+  });
 };
 
 /** Fetch the raw (non-deleted) submission row — used by the engine write path. */
@@ -159,6 +183,18 @@ export const getWorkspaceIdForSubmission = async (submissionId: string): Promise
   return context?.workspaceId ?? null;
 };
 
+/** Resolve a submission's workspace + workflow state by id alone (for the file-upload gate). */
+export const getSubmissionWorkspaceAndState = async (
+  submissionId: string,
+): Promise<{ workspaceId: string; workflowState: string } | null> => {
+  const rows = await db
+    .select({ workspaceId: submissions.workspaceId, workflowState: submissions.workflowState })
+    .from(submissions)
+    .where(and(eq(submissions.id, submissionId), isNull(submissions.deletedAt)))
+    .limit(1);
+  return rows[0] ?? null;
+};
+
 export const listSubmissionsForWorkspace = async (
   input: ListSubmissionsInput,
 ): Promise<{ items: SubmissionListRow[]; hasMore: boolean }> => {
@@ -168,6 +204,9 @@ export const listSubmissionsForWorkspace = async (
   const whereClauses = [
     inArray(submissions.workspaceId, input.workspaceIds),
     isNull(submissions.deletedAt),
+    // Workspace/staff list shows only real submissions; a just-`opened` shell isn't one yet.
+    // (A future user-scoped list would surface the caller's own opened submissions.)
+    ne(submissions.workflowState, SubmissionWorkflowState.opened),
   ];
 
   if (input.formId) {
@@ -263,8 +302,8 @@ export const updateSubmissionDraft = async (
 /**
  * Record a submission revision and advance the submission's current pointer in one transaction.
  * `beforeEngineSubmissionRef` is the submission's current ref; `afterEngineSubmissionRef` is the
- * newly-created engine document for this save — so the revision captures the real change. Marks the
- * submission `ready` (the engine write already succeeded) and stamps submit events.
+ * newly-created engine document for this save — so the revision captures the real change. Applies the
+ * lifecycle-decided workflow state, marks the engine sync `ready`, and stamps `submitted_at` on submit.
  */
 export const appendSubmissionRevision = async (input: SaveSubmissionInput) => {
   return db.transaction(async (tx) => {
@@ -289,7 +328,6 @@ export const appendSubmissionRevision = async (input: SaveSubmissionInput) => {
       beforeEngineSubmissionRef: submission.engineSubmissionRef,
       afterEngineSubmissionRef: input.afterEngineSubmissionRef,
       changedBy: input.actorId,
-      changeNote: input.changeNote,
     });
 
     const updates: Record<string, unknown> = {
@@ -297,14 +335,14 @@ export const appendSubmissionRevision = async (input: SaveSubmissionInput) => {
       engineSubmissionRef: input.afterEngineSubmissionRef,
       engineSyncStatus: 'ready',
       engineSyncError: null,
+      workflowState: input.workflowState,
       updatedBy: input.actorDisplayLabel,
       updatedAt: new Date(),
     };
 
-    if (input.eventType === 'submit' && !submission.submittedBy) {
-      updates.submittedBy = input.actorId;
+    // submittedBy is stamped at open; record the submit timestamp when the submit event lands.
+    if (input.eventType === SubmissionEventType.submitted) {
       updates.submittedAt = new Date();
-      updates.workflowState = 'submitted';
     }
 
     const updated = await tx
@@ -327,7 +365,7 @@ export const markSubmissionDeleted = async (
   const updated = await db
     .update(submissions)
     .set({
-      workflowState: 'deleted',
+      workflowState: SubmissionWorkflowState.deleted,
       deletedAt: new Date(),
       deletedBy: actorDisplayLabel,
       updatedBy: actorDisplayLabel,

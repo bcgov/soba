@@ -153,6 +153,9 @@ export function createEnvReader(source: EnvSource) {
     getCacheDefaultCode: () => getOptionalEnvFrom(source, 'CACHE_DEFAULT_CODE'),
     getMessageBusDefaultCode: () => getOptionalEnvFrom(source, 'MESSAGEBUS_DEFAULT_CODE'),
     getFormEngineDefaultCode: () => getOptionalEnvFrom(source, 'FORM_ENGINE_DEFAULT_CODE'),
+    /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
+    getDefaultSubmitterProvider: () =>
+      getOptionalEnvFrom(source, 'DEFAULT_SUBMITTER_PROVIDER') ?? 'azureidir',
     getStorageProfiles: () => {
       const raw = getOptionalEnvFrom(source, 'STORAGE_PROFILES');
       return raw ? parseCsvValue(raw) : [];
@@ -210,6 +213,8 @@ export const env = {
   getCacheDefaultCode: () => getOptionalEnv('CACHE_DEFAULT_CODE'),
   getMessageBusDefaultCode: () => getOptionalEnv('MESSAGEBUS_DEFAULT_CODE'),
   getFormEngineDefaultCode: () => getOptionalEnv('FORM_ENGINE_DEFAULT_CODE'),
+  /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
+  getDefaultSubmitterProvider: () => getOptionalEnv('DEFAULT_SUBMITTER_PROVIDER') ?? 'azureidir',
   getStorageProfiles: () => {
     const raw = getOptionalEnv('STORAGE_PROFILES');
     return raw ? parseCsvValue(raw) : [];
