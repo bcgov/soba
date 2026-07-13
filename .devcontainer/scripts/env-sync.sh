@@ -8,12 +8,12 @@
 # sync_env_file <example> <target> <marker>
 sync_env_file() {
   local example="$1" target="$2" marker="$3"
-  [ -f "$example" ] || return 0
+  [[ -f "$example" ]] || return 0
 
   local new_hash
   new_hash="$(sha256sum "$example" | awk '{print $1}')"
 
-  if [ ! -f "$target" ]; then
+  if [[ ! -f "$target" ]]; then
     cp "$example" "$target"
     echo "$new_hash" >"$marker"
     echo "  Created $target from $(basename "$example")"
@@ -22,12 +22,12 @@ sync_env_file() {
 
   # Target exists but no recorded template hash (first run after this landed):
   # adopt the current state as the baseline — never clobber an existing file.
-  if [ ! -f "$marker" ]; then
+  if [[ ! -f "$marker" ]]; then
     echo "$new_hash" >"$marker"
     return 0
   fi
 
-  if [ "$new_hash" != "$(cat "$marker")" ]; then
+  if [[ "$new_hash" != "$(cat "$marker")" ]]; then
     local backup="${target}.prev"
     cp "$target" "$backup"
     cp "$example" "$target"
