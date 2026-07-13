@@ -66,7 +66,7 @@ import { getSubmissionRecordById } from '../../../src/core/db/repos/submissionRe
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'files-svc-'));
 process.env.STORAGE_PROFILES = 'default';
 process.env.FILES_STORAGE_PROFILE = 'default';
-process.env.STORAGE_PROFILE_DEFAULT_BACKEND = 'local-storage';
+process.env.STORAGE_PROFILE_DEFAULT_BACKEND = 'storage-local';
 process.env.STORAGE_PROFILE_DEFAULT_BASE_PATH = tmp;
 
 const audienceMock = hasFormSubmitAccess as jest.Mock;

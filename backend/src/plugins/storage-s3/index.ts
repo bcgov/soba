@@ -14,7 +14,8 @@ import type { PluginConfigReader } from '../../core/config/pluginConfig';
 /**
  * S3-compatible (MinIO) storage plugin adapter.
  *
- * Environment keys expected (prefix PLUGIN_S3_COMPATIBLE_):
+ * Config is read per storage profile, so keys use the STORAGE_PROFILE_<PROFILE>_ prefix
+ * (e.g. STORAGE_PROFILE_DEFAULT_ENDPOINT), not a plugin-code prefix:
  * - ENDPOINT (http://host:port or host)
  * - PORT (optional)
  * - USE_SSL (true/false)
@@ -86,7 +87,7 @@ function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
         });
       } else if (input.sourceUrl) {
         // Implementation could fetch the source URL and stream into putObject.
-        throw new Error('sourceUrl uploads are not supported by s3-compatible adapter');
+        throw new Error('sourceUrl uploads are not supported by storage-s3 adapter');
       } else {
         throw new Error('Only buffer/stream uploads supported');
       }
@@ -168,6 +169,6 @@ function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
 }
 
 export const storagePluginDefinition: StoragePluginDefinition = {
-  code: 's3-compatible',
+  code: 'storage-s3',
   createAdapter: createMinioAdapter,
 };

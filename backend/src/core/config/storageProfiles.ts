@@ -3,7 +3,7 @@ import { normalizeKey } from './pluginConfig';
 import { log } from '../logging';
 
 export interface StorageProfileConfig {
-  /** Storage backend plugin code this profile instantiates (e.g. 'local-storage', 's3-compatible'). */
+  /** Storage backend plugin code this profile instantiates (e.g. 'storage-local', 'storage-s3'). */
   backend: string;
 }
 
