@@ -1,15 +1,18 @@
 /**
- * Single plugin discovery and cache. Scans plugins dir once (lazy), validates with Zod,
- * exposes workspace resolvers, form engine definitions, plugin API definitions,
- * cache plugins, messagebus plugins, and storage plugins.
+ * Plugin discovery + selection. Scans the plugins dir once (lazy, cached), validates each module's
+ * exported definitions with Zod, and exposes per-kind definition lists, the discovered catalog, and
+ * lazily-instantiated singleton adapters for the selectable kinds (cache, messagebus). Storage is
+ * discovered here too but selected per profile (see getStorageAdapter).
  */
 import fs from 'fs';
 import path from 'path';
 import { z } from 'zod';
 import { env } from '../../config/env';
+import { log } from '../../logging';
 import {
   createPluginConfigReader,
   createStorageProfileConfigReader,
+  type PluginConfigReader,
 } from '../../config/pluginConfig';
 import { getStorageProfilesConfig } from '../../config/storageProfiles';
 import type { FormEnginePluginDefinition } from '../form-engine/FormEnginePluginDefinition';
@@ -25,6 +28,14 @@ import type {
   StorageEngineReadinessResult,
   StoragePluginDefinition,
 } from '../storage-engine/StorageEngineAdapter';
+
+// --- Definition schemas -----------------------------------------------------
+
+// cache / messagebus / storage all export the same { code, createAdapter } shape.
+const AdapterPluginDefinitionSchema = z.object({
+  code: z.string().min(1),
+  createAdapter: z.any(),
+});
 
 const FormEnginePluginDefinitionSchema = z.object({
   code: z.string().min(1),
@@ -43,26 +54,13 @@ const FeatureApiDefinitionSchema = z.object({
   registerOpenApi: z.any().optional(),
 });
 
-const CachePluginDefinitionSchema = z.object({
-  code: z.string().min(1),
-  createAdapter: z.any(),
-});
-
-const MessageBusPluginDefinitionSchema = z.object({
-  code: z.string().min(1),
-  createAdapter: z.any(),
-});
-
-const StoragePluginDefinitionSchema = z.object({
-  code: z.string().min(1),
-  createAdapter: z.any(),
-});
-
 const IdpPluginDefinitionSchema = z.object({
   code: z.string().min(1),
   createAuthMiddleware: z.any(),
   createClaimMapper: z.any(),
 });
+
+// --- Discovery --------------------------------------------------------------
 
 interface CachedPlugin {
   dir: string;
@@ -73,6 +71,37 @@ interface CachedPlugin {
   storageDefinition?: StoragePluginDefinition;
   idpDefinition?: IdpPluginDefinition;
 }
+
+// Each CachedPlugin definition field, the module export it comes from, and the schema that
+// validates it. The one place to add a new plugin kind.
+const DEFINITION_KINDS: ReadonlyArray<{
+  field: keyof CachedPlugin;
+  exportKey: string;
+  schema: z.ZodTypeAny;
+}> = [
+  {
+    field: 'formEngineDefinition',
+    exportKey: 'formEnginePluginDefinition',
+    schema: FormEnginePluginDefinitionSchema,
+  },
+  { field: 'apiDefinition', exportKey: 'pluginApiDefinition', schema: FeatureApiDefinitionSchema },
+  {
+    field: 'cacheDefinition',
+    exportKey: 'cachePluginDefinition',
+    schema: AdapterPluginDefinitionSchema,
+  },
+  {
+    field: 'messagebusDefinition',
+    exportKey: 'messagebusPluginDefinition',
+    schema: AdapterPluginDefinitionSchema,
+  },
+  {
+    field: 'storageDefinition',
+    exportKey: 'storagePluginDefinition',
+    schema: AdapterPluginDefinitionSchema,
+  },
+  { field: 'idpDefinition', exportKey: 'idpPluginDefinition', schema: IdpPluginDefinitionSchema },
+];
 
 let cache: CachedPlugin[] | null = null;
 
@@ -89,26 +118,28 @@ function getPluginsRoot(): string {
 }
 
 /**
- * Read `obj[key]`, validate it with `schema`, and return it typed as `T`. Returns undefined when the
- * key is absent or invalid (logging a warning in the latter case) so a malformed plugin export is
- * skipped rather than fatal.
+ * Validate `obj[key]` with `schema`, returning it when valid or undefined (warning when invalid) so
+ * a malformed plugin export is skipped rather than fatal.
  */
-function parsePluginDefinition<T>(
+function parseDefinition(
   obj: Record<string, unknown>,
   pluginDir: string,
   key: string,
   schema: z.ZodTypeAny,
-): T | undefined {
+): unknown {
   const value = obj[key];
   if (value === undefined) return undefined;
   const parsed = schema.safeParse(value);
-  if (parsed.success) return value as T;
-  console.warn(`[PluginRegistry] invalid ${key} in '${pluginDir}':`, parsed.error.message);
+  if (parsed.success) return value;
+  log.warn(
+    { plugin: pluginDir, key, error: parsed.error.message },
+    '[PluginRegistry] invalid plugin definition, skipping',
+  );
   return undefined;
 }
 
 /** Load and validate a single plugin module into a CachedPlugin entry. Null when the module fails to
- *  load (logged); individual malformed definitions are skipped by parsePluginDefinition. */
+ *  load (logged); individual malformed definitions are skipped by parseDefinition. */
 function loadPlugin(pluginsRoot: string, pluginDir: string): CachedPlugin | null {
   const modulePath = path.join(pluginsRoot, pluginDir);
   let raw: unknown;
@@ -116,50 +147,18 @@ function loadPlugin(pluginsRoot: string, pluginDir: string): CachedPlugin | null
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     raw = require(modulePath);
   } catch (err) {
-    console.warn(`[PluginRegistry] failed to load plugin '${pluginDir}':`, err);
+    log.warn({ err, plugin: pluginDir }, '[PluginRegistry] failed to load plugin');
     return null;
   }
 
   const obj = raw !== null && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
-  return {
-    dir: pluginDir,
-    formEngineDefinition: parsePluginDefinition<FormEnginePluginDefinition>(
-      obj,
-      pluginDir,
-      'formEnginePluginDefinition',
-      FormEnginePluginDefinitionSchema,
-    ),
-    apiDefinition: parsePluginDefinition<FeatureApiDefinition>(
-      obj,
-      pluginDir,
-      'pluginApiDefinition',
-      FeatureApiDefinitionSchema,
-    ),
-    cacheDefinition: parsePluginDefinition<CachePluginDefinition>(
-      obj,
-      pluginDir,
-      'cachePluginDefinition',
-      CachePluginDefinitionSchema,
-    ),
-    messagebusDefinition: parsePluginDefinition<MessageBusPluginDefinition>(
-      obj,
-      pluginDir,
-      'messagebusPluginDefinition',
-      MessageBusPluginDefinitionSchema,
-    ),
-    storageDefinition: parsePluginDefinition<StoragePluginDefinition>(
-      obj,
-      pluginDir,
-      'storagePluginDefinition',
-      StoragePluginDefinitionSchema,
-    ),
-    idpDefinition: parsePluginDefinition<IdpPluginDefinition>(
-      obj,
-      pluginDir,
-      'idpPluginDefinition',
-      IdpPluginDefinitionSchema,
-    ),
-  };
+  const entry: CachedPlugin = { dir: pluginDir };
+  // Dynamic-key write; each value's shape is guarded at runtime by its schema.
+  const writable = entry as unknown as Record<string, unknown>;
+  for (const { field, exportKey, schema } of DEFINITION_KINDS) {
+    writable[field] = parseDefinition(obj, pluginDir, exportKey, schema);
+  }
+  return entry;
 }
 
 function discoverAndCache(): CachedPlugin[] {
@@ -186,6 +185,15 @@ function discoverAndCache(): CachedPlugin[] {
   return cache;
 }
 
+/** All present values of one definition field across discovered plugins. */
+function definitionsOf<K extends keyof CachedPlugin>(field: K): NonNullable<CachedPlugin[K]>[] {
+  return discoverAndCache()
+    .map((p) => p[field])
+    .filter((v): v is NonNullable<CachedPlugin[K]> => v !== undefined);
+}
+
+// --- Catalog + definition getters -------------------------------------------
+
 export interface PluginCatalogEntry {
   code: string;
   hasApi: boolean;
@@ -210,8 +218,7 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
 }
 
 export function getEnabledPluginApiDefinitions(): FeatureApiDefinition[] {
-  const discovered = discoverAndCache();
-  return discovered.filter((p) => p.apiDefinition).map((p) => p.apiDefinition!);
+  return definitionsOf('apiDefinition');
 }
 
 export interface FormEnginePluginCatalogEntry {
@@ -221,82 +228,97 @@ export interface FormEnginePluginCatalogEntry {
 }
 
 export function getFormEnginePluginCatalog(): FormEnginePluginCatalogEntry[] {
-  const discovered = discoverAndCache();
-  return discovered
-    .filter((p) => p.formEngineDefinition)
-    .map((p) => ({
-      code: p.formEngineDefinition!.code,
-      name: p.formEngineDefinition!.metadata.name,
-      version: p.formEngineDefinition!.metadata.version,
-    }));
+  return getFormEnginePluginDefinitions().map((d) => ({
+    code: d.code,
+    name: d.metadata.name,
+    version: d.metadata.version,
+  }));
 }
 
 export function getFormEnginePluginDefinitions(): FormEnginePluginDefinition[] {
-  const discovered = discoverAndCache();
-  return discovered
-    .map((p) => p.formEngineDefinition)
-    .filter((d): d is FormEnginePluginDefinition => Boolean(d));
+  return definitionsOf('formEngineDefinition');
 }
 
 export function getCachePluginDefinitions(): CachePluginDefinition[] {
-  const discovered = discoverAndCache();
-  return discovered
-    .map((p) => p.cacheDefinition)
-    .filter((d): d is CachePluginDefinition => Boolean(d));
+  return definitionsOf('cacheDefinition');
 }
 
 export function getMessageBusPluginDefinitions(): MessageBusPluginDefinition[] {
-  const discovered = discoverAndCache();
-  return discovered
-    .map((p) => p.messagebusDefinition)
-    .filter((d): d is MessageBusPluginDefinition => Boolean(d));
+  return definitionsOf('messagebusDefinition');
 }
 
 export function getStoragePluginDefinitions(): StoragePluginDefinition[] {
-  const discovered = discoverAndCache();
-  return discovered
-    .map((p) => p.storageDefinition)
-    .filter((d): d is StoragePluginDefinition => Boolean(d));
+  return definitionsOf('storageDefinition');
 }
 
 export function getIdpPluginDefinitions(): IdpPluginDefinition[] {
-  const discovered = discoverAndCache();
-  return discovered.map((p) => p.idpDefinition).filter((d): d is IdpPluginDefinition => Boolean(d));
+  return definitionsOf('idpDefinition');
 }
 
-let cacheAdapterInstance: CacheAdapter | null = null;
+// --- Selectable adapters (singleton by code) --------------------------------
 
-export function getCacheAdapter(): CacheAdapter {
-  if (!cacheAdapterInstance) {
-    const code = env.getCacheDefaultCode() ?? 'cache-memory';
-    const definitions = getCachePluginDefinitions();
-    const definition = definitions.find((d) => d.code === code);
-    if (!definition) {
-      throw new Error(
-        `No cache plugin is installed for code '${code}'. Available: ${definitions.map((d) => d.code).join(', ') || '<none>'}`,
-      );
+// Active plugin code per selectable kind. The adapter getters and /meta/plugins both resolve
+// through this, so they can't drift. Storage is not here — it is selected per profile.
+const SELECTABLE_PLUGIN_DEFAULTS = {
+  cache: { label: 'cache', configured: () => env.getCacheDefaultCode(), fallback: 'cache-memory' },
+  messagebus: {
+    label: 'messagebus',
+    configured: () => env.getMessageBusDefaultCode(),
+    fallback: 'messagebus-memory',
+  },
+} as const;
+
+type SelectablePluginType = keyof typeof SELECTABLE_PLUGIN_DEFAULTS;
+
+/** The code the registry will instantiate for a selectable plugin kind. */
+export function resolveActivePluginCode(type: SelectablePluginType): string {
+  const { configured, fallback } = SELECTABLE_PLUGIN_DEFAULTS[type];
+  return configured() ?? fallback;
+}
+
+/** Codes of the plugins actually selected across every selectable kind. */
+export function getActivePluginCodes(): Set<string> {
+  const types = Object.keys(SELECTABLE_PLUGIN_DEFAULTS) as SelectablePluginType[];
+  return new Set(types.map(resolveActivePluginCode));
+}
+
+/** Minimal shape shared by every adapter plugin definition. */
+interface AdapterDefinition<T> {
+  code: string;
+  createAdapter: (config: PluginConfigReader) => T;
+}
+
+/** Memoized getter for a selectable adapter: resolve the active code, find its definition,
+ *  construct once. Throws (listing installed codes) if none matches. */
+function lazyAdapter<T>(
+  type: SelectablePluginType,
+  getDefinitions: () => AdapterDefinition<T>[],
+): () => T {
+  let instance: T | undefined;
+  return () => {
+    if (instance === undefined) {
+      const code = resolveActivePluginCode(type);
+      const definitions = getDefinitions();
+      const definition = definitions.find((d) => d.code === code);
+      if (!definition) {
+        const available = definitions.map((d) => d.code).join(', ') || '<none>';
+        throw new Error(
+          `No ${SELECTABLE_PLUGIN_DEFAULTS[type].label} plugin is installed for code '${code}'. Available: ${available}`,
+        );
+      }
+      instance = definition.createAdapter(createPluginConfigReader(definition.code));
     }
-    cacheAdapterInstance = definition.createAdapter(createPluginConfigReader(definition.code));
-  }
-  return cacheAdapterInstance;
+    return instance;
+  };
 }
 
-let messageBusAdapterInstance: MessageBusAdapter | null = null;
+export const getCacheAdapter = lazyAdapter<CacheAdapter>('cache', getCachePluginDefinitions);
+export const getMessageBusAdapter = lazyAdapter<MessageBusAdapter>(
+  'messagebus',
+  getMessageBusPluginDefinitions,
+);
 
-export function getMessageBusAdapter(): MessageBusAdapter {
-  if (!messageBusAdapterInstance) {
-    const code = env.getMessageBusDefaultCode() ?? 'messagebus-memory';
-    const definitions = getMessageBusPluginDefinitions();
-    const definition = definitions.find((d) => d.code === code);
-    if (!definition) {
-      throw new Error(
-        `No messagebus plugin is installed for code '${code}'. Available: ${definitions.map((d) => d.code).join(', ') || '<none>'}`,
-      );
-    }
-    messageBusAdapterInstance = definition.createAdapter(createPluginConfigReader(definition.code));
-  }
-  return messageBusAdapterInstance;
-}
+// --- Storage (discovered above, but selected per profile) -------------------
 
 const storageAdapterByProfile = new Map<string, StorageEngineAdapter>();
 

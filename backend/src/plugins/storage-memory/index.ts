@@ -20,7 +20,7 @@ import type { PluginConfigReader } from '../../core/config/pluginConfig';
  *
  * Not suitable for durable, multi-replica environments: each replica holds its own Map, so a
  * file uploaded to one pod is invisible to the others, and nothing survives a restart. Point
- * those environments at 's3-compatible' (or 'local-storage' with a shared volume) instead.
+ * those environments at 'storage-s3' (or 'storage-local' with a shared volume) instead.
  */
 interface StoredObject {
   buffer: Buffer;

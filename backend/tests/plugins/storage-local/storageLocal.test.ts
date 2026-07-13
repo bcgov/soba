@@ -3,7 +3,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { storagePluginDefinition } from '../../../src/plugins/local-storage';
+import { storagePluginDefinition } from '../../../src/plugins/storage-local';
 import type { PluginConfigReader } from '../../../src/core/config/pluginConfig';
 
 function makeConfig(basePath: string): PluginConfigReader {
@@ -22,8 +22,8 @@ function makeConfig(basePath: string): PluginConfigReader {
   };
 }
 
-describe('local-storage adapter', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'local-storage-test-'));
+describe('storage-local adapter', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'storage-local-test-'));
   const adapter = storagePluginDefinition.createAdapter(makeConfig(tmp));
 
   it('uploads, lists, gets and deletes a file', async () => {

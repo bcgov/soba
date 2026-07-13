@@ -11,7 +11,7 @@ Runs on the host before the container is built or started:
 - **Environment files**: Copies example files to active env files only if targets don't exist (`cp -n`):
   - `backend/.env.example` → `backend/.env`, `backend/.env.local.example` → `backend/.env.local`
   - `frontend/.env.example` → `frontend/.env`
-  - Existing files (e.g. `backend/.env.local` with secrets) are never overwritten.
+  - Existing files (e.g. `backend/.env.local` with secrets) are not overwritten by this step.
 
 ### 2. Container build
 
@@ -25,7 +25,7 @@ The `Dockerfile` builds a Node.js 24 image with:
 
 ### 3. Container start
 
-- **Host access**: `runArgs` includes `--add-host=host.docker.internal:host-gateway` so that `host.docker.internal` resolves to the host from inside the container (needed on Linux; Docker Desktop on Mac/Windows provides it by default). Memory and Node heap limits are **not** set in `devcontainer.json`; see [Memory and Node performance](#memory-and-node-performance-per-developer). Backend and frontend processes still read their own `.env` files via **dotenv** / Next.js; those files are **not** injected into the container via Docker `--env-file`.
+- **Host access**: `runArgs` includes `--add-host=host.docker.internal:host-gateway` so that `host.docker.internal` resolves to the host from inside the container (needed on Linux; Docker Desktop on Mac/Windows provides it by default). Node heap size comes from the host `DEVCONTAINER_NODE_OPTIONS` variable via `containerEnv` (empty by default), and a `hostRequirements.memory` hint of 4 GB is declared; see [Memory and Node performance](#memory-and-node-performance). Backend and frontend processes still read their own `.env` files via **dotenv** / Next.js; those files are **not** injected into the container via Docker `--env-file`.
 - **Forwarded ports**: 3000 (Frontend), 3001 (Form.io), 4000 (Backend)
 
 ### 4. Post-create (first run only)
@@ -33,14 +33,13 @@ The `Dockerfile` builds a Node.js 24 image with:
 Runs once when the devcontainer is first created:
 
 - Configures pnpm (copy import method, store off virtiofs) for reliable installs on all architectures
-- Creates `backend/.env`, `backend/.env.local`, and `frontend/.env` from examples if missing (safety net)
 - Cleans dependency trees, then runs `pnpm install` at the repo root (workspace: frontend + backend)
-- Installs `integration/playwright` dependencies and Playwright Chromium
+- Integration (Playwright) tests are opt-in and **not** installed here — see `integration/README.md`
 
 ### 5. Post-start (every container start)
 
-- Refreshes `backend/.env` and `frontend/.env` from their `.env.example` files on each start.
-- `backend/.env.local` is never touched and keeps your secrets.
+- Syncs `backend/.env`, `backend/.env.local`, and `frontend/.env` with their `*.example` templates: creates them if missing, and when a template changes, backs up the current file to `*.prev` before applying the new template. Change is detected via a gitignored `*.hash` marker, so it survives git checkouts (which reset mtimes).
+- After a template change to `.env.local`, re-apply your secrets from the backup — the new template ships with placeholders.
 - Runs `pnpm install` only when `pnpm-lock.yaml` changed or dependencies are missing (not on every start).
 
 ---
@@ -106,7 +105,7 @@ Use `host.docker.internal` to reach the sidecar services (the devcontainer is st
 
 ### Option 1: VS Code launch
 
-- **SOBA (Backend + Temporal)**: backend stack only — then run `soba-fe` in a terminal for frontend (`http://localhost:3000`)
+- **SOBA (Backend + Temporal)**: backend stack only — then run `pnpm --dir frontend dev` (or `soba-fe`) in a terminal for the frontend (`http://localhost:3000`)
 - **SOBA (Backend + Temporal + Frontend)**: everything including frontend via `pnpm dev:watch`
 - **SOBA Backend** / **SOBA Frontend**: individual services (`http://localhost:4000`, `http://localhost:3000`)
 
@@ -116,9 +115,8 @@ Use `host.docker.internal` to reach the sidecar services (the devcontainer is st
 # Backend
 pnpm --dir backend dev
 
-# Frontend (in another terminal) — prefer soba-fe after setting up ~/.bashrc
-soba-fe
-# or: cd frontend && pnpm dev
+# Frontend (in another terminal) — or `soba-fe` with the bashrc aliases
+pnpm --dir frontend dev
 ```
 
 ### Endpoints
@@ -135,70 +133,43 @@ The frontend example uses `NEXT_PUBLIC_SOBA_API_BASE_URL=http://localhost:4000/a
 
 ---
 
-## Memory and Node performance (per developer)
+## Memory and Node performance
 
-The devcontainer does **not** set Docker memory caps or `NODE_OPTIONS` in `devcontainer.json`. Each developer tunes heap and tooling for their machine.
+The devcontainer sets the container-wide `NODE_OPTIONS` from the host `DEVCONTAINER_NODE_OPTIONS` variable (empty by default, so no heap cap) and declares a `hostRequirements.memory` hint of 4 GB. Because it is set in `containerEnv`, the value applies to **every** process in the container — integrated terminals **and** F5 Run-and-Debug — with no per-shell setup.
+
+If local builds run out of memory, first increase the memory available to your Docker runtime (Docker Desktop, Rancher Desktop, Colima, OrbStack, or your equivalent container manager). For Node heap-related failures, launch the editor with a heap cap:
+
+```bash
+DEVCONTAINER_NODE_OPTIONS="--max-old-space-size=4096" code .
+```
 
 ### Why this matters
 
 Node's `--max-old-space-size` caps the V8 heap **per process**. Next.js dev, Jest, and the TypeScript language server (`tsserver`) each run as separate processes. If total usage exceeds available RAM, Linux may **SIGKILL** a process (tests or dev server die with no stack trace).
 
-Some `package.json` scripts still set `NODE_OPTIONS` inline (e.g. `frontend` `dev`, `backend` `test`). Those **override** your shell defaults for that command. Use the aliases below to bypass them when you want personal limits.
+Some `package.json` scripts set `NODE_OPTIONS` inline (e.g. `frontend` `dev`, `backend` `test`). An inline value **overrides** the container-wide `DEVCONTAINER_NODE_OPTIONS` for that command. Use the one-off CLI form below to run one of those with a different heap.
 
-### Option 1: Container `~/.bashrc` (task-specific aliases)
+### Per-task overrides
 
-`~/.bashrc` is **inside the container** (typically `/home/node/.bashrc`), not your host home directory. It is **not** in git. It usually survives container stop/start but is **lost on rebuild** — re-copy after rebuild.
+**Container `~/.bashrc` aliases** — task-specific aliases inside the container (`/home/node/.bashrc`, not your host home; not in git; lost on rebuild — re-copy after):
 
 ```bash
 cp .devcontainer/bashrc.example ~/.bashrc
 source ~/.bashrc
 ```
 
-Verify:
+This adds `soba-fe` (frontend dev with its own heap), `soba-test-be` (serial backend tests), and a default shell `NODE_OPTIONS`. See `.devcontainer/bashrc.example` for the values and larger-machine variants.
+
+**One-off CLI** — a specific heap for a single command, bypassing the script default:
 
 ```bash
-echo $NODE_OPTIONS
-type soba-fe
+NODE_OPTIONS=--max-old-space-size=1536 pnpm --dir frontend exec next dev --hostname 0.0.0.0
+NODE_OPTIONS=--max-old-space-size=1024 pnpm --dir backend exec jest --runInBand
 ```
 
-**Practical examples** (also in `.devcontainer/bashrc.example`):
+**VS Code User settings** — a persistent terminal default on your host (survives container rebuild). Open **User** settings JSON (not workspace `.vscode/settings.json`):
 
-```bash
-# Default heap for generic node commands in this shell
-export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=2048}"
-
-# Frontend hot reload — bypasses frontend/package.json dev script heap
-soba-fe() {
-  NODE_OPTIONS=--max-old-space-size=1536 pnpm --dir /workspaces/soba/frontend exec next dev --hostname 0.0.0.0
-}
-
-# Backend tests — serial, low memory
-soba-test-be() {
-  NODE_OPTIONS=--max-old-space-size=1024 pnpm --dir /workspaces/soba/backend exec jest --runInBand
-}
-```
-
-**Larger machine (16 GB+ host, comfortable Docker limits):**
-
-```bash
-export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=4096}"
-
-soba-fe() {
-  NODE_OPTIONS=--max-old-space-size=3072 pnpm --dir /workspaces/soba/frontend exec next dev --hostname 0.0.0.0
-}
-
-soba-test-be() {
-  NODE_OPTIONS=--max-old-space-size=1536 pnpm --dir /workspaces/soba/backend exec jest --maxWorkers=2
-}
-```
-
-Use `soba-fe` instead of `pnpm dev` in `frontend/` when you want your heap, not the script default.
-
-### Option 2: Cursor User settings (survives container rebuild)
-
-Open **User** settings JSON (not workspace `.vscode/settings.json`). These apply to integrated terminals in the devcontainer and persist on your host.
-
-**Conservative (laptop / tight memory):**
+Conservative (laptop / tight memory):
 
 ```json
 {
@@ -209,7 +180,7 @@ Open **User** settings JSON (not workspace `.vscode/settings.json`). These apply
 }
 ```
 
-**Comfortable (16 GB+ host):**
+Comfortable (16 GB+ host):
 
 ```json
 {
@@ -220,42 +191,35 @@ Open **User** settings JSON (not workspace `.vscode/settings.json`). These apply
 }
 ```
 
-Open a **new** terminal and run `echo $NODE_OPTIONS` to confirm.
+Open a **new** terminal and run `echo $NODE_OPTIONS` to confirm. `typescript.tsserver.maxTsServerMemory` caps the IDE TypeScript server, freeing RAM for Next/Jest.
 
-`typescript.tsserver.maxTsServerMemory` frees RAM for Next/Jest by capping the IDE TypeScript server.
+### What sets NODE_OPTIONS where
 
-### Option 3: One-off CLI
+| Mechanism                                        | Terminals                           | F5 Run and Debug               |
+| ------------------------------------------------ | ----------------------------------- | ------------------------------ |
+| `DEVCONTAINER_NODE_OPTIONS` (via `containerEnv`) | Yes                                 | Yes                            |
+| `~/.bashrc` / aliases                            | Yes                                 | No (unless launch runs via your shell) |
+| User `terminal.integrated.env.linux`             | Yes                                 | Usually no                     |
+| `package.json` script prefix                     | Overrides the above for that script | Yes, if launch uses the script |
 
-```bash
-NODE_OPTIONS=--max-old-space-size=1536 pnpm --dir frontend exec next dev --hostname 0.0.0.0
-NODE_OPTIONS=--max-old-space-size=1024 pnpm --dir backend exec jest --runInBand
-```
-
-### What is not covered by personal env
-
-| Mechanism                            | Terminals                       | F5 Run and Debug                       |
-| ------------------------------------ | ------------------------------- | -------------------------------------- |
-| `~/.bashrc` / aliases                | Yes                             | No (unless launch runs via your shell) |
-| User `terminal.integrated.env.linux` | Yes                             | Usually no                             |
-| `package.json` script prefix         | Overrides shell for that script | Yes, if launch uses the script         |
-
-For stable frontend dev on smaller machines, use **SOBA (Backend + Temporal)** from Run and Debug, then **`soba-fe`** in a terminal — instead of the all-in-one compound that starts frontend via `dev:watch`.
+For stable frontend dev on smaller machines, launch with a modest `DEVCONTAINER_NODE_OPTIONS`, run **SOBA (Backend + Temporal)** from Run and Debug, then start the frontend in a terminal (`pnpm --dir frontend dev`, or `soba-fe` with the bashrc aliases) — instead of the all-in-one compound that starts the frontend via `dev:watch`.
 
 ### Troubleshooting
 
 | Symptom                          | Likely cause            | Action                                                                           |
 | -------------------------------- | ----------------------- | -------------------------------------------------------------------------------- |
-| `JavaScript heap out of memory`  | V8 heap too small       | Raise `max-old-space-size` for that task                                         |
+| `JavaScript heap out of memory`  | V8 heap too small       | Raise `max-old-space-size` (relaunch with a larger `DEVCONTAINER_NODE_OPTIONS`, or use the one-off CLI) |
 | `pnpm install` fails with `EINVAL` on virtiofs | Corrupt/partial `node_modules` on VM mount | Run `pnpm clean:workspace && pnpm install`, then rebuild container |
-| Jest/test suite `signal=SIGKILL` | Total RAM exceeded      | Lower heaps, use `soba-test-be`, avoid running `pnpm qa` while Next is compiling |
-| Slow but stable                  | Low heap / serial tests | Expected; use `test:parallel` or higher heaps on a bigger machine                |
+| Jest/test suite `signal=SIGKILL` | Total RAM exceeded      | Lower heaps, run `pnpm --dir backend test` or `soba-test-be` (serial), avoid `pnpm qa` while Next is compiling |
+| Slow but stable                  | Low heap / serial tests | Expected; use `test:parallel` or a larger heap on a bigger machine               |
 
 ### Quick checklist for new developers
 
-1. Copy `.devcontainer/bashrc.example` → `~/.bashrc` and `source ~/.bashrc`
-2. Set User `terminal.integrated.env.linux` and `typescript.tsserver.maxTsServerMemory`
-3. Start frontend with `soba-fe`; run tests with `soba-test-be` or `pnpm test:backend`
-4. After **Rebuild Container**, repeat step 1 (User settings from step 2 remain)
+1. (Optional) Increase your Docker runtime's memory allocation.
+2. Launch with a heap cap if you hit OOM: `DEVCONTAINER_NODE_OPTIONS="--max-old-space-size=4096" code .`
+3. (Optional) Copy `.devcontainer/bashrc.example` → `~/.bashrc` and `source ~/.bashrc` for the `soba-fe`/`soba-test-be` aliases (re-copy after a container rebuild).
+4. (Optional) Set User `terminal.integrated.env.linux` and `typescript.tsserver.maxTsServerMemory` for a persistent terminal default.
+5. Start the frontend with `pnpm --dir frontend dev` (or `soba-fe`); run backend tests with `pnpm --dir backend test` (or `soba-test-be`).
 
 ---
 
@@ -287,7 +251,7 @@ The frontend uses `.env`. Next.js loads it at build/runtime. The example sets `N
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | **Initialize** (before container starts) | `cp -n` for backend and frontend env files — copies only if the target does not exist. Existing files are never overwritten.      |
 | **Post-create** (first run only)         | Same as above, as a safety net.                                                                                                   |
-| **Post-start** (every start)             | `cp .env.example .env` — refreshes `backend/.env` and `frontend/.env` from their examples. `backend/.env.local` is never touched. |
+| **Post-start** (every start)             | Syncs `backend/.env`, `backend/.env.local`, and `frontend/.env` with their templates — creates if missing; on a template change, backs up the current file to `*.prev` then applies the new template. |
 
 ### How they are applied
 
@@ -300,5 +264,5 @@ The frontend uses `.env`. Next.js loads it at build/runtime. The example sets `N
 ### Summary
 
 - `.env` is never committed; it is created from `.env.example` when the devcontainer starts.
-- Backend: put credentials in `.env.local`; it is never overwritten.
+- Backend: put credentials in `.env.local`. It changes only when `.env.local.example` changes, and the previous copy is backed up to `.env.local.prev` so you can re-apply your secrets.
 - Frontend: `.env.example` values target localhost; edit `.env` for other environments.

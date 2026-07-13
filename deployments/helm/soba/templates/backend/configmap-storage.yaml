@@ -7,18 +7,18 @@ metadata:
 data:
   # Files feature + storage profiles. The default profile uses 'storage-memory' (in-process,
   # ephemeral — no volume or external service). Switch storageProfileDefaultBackend to
-  # 's3-compatible' and set the endpoint/bucket below (credentials come from a Secret) for durable,
+  # 'storage-s3' and set the endpoint/bucket below (credentials come from a Secret) for durable,
   # multi-replica storage.
   STORAGE_PROFILES: {{ .Values.backend.storage.profiles | quote }}
   STORAGE_PROFILE_DEFAULT_BACKEND: {{ .Values.backend.storage.defaultBackend | quote }}
   FILES_STORAGE_PROFILE: {{ .Values.backend.storage.filesStorageProfile | quote }}
   FILES_MAX_FILE_SIZE_MB: {{ .Values.backend.storage.filesMaxFileSizeMb | quote }}
   {{- with .Values.backend.storage.defaultBasePath }}
-  # local-storage only: filesystem path the default profile writes to (needs a writable volume).
+  # storage-local only: filesystem path the default profile writes to (needs a writable volume).
   STORAGE_PROFILE_DEFAULT_BASE_PATH: {{ . | quote }}
   {{- end }}
   {{- with .Values.backend.storage.defaultEndpoint }}
-  # s3-compatible only (non-credential keys; ACCESS_KEY/SECRET_KEY come from a Secret).
+  # storage-s3 only (non-credential keys; ACCESS_KEY/SECRET_KEY come from a Secret).
   # A full URL (https://host:port) also sets port + SSL, making the two keys below optional.
   STORAGE_PROFILE_DEFAULT_ENDPOINT: {{ . | quote }}
   {{- end }}

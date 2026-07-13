@@ -20,7 +20,7 @@ export const FileUploadResponseSchema = z
   .openapi('Files_UploadResponse');
 
 export function registerFilesOpenApi(registry: OpenAPIRegistry) {
-  const tag = 'core.files';
+  const tag = 'feature.files';
 
   registry.registerPath({
     method: 'post',

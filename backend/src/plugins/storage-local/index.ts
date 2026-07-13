@@ -58,7 +58,7 @@ function createLocalStorageAdapter(config: PluginConfigReader): StorageEngineAda
         });
       } else if (input.sourceUrl) {
         // sourceUrl ingestion is not implemented in this adapter.
-        throw new Error('sourceUrl uploads are not supported by local-storage adapter');
+        throw new Error('sourceUrl uploads are not supported by storage-local adapter');
       } else {
         throw new Error('No payload provided');
       }
@@ -125,6 +125,6 @@ function createLocalStorageAdapter(config: PluginConfigReader): StorageEngineAda
 }
 
 export const storagePluginDefinition: StoragePluginDefinition = {
-  code: 'local-storage',
+  code: 'storage-local',
   createAdapter: createLocalStorageAdapter,
 };

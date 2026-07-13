@@ -10,6 +10,7 @@ import { filesDomain } from '../../features/files';
 import { meDomain } from './me';
 import { membersDomain } from './members';
 import { workspacesDomain } from './workspaces';
+import { metaDomain } from './meta';
 import { registerOpenApiPaths } from './shared/openapi';
 
 // API surfaces, each mounted under its own base path with its own auth (see app.ts):
@@ -25,6 +26,7 @@ registerOpenApiPaths((registry) => {
   membersDomain.registerOpenApi(registry);
   workspacesDomain.registerOpenApi(registry);
   filesDomain.registerOpenApi(registry);
+  metaDomain.registerOpenApi(registry);
   registerAdminOpenApi(registry);
   registerHealthOpenApi(registry);
 });
