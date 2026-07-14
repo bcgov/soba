@@ -58,6 +58,10 @@ jest.mock('../../../src/core/db/repos/formSubmitAccessRepo', () => ({
 jest.mock('../../../src/core/db/repos/submissionRepo', () => ({
   getSubmissionRecordById: jest.fn(),
 }));
+// Antivirus off here: these cases predate scanning and cover storage + authorization.
+jest.mock('../../../src/core/db/repos/featureRepo', () => ({
+  isFeatureEnabledCached: jest.fn().mockResolvedValue(false),
+}));
 
 import { filesService } from '../../../src/features/files/service';
 import { hasFormSubmitAccess } from '../../../src/core/db/repos/formSubmitAccessRepo';
@@ -75,8 +79,16 @@ const submissionMock = getSubmissionRecordById as jest.Mock;
 const owner = { actorId: 'actor1', idpCode: 'idir' };
 const intruder = { actorId: 'intruder', idpCode: 'idir' };
 
+// upload() returns a discriminated union once antivirus can reject; with the feature off here it is
+// always a record. Narrow so the download/delete cases can read the id.
+async function uploadRecord(params: Parameters<typeof filesService.upload>[0]) {
+  const result = await filesService.upload(params);
+  if (typeof result === 'string') throw new Error(`unexpected scan outcome: ${result}`);
+  return result;
+}
+
 const uploadFor = (submissionId: string | null, filename = 'a.txt') =>
-  filesService.upload({
+  uploadRecord({
     workspaceId: 'ws1',
     actorId: 'actor1',
     filename,
@@ -116,19 +128,19 @@ describe('filesService', () => {
   });
 
   it('associates only same-workspace files referenced in submission data', async () => {
-    const f1 = await filesService.upload({
+    const f1 = await uploadRecord({
       workspaceId: 'ws1',
       actorId: 'a',
       filename: 'f1.pdf',
       buffer: Buffer.from('1'),
     });
-    const f2 = await filesService.upload({
+    const f2 = await uploadRecord({
       workspaceId: 'ws1',
       actorId: 'a',
       filename: 'f2.pdf',
       buffer: Buffer.from('2'),
     });
-    const other = await filesService.upload({
+    const other = await uploadRecord({
       workspaceId: 'ws2',
       actorId: 'a',
       filename: 'x.pdf',

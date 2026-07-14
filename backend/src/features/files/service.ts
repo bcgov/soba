@@ -12,6 +12,7 @@ import { hasFormSubmitAccess, type CallerIdentity } from '../../core/db/repos/fo
 import { Permissions, SubmissionWorkflowState } from '../../core/db/codes';
 import type { GetFileResult } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 import { extractChefsFileIds } from './fileReferences';
+import { scanUpload } from './scanUpload';
 
 export interface UploadFileParams {
   workspaceId: string;
@@ -25,8 +26,15 @@ export interface UploadFileParams {
 }
 
 export const filesService = {
-  /** Store the bytes and record a file row. The returned record's id is the public reference. */
-  async upload(params: UploadFileParams): Promise<FileRecord> {
+  /**
+   * Store the bytes and record a file row. The returned record's id is the public reference.
+   * Scans first when the antivirus feature is on: an infected or unscannable file is rejected
+   * (discriminated result) before it reaches storage or the DB.
+   */
+  async upload(params: UploadFileParams): Promise<FileRecord | 'infected' | 'scan-unavailable'> {
+    const scan = await scanUpload(params.buffer, params.filename);
+    if (scan !== 'clean') return scan;
+
     const profile = params.useProfile ?? env.getFilesStorageProfile();
     const result = await getStorageAdapter(profile).uploadFile({
       workspaceId: params.workspaceId,

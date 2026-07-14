@@ -111,11 +111,16 @@ export const FeatureStatus = {
 } as const;
 export type FeatureStatusCode = (typeof FeatureStatus)[keyof typeof FeatureStatus];
 
-/** Feature codes gating a mounted API surface (see requireFeature); mirrors the frontend FEATURE_CODES. */
+/**
+ * Feature codes backed by the soba.feature table. Most gate a mounted API surface via
+ * requireFeature and mirror the frontend FEATURE_CODES; antivirus is backend-only and gates
+ * scan-on-upload behaviour inside the files surface rather than a surface of its own.
+ */
 export const Features = {
   design_mode: 'design-mode',
   submit_mode: 'submit-mode',
   files: 'files',
+  antivirus: 'antivirus',
 } as const;
 export type FeatureCode = (typeof Features)[keyof typeof Features];
 
