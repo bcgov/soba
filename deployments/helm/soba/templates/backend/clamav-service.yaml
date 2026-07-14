@@ -1,0 +1,14 @@
+{{- if include "soba.virusScanUsesClamav" . }}
+# In-namespace alias to the separately-deployed clamav (deployments/helm/clamav).
+# The backend targets this stable name ({{ include "soba.fullname" . }}-clamav);
+# only externalName changes per environment, so the backend config is env-invariant.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "soba.fullname" . }}-clamav
+  labels:
+    {{- include "soba.labels" (dict "root" . "component" "clamav") | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: {{ .Values.clamav.externalName | default (printf "clamav.%s.svc.cluster.local" .Release.Namespace) | quote }}
+{{- end }}

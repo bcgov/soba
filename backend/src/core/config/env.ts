@@ -153,6 +153,7 @@ export function createEnvReader(source: EnvSource) {
     getCacheDefaultCode: () => getOptionalEnvFrom(source, 'CACHE_DEFAULT_CODE'),
     getMessageBusDefaultCode: () => getOptionalEnvFrom(source, 'MESSAGEBUS_DEFAULT_CODE'),
     getTempStorageDefaultCode: () => getOptionalEnvFrom(source, 'TEMPSTORAGE_DEFAULT_CODE'),
+    getVirusScanDefaultCode: () => getOptionalEnvFrom(source, 'VIRUSSCAN_DEFAULT_CODE'),
     getFormEngineDefaultCode: () => getOptionalEnvFrom(source, 'FORM_ENGINE_DEFAULT_CODE'),
     /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
     getDefaultSubmitterProvider: () =>
@@ -214,6 +215,7 @@ export const env = {
   getCacheDefaultCode: () => getOptionalEnv('CACHE_DEFAULT_CODE'),
   getMessageBusDefaultCode: () => getOptionalEnv('MESSAGEBUS_DEFAULT_CODE'),
   getTempStorageDefaultCode: () => getOptionalEnv('TEMPSTORAGE_DEFAULT_CODE'),
+  getVirusScanDefaultCode: () => getOptionalEnv('VIRUSSCAN_DEFAULT_CODE'),
   getFormEngineDefaultCode: () => getOptionalEnv('FORM_ENGINE_DEFAULT_CODE'),
   /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
   getDefaultSubmitterProvider: () => getOptionalEnv('DEFAULT_SUBMITTER_PROVIDER') ?? 'azureidir',

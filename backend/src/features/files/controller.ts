@@ -56,6 +56,17 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
     useProfile: profile,
   });
 
+  // Virus scan rejections (antivirus feature on): infected is a client-side content problem;
+  // scan-unavailable is fail-closed — the scanner couldn't clear the file, so we don't store it.
+  if (record === 'infected') {
+    res.status(422).json({ error: 'File failed virus scan' });
+    return;
+  }
+  if (record === 'scan-unavailable') {
+    res.status(503).json({ error: 'Virus scanning unavailable' });
+    return;
+  }
+
   // The chefs provider builds each file's URL as `${filesUrl}/${id}`, so it only needs the id
   // (name/size/type are used for the Form.io file value).
   res.json({

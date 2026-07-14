@@ -1,7 +1,8 @@
 /**
  * Plugin discovery + selection. Scans the plugins dir once (lazy, cached), validates each module's
  * exported definitions with Zod, and exposes per-kind definition lists, the discovered catalog, and
- * lazily-instantiated singleton adapters for the selectable kinds (cache, messagebus, temp storage).
+ * lazily-instantiated singleton adapters for the selectable kinds (cache, messagebus, temp storage,
+ * virus scan).
  * Storage is discovered here too but selected per profile (see getStorageAdapter).
  */
 import fs from 'fs';
@@ -26,6 +27,7 @@ import type {
   TempStorageAdapter,
   TempStoragePluginDefinition,
 } from '../temp-storage/TempStorageAdapter';
+import type { VirusScanAdapter, VirusScanPluginDefinition } from '../virus-scan/VirusScanAdapter';
 import type { IdpPluginDefinition } from '../../auth/IdpPlugin';
 import type {
   StorageEngineAdapter,
@@ -73,6 +75,7 @@ interface CachedPlugin {
   cacheDefinition?: CachePluginDefinition;
   messagebusDefinition?: MessageBusPluginDefinition;
   tempStorageDefinition?: TempStoragePluginDefinition;
+  virusScanDefinition?: VirusScanPluginDefinition;
   storageDefinition?: StoragePluginDefinition;
   idpDefinition?: IdpPluginDefinition;
 }
@@ -103,6 +106,11 @@ const DEFINITION_KINDS: ReadonlyArray<{
   {
     field: 'tempStorageDefinition',
     exportKey: 'tempStoragePluginDefinition',
+    schema: AdapterPluginDefinitionSchema,
+  },
+  {
+    field: 'virusScanDefinition',
+    exportKey: 'virusScanPluginDefinition',
     schema: AdapterPluginDefinitionSchema,
   },
   {
@@ -219,6 +227,7 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
       p.cacheDefinition?.code ??
       p.messagebusDefinition?.code ??
       p.tempStorageDefinition?.code ??
+      p.virusScanDefinition?.code ??
       p.dir;
     return {
       code,
@@ -262,6 +271,10 @@ export function getTempStoragePluginDefinitions(): TempStoragePluginDefinition[]
   return definitionsOf('tempStorageDefinition');
 }
 
+export function getVirusScanPluginDefinitions(): VirusScanPluginDefinition[] {
+  return definitionsOf('virusScanDefinition');
+}
+
 export function getStoragePluginDefinitions(): StoragePluginDefinition[] {
   return definitionsOf('storageDefinition');
 }
@@ -285,6 +298,11 @@ const SELECTABLE_PLUGIN_DEFAULTS = {
     label: 'temp-storage',
     configured: () => env.getTempStorageDefaultCode(),
     fallback: 'tempstorage-os',
+  },
+  virusScan: {
+    label: 'virus-scan',
+    configured: () => env.getVirusScanDefaultCode(),
+    fallback: 'virusscan-noop',
   },
 } as const;
 
@@ -340,6 +358,10 @@ export const getMessageBusAdapter = lazyAdapter<MessageBusAdapter>(
 export const getTempStorageAdapter = lazyAdapter<TempStorageAdapter>(
   'tempStorage',
   getTempStoragePluginDefinitions,
+);
+export const getVirusScanAdapter = lazyAdapter<VirusScanAdapter>(
+  'virusScan',
+  getVirusScanPluginDefinitions,
 );
 
 // --- Storage (discovered above, but selected per profile) -------------------

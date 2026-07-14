@@ -132,3 +132,12 @@ cannot drift apart. Any other code (e.g. tempstorage-os) needs no PVC.
 {{- define "soba.tempStorageUsesMount" -}}
 {{- if eq .Values.backend.config.tempStorageDefaultCode "tempstorage-mount" -}}true{{- end -}}
 {{- end }}
+
+{{/*
+Truthy ("true") only when the backend scans with clamav. Gates the clamav alias
+Service and the PLUGIN_VIRUSSCAN_CLAMAV_* env together so they cannot drift apart.
+Any other code (e.g. virusscan-noop) needs no clamav wiring.
+*/}}
+{{- define "soba.virusScanUsesClamav" -}}
+{{- if eq .Values.backend.config.virusScanDefaultCode "virusscan-clamav" -}}true{{- end -}}
+{{- end }}

@@ -28,6 +28,19 @@
         "reveal": "always",
         "panel": "new"
       }
+    },
+    {
+      "label": "Start ClamAV Container",
+      "type": "shell",
+      "command": "bash .devcontainer/start-clamav.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
     }
   ]
 }

@@ -27,6 +27,11 @@ data:
   {{- if include "soba.tempStorageUsesMount" . }}
   PLUGIN_TEMPSTORAGE_MOUNT_DIR: {{ .Values.backend.tempStorage.mountPath | quote }}
   {{- end }}
+  VIRUSSCAN_DEFAULT_CODE: {{ .Values.backend.config.virusScanDefaultCode | quote }}
+  {{- if include "soba.virusScanUsesClamav" . }}
+  PLUGIN_VIRUSSCAN_CLAMAV_URL: {{ printf "%s-clamav:%v" (include "soba.fullname" .) .Values.clamav.port | quote }}
+  PLUGIN_VIRUSSCAN_CLAMAV_TIMEOUT_MS: {{ .Values.clamav.timeoutMs | quote }}
+  {{- end }}
   SOBA_SYSTEM_SUBJECT: {{ .Values.backend.config.sobaSystemSubject | quote }}
   {{- if not .Values.database.uri }}
   DB_HOST: {{ .Values.database.host | quote }}

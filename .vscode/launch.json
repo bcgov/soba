@@ -60,6 +60,15 @@
       "program": "${workspaceFolder}",
       "runtimeExecutable": "echo",
       "runtimeArgs": ["MinIO command sent successfully!"]
+    },
+    {
+      "name": "ClamAV",
+      "type": "node",
+      "request": "launch",
+      "preLaunchTask": "Start ClamAV Container",
+      "program": "${workspaceFolder}",
+      "runtimeExecutable": "echo",
+      "runtimeArgs": ["ClamAV command sent successfully!"]
     }
   ]
 }
