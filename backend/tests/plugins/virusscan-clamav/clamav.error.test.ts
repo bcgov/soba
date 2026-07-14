@@ -46,4 +46,16 @@ describe('virusscan-clamav (clamd unreachable)', () => {
   it('ping resolves false when the scanner is unreachable', async () => {
     await expect(unreachableAdapter().ping()).resolves.toBe(false);
   });
+
+  // clamscan's init() mutates the options object (deletes the clamdscan key). If those options
+  // are shared across retries, the second init loses host/port and fails as "no scanner" — so a
+  // scanner that's briefly unreachable at boot would stay broken for the process lifetime.
+  it('keeps returning a connection error across retries, not "no scanner"', async () => {
+    const adapter = unreachableAdapter();
+    const first = await adapter.scanBuffer(Buffer.from('a'));
+    const second = await adapter.scanBuffer(Buffer.from('b'));
+    expect(first.verdict).toBe('error');
+    expect(second.verdict).toBe('error');
+    expect(second.message ?? '').not.toMatch(/no socket\/port\/host/i);
+  });
 });

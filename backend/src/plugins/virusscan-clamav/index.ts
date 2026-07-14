@@ -51,15 +51,17 @@ function createClamavVirusScanAdapter(config: PluginConfigReader): VirusScanAdap
   const timeout = timeoutRaw ? parseNumberEnvValue(timeoutRaw) : DEFAULT_TIMEOUT_MS;
 
   // Remote clamd over TCP; no local-binary fallback.
-  const initOptions: NodeClam.Options = {
+  const buildInitOptions = (): NodeClam.Options => ({
     clamdscan: { host, port, timeout, localFallback: false },
     preference: 'clamdscan',
-  };
+  });
 
-  // Memoize the client; clear a failed init so the next call retries.
+  // Memoize the client; clear a failed init so the next call retries. init() mutates the
+  // options it's given (it deletes the clamdscan key), so pass a fresh object each time —
+  // otherwise a retry after a failed init would lose host/port and fail as "no scanner".
   let clamPromise: Promise<NodeClam> | null = null;
   const getClam = (): Promise<NodeClam> => {
-    clamPromise ??= new NodeClam().init(initOptions).catch((err) => {
+    clamPromise ??= new NodeClam().init(buildInitOptions()).catch((err) => {
       clamPromise = null;
       throw err;
     });
