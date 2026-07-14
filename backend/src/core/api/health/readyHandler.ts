@@ -1,7 +1,10 @@
 import { Request, Response } from 'express';
 import { pool } from '../../db/client';
 import { checkFormEngineReadiness } from '../../integrations/form-engine/FormEngineRegistry';
-import { checkStorageReadiness } from '../../integrations/plugins/PluginRegistry';
+import {
+  checkStorageReadiness,
+  getTempStorageAdapter,
+} from '../../integrations/plugins/PluginRegistry';
 
 export async function readinessHandler(_req: Request, res: Response): Promise<void> {
   let dbOk = false;
@@ -19,11 +22,20 @@ export async function readinessHandler(_req: Request, res: Response): Promise<vo
   // pull the pod from rotation (unlike DB and form engines).
   const storage = await checkStorageReadiness();
 
+  // Temp storage is likewise reported but non-gating.
+  let tempStorageOk = false;
+  try {
+    tempStorageOk = await getTempStorageAdapter().ping();
+  } catch {
+    // tempStorageOk stays false
+  }
+
   const body = {
     status: dbOk && allEnginesOk ? 'ready' : 'unhealthy',
     db: dbOk ? 'ok' : 'unreachable',
     formEngines,
     storage,
+    tempStorage: tempStorageOk ? 'ok' : 'unreachable',
   };
 
   if (!dbOk || !allEnginesOk) {

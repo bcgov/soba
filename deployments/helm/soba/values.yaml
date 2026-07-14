@@ -66,7 +66,20 @@ backend:
     formEngineDefaultCode: formio-v5
     cacheDefaultCode: cache-memory
     messagebusDefaultCode: messagebus-memory
+    # Temp storage plugin. tempstorage-mount uses the shared PVC below (never
+    # os.tmpdir()) — the default for real deployments. PRs override to
+    # tempstorage-os (see values-pr.yaml).
+    tempStorageDefaultCode: tempstorage-mount
     sobaSystemSubject: soba-system
+
+  # -- Shared temp storage PVC (RWX so it survives horizontal scaling).
+  # Only provisioned/mounted when config.tempStorageDefaultCode is
+  # tempstorage-mount; mountPath doubles as the plugin's DIR. Ignored otherwise.
+  tempStorage:
+    mountPath: /app/tmp
+    accessMode: ReadWriteMany
+    size: 1Gi
+    storageClassName: ""
 
   # -- configmap-storage: files feature + storage profiles (STORAGE_* + FILES_*)
   storage:

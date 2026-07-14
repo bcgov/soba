@@ -1,8 +1,8 @@
 /**
  * Plugin discovery + selection. Scans the plugins dir once (lazy, cached), validates each module's
  * exported definitions with Zod, and exposes per-kind definition lists, the discovered catalog, and
- * lazily-instantiated singleton adapters for the selectable kinds (cache, messagebus). Storage is
- * discovered here too but selected per profile (see getStorageAdapter).
+ * lazily-instantiated singleton adapters for the selectable kinds (cache, messagebus, temp storage).
+ * Storage is discovered here too but selected per profile (see getStorageAdapter).
  */
 import fs from 'fs';
 import path from 'path';
@@ -22,6 +22,10 @@ import type {
   MessageBusAdapter,
   MessageBusPluginDefinition,
 } from '../messagebus/MessageBusAdapter';
+import type {
+  TempStorageAdapter,
+  TempStoragePluginDefinition,
+} from '../temp-storage/TempStorageAdapter';
 import type { IdpPluginDefinition } from '../../auth/IdpPlugin';
 import type {
   StorageEngineAdapter,
@@ -68,6 +72,7 @@ interface CachedPlugin {
   apiDefinition?: FeatureApiDefinition;
   cacheDefinition?: CachePluginDefinition;
   messagebusDefinition?: MessageBusPluginDefinition;
+  tempStorageDefinition?: TempStoragePluginDefinition;
   storageDefinition?: StoragePluginDefinition;
   idpDefinition?: IdpPluginDefinition;
 }
@@ -93,6 +98,11 @@ const DEFINITION_KINDS: ReadonlyArray<{
   {
     field: 'messagebusDefinition',
     exportKey: 'messagebusPluginDefinition',
+    schema: AdapterPluginDefinitionSchema,
+  },
+  {
+    field: 'tempStorageDefinition',
+    exportKey: 'tempStoragePluginDefinition',
     schema: AdapterPluginDefinitionSchema,
   },
   {
@@ -208,6 +218,7 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
       p.formEngineDefinition?.code ??
       p.cacheDefinition?.code ??
       p.messagebusDefinition?.code ??
+      p.tempStorageDefinition?.code ??
       p.dir;
     return {
       code,
@@ -247,6 +258,10 @@ export function getMessageBusPluginDefinitions(): MessageBusPluginDefinition[] {
   return definitionsOf('messagebusDefinition');
 }
 
+export function getTempStoragePluginDefinitions(): TempStoragePluginDefinition[] {
+  return definitionsOf('tempStorageDefinition');
+}
+
 export function getStoragePluginDefinitions(): StoragePluginDefinition[] {
   return definitionsOf('storageDefinition');
 }
@@ -265,6 +280,11 @@ const SELECTABLE_PLUGIN_DEFAULTS = {
     label: 'messagebus',
     configured: () => env.getMessageBusDefaultCode(),
     fallback: 'messagebus-memory',
+  },
+  tempStorage: {
+    label: 'temp-storage',
+    configured: () => env.getTempStorageDefaultCode(),
+    fallback: 'tempstorage-os',
   },
 } as const;
 
@@ -316,6 +336,10 @@ export const getCacheAdapter = lazyAdapter<CacheAdapter>('cache', getCachePlugin
 export const getMessageBusAdapter = lazyAdapter<MessageBusAdapter>(
   'messagebus',
   getMessageBusPluginDefinitions,
+);
+export const getTempStorageAdapter = lazyAdapter<TempStorageAdapter>(
+  'tempStorage',
+  getTempStoragePluginDefinitions,
 );
 
 // --- Storage (discovered above, but selected per profile) -------------------
