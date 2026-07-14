@@ -31,6 +31,7 @@ export const HealthReadinessResponseSchema = z
     formEngines: z.record(z.string(), FormEngineReadinessResultSchema),
     storage: z.record(z.string(), StorageReadinessResultSchema),
     tempStorage: z.enum(['ok', 'unreachable']),
+    virusScanner: z.enum(['ok', 'unreachable']),
   })
   .openapi('Health_ReadinessResponse');
 
@@ -58,7 +59,7 @@ export const registerHealthOpenApi = (registry: OpenAPIRegistry) => {
     responses: {
       200: {
         description:
-          'Readiness probe (DB and form engines OK; storage and temp storage reported but non-gating)',
+          'Readiness probe (DB and form engines OK; storage, temp storage and virus scanner reported but non-gating)',
         content: {
           'application/json': {
             schema: HealthReadinessResponseSchema,

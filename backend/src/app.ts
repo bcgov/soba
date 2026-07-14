@@ -7,7 +7,12 @@ import cors from 'cors';
 import passport from 'passport';
 import { checkJwt } from './core/middleware/auth';
 import { designRouter, submitRouter, coreRouter } from './core/api';
-import { healthRouter, logStartupHealth, logTempStorageSelfTest } from './core/api/health';
+import {
+  healthRouter,
+  logStartupHealth,
+  logTempStorageSelfTest,
+  logVirusScanSelfTest,
+} from './core/api/health';
 import { metaRouter } from './core/api/meta';
 import { buildOpenApiSpec } from './core/api/shared/openapi';
 import swaggerUi from 'swagger-ui-express';
@@ -125,5 +130,5 @@ app.use('/api/v1', apiRateLimit, express.json(), checkJwt(), resolveActor, coreR
 
 app.listen(port, () => {
   log.info({ port }, 'Express is listening');
-  void logStartupHealth().then(logTempStorageSelfTest);
+  void logStartupHealth().then(logTempStorageSelfTest).then(logVirusScanSelfTest);
 });

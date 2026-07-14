@@ -4,6 +4,7 @@ import { checkFormEngineReadiness } from '../../integrations/form-engine/FormEng
 import {
   checkStorageReadiness,
   getTempStorageAdapter,
+  getVirusScanAdapter,
 } from '../../integrations/plugins/PluginRegistry';
 
 export async function readinessHandler(_req: Request, res: Response): Promise<void> {
@@ -30,12 +31,22 @@ export async function readinessHandler(_req: Request, res: Response): Promise<vo
     // tempStorageOk stays false
   }
 
+  // Virus scanner is reported but non-gating — a scanner outage blocks uploads (fail-closed at the
+  // upload path), it doesn't pull the pod from rotation.
+  let virusScannerOk = false;
+  try {
+    virusScannerOk = await getVirusScanAdapter().ping();
+  } catch {
+    // virusScannerOk stays false
+  }
+
   const body = {
     status: dbOk && allEnginesOk ? 'ready' : 'unhealthy',
     db: dbOk ? 'ok' : 'unreachable',
     formEngines,
     storage,
     tempStorage: tempStorageOk ? 'ok' : 'unreachable',
+    virusScanner: virusScannerOk ? 'ok' : 'unreachable',
   };
 
   if (!dbOk || !allEnginesOk) {
