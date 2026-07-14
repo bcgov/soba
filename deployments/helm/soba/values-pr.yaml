@@ -3,7 +3,7 @@ backend:
   replicas: 1
   config:
     # Ephemeral PR namespaces stage temp bytes under os.tmpdir() — no RWX PVC.
-    tempStorageDefaultCode: tempstorage-mount
+    tempStorageDefaultCode: tempstorage-os
   sso:
     jwksUri: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/certs
     jwtIssuer: https://dev.loginproxy.gov.bc.ca/auth/realms/standard
