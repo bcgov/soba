@@ -21,7 +21,7 @@ export interface UploadFileParams {
   size?: number;
   buffer: Buffer;
   submissionId?: string | null;
-  useProfile?: string | undefined;
+  useProfile?: string;
 }
 
 export const filesService = {
