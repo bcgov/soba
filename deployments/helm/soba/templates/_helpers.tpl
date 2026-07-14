@@ -123,3 +123,12 @@ Database secret name and key.
 DATABASE_URL
 {{- end }}
 {{- end }}
+
+{{/*
+Truthy ("true") only when the tempstorage-mount plugin is selected. Gates the
+temp PVC, its mount, and PLUGIN_TEMPSTORAGE_MOUNT_DIR off one value so they
+cannot drift apart. Any other code (e.g. tempstorage-os) needs no PVC.
+*/}}
+{{- define "soba.tempStorageUsesMount" -}}
+{{- if eq .Values.backend.config.tempStorageDefaultCode "tempstorage-mount" -}}true{{- end -}}
+{{- end }}

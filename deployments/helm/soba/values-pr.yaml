@@ -1,6 +1,9 @@
 # PR environment — minimal resources, single replica, internal Form.io + MongoDB
 backend:
   replicas: 1
+  config:
+    # Ephemeral PR namespaces stage temp bytes under os.tmpdir() — no RWX PVC.
+    tempStorageDefaultCode: tempstorage-mount
   sso:
     jwksUri: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/certs
     jwtIssuer: https://dev.loginproxy.gov.bc.ca/auth/realms/standard
@@ -66,7 +69,7 @@ mongodb:
       memory: 512Mi
   persistence:
     size: 1Gi
-    
+
 temporal:
   allowed: "true"
   address: ""

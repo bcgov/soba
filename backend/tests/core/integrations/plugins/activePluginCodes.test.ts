@@ -14,23 +14,30 @@ describe('active plugin code resolution', () => {
   it('defaults match what the adapter getters instantiate', () => {
     delete process.env.CACHE_DEFAULT_CODE;
     delete process.env.MESSAGEBUS_DEFAULT_CODE;
+    delete process.env.TEMPSTORAGE_DEFAULT_CODE;
     expect(resolveActivePluginCode('cache')).toBe('cache-memory');
     expect(resolveActivePluginCode('messagebus')).toBe('messagebus-memory');
+    expect(resolveActivePluginCode('tempStorage')).toBe('tempstorage-os');
 
     const active = getActivePluginCodes();
     expect(active.has('cache-memory')).toBe(true);
     expect(active.has('messagebus-memory')).toBe(true);
+    expect(active.has('tempstorage-os')).toBe(true);
   });
 
   it('reflects env overrides', () => {
     process.env.CACHE_DEFAULT_CODE = 'cache-redis';
     process.env.MESSAGEBUS_DEFAULT_CODE = 'messagebus-redis';
+    process.env.TEMPSTORAGE_DEFAULT_CODE = 'tempstorage-mount';
     expect(resolveActivePluginCode('cache')).toBe('cache-redis');
     expect(resolveActivePluginCode('messagebus')).toBe('messagebus-redis');
+    expect(resolveActivePluginCode('tempStorage')).toBe('tempstorage-mount');
 
     const active = getActivePluginCodes();
     expect(active.has('cache-redis')).toBe(true);
     expect(active.has('messagebus-redis')).toBe(true);
+    expect(active.has('tempstorage-mount')).toBe(true);
     expect(active.has('cache-memory')).toBe(false);
+    expect(active.has('tempstorage-os')).toBe(false);
   });
 });
