@@ -4,6 +4,10 @@ run-name: PR-${{ github.event.number }}
 
 env:
   ACRONYM: soba
+  # PR deployments map to a fixed pool of slots (PR_NUM % SLOT_COUNT) so login
+  # hostnames are a known, finite set. Keep in sync with pr_close.yaml and the
+  # redirect URIs registered on the Keycloak client (soba-pr-slot-0 .. N-1).
+  SLOT_COUNT: "20"
 
 on:
   pull_request:
@@ -60,14 +64,17 @@ jobs:
       URL: ${{ steps.vars.outputs.URL }}
       ref: ${{ steps.vars.outputs.ref }}
       PR_NUM: ${{ steps.vars.outputs.PR_NUM }}
+      SLOT: ${{ steps.vars.outputs.SLOT }}
     steps:
       - name: Setting variables
         id: vars
         run: |
           PR_NUMBER="${{ github.event.number }}"
+          SLOT=$(( PR_NUMBER % SLOT_COUNT ))
           echo "PR_NUM=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "JOB_NAME=pr-$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "URL=https://soba-pr-${PR_NUMBER}.${{ vars.OC_DOMAIN }}" >> "$GITHUB_OUTPUT"
+          echo "SLOT=$SLOT" >> "$GITHUB_OUTPUT"
+          echo "JOB_NAME=pr-slot-$SLOT" >> "$GITHUB_OUTPUT"
+          echo "URL=https://soba-pr-slot-${SLOT}.${{ vars.OC_DOMAIN }}" >> "$GITHUB_OUTPUT"
           echo "ref=refs/pull/$PR_NUMBER/head" >> "$GITHUB_OUTPUT"
 
   build:
@@ -171,6 +178,7 @@ jobs:
           TAG: sha-${{ needs.build.outputs.short_sha }}
           DOMAIN: ${{ vars.OC_DOMAIN }}
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
+          SLOT: ${{ needs.set-vars.outputs.SLOT }}
         run: |
           # Pipeline performance fix: Revert if needed.
           set -euo pipefail
@@ -182,7 +190,7 @@ jobs:
               repository: "ghcr.io/${REPO_LC}/backend"
               tag: "${TAG}"
             config:
-              corsOrigin: "https://soba-pr-${PR_NUM}.${DOMAIN}"
+              corsOrigin: "https://soba-pr-slot-${SLOT}.${DOMAIN}"
           frontend:
             image:
               repository: "ghcr.io/${REPO_LC}/frontend"
@@ -193,8 +201,9 @@ jobs:
               tag: "${TAG}"
           global:
             domain: "${DOMAIN}"
-            routeHost: "soba-pr-${PR_NUM}.${DOMAIN}"
+            routeHost: "soba-pr-slot-${SLOT}.${DOMAIN}"
             routePath: ""
+            prNumber: "${PR_NUM}"
           database:
             existingSecretName: "${{ steps.db.outputs.secret_name }}"
             existingSecretKey: "uri"

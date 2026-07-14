@@ -5,6 +5,9 @@ global:
   forceCleanup: false
   routeHost: ""
   routePath: ""
+  # Owning PR number when a PR reuses a deployment slot; read on teardown so a
+  # closing PR does not uninstall a newer PR that has since taken the slot.
+  prNumber: ""
 
 # -- Backend (Express API) ------------------------------------------------
 backend:

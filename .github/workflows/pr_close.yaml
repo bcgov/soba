@@ -28,6 +28,11 @@ on:
 
 permissions: {}
 
+env:
+  # Must match SLOT_COUNT in pr_open.yaml so the slot (PR_NUM % SLOT_COUNT) and
+  # release name resolve to the same environment this PR was deployed to.
+  SLOT_COUNT: "20"
+
 concurrency:
   group: openshift-deploy
   cancel-in-progress: false
@@ -38,6 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       PR_NUM: ${{ steps.vars.outputs.PR_NUM }}
+      SLOT: ${{ steps.vars.outputs.SLOT }}
       JOB_NAME: ${{ steps.vars.outputs.JOB_NAME }}
       RELEASE: ${{ steps.vars.outputs.RELEASE }}
     steps:
@@ -49,9 +55,11 @@ jobs:
           else
             PR_NUM="${{ github.event.pull_request.number }}"
           fi
+          SLOT=$(( PR_NUM % SLOT_COUNT ))
           echo "PR_NUM=$PR_NUM" >> "$GITHUB_OUTPUT"
-          echo "JOB_NAME=pr-$PR_NUM" >> "$GITHUB_OUTPUT"
-          echo "RELEASE=soba-pr-$PR_NUM" >> "$GITHUB_OUTPUT"
+          echo "SLOT=$SLOT" >> "$GITHUB_OUTPUT"
+          echo "JOB_NAME=pr-slot-$SLOT" >> "$GITHUB_OUTPUT"
+          echo "RELEASE=soba-pr-slot-$SLOT" >> "$GITHUB_OUTPUT"
 
   soba-cleanup:
     name: Uninstall SOBA and remove secrets/PVCs
@@ -90,16 +98,26 @@ jobs:
         env:
           RELEASE: ${{ needs.set-vars.outputs.RELEASE }}
           NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
         run: |
           LABEL="app.kubernetes.io/instance=${RELEASE}"
 
-          # Step 1: Helm uninstall (if release exists)
-          if helm status "${RELEASE}" -n "${NAMESPACE}" &>/dev/null; then
-            echo "Uninstalling Helm release ${RELEASE}..."
-            helm uninstall "${RELEASE}" --namespace "${NAMESPACE}" || true
-          else
-            echo "Release ${RELEASE} not found, skipping helm uninstall."
+          if ! helm status "${RELEASE}" -n "${NAMESPACE}" &>/dev/null; then
+            echo "Release ${RELEASE} not found, nothing to clean up."
+            exit 0
           fi
+
+          # Slots are reused across PRs (PR_NUM % SLOT_COUNT). Only tear the slot down
+          # if this PR still owns it — a newer PR may have redeployed over it. An empty
+          # owner means the release predates slot tracking, so treat it as ours.
+          OWNER=$(helm get values "${RELEASE}" -n "${NAMESPACE}" -o json 2>/dev/null | jq -r '.global.prNumber // empty')
+          if [ -n "${OWNER}" ] && [ "${OWNER}" != "${PR_NUM}" ]; then
+            echo "Slot ${RELEASE} is now owned by PR ${OWNER}, not ${PR_NUM}; skipping teardown."
+            exit 0
+          fi
+
+          echo "Uninstalling Helm release ${RELEASE}..."
+          helm uninstall "${RELEASE}" --namespace "${NAMESPACE}" || true
 
           echo "Sweeping all resources with label ${LABEL}..."
           oc delete all,secret,pvc,configmap,serviceaccount,networkpolicy \
