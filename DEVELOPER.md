@@ -19,7 +19,7 @@ Before requesting review, ensure:
 
 ## Devcontainer
 
-The project uses a VS Code devcontainer (`.devcontainer/`). Open the repo in VS Code and **Reopen in Container** so all tooling and env are consistent.
+The project uses a VS Code devcontainer (`.devcontainer/`). Open the repo in VS Code and **Reopen in Container** so all tooling and env are consistent. It runs via `docker-compose.devcontainer.yml`; to cap the container's memory/swap or the Node heap for your machine, see per-developer resource limits in [`.devcontainer/README.md`](.devcontainer/README.md).
 
 ### Tools added to the OS
 
