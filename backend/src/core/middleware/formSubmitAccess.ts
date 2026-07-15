@@ -1,4 +1,4 @@
-import { hasFormSubmitAccess, type CallerIdentity } from '../db/repos/formSubmitAccessRepo';
+import { hasFormSubmitAccess } from '../db/repos/formSubmitAccessRepo';
 import { getWorkspaceIdForSubmission } from '../db/repos/submissionRepo';
 import { getWorkspaceIdForForm } from '../db/repos/formRepo';
 import {
@@ -8,18 +8,12 @@ import {
   type PermissionCode,
 } from '../db/codes';
 import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from '../errors';
-import { getActorIdpCode } from './actor';
+import { resolveCaller } from './actor';
 import { WORKSPACE_HEADER } from './workspaceContext';
 import type { Request, Response, NextFunction } from 'express';
 
-/** The caller's identity for audience checks: resolved actor id and provider code (`public` if anon). */
-const resolveCaller = (req: Request): CallerIdentity => ({
-  actorId: req.actorId ?? null,
-  idpCode: getActorIdpCode(req) ?? req.idpType?.toLowerCase() ?? null,
-});
-
 /** A denial that distinguishes an authenticated caller (403) from an anonymous one (401). */
-const accessDenial = (req: Request, message: string): Error =>
+export const accessDenial = (req: Request, message: string): Error =>
   req.user ? new ForbiddenError(message) : new UnauthorizedError(message);
 
 /** The workspace a submission request authorizes against. */
@@ -89,9 +83,13 @@ export const authorizeSubmitterForWorkspace = async (
   if (!allowed) {
     throw accessDenial(req, 'Not authorized to submit this form');
   }
+  // Guaranteed by resolveActorOrPublic upstream; guard so a missing id can't become an empty-string FK.
+  if (!req.actorId) {
+    throw new Error('authorizeSubmitterForWorkspace requires a resolved actor');
+  }
   req.coreContext = {
     workspaceId,
-    actorId: req.actorId ?? '',
+    actorId: req.actorId,
     actorDisplayLabel:
       req.user?.profile?.displayLabel || req.user?.profile?.displayName || PUBLIC_SUBMITTER_LABEL,
     workspaceSource: 'public-submit',
