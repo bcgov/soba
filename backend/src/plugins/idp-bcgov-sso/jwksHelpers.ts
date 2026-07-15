@@ -7,6 +7,7 @@ import type { RequestHandler } from 'express';
 import { expressjwt as jwt } from 'express-jwt';
 import jwksRsa from 'jwks-rsa';
 import { getToken } from '../../core/auth/IdpPlugin';
+import { log } from '../../core/logging';
 
 export function firstString(
   claims: Record<string, unknown>,
@@ -74,7 +75,7 @@ export function createJwksExpressMiddleware(options: JwksMiddlewareOptions): Req
       cache: true,
       jwksUri,
       handleSigningKeyError: (err, cb) => {
-        console.error('Error:', { error: err?.message, stack: err?.stack });
+        log.error({ err }, 'JWKS signing key error during authentication');
         cb(new Error('Error occurred during authentication'));
       },
     }),
