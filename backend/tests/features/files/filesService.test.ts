@@ -64,6 +64,7 @@ jest.mock('../../../src/core/db/repos/featureRepo', () => ({
 }));
 
 import { filesService } from '../../../src/features/files/service';
+import { createFileRecord, deleteFileRecordById } from '../../../src/core/db/repos/fileRepo';
 import { hasFormSubmitAccess } from '../../../src/core/db/repos/formSubmitAccessRepo';
 import { getSubmissionRecordById } from '../../../src/core/db/repos/submissionRepo';
 
@@ -102,6 +103,17 @@ async function readAll(stream: NodeJS.ReadableStream): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of stream) chunks.push(Buffer.from(chunk));
   return Buffer.concat(chunks).toString('utf8');
+}
+
+/** Every stored blob under the temp backend, so a test can assert nothing was orphaned/left behind. */
+function listBlobs(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...listBlobs(full));
+    else out.push(full);
+  }
+  return out.sort();
 }
 
 describe('filesService', () => {
@@ -206,5 +218,33 @@ describe('filesService', () => {
   it('delete of a file with no owning submission is notfound', async () => {
     const record = await uploadFor(null, 'g.txt');
     expect(await filesService.deleteForCaller(record.id, owner)).toBe('notfound');
+  });
+
+  it('removes the stored blob when the file-record insert fails (no orphan)', async () => {
+    const before = listBlobs(tmp);
+    (createFileRecord as jest.Mock).mockRejectedValueOnce(new Error('insert failed'));
+    await expect(
+      filesService.upload({
+        workspaceId: 'ws1',
+        actorId: 'actor1',
+        filename: 'orphan.txt',
+        buffer: Buffer.from('zz'),
+        submissionId: 'sub1',
+      }),
+    ).rejects.toThrow('insert failed');
+    expect(listBlobs(tmp)).toEqual(before);
+  });
+
+  it('leaves the blob intact when the row delete fails (row-first ordering)', async () => {
+    const record = await uploadFor('sub1', 'keep.txt');
+    submissionMock.mockResolvedValue({ workflowState: 'draft', submittedBy: 'actor1' });
+    audienceMock.mockResolvedValue(true);
+    const blobs = listBlobs(tmp);
+    (deleteFileRecordById as jest.Mock).mockRejectedValueOnce(new Error('row delete failed'));
+    await expect(filesService.deleteForCaller(record.id, owner)).rejects.toThrow(
+      'row delete failed',
+    );
+    // Row-first: the throw precedes deleteFile, so the blob is still present (retryable, no orphan).
+    expect(listBlobs(tmp)).toEqual(blobs);
   });
 });

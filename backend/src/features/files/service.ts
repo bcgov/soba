@@ -36,7 +36,8 @@ export const filesService = {
     if (scan !== 'clean') return scan;
 
     const profile = params.useProfile ?? env.getFilesStorageProfile();
-    const result = await getStorageAdapter(profile).uploadFile({
+    const adapter = getStorageAdapter(profile);
+    const result = await adapter.uploadFile({
       workspaceId: params.workspaceId,
       submissionId: params.submissionId ?? undefined,
       filename: params.filename,
@@ -44,16 +45,23 @@ export const filesService = {
       size: params.size,
       buffer: params.buffer,
     });
-    return createFileRecord({
-      workspaceId: params.workspaceId,
-      profile,
-      backendRef: result.engineFileRef,
-      filename: params.filename,
-      contentType: params.contentType ?? null,
-      size: params.size ?? null,
-      submissionId: params.submissionId ?? null,
-      createdBy: params.actorId,
-    });
+    try {
+      return await createFileRecord({
+        workspaceId: params.workspaceId,
+        profile,
+        backendRef: result.engineFileRef,
+        filename: params.filename,
+        contentType: params.contentType ?? null,
+        size: params.size ?? null,
+        submissionId: params.submissionId ?? null,
+        createdBy: params.actorId,
+      });
+    } catch (err) {
+      // The bytes are already stored; storage and DB can't share a transaction, so compensate by
+      // dropping the blob (best-effort — deleteFile swallows its own errors) rather than orphan it.
+      await adapter.deleteFile(result.engineFileRef);
+      throw err;
+    }
   },
 
   /**
@@ -115,8 +123,10 @@ export const filesService = {
           submission.submittedBy === caller.actorId &&
           (await hasFormSubmitAccess(record.workspaceId, caller, Permissions.submission_create));
     if (!allowed) return 'denied';
-    await getStorageAdapter(record.profile).deleteFile(record.backendRef);
+    // Row first: if the row delete throws, nothing is destroyed (retryable). A blob delete failing
+    // after the row is gone leaves a reclaimable orphan, not a dangling, un-downloadable row.
     await deleteFileRecordById(id);
+    await getStorageAdapter(record.profile).deleteFile(record.backendRef);
     return 'deleted';
   },
 };
