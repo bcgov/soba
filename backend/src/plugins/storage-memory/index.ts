@@ -23,7 +23,6 @@ import type { PluginConfigReader } from '../../core/config/pluginConfig';
  */
 interface StoredObject {
   buffer: Buffer;
-  workspaceId: string;
   filename: string;
   contentType?: string;
   createdAt: string;
@@ -72,7 +71,6 @@ function createMemoryStorageAdapter(_config: PluginConfigReader): StorageEngineA
       const id = uuidv7();
       store.set(id, {
         buffer,
-        workspaceId: input.workspaceId,
         filename: input.filename,
         contentType: input.contentType,
         createdAt: new Date().toISOString(),

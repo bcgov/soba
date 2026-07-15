@@ -3,7 +3,14 @@ import { filesService } from './service';
 import { isBlockedExtension } from './config';
 import { resolveCaller } from '../../core/middleware/actor';
 import { accessDenial } from '../../core/middleware/formSubmitAccess';
-import { AppError, InternalError, NotFoundError, ValidationError } from '../../core/errors';
+import {
+  InternalError,
+  NotFoundError,
+  ServiceUnavailableError,
+  UnprocessableEntityError,
+  UnsupportedMediaTypeError,
+  ValidationError,
+} from '../../core/errors';
 
 /** Minimal shape of a multer memory-storage file (this project has no @types/multer). */
 interface UploadedFile {
@@ -30,7 +37,7 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
   // Always reject blocked extensions, regardless of the form's designer-configured fileTypes.
   // Check both the stored name and the real uploaded name (they can differ via fileNameTemplate).
   if (isBlockedExtension(uploaded.originalname) || isBlockedExtension(filename)) {
-    throw new AppError('File type not allowed', 415);
+    throw new UnsupportedMediaTypeError('File type not allowed');
   }
 
   const profile = req.header('storageProfile') || undefined;
@@ -49,10 +56,10 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
   // Virus scan rejections (antivirus feature on): infected is a client-side content problem;
   // scan-unavailable is fail-closed — the scanner couldn't clear the file, so we don't store it.
   if (record === 'infected') {
-    throw new AppError('File failed virus scan', 422);
+    throw new UnprocessableEntityError('File failed virus scan');
   }
   if (record === 'scan-unavailable') {
-    throw new AppError('Virus scanning unavailable', 503);
+    throw new ServiceUnavailableError('Virus scanning unavailable');
   }
 
   // The chefs provider builds each file's URL as `${filesUrl}/${id}`, so it only needs the id

@@ -43,8 +43,26 @@ export class ConflictError extends AppError {
   }
 }
 
+export class UnsupportedMediaTypeError extends AppError {
+  constructor(message: string = 'Unsupported media type') {
+    super(message, 415);
+  }
+}
+
+export class UnprocessableEntityError extends AppError {
+  constructor(message: string = 'Unprocessable entity') {
+    super(message, 422);
+  }
+}
+
 export class InternalError extends AppError {
   constructor(message: string = 'Internal server error') {
     super(message, 500);
+  }
+}
+
+export class ServiceUnavailableError extends AppError {
+  constructor(message: string = 'Service unavailable') {
+    super(message, 503);
   }
 }
