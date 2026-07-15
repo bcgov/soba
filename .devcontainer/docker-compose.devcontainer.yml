@@ -1,0 +1,24 @@
+# Dev container workspace. App-only — sidecars stay in docker-compose.yml and are
+# reached over host.docker.internal. Per-developer resource caps come from
+# .devcontainer/.env (gitignored); with no .env the container runs uncapped.
+name: soba-devcontainer
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    # 0 = unlimited (no .env → uncapped). memswap_limit is total memory+swap.
+    mem_limit: ${DEVCONTAINER_MEMORY:-0}
+    memswap_limit: ${DEVCONTAINER_MEMORY_SWAP:-0}
+
+    environment:
+      NODE_OPTIONS: ${DEVCONTAINER_NODE_OPTIONS:-}
+
+    volumes:
+      - ..:/workspaces/soba:cached
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    command: sleep infinity
