@@ -26,7 +26,7 @@ describe('storage-local adapter', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'storage-local-test-'));
   const adapter = storagePluginDefinition.createAdapter(makeConfig(tmp));
 
-  it('uploads, lists, gets and deletes a file', async () => {
+  it('uploads, gets and deletes a file', async () => {
     const result = await (adapter as any).uploadFile({
       workspaceId: 'w1',
       filename: 'hello.txt',
@@ -37,13 +37,18 @@ describe('storage-local adapter', () => {
     const meta = await (adapter as any).getFile(result.engineFileRef);
     expect(meta).not.toBeNull();
     expect(meta.filename).toBeDefined();
-
-    const list = await (adapter as any).listFiles('w1');
-    expect(Array.isArray(list.items)).toBe(true);
-    expect(list.items.length).toBeGreaterThan(0);
+    // Drain the stream so its file descriptor opens and closes before we delete.
+    await new Promise<void>((resolve, reject) => {
+      meta.downloadStream.on('end', resolve).on('error', reject).resume();
+    });
 
     await (adapter as any).deleteFile(result.engineFileRef);
     const after = await (adapter as any).getFile(result.engineFileRef);
     expect(after).toBeNull();
+  });
+
+  it('rejects path-traversal refs that escape basePath', async () => {
+    expect(await (adapter as any).getFile('local:../../../etc/passwd')).toBeNull();
+    await expect((adapter as any).deleteFile('local:../../../etc/passwd')).resolves.toBeUndefined();
   });
 });

@@ -6,8 +6,6 @@ import type {
   UploadFileInput,
   UploadFileResult,
   GetFileResult,
-  ListFilesResult,
-  GeneratePresignedUrlInput,
 } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 import type { PluginConfigReader } from '../../core/config/pluginConfig';
 
@@ -109,7 +107,7 @@ function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
           filename: parsed.key.split('/').pop() ?? parsed.key,
           contentType: stat.metaData?.['content-type'] as string | undefined,
           size: stat.size,
-          createdAt: stat.metaData?.['createdAt'] as string | undefined,
+          createdAt: stat.lastModified?.toISOString(),
           downloadStream: stream as unknown as NodeJS.ReadableStream,
         };
       } catch {
@@ -125,45 +123,6 @@ function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
       } catch {
         // ignore
       }
-    },
-
-    async listFiles(workspaceId: string): Promise<ListFilesResult> {
-      const prefix = `${workspaceId ?? 'default'}/`;
-      const items: Array<{
-        engineFileRef: string;
-        filename: string;
-        size?: number;
-        createdAt?: string;
-      }> = [];
-      const stream = client.listObjectsV2(bucket, prefix, false);
-      for await (const obj of stream as AsyncIterable<Minio.BucketItem>) {
-        items.push({
-          engineFileRef: engineRefFor(obj.name),
-          filename: obj.name.split('/').pop() ?? obj.name,
-          size: obj.size,
-          createdAt: obj.lastModified?.toISOString(),
-        });
-      }
-      return { items };
-    },
-
-    async generatePresignedUrl(input: GeneratePresignedUrlInput) {
-      if (input.operation === 'get') {
-        const parsed = parseEngineRef(input.engineFileRef ?? '');
-        if (!parsed) throw new Error('engineFileRef required for get presign');
-        const url = await client.presignedGetObject(
-          parsed.bucket,
-          parsed.key,
-          input.expiresIn ?? 60,
-        );
-        return { url, method: 'GET', expiresIn: input.expiresIn ?? 60 };
-      }
-      if (input.operation === 'put') {
-        const key = `${input.filename ?? 'upload'}-${Date.now()}`;
-        const url = await client.presignedPutObject(bucket, key, input.expiresIn ?? 60);
-        return { url, method: 'PUT', expiresIn: input.expiresIn ?? 60 };
-      }
-      throw new Error('unsupported operation');
     },
   };
 }

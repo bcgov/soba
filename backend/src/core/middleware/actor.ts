@@ -6,6 +6,7 @@
 import { Request, Response, NextFunction } from 'express';
 const X_SOBA_USER_ID = 'x-soba-user-id';
 import { getIdpPlugins } from '../auth/idpRegistry';
+import type { CallerIdentity } from '../db/repos/formSubmitAccessRepo';
 import { findOrCreateUserByIdentity } from '../db/repos/membershipRepo';
 import { isSobaAdmin, upsertSobaAdminFromIdp } from '../db/repos/sobaAdminRepo';
 import { ValidationError } from '../errors';
@@ -23,6 +24,12 @@ export const getActorId = (req: Request): string | null =>
 /** Identity provider code for the current session (from the verified JWT). */
 export const getActorIdpCode = (req: Request): string | null =>
   req.user?.providerCode?.toLowerCase() ?? null;
+
+/** The caller's identity for audience checks: resolved actor id and provider code (`public` if anon). */
+export const resolveCaller = (req: Request): CallerIdentity => ({
+  actorId: req.actorId ?? null,
+  idpCode: getActorIdpCode(req) ?? req.idpType?.toLowerCase() ?? null,
+});
 
 export function resolveActor(req: Request, res: Response, next: NextFunction): void {
   const actorId = getActorId(req);

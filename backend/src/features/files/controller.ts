@@ -1,17 +1,16 @@
 import { Request, Response } from 'express';
 import { filesService } from './service';
 import { isBlockedExtension } from './config';
-import { getActorIdpCode } from '../../core/middleware/actor';
-import type { CallerIdentity } from '../../core/db/repos/formSubmitAccessRepo';
-
-/** The caller identity for audience checks (`public` for anonymous). */
-const callerFrom = (req: Request): CallerIdentity => ({
-  actorId: req.actorId ?? null,
-  idpCode: getActorIdpCode(req) ?? req.idpType?.toLowerCase() ?? null,
-});
-
-/** 401 for anonymous, 403 for an authenticated caller — the standard denial split. */
-const deniedStatus = (req: Request): number => (req.user ? 403 : 401);
+import { resolveCaller } from '../../core/middleware/actor';
+import { accessDenial } from '../../core/middleware/formSubmitAccess';
+import {
+  InternalError,
+  NotFoundError,
+  ServiceUnavailableError,
+  UnprocessableEntityError,
+  UnsupportedMediaTypeError,
+  ValidationError,
+} from '../../core/errors';
 
 /** Minimal shape of a multer memory-storage file (this project has no @types/multer). */
 interface UploadedFile {
@@ -28,8 +27,7 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
   const files = (req as Request & { files?: UploadedFile[] }).files;
   const uploaded = Array.isArray(files) ? files[0] : undefined;
   if (!uploaded) {
-    res.status(400).json({ error: 'no file' });
-    return;
+    throw new ValidationError('no file');
   }
 
   const filename =
@@ -39,8 +37,7 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
   // Always reject blocked extensions, regardless of the form's designer-configured fileTypes.
   // Check both the stored name and the real uploaded name (they can differ via fileNameTemplate).
   if (isBlockedExtension(uploaded.originalname) || isBlockedExtension(filename)) {
-    res.status(415).json({ error: 'File type not allowed' });
-    return;
+    throw new UnsupportedMediaTypeError('File type not allowed');
   }
 
   const profile = req.header('storageProfile') || undefined;
@@ -59,12 +56,10 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
   // Virus scan rejections (antivirus feature on): infected is a client-side content problem;
   // scan-unavailable is fail-closed — the scanner couldn't clear the file, so we don't store it.
   if (record === 'infected') {
-    res.status(422).json({ error: 'File failed virus scan' });
-    return;
+    throw new UnprocessableEntityError('File failed virus scan');
   }
   if (record === 'scan-unavailable') {
-    res.status(503).json({ error: 'Virus scanning unavailable' });
-    return;
+    throw new ServiceUnavailableError('Virus scanning unavailable');
   }
 
   // The chefs provider builds each file's URL as `${filesUrl}/${id}`, so it only needs the id
@@ -79,14 +74,12 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
 }
 
 export async function downloadFileHandler(req: Request, res: Response): Promise<void> {
-  const result = await filesService.getForCaller(req.params.id, callerFrom(req));
+  const result = await filesService.getForCaller(req.params.id, resolveCaller(req));
   if (result === 'notfound') {
-    res.status(404).end();
-    return;
+    throw new NotFoundError('File not found');
   }
   if (result === 'denied') {
-    res.status(deniedStatus(req)).end();
-    return;
+    throw accessDenial(req, 'Not authorized to access this file');
   }
   const { record, file } = result;
   res.setHeader(
@@ -105,18 +98,17 @@ export async function downloadFileHandler(req: Request, res: Response): Promise<
     res.redirect(file.publicUrl);
     return;
   }
-  res.status(500).json({ error: 'no download available' });
+  throw new InternalError('no download available');
 }
 
 export async function deleteFileHandler(req: Request, res: Response): Promise<void> {
-  const outcome = await filesService.deleteForCaller(req.params.id, callerFrom(req));
+  const outcome = await filesService.deleteForCaller(req.params.id, resolveCaller(req));
   if (outcome === 'deleted') {
     res.status(204).end();
     return;
   }
   if (outcome === 'notfound') {
-    res.status(404).end();
-    return;
+    throw new NotFoundError('File not found');
   }
-  res.status(deniedStatus(req)).end();
+  throw accessDenial(req, 'Not authorized to access this file');
 }

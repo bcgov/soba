@@ -29,9 +29,10 @@ on:
 permissions: {}
 
 env:
-  # Must match SLOT_COUNT in pr_open.yaml so the slot (PR_NUM % SLOT_COUNT) and
-  # release name resolve to the same environment this PR was deployed to.
-  SLOT_COUNT: "20"
+  # Sourced from the repo variable shared with pr_open.yaml so the slot
+  # (PR_NUM % SLOT_COUNT) and release name resolve to the same environment this PR
+  # was deployed to; the literal is a fallback if the variable is unset.
+  SLOT_COUNT: ${{ vars.SLOT_COUNT || '20' }}
 
 concurrency:
   group: openshift-deploy

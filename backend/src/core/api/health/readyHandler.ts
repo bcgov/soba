@@ -24,20 +24,20 @@ export async function readinessHandler(_req: Request, res: Response): Promise<vo
   const storage = await checkStorageReadiness();
 
   // Temp storage is likewise reported but non-gating.
-  let tempStorageOk = false;
+  let tempStorage: { ok: boolean; message?: string };
   try {
-    tempStorageOk = await getTempStorageAdapter().ping();
-  } catch {
-    // tempStorageOk stays false
+    tempStorage = { ok: await getTempStorageAdapter().ping() };
+  } catch (err) {
+    tempStorage = { ok: false, message: err instanceof Error ? err.message : String(err) };
   }
 
   // Virus scanner is reported but non-gating — a scanner outage blocks uploads (fail-closed at the
   // upload path), it doesn't pull the pod from rotation.
-  let virusScannerOk = false;
+  let virusScanner: { ok: boolean; message?: string };
   try {
-    virusScannerOk = await getVirusScanAdapter().ping();
-  } catch {
-    // virusScannerOk stays false
+    virusScanner = { ok: await getVirusScanAdapter().ping() };
+  } catch (err) {
+    virusScanner = { ok: false, message: err instanceof Error ? err.message : String(err) };
   }
 
   const body = {
@@ -45,8 +45,8 @@ export async function readinessHandler(_req: Request, res: Response): Promise<vo
     db: dbOk ? 'ok' : 'unreachable',
     formEngines,
     storage,
-    tempStorage: tempStorageOk ? 'ok' : 'unreachable',
-    virusScanner: virusScannerOk ? 'ok' : 'unreachable',
+    tempStorage,
+    virusScanner,
   };
 
   if (!dbOk || !allEnginesOk) {

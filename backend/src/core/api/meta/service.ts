@@ -2,7 +2,11 @@ import packageJson from '../../../../package.json';
 import { env } from '../../config/env';
 import { authEnv } from '../../config/authEnv';
 import { getFormEnginePlugins } from '../../integrations/form-engine/FormEngineRegistry';
-import { getActivePluginCodes, getPluginCatalog } from '../../integrations/plugins/PluginRegistry';
+import {
+  getActivePluginCodes,
+  getActiveStorageBackendCodes,
+  getPluginCatalog,
+} from '../../integrations/plugins/PluginRegistry';
 import { isFeatureEnabled, listFeatures } from '../../db/repos/featureRepo';
 import { roleService } from '../../services/roleService';
 
@@ -24,7 +28,11 @@ export class MetaApiService {
     // Selectable adapter codes come from the registry; form engine has its own registry.
     const activeFormEngineCode =
       env.getFormEngineDefaultCode() ?? getFormEnginePlugins()[0]?.code ?? 'formio-v5';
-    const activeCodes = new Set([activeFormEngineCode, ...getActivePluginCodes()]);
+    const activeCodes = new Set([
+      activeFormEngineCode,
+      ...getActivePluginCodes(),
+      ...getActiveStorageBackendCodes(),
+    ]);
     return {
       plugins: plugins.map((plugin) => ({
         ...plugin,

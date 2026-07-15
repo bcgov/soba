@@ -5,9 +5,10 @@ run-name: PR-${{ github.event.number }}
 env:
   ACRONYM: soba
   # PR deployments map to a fixed pool of slots (PR_NUM % SLOT_COUNT) so login
-  # hostnames are a known, finite set. Keep in sync with pr_close.yaml and the
-  # redirect URIs registered on the Keycloak client (soba-pr-slot-0 .. N-1).
-  SLOT_COUNT: "20"
+  # hostnames are a known, finite set. Sourced from the repo variable so
+  # pr_close.yaml and the Keycloak redirect URIs (soba-pr-slot-0 .. N-1) share one
+  # value; the literal is a fallback if the variable is unset.
+  SLOT_COUNT: ${{ vars.SLOT_COUNT || '20' }}
 
 on:
   pull_request:

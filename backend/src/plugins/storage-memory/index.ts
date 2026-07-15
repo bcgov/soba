@@ -6,7 +6,6 @@ import type {
   UploadFileInput,
   UploadFileResult,
   GetFileResult,
-  ListFilesResult,
 } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 import type { PluginConfigReader } from '../../core/config/pluginConfig';
 
@@ -24,7 +23,6 @@ import type { PluginConfigReader } from '../../core/config/pluginConfig';
  */
 interface StoredObject {
   buffer: Buffer;
-  workspaceId: string;
   filename: string;
   contentType?: string;
   createdAt: string;
@@ -73,7 +71,6 @@ function createMemoryStorageAdapter(_config: PluginConfigReader): StorageEngineA
       const id = uuidv7();
       store.set(id, {
         buffer,
-        workspaceId: input.workspaceId,
         filename: input.filename,
         contentType: input.contentType,
         createdAt: new Date().toISOString(),
@@ -105,21 +102,6 @@ function createMemoryStorageAdapter(_config: PluginConfigReader): StorageEngineA
       const id = parseEngineRef(engineFileRef);
       if (!id) return;
       store.delete(id);
-    },
-
-    async listFiles(workspaceId: string): Promise<ListFilesResult> {
-      const items = [];
-      for (const [id, obj] of store) {
-        if (workspaceId && obj.workspaceId !== workspaceId) continue;
-        items.push({
-          engineFileRef: engineRefFor(id),
-          filename: obj.filename,
-          contentType: obj.contentType,
-          size: obj.buffer.length,
-          createdAt: obj.createdAt,
-        });
-      }
-      return { items };
     },
   };
 }
