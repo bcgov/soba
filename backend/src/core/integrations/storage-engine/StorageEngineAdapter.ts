@@ -68,31 +68,6 @@ export interface GetFileResult extends StorageFileMeta {
   downloadStream?: NodeJS.ReadableStream;
 }
 
-export interface ListFilesResult {
-  items: StorageFileMeta[];
-  nextPageToken?: string;
-}
-
-export interface GeneratePresignedUrlInput {
-  /** The intended operation: 'get' for download, 'put' for upload. */
-  operation: 'get' | 'put';
-  /** Optional target engineFileRef (for downloads) or filename (for uploads). */
-  engineFileRef?: string;
-  filename?: string;
-  /** Expiration in seconds. */
-  expiresIn?: number;
-  /** Optional content type constraint for uploads. */
-  contentType?: string;
-}
-
-export interface GeneratePresignedUrlResult {
-  url: string;
-  method: 'GET' | 'PUT' | 'POST';
-  expiresIn: number;
-  /** Any required headers the client must set when using the URL. */
-  headers?: Record<string, string>;
-}
-
 /**
  * Storage engine adapter contract. Implementations (local, minio, s3, etc.) should
  * implement this interface to plug into SOBA's storage abstraction.
@@ -113,18 +88,6 @@ export interface StorageEngineAdapter {
 
   /** Delete a stored file by engine reference. */
   deleteFile(engineFileRef: string): Promise<void>;
-
-  /**
-   * List files for a workspace, with an optional prefix or pagination token.
-   * Implementations may provide provider-specific filters via metadata.
-   */
-  listFiles?(workspaceId: string, prefix?: string, pageToken?: string): Promise<ListFilesResult>;
-
-  /**
-   * Generate a presigned (time-limited) URL that a client can use to upload or download
-   * directly from the storage backend. Optional — not all adapters need to support it.
-   */
-  generatePresignedUrl?(input: GeneratePresignedUrlInput): Promise<GeneratePresignedUrlResult>;
 
   /**
    * Optional transform hook to normalize provider-specific metadata into a portable shape.

@@ -29,7 +29,7 @@ describe('storage-memory adapter', () => {
     expect(storagePluginDefinition.code).toBe('storage-memory');
   });
 
-  it('uploads, lists, gets (with contents) and deletes a buffer file', async () => {
+  it('uploads, gets (with contents) and deletes a buffer file', async () => {
     const adapter = storagePluginDefinition.createAdapter(makeConfig());
 
     const result = await (adapter as any).uploadFile({
@@ -48,10 +48,6 @@ describe('storage-memory adapter', () => {
     expect(meta.size).toBe(Buffer.byteLength('hello world'));
     expect(await readStream(meta.downloadStream)).toBe('hello world');
 
-    const list = await (adapter as any).listFiles('w1');
-    expect(list.items).toHaveLength(1);
-    expect(list.items[0].engineFileRef).toBe(result.engineFileRef);
-
     await (adapter as any).deleteFile(result.engineFileRef);
     const after = await (adapter as any).getFile(result.engineFileRef);
     expect(after).toBeNull();
@@ -66,22 +62,6 @@ describe('storage-memory adapter', () => {
     });
     const meta = await (adapter as any).getFile(result.engineFileRef);
     expect(await readStream(meta.downloadStream)).toBe('streamed bytes');
-  });
-
-  it('scopes listFiles by workspace', async () => {
-    const adapter = storagePluginDefinition.createAdapter(makeConfig());
-    await (adapter as any).uploadFile({
-      workspaceId: 'a',
-      filename: 'a.txt',
-      buffer: Buffer.from('a'),
-    });
-    await (adapter as any).uploadFile({
-      workspaceId: 'b',
-      filename: 'b.txt',
-      buffer: Buffer.from('b'),
-    });
-    const listA = await (adapter as any).listFiles('a');
-    expect(listA.items.map((i: any) => i.filename)).toEqual(['a.txt']);
   });
 
   it('reports ready without a backing service', async () => {

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import fs from 'node:fs';
 import path from 'node:path';
 // use fs.promises.mkdir with recursive instead of fs-extra
@@ -8,7 +7,6 @@ import type {
   UploadFileInput,
   UploadFileResult,
   GetFileResult,
-  ListFilesResult,
 } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 import type { PluginConfigReader } from '../../core/config/pluginConfig';
 
@@ -19,6 +17,15 @@ function engineRefFor(relPath: string) {
 function parseEngineRef(ref: string) {
   if (!ref.startsWith('local:')) return null;
   return ref.slice('local:'.length);
+}
+
+// Refs are adapter-generated, but resolve and contain them so a crafted
+// `local:../..` ref can never read or delete outside basePath.
+function resolveWithin(basePath: string, rel: string): string | null {
+  const base = path.resolve(basePath);
+  const full = path.resolve(base, rel);
+  if (full !== base && !full.startsWith(base + path.sep)) return null;
+  return full;
 }
 
 function createLocalStorageAdapter(config: PluginConfigReader): StorageEngineAdapter {
@@ -33,8 +40,8 @@ function createLocalStorageAdapter(config: PluginConfigReader): StorageEngineAda
       try {
         await ensureBase();
         return { ok: true };
-      } catch (err: any) {
-        return { ok: false, message: String(err?.message ?? err) };
+      } catch (err) {
+        return { ok: false, message: err instanceof Error ? err.message : String(err) };
       }
     },
 
@@ -73,7 +80,8 @@ function createLocalStorageAdapter(config: PluginConfigReader): StorageEngineAda
     async getFile(engineFileRef: string): Promise<GetFileResult | null> {
       const rel = parseEngineRef(engineFileRef);
       if (!rel) return null;
-      const full = path.join(basePath, rel);
+      const full = resolveWithin(basePath, rel);
+      if (!full) return null;
       try {
         const stats = await fs.promises.stat(full);
         return {
@@ -92,33 +100,12 @@ function createLocalStorageAdapter(config: PluginConfigReader): StorageEngineAda
     async deleteFile(engineFileRef: string): Promise<void> {
       const rel = parseEngineRef(engineFileRef);
       if (!rel) return;
-      const full = path.join(basePath, rel);
+      const full = resolveWithin(basePath, rel);
+      if (!full) return;
       try {
         await fs.promises.unlink(full);
       } catch {
         // ignore
-      }
-    },
-
-    async listFiles(workspaceId: string): Promise<ListFilesResult> {
-      const dir = workspaceId ? path.join(basePath, workspaceId) : basePath;
-      try {
-        const entries = await fs.promises.readdir(dir);
-        const items = await Promise.all(
-          entries.map(async (e) => {
-            const full = path.join(dir, e);
-            const stats = await fs.promises.stat(full);
-            return {
-              engineFileRef: engineRefFor(path.relative(basePath, full)),
-              filename: e,
-              size: stats.size,
-              createdAt: stats.ctime.toISOString(),
-            };
-          }),
-        );
-        return { items };
-      } catch {
-        return { items: [] };
       }
     },
   };
