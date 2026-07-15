@@ -228,6 +228,8 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
       p.messagebusDefinition?.code ??
       p.tempStorageDefinition?.code ??
       p.virusScanDefinition?.code ??
+      p.storageDefinition?.code ??
+      p.idpDefinition?.code ??
       p.dir;
     return {
       code,
@@ -318,6 +320,15 @@ export function resolveActivePluginCode(type: SelectablePluginType): string {
 export function getActivePluginCodes(): Set<string> {
   const types = Object.keys(SELECTABLE_PLUGIN_DEFAULTS) as SelectablePluginType[];
   return new Set(types.map(resolveActivePluginCode));
+}
+
+/**
+ * Storage backend codes referenced by the active storage profiles. Storage is profile-keyed rather
+ * than singleton-by-code, so it isn't part of getActivePluginCodes — callers that report the active
+ * set (e.g. /meta/plugins) union this in.
+ */
+export function getActiveStorageBackendCodes(): Set<string> {
+  return new Set(Object.values(getStorageProfilesConfig()).map((profile) => profile.backend));
 }
 
 /** Minimal shape shared by every adapter plugin definition. */

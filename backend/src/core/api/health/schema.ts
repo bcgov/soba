@@ -24,14 +24,21 @@ export const StorageReadinessResultSchema = z
   })
   .openapi('Health_StorageReadinessResult');
 
+export const AdapterReadinessResultSchema = z
+  .object({
+    ok: z.boolean(),
+    message: z.string().optional(),
+  })
+  .openapi('Health_AdapterReadinessResult');
+
 export const HealthReadinessResponseSchema = z
   .object({
     status: z.enum(['ready', 'unhealthy']),
     db: z.enum(['ok', 'unreachable']),
     formEngines: z.record(z.string(), FormEngineReadinessResultSchema),
     storage: z.record(z.string(), StorageReadinessResultSchema),
-    tempStorage: z.enum(['ok', 'unreachable']),
-    virusScanner: z.enum(['ok', 'unreachable']),
+    tempStorage: AdapterReadinessResultSchema,
+    virusScanner: AdapterReadinessResultSchema,
   })
   .openapi('Health_ReadinessResponse');
 
