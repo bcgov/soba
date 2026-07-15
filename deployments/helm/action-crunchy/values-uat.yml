@@ -1,0 +1,132 @@
+# Crunchy Postgres values for SOBA UAT.
+# Storage is sized to fit a 64Gi namespace storage quota:
+#   data 10Gi x 3 replicas + WAL 2Gi x 3 replicas + backup 20Gi = 56Gi.
+global:
+  config:
+    dbName: app
+
+crunchy:
+  enabled: true
+  postgresVersion: 18
+  postGISVersion: ~
+  openshift: true
+  imagePullPolicy: IfNotPresent
+  clone:
+    enabled: false
+    s3:
+      enabled: false
+    pvc:
+      enabled: false
+    path: ~
+  restore:
+    repoName: ~
+    enabled: false
+    target: ~
+  instances:
+    name: db
+    replicas: 3
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+    dataVolumeClaimSpec:
+      storage: 10Gi
+      storageClassName: netapp-block-standard
+      walStorage: 2Gi
+    requests:
+      cpu: 250m
+      memory: 4Gi
+    replicaCertCopy:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+  pgBackRest:
+    enabled: true
+    backupPath: /backups/uat/cluster/version
+    clusterCounter: 1
+    retentionFullType: count
+    s3:
+      enabled: false
+      retention: 7
+      bucket: ~
+      endpoint: ~
+      accessKey: ~
+      secretKey: ~
+      fullBackupSchedule: ~
+      incrementalBackupSchedule: ~
+    pvc:
+      retention: 1
+      retentionFullType: count
+      fullBackupSchedule: 0 8 * * *
+      incrementalBackupSchedule: 0 0-7,9-23 * * *
+      volume:
+        accessModes: ReadWriteOnce
+        storage: 20Gi
+        storageClassName: netapp-file-backup
+    config:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+    repoHost:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+    sidecars:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+    jobs:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+  patroni:
+    postgresql:
+      pg_hba:
+        - "host all all 0.0.0.0/0 scram-sha-256"
+        - "host all all ::1/128 scram-sha-256"
+      parameters:
+        shared_buffers: 1GB
+        wal_buffers: "-1"
+        min_wal_size: 128MB
+        max_wal_size: 512MB
+        max_slot_wal_keep_size: 1GB
+        work_mem: 32MB
+        log_min_duration_statement: 1000ms
+        effective_io_concurrency: 20
+  proxy:
+    enabled: true
+    pgBouncer:
+      replicas: 2
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      maxConnections: 100
+      poolMode: transaction
+  pgmonitor:
+    enabled: true
+    exporter:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+  users:
+    - name: "{{ .Values.global.config.dbName }}"
+      databases:
+        - "{{ .Values.global.config.dbName }}"
+      options: "SUPERUSER CREATEDB CREATEROLE"
+    - name: "postgres"
+      databases:
+        - "postgres"
+        - "{{ .Values.global.config.dbName }}"
+    - name: "{{ .Values.global.config.dbName }}proxy"
+      databases:
+        - "{{ .Values.global.config.dbName }}"
+        - "postgres"
+    - name: "{{ .Values.global.config.dbName }}proxytest"
+      databases:
+        - "{{ .Values.global.config.dbName }}"
+        - "postgres"
+    - name: "temporal"
+      databases:
+        - "temporal"
+        - "temporal_visibility"
+      options: "SUPERUSER CREATEDB CREATEROLE"

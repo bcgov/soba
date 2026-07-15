@@ -1,0 +1,36 @@
+---
+name: Deploy Crunchy UAT
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crunchy-uat-db
+  cancel-in-progress: false
+
+jobs:
+  deploy-crunchy-uat:
+    name: Deploy Crunchy UAT
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: uat-db
+    outputs:
+      release: ${{ steps.deploy.outputs.release }}
+      cluster: ${{ steps.deploy.outputs.cluster }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Deploy Crunchy UAT
+        id: deploy
+        uses: ./.github/actions/deploy-crunchy-uat
+        with:
+          oc_namespace: ${{ secrets.OC_NAMESPACE }}
+          oc_token: ${{ secrets.OC_TOKEN }}
+          oc_server: ${{ vars.OC_SERVER }}
+          release_name: pg-soba
+          values_file: deployments/helm/action-crunchy/values-uat.yml
