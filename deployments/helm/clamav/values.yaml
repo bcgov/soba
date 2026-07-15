@@ -15,8 +15,10 @@ service:
 clamav:
   # clamav.image -- The clamav docker image
   image: ghcr.io/bcgov/chefs-clamav
-  # clamav.version -- The clamav docker image version - defaults to .Chart.appVersion
-  tag: latest
+  # clamav.tag -- The clamav image tag. Pinned to an immutable sha tag (equal to
+  # latest when pinned) for reproducible deploys; freshclam pulls definitions at
+  # runtime so this does not stale virus signatures.
+  tag: sha-82c03f0
   # clamav.imagePullPolicy -- IfNotPresent
   imagePullPolicy: IfNotPresent
   replicaCount: 1
