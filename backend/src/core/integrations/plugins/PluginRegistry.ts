@@ -17,6 +17,7 @@ import {
 } from '../../config/pluginConfig';
 import { getStorageProfilesConfig } from '../../config/storageProfiles';
 import type { FormEnginePluginDefinition } from '../form-engine/FormEnginePluginDefinition';
+import type { DocumentGenerationPluginDefinition } from '../document-generation/DocumentGenerationPluginDefinition';
 import type { FeatureApiDefinition } from './FeatureApiDefinition';
 import type { CacheAdapter, CachePluginDefinition } from '../cache/CacheAdapter';
 import type {
@@ -43,7 +44,8 @@ const AdapterPluginDefinitionSchema = z.object({
   createAdapter: z.any(),
 });
 
-const FormEnginePluginDefinitionSchema = z.object({
+// form-engine and document-generation share this { code, metadata, createAdapter } shape.
+const MetadataPluginDefinitionSchema = z.object({
   code: z.string().min(1),
   metadata: z.object({
     code: z.string(),
@@ -71,6 +73,7 @@ const IdpPluginDefinitionSchema = z.object({
 interface CachedPlugin {
   dir: string;
   formEngineDefinition?: FormEnginePluginDefinition;
+  documentGenerationDefinition?: DocumentGenerationPluginDefinition;
   apiDefinition?: FeatureApiDefinition;
   cacheDefinition?: CachePluginDefinition;
   messagebusDefinition?: MessageBusPluginDefinition;
@@ -90,7 +93,12 @@ const DEFINITION_KINDS: ReadonlyArray<{
   {
     field: 'formEngineDefinition',
     exportKey: 'formEnginePluginDefinition',
-    schema: FormEnginePluginDefinitionSchema,
+    schema: MetadataPluginDefinitionSchema,
+  },
+  {
+    field: 'documentGenerationDefinition',
+    exportKey: 'documentGenerationPluginDefinition',
+    schema: MetadataPluginDefinitionSchema,
   },
   { field: 'apiDefinition', exportKey: 'pluginApiDefinition', schema: FeatureApiDefinitionSchema },
   {
@@ -224,6 +232,7 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
     const code =
       p.apiDefinition?.code ??
       p.formEngineDefinition?.code ??
+      p.documentGenerationDefinition?.code ??
       p.cacheDefinition?.code ??
       p.messagebusDefinition?.code ??
       p.tempStorageDefinition?.code ??
@@ -259,6 +268,24 @@ export function getFormEnginePluginCatalog(): FormEnginePluginCatalogEntry[] {
 
 export function getFormEnginePluginDefinitions(): FormEnginePluginDefinition[] {
   return definitionsOf('formEngineDefinition');
+}
+
+export interface DocumentGenerationPluginCatalogEntry {
+  code: string;
+  name: string;
+  version?: string;
+}
+
+export function getDocumentGenerationPluginCatalog(): DocumentGenerationPluginCatalogEntry[] {
+  return getDocumentGenerationPluginDefinitions().map((d) => ({
+    code: d.code,
+    name: d.metadata.name,
+    version: d.metadata.version,
+  }));
+}
+
+export function getDocumentGenerationPluginDefinitions(): DocumentGenerationPluginDefinition[] {
+  return definitionsOf('documentGenerationDefinition');
 }
 
 export function getCachePluginDefinitions(): CachePluginDefinition[] {

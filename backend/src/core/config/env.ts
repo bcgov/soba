@@ -155,6 +155,8 @@ export function createEnvReader(source: EnvSource) {
     getTempStorageDefaultCode: () => getOptionalEnvFrom(source, 'TEMPSTORAGE_DEFAULT_CODE'),
     getVirusScanDefaultCode: () => getOptionalEnvFrom(source, 'VIRUSSCAN_DEFAULT_CODE'),
     getFormEngineDefaultCode: () => getOptionalEnvFrom(source, 'FORM_ENGINE_DEFAULT_CODE'),
+    getDocumentGenerationDefaultCode: () =>
+      getOptionalEnvFrom(source, 'DOCUMENT_GENERATION_DEFAULT_CODE'),
     /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
     getDefaultSubmitterProvider: () =>
       getOptionalEnvFrom(source, 'DEFAULT_SUBMITTER_PROVIDER') ?? 'azureidir',
@@ -217,6 +219,8 @@ export const env = {
   getTempStorageDefaultCode: () => getOptionalEnv('TEMPSTORAGE_DEFAULT_CODE'),
   getVirusScanDefaultCode: () => getOptionalEnv('VIRUSSCAN_DEFAULT_CODE'),
   getFormEngineDefaultCode: () => getOptionalEnv('FORM_ENGINE_DEFAULT_CODE'),
+  /** Document generation backend the consumer defaults to (a discovered plugin code). */
+  getDocumentGenerationDefaultCode: () => getOptionalEnv('DOCUMENT_GENERATION_DEFAULT_CODE'),
   /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
   getDefaultSubmitterProvider: () => getOptionalEnv('DEFAULT_SUBMITTER_PROVIDER') ?? 'azureidir',
   getStorageProfiles: () => {
