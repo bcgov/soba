@@ -29,9 +29,15 @@ export interface BinaryResponse {
   contentType?: string;
 }
 
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') end--;
+  return value.slice(0, end);
+}
+
 /** Join a base URL and a path segment with exactly one slash, tolerating stray slashes on either side. */
 export function joinUrl(base: string, segment: string): string {
-  return `${base.replace(/\/+$/, '')}/${segment.replace(/^\/+/, '')}`;
+  return `${stripTrailingSlashes(base)}/${segment.replace(/^\/+/, '')}`;
 }
 
 /**
@@ -45,7 +51,7 @@ export class HttpClient {
   private readonly defaultHeaders: Record<string, string>;
 
   constructor(options: HttpClientOptions) {
-    this.baseUrl = options.baseUrl.replace(/\/+$/, '');
+    this.baseUrl = stripTrailingSlashes(options.baseUrl);
     this.getToken = options.getToken;
     this.defaultHeaders = options.defaultHeaders ?? {};
   }
