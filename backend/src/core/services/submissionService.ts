@@ -8,6 +8,7 @@ import {
   listSubmissionsForWorkspace,
   markSubmissionDeleted,
   updateSubmissionDraft,
+  type SubmissionRecord,
 } from '../db/repos/submissionRepo';
 import { getFormVersionById, getPublishedVersionForForm } from '../db/repos/formVersionRepo';
 import { getFormEngineCodeForForm } from '../db/repos/formRepo';
@@ -143,9 +144,17 @@ export class SubmissionService {
     return getSubmissionById(workspaceId, submissionId);
   }
 
-  /** Reads the submission's current answer document back from the form engine (null if unprovisioned). */
-  async getContent(input: { workspaceId: string; submissionId: string }) {
-    const submission = await getSubmissionRecordById(input.workspaceId, input.submissionId);
+  /**
+   * Reads the submission's current answer document back from the form engine (null if unprovisioned).
+   * Pass `record` to reuse an already-loaded submission row instead of re-fetching it.
+   */
+  async getContent(input: {
+    workspaceId: string;
+    submissionId: string;
+    record?: SubmissionRecord;
+  }) {
+    const submission =
+      input.record ?? (await getSubmissionRecordById(input.workspaceId, input.submissionId));
     if (!submission || !submission.engineSubmissionRef) return null;
 
     const version = await getFormVersionById(input.workspaceId, submission.formVersionId);

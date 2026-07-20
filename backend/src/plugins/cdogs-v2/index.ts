@@ -9,5 +9,6 @@ export const documentGenerationPluginDefinition: DocumentGenerationPluginDefinit
     name: 'CDOGS',
     version: 'v2',
   },
+  featureCode: 'document-generation-v2',
   createAdapter: (config: PluginConfigReader) => new CdogsV2Adapter(config),
 };

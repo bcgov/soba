@@ -7,6 +7,7 @@ import { designSubmissionsRouter, registerSubmissionsOpenApi } from './submissio
 import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
 import { groupsDomain } from './groups';
 import { filesDomain } from '../../features/files';
+import { documentGenerationDomain } from '../../features/document-generation';
 import { meDomain } from './me';
 import { membersDomain } from './members';
 import { workspacesDomain } from './workspaces';
@@ -26,6 +27,7 @@ registerOpenApiPaths((registry) => {
   membersDomain.registerOpenApi(registry);
   workspacesDomain.registerOpenApi(registry);
   filesDomain.registerOpenApi(registry);
+  documentGenerationDomain.registerOpenApi(registry);
   metaDomain.registerOpenApi(registry);
   registerAdminOpenApi(registry);
   registerHealthOpenApi(registry);
@@ -43,6 +45,9 @@ designRouter.use(coreErrorHandler);
 const submitRouter = express.Router();
 submitRouter.use('/', submitRoutes);
 submitRouter.use('/files', filesDomain.router);
+// Mounted after submitRoutes so only the fall-through actions (preview/print) reach it; the
+// document-generation feature gate lives inside the router.
+submitRouter.use('/submissions', documentGenerationDomain.router);
 submitRouter.use(coreErrorHandler);
 
 // Core: workspace/account management.

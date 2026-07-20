@@ -121,6 +121,11 @@ export const Features = {
   submit_mode: 'submit-mode',
   files: 'files',
   antivirus: 'antivirus',
+  /** Umbrella: gates the document-generation surface within submit. */
+  document_generation: 'document-generation',
+  /** Per-backend: which document-generation engine is available (v3 is scoped). */
+  document_generation_v2: 'document-generation-v2',
+  document_generation_v3: 'document-generation-v3',
 } as const;
 export type FeatureCode = (typeof Features)[keyof typeof Features];
 
@@ -128,7 +133,7 @@ export type FeatureCode = (typeof Features)[keyof typeof Features];
  * How a feature is gated (soba.feature.availability):
  *  - `fixed`  — available wherever the feature is platform-enabled; not gated to a workspace/form.
  *  - `scoped` — available only where an active feature_scope grant exists (a workspace or form).
- * A scoped pilot that graduates to everyone is switched to `fixed`.
+ * A scoped feature that graduates to everyone is switched to `fixed`.
  */
 export const FeatureAvailability = {
   fixed: 'fixed',
