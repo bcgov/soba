@@ -42,6 +42,9 @@ crunchy:
         memory: 128Mi
   pgBackRest:
     enabled: false
+    # Required by the external chart even when pgBackRest is disabled.
+    s3:
+      enabled: false
   patroni:
     postgresql:
       pg_hba:
