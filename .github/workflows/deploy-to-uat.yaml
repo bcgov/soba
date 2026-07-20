@@ -1,0 +1,163 @@
+---
+name: Deploy to UAT
+run-name: Deploy main ${{ github.sha }} to UAT
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/deploy-to-uat.yaml"
+      - ".github/workflows/build-images.yaml"
+      - "deployments/helm/soba/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: soba-uat
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build application images once
+    uses: ./.github/workflows/build-images.yaml
+    with:
+      ref: ${{ github.sha }}
+      platforms: amd64
+      image_version: uat-${{ github.sha }}
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+
+  deploy:
+    name: Verify databases and deploy SOBA to UAT
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    environment:
+      name: uat
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+
+      - name: Install OpenShift CLI
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
+
+      - name: Login to OpenShift
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: ${{ vars.OC_SERVER }}
+          openshift_token: ${{ secrets.OC_TOKEN }}
+          insecure_skip_tls_verify: true
+          namespace: acf456-prod
+
+      - name: Verify separately managed databases
+        env:
+          NAMESPACE: acf456-prod
+        run: |
+          set -euo pipefail
+
+          helm status pg-soba --namespace "$NAMESPACE" >/dev/null
+          PG_READY="$(oc -n "$NAMESPACE" get postgrescluster pg-soba \
+            -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')"
+          test "$PG_READY" = "True"
+          oc -n "$NAMESPACE" get secret pg-soba-pguser-app >/dev/null
+
+          helm status soba-uat-mongodb --namespace "$NAMESPACE" >/dev/null
+          MONGO_DESIRED="$(oc -n "$NAMESPACE" get statefulset soba-uat-mongodb -o jsonpath='{.spec.replicas}')"
+          MONGO_READY="$(oc -n "$NAMESPACE" get statefulset soba-uat-mongodb -o jsonpath='{.status.readyReplicas}')"
+          test "$MONGO_DESIRED" = "3"
+          test "$MONGO_READY" = "$MONGO_DESIRED"
+          oc -n "$NAMESPACE" rollout status statefulset/soba-uat-mongodb --timeout=30s
+          oc -n "$NAMESPACE" get secret soba-uat-mongodb-ca >/dev/null
+          oc -n "$NAMESPACE" get secret soba-uat-formio >/dev/null
+
+      - name: Create immutable interim UAT source tag
+        env:
+          SHORT_SHA: ${{ needs.build.outputs.short_sha }}
+        run: |
+          set -euo pipefail
+          TAG="uat-${SHORT_SHA}"
+          COMMIT="$(git rev-parse HEAD)"
+          git fetch --tags --force
+
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            test "$(git rev-list -n 1 "${TAG}")" = "$COMMIT"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$COMMIT" -m "UAT candidate for ${COMMIT}"
+          git push origin "refs/tags/${TAG}"
+
+      - name: Render and deploy SOBA to UAT
+        env:
+          NAMESPACE: acf456-prod
+          DOMAIN: ${{ vars.OC_DOMAIN }}
+          REPOSITORY: ${{ github.repository }}
+          SHORT_SHA: ${{ needs.build.outputs.short_sha }}
+        run: |
+          set -euo pipefail
+          REPO_LC="$(echo "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          TAG="uat-${SHORT_SHA}"
+
+          cat > /tmp/values-override.yaml <<EOF
+          global:
+            domain: "${DOMAIN}"
+          backend:
+            image:
+              repository: "ghcr.io/${REPO_LC}/backend"
+              tag: "sha-${SHORT_SHA}"
+            config:
+              gitSha: "${GITHUB_SHA}"
+              gitTag: "${TAG}"
+              imageTag: "sha-${SHORT_SHA}"
+          frontend:
+            image:
+              repository: "ghcr.io/${REPO_LC}/frontend"
+              tag: "sha-${SHORT_SHA}"
+          temporalWorker:
+            image:
+              repository: "ghcr.io/${REPO_LC}/temporal-worker"
+              tag: "sha-${SHORT_SHA}"
+          EOF
+
+          helm lint deployments/helm/soba \
+            --values deployments/helm/soba/values-uat.yaml \
+            --values /tmp/values-override.yaml
+          helm upgrade --install soba-uat deployments/helm/soba \
+            --namespace "$NAMESPACE" \
+            --values deployments/helm/soba/values-uat.yaml \
+            --values /tmp/values-override.yaml \
+            --wait \
+            --wait-for-jobs \
+            --timeout 15m \
+            --history-max 10
+
+      - name: Confirm application rollouts
+        env:
+          NAMESPACE: acf456-prod
+        run: |
+          set -euo pipefail
+          oc -n "$NAMESPACE" rollout status deployment/soba-uat-backend --timeout=300s
+          oc -n "$NAMESPACE" rollout status deployment/soba-uat-frontend --timeout=300s
+          oc -n "$NAMESPACE" rollout status deployment/soba-uat-formio --timeout=300s
