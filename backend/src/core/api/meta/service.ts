@@ -8,6 +8,7 @@ import {
   getPluginCatalog,
 } from '../../integrations/plugins/PluginRegistry';
 import { isFeatureEnabled, listFeatures } from '../../db/repos/featureRepo';
+import { isFeatureAvailable } from '../../services/featureAvailabilityService';
 import { roleService } from '../../services/roleService';
 
 function parseKeycloakIssuer(issuer: string): { url: string; realm: string } {
@@ -50,9 +51,22 @@ export class MetaApiService {
         description: f.description,
         version: f.version,
         status: f.status,
+        availability: f.availability,
         platformAllowed: isFeatureEnabled(f.status),
       })),
     };
+  }
+
+  /**
+   * Resolve whether a feature is available for a workspace/form scope (3-gate resolution). Lets the
+   * frontend check a `scoped` feature it cannot resolve locally, since grants live server-side.
+   */
+  async getFeatureAvailability(params: { code: string; workspaceId?: string; formId?: string }) {
+    const available = await isFeatureAvailable(params.code, {
+      workspaceId: params.workspaceId,
+      formId: params.formId,
+    });
+    return { code: params.code, available };
   }
 
   getBuild() {

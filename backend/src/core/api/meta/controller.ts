@@ -12,6 +12,15 @@ export const getFeaturesMeta = asyncHandler(async (_req: Request, res: Response)
   res.json(await metaApiService.getFeatures());
 });
 
+export const getFeatureAvailabilityMeta = asyncHandler(async (req: Request, res: Response) => {
+  const { code, workspaceId, formId } = req.query as {
+    code: string;
+    workspaceId?: string;
+    formId?: string;
+  };
+  res.json(await metaApiService.getFeatureAvailability({ code, workspaceId, formId }));
+});
+
 export const getFormEnginesMeta = asyncHandler(async (_req: Request, res: Response) => {
   res.json(await metaApiService.getFormEngines());
 });

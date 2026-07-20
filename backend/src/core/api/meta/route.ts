@@ -5,6 +5,7 @@ import { Features } from '../../db/codes';
 import {
   getBuildMeta,
   getCodesMeta,
+  getFeatureAvailabilityMeta,
   getFeaturesMeta,
   getFilesConfigMeta,
   getFrontendConfigMeta,
@@ -12,12 +13,21 @@ import {
   getPluginsMeta,
   getRolesMeta,
 } from './controller';
-import { ListCodesQuerySchema, ListRolesQuerySchema } from './schema';
+import {
+  FeatureAvailabilityQuerySchema,
+  ListCodesQuerySchema,
+  ListRolesQuerySchema,
+} from './schema';
 
 const router = express.Router();
 
 router.get('/plugins', getPluginsMeta);
 router.get('/features', getFeaturesMeta);
+router.get(
+  '/feature-availability',
+  validateRequest({ query: FeatureAvailabilityQuerySchema }),
+  getFeatureAvailabilityMeta,
+);
 router.get('/form-engines', getFormEnginesMeta);
 router.get('/build', getBuildMeta);
 router.get('/frontend-config', getFrontendConfigMeta);

@@ -25,6 +25,8 @@ export const FeatureMetaSchema = z
     description: z.string().nullable(),
     version: z.string().nullable(),
     status: z.string(),
+    /** How the feature is gated: 'fixed' (everywhere platform-enabled) or 'scoped' (per workspace/form grant). */
+    availability: z.string(),
     platformAllowed: z.boolean(),
   })
   .openapi('Meta_Feature');
@@ -34,6 +36,22 @@ export const FeaturesMetaResponseSchema = z
     features: z.array(FeatureMetaSchema),
   })
   .openapi('Meta_FeaturesResponse');
+
+export const FeatureAvailabilityQuerySchema = z
+  .object({
+    code: z.string().min(1),
+    // Validate as uuid so a malformed id is a clean 400, not a uuid-cast 500 in the grant lookup.
+    workspaceId: z.string().uuid().optional(),
+    formId: z.string().uuid().optional(),
+  })
+  .openapi('Meta_FeatureAvailabilityQuery');
+
+export const FeatureAvailabilityResponseSchema = z
+  .object({
+    code: z.string(),
+    available: z.boolean(),
+  })
+  .openapi('Meta_FeatureAvailabilityResponse');
 
 export const BuildMetaResponseSchema = z
   .object({
@@ -168,12 +186,26 @@ export const registerMetaOpenApi = (registry: OpenAPIRegistry) => {
     tags: ['core.meta'],
     responses: {
       200: {
-        description: 'DB-backed feature list (code, name, status, platformAllowed)',
+        description: 'DB-backed feature list (code, name, status, availability, platformAllowed)',
         content: {
           'application/json': {
             schema: FeaturesMetaResponseSchema,
           },
         },
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/meta/feature-availability',
+    tags: ['core.meta'],
+    request: { query: FeatureAvailabilityQuerySchema },
+    responses: {
+      200: {
+        description:
+          'Whether a feature is available for the given workspace/form scope (fixed → platform-enabled; scoped → an active grant).',
+        content: { 'application/json': { schema: FeatureAvailabilityResponseSchema } },
       },
     },
   });

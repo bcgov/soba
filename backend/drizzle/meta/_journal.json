@@ -141,6 +141,13 @@
       "when": 1772612000000,
       "tag": "0019_add_antivirus_feature",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1772613000000,
+      "tag": "0020_feature_availability",
+      "breakpoints": true
     }
   ]
 }
