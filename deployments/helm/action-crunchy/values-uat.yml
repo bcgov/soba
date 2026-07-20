@@ -1,6 +1,6 @@
 # Crunchy Postgres values for SOBA UAT.
-# Storage is sized to fit a 64Gi namespace storage quota:
-#   data 10Gi x 3 replicas + WAL 2Gi x 3 replicas + backup 20Gi = 56Gi.
+# Backups are intentionally disabled for the initial UAT deployment.
+# Storage: data 10Gi x 3 replicas + WAL 2Gi x 3 replicas = 36Gi.
 global:
   config:
     dbName: app
@@ -41,44 +41,7 @@ crunchy:
         cpu: 10m
         memory: 128Mi
   pgBackRest:
-    enabled: true
-    backupPath: /backups/uat/cluster/version
-    clusterCounter: 1
-    retentionFullType: count
-    s3:
-      enabled: false
-      retention: 7
-      bucket: ~
-      endpoint: ~
-      accessKey: ~
-      secretKey: ~
-      fullBackupSchedule: ~
-      incrementalBackupSchedule: ~
-    pvc:
-      retention: 1
-      retentionFullType: count
-      fullBackupSchedule: 0 8 * * *
-      incrementalBackupSchedule: 0 0-7,9-23 * * *
-      volume:
-        accessModes: ReadWriteOnce
-        storage: 20Gi
-        storageClassName: netapp-file-backup
-    config:
-      requests:
-        cpu: 50m
-        memory: 128Mi
-    repoHost:
-      requests:
-        cpu: 100m
-        memory: 512Mi
-    sidecars:
-      requests:
-        cpu: 10m
-        memory: 64Mi
-    jobs:
-      requests:
-        cpu: 100m
-        memory: 512Mi
+    enabled: false
   patroni:
     postgresql:
       pg_hba:
