@@ -2,6 +2,12 @@
 name: Deploy Crunchy UAT
 
 on:
+  # A database-labelled PR may deploy Crunchy before the application workflow.
+  # `labeled` supports adding the label after PR creation; `opened` supports a
+  # label selected before creating the PR.
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, labeled]
   workflow_dispatch:
 
 permissions:
@@ -14,6 +20,9 @@ concurrency:
 jobs:
   deploy-crunchy-uat:
     name: Deploy Crunchy UAT
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'deploy-uat-db')
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment:
