@@ -14,6 +14,11 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
+  # Temporary validation path for this implementation PR. Remove this branch
+  # condition when the permanent release workflow replaces this interim flow.
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize]
   workflow_dispatch:
 
 permissions: {}
@@ -25,11 +30,12 @@ concurrency:
 jobs:
   build:
     name: Build application images once
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'feat/CCP-4817-Deploy-UAT'
     uses: ./.github/workflows/build-images.yaml
     with:
-      ref: ${{ github.sha }}
+      ref: ${{ github.event.pull_request.head.sha || github.sha }}
       platforms: amd64
-      image_version: uat-${{ github.sha }}
+      image_version: uat-${{ github.event.pull_request.head.sha || github.sha }}
     secrets: inherit
     permissions:
       contents: read
@@ -48,7 +54,7 @@ jobs:
       - name: Checkout main
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Install Helm
@@ -93,9 +99,14 @@ jobs:
       - name: Create immutable interim UAT source tag
         env:
           SHORT_SHA: ${{ needs.build.outputs.short_sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
         run: |
           set -euo pipefail
-          TAG="uat-${SHORT_SHA}"
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            TAG="uat-pr-${PR_NUMBER}-${SHORT_SHA}"
+          else
+            TAG="uat-${SHORT_SHA}"
+          fi
           COMMIT="$(git rev-parse HEAD)"
           git fetch --tags --force
 
@@ -115,10 +126,15 @@ jobs:
           DOMAIN: ${{ vars.OC_DOMAIN }}
           REPOSITORY: ${{ github.repository }}
           SHORT_SHA: ${{ needs.build.outputs.short_sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
         run: |
           set -euo pipefail
           REPO_LC="$(echo "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"
-          TAG="uat-${SHORT_SHA}"
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            TAG="uat-pr-${PR_NUMBER}-${SHORT_SHA}"
+          else
+            TAG="uat-${SHORT_SHA}"
+          fi
 
           cat > /tmp/values-override.yaml <<EOF
           global:
