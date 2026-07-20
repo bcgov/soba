@@ -19,7 +19,7 @@ Before requesting review, ensure:
 
 ## Devcontainer
 
-The project uses a VS Code devcontainer (`.devcontainer/`). Open the repo in VS Code and **Reopen in Container** so all tooling and env are consistent.
+The project uses a VS Code devcontainer (`.devcontainer/`). Open the repo in VS Code and **Reopen in Container** so all tooling and env are consistent. It runs via `docker-compose.devcontainer.yml`; to cap the container's memory/swap or the Node heap for your machine, see per-developer resource limits in [`.devcontainer/README.md`](.devcontainer/README.md).
 
 ### Tools added to the OS
 
@@ -60,7 +60,7 @@ This starts:
 - **Temporal** (gRPC port 7233) — workflow engine
 - **Temporal UI** (port 8088) — workflow dashboard
 
-**Inside the devcontainer** use `host.docker.internal` to reach sidecars from backend processes (e.g. `mongodb://host.docker.internal:27017`, `postgresql://postgres:postgres@host.docker.internal:5432/postgres`, `http://host.docker.internal:3001`). The devcontainer is started with `--add-host=host.docker.internal:host-gateway` so that this hostname works on Linux as well as on Docker Desktop (Mac/Windows). **Committed `.env.example` files use `localhost`** for DB, Form.io, and API URLs — that works when the browser and forwarded ports are on the host (e.g. http://localhost:3000 with `NEXT_PUBLIC_SOBA_API_BASE_URL=http://localhost:4000/api/v1`). Use `host.docker.internal` in backend env when the API server runs inside the container and must reach compose services. Form.io login: `formio@localhost.com` / `formio`.
+**Inside the devcontainer** use `host.docker.internal` to reach sidecars from backend processes (e.g. `mongodb://host.docker.internal:27017`, `postgresql://postgres:postgres@host.docker.internal:5432/postgres`, `http://host.docker.internal:3001`). The `app` service sets `extra_hosts: host.docker.internal:host-gateway` so that this hostname works on Linux as well as on Docker Desktop (Mac/Windows). **Committed `.env.example` files use `localhost`** for DB, Form.io, and API URLs — that works when the browser and forwarded ports are on the host (e.g. http://localhost:3000 with `NEXT_PUBLIC_SOBA_API_BASE_URL=http://localhost:4000/api/v1`). Use `host.docker.internal` in backend env when the API server runs inside the container and must reach compose services. Form.io login: `formio@localhost.com` / `formio`.
 
 **Database (migrate + seed):** After the sidecars are up, from the repo root run `pnpm db:init` (or `pnpm dev:db:up` to start services and init in one step). See [Drizzle](#drizzle) for individual `db:migrate` / `db:seed` commands.
 
@@ -148,7 +148,7 @@ The devcontainer **initialize** and **post-create** steps copy from example file
 
 - Backend uses **[dotenv](https://github.com/motdotla/dotenv)**: it loads `.env` then `.env.local` (with `override: true`) so local values win.
 - Frontend uses **[Next.js](https://nextjs.org) built-in** env loading (no extra lib): `.env`, `.env.local`, `.env.development` / `.env.production` are read automatically; expose client-side values via the `NEXT_PUBLIC_` prefix.
-- The devcontainer does **not** pass `backend/.env` or `backend/.env.local` into the container via Docker (`runArgs`); shells and one-off CLI commands only see variables you export yourself. App servers started inside the container still pick up the files through dotenv / Next.js.
+- The devcontainer does **not** inject `backend/.env` or `backend/.env.local` into the container environment; shells and one-off CLI commands only see variables you export yourself. App servers started inside the container still pick up the files through dotenv / Next.js.
 
 ---
 
