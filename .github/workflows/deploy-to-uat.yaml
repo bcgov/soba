@@ -14,13 +14,7 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
-  # Temporary validation path for this implementation PR. A database-labelled
-  # PR is handled by Deploy Crunchy UAT instead and must not deploy the app.
-  # Remove this branch condition when the permanent release workflow replaces
-  # this interim flow.
-  pull_request:
-    branches: [main]
-    types: [opened, reopened]
+  workflow_call:
   workflow_dispatch:
 
 permissions: {}
@@ -32,10 +26,6 @@ concurrency:
 jobs:
   build:
     name: Build application images once
-    if: >-
-      github.event_name != 'pull_request' ||
-      (github.event.pull_request.head.ref == 'feat/CCP-4817-Deploy-UAT' &&
-      !contains(github.event.pull_request.labels.*.name, 'deploy-uat-db'))
     uses: ./.github/workflows/build-images.yaml
     with:
       ref: ${{ github.event.pull_request.head.sha || github.sha }}

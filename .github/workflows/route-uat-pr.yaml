@@ -1,0 +1,32 @@
+---
+name: Route UAT PR deployment
+run-name: "Route PR #${{ github.event.pull_request.number }} to UAT"
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+permissions: {}
+
+jobs:
+  deploy-crunchy:
+    name: Deploy Crunchy UAT
+    if: contains(github.event.pull_request.labels.*.name, 'deploy-uat-db')
+    uses: ./.github/workflows/deploy-crunchy-uat.yaml
+    secrets: inherit
+    permissions:
+      contents: read
+
+  deploy-application:
+    name: Deploy application to UAT
+    # Temporary implementation-PR path. Replace this branch guard with the
+    # permanent release routing when the release process is introduced.
+    if: >-
+      github.event.pull_request.head.ref == 'feat/CCP-4817-Deploy-UAT' &&
+      !contains(github.event.pull_request.labels.*.name, 'deploy-uat-db')
+    uses: ./.github/workflows/deploy-to-uat.yaml
+    secrets: inherit
+    permissions:
+      contents: write
+      packages: write
