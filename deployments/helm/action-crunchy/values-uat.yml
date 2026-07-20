@@ -1,6 +1,6 @@
 # Crunchy Postgres values for SOBA UAT.
 # Backups are intentionally disabled for the initial UAT deployment.
-# Storage: data 10Gi x 3 replicas + WAL 2Gi x 3 replicas = 36Gi.
+# Storage: data 5Gi x 3 replicas + WAL 2Gi x 3 replicas = 21Gi.
 global:
   config:
     dbName: app
@@ -32,12 +32,14 @@ crunchy:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9187"
     dataVolumeClaimSpec:
-      storage: 10Gi
+      storage: 5Gi
       storageClassName: netapp-block-standard
       walStorage: 2Gi
     requests:
-      cpu: 250m
-      memory: 4Gi
+      # UAT sizing: keeps three PostgreSQL replicas plus the UAT application
+      # within the namespace's current 4 CPU / 16Gi request quota with headroom.
+      cpu: 150m
+      memory: 1536Mi
     replicaCertCopy:
       requests:
         cpu: 10m
@@ -53,7 +55,7 @@ crunchy:
         - "host all all 0.0.0.0/0 scram-sha-256"
         - "host all all ::1/128 scram-sha-256"
       parameters:
-        shared_buffers: 1GB
+        shared_buffers: 512MB
         wal_buffers: "-1"
         min_wal_size: 128MB
         max_wal_size: 512MB
