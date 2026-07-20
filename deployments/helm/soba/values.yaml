@@ -69,10 +69,10 @@ backend:
     formEngineDefaultCode: formio-v5
     cacheDefaultCode: cache-memory
     messagebusDefaultCode: messagebus-memory
-    # Temp storage plugin. tempstorage-mount uses the shared PVC below (never
-    # os.tmpdir()) — the default for real deployments. PRs override to
-    # tempstorage-os (see values-pr.yaml).
-    tempStorageDefaultCode: tempstorage-mount
+    # Temp storage plugin. Default tempstorage-os stages temp bytes under
+    # os.tmpdir() (per-pod, no PVC). Override to tempstorage-mount for a shared
+    # RWX PVC across replicas (see the tempStorage block below).
+    tempStorageDefaultCode: tempstorage-os
     # Virus scan plugin. Deployments scan for real against the shared clamav
     # (see the clamav block below); local dev overrides to virusscan-noop via .env.
     virusScanDefaultCode: virusscan-clamav

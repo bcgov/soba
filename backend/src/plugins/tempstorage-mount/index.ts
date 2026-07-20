@@ -9,8 +9,8 @@ const CODE = 'tempstorage-mount';
 
 const DEFAULT_DIR = '/app/tmp';
 
-/** Disk temp storage under a fixed DIR (default /app/tmp) — a shared RWX PVC in
- *  deployments. Config: DIR. */
+/** Disk temp storage under a fixed DIR (default /app/tmp) — a shared RWX PVC for
+ *  temp shared across replicas. Opt-in; the default is tempstorage-os. Config: DIR. */
 function createMountTempStorageAdapter(config: PluginConfigReader): TempStorageAdapter {
   const dir = config.getOptional('DIR') ?? DEFAULT_DIR;
   return createDiskTempStorageAdapter(dir);
