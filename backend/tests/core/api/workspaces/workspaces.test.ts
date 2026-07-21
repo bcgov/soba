@@ -30,6 +30,7 @@ const workspaceRow = {
   status: 'active',
   membershipId: 'membership-1',
   disclaimerAcceptedAt: null,
+  updatedAt: new Date(),
 };
 
 describe('WorkspacesApiService', () => {

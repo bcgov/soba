@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
+import { and, desc, asc, eq, lt, gt, or, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { db } from '../client';
 import {
@@ -127,6 +127,7 @@ export const getWorkspaceForUser = async (workspaceId: string, userId: string) =
       membershipId: workspaceMemberships.id,
       role: workspaceMemberships.role,
       disclaimerAcceptedAt: workspaceDisclaimerAcceptances.acceptedAt,
+      updatedAt: workspaces.updatedAt,
     })
     .from(workspaces)
     .innerJoin(
@@ -164,6 +165,20 @@ export const getActiveWorkspaceIdsForUser = async (userId: string): Promise<stri
   return rows.map((row) => row.workspaceId);
 };
 
+export const getActiveUserIdsForWorkspace = async (workspaceId: string): Promise<string[]> => {
+  const rows = await db
+    .select({ userId: workspaceMemberships.userId })
+    .from(workspaceMemberships)
+    .where(
+      and(
+        eq(workspaceMemberships.workspaceId, workspaceId),
+        eq(workspaceMemberships.status, 'active'),
+      ),
+    );
+
+  return rows.map((row) => row.userId);
+};
+
 /**
  * Invalidate cached membership for a workspace/user after insert/update/delete.
  * Call from code that mutates workspace memberships (e.g. workspaceRepo, seed).
@@ -178,7 +193,7 @@ export const invalidateMembershipCache = (workspaceId: string, userId: string): 
   }
 };
 
-export type WorkspaceListSort = 'id:desc' | 'updatedAt:desc';
+export type WorkspaceListSort = 'id:desc' | 'updatedAt:desc' | 'updatedAt:asc';
 export type WorkspaceListCursorMode = 'id' | 'ts_id';
 
 export interface ListWorkspacesForUserInput {
@@ -190,6 +205,7 @@ export interface ListWorkspacesForUserInput {
   afterUpdatedAt?: Date;
   kind?: string;
   status?: string;
+  updatedSince?: Date;
 }
 
 export interface WorkspaceListRow {
@@ -200,6 +216,21 @@ export interface WorkspaceListRow {
   status: string;
   disclaimerAcceptedAt: Date | null;
   updatedAt: Date;
+}
+
+function buildIdCursorClause(sort: string, afterId: string) {
+  return sort.endsWith(':asc') ? gt(workspaces.id, afterId) : lt(workspaces.id, afterId);
+}
+
+function buildTsIdCursorClause(sort: string, afterId: string, afterUpdatedAt: Date) {
+  const isAsc = sort.endsWith(':asc');
+  return or(
+    isAsc ? gt(workspaces.updatedAt, afterUpdatedAt) : lt(workspaces.updatedAt, afterUpdatedAt),
+    and(
+      eq(workspaces.updatedAt, afterUpdatedAt),
+      isAsc ? gt(workspaces.id, afterId) : lt(workspaces.id, afterId),
+    ),
+  );
 }
 
 export const listWorkspacesForUser = async (
@@ -216,16 +247,18 @@ export const listWorkspacesForUser = async (
     whereClauses.push(eq(workspaces.status, input.status));
   }
   if (input.cursorMode === 'id' && input.afterId) {
-    whereClauses.push(lt(workspaces.id, input.afterId));
+    whereClauses.push(buildIdCursorClause(input.sort, input.afterId));
   }
   if (input.cursorMode === 'ts_id' && input.afterId && input.afterUpdatedAt) {
-    whereClauses.push(
-      or(
-        lt(workspaces.updatedAt, input.afterUpdatedAt),
-        and(eq(workspaces.updatedAt, input.afterUpdatedAt), lt(workspaces.id, input.afterId)),
-      ),
-    );
+    whereClauses.push(buildTsIdCursorClause(input.sort, input.afterId, input.afterUpdatedAt));
   }
+  if (input.updatedSince) {
+    whereClauses.push(gt(workspaces.updatedAt, input.updatedSince));
+  }
+
+  const isAsc = input.sort === 'updatedAt:asc';
+  const firstCol = isAsc ? asc(workspaces.updatedAt) : desc(workspaces.updatedAt);
+  const secondCol = isAsc ? asc(workspaces.id) : desc(workspaces.id);
 
   const rows = await db
     .select({
@@ -244,12 +277,7 @@ export const listWorkspacesForUser = async (
       eq(workspaceDisclaimerAcceptances.workspaceId, workspaces.id),
     )
     .where(and(...whereClauses))
-    .orderBy(
-      input.cursorMode === 'ts_id' || input.sort === 'updatedAt:desc'
-        ? desc(workspaces.updatedAt)
-        : desc(workspaces.id),
-      desc(workspaces.id),
-    )
+    .orderBy(firstCol, secondCol)
     .limit(input.limit + 1);
 
   return {

@@ -5,6 +5,7 @@ export type WorkspaceItem = {
   role: string;
   status: string;
   disclaimerAccepted: boolean;
+  updatedAt?: string;
 };
 
 export type WorkspacesResponse = {
@@ -23,6 +24,7 @@ export type WorkspacesResponse = {
 };
 
 export type CreateWorkspaceBody = {
+  id?: string;
   name: string;
   disclaimerAccepted?: boolean;
 };

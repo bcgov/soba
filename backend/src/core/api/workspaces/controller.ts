@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { z } from 'zod';
 import { workspacesApiService } from './service';
 import { asyncHandler } from '../shared/asyncHandler';
+import { addStreamConnection } from './stream';
 import { NotFoundError, ValidationError } from '../../errors';
 import { getActorId, getActorIdpCode } from '../../middleware/actor';
 import type { Request } from 'express';
@@ -27,6 +28,21 @@ export const listWorkspaces = asyncHandler(async (req: Request, res: Response) =
     req.query as unknown as ListWorkspacesQuery,
   );
   res.json(result);
+});
+
+export const streamWorkspaces = asyncHandler(async (req: Request, res: Response) => {
+  const actorId = getActorId(req);
+  if (!actorId) {
+    throw new ValidationError('Missing actor identity');
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  addStreamConnection(actorId, res);
+  res.write('event: connected\ndata: {}\n\n');
 });
 
 export const createWorkspace = asyncHandler(async (req: Request, res: Response) => {

@@ -3,12 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Tabs, Tab } from 'react-bootstrap';
-import {
-  Button,
-  Form,
-  Switch,
-  TextField,
-} from '@bcgov/design-system-react-components';
+import { Button, Form, Switch, TextField } from '@bcgov/design-system-react-components';
 import { FormSubmitterAudience } from '@/src/features/designer/ui/FormSubmitterAudience';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { ListPageLayout } from '@/src/components/ListPageLayout';
@@ -20,11 +15,8 @@ import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { loadWorkspaces } from '@/lib/slices/workspaceSlice';
 import { loadCurrentUser, updateDefaultWorkspace } from '@/lib/slices/currentUserSlice';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import {
-  createWorkspace,
-  selectWorkspace,
-  updateWorkspace,
-} from '@/src/shared/api/sobaApi';
+import { selectWorkspace, createWorkspace, updateWorkspace } from '@/src/shared/api/sobaApi';
+import { v7 as uuidv7 } from 'uuid';
 import { isWorkspaceManageRole } from '../workspaceRoles';
 import styles from './WorkspaceForm.module.css';
 
@@ -149,10 +141,20 @@ function WorkspaceForm({ workspaceId }: Readonly<WorkspaceFormProps>) {
       let savedId = workspaceId ?? null;
 
       if (isCreate) {
-        const created = await createWorkspace(token, { name: trimmedName, disclaimerAccepted });
-        savedId = created.id;
+        const newId = uuidv7();
+        await createWorkspace(token, {
+          id: newId,
+          name: trimmedName,
+          disclaimerAccepted,
+        });
+        savedId = newId;
       } else if (trimmedName !== loadedName || disclaimerAccepted !== loadedDisclaimer) {
-        await updateWorkspace(token, workspaceId, { name: trimmedName, disclaimerAccepted });
+        if (workspaceId) {
+          await updateWorkspace(token, workspaceId, {
+            name: trimmedName,
+            disclaimerAccepted,
+          });
+        }
       }
 
       // Only change the stored default when the user's intent is explicit. An untouched

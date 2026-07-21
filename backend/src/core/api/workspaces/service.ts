@@ -1,6 +1,7 @@
 import {
   getWorkspaceForUser,
   listWorkspacesForUser,
+  getActiveUserIdsForWorkspace,
   type WorkspaceListCursorMode,
   type WorkspaceListSort,
 } from '../../db/repos/membershipRepo';
@@ -8,6 +9,7 @@ import { canCreateWorkspaceByIdp } from '../../db/repos/idpGroupRepo';
 import { createTeamWorkspace, updateWorkspace } from '../../db/repos/workspaceRepo';
 import { ForbiddenError } from '../../errors';
 import { decodeCursorAndMode, buildNextCursor, type CursorSort } from '../shared/pagination';
+import { emitWorkspaceUpdate } from './stream';
 
 export class WorkspacesApiService {
   async list(
@@ -18,6 +20,7 @@ export class WorkspacesApiService {
       kind?: string;
       status?: string;
       sort?: CursorSort;
+      updatedSince?: string;
     },
   ) {
     const { cursorMode, sort, afterId, afterUpdatedAt } = decodeCursorAndMode({
@@ -33,6 +36,7 @@ export class WorkspacesApiService {
       afterUpdatedAt,
       kind: query.kind,
       status: query.status,
+      updatedSince: query.updatedSince ? new Date(query.updatedSince) : undefined,
     });
     const lastItem = items[items.length - 1];
     const nextCursor = buildNextCursor(
@@ -48,6 +52,7 @@ export class WorkspacesApiService {
         role: r.role,
         status: r.status,
         disclaimerAccepted: r.disclaimerAcceptedAt != null,
+        updatedAt: r.updatedAt.toISOString(),
       })),
       page: {
         limit: query.limit,
@@ -76,6 +81,7 @@ export class WorkspacesApiService {
     role: string;
     status: string;
     disclaimerAcceptedAt: Date | null;
+    updatedAt?: Date;
   }) {
     return {
       id: row.id,
@@ -84,13 +90,14 @@ export class WorkspacesApiService {
       role: row.role,
       status: row.status,
       disclaimerAccepted: row.disclaimerAcceptedAt != null,
+      updatedAt: row.updatedAt?.toISOString(),
     };
   }
 
   async create(
     actorId: string,
     idpCode: string | null,
-    body: { name: string; disclaimerAccepted?: boolean },
+    body: { id?: string; name: string; disclaimerAccepted?: boolean },
   ) {
     const canCreate = await canCreateWorkspaceByIdp(idpCode);
     if (!canCreate) {
@@ -102,12 +109,16 @@ export class WorkspacesApiService {
       actorId,
       body.name,
       body.disclaimerAccepted ?? false,
+      body.id,
     );
     const row = await getWorkspaceForUser(workspaceId, actorId);
     if (!row) {
       throw new Error('Created workspace could not be loaded');
     }
-    return this.toWorkspaceItem(row);
+    const item = this.toWorkspaceItem(row);
+    const userIds = await getActiveUserIdsForWorkspace(workspaceId);
+    emitWorkspaceUpdate(item, userIds);
+    return item;
   }
 
   async update(
@@ -121,7 +132,10 @@ export class WorkspacesApiService {
     }
     const row = await getWorkspaceForUser(workspaceId, actorId);
     if (!row) return null;
-    return this.toWorkspaceItem(row);
+    const item = this.toWorkspaceItem(row);
+    const userIds = await getActiveUserIdsForWorkspace(workspaceId);
+    emitWorkspaceUpdate(item, userIds);
+    return item;
   }
 }
 

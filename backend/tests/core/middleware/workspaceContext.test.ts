@@ -69,6 +69,7 @@ function membershipRow(id: string) {
     membershipId: 'membership-1',
     role: 'owner',
     disclaimerAcceptedAt: null,
+    updatedAt: new Date(),
   };
 }
 

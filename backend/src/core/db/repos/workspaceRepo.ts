@@ -122,6 +122,7 @@ export const createTeamWorkspace = async (
   userId: string,
   name: string,
   disclaimerAccepted = false,
+  providedId?: string,
 ) => {
   if (await workspaceNameExistsForKind(WorkspaceKind.team, name)) {
     throw new ConflictError(WORKSPACE_NAME_TAKEN);
@@ -134,7 +135,7 @@ export const createTeamWorkspace = async (
       .limit(1);
     const displayLabel = userRow[0]?.displayLabel ?? null;
 
-    const workspaceId = uuidv7();
+    const workspaceId = providedId || uuidv7();
     await tx.insert(workspaces).values({
       id: workspaceId,
       kind: WorkspaceKind.team,

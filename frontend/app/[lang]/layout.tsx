@@ -1,4 +1,5 @@
 import DictionaryProvider from './Providers';
+import { RxDbProvider } from './Providers';
 import { Locale } from './dictionaries';
 import { getDictionary } from './dictionaries';
 import { Header } from '../ui/Header';
@@ -34,16 +35,18 @@ export default async function RootLayout({
 
   return (
     <DictionaryProvider dictionary={dictionary} locale={locale}>
-      <Header headerNavItems={headerNavItems} overlayNavItems={overlayNavItems} />
-      <div className="d-flex w-100">
-        <aside className={`p-2 d-flex flex-column flex-shrink-0 ${shellStyles.aside}`}>
-          <SideNav showAppLinks={showAppLinks} showHome={showHome} />
-        </aside>
-        <main id="main-content" tabIndex={-1} className="flex-grow-1 p-5 overflow-auto">
-          <AppAccessGuard locale={locale}>{children}</AppAccessGuard>
-        </main>
-      </div>
-      <Footer hideAcknowledgement={true} contact={React.createElement('span', null, '')} />
+      <RxDbProvider>
+        <Header headerNavItems={headerNavItems} overlayNavItems={overlayNavItems} />
+        <div className="d-flex w-100">
+          <aside className={`p-2 d-flex flex-column flex-shrink-0 ${shellStyles.aside}`}>
+            <SideNav showAppLinks={showAppLinks} showHome={showHome} />
+          </aside>
+          <main id="main-content" tabIndex={-1} className="flex-grow-1 p-5 overflow-auto">
+            <AppAccessGuard locale={locale}>{children}</AppAccessGuard>
+          </main>
+        </div>
+        <Footer hideAcknowledgement={true} contact={React.createElement('span', null, '')} />
+      </RxDbProvider>
     </DictionaryProvider>
   );
 }

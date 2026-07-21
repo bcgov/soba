@@ -3,7 +3,13 @@ import { validateRequest } from '../shared/validation';
 import { workspaceListScope, workspaceFromResource } from '../../middleware/workspaceContext';
 import { requireFormPermissions } from '../../middleware/requireFormPermissions';
 import { Permissions } from '../../db/codes';
-import { deleteSubmission, getSubmission, getSubmissionData, listSubmissions } from './controller';
+import {
+  deleteSubmission,
+  getSubmission,
+  getSubmissionData,
+  listSubmissions,
+  streamSubmissions,
+} from './controller';
 import { ListSubmissionsQuerySchema, SubmissionIdParamsSchema } from './schema';
 
 // Design-mode submission management: mounted under /api/v1/design/submissions with mandatory auth.
@@ -23,6 +29,7 @@ router.get(
   requireFormPermissions([Permissions.submission_read]),
   listSubmissions,
 );
+router.get('/stream', streamSubmissions);
 router.get(
   ID_PATH,
   validateRequest({ params: SubmissionIdParamsSchema }),

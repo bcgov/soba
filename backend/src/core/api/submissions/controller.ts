@@ -8,10 +8,12 @@ import {
 } from './schema';
 import { submissionsApiService } from './service';
 import { asyncHandler } from '../shared/asyncHandler';
-import { NotFoundError } from '../../errors';
+import { NotFoundError, ValidationError } from '../../errors';
 import { filesService } from '../../../features/files/service';
 import { log } from '../../logging';
 import type { Request } from 'express';
+import { addStreamConnection, addDataStreamConnection } from './stream';
+import { getActorId } from '../../middleware/actor';
 
 type OpenSubmissionBody = z.infer<typeof OpenSubmissionBodySchema>;
 type SubmissionIdParams = z.infer<typeof SubmissionIdParamsSchema>;
@@ -104,3 +106,33 @@ export const deleteSubmission = asyncHandler(
     res.status(204).send();
   },
 );
+
+export const streamSubmissions = asyncHandler(async (req: Request, res: Response) => {
+  const actorId = getActorId(req);
+  if (!actorId) {
+    throw new ValidationError('Only authenticated users can stream');
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  addStreamConnection(actorId, res);
+  res.write('event: connected\ndata: {}\n\n');
+});
+
+export const streamSubmissionData = asyncHandler(async (req: Request, res: Response) => {
+  const actorId = getActorId(req);
+  if (!actorId) {
+    throw new ValidationError('Only authenticated users can stream');
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  addDataStreamConnection(actorId, res);
+  res.write('event: connected\ndata: {}\n\n');
+});
