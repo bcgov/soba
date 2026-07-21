@@ -111,6 +111,7 @@ describe('documentGenerationService.preview', () => {
     });
     expect(outcome).toMatchObject({ status: 'ok', code: 'cdogs-v2' });
     expect(createAdapter).toHaveBeenCalledWith('cdogs-v2');
+    // Service passes the payload through untouched; CDOGS-specific shaping is in the plugin.
     expect(renderMock).toHaveBeenCalledWith({
       template,
       options: { reportName: 'r' },
@@ -182,8 +183,10 @@ describe('documentGenerationService.print', () => {
     const outcome = await documentGenerationService.print(caller, { submissionId: 's1', template });
 
     expect(outcome).toMatchObject({ status: 'ok' });
-    // Persisted doc { data: { field } } is flattened to { field } so templates use {d.field}.
-    expect(renderMock).toHaveBeenCalledWith(expect.objectContaining({ data: { field: 'saved' } }));
+    // Service passes the raw persisted doc through; the plugin flattens it for the template.
+    expect(renderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { data: { field: 'saved' } } }),
+    );
   });
 
   it('lets a submitter print their own submission (no submission_read)', async () => {

@@ -187,6 +187,10 @@ function loadPlugin(pluginsRoot: string, pluginDir: string): CachedPlugin | null
   return entry;
 }
 
+// Directories under plugins/ that hold shared code, not plugins — skipped by discovery. Put code
+// shared between plugins here (e.g. plugins/shared/cdogs/renderBody.ts) instead of a plugin dir.
+const NON_PLUGIN_DIRS = new Set(['shared']);
+
 function discoverAndCache(): CachedPlugin[] {
   if (cache) return cache;
 
@@ -198,7 +202,7 @@ function discoverAndCache(): CachedPlugin[] {
 
   const pluginDirs = fs
     .readdirSync(pluginsRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.isDirectory() && !NON_PLUGIN_DIRS.has(entry.name))
     .map((entry) => entry.name);
 
   const result: CachedPlugin[] = [];

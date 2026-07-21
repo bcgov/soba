@@ -65,18 +65,6 @@ const submissionReader = new SubmissionService();
 const errorLabel = (err: unknown): string => (err instanceof Error ? err.name : 'Error');
 
 /**
- * Normalize answer data to the flat shape templates use ({d.field}). Form-engine submission documents
- * nest the answers under `.data`; unwrap that so preview (live data) and print (persisted data) render
- * with a single template. Data that is already flat passes through unchanged.
- */
-function toTemplateData(data: PayloadObject): PayloadObject {
-  const inner = data.data;
-  return inner !== null && typeof inner === 'object' && !Array.isArray(inner)
-    ? (inner as PayloadObject)
-    : data;
-}
-
-/**
  * Record one document-generation backend call (success or error). Non-blocking: a failed audit write
  * is logged and swallowed so it never fails the render. Skips when there is no actor to attribute.
  */
@@ -160,11 +148,13 @@ async function renderWith(
   // audited and surfaced cleanly instead of throwing an unaudited 500.
   const startedAt = Date.now();
   try {
+    // Backend-agnostic: pass the payload through as-is. Backend-specific shaping (data flatten,
+    // CDOGS overwrite) lives in the plugin.
     const adapter = createDocumentGenerationAdapter(code);
     const result = await adapter.render({
       template: body.template,
       options: body.options ?? {},
-      data: toTemplateData(body.data),
+      data: body.data,
     });
     await recordAudit({
       audit,
@@ -242,8 +232,8 @@ export const documentGenerationService = {
     if (!record) return { status: 'notfound' };
     if (!(await canPrint(scope.workspaceId, caller, record))) return { status: 'denied' };
 
-    // Persisted answer document from the engine; renderWith flattens it to {d.field}. Pass the record
-    // we already loaded so getContent doesn't re-read it.
+    // Persisted answer document from the engine (the plugin shapes it for the template). Pass the
+    // record we already loaded so getContent doesn't re-read it.
     const data = await submissionReader.getContent({
       workspaceId: scope.workspaceId,
       submissionId: input.submissionId,

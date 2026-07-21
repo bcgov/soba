@@ -5,6 +5,7 @@ import {
 } from '../../core/integrations/document-generation/DocumentGenerationAdapter';
 import { HttpClient, joinUrl } from '../../core/http/httpClient';
 import { postBinaryOrThrow } from '../../core/http/httpErrorMapper';
+import { toCdogsRenderBody } from '../shared/cdogs/renderBody';
 
 const SERVICE = 'CDOGS';
 const RENDER_PATH = '/template/render';
@@ -21,6 +22,6 @@ export class CdogsV3Adapter implements DocumentGenerationAdapter {
   }
 
   render(payload: Record<string, unknown>): Promise<DocumentRenderResult> {
-    return postBinaryOrThrow(this.http, RENDER_PATH, payload, SERVICE);
+    return postBinaryOrThrow(this.http, RENDER_PATH, toCdogsRenderBody(payload), SERVICE);
   }
 }

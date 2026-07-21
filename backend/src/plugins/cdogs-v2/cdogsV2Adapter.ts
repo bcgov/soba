@@ -7,6 +7,7 @@ import {
 import { HttpClient, HttpClientError, joinUrl } from '../../core/http/httpClient';
 import { httpErrorToAppError } from '../../core/http/httpErrorMapper';
 import { OAuth2TokenProvider } from '../../core/auth/oauth2TokenProvider';
+import { toCdogsRenderBody } from '../shared/cdogs/renderBody';
 import { log } from '../../core/logging';
 
 const SERVICE = 'CDOGS';
@@ -50,14 +51,15 @@ export class CdogsV2Adapter implements DocumentGenerationAdapter {
   }
 
   private async attemptRender(payload: Record<string, unknown>): Promise<DocumentRenderResult> {
+    const body = toCdogsRenderBody(payload);
     try {
-      return await this.http.postJsonForBinary(RENDER_PATH, payload);
+      return await this.http.postJsonForBinary(RENDER_PATH, body);
     } catch (err) {
       if (!isTokenRejected(err)) throw err;
       // CDOGS rejected our token — drop the cached token and retry once.
       log.warn({ plugin: PLUGIN }, 'CDOGS rejected the access token; refreshing and retrying');
       this.tokenProvider.clearCache();
-      return this.http.postJsonForBinary(RENDER_PATH, payload);
+      return this.http.postJsonForBinary(RENDER_PATH, body);
     }
   }
 
