@@ -156,6 +156,22 @@ export const FeatureScopeStatus = {
 } as const;
 export type FeatureScopeStatusCode = (typeof FeatureScopeStatus)[keyof typeof FeatureScopeStatus];
 
+/** Which render operation an audit row records (document_generation_audit.mode). */
+export const DocumentGenerationMode = {
+  preview: 'preview',
+  print: 'print',
+} as const;
+export type DocumentGenerationModeCode =
+  (typeof DocumentGenerationMode)[keyof typeof DocumentGenerationMode];
+
+/** Outcome of a document-generation backend call (document_generation_audit.outcome). */
+export const DocumentGenerationOutcome = {
+  success: 'success',
+  error: 'error',
+} as const;
+export type DocumentGenerationOutcomeCode =
+  (typeof DocumentGenerationOutcome)[keyof typeof DocumentGenerationOutcome];
+
 /** Display name for the group that grants form admin on all forms in a workspace. */
 export const FORM_ADMINS_GROUP_NAME = 'Form administrators';
 

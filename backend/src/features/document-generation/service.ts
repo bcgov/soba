@@ -5,14 +5,22 @@ import {
 } from '../../core/integrations/document-generation/DocumentGenerationRegistry';
 import { getFeatureGateCached } from '../../core/db/repos/featureRepo';
 import { isFeatureAvailable } from '../../core/services/featureAvailabilityService';
-import { FeatureAvailability, Permissions } from '../../core/db/codes';
+import {
+  DocumentGenerationMode,
+  DocumentGenerationOutcome,
+  FeatureAvailability,
+  Permissions,
+} from '../../core/db/codes';
 import {
   getSubmissionListContext,
   getSubmissionRecordById,
   type SubmissionRecord,
 } from '../../core/db/repos/submissionRepo';
 import { hasFormSubmitAccess, type CallerIdentity } from '../../core/db/repos/formSubmitAccessRepo';
+import { createDocumentGenerationAudit } from '../../core/db/repos/documentGenerationAuditRepo';
 import { SubmissionService } from '../../core/services/submissionService';
+import { AppError } from '../../core/errors';
+import { log, getCorrelationId } from '../../core/logging';
 
 // Opaque CDOGS payload parts, passed through to the backend adapter as { template, options, data }.
 type PayloadObject = Record<string, unknown>;
@@ -33,6 +41,7 @@ export interface PrintInput {
 
 export type DocumentRenderOutcome =
   | { status: 'ok'; code: string; data: Buffer; contentType?: string }
+  | { status: 'error'; code: string; error: unknown }
   | { status: 'notfound' }
   | { status: 'denied' }
   | { status: 'unavailable' }
@@ -43,7 +52,61 @@ interface ResolvedScope {
   formId: string;
 }
 
+interface AuditContext {
+  mode: string;
+  caller: CallerIdentity;
+  submissionId: string;
+}
+
 const submissionReader = new SubmissionService();
+
+// Bound the audit error message so a large/binary upstream error can't bloat the row.
+const MAX_ERROR_DETAIL = 500;
+const boundedDetail = (err: unknown): string => {
+  const message = err instanceof Error ? err.message : String(err);
+  return message.length > MAX_ERROR_DETAIL ? `${message.slice(0, MAX_ERROR_DETAIL)}…` : message;
+};
+
+/**
+ * Record one document-generation backend call (success or error). Non-blocking: a failed audit write
+ * is logged and swallowed so it never fails the render. Skips when there is no actor to attribute.
+ */
+async function recordAudit(params: {
+  audit: AuditContext;
+  scope: ResolvedScope;
+  backendCode: string;
+  outcome: string;
+  durationMs: number;
+  httpStatus?: number | null;
+  errorDetail?: string | null;
+}): Promise<void> {
+  const createdBy = params.audit.caller.actorId;
+  if (!createdBy) {
+    // Shouldn't happen on the submit surface (public user always resolves an actor); flag if it does.
+    log.warn(
+      { mode: params.audit.mode },
+      'skipping document-generation audit: no actor to attribute',
+    );
+    return;
+  }
+  try {
+    await createDocumentGenerationAudit({
+      workspaceId: params.scope.workspaceId,
+      formId: params.scope.formId,
+      submissionId: params.audit.submissionId,
+      mode: params.audit.mode,
+      backendCode: params.backendCode,
+      outcome: params.outcome,
+      httpStatus: params.httpStatus,
+      durationMs: params.durationMs,
+      errorDetail: params.errorDetail,
+      requestId: getCorrelationId() ?? null,
+      createdBy,
+    });
+  } catch (err) {
+    log.error({ err }, 'failed to write document-generation audit');
+  }
+}
 
 /**
  * Pick the document-generation backend for a scope: a granted scoped backend (e.g. cdogs-v3)
@@ -78,17 +141,40 @@ async function resolveBackendCode(scope: ResolvedScope): Promise<string | null> 
 async function renderWith(
   scope: ResolvedScope,
   body: { template: PayloadObject; options?: PayloadObject; data: PayloadObject },
+  audit: AuditContext,
 ): Promise<DocumentRenderOutcome> {
   const code = await resolveBackendCode(scope);
   if (!code) return { status: 'unavailable' };
 
+  // The audit boundary is the backend call itself: one row per invocation, success or error.
   const adapter = createDocumentGenerationAdapter(code);
-  const result = await adapter.render({
-    template: body.template,
-    options: body.options ?? {},
-    data: body.data,
-  });
-  return { status: 'ok', code, data: result.data, contentType: result.contentType };
+  const startedAt = Date.now();
+  try {
+    const result = await adapter.render({
+      template: body.template,
+      options: body.options ?? {},
+      data: body.data,
+    });
+    await recordAudit({
+      audit,
+      scope,
+      backendCode: code,
+      outcome: DocumentGenerationOutcome.success,
+      durationMs: Date.now() - startedAt,
+    });
+    return { status: 'ok', code, data: result.data, contentType: result.contentType };
+  } catch (err) {
+    await recordAudit({
+      audit,
+      scope,
+      backendCode: code,
+      outcome: DocumentGenerationOutcome.error,
+      durationMs: Date.now() - startedAt,
+      httpStatus: err instanceof AppError ? err.statusCode : null,
+      errorDetail: boundedDetail(err),
+    });
+    return { status: 'error', code, error: err };
+  }
 }
 
 /**
@@ -121,11 +207,11 @@ export const documentGenerationService = {
       Permissions.submission_create,
     );
     if (!allowed) return { status: 'denied' };
-    return renderWith(scope, {
-      template: input.template,
-      options: input.options,
-      data: input.data,
-    });
+    return renderWith(
+      scope,
+      { template: input.template, options: input.options, data: input.data },
+      { mode: DocumentGenerationMode.preview, caller, submissionId: input.submissionId },
+    );
   },
 
   /** Render from the submission's persisted answer data (read from the form engine). */
@@ -146,6 +232,10 @@ export const documentGenerationService = {
     });
     if (!data) return { status: 'no-content' };
 
-    return renderWith(scope, { template: input.template, options: input.options, data });
+    return renderWith(
+      scope,
+      { template: input.template, options: input.options, data },
+      { mode: DocumentGenerationMode.print, caller, submissionId: input.submissionId },
+    );
   },
 };

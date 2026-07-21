@@ -24,6 +24,9 @@ const getContentMock = jest.fn();
 jest.mock('../../../src/core/services/submissionService', () => ({
   SubmissionService: jest.fn().mockImplementation(() => ({ getContent: getContentMock })),
 }));
+jest.mock('../../../src/core/db/repos/documentGenerationAuditRepo', () => ({
+  createDocumentGenerationAudit: jest.fn(),
+}));
 
 import { documentGenerationService } from '../../../src/features/document-generation/service';
 import * as submissionRepo from '../../../src/core/db/repos/submissionRepo';
@@ -32,6 +35,8 @@ import * as pluginRegistry from '../../../src/core/integrations/plugins/PluginRe
 import * as docgenRegistry from '../../../src/core/integrations/document-generation/DocumentGenerationRegistry';
 import * as featureRepo from '../../../src/core/db/repos/featureRepo';
 import * as availability from '../../../src/core/services/featureAvailabilityService';
+import * as auditRepo from '../../../src/core/db/repos/documentGenerationAuditRepo';
+import { ServiceUnavailableError } from '../../../src/core/errors';
 
 const getSubmissionListContext = submissionRepo.getSubmissionListContext as unknown as jest.Mock;
 const getSubmissionRecordById = submissionRepo.getSubmissionRecordById as unknown as jest.Mock;
@@ -41,6 +46,7 @@ const resolveDefault = docgenRegistry.resolveDefaultDocumentGenerationCode as un
 const createAdapter = docgenRegistry.createDocumentGenerationAdapter as unknown as jest.Mock;
 const getFeatureGateCached = featureRepo.getFeatureGateCached as unknown as jest.Mock;
 const isFeatureAvailable = availability.isFeatureAvailable as unknown as jest.Mock;
+const createAudit = auditRepo.createDocumentGenerationAudit as unknown as jest.Mock;
 
 const caller = { actorId: 'user-1', idpCode: 'idir' };
 const scope = { workspaceId: 'ws-1', formId: 'form-1', formVersionId: 'fv-1' };
@@ -71,6 +77,7 @@ beforeEach(() => {
   renderMock.mockResolvedValue({ data: Buffer.from('doc'), contentType: 'application/pdf' });
   createAdapter.mockReturnValue({ render: renderMock });
   getContentMock.mockResolvedValue({ data: { field: 'saved' } });
+  createAudit.mockResolvedValue(undefined);
 });
 
 describe('documentGenerationService.preview', () => {
@@ -207,5 +214,79 @@ describe('documentGenerationService.print', () => {
     const outcome = await documentGenerationService.print(caller, { submissionId: 's1', template });
 
     expect(outcome.status).toBe('no-content');
+  });
+});
+
+describe('documentGenerationService audit', () => {
+  it('records a success audit for the backend call', async () => {
+    hasFormSubmitAccess.mockResolvedValue(true);
+
+    await documentGenerationService.preview(caller, { submissionId: 's1', template, data: {} });
+
+    expect(createAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: 'ws-1',
+        formId: 'form-1',
+        submissionId: 's1',
+        mode: 'preview',
+        backendCode: 'cdogs-v2',
+        outcome: 'success',
+        createdBy: 'user-1',
+      }),
+    );
+  });
+
+  it('records an error audit and returns error when the backend throws', async () => {
+    hasFormSubmitAccess.mockResolvedValue(true);
+    renderMock.mockRejectedValue(new ServiceUnavailableError('CDOGS error 500: boom'));
+
+    const outcome = await documentGenerationService.preview(caller, {
+      submissionId: 's1',
+      template,
+      data: {},
+    });
+
+    expect(outcome.status).toBe('error');
+    expect(createAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        backendCode: 'cdogs-v2',
+        outcome: 'error',
+        httpStatus: 503,
+        errorDetail: expect.stringContaining('CDOGS error 500'),
+      }),
+    );
+  });
+
+  it('does not fail the render when the audit write fails', async () => {
+    hasFormSubmitAccess.mockResolvedValue(true);
+    createAudit.mockRejectedValue(new Error('audit db down'));
+
+    const outcome = await documentGenerationService.preview(caller, {
+      submissionId: 's1',
+      template,
+      data: {},
+    });
+
+    expect(outcome.status).toBe('ok');
+  });
+
+  it('does not audit when no backend call is made', async () => {
+    // denied: never reaches the backend
+    hasFormSubmitAccess.mockResolvedValue(false);
+    await documentGenerationService.preview(caller, { submissionId: 's1', template, data: {} });
+
+    // unavailable: no backend resolved
+    hasFormSubmitAccess.mockResolvedValue(true);
+    isFeatureAvailable.mockResolvedValue(false);
+    await documentGenerationService.preview(caller, { submissionId: 's1', template, data: {} });
+
+    // print no-content: no persisted data, so no backend call
+    isFeatureAvailable.mockImplementation((code: string) =>
+      Promise.resolve(code === 'document-generation-v2'),
+    );
+    getContentMock.mockResolvedValue(null);
+    await documentGenerationService.print(caller, { submissionId: 's1', template });
+
+    expect(createAudit).not.toHaveBeenCalled();
   });
 });

@@ -50,6 +50,9 @@ function respond(
       throw new ServiceUnavailableError('Document generation is not available for this submission');
     case 'no-content':
       throw new UnprocessableEntityError('Submission has no saved data to print');
+    case 'error':
+      // The backend call failed; re-throw the mapped AppError so httpErrorMapper's status is preserved.
+      throw outcome.error;
     case 'ok':
       res.setHeader('Content-Type', outcome.contentType ?? 'application/octet-stream');
       res.setHeader('Content-Disposition', contentDisposition(filename));
