@@ -241,7 +241,12 @@ describe('push handler', () => {
 
     const docs = [
       {
-        assumedMasterState: { id: 'ws1', name: 'Old Name', updatedAt: '2025-01-01T00:00:00.000Z', _deleted: false },
+        assumedMasterState: {
+          id: 'ws1',
+          name: 'Old Name',
+          updatedAt: '2025-01-01T00:00:00.000Z',
+          _deleted: false,
+        },
         newDocumentState: {
           id: 'ws1',
           name: 'New Name',
@@ -270,7 +275,12 @@ describe('push handler', () => {
     setupWorkspaceReplication(mockCollection, TOKEN);
     const handler = getPushHandler();
 
-    const masterState = { id: 'ws1', name: 'Existing', updatedAt: '2025-01-01T00:00:00.000Z', _deleted: false as const };
+    const masterState = {
+      id: 'ws1',
+      name: 'Existing',
+      updatedAt: '2025-01-01T00:00:00.000Z',
+      _deleted: false as const,
+    };
     const docs = [
       {
         assumedMasterState: masterState,
