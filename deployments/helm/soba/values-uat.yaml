@@ -29,7 +29,7 @@ frontend:
 
 database:
   # Created and managed by the separate Crunchy deployment workflow.
-  existingSecretName: pg-soba-pguser-app
+  existingSecretName: pg-soba-crunchy-pguser-app
   existingSecretKey: uri
 
 formio:

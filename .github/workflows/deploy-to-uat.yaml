@@ -74,19 +74,52 @@ jobs:
           openshift_server_url: ${{ vars.OC_SERVER }}
           openshift_token: ${{ secrets.OC_TOKEN }}
           insecure_skip_tls_verify: true
-          namespace: acf456-prod
+          namespace: ${{ secrets.OC_NAMESPACE }}
+
+      - name: Apply UAT GitHub Secret Bridge
+        env:
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          FORMIO_ADMIN_PASSWORD: ${{ secrets.FORMIO_ADMIN_PASSWORD }}
+          FORMIO_JWT_SECRET: ${{ secrets.FORMIO_JWT_SECRET }}
+          MONGODB_FORMIO_URI: ${{ secrets.MONGODB_FORMIO_URI }}
+        run: |
+          set -euo pipefail
+          secret_dir="$(mktemp -d)"
+          trap 'rm -rf "$secret_dir"' EXIT
+
+          printf '%s' 'formio@soba.gov.bc.ca' > "$secret_dir/PLUGIN_FORMIO_V5_ADMIN_USERNAME"
+          printf '%s' "$FORMIO_ADMIN_PASSWORD" > "$secret_dir/PLUGIN_FORMIO_V5_ADMIN_PASSWORD"
+          printf '%s' 'formio@soba.gov.bc.ca' > "$secret_dir/ROOT_EMAIL"
+          printf '%s' "$FORMIO_ADMIN_PASSWORD" > "$secret_dir/ROOT_PASSWORD"
+          printf '%s' "$FORMIO_JWT_SECRET" > "$secret_dir/FORMIO_JWT_SECRET"
+          jq -cn \
+            --arg mongo "$MONGODB_FORMIO_URI" \
+            --arg jwt "$FORMIO_JWT_SECRET" \
+            '{mongo: $mongo, port: 3001, jwt: {secret: $jwt}, reservedForms: ["submissions", "submission", "exists", "export", "role", "current", "logout", "import", "form", "access", "health"]}' \
+            > "$secret_dir/NODE_CONFIG"
+
+          oc -n "$NAMESPACE" create secret generic soba-uat-formio-github-runtime \
+            --from-file="$secret_dir/PLUGIN_FORMIO_V5_ADMIN_USERNAME" \
+            --from-file="$secret_dir/PLUGIN_FORMIO_V5_ADMIN_PASSWORD" \
+            --from-file="$secret_dir/ROOT_EMAIL" \
+            --from-file="$secret_dir/ROOT_PASSWORD" \
+            --from-file="$secret_dir/FORMIO_JWT_SECRET" \
+            --from-file="$secret_dir/NODE_CONFIG" \
+            --dry-run=client -o yaml \
+            | oc -n "$NAMESPACE" apply -f -
 
       - name: Verify separately managed databases
         env:
-          NAMESPACE: acf456-prod
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
         run: |
           set -euo pipefail
 
           helm status pg-soba --namespace "$NAMESPACE" >/dev/null
-          PG_READY="$(oc -n "$NAMESPACE" get postgrescluster pg-soba \
-            -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')"
-          test "$PG_READY" = "True"
-          oc -n "$NAMESPACE" get secret pg-soba-pguser-app >/dev/null
+          PG_DATABASE_PODS="$(oc -n "$NAMESPACE" get pods \
+            -l 'postgres-operator.crunchydata.com/cluster=pg-soba-crunchy,postgres-operator.crunchydata.com/data=postgres' \
+            -o jsonpath='{range .items[*]}{.status.phase}{" "}{range .status.containerStatuses[*]}{.ready}{","}{end}{"\n"}{end}')"
+          test "$(printf '%s\n' "$PG_DATABASE_PODS" | grep -Ec '^Running true,true,true,$')" = "3"
+          oc -n "$NAMESPACE" get secret pg-soba-crunchy-pguser-app >/dev/null
 
           helm status soba-uat-mongodb --namespace "$NAMESPACE" >/dev/null
           MONGO_DESIRED="$(oc -n "$NAMESPACE" get statefulset soba-uat-mongodb -o jsonpath='{.spec.replicas}')"
@@ -95,7 +128,7 @@ jobs:
           test "$MONGO_READY" = "$MONGO_DESIRED"
           oc -n "$NAMESPACE" rollout status statefulset/soba-uat-mongodb --timeout=30s
           oc -n "$NAMESPACE" get secret soba-uat-mongodb-ca >/dev/null
-          oc -n "$NAMESPACE" get secret soba-uat-formio >/dev/null
+          oc -n "$NAMESPACE" get secret soba-uat-formio-github-runtime >/dev/null
 
       - name: Create immutable interim UAT source tag
         env:
@@ -123,11 +156,13 @@ jobs:
 
       - name: Render and deploy SOBA to UAT
         env:
-          NAMESPACE: acf456-prod
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
           DOMAIN: ${{ vars.OC_DOMAIN }}
           REPOSITORY: ${{ github.repository }}
           SHORT_SHA: ${{ needs.build.outputs.short_sha }}
           PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+          FORMIO_HELM_SECRET: soba-uat-formio
+          FORMIO_RUNTIME_SECRET: soba-uat-formio-github-runtime
         run: |
           set -euo pipefail
           REPO_LC="$(echo "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"
@@ -165,6 +200,7 @@ jobs:
             --namespace "$NAMESPACE" \
             --values deployments/helm/soba/values-uat.yaml \
             --values /tmp/values-override.yaml \
+            --post-renderer "$GITHUB_WORKSPACE/deployments/helm/soba-uat-github-secrets/post-render.rb" \
             --wait \
             --wait-for-jobs \
             --timeout 15m \
@@ -172,7 +208,7 @@ jobs:
 
       - name: Confirm application rollouts
         env:
-          NAMESPACE: acf456-prod
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
         run: |
           set -euo pipefail
           oc -n "$NAMESPACE" rollout status deployment/soba-uat-backend --timeout=300s
