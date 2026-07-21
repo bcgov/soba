@@ -1,6 +1,6 @@
 ---
 name: Deploy to UAT
-run-name: Deploy main ${{ github.sha }} to UAT
+run-name: Deploy existing UAT image to UAT
 
 on:
   push:
@@ -9,8 +9,8 @@ on:
       - "backend/**"
       - "frontend/**"
       - ".github/workflows/deploy-to-uat.yaml"
-      - ".github/workflows/build-images.yaml"
       - "deployments/helm/soba/**"
+      - "deployments/helm/soba-uat-github-secrets/**"
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
@@ -26,31 +26,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: Build application images once
+  deploy:
+    name: Verify databases and deploy SOBA to UAT
     if: >-
       github.event_name != 'pull_request' ||
       (github.event.pull_request.head.ref == 'feat/CCP-4817-Deploy-UAT' &&
       !contains(github.event.pull_request.labels.*.name, 'deploy-uat-db'))
-    uses: ./.github/workflows/build-images.yaml
-    with:
-      ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      platforms: amd64
-      image_version: uat-${{ github.event.pull_request.head.sha || github.sha }}
-    secrets: inherit
-    permissions:
-      contents: read
-      packages: write
-
-  deploy:
-    name: Verify databases and deploy SOBA to UAT
-    needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     environment:
       name: uat
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Checkout main
         uses: actions/checkout@v5
@@ -130,47 +117,26 @@ jobs:
           oc -n "$NAMESPACE" get secret soba-uat-mongodb-ca >/dev/null
           oc -n "$NAMESPACE" get secret soba-uat-formio-github-runtime >/dev/null
 
-      - name: Create immutable interim UAT source tag
-        env:
-          SHORT_SHA: ${{ needs.build.outputs.short_sha }}
-          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
-        run: |
-          set -euo pipefail
-          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            TAG="uat-pr-${PR_NUMBER}-${SHORT_SHA}"
-          else
-            TAG="uat-${SHORT_SHA}"
-          fi
-          COMMIT="$(git rev-parse HEAD)"
-          git fetch --tags --force
-
-          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
-            test "$(git rev-list -n 1 "${TAG}")" = "$COMMIT"
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" "$COMMIT" -m "UAT candidate for ${COMMIT}"
-          git push origin "refs/tags/${TAG}"
-
       - name: Render and deploy SOBA to UAT
         env:
           NAMESPACE: ${{ secrets.OC_NAMESPACE }}
           DOMAIN: ${{ vars.OC_DOMAIN }}
           REPOSITORY: ${{ github.repository }}
-          SHORT_SHA: ${{ needs.build.outputs.short_sha }}
-          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+          # Temporary Sprint 33 promotion. Replace this pin with the UAT
+          # environment variable once the release-promotion process is finalized.
+          IMAGE_TAG: sha-019e4fd
           FORMIO_HELM_SECRET: soba-uat-formio
           FORMIO_RUNTIME_SECRET: soba-uat-formio-github-runtime
         run: |
           set -euo pipefail
+          test -n "$IMAGE_TAG"
+          case "$IMAGE_TAG" in
+            sha-[0-9a-f]*) ;;
+            *) echo "UAT_IMAGE_TAG must be an immutable sha-<commit> image tag" >&2; exit 1 ;;
+          esac
+
           REPO_LC="$(echo "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"
-          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            TAG="uat-pr-${PR_NUMBER}-${SHORT_SHA}"
-          else
-            TAG="uat-${SHORT_SHA}"
-          fi
+          IMAGE_SHA="${IMAGE_TAG#sha-}"
 
           cat > /tmp/values-override.yaml <<EOF
           global:
@@ -178,19 +144,15 @@ jobs:
           backend:
             image:
               repository: "ghcr.io/${REPO_LC}/backend"
-              tag: "sha-${SHORT_SHA}"
+              tag: "${IMAGE_TAG}"
             config:
-              gitSha: "${GITHUB_SHA}"
-              gitTag: "${TAG}"
-              imageTag: "sha-${SHORT_SHA}"
+              gitSha: "${IMAGE_SHA}"
+              gitTag: "${IMAGE_TAG}"
+              imageTag: "${IMAGE_TAG}"
           frontend:
             image:
               repository: "ghcr.io/${REPO_LC}/frontend"
-              tag: "sha-${SHORT_SHA}"
-          temporalWorker:
-            image:
-              repository: "ghcr.io/${REPO_LC}/temporal-worker"
-              tag: "sha-${SHORT_SHA}"
+              tag: "${IMAGE_TAG}"
           EOF
 
           helm lint deployments/helm/soba \
