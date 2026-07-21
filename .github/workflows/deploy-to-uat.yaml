@@ -63,6 +63,14 @@ jobs:
           insecure_skip_tls_verify: true
           namespace: ${{ secrets.OC_NAMESPACE }}
 
+      - name: Apply UAT PostgreSQL access policy
+        env:
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+        run: |
+          set -euo pipefail
+          oc -n "$NAMESPACE" apply \
+            -f deployments/helm/soba-uat-github-secrets/postgres-access-networkpolicy.yaml
+
       - name: Apply UAT GitHub Secret Bridge
         env:
           NAMESPACE: ${{ secrets.OC_NAMESPACE }}
