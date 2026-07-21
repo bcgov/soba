@@ -48,6 +48,14 @@ puts YAML.dump({
   'kind' => 'NetworkPolicy',
   'metadata' => {
     'name' => 'soba-uat-postgres-access',
+    # The migration Job is a Helm pre-install/pre-upgrade hook. This policy must
+    # be a hook too, with an earlier weight, otherwise Helm runs the migration
+    # before it applies the policy.
+    'annotations' => {
+      'helm.sh/hook' => 'pre-install,pre-upgrade',
+      'helm.sh/hook-weight' => '-1',
+      'helm.sh/hook-delete-policy' => 'before-hook-creation'
+    },
     'labels' => {
       'app.kubernetes.io/instance' => 'soba-uat',
       'app.kubernetes.io/name' => 'soba'
