@@ -19,7 +19,7 @@ import {
 import { hasFormSubmitAccess, type CallerIdentity } from '../../core/db/repos/formSubmitAccessRepo';
 import { createDocumentGenerationAudit } from '../../core/db/repos/documentGenerationAuditRepo';
 import { SubmissionService } from '../../core/services/submissionService';
-import { AppError } from '../../core/errors';
+import { AppError, ServiceUnavailableError } from '../../core/errors';
 import { log, getCorrelationId } from '../../core/logging';
 
 // Opaque CDOGS payload parts, passed through to the backend adapter as { template, options, data }.
@@ -63,6 +63,18 @@ const submissionReader = new SubmissionService();
 // PI-safe: record the error class only (e.g. ServiceUnavailableError), never the upstream error
 // body, which can echo submitted answer data. The mapped HTTP status is captured separately.
 const errorLabel = (err: unknown): string => (err instanceof Error ? err.name : 'Error');
+
+/**
+ * Normalize answer data to the flat shape templates use ({d.field}). Form-engine submission documents
+ * nest the answers under `.data`; unwrap that so preview (live data) and print (persisted data) render
+ * with a single template. Data that is already flat passes through unchanged.
+ */
+function toTemplateData(data: PayloadObject): PayloadObject {
+  const inner = data.data;
+  return inner !== null && typeof inner === 'object' && !Array.isArray(inner)
+    ? (inner as PayloadObject)
+    : data;
+}
 
 /**
  * Record one document-generation backend call (success or error). Non-blocking: a failed audit write
@@ -143,14 +155,16 @@ async function renderWith(
   const code = await resolveBackendCode(scope);
   if (!code) return { status: 'unavailable' };
 
-  // The audit boundary is the backend call itself: one row per invocation, success or error.
-  const adapter = createDocumentGenerationAdapter(code);
+  // The audit boundary is the backend call: one row per invocation, success or error. Adapter
+  // construction (which validates config) is inside it, so a granted-but-unconfigured backend is
+  // audited and surfaced cleanly instead of throwing an unaudited 500.
   const startedAt = Date.now();
   try {
+    const adapter = createDocumentGenerationAdapter(code);
     const result = await adapter.render({
       template: body.template,
       options: body.options ?? {},
-      data: body.data,
+      data: toTemplateData(body.data),
     });
     await recordAudit({
       audit,
@@ -161,16 +175,25 @@ async function renderWith(
     });
     return { status: 'ok', code, data: result.data, contentType: result.contentType };
   } catch (err) {
+    // CDOGS HTTP failures are already mapped AppErrors; a config/construct or unexpected failure is a
+    // plain Error — log it for ops and surface a generic 503 so we never leak internals or return 500.
+    if (!(err instanceof AppError)) {
+      log.error({ code, err }, 'document generation backend failed (config or unexpected error)');
+    }
+    const mapped =
+      err instanceof AppError
+        ? err
+        : new ServiceUnavailableError('Document generation is unavailable');
     await recordAudit({
       audit,
       scope,
       backendCode: code,
       outcome: DocumentGenerationOutcome.error,
       durationMs: Date.now() - startedAt,
-      httpStatus: err instanceof AppError ? err.statusCode : null,
-      errorDetail: errorLabel(err),
+      httpStatus: mapped.statusCode,
+      errorDetail: errorLabel(mapped),
     });
-    return { status: 'error', code, error: err };
+    return { status: 'error', code, error: mapped };
   }
 }
 
@@ -219,9 +242,8 @@ export const documentGenerationService = {
     if (!record) return { status: 'notfound' };
     if (!(await canPrint(scope.workspaceId, caller, record))) return { status: 'denied' };
 
-    // Persisted answer data as returned by the engine. The exact merge shape (unwrapping/metadata)
-    // is a template-contract detail to finalize with stored templates. Pass the record we already
-    // loaded so getContent doesn't re-read it.
+    // Persisted answer document from the engine; renderWith flattens it to {d.field}. Pass the record
+    // we already loaded so getContent doesn't re-read it.
     const data = await submissionReader.getContent({
       workspaceId: scope.workspaceId,
       submissionId: input.submissionId,

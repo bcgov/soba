@@ -182,9 +182,8 @@ describe('documentGenerationService.print', () => {
     const outcome = await documentGenerationService.print(caller, { submissionId: 's1', template });
 
     expect(outcome).toMatchObject({ status: 'ok' });
-    expect(renderMock).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { data: { field: 'saved' } } }),
-    );
+    // Persisted doc { data: { field } } is flattened to { field } so templates use {d.field}.
+    expect(renderMock).toHaveBeenCalledWith(expect.objectContaining({ data: { field: 'saved' } }));
   });
 
   it('lets a submitter print their own submission (no submission_read)', async () => {
@@ -253,6 +252,30 @@ describe('documentGenerationService audit', () => {
         outcome: 'error',
         httpStatus: 503,
         // PI-safe: the error class, not the upstream body (which was 'CDOGS error 500: boom').
+        errorDetail: 'ServiceUnavailableError',
+      }),
+    );
+  });
+
+  it('audits and returns a 503 when the backend fails to construct (misconfigured)', async () => {
+    hasFormSubmitAccess.mockResolvedValue(true);
+    // A granted-but-unconfigured backend throws a plain Error during construction.
+    createAdapter.mockImplementation(() => {
+      throw new Error('PLUGIN_CDOGS_V3_ENDPOINT is required');
+    });
+
+    const outcome = await documentGenerationService.preview(caller, {
+      submissionId: 's1',
+      template,
+      data: {},
+    });
+
+    expect(outcome.status).toBe('error');
+    expect((outcome as { error: unknown }).error).toBeInstanceOf(ServiceUnavailableError);
+    expect(createAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: 'error',
+        httpStatus: 503,
         errorDetail: 'ServiceUnavailableError',
       }),
     );
