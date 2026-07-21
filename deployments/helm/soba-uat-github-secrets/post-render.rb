@@ -7,6 +7,10 @@
 # that generated Secret and redirects references to a separately managed UAT
 # runtime Secret. It deliberately never reads the runtime Secret, preventing
 # its credentials from entering Helm release metadata.
+#
+# It also adds the UAT-only PostgreSQL access policy. The Crunchy chart's
+# generated policy permits database-to-database traffic only; this additional
+# policy permits SOBA UAT pods to reach the PostgreSQL primary on TCP 5432.
 
 require 'yaml'
 
@@ -38,3 +42,37 @@ YAML.load_stream($stdin.read).each do |document|
 
   puts YAML.dump(replace_secret_refs(document, source_secret, runtime_secret))
 end
+
+puts YAML.dump({
+  'apiVersion' => 'networking.k8s.io/v1',
+  'kind' => 'NetworkPolicy',
+  'metadata' => {
+    'name' => 'soba-uat-postgres-access',
+    'labels' => {
+      'app.kubernetes.io/instance' => 'soba-uat',
+      'app.kubernetes.io/name' => 'soba'
+    }
+  },
+  'spec' => {
+    'podSelector' => {
+      'matchLabels' => {
+        'postgres-operator.crunchydata.com/cluster' => 'pg-soba-crunchy'
+      }
+    },
+    'policyTypes' => ['Ingress'],
+    'ingress' => [{
+      'from' => [{
+        'podSelector' => {
+          'matchLabels' => {
+            'app.kubernetes.io/instance' => 'soba-uat',
+            'app.kubernetes.io/name' => 'soba'
+          }
+        }
+      }],
+      'ports' => [{
+        'protocol' => 'TCP',
+        'port' => 5432
+      }]
+    }]
+  }
+})
