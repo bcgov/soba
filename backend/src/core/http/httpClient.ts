@@ -69,6 +69,11 @@ export class HttpClient {
     };
   }
 
+  /** GET a path, resolving on 2xx and throwing HttpClientError on non-2xx (e.g. health/liveness). */
+  async get(path: string): Promise<void> {
+    await this.send(path, { method: 'GET' });
+  }
+
   private buildUrl(path: string): string {
     return joinUrl(this.baseUrl, path);
   }

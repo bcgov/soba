@@ -13,6 +13,7 @@ import {
   virusScanSelfTest,
   type VirusScanSelfTestResult,
 } from '../../integrations/virus-scan/virusScanSelfTest';
+import { checkDocumentGenerationReadiness } from '../../integrations/document-generation/DocumentGenerationRegistry';
 
 /** Run a check; swallow sync throws and rejections. */
 async function probe(check: () => Promise<boolean>): Promise<boolean> {
@@ -96,5 +97,29 @@ export async function logVirusScanSelfTest(): Promise<void> {
       { virusScan, message: result.message },
       'Virus scan self-test: configured scanner not detecting (unreachable or definitions missing)',
     );
+  }
+}
+
+/** Log per-backend document-generation readiness (CDOGS liveness / config) at startup. Never throws. */
+export async function logDocumentGenerationReadiness(): Promise<void> {
+  let results: Record<string, { ok: boolean; message?: string }>;
+  try {
+    results = await checkDocumentGenerationReadiness();
+  } catch (err) {
+    log.warn({ err }, 'Document generation readiness could not run');
+    return;
+  }
+
+  const notReady = Object.entries(results)
+    .filter(([, r]) => !r.ok)
+    .map(([code]) => code);
+
+  if (notReady.length > 0) {
+    log.warn(
+      { documentGeneration: results },
+      `Document generation readiness: not ready: ${notReady.join(', ')}`,
+    );
+  } else {
+    log.info({ documentGeneration: results }, 'Document generation readiness: all backends ready');
   }
 }

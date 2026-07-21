@@ -129,4 +129,36 @@ describe('cdogs-v2 plugin', () => {
       UnprocessableEntityError,
     );
   });
+
+  it('readinessCheck returns ok when the authenticated GET /health succeeds', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(tokenOk())
+      .mockResolvedValueOnce({ ok: true, status: 200 } as unknown as Response);
+    global.fetch = fetchMock;
+
+    const result = await new CdogsV2Adapter(makeConfig()).readinessCheck();
+
+    expect(result).toEqual({ ok: true });
+    const healthCall = fetchMock.mock.calls[1];
+    expect(healthCall[0]).toContain('/v2/health');
+    expect(healthCall[1].method).toBe('GET');
+  });
+
+  it('readinessCheck returns not-ok when /health fails', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(tokenOk())
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+        text: () => Promise.resolve('down'),
+      } as unknown as Response);
+    global.fetch = fetchMock;
+
+    const result = await new CdogsV2Adapter(makeConfig()).readinessCheck();
+
+    expect(result.ok).toBe(false);
+  });
 });

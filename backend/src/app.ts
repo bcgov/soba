@@ -12,6 +12,7 @@ import {
   logStartupHealth,
   logTempStorageSelfTest,
   logVirusScanSelfTest,
+  logDocumentGenerationReadiness,
 } from './core/api/health';
 import { metaRouter } from './core/api/meta';
 import { buildOpenApiSpec } from './core/api/shared/openapi';
@@ -130,5 +131,8 @@ app.use('/api/v1', apiRateLimit, express.json(), checkJwt(), resolveActor, coreR
 
 app.listen(port, () => {
   log.info({ port }, 'Express is listening');
-  void logStartupHealth().then(logTempStorageSelfTest).then(logVirusScanSelfTest);
+  void logStartupHealth()
+    .then(logTempStorageSelfTest)
+    .then(logVirusScanSelfTest)
+    .then(logDocumentGenerationReadiness);
 });
