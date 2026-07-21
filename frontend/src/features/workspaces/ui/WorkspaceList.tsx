@@ -65,7 +65,7 @@ function WorkspaceList({ showFormsAction = true }: Readonly<{ showFormsAction?: 
 
   useEffect(() => {
     if (!db) return;
-    const sub = db.workspaces.find().$.subscribe((results: WorkspaceItem[]) => {
+    const sub = db.workspaces.find().$.subscribe((results) => {
       setWorkspaces(results.map((doc) => doc.toJSON() as WorkspaceItem));
     });
     return () => sub.unsubscribe();

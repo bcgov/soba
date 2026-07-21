@@ -4,6 +4,7 @@ import { useParams, useRouter, usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Submission } from '@formio/react';
 import type { FormType } from '@formio/react';
+import { Subscription } from 'rxjs';
 import { InlineAlert } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useDictionary } from '@/app/[lang]/Providers';
@@ -122,7 +123,7 @@ function SubmissionFillBody({
   // React re-renders, Form.io gets a new submission prop, re-processes the data, and fires
   // onChange with slightly different output, creating an infinite save loop.
   useEffect(() => {
-    let sub: SubmissionListItem;
+    let sub: Subscription | undefined;
     if (db) {
       sub = db.submissionData.findOne(submissionId).$.subscribe((doc) => {
         if (doc) {
@@ -238,7 +239,7 @@ function SubmissionFillBody({
               formReadyRef.current = true;
 
               if (instance?.data) {
-                lastSeenDataRef.current = instance.data;
+                lastSeenDataRef.current = instance.data as Record<string, unknown>;
               }
             }}
             onError={(err) => {

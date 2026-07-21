@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { Subscription } from 'rxjs';
 import { InlineAlert } from '@bcgov/design-system-react-components';
 import { useRouter, usePathname } from 'next/navigation';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
@@ -41,7 +42,7 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
   );
 
   useEffect(() => {
-    let sub: SubmissionListItem;
+    let sub: Subscription | undefined;
     if (db && activeWorkspaceId) {
       const query = formId ? db.submissions.find({ selector: { formId } }) : db.submissions.find();
       sub = query.$.subscribe((results) => {

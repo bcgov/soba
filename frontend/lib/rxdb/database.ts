@@ -1,4 +1,5 @@
-import { createRxDatabase, addRxPlugin, RxDatabase, RxStorage } from 'rxdb';
+import { createRxDatabase, addRxPlugin } from 'rxdb';
+import type { ChefsDatabase } from '@/src/app/providers/DbProviders';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie'; // or getRxStorageMemory for SSR fallback
 import { RxDBQueryBuilderPlugin } from 'rxdb/plugins/query-builder';
 import { RxDBUpdatePlugin } from 'rxdb/plugins/update';
@@ -11,7 +12,7 @@ addRxPlugin(RxDBQueryBuilderPlugin);
 addRxPlugin(RxDBUpdatePlugin);
 addRxPlugin(RxDBMigrationSchemaPlugin);
 
-let dbPromise: Promise<RxDatabase> | null = null;
+let dbPromise: Promise<ChefsDatabase> | null = null;
 let devModeAdded = false;
 
 export async function initDatabase() {
@@ -28,11 +29,13 @@ export async function initDatabase() {
         devModeAdded = true;
       }
 
-      let storage: RxStorage = getRxStorageDexie();
-      if (process.env.NODE_ENV === 'development') {
-        const { wrappedValidateAjvStorage } = await import('rxdb/plugins/validate-ajv');
-        storage = wrappedValidateAjvStorage({ storage });
-      }
+      const baseStorage = getRxStorageDexie();
+      const storage =
+        process.env.NODE_ENV === 'development'
+          ? (await import('rxdb/plugins/validate-ajv')).wrappedValidateAjvStorage({
+              storage: baseStorage,
+            })
+          : baseStorage;
 
       const db = await createRxDatabase({
         name: 'chefs_rxdb_store',
@@ -55,7 +58,7 @@ export async function initDatabase() {
         },
       });
 
-      return db;
+      return db as unknown as ChefsDatabase;
     })();
   }
 

@@ -7,6 +7,7 @@ jest.mock('../../../../src/core/db/repos/idpGroupRepo', () => ({
 jest.mock('../../../../src/core/db/repos/membershipRepo', () => ({
   getWorkspaceForUser: jest.fn(),
   listWorkspacesForUser: jest.fn(),
+  getActiveUserIdsForWorkspace: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('../../../../src/core/db/repos/workspaceRepo', () => ({
@@ -47,15 +48,18 @@ describe('WorkspacesApiService', () => {
 
     expect(idpGroupRepo.canCreateWorkspaceByIdp).toHaveBeenCalledWith('idir');
 
-    expect(workspaceRepo.createTeamWorkspace).toHaveBeenCalledWith(actorId, 'Team Alpha', false);
-    expect(result).toEqual({
-      id: workspaceId,
-      name: 'Team Alpha',
-      kind: 'team',
-      role: 'owner',
-      status: 'active',
-      disclaimerAccepted: false,
-    });
+    expect(workspaceRepo.createTeamWorkspace).toHaveBeenCalledWith(
+      actorId,
+      'Team Alpha',
+      false,
+      undefined,
+    );
+    expect(result.id).toEqual(workspaceId);
+    expect(result.name).toEqual('Team Alpha');
+    expect(result.kind).toEqual('team');
+    expect(result.role).toEqual('owner');
+    expect(result.status).toEqual('active');
+    expect(result.disclaimerAccepted).toEqual(false);
   });
 
   it('create throws ForbiddenError when IdP is not in the bcgov group', async () => {

@@ -17,11 +17,11 @@ export function setupSubmissionReplication(
     collection,
     replicationIdentifier: `submission-rest-replication-${workspaceId}`,
     pull: {
-      async handler(lastCheckpoint?: { updatedAt: string; id: string }) {
+      async handler(lastCheckpoint?: { updatedAt: string }) {
         // Build the cursor for backend pagination if we have a checkpoint
         let cursorStr = undefined;
-        if (lastCheckpoint?.updatedAt && lastCheckpoint?.id) {
-          const cursor = { m: 'ts_id', ts: lastCheckpoint.updatedAt, id: lastCheckpoint.id };
+        if (lastCheckpoint?.updatedAt) {
+          const cursor = { m: 'ts_id', ts: lastCheckpoint.updatedAt };
           cursorStr = Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
         }
 

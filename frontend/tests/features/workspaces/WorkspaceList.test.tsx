@@ -3,6 +3,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+const { mockSubscribe, mockPush, mockDispatch, mockUnwrap, mockDb } = vi.hoisted(() => ({
+  mockSubscribe: vi.fn(),
+  mockPush: vi.fn(),
+  mockDispatch: vi.fn(),
+  mockUnwrap: vi.fn().mockResolvedValue('ws1'),
+  mockDb: {
+    workspaces: {
+      find: () => ({
+        $: { subscribe: mockSubscribe },
+      }),
+    },
+  },
+}));
+
 vi.mock('@/lib/hooks/useKeycloak', () => ({
   useKeycloak: () => ({ authenticated: true, token: 'token', initializing: false }),
 }));
@@ -28,7 +42,6 @@ vi.mock('@/app/[lang]/Providers', () => ({
   }),
 }));
 
-const mockPush = vi.fn();
 vi.mock('next/navigation', async () => {
   const actual = await vi.importActual<unknown>('next/navigation');
   return {
@@ -38,9 +51,6 @@ vi.mock('next/navigation', async () => {
   };
 });
 
-const mockDispatch = vi.fn();
-const mockUnwrap = vi.fn().mockResolvedValue('ws1');
-
 vi.mock('@/lib/store', () => ({
   useAppDispatch: () => mockDispatch,
   useAppSelector: (fn: (s: unknown) => unknown) =>
@@ -49,22 +59,6 @@ vi.mock('@/lib/store', () => ({
         activeWorkspaceId: 'ws1',
         status: 'succeeded',
         error: null,
-        workspaces: [
-          {
-            id: 'ws1',
-            name: 'Personal Workspace',
-            kind: 'personal',
-            role: 'owner',
-            status: 'active',
-          },
-          {
-            id: 'ws2',
-            name: 'Team Workspace',
-            kind: 'enterprise',
-            role: 'member',
-            status: 'active',
-          },
-        ],
       },
       currentUser: {
         data: {
@@ -82,12 +76,63 @@ vi.mock('@/lib/hooks/useNotificationStore', () => ({
   useNotificationStore: () => ({ addNotification: vi.fn() }),
 }));
 
+vi.mock('@/lib/rxdb/replication', () => ({
+  useWorkspaceReplication: vi.fn(),
+}));
+
+vi.mock('@/src/app/providers/DbProviders', () => ({
+  useRxDb: () => mockDb,
+}));
+
 import WorkspaceList from '@/src/features/workspaces/ui/WorkspaceList';
+
+const mockWorkspaceDocs = [
+  {
+    id: 'ws1',
+    name: 'Personal Workspace',
+    kind: 'personal',
+    role: 'owner',
+    status: 'active',
+    disclaimerAccepted: true,
+    toJSON() {
+      return {
+        id: this.id,
+        name: this.name,
+        kind: this.kind,
+        role: this.role,
+        status: this.status,
+        disclaimerAccepted: this.disclaimerAccepted,
+      };
+    },
+  },
+  {
+    id: 'ws2',
+    name: 'Team Workspace',
+    kind: 'enterprise',
+    role: 'member',
+    status: 'active',
+    disclaimerAccepted: true,
+    toJSON() {
+      return {
+        id: this.id,
+        name: this.name,
+        kind: this.kind,
+        role: this.role,
+        status: this.status,
+        disclaimerAccepted: this.disclaimerAccepted,
+      };
+    },
+  },
+];
 
 describe('WorkspaceList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDispatch.mockReturnValue({ unwrap: mockUnwrap });
+    mockSubscribe.mockImplementation((cb: (docs: typeof mockWorkspaceDocs) => void) => {
+      cb(mockWorkspaceDocs);
+      return { unsubscribe: vi.fn() };
+    });
   });
 
   it('renders the header and search input', async () => {

@@ -23,7 +23,7 @@ export function RxDbProvider({ children }: { children: React.ReactNode }) {
 
     initDatabase().then((database) => {
       if (active && database) {
-        setDb(database as ChefsDatabase);
+        setDb(database);
       }
     });
 
@@ -32,11 +32,7 @@ export function RxDbProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  return (
-    <RxDbContext.Provider value={db}>
-      {children}
-    </RxDbContext.Provider>
-  );
+  return <RxDbContext.Provider value={db}>{children}</RxDbContext.Provider>;
 }
 
 export function useRxDb() {
