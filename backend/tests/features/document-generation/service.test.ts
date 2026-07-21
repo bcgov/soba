@@ -252,7 +252,8 @@ describe('documentGenerationService audit', () => {
         backendCode: 'cdogs-v2',
         outcome: 'error',
         httpStatus: 503,
-        errorDetail: expect.stringContaining('CDOGS error 500'),
+        // PI-safe: the error class, not the upstream body (which was 'CDOGS error 500: boom').
+        errorDetail: 'ServiceUnavailableError',
       }),
     );
   });

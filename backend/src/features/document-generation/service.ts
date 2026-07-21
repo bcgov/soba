@@ -60,12 +60,9 @@ interface AuditContext {
 
 const submissionReader = new SubmissionService();
 
-// Bound the audit error message so a large/binary upstream error can't bloat the row.
-const MAX_ERROR_DETAIL = 500;
-const boundedDetail = (err: unknown): string => {
-  const message = err instanceof Error ? err.message : String(err);
-  return message.length > MAX_ERROR_DETAIL ? `${message.slice(0, MAX_ERROR_DETAIL)}…` : message;
-};
+// PI-safe: record the error class only (e.g. ServiceUnavailableError), never the upstream error
+// body, which can echo submitted answer data. The mapped HTTP status is captured separately.
+const errorLabel = (err: unknown): string => (err instanceof Error ? err.name : 'Error');
 
 /**
  * Record one document-generation backend call (success or error). Non-blocking: a failed audit write
@@ -171,7 +168,7 @@ async function renderWith(
       outcome: DocumentGenerationOutcome.error,
       durationMs: Date.now() - startedAt,
       httpStatus: err instanceof AppError ? err.statusCode : null,
-      errorDetail: boundedDetail(err),
+      errorDetail: errorLabel(err),
     });
     return { status: 'error', code, error: err };
   }
