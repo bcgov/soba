@@ -36,10 +36,62 @@ test.describe.serial("Landing page tests", () => {
     console.log("Form name is: " + form_name);
     await sharedPage.waitForTimeout(1000);
   });
-  test("Checks form creation", async () => {
-    const source = sharedPage.locator("text=Text Field"); // component from builder palette
+  test("Checks form creation with basic components", async () => {
+    const txt_box = sharedPage.locator("text=Text Field"); // component from builder palette
     const target = sharedPage.locator(".builder-components.drag-container");
-    await source.dragTo(target);
+    await txt_box.dragTo(target);
+    await sharedPage.click('button[ref="saveButton"]');
+    await sharedPage.waitForTimeout(1000); // waits 1 second
+    const text_area = sharedPage.locator(
+      'span[data-group="basic"][data-key="textarea"][data-type="textarea"]',
+    );
+    await text_area.dragTo(target);
+    await sharedPage.click('button[ref="saveButton"]');
+    await sharedPage.waitForTimeout(1000); // waits 1 second
+    const number = sharedPage.locator(
+      'span[data-group="basic"][data-key="number"][data-type="number"]',
+    );
+    await number.dragTo(target);
+    await sharedPage.click('button[ref="saveButton"]');
+    await sharedPage.waitForTimeout(1000); // waits 1 second
+    const password = sharedPage.locator(
+      'span[data-group="basic"][data-key="password"][data-type="password"]',
+    );
+    await password.dragTo(target);
+    await sharedPage.click('button[ref="saveButton"]');
+    await sharedPage.waitForTimeout(1000); // waits 1 second
+    const checkbox = sharedPage.locator(
+      'span[data-group="basic"][data-key="checkbox"][data-type="checkbox"]',
+    );
+    await checkbox.dragTo(target);
+    await sharedPage.click('button[ref="saveButton"]');
+    await sharedPage.waitForTimeout(1000); // waits 1 second
+    const selectboxes = sharedPage.locator(
+      'span[data-group="basic"][data-key="selectboxes"][data-type="selectboxes"]',
+    );
+    await selectboxes.dragTo(target);
+    await sharedPage.locator('a[href="#data"]').click();
+    await sharedPage.locator('input[name="data[values][0][value]"]').fill("1");
+    await sharedPage.click('button[ref="saveButton"]');
+    await sharedPage.waitForTimeout(1000); // waits 1 second
+    const select = sharedPage.locator(
+      'span[data-group="basic"][data-key="select"][data-type="select"]',
+    );
+    await select.dragTo(target);
+    await sharedPage.click('button[ref="saveButton"]');
+    await sharedPage.waitForTimeout(1000); // waits 1 second
+    const radio = sharedPage.locator(
+      'span[data-group="basic"][data-key="radio"][data-type="radio"]',
+    );
+    await radio.dragTo(target);
+    await sharedPage.locator('a[href="#data"]').click();
+    await sharedPage.locator('input[name="data[values][0][value]"]').fill("1");
+    await sharedPage.click('button[ref="saveButton"]');
+    await sharedPage.waitForTimeout(1000); // waits 1 second
+    const button = sharedPage.locator(
+      'span[data-group="basic"][data-key="button"][data-type="button"]',
+    );
+    await button.dragTo(target);
     await sharedPage.click('button[ref="saveButton"]');
     await sharedPage.waitForTimeout(1000); // waits 1 second
     await expect(
@@ -63,7 +115,7 @@ test.describe.serial("Landing page tests", () => {
     await sharedPage.waitForTimeout(1000); // waits 1 second
     await sharedPage.getByText(form_name).click();
     console.log("Form name is: " + form_name);
-    await sharedPage.waitForTimeout(3000);
+    await sharedPage.waitForTimeout(2000);
     //Validate form is created by checking form name
     await expect(sharedPage.getByPlaceholder("Enter form name")).toHaveValue(
       form_name,
