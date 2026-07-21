@@ -20,7 +20,7 @@ export const isFeatureAvailable = async (
   scope: FeatureScopeContext = {},
 ): Promise<boolean> => {
   const gate = await getFeatureGateCached(code, Date.now());
-  if (!gate || !gate.enabled) return false;
+  if (!gate?.enabled) return false;
   if (gate.availability !== FeatureAvailability.scoped) return true;
 
   return hasActiveFeatureGrant({
