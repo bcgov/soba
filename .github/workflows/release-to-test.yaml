@@ -16,12 +16,13 @@ on:
       - ".github/workflows/release-to-test.yaml"
       - ".github/workflows/build-images.yaml"
       - ".github/workflows/playwright.yaml"
-      - "integration/playwright/*"
+      - "integration/playwright/**"
       - ".gitignore"
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "deployments/**"
+  create:
   workflow_dispatch:
     inputs:
       release_branch:
@@ -38,6 +39,9 @@ concurrency:
 jobs:
   set-vars:
     name: Set release variables
+    # The create event is emitted for every new branch and tag; only release
+    # branches should start this deployment workflow.
+    if: ${{ github.event_name != 'create' || (github.event.ref_type == 'branch' && startsWith(github.event.ref, 'release/sprint-')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -50,6 +54,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             BRANCH="${{ github.event.inputs.release_branch }}"
+          elif [ "${{ github.event_name }}" = "create" ]; then
+            BRANCH="${{ github.event.ref }}"
           else
             BRANCH="${{ github.ref_name }}"
           fi
