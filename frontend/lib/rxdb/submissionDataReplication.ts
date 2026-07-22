@@ -57,7 +57,7 @@ export function setupSubmissionDataReplication(
   eventSource.onmessage = async (event) => {
     try {
       const payload = JSON.parse(event.data);
-      if (payload && payload.id && payload.data) {
+      if (payload?.id && payload?.data) {
         // Real-time update from another user! Upsert it into local db.
         // We use insert/update directly since pull handler doesn't stream.
         await collection.upsert({

@@ -81,11 +81,6 @@ function SubmissionFillBody({
   const db = useRxDb();
   useSubmissionDataReplication();
 
-  // Form.io mutates its submission.data object after firing onChange, so any ref pointing
-  // at the same object reference will silently become stale. Deep-clone before storing.
-  const clone = (d: Record<string, unknown>): Record<string, unknown> =>
-    JSON.parse(JSON.stringify(d));
-
   useEffect(() => {
     // Wait for auth to settle so an authenticated caller sends their token; anonymous proceeds with none.
     if (initializing || loadStartedRef.current) return;
@@ -111,7 +106,7 @@ function SubmissionFillBody({
         // an unnecessary push-replication save of unchanged data.
         const loadedData = (bundle.content?.data ?? {}) as Record<string, unknown>;
         setInitialData(loadedData);
-        lastSeenDataRef.current = clone(loadedData);
+        lastSeenDataRef.current = structuredClone(loadedData);
       } catch (err) {
         setLoadError(normalizeFormioRenderError(err, labels.loadError));
       }
@@ -179,7 +174,7 @@ function SubmissionFillBody({
     if (formChangeRef.current) clearTimeout(formChangeRef.current);
     // Capture snapshot NOW — Form.io mutates submission.data after onChange returns, so reading
     // it inside the timeout would pick up the mutated version and break deepEqual comparisons.
-    const snapshot = clone(submission.data as Record<string, unknown>);
+    const snapshot = structuredClone(submission.data as Record<string, unknown>);
     formChangeRef.current = setTimeout(() => {
       if (db) {
         if (lastSeenDataRef.current && deepEqual(lastSeenDataRef.current, snapshot)) {

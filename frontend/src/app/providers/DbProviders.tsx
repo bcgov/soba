@@ -15,7 +15,7 @@ export type ChefsDatabase = RxDatabase<{
 
 const RxDbContext = createContext<ChefsDatabase | null>(null);
 
-export function RxDbProvider({ children }: { children: React.ReactNode }) {
+export function RxDbProvider({ children }: Readonly<{ children: React.ReactNode }>) {
   const [db, setDb] = useState<ChefsDatabase | null>(null);
 
   useEffect(() => {

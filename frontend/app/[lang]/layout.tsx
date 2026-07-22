@@ -1,5 +1,4 @@
-import DictionaryProvider from './Providers';
-import { RxDbProvider } from './Providers';
+import { DictionaryProvider, RxDbProvider } from './Providers';
 import { Locale } from './dictionaries';
 import { getDictionary } from './dictionaries';
 import { Header } from '../ui/Header';

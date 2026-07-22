@@ -22,8 +22,6 @@ function objectsEqual(a: Record<string, unknown>, b: Record<string, unknown>): b
   const keysB = Object.keys(b);
   return (
     keysA.length === keysB.length &&
-    keysA.every(
-      (k) => Object.prototype.hasOwnProperty.call(b, k) && deepEqual(a[k], b[k]),
-    )
+    keysA.every((k) => Object.hasOwn(b, k) && deepEqual(a[k], b[k]))
   );
 }

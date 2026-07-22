@@ -20,7 +20,7 @@ export function setupWorkspaceReplication(collection: RxCollection<WorkspaceItem
           ...item,
           _deleted: false,
         }));
-        const lastDoc = documents[documents.length - 1];
+        const lastDoc = documents.at(documents.length - 1);
 
         const nextCheckpoint = lastDoc
           ? { updatedAt: lastDoc.updatedAt || new Date().toISOString() }
@@ -66,7 +66,7 @@ export function setupWorkspaceReplication(collection: RxCollection<WorkspaceItem
   eventSource.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      if (data && data.id) {
+      if (data?.id) {
         replicationState.reSync();
       }
     } catch {}
