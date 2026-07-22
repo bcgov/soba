@@ -1,0 +1,190 @@
+# Manual recovery for an open PR environment. Unlike PR Close, this workflow is
+# never triggered by a pull-request event and is intended for stuck Helm releases.
+name: Undeploy PR
+run-name: Undeploy PR-${{ inputs.pr_number }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Open PR number whose deployed environment should be removed
+        required: true
+        type: number
+      confirmation:
+        description: Type UNDEPLOY PR <number> (for example, UNDEPLOY PR 94)
+        required: true
+        type: string
+
+permissions: {}
+
+env:
+  SLOT_COUNT: ${{ vars.SLOT_COUNT || '20' }}
+
+jobs:
+  set-vars:
+    name: Confirm target
+    runs-on: ubuntu-latest
+    outputs:
+      PR_NUM: ${{ steps.vars.outputs.PR_NUM }}
+      SLOT: ${{ steps.vars.outputs.SLOT }}
+      RELEASE: ${{ steps.vars.outputs.RELEASE }}
+    steps:
+      - name: Validate confirmation and derive release
+        id: vars
+        env:
+          PR_NUM: ${{ inputs.pr_number }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          [[ "${PR_NUM}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${CONFIRMATION}" == "UNDEPLOY PR ${PR_NUM}" ]]
+
+          SLOT=$(( PR_NUM % SLOT_COUNT ))
+          echo "PR_NUM=${PR_NUM}" >> "$GITHUB_OUTPUT"
+          echo "SLOT=${SLOT}" >> "$GITHUB_OUTPUT"
+          echo "RELEASE=soba-pr-slot-${SLOT}" >> "$GITHUB_OUTPUT"
+
+  undeploy:
+    name: Remove PR environment
+    needs: [set-vars]
+    runs-on: ubuntu-latest
+    # A release is named for its slot, not its PR number. Serialize every
+    # destructive operation that can affect the same reusable slot.
+    concurrency:
+      group: soba-pr-slot-${{ needs.set-vars.outputs.SLOT }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install OpenShift CLI
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
+          skip_cache: "true"
+
+      - name: Login to OpenShift Cluster
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: ${{ vars.OC_SERVER }}
+          openshift_token: ${{ secrets.OC_TOKEN }}
+          insecure_skip_tls_verify: true
+          namespace: ${{ secrets.OC_NAMESPACE }}
+
+      - name: Verify ownership and capture Helm history
+        env:
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
+          RELEASE: ${{ needs.set-vars.outputs.RELEASE }}
+        run: |
+          set -euo pipefail
+
+          if ! helm status "${RELEASE}" -n "${NAMESPACE}"; then
+            echo "Release ${RELEASE} is absent or cannot be read; refusing orphan cleanup without a verified owner." >&2
+            exit 1
+          fi
+
+          helm history "${RELEASE}" -n "${NAMESPACE}"
+          OWNER=$(helm get values "${RELEASE}" -n "${NAMESPACE}" -o json | jq -r '.global.prNumber // empty')
+          if [[ "${OWNER}" != "${PR_NUM}" ]]; then
+            echo "Refusing undeploy: ${RELEASE} is owned by PR ${OWNER:-unknown}, not PR ${PR_NUM}." >&2
+            exit 1
+          fi
+
+      - name: Stop PR workloads
+        env:
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          RELEASE: ${{ needs.set-vars.outputs.RELEASE }}
+        run: |
+          set -euo pipefail
+          LABEL="app.kubernetes.io/instance=${RELEASE}"
+
+          WORKLOADS=$(oc get deployment,statefulset -l "${LABEL}" -n "${NAMESPACE}" -o name)
+          if [[ -n "${WORKLOADS}" ]]; then
+            echo "${WORKLOADS}" | xargs -r oc scale -n "${NAMESPACE}" --replicas=0
+          fi
+          oc delete job -l "${LABEL}" -n "${NAMESPACE}" --ignore-not-found --wait=false
+
+          for _ in {1..15}; do
+            if [[ -z "$(oc get pods -l "${LABEL}" -n "${NAMESPACE}" -o name)" ]]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Some pods are still terminating; continuing with Helm uninstall."
+
+      - name: Uninstall Helm release, recovering a verified pending revision if needed
+        env:
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          RELEASE: ${{ needs.set-vars.outputs.RELEASE }}
+        run: |
+          set -euo pipefail
+
+          if helm uninstall "${RELEASE}" -n "${NAMESPACE}"; then
+            exit 0
+          fi
+
+          STATUS=$(helm status "${RELEASE}" -n "${NAMESPACE}" -o json | jq -r '.info.status // empty')
+          REVISION=$(helm status "${RELEASE}" -n "${NAMESPACE}" -o json | jq -r '.version // empty')
+          if [[ ! "${STATUS}" =~ ^pending- ]] || [[ ! "${REVISION}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "Helm uninstall failed, but the release is not a recoverable pending revision (status: ${STATUS:-unknown})." >&2
+            exit 1
+          fi
+
+          PENDING_SECRET="sh.helm.release.v1.${RELEASE}.v${REVISION}"
+          SECRET_OWNER=$(oc get secret "${PENDING_SECRET}" -n "${NAMESPACE}" -o jsonpath='{.metadata.labels.owner}')
+          SECRET_NAME=$(oc get secret "${PENDING_SECRET}" -n "${NAMESPACE}" -o jsonpath='{.metadata.labels.name}')
+          SECRET_STATUS=$(oc get secret "${PENDING_SECRET}" -n "${NAMESPACE}" -o jsonpath='{.metadata.labels.status}')
+          if [[ "${SECRET_OWNER}" != "helm" ]] || [[ "${SECRET_NAME}" != "${RELEASE}" ]] || [[ "${SECRET_STATUS}" != "${STATUS}" ]]; then
+            echo "Refusing to delete an unverified Helm release secret: ${PENDING_SECRET}." >&2
+            exit 1
+          fi
+
+          echo "Deleting verified ${STATUS} Helm revision ${REVISION} to clear the stale operation lock."
+          oc delete secret "${PENDING_SECRET}" -n "${NAMESPACE}"
+          helm uninstall "${RELEASE}" -n "${NAMESPACE}" || true
+
+      - name: Sweep remaining release resources and report result
+        env:
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          RELEASE: ${{ needs.set-vars.outputs.RELEASE }}
+        run: |
+          set -euo pipefail
+          LABEL="app.kubernetes.io/instance=${RELEASE}"
+          oc delete all,secret,pvc,configmap,serviceaccount,networkpolicy,route,ingress,hpa,job,cronjob,role,rolebinding \
+            -l "${LABEL}" -n "${NAMESPACE}" --ignore-not-found
+
+          REMAINING=$(oc get all,secret,pvc,configmap,serviceaccount,networkpolicy,route,ingress,hpa,job,cronjob,role,rolebinding \
+            -l "${LABEL}" -n "${NAMESPACE}" -o name)
+          if [[ -n "${REMAINING}" ]]; then
+            echo "Release resources remain after cleanup:" >&2
+            echo "${REMAINING}" >&2
+            exit 1
+          fi
+          echo "No labeled release resources remain."
+
+      - name: Delete Temporal PR namespace
+        env:
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
+        run: |
+          set -euo pipefail
+          TEMPORAL_NS="soba-pr-${PR_NUM}"
+          if oc get deployment temporal-admintools -n "${NAMESPACE}" &>/dev/null; then
+            oc exec deployment/temporal-admintools -n "${NAMESPACE}" -- \
+              temporal operator namespace delete -n "${TEMPORAL_NS}" --yes 2>/dev/null || true
+          fi
+
+      - name: Checkout action-crunchy
+        uses: actions/checkout@v5
+        with:
+          repository: bcgov/action-crunchy
+          ref: v2.0.0
+          path: action-crunchy
+
+      - name: Remove Crunchy PR user and database
+        env:
+          PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
+        run: |
+          set -euo pipefail
+          ./action-crunchy/scripts/user_change.sh remove "${PR_NUM}" "pg-soba-crunchy"
