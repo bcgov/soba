@@ -56,9 +56,14 @@ on:
         default: amd64
         type: string
       image_version:
-        description: "Tag suffix (e.g. pr-42, main). Default derived from ref."
+        description: "Primary image tag (e.g. pr-42, develop, or a release tag). Default derived from ref."
         required: false
         type: string
+      publish_latest:
+        description: "Also publish the image as the mutable latest tag."
+        required: false
+        default: false
+        type: boolean
       base_path:
         description: "Next.js basePath for path-based routing (e.g. /pr-42)"
         required: false
@@ -111,12 +116,15 @@ jobs:
       - name: Set variables
         id: vars
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            REF="${{ github.event.inputs.ref }}"
-            PLATFORMS="${{ github.event.inputs.platforms }}"
-          elif [ "${{ github.event_name }}" = "workflow_call" ]; then
+          # A reusable workflow retains the caller's github.event_name (for
+          # example, "push"), so select caller-provided inputs first instead
+          # of testing for a non-existent "workflow_call" event here.
+          if [ -n "${{ inputs.ref }}" ]; then
             REF="${{ inputs.ref }}"
             PLATFORMS="${{ inputs.platforms }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            REF="${{ github.event.inputs.ref }}"
+            PLATFORMS="${{ github.event.inputs.platforms }}"
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
             REF="refs/pull/${{ github.event.pull_request.number }}/head"
             PLATFORMS="amd64"
@@ -153,20 +161,14 @@ jobs:
           echo "matrix<<MATRIX_EOF" >> $GITHUB_OUTPUT
           echo "$MATRIX" >> $GITHUB_OUTPUT
           echo "MATRIX_EOF" >> $GITHUB_OUTPUT
-          if [ "${{ github.event_name }}" = "workflow_call" ] && [ -n "${{ inputs.image_version }}" ]; then
+          # An explicit caller tag (including a release tag)
+          if [ -n "${{ inputs.image_version }}" ]; then
             echo "image_version=${{ inputs.image_version }}" >> $GITHUB_OUTPUT
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && echo "$REF" | grep -q 'refs/pull/'; then
             PR_NUM=$(echo "$REF" | sed 's|refs/pull/||;s|/head||')
             echo "image_version=pr-${PR_NUM}" >> $GITHUB_OUTPUT
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "image_version=pr-${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event_name }}" = "workflow_call" ]; then
-            if echo "$REF" | grep -q 'refs/pull/'; then
-              PR_NUM=$(echo "$REF" | sed 's|refs/pull/||;s|/head||')
-              echo "image_version=pr-${PR_NUM}" >> $GITHUB_OUTPUT
-            else
-              echo "image_version=local" >> $GITHUB_OUTPUT
-            fi
           elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "image_version=main" >> $GITHUB_OUTPUT
           else
@@ -272,7 +274,7 @@ jobs:
           docker buildx imagetools create \
             --annotation "index:org.opencontainers.image.description=SOBA API backend for form data management" \
             -t ${IMAGE}:sha-${SHORT_SHA} -t ${IMAGE}:${IMAGE_VERSION} ${DIGESTS}
-          if [ "$IMAGE_VERSION" = "main" ]; then
+          if [ "${{ inputs.publish_latest }}" = "true" ]; then
             docker buildx imagetools create \
               --annotation "index:org.opencontainers.image.description=SOBA API backend for form data management" \
               -t ${IMAGE}:latest ${DIGESTS}
@@ -291,7 +293,7 @@ jobs:
           docker buildx imagetools create \
             --annotation "index:org.opencontainers.image.description=SOBA Next.js frontend for web form builder" \
             -t ${IMAGE}:sha-${SHORT_SHA} -t ${IMAGE}:${IMAGE_VERSION} ${DIGESTS}
-          if [ "$IMAGE_VERSION" = "main" ]; then
+          if [ "${{ inputs.publish_latest }}" = "true" ]; then
             docker buildx imagetools create \
               --annotation "index:org.opencontainers.image.description=SOBA Next.js frontend for web form builder" \
               -t ${IMAGE}:latest ${DIGESTS}
@@ -310,7 +312,7 @@ jobs:
           docker buildx imagetools create \
             --annotation "index:org.opencontainers.image.description=SOBA Temporal worker for workflow execution" \
             -t ${IMAGE}:sha-${SHORT_SHA} -t ${IMAGE}:${IMAGE_VERSION} ${DIGESTS}
-          if [ "$IMAGE_VERSION" = "main" ]; then
+          if [ "${{ inputs.publish_latest }}" = "true" ]; then
             docker buildx imagetools create \
               --annotation "index:org.opencontainers.image.description=SOBA Temporal worker for workflow execution" \
               -t ${IMAGE}:latest ${DIGESTS}
