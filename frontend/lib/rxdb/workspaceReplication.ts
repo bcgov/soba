@@ -20,7 +20,7 @@ export function setupWorkspaceReplication(collection: RxCollection<WorkspaceItem
           ...item,
           _deleted: false,
         }));
-        const lastDoc = documents.at(documents.length - 1);
+        const lastDoc = documents.at(-1);
 
         const nextCheckpoint = lastDoc
           ? { updatedAt: lastDoc.updatedAt || new Date().toISOString() }

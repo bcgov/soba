@@ -37,7 +37,7 @@ export function setupSubmissionReplication(
           _deleted: false,
         }));
 
-        const lastDoc = documents.at(documents.length - 1);
+        const lastDoc = documents.at(-1);
         const nextCheckpoint = lastDoc
           ? { updatedAt: lastDoc.updatedAt || new Date().toISOString(), id: lastDoc.id }
           : lastCheckpoint;
