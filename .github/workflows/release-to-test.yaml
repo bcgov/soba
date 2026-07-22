@@ -16,12 +16,13 @@ on:
       - ".github/workflows/release-to-test.yaml"
       - ".github/workflows/build-images.yaml"
       - ".github/workflows/playwright.yaml"
-      - "integration/playwright/*"
+      - "integration/playwright/**"
       - ".gitignore"
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "deployments/**"
+  create:
   workflow_dispatch:
     inputs:
       release_branch:
@@ -38,6 +39,9 @@ concurrency:
 jobs:
   set-vars:
     name: Set release variables
+    # The create event is emitted for every new branch and tag; only release
+    # branches should start this deployment workflow.
+    if: ${{ github.event_name != 'create' || (github.event.ref_type == 'branch' && startsWith(github.event.ref, 'release/sprint-')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -50,6 +54,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             BRANCH="${{ github.event.inputs.release_branch }}"
+          elif [ "${{ github.event_name }}" = "create" ]; then
+            BRANCH="${{ github.event.ref }}"
           else
             BRANCH="${{ github.ref_name }}"
           fi
@@ -59,7 +65,9 @@ jobs:
             exit 1
           fi
 
-          IMAGE_VERSION=$(echo "$BRANCH" | tr '/' '-')
+          # Keep release images distinct from ordinary branch images.
+          # release/sprint-34 becomes soba-release-sprint-34.
+          IMAGE_VERSION="soba-$(echo "$BRANCH" | tr '/' '-')"
 
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
           echo "ref=refs/heads/$BRANCH" >> "$GITHUB_OUTPUT"
@@ -73,6 +81,7 @@ jobs:
       ref: ${{ needs.set-vars.outputs.ref }}
       platforms: amd64
       image_version: ${{ needs.set-vars.outputs.image_version }}
+      publish_latest: true
     secrets: inherit
     permissions:
       contents: read
