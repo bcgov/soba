@@ -4,9 +4,9 @@ import { asyncHandler } from '../shared/asyncHandler';
 import { codeService } from '../../services/codeService';
 import { getFilesConfig } from '../../../features/files/config';
 
-export const getPluginsMeta = (_req: Request, res: Response) => {
-  res.json(metaApiService.getPlugins());
-};
+export const getPluginsMeta = asyncHandler(async (_req: Request, res: Response) => {
+  res.json(await metaApiService.getPlugins());
+});
 
 export const getFeaturesMeta = asyncHandler(async (_req: Request, res: Response) => {
   res.json(await metaApiService.getFeatures());

@@ -222,6 +222,30 @@ function definitionsOf<K extends keyof CachedPlugin>(field: K): NonNullable<Cach
     .filter((v): v is NonNullable<CachedPlugin[K]> => v !== undefined);
 }
 
+/** A plugin (any kind) that opts into feature gating by declaring a `featureCode` on its definition. */
+export interface FeatureGatedPlugin {
+  code: string;
+  featureCode: string;
+}
+
+/**
+ * Every installed plugin definition — across all kinds — that opts into feature gating by declaring
+ * a `featureCode`. Lets callers report or gate such plugins uniformly (e.g. /meta/plugins enablement)
+ * without a per-kind method: a new feature-gated plugin family just declares featureCode.
+ */
+export function getFeatureGatedPluginCodes(): FeatureGatedPlugin[] {
+  const gated: FeatureGatedPlugin[] = [];
+  for (const { field } of DEFINITION_KINDS) {
+    for (const def of definitionsOf(field)) {
+      const d = def as { code?: unknown; featureCode?: unknown };
+      if (typeof d.code === 'string' && typeof d.featureCode === 'string' && d.featureCode) {
+        gated.push({ code: d.code, featureCode: d.featureCode });
+      }
+    }
+  }
+  return gated;
+}
+
 // --- Catalog + definition getters -------------------------------------------
 
 export interface PluginCatalogEntry {
