@@ -4,6 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const mockPush = vi.fn();
+const MOCK_UUID = 'mock-uuid-0001';
 const { mockCreateWorkspace, mockUpdateWorkspace, mockSelectWorkspace, mockDispatch, mockUnwrap } =
   vi.hoisted(() => ({
     mockCreateWorkspace: vi.fn(),
@@ -77,6 +78,10 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
   selectWorkspace: mockSelectWorkspace,
 }));
 
+vi.mock('uuid', () => ({
+  v7: vi.fn(() => MOCK_UUID),
+}));
+
 import WorkspaceForm from '@/src/features/workspaces/ui/WorkspaceForm';
 
 describe('WorkspaceForm', () => {
@@ -144,6 +149,7 @@ describe('WorkspaceForm', () => {
 
     await waitFor(() => {
       expect(mockCreateWorkspace).toHaveBeenCalledWith('token', {
+        id: MOCK_UUID,
         name: 'New Team',
         disclaimerAccepted: false,
       });
@@ -162,6 +168,7 @@ describe('WorkspaceForm', () => {
 
     await waitFor(() => {
       expect(mockCreateWorkspace).toHaveBeenCalledWith('token', {
+        id: MOCK_UUID,
         name: 'New Team',
         disclaimerAccepted: true,
       });
@@ -179,6 +186,7 @@ describe('WorkspaceForm', () => {
 
     await waitFor(() => {
       expect(mockCreateWorkspace).toHaveBeenCalledWith('token', {
+        id: MOCK_UUID,
         name: 'Second Team',
         disclaimerAccepted: false,
       });

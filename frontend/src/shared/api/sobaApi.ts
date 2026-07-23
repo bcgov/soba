@@ -7,7 +7,12 @@ import { parseJson } from './sobaHelpers';
 import { sobaFetch } from './sobaFetch';
 
 import type { SobaFormType } from '../../types/forms';
-import type { WorkspaceItem, WorkspacesResponse, CreateWorkspaceBody, UpdateWorkspaceBody } from '../../types/workspaces';
+import type {
+  WorkspaceItem,
+  WorkspacesResponse,
+  CreateWorkspaceBody,
+  UpdateWorkspaceBody,
+} from '../../types/workspaces';
 import type { CurrentUserResponse, PatchCurrentUserBody } from '../../types/user';
 
 export type { SobaFormType, WorkspaceItem, WorkspacesResponse, CurrentUserResponse };
@@ -135,8 +140,17 @@ export async function fetchRolesMeta(onlyEnabledFeatures = true): Promise<unknow
   return parseJson(response);
 }
 
-export async function fetchWorkspaces(token: string): Promise<WorkspacesResponse> {
-  const response = await sobaFetch('/workspaces', { token });
+export async function fetchWorkspaces(
+  token: string,
+  updatedSince?: string,
+  sort: string = 'updatedAt:asc',
+): Promise<WorkspacesResponse> {
+  const params = new URLSearchParams();
+  if (updatedSince) params.append('updatedSince', updatedSince);
+  if (sort) params.append('sort', sort);
+
+  const queryString = params.toString() ? `?${params.toString()}` : '';
+  const response = await sobaFetch(`/workspaces${queryString}`, { token });
   return parseJson(response);
 }
 

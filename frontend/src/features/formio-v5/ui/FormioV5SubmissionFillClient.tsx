@@ -4,6 +4,7 @@ import { useParams, useRouter, usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Submission } from '@formio/react';
 import type { FormType } from '@formio/react';
+import { Subscription } from 'rxjs';
 import { InlineAlert } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useDictionary } from '@/app/[lang]/Providers';
@@ -16,9 +17,12 @@ import {
   setActiveSubmissionId,
   clearActiveSubmissionId,
 } from '@/src/features/formio-v5/activeSubmission';
-import { getSubmitFillBundle, submitSobaFormSubmission } from '@/src/shared/api/sobaApi';
+import { getSubmitFillBundle } from '@/src/shared/api/sobaApi';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
+import { useRxDb } from '@/src/app/providers/DbProviders';
+import { useSubmissionDataReplication } from '@/lib/rxdb/replication';
+import { deepEqual } from '@/src/shared/util/deepEqual';
 
 type FillLabels = {
   loading: string;
@@ -60,6 +64,22 @@ function SubmissionFillBody({
   const formInstanceRef = useRef<{
     emit: (event: string, ...args: unknown[]) => void;
   } | null>(null);
+  // Tracks the last data Form.io gave us via onChange. Used to skip no-op saves: if Form.io
+  // fires onChange with the same data it gave last time, we know nothing user-visible changed.
+  // Updated eagerly (before the upsert) so the SSE feedback loop doesn't re-trigger a save.
+  // Always deep-cloned before storing — Form.io mutates its submission object after onChange,
+  // so a raw reference would become stale and break deepEqual comparisons.
+  const lastSeenDataRef = useRef<Record<string, unknown> | null>(null);
+  // Gates save logic: only start saving after Form.io has finished initializing. All onChange
+  // events before onFormReady fires are mount-time normalization and should be ignored.
+  const formReadyRef = useRef(false);
+  // Tracks the raw data we last upserted into RxDB. When the SSE echo comes back with the
+  // same data, the RxDB subscription detects it's our own save and skips the re-render that
+  // would otherwise make Form.io fire onChange with re-processed data.
+  const lastUpsertedDataRef = useRef<Record<string, unknown> | null>(null);
+
+  const db = useRxDb();
+  useSubmissionDataReplication();
 
   useEffect(() => {
     // Wait for auth to settle so an authenticated caller sends their token; anonymous proceeds with none.
@@ -68,8 +88,7 @@ function SubmissionFillBody({
     void (async () => {
       try {
         const authToken = token ?? undefined;
-        // One call: workflow state + schema + any saved answers. `content` is null for a just-opened
-        // submission, so there's no separate (404-ing) data fetch.
+        // One call: workflow state + schema + any saved answers.
         const bundle = await getSubmitFillBundle(authToken, submissionId);
         // An already-submitted submission isn't fillable; send them to its confirmation.
         if (bundle.workflowState === 'submitted') {
@@ -81,13 +100,43 @@ function SubmissionFillBody({
           return;
         }
         setSchema(bundle.schema as FormType);
-        // Resume: prefill with any saved answers (a just-opened submission has none).
-        setInitialData((bundle.content?.data ?? {}) as Record<string, unknown>);
+
+        // Populate the form directly from the server response. The RxDB document is created on
+        // the first actual change (or remote update via SSE), so we don't insert here and trigger
+        // an unnecessary push-replication save of unchanged data.
+        const loadedData = (bundle.content?.data ?? {}) as Record<string, unknown>;
+        setInitialData(loadedData);
+        lastSeenDataRef.current = structuredClone(loadedData);
       } catch (err) {
         setLoadError(normalizeFormioRenderError(err, labels.loadError));
       }
     })();
   }, [initializing, token, submissionId, locale, router, labels.loadError, labels.unavailable]);
+
+  // Subscribe to local RxDB for real-time collaboration updates.
+  // When we save, the SSE echo upserts the same data back. Detect that and skip — otherwise
+  // React re-renders, Form.io gets a new submission prop, re-processes the data, and fires
+  // onChange with slightly different output, creating an infinite save loop.
+  useEffect(() => {
+    let sub: Subscription | undefined;
+    if (db) {
+      sub = db.submissionData.findOne(submissionId).$.subscribe((doc) => {
+        if (doc) {
+          const incoming = doc.data as Record<string, unknown>;
+          if (lastUpsertedDataRef.current && deepEqual(lastUpsertedDataRef.current, incoming)) {
+            return; // Our own save echoing back via SSE — skip to avoid re-render loop
+          }
+          setInitialData((prev) => {
+            if (deepEqual(prev, incoming)) return prev;
+            return incoming;
+          });
+        }
+      });
+    }
+    return () => {
+      if (sub) sub.unsubscribe();
+    };
+  }, [db, submissionId]);
 
   // Expose the submission being filled to the CHEFS upload provider; clear it when leaving so a stale
   // id can't tag an unrelated upload (e.g. a designer preview).
@@ -97,12 +146,17 @@ function SubmissionFillBody({
   }, [submissionId]);
 
   const submitForm = async (submission: Submission) => {
+    // Cancel any pending draft save so it doesn't race with the submit and produce a 409.
+    if (formChangeRef.current) clearTimeout(formChangeRef.current);
     try {
-      await submitSobaFormSubmission(
-        token ?? undefined,
-        submissionId,
-        (submission?.data ?? {}) as Record<string, unknown>,
-      );
+      if (db) {
+        await db.submissionData.upsert({
+          id: submissionId,
+          data: (submission?.data ?? {}) as Record<string, unknown>,
+          updatedAt: new Date().toISOString(),
+          isDraft: false, // Triggers submit API via RxDB push
+        });
+      }
       addNotification({ text: labels.submitSuccess, type: 'success' });
       // Straight to the read-only confirmation; navigating away unmounts the form, so there's no
       // need to emit `submitDone` and no flash of Form.io's own success screen.
@@ -111,6 +165,33 @@ function SubmissionFillBody({
       setRenderError(normalizeFormioRenderError(err, labels.rendererError));
       formInstanceRef.current?.emit('submitError', labels.rendererError);
     }
+  };
+
+  const formChangeRef = useRef<NodeJS.Timeout | null>(null);
+  const handleFormChange = (submission: Submission) => {
+    // Before onFormReady fires, every onChange is Form.io's mount-time normalization — ignore it.
+    if (!formReadyRef.current) return;
+    if (formChangeRef.current) clearTimeout(formChangeRef.current);
+    // Capture snapshot NOW — Form.io mutates submission.data after onChange returns, so reading
+    // it inside the timeout would pick up the mutated version and break deepEqual comparisons.
+    const snapshot = structuredClone(submission.data as Record<string, unknown>);
+    formChangeRef.current = setTimeout(() => {
+      if (db) {
+        if (lastSeenDataRef.current && deepEqual(lastSeenDataRef.current, snapshot)) {
+          return; // Form.io gave us the same data as last time — nothing changed
+        }
+        // Track what we're about to upsert so the RxDB subscription can recognise the SSE
+        // echo and skip the re-render that would restart the loop.
+        lastUpsertedDataRef.current = snapshot;
+        lastSeenDataRef.current = snapshot;
+        db.submissionData.upsert({
+          id: submissionId,
+          data: snapshot,
+          updatedAt: new Date().toISOString(),
+          isDraft: true, // Triggers save draft API via RxDB push
+        });
+      }
+    }, 1000); // 1s debounce
   };
 
   if (loadError) {
@@ -150,10 +231,16 @@ function SubmissionFillBody({
             options={{ noAlerts: true, ...bcgovFileOption }}
             onFormReady={(instance) => {
               formInstanceRef.current = instance;
+              formReadyRef.current = true;
+
+              if (instance?.data) {
+                lastSeenDataRef.current = instance.data as Record<string, unknown>;
+              }
             }}
             onError={(err) => {
               setRenderError(normalizeFormioRenderError(err, labels.loadError));
             }}
+            onChange={handleFormChange}
             onSubmit={submitForm}
           />
         </div>

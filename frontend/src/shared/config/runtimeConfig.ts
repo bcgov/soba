@@ -60,16 +60,20 @@ function assertRuntimeConfigShape(config: unknown): asserts config is FrontendRu
   }
 }
 
+const CONFIG_FETCH_TIMEOUT_MS = 10_000;
+
 export async function loadFrontendRuntimeConfig(): Promise<FrontendRuntimeConfig> {
   if (cachedConfig) return cachedConfig;
   if (configPromise) return configPromise;
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CONFIG_FETCH_TIMEOUT_MS);
+
   configPromise = fetch(`${getBootstrapApiBaseUrl()}/meta/frontend-config`, {
     method: 'GET',
     cache: 'no-store',
-    headers: {
-      Accept: 'application/json',
-    },
+    headers: { Accept: 'application/json' },
+    signal: controller.signal,
   })
     .then(async (response) => {
       if (!response.ok) {
@@ -80,8 +84,13 @@ export async function loadFrontendRuntimeConfig(): Promise<FrontendRuntimeConfig
       cachedConfig = payload;
       return payload;
     })
-    .finally(() => {
+    .catch((err) => {
+      // Clear the shared promise so the next caller retries instead of sharing a dead promise.
       configPromise = null;
+      throw err;
+    })
+    .finally(() => {
+      clearTimeout(timer);
     });
 
   return configPromise;

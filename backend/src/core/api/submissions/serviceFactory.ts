@@ -5,6 +5,8 @@ import type {
   SubmissionListRow,
   SubmissionDetailRow,
 } from '../../db/repos/submissionRepo';
+import { emitSubmissionsUpdate, emitSubmissionDataUpdate } from './stream';
+import { getActiveUserIdsForWorkspace } from '../../db/repos/membershipRepo';
 
 export interface SubmissionsContextInput {
   workspaceId: string;
@@ -116,11 +118,37 @@ export function createSubmissionsApiService(submissionService: SubmissionService
     open: async (ctx: SubmissionsContextInput, formId: string) =>
       toSubmissionDto(await submissionService.open({ ...ctx, formId })),
 
-    save: (ctx: SubmissionsContextInput, submissionId: string, data: Record<string, unknown>) =>
-      submissionService.save({ ...ctx, submissionId, data }).then((row) => toSubmissionDto(row)),
+    save: async (
+      ctx: SubmissionsContextInput,
+      submissionId: string,
+      data: Record<string, unknown>,
+    ) => {
+      const row = await submissionService.save({ ...ctx, submissionId, data });
+      const result = toSubmissionDto(row);
+      const userIds = await getActiveUserIdsForWorkspace(ctx.workspaceId);
+      emitSubmissionsUpdate(result, userIds);
+      emitSubmissionDataUpdate(
+        { id: submissionId, data, updatedAt: result.updatedAt, isDraft: true },
+        userIds,
+      );
+      return result;
+    },
 
-    submit: (ctx: SubmissionsContextInput, submissionId: string, data: Record<string, unknown>) =>
-      submissionService.submit({ ...ctx, submissionId, data }).then((row) => toSubmissionDto(row)),
+    submit: async (
+      ctx: SubmissionsContextInput,
+      submissionId: string,
+      data: Record<string, unknown>,
+    ) => {
+      const row = await submissionService.submit({ ...ctx, submissionId, data });
+      const result = toSubmissionDto(row);
+      const userIds = await getActiveUserIdsForWorkspace(ctx.workspaceId);
+      emitSubmissionsUpdate(result, userIds);
+      emitSubmissionDataUpdate(
+        { id: submissionId, data, updatedAt: result.updatedAt, isDraft: false },
+        userIds,
+      );
+      return result;
+    },
 
     delete: (ctx: SubmissionsContextInput, submissionId: string) =>
       submissionService.delete({ ...ctx, submissionId }),

@@ -47,7 +47,7 @@ interface SaveSubmissionInput {
   afterEngineSubmissionRef: string;
 }
 
-export type SubmissionListSort = 'id:desc' | 'updatedAt:desc';
+export type SubmissionListSort = 'id:desc' | 'updatedAt:desc' | 'updatedAt:asc';
 export type SubmissionCursorMode = 'id' | 'ts_id';
 
 export interface ListSubmissionsInput {

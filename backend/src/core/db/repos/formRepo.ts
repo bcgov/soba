@@ -2,7 +2,7 @@ import { and, desc, eq, ilike, inArray, isNull, lt, ne, or } from 'drizzle-orm';
 import { db, type DbOrTx } from '../client';
 import { forms, formVersions } from '../schema';
 
-export type FormListSort = 'id:desc' | 'updatedAt:desc';
+export type FormListSort = 'id:desc' | 'updatedAt:desc' | 'updatedAt:asc';
 export type FormCursorMode = 'id' | 'ts_id';
 
 export interface ListFormsForWorkspaceInput {

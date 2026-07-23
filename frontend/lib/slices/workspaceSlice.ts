@@ -36,6 +36,9 @@ export const loadWorkspaces = createAsyncThunk(
   async (token: string, { rejectWithValue }) => {
     try {
       const response = await fetchWorkspaces(token);
+      // Removed db.workspaces.bulkUpsert(response.items) to prevent triggering 
+      // push replication as 'new' documents and causing 409 conflicts.
+      // RxDB's pull replication will handle syncing the DB.
       return response.items;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to load workspaces';

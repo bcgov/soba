@@ -3,6 +3,7 @@ import { validateRequest } from '../shared/validation';
 import { workspaceFromQuery, workspaceFromResource } from '../../middleware/workspaceContext';
 import {
   listWorkspaces,
+  streamWorkspaces,
   createWorkspace,
   getCurrentWorkspace,
   getWorkspaceById,
@@ -19,6 +20,7 @@ const router = express.Router();
 
 // Actor-only: lists the workspaces the caller belongs to (no workspace context required).
 router.get('/workspaces', validateRequest({ query: ListWorkspacesQuerySchema }), listWorkspaces);
+router.get('/workspaces/stream', streamWorkspaces);
 router.post('/workspaces', validateRequest({ body: CreateWorkspaceBodySchema }), createWorkspace);
 // "Current" resolves from the tab's ?workspaceId; echoes the header like other scoped routes.
 // Registered before '/workspaces/:id' so the literal isn't captured as an id.

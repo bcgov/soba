@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRxDb } from '@/src/app/providers/DbProviders';
+import { useWorkspaceReplication } from '@/lib/rxdb/replication';
 import { Button as DSButton } from '@bcgov/design-system-react-components';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { ListPageLayout, ListPageToolbar, ListPageAuthGate } from '@/src/components/ListPageLayout';
@@ -13,7 +15,7 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { useRouter, usePathname } from 'next/navigation';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
-import { loadWorkspaces, selectActiveWorkspace } from '@/lib/slices/workspaceSlice';
+import { selectActiveWorkspace } from '@/lib/slices/workspaceSlice';
 import { loadCurrentUser } from '@/lib/slices/currentUserSlice';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import type { WorkspaceItem } from '@/src/types/workspaces';
@@ -56,7 +58,18 @@ const WorkspaceActionButtons = ({
 };
 
 function WorkspaceList({ showFormsAction = true }: Readonly<{ showFormsAction?: boolean }>) {
+  useWorkspaceReplication();
   const dict = useDictionary();
+  const db = useRxDb();
+  const [workspaces, setWorkspaces] = useState<WorkspaceItem[]>([]);
+
+  useEffect(() => {
+    if (!db) return;
+    const sub = db.workspaces.find().$.subscribe((results) => {
+      setWorkspaces(results.map((doc) => doc.toJSON() as WorkspaceItem));
+    });
+    return () => sub.unsubscribe();
+  }, [db]);
   const dictWorkspaces = dict.workspaces;
   const { authenticated, token, initializing } = useKeycloak();
   const dispatch = useAppDispatch();
@@ -71,18 +84,15 @@ function WorkspaceList({ showFormsAction = true }: Readonly<{ showFormsAction?: 
 
   const locale = getLocaleFromPath(pathname);
 
-  const { workspaces, activeWorkspaceId, status: workspaceStatus, error: workspaceError } =
-    useAppSelector((state) => state.workspace);
+  const {
+    activeWorkspaceId,
+    status: workspaceStatus,
+    error: workspaceError,
+  } = useAppSelector((state) => state.workspace);
   const { data: currentUser, status: currentUserStatus } = useAppSelector(
     (state) => state.currentUser,
   );
   const defaultWorkspaceId = currentUser?.preferences?.defaultWorkspaceId ?? null;
-
-  useEffect(() => {
-    if (authenticated && token && workspaceStatus === 'idle') {
-      dispatch(loadWorkspaces(token));
-    }
-  }, [authenticated, token, workspaceStatus, dispatch]);
 
   useEffect(() => {
     if (authenticated && token && currentUserStatus === 'idle') {

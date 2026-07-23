@@ -3,7 +3,9 @@ import { z } from 'zod';
 
 extendZodWithOpenApi(z);
 
-export const CursorSortSchema = z.enum(['id:desc', 'updatedAt:desc']).openapi('Core_CursorSort');
+export const CursorSortSchema = z
+  .enum(['id:desc', 'updatedAt:desc', 'updatedAt:asc'])
+  .openapi('Core_CursorSort');
 export type CursorSort = z.infer<typeof CursorSortSchema>;
 
 export const CursorTokenSchema = z
@@ -28,7 +30,7 @@ export const resolveCursorMode = (input: {
   cursor?: CursorToken;
 }): CursorMode => {
   if (input.cursor) return input.cursor.m;
-  if (input.sort === 'updatedAt:desc') return 'ts_id';
+  if (input.sort === 'updatedAt:desc' || input.sort === 'updatedAt:asc') return 'ts_id';
   return 'id';
 };
 

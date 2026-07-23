@@ -19,7 +19,7 @@ interface SaveRevisionInput {
   engineSchemaRef?: string | null;
 }
 
-export type FormVersionListSort = 'id:desc' | 'updatedAt:desc';
+export type FormVersionListSort = 'id:desc' | 'updatedAt:desc' | 'updatedAt:asc';
 export type FormVersionCursorMode = 'id' | 'ts_id';
 
 export interface ListFormVersionsInput {

@@ -10,6 +10,7 @@ import {
   getSubmissionData,
   saveSubmission,
   submitSubmission,
+  streamSubmissionData,
 } from '../submissions/controller';
 import {
   OpenSubmissionBodySchema,
@@ -45,6 +46,9 @@ router.post(
   requireFormSubmitAccess,
   submitSubmission,
 );
+
+// SSE stream for real-time submission data updates (fill-form collaboration).
+router.get('/submissions/stream', streamSubmissionData);
 
 // Confirmation read (a public form's submissions are public data; the UUID is the practical capability).
 router.get(

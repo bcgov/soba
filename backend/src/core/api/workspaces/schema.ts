@@ -24,6 +24,7 @@ export const ListWorkspacesQuerySchema = z
     kind: z.string().trim().min(1).optional(),
     status: z.string().trim().min(1).optional(),
     sort: CursorSortSchema.default('id:desc'),
+    updatedSince: z.string().datetime().optional(),
   })
   .openapi('Workspaces_ListWorkspacesQuery');
 
@@ -56,6 +57,7 @@ export const WorkspaceIdParamsSchema = z
 
 export const CreateWorkspaceBodySchema = z
   .object({
+    id: z.string().uuid().optional(),
     name: z.string().trim().min(1),
     disclaimerAccepted: z.boolean().optional(),
   })

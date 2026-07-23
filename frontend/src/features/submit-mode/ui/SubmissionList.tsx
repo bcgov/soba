@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { Subscription } from 'rxjs';
 import { InlineAlert } from '@bcgov/design-system-react-components';
 import { useRouter, usePathname } from 'next/navigation';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
-import { getSobaSubmissions } from '@/src/shared/api/sobaApiDesign';
 import type { SubmissionListItem } from '@/src/types/submissions';
 import { DataTable, Column } from '@/src/components/DataTable';
 import { ListPageLayout } from '@/src/components/ListPageLayout';
@@ -14,6 +14,8 @@ import { DsPageHeading } from '@/app/ui/DsPageHeading';
 import { RowActionButton } from '@/src/components/RowActionButton';
 import { WorkflowStateBadge } from './WorkflowStateBadge';
 import { useAppSelector } from '@/lib/store';
+import { useRxDb } from '@/src/app/providers/DbProviders';
+import { useSubmissionReplication } from '@/lib/rxdb/replication';
 
 interface SubmissionListProps {
   formId?: string;
@@ -31,6 +33,8 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
   const [currentPage, setCurrentPage] = useState(1);
 
   const { activeWorkspaceId } = useAppSelector((state) => state.workspace);
+  const db = useRxDb();
+  useSubmissionReplication();
 
   const paginatedSubmissions = useMemo(
     () => submissions.slice((currentPage - 1) * pageSize, currentPage * pageSize),
@@ -38,25 +42,24 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
   );
 
   useEffect(() => {
-    if (authenticated && token && activeWorkspaceId) {
-      const fetchSubmissions = async () => {
-        try {
-          // `formId` is the SOBA formId (routed from FormList); list submissions for it directly.
-          const params = formId ? { formId } : undefined;
-          const data = await getSobaSubmissions(token, params, activeWorkspaceId);
-          setSubmissions(data.items || []);
-        } catch {
-          // Submissions failed to load; the empty state is shown to the user.
-        } finally {
-          setIsLoaded(true);
-        }
+    let sub: Subscription | undefined;
+    if (db && activeWorkspaceId) {
+      const query = formId ? db.submissions.find({ selector: { formId } }) : db.submissions.find();
+      sub = query.$.subscribe((results) => {
+        setSubmissions(results.map((r) => r.toJSON()));
+        setIsLoaded(true);
+      });
+    } else {
+      const setup = () => {
+        setSubmissions([]);
+        setIsLoaded(false);
       };
-
-      fetchSubmissions();
+      setup();
     }
-    // No workspace selected for this tab: submissions are workspace-scoped, so we render a
-    // "select a workspace" prompt (below) instead of calling the API.
-  }, [authenticated, token, formId, activeWorkspaceId]);
+    return () => {
+      if (sub) sub.unsubscribe();
+    };
+  }, [db, activeWorkspaceId, formId]);
 
   const loading = initializing || (authenticated && (!token || !isLoaded));
 
@@ -85,7 +88,9 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
       key: 'formName',
       label: dict.submission?.columns?.formName || dict.form?.nameLabel || 'Form Name',
       render: (sub) => (
-        <span className="fw-semibold">{sub.formName || dict.form?.nameLabel || 'Untitled Form'}</span>
+        <span className="fw-semibold">
+          {sub.formName || dict.form?.nameLabel || 'Untitled Form'}
+        </span>
       ),
     },
     {
