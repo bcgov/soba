@@ -17,6 +17,7 @@ import {
 } from '../../config/pluginConfig';
 import { getStorageProfilesConfig } from '../../config/storageProfiles';
 import type { FormEnginePluginDefinition } from '../form-engine/FormEnginePluginDefinition';
+import type { DocumentGenerationPluginDefinition } from '../document-generation/DocumentGenerationPluginDefinition';
 import type { FeatureApiDefinition } from './FeatureApiDefinition';
 import type { CacheAdapter, CachePluginDefinition } from '../cache/CacheAdapter';
 import type {
@@ -43,7 +44,8 @@ const AdapterPluginDefinitionSchema = z.object({
   createAdapter: z.any(),
 });
 
-const FormEnginePluginDefinitionSchema = z.object({
+// form-engine and document-generation share this { code, metadata, createAdapter } shape.
+const MetadataPluginDefinitionSchema = z.object({
   code: z.string().min(1),
   metadata: z.object({
     code: z.string(),
@@ -71,6 +73,7 @@ const IdpPluginDefinitionSchema = z.object({
 interface CachedPlugin {
   dir: string;
   formEngineDefinition?: FormEnginePluginDefinition;
+  documentGenerationDefinition?: DocumentGenerationPluginDefinition;
   apiDefinition?: FeatureApiDefinition;
   cacheDefinition?: CachePluginDefinition;
   messagebusDefinition?: MessageBusPluginDefinition;
@@ -90,7 +93,12 @@ const DEFINITION_KINDS: ReadonlyArray<{
   {
     field: 'formEngineDefinition',
     exportKey: 'formEnginePluginDefinition',
-    schema: FormEnginePluginDefinitionSchema,
+    schema: MetadataPluginDefinitionSchema,
+  },
+  {
+    field: 'documentGenerationDefinition',
+    exportKey: 'documentGenerationPluginDefinition',
+    schema: MetadataPluginDefinitionSchema,
   },
   { field: 'apiDefinition', exportKey: 'pluginApiDefinition', schema: FeatureApiDefinitionSchema },
   {
@@ -179,6 +187,10 @@ function loadPlugin(pluginsRoot: string, pluginDir: string): CachedPlugin | null
   return entry;
 }
 
+// Directories under plugins/ that hold shared code, not plugins — skipped by discovery. Put code
+// shared between plugins here (e.g. plugins/shared/cdogs/renderBody.ts) instead of a plugin dir.
+const NON_PLUGIN_DIRS = new Set(['shared']);
+
 function discoverAndCache(): CachedPlugin[] {
   if (cache) return cache;
 
@@ -190,7 +202,7 @@ function discoverAndCache(): CachedPlugin[] {
 
   const pluginDirs = fs
     .readdirSync(pluginsRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.isDirectory() && !NON_PLUGIN_DIRS.has(entry.name))
     .map((entry) => entry.name);
 
   const result: CachedPlugin[] = [];
@@ -210,6 +222,30 @@ function definitionsOf<K extends keyof CachedPlugin>(field: K): NonNullable<Cach
     .filter((v): v is NonNullable<CachedPlugin[K]> => v !== undefined);
 }
 
+/** A plugin (any kind) that opts into feature gating by declaring a `featureCode` on its definition. */
+export interface FeatureGatedPlugin {
+  code: string;
+  featureCode: string;
+}
+
+/**
+ * Every installed plugin definition — across all kinds — that opts into feature gating by declaring
+ * a `featureCode`. Lets callers report or gate such plugins uniformly (e.g. /meta/plugins enablement)
+ * without a per-kind method: a new feature-gated plugin family just declares featureCode.
+ */
+export function getFeatureGatedPluginCodes(): FeatureGatedPlugin[] {
+  const gated: FeatureGatedPlugin[] = [];
+  for (const { field } of DEFINITION_KINDS) {
+    for (const def of definitionsOf(field)) {
+      const d = def as { code?: unknown; featureCode?: unknown };
+      if (typeof d.code === 'string' && typeof d.featureCode === 'string' && d.featureCode) {
+        gated.push({ code: d.code, featureCode: d.featureCode });
+      }
+    }
+  }
+  return gated;
+}
+
 // --- Catalog + definition getters -------------------------------------------
 
 export interface PluginCatalogEntry {
@@ -224,6 +260,7 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
     const code =
       p.apiDefinition?.code ??
       p.formEngineDefinition?.code ??
+      p.documentGenerationDefinition?.code ??
       p.cacheDefinition?.code ??
       p.messagebusDefinition?.code ??
       p.tempStorageDefinition?.code ??
@@ -259,6 +296,24 @@ export function getFormEnginePluginCatalog(): FormEnginePluginCatalogEntry[] {
 
 export function getFormEnginePluginDefinitions(): FormEnginePluginDefinition[] {
   return definitionsOf('formEngineDefinition');
+}
+
+export interface DocumentGenerationPluginCatalogEntry {
+  code: string;
+  name: string;
+  version?: string;
+}
+
+export function getDocumentGenerationPluginCatalog(): DocumentGenerationPluginCatalogEntry[] {
+  return getDocumentGenerationPluginDefinitions().map((d) => ({
+    code: d.code,
+    name: d.metadata.name,
+    version: d.metadata.version,
+  }));
+}
+
+export function getDocumentGenerationPluginDefinitions(): DocumentGenerationPluginDefinition[] {
+  return definitionsOf('documentGenerationDefinition');
 }
 
 export function getCachePluginDefinitions(): CachePluginDefinition[] {

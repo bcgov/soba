@@ -4,12 +4,21 @@ import { asyncHandler } from '../shared/asyncHandler';
 import { codeService } from '../../services/codeService';
 import { getFilesConfig } from '../../../features/files/config';
 
-export const getPluginsMeta = (_req: Request, res: Response) => {
-  res.json(metaApiService.getPlugins());
-};
+export const getPluginsMeta = asyncHandler(async (_req: Request, res: Response) => {
+  res.json(await metaApiService.getPlugins());
+});
 
 export const getFeaturesMeta = asyncHandler(async (_req: Request, res: Response) => {
   res.json(await metaApiService.getFeatures());
+});
+
+export const getFeatureAvailabilityMeta = asyncHandler(async (req: Request, res: Response) => {
+  const { code, workspaceId, formId } = req.query as {
+    code: string;
+    workspaceId?: string;
+    formId?: string;
+  };
+  res.json(await metaApiService.getFeatureAvailability({ code, workspaceId, formId }));
 });
 
 export const getFormEnginesMeta = asyncHandler(async (_req: Request, res: Response) => {

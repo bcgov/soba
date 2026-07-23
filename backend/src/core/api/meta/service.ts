@@ -5,9 +5,11 @@ import { getFormEnginePlugins } from '../../integrations/form-engine/FormEngineR
 import {
   getActivePluginCodes,
   getActiveStorageBackendCodes,
+  getFeatureGatedPluginCodes,
   getPluginCatalog,
 } from '../../integrations/plugins/PluginRegistry';
 import { isFeatureEnabled, listFeatures } from '../../db/repos/featureRepo';
+import { isFeatureAvailable } from '../../services/featureAvailabilityService';
 import { roleService } from '../../services/roleService';
 
 function parseKeycloakIssuer(issuer: string): { url: string; realm: string } {
@@ -23,7 +25,7 @@ function parseKeycloakIssuer(issuer: string): { url: string; realm: string } {
 }
 
 export class MetaApiService {
-  getPlugins() {
+  async getPlugins() {
     const plugins = getPluginCatalog();
     // Selectable adapter codes come from the registry; form engine has its own registry.
     const activeFormEngineCode =
@@ -33,6 +35,15 @@ export class MetaApiService {
       ...getActivePluginCodes(),
       ...getActiveStorageBackendCodes(),
     ]);
+    // Feature-gated plugins (e.g. document-generation backends) aren't selected by a single config
+    // code — they're enabled when their gating feature is platform-enabled. Any plugin kind that
+    // declares a featureCode is picked up here generically, so new families need no code change.
+    const enabledFeatureCodes = new Set(
+      (await listFeatures()).filter((f) => isFeatureEnabled(f.status)).map((f) => f.code),
+    );
+    for (const { code, featureCode } of getFeatureGatedPluginCodes()) {
+      if (enabledFeatureCodes.has(featureCode)) activeCodes.add(code);
+    }
     return {
       plugins: plugins.map((plugin) => ({
         ...plugin,
@@ -50,9 +61,22 @@ export class MetaApiService {
         description: f.description,
         version: f.version,
         status: f.status,
+        availability: f.availability,
         platformAllowed: isFeatureEnabled(f.status),
       })),
     };
+  }
+
+  /**
+   * Resolve whether a feature is available for a workspace/form scope (3-gate resolution). Lets the
+   * frontend check a `scoped` feature it cannot resolve locally, since grants live server-side.
+   */
+  async getFeatureAvailability(params: { code: string; workspaceId?: string; formId?: string }) {
+    const available = await isFeatureAvailable(params.code, {
+      workspaceId: params.workspaceId,
+      formId: params.formId,
+    });
+    return { code: params.code, available };
   }
 
   getBuild() {

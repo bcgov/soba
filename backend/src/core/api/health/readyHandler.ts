@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { pool } from '../../db/client';
 import { checkFormEngineReadiness } from '../../integrations/form-engine/FormEngineRegistry';
+import { checkDocumentGenerationReadiness } from '../../integrations/document-generation/DocumentGenerationRegistry';
 import {
   checkStorageReadiness,
   getTempStorageAdapter,
@@ -40,6 +41,10 @@ export async function readinessHandler(_req: Request, res: Response): Promise<vo
     virusScanner = { ok: false, message: err instanceof Error ? err.message : String(err) };
   }
 
+  // Document generation is reported but non-gating — a CDOGS outage degrades rendering, it doesn't
+  // pull the pod from rotation.
+  const documentGeneration = await checkDocumentGenerationReadiness();
+
   const body = {
     status: dbOk && allEnginesOk ? 'ready' : 'unhealthy',
     db: dbOk ? 'ok' : 'unreachable',
@@ -47,6 +52,7 @@ export async function readinessHandler(_req: Request, res: Response): Promise<vo
     storage,
     tempStorage,
     virusScanner,
+    documentGeneration,
   };
 
   if (!dbOk || !allEnginesOk) {

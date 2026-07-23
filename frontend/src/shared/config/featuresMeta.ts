@@ -7,6 +7,8 @@ export type MetaFeatureRow = {
   version: string | null;
   status: string;
   platformAllowed: boolean;
+  /** 'fixed' | 'scoped'. Optional; absent is treated as non-scoped. */
+  availability?: string;
 };
 
 export type FeaturesMetaPayload = {
@@ -29,7 +31,8 @@ export function isFeaturesMetaPayload(value: unknown): value is FeaturesMetaPayl
       (r.description === null || typeof r.description === 'string') &&
       (r.version === null || typeof r.version === 'string') &&
       typeof r.status === 'string' &&
-      typeof r.platformAllowed === 'boolean'
+      typeof r.platformAllowed === 'boolean' &&
+      (r.availability === undefined || typeof r.availability === 'string')
     );
   });
 }

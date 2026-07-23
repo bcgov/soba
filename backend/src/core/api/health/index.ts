@@ -11,4 +11,9 @@ router.get('/ready', readinessHandler);
 
 export const healthRouter = router;
 export { registerHealthOpenApi } from './schema';
-export { logStartupHealth, logTempStorageSelfTest, logVirusScanSelfTest } from './startupHealth';
+export {
+  logStartupHealth,
+  logTempStorageSelfTest,
+  logVirusScanSelfTest,
+  logDocumentGenerationReadiness,
+} from './startupHealth';

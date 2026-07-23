@@ -12,6 +12,7 @@ import {
   logStartupHealth,
   logTempStorageSelfTest,
   logVirusScanSelfTest,
+  logDocumentGenerationReadiness,
 } from './core/api/health';
 import { metaRouter } from './core/api/meta';
 import { buildOpenApiSpec } from './core/api/shared/openapi';
@@ -91,12 +92,17 @@ app.use(
 app.use('/api/v1/meta', publicRateLimit, express.json(), metaRouter);
 app.use('/api/v1/health', publicRateLimit, healthRouter);
 
+// Body limit for the body-carrying surfaces — larger than express's 100kb default so document
+// generation can carry a base64 template inline (see env.getJsonBodyLimit). meta stays at the
+// default: it is public and body-less.
+const jsonBodyLimit = env.getJsonBodyLimit();
+
 // Submit feature (public-capable): anonymous resolves to the public user; the Form submitters audience
 // decides access. 404s when submit-mode is disabled.
 app.use(
   '/api/v1/submit',
   apiRateLimit,
-  express.json(),
+  express.json({ limit: jsonBodyLimit }),
   checkJwt({ allowPublic: true }),
   resolveActorOrPublic,
   requireFeature(Features.submit_mode),
@@ -107,7 +113,7 @@ app.use(
 app.use(
   '/api/v1/design',
   apiRateLimit,
-  express.json(),
+  express.json({ limit: jsonBodyLimit }),
   checkJwt(),
   resolveActor,
   requireFeature(Features.design_mode),
@@ -118,7 +124,7 @@ app.use(
 app.use(
   '/api/v1/admin',
   apiRateLimit,
-  express.json(),
+  express.json({ limit: jsonBodyLimit }),
   checkJwt(),
   resolveActor,
   requireSobaAdmin,
@@ -126,9 +132,19 @@ app.use(
 );
 
 // Core: workspace/account management (mandatory auth). Mounted last so the more specific paths win.
-app.use('/api/v1', apiRateLimit, express.json(), checkJwt(), resolveActor, coreRouter);
+app.use(
+  '/api/v1',
+  apiRateLimit,
+  express.json({ limit: jsonBodyLimit }),
+  checkJwt(),
+  resolveActor,
+  coreRouter,
+);
 
 app.listen(port, () => {
   log.info({ port }, 'Express is listening');
-  void logStartupHealth().then(logTempStorageSelfTest).then(logVirusScanSelfTest);
+  void logStartupHealth()
+    .then(logTempStorageSelfTest)
+    .then(logVirusScanSelfTest)
+    .then(logDocumentGenerationReadiness);
 });

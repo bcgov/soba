@@ -121,8 +121,56 @@ export const Features = {
   submit_mode: 'submit-mode',
   files: 'files',
   antivirus: 'antivirus',
+  /** Umbrella: gates the document-generation surface within submit. */
+  document_generation: 'document-generation',
+  /** Per-backend: which document-generation engine is available (v3 is scoped). */
+  document_generation_v2: 'document-generation-v2',
+  document_generation_v3: 'document-generation-v3',
 } as const;
 export type FeatureCode = (typeof Features)[keyof typeof Features];
+
+/**
+ * How a feature is gated (soba.feature.availability):
+ *  - `fixed`  — available wherever the feature is platform-enabled; not gated to a workspace/form.
+ *  - `scoped` — available only where an active feature_scope grant exists (a workspace or form).
+ * A scoped feature that graduates to everyone is switched to `fixed`.
+ */
+export const FeatureAvailability = {
+  fixed: 'fixed',
+  scoped: 'scoped',
+} as const;
+export type FeatureAvailabilityCode =
+  (typeof FeatureAvailability)[keyof typeof FeatureAvailability];
+
+/** Target a feature_scope grant addresses (feature_scope.scope_type). */
+export const FeatureScopeType = {
+  workspace: 'workspace',
+  form: 'form',
+} as const;
+export type FeatureScopeTypeCode = (typeof FeatureScopeType)[keyof typeof FeatureScopeType];
+
+/** Status of a feature_scope grant (feature_scope.status). */
+export const FeatureScopeStatus = {
+  active: 'active',
+  inactive: 'inactive',
+} as const;
+export type FeatureScopeStatusCode = (typeof FeatureScopeStatus)[keyof typeof FeatureScopeStatus];
+
+/** Which render operation an audit row records (document_generation_audit.mode). */
+export const DocumentGenerationMode = {
+  preview: 'preview',
+  print: 'print',
+} as const;
+export type DocumentGenerationModeCode =
+  (typeof DocumentGenerationMode)[keyof typeof DocumentGenerationMode];
+
+/** Outcome of a document-generation backend call (document_generation_audit.outcome). */
+export const DocumentGenerationOutcome = {
+  success: 'success',
+  error: 'error',
+} as const;
+export type DocumentGenerationOutcomeCode =
+  (typeof DocumentGenerationOutcome)[keyof typeof DocumentGenerationOutcome];
 
 /** Display name for the group that grants form admin on all forms in a workspace. */
 export const FORM_ADMINS_GROUP_NAME = 'Form administrators';

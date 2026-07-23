@@ -15,6 +15,12 @@ export const FEATURE_CODES = {
 
 export type FeatureCode = (typeof FEATURE_CODES)[keyof typeof FEATURE_CODES];
 
+/** Feature availability class, aligned with `soba.feature.availability`. */
+export const FEATURE_AVAILABILITY = {
+  FIXED: 'fixed',
+  SCOPED: 'scoped',
+} as const;
+
 const FRONTEND_FEATURES_ENV = 'NEXT_PUBLIC_SOBA_FEATURES_ALLOWED';
 
 /**
@@ -61,17 +67,32 @@ export function parseFrontendFeaturesAllowlist(raw: string | undefined): Fronten
 }
 
 /**
- * `featureAllowed(code) === platformAllowed(code) && frontendAllowed(code)`.
+ * `featureAllowed(code) === platformAllowed(code) && frontendAllowed(code)`, for `fixed` features.
+ * A `scoped` feature depends on a workspace/form grant the client can't see, so it always resolves
+ * false here — callers must use `fetchFeatureAvailability` with the scope instead.
  * Unknown codes are not platform-allowed (missing from meta → false).
  */
 export function createIsFeatureAllowed(meta: FeaturesMetaPayload) {
   const platformByCode = new Map(
     meta.features.map((f) => [normalizeFeatureCode(f.code), f.platformAllowed] as const),
   );
+  // Normalize the availability value too, so a casing/whitespace variant can't fail open a scoped feature.
+  const availabilityByCode = new Map(
+    meta.features.map(
+      (f) =>
+        [
+          normalizeFeatureCode(f.code),
+          String(f.availability ?? FEATURE_AVAILABILITY.FIXED)
+            .trim()
+            .toLowerCase(),
+        ] as const,
+    ),
+  );
   const policy = parseFrontendFeaturesAllowlist(getFrontendFeaturesAllowlistRaw());
 
   return function isFeatureAllowed(code: string): boolean {
     const key = normalizeFeatureCode(code);
+    if (availabilityByCode.get(key) === FEATURE_AVAILABILITY.SCOPED) return false;
     const platformAllowed = platformByCode.get(key) ?? false;
     const frontendAllowed = policy === 'all' || policy.has(key);
     return platformAllowed && frontendAllowed;

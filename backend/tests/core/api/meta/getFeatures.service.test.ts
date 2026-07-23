@@ -30,6 +30,7 @@ describe('MetaApiService.getFeatures', () => {
         description: null,
         version: null,
         status: FeatureStatus.enabled,
+        availability: 'fixed',
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -39,6 +40,7 @@ describe('MetaApiService.getFeatures', () => {
         description: null,
         version: null,
         status: FeatureStatus.disabled,
+        availability: 'scoped',
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -49,8 +51,10 @@ describe('MetaApiService.getFeatures', () => {
     expect(result.features).toHaveLength(2);
     const design = result.features.find((f) => f.code === 'design-mode');
     expect(design?.platformAllowed).toBe(true);
+    expect(design?.availability).toBe('fixed');
     expect(design).not.toHaveProperty('enabled');
     const off = result.features.find((f) => f.code === 'x-off');
     expect(off?.platformAllowed).toBe(false);
+    expect(off?.availability).toBe('scoped');
   });
 });

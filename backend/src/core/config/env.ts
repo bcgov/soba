@@ -134,6 +134,11 @@ export function createEnvReader(source: EnvSource) {
     getNumberEnv: (key: string) => getNumberEnvFrom(source, key),
     getCsvEnv: (key: string) => getCsvEnvFrom(source, key),
     getDatabaseUrl: () => resolveDatabaseUrl(source),
+    /**
+     * express.json body limit for the API surfaces. Larger than the 100kb default so document
+     * generation can carry a base64 template inline (reducible once templates are stored server-side).
+     */
+    getJsonBodyLimit: () => getOptionalEnvFrom(source, 'HTTP_JSON_BODY_LIMIT') ?? '10mb',
     getDbAdminDatabase: () => getOptionalEnvFrom(source, 'DB_ADMIN_DATABASE'),
     // Pipeline performance fix: Revert if needed.
     getDbConnectionTimeoutMs: () => getNumberEnvFrom(source, 'DB_CONNECTION_TIMEOUT_MS') ?? 10000,
@@ -155,6 +160,8 @@ export function createEnvReader(source: EnvSource) {
     getTempStorageDefaultCode: () => getOptionalEnvFrom(source, 'TEMPSTORAGE_DEFAULT_CODE'),
     getVirusScanDefaultCode: () => getOptionalEnvFrom(source, 'VIRUSSCAN_DEFAULT_CODE'),
     getFormEngineDefaultCode: () => getOptionalEnvFrom(source, 'FORM_ENGINE_DEFAULT_CODE'),
+    getDocumentGenerationDefaultCode: () =>
+      getOptionalEnvFrom(source, 'DOCUMENT_GENERATION_DEFAULT_CODE'),
     /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
     getDefaultSubmitterProvider: () =>
       getOptionalEnvFrom(source, 'DEFAULT_SUBMITTER_PROVIDER') ?? 'azureidir',
@@ -198,6 +205,11 @@ export const env = {
   getNumberEnv,
   getCsvEnv,
   getDatabaseUrl: () => resolveDatabaseUrl(process.env),
+  /**
+   * express.json body limit for the API surfaces. Larger than the 100kb default so document
+   * generation can carry a base64 template inline (reducible once templates are stored server-side).
+   */
+  getJsonBodyLimit: () => getOptionalEnv('HTTP_JSON_BODY_LIMIT') ?? '10mb',
   getDbAdminDatabase: () => getOptionalEnv('DB_ADMIN_DATABASE'),
   // Pipeline performance fix: Revert if needed.
   getDbConnectionTimeoutMs: () => getNumberEnv('DB_CONNECTION_TIMEOUT_MS') ?? 10000,
@@ -217,6 +229,8 @@ export const env = {
   getTempStorageDefaultCode: () => getOptionalEnv('TEMPSTORAGE_DEFAULT_CODE'),
   getVirusScanDefaultCode: () => getOptionalEnv('VIRUSSCAN_DEFAULT_CODE'),
   getFormEngineDefaultCode: () => getOptionalEnv('FORM_ENGINE_DEFAULT_CODE'),
+  /** Document generation backend the consumer defaults to (a discovered plugin code). */
+  getDocumentGenerationDefaultCode: () => getOptionalEnv('DOCUMENT_GENERATION_DEFAULT_CODE'),
   /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
   getDefaultSubmitterProvider: () => getOptionalEnv('DEFAULT_SUBMITTER_PROVIDER') ?? 'azureidir',
   getStorageProfiles: () => {
