@@ -40,6 +40,13 @@ spec:
           {{`export PLUGIN_FORMIO_V5_ADMIN_PASSWORD="{{ .Data.data.FORMIO_ADMIN_PASSWORD }}"`}}
           {{`export FORMIO_JWT_SECRET="{{ .Data.data.FORMIO_JWT_SECRET }}"`}}
           {{`{{- end }}`}}
+        vault.hashicorp.com/error-on-missing-key-soba-cdogs: 'true'
+        vault.hashicorp.com/agent-inject-secret-soba-cdogs: {{ .Values.vault.secretPath | quote }}
+        vault.hashicorp.com/agent-inject-template-soba-cdogs: |
+          {{`{{- with secret "`}}{{ .Values.vault.secretPath }}{{`" }}`}}
+          {{`export PLUGIN_CDOGS_V2_CLIENT_ID="{{ .Data.data.PLUGIN_CDOGS_V2_CLIENT_ID }}"`}}
+          {{`export PLUGIN_CDOGS_V2_CLIENT_SECRET="{{ .Data.data.PLUGIN_CDOGS_V2_CLIENT_SECRET }}"`}}
+          {{`{{- end }}`}}
         {{- end }}
       labels:
         {{- include "soba.selectorLabels" (dict "root" . "component" "backend") | nindent 8 }}
@@ -60,6 +67,7 @@ spec:
           args:
             - |
               . /vault/secrets/soba-formio
+              . /vault/secrets/soba-cdogs
               exec node backend/dist/src/app.js
           {{- end }}
           envFrom:
