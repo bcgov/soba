@@ -39,6 +39,8 @@ spec:
           {{`export ROOT_PASSWORD="{{ .Data.data.FORMIO_ADMIN_PASSWORD }}"`}}
           {{`export PLUGIN_FORMIO_V5_ADMIN_PASSWORD="{{ .Data.data.FORMIO_ADMIN_PASSWORD }}"`}}
           {{`export FORMIO_JWT_SECRET="{{ .Data.data.FORMIO_JWT_SECRET }}"`}}
+          {{`export PLUGIN_CDOGS_V2_CLIENT_ID="{{ .Data.data.PLUGIN_CDOGS_V2_CLIENT_ID }}"`}}
+          {{`export PLUGIN_CDOGS_V2_CLIENT_SECRET="{{ .Data.data.PLUGIN_CDOGS_V2_CLIENT_SECRET }}"`}}
           {{`{{- end }}`}}
         {{- end }}
       labels:
