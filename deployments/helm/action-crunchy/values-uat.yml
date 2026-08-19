@@ -3,11 +3,11 @@
 #
 # UAT is intended to mirror the future production database pattern:
 # - stable release/cluster name supplied by workflow: pg-soba-uat / pg-soba-uat-crunchy
-# - explicit users and no fallback users
+# - explicit users, no fallback users
 # - backend runtime connects through PgBouncer as appproxy
 # - migrations use appproxy
 # - Temporal connects directly as temporal
-# - admin is the only superuser
+# - admin is the only exposed break-glass superuser
 global:
   config:
     dbName: app
@@ -34,19 +34,21 @@ crunchy:
     replicas: 3
     metadata:
       annotations:
-        prometheus.io/scrape: 'true'
-        prometheus.io/port: '9187'
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
     dataVolumeClaimSpec:
+      # PVCs can grow but cannot shrink. Choose UAT sizes carefully before first deploy.
       storage: 20Gi
       storageClassName: netapp-block-standard
       walStorage: 2Gi
     requests:
-      cpu: 150m
-      memory: 1536Mi
+      cpu: 250m
+      memory: 4Gi
     replicaCertCopy:
       requests:
         cpu: 10m
         memory: 128Mi
+  # Backups are intentionally out of scope for the first UAT DB setup.
   pgBackRest:
     enabled: false
     s3:
@@ -57,7 +59,7 @@ crunchy:
         - "host all all 0.0.0.0/0 scram-sha-256"
         - "host all all ::1/128 scram-sha-256"
       parameters:
-        shared_buffers: 512MB
+        shared_buffers: 1GB
         wal_buffers: "-1"
         min_wal_size: 128MB
         max_wal_size: 512MB
@@ -75,25 +77,25 @@ crunchy:
       maxConnections: 100
       poolMode: transaction
   pgmonitor:
-    enabled: false
+    enabled: true
     exporter:
       requests:
         cpu: 25m
         memory: 64Mi
   users:
-    - name: 'appproxy'
+    - name: "appproxy"
       databases:
-        - '{{ .Values.global.config.dbName }}'
-        - 'postgres'
-    - name: 'admin'
+        - "{{ .Values.global.config.dbName }}"
+        - "postgres"
+    - name: "admin"
       databases:
-        - 'postgres'
-        - '{{ .Values.global.config.dbName }}'
+        - "postgres"
+        - "{{ .Values.global.config.dbName }}"
       options: "SUPERUSER CREATEDB CREATEROLE"
-    - name: 'app-reader'
+    - name: "app_reader"
       databases:
-        - '{{ .Values.global.config.dbName }}'
-    - name: 'temporal'
+        - "{{ .Values.global.config.dbName }}"
+    - name: "temporal"
       databases:
-        - 'temporal'
-        - 'temporal_visibility'
+        - "temporal"
+        - "temporal_visibility"

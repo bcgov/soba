@@ -1,7 +1,7 @@
 # Manual UAT Crunchy PostgreSQL deployment.
 #
 # This workflow manages only the UAT Crunchy cluster lifecycle. Normal UAT app
-# UAT app deployments should consume the existing Crunchy-generated secrets and run
+# deployments should consume the existing Crunchy-generated secrets and run
 # application migrations separately.
 name: Deploy Crunchy UAT
 
@@ -9,10 +9,6 @@ run-name: Deploy UAT Crunchy Postgres
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - ".github/workflows/deploy-crunchy-uat.yaml"
-      - "deployments/helm/action-crunchy/values-uat.yml"
 
 permissions:
   contents: read
@@ -27,7 +23,7 @@ jobs:
     environment:
       name: uat
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 30
     outputs:
       release: ${{ steps.crunchy.outputs.release }}
       cluster: ${{ steps.crunchy.outputs.cluster }}
@@ -50,23 +46,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          EXPECTED_REPLICAS=3
-          READY_REPLICAS="0"
-          for attempt in $(seq 1 90); do
-            READY_REPLICAS="$(oc -n "$NAMESPACE" get postgrescluster "$CLUSTER" -o jsonpath='{.status.instances[0].readyReplicas}' 2>/dev/null || true)"
-            if [ "$READY_REPLICAS" = "$EXPECTED_REPLICAS" ]; then
-              echo "Crunchy cluster ${CLUSTER} has ${EXPECTED_REPLICAS} ready Postgres replicas."
-              break
-            fi
+          oc -n "$NAMESPACE" get postgrescluster "$CLUSTER"
 
-            echo "Attempt ${attempt}: expected ${EXPECTED_REPLICAS} ready Postgres replicas for ${CLUSTER}, got ${READY_REPLICAS:-0}; waiting 10 seconds"
-            sleep 10
-          done
-
-          if [ "$READY_REPLICAS" != "$EXPECTED_REPLICAS" ]; then
-            echo "::error::Expected ${EXPECTED_REPLICAS} ready Postgres replicas for ${CLUSTER}, got ${READY_REPLICAS:-0}"
-            oc -n "$NAMESPACE" get postgrescluster "$CLUSTER" -o yaml || true
-            oc -n "$NAMESPACE" get pods -l "postgres-operator.crunchydata.com/cluster=${CLUSTER}" || true
+          READY_REPLICAS="$(oc -n "$NAMESPACE" get postgrescluster "$CLUSTER" -o jsonpath='{.status.instances[0].readyReplicas}')"
+          if [ "$READY_REPLICAS" != "3" ]; then
+            echo "::error::Expected 3 ready Postgres replicas for ${CLUSTER}, got ${READY_REPLICAS:-0}"
             exit 1
           fi
 
@@ -75,80 +59,48 @@ jobs:
             "${CLUSTER}-pguser-admin" \
             "${CLUSTER}-pguser-app-reader" \
             "${CLUSTER}-pguser-temporal"; do
-            for attempt in $(seq 1 30); do
-              if oc -n "$NAMESPACE" get secret "$secret" >/dev/null 2>&1; then
-                echo "Found expected secret ${secret}."
-                break
-              fi
-
-              if [ "$attempt" = "30" ]; then
-                echo "::error::Expected secret ${secret} was not created."
-                exit 1
-              fi
-
-              echo "Attempt ${attempt}: expected secret ${secret} not found; waiting 10 seconds"
-              sleep 10
-            done
+            oc -n "$NAMESPACE" get secret "$secret" >/dev/null
           done
 
           APPPROXY_SECRET="${CLUSTER}-pguser-appproxy"
           oc -n "$NAMESPACE" get secret "$APPPROXY_SECRET" -o jsonpath='{.data.uri}' >/dev/null
           oc -n "$NAMESPACE" get secret "$APPPROXY_SECRET" -o jsonpath="{.data['pgbouncer-uri']}" >/dev/null
 
-      - name: Harden database privileges
+      - name: Validate database connectivity
         env:
           NAMESPACE: ${{ secrets.OC_NAMESPACE }}
           CLUSTER: ${{ steps.crunchy.outputs.cluster }}
         run: |
           set -euo pipefail
 
-          JOB_NAME="${CLUSTER}-db-hardening"
-          ADMIN_SECRET="${CLUSTER}-pguser-admin"
-          POSTGRES_IMAGE="$(oc -n "$NAMESPACE" get postgrescluster "$CLUSTER" -o jsonpath='{.spec.image}')"
+          PRIMARY_POD="$(oc -n "$NAMESPACE" get pod \
+            -l "postgres-operator.crunchydata.com/cluster=${CLUSTER},postgres-operator.crunchydata.com/role=master" \
+            -o jsonpath='{.items[0].metadata.name}')"
 
-          oc -n "$NAMESPACE" delete job "$JOB_NAME" --ignore-not-found=true
-
-          cat <<EOF | oc -n "$NAMESPACE" apply -f -
-          apiVersion: batch/v1
-          kind: Job
-          metadata:
-            name: ${JOB_NAME}
-          spec:
-            backoffLimit: 2
-            ttlSecondsAfterFinished: 300
-            template:
-              metadata:
-                labels:
-                  postgres-operator.crunchydata.com/cluster: ${CLUSTER}
-              spec:
-                restartPolicy: Never
-                containers:
-                  - name: db-hardening
-                    image: ${POSTGRES_IMAGE}
-                    imagePullPolicy: IfNotPresent
-                    env:
-                      - name: DATABASE_URI
-                        valueFrom:
-                          secretKeyRef:
-                            name: ${ADMIN_SECRET}
-                            key: uri
-                    command:
-                      - sh
-                      - -ec
-                      - |
-                        psql "\$DATABASE_URI" -v ON_ERROR_STOP=1 <<'SQL'
-                        REVOKE CONNECT, TEMPORARY ON DATABASE app FROM PUBLIC;
-                        REVOKE CONNECT, TEMPORARY ON DATABASE postgres FROM PUBLIC;
-                        REVOKE CONNECT, TEMPORARY ON DATABASE temporal FROM PUBLIC;
-                        REVOKE CONNECT, TEMPORARY ON DATABASE temporal_visibility FROM PUBLIC;
-                        REVOKE CREATE, TEMPORARY ON DATABASE app FROM "app-reader";
-                        SQL
-          EOF
-
-          if ! oc -n "$NAMESPACE" wait --for=condition=complete "job/${JOB_NAME}" --timeout=5m; then
-            oc -n "$NAMESPACE" logs "job/${JOB_NAME}" || true
+          if [ -z "$PRIMARY_POD" ]; then
+            echo "::error::Could not find primary Postgres pod for ${CLUSTER}"
             exit 1
           fi
+
+          oc -n "$NAMESPACE" get secret "${CLUSTER}-pguser-appproxy" -o jsonpath='{.data.uri}' \
+            | base64 -d \
+            | oc -n "$NAMESPACE" exec -i "$PRIMARY_POD" -c database -- \
+                sh -c 'read -r DATABASE_URI && psql "$DATABASE_URI" -v ON_ERROR_STOP=1 -c "SELECT current_database(), current_user;"'
+
+          oc -n "$NAMESPACE" get secret "${CLUSTER}-pguser-appproxy" -o jsonpath="{.data['pgbouncer-uri']}" \
+            | base64 -d \
+            | oc -n "$NAMESPACE" exec -i "$PRIMARY_POD" -c database -- \
+                sh -c 'read -r DATABASE_URI && psql "$DATABASE_URI" -v ON_ERROR_STOP=1 -c "SELECT current_database(), current_user;"'
+
+          oc -n "$NAMESPACE" get secret "${CLUSTER}-pguser-temporal" -o jsonpath='{.data.uri}' \
+            | base64 -d \
+            | oc -n "$NAMESPACE" exec -i "$PRIMARY_POD" -c database -- \
+                sh -c 'read -r DATABASE_URI && psql "$DATABASE_URI" -v ON_ERROR_STOP=1 -c "SELECT current_database(), current_user;"'
+
+          oc -n "$NAMESPACE" get secret "${CLUSTER}-pguser-appproxy" -o jsonpath='{.data.uri}' \
+            | base64 -d \
+            | oc -n "$NAMESPACE" exec -i "$PRIMARY_POD" -c database -- \
+                sh -c 'read -r DATABASE_URI && psql "$DATABASE_URI" -v ON_ERROR_STOP=1 -c "SELECT datname FROM pg_database WHERE datname IN ('"'"'app'"'"', '"'"'postgres'"'"', '"'"'temporal'"'"', '"'"'temporal_visibility'"'"') ORDER BY datname;"'
 
       - name: Deployment summary
         run: |
