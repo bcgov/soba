@@ -62,6 +62,10 @@ crunchy:
       maxConnections: 10
   pgmonitor:
     enabled: false
+    exporter:
+      requests:
+        cpu: 10m
+        memory: 32Mi
   users:
     - name: "{{ .Values.global.config.dbName }}"
       databases:
