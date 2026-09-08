@@ -17,7 +17,11 @@ interface FormProfileDrawerProps {
   formId: string;
 }
 
-export default function FormProfileDrawer({ dict, drawerName, formId }: FormProfileDrawerProps) {
+export default function FormProfileDrawer({
+  dict,
+  drawerName,
+  formId,
+}: Readonly<FormProfileDrawerProps>) {
   const { token } = useKeycloak();
   const { form, refreshForm } = useForm(formId);
   const { addNotification } = useNotificationStore();

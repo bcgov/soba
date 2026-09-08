@@ -16,7 +16,7 @@ export default function FormSettingsDrawers({
   label,
   onSave,
   onCancel,
-}: FormSettingsDrawersProps) {
+}: Readonly<FormSettingsDrawersProps>) {
   return (
     <Accordion id={id} data-testid={`accordion-${id}`} label={label}>
       <div className="d-block w-100">

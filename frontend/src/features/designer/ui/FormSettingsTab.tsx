@@ -10,7 +10,7 @@ interface FormSettingsTabProps {
   formId: string;
 }
 
-export default function FormSettingsTab({ dict, formId }: FormSettingsTabProps) {
+export default function FormSettingsTab({ dict, formId }: Readonly<FormSettingsTabProps>) {
   const defExpanded = ['form-settings'];
   return (
     <AccordionGroup allowsMultipleExpanded={false} defaultExpandedKeys={defExpanded}>

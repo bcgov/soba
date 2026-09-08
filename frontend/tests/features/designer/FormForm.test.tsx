@@ -109,20 +109,17 @@ import { PageLayout } from '@/src/components/PageLayout';
 let store: ReturnType<typeof makeStore>;
 
 async function renderForm(props: { formId?: string } = {}) {
-  let view: ReturnType<typeof render> | undefined;
-  await act(async () => {
-    view = render(
-      <Provider store={store}>
-        <SWRConfig
-          value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}
-        >
-          <PageLayout headingId="designer-heading" heading="Form Designer">
-            <FormForm {...props} />
-          </PageLayout>
-        </SWRConfig>
-      </Provider>,
-    );
-  });
+  const view: ReturnType<typeof render> | undefined = render(
+    <Provider store={store}>
+      <SWRConfig
+        value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}
+      >
+        <PageLayout headingId="designer-heading" heading="Form Designer">
+          <FormForm {...props} />
+        </PageLayout>
+      </SWRConfig>
+    </Provider>,
+  );
   return view!;
 }
 
@@ -145,7 +142,9 @@ describe('FormForm', () => {
   });
 
   it('renders designer tab content when authenticated and not initializing', async () => {
-    await renderForm({ formId: 'f1' });
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
     // The designer area includes a form name input; assert it renders with loaded value
     await waitFor(() => expect(screen.getByDisplayValue('Test')).toBeInTheDocument());
   });
@@ -153,7 +152,9 @@ describe('FormForm', () => {
   it('blocks new-form designer access when the user has no workspaces', async () => {
     mockWorkspaceState.workspaces = [];
     mockWorkspaceState.writableWorkspaces = [];
-    await renderForm();
+    await act(async () => {
+      await renderForm();
+    });
     expect(await screen.findByTestId('designer-select-workspace')).toBeInTheDocument();
     expect(screen.queryByTestId('form-designer')).not.toBeInTheDocument();
   });
@@ -167,7 +168,9 @@ describe('FormForm', () => {
     mockWorkspaceState.writableWorkspaces = [
       { id: 'ws1', name: 'Alpha', kind: 'team', disclaimerAccepted: true },
     ];
-    await renderForm();
+    await act(async () => {
+      await renderForm();
+    });
 
     const picker = await screen.findByTestId('workspace-select');
     expect(picker.querySelector('select')).toHaveValue('');
@@ -184,7 +187,9 @@ describe('FormForm', () => {
       { id: 'ws1', name: 'Alpha', kind: 'team', disclaimerAccepted: true },
       { id: 'ws2', name: 'Beta', kind: 'team', disclaimerAccepted: true },
     ];
-    await renderForm();
+    await act(async () => {
+      await renderForm();
+    });
 
     const picker = await screen.findByTestId('workspace-select');
     expect(picker.querySelector('select')).toHaveValue('');
@@ -194,7 +199,9 @@ describe('FormForm', () => {
   it('blocks new-form designer access when no workspace has an accepted disclaimer', async () => {
     mockWorkspaceState.workspaces = [{ id: 'ws1', disclaimerAccepted: false }];
     mockWorkspaceState.writableWorkspaces = [{ id: 'ws1', disclaimerAccepted: false }];
-    await renderForm();
+    await act(async () => {
+      await renderForm();
+    });
     expect(await screen.findByTestId('disclaimer-required-alert')).toBeInTheDocument();
     expect(screen.queryByTestId('form-designer')).not.toBeInTheDocument();
   });
@@ -205,7 +212,9 @@ describe('FormForm', () => {
       { id: 'v1', versionNo: 1, state: 'published' },
       { id: 'v2', versionNo: 2, state: 'draft' },
     ];
-    await renderForm({ formId: 'f1' });
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
 
     const { getFormVersionSchema } = await import('@/src/shared/api/sobaApi');
     await waitFor(() => expect(getFormVersionSchema).toHaveBeenCalledWith('token', 'v2'));
@@ -215,7 +224,9 @@ describe('FormForm', () => {
   // The loaded name is server truth and the typed one is the user's unsaved edit. A re-read must
   // never win over what has been typed.
   it('keeps a typed name over the loaded one', async () => {
-    await renderForm({ formId: 'f1' });
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
     const input = (await screen.findByDisplayValue('Test')) as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'Renamed' } });
     expect(await screen.findByDisplayValue('Renamed')).toBeInTheDocument();
@@ -229,7 +240,9 @@ describe('FormForm', () => {
       { id: 'v1', versionNo: 1, state: 'published' },
       { id: 'v2', versionNo: 2, state: 'draft' },
     ];
-    await renderForm({ formId: 'f1' });
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
 
     const { getFormVersionSchema } = await import('@/src/shared/api/sobaApi');
     await waitFor(() => expect(getFormVersionSchema).toHaveBeenCalledWith('token', 'v2'));
@@ -254,7 +267,9 @@ describe('FormForm', () => {
       v1: { components: [{ key: 'from-v1' }] },
       v2: { components: [{ key: 'from-v2' }] },
     };
-    await renderForm({ formId: 'f1' });
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
 
     const picker = (await screen.findByTestId('form-version-select')).querySelector(
       'select',
@@ -273,7 +288,9 @@ describe('FormForm', () => {
   it('posts the saved schema, not the pre-save one, on a second save', async () => {
     mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
     mockWorkspaceState.schemas = { v1: { components: [{ key: 'original' }] } };
-    await renderForm({ formId: 'f1' });
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
     await waitFor(() => expect(screen.getByTestId('form-designer')).toHaveTextContent('original'));
 
     await act(async () => {
@@ -292,7 +309,9 @@ describe('FormForm', () => {
   it('creates a new version from the saved schema', async () => {
     mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
     mockWorkspaceState.schemas = { v1: { components: [{ key: 'original' }] } };
-    await renderForm({ formId: 'f1' });
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
     await waitFor(() => expect(screen.getByTestId('form-designer')).toHaveTextContent('original'));
 
     await act(async () => {
@@ -311,7 +330,9 @@ describe('FormForm', () => {
   // the create branch there files the edits under a second form.
   it('never creates a second form for an existing formId', async () => {
     mockWorkspaceState.versions = [];
-    await renderForm({ formId: 'f1' });
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
     await waitFor(() => expect(screen.getByTestId('save-form-button')).toBeEnabled());
 
     await userEvent.click(screen.getByTestId('save-form-button'));
@@ -322,7 +343,9 @@ describe('FormForm', () => {
   // read reports ready and the designer claims the schema is missing.
   it('shows a spinner, not "schema not available", while the draft assembles', async () => {
     mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
-    await renderForm({ formId: 'f1' });
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
 
     expect(screen.queryByText('Form schema not available.')).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('form-designer')).toBeInTheDocument());
@@ -332,7 +355,9 @@ describe('FormForm', () => {
   // the designer on a spinner with every tab and action disabled, for the life of the page.
   it('reports a failed load instead of spinning', async () => {
     api.getSobaForm.mockRejectedValue(new Error('boom'));
-    await renderForm({ formId: 'f1' });
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
 
     expect(await screen.findByTestId('designer-load-error')).toHaveTextContent(
       'Failed to load form.',
