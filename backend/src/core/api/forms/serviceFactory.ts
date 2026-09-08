@@ -45,6 +45,8 @@ interface CreateFormInput {
 interface UpdateFormInput {
   name?: string;
   description?: string | null;
+  org?: string;
+  useCase?: string;
   status?: string;
 }
 
@@ -53,6 +55,8 @@ const toFormDto = (item: {
   workspaceId: string;
   name: string;
   description: string | null;
+  org: string;
+  useCase: string;
   status: string;
   createdAt: Date;
   updatedAt: Date;
@@ -63,6 +67,8 @@ const toFormDto = (item: {
   workspaceId: item.workspaceId,
   name: item.name,
   description: item.description,
+  org: item.org,
+  useCase: item.useCase,
   status: item.status,
   createdAt: item.createdAt.toISOString(),
   updatedAt: item.updatedAt.toISOString(),
@@ -74,6 +80,8 @@ const toFormListItemDto = (item: {
   id: string;
   workspaceId: string;
   name: string;
+  org: string;
+  useCase: string;
   status: string;
   createdAt: Date;
   updatedAt: Date;
@@ -83,6 +91,8 @@ const toFormListItemDto = (item: {
   id: item.id,
   workspaceId: item.workspaceId,
   name: item.name,
+  org: item.org,
+  useCase: item.useCase,
   status: item.status,
   createdAt: item.createdAt.toISOString(),
   updatedAt: item.updatedAt.toISOString(),
@@ -170,6 +180,8 @@ export function createFormsApiService(
         formId,
         name: input.name,
         description: input.description,
+        org: input.org,
+        useCase: input.useCase,
         status: input.status,
       });
       return row ? toFormDto(row) : null;

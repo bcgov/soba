@@ -293,7 +293,15 @@
     "copiedNotification": "Copié dans le presse-papiers",
     "newVersionFrom": "Nouvelle Version De",
     "emptyHistory": "Aucune version précédente",
-    "loadVersionsError": "Échec du chargement de l'historique des versions."
+    "loadVersionsError": "Échec du chargement de l'historique des versions.",
+    "settings": {
+      "formSettingsDrawerLabel": "Paramètres du Formulaire",
+      "formSettingsDrawerSaveSuccessMessage": "Modifications mises à jour avec succès.",
+      "formSettingsDrawerSaveErrorMessage": "Échec de l'enregistrement des modifications.",
+      "profileDrawerInfo": "L'équipe CHEFS recueille et organise des informations pour servir d'entrée cruciale à l'élaboration de dossiers d'affaires complets. Ces dossiers joueront un rôle central dans l'orientation de l'exploitation stratégique et de l'amélioration continue de CHEFS dans les années à venir. Cette initiative de collecte de données est essentielle pour éclairer les décisions critiques et façonner la trajectoire de CHEFS, garantissant son adaptabilité et son efficacité face aux besoins et défis évolutifs.",
+      "profileDrawerLabel": "Profil du Formulaire"
+    },
+    "descriptionLabel": "Description du Formulaire"
   },
   "submission": {
     "submissions": "Soumissions",

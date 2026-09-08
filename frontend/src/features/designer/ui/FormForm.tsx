@@ -29,7 +29,7 @@ import FormShareTab from './FormShareTab';
 import { FormSubmitterAudience } from './FormSubmitterAudience';
 import { isWorkspaceManageRole } from '@/src/features/workspaces/workspaceRoles';
 import { useWorkspaces, useWritableWorkspaces } from '@/src/shared/api/useWorkspaces';
-import { useFormDraft } from '@/src/features/designer/useFormDraft';
+import { useForm } from '@/src/features/designer/useForm';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
 import {
@@ -144,7 +144,7 @@ function FormForm({ formId }: { formId?: string }) {
     selectVersion,
     refreshForm,
     refreshVersions,
-  } = useFormDraft(formId);
+  } = useForm(formId);
 
   // A draft that failed to load leaves nothing to edit, save or publish. Distinct from `loading`,
   // which these reads leave behind for good once a read has failed.
@@ -174,6 +174,10 @@ function FormForm({ formId }: { formId?: string }) {
       onSwitchToCurrent: () => selectVersion('current'),
     }),
   );
+
+  const clickNewVersion = async () => {
+    await createNewVersion();
+  };
 
   const createNewVersion = async (sourceSchema?: FormType) => {
     if (isSaving || draftUnavailable || !token) return;
@@ -320,15 +324,55 @@ function FormForm({ formId }: { formId?: string }) {
     );
   }
 
+  const renderToolBar = () => {
+    return (
+      <div className={`${styles.stickyActions} p-3 d-flex gap-2 w-100`}>
+        {formId && (
+          <Button variant="secondary" onPress={clickNewVersion} isDisabled={isSaving || loading}>
+            {getNewVersionLabel()}
+          </Button>
+        )}
+        <Button
+          variant="primary"
+          onPress={saveFormDraft}
+          isDisabled={isHistoryView || isCurrentPublished || isSaving || loading}
+        >
+          {isSaving ? dict.form.saving || 'Saving...' : dict.form.save || 'Save'}
+        </Button>
+        <Button
+          variant="tertiary"
+          onPress={() => setShowPreview(true)}
+          isDisabled={isSaving || loading}
+        >
+          {dict.form.preview || 'Preview'}
+        </Button>
+        {formId && (
+          <span className="d-inline-flex" title={getPublishTitle()}>
+            <Button
+              variant="primary"
+              onPress={saveFormPublish}
+              isDisabled={isHistoryView || isCurrentPublished || isDirty || isSaving || loading}
+            >
+              {dict.form.publish || 'Publish'}
+            </Button>
+          </span>
+        )}
+      </div>
+    );
+  };
+
   const renderFormBuilder = () => {
     if (!formId) {
       return (
-        <FormDesigner
-          onUpdateModel={setSchema}
-          initialModel={null}
-          formName={formName}
-          isDirty={isDirty}
-        />
+        <>
+          {renderToolBar()}
+          <FormDesigner
+            onUpdateModel={setSchema}
+            initialModel={null}
+            formName={formName}
+            isDirty={isDirty}
+          />
+        </>
       );
     }
     if (loadError) {
@@ -345,17 +389,20 @@ function FormForm({ formId }: { formId?: string }) {
       return <div className="my-4">{dict.form.schemaNotAvailable}</div>;
     }
     return (
-      <FormDesigner
-        // FormDesigner takes its model once at mount. Switching to a version already in the cache
-        // produces no loading frame, so without this the previous version stays on screen.
-        key={activeVersion?.id}
-        onUpdateModel={setSchema}
-        initialModel={formSchema}
-        formName={formName}
-        versionNo={currentVersion?.versionNo ?? null}
-        state={currentVersion?.state ?? null}
-        isDirty={isDirty}
-      />
+      <>
+        {renderToolBar()}
+        <FormDesigner
+          // FormDesigner takes its model once at mount. Switching to a version already in the cache
+          // produces no loading frame, so without this the previous version stays on screen.
+          key={activeVersion?.id}
+          onUpdateModel={setSchema}
+          initialModel={formSchema}
+          formName={formName}
+          versionNo={currentVersion?.versionNo ?? null}
+          state={currentVersion?.state ?? null}
+          isDirty={isDirty}
+        />
+      </>
     );
   };
 
@@ -425,50 +472,6 @@ function FormForm({ formId }: { formId?: string }) {
 
       {/* Form Builder */}
       <div className={styles.designerWrapper}>{renderFormBuilder()}</div>
-
-      {/* Spacer so the builder clears the fixed action bar */}
-      <div className="mb-5 pb-5" />
-
-      <div
-        className={`${styles.floatingActions} shadow-lg p-3 rounded-pill d-flex gap-2 bg-white border`}
-      >
-        {formId && (
-          <Button
-            variant="secondary"
-            onPress={() => createNewVersion()}
-            isDisabled={isSaving || draftUnavailable}
-          >
-            {getNewVersionLabel()}
-          </Button>
-        )}
-        <Button
-          variant="primary"
-          onPress={saveFormDraft}
-          isDisabled={isHistoryView || isCurrentPublished || isSaving || draftUnavailable}
-        >
-          {isSaving ? dict.form.saving || 'Saving...' : dict.form.save || 'Save'}
-        </Button>
-        <Button
-          variant="tertiary"
-          onPress={() => setShowPreview(true)}
-          isDisabled={isSaving || draftUnavailable}
-        >
-          {dict.form.preview || 'Preview'}
-        </Button>
-        {formId && (
-          <span className="d-inline-flex" title={getPublishTitle()}>
-            <Button
-              variant="primary"
-              onPress={saveFormPublish}
-              isDisabled={
-                isHistoryView || isCurrentPublished || isDirty || isSaving || draftUnavailable
-              }
-            >
-              {dict.form.publish || 'Publish'}
-            </Button>
-          </span>
-        )}
-      </div>
     </>
   );
 
@@ -497,7 +500,7 @@ function FormForm({ formId }: { formId?: string }) {
             disabled={isSaving || draftUnavailable}
             title={dict.form.settingsTab || 'Settings'}
           >
-            <FormSettingsTab dict={dict} />
+            <FormSettingsTab dict={dict} formId={formId} />
           </Tab>
           <Tab
             eventKey="team"

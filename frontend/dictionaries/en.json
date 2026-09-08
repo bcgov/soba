@@ -292,7 +292,15 @@
     "copiedNotification": "Copied to clipboard",
     "newVersionFrom": "New Version From",
     "emptyHistory": "No Previous Versions",
-    "loadVersionsError": "Failed to load version history."
+    "loadVersionsError": "Failed to load version history.",
+    "settings": {
+      "formSettingsDrawerLabel": "Form Settings",
+      "formSettingsDrawerSaveSuccessMessage": "Changes updated successfully.",
+      "formSettingsDrawerSaveErrorMessage": "Failed to save changes.",
+      "profileDrawerInfo": "The CHEFS team is collecting and organizing information to serve as crucial input for crafting comprehensive business cases. These cases will play a pivotal role in guiding the strategic operation and ongoing improvement of CHEFS in the coming years. This initiative to gather data is essential for informing critical decisions and molding the trajectory of CHEFS, ensuring its adaptability and effectiveness in addressing evolving needs and challenges.",
+      "profileDrawerLabel": "Form Profile"
+    },
+    "descriptionLabel": "Description"
   },
   "submission": {
     "submissions": "Submissions",

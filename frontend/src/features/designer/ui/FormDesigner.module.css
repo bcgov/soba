@@ -25,16 +25,22 @@
   cursor: grab !important;
 }
 
+/* Force the row to use flexbox so the sidebar's parent column stretches to provide a tall track */
+:global(.formbuilder > .row) {
+  display: flex !important;
+  align-items: stretch !important;
+}
+
 :global(.builder-sidebar) {
-  position: sticky;
-  top: calc(var(--app-header-height, 0px) + var(--layout-margin-medium));
+  position: -webkit-sticky !important;
+  position: sticky !important;
+  top: calc(var(--app-header-height, 0px) * 2 + var(--layout-margin-medium));
   align-self: flex-start;
   max-height: none;
   padding-right: var(--layout-padding-small);
   z-index: 10;
 }
 
-/* Custom scrollbar for the sidebar */
 :global(.builder-sidebar::-webkit-scrollbar) {
   width: 4px;
 }

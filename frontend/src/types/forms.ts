@@ -3,6 +3,8 @@ export type SobaFormType = {
   description: string;
   formEngineCode?: string;
   workspaceId?: string;
+  useCase?: string;
+  org?: string;
 };
 
 export type CreateSobaFormioFormResponse = {

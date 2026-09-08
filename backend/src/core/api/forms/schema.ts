@@ -52,6 +52,8 @@ export const UpdateFormBodySchema = z
     name: z.string().trim().min(1).optional(),
     description: z.string().nullable().optional(),
     status: z.string().trim().min(1).optional(),
+    org: z.string().trim().min(1).optional(),
+    useCase: z.string().trim().min(1).optional(),
   })
   .openapi('Forms_UpdateFormBody');
 
@@ -107,6 +109,8 @@ export const FormListItemSchema = z
     id: z.string(),
     workspaceId: z.string(),
     name: z.string(),
+    org: z.string(),
+    useCase: z.string(),
     status: z.string(),
     createdAt: z.string(),
     updatedAt: z.string(),
@@ -120,6 +124,8 @@ export const FormResponseSchema = z
     workspaceId: z.string(),
     name: z.string(),
     description: z.string().nullable(),
+    org: z.string(),
+    useCase: z.string(),
     status: z.string(),
     createdAt: z.string(),
     updatedAt: z.string(),
