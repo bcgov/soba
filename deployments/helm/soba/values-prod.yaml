@@ -20,6 +20,20 @@ backend:
     nodeEnv: production
     logLevel: warn
     documentGenerationDefaultCode: cdogs-v2
+  storage:
+    # 'default' profile stays on storage-memory (inherited); templates gets its own profile below.
+    profiles: "default,templates"
+  templateStorage:
+    # Local PVC for now; revisit storage-s3 once durable multi-replica storage is needed (this PVC
+    # must be ReadWriteMany-capable since backend.replicas > 1 here).
+    enabled: true
+    backend: storage-local
+    basePath: /app/templates
+    persistence:
+      enabled: true
+      mountPath: /app/templates
+      accessMode: ReadWriteMany
+      size: 1Gi
   documentGeneration:
     cdogsV2:
       endpoint: https://cdogs.api.gov.bc.ca/api
