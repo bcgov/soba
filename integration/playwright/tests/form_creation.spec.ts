@@ -103,10 +103,8 @@ test.describe.serial("Landing page tests", () => {
       const formNameInput = sharedPage
         .locator("label", { hasText: "Form Name" })
         .locator("xpath=following-sibling::div//input");
-      //await formNameInput.click();
       await formNameInput.fill(title);
       form_name = title;
-      await workspaceOption.click();
       await sharedPage.getByTestId("submitter-audience-trigger").click();
       await expect(
         sharedPage.getByTestId("audience-mode-public"),
@@ -143,11 +141,9 @@ test.describe.serial("Landing page tests", () => {
         });
         await workspaceOption.click();
       }
-      //await expect(workspaceOption).toHaveAttribute("aria-selected", "true");
       const formNameInput = sharedPage
         .locator("label", { hasText: "Form Name" })
         .locator("xpath=following-sibling::div//input");
-      //await formNameInput.click();
       await formNameInput.fill(title);
       form_name = title;
       await sharedPage.getByTestId("submitter-audience-trigger").click();
@@ -171,6 +167,11 @@ test.describe.serial("Landing page tests", () => {
       await expect(idirMfa.locator('input[type="checkbox"]')).toBeChecked();
       await expect(sharedPage.getByTestId("audience-cancel")).toBeVisible();
       await sharedPage.getByTestId("audience-save").click();
+      await expect(
+        sharedPage
+          .locator(".drag-and-drop-alert")
+          .filter({ hasText: "Drag and Drop a form component" }),
+      ).toBeVisible();
     }
   });
   test("Checks form creation with basic components", async ({ title }) => {
@@ -178,8 +179,11 @@ test.describe.serial("Landing page tests", () => {
       name: "Save",
       exact: true,
     });
-    //await sharedPage.getByRole("textbox", { name: "Form Name" }).fill(title);
-    //await sharedPage.locator('input[type="text"]').fill(title);
+    await expect(
+      sharedPage
+        .locator(".drag-and-drop-alert")
+        .filter({ hasText: "Drag and Drop a form component" }),
+    ).toBeVisible();
     const txt_box = sharedPage.locator("text=Text Field"); // component from builder palette
     const target = sharedPage.locator(".builder-components.drag-container");
     await txt_box.dragTo(target);
