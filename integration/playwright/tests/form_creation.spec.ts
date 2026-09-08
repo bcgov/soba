@@ -2,9 +2,14 @@ import { test, expect } from "../fixtures/form_title";
 import type { Page } from "@playwright/test";
 import { login } from "../support/soba_login";
 import dictionaries from "../../../frontend/dictionaries/en.json";
+import * as dotenv from "dotenv";
+import path from "path"; // <-- import dotenv
 
 let sharedPage: Page;
 let form_name: string;
+// Load .env reliably
+dotenv.config({ path: path.resolve(__dirname, ".env") });
+const depEnv = process.env.DEP_ENV || "dev"; // fallback to dev if undefined
 
 test.describe.serial("Landing page tests", () => {
   test.beforeAll(async ({ browser }) => {
@@ -54,11 +59,9 @@ test.describe.serial("Landing page tests", () => {
         .getByRole("option", { name: "Health (HLTH)", exact: true })
         .click(); // Click on the option to select
       await sharedPage.getByTestId("workspace-use-case").click();
-
       // Check all use cases available in dropdown
       const availableUseCases: string[] = [];
       const allUseCases = Object.entries(dictionaries.useCases);
-
       for (const [key, name] of allUseCases) {
         const optionElement = sharedPage.getByRole("option", {
           name: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
@@ -85,41 +88,101 @@ test.describe.serial("Landing page tests", () => {
         sharedPage.getByTestId("workspace-disclaimer-switch").locator("input"),
       ).toBeChecked();
       await sharedPage.getByTestId("workspace-save").click();
-      sharedPage.locator('[data-testid="forms-nav"]').click();
+      const formsNav = sharedPage.getByTestId("home-nav");
+      await formsNav.click();
       await sharedPage.click('[data-testid="create-form-button"]');
-      await sharedPage.locator("#formName").fill(title);
-      await sharedPage.locator('input[type="text"]').fill(title);
+      const workspaceSelect = sharedPage.getByTestId("#workspace-select");
+      await expect(workspaceSelect).toBeVisible();
+      await workspaceSelect.click();
+      await sharedPage.waitForTimeout(1000);
+      const workspaceOption = sharedPage.getByRole("option", {
+        name: "Test Workspace (team)",
+        exact: true,
+      });
+      await workspaceOption.click();
+      const formNameInput = sharedPage
+        .locator("label", { hasText: "Form Name" })
+        .locator("xpath=following-sibling::div//input");
+      //await formNameInput.click();
+      await formNameInput.fill(title);
       form_name = title;
+      await workspaceOption.click();
+      await sharedPage.getByTestId("submitter-audience-trigger").click();
+      await expect(
+        sharedPage.getByTestId("audience-mode-public"),
+      ).toBeVisible();
+      await expect(
+        sharedPage.getByTestId("audience-mode-protected"),
+      ).toBeVisible();
+      await expect(
+        sharedPage.locator('input[type="radio"][value="protected"]'),
+      ).toBeChecked();
+      const bceidBusiness = sharedPage.getByTestId(
+        "audience-idp-bceidbusiness",
+      );
+      const idirMfa = sharedPage.getByTestId("audience-idp-azureidir");
+      // Verify both options are visible
+      await expect(bceidBusiness).toBeVisible();
+      await expect(idirMfa).toBeVisible();
+      // Verify IDIR - MFA is selected
+      await expect(idirMfa.locator('input[type="checkbox"]')).toBeChecked();
+      await expect(sharedPage.getByTestId("audience-cancel")).toBeVisible();
+      await sharedPage.getByTestId("audience-save").click();
     } else {
       // Continue with normal flow
       //Form creation
       await sharedPage.click('[data-testid="create-form-button"]');
-      await sharedPage.locator("#formName").fill(title);
-      await sharedPage.locator('input[type="text"]').fill(title);
-      form_name = title;
-      await sharedPage.getByTestId("workspace-select").click();
-      await sharedPage.waitForTimeout(1000);
-      await sharedPage
-        .getByText("Test Workspace (team)", { exact: true })
-        .click();
-      const submitterAudience = sharedPage.getByRole("button", {
-        name: "Protected (IDIR - MFA)",
-        exact: true,
-      });
-      if (await submitterAudience.isVisible()) {
-        await submitterAudience.click();
+      if (depEnv === "dev" || /^\d+$/.test(depEnv ?? "")) {
+        const selectItem = sharedPage.getByText("Select an item", {
+          exact: true,
+        });
+        await selectItem.click();
+        const workspaceOption = sharedPage.getByRole("option", {
+          name: "Test Workspace (team)",
+          exact: true,
+        });
+        await workspaceOption.click();
       }
+      //await expect(workspaceOption).toHaveAttribute("aria-selected", "true");
+      const formNameInput = sharedPage
+        .locator("label", { hasText: "Form Name" })
+        .locator("xpath=following-sibling::div//input");
+      //await formNameInput.click();
+      await formNameInput.fill(title);
+      form_name = title;
+      await sharedPage.getByTestId("submitter-audience-trigger").click();
+      await expect(
+        sharedPage.getByTestId("audience-mode-public"),
+      ).toBeVisible();
+      await expect(
+        sharedPage.getByTestId("audience-mode-protected"),
+      ).toBeVisible();
+      await expect(
+        sharedPage.locator('input[type="radio"][value="protected"]'),
+      ).toBeChecked();
+      const bceidBusiness = sharedPage.getByTestId(
+        "audience-idp-bceidbusiness",
+      );
+      const idirMfa = sharedPage.getByTestId("audience-idp-azureidir");
+      // Verify both options are visible
+      await expect(bceidBusiness).toBeVisible();
+      await expect(idirMfa).toBeVisible();
+      // Verify IDIR - MFA is selected
+      await expect(idirMfa.locator('input[type="checkbox"]')).toBeChecked();
+      await expect(sharedPage.getByTestId("audience-cancel")).toBeVisible();
+      await sharedPage.getByTestId("audience-save").click();
     }
   });
-  test("Checks form creation with basic components", async () => {
+  test("Checks form creation with basic components", async ({ title }) => {
+    const saveButton = sharedPage.getByRole("button", {
+      name: "Save",
+      exact: true,
+    });
+    //await sharedPage.getByRole("textbox", { name: "Form Name" }).fill(title);
+    //await sharedPage.locator('input[type="text"]').fill(title);
     const txt_box = sharedPage.locator("text=Text Field"); // component from builder palette
     const target = sharedPage.locator(".builder-components.drag-container");
     await txt_box.dragTo(target);
-    await expect(
-      sharedPage.locator("button.btn.btn-outline-primary", {
-        hasText: "Save",
-      }),
-    ).toBeEnabled();
     await sharedPage.click('button[ref="saveButton"]');
     await sharedPage.waitForTimeout(1000); // waits 1 second
     const text_area = sharedPage.locator(
@@ -174,28 +237,30 @@ test.describe.serial("Landing page tests", () => {
     await button.dragTo(target);
     await sharedPage.click('button[ref="saveButton"]');
     await sharedPage.waitForTimeout(1000); // waits 1 second
-    await sharedPage.locator('label[for="disclaimer-checkbox"]').click();
-    await expect(
-      sharedPage.locator("button.btn.btn-outline-primary", { hasText: "Save" }),
-    ).toBeEnabled();
-    await sharedPage
-      .locator("button.btn.btn-outline-primary", { hasText: "Save" })
-      .click();
+    const formNameInput = sharedPage
+      .locator("label", { hasText: "Form Name" })
+      .locator("xpath=following-sibling::div//input");
+    await formNameInput.click();
+    await formNameInput.fill(title);
+    form_name = title;
+    await saveButton.click();
     await sharedPage.waitForTimeout(1000);
   });
   //form validation by searching the form
   test("search form", async () => {
-    await sharedPage.click('[data-testid="forms-nav"]');
-    await sharedPage
-      .locator('[data-testid="search-forms-text"]')
-      .fill(form_name);
+    const formsNav = sharedPage.getByTestId("home-nav");
+    await expect(formsNav).toBeVisible();
+    await formsNav.click();
+    await sharedPage.locator('[data-testid="search-forms-text"]').click();
+    const searchInput = sharedPage
+      .getByTestId("search-forms-text")
+      .getByRole("textbox", { name: "Search" });
+    await searchInput.fill(form_name);
     await sharedPage.waitForTimeout(1000); // waits 1 second
     await sharedPage.getByText(form_name).click();
     console.log("Form name is: " + form_name);
     await sharedPage.waitForTimeout(2000);
     //Validate form is created by checking form name
-    await expect(sharedPage.getByPlaceholder("Enter form name")).toHaveValue(
-      form_name,
-    );
+    await expect(sharedPage.getByLabel("Form Name")).toHaveValue(form_name);
   });
 });
