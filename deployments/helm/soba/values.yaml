@@ -127,12 +127,30 @@ backend:
     size: 1Gi
     storageClassName: ""
 
+  # -- Optional dedicated storage profile for document-generation templates. Independent of the
+  # 'default' files profile and of tempStorage above — all three can be active at once (e.g.
+  # default on storage-s3, templates on storage-local with this PVC, tempStorage on tempstorage-mount).
+  # To activate: set enabled true and add 'templates' to backend.storage.profiles.
+  templateStorage:
+    enabled: false
+    # storage-memory, storage-local, or storage-s3.
+    backend: storage-local
+    # storage-local only: writable filesystem path. Rendered only when set.
+    basePath: /app/templates
+    # PVC provisioned only when enabled here AND backend is storage-local.
+    persistence:
+      enabled: false
+      mountPath: /app/templates
+      accessMode: ReadWriteMany
+      size: 1Gi
+      storageClassName: ""
+
   # -- configmap-storage: files feature + storage profiles (STORAGE_* + FILES_*)
   storage:
     # Active storage profiles (comma-separated). Each needs a *Backend below.
     profiles: "default"
     # Backend for the 'default' profile. 'storage-memory' is in-process and ephemeral — no PVC,
-    # no external service, lost on restart, per-replica. Fine for ephemeral (PR/dev) namespaces.
+    # no external service, lost on restart, per-replica. Fine for ephemeral namespaces.
     # For durable, multi-replica environments override to 'storage-s3' and set the endpoint/
     # bucket below (credentials come from a Secret).
     defaultBackend: storage-memory

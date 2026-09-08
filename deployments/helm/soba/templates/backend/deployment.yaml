@@ -115,14 +115,27 @@ spec:
             timeoutSeconds: {{ .Values.backend.readinessProbe.timeoutSeconds }}
           resources:
             {{- toYaml .Values.backend.resources | nindent 12 }}
-          {{- if include "soba.tempStorageUsesMount" . }}
+          {{- if or (include "soba.tempStorageUsesMount" .) (include "soba.templateStorageUsesPersistence" .) }}
           volumeMounts:
+            {{- if include "soba.templateStorageUsesPersistence" . }}
+            - name: app-templates
+              mountPath: {{ .Values.backend.templateStorage.persistence.mountPath }}
+            {{- end }}
+            {{- if include "soba.tempStorageUsesMount" . }}
             - name: app-tmp
               mountPath: {{ .Values.backend.tempStorage.mountPath }}
+            {{- end }}
           {{- end }}
-      {{- if include "soba.tempStorageUsesMount" . }}
+      {{- if or (include "soba.tempStorageUsesMount" .) (include "soba.templateStorageUsesPersistence" .) }}
       volumes:
+        {{- if include "soba.templateStorageUsesPersistence" . }}
+        - name: app-templates
+          persistentVolumeClaim:
+            claimName: {{ include "soba.fullname" . }}-backend-templates
+        {{- end }}
+        {{- if include "soba.tempStorageUsesMount" . }}
         - name: app-tmp
           persistentVolumeClaim:
             claimName: {{ include "soba.fullname" . }}-backend-tmp
+        {{- end }}
       {{- end }}

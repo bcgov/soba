@@ -72,3 +72,20 @@ The cap above sizes the whole container; to tune individual processes under it t
 ## Env files (backend / frontend)
 
 Separate from the devcontainer `.env` above. `post-start.sh` keeps `backend/.env`, `backend/.env.local`, and `frontend/.env` in step with their `*.example` templates: it creates them if missing and, when a template changes, backs up the current file to `*.prev` before applying the new one. Put secrets in `backend/.env.local` and re-apply them from the backup after a template bump. The app loads these itself (dotenv / Next.js); they are not injected into the container.
+
+## Local document templates
+
+Templates use their own storage profile (`templates`), separate from the `default` profile the files
+feature uses \u2014 each can run a different backend at the same time (memory, local disk, or S3). To
+store templates on disk locally, in `backend/data/templates` (part of the workspace bind mount, so
+they survive backend restarts and devcontainer rebuilds), add the profile and its backend to the
+active backend env file:
+
+```bash
+STORAGE_PROFILES=default,templates
+STORAGE_PROFILE_TEMPLATES_BACKEND=storage-local
+STORAGE_PROFILE_TEMPLATES_BASE_PATH=./data/templates
+```
+
+The OpenShift development Helm overlay provisions the equivalent retained PVC at `/app/templates`,
+independent of the `default` profile and of backend temp storage.

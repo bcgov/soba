@@ -1,0 +1,22 @@
+{{- if include "soba.templateStorageUsesPersistence" . }}
+# Durable local storage for uploaded document templates. Backed by the dedicated 'templates'
+# storage profile — separate from the 'default' files profile and from backend temp storage, so
+# none of the three can be cleaned up or reconfigured in a way that affects the others.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "soba.fullname" . }}-backend-templates
+  labels:
+    {{- include "soba.labels" (dict "root" . "component" "backend") | nindent 4 }}
+  annotations:
+    {{- include "soba.keepPolicy" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.backend.templateStorage.persistence.accessMode }}
+  {{- if .Values.backend.templateStorage.persistence.storageClassName }}
+  storageClassName: {{ .Values.backend.templateStorage.persistence.storageClassName | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backend.templateStorage.persistence.size }}
+{{- end }}

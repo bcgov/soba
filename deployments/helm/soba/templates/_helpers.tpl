@@ -165,6 +165,11 @@ cannot drift apart. Any other code (e.g. tempstorage-os) needs no PVC.
 {{- if eq .Values.backend.config.tempStorageDefaultCode "tempstorage-mount" -}}true{{- end -}}
 {{- end }}
 
+{{/* Truthy when the dedicated templates storage profile needs its persistent volume. */}}
+{{- define "soba.templateStorageUsesPersistence" -}}
+{{- if and .Values.backend.templateStorage.enabled .Values.backend.templateStorage.persistence.enabled (eq .Values.backend.templateStorage.backend "storage-local") -}}true{{- end }}
+{{- end }}
+
 {{/*
 Truthy ("true") only when the backend scans with clamav. Gates the clamav alias
 Service and the PLUGIN_VIRUSSCAN_CLAMAV_* env together so they cannot drift apart.
