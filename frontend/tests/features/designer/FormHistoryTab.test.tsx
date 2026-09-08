@@ -9,10 +9,14 @@ const { mockGetVersionPage, dict } = vi.hoisted(() => ({
   mockGetVersionPage: vi.fn(),
   dict: {
     locale: 'en',
-    general: { loading: 'Loading...', version: 'Version', forms: 'Forms' },
+    general: { loading: 'Loading...', version: 'Version', forms: 'Forms', sortBy: 'Sort by' },
     dataTable: { itemName: 'items', pageOf: 'of {totalPages} page(s)' },
     header: { design: 'Design' },
-    form: { status: 'Status', newVersionFrom: 'New version from', emptyHistory: 'No versions yet.' },
+    form: {
+      status: 'Status',
+      newVersionFrom: 'New version from',
+      emptyHistory: 'No versions yet.',
+    },
     submission: {
       formList: { columns: { createdBy: 'Created By', createdAt: 'Created Date' } },
     },
@@ -114,10 +118,10 @@ describe('FormHistoryTab', () => {
     });
     await screen.findByTestId('v9-status-tag');
 
-    expect(screen.getByRole('button', { name: 'Version' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Status' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Created Date' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Created By' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sort by Version' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sort by Status' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sort by Created Date' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sort by Created By' })).not.toBeInTheDocument();
   });
 
   // The picker carries only the newest versions, so a row further down the history is the case

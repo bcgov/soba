@@ -23,8 +23,14 @@ export default function FormSettingsDrawers({
         <Form>
           {children}
           <div className="d-md-flex mt-2 justify-content-start gap-2 mt-3 w-100">
-            <Button onClick={onSave}>Save</Button>
-            <Button onClick={onCancel} variant="secondary">
+            <Button data-testid={`form-settings-${id}-save`} onClick={onSave}>
+              Save
+            </Button>
+            <Button
+              data-testid={`form-settings-${id}-cancel`}
+              onClick={onCancel}
+              variant="secondary"
+            >
               Cancel
             </Button>
           </div>

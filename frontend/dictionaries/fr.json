@@ -33,7 +33,8 @@
     "create": "Créer",
     "version": "Version",
     "clearFilters": "Effacer les filtres",
-    "noAccess": "Vous n'avez pas accès à ceci."
+    "noAccess": "Vous n'avez pas accès à ceci.",
+    "sortBy": "Trier par"
   },
   "dataTable": {
     "emptyMessage": "Aucun élément trouvé.",
@@ -301,7 +302,8 @@
       "profileDrawerInfo": "L'équipe CHEFS recueille et organise des informations pour servir d'entrée cruciale à l'élaboration de dossiers d'affaires complets. Ces dossiers joueront un rôle central dans l'orientation de l'exploitation stratégique et de l'amélioration continue de CHEFS dans les années à venir. Cette initiative de collecte de données est essentielle pour éclairer les décisions critiques et façonner la trajectoire de CHEFS, garantissant son adaptabilité et son efficacité face aux besoins et défis évolutifs.",
       "profileDrawerLabel": "Profil du Formulaire"
     },
-    "descriptionLabel": "Description du Formulaire"
+    "descriptionLabel": "Description du Formulaire",
+    "submit": "Soumettre"
   },
   "submission": {
     "submissions": "Soumissions",

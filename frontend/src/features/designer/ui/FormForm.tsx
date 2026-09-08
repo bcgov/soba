@@ -328,19 +328,26 @@ function FormForm({ formId }: { formId?: string }) {
     return (
       <div className={`${styles.stickyActions} p-3 d-flex gap-2 w-100`}>
         {formId && (
-          <Button variant="secondary" onPress={clickNewVersion} isDisabled={isSaving || loading}>
+          <Button
+            variant="secondary"
+            data-testid="new-version-button"
+            onPress={clickNewVersion}
+            isDisabled={isSaving || loading}
+          >
             {getNewVersionLabel()}
           </Button>
         )}
         <Button
-          variant="primary"
+          variant="secondary"
           onPress={saveFormDraft}
+          data-testid="save-form-button"
           isDisabled={isHistoryView || isCurrentPublished || isSaving || loading}
         >
           {isSaving ? dict.form.saving || 'Saving...' : dict.form.save || 'Save'}
         </Button>
         <Button
-          variant="tertiary"
+          variant="secondary"
+          data-testid="preview-form-button"
           onPress={() => setShowPreview(true)}
           isDisabled={isSaving || loading}
         >
@@ -350,6 +357,7 @@ function FormForm({ formId }: { formId?: string }) {
           <span className="d-inline-flex" title={getPublishTitle()}>
             <Button
               variant="primary"
+              data-testid="publish-form-button"
               onPress={saveFormPublish}
               isDisabled={isHistoryView || isCurrentPublished || isDirty || isSaving || loading}
             >
@@ -364,15 +372,12 @@ function FormForm({ formId }: { formId?: string }) {
   const renderFormBuilder = () => {
     if (!formId) {
       return (
-        <>
-          {renderToolBar()}
-          <FormDesigner
-            onUpdateModel={setSchema}
-            initialModel={null}
-            formName={formName}
-            isDirty={isDirty}
-          />
-        </>
+        <FormDesigner
+          onUpdateModel={setSchema}
+          initialModel={null}
+          formName={formName}
+          isDirty={isDirty}
+        />
       );
     }
     if (loadError) {
@@ -389,20 +394,17 @@ function FormForm({ formId }: { formId?: string }) {
       return <div className="my-4">{dict.form.schemaNotAvailable}</div>;
     }
     return (
-      <>
-        {renderToolBar()}
-        <FormDesigner
-          // FormDesigner takes its model once at mount. Switching to a version already in the cache
-          // produces no loading frame, so without this the previous version stays on screen.
-          key={activeVersion?.id}
-          onUpdateModel={setSchema}
-          initialModel={formSchema}
-          formName={formName}
-          versionNo={currentVersion?.versionNo ?? null}
-          state={currentVersion?.state ?? null}
-          isDirty={isDirty}
-        />
-      </>
+      <FormDesigner
+        // FormDesigner takes its model once at mount. Switching to a version already in the cache
+        // produces no loading frame, so without this the previous version stays on screen.
+        key={activeVersion?.id}
+        onUpdateModel={setSchema}
+        initialModel={formSchema}
+        formName={formName}
+        versionNo={currentVersion?.versionNo ?? null}
+        state={currentVersion?.state ?? null}
+        isDirty={isDirty}
+      />
     );
   };
 
@@ -428,6 +430,7 @@ function FormForm({ formId }: { formId?: string }) {
       >
         <TextField
           label={dict.form.nameLabel}
+          aria-label={dict.form.nameLabel}
           value={formName}
           onChange={setName}
           isDisabled={isHistoryView || isCurrentPublished}
@@ -470,6 +473,7 @@ function FormForm({ formId }: { formId?: string }) {
         />
       </Form>
 
+      {renderToolBar()}
       {/* Form Builder */}
       <div className={styles.designerWrapper}>{renderFormBuilder()}</div>
     </>
@@ -480,6 +484,7 @@ function FormForm({ formId }: { formId?: string }) {
       {formId ? (
         <Tabs
           id="form-designer-tabs"
+          aria-label={dict.form.nameLabel || 'Form Designer Tabs'}
           activeKey={activeTab}
           onSelect={(k) => openTab(k || 'designer')}
           className="mb-3"
@@ -562,7 +567,11 @@ function FormForm({ formId }: { formId?: string }) {
         onClose={() => setShowPreview(false)}
         size="lg"
         footer={
-          <Button variant="secondary" onPress={() => setShowPreview(false)}>
+          <Button
+            variant="secondary"
+            data-testid="close-preview-button"
+            onPress={() => setShowPreview(false)}
+          >
             {dict.form.closePreview || 'Close Preview'}
           </Button>
         }

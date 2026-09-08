@@ -131,6 +131,9 @@ export function DataTable<T>({
         type="button"
         className={styles.sortButton}
         data-testid={`datatable-sort-${col.key}`}
+        aria-label={
+          col.label ? `${dict.general.sortBy} ${col.label}` : `${dict.general.sortBy} ${col.key}`
+        }
         onClick={() => onSortChange(`${col.sortField}:${nextDirection}`)}
       >
         {col.label}
@@ -221,7 +224,7 @@ export function DataTable<T>({
             <span>{t.itemsPerPage}</span>
             {onPageSizeChange ? (
               <Select
-                aria-label={t.itemsPerPageAria}
+                aria-label={t.itemsPerPageAria || 'Items per page'}
                 data-testid="datatable-page-size-select"
                 size="small"
                 value={effectivePageSize}
@@ -249,7 +252,7 @@ export function DataTable<T>({
               {totalPages <= 1 && <span>{effectivePage}</span>}
               {onPageChange && totalPages > 1 && (
                 <Select
-                  aria-label={t.pageAria}
+                  aria-label={t.pageAria || 'Page'}
                   data-testid="datatable-page-select-select"
                   size="small"
                   value={effectivePage}
@@ -271,7 +274,7 @@ export function DataTable<T>({
                   isIconButton
                   onPress={() => onPageChange?.(effectivePage - 1)}
                   data-testid="datatable-prev-page-button"
-                  aria-label={t.previousPage}
+                  aria-label={t.previousPage || 'Previous page'}
                   isDisabled={effectivePage === 1}
                 >
                   <FaChevronLeft />
@@ -284,7 +287,7 @@ export function DataTable<T>({
                   isIconButton
                   onPress={() => onPageChange?.(effectivePage + 1)}
                   data-testid="datatable-next-page-button"
-                  aria-label={t.nextPage}
+                  aria-label={t.nextPage || 'Next page'}
                   isDisabled={effectivePage >= totalPages}
                 >
                   <FaChevronRight />

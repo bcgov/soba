@@ -28,6 +28,7 @@ export function WorkspaceSelector({
       id="workspace-select"
       data-testid="workspace-select"
       label={label}
+      aria-label={label}
       className={`mr-2 ${className}`}
       selectedKey={selectedWorkspaceId || (allLabel ? 'all' : null)}
       onSelectionChange={(key) => onChange(key === 'all' ? null : key)}
