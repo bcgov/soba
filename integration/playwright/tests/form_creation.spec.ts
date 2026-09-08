@@ -138,7 +138,7 @@ test.describe.serial("Landing page tests", () => {
         });
         await selectItem.click();
         const workspaceOption = sharedPage.getByRole("option", {
-          name: "Test Workspace (team)",
+          name: "Test (team)",
           exact: true,
         });
         await workspaceOption.click();
@@ -251,7 +251,10 @@ test.describe.serial("Landing page tests", () => {
     const formsNav = sharedPage.getByTestId("home-nav");
     await expect(formsNav).toBeVisible();
     await formsNav.click();
-    await sharedPage.locator('[data-testid="search-forms-text"]').click();
+    const searchForms = sharedPage.locator('[data-testid="search-forms-text"]');
+    await expect(searchForms).toBeVisible({ timeout: 10000 });
+    await expect(searchForms).toBeEnabled();
+    await searchForms.click();
     const searchInput = sharedPage
       .getByTestId("search-forms-text")
       .getByRole("textbox", { name: "Search" });
