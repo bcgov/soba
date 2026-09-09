@@ -179,8 +179,6 @@ await mutate(
 
 Guard `current`. A key with nothing in it yet hands the updater `undefined`.
 
-> > > > > > > Stashed changes
-
 To forget a key rather than patch it, go through the cache: `mutate(key, undefined)` reads
 as "revalidate", not "forget", and leaves the old value in place.
 
@@ -304,8 +302,6 @@ coming back returns it as the user left it. Declare the params your list owns in
 without it is a bookmark or someone else's link and means the unfiltered list. A URL that
 names a scope counts as a choice wherever it came from. A bare one does not touch the
 memory.
-
-> > > > > > > Stashed changes
 
 ## Screens with their own loading
 
