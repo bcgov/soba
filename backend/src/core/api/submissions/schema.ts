@@ -1,14 +1,20 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import {
-  makeSortEnum,
+  SubmissionListItemSchema as SobaSubmissionListItemSchema,
+  SubmissionDataBodySchema as SobaSubmissionDataBodySchema,
+  OpenSubmissionBodySchema as SobaOpenSubmissionBodySchema,
+  SubmissionResponseSchema as SobaSubmissionResponseSchema,
+  ListSubmissionsResponseSchema as SobaListSubmissionsResponseSchema,
+  SubmissionSortSchema as SobaSubmissionSortSchema,
+} from '@soba/lib';
+
+import {
   offsetQueryFields,
   rejectedCursorField,
   searchQueryField,
-  OffsetPageSchema,
   OFFSET_DRIFT_NOTE,
 } from '../shared/offsetPagination';
-import { SUBMISSION_SORT_FIELDS } from '../../db/repos/submissionRepo';
 import {
   workspaceIdQueryField,
   formIdQueryField,
@@ -22,12 +28,9 @@ extendZodWithOpenApi(z);
 // The client mints the submission id (uuidv7) so it can originate a submission without a round-trip.
 // Create is idempotent on this id (see openSubmission), which is what makes a retry safe. Enforce v7
 // specifically: the id is the record's identity, so we reject nil/low-entropy or wrong-version uuids.
-export const OpenSubmissionBodySchema = z
-  .object({
-    id: z.uuidv7(),
-    formId: z.string().min(1),
-  })
-  .openapi('Submissions_OpenSubmissionBody');
+export const OpenSubmissionBodySchema = (
+  SobaOpenSubmissionBodySchema as z.ZodType<z.infer<typeof SobaOpenSubmissionBodySchema>>
+).openapi('Submissions_OpenSubmissionBody');
 
 // The submission id path param, shared by every /:id route (read/save/submit/delete).
 export const SubmissionIdParamsSchema = z
@@ -37,15 +40,15 @@ export const SubmissionIdParamsSchema = z
   .openapi('Submissions_SubmissionIdParams');
 
 // The answer-data body, shared by save (draft) and submit.
-export const SubmissionDataBodySchema = z
-  .object({
-    data: z.record(z.string(), z.unknown()),
-  })
-  .openapi('Submissions_SubmissionDataBody');
+export const SubmissionDataBodySchema = (
+  SobaSubmissionDataBodySchema as z.ZodType<z.infer<typeof SobaSubmissionDataBodySchema>>
+).openapi('Submissions_SubmissionDataBody');
 
-export const SubmissionSortSchema = makeSortEnum(SUBMISSION_SORT_FIELDS).openapi(
-  'Submissions_SubmissionSort',
-);
+export const SubmissionSortSchema = (
+  SobaSubmissionSortSchema as z.ZodType<z.infer<typeof SobaSubmissionSortSchema>>
+).openapi('Submissions_SubmissionSort', {
+  description: 'Valid submission sort fields, prefixed with `-` for descending.',
+});
 
 export const ListSubmissionsQuerySchema = requireAtLeastOneQueryField(
   z.object({
@@ -67,55 +70,17 @@ export const ListSubmissionsQuerySchema = requireAtLeastOneQueryField(
   'At least one of workspaceId, formId, formVersionId, or submissionId is required',
 ).openapi('Submissions_ListSubmissionsQuery');
 
-export const SubmissionListItemSchema = z
-  .object({
-    id: z.string(),
-    formId: z.string(),
-    formName: z.string().optional(),
-    formVersionId: z.string(),
-    versionNo: z.number().int().optional(),
-    workflowState: z.string(),
-    engineSyncStatus: z.string(),
-    submittedAt: z.string().nullable(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-    createdBy: z.string().nullable().optional(),
-    submittedBy: z.string().nullable().optional(),
-  })
-  .openapi('Submissions_SubmissionListItem');
+export const SubmissionListItemSchema = (
+  SobaSubmissionListItemSchema as z.ZodType<z.infer<typeof SobaSubmissionListItemSchema>>
+).openapi('Submissions_SubmissionListItem');
 
-export const SubmissionResponseSchema = z
-  .object({
-    id: z.string(),
-    formId: z.string(),
-    formVersionId: z.string(),
-    workflowState: z.string(),
-    engineSyncStatus: z.string(),
-    currentRevisionNo: z.number().int(),
-    submittedAt: z.string().nullable(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-    createdBy: z.string().nullable().optional(),
-    submittedBy: z.string().nullable().optional(),
-  })
-  .openapi('Submissions_SubmissionResponse');
+export const SubmissionResponseSchema = (
+  SobaSubmissionResponseSchema as z.ZodType<z.infer<typeof SobaSubmissionResponseSchema>>
+).openapi('Submissions_SubmissionResponse');
 
-export const ListSubmissionsResponseSchema = z
-  .object({
-    items: z.array(SubmissionListItemSchema),
-    page: OffsetPageSchema,
-    filters: z.object({
-      workspaceId: z.string().optional(),
-      formId: z.string().optional(),
-      formVersionId: z.string().optional(),
-      submissionId: z.string().optional(),
-      workflowState: z.string().optional(),
-      createdBy: z.string().optional(),
-      q: z.string().optional(),
-    }),
-    sort: SubmissionSortSchema,
-  })
-  .openapi('Submissions_ListSubmissionsResponse');
+export const ListSubmissionsResponseSchema = (
+  SobaListSubmissionsResponseSchema as z.ZodType<z.infer<typeof SobaListSubmissionsResponseSchema>>
+).openapi('Submissions_ListSubmissionsResponse');
 
 const TAG = 'core.submissions';
 const SUBMISSION_PATH = '/design/submissions/{id}';

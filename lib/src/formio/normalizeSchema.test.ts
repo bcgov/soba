@@ -1,4 +1,4 @@
-import { normalizeSchema } from '../../../src/plugins/formio-v5/normalizeSchema';
+import { normalizeSchema } from './normalizeSchema';
 
 type Comp = Record<string, unknown>;
 

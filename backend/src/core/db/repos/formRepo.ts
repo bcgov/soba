@@ -4,7 +4,7 @@ import { forms, formVersions, workspaces } from '../schema';
 import { likePattern, orderByForSort, type SortColumns, type SortToken } from '../listSort';
 import { readListPage } from '../listRead';
 
-export const FORM_SORT_FIELDS = ['name', 'status', 'createdAt', 'updatedAt'] as const;
+import { FORM_SORT_FIELDS } from '@soba/lib';
 export type FormListSortField = (typeof FORM_SORT_FIELDS)[number];
 export type FormListSort = SortToken<FormListSortField>;
 

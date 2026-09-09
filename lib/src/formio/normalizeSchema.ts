@@ -9,7 +9,8 @@ type Node = Record<string, unknown>;
 function transformChefs1Types(schema: Record<string, unknown>): Record<string, unknown> {
   const json = JSON.stringify(schema)
     .replace(/"type"\s*:\s*"simple(.*?)advanced"/g, '"type": "$1"')
-    .replace(/"type"\s*:\s*"simple(.*?)"/g, '"type": "$1"');
+    .replace(/"type"\s*:\s*"simple(.*?)"/g, '"type": "$1"')
+    .replace(/"type"\s*:\s*"phonenumber"/g, '"type": "phoneNumber"');
   return JSON.parse(json) as Record<string, unknown>;
 }
 

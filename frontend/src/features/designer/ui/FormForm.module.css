@@ -6,7 +6,7 @@
 .stickyActions {
   position: sticky;
   top: var(--app-header-height);
-  z-index: 1050;
+  z-index: 20;
   background: #f8f8f8;
 }
 

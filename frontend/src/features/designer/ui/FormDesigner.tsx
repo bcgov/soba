@@ -13,7 +13,7 @@ import type { FormType, FormBuilderProps } from '@formio/react';
 import './FormDesigner.module.css';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { normalizeFormSchema } from '@/src/shared/api/sobaApi';
+import { normalizeSchema } from '@soba/lib';
 import { buildExportFilename } from '@/src/features/designer/exportFilename';
 
 // Import Types
@@ -139,13 +139,13 @@ const FormDesigner: React.FC<DesignerProps> = ({
     [onUpdateModel],
   );
 
-  // Export the live builder design (may be unsaved): normalize it on the server (same operation
-  // as import) to a clean, portable form definition, then download.
+  // Export the live builder design (may be unsaved): normalize it to a clean,
+  // portable form definition, then download.
   const handleExport = useCallback(async () => {
     if (!token) return;
     try {
       const schema = (liveSchemaRef.current ?? stableForm) as Record<string, unknown>;
-      const clean = await normalizeFormSchema(token, schema);
+      const clean = normalizeSchema(schema);
       const blob = new Blob([JSON.stringify(clean, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -175,7 +175,7 @@ const FormDesigner: React.FC<DesignerProps> = ({
 
   const handleImportClick = useCallback(() => fileInputRef.current?.click(), []);
 
-  // Upload a schema file → server applies the CHEFS-1 transform → load the result into the builder.
+  // Upload a schema file → normalize it → load the result into the builder.
   const handleFileSelected = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -183,7 +183,7 @@ const FormDesigner: React.FC<DesignerProps> = ({
       if (!file || !token) return;
       try {
         const raw = JSON.parse(await file.text()) as Record<string, unknown>;
-        const transformed = (await normalizeFormSchema(token, raw)) as FormType;
+        const transformed = normalizeSchema(raw) as FormType;
         // Update the EXISTING builder in place. Re-creating @formio/react's FormBuilder
         // (by changing `initialForm`/`key`) orphans the underlying instance, and its
         // unguarded `updateComponent` handler then reads `builder.instance.form` on the

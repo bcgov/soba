@@ -23,6 +23,7 @@
     "check": "pnpm type-check && pnpm lint"
   },
   "dependencies": {
+    "@soba/lib": "workspace:*",
     "@bcgov/bc-sans": "^2.1.0",
     "@bcgov/design-system-react-components": "^0.8.1",
     "@bcgov/design-tokens": "^5.0.0",

@@ -1,6 +1,19 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import {
+  CreateFormBodySchema as SobaCreateFormBodySchema,
+  FormVersionResponseSchema as SobaFormVersionResponseSchema,
+  FormVersionListItemSchema as SobaFormVersionListItemSchema,
+  FormResponseSchema as SobaFormResponseSchema,
+  UpdateFormBodySchema as SobaUpdateFormBodySchema,
+  FormWithVersionResponseSchema as SobaFormWithVersionResponseSchema,
+  FormWithPermissionsResponseSchema as SobaFormWithPermissionsResponseSchema,
+  FormListItemSchema as SobaFormListItemSchema,
+  ListFormsResponseSchema as SobaListFormsResponseSchema,
+  FormSortSchema as SobaFormSortSchema,
+} from '@soba/lib';
+
+import {
   makeSortEnum,
   offsetQueryFields,
   rejectedCursorField,
@@ -8,7 +21,6 @@ import {
   OffsetPageSchema,
   OFFSET_DRIFT_NOTE,
 } from '../shared/offsetPagination';
-import { FORM_SORT_FIELDS } from '../../db/repos/formRepo';
 import { FORM_VERSION_SORT_FIELDS } from '../../db/repos/formVersionRepo';
 import { FORM_NAME_TAKEN } from '../../messages';
 import {
@@ -20,14 +32,32 @@ import {
 
 extendZodWithOpenApi(z);
 
-export const CreateFormBodySchema = z
-  .object({
-    workspaceId: z.string().min(1),
-    name: z.string().trim().min(1),
-    description: z.string().optional(),
-    formEngineCode: z.string().trim().min(1).optional(),
-  })
-  .openapi('Forms_CreateFormBody');
+export const CreateFormBodySchema = (
+  SobaCreateFormBodySchema as z.ZodType<z.infer<typeof SobaCreateFormBodySchema>>
+).openapi('Forms_CreateFormBody');
+export const UpdateFormBodySchema = (
+  SobaUpdateFormBodySchema as z.ZodType<z.infer<typeof SobaUpdateFormBodySchema>>
+).openapi('Forms_UpdateFormBody');
+export const FormListItemSchema = (
+  SobaFormListItemSchema as z.ZodType<z.infer<typeof SobaFormListItemSchema>>
+).openapi('Forms_FormListItem');
+export const FormResponseSchema = (
+  SobaFormResponseSchema as z.ZodType<z.infer<typeof SobaFormResponseSchema>>
+).openapi('Forms_FormResponse');
+export const FormVersionResponseSchema = (
+  SobaFormVersionResponseSchema as z.ZodType<z.infer<typeof SobaFormVersionResponseSchema>>
+).openapi('Forms_FormVersionResponse');
+export const FormWithVersionResponseSchema = (
+  SobaFormWithVersionResponseSchema as z.ZodType<z.infer<typeof SobaFormWithVersionResponseSchema>>
+).openapi('Forms_FormWithVersionResponse');
+export const FormWithPermissionsResponseSchema = (
+  SobaFormWithPermissionsResponseSchema as z.ZodType<
+    z.infer<typeof SobaFormWithPermissionsResponseSchema>
+  >
+).openapi('Forms_FormWithPermissionsResponse');
+export const FormVersionListItemSchema = (
+  SobaFormVersionListItemSchema as z.ZodType<z.infer<typeof SobaFormVersionListItemSchema>>
+).openapi('Forms_FormVersionListItem');
 
 export const CreateFormVersionBodySchema = z
   .object({
@@ -46,16 +76,6 @@ export const FormVersionIdParamsSchema = z
     id: z.string().min(1),
   })
   .openapi('Forms_FormVersionIdParams');
-
-export const UpdateFormBodySchema = z
-  .object({
-    name: z.string().trim().min(1).optional(),
-    description: z.string().nullable().optional(),
-    status: z.string().trim().min(1).optional(),
-    org: z.string().trim().min(1).optional(),
-    useCase: z.string().trim().min(1).optional(),
-  })
-  .openapi('Forms_UpdateFormBody');
 
 export const SaveFormVersionParamsSchema = z
   .object({
@@ -90,7 +110,9 @@ export const NormalizeSchemaResponseSchema = z
   })
   .openapi('Forms_NormalizeSchemaResponse');
 
-export const FormSortSchema = makeSortEnum(FORM_SORT_FIELDS).openapi('Forms_FormSort');
+export const FormSortSchema = (
+  SobaFormSortSchema as z.ZodType<z.infer<typeof SobaFormSortSchema>>
+).openapi('Forms_FormSort');
 
 export const ListFormsQuerySchema = z
   .object({
@@ -104,70 +126,9 @@ export const ListFormsQuerySchema = z
   })
   .openapi('Forms_ListFormsQuery');
 
-export const FormListItemSchema = z
-  .object({
-    id: z.string(),
-    workspaceId: z.string(),
-    name: z.string(),
-    org: z.string(),
-    useCase: z.string(),
-    status: z.string(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-    createdBy: z.string().nullable(),
-  })
-  .openapi('Forms_FormListItem');
-
-export const FormResponseSchema = z
-  .object({
-    id: z.string(),
-    workspaceId: z.string(),
-    name: z.string(),
-    description: z.string().nullable(),
-    org: z.string(),
-    useCase: z.string(),
-    status: z.string(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-  })
-  .openapi('Forms_FormResponse');
-
-export const FormVersionResponseSchema = z
-  .object({
-    id: z.string(),
-    formId: z.string(),
-    versionNo: z.number().int(),
-    state: z.string(),
-    engineSyncStatus: z.string(),
-    engineSchemaRef: z.string().nullable(),
-    currentRevisionNo: z.number().int(),
-    publishedAt: z.string().nullable(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-  })
-  .openapi('Forms_FormVersionResponse');
-
-export const FormWithVersionResponseSchema = FormResponseSchema.extend({
-  formVersion: FormVersionResponseSchema.nullable(),
-}).openapi('Forms_FormWithVersionResponse');
-
-export const FormWithPermissionsResponseSchema = FormResponseSchema.extend({
-  permissions: z.array(z.string()),
-}).openapi('Forms_FormWithPermissionsResponse');
-
-export const ListFormsResponseSchema = z
-  .object({
-    items: z.array(FormListItemSchema),
-    page: OffsetPageSchema,
-    filters: z.object({
-      workspaceId: z.string().optional(),
-      formId: z.string().optional(),
-      q: z.string().optional(),
-      status: z.string().optional(),
-    }),
-    sort: FormSortSchema,
-  })
-  .openapi('Forms_ListFormsResponse');
+export const ListFormsResponseSchema = (
+  SobaListFormsResponseSchema as z.ZodType<z.infer<typeof SobaListFormsResponseSchema>>
+).openapi('Forms_ListFormsResponse');
 
 export const FormVersionSortSchema =
   makeSortEnum(FORM_VERSION_SORT_FIELDS).openapi('Forms_FormVersionSort');
@@ -183,19 +144,6 @@ export const ListFormVersionsQuerySchema = z
     sort: FormVersionSortSchema.default('versionNo:desc'),
   })
   .openapi('Forms_ListFormVersionsQuery');
-
-export const FormVersionListItemSchema = z
-  .object({
-    id: z.string(),
-    formId: z.string(),
-    versionNo: z.number().int(),
-    state: z.string(),
-    engineSyncStatus: z.string(),
-    engineSchemaRef: z.string().nullable(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-  })
-  .openapi('Forms_FormVersionListItem');
 
 export const ListFormVersionsResponseSchema = z
   .object({

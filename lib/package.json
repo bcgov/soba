@@ -1,0 +1,19 @@
+{
+  "name": "@soba/lib",
+  "version": "2.0.0-beta.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc -w",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -44,23 +44,6 @@ export async function updateSobaForm(
   return parseJson(response);
 }
 
-/**
- * POST a Form.io schema to the server to normalize it into a clean, portable, builder-ready
- * form definition. Used both for import (file upload) and export (download).
- */
-export async function normalizeFormSchema(
-  token: string,
-  schema: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
-  const response = await sobaFetch('/design/forms/normalize', {
-    token,
-    method: 'POST',
-    json: { schema },
-  });
-  const data = await parseJson<{ schema: Record<string, unknown> }>(response);
-  return data.schema;
-}
-
 export async function publishSobaFormVersion(token: string, id: string) {
   const response = await sobaFetch(`/design/form-versions/${id}/publish`, {
     token,

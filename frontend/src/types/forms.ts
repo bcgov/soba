@@ -1,43 +1,31 @@
-export type SobaFormType = {
-  name: string;
-  description: string;
-  formEngineCode?: string;
-  workspaceId?: string;
-  useCase?: string;
-  org?: string;
+
+import type {
+  CreateFormBody,
+  UpdateFormBody,
+  FormResponse,
+  FormVersionResponse,
+  FormWithVersionResponse,
+  FormWithPermissionsResponse,
+  ListFormsResponse,
+} from '@soba/lib';
+
+export type {
+  CreateFormBody,
+  UpdateFormBody,
+  FormResponse,
+  FormVersionResponse,
+  FormWithVersionResponse,
+  FormWithPermissionsResponse,
+  ListFormsResponse,
 };
 
-export type CreateSobaFormioFormResponse = {
-  createdAt: Date;
-  description: string;
-  id: string;
-  workspaceId: string;
-  name: string;
-  status: string;
-  updatedAt: Date;
-  // POST /forms now returns the form plus its initial v1 draft (FormWithVersionResponse).
-  formVersion?: SobaFormVersionType | null;
-};
+export type SobaFormType = Partial<CreateFormBody> & Partial<UpdateFormBody>;
 
-export type SobaResponseFormType = {
-  id: string;
-  workspaceId: string;
-  name: string;
-  description: string;
-  formEngineCode?: string;
-};
+export type CreateSobaFormioFormResponse = FormWithVersionResponse;
 
-export type SobaFormVersionType = {
-  id: string;
-  versionNo: number;
-  state: string;
-  engineSyncStatus: string;
-  engineSchemaRef?: string | null;
-  currentRevisionNo: number;
-  publishedAt?: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
+export type SobaResponseFormType = FormResponse;
+
+export type SobaFormVersionType = FormVersionResponse;
 
 // Submit-mode payload: the published form + version + schema needed to render the public fill page.
 /** The one payload the fill page needs: workflow state + schema + any saved answers (resume). */
