@@ -8,6 +8,14 @@ export type {
   ListFormsResponse,
 } from '@soba/lib';
 
+import type {
+  CreateFormBody,
+  UpdateFormBody,
+  FormResponse,
+  FormVersionResponse,
+  FormWithVersionResponse,
+} from '@soba/lib';
+
 export type SobaFormType = Partial<CreateFormBody> & Partial<UpdateFormBody>;
 
 export type CreateSobaFormioFormResponse = FormWithVersionResponse;
