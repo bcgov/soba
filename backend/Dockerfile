@@ -8,6 +8,7 @@ WORKDIR /app
 # copy root workspace config + backend package file
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY backend/package.json backend/
+COPY lib/package.json lib/
 
 # install only backend deps (hoisted into root node_modules)
 RUN pnpm install --filter ./backend...
