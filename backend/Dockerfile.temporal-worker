@@ -10,14 +10,11 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY backend/package.json backend/
 COPY lib/package.json lib/
 
-RUN pnpm install --filter ./lib --frozen-lockfile
-
-# install only backend deps (hoisted into root node_modules)
-RUN pnpm install --filter ./backend...
+RUN pnpm install --filter ./lib --frozen-lockfile && pnpm install --filter ./backend...
 
 # copy entire repo and build backend
 COPY . .
-RUN pnpm --filter ./backend... run build
+RUN pnpm --filter @soba/lib run build && pnpm --filter ./backend run build
 
 # OpenShift / arbitrary UID: run non-root; g=u lets assigned user (often gid 0) read /app
 RUN chgrp -R 0 /app && chmod -R g=u /app
