@@ -195,6 +195,16 @@ const FormDesigner: React.FC<DesignerProps> = ({
         )?.instance;
         if (instance?.setForm) {
           await instance.setForm(transformed);
+          // Re-query the sidebar because setting a new form rebuilds the builder DOM,
+          // orphan-ing our previous portal target.
+          if (builderRef.current?.element) {
+            const sidebar = (builderRef.current.element as HTMLElement).querySelector(
+              '.builder-sidebar',
+            ) as HTMLElement;
+            if (sidebar) {
+              setSidebarEl(sidebar);
+            }
+          }
         }
         liveSchemaRef.current = transformed;
         if (onUpdateModel) onUpdateModel(transformed);
