@@ -261,6 +261,7 @@
     "historyTab": "Version History",
     "submissionTab": "Submissions",
     "shareTab": "Share",
+    "documentGenerationTab": "Document Generation",
     "readOnlyMode": "Read-Only Mode:",
     "viewingHistoricalVersion": "You are viewing historical version",
     "savePublishDisabled": "Save and Publish options are disabled.",

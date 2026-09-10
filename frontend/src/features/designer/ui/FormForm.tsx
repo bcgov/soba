@@ -27,6 +27,9 @@ import FormHistoryTab from './FormHistoryTab';
 import FormSubmissionTab from './FormSubmissionTab';
 import FormShareTab from './FormShareTab';
 import { FormSubmitterAudience } from './FormSubmitterAudience';
+import FormDocumentGenerationTab from '@/src/features/document-generation/ui/FormDocumentGenerationTab';
+import { FEATURE_CODES } from '@/src/shared/featureFlags/flags';
+import { useFeatureAllowed } from '@/src/shared/featureFlags/useFeatureAllowed';
 import { isWorkspaceManageRole } from '@/src/features/workspaces/workspaceRoles';
 import { useWorkspaces, useWritableWorkspaces } from '@/src/shared/api/useWorkspaces';
 import { useFormDraft } from '@/src/features/designer/useFormDraft';
@@ -122,6 +125,7 @@ function FormForm({ formId }: { formId?: string }) {
   }, []);
   const [isSaving, setIsSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const documentGenerationAllowed = useFeatureAllowed(FEATURE_CODES.DOCUMENT_GENERATION);
 
   const {
     form,
@@ -547,6 +551,16 @@ function FormForm({ formId }: { formId?: string }) {
               workspaceId={selectedWorkspaceId}
             />
           </Tab>
+          {documentGenerationAllowed && (
+            <Tab
+              eventKey="document-generation"
+              data-testid="document-generation-tab"
+              disabled={isSaving || draftUnavailable}
+              title={dict.form.documentGenerationTab || 'Document Generation'}
+            >
+              <FormDocumentGenerationTab dict={dict} formId={formId} />
+            </Tab>
+          )}
         </Tabs>
       ) : (
         renderDesignerContent()

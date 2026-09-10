@@ -258,11 +258,11 @@ frontend:
   apps:
     designer:
       enabled: true
-      featuresAllowed: "workspaces,design-mode,meta,marketing"
+      featuresAllowed: "workspaces,design-mode,meta,marketing,document-generation"
       host: ""
     forms:
       enabled: true
-      featuresAllowed: "submit-mode,files,meta"
+      featuresAllowed: "submit-mode,files,meta,document-generation"
       host: ""
 
 # -- Database (external Postgres) -----------------------------------------
