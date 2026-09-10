@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Select } from '@bcgov/design-system-react-components';
 
 import type { Dictionary } from '@/src/types/plugins';
+import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import FormSettingsDrawers from '@/src/features/designer/ui/FormSettingsDrawers';
 import { codeItems } from '@/src/shared/util/codeList';
 import { updateSobaForm } from '@/src/shared/api/sobaApiDesign';
@@ -26,13 +27,26 @@ export default function FormProfileDrawer({
   const { form, refreshForm } = useForm(formId);
   const { addNotification } = useNotificationStore();
 
-  const [ministryOrg, setMinistryOrg] = useState(form.org || '');
-  const [initialMinistryOrg, setInitialMinistryOrg] = useState(form.org || '');
+  const [ministryOrg, setMinistryOrg] = useState(form?.org || '');
+  const [initialMinistryOrg, setInitialMinistryOrg] = useState(form?.org || '');
 
-  const [useCase, setUseCase] = useState(form.useCase || '');
-  const [initialUseCase, setInitialUseCase] = useState(form.useCase || '');
+  const [useCase, setUseCase] = useState(form?.useCase || '');
+  const [initialUseCase, setInitialUseCase] = useState(form?.useCase || '');
 
   const [saving, setSaving] = useState(false);
+  const [prevFormId, setPrevFormId] = useState<string | null>(null);
+
+  if (form && form.id !== prevFormId) {
+    setMinistryOrg(form.org || '');
+    setInitialMinistryOrg(form.org || '');
+    setUseCase(form.useCase || '');
+    setInitialUseCase(form.useCase || '');
+    setPrevFormId(form.id);
+  }
+
+  const loading = useMemo(() => {
+    return form === null;
+  }, [form]);
 
   const saveChanges = async () => {
     if (token !== undefined) {
@@ -67,6 +81,10 @@ export default function FormProfileDrawer({
     setMinistryOrg(initialMinistryOrg);
     setUseCase(initialUseCase);
   };
+
+  if (loading) {
+    return <CenteredProgress label={dict.general.loading} />;
+  }
 
   return (
     <FormSettingsDrawers

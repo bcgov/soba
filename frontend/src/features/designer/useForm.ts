@@ -28,7 +28,6 @@ export function useForm(formId?: string) {
 
   const {
     data: versionsData,
-    mutate: refreshVersions,
     error: versionsError,
   } = useAuthedSWR(
     formId ? ['design-form-versions', formId] : null,
@@ -79,6 +78,12 @@ export function useForm(formId?: string) {
       globalMutate(schemaKey(versionId), next, { revalidate: false }),
     [globalMutate],
   );
+
+  const refreshVersions = useCallback(() => {
+    return globalMutate(
+      (key) => Array.isArray(key) && key[0] === 'design-form-versions' && key[1] === formId
+    );
+  }, [globalMutate, formId]);
 
   const loadError = formError ?? versionsError ?? schemaError ?? null;
 
