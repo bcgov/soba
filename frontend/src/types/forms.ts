@@ -5,9 +5,9 @@ import type {
   FormResponse,
   FormVersionResponse,
   FormWithVersionResponse,
-  FormWithPermissionsResponse,
-  ListFormsResponse,
 } from '@soba/lib';
+
+export type { FormWithPermissionsResponse, ListFormsResponse } from '@soba/lib';
 
 export type {
   CreateFormBody,
@@ -15,8 +15,6 @@ export type {
   FormResponse,
   FormVersionResponse,
   FormWithVersionResponse,
-  FormWithPermissionsResponse,
-  ListFormsResponse,
 };
 
 export type SobaFormType = Partial<CreateFormBody> & Partial<UpdateFormBody>;
