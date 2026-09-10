@@ -1,4 +1,5 @@
 import type { NormalizedProfile, IdpAttributes } from '../core/auth/jwtClaims';
+import type { FileRecord } from '../core/db/repos/fileRepo';
 import type { CoreRequestContext, CoreListScope } from '../core/middleware/requestContext';
 
 declare global {
@@ -23,6 +24,8 @@ declare global {
       listScope?: CoreListScope;
       actorId?: string;
       isSobaAdmin?: boolean;
+      fileRecord?: FileRecord;
+      fileDownloadDisposition?: 'inline' | 'attachment';
     }
   }
 }

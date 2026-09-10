@@ -1,8 +1,6 @@
 import { Request, Response } from 'express';
 import { filesService } from './service';
 import { isBlockedExtension } from './config';
-import { resolveCaller } from '../../core/middleware/actor';
-import { accessDenial } from '../../core/middleware/formSubmitAccess';
 import {
   InternalError,
   NotFoundError,
@@ -12,7 +10,6 @@ import {
   ValidationError,
 } from '../../core/errors';
 
-/** Minimal shape of a multer memory-storage file (this project has no @types/multer). */
 interface UploadedFile {
   originalname: string;
   mimetype: string;
@@ -20,19 +17,66 @@ interface UploadedFile {
   buffer: Buffer;
 }
 
-export async function uploadFileHandler(req: Request, res: Response): Promise<void> {
-  // requireUploadAccess has resolved + authorized the submission's workspace into coreContext.
-  const ctx = req.coreContext!;
+const FILE_NOT_FOUND = 'File not found';
+const NOT_FOUND_OUTCOME = 'notfound';
 
-  const files = (req as Request & { files?: UploadedFile[] }).files;
-  const uploaded = Array.isArray(files) ? files[0] : undefined;
-  if (!uploaded) {
-    throw new ValidationError('no file');
+const serializeMetadata = (record: NonNullable<Request['fileRecord']>) => {
+  return {
+    id: record.id,
+    formId: record.formId,
+    storageProfile: record.profile,
+    filename: record.filename,
+    contentType: record.contentType,
+    size: record.size,
+    createdBy: record.createdBy,
+    createdAt: record.createdAt.toISOString(),
+    updatedBy: record.updatedBy,
+    updatedAt: record.updatedAt.toISOString(),
+  };
+};
+
+function getUploadedFile(req: Request): UploadedFile {
+  const request = req as Request & { file?: UploadedFile; files?: UploadedFile[] };
+  const uploaded = request.file ?? (Array.isArray(request.files) ? request.files[0] : undefined);
+  if (!uploaded) throw new ValidationError('no file');
+  return uploaded;
+}
+
+function sendFile(
+  res: Response,
+  record: NonNullable<Request['fileRecord']>,
+  file: Exclude<Awaited<ReturnType<typeof filesService.get>>, 'notfound'>,
+  disposition: 'inline' | 'attachment',
+): void {
+  res.setHeader(
+    'Content-Type',
+    record.contentType ?? file.contentType ?? 'application/octet-stream',
+  );
+  const size = record.size ?? file.size;
+  if (size != null) res.setHeader('Content-Length', String(size));
+  res.setHeader(
+    'Content-Disposition',
+    `${disposition}; filename="${encodeURIComponent(record.filename)}"`,
+  );
+  if (file.downloadStream) {
+    file.downloadStream.pipe(res);
+    return;
   }
+  if (file.publicUrl) {
+    res.redirect(file.publicUrl);
+    return;
+  }
+  throw new InternalError('no download available');
+}
 
-  const filename =
-    (req.body?.fileName as string) || (req.body?.name as string) || uploaded.originalname;
-  const submissionId = (req.body?.submissionId as string) || null;
+export async function uploadFileHandler(req: Request, res: Response): Promise<void> {
+  const ctx = req.coreContext!;
+  const uploaded = getUploadedFile(req);
+  const formId = req.params.id || null;
+  const filename = formId
+    ? uploaded.originalname
+    : (req.body?.fileName as string) || (req.body?.name as string) || uploaded.originalname;
+  const submissionId = formId ? null : (req.body?.submissionId as string) || null;
 
   // Always reject blocked extensions, regardless of the form's designer-configured fileTypes.
   // Check both the stored name and the real uploaded name (they can differ via fileNameTemplate).
@@ -40,7 +84,10 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
     throw new UnsupportedMediaTypeError('File type not allowed');
   }
 
-  const profile = req.header('storageProfile') || undefined;
+  const profile =
+    (typeof req.body?.storageProfile === 'string' && req.body.storageProfile) ||
+    req.header('storageProfile') ||
+    undefined;
 
   const record = await filesService.upload({
     workspaceId: ctx.workspaceId,
@@ -49,17 +96,19 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
     contentType: uploaded.mimetype,
     size: uploaded.size,
     buffer: uploaded.buffer,
+    formId,
     submissionId,
     useProfile: profile,
   });
 
-  // Virus scan rejections (antivirus feature on): infected is a client-side content problem;
-  // scan-unavailable is fail-closed — the scanner couldn't clear the file, so we don't store it.
-  if (record === 'infected') {
-    throw new UnprocessableEntityError('File failed virus scan');
-  }
+  if (record === 'infected') throw new UnprocessableEntityError('File failed virus scan');
   if (record === 'scan-unavailable') {
     throw new ServiceUnavailableError('Virus scanning unavailable');
+  }
+
+  if (formId) {
+    res.status(201).json(serializeMetadata(record));
+    return;
   }
 
   // The chefs provider builds each file's URL as `${filesUrl}/${id}`, so it only needs the id
@@ -74,41 +123,17 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
 }
 
 export async function downloadFileHandler(req: Request, res: Response): Promise<void> {
-  const result = await filesService.getForCaller(req.params.id, resolveCaller(req));
-  if (result === 'notfound') {
-    throw new NotFoundError('File not found');
-  }
-  if (result === 'denied') {
-    throw accessDenial(req, 'Not authorized to access this file');
-  }
-  const { record, file } = result;
-  res.setHeader(
-    'Content-Type',
-    record.contentType ?? file.contentType ?? 'application/octet-stream',
-  );
-  const size = record.size ?? file.size;
-  if (size != null) res.setHeader('Content-Length', String(size));
-  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(record.filename)}"`);
+  const record = req.fileRecord!;
+  const file = await filesService.get(record);
+  if (file === NOT_FOUND_OUTCOME) throw new NotFoundError(FILE_NOT_FOUND);
+  sendFile(res, record, file, req.fileDownloadDisposition ?? 'inline');
+}
 
-  if (file.downloadStream) {
-    file.downloadStream.pipe(res);
-    return;
-  }
-  if (file.publicUrl) {
-    res.redirect(file.publicUrl);
-    return;
-  }
-  throw new InternalError('no download available');
+export async function getFileMetadataHandler(req: Request, res: Response): Promise<void> {
+  res.json(serializeMetadata(req.fileRecord!));
 }
 
 export async function deleteFileHandler(req: Request, res: Response): Promise<void> {
-  const outcome = await filesService.deleteForCaller(req.params.id, resolveCaller(req));
-  if (outcome === 'deleted') {
-    res.status(204).end();
-    return;
-  }
-  if (outcome === 'notfound') {
-    throw new NotFoundError('File not found');
-  }
-  throw accessDenial(req, 'Not authorized to access this file');
+  await filesService.delete(req.fileRecord!);
+  res.status(204).end();
 }

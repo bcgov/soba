@@ -47,7 +47,9 @@ function createLocalStorageAdapter(config: PluginConfigReader): StorageEngineAda
 
     async uploadFile(input: UploadFileInput): Promise<UploadFileResult> {
       await ensureBase();
-      const subdir = input.workspaceId ? path.join(basePath, input.workspaceId) : basePath;
+      const subdir = input.formId
+        ? path.join(basePath, input.workspaceId, input.formId)
+        : path.join(basePath, input.workspaceId);
       await fs.promises.mkdir(subdir, { recursive: true });
       const filename = `${Date.now()}-${input.workspaceId}-${path.basename(
         input.filename || 'file',

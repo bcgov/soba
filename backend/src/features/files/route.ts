@@ -4,6 +4,7 @@ import { env } from '../../core/config/env';
 import { requireFeature } from '../../core/middleware/requireFeature';
 import { Features } from '../../core/db/codes';
 import { requireUploadAccess } from './uploadAccess';
+import { requireSubmissionFileDeleteAccess, requireSubmissionFileReadAccess } from './fileAccess';
 import { uploadFileHandler, downloadFileHandler, deleteFileHandler } from './controller';
 import { asyncHandler } from '../../core/api/shared/asyncHandler';
 
@@ -23,9 +24,7 @@ router.use(requireFeature(Features.files));
 // field name (Form.io's fileKey is configurable; the component uploads one at a time).
 router.post('/', upload.any(), requireUploadAccess, asyncHandler(uploadFileHandler));
 
-// Download / delete: authorized against the file's owning submission (audience / ownership). Wrapped
-// in asyncHandler so an unexpected failure reaches the router's error handler instead of hanging.
-router.get('/:id', asyncHandler(downloadFileHandler));
-router.delete('/:id', asyncHandler(deleteFileHandler));
+router.get('/:id', requireSubmissionFileReadAccess, asyncHandler(downloadFileHandler));
+router.delete('/:id', requireSubmissionFileDeleteAccess, asyncHandler(deleteFileHandler));
 
 export { router as filesRouter };
