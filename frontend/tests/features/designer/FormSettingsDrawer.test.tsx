@@ -34,6 +34,7 @@ vi.mock('@/lib/hooks/useNotificationStore', () => ({
 
 const mockDict = {
   form: {
+    save: "Save",
     settings: {
       formSettingsDrawerLabel: 'Form Settings',
       formSettingsDrawerSaveSuccessMessage: 'Changes saved successfully.',
@@ -41,6 +42,9 @@ const mockDict = {
     },
     descriptionLabel: 'Description',
   },
+  general: {
+    cancel: "Cancel"
+  }
 } as unknown as Dictionary;
 
 vi.mock('@/app/[lang]/Providers', () => ({
