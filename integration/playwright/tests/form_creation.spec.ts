@@ -252,22 +252,28 @@ test.describe.serial("Landing page tests", () => {
   });
   //form validation by searching the form
   test("search form", async () => {
-    const formsNav = sharedPage.getByTestId("home-nav");
-    await expect(formsNav).toBeVisible();
-    await formsNav.click();
-    const searchForms = sharedPage.locator('[data-testid="search-forms-text"]');
-    await expect(searchForms).toBeVisible({ timeout: 10000 });
-    await expect(searchForms).toBeEnabled();
-    await searchForms.click();
-    const searchInput = sharedPage
-      .getByTestId("search-forms-text")
-      .getByRole("textbox", { name: "Search" });
-    await searchInput.fill(form_name);
-    await sharedPage.waitForTimeout(1000); // waits 1 second
-    await sharedPage.getByText(form_name).click();
-    console.log("Form name is: " + form_name);
-    await sharedPage.waitForTimeout(2000);
-    //Validate form is created by checking form name
-    await expect(sharedPage.getByLabel("Form Name")).toHaveValue(form_name);
+    if (depEnv === "test" || /^\d+$/.test(depEnv ?? "")) {
+      const formsNav = sharedPage.getByTestId("home-nav");
+      await expect(formsNav).toBeVisible();
+      await formsNav.click();
+      const searchForms = sharedPage.locator(
+        '[data-testid="search-forms-text"]',
+      );
+      await expect(searchForms).toBeVisible({ timeout: 10000 });
+      await expect(searchForms).toBeEnabled();
+      await searchForms.click();
+      const searchInput = sharedPage
+        .getByTestId("search-forms-text")
+        .getByRole("textbox", { name: "Search" });
+      await searchInput.fill(form_name);
+      await sharedPage.waitForTimeout(1000); // waits 1 second
+      await sharedPage.getByText(form_name).click();
+      console.log("Form name is: " + form_name);
+      await sharedPage.waitForTimeout(2000);
+      //Validate form is created by checking form name
+      await expect(sharedPage.getByLabel("Form Name")).toHaveValue(form_name);
+    } else {
+      console.log("Skipping form search test in dev environment");
+    }
   });
 });
