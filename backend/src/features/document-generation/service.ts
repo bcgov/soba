@@ -21,6 +21,7 @@ import { createDocumentGenerationAudit } from '../../core/db/repos/documentGener
 import { SubmissionService } from '../../core/services/submissionService';
 import { AppError, ServiceUnavailableError } from '../../core/errors';
 import { log, getCorrelationId } from '../../core/logging';
+import { documentGenerationConfigurationService } from './configurationService';
 
 // Opaque CDOGS payload parts, passed through to the backend adapter as { template, options, data }.
 type PayloadObject = Record<string, unknown>;
@@ -35,16 +36,18 @@ export interface PreviewInput {
 
 export interface PrintInput {
   submissionId: string;
-  template: PayloadObject;
+  /** Deprecated input retained for API compatibility; print uses the form's configured template. */
+  template?: PayloadObject;
   options?: PayloadObject;
 }
 
 export type DocumentRenderOutcome =
-  | { status: 'ok'; code: string; data: Buffer; contentType?: string }
+  | { status: 'ok'; code: string; data: Buffer; contentType?: string; reportName?: string }
   | { status: 'error'; code: string; error: unknown }
   | { status: 'notfound' }
   | { status: 'denied' }
   | { status: 'unavailable' }
+  | { status: 'unconfigured' }
   | { status: 'no-content' };
 
 interface ResolvedScope {
@@ -139,6 +142,7 @@ async function renderWith(
   scope: ResolvedScope,
   body: { template: PayloadObject; options?: PayloadObject; data: PayloadObject },
   audit: AuditContext,
+  reportName?: string,
 ): Promise<DocumentRenderOutcome> {
   const code = await resolveBackendCode(scope);
   if (!code) return { status: 'unavailable' };
@@ -163,7 +167,7 @@ async function renderWith(
       outcome: DocumentGenerationOutcome.success,
       durationMs: Date.now() - startedAt,
     });
-    return { status: 'ok', code, data: result.data, contentType: result.contentType };
+    return { status: 'ok', code, data: result.data, contentType: result.contentType, reportName };
   } catch (err) {
     // CDOGS HTTP failures are already mapped AppErrors; a config/construct or unexpected failure is a
     // plain Error — log it for ops and surface a generic 503 so we never leak internals or return 500.
@@ -232,6 +236,11 @@ export const documentGenerationService = {
     if (!record) return { status: 'notfound' };
     if (!(await canPrint(scope.workspaceId, caller, record))) return { status: 'denied' };
 
+    const configured = await documentGenerationConfigurationService.loadDefaultTemplate(
+      scope.formId,
+    );
+    if (!configured) return { status: 'unconfigured' };
+
     // Persisted answer document from the engine (the plugin shapes it for the template). Pass the
     // record we already loaded so getContent doesn't re-read it.
     const data = await submissionReader.getContent({
@@ -243,8 +252,15 @@ export const documentGenerationService = {
 
     return renderWith(
       scope,
-      { template: input.template, options: input.options, data },
+      {
+        template: configured.template,
+        options: configured.printableName
+          ? { ...input.options, reportName: configured.printableName }
+          : input.options,
+        data,
+      },
       { mode: DocumentGenerationMode.print, caller, submissionId: input.submissionId },
+      configured.printableName ?? undefined,
     );
   },
 };

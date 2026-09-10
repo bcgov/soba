@@ -27,6 +27,12 @@ jest.mock('../../../src/core/services/submissionService', () => ({
 jest.mock('../../../src/core/db/repos/documentGenerationAuditRepo', () => ({
   createDocumentGenerationAudit: jest.fn(),
 }));
+const loadDefaultTemplateMock = jest.fn();
+jest.mock('../../../src/features/document-generation/configurationService', () => ({
+  documentGenerationConfigurationService: {
+    loadDefaultTemplate: loadDefaultTemplateMock,
+  },
+}));
 
 import { documentGenerationService } from '../../../src/features/document-generation/service';
 import * as submissionRepo from '../../../src/core/db/repos/submissionRepo';
@@ -78,6 +84,7 @@ beforeEach(() => {
   createAdapter.mockReturnValue({ render: renderMock });
   getContentMock.mockResolvedValue({ data: { field: 'saved' } });
   createAudit.mockResolvedValue(undefined);
+  loadDefaultTemplateMock.mockResolvedValue({ template, printableName: 'configured-document' });
 });
 
 describe('documentGenerationService.preview', () => {
@@ -176,6 +183,34 @@ describe('documentGenerationService.preview', () => {
 });
 
 describe('documentGenerationService.print', () => {
+  it('renders with the configured default template and printable name', async () => {
+    hasFormSubmitAccess.mockResolvedValue(true);
+
+    const outcome = await documentGenerationService.print(caller, {
+      submissionId: 's1',
+      template: { content: 'caller-template' },
+      options: { convertTo: 'pdf', reportName: 'caller-name' },
+    });
+
+    expect(renderMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        template,
+        options: { convertTo: 'pdf', reportName: 'configured-document' },
+      }),
+    );
+    expect(outcome).toMatchObject({ status: 'ok', reportName: 'configured-document' });
+  });
+
+  it('is unconfigured when the form has no default template', async () => {
+    hasFormSubmitAccess.mockResolvedValue(true);
+    loadDefaultTemplateMock.mockResolvedValue(null);
+
+    const outcome = await documentGenerationService.print(caller, { submissionId: 's1' });
+
+    expect(outcome.status).toBe('unconfigured');
+    expect(renderMock).not.toHaveBeenCalled();
+  });
+
   it('lets staff with submission_read print any submission', async () => {
     getSubmissionRecordById.mockResolvedValue({ submittedBy: 'someone-else' });
     hasFormSubmitAccess.mockImplementation((_w, _c, p) => Promise.resolve(p === 'submission_read'));

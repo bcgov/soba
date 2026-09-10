@@ -177,6 +177,9 @@ backend:
 
   # -- configmap-document-generation: PLUGIN_CDOGS_* + default backend code
   documentGeneration:
+    # Storage profile used for uploaded templates. Environment overlays with a dedicated templates
+    # profile override this; default keeps ephemeral/PR environments functional.
+    templateStorageProfile: default
     cdogsV2:
       endpoint: ""
       tokenUrl: ""

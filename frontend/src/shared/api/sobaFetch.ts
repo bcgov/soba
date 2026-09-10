@@ -7,6 +7,8 @@ export type SobaFetchOptions = {
   method?: string;
   /** JSON body; serialized and sent with a Content-Type: application/json header. */
   json?: unknown;
+  /** Multipart body; sent without setting Content-Type so the browser adds its boundary. */
+  formData?: FormData;
   /** Additional query params. */
   query?: Record<string, string | number | boolean | undefined | null>;
   headers?: Record<string, string>;
@@ -29,7 +31,7 @@ function send(
   url: string,
   options: SobaFetchOptions,
   token: string | undefined,
-  body: string | undefined,
+  body: BodyInit | undefined,
 ): Promise<Response> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -38,7 +40,7 @@ function send(
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-  if (body !== undefined) {
+  if (options.json !== undefined) {
     headers['Content-Type'] = 'application/json';
   }
 
@@ -82,7 +84,8 @@ async function resolveToken(callerToken: string): Promise<string> {
  */
 export async function sobaFetch(path: string, options: SobaFetchOptions = {}): Promise<Response> {
   const url = buildUrl(path, options);
-  const body = options.json !== undefined ? JSON.stringify(options.json) : undefined;
+  const body =
+    options.formData ?? (options.json !== undefined ? JSON.stringify(options.json) : undefined);
   const token = options.token ? await resolveToken(options.token) : undefined;
 
   const response = await send(url, options, token, body);

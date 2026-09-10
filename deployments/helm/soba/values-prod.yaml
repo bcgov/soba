@@ -35,6 +35,7 @@ backend:
       accessMode: ReadWriteMany
       size: 1Gi
   documentGeneration:
+    templateStorageProfile: templates
     cdogsV2:
       endpoint: https://cdogs.api.gov.bc.ca/api
       tokenUrl: https://loginproxy.gov.bc.ca/auth/realms/comsvcauth/protocol/openid-connect/token
