@@ -182,8 +182,9 @@ export const createForm = async (input: CreateFormInput, tx?: DbOrTx): Promise<F
     .where(eq(workspaces.id, input.workspaceId))
     .limit(1);
 
-  const org = ws[0]?.org ?? '';
-  const useCase = ws[0]?.useCase ?? '';
+  //since this doesn't null coalesce this throws if it isn't found
+  const org = ws[0]?.org;
+  const useCase = ws[0]?.useCase;
 
   const created = await d
     .insert(forms)

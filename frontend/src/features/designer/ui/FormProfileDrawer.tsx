@@ -88,6 +88,7 @@ export default function FormProfileDrawer({
 
   return (
     <FormSettingsDrawers
+      dict={dict}
       id={drawerName}
       label={dict.form.settings.profileDrawerLabel}
       onSave={saveChanges}
@@ -110,7 +111,7 @@ export default function FormProfileDrawer({
         label={dict.workspaces.useCase}
         selectionMode="single"
         size="medium"
-        data-testid="workspace-use-case"
+        data-testid="form-profile-use-case"
         isRequired={true}
         isDisabled={saving}
         value={useCase}

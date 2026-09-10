@@ -78,6 +78,7 @@ export default function FormSettingsDrawer({
 
   return (
     <FormSettingsDrawers
+      dict={dict}
       id={drawerName}
       label={dict.form.settings.formSettingsDrawerLabel}
       onSave={saveChanges}
