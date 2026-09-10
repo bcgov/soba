@@ -245,7 +245,7 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
             form={form}
             onAction={handleAction}
             designModeEnabled={designModeEnabled}
-            submitLabel={dict.form?.submit || 'Submit'}
+            submitLabel={dictForm?.submit || 'Submit'}
             submissionsLabel={dict.submission?.submissions || 'Submissions'}
           />
         ),
@@ -269,13 +269,18 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
       },
     ],
     [
-      handleAction,
-      dictFormList,
-      dictForm,
-      dict.workspaces,
-      workspaces,
       designModeEnabled,
+      dictForm?.submit,
+      dict.submission?.submissions,
+      dict.workspaces?.workspace,
+      dictForm?.nameLabel,
+      dictFormList?.columns?.createdAt,
+      dictFormList?.columns?.createdBy,
+      dictFormList?.columns?.name,
+      dictFormList?.columns?.quickLinks,
       formatLongDate,
+      handleAction,
+      workspaces,
     ],
   );
 
@@ -315,11 +320,7 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
           allLabel={dict.workspaces.allWorkspaces}
           size="medium"
         />
-        <DSButton
-          variant="secondary"
-          data-testid="clear-filters-button"
-          onPress={listQuery.clear}
-        >
+        <DSButton variant="secondary" data-testid="clear-filters-button" onPress={listQuery.clear}>
           {dict.general.clearFilters || 'Clear'}
         </DSButton>
       </div>

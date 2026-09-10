@@ -325,6 +325,9 @@ function FormForm({ formId }: { formId?: string }) {
   }
 
   const renderToolBar = () => {
+    if (draftUnavailable) {
+      return <></>;
+    }
     return (
       <div className={`${styles.stickyActions} p-3 d-flex gap-2 w-100`}>
         {formId && (

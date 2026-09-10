@@ -3,6 +3,7 @@
 import { Button, Accordion, Form } from '@bcgov/design-system-react-components';
 
 interface FormSettingsDrawersProps {
+  dict: Dictionary;
   children: React.ReactNode;
   id: string;
   label: string;
@@ -11,6 +12,7 @@ interface FormSettingsDrawersProps {
 }
 
 export default function FormSettingsDrawers({
+  dict,
   children,
   id,
   label,
@@ -24,14 +26,14 @@ export default function FormSettingsDrawers({
           {children}
           <div className="d-md-flex mt-2 justify-content-start gap-2 mt-3 w-100">
             <Button data-testid={`form-settings-${id}-save`} onClick={onSave}>
-              Save
+              {dict.general.save}
             </Button>
             <Button
               data-testid={`form-settings-${id}-cancel`}
               onClick={onCancel}
               variant="secondary"
             >
-              Cancel
+              {dict.general.cancel}
             </Button>
           </div>
         </Form>
