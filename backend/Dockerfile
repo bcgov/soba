@@ -1,4 +1,4 @@
-FROM node:lts-alpine
+FROM node:lts-alpine AS builder
 
 # enable pnpm via corepack and ensure workspace installs work
 RUN corepack enable pnpm
@@ -17,6 +17,12 @@ RUN pnpm install --filter ./lib --frozen-lockfile && pnpm install --filter ./bac
 COPY . .
 # OpenShift / arbitrary UID: run non-root; g=u lets assigned user (often gid 0) read /app
 RUN pnpm --filter ./backend run build && chgrp -R 0 /app && chmod -R g=u /app
+
+FROM node:lts-alpine AS runner
+WORKDIR /app
+# copied out of the builder so /app ships once; the chmod -R there writes a second copy of it
+COPY --from=builder /app ./
+
 # OpenShift: arbitrary UID + read-only root — never invoke pnpm/corepack at runtime (corepack mkdirs under $HOME/.cache; HOME can be unset)
 ENV HOME=/tmp
 ENV XDG_CACHE_HOME=/tmp/.cache
