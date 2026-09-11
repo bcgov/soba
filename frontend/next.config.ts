@@ -1,12 +1,16 @@
 import type { NextConfig } from 'next';
 import { join } from 'path';
 
+const basePath = process.env.BASE_PATH || '';
+
 const nextConfig: NextConfig = {
   output: 'standalone',
   // Overridable so a second local dev server (forms/submit-mode) can build into its
   // own dir instead of racing the designer server on .next. Unset in Docker → .next.
   distDir: process.env.NEXT_DIST_DIR || '.next',
-  basePath: process.env.BASE_PATH || '',
+  basePath,
+  // Inlined into the browser bundle for URLs built outside the router.
+  env: { NEXT_PUBLIC_BASE_PATH: basePath },
   // React Aria ships ESM that needs transpiling for the App Router server
   // graph; without this, SSR fails with "createContext is not a function".
   transpilePackages: ['react-aria-components', '@bcgov/design-system-react-components'],
