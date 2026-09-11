@@ -169,14 +169,14 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
     (name: string, id: string) => {
       if (name === 'manage') {
         if (designModeEnabled) {
-          router.push(`/${locale}/designer/${id}`);
+          router.push(`/${locale}/build/${id}`);
         } else {
           router.push(`/${locale}/form/${id}`);
         }
       } else if (name === 'submit') {
-        router.push(`/${locale}/designer/${id}?tab=share`);
+        router.push(`/${locale}/build/${id}?tab=share`);
       } else if (name === 'submissions') {
-        router.push(`/${locale}/designer/${id}?tab=submissions`);
+        router.push(`/${locale}/build/${id}?tab=submissions`);
       }
     },
     [router, locale, designModeEnabled],
@@ -304,7 +304,7 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
             variant="primary"
             data-testid="create-form-button"
             isDisabled={!canCreate}
-            onPress={() => router.push(`/${locale}/designer`)}
+            onPress={() => router.push(`/${locale}/build`)}
           >
             {dict.general.create}
           </DSButton>
