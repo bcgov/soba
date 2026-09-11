@@ -9,6 +9,7 @@ type RowActionButtonProps = {
   main?: boolean;
   onPress: () => void;
   children: React.ReactNode;
+  'aria-label'?: string;
   'data-testid'?: string;
 };
 
@@ -24,11 +25,12 @@ export function RowActionButton({
   main = false,
   onPress,
   children,
+  'aria-label': ariaLabel,
   'data-testid': testId,
 }: RowActionButtonProps) {
   return (
     <span className={main ? styles.main : undefined}>
-      <Button variant="link" size="small" data-testid={testId} onPress={onPress}>
+      <Button variant="link" size="small" aria-label={ariaLabel} data-testid={testId} onPress={onPress}>
         {children}
       </Button>
     </span>

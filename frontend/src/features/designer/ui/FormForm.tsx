@@ -29,7 +29,7 @@ import FormShareTab from './FormShareTab';
 import { FormSubmitterAudience } from './FormSubmitterAudience';
 import { isWorkspaceManageRole } from '@/src/features/workspaces/workspaceRoles';
 import { useWorkspaces, useWritableWorkspaces } from '@/src/shared/api/useWorkspaces';
-import { useFormDraft } from '@/src/features/designer/useFormDraft';
+import { useForm } from '@/src/features/designer/useForm';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
 import {
@@ -144,7 +144,7 @@ function FormForm({ formId }: { formId?: string }) {
     selectVersion,
     refreshForm,
     refreshVersions,
-  } = useFormDraft(formId);
+  } = useForm(formId);
 
   // A draft that failed to load leaves nothing to edit, save or publish. Distinct from `loading`,
   // which these reads leave behind for good once a read has failed.
@@ -175,9 +175,14 @@ function FormForm({ formId }: { formId?: string }) {
     }),
   );
 
-  const createNewVersion = async (sourceSchema?: FormType) => {
-    if (isSaving || draftUnavailable || !token) return;
-    if (!formId) return;
+  const clickNewVersion = async () => {
+    await createNewVersion();
+  };
+
+  /** True once the new version exists and is selected. Callers navigate only on true. */
+  const createNewVersion = async (sourceSchema?: FormType): Promise<boolean> => {
+    if (isSaving || draftUnavailable || !token) return false;
+    if (!formId) return false;
     setIsSaving(true);
 
     try {
@@ -198,21 +203,33 @@ function FormForm({ formId }: { formId?: string }) {
         ).replace('{version}', String(newVersion.versionNo)),
         type: 'success',
       });
+      return true;
     } catch (e: unknown) {
       addNotification({
         text: dict.form.createVersionError || 'Failed to create new version.',
         type: 'error',
         consoleError: e,
       });
+      return false;
     } finally {
       setIsSaving(false);
     }
   };
 
-  const restoreVersionAsNew = async (version: SobaFormVersionType) => {
-    if (!token) return;
-    const schema = (await getFormVersionSchema(token, version.id)) as FormType | null;
-    await createNewVersion(schema ?? undefined);
+  const restoreVersionAsNew = async (version: SobaFormVersionType): Promise<boolean> => {
+    if (!token) return false;
+    let schema: FormType | null;
+    try {
+      schema = (await getFormVersionSchema(token, version.id)) as FormType | null;
+    } catch (e: unknown) {
+      addNotification({
+        text: dict.form.createVersionError || 'Failed to create new version.',
+        type: 'error',
+        consoleError: e,
+      });
+      return false;
+    }
+    return createNewVersion(schema ?? undefined);
   };
 
   const saveFormPublish = async () => {
@@ -254,10 +271,9 @@ function FormForm({ formId }: { formId?: string }) {
 
     try {
       if (currentVersion?.id) {
-        await updateSobaForm(token as string, formId as string, {
-          name: formName,
-          description: formDesc,
-        });
+        // Only the name is edited here. Sending any other field would write back whatever this
+        // screen last read over a change made from the settings tab.
+        await updateSobaForm(token as string, formId as string, { name: formName });
         await saveFormVersionSchema(token as string, currentVersion.id, schema);
         if (publish) {
           await publishSobaFormVersion(token as string, currentVersion.id);
@@ -319,6 +335,54 @@ function FormForm({ formId }: { formId?: string }) {
       </div>
     );
   }
+
+  const renderToolBar = () => {
+    if (draftUnavailable) {
+      return <></>;
+    }
+    return (
+      <div className={`${styles.stickyActions} p-3 d-flex gap-2 w-100`}>
+        {formId && (
+          <Button
+            variant="secondary"
+            data-testid="new-version-button"
+            onPress={clickNewVersion}
+            isDisabled={isSaving || loading}
+          >
+            {getNewVersionLabel()}
+          </Button>
+        )}
+        <Button
+          variant="secondary"
+          onPress={saveFormDraft}
+          data-testid="save-form-button"
+          isDisabled={isHistoryView || isCurrentPublished || isSaving || loading}
+        >
+          {isSaving ? dict.form.saving || 'Saving...' : dict.form.save || 'Save'}
+        </Button>
+        <Button
+          variant="secondary"
+          data-testid="preview-form-button"
+          onPress={() => setShowPreview(true)}
+          isDisabled={isSaving || loading}
+        >
+          {dict.form.preview || 'Preview'}
+        </Button>
+        {formId && (
+          <span className="d-inline-flex" title={getPublishTitle()}>
+            <Button
+              variant="primary"
+              data-testid="publish-form-button"
+              onPress={saveFormPublish}
+              isDisabled={isHistoryView || isCurrentPublished || isDirty || isSaving || loading}
+            >
+              {dict.form.publish || 'Publish'}
+            </Button>
+          </span>
+        )}
+      </div>
+    );
+  };
 
   const renderFormBuilder = () => {
     if (!formId) {
@@ -423,52 +487,9 @@ function FormForm({ formId }: { formId?: string }) {
         />
       </Form>
 
+      {renderToolBar()}
       {/* Form Builder */}
       <div className={styles.designerWrapper}>{renderFormBuilder()}</div>
-
-      {/* Spacer so the builder clears the fixed action bar */}
-      <div className="mb-5 pb-5" />
-
-      <div
-        className={`${styles.floatingActions} shadow-lg p-3 rounded-pill d-flex gap-2 bg-white border`}
-      >
-        {formId && (
-          <Button
-            variant="secondary"
-            onPress={() => createNewVersion()}
-            isDisabled={isSaving || draftUnavailable}
-          >
-            {getNewVersionLabel()}
-          </Button>
-        )}
-        <Button
-          variant="primary"
-          onPress={saveFormDraft}
-          isDisabled={isHistoryView || isCurrentPublished || isSaving || draftUnavailable}
-        >
-          {isSaving ? dict.form.saving || 'Saving...' : dict.form.save || 'Save'}
-        </Button>
-        <Button
-          variant="tertiary"
-          onPress={() => setShowPreview(true)}
-          isDisabled={isSaving || draftUnavailable}
-        >
-          {dict.form.preview || 'Preview'}
-        </Button>
-        {formId && (
-          <span className="d-inline-flex" title={getPublishTitle()}>
-            <Button
-              variant="primary"
-              onPress={saveFormPublish}
-              isDisabled={
-                isHistoryView || isCurrentPublished || isDirty || isSaving || draftUnavailable
-              }
-            >
-              {dict.form.publish || 'Publish'}
-            </Button>
-          </span>
-        )}
-      </div>
     </>
   );
 
@@ -477,6 +498,7 @@ function FormForm({ formId }: { formId?: string }) {
       {formId ? (
         <Tabs
           id="form-designer-tabs"
+          aria-label={dict.form.designerTabs || 'Form Designer tabs'}
           activeKey={activeTab}
           onSelect={(k) => openTab(k || 'designer')}
           className="mb-3"
@@ -497,7 +519,7 @@ function FormForm({ formId }: { formId?: string }) {
             disabled={isSaving || draftUnavailable}
             title={dict.form.settingsTab || 'Settings'}
           >
-            <FormSettingsTab dict={dict} />
+            <FormSettingsTab dict={dict} formId={formId} />
           </Tab>
           <Tab
             eventKey="team"
@@ -559,7 +581,11 @@ function FormForm({ formId }: { formId?: string }) {
         onClose={() => setShowPreview(false)}
         size="lg"
         footer={
-          <Button variant="secondary" onPress={() => setShowPreview(false)}>
+          <Button
+            variant="secondary"
+            data-testid="close-preview-button"
+            onPress={() => setShowPreview(false)}
+          >
             {dict.form.closePreview || 'Close Preview'}
           </Button>
         }

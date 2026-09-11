@@ -222,7 +222,10 @@ const FormDesigner: React.FC<DesignerProps> = ({
     <section className="p-4 w-100 min-vh-100 position-relative">
       {sidebarEl &&
         createPortal(
-          <div className="p-2 mt-2 border-top bg-light">
+          <div
+            className="p-2 mt-2 border-top bg-light"
+            style={{ position: 'sticky', top: 'var(--app-header-height)' }}
+          >
             <button
               className="mb-2 d-block btn btn-sm btn-outline-secondary w-100"
               onClick={handleExport}

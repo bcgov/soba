@@ -17,7 +17,7 @@ interface FormHistoryTabProps {
   dict: Dictionary;
   formId?: string;
   onSelectVersion: (versionId: string) => void;
-  onRestoreVersion: (version: SobaFormVersionType) => Promise<void>;
+  onRestoreVersion: (version: SobaFormVersionType) => Promise<boolean>;
   onNavigateToDesigner?: () => void;
 }
 
@@ -51,7 +51,13 @@ export default function FormHistoryTab({
 
   const restore = useCallback(
     (version: SobaFormVersionType) => {
-      void onRestoreVersion(version).then(() => onNavigateToDesigner?.());
+      // A restore that failed leaves the designer on the old draft, so staying put is the honest
+      // result. The caller reports the failure.
+      void onRestoreVersion(version)
+        .then((created) => {
+          if (created) onNavigateToDesigner?.();
+        })
+        .catch(() => undefined);
     },
     [onRestoreVersion, onNavigateToDesigner],
   );

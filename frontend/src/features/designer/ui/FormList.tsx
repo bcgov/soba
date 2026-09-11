@@ -29,10 +29,14 @@ const CustomActionButtons = ({
   form,
   onAction,
   designModeEnabled,
+  submitLabel,
+  submissionsLabel,
 }: {
   form: SobaFormSummary;
   onAction: (name: string, id: string) => void;
   designModeEnabled?: boolean;
+  submitLabel: string;
+  submissionsLabel: string;
 }) => {
   // All actions (manage/submit/submissions) are keyed on the SOBA formId.
   const sobaFormId = form.id;
@@ -41,8 +45,8 @@ const CustomActionButtons = ({
   // Both quick links open designer tabs, and the designer page 404s without design mode.
   if (designModeEnabled) {
     actions.push(
-      { name: 'submit', icon: <FaLink /> },
-      { name: 'submissions', icon: <FaDatabase /> },
+      { name: 'submit', icon: <FaLink />, ariaLabel: submitLabel },
+      { name: 'submissions', icon: <FaDatabase />, ariaLabel: submissionsLabel },
     );
   }
 
@@ -51,6 +55,7 @@ const CustomActionButtons = ({
       {actions.map((action) => (
         <RowActionButton
           key={action.name}
+          aria-label={action.ariaLabel}
           data-testid={action.name + '-' + sobaFormId + '-button'}
           onPress={() => {
             if (!sobaFormId) return;
@@ -240,6 +245,8 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
             form={form}
             onAction={handleAction}
             designModeEnabled={designModeEnabled}
+            submitLabel={dictForm?.submit || 'Submit'}
+            submissionsLabel={dict.submission?.submissions || 'Submissions'}
           />
         ),
       },
@@ -262,13 +269,18 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
       },
     ],
     [
-      handleAction,
-      dictFormList,
-      dictForm,
-      dict.workspaces,
-      workspaces,
       designModeEnabled,
+      dictForm?.submit,
+      dict.submission?.submissions,
+      dict.workspaces?.workspace,
+      dictForm?.nameLabel,
+      dictFormList?.columns?.createdAt,
+      dictFormList?.columns?.createdBy,
+      dictFormList?.columns?.name,
+      dictFormList?.columns?.quickLinks,
       formatLongDate,
+      handleAction,
+      workspaces,
     ],
   );
 
@@ -308,11 +320,7 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
           allLabel={dict.workspaces.allWorkspaces}
           size="medium"
         />
-        <DSButton
-          variant="secondary"
-          data-testid="clear-filters-button"
-          onPress={listQuery.clear}
-        >
+        <DSButton variant="secondary" data-testid="clear-filters-button" onPress={listQuery.clear}>
           {dict.general.clearFilters || 'Clear'}
         </DSButton>
       </div>
