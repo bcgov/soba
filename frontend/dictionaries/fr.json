@@ -258,6 +258,7 @@
     "exportJson": "Exporter JSON",
     "importJson": "Importer JSON",
     "designerTab": "Formulaire",
+    "designerTabs": "Onglets du concepteur de formulaire",
     "teamTab": "Accès",
     "settingsTab": "Paramètres",
     "historyTab": "Version l'historique",

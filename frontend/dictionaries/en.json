@@ -257,6 +257,7 @@
     "exportJson": "Export JSON",
     "importJson": "Import JSON",
     "designerTab": "Form",
+    "designerTabs": "Form Designer tabs",
     "teamTab": "Access",
     "settingsTab": "Settings",
     "historyTab": "Version History",

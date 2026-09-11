@@ -5,10 +5,12 @@ import userEvent from '@testing-library/user-event';
 import FormSettingsDrawer from '@/src/features/designer/ui/FormSettingsDrawer';
 import type { Dictionary } from '@/src/types/plugins';
 
-const { mockUpdateSobaForm, mockRefreshForm, mockAddNotification } = vi.hoisted(() => ({
+const { mockUpdateSobaForm, mockRefreshForm, mockAddNotification, loaded } = vi.hoisted(() => ({
   mockUpdateSobaForm: vi.fn(),
   mockRefreshForm: vi.fn(),
   mockAddNotification: vi.fn(),
+  // Stands in for the shared SWR key: a write anywhere changes what every reader sees.
+  loaded: { description: 'Initial description' },
 }));
 
 vi.mock('@/src/shared/api/sobaApiDesign', () => ({
@@ -21,7 +23,7 @@ vi.mock('@/lib/hooks/useKeycloak', () => ({
 
 vi.mock('@/src/features/designer/useForm', () => ({
   useForm: () => ({
-    form: { description: 'Initial description' },
+    form: loaded,
     refreshForm: mockRefreshForm,
   }),
 }));
@@ -34,7 +36,7 @@ vi.mock('@/lib/hooks/useNotificationStore', () => ({
 
 const mockDict = {
   form: {
-    save: "Save",
+    save: 'Save',
     settings: {
       formSettingsDrawerLabel: 'Form Settings',
       formSettingsDrawerSaveSuccessMessage: 'Changes saved successfully.',
@@ -43,8 +45,8 @@ const mockDict = {
     descriptionLabel: 'Description',
   },
   general: {
-    cancel: "Cancel"
-  }
+    cancel: 'Cancel',
+  },
 } as unknown as Dictionary;
 
 vi.mock('@/app/[lang]/Providers', () => ({
@@ -54,6 +56,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
 describe('FormSettingsDrawer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    loaded.description = 'Initial description';
   });
 
   function renderDrawer() {
@@ -138,5 +141,30 @@ describe('FormSettingsDrawer', () => {
 
     expect(textarea).toHaveValue('Initial description');
     expect(mockUpdateSobaForm).not.toHaveBeenCalled();
+  });
+
+  // The description is edited here and written from the designer's save, so a field left alone has
+  // to follow the record rather than the copy this drawer was mounted with.
+  it('shows a description written elsewhere when the field is untouched', () => {
+    const { rerender } = renderDrawer();
+
+    loaded.description = 'Written somewhere else';
+    rerender(<FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />);
+
+    const textarea = screen.getByTestId('form-settings-description').querySelector('textarea')!;
+    expect(textarea).toHaveValue('Written somewhere else');
+  });
+
+  it('keeps an in-progress edit when the record changes underneath', async () => {
+    const { rerender } = renderDrawer();
+
+    const textarea = screen.getByTestId('form-settings-description').querySelector('textarea')!;
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, 'Half typed');
+
+    loaded.description = 'Written somewhere else';
+    rerender(<FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />);
+
+    expect(textarea).toHaveValue('Half typed');
   });
 });
