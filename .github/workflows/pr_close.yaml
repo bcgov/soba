@@ -100,8 +100,26 @@ jobs:
           RELEASE: ${{ needs.set-vars.outputs.RELEASE }}
           NAMESPACE: ${{ secrets.OC_NAMESPACE }}
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
+          SLOT: ${{ needs.set-vars.outputs.SLOT }}
         run: |
+          set -euo pipefail
+
+          MONGO_RELEASE="soba-pr-${PR_NUM}-slot-${SLOT}-mongodb"
+          MONGO_LABEL="app.kubernetes.io/instance=${MONGO_RELEASE}"
           LABEL="app.kubernetes.io/instance=${RELEASE}"
+
+          if helm status "${MONGO_RELEASE}" -n "${NAMESPACE}" &>/dev/null; then
+            echo "Uninstalling MongoDB Helm release ${MONGO_RELEASE}..."
+            helm uninstall "${MONGO_RELEASE}" --namespace "${NAMESPACE}" || true
+          else
+            echo "MongoDB release ${MONGO_RELEASE} not found, skipping helm uninstall."
+          fi
+
+          echo "Sweeping MongoDB resources with label ${MONGO_LABEL}..."
+          oc delete all,pvc,configmap,serviceaccount,networkpolicy,poddisruptionbudget \
+            -l "${MONGO_LABEL}" \
+            -n "${NAMESPACE}" \
+            --ignore-not-found
 
           if ! helm status "${RELEASE}" -n "${NAMESPACE}" &>/dev/null; then
             echo "Release ${RELEASE} not found, nothing to clean up."

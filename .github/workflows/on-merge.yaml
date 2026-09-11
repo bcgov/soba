@@ -113,6 +113,20 @@ jobs:
           label: dev database
       # Pipeline performance fix: Revert if needed.
 
+      - name: Deploy MongoDB
+        env:
+          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+        run: |
+          set -euo pipefail
+
+          helm dependency build deployments/helm/action-mongodb
+
+          helm upgrade --install "soba-dev-mongodb" deployments/helm/action-mongodb \
+            --namespace "${NAMESPACE}" \
+            --wait \
+            --timeout 660s \
+            -f deployments/helm/action-mongodb/values-dev.yaml
+
       - name: Generate values override and deploy
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -121,7 +135,15 @@ jobs:
           SHORT_SHA: ${{ needs.build.outputs.short_sha }}
           DOMAIN: ${{ vars.OC_DOMAIN }}
         run: |
+          set -euo pipefail
           REPO_LC=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          MONGODB_FORMIO_PASSWORD=$(
+            oc get secret soba-dev-mongodb-auth \
+              -n "${NAMESPACE}" \
+              -o jsonpath='{.data.mongodb-passwords}' | base64 -d
+          )
+          MONGODB_FORMIO_PASSWORD_ENCODED=$(jq -rn --arg v "${MONGODB_FORMIO_PASSWORD}" '$v|@uri')
+          MONGODB_URI="mongodb://formio:${MONGODB_FORMIO_PASSWORD_ENCODED}@soba-dev-mongodb-0.soba-dev-mongodb-headless:27017/formio-ce?replicaSet=rs0&authSource=formio-ce"
 
           cat > /tmp/values-override.yaml <<OVERRIDE
           backend:
@@ -145,6 +167,11 @@ jobs:
           database:
             existingSecretName: "${{ steps.db.outputs.secret_name }}"
             existingSecretKey: "uri"
+          mongodb:
+            internal:
+              enabled: false
+            external:
+              uri: "${MONGODB_URI}"
           temporal:
             address: "temporal-frontend.${NAMESPACE}.svc.cluster.local:7233"
             namespace: "soba-dev"

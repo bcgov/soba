@@ -1,0 +1,41 @@
+mongodb:
+  enabled: true
+  fullnameOverride: ""
+
+  replicaCount: 1
+
+  auth:
+    existingSecret: soba-pr-mongodb-auth
+    usernames:
+      - formio
+    databases:
+      - formio-ce
+
+  persistence:
+    storageClass: netapp-block-standard
+    size: 1Gi
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+
+  pdb:
+    create: true
+    minAvailable: 1
+
+  podAntiAffinityPreset: soft
+
+  networkPolicy:
+    ingressPodMatchLabels:
+      app.kubernetes.io/name: soba
+      app.kubernetes.io/component: formio
+    extraEgress:
+      - ports:
+          - port: 5353
+            protocol: UDP
+          - port: 5353
+            protocol: TCP
