@@ -22,6 +22,8 @@ FROM node:lts-alpine AS runner
 WORKDIR /app
 # copied out of the builder so /app ships once; the chmod -R there writes a second copy of it
 COPY --from=builder /app ./
+# COPY keeps the file modes but not the mode of /app itself
+RUN chmod g=u /app
 
 # OpenShift: arbitrary UID + read-only root — never invoke pnpm/corepack at runtime (corepack mkdirs under $HOME/.cache; HOME can be unset)
 ENV HOME=/tmp

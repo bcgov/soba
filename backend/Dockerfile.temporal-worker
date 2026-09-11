@@ -22,6 +22,8 @@ FROM node:lts-slim AS runner
 WORKDIR /app
 # copied out of the builder so /app ships once; the chmod -R there writes a second copy of it
 COPY --from=builder /app ./
+# COPY keeps the file modes but not the mode of /app itself
+RUN chmod g=u /app
 
 ENV HOME=/tmp
 ENV XDG_CACHE_HOME=/tmp/.cache
