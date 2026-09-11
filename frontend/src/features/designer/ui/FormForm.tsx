@@ -179,9 +179,10 @@ function FormForm({ formId }: { formId?: string }) {
     await createNewVersion();
   };
 
-  const createNewVersion = async (sourceSchema?: FormType) => {
-    if (isSaving || draftUnavailable || !token) return;
-    if (!formId) return;
+  /** True once the new version exists and is selected. Callers navigate only on true. */
+  const createNewVersion = async (sourceSchema?: FormType): Promise<boolean> => {
+    if (isSaving || draftUnavailable || !token) return false;
+    if (!formId) return false;
     setIsSaving(true);
 
     try {
@@ -202,21 +203,33 @@ function FormForm({ formId }: { formId?: string }) {
         ).replace('{version}', String(newVersion.versionNo)),
         type: 'success',
       });
+      return true;
     } catch (e: unknown) {
       addNotification({
         text: dict.form.createVersionError || 'Failed to create new version.',
         type: 'error',
         consoleError: e,
       });
+      return false;
     } finally {
       setIsSaving(false);
     }
   };
 
-  const restoreVersionAsNew = async (version: SobaFormVersionType) => {
-    if (!token) return;
-    const schema = (await getFormVersionSchema(token, version.id)) as FormType | null;
-    await createNewVersion(schema ?? undefined);
+  const restoreVersionAsNew = async (version: SobaFormVersionType): Promise<boolean> => {
+    if (!token) return false;
+    let schema: FormType | null;
+    try {
+      schema = (await getFormVersionSchema(token, version.id)) as FormType | null;
+    } catch (e: unknown) {
+      addNotification({
+        text: dict.form.createVersionError || 'Failed to create new version.',
+        type: 'error',
+        consoleError: e,
+      });
+      return false;
+    }
+    return createNewVersion(schema ?? undefined);
   };
 
   const saveFormPublish = async () => {
@@ -258,10 +271,9 @@ function FormForm({ formId }: { formId?: string }) {
 
     try {
       if (currentVersion?.id) {
-        await updateSobaForm(token as string, formId as string, {
-          name: formName,
-          description: formDesc,
-        });
+        // Only the name is edited here. Sending any other field would write back whatever this
+        // screen last read over a change made from the settings tab.
+        await updateSobaForm(token as string, formId as string, { name: formName });
         await saveFormVersionSchema(token as string, currentVersion.id, schema);
         if (publish) {
           await publishSobaFormVersion(token as string, currentVersion.id);
@@ -433,7 +445,6 @@ function FormForm({ formId }: { formId?: string }) {
       >
         <TextField
           label={dict.form.nameLabel}
-          aria-label={dict.form.nameLabel}
           value={formName}
           onChange={setName}
           isDisabled={isHistoryView || isCurrentPublished}
@@ -487,7 +498,7 @@ function FormForm({ formId }: { formId?: string }) {
       {formId ? (
         <Tabs
           id="form-designer-tabs"
-          aria-label={dict.form.nameLabel || 'Form Designer Tabs'}
+          aria-label={dict.form.designerTabs || 'Form Designer tabs'}
           activeKey={activeTab}
           onSelect={(k) => openTab(k || 'designer')}
           className="mb-3"

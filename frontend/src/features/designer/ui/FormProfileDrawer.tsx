@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Select } from '@bcgov/design-system-react-components';
 
 import type { Dictionary } from '@/src/types/plugins';
-import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import FormSettingsDrawers from '@/src/features/designer/ui/FormSettingsDrawers';
 import { codeItems } from '@/src/shared/util/codeList';
 import { updateSobaForm } from '@/src/shared/api/sobaApiDesign';
@@ -27,26 +26,14 @@ export default function FormProfileDrawer({
   const { form, refreshForm } = useForm(formId);
   const { addNotification } = useNotificationStore();
 
-  const [ministryOrg, setMinistryOrg] = useState(form?.org || '');
-  const [initialMinistryOrg, setInitialMinistryOrg] = useState(form?.org || '');
-
-  const [useCase, setUseCase] = useState(form?.useCase || '');
-  const [initialUseCase, setInitialUseCase] = useState(form?.useCase || '');
-
+  // Edits layered over the loaded values. Null means no edit, so a refresh from anywhere shows
+  // through until the user picks something.
+  const [editedOrg, setEditedOrg] = useState<string | null>(null);
+  const [editedUseCase, setEditedUseCase] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [prevFormId, setPrevFormId] = useState<string | null>(null);
 
-  if (form && form.id !== prevFormId) {
-    setMinistryOrg(form.org || '');
-    setInitialMinistryOrg(form.org || '');
-    setUseCase(form.useCase || '');
-    setInitialUseCase(form.useCase || '');
-    setPrevFormId(form.id);
-  }
-
-  const loading = useMemo(() => {
-    return form === null;
-  }, [form]);
+  const ministryOrg = editedOrg ?? form?.org ?? '';
+  const useCase = editedUseCase ?? form?.useCase ?? '';
 
   const saveChanges = async () => {
     if (token !== undefined) {
@@ -63,8 +50,8 @@ export default function FormProfileDrawer({
             dict.form.settings.formSettingsDrawerSaveSuccessMessage ||
             'Changes saved successfully.',
         });
-        setInitialMinistryOrg(ministryOrg);
-        setInitialUseCase(useCase);
+        setEditedOrg(null);
+        setEditedUseCase(null);
       } catch {
         addNotification({
           type: 'error',
@@ -78,13 +65,9 @@ export default function FormProfileDrawer({
   };
 
   const cancelChanges = () => {
-    setMinistryOrg(initialMinistryOrg);
-    setUseCase(initialUseCase);
+    setEditedOrg(null);
+    setEditedUseCase(null);
   };
-
-  if (loading) {
-    return <CenteredProgress label={dict.general.loading} />;
-  }
 
   return (
     <FormSettingsDrawers
@@ -96,7 +79,7 @@ export default function FormProfileDrawer({
     >
       <p>{dict.form.settings.profileDrawerInfo}</p>
       <Select
-        items={codeItems(dict.ministries, initialMinistryOrg)}
+        items={codeItems(dict.ministries, form?.org)}
         label={dict.workspaces.yourOrgReq}
         selectionMode="single"
         size="medium"
@@ -104,10 +87,10 @@ export default function FormProfileDrawer({
         isRequired={true}
         isDisabled={saving}
         value={ministryOrg}
-        onChange={(newOrg) => setMinistryOrg(newOrg)}
+        onChange={(newOrg) => setEditedOrg(newOrg?.toString() ?? '')}
       />
       <Select
-        items={codeItems(dict.useCases, initialUseCase)}
+        items={codeItems(dict.useCases, form?.useCase)}
         label={dict.workspaces.useCase}
         selectionMode="single"
         size="medium"
@@ -115,7 +98,7 @@ export default function FormProfileDrawer({
         isRequired={true}
         isDisabled={saving}
         value={useCase}
-        onChange={(newUseCase) => setUseCase(newUseCase)}
+        onChange={(newUseCase) => setEditedUseCase(newUseCase?.toString() ?? '')}
       />
     </FormSettingsDrawers>
   );

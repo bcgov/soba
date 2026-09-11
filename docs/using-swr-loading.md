@@ -13,14 +13,7 @@ it.
 ```ts
 const { data, isLoading, error, mutate } = useAuthedSWR(
   formId && opened
-    ? [
-        "form-submissions",
-        formId,
-        query.offset,
-        query.limit,
-        query.sort,
-        query.q ?? "",
-      ]
+    ? ['form-submissions', formId, query.offset, query.limit, query.sort, query.q ?? '']
     : null,
   (token) =>
     getSobaSubmissions(token, {
@@ -86,7 +79,7 @@ must say which identity it is, or signing in gets served the anonymous reader's 
 ```ts
 !initStarted || initializing || !submissionId
   ? null
-  : ["submit-submission", submissionId, token ? "user" : "anonymous"];
+  : ['submit-submission', submissionId, token ? 'user' : 'anonymous'];
 ```
 
 `!initStarted` is the guard that matters. Before Keycloak has run, "no token" is the
@@ -103,17 +96,10 @@ requests.
 export function useWorkspaces() {
   const { data, isLoading, error, mutate } = useAuthedSWR<WorkspaceItem[]>(
     WORKSPACES_KEY,
-    async (token) =>
-      toItems((await fetchWorkspaces(token, PICKER_QUERY)).items),
+    async (token) => toItems((await fetchWorkspaces(token, PICKER_QUERY)).items),
     sessionReadConfig,
   );
-  return {
-    workspaces: data ?? EMPTY,
-    loaded: data !== undefined,
-    isLoading,
-    error,
-    mutate,
-  };
+  return { workspaces: data ?? EMPTY, loaded: data !== undefined, isLoading, error, mutate };
 }
 ```
 
@@ -162,22 +148,6 @@ router.push(navLink(`/${locale}/workspaces`));
 A paged list should be re-read after a write (`mutate` / `refresh`). Patching `items` in the
 cache leaves `page.total` and the sort order stale. How lists are declared and linked is in
 `docs/server-paged-lists.md`.
-
-When the write tells you what the row now holds, apply it to the cache instead of
-refetching the list:
-
-```ts
-await upsertFeatureScope(token, body);
-await mutate(
-  (current) =>
-    current ? { ...current, items: patched(current.items) } : current,
-  {
-    revalidate: false,
-  },
-);
-```
-
-Guard `current`. A key with nothing in it yet hands the updater `undefined`.
 
 To forget a key rather than patch it, go through the cache: `mutate(key, undefined)` reads
 as "revalidate", not "forget", and leaves the old value in place.
@@ -272,37 +242,6 @@ and takes keyboard focus with it. `isLoading` still reports the in-flight page.
 Hold the key at `null` until a URL id has been resolved against a list the user can see.
 Resolving too early scopes the request to nothing.
 
-```ts
-const selectedWorkspaceId =
-  workspaceParam && workspaces.some((w) => w.id === workspaceParam)
-    ? workspaceParam
-    : undefined;
-```
-
-Hold the key at `null` while the list you resolve against is still loading. Resolving too
-early scopes the request to nothing.
-
-An id that never resolves reads unscoped, and the screen says so: the picker returns to all
-workspaces and a notice explains that the filter was not applied, with a Clear action. Do
-not leave the table asserting a filter it does not have, and do not show an empty table
-instead, which asserts there is nothing to see. Use the same message for unknown and
-forbidden, so the page does not confirm which ids exist.
-
-Forget a rejected id rather than remembering it. It is not a view worth restoring, and the
-memory would otherwise hand it back on every arrival and raise the notice again.
-
-Write filter changes with `history.replaceState`, not `router.replace`. A router
-navigation re-runs the page's server component, which re-reads the features and build
-metadata for what is only a client-side change. Next keeps `useSearchParams` in sync with
-`replaceState`.
-
-`src/shared/list/listQueryMemory.ts` remembers a list's query per tab, so leaving and
-coming back returns it as the user left it. Declare the params your list owns in a
-`ListQuerySpec`. Links from inside the app carry `?from=nav` (use `navLink()`); a URL
-without it is a bookmark or someone else's link and means the unfiltered list. A URL that
-names a scope counts as a choice wherever it came from. A bare one does not touch the
-memory.
-
 ## Screens with their own loading
 
 `FormioV5SubmissionFillClient` and `StartSubmission`.
@@ -343,11 +282,6 @@ prerendered: the segment has no `generateStaticParams`, and the layout awaits tw
 `no-store` fetches. Adding either would turn the client-side-rendering bailout into a build
 failure on every list page.
 
-Search, page size, page and sort are still resolved client-side over a capped fetch and are
-not in the URL. They move when the list endpoints can answer them: offset paging with a
-total, per-resource sort options, and search on the endpoints that lack it.
-
-How much of a screen changes then depends on where its key and fetcher live. Put them in a
-resource hook, as `useWorkspaces` and `useForm` do, and the screen does not move at
-all. `FormList` is the last list screen still calling `useAuthedSWR` inline, so it will be
-edited directly.
+Pickers are not lists. `useWorkspaces` asks for a single page at the endpoint's cap because
+a permission gate reading page one would be wrong, not just short. A user in more
+workspaces than that cap sees a truncated picker.

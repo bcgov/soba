@@ -3,6 +3,7 @@ import { db, type DbOrTx } from '../client';
 import { forms, formVersions, workspaces } from '../schema';
 import { likePattern, orderByForSort, type SortColumns, type SortToken } from '../listSort';
 import { readListPage } from '../listRead';
+import { NotFoundError } from '../../errors';
 
 export const FORM_SORT_FIELDS = ['name', 'status', 'createdAt', 'updatedAt'] as const;
 export type FormListSortField = (typeof FORM_SORT_FIELDS)[number];
@@ -182,9 +183,11 @@ export const createForm = async (input: CreateFormInput, tx?: DbOrTx): Promise<F
     .where(eq(workspaces.id, input.workspaceId))
     .limit(1);
 
-  //since this doesn't null coalesce this throws if it isn't found
-  const org = ws[0]?.org;
-  const useCase = ws[0]?.useCase;
+  // A form's org and use case are seeded from its workspace and owned by the form after that.
+  const workspace = ws[0];
+  if (!workspace) {
+    throw new NotFoundError(`Workspace not found: ${input.workspaceId}`);
+  }
 
   const created = await d
     .insert(forms)
@@ -193,8 +196,8 @@ export const createForm = async (input: CreateFormInput, tx?: DbOrTx): Promise<F
       formEngineCode: input.formEngineCode,
       name: input.name,
       description: input.description,
-      org,
-      useCase,
+      org: workspace.org,
+      useCase: workspace.useCase,
       status: 'active',
       createdBy: input.actorDisplayLabel,
       updatedBy: input.actorDisplayLabel,

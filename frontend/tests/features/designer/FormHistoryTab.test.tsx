@@ -57,7 +57,11 @@ const version = (id: string, versionNo: number, state = 'draft') => ({
 
 let store: ReturnType<typeof makeStore>;
 
-function renderTab(onSelectVersion = vi.fn()) {
+function renderTab(
+  onSelectVersion = vi.fn(),
+  onRestoreVersion = vi.fn(() => Promise.resolve(true)),
+) {
+  const onNavigateToDesigner = vi.fn();
   render(
     <Provider store={store}>
       <SWRConfig
@@ -67,12 +71,13 @@ function renderTab(onSelectVersion = vi.fn()) {
           dict={dict as unknown as Dictionary}
           formId="f1"
           onSelectVersion={onSelectVersion}
-          onRestoreVersion={vi.fn(() => Promise.resolve())}
+          onRestoreVersion={onRestoreVersion}
+          onNavigateToDesigner={onNavigateToDesigner}
         />
       </SWRConfig>
     </Provider>,
   );
-  return onSelectVersion;
+  return { onSelectVersion, onRestoreVersion, onNavigateToDesigner };
 }
 
 describe('FormHistoryTab', () => {
@@ -127,11 +132,32 @@ describe('FormHistoryTab', () => {
   // The picker carries only the newest versions, so a row further down the history is the case
   // that has to keep working.
   it('opens a version that only the table holds', async () => {
-    const onSelectVersion = renderTab();
+    const { onSelectVersion } = renderTab();
     await screen.findByTestId('v9-design-link');
 
     await userEvent.click(screen.getByTestId('v9-design-link'));
 
     expect(onSelectVersion).toHaveBeenCalledWith('v9');
+  });
+
+  it('leaves the user on the history when a restore creates nothing', async () => {
+    const { onNavigateToDesigner } = renderTab(
+      vi.fn(),
+      vi.fn(() => Promise.resolve(false)),
+    );
+    await screen.findByTestId('v9-newVersionFrom-link');
+
+    await userEvent.click(screen.getByTestId('v9-newVersionFrom-link'));
+
+    expect(onNavigateToDesigner).not.toHaveBeenCalled();
+  });
+
+  it('opens the designer when a restore creates a version', async () => {
+    const { onNavigateToDesigner } = renderTab();
+    await screen.findByTestId('v9-newVersionFrom-link');
+
+    await userEvent.click(screen.getByTestId('v9-newVersionFrom-link'));
+
+    await waitFor(() => expect(onNavigateToDesigner).toHaveBeenCalled());
   });
 });
