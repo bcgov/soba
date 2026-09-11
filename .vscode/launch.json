@@ -38,7 +38,7 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],
       "env": {
-        "CORS_DEV_ORIGIN": "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3100,http://127.0.0.1:3100"
+        "CORS_DEV_ORIGIN": "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3100,http://127.0.0.1:3100,http://localhost:3101,http://127.0.0.1:3101"
       },
       "skipFiles": ["<node_internals>/**"],
       "console": "integratedTerminal"
@@ -105,14 +105,21 @@
       "name": "SOBA Frontend (Chrome)",
       "type": "chrome",
       "request": "launch",
-      "url": "http://localhost:3000",
+      "url": "http://localhost:3000/soba",
       "webRoot": "${workspaceFolder}/frontend"
     },
     {
       "name": "SOBA Frontend Forms (Chrome)",
       "type": "chrome",
       "request": "launch",
-      "url": "http://localhost:3100",
+      "url": "http://localhost:3100/forms",
+      "webRoot": "${workspaceFolder}/frontend"
+    },
+    {
+      "name": "SOBA Frontend Designer (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3101/designer",
       "webRoot": "${workspaceFolder}/frontend"
     },
     {
