@@ -23,10 +23,16 @@ jobs:
             command: pnpm --filter backend run type-check
           - name: Backend · lint
             command: pnpm --filter backend run lint
+          - name: Lib · type-check
+            command: pnpm --filter @soba/lib run type-check
+          - name: Lib · lint
+            command: pnpm --filter @soba/lib run lint
           - name: Frontend · unit tests
             command: pnpm --filter frontend run test
           - name: Backend · unit tests
             command: pnpm --filter backend run test
+          - name: Lib · unit tests
+            command: pnpm --filter @soba/lib run test
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

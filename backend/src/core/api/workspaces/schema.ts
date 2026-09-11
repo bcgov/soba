@@ -1,33 +1,33 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import {
-  makeSortEnum,
+  WorkspaceItemSchema as SobaWorkspaceItemSchema,
+  CreateWorkspaceBodySchema as SobaCreateWorkspaceBodySchema,
+  UpdateWorkspaceBodySchema as SobaUpdateWorkspaceBodySchema,
+  WorkspaceSortSchema as SobaWorkspaceSortSchema,
+  ListWorkspacesResponseSchema as SobaListWorkspacesResponseSchema,
+} from '@soba/lib';
+
+import {
   offsetQueryFields,
   rejectedCursorField,
   searchQueryField,
   OffsetPageSchema,
   OFFSET_DRIFT_NOTE,
 } from '../shared/offsetPagination';
-import { WORKSPACE_SORT_FIELDS } from '../../db/repos/membershipRepo';
 import { WORKSPACE_NAME_TAKEN } from '../../messages';
 
 extendZodWithOpenApi(z);
 
-export const WorkspaceItemSchema = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-    kind: z.string(),
-    role: z.string(),
-    status: z.string(),
-    org: z.string().nullable(),
-    useCase: z.string().nullable(),
-    disclaimerAccepted: z.boolean(),
-  })
-  .openapi('Workspaces_WorkspaceItem');
+// @soba/lib builds its schemas before zod is extended, so they only get `.openapi()` once cloned.
+// Composites are rebuilt on the named children so the spec references them instead of inlining.
+export const WorkspaceItemSchema = SobaWorkspaceItemSchema.clone().openapi(
+  'Workspaces_WorkspaceItem',
+);
 
-export const WorkspaceSortSchema = makeSortEnum(WORKSPACE_SORT_FIELDS).openapi(
+export const WorkspaceSortSchema = SobaWorkspaceSortSchema.clone().openapi(
   'Workspaces_WorkspaceSort',
+  { description: 'Valid workspace sort tokens: `field:asc` or `field:desc`.' },
 );
 
 export const ListWorkspacesQuerySchema = z
@@ -44,19 +44,11 @@ export const ListWorkspacesQuerySchema = z
   })
   .openapi('Workspaces_ListWorkspacesQuery');
 
-export const ListWorkspacesResponseSchema = z
-  .object({
-    items: z.array(WorkspaceItemSchema),
-    page: OffsetPageSchema,
-    filters: z.object({
-      kind: z.string().optional(),
-      status: z.string().optional(),
-      q: z.string().optional(),
-      requiredPermission: z.string().optional(),
-    }),
-    sort: WorkspaceSortSchema,
-  })
-  .openapi('Workspaces_ListWorkspacesResponse');
+export const ListWorkspacesResponseSchema = SobaListWorkspacesResponseSchema.extend({
+  items: z.array(WorkspaceItemSchema),
+  page: OffsetPageSchema,
+  sort: WorkspaceSortSchema,
+}).openapi('Workspaces_ListWorkspacesResponse');
 
 export const CurrentWorkspaceResponseSchema = WorkspaceItemSchema.openapi(
   'Workspaces_CurrentWorkspaceResponse',
@@ -68,33 +60,13 @@ export const WorkspaceIdParamsSchema = z
   })
   .openapi('Workspaces_WorkspaceIdParams');
 
-export const CreateWorkspaceBodySchema = z
-  .object({
-    name: z.string().trim().min(1),
-    org: z.string().trim().min(1),
-    useCase: z.string().trim().min(1),
-    disclaimerAccepted: z.boolean().optional(),
-  })
-  .openapi('Workspaces_CreateWorkspaceBody');
+export const CreateWorkspaceBodySchema = SobaCreateWorkspaceBodySchema.clone().openapi(
+  'Workspaces_CreateWorkspaceBody',
+);
 
-export const UpdateWorkspaceBodySchema = z
-  .object({
-    name: z.string().trim().min(1).optional(),
-    org: z.string().trim().min(1).optional(),
-    useCase: z.string().trim().min(1).optional(),
-    disclaimerAccepted: z.boolean().optional(),
-  })
-  .refine(
-    (body) =>
-      body.name !== undefined ||
-      body.org !== undefined ||
-      body.useCase !== undefined ||
-      body.disclaimerAccepted !== undefined,
-    {
-      message: 'Provide a field to update',
-    },
-  )
-  .openapi('Workspaces_UpdateWorkspaceBody');
+export const UpdateWorkspaceBodySchema = SobaUpdateWorkspaceBodySchema.clone().openapi(
+  'Workspaces_UpdateWorkspaceBody',
+);
 
 const TAG = 'core.workspaces';
 const WORKSPACES_PATH = '/workspaces';

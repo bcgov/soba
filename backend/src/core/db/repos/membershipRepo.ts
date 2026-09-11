@@ -191,7 +191,7 @@ export const invalidateMembershipCache = (workspaceId: string, userId: string): 
   }
 };
 
-export const WORKSPACE_SORT_FIELDS = ['name', 'kind', 'status', 'updatedAt'] as const;
+import { WORKSPACE_SORT_FIELDS } from '@soba/lib';
 export type WorkspaceListSortField = (typeof WORKSPACE_SORT_FIELDS)[number];
 export type WorkspaceListSort = SortToken<WorkspaceListSortField>;
 

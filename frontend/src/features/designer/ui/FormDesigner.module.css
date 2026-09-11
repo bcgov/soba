@@ -36,9 +36,10 @@
   position: sticky !important;
   top: calc(var(--app-header-height, 0px) * 2 + var(--layout-margin-medium));
   align-self: flex-start;
-  max-height: none;
+  max-height: calc(100vh - (var(--app-header-height, 0px) * 2 + var(--layout-margin-medium)));
   padding-right: var(--layout-padding-small);
   z-index: 10;
+  overflow-y: scroll;
 }
 
 :global(.builder-sidebar::-webkit-scrollbar) {

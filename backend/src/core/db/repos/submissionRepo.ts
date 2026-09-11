@@ -63,12 +63,8 @@ interface SaveSubmissionInput {
   afterEngineSubmissionRef: string;
 }
 
-export const SUBMISSION_SORT_FIELDS = [
-  'formName',
-  'submittedAt',
-  'createdAt',
-  'updatedAt',
-] as const;
+import { SUBMISSION_SORT_FIELDS } from '@soba/lib';
+
 export type SubmissionListSortField = (typeof SUBMISSION_SORT_FIELDS)[number];
 export type SubmissionListSort = SortToken<SubmissionListSortField>;
 

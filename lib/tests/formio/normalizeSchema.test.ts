@@ -1,21 +1,19 @@
-import { normalizeSchema } from '../../../src/plugins/formio-v5/normalizeSchema';
+import { normalizeSchema } from '../../src/formio/normalizeSchema';
 
 type Comp = Record<string, unknown>;
 
 describe('normalizeSchema', () => {
-  it('applies the legacy CHEFS-1 type fix (simple…/…advanced)', () => {
-    const out = normalizeSchema({ components: [{ type: 'simplenumberadvanced', key: 'a' }] });
-    expect((out.components as Comp[])[0].type).toBe('number');
-  });
-
-  it('strips the simple… prefix with no advanced suffix', () => {
-    const out = normalizeSchema({ components: [{ type: 'simpleemail', key: 'b' }] });
-    expect((out.components as Comp[])[0].type).toBe('email');
-  });
-
-  it('leaves a standard Form.io v5 type unchanged', () => {
-    const out = normalizeSchema({ components: [{ type: 'textfield', key: 'c' }] });
-    expect((out.components as Comp[])[0].type).toBe('textfield');
+  // CHEFS-1 simple* types map to their Form.io v5 equivalents; v5 types pass through.
+  it.each([
+    ['simplenumberadvanced', 'number'],
+    ['simpleemail', 'email'],
+    ['textfield', 'textfield'],
+    ['simplephonenumber', 'phoneNumber'],
+    ['simplephonenumberadvanced', 'phoneNumber'],
+    ['phoneNumber', 'phoneNumber'],
+  ])('maps component type %s to %s', (type, expected) => {
+    const out = normalizeSchema({ components: [{ type, key: 'a' }] });
+    expect((out.components as Comp[])[0].type).toBe(expected);
   });
 
   it('keeps only form-definition fields and drops engine/document metadata', () => {

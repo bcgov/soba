@@ -18,7 +18,6 @@ export type { SobaFormType, WorkspaceItem, WorkspacesResponse, CurrentUserRespon
 // Design-mode (staff, /design/*)
 export {
   createSobaFormioForm,
-  normalizeFormSchema,
   publishSobaFormVersion,
   getSobaForm,
   getSobaForms,

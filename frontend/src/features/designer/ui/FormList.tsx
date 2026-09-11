@@ -12,7 +12,7 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { useRouter, usePathname } from 'next/navigation';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { getSobaForms } from '@/src/shared/api/sobaApi';
-import type { SobaFormSummary } from '@/src/shared/api/sobaApiDesign';
+import type { SobaFormSummary } from '@/src/types/forms';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import { usePageNotices } from '@/src/components/PageHeader';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';

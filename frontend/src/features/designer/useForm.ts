@@ -6,7 +6,7 @@ import type { FormType } from '@formio/react';
 import { getFormVersionSchema, getSobaForm, getSobaFormVersions } from '@/src/shared/api/sobaApi';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { sessionReadConfig } from '@/src/shared/api/swrConfig';
-import type { SobaFormVersionType } from '@/src/types/forms';
+import type { SobaFormVersionListItem } from '@/src/types/forms';
 
 const schemaKey = (versionId: string) => ['form-version-schema', versionId];
 
@@ -35,7 +35,7 @@ export function useForm(formId?: string) {
     sessionReadConfig,
   );
 
-  const versions: SobaFormVersionType[] = useMemo(
+  const versions: SobaFormVersionListItem[] = useMemo(
     () => (Array.isArray(versionsData?.items) ? versionsData.items : []),
     [versionsData],
   );
@@ -43,7 +43,7 @@ export function useForm(formId?: string) {
   // The highest versionNo is the current one; a new draft becomes current as soon as it is listed.
   const currentVersion = useMemo(
     () =>
-      versions.reduce<SobaFormVersionType | null>(
+      versions.reduce<SobaFormVersionListItem | null>(
         (acc, v) => (!acc || v.versionNo > acc.versionNo ? v : acc),
         null,
       ),

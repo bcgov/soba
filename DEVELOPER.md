@@ -12,8 +12,8 @@ Work from **branches** (not forks) off `develop`. Open a **pull request** into `
 
 Before requesting review, ensure:
 
-- **All checks pass** — e.g. `pnpm check` at the repo root (type-check and lint for backend and frontend). See [pnpm](#pnpm) for root commands.
-- **Unit tests** — New or changed behaviour is covered by tests. See [Backend](#backend) and [Frontend](#frontend) for how tests are run and where they live.
+- **All checks pass** — e.g. `pnpm check` at the repo root (type-check and lint for lib, backend and frontend). See [pnpm](#pnpm) for root commands.
+- **Unit tests** — New or changed behaviour is covered by tests. See [Backend](#backend), [Frontend](#frontend) and [Lib](#lib) for how tests are run and where they live.
 
 ---
 
@@ -68,7 +68,7 @@ This starts:
 
 ## pnpm
 
-The repo is a **[pnpm](https://pnpm.io) workspace** (faster installs, shared store, strict dependency graph). Root `package.json` delegates to the `frontend` and `backend` workspaces.
+The repo is a **[pnpm](https://pnpm.io) workspace** (faster installs, shared store, strict dependency graph). Root `package.json` delegates to the `lib`, `frontend` and `backend` workspaces.
 
 **Why pnpm:** Single lockfile and workspace protocol for frontend + backend, disk-efficient store, and consistent installs across dev and CI.
 
@@ -77,20 +77,24 @@ The repo is a **[pnpm](https://pnpm.io) workspace** (faster installs, shared sto
 | Command                                            | What it does                                                    |
 | -------------------------------------------------- | --------------------------------------------------------------- |
 | `pnpm install`                                     | Install all workspace deps (run after clone / when deps change) |
-| `pnpm build`                                       | `build:frontend` then `build:backend`                           |
+| `pnpm build`                                       | `build:lib`, `build:frontend`, then `build:backend`             |
 | `pnpm build:frontend` / `pnpm build:backend`       | Build one app                                                   |
-| `pnpm test`                                        | Run frontend and backend tests                                  |
+| `pnpm build:lib`                                   | Build the shared lib into `lib/dist`                            |
+| `pnpm test`                                        | Run lib, frontend and backend tests                             |
 | `pnpm test:frontend` / `pnpm test:backend`         | Test one app                                                    |
-| `pnpm lint`                                        | Lint frontend and backend                                       |
-| `pnpm lint:fix`                                    | Lint with auto-fix both                                         |
+| `pnpm test:lib`                                    | Test the shared lib                                             |
+| `pnpm lint`                                        | Lint lib, frontend and backend                                  |
+| `pnpm lint:fix`                                    | Lint with auto-fix, all three                                   |
 | `pnpm db:migrate`                                  | Run pending DB migrations (backend)                             |
 | `pnpm db:seed`                                     | Seed DB (run after migrate)                                     |
 | `pnpm db:init`                                     | Migrate then seed (full DB setup)                               |
 | `pnpm db:dev-data`                                 | Build/remove development data ([guide](backend/src/features/dev-data/README.md)) |
 | `pnpm lint:frontend` / `pnpm lint:backend`         | Lint one app                                                    |
 | `pnpm lint:fix:frontend` / `pnpm lint:fix:backend` | Lint fix one app                                                |
-| `pnpm check`                                       | Type/style checks for both apps                                 |
+| `pnpm lint:lib` / `pnpm lint:fix:lib`              | Lint or lint fix the shared lib                                 |
+| `pnpm check`                                       | Type/style checks for lib and both apps                         |
 | `pnpm check:frontend` / `pnpm check:backend`       | Check one app                                                   |
+| `pnpm check:lib`                                   | Check the shared lib                                            |
 | `pnpm qa`                                          | `check` then `test` (PR readiness shortcut)                     |
 | `pnpm qa:build`                                    | `qa` then `build`                                               |
 | `pnpm dev:services:up`                             | Start sidecars via docker compose (`up -d --wait`)              |
@@ -369,6 +373,28 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 ### data-testid
 
 - Integration tests (Playwright) select elements by `data-testid`. Add testids to interactive elements, landmarks, lists, and status/state UI as described in [Integration](#integration).
+
+---
+
+## Lib
+
+Shared code for the backend and frontend, used in the workspace as `@soba/lib`: Zod schemas and types for the API request and response shapes, and `normalizeSchema` for Form.io schema import and export.
+
+`lib/dist/` is generated and not committed. `pnpm install` builds it (the `prepare` script) and the devcontainer rebuilds it on start. While editing lib, run `pnpm dev` in `lib/` to keep `dist/` current. The backend's watcher follows `backend/src` only, so restart the backend after a lib change.
+
+### Scripts
+
+| Command                        | Purpose                                  |
+| ------------------------------ | ---------------------------------------- |
+| `pnpm build`                   | Clean `dist/` and compile `src/` into it |
+| `pnpm dev`                     | Compile `src/` into `dist/` on change    |
+| `pnpm test`                    | Run Jest unit tests                      |
+| `pnpm lint` / `lint:fix`       | ESLint; fix applies auto-fix             |
+| `pnpm format` / `format:check` | Prettier write / check                   |
+| `pnpm type-check`              | `tsc --noEmit` over `src/` and `tests/`  |
+| `pnpm check`                   | Type-check + lint (run before PR)        |
+
+Tests live under `lib/tests/`.
 
 ---
 

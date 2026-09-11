@@ -3,6 +3,7 @@ import { FormVersionService } from '../../services/formVersionService';
 import { resolveFormPermissions } from '../../db/repos/formAccessRepo';
 import type { FormListSort } from '../../db/repos/formRepo';
 import type { FormVersionListSort } from '../../db/repos/formVersionRepo';
+import type { FormListItem, FormVersionListItem } from '@soba/lib';
 
 export interface FormsContextInput {
   workspaceId: string;
@@ -87,7 +88,7 @@ const toFormListItemDto = (item: {
   updatedAt: Date;
   createdBy: string | null;
   updatedBy: string | null;
-}) => ({
+}): FormListItem => ({
   id: item.id,
   workspaceId: item.workspaceId,
   name: item.name,
@@ -139,7 +140,7 @@ const toFormVersionListItemDto = (item: {
   updatedAt: Date;
   createdBy: string | null;
   updatedBy: string | null;
-}) => ({
+}): FormVersionListItem => ({
   id: item.id,
   formId: item.formId,
   versionNo: item.versionNo,
