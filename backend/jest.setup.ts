@@ -1,9 +1,5 @@
 import path from 'path';
 import dotenv from 'dotenv';
-import { z } from 'zod';
-import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-
-extendZodWithOpenApi(z);
 
 // Ensure dotenv does not log "injecting env" and tips when running tests.
 process.env.DOTENV_CONFIG_QUIET = 'true';

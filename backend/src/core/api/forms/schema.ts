@@ -6,7 +6,6 @@ import {
   FormVersionListItemSchema as SobaFormVersionListItemSchema,
   FormResponseSchema as SobaFormResponseSchema,
   UpdateFormBodySchema as SobaUpdateFormBodySchema,
-  FormWithVersionResponseSchema as SobaFormWithVersionResponseSchema,
   FormWithPermissionsResponseSchema as SobaFormWithPermissionsResponseSchema,
   FormListItemSchema as SobaFormListItemSchema,
   ListFormsResponseSchema as SobaListFormsResponseSchema,
@@ -32,32 +31,26 @@ import {
 
 extendZodWithOpenApi(z);
 
-export const CreateFormBodySchema = (
-  SobaCreateFormBodySchema as z.ZodType<z.infer<typeof SobaCreateFormBodySchema>>
-).openapi('Forms_CreateFormBody');
-export const UpdateFormBodySchema = (
-  SobaUpdateFormBodySchema as z.ZodType<z.infer<typeof SobaUpdateFormBodySchema>>
-).openapi('Forms_UpdateFormBody');
-export const FormListItemSchema = (
-  SobaFormListItemSchema as z.ZodType<z.infer<typeof SobaFormListItemSchema>>
-).openapi('Forms_FormListItem');
-export const FormResponseSchema = (
-  SobaFormResponseSchema as z.ZodType<z.infer<typeof SobaFormResponseSchema>>
-).openapi('Forms_FormResponse');
-export const FormVersionResponseSchema = (
-  SobaFormVersionResponseSchema as z.ZodType<z.infer<typeof SobaFormVersionResponseSchema>>
-).openapi('Forms_FormVersionResponse');
-export const FormWithVersionResponseSchema = (
-  SobaFormWithVersionResponseSchema as z.ZodType<z.infer<typeof SobaFormWithVersionResponseSchema>>
-).openapi('Forms_FormWithVersionResponse');
-export const FormWithPermissionsResponseSchema = (
-  SobaFormWithPermissionsResponseSchema as z.ZodType<
-    z.infer<typeof SobaFormWithPermissionsResponseSchema>
-  >
-).openapi('Forms_FormWithPermissionsResponse');
-export const FormVersionListItemSchema = (
-  SobaFormVersionListItemSchema as z.ZodType<z.infer<typeof SobaFormVersionListItemSchema>>
-).openapi('Forms_FormVersionListItem');
+// @soba/lib builds its schemas before zod is extended, so they only get `.openapi()` once cloned.
+// Composites are rebuilt on the named children so the spec references them instead of inlining.
+export const CreateFormBodySchema =
+  SobaCreateFormBodySchema.clone().openapi('Forms_CreateFormBody');
+export const UpdateFormBodySchema =
+  SobaUpdateFormBodySchema.clone().openapi('Forms_UpdateFormBody');
+export const FormListItemSchema = SobaFormListItemSchema.clone().openapi('Forms_FormListItem');
+export const FormResponseSchema = SobaFormResponseSchema.clone().openapi('Forms_FormResponse');
+export const FormVersionResponseSchema = SobaFormVersionResponseSchema.clone().openapi(
+  'Forms_FormVersionResponse',
+);
+export const FormWithVersionResponseSchema = FormResponseSchema.extend({
+  formVersion: FormVersionResponseSchema.nullable(),
+}).openapi('Forms_FormWithVersionResponse');
+export const FormWithPermissionsResponseSchema = FormResponseSchema.extend({
+  permissions: SobaFormWithPermissionsResponseSchema.shape.permissions,
+}).openapi('Forms_FormWithPermissionsResponse');
+export const FormVersionListItemSchema = SobaFormVersionListItemSchema.clone().openapi(
+  'Forms_FormVersionListItem',
+);
 
 export const CreateFormVersionBodySchema = z
   .object({
@@ -110,9 +103,7 @@ export const NormalizeSchemaResponseSchema = z
   })
   .openapi('Forms_NormalizeSchemaResponse');
 
-export const FormSortSchema = (
-  SobaFormSortSchema as z.ZodType<z.infer<typeof SobaFormSortSchema>>
-).openapi('Forms_FormSort');
+export const FormSortSchema = SobaFormSortSchema.clone().openapi('Forms_FormSort');
 
 export const ListFormsQuerySchema = z
   .object({
@@ -126,9 +117,11 @@ export const ListFormsQuerySchema = z
   })
   .openapi('Forms_ListFormsQuery');
 
-export const ListFormsResponseSchema = (
-  SobaListFormsResponseSchema as z.ZodType<z.infer<typeof SobaListFormsResponseSchema>>
-).openapi('Forms_ListFormsResponse');
+export const ListFormsResponseSchema = SobaListFormsResponseSchema.extend({
+  items: z.array(FormListItemSchema),
+  page: OffsetPageSchema,
+  sort: FormSortSchema,
+}).openapi('Forms_ListFormsResponse');
 
 export const FormVersionSortSchema =
   makeSortEnum(FORM_VERSION_SORT_FIELDS).openapi('Forms_FormVersionSort');
