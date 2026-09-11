@@ -26,6 +26,7 @@ export const FormListItemSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   createdBy: z.string().nullable(),
+  updatedBy: z.string().nullable(),
 });
 
 export const FormResponseSchema = z.object({
@@ -70,6 +71,8 @@ export const FormVersionListItemSchema = z.object({
   engineSchemaRef: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  createdBy: z.string().nullable(),
+  updatedBy: z.string().nullable(),
 });
 
 export type CreateFormBody = z.infer<typeof CreateFormBodySchema>;
@@ -98,3 +101,21 @@ export const ListFormsResponseSchema = z.object({
 });
 
 export type ListFormsResponse = z.infer<typeof ListFormsResponseSchema>;
+
+export const FORM_VERSION_SORT_FIELDS = ['versionNo', 'state', 'createdAt', 'updatedAt'] as const;
+
+export const FormVersionSortSchema = makeSortEnum(FORM_VERSION_SORT_FIELDS);
+
+export const ListFormVersionsResponseSchema = z.object({
+  items: z.array(FormVersionListItemSchema),
+  page: OffsetPageSchema,
+  filters: z.object({
+    workspaceId: z.string().optional(),
+    formId: z.string().optional(),
+    formVersionId: z.string().optional(),
+    state: z.string().optional(),
+  }),
+  sort: FormVersionSortSchema,
+});
+
+export type ListFormVersionsResponse = z.infer<typeof ListFormVersionsResponseSchema>;

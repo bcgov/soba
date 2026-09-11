@@ -21,7 +21,7 @@ interface SaveRevisionInput {
   engineSchemaRef?: string | null;
 }
 
-export const FORM_VERSION_SORT_FIELDS = ['versionNo', 'state', 'createdAt', 'updatedAt'] as const;
+import { FORM_VERSION_SORT_FIELDS } from '@soba/lib';
 export type FormVersionListSortField = (typeof FORM_VERSION_SORT_FIELDS)[number];
 export type FormVersionListSort = SortToken<FormVersionListSortField>;
 

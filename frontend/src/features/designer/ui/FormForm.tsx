@@ -40,7 +40,7 @@ import {
   updateSobaForm,
   getFormVersionSchema,
 } from '@/src/shared/api/sobaApi';
-import type { SobaFormType, SobaFormVersionType } from '@/src/types/forms';
+import type { SobaFormType, SobaFormVersionListItem } from '@/src/types/forms';
 import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';
 
 type Dict = ReturnType<typeof useDictionary>;
@@ -216,7 +216,7 @@ function FormForm({ formId }: { formId?: string }) {
     }
   };
 
-  const restoreVersionAsNew = async (version: SobaFormVersionType): Promise<boolean> => {
+  const restoreVersionAsNew = async (version: SobaFormVersionListItem): Promise<boolean> => {
     if (!token) return false;
     let schema: FormType | null;
     try {

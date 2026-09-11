@@ -10,17 +10,17 @@ import {
   FormListItemSchema as SobaFormListItemSchema,
   ListFormsResponseSchema as SobaListFormsResponseSchema,
   FormSortSchema as SobaFormSortSchema,
+  FormVersionSortSchema as SobaFormVersionSortSchema,
+  ListFormVersionsResponseSchema as SobaListFormVersionsResponseSchema,
 } from '@soba/lib';
 
 import {
-  makeSortEnum,
   offsetQueryFields,
   rejectedCursorField,
   searchQueryField,
   OffsetPageSchema,
   OFFSET_DRIFT_NOTE,
 } from '../shared/offsetPagination';
-import { FORM_VERSION_SORT_FIELDS } from '../../db/repos/formVersionRepo';
 import { FORM_NAME_TAKEN } from '../../messages';
 import {
   workspaceIdQueryField,
@@ -124,7 +124,7 @@ export const ListFormsResponseSchema = SobaListFormsResponseSchema.extend({
 }).openapi('Forms_ListFormsResponse');
 
 export const FormVersionSortSchema =
-  makeSortEnum(FORM_VERSION_SORT_FIELDS).openapi('Forms_FormVersionSort');
+  SobaFormVersionSortSchema.clone().openapi('Forms_FormVersionSort');
 
 export const ListFormVersionsQuerySchema = z
   .object({
@@ -138,19 +138,11 @@ export const ListFormVersionsQuerySchema = z
   })
   .openapi('Forms_ListFormVersionsQuery');
 
-export const ListFormVersionsResponseSchema = z
-  .object({
-    items: z.array(FormVersionListItemSchema),
-    page: OffsetPageSchema,
-    filters: z.object({
-      workspaceId: z.string().optional(),
-      formId: z.string().optional(),
-      formVersionId: z.string().optional(),
-      state: z.string().optional(),
-    }),
-    sort: FormVersionSortSchema,
-  })
-  .openapi('Forms_ListFormVersionsResponse');
+export const ListFormVersionsResponseSchema = SobaListFormVersionsResponseSchema.extend({
+  items: z.array(FormVersionListItemSchema),
+  page: OffsetPageSchema,
+  sort: FormVersionSortSchema,
+}).openapi('Forms_ListFormVersionsResponse');
 
 const TAG = 'core.forms';
 const FORMS_PATH = '/design/forms';

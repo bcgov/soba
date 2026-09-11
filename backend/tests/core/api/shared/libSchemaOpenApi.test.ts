@@ -30,6 +30,7 @@ describe('OpenAPI components for lib-backed schemas', () => {
 
   it.each([
     ['Forms_ListFormsResponse', 'Forms_FormListItem', 'Forms_FormSort'],
+    ['Forms_ListFormVersionsResponse', 'Forms_FormVersionListItem', 'Forms_FormVersionSort'],
     [
       'Submissions_ListSubmissionsResponse',
       'Submissions_SubmissionListItem',
