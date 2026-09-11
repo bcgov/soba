@@ -1,3 +1,5 @@
+import { getBasePath } from '@/src/shared/config/basePath';
+
 export type FrontendRuntimeConfig = {
   auth: {
     provider: 'keycloak';
@@ -107,7 +109,7 @@ export function getSobaApiBaseUrl(): string {
 
 /**
  * Public URL of a frontend app. Runtime config wins, then the value the server injected from its
- * own env, then this origin, which is correct for a deployment serving both modes.
+ * own env, then this app's own URL, which is correct for a deployment serving both modes.
  */
 function getAppBaseUrl(
   fromConfig: string | undefined,
@@ -116,7 +118,7 @@ function getAppBaseUrl(
 ): string {
   const configured = fromConfig || injected || fromEnv;
   if (configured) return configured;
-  return typeof window === 'undefined' ? '' : window.location.origin;
+  return typeof window === 'undefined' ? '' : window.location.origin + getBasePath();
 }
 
 export function getDesignerAppBaseUrl(): string {
