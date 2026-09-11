@@ -1,4 +1,4 @@
-import { normalizeSchema } from './normalizeSchema';
+import { normalizeSchema } from '../../src/formio/normalizeSchema';
 
 type Comp = Record<string, unknown>;
 
@@ -16,6 +16,21 @@ describe('normalizeSchema', () => {
   it('leaves a standard Form.io v5 type unchanged', () => {
     const out = normalizeSchema({ components: [{ type: 'textfield', key: 'c' }] });
     expect((out.components as Comp[])[0].type).toBe('textfield');
+  });
+
+  it('maps the CHEFS-1 simple phone number to the Form.io phoneNumber type', () => {
+    const out = normalizeSchema({ components: [{ type: 'simplephonenumber', key: 'p' }] });
+    expect((out.components as Comp[])[0].type).toBe('phoneNumber');
+  });
+
+  it('maps the CHEFS-1 advanced phone number to the Form.io phoneNumber type', () => {
+    const out = normalizeSchema({ components: [{ type: 'simplephonenumberadvanced', key: 'p' }] });
+    expect((out.components as Comp[])[0].type).toBe('phoneNumber');
+  });
+
+  it('leaves a Form.io v5 phoneNumber unchanged', () => {
+    const out = normalizeSchema({ components: [{ type: 'phoneNumber', key: 'p' }] });
+    expect((out.components as Comp[])[0].type).toBe('phoneNumber');
   });
 
   it('keeps only form-definition fields and drops engine/document metadata', () => {

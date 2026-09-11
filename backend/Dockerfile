@@ -8,7 +8,8 @@ WORKDIR /app
 # copy root workspace config + backend package file
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY backend/package.json backend/
-COPY lib/package.json lib/
+# lib builds itself on install (prepare), so its source has to be present before pnpm install
+COPY lib ./lib
 
 RUN pnpm install --filter ./lib --frozen-lockfile && pnpm install --filter ./backend...
 
