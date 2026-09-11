@@ -21,7 +21,7 @@ export const ROUTE_KIND_BY_SEGMENT: Readonly<Record<string, RouteKind>> = {
   // backend `/admin/*` routes gate on the `soba_admin` role.
   admin: WORKSPACES, // app/[lang]/admin
   forms: WORKSPACE_APP, // app/[lang]/forms
-  designer: WORKSPACE_APP, // app/[lang]/designer
+  build: WORKSPACE_APP, // app/[lang]/build
   // Public fill/submit route: reachable without signing in; the backend authorizes against the
   // form's Form submitters audience (a non-public form returns 401 and the renderer shows an error).
   form: PUBLIC, // app/[lang]/form/[formId]

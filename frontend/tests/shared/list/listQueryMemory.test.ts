@@ -36,7 +36,7 @@ describe('listQueryMemory', () => {
     expect(listLink('/en/forms', FORMS_LIST_QUERY, {})).toBe('/en/forms');
   });
 
-  // Two lists share the designer route, so a page number has to say which table it belongs to.
+  // Two lists share the build route, so a page number has to say which table it belongs to.
   it('does not answer for another list on the same route', () => {
     const search = new URLSearchParams('formSubmissions.page=3&formVersions.sort=state:asc');
     expect(readUrlParams(FORM_VERSIONS_LIST_QUERY, search)).toEqual({ sort: 'state:asc' });

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Segment error UI for `/[lang]/forms/[formId]` only.
+ * Segment error UI for `/[lang]/form/[formId]` only.
  *
  * Today: catches uncaught errors in this route segment (including escaped RSC/client failures).
  * The Form.io tree also uses `FormioV5FormRenderErrorBoundary` for renderer-local throws.

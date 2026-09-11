@@ -18,7 +18,7 @@ describe('classifyRoute', () => {
     expect(classifyRoute('/en')).toBe('home');
     expect(classifyRoute('/fr/onboarding')).toBe('onboarding');
     expect(classifyRoute('/en/forms')).toBe('workspace-app');
-    expect(classifyRoute('/en/designer/abc')).toBe('workspace-app');
+    expect(classifyRoute('/en/build/abc')).toBe('workspace-app');
     expect(classifyRoute('/en/workspaces')).toBe('workspaces');
     expect(classifyRoute('/en/workspace/ws1')).toBe('workspaces');
     expect(classifyRoute('/en/help')).toBe('public');
@@ -51,7 +51,7 @@ describe('resolveRedirect — workspaces enabled', () => {
     const unstarted = { ...readySession, authenticated: false, initStarted: false };
     expect(resolveRedirect('/en/forms', 'en', unstarted, true)).toBeNull();
     expect(resolveRedirect('/en/workspaces', 'en', unstarted, true)).toBeNull();
-    expect(resolveRedirect('/en/designer/abc', 'en', unstarted, true)).toBeNull();
+    expect(resolveRedirect('/en/build/abc', 'en', unstarted, true)).toBeNull();
   });
 
   it('allows unauthenticated users on home and public routes', () => {
