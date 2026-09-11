@@ -123,3 +123,30 @@ Database secret name and key.
 DATABASE_URL
 {{- end }}
 {{- end }}
+
+{{/*
+Truthy ("true") only when the tempstorage-mount plugin is selected. Gates the
+temp PVC, its mount, and PLUGIN_TEMPSTORAGE_MOUNT_DIR off one value so they
+cannot drift apart. Any other code (e.g. tempstorage-os) needs no PVC.
+*/}}
+{{- define "soba.tempStorageUsesMount" -}}
+{{- if eq .Values.backend.config.tempStorageDefaultCode "tempstorage-mount" -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Truthy ("true") only when the backend scans with clamav. Gates the clamav alias
+Service and the PLUGIN_VIRUSSCAN_CLAMAV_* env together so they cannot drift apart.
+Any other code (e.g. virusscan-noop) needs no clamav wiring.
+*/}}
+{{- define "soba.virusScanUsesClamav" -}}
+{{- if eq .Values.backend.config.virusScanDefaultCode "virusscan-clamav" -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Truthy ("true") only when the backend caches with cache-redis. Gates the valkey alias Service
+and the PLUGIN_CACHE_REDIS_URL env together so they cannot drift apart. Any other code (e.g.
+cache-memory) needs no valkey wiring.
+*/}}
+{{- define "soba.cacheUsesRedis" -}}
+{{- if eq .Values.backend.config.cacheDefaultCode "cache-redis" -}}true{{- end -}}
+{{- end }}

@@ -28,12 +28,12 @@ export default async function Page({ params }: PageProps) {
     notFound();
   }
 
-  const { lang } = await params;
+  const { lang, submissionId } = await params;
   const dict = await getDictionary((hasLocale(lang) ? lang : 'en') as Locale);
   return (
     <section className="p-4" aria-labelledby="submission-view-heading">
       <DsPageHeading id="submission-view-heading">{dict.submission.pageTitle}</DsPageHeading>
-      <SubmissionView />
+      <SubmissionView key={submissionId} />
     </section>
   );
 }

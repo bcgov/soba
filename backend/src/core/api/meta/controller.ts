@@ -2,13 +2,23 @@ import { Request, Response } from 'express';
 import { metaApiService } from './service';
 import { asyncHandler } from '../shared/asyncHandler';
 import { codeService } from '../../services/codeService';
+import { getFilesConfig } from '../../../features/files/config';
 
-export const getPluginsMeta = (_req: Request, res: Response) => {
-  res.json(metaApiService.getPlugins());
-};
+export const getPluginsMeta = asyncHandler(async (_req: Request, res: Response) => {
+  res.json(await metaApiService.getPlugins());
+});
 
 export const getFeaturesMeta = asyncHandler(async (_req: Request, res: Response) => {
   res.json(await metaApiService.getFeatures());
+});
+
+export const getFeatureAvailabilityMeta = asyncHandler(async (req: Request, res: Response) => {
+  const { code, workspaceId, formId } = req.query as {
+    code: string;
+    workspaceId?: string;
+    formId?: string;
+  };
+  res.json(await metaApiService.getFeatureAvailability({ code, workspaceId, formId }));
 });
 
 export const getFormEnginesMeta = asyncHandler(async (_req: Request, res: Response) => {
@@ -21,6 +31,11 @@ export const getBuildMeta = (_req: Request, res: Response) => {
 
 export const getFrontendConfigMeta = (_req: Request, res: Response) => {
   res.json(metaApiService.getFrontendConfig());
+};
+
+/** Files feature config (upload size limit + always-blocked extensions); gated by the files feature. */
+export const getFilesConfigMeta = (_req: Request, res: Response) => {
+  res.json(getFilesConfig());
 };
 
 export const getCodesMeta = asyncHandler(async (req: Request, res: Response) => {

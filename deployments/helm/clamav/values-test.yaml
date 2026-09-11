@@ -1,0 +1,7 @@
+# Test: 3 replicas (spread across nodes via podAntiAffinity) + PDB.
+clamav:
+  replicaCount: 3
+
+pdb:
+  create: true
+  minAvailable: 2

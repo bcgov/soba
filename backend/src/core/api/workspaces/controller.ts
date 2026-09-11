@@ -63,7 +63,7 @@ export const getWorkspaceById = asyncHandler(async (req: Request, res: Response)
 export const updateWorkspace = asyncHandler(
   async (req: Request<WorkspaceIdParams, unknown, UpdateWorkspaceBody>, res: Response) => {
     const ctx = req.coreContext!;
-    const result = await workspacesApiService.updateName(ctx.workspaceId, ctx.actorId, req.body);
+    const result = await workspacesApiService.update(ctx.workspaceId, ctx.actorId, req.body);
     if (!result) {
       throw new NotFoundError('Workspace not found');
     }

@@ -17,11 +17,30 @@ export const FormEngineReadinessResultSchema = z
   })
   .openapi('Health_FormEngineReadinessResult');
 
+export const StorageReadinessResultSchema = z
+  .object({
+    ok: z.boolean(),
+    message: z.string().optional(),
+  })
+  .openapi('Health_StorageReadinessResult');
+
+export const AdapterReadinessResultSchema = z
+  .object({
+    ok: z.boolean(),
+    message: z.string().optional(),
+  })
+  .openapi('Health_AdapterReadinessResult');
+
 export const HealthReadinessResponseSchema = z
   .object({
     status: z.enum(['ready', 'unhealthy']),
     db: z.enum(['ok', 'unreachable']),
     formEngines: z.record(z.string(), FormEngineReadinessResultSchema),
+    storage: z.record(z.string(), StorageReadinessResultSchema),
+    tempStorage: AdapterReadinessResultSchema,
+    virusScanner: AdapterReadinessResultSchema,
+    documentGeneration: z.record(z.string(), AdapterReadinessResultSchema),
+    cache: AdapterReadinessResultSchema,
   })
   .openapi('Health_ReadinessResponse');
 
@@ -48,7 +67,8 @@ export const registerHealthOpenApi = (registry: OpenAPIRegistry) => {
     tags: ['core.health'],
     responses: {
       200: {
-        description: 'Readiness probe (DB and form engines OK)',
+        description:
+          'Readiness probe (DB and form engines OK; storage, temp storage, virus scanner, document generation and cache reported but non-gating)',
         content: {
           'application/json': {
             schema: HealthReadinessResponseSchema,

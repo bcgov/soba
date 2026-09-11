@@ -5,6 +5,9 @@ global:
   forceCleanup: false
   routeHost: ""
   routePath: ""
+  # Owning PR number when a PR reuses a deployment slot; read on teardown so a
+  # closing PR does not uninstall a newer PR that has since taken the slot.
+  prNumber: ""
 
 # -- Backend (Express API) ------------------------------------------------
 backend:
@@ -64,21 +67,69 @@ backend:
     gitTag: ""
     imageTag: ""
     formEngineDefaultCode: formio-v5
+    # Cache plugin. Default cache-memory (per-pod). Set cache-redis in a per-env values file
+    # (values-<env>.yaml) once that namespace's Valkey chart is deployed and confirmed reachable —
+    # cache-redis without a reachable Valkey is worse than cache-memory (no caching, warn per
+    # reconnect). See the valkey block below for the shared-cache wiring.
+    # Document generation backend code the consumer defaults to.
+    documentGenerationDefaultCode: docgen-noop
     cacheDefaultCode: cache-memory
     messagebusDefaultCode: messagebus-memory
+    # Temp storage plugin. Default tempstorage-os stages temp bytes under
+    # os.tmpdir() (per-pod, no PVC). Override to tempstorage-mount for a shared
+    # RWX PVC across replicas (see the tempStorage block below).
+    tempStorageDefaultCode: tempstorage-os
+    # Virus scan plugin. Deployments scan for real against the shared clamav
+    # (see the clamav block below); local dev overrides to virusscan-noop via .env.
+    virusScanDefaultCode: virusscan-clamav
     sobaSystemSubject: soba-system
-    workspacePluginsAllowed: "enterprise-cstar,personal-local"
-    workspacePluginsStrictMode: "false"
-    pluginEnterpriseCstarHeaderKeys: "x-enterprise-workspace-id,x-cstar-tenant-id"
-    pluginEnterpriseCstarRequireExternalHeader: "false"
-    pluginPersonalLocalCookieKey: soba_workspace_id
-    pluginPersonalLocalAllowHeaderOverride: "true"
+
+  # -- Shared temp storage PVC (RWX so it survives horizontal scaling).
+  # Only provisioned/mounted when config.tempStorageDefaultCode is
+  # tempstorage-mount; mountPath doubles as the plugin's DIR. Ignored otherwise.
+  tempStorage:
+    mountPath: /app/tmp
+    accessMode: ReadWriteMany
+    size: 1Gi
+    storageClassName: ""
+
+  # -- configmap-storage: files feature + storage profiles (STORAGE_* + FILES_*)
+  storage:
+    # Active storage profiles (comma-separated). Each needs a *Backend below.
+    profiles: "default"
+    # Backend for the 'default' profile. 'storage-memory' is in-process and ephemeral — no PVC,
+    # no external service, lost on restart, per-replica. Fine for ephemeral (PR/dev) namespaces.
+    # For durable, multi-replica environments override to 'storage-s3' and set the endpoint/
+    # bucket below (credentials come from a Secret).
+    defaultBackend: storage-memory
+    # Profile the /files API reads/writes, and the max upload size it accepts (MB).
+    filesStorageProfile: "default"
+    filesMaxFileSizeMb: "10"
+
+    # storage-local only: writable filesystem path for the default profile. Rendered only when set.
+    defaultBasePath: ""
+
+    # storage-s3 only — non-credential keys, rendered only when set. ACCESS_KEY/SECRET_KEY are
+    # NOT here; supply them via a Secret. A full URL endpoint (https://host:port) also carries the
+    # port and SSL flag, so defaultPort/defaultUseSsl can stay empty in that case.
+    defaultEndpoint: ""
+    defaultBucketName: ""
+    defaultPort: ""
+    defaultUseSsl: ""
 
   # -- configmap-formio: PLUGIN_FORMIO_V5_* (non-secret values)
   formio:
     routesAllowed: "true"
     proxyPath: /formio-v5
     # apiBaseUrl is auto-constructed from the formio service/external URL
+
+  # -- configmap-document-generation: PLUGIN_CDOGS_* + default backend code
+  documentGeneration:
+    cdogsV2:
+      endpoint: ""
+      tokenUrl: ""
+    cdogsV3:
+      endpoint: ""
 
   # -- configmap-sso: IDP / SSO config
   sso:
@@ -173,7 +224,9 @@ formio:
   external:
     url: ""
   image:
-    repository: docker.io/formio/formio
+    # Pull official images through Google's Docker Hub mirror to avoid the anonymous pull-rate
+    # limit on the cluster (same image, matching digest).
+    repository: mirror.gcr.io/formio/formio
     tag: 4.6.0
     pullPolicy: IfNotPresent
   replicas: 1
@@ -205,7 +258,9 @@ mongodb:
   external:
     uri: ""
   image:
-    repository: docker.io/mongo
+    # Google's Docker Hub mirror — avoids the anonymous pull-rate limit on the cluster (same
+    # image, matching digest).
+    repository: mirror.gcr.io/library/mongo
     tag: "7"
     pullPolicy: IfNotPresent
   replicas: 1
@@ -221,6 +276,35 @@ mongodb:
   persistence:
     size: 1Gi
     storageClassName: ""
+
+# -- ClamAV endpoint (alias to the separately-deployed clamav) ----------------
+# ClamAV runs as its own chart (deployments/helm/clamav), one per namespace. The
+# backend always targets an in-namespace ExternalName Service <release>-clamav on
+# the URL <release>-clamav:port, so backend config never changes per env — only
+# externalName (the real clamav Service) does. The alias Service + the backend
+# wiring are created only when backend.config.virusScanDefaultCode == virusscan-clamav.
+clamav:
+  # Real clamav Service the <release>-clamav alias points at. Empty defaults to the
+  # clamav Service in THIS namespace; override for cross-namespace (e.g. a PR in its
+  # own namespace pointing at dev's clamav).
+  externalName: ""
+  port: 3310
+  timeoutMs: "60000"
+
+# -- Valkey endpoint (alias to the separately-deployed valkey) ----------------
+# Valkey (Redis-compatible) runs as its own chart (deployments/helm/valkey), one per namespace,
+# providing the shared cache. The backend always targets an in-namespace <release>-valkey alias
+# Service on redis://<release>-valkey:port, so backend config never changes per env — only
+# externalName does. The alias Service + the PLUGIN_CACHE_REDIS_URL env are created only when
+# backend.config.cacheDefaultCode == cache-redis.
+valkey:
+  # Real valkey Service the <release>-valkey alias points at. Empty defaults to the valkey Service
+  # in THIS namespace; override for cross-namespace (e.g. a PR pointing at dev's valkey).
+  externalName: ""
+  port: 6379
+  # Optional key namespace, so releases sharing a Valkey never collide. Empty = per-release
+  # prefix (<release>:), set by the backend configmap.
+  keyPrefix: ""
 
 # -- Temporal (shared server, env vars for backend + worker) ------------------
 temporal:
@@ -246,7 +330,7 @@ temporalWorker:
     limits:
       cpu: 100m
       memory: 512Mi
-      
+
 # -- Vault Agent Injector
 vault:
   enabled: false

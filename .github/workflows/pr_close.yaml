@@ -28,6 +28,12 @@ on:
 
 permissions: {}
 
+env:
+  # Sourced from the repo variable shared with pr_open.yaml so the slot
+  # (PR_NUM % SLOT_COUNT) and release name resolve to the same environment this PR
+  # was deployed to; the literal is a fallback if the variable is unset.
+  SLOT_COUNT: ${{ vars.SLOT_COUNT || '20' }}
+
 concurrency:
   group: openshift-deploy
   cancel-in-progress: false
@@ -35,9 +41,10 @@ concurrency:
 jobs:
   set-vars:
     name: Set variables
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       PR_NUM: ${{ steps.vars.outputs.PR_NUM }}
+      SLOT: ${{ steps.vars.outputs.SLOT }}
       JOB_NAME: ${{ steps.vars.outputs.JOB_NAME }}
       RELEASE: ${{ steps.vars.outputs.RELEASE }}
     steps:
@@ -49,26 +56,28 @@ jobs:
           else
             PR_NUM="${{ github.event.pull_request.number }}"
           fi
+          SLOT=$(( PR_NUM % SLOT_COUNT ))
           echo "PR_NUM=$PR_NUM" >> "$GITHUB_OUTPUT"
-          echo "JOB_NAME=pr-$PR_NUM" >> "$GITHUB_OUTPUT"
-          echo "RELEASE=soba-pr-$PR_NUM" >> "$GITHUB_OUTPUT"
+          echo "SLOT=$SLOT" >> "$GITHUB_OUTPUT"
+          echo "JOB_NAME=pr-slot-$SLOT" >> "$GITHUB_OUTPUT"
+          echo "RELEASE=soba-pr-slot-$SLOT" >> "$GITHUB_OUTPUT"
 
   soba-cleanup:
     name: Uninstall SOBA and remove secrets/PVCs
     needs: [set-vars]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install OpenShift CLI
-        uses: redhat-actions/openshift-tools-installer@v1
+        uses: redhat-actions/openshift-tools-installer@e3b32c2ab7b064b2ce189121c4a49f509a99a7b4 # v3.0
         with:
           oc: "4.14"
           skip_cache: "true"
 
       - name: Login to OpenShift Cluster
-        uses: redhat-actions/oc-login@v1
+        uses: redhat-actions/oc-login@2a1614bc977c054c8786c8e35fc9534bd0ddc156 # v2.0.1
         with:
           openshift_server_url: ${{ vars.OC_SERVER }}
           openshift_token: ${{ secrets.OC_TOKEN }}
@@ -90,16 +99,26 @@ jobs:
         env:
           RELEASE: ${{ needs.set-vars.outputs.RELEASE }}
           NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
         run: |
           LABEL="app.kubernetes.io/instance=${RELEASE}"
 
-          # Step 1: Helm uninstall (if release exists)
-          if helm status "${RELEASE}" -n "${NAMESPACE}" &>/dev/null; then
-            echo "Uninstalling Helm release ${RELEASE}..."
-            helm uninstall "${RELEASE}" --namespace "${NAMESPACE}" || true
-          else
-            echo "Release ${RELEASE} not found, skipping helm uninstall."
+          if ! helm status "${RELEASE}" -n "${NAMESPACE}" &>/dev/null; then
+            echo "Release ${RELEASE} not found, nothing to clean up."
+            exit 0
           fi
+
+          # Slots are reused across PRs (PR_NUM % SLOT_COUNT). Only tear the slot down
+          # if this PR still owns it — a newer PR may have redeployed over it. An empty
+          # owner means the release predates slot tracking, so treat it as ours.
+          OWNER=$(helm get values "${RELEASE}" -n "${NAMESPACE}" -o json 2>/dev/null | jq -r '.global.prNumber // empty')
+          if [ -n "${OWNER}" ] && [ "${OWNER}" != "${PR_NUM}" ]; then
+            echo "Slot ${RELEASE} is now owned by PR ${OWNER}, not ${PR_NUM}; skipping teardown."
+            exit 0
+          fi
+
+          echo "Uninstalling Helm release ${RELEASE}..."
+          helm uninstall "${RELEASE}" --namespace "${NAMESPACE}" || true
 
           echo "Sweeping all resources with label ${LABEL}..."
           oc delete all,secret,pvc,configmap,serviceaccount,networkpolicy \
@@ -110,22 +129,22 @@ jobs:
   crunch-cleanup:
     name: Remove Crunchy PR user and database
     needs: [set-vars, soba-cleanup]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout action-crunchy
-        uses: actions/checkout@v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: bcgov/action-crunchy
           ref: v2.0.0
 
       - name: Install OpenShift CLI
-        uses: redhat-actions/openshift-tools-installer@v1
+        uses: redhat-actions/openshift-tools-installer@e3b32c2ab7b064b2ce189121c4a49f509a99a7b4 # v3.0
         with:
           oc: "4.14"
           skip_cache: "true"
 
       - name: Login to OpenShift Cluster
-        uses: redhat-actions/oc-login@v1
+        uses: redhat-actions/oc-login@2a1614bc977c054c8786c8e35fc9534bd0ddc156 # v2.0.1
         with:
           openshift_server_url: ${{ vars.OC_SERVER }}
           openshift_token: ${{ secrets.OC_TOKEN }}

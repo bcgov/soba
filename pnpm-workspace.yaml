@@ -7,11 +7,12 @@ ignoredBuiltDependencies:
   - unrs-resolver
 
 onlyBuiltDependencies:
-  - '@scarf/scarf'
-  - '@swc/core'
+  - "@scarf/scarf"
+  - "@swc/core"
   - core-js
   - esbuild
   - protobufjs
+  - "@bcgov/formio-components"
 
 overrides:
   minimatch: 10.2.4

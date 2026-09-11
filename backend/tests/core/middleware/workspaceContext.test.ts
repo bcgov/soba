@@ -65,10 +65,12 @@ function membershipRow(id: string) {
     id,
     kind: 'team',
     name: 'Workspace',
-    slug: null,
     status: 'active',
+    org: 'IT',
+    useCase: 'Internal',
     membershipId: 'membership-1',
     role: 'owner',
+    disclaimerAcceptedAt: null,
   };
 }
 
@@ -114,6 +116,7 @@ describe('workspaceFromQuery', () => {
       actorId: 'actor1',
       actorDisplayLabel: 'Actor One',
       workspaceSource: 'query',
+      role: 'owner',
     });
     expect(res.set).toHaveBeenCalledWith('x-soba-workspace-id', 'ws1');
     expect(next).toHaveBeenCalledWith();

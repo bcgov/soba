@@ -57,6 +57,132 @@
       "when": 1772600000000,
       "tag": "0007_seed_core_data",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1772601000000,
+      "tag": "0008_rbac_catalog",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1772602000000,
+      "tag": "0009_workspace_group_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1772603000000,
+      "tag": "0010_group_member_kinds",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1772604000000,
+      "tag": "0011_remove_workspace_owner_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1772605000000,
+      "tag": "0012_add_files_feature",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1772606000000,
+      "tag": "0013_scoped_name_uniqueness",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1772607000000,
+      "tag": "0014_workspace_group_system_code",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1772608000000,
+      "tag": "0015_workspace_disclaimer_acceptance",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1772609000000,
+      "tag": "0016_workspace_group_system_code_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1772610000000,
+      "tag": "0017_grandfather_workspace_disclaimer",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1772611000000,
+      "tag": "0018_drop_form_version_visibility",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1772612000000,
+      "tag": "0019_add_antivirus_feature",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1772613000000,
+      "tag": "0020_feature_availability",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1772614000000,
+      "tag": "0021_add_document_generation_features",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1772615000000,
+      "tag": "0022_add_document_generation_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1772616000000,
+      "tag": "0023_add_workspace_org_use_case",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1772617000000,
+      "tag": "0024_submission_workspace_updated_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1772618000000,
+      "tag": "0025_enable_bceid_business_login",
+      "breakpoints": true
     }
   ]
 }

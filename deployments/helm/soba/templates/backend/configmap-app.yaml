@@ -22,14 +22,23 @@ data:
   {{- end }}
   FORM_ENGINE_DEFAULT_CODE: {{ .Values.backend.config.formEngineDefaultCode | quote }}
   CACHE_DEFAULT_CODE: {{ .Values.backend.config.cacheDefaultCode | quote }}
+  {{- if include "soba.cacheUsesRedis" . }}
+  PLUGIN_CACHE_REDIS_URL: {{ printf "redis://%s-valkey:%v" (include "soba.fullname" .) .Values.valkey.port | quote }}
+  # Per-release key namespace so releases sharing one Valkey (e.g. PRs in the dev namespace) never
+  # read each other's cached rows. Defaults to <release>:; override with valkey.keyPrefix.
+  PLUGIN_CACHE_REDIS_KEY_PREFIX: {{ .Values.valkey.keyPrefix | default (printf "%s:" (include "soba.fullname" .)) | quote }}
+  {{- end }}
   MESSAGEBUS_DEFAULT_CODE: {{ .Values.backend.config.messagebusDefaultCode | quote }}
+  TEMPSTORAGE_DEFAULT_CODE: {{ .Values.backend.config.tempStorageDefaultCode | quote }}
+  {{- if include "soba.tempStorageUsesMount" . }}
+  PLUGIN_TEMPSTORAGE_MOUNT_DIR: {{ .Values.backend.tempStorage.mountPath | quote }}
+  {{- end }}
+  VIRUSSCAN_DEFAULT_CODE: {{ .Values.backend.config.virusScanDefaultCode | quote }}
+  {{- if include "soba.virusScanUsesClamav" . }}
+  PLUGIN_VIRUSSCAN_CLAMAV_URL: {{ printf "%s-clamav:%v" (include "soba.fullname" .) .Values.clamav.port | quote }}
+  PLUGIN_VIRUSSCAN_CLAMAV_TIMEOUT_MS: {{ .Values.clamav.timeoutMs | quote }}
+  {{- end }}
   SOBA_SYSTEM_SUBJECT: {{ .Values.backend.config.sobaSystemSubject | quote }}
-  WORKSPACE_PLUGINS_ALLOWED: {{ .Values.backend.config.workspacePluginsAllowed | quote }}
-  WORKSPACE_PLUGINS_STRICT_MODE: {{ .Values.backend.config.workspacePluginsStrictMode | quote }}
-  PLUGIN_ENTERPRISE_CSTAR_HEADER_KEYS: {{ .Values.backend.config.pluginEnterpriseCstarHeaderKeys | quote }}
-  PLUGIN_ENTERPRISE_CSTAR_REQUIRE_EXTERNAL_HEADER: {{ .Values.backend.config.pluginEnterpriseCstarRequireExternalHeader | quote }}
-  PLUGIN_PERSONAL_LOCAL_COOKIE_KEY: {{ .Values.backend.config.pluginPersonalLocalCookieKey | quote }}
-  PLUGIN_PERSONAL_LOCAL_ALLOW_HEADER_OVERRIDE: {{ .Values.backend.config.pluginPersonalLocalAllowHeaderOverride | quote }}
   {{- if not .Values.database.uri }}
   DB_HOST: {{ .Values.database.host | quote }}
   DB_PORT: {{ .Values.database.port | quote }}

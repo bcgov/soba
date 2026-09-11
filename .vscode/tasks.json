@@ -18,6 +18,39 @@
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
+    },
+    {
+      "label": "Start MinIO Container",
+      "type": "shell",
+      "command": "docker rm -f soba-minio || true && docker run -d --name soba-minio -p 9000:9000 -p 9001:9001 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadminpassword minio/minio server /data --console-address ':9001' && echo 'Waiting for MinIO to initialize...' && sleep 3 && docker exec soba-minio mc alias set myminio http://127.0.0.1:9000 minioadmin minioadminpassword && docker exec soba-minio mc mb --ignore-existing myminio/soba-bucket",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "Start ClamAV Container",
+      "type": "shell",
+      "command": "bash .devcontainer/start-clamav.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "Start Valkey Container",
+      "type": "shell",
+      "command": "docker rm -f soba-valkey || true && docker run -d --name soba-valkey --restart unless-stopped -p 6379:6379 valkey/valkey:8-alpine valkey-server --maxmemory-policy allkeys-lru && echo 'Valkey listening on localhost:6379 — set CACHE_DEFAULT_CODE=cache-redis and PLUGIN_CACHE_REDIS_URL=redis://localhost:6379 in backend/.env.local'",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
     }
   ]
 }

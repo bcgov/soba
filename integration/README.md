@@ -5,30 +5,31 @@ This folder holds cross-service integration tests at repo root (outside `backend
 - Framework: Playwright
 - Purpose: smoke-level examples for SOBA UI + API integration
 
-## Run in devcontainer (recommended)
+## Setup (on demand)
 
-Devcontainer setup now prepares integration tests automatically:
+These tests are **not** installed by the devcontainer — set them up only if you need them.
+`integration/playwright` is a standalone npm project (its own lockfile), not part of the pnpm workspace.
 
-- `.devcontainer/post-create.sh` installs integration dependencies with `pnpm`
-- `.devcontainer/post-create.sh` installs Playwright Chromium
-- `.devcontainer/Dockerfile` includes required Linux runtime libraries for Playwright
+### In the devcontainer
 
-After the container is created/rebuilt, tests should be ready to run:
-
-```bash
-pnpm -C integration/playwright test
-```
-
-## Run manually (outside devcontainer)
-
-Install dependencies and browser once:
+The image already includes Playwright's Linux runtime libraries (see `.devcontainer/Dockerfile`),
+so you only install the npm dependencies and the Chromium binary:
 
 ```bash
 npm ci --prefix integration/playwright
 npm exec --prefix integration/playwright -- playwright install chromium
 ```
 
-Run tests:
+### Outside the devcontainer
+
+System libraries aren't present, so let Playwright add them:
+
+```bash
+npm ci --prefix integration/playwright
+npm exec --prefix integration/playwright -- playwright install --with-deps chromium
+```
+
+## Run
 
 ```bash
 pnpm -C integration/playwright test

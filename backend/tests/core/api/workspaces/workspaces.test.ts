@@ -11,7 +11,7 @@ jest.mock('../../../../src/core/db/repos/membershipRepo', () => ({
 
 jest.mock('../../../../src/core/db/repos/workspaceRepo', () => ({
   createTeamWorkspace: jest.fn(),
-  updateWorkspaceName: jest.fn(),
+  updateWorkspace: jest.fn(),
 }));
 
 import { workspacesApiService } from '../../../../src/core/api/workspaces/service';
@@ -25,11 +25,13 @@ const workspaceId = '11111111-1111-7111-8111-111111111111';
 const workspaceRow = {
   id: workspaceId,
   name: 'Team Alpha',
-  slug: null,
   kind: 'team',
   role: 'owner',
   status: 'active',
+  org: 'IT',
+  useCase: 'Internal',
   membershipId: 'membership-1',
+  disclaimerAcceptedAt: null,
 };
 
 describe('WorkspacesApiService', () => {
@@ -42,18 +44,30 @@ describe('WorkspacesApiService', () => {
     jest.mocked(workspaceRepo.createTeamWorkspace).mockResolvedValue(workspaceId);
     jest.mocked(membershipRepo.getWorkspaceForUser).mockResolvedValue(workspaceRow);
 
-    const result = await workspacesApiService.create(actorId, 'idir', { name: 'Team Alpha' });
+    const result = await workspacesApiService.create(actorId, 'idir', {
+      name: 'Team Alpha',
+      org: 'IT',
+      useCase: 'Internal',
+    });
 
     expect(idpGroupRepo.canCreateWorkspaceByIdp).toHaveBeenCalledWith('idir');
 
-    expect(workspaceRepo.createTeamWorkspace).toHaveBeenCalledWith(actorId, 'Team Alpha');
+    expect(workspaceRepo.createTeamWorkspace).toHaveBeenCalledWith(
+      actorId,
+      'Team Alpha',
+      'IT',
+      'Internal',
+      false,
+    );
     expect(result).toEqual({
       id: workspaceId,
       name: 'Team Alpha',
-      slug: null,
       kind: 'team',
       role: 'owner',
       status: 'active',
+      org: 'IT',
+      useCase: 'Internal',
+      disclaimerAccepted: false,
     });
   });
 
@@ -61,40 +75,46 @@ describe('WorkspacesApiService', () => {
     jest.mocked(idpGroupRepo.canCreateWorkspaceByIdp).mockResolvedValue(false);
 
     await expect(
-      workspacesApiService.create(actorId, 'bceidbusiness', { name: 'Team Alpha' }),
+      workspacesApiService.create(actorId, 'bceidbusiness', {
+        name: 'Team Alpha',
+        org: 'IT',
+        useCase: 'Internal',
+      }),
     ).rejects.toBeInstanceOf(ForbiddenError);
 
     expect(workspaceRepo.createTeamWorkspace).not.toHaveBeenCalled();
   });
 
   it('updateName returns updated workspace when rename succeeds', async () => {
-    jest.mocked(workspaceRepo.updateWorkspaceName).mockResolvedValue(true);
+    jest.mocked(workspaceRepo.updateWorkspace).mockResolvedValue(true);
     jest.mocked(membershipRepo.getWorkspaceForUser).mockResolvedValue({
       ...workspaceRow,
       name: 'Renamed',
     });
 
-    const result = await workspacesApiService.updateName(workspaceId, actorId, {
+    const result = await workspacesApiService.update(workspaceId, actorId, {
       name: 'Renamed',
     });
 
-    expect(workspaceRepo.updateWorkspaceName).toHaveBeenCalledWith(workspaceId, actorId, 'Renamed');
+    expect(workspaceRepo.updateWorkspace).toHaveBeenCalledWith(workspaceId, actorId, {
+      name: 'Renamed',
+    });
     expect(result?.name).toBe('Renamed');
   });
 
   it('updateName throws ForbiddenError when actor cannot rename', async () => {
-    jest.mocked(workspaceRepo.updateWorkspaceName).mockResolvedValue(false);
+    jest.mocked(workspaceRepo.updateWorkspace).mockResolvedValue(false);
 
     await expect(
-      workspacesApiService.updateName(workspaceId, actorId, { name: 'Renamed' }),
+      workspacesApiService.update(workspaceId, actorId, { name: 'Renamed' }),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it('updateName returns null when workspace is missing after update', async () => {
-    jest.mocked(workspaceRepo.updateWorkspaceName).mockResolvedValue(true);
+    jest.mocked(workspaceRepo.updateWorkspace).mockResolvedValue(true);
     jest.mocked(membershipRepo.getWorkspaceForUser).mockResolvedValue(null);
 
-    const result = await workspacesApiService.updateName(workspaceId, actorId, {
+    const result = await workspacesApiService.update(workspaceId, actorId, {
       name: 'Renamed',
     });
 

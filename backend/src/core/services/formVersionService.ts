@@ -21,15 +21,6 @@ interface CreateDraftInput {
   actorId: string;
   actorDisplayLabel: string | null;
   formId: string;
-  visibility?: string[];
-}
-
-interface UpdateDraftInput {
-  workspaceId: string;
-  actorId: string;
-  actorDisplayLabel: string | null;
-  formVersionId: string;
-  visibility?: string[];
 }
 
 interface SaveInput {
@@ -114,12 +105,6 @@ function stateStamps(
 export class FormVersionService {
   async createDraft(input: CreateDraftInput) {
     return createEmptyFormVersionDraft(input);
-  }
-
-  async updateDraft(input: UpdateDraftInput) {
-    return updateFormVersionDraft(input.workspaceId, input.formVersionId, input.actorDisplayLabel, {
-      visibility: input.visibility,
-    });
   }
 
   async save(input: SaveInput) {
@@ -288,9 +273,19 @@ export class FormVersionService {
   /** Reads the form version's schema back from the form engine (null if unprovisioned). */
   async getSchema(input: { workspaceId: string; formVersionId: string }) {
     const version = await getFormVersionById(input.workspaceId, input.formVersionId);
-    if (!version || !version.engineSchemaRef) return null;
+    if (!version) return null;
+    return this.getSchemaForVersion(version);
+  }
 
-    const engineCode = await getFormEngineCodeForForm(input.workspaceId, version.formId);
+  /** As getSchema, but for an already-loaded version row — skips the re-fetch by id. */
+  async getSchemaForVersion(version: {
+    workspaceId: string;
+    formId: string;
+    engineSchemaRef: string | null;
+  }) {
+    if (!version.engineSchemaRef) return null;
+
+    const engineCode = await getFormEngineCodeForForm(version.workspaceId, version.formId);
     if (!engineCode) return null;
 
     const adapter = createFormEngineAdapter(engineCode);

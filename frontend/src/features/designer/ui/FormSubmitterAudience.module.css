@@ -1,0 +1,41 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.label {
+  font-weight: 700;
+}
+
+.triggerWrap {
+  display: inline-flex;
+  align-self: flex-start;
+}
+
+.panel {
+  background: #ffffff;
+  border: 1px solid #606060;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  min-width: 20rem;
+  max-width: 24rem;
+}
+
+.dialog {
+  outline: none;
+  padding: 1rem;
+}
+
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}

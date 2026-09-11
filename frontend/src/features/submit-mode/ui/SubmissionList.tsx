@@ -6,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
-import { getSobaSubmissions } from '@/src/shared/api/sobaApiForms';
+import { getSobaSubmissions } from '@/src/shared/api/sobaApiDesign';
 import type { SubmissionListItem } from '@/src/types/submissions';
 import { DataTable, Column } from '@/src/components/DataTable';
 import { ListPageLayout } from '@/src/components/ListPageLayout';

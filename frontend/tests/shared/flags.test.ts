@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   normalizeFeatureCode,
   parseFrontendFeaturesAllowlist,
@@ -53,5 +53,48 @@ describe('feature flags utilities', () => {
     const fn = createIsFeatureAllowed(meta);
     // By default process.env likely doesn't include features so none allowed
     expect(fn('workspaces')).toBe(false);
+  });
+
+  it('createIsFeatureAllowed hides scoped features (can only be resolved with scope)', () => {
+    vi.stubEnv('NEXT_PUBLIC_SOBA_FEATURES_ALLOWED', '*');
+    const meta = {
+      features: [
+        {
+          code: 'doc-fixed',
+          name: 'Fixed',
+          description: null,
+          version: null,
+          status: 'enabled',
+          platformAllowed: true,
+          availability: 'fixed',
+        },
+        {
+          code: 'doc-scoped',
+          name: 'Scoped',
+          description: null,
+          version: null,
+          status: 'enabled',
+          platformAllowed: true,
+          availability: 'scoped',
+        },
+        {
+          code: 'legacy',
+          name: 'Legacy',
+          description: null,
+          version: null,
+          status: 'enabled',
+          platformAllowed: true,
+        },
+      ],
+    } as unknown as FeaturesMetaPayload;
+    const fn = createIsFeatureAllowed(meta);
+
+    expect(fn('doc-fixed')).toBe(true);
+    // Scoped resolves false even though platform- and frontend-allowed.
+    expect(fn('doc-scoped')).toBe(false);
+    // Missing availability is treated as non-scoped.
+    expect(fn('legacy')).toBe(true);
+
+    vi.unstubAllEnvs();
   });
 });

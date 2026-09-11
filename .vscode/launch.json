@@ -11,10 +11,7 @@
     },
     {
       "name": "SOBA (Backend + Temporal)",
-      "configurations": [
-        "SOBA Backend",
-        "SOBA Temporal Worker"
-      ]
+      "configurations": ["SOBA Backend", "SOBA Temporal Worker"]
     }
   ],
   "configurations": [
@@ -54,6 +51,33 @@
       "request": "launch",
       "url": "http://localhost:3000",
       "webRoot": "${workspaceFolder}/frontend"
+    },
+    {
+      "name": "MinIO",
+      "type": "node",
+      "request": "launch",
+      "preLaunchTask": "Start MinIO Container",
+      "program": "${workspaceFolder}",
+      "runtimeExecutable": "echo",
+      "runtimeArgs": ["MinIO command sent successfully!"]
+    },
+    {
+      "name": "ClamAV",
+      "type": "node",
+      "request": "launch",
+      "preLaunchTask": "Start ClamAV Container",
+      "program": "${workspaceFolder}",
+      "runtimeExecutable": "echo",
+      "runtimeArgs": ["ClamAV command sent successfully!"]
+    },
+    {
+      "name": "Valkey",
+      "type": "node",
+      "request": "launch",
+      "preLaunchTask": "Start Valkey Container",
+      "program": "${workspaceFolder}",
+      "runtimeExecutable": "echo",
+      "runtimeArgs": ["Valkey command sent successfully!"]
     }
   ]
 }

@@ -43,7 +43,18 @@ describe('workspaceOnboarding', () => {
     expect(
       needsWorkspaceOnboarding({
         ...readyContext,
-        workspaces: [{ id: 'ws1', name: 'Team', slug: null, kind: 'team', role: 'member', status: 'active' }],
+        workspaces: [
+          {
+            id: 'ws1',
+            name: 'Team',
+            kind: 'team',
+            role: 'member',
+            status: 'active',
+            disclaimerAccepted: false,
+            useCase: 'other',
+            org: 'other',
+          },
+        ],
         currentUser: {
           actor: { id: 'u1', displayLabel: 'User', status: 'active' },
           profile: { displayName: 'User', email: null, preferredUsername: null },

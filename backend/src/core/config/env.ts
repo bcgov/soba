@@ -134,6 +134,11 @@ export function createEnvReader(source: EnvSource) {
     getNumberEnv: (key: string) => getNumberEnvFrom(source, key),
     getCsvEnv: (key: string) => getCsvEnvFrom(source, key),
     getDatabaseUrl: () => resolveDatabaseUrl(source),
+    /**
+     * express.json body limit for the API surfaces. Larger than the 100kb default so document
+     * generation can carry a base64 template inline (reducible once templates are stored server-side).
+     */
+    getJsonBodyLimit: () => getOptionalEnvFrom(source, 'HTTP_JSON_BODY_LIMIT') ?? '10mb',
     getDbAdminDatabase: () => getOptionalEnvFrom(source, 'DB_ADMIN_DATABASE'),
     // Pipeline performance fix: Revert if needed.
     getDbConnectionTimeoutMs: () => getNumberEnvFrom(source, 'DB_CONNECTION_TIMEOUT_MS') ?? 10000,
@@ -146,16 +151,24 @@ export function createEnvReader(source: EnvSource) {
     // Pipeline performance fix: Revert if needed.
     getSystemSobaUserEmail: () => getOptionalEnvFrom(source, 'SYSTEM_SOBA_USER_EMAIL'),
     getSystemSobaSubject: () => getOptionalEnvFrom(source, 'SOBA_SYSTEM_SUBJECT'),
-    getWorkspacePluginsAllowed: () => getRequiredEnvFrom(source, 'WORKSPACE_PLUGINS_ALLOWED'),
-    getWorkspacePluginsStrictModeRaw: () =>
-      getRequiredEnvFrom(source, 'WORKSPACE_PLUGINS_STRICT_MODE'),
     isDevelopment: () => getOptionalEnvFrom(source, 'NODE_ENV') === 'development',
     getPluginsPath: () =>
       getOptionalEnvFrom(source, 'PLUGINS_PATH') ??
       getOptionalEnvFrom(source, 'WORKSPACE_PLUGINS_PATH'),
     getCacheDefaultCode: () => getOptionalEnvFrom(source, 'CACHE_DEFAULT_CODE'),
     getMessageBusDefaultCode: () => getOptionalEnvFrom(source, 'MESSAGEBUS_DEFAULT_CODE'),
+    getTempStorageDefaultCode: () => getOptionalEnvFrom(source, 'TEMPSTORAGE_DEFAULT_CODE'),
+    getVirusScanDefaultCode: () => getOptionalEnvFrom(source, 'VIRUSSCAN_DEFAULT_CODE'),
     getFormEngineDefaultCode: () => getOptionalEnvFrom(source, 'FORM_ENGINE_DEFAULT_CODE'),
+    getDocumentGenerationDefaultCode: () =>
+      getOptionalEnvFrom(source, 'DOCUMENT_GENERATION_DEFAULT_CODE'),
+    /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
+    getDefaultSubmitterProvider: () =>
+      getOptionalEnvFrom(source, 'DEFAULT_SUBMITTER_PROVIDER') ?? 'azureidir',
+    getStorageProfiles: () => {
+      const raw = getOptionalEnvFrom(source, 'STORAGE_PROFILES');
+      return raw ? parseCsvValue(raw) : [];
+    },
     getRateLimitWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_WINDOW_MS'),
     getRateLimitMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_MAX'),
     getRateLimitApiWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_API_WINDOW_MS'),
@@ -192,6 +205,11 @@ export const env = {
   getNumberEnv,
   getCsvEnv,
   getDatabaseUrl: () => resolveDatabaseUrl(process.env),
+  /**
+   * express.json body limit for the API surfaces. Larger than the 100kb default so document
+   * generation can carry a base64 template inline (reducible once templates are stored server-side).
+   */
+  getJsonBodyLimit: () => getOptionalEnv('HTTP_JSON_BODY_LIMIT') ?? '10mb',
   getDbAdminDatabase: () => getOptionalEnv('DB_ADMIN_DATABASE'),
   // Pipeline performance fix: Revert if needed.
   getDbConnectionTimeoutMs: () => getNumberEnv('DB_CONNECTION_TIMEOUT_MS') ?? 10000,
@@ -204,13 +222,21 @@ export const env = {
   getSystemSobaUserEmail: () => getOptionalEnv('SYSTEM_SOBA_USER_EMAIL'),
   /** Subject for the system SOBA user identity (provider=system). Default in code: soba-system. */
   getSystemSobaSubject: () => getOptionalEnv('SOBA_SYSTEM_SUBJECT'),
-  getWorkspacePluginsAllowed: () => getRequiredEnv('WORKSPACE_PLUGINS_ALLOWED'),
-  getWorkspacePluginsStrictModeRaw: () => getRequiredEnv('WORKSPACE_PLUGINS_STRICT_MODE'),
   isDevelopment: () => getOptionalEnv('NODE_ENV') === 'development',
   getPluginsPath: () => getOptionalEnv('PLUGINS_PATH') ?? getOptionalEnv('WORKSPACE_PLUGINS_PATH'),
   getCacheDefaultCode: () => getOptionalEnv('CACHE_DEFAULT_CODE'),
   getMessageBusDefaultCode: () => getOptionalEnv('MESSAGEBUS_DEFAULT_CODE'),
+  getTempStorageDefaultCode: () => getOptionalEnv('TEMPSTORAGE_DEFAULT_CODE'),
+  getVirusScanDefaultCode: () => getOptionalEnv('VIRUSSCAN_DEFAULT_CODE'),
   getFormEngineDefaultCode: () => getOptionalEnv('FORM_ENGINE_DEFAULT_CODE'),
+  /** Document generation backend the consumer defaults to (a discovered plugin code). */
+  getDocumentGenerationDefaultCode: () => getOptionalEnv('DOCUMENT_GENERATION_DEFAULT_CODE'),
+  /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
+  getDefaultSubmitterProvider: () => getOptionalEnv('DEFAULT_SUBMITTER_PROVIDER') ?? 'azureidir',
+  getStorageProfiles: () => {
+    const raw = getOptionalEnv('STORAGE_PROFILES');
+    return raw ? parseCsvValue(raw) : [];
+  },
   getRateLimitWindowMs: () => getNumberEnv('RATE_LIMIT_WINDOW_MS'),
   getRateLimitMax: () => getNumberEnv('RATE_LIMIT_MAX'),
   getRateLimitApiWindowMs: () => getNumberEnv('RATE_LIMIT_API_WINDOW_MS'),
@@ -227,4 +253,8 @@ export const env = {
   getTemporalNamespace: () => getOptionalEnv('TEMPORAL_NAMESPACE') ?? 'default',
   getTemporalTaskQueue: () => getOptionalEnv('TEMPORAL_TASK_QUEUE') ?? 'soba',
   getTemporalWorkerHealthPort: () => getNumberEnv('TEMPORAL_WORKER_HEALTH_PORT') ?? 9090,
+  // Max upload size accepted by the files API. Feature-level (not per storage backend).
+  getFilesMaxFileSizeMb: () => getNumberEnv('FILES_MAX_FILE_SIZE_MB') || 10,
+  // Storage profile the files feature reads/writes. Defaults to 'default'.
+  getFilesStorageProfile: () => getOptionalEnv('FILES_STORAGE_PROFILE') ?? 'default',
 };

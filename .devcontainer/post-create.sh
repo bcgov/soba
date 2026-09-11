@@ -15,43 +15,10 @@ source "$SCRIPT_DIR/scripts/pnpm-setup.sh"
 echo "==> Configuring pnpm..."
 configure_pnpm
 
-# ── Set up environment files (before install) ─────────────────────────────────
-if [ -f backend/.env.example ] && [ ! -f backend/.env ]; then
-  echo "==> Creating backend/.env from .env.example..."
-  cp backend/.env.example backend/.env
-  echo "    Review backend/.env and set values for your environment"
-else
-  echo "==> backend/.env already exists or no .env.example, skipping..."
-fi
-
-if [ ! -f backend/.env.local ]; then
-  echo "==> Creating backend/.env.local from .env.local.example..."
-  cp backend/.env.local.example backend/.env.local
-  echo "    Add credentials and overrides to backend/.env.local (never committed)"
-else
-  echo "==> backend/.env.local already exists, skipping..."
-fi
-
-if [ -f frontend/.env.example ] && [ ! -f frontend/.env ]; then
-  echo "==> Creating frontend/.env from .env.example..."
-  cp frontend/.env.example frontend/.env
-  echo "    Values are for localhost; edit frontend/.env for other environments"
-else
-  echo "==> frontend/.env already exists or no .env.example, skipping..."
-fi
+# Env files are created and kept in step with their *.example templates by
+# post-start.sh (env-sync), plus initializeCommand on the host — nothing here.
 
 install_workspace_deps full
-
-# ── Integration test dependencies + Playwright Chromium ─────────────────────
-if [ -f integration/playwright/package.json ]; then
-  echo "==> Installing integration test dependencies..."
-  npm ci --prefix integration/playwright
-
-  echo "==> Installing Playwright Chromium (integration)..."
-  npm exec --prefix integration/playwright -- playwright install chromium
-else
-  echo "==> integration/playwright/package.json not found, skipping integration setup..."
-fi
 
 # ── Print summary ───────────────────────────────────────────────────────────
 echo ""
@@ -63,6 +30,8 @@ echo "  Quick start:"
 echo "    Backend:  pnpm dev (in backend/)   (or use launch config 'SOBA Backend')"
 echo "    Frontend: pnpm dev (in frontend/)        (or use launch config 'SOBA Frontend')"
 echo "    Both:     use compound 'SOBA (Backend + Frontend)'"
+echo ""
+echo "  Integration (Playwright) e2e: opt-in — see integration/README.md"
 echo ""
 echo "  Endpoints:"
 echo "    Backend API:  http://localhost:4000"

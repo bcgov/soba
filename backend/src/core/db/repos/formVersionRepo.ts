@@ -7,7 +7,6 @@ interface CreateDraftInput {
   formId: string;
   actorId: string;
   actorDisplayLabel: string | null;
-  visibility?: string[] | null;
 }
 
 interface SaveRevisionInput {
@@ -43,7 +42,6 @@ export interface FormVersionListRow {
   state: string;
   engineSyncStatus: string;
   engineSchemaRef: string | null;
-  visibility: string[] | null;
   createdAt: Date;
   updatedAt: Date;
   createdBy: string | null;
@@ -99,7 +97,6 @@ export const createEmptyFormVersionDraft = async (input: CreateDraftInput, tx?: 
         state: 'draft',
         engineSyncStatus: 'pending',
         currentRevisionNo: 0,
-        visibility: input.visibility ?? [],
         createdBy: input.actorDisplayLabel,
         updatedBy: input.actorDisplayLabel,
       })
@@ -174,7 +171,6 @@ export const listFormVersionsForWorkspace = async (
       state: formVersions.state,
       engineSyncStatus: formVersions.engineSyncStatus,
       engineSchemaRef: formVersions.engineSchemaRef,
-      visibility: formVersions.visibility,
       createdAt: formVersions.createdAt,
       updatedAt: formVersions.updatedAt,
       createdBy: formVersions.createdBy,
@@ -205,7 +201,6 @@ export const updateFormVersionDraft = async (
     engineSchemaRef: string;
     engineSyncStatus: string;
     engineSyncError: string | null;
-    visibility: string[] | null;
     publishedAt: Date | null;
     publishedBy: string | null;
     deletedAt: Date | null;

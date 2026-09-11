@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, inArray, isNull, lt, or } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNull, lt, ne, or } from 'drizzle-orm';
 import { db, type DbOrTx } from '../client';
 import { forms, formVersions } from '../schema';
 
@@ -185,6 +185,27 @@ export const createForm = async (input: CreateFormInput, tx?: DbOrTx): Promise<F
     .returning();
 
   return created[0] as FormRecord;
+};
+
+/** True if a non-deleted form with this name exists in the workspace (optionally excluding one form). */
+export const formNameExistsInWorkspace = async (
+  workspaceId: string,
+  name: string,
+  exceptFormId?: string,
+): Promise<boolean> => {
+  const rows = await db
+    .select({ id: forms.id })
+    .from(forms)
+    .where(
+      and(
+        eq(forms.workspaceId, workspaceId),
+        eq(forms.name, name),
+        isNull(forms.deletedAt),
+        ...(exceptFormId ? [ne(forms.id, exceptFormId)] : []),
+      ),
+    )
+    .limit(1);
+  return Boolean(rows[0]);
 };
 
 export const updateForm = async (input: UpdateFormInput): Promise<FormRecord | null> => {

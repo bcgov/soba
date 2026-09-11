@@ -3,6 +3,7 @@ import {
   FormCursorMode,
   FormRecord,
   FormListSort,
+  formNameExistsInWorkspace,
   getFormById,
   listFormsForWorkspace,
   markFormDeleted,
@@ -10,6 +11,7 @@ import {
   getFormByEngineSchemaRef,
 } from '../db/repos/formRepo';
 import { createEmptyFormVersionDraft } from '../db/repos/formVersionRepo';
+import { isWorkspaceDisclaimerAccepted } from '../db/repos/workspaceRepo';
 import { db } from '../db/client';
 import { env } from '../config/env';
 import {
@@ -17,7 +19,8 @@ import {
   getFormEnginePlugins,
   resolveFormEnginePlugin,
 } from '../integrations/form-engine/FormEngineRegistry';
-import { ValidationError } from '../errors';
+import { ConflictError, ValidationError } from '../errors';
+import { FORM_NAME_TAKEN } from '../messages';
 
 interface DeleteInput {
   workspaceId: string;
@@ -46,7 +49,6 @@ interface CreateInput {
   name: string;
   description?: string;
   formEngineCode?: string;
-  visibility?: string[];
 }
 
 interface UpdateInput {
@@ -64,6 +66,10 @@ export class FormService {
     form: FormRecord;
     version: Awaited<ReturnType<typeof createEmptyFormVersionDraft>>;
   }> {
+    // Gate: the workspace disclaimer must be accepted before any form can be created.
+    if (!(await isWorkspaceDisclaimerAccepted(input.workspaceId))) {
+      throw new ConflictError('Accept the workspace disclaimer before creating forms');
+    }
     const plugins = getFormEnginePlugins();
     if (plugins.length === 0) {
       throw new ValidationError('No form engine plugins installed.');
@@ -81,6 +87,10 @@ export class FormService {
       );
     }
     resolveFormEnginePlugin(engineCode);
+
+    if (await formNameExistsInWorkspace(input.workspaceId, input.name)) {
+      throw new ConflictError(FORM_NAME_TAKEN);
+    }
 
     // One-call create: form + an empty v1 draft in a single transaction.
     return db.transaction(async (tx) => {
@@ -101,7 +111,6 @@ export class FormService {
           formId: form.id,
           actorId: input.actorId,
           actorDisplayLabel: input.actorDisplayLabel,
-          visibility: input.visibility,
         },
         tx,
       );
@@ -110,6 +119,12 @@ export class FormService {
   }
 
   async update(input: UpdateInput): Promise<FormRecord | null> {
+    if (
+      input.name !== undefined &&
+      (await formNameExistsInWorkspace(input.workspaceId, input.name, input.formId))
+    ) {
+      throw new ConflictError(FORM_NAME_TAKEN);
+    }
     return updateForm(input);
   }
 

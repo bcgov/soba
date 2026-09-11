@@ -90,6 +90,15 @@ describe('env', () => {
     expect(reader.getOptionalEnv('EMPTY')).toBeUndefined();
   });
 
+  it('createEnvReader getDefaultSubmitterProvider defaults to azureidir when unset', () => {
+    expect(createEnvReader({}).getDefaultSubmitterProvider()).toBe('azureidir');
+    expect(
+      createEnvReader({
+        DEFAULT_SUBMITTER_PROVIDER: 'bceidbusiness',
+      }).getDefaultSubmitterProvider(),
+    ).toBe('bceidbusiness');
+  });
+
   it('createEnvReader getBooleanEnv returns true/false/undefined from simulated env', () => {
     const reader = createEnvReader({ B1: 'true', B2: 'false' });
     expect(reader.getBooleanEnv('B1')).toBe(true);
@@ -173,16 +182,6 @@ describe('env', () => {
     ).toThrow(
       /DATABASE_URL or all of DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME are required/,
     );
-  });
-
-  it('createEnvReader getWorkspacePluginsAllowed returns required value from simulated env', () => {
-    const reader = createEnvReader({ WORKSPACE_PLUGINS_ALLOWED: 'personal-local' });
-    expect(reader.getWorkspacePluginsAllowed()).toBe('personal-local');
-  });
-
-  it('createEnvReader getWorkspacePluginsStrictModeRaw returns value from simulated env', () => {
-    const reader = createEnvReader({ WORKSPACE_PLUGINS_STRICT_MODE: 'false' });
-    expect(reader.getWorkspacePluginsStrictModeRaw()).toBe('false');
   });
 
   it('createEnvReader isDevelopment returns true when NODE_ENV is development', () => {

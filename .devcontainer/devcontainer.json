@@ -1,10 +1,8 @@
 {
   "name": "SOBA",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": "."
-  },
-  "runArgs": ["--add-host=host.docker.internal:host-gateway"],
+  "dockerComposeFile": "docker-compose.devcontainer.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/soba",
   "containerEnv": {
     "PNPM_STORE_DIR": "/home/node/.local/share/pnpm/store",
     "npm_config_package_import_method": "copy"
@@ -16,7 +14,7 @@
       "minikube": "latest"
     }
   },
-  "forwardPorts": [3000, 3001, 4000, 5432, 7233, 8088, 27017],
+  "forwardPorts": [3000, 3001, 4000, 5432, 7233, 8088, 27017, 9000, 9001],
   "portsAttributes": {
     "3000": {
       "label": "Frontend (Next.js)"
@@ -38,6 +36,12 @@
     },
     "27017": {
       "label": "MongoDB"
+    },
+    "9000": {
+      "label": "MinIO API"
+    },
+    "9001": {
+      "label": "MinIO Console"
     }
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",

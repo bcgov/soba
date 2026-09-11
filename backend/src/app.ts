@@ -6,23 +6,26 @@ import rTracer from 'cls-rtracer';
 import cors from 'cors';
 import passport from 'passport';
 import { checkJwt } from './core/middleware/auth';
-import { coreRouter } from './core/api';
-import { healthRouter } from './core/api/health';
+import { designRouter, submitRouter, coreRouter } from './core/api';
+import {
+  healthRouter,
+  logStartupHealth,
+  logTempStorageSelfTest,
+  logVirusScanSelfTest,
+  logCacheSelfTest,
+  logDocumentGenerationReadiness,
+} from './core/api/health';
 import { metaRouter } from './core/api/meta';
 import { buildOpenApiSpec } from './core/api/shared/openapi';
 import swaggerUi from 'swagger-ui-express';
 import { httpLogger, log } from './core/logging';
-import { resolveActor } from './core/middleware/actor';
+import { resolveActor, resolveActorOrPublic } from './core/middleware/actor';
+import { requireFeature } from './core/middleware/requireFeature';
 import { requireSobaAdmin } from './core/middleware/requireSobaAdmin';
 import { adminRouter } from './core/api/admin';
 import { globalRateLimit, apiRateLimit, publicRateLimit } from './core/middleware/rateLimit';
 import { initializePassport } from './core/auth/passport';
-import {
-  checkJwtOptional,
-  resolveActorOptional,
-  checkFormVisibility,
-} from './core/middleware/formVisibility';
-import { createSubmission, saveSubmission } from './core/api/submissions/controller';
+import { Features } from './core/db/codes';
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
@@ -84,35 +87,66 @@ app.use(
   }),
 );
 
-// ——— Public Submission Routes (Optionally Authenticated) ———
-const publicSubmissionRouter = express.Router();
-const publicSubmissionMiddleware = [
-  apiRateLimit,
-  express.json(),
-  checkJwtOptional(),
-  resolveActorOptional,
-  checkFormVisibility,
-];
-
-publicSubmissionRouter.post('/submissions', ...publicSubmissionMiddleware, createSubmission);
-publicSubmissionRouter.post('/submissions/:id/save', ...publicSubmissionMiddleware, saveSubmission);
-
-app.use('/api/v1', publicSubmissionRouter);
-
-// ——— Core v1 API ———
+// ——— v1 API ———
+// Each surface has its own base path, so its middleware only runs for its own routes (no fall-through,
+// no double rate-limit) and its auth stack is uniform.
 app.use('/api/v1/meta', publicRateLimit, express.json(), metaRouter);
 app.use('/api/v1/health', publicRateLimit, healthRouter);
-app.use('/api/v1', apiRateLimit, express.json(), checkJwt(), resolveActor, coreRouter);
+
+// Body limit for the body-carrying surfaces — larger than express's 100kb default so document
+// generation can carry a base64 template inline (see env.getJsonBodyLimit). meta stays at the
+// default: it is public and body-less.
+const jsonBodyLimit = env.getJsonBodyLimit();
+
+// Submit feature (public-capable): anonymous resolves to the public user; the Form submitters audience
+// decides access. 404s when submit-mode is disabled.
+app.use(
+  '/api/v1/submit',
+  apiRateLimit,
+  express.json({ limit: jsonBodyLimit }),
+  checkJwt({ allowPublic: true }),
+  resolveActorOrPublic,
+  requireFeature(Features.submit_mode),
+  submitRouter,
+);
+
+// Design feature (staff): mandatory auth. 404s when design-mode is disabled.
+app.use(
+  '/api/v1/design',
+  apiRateLimit,
+  express.json({ limit: jsonBodyLimit }),
+  checkJwt(),
+  resolveActor,
+  requireFeature(Features.design_mode),
+  designRouter,
+);
+
+// Admin: platform administration.
 app.use(
   '/api/v1/admin',
   apiRateLimit,
-  express.json(),
+  express.json({ limit: jsonBodyLimit }),
   checkJwt(),
   resolveActor,
   requireSobaAdmin,
   adminRouter,
 );
 
+// Core: workspace/account management (mandatory auth). Mounted last so the more specific paths win.
+app.use(
+  '/api/v1',
+  apiRateLimit,
+  express.json({ limit: jsonBodyLimit }),
+  checkJwt(),
+  resolveActor,
+  coreRouter,
+);
+
 app.listen(port, () => {
   log.info({ port }, 'Express is listening');
+  void logStartupHealth()
+    .then(logTempStorageSelfTest)
+    .then(logVirusScanSelfTest)
+    .then(logCacheSelfTest)
+    .then(logDocumentGenerationReadiness);
 });

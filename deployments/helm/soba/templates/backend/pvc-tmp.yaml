@@ -1,0 +1,22 @@
+{{- if include "soba.tempStorageUsesMount" . }}
+# Shared temp storage for the backend, mounted at tempStorage.mountPath and used
+# by the tempstorage-mount plugin (never os.tmpdir()). ReadWriteMany so it is
+# shared across replicas when the backend scales horizontally.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "soba.fullname" . }}-backend-tmp
+  labels:
+    {{- include "soba.labels" (dict "root" . "component" "backend") | nindent 4 }}
+  annotations:
+    {{- include "soba.keepPolicy" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.backend.tempStorage.accessMode }}
+  {{- if .Values.backend.tempStorage.storageClassName }}
+  storageClassName: {{ .Values.backend.tempStorage.storageClassName | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backend.tempStorage.size }}
+{{- end }}

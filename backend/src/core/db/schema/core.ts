@@ -8,6 +8,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 import { auditColumns, idColumn } from './audit';
 import { sobaSchema } from './sobaSchema';
@@ -21,6 +22,8 @@ export const identityProviders = sobaSchema.table('identity_provider', {
   name: text('name').notNull(),
   hint: text('hint').notNull().default('code'),
   isActive: boolean('is_active').notNull().default(true),
+  /** False for pseudo providers (system, public) that cannot be used to sign in. */
+  isLoginProvider: boolean('is_login_provider').notNull().default(true),
   ...auditColumns(),
 });
 
@@ -124,13 +127,16 @@ export const workspaces = sobaSchema.table(
     id: idColumn(),
     kind: text('kind').notNull(),
     name: text('name').notNull(),
-    slug: text('slug'),
+    org: text('org').notNull(),
+    useCase: text('use_case').notNull(),
     status: text('status').notNull(),
     parentWorkspaceId: uuid('parent_workspace_id').references(() => workspaces.id),
     ...auditColumns(),
   },
   (table) => ({
-    slugUnique: uniqueIndex('workspace_slug_uq').on(table.slug),
+    // Names are unique per kind (e.g. two 'team' workspaces can't share a name). Not status-scoped
+    // like the group/form name indexes because workspaces are never soft-deleted.
+    kindNameUnique: uniqueIndex('workspace_kind_name_uq').on(table.kind, table.name),
     parentIdx: index('workspace_parent_idx').on(table.parentWorkspaceId),
   }),
 );
@@ -164,6 +170,18 @@ export const workspaceMemberships = sobaSchema.table(
   }),
 );
 
+/** One row per workspace once its disclaimer is accepted; absence gates form creation. */
+export const workspaceDisclaimerAcceptances = sobaSchema.table('workspace_disclaimer_acceptance', {
+  workspaceId: uuid('workspace_id')
+    .primaryKey()
+    .references(() => workspaces.id),
+  acceptedByUserId: uuid('accepted_by_user_id')
+    .notNull()
+    .references(() => appUsers.id),
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }).notNull(),
+  ...auditColumns(),
+});
+
 export const workspaceGroups = sobaSchema.table(
   'workspace_group',
   {
@@ -175,22 +193,31 @@ export const workspaceGroups = sobaSchema.table(
     name: text('name').notNull(),
     description: text('description'),
     status: text('status').notNull(),
-    roleCode: text('role_code').references(() => roles.code),
+    /** Set for the two bootstrap groups (form_admins/form_submitters); null for user-created groups. */
+    systemCode: text('system_code'),
     ...auditColumns(),
   },
   (table) => ({
-    workspaceNameUnique: uniqueIndex('workspace_group_workspace_name_uq').on(
-      table.workspaceId,
-      table.name,
-    ),
+    // Active groups only, so a soft-deleted group frees its name for reuse.
+    workspaceNameUnique: uniqueIndex('workspace_group_workspace_name_uq')
+      .on(table.workspaceId, table.name)
+      .where(sql`${table.status} = 'active'`),
     workspaceExternalUnique: uniqueIndex('workspace_group_workspace_external_uq').on(
       table.workspaceId,
       table.externalGroupId,
     ),
+    // At most one system group per code per workspace (guards the bootstrap tagging).
+    systemCodeUnique: uniqueIndex('workspace_group_system_code_uq')
+      .on(table.workspaceId, table.systemCode)
+      .where(sql`${table.systemCode} is not null`),
     workspaceIdx: index('workspace_group_workspace_idx').on(table.workspaceId),
   }),
 );
 
+/**
+ * A group's members. `member_kind` selects the ref: 'user' -> workspace_membership_id,
+ * 'idp' -> identity_provider_code, 'idp_group' -> idp_group_code.
+ */
 export const workspaceGroupMemberships = sobaSchema.table(
   'workspace_group_membership',
   {
@@ -198,9 +225,12 @@ export const workspaceGroupMemberships = sobaSchema.table(
     workspaceId: uuid('workspace_id')
       .notNull()
       .references(() => workspaces.id),
-    workspaceMembershipId: uuid('workspace_membership_id')
-      .notNull()
-      .references(() => workspaceMemberships.id),
+    memberKind: text('member_kind').notNull().default('user'),
+    workspaceMembershipId: uuid('workspace_membership_id').references(
+      () => workspaceMemberships.id,
+    ),
+    identityProviderCode: text('identity_provider_code').references(() => identityProviders.code),
+    idpGroupCode: text('idp_group_code').references(() => idpGroups.code),
     groupId: uuid('group_id')
       .notNull()
       .references(() => workspaceGroups.id),
@@ -208,15 +238,45 @@ export const workspaceGroupMemberships = sobaSchema.table(
     ...auditColumns(),
   },
   (table) => ({
-    workspaceMembershipGroupUnique: uniqueIndex('workspace_group_membership_uq').on(
-      table.workspaceId,
-      table.workspaceMembershipId,
-      table.groupId,
-    ),
+    userMemberUnique: uniqueIndex('workspace_group_membership_user_uq')
+      .on(table.groupId, table.workspaceMembershipId)
+      .where(sql`${table.memberKind} = 'user'`),
+    idpMemberUnique: uniqueIndex('workspace_group_membership_idp_uq')
+      .on(table.groupId, table.identityProviderCode)
+      .where(sql`${table.memberKind} = 'idp'`),
+    idpGroupMemberUnique: uniqueIndex('workspace_group_membership_idp_group_uq')
+      .on(table.groupId, table.idpGroupCode)
+      .where(sql`${table.memberKind} = 'idp_group'`),
     workspaceIdx: index('workspace_group_membership_workspace_idx').on(table.workspaceId),
     membershipIdx: index('workspace_group_membership_membership_idx').on(
       table.workspaceMembershipId,
     ),
     groupIdx: index('workspace_group_membership_group_idx').on(table.groupId),
+  }),
+);
+
+export const workspaceGroupRoles = sobaSchema.table(
+  'workspace_group_role',
+  {
+    id: idColumn(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id),
+    groupId: uuid('group_id')
+      .notNull()
+      .references(() => workspaceGroups.id),
+    roleCode: text('role_code')
+      .notNull()
+      .references(() => roles.code),
+    status: text('status').notNull(),
+    ...auditColumns(),
+  },
+  (table) => ({
+    groupRoleUnique: uniqueIndex('workspace_group_role_group_role_uq').on(
+      table.groupId,
+      table.roleCode,
+    ),
+    groupIdx: index('workspace_group_role_group_idx').on(table.groupId),
+    roleIdx: index('workspace_group_role_role_idx').on(table.roleCode),
   }),
 );

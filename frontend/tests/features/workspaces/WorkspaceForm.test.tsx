@@ -4,19 +4,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const mockPush = vi.fn();
-const {
-  mockCreateWorkspace,
-  mockUpdateWorkspace,
-  mockSelectWorkspace,
-  mockDispatch,
-  mockUnwrap,
-} = vi.hoisted(() => ({
-  mockCreateWorkspace: vi.fn(),
-  mockUpdateWorkspace: vi.fn(),
-  mockSelectWorkspace: vi.fn(),
-  mockDispatch: vi.fn(),
-  mockUnwrap: vi.fn().mockResolvedValue({}),
-}));
+const { mockCreateWorkspace, mockUpdateWorkspace, mockSelectWorkspace, mockDispatch, mockUnwrap } =
+  vi.hoisted(() => ({
+    mockCreateWorkspace: vi.fn(),
+    mockUpdateWorkspace: vi.fn(),
+    mockSelectWorkspace: vi.fn(),
+    mockDispatch: vi.fn(),
+    mockUnwrap: vi.fn().mockResolvedValue({}),
+  }));
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
   useKeycloak: () => ({ authenticated: true, token: 'token', initializing: false }),
@@ -29,9 +24,17 @@ vi.mock('@/app/[lang]/Providers', () => ({
       notAuthenticated: 'Not authed',
       loading: 'Loading…',
     },
+    ministries: {
+      testOrg: 'Test Org',
+    },
+    useCases: {
+      testUseCase: 'Test Use Case',
+    },
     workspaces: {
       createHeading: 'Create Workspace',
       manageHeading: 'Manage Workspace',
+      settingsTab: 'Settings',
+      teamTab: 'Team',
       nameLabel: 'Name',
       save: 'Save',
       create: 'Create',
@@ -42,9 +45,44 @@ vi.mock('@/app/[lang]/Providers', () => ({
       manageForbidden: 'Only workspace owners or admins can manage this workspace.',
       createForbidden: 'Only BC Government identity provider users can create workspaces.',
       defaultWorkspaceFormLabel: 'Set as default workspace',
+      disclaimerLabel: 'I agree to the disclaimer and statement of responsibility',
     },
   }),
 }));
+
+vi.mock('@bcgov/design-system-react-components', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@bcgov/design-system-react-components')>();
+  
+  type SelectItem = { id: string | number; label: string };
+  
+  return {
+    ...actual,
+    Select: ({ 
+      'data-testid': testId, 
+      value, 
+      onChange, 
+      items 
+    }: {
+      'data-testid'?: string;
+      value?: string | number | null;
+      onChange?: (val: string) => void;
+      items?: SelectItem[];
+    }) => (
+      <select
+        data-testid={testId}
+        value={value ?? ''}
+        onChange={(e) => onChange?.(e.target.value)}
+        aria-label={testId}
+      >
+        <option value="">Select...</option>
+        {items?.map((item) => (
+          <option key={item.id} value={item.id}>{item.label}</option>
+        ))}
+      </select>
+    ),
+  };
+});
+
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -88,7 +126,6 @@ describe('WorkspaceForm', () => {
     mockCreateWorkspace.mockResolvedValue({
       id: 'ws-new',
       name: 'New Team',
-      slug: null,
       kind: 'team',
       role: 'owner',
       status: 'active',
@@ -96,18 +133,22 @@ describe('WorkspaceForm', () => {
     mockSelectWorkspace.mockResolvedValue({
       id: 'ws2',
       name: 'Team Workspace',
-      slug: null,
       kind: 'team',
       role: 'owner',
       status: 'active',
+      disclaimerAccepted: false,
+      useCase: 'testUseCase',
+      org: 'testOrg',
     });
     mockUpdateWorkspace.mockResolvedValue({
       id: 'ws2',
       name: 'Renamed',
-      slug: null,
       kind: 'team',
       role: 'owner',
       status: 'active',
+      disclaimerAccepted: false,
+      useCase: 'testUseCase',
+      org: 'testOrg',
     });
   });
 
@@ -128,18 +169,54 @@ describe('WorkspaceForm', () => {
     expect(mockSelectWorkspace).toHaveBeenCalledWith('token', 'ws2');
   });
 
+  it('manage mode shows Settings and Team tabs', async () => {
+    await act(async () => {
+      render(<WorkspaceForm workspaceId="ws2" />);
+    });
+    await waitFor(() => expect(mockSelectWorkspace).toHaveBeenCalled());
+    expect(screen.getByRole('tab', { name: 'Settings' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Team' })).toBeInTheDocument();
+  });
+
   it('save on create posts workspace and optional default preference', async () => {
     await act(async () => {
       render(<WorkspaceForm />);
     });
     await userEvent.type(screen.getByRole('textbox'), 'New Team');
+    await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    await userEvent.selectOptions(screen.getByTestId('workspace-use-case'), 'testUseCase');
     await userEvent.click(screen.getByTestId('workspace-default-switch'));
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
 
     await waitFor(() => {
-      expect(mockCreateWorkspace).toHaveBeenCalledWith('token', { name: 'New Team' });
+      expect(mockCreateWorkspace).toHaveBeenCalledWith('token', {
+        name: 'New Team',
+        disclaimerAccepted: false,
+        useCase: 'testUseCase',
+        org: 'testOrg',
+      });
       expect(mockDispatch).toHaveBeenCalled();
       expect(mockPush).toHaveBeenCalledWith('/en/workspaces');
+    });
+  });
+
+  it('save on create sends the disclaimer acceptance', async () => {
+    await act(async () => {
+      render(<WorkspaceForm />);
+    });
+    await userEvent.type(screen.getByRole('textbox'), 'New Team');
+    await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    await userEvent.selectOptions(screen.getByTestId('workspace-use-case'), 'testUseCase');
+    await userEvent.click(screen.getByTestId('workspace-disclaimer-switch'));
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => {
+      expect(mockCreateWorkspace).toHaveBeenCalledWith('token', {
+        name: 'New Team',
+        disclaimerAccepted: true,
+        useCase: 'testUseCase',
+        org: 'testOrg',
+      });
     });
   });
 
@@ -150,10 +227,17 @@ describe('WorkspaceForm', () => {
       render(<WorkspaceForm />);
     });
     await userEvent.type(screen.getByRole('textbox'), 'Second Team');
+    await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    await userEvent.selectOptions(screen.getByTestId('workspace-use-case'), 'testUseCase');
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
 
     await waitFor(() => {
-      expect(mockCreateWorkspace).toHaveBeenCalledWith('token', { name: 'Second Team' });
+      expect(mockCreateWorkspace).toHaveBeenCalledWith('token', {
+        name: 'Second Team',
+        disclaimerAccepted: false,
+        useCase: 'testUseCase',
+        org: 'testOrg',
+      });
       expect(mockPush).toHaveBeenCalledWith('/en/workspaces');
     });
     // Only updateDefaultWorkspace calls .unwrap(); loadWorkspaces does not.
@@ -180,8 +264,31 @@ describe('WorkspaceForm', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
-      expect(mockUpdateWorkspace).toHaveBeenCalledWith('token', 'ws2', { name: 'Renamed' });
+      expect(mockUpdateWorkspace).toHaveBeenCalledWith('token', 'ws2', {
+        name: 'Renamed',
+        disclaimerAccepted: false,
+        useCase: 'testUseCase',
+        org: 'testOrg',
+      });
       expect(mockPush).toHaveBeenCalledWith('/en/workspaces');
+    });
+  });
+
+  it('save on manage sends the disclaimer acceptance', async () => {
+    await act(async () => {
+      render(<WorkspaceForm workspaceId="ws2" />);
+    });
+    await waitFor(() => expect(screen.getByDisplayValue('Team Workspace')).toBeInTheDocument());
+    await userEvent.click(screen.getByTestId('workspace-disclaimer-switch'));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(mockUpdateWorkspace).toHaveBeenCalledWith('token', 'ws2', {
+        name: 'Team Workspace',
+        disclaimerAccepted: true,
+        useCase: 'testUseCase',
+        org: 'testOrg',
+      });
     });
   });
 });
