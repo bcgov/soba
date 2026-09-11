@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { OffsetPageSchema, makeSortEnum } from './pagination';
 
 export const OpenSubmissionBodySchema = z.object({
-  id: z.string().uuid(), // Note: previously uuidv7(), uuid() is compatible. If strict uuidv7 is needed, we'll keep as string or custom refinement.
+  // v7 only: the client mints this id, and it is the submission's identity.
+  id: z.uuidv7(),
   formId: z.string().min(1),
 });
 
