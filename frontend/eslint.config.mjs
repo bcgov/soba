@@ -10,7 +10,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     '.next/**',
-    // Second dev-server build dir (forms/submit-mode via NEXT_DIST_DIR).
+    // Per-variant dev-server build dirs (NEXT_DIST_DIR).
+    '.next-designer/**',
     '.next-forms/**',
     'out/**',
     'build/**',
