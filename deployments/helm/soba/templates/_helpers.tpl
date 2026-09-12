@@ -84,16 +84,20 @@ If mongodb is internal, point at the in-cluster service; otherwise use mongodb.e
 {{- end }}
 
 {{/*
-Public host for a named frontend app (Route / Ingress).
-Per-app `host` override wins; otherwise <fullname>-<name>.<domain>.
-Usage: {{ include "soba.frontendHostFor" (dict "root" $root "name" $name "app" $app) }}
+Public host shared by every frontend app (Route / Ingress); apps are told apart by routePath.
+Usage: {{ include "soba.frontendHost" $root }}
 */}}
-{{- define "soba.frontendHostFor" -}}
-{{- if .app.host -}}
-{{- .app.host -}}
-{{- else -}}
-{{- printf "%s-%s.%s" (include "soba.fullname" .root) .name .root.Values.global.domain -}}
-{{- end -}}
+{{- define "soba.frontendHost" -}}
+{{- .Values.frontend.host | default (printf "%s.%s" (include "soba.fullname" .) .Values.global.domain) -}}
+{{- end }}
+
+{{/*
+Path a named frontend app is served under, e.g. /designer.
+Usage: {{ include "soba.frontendRoutePathFor" (dict "root" $root "name" "forms") }}
+*/}}
+{{- define "soba.frontendRoutePathFor" -}}
+{{- $app := index .root.Values.frontend.apps .name | default dict -}}
+{{- $app.routePath | default "" -}}
 {{- end }}
 
 {{/*
@@ -102,24 +106,14 @@ them from here and cannot drift.
 Usage: {{ include "soba.frontendAppUrlFor" (dict "root" $root "name" "forms") }}
 */}}
 {{- define "soba.frontendAppUrlFor" -}}
-{{- $app := index .root.Values.frontend.apps .name | default dict -}}
-{{- printf "https://%s" (include "soba.frontendHostFor" (dict "root" .root "name" .name "app" $app)) -}}
+{{- printf "https://%s%s" (include "soba.frontendHost" .root) (include "soba.frontendRoutePathFor" (dict "root" .root "name" .name)) -}}
 {{- end }}
 
 {{/*
-Comma-separated https:// origins for every enabled frontend app.
-Feeds the backend CORS allowlist so both modes can call the API.
+The https:// origin every frontend app shares. Feeds the backend CORS allowlist.
 */}}
 {{- define "soba.frontendOrigins" -}}
-{{- $root := . -}}
-{{- $origins := list -}}
-{{- range $name, $app := .Values.frontend.apps -}}
-{{- if ne $app.enabled false -}}
-{{- $host := include "soba.frontendHostFor" (dict "root" $root "name" $name "app" $app) -}}
-{{- $origins = append $origins (printf "https://%s" $host) -}}
-{{- end -}}
-{{- end -}}
-{{- join "," $origins -}}
+{{- printf "https://%s" (include "soba.frontendHost" .) -}}
 {{- end }}
 
 {{/*
