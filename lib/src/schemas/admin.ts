@@ -100,4 +100,6 @@ export const ListDocumentGenerationAuditsResponseSchema = z.object({
   }),
   sort: DocgenAuditSortSchema,
 });
-export type ListDocumentGenerationAuditsResponse = z.infer<typeof ListDocumentGenerationAuditsResponseSchema>;
+export type ListDocumentGenerationAuditsResponse = z.infer<
+  typeof ListDocumentGenerationAuditsResponseSchema
+>;
