@@ -37,7 +37,7 @@ pnpm -C integration/playwright test
 
 By default these tests target:
 
-- Frontend: `http://localhost:3000`
+- Frontend: `http://localhost:3000/soba/`
 - Backend API: `http://localhost:4000/soba/api/v1`
 
 Override with environment variables:

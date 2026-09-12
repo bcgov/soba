@@ -20,7 +20,7 @@ test.describe.serial("Landing page tests", () => {
   });
 
   test("Validate form designing page", async ({ title }) => {
-    await sharedPage.goto("/");
+    await sharedPage.goto("./");
     await expect(
       sharedPage.locator('[data-testid="login-button"]'),
     ).toBeVisible();
