@@ -261,15 +261,17 @@ them in pairs.
 
 Hostnames are derived from the release name and `global.domain`:
 
-- **Frontend:** one host per `frontend.apps` entry, `<fullname>-<name>.<domain>`
-  (e.g. `soba-dev-designer.apps.gov.bc.ca`, `soba-dev-forms.apps.gov.bc.ca`).
-  Override a single app with `frontend.apps.<name>.host` (PR slots pin the host this way).
-- **Backend API:** `<fullname>-api.<domain>` (e.g. `soba-pr-42-api.apps.gov.bc.ca`)
+- **Frontend:** one host for every `frontend.apps` entry, `<fullname>.<domain>`
+  (e.g. `soba-dev.apps.gov.bc.ca`), with each app at its own `routePath`
+  (`/designer`, `/forms`). Pin it with `frontend.host` (PR deployments point at the dev host).
+- **Backend API:** `<fullname>-api.<domain>` (e.g. `soba-pr-42-api.apps.gov.bc.ca`),
+  served under `backend.basePath` (e.g. `/soba`).
 
-Each `frontend.apps` entry renders its own Deployment/Service/Route/ConfigMap from the
-same image, differing only by `featuresAllowed` (the mode). The backend `CORS_ORIGIN`
-defaults to the origins of all enabled frontend apps; set `backend.config.corsOrigin`
-to override.
+Each `frontend.apps` entry renders its own Deployment/Service/Route/ConfigMap, differing by
+`featuresAllowed` (the mode) and `routePath` (the URL). They share an image repository, but
+the tag carries the app name: Next bakes `basePath` at build time, so each path needs its own
+image. The backend `CORS_ORIGIN` defaults to the shared frontend origin; set
+`backend.config.corsOrigin` to override.
 
 ### Route annotations
 
