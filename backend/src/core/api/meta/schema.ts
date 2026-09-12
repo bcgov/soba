@@ -9,32 +9,38 @@ import {
   BuildMetaResponseSchema as LibBuildMetaResponseSchema,
   FrontendConfigMetaResponseSchema as LibFrontendConfigMetaResponseSchema,
   CodeRowWithSourceMetaSchema as LibCodeRowWithSourceMetaSchema,
-  CodesKeyedMetaResponseSchema as LibCodesKeyedMetaResponseSchema,
   FormEngineMetaSchema as LibFormEngineMetaSchema,
   FormEnginesMetaResponseSchema as LibFormEnginesMetaResponseSchema,
   RoleWithSourceMetaSchema as LibRoleWithSourceMetaSchema,
   RolesMetaResponseSchema as LibRolesMetaResponseSchema,
   FilesConfigMetaResponseSchema as LibFilesConfigMetaResponseSchema,
-  FeatureAvailabilityQuerySchema as LibFeatureAvailabilityQuerySchema,
-  ListCodesQuerySchema as LibListCodesQuerySchema,
 } from '@soba/lib';
 
 extendZodWithOpenApi(z);
 
+// @soba/lib builds its schemas before zod is extended, so they only get `.openapi()` once cloned.
+// Composites are rebuilt on the named children so the spec references them instead of inlining.
 export const PluginCatalogEntrySchema =
   LibPluginCatalogEntrySchema.clone().openapi('Meta_PluginCatalogEntry');
 
-export const PluginsMetaResponseSchema =
-  LibPluginsMetaResponseSchema.clone().openapi('Meta_PluginsResponse');
+export const PluginsMetaResponseSchema = LibPluginsMetaResponseSchema.extend({
+  plugins: z.array(PluginCatalogEntrySchema),
+}).openapi('Meta_PluginsResponse');
 
 export const FeatureMetaSchema = LibFeatureMetaSchema.clone().openapi('Meta_Feature');
 
-export const FeaturesMetaResponseSchema =
-  LibFeaturesMetaResponseSchema.clone().openapi('Meta_FeaturesResponse');
+export const FeaturesMetaResponseSchema = LibFeaturesMetaResponseSchema.extend({
+  features: z.array(FeatureMetaSchema),
+}).openapi('Meta_FeaturesResponse');
 
-export const FeatureAvailabilityQuerySchema = LibFeatureAvailabilityQuerySchema.clone().openapi(
-  'Meta_FeatureAvailabilityQuery',
-);
+export const FeatureAvailabilityQuerySchema = z
+  .object({
+    code: z.string().min(1),
+    // Validate as uuid so a malformed id is a clean 400, not a uuid-cast 500 in the grant lookup.
+    workspaceId: z.string().uuid().optional(),
+    formId: z.string().uuid().optional(),
+  })
+  .openapi('Meta_FeatureAvailabilityQuery');
 
 export const FeatureAvailabilityResponseSchema =
   LibFeatureAvailabilityResponseSchema.clone().openapi('Meta_FeatureAvailabilityResponse');
@@ -50,8 +56,9 @@ export const CodeRowWithSourceMetaSchema =
   LibCodeRowWithSourceMetaSchema.clone().openapi('Meta_CodeRowWithSource');
 
 /** Response: object keyed by code set name, values = arrays of code rows with source */
-export const CodesKeyedMetaResponseSchema =
-  LibCodesKeyedMetaResponseSchema.clone().openapi('Meta_CodesKeyedResponse');
+export const CodesKeyedMetaResponseSchema = z
+  .record(z.string(), z.array(CodeRowWithSourceMetaSchema))
+  .openapi('Meta_CodesKeyedResponse');
 
 export const ListCodesQuerySchema = z
   .object({
@@ -64,17 +71,25 @@ export const ListCodesQuerySchema = z
 
 export const FormEngineMetaSchema = LibFormEngineMetaSchema.clone().openapi('Meta_FormEngine');
 
-export const FormEnginesMetaResponseSchema = LibFormEnginesMetaResponseSchema.clone().openapi(
-  'Meta_FormEnginesResponse',
-);
+export const FormEnginesMetaResponseSchema = LibFormEnginesMetaResponseSchema.extend({
+  items: z.array(FormEngineMetaSchema),
+}).openapi('Meta_FormEnginesResponse');
 
 export const RoleWithSourceMetaSchema =
   LibRoleWithSourceMetaSchema.clone().openapi('Meta_RoleWithSource');
 
-export const ListRolesQuerySchema = LibListCodesQuerySchema.clone().openapi('Meta_ListRolesQuery');
+export const ListRolesQuerySchema = z
+  .object({
+    code: z.string().optional(),
+    source: z.string().optional(),
+    status: z.string().optional(),
+    only_enabled_features: z.enum(['true', 'false']).optional(),
+  })
+  .openapi('Meta_ListRolesQuery');
 
-export const RolesMetaResponseSchema =
-  LibRolesMetaResponseSchema.clone().openapi('Meta_RolesResponse');
+export const RolesMetaResponseSchema = LibRolesMetaResponseSchema.extend({
+  roles: z.array(RoleWithSourceMetaSchema),
+}).openapi('Meta_RolesResponse');
 
 export const FilesConfigMetaResponseSchema = LibFilesConfigMetaResponseSchema.clone().openapi(
   'Meta_FilesConfigResponse',
@@ -134,7 +149,7 @@ export const registerMetaOpenApi = (registry: OpenAPIRegistry) => {
     tags: ['core.meta'],
     responses: {
       200: {
-        description: 'Configured platform form engines and plugin installation status',
+        description: 'Installed form engine plugins and which one is the default',
         content: {
           'application/json': {
             schema: FormEnginesMetaResponseSchema,

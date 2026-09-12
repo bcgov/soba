@@ -1,12 +1,6 @@
 import { asc, desc, sql, type Column, type SQL } from 'drizzle-orm';
+import type { SortToken } from '@soba/lib';
 import { ValidationError } from '../errors';
-
-export type SortToken<TField extends string> = `${TField}:asc` | `${TField}:desc`;
-
-export const sortTokensFor = <TField extends string>(
-  fields: readonly TField[],
-): SortToken<TField>[] =>
-  fields.flatMap((field) => [`${field}:asc`, `${field}:desc`] as SortToken<TField>[]);
 
 interface SortableColumn {
   column: Column;

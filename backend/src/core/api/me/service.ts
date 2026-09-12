@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { MeResponse } from '@soba/lib';
 import { findAppUserById, updateAppUserProfile } from '../../db/repos/appUserRepo';
 import { toAppUserView } from '../../db/appUserView';
 import { canCreateWorkspaceByIdp } from '../../db/repos/idpGroupRepo';
@@ -24,7 +25,7 @@ export class MeApiService {
     user: NonNullable<Awaited<ReturnType<typeof findAppUserById>>>,
     idpCode: string | null,
     isSobaAdmin: boolean,
-  ) {
+  ): Promise<MeResponse> {
     const view = toAppUserView(user);
     // Independent lookups — run concurrently so /me (a bootstrap hot path) pays
     // one DB round-trip of latency, not two.

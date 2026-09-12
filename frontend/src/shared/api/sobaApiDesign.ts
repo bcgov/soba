@@ -101,6 +101,7 @@ export async function getSobaSubmissionData(
   submissionId: string,
 ): Promise<SubmissionDataDocument | null> {
   const response = await sobaFetch(`/design/submissions/${submissionId}/data`, { token });
+  if (response.status === 404) return null;
   return parseJson<SubmissionDataDocument>(response);
 }
 
@@ -125,10 +126,7 @@ export async function getSobaFormVersions(
 }
 
 /** One version, by id. */
-export async function getSobaFormVersion(
-  token: string,
-  id: string,
-): Promise<SobaFormVersionType> {
+export async function getSobaFormVersion(token: string, id: string): Promise<SobaFormVersionType> {
   const response = await sobaFetch(`${FORM_VERSIONS_PATH}/${id}`, { token });
   return parseJson(response);
 }

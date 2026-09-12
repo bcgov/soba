@@ -90,13 +90,10 @@ export const CodesKeyedMetaResponseSchema = z.record(
 export type CodesKeyedMetaResponse = z.infer<typeof CodesKeyedMetaResponseSchema>;
 
 export const FormEngineMetaSchema = z.object({
-  id: z.string(),
   code: z.string(),
   name: z.string(),
   engineVersion: z.string().nullable(),
-  isActive: z.boolean(),
   isDefault: z.boolean(),
-  installedPlugin: z.boolean(),
 });
 export type FormEngineMeta = z.infer<typeof FormEngineMetaSchema>;
 
@@ -126,19 +123,3 @@ export const FilesConfigMetaResponseSchema = z.object({
   blockedExtensions: z.array(z.string()),
 });
 export type FilesConfigMetaResponse = z.infer<typeof FilesConfigMetaResponseSchema>;
-
-export const FeatureAvailabilityQuerySchema = z.object({
-  code: z.string().min(1),
-  // Validate as uuid so a malformed id is a clean 400, not a uuid-cast 500 in the grant lookup.
-  workspaceId: z.string().uuid().optional(),
-  formId: z.string().uuid().optional(),
-});
-export type FeatureAvailabilityQuery = z.infer<typeof FeatureAvailabilityQuerySchema>;
-
-export const ListCodesQuerySchema = z.object({
-  code_set: z.string().optional(),
-  source: z.string().optional(),
-  is_active: z.enum(['true', 'false']).optional(),
-  only_enabled_features: z.enum(['true', 'false']).optional(),
-});
-export type ListCodesQuery = z.infer<typeof ListCodesQuerySchema>;

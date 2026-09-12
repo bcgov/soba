@@ -1,7 +1,7 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
+import { makeSortEnum } from '@soba/lib';
 import {
-  makeSortEnum,
   offsetQueryFields,
   rejectedCursorField,
   searchQueryField,

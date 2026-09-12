@@ -1,9 +1,6 @@
-/** Server-resolved paging. `total` counts every row the query matches, not the rows returned. */
-export type ListPage = {
-  offset: number;
-  limit: number;
-  total: number;
-};
+import type { OffsetPage } from '@soba/lib';
+
+export type { OffsetPage } from '@soba/lib';
 
 /** Paging, search and sort, as a list endpoint takes them. */
 export type ListQueryArgs = {
@@ -13,7 +10,7 @@ export type ListQueryArgs = {
   q?: string;
 };
 
-export const EMPTY_LIST_PAGE: ListPage = { offset: 0, limit: 0, total: 0 };
+export const EMPTY_LIST_PAGE: OffsetPage = { offset: 0, limit: 0, total: 0 };
 
 /** Query params for a list request, with the empty search dropped. */
 export const toListRequestQuery = (args: ListQueryArgs): Record<string, string | number> => ({

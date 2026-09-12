@@ -1,7 +1,7 @@
 import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { db, type DbOrTx } from '../client';
 import { formVersionRevisions, formVersions } from '../schema';
-import { orderByForSort, type SortColumns, type SortToken } from '../listSort';
+import { orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 
 interface CreateDraftInput {
@@ -21,7 +21,7 @@ interface SaveRevisionInput {
   engineSchemaRef?: string | null;
 }
 
-import { FORM_VERSION_SORT_FIELDS } from '@soba/lib';
+import { FORM_VERSION_SORT_FIELDS, type SortToken } from '@soba/lib';
 export type FormVersionListSortField = (typeof FORM_VERSION_SORT_FIELDS)[number];
 export type FormVersionListSort = SortToken<FormVersionListSortField>;
 

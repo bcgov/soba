@@ -92,5 +92,6 @@ export async function getSubmitSubmissionData(
   submissionId: string,
 ): Promise<SubmissionDataDocument | null> {
   const response = await sobaFetch(`/submit/submissions/${submissionId}/data`, { token });
+  if (response.status === 404) return null;
   return parseJson<SubmissionDataDocument>(response);
 }

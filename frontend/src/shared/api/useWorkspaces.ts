@@ -5,7 +5,7 @@ import { useCallback } from 'react';
 import { fetchWorkspaces, selectWorkspace } from './sobaApi';
 import { useAuthedSWR } from './useAuthedSWR';
 import { listReadConfig, sessionReadConfig } from './swrConfig';
-import { EMPTY_LIST_PAGE, type ListPage, type ListQueryArgs } from '@/src/types/list';
+import { EMPTY_LIST_PAGE, type ListQueryArgs, type OffsetPage } from '@/src/types/list';
 import type { WorkspaceItem } from '@/src/types/workspaces';
 
 /**
@@ -60,7 +60,7 @@ export function useWorkspace(workspaceId: string | undefined) {
  * workspace created or renamed on another screen shows up on the way back.
  */
 export function useWorkspaceList(query: ListQueryArgs) {
-  const { data, isLoading, error } = useAuthedSWR<{ items: WorkspaceItem[]; page: ListPage }>(
+  const { data, isLoading, error } = useAuthedSWR<{ items: WorkspaceItem[]; page: OffsetPage }>(
     ['workspaces', 'list', query.offset, query.limit, query.sort, query.q ?? ''],
     async (token) => {
       const response = await fetchWorkspaces(token, query);

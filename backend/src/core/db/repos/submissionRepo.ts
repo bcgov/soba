@@ -1,7 +1,7 @@
 import { and, count, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { db } from '../client';
 import { submissionRevisions, submissions, forms, formVersions } from '../schema';
-import { likePattern, orderByForSort, type SortColumns, type SortToken } from '../listSort';
+import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 import {
   SubmissionEventType,
@@ -63,10 +63,9 @@ interface SaveSubmissionInput {
   afterEngineSubmissionRef: string;
 }
 
-import { SUBMISSION_SORT_FIELDS } from '@soba/lib';
+import { SUBMISSION_SORT_FIELDS, type SubmissionListSort } from '@soba/lib';
 
 export type SubmissionListSortField = (typeof SUBMISSION_SORT_FIELDS)[number];
-export type SubmissionListSort = SortToken<SubmissionListSortField>;
 
 const SUBMISSION_SORT_COLUMNS: SortColumns<SubmissionListSortField> = {
   formName: { column: forms.name, caseInsensitive: true },

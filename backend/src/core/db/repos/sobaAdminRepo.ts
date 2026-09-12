@@ -1,7 +1,7 @@
 import { and, count, eq, ilike, sql } from 'drizzle-orm';
 import { db } from '../client';
 import { appUsers, sobaAdmins } from '../schema';
-import { likePattern, orderByForSort, type SortColumns, type SortToken } from '../listSort';
+import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 
 /** Second int for `pg_advisory_xact_lock`; must not collide with workspaceRepo / membershipRepo lock ids. */
@@ -10,7 +10,7 @@ const ADV_LOCK_UPSERT_SOBA_ADMIN = 1_774_566_321;
 export const SOBA_ADMIN_SOURCE_IDP = 'idp';
 export const SOBA_ADMIN_SOURCE_DIRECT = 'direct';
 
-import { SOBA_ADMIN_SORT_FIELDS } from '@soba/lib';
+import { SOBA_ADMIN_SORT_FIELDS, type SortToken } from '@soba/lib';
 
 export interface SobaAdminListRow {
   userId: string;
