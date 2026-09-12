@@ -265,7 +265,7 @@ Hostnames are derived from the release name and `global.domain`:
   (e.g. `soba-dev.apps.gov.bc.ca`), with each app at its own `routePath`
   (`/designer`, `/forms`). Pin it with `frontend.host` (PR deployments point at the dev host).
 - **Backend API:** `<fullname>-api.<domain>` (e.g. `soba-pr-42-api.apps.gov.bc.ca`),
-  served under `backend.basePath` (e.g. `/soba`).
+  served under `backend.basePath` (e.g. `/chefs`).
 
 Each `frontend.apps` entry renders its own Deployment/Service/Route/ConfigMap, differing by
 `featuresAllowed` (the mode) and `routePath` (the URL). They share an image repository, but

@@ -60,8 +60,8 @@ describe('getFormsAppBaseUrl', () => {
   });
 
   it('keeps the base path on the fallback', () => {
-    vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/soba');
-    expect(getFormsAppBaseUrl()).toBe(`${window.location.origin}/soba`);
+    vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/chefs');
+    expect(getFormsAppBaseUrl()).toBe(`${window.location.origin}/chefs`);
   });
 
   it('prefers the injected value over the build-time env', () => {

@@ -124,7 +124,7 @@ Backend public URL host (browser and NEXT_PUBLIC_SOBA_API_BASE_URL).
 {{- end }}
 
 {{/*
-URL path the API is served under (e.g. /soba). Blank serves at the host root.
+URL path the API is served under (e.g. /chefs). Blank serves at the host root.
 */}}
 {{- define "soba.backendBasePath" -}}
 {{- .Values.backend.basePath | default "" -}}

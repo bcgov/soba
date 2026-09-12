@@ -55,11 +55,11 @@ describe('initKeycloak', () => {
   });
 
   it('points the silent check at the base path', async () => {
-    vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/soba');
+    vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/chefs');
     await makeStore().dispatch(initKeycloak());
     expect(kc.init).toHaveBeenCalledWith(
       expect.objectContaining({
-        silentCheckSsoRedirectUri: `${window.location.origin}/soba/silent-check-sso.html`,
+        silentCheckSsoRedirectUri: `${window.location.origin}/chefs/silent-check-sso.html`,
       }),
     );
   });
@@ -77,13 +77,13 @@ describe('login', () => {
 
   // After page-load init, keycloak-js refuses a second init, so every sign-in takes this redirect.
   it('returns to the base path after sign-in', async () => {
-    vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/soba');
+    vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/chefs');
     const store = await storeWithSession();
     kc.init.mockRejectedValueOnce(new Error("A 'Keycloak' instance can only be initialized once."));
 
     await store.dispatch(login());
 
-    expect(kc.login).toHaveBeenCalledWith({ redirectUri: `${window.location.origin}/soba` });
+    expect(kc.login).toHaveBeenCalledWith({ redirectUri: `${window.location.origin}/chefs` });
   });
 });
 

@@ -92,13 +92,13 @@ describe('useListQuery', () => {
   });
 
   it('keeps the base path in the URL it writes', () => {
-    vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/soba');
+    vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/chefs');
     const replaceState = vi.spyOn(window.history, 'replaceState');
     const { result } = renderHook(() => useListQuery(FORMS_LIST_QUERY));
 
     act(() => result.current.setPage(2));
 
-    expect(replaceState.mock.calls.at(-1)?.[2]).toBe('/soba/en/forms?forms.page=2');
+    expect(replaceState.mock.calls.at(-1)?.[2]).toBe('/chefs/en/forms?forms.page=2');
   });
 
   // Typing is not a search. Every term reaches the server only because the user asked for it.

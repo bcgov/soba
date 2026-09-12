@@ -60,7 +60,7 @@ This starts:
 - **Temporal** (gRPC port 7233) — workflow engine
 - **Temporal UI** (port 8088) — workflow dashboard
 
-**Inside the devcontainer** use `host.docker.internal` to reach sidecars from backend processes (e.g. `mongodb://host.docker.internal:27017`, `postgresql://postgres:postgres@host.docker.internal:5432/postgres`, `http://host.docker.internal:3001`). The `app` service sets `extra_hosts: host.docker.internal:host-gateway` so that this hostname works on Linux as well as on Docker Desktop (Mac/Windows). **Committed `.env.example` files use `localhost`** for DB, Form.io, and API URLs — that works when the browser and forwarded ports are on the host (e.g. http://localhost:3000 with `NEXT_PUBLIC_SOBA_API_BASE_URL=http://localhost:4000/soba/api/v1`). Use `host.docker.internal` in backend env when the API server runs inside the container and must reach compose services. Form.io login: `formio@localhost.com` / `formio`.
+**Inside the devcontainer** use `host.docker.internal` to reach sidecars from backend processes (e.g. `mongodb://host.docker.internal:27017`, `postgresql://postgres:postgres@host.docker.internal:5432/postgres`, `http://host.docker.internal:3001`). The `app` service sets `extra_hosts: host.docker.internal:host-gateway` so that this hostname works on Linux as well as on Docker Desktop (Mac/Windows). **Committed `.env.example` files use `localhost`** for DB, Form.io, and API URLs — that works when the browser and forwarded ports are on the host (e.g. http://localhost:3000 with `NEXT_PUBLIC_SOBA_API_BASE_URL=http://localhost:4000/chefs/api/v1`). Use `host.docker.internal` in backend env when the API server runs inside the container and must reach compose services. Form.io login: `formio@localhost.com` / `formio`.
 
 **Database (migrate + seed):** After the sidecars are up, from the repo root run `pnpm db:init` (or `pnpm dev:db:up` to start services and init in one step). See [Drizzle](#drizzle) for individual `db:migrate` / `db:seed` commands.
 
@@ -402,7 +402,7 @@ Tests live under `lib/tests/`.
 
 Integration tests live in the **integration** app (repo root). An integration test specialist will own and expand this area; below is the minimum for running tests and for frontend support.
 
-**Tech:** [Playwright](https://playwright.dev) (Chromium). Tests target the running frontend and backend (default: `http://localhost:3000`, `http://localhost:4000/soba/api/v1`; override with `E2E_BASE_URL`, `E2E_API_BASE_URL`).
+**Tech:** [Playwright](https://playwright.dev) (Chromium). Tests target the running frontend and backend (default: `http://localhost:3000`, `http://localhost:4000/chefs/api/v1`; override with `E2E_BASE_URL`, `E2E_API_BASE_URL`).
 
 **Run tests:** From repo root, `pnpm -C integration/playwright test`. In the devcontainer, dependencies and Playwright Chromium are installed by post-create; otherwise run `npm ci --prefix integration/playwright` and `npm exec --prefix integration/playwright -- playwright install chromium` once.
 

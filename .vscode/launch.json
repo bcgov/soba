@@ -38,7 +38,7 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],
       "env": {
-        "API_BASE_PATH": "/soba",
+        "API_BASE_PATH": "/chefs",
         "CORS_DEV_ORIGIN": "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3100,http://127.0.0.1:3100,http://localhost:3101,http://127.0.0.1:3101"
       },
       "skipFiles": ["<node_internals>/**"],
@@ -106,7 +106,7 @@
       "name": "SOBA Frontend (Chrome)",
       "type": "chrome",
       "request": "launch",
-      "url": "http://localhost:3000/soba",
+      "url": "http://localhost:3000/chefs",
       "webRoot": "${workspaceFolder}/frontend"
     },
     {
