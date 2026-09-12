@@ -383,7 +383,7 @@ Shared code for the backend and frontend, used in the workspace as `@soba/lib`:
 - Zod schemas and inferred types for the request bodies and responses both sides use, with the sort-field constants and sort enums of each list.
 - `normalizeSchema` for Form.io schema import and export.
 
-Query and params schemas stay in the backend. The frontend re-exports the lib types from `frontend/src/types/<domain>.ts`.
+Query and params schemas stay in the backend. The frontend re-exports the lib types from `frontend/src/types/<domain>.ts`. A runtime import from `@soba/lib` bundles zod and every schema, so frontend code that loads on every page takes the sort fields from `@soba/lib/sort` instead.
 
 lib builds its schemas before the backend extends zod, so calling `.openapi()` on a lib schema directly works or fails depending on which module requires lib first. The backend names a lib schema by cloning it: `XSchema.clone().openapi('Domain_X')`. A composite, such as a list response, is rebuilt with `.extend()` on the named children so the spec references each child with `$ref`. Cloning a composite inlines its children. `libSchemaLoadOrder.test.ts` and `libSchemaOpenApi.test.ts` in `backend/tests/core/api/shared/` check both, and each new schema module and composite needs a row there.
 

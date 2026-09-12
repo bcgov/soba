@@ -1,4 +1,5 @@
-import { makeSortEnum, sortTokensFor } from '../../src/schemas/pagination';
+import { makeSortEnum } from '../../src/schemas/pagination';
+import { sortTokensFor } from '../../src/sort';
 
 describe('sortTokensFor', () => {
   it('declares both directions for every field', () => {

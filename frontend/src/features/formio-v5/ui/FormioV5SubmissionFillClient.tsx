@@ -42,7 +42,7 @@ function SubmissionFillBody({
   labels: FillLabels;
 }>) {
   // Token is optional: a public-audience submission is fillable without signing in.
-  const { token, initializing } = useKeycloak();
+  const { token, initializing, initStarted } = useKeycloak();
   const { addNotification } = useNotificationStore();
   const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
@@ -63,8 +63,9 @@ function SubmissionFillBody({
   } | null>(null);
 
   useEffect(() => {
-    // Wait for auth to settle so an authenticated caller sends their token; anonymous proceeds with none.
-    if (initializing || loadStartedRef.current) return;
+    // Wait for Keycloak to answer. Before init starts, `initializing` is still false and "no token" is
+    // the default rather than an answer, so a signed-in caller's read would go out anonymously.
+    if (!initStarted || initializing || loadStartedRef.current) return;
     loadStartedRef.current = true;
     void (async () => {
       try {
@@ -85,6 +86,7 @@ function SubmissionFillBody({
       }
     })();
   }, [
+    initStarted,
     initializing,
     token,
     submissionId,

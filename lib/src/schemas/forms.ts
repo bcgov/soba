@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { OffsetPageSchema, makeSortEnum } from './pagination';
+import { FORM_SORT_FIELDS, FORM_VERSION_SORT_FIELDS } from '../sort';
 
 export const CreateFormBodySchema = z.object({
   workspaceId: z.string().min(1),
@@ -84,8 +85,6 @@ export type FormWithVersionResponse = z.infer<typeof FormWithVersionResponseSche
 export type FormWithPermissionsResponse = z.infer<typeof FormWithPermissionsResponseSchema>;
 export type FormVersionListItem = z.infer<typeof FormVersionListItemSchema>;
 
-export const FORM_SORT_FIELDS = ['name', 'status', 'createdAt', 'updatedAt'] as const;
-
 export const FormSortSchema = makeSortEnum(FORM_SORT_FIELDS);
 
 export const ListFormsResponseSchema = z.object({
@@ -101,8 +100,6 @@ export const ListFormsResponseSchema = z.object({
 });
 
 export type ListFormsResponse = z.infer<typeof ListFormsResponseSchema>;
-
-export const FORM_VERSION_SORT_FIELDS = ['versionNo', 'state', 'createdAt', 'updatedAt'] as const;
 
 export const FormVersionSortSchema = makeSortEnum(FORM_VERSION_SORT_FIELDS);
 

@@ -31,7 +31,7 @@ function StartSubmissionBody({
   labels,
 }: Readonly<{ formId: string; labels: StartLabels }>) {
   // Token is optional: a public-audience form can be started without signing in.
-  const { token, initializing } = useKeycloak();
+  const { token, initializing, initStarted } = useKeycloak();
   const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
 
@@ -40,10 +40,11 @@ function StartSubmissionBody({
   const startedRef = useRef(false);
 
   useEffect(() => {
-    // Wait for auth to settle so a signed-in caller sends their token; anonymous proceeds with none.
+    // Wait for Keycloak to answer. Before init starts, `initializing` is still false and "no token" is
+    // the default rather than an answer, so a public form would be opened for the public user.
     // Fire exactly once (startedRef) and run to completion — deliberately no unmount/active guard:
     // StrictMode's dev remount would otherwise cancel the only in-flight open and strand the spinner.
-    if (initializing || startedRef.current) return;
+    if (!initStarted || initializing || startedRef.current) return;
     startedRef.current = true;
     void (async () => {
       try {
@@ -55,7 +56,16 @@ function StartSubmissionBody({
         setError(normalizeFormioRenderError(err, labels.startError, labels.sessionExpired));
       }
     })();
-  }, [initializing, token, formId, locale, router, labels.startError, labels.sessionExpired]);
+  }, [
+    initStarted,
+    initializing,
+    token,
+    formId,
+    locale,
+    router,
+    labels.startError,
+    labels.sessionExpired,
+  ]);
 
   if (error) {
     return (
