@@ -3,8 +3,7 @@ global:
   namespace: ""
   # Set true to remove "keep" policy on Secrets/PVCs (e.g. PR teardown)
   forceCleanup: false
-  # Owning PR number when a PR reuses a deployment slot; read on teardown so a
-  # closing PR does not uninstall a newer PR that has since taken the slot.
+  # PR number a deployment belongs to, for provenance when several PR releases share a namespace.
   prNumber: ""
 
 # -- Backend (Express API) ------------------------------------------------
