@@ -378,13 +378,15 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 ## Lib
 
-Shared code for the backend and frontend, used in the workspace as `@soba/lib`. This is the single source of truth for:
-- Zod schemas and inferred TypeScript types for API request and response shapes (preventing frontend/backend drift).
-- Sorting constants and enums (e.g., `FormSort`, `SubmissionSort`).
+Shared code for the backend and frontend, used in the workspace as `@soba/lib`:
+
+- Zod schemas and inferred types for the request bodies and responses both sides use, with the sort-field constants and sort enums of each list.
 - `normalizeSchema` for Form.io schema import and export.
 
-**OpenAPI and schema composition:**
-When a backend module needs to add OpenAPI documentation or `$ref` metadata to a lib schema, it must import the schema from `@soba/lib` and use `.clone().openapi('Name')` to bind the OpenAPI name locally without mutating the shared schema registry. For composite schemas (e.g., lists with nested items), use `.extend(...)` or rebuild the outer wrapper using the locally named inner schemas. This ensures nested components resolve correctly via `$ref` in the generated Swagger spec.
+Query and params schemas stay in the backend. The frontend re-exports the lib types from `frontend/src/types/<domain>.ts`.
+
+lib builds its schemas before the backend extends zod, so calling `.openapi()` on a lib schema directly works or fails depending on which module requires lib first. The backend names a lib schema by cloning it: `XSchema.clone().openapi('Domain_X')`. A composite, such as a list response, is rebuilt with `.extend()` on the named children so the spec references each child with `$ref`. Cloning a composite inlines its children. `libSchemaLoadOrder.test.ts` and `libSchemaOpenApi.test.ts` in `backend/tests/core/api/shared/` check both, and each new schema module and composite needs a row there.
+
 `lib/dist/` is generated and not committed. `pnpm install` builds it (the `prepare` script) and the devcontainer rebuilds it on start. While editing lib, run `pnpm dev` in `lib/` to keep `dist/` current. The backend's watcher follows `backend/src` only, so restart the backend after a lib change.
 
 ### Scripts

@@ -3,6 +3,7 @@ import { registerFormsOpenApi } from '../../../../src/core/api/forms/schema';
 import { registerSubmissionsOpenApi } from '../../../../src/core/api/submissions/schema';
 import { registerWorkspacesOpenApi } from '../../../../src/core/api/workspaces/schema';
 import { registerAdminOpenApi } from '../../../../src/core/api/admin/schema';
+import { registerMetaOpenApi } from '../../../../src/core/api/meta/schema';
 
 function componentSchemas(): unknown {
   const registry = new OpenAPIRegistry();
@@ -10,6 +11,7 @@ function componentSchemas(): unknown {
   registerSubmissionsOpenApi(registry);
   registerWorkspacesOpenApi(registry);
   registerAdminOpenApi(registry);
+  registerMetaOpenApi(registry);
   const doc = new OpenApiGeneratorV3(registry.definitions).generateDocument({
     openapi: '3.0.3',
     info: { title: 'test', version: '1' },
@@ -50,6 +52,21 @@ describe('OpenAPI components for lib-backed schemas', () => {
     expect(at(schemas, list, 'properties', 'items', 'items')).toEqual(ref(item));
     expect(at(schemas, list, 'properties', 'page')).toEqual(ref('Core_OffsetPage'));
     expect(at(schemas, list, 'properties', 'sort')).toEqual(ref(sort));
+  });
+
+  it.each([
+    ['Meta_PluginsResponse', 'plugins', 'Meta_PluginCatalogEntry'],
+    ['Meta_FeaturesResponse', 'features', 'Meta_Feature'],
+    ['Meta_FormEnginesResponse', 'items', 'Meta_FormEngine'],
+    ['Meta_RolesResponse', 'roles', 'Meta_RoleWithSource'],
+  ])('%s references its %s item component', (response, property, item) => {
+    expect(at(schemas, response, 'properties', property, 'items')).toEqual(ref(item));
+  });
+
+  it('builds the codes response on the named code row', () => {
+    expect(at(schemas, 'Meta_CodesKeyedResponse', 'additionalProperties', 'items')).toEqual(
+      ref('Meta_CodeRowWithSource'),
+    );
   });
 
   it('builds the form-with-version response on the named form response', () => {

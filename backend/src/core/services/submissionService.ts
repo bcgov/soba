@@ -1,5 +1,5 @@
+import type { SubmissionListSort } from '@soba/lib';
 import {
-  SubmissionListSort,
   appendSubmissionRevision,
   openSubmission,
   getSubmissionById,
