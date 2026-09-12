@@ -27,7 +27,7 @@ export type FrontendRuntimeConfig = {
   };
 };
 
-const DEFAULT_SOBA_API_BASE_URL = 'http://localhost:4000/api/v1';
+const DEFAULT_SOBA_API_BASE_URL = 'http://localhost:4000/soba/api/v1';
 
 /**
  * API base URL used before runtime config is loaded (and for the initial
@@ -37,7 +37,7 @@ const DEFAULT_SOBA_API_BASE_URL = 'http://localhost:4000/api/v1';
  *
  * In Docker Compose, the browser must use host-exposed ports (NEXT_PUBLIC → localhost:4000).
  * Server Components run inside the frontend container and need SOBA_API_INTERNAL_URL
- * (e.g. http://backend:4000/api/v1) — localhost:4000 there is this container, not the API.
+ * (e.g. http://backend:4000/soba/api/v1) — localhost:4000 there is this container, not the API.
  */
 export function getBootstrapApiBaseUrl(): string {
   if (typeof window !== 'undefined' && window.__SOBA_API_BASE_URL) {

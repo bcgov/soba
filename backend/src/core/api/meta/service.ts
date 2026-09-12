@@ -117,7 +117,9 @@ export class MetaApiService {
         },
       },
       api: {
-        baseUrl: env.getOptionalEnv('SOBA_API_BASE_URL') ?? 'http://localhost:4000/api/v1',
+        baseUrl:
+          env.getOptionalEnv('SOBA_API_BASE_URL') ??
+          `http://localhost:4000${env.getApiBasePath()}/api/v1`,
       },
       // Reported only when configured. A guessed URL would be served to every client and silently
       // produce links to the wrong host.
