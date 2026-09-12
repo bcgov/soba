@@ -83,7 +83,10 @@ export const CodeRowWithSourceMetaSchema = z.object({
 });
 export type CodeRowWithSourceMeta = z.infer<typeof CodeRowWithSourceMetaSchema>;
 
-export const CodesKeyedMetaResponseSchema = z.record(z.string(), z.array(CodeRowWithSourceMetaSchema));
+export const CodesKeyedMetaResponseSchema = z.record(
+  z.string(),
+  z.array(CodeRowWithSourceMetaSchema),
+);
 export type CodesKeyedMetaResponse = z.infer<typeof CodesKeyedMetaResponseSchema>;
 
 export const FormEngineMetaSchema = z.object({
@@ -137,5 +140,5 @@ export const ListCodesQuerySchema = z.object({
   source: z.string().optional(),
   is_active: z.enum(['true', 'false']).optional(),
   only_enabled_features: z.enum(['true', 'false']).optional(),
-})
+});
 export type ListCodesQuery = z.infer<typeof ListCodesQuerySchema>;
