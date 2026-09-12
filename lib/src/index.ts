@@ -1,6 +1,7 @@
 export * from './schemas/forms';
 export * from './schemas/submissions';
 export * from './schemas/pagination';
+export * from './sort';
 export * from './schemas/admin';
 export * from './schemas/workspaces';
 export * from './formio/normalizeSchema';

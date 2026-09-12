@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { OffsetPageSchema, makeSortEnum } from './pagination';
+import { SUBMISSION_SORT_FIELDS } from '../sort';
 
 export const OpenSubmissionBodySchema = z.object({
   // v7 only: the client mints this id, and it is the submission's identity.
@@ -44,13 +45,6 @@ export type OpenSubmissionBody = z.infer<typeof OpenSubmissionBodySchema>;
 export type SubmissionDataBody = z.infer<typeof SubmissionDataBodySchema>;
 export type SubmissionListItem = z.infer<typeof SubmissionListItemSchema>;
 export type SubmissionResponse = z.infer<typeof SubmissionResponseSchema>;
-
-export const SUBMISSION_SORT_FIELDS = [
-  'formName',
-  'submittedAt',
-  'createdAt',
-  'updatedAt',
-] as const;
 
 export const SubmissionSortSchema = makeSortEnum(SUBMISSION_SORT_FIELDS);
 export type SubmissionListSort = z.infer<typeof SubmissionSortSchema>;

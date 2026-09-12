@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import { OffsetPageSchema, makeSortEnum } from './pagination';
+import {
+  DOCGEN_AUDIT_SORT_FIELDS,
+  FEATURE_SCOPE_SORT_FIELDS,
+  SOBA_ADMIN_SORT_FIELDS,
+} from '../sort';
 
-export const SOBA_ADMIN_SORT_FIELDS = ['displayLabel', 'source', 'syncedAt'] as const;
 export const SobaAdminSortSchema = makeSortEnum(SOBA_ADMIN_SORT_FIELDS);
 
 export const SobaAdminItemSchema = z.object({
@@ -29,13 +33,6 @@ export const AddSobaAdminBodySchema = z.object({
 });
 export type AddSobaAdminBody = z.infer<typeof AddSobaAdminBodySchema>;
 
-export const FEATURE_SCOPE_SORT_FIELDS = [
-  'featureCode',
-  'scopeType',
-  'status',
-  'createdAt',
-  'updatedAt',
-] as const;
 export const FeatureScopeSortSchema = makeSortEnum(FEATURE_SCOPE_SORT_FIELDS);
 
 export const FeatureScopeItemSchema = z.object({
@@ -71,7 +68,6 @@ export const UpsertFeatureScopeBodySchema = z.object({
 });
 export type UpsertFeatureScopeBody = z.infer<typeof UpsertFeatureScopeBodySchema>;
 
-export const DOCGEN_AUDIT_SORT_FIELDS = ['createdAt', 'outcome', 'durationMs'] as const;
 export const DocgenAuditSortSchema = makeSortEnum(DOCGEN_AUDIT_SORT_FIELDS);
 
 export const DocumentGenerationAuditItemSchema = z.object({

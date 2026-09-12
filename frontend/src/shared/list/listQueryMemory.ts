@@ -1,4 +1,14 @@
 import {
+  DOCGEN_AUDIT_SORT_FIELDS,
+  FEATURE_SCOPE_SORT_FIELDS,
+  FORM_SORT_FIELDS,
+  FORM_VERSION_SORT_FIELDS,
+  SOBA_ADMIN_SORT_FIELDS,
+  SUBMISSION_SORT_FIELDS,
+  WORKSPACE_SORT_FIELDS,
+  sortTokensFor,
+} from '@soba/lib/sort';
+import {
   readSessionValue,
   removeSessionValues,
   writeSessionValue,
@@ -34,24 +44,19 @@ export const listQueryParams = (spec: ListQuerySpec): string[] => [
 export const urlParamName = (spec: ListQuerySpec, name: string): string =>
   `${spec.resource}.${name}`;
 
-/** Both directions of every field the endpoint declares. */
-const sortOptionsFor = (fields: readonly string[]): string[] =>
-  fields.flatMap((field) => [`${field}:asc`, `${field}:desc`]);
-
-const SUBMISSION_SORT_FIELDS = ['formName', 'submittedAt', 'createdAt', 'updatedAt'] as const;
 const UPDATED_DESC = 'updatedAt:desc';
 
 export const FORMS_LIST_QUERY: ListQuerySpec = {
   resource: 'forms',
   filters: ['workspace'],
-  sortOptions: sortOptionsFor(['name', 'status', 'createdAt', 'updatedAt']),
+  sortOptions: sortTokensFor(FORM_SORT_FIELDS),
   defaultSort: 'createdAt:desc',
 };
 
 export const WORKSPACES_LIST_QUERY: ListQuerySpec = {
   resource: 'workspaces',
   filters: [],
-  sortOptions: sortOptionsFor(['name', 'kind', 'status', 'updatedAt']),
+  sortOptions: sortTokensFor(WORKSPACE_SORT_FIELDS),
   defaultSort: 'name:asc',
 };
 
@@ -59,7 +64,7 @@ export const WORKSPACES_LIST_QUERY: ListQuerySpec = {
 export const FORM_SUBMISSIONS_LIST_QUERY: ListQuerySpec = {
   resource: 'formSubmissions',
   filters: [],
-  sortOptions: sortOptionsFor(SUBMISSION_SORT_FIELDS),
+  sortOptions: sortTokensFor(SUBMISSION_SORT_FIELDS),
   // A column carries this one, so the header can report the order and reverse it.
   defaultSort: 'submittedAt:desc',
 };
@@ -68,35 +73,35 @@ export const FORM_SUBMISSIONS_LIST_QUERY: ListQuerySpec = {
 export const FORM_VERSIONS_LIST_QUERY: ListQuerySpec = {
   resource: 'formVersions',
   filters: [],
-  sortOptions: sortOptionsFor(['versionNo', 'state', 'createdAt', 'updatedAt']),
+  sortOptions: sortTokensFor(FORM_VERSION_SORT_FIELDS),
   defaultSort: 'versionNo:desc',
 };
 
 export const SUBMISSIONS_LIST_QUERY: ListQuerySpec = {
   resource: 'submissions',
   filters: [],
-  sortOptions: sortOptionsFor(['formName', 'submittedAt', 'createdAt', 'updatedAt']),
+  sortOptions: sortTokensFor(SUBMISSION_SORT_FIELDS),
   defaultSort: 'updatedAt:desc',
 };
 
 export const SOBA_ADMINS_LIST_QUERY: ListQuerySpec = {
   resource: 'sobaAdmins',
   filters: [],
-  sortOptions: sortOptionsFor(['displayLabel', 'source', 'syncedAt']),
+  sortOptions: sortTokensFor(SOBA_ADMIN_SORT_FIELDS),
   defaultSort: 'displayLabel:asc',
 };
 
 export const FEATURE_SCOPES_LIST_QUERY: ListQuerySpec = {
   resource: 'featureScopes',
   filters: [],
-  sortOptions: sortOptionsFor(['featureCode', 'scopeType', 'status', 'createdAt', 'updatedAt']),
+  sortOptions: sortTokensFor(FEATURE_SCOPE_SORT_FIELDS),
   defaultSort: UPDATED_DESC,
 };
 
 export const DOCGEN_AUDITS_LIST_QUERY: ListQuerySpec = {
   resource: 'docgenAudits',
   filters: [],
-  sortOptions: sortOptionsFor(['createdAt', 'outcome', 'durationMs']),
+  sortOptions: sortTokensFor(DOCGEN_AUDIT_SORT_FIELDS),
   defaultSort: 'createdAt:desc',
 };
 
