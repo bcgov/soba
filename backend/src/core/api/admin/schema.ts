@@ -37,7 +37,8 @@ export const ListSobaAdminsQuerySchema = z
   })
   .openapi('Admin_ListSobaAdminsQuery');
 
-export const DocgenAuditSortSchema = LibDocgenAuditSortSchema.clone().openapi('Admin_DocgenAuditSort');
+export const DocgenAuditSortSchema =
+  LibDocgenAuditSortSchema.clone().openapi('Admin_DocgenAuditSort');
 
 export const ListDocumentGenerationAuditsQuerySchema = z
   .object({
@@ -59,17 +60,21 @@ export const ListSobaAdminsResponseSchema = LibListSobaAdminsResponseSchema.exte
   sort: SobaAdminSortSchema,
 }).openapi('Admin_ListSobaAdminsResponse');
 
-export const DocumentGenerationAuditItemSchema = LibDocumentGenerationAuditItemSchema.clone().openapi('Admin_DocumentGenerationAuditItem');
+export const DocumentGenerationAuditItemSchema =
+  LibDocumentGenerationAuditItemSchema.clone().openapi('Admin_DocumentGenerationAuditItem');
 
-export const ListDocumentGenerationAuditsResponseSchema = LibListDocumentGenerationAuditsResponseSchema.extend({
-  items: z.array(DocumentGenerationAuditItemSchema),
-  page: OffsetPageSchema,
-  sort: DocgenAuditSortSchema,
-}).openapi('Admin_ListDocumentGenerationAuditsResponse');
+export const ListDocumentGenerationAuditsResponseSchema =
+  LibListDocumentGenerationAuditsResponseSchema.extend({
+    items: z.array(DocumentGenerationAuditItemSchema),
+    page: OffsetPageSchema,
+    sort: DocgenAuditSortSchema,
+  }).openapi('Admin_ListDocumentGenerationAuditsResponse');
 
-export const FeatureScopeItemSchema = LibFeatureScopeItemSchema.clone().openapi('Admin_FeatureScopeItem');
+export const FeatureScopeItemSchema =
+  LibFeatureScopeItemSchema.clone().openapi('Admin_FeatureScopeItem');
 
-export const FeatureScopeSortSchema = LibFeatureScopeSortSchema.clone().openapi('Admin_FeatureScopeSort');
+export const FeatureScopeSortSchema =
+  LibFeatureScopeSortSchema.clone().openapi('Admin_FeatureScopeSort');
 
 export const ListFeatureScopesQuerySchema = z
   .object({
@@ -102,9 +107,12 @@ export const ListFeatureScopesResponseSchema = LibListFeatureScopesResponseSchem
   sort: FeatureScopeSortSchema,
 }).openapi('Admin_ListFeatureScopesResponse');
 
-export const AddSobaAdminBodySchema = LibAddSobaAdminBodySchema.clone().openapi('Admin_AddSobaAdminBody');
+export const AddSobaAdminBodySchema =
+  LibAddSobaAdminBodySchema.clone().openapi('Admin_AddSobaAdminBody');
 
-export const UpsertFeatureScopeBodySchema = LibUpsertFeatureScopeBodySchema.clone().openapi('Admin_UpsertFeatureScopeBody');
+export const UpsertFeatureScopeBodySchema = LibUpsertFeatureScopeBodySchema.clone().openapi(
+  'Admin_UpsertFeatureScopeBody',
+);
 
 export const SobaAdminUserIdParamsSchema = z
   .object({

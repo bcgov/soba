@@ -10,7 +10,8 @@ import { SubmitFillBundleSchema as LibSubmitFillBundleSchema } from '@soba/lib';
 
 extendZodWithOpenApi(z);
 
-export const SubmitFillBundleSchema = LibSubmitFillBundleSchema.clone().openapi('Submit_FillBundle');
+export const SubmitFillBundleSchema =
+  LibSubmitFillBundleSchema.clone().openapi('Submit_FillBundle');
 
 const TAG = 'core.submit';
 const SUBMISSION_PATH = '/submit/submissions/{id}';

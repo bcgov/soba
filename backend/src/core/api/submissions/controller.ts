@@ -1,7 +1,6 @@
 import { Response } from 'express';
 import { z } from 'zod';
 import {
-  ListSubmissionsQuerySchema,
   OpenSubmissionBodySchema,
   SubmissionDataBodySchema,
   SubmissionIdParamsSchema,

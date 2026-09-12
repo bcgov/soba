@@ -99,9 +99,13 @@ export const ListGroupsResponseSchema = z
   })
   .openapi('Groups_ListGroupsResponse');
 
-export const SetSubmitterAudienceBodySchema = LibSetSubmitterAudienceBodySchema.clone().openapi('Groups_SetSubmitterAudienceBody');
+export const SetSubmitterAudienceBodySchema = LibSetSubmitterAudienceBodySchema.clone().openapi(
+  'Groups_SetSubmitterAudienceBody',
+);
 
-export const SubmitterAudienceSchema = LibSubmitterAudienceSchema.clone().openapi('Groups_SubmitterAudience');
+export const SubmitterAudienceSchema = LibSubmitterAudienceSchema.clone().openapi(
+  'Groups_SubmitterAudience',
+);
 
 const TAG = 'core.groups';
 const GROUPS_PATH = '/workspaces/{id}/groups';

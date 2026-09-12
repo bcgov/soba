@@ -21,26 +21,37 @@ import {
 
 extendZodWithOpenApi(z);
 
-export const PluginCatalogEntrySchema = LibPluginCatalogEntrySchema.clone().openapi('Meta_PluginCatalogEntry');
+export const PluginCatalogEntrySchema =
+  LibPluginCatalogEntrySchema.clone().openapi('Meta_PluginCatalogEntry');
 
-export const PluginsMetaResponseSchema = LibPluginsMetaResponseSchema.clone().openapi('Meta_PluginsResponse');
+export const PluginsMetaResponseSchema =
+  LibPluginsMetaResponseSchema.clone().openapi('Meta_PluginsResponse');
 
 export const FeatureMetaSchema = LibFeatureMetaSchema.clone().openapi('Meta_Feature');
 
-export const FeaturesMetaResponseSchema = LibFeaturesMetaResponseSchema.clone().openapi('Meta_FeaturesResponse');
+export const FeaturesMetaResponseSchema =
+  LibFeaturesMetaResponseSchema.clone().openapi('Meta_FeaturesResponse');
 
-export const FeatureAvailabilityQuerySchema = LibFeatureAvailabilityQuerySchema.clone().openapi('Meta_FeatureAvailabilityQuery');
+export const FeatureAvailabilityQuerySchema = LibFeatureAvailabilityQuerySchema.clone().openapi(
+  'Meta_FeatureAvailabilityQuery',
+);
 
-export const FeatureAvailabilityResponseSchema = LibFeatureAvailabilityResponseSchema.clone().openapi('Meta_FeatureAvailabilityResponse');
+export const FeatureAvailabilityResponseSchema =
+  LibFeatureAvailabilityResponseSchema.clone().openapi('Meta_FeatureAvailabilityResponse');
 
-export const BuildMetaResponseSchema = LibBuildMetaResponseSchema.clone().openapi('Meta_BuildResponse');
+export const BuildMetaResponseSchema =
+  LibBuildMetaResponseSchema.clone().openapi('Meta_BuildResponse');
 
-export const FrontendConfigMetaResponseSchema = LibFrontendConfigMetaResponseSchema.clone().openapi('Meta_FrontendConfigResponse');
+export const FrontendConfigMetaResponseSchema = LibFrontendConfigMetaResponseSchema.clone().openapi(
+  'Meta_FrontendConfigResponse',
+);
 
-export const CodeRowWithSourceMetaSchema = LibCodeRowWithSourceMetaSchema.clone().openapi('Meta_CodeRowWithSource');
+export const CodeRowWithSourceMetaSchema =
+  LibCodeRowWithSourceMetaSchema.clone().openapi('Meta_CodeRowWithSource');
 
 /** Response: object keyed by code set name, values = arrays of code rows with source */
-export const CodesKeyedMetaResponseSchema = LibCodesKeyedMetaResponseSchema.clone().openapi('Meta_CodesKeyedResponse');
+export const CodesKeyedMetaResponseSchema =
+  LibCodesKeyedMetaResponseSchema.clone().openapi('Meta_CodesKeyedResponse');
 
 export const ListCodesQuerySchema = z
   .object({
@@ -53,15 +64,21 @@ export const ListCodesQuerySchema = z
 
 export const FormEngineMetaSchema = LibFormEngineMetaSchema.clone().openapi('Meta_FormEngine');
 
-export const FormEnginesMetaResponseSchema = LibFormEnginesMetaResponseSchema.clone().openapi('Meta_FormEnginesResponse');
+export const FormEnginesMetaResponseSchema = LibFormEnginesMetaResponseSchema.clone().openapi(
+  'Meta_FormEnginesResponse',
+);
 
-export const RoleWithSourceMetaSchema = LibRoleWithSourceMetaSchema.clone().openapi('Meta_RoleWithSource');
+export const RoleWithSourceMetaSchema =
+  LibRoleWithSourceMetaSchema.clone().openapi('Meta_RoleWithSource');
 
 export const ListRolesQuerySchema = LibListCodesQuerySchema.clone().openapi('Meta_ListRolesQuery');
 
-export const RolesMetaResponseSchema = LibRolesMetaResponseSchema.clone().openapi('Meta_RolesResponse');
+export const RolesMetaResponseSchema =
+  LibRolesMetaResponseSchema.clone().openapi('Meta_RolesResponse');
 
-export const FilesConfigMetaResponseSchema = LibFilesConfigMetaResponseSchema.clone().openapi('Meta_FilesConfigResponse');
+export const FilesConfigMetaResponseSchema = LibFilesConfigMetaResponseSchema.clone().openapi(
+  'Meta_FilesConfigResponse',
+);
 
 export const registerMetaOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
