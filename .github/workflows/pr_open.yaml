@@ -213,7 +213,6 @@ jobs:
             image:
               repository: "ghcr.io/${REPO_LC}/backend"
               tag: "${TAG}"
-            basePath: "/chefs-${PR_NUM}"
             config:
               appVersion: "${APP_VERSION}"
               gitSha: "${SHORT_SHA}"
