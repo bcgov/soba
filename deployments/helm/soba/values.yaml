@@ -3,11 +3,7 @@ global:
   namespace: ""
   # Set true to remove "keep" policy on Secrets/PVCs (e.g. PR teardown)
   forceCleanup: false
-  # Optional shared subpath for frontend Route/Ingress + liveness (blank = root).
-  # Per-frontend host is set via frontend.apps.<name>.host, not here.
-  routePath: ""
-  # Owning PR number when a PR reuses a deployment slot; read on teardown so a
-  # closing PR does not uninstall a newer PR that has since taken the slot.
+  # PR number a deployment belongs to, for provenance when several PR releases share a namespace.
   prNumber: ""
 
 # -- Backend (Express API) ------------------------------------------------
@@ -33,6 +29,9 @@ backend:
       memory: 256Mi
   service:
     port: 4000
+  # URL path the API is served under. The app serves it, so Routes, probes and the advertised API
+  # URLs all use it as-is. Every environment shares this path; the host keeps deployments apart.
+  basePath: /chefs
   route:
     enabled: true
     tls:
@@ -46,7 +45,8 @@ backend:
       # The router sets a session cookie on edge routes whether or not we ask; this just
       # names it. sobaFetch sends no credentials, so nothing returns it on this host.
       router.openshift.io/cookie_name: "soba-affinity"
-    # Path-scoped Routes on the same host, annotations merged over the ones above.
+    # Path-scoped Routes on the same host, annotations merged over the ones above. Paths are
+    # relative to backend.basePath, which the template prepends.
     extraPaths:
       - name: files
         path: /api/v1/submit/files
@@ -192,6 +192,8 @@ frontend:
     repository: ghcr.io/bcgov/soba/frontend
     tag: latest
     pullPolicy: IfNotPresent
+  # Host shared by every app; they are told apart by routePath. Blank = <fullname>.<domain>.
+  host: ""
   replicas: 1
   livenessProbe:
     initialDelaySeconds: 15
@@ -234,18 +236,19 @@ frontend:
     targetCPUUtilizationPercentage: 80
   # Optional: override SOBA_API_INTERNAL_URL (Next SSR → API). Default: in-cluster http://<release>-backend.<namespace>.svc.cluster.local:<port>/api/v1
   internalApiBaseUrl: ""
-  # Named frontend apps: one Deployment/Service/Route/ConfigMap each, same image, mode set by
-  # featuresAllowed (codes from GET /meta/features, or * / all). Host defaults to <fullname>-<name>.<domain>.
+  # Named frontend apps: one Deployment/Service/Route/ConfigMap each, mode set by featuresAllowed
+  # (codes from GET /meta/features, or * / all) and URL by routePath. They share one host and one
+  # image repository; the tag carries the app name, because basePath is baked per build.
   # All other frontend.* settings (image, probes, resources, route.tls, autoscaling) are shared.
   apps:
     designer:
       enabled: true
       featuresAllowed: "workspaces,design-mode,meta,marketing"
-      host: ""
+      routePath: /designer
     forms:
       enabled: true
       featuresAllowed: "submit-mode,files,meta"
-      host: ""
+      routePath: /forms
 
 # -- Database (external Postgres) -----------------------------------------
 database:

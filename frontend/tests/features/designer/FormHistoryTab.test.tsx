@@ -36,7 +36,7 @@ vi.mock('next/navigation', async () => {
   return {
     ...(actual as Record<string, unknown>),
     useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
-    usePathname: () => '/en/designer/f1',
+    usePathname: () => '/en/build/f1',
     useSearchParams: () => new URLSearchParams(''),
   };
 });

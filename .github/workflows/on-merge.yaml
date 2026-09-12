@@ -67,7 +67,7 @@ jobs:
       contents: read
     environment:
       name: dev
-      url: https://soba-dev-designer.${{ vars.OC_DOMAIN }}
+      url: https://soba-dev.${{ vars.OC_DOMAIN }}/designer
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:

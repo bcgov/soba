@@ -15,7 +15,7 @@ export function formsettings() {
 
 export async function login(page: Page) {
   const { username, password, mfaCode } = formsettings();
-  await page.goto("/");
+  await page.goto("./");
   await page.click('[data-testid="login-button"]');
   await page.fill('input[type="email"]', username);
   await page.click('input[type="submit"]');

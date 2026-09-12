@@ -8,7 +8,7 @@ export const designerPlugin: AppPlugin = {
   order: 20,
   getNavItem: ({ locale, dictionary }) => ({
     id: 'designer',
-    href: `/${locale}/designer`,
+    href: `/${locale}/build`,
     label: dictionary.header.designer,
   }),
 };
