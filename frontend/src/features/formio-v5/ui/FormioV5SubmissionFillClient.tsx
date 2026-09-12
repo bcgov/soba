@@ -77,10 +77,6 @@ function SubmissionFillBody({
           router.replace(`/${locale}/submission/${submissionId}`);
           return;
         }
-        if (!bundle.schema) {
-          setLoadError(labels.unavailable);
-          return;
-        }
         setSchema(bundle.schema as FormType);
         // Resume: prefill with any saved answers (a just-opened submission has none).
         setInitialData((bundle.content?.data ?? {}) as Record<string, unknown>);
