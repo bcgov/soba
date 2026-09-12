@@ -41,7 +41,11 @@ describe('OpenAPI components for lib-backed schemas', () => {
     ['Workspaces_ListWorkspacesResponse', 'Workspaces_WorkspaceItem', 'Workspaces_WorkspaceSort'],
     ['Admin_ListSobaAdminsResponse', 'Admin_SobaAdminItem', 'Admin_SobaAdminSort'],
     ['Admin_ListFeatureScopesResponse', 'Admin_FeatureScopeItem', 'Admin_FeatureScopeSort'],
-    ['Admin_ListDocumentGenerationAuditsResponse', 'Admin_DocumentGenerationAuditItem', 'Admin_DocgenAuditSort'],
+    [
+      'Admin_ListDocumentGenerationAuditsResponse',
+      'Admin_DocumentGenerationAuditItem',
+      'Admin_DocgenAuditSort',
+    ],
   ])('%s references its item, page and sort components', (list, item, sort) => {
     expect(at(schemas, list, 'properties', 'items', 'items')).toEqual(ref(item));
     expect(at(schemas, list, 'properties', 'page')).toEqual(ref('Core_OffsetPage'));
