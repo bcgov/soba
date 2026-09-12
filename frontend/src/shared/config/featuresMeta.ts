@@ -1,20 +1,8 @@
 import { cache } from 'react';
 import { getBootstrapApiBaseUrl } from '@/src/shared/config/runtimeConfig';
+import type { FeatureMeta as MetaFeatureRow, FeaturesMetaResponse as FeaturesMetaPayload } from '@soba/lib';
 
-export type MetaFeatureRow = {
-  code: string;
-  name: string;
-  description: string | null;
-  version: string | null;
-  status: string;
-  platformAllowed: boolean;
-  /** 'fixed' | 'scoped'. Optional; absent is treated as non-scoped. */
-  availability?: string;
-};
-
-export type FeaturesMetaPayload = {
-  features: MetaFeatureRow[];
-};
+export type { MetaFeatureRow, FeaturesMetaPayload };
 
 let cachedFeaturesMeta: FeaturesMetaPayload | null = null;
 let featuresMetaPromise: Promise<FeaturesMetaPayload> | null = null;
@@ -33,7 +21,7 @@ export function isFeaturesMetaPayload(value: unknown): value is FeaturesMetaPayl
       (r.version === null || typeof r.version === 'string') &&
       typeof r.status === 'string' &&
       typeof r.platformAllowed === 'boolean' &&
-      (r.availability === undefined || typeof r.availability === 'string')
+      typeof r.availability === 'string'
     );
   });
 }

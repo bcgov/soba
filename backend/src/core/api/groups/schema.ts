@@ -1,6 +1,10 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import { GROUP_NAME_TAKEN } from '../../messages';
+import {
+  SetSubmitterAudienceBodySchema as LibSetSubmitterAudienceBodySchema,
+  SubmitterAudienceSchema as LibSubmitterAudienceSchema,
+} from '@soba/lib';
 
 extendZodWithOpenApi(z);
 
@@ -95,21 +99,9 @@ export const ListGroupsResponseSchema = z
   })
   .openapi('Groups_ListGroupsResponse');
 
-export const SetSubmitterAudienceBodySchema = z
-  .discriminatedUnion('mode', [
-    z.object({ mode: z.literal('public') }),
-    z.object({ mode: z.literal('protected'), idps: z.array(z.string().trim().min(1)).max(20) }),
-  ])
-  .openapi('Groups_SetSubmitterAudienceBody');
+export const SetSubmitterAudienceBodySchema = LibSetSubmitterAudienceBodySchema.clone().openapi('Groups_SetSubmitterAudienceBody');
 
-export const SubmitterAudienceSchema = z
-  .object({
-    mode: z.enum(['public', 'protected', 'none']),
-    idps: z.array(z.string()),
-    users: z.array(z.object({ membershipId: z.string(), displayLabel: z.string().nullable() })),
-    available: z.array(z.object({ code: z.string(), name: z.string() })),
-  })
-  .openapi('Groups_SubmitterAudience');
+export const SubmitterAudienceSchema = LibSubmitterAudienceSchema.clone().openapi('Groups_SubmitterAudience');
 
 const TAG = 'core.groups';
 const GROUPS_PATH = '/workspaces/{id}/groups';

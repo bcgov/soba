@@ -6,6 +6,8 @@ import { readListPage } from '../listRead';
 
 export type DocumentGenerationAuditRecord = typeof documentGenerationAudits.$inferSelect;
 
+import { DOCGEN_AUDIT_SORT_FIELDS } from '@soba/lib';
+
 export interface NewDocumentGenerationAudit {
   workspaceId: string;
   formId: string;
@@ -20,7 +22,6 @@ export interface NewDocumentGenerationAudit {
   createdBy: string;
 }
 
-export const DOCGEN_AUDIT_SORT_FIELDS = ['createdAt', 'outcome', 'durationMs'] as const;
 export type DocgenAuditListSortField = (typeof DOCGEN_AUDIT_SORT_FIELDS)[number];
 export type DocgenAuditListSort = SortToken<DocgenAuditListSortField>;
 

@@ -53,6 +53,7 @@ export const SUBMISSION_SORT_FIELDS = [
 ] as const;
 
 export const SubmissionSortSchema = makeSortEnum(SUBMISSION_SORT_FIELDS);
+export type SubmissionListSort = z.infer<typeof SubmissionSortSchema>;
 
 export const ListSubmissionsResponseSchema = z.object({
   items: z.array(SubmissionListItemSchema),

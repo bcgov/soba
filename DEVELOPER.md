@@ -378,8 +378,13 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 ## Lib
 
-Shared code for the backend and frontend, used in the workspace as `@soba/lib`: Zod schemas and types for the API request and response shapes, and `normalizeSchema` for Form.io schema import and export.
+Shared code for the backend and frontend, used in the workspace as `@soba/lib`. This is the single source of truth for:
+- Zod schemas and inferred TypeScript types for API request and response shapes (preventing frontend/backend drift).
+- Sorting constants and enums (e.g., `FormSort`, `SubmissionSort`).
+- `normalizeSchema` for Form.io schema import and export.
 
+**OpenAPI and schema composition:**
+When a backend module needs to add OpenAPI documentation or `$ref` metadata to a lib schema, it must import the schema from `@soba/lib` and use `.clone().openapi('Name')` to bind the OpenAPI name locally without mutating the shared schema registry. For composite schemas (e.g., lists with nested items), use `.extend(...)` or rebuild the outer wrapper using the locally named inner schemas. This ensures nested components resolve correctly via `$ref` in the generated Swagger spec.
 `lib/dist/` is generated and not committed. `pnpm install` builds it (the `prepare` script) and the devcontainer rebuilds it on start. While editing lib, run `pnpm dev` in `lib/` to keep `dist/` current. The backend's watcher follows `backend/src` only, so restart the backend after a lib change.
 
 ### Scripts

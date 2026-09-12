@@ -4,7 +4,7 @@
 import { sobaFetch } from './sobaFetch';
 import { parseJson } from './sobaHelpers';
 import { FormType } from '@formio/react';
-import type { SubmitFillBundle } from '../../types/forms';
+import type { SubmitFillBundle, SubmissionDataDocument } from '../../types/forms';
 import type { SubmissionResponse, SubmissionListItem } from '@/src/types/submissions';
 
 /** The one payload the fill page needs: workflow state + schema + any saved answers (resume). */
@@ -89,9 +89,8 @@ export async function getSubmitSubmission(
 /** Read a submission's answer document for the confirmation view (null if not yet provisioned). */
 export async function getSubmitSubmissionData(
   token: string | undefined,
-  id: string,
-): Promise<{ data?: Record<string, unknown> } | null> {
-  const response = await sobaFetch(`/submit/submissions/${id}/data`, { token });
-  if (response.status === 404) return null;
-  return parseJson(response);
+  submissionId: string,
+): Promise<SubmissionDataDocument | null> {
+  const response = await sobaFetch(`/submit/submissions/${submissionId}/data`, { token });
+  return parseJson<SubmissionDataDocument>(response);
 }

@@ -10,6 +10,8 @@ const ADV_LOCK_UPSERT_SOBA_ADMIN = 1_774_566_321;
 export const SOBA_ADMIN_SOURCE_IDP = 'idp';
 export const SOBA_ADMIN_SOURCE_DIRECT = 'direct';
 
+import { SOBA_ADMIN_SORT_FIELDS } from '@soba/lib';
+
 export interface SobaAdminListRow {
   userId: string;
   source: string;
@@ -18,7 +20,6 @@ export interface SobaAdminListRow {
   displayLabel: string | null;
 }
 
-export const SOBA_ADMIN_SORT_FIELDS = ['displayLabel', 'source', 'syncedAt'] as const;
 export type SobaAdminListSortField = (typeof SOBA_ADMIN_SORT_FIELDS)[number];
 export type SobaAdminListSort = SortToken<SobaAdminListSortField>;
 
