@@ -25,3 +25,5 @@ integration/test-results/
 integration/playwright-report/
 integration/.playwright/
 integration/.cache/
+
+lib/dist

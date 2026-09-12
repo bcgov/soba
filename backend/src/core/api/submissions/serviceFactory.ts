@@ -2,9 +2,9 @@ import { SubmissionService } from '../../services/submissionService';
 import type {
   SubmissionRecord,
   SubmissionListRow,
-  SubmissionListSort,
   SubmissionDetailRow,
 } from '../../db/repos/submissionRepo';
+import type { SubmissionListSort } from '@soba/lib';
 
 export interface SubmissionsContextInput {
   workspaceId: string;
@@ -18,7 +18,7 @@ export interface SubmissionsListScopeInput {
   actorId: string;
 }
 
-interface ListSubmissionsQueryInput {
+export interface ListSubmissionsQueryInput {
   workspaceId?: string;
   formId?: string;
   formVersionId?: string;

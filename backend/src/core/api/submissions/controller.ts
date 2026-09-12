@@ -16,7 +16,7 @@ import type { Request } from 'express';
 type OpenSubmissionBody = z.infer<typeof OpenSubmissionBodySchema>;
 type SubmissionIdParams = z.infer<typeof SubmissionIdParamsSchema>;
 type SubmissionDataBody = z.infer<typeof SubmissionDataBodySchema>;
-type ListSubmissionsQuery = z.infer<typeof ListSubmissionsQuerySchema>;
+import type { ListSubmissionsQueryInput } from './serviceFactory';
 
 const SUBMISSION_NOT_FOUND = 'Submission not found';
 
@@ -46,7 +46,7 @@ export const listSubmissions = asyncHandler(async (req: Request, res: Response) 
   const scope = req.listScope!;
   const result = await submissionsApiService.list(
     { workspaceIds: scope.workspaceIds, actorId: scope.actorId },
-    req.query as unknown as ListSubmissionsQuery,
+    req.query as unknown as ListSubmissionsQueryInput,
   );
   res.json(result);
 });

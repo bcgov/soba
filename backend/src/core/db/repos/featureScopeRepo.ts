@@ -15,6 +15,8 @@ export interface NewFeatureScope {
   createdBy?: string | null;
 }
 
+import { FEATURE_SCOPE_SORT_FIELDS } from '@soba/lib';
+
 export interface UpsertFeatureScopeInput {
   featureCode: string;
   scopeType: string;
@@ -23,13 +25,6 @@ export interface UpsertFeatureScopeInput {
   updatedBy?: string | null;
 }
 
-export const FEATURE_SCOPE_SORT_FIELDS = [
-  'featureCode',
-  'scopeType',
-  'status',
-  'createdAt',
-  'updatedAt',
-] as const;
 export type FeatureScopeListSortField = (typeof FEATURE_SCOPE_SORT_FIELDS)[number];
 export type FeatureScopeListSort = SortToken<FeatureScopeListSortField>;
 

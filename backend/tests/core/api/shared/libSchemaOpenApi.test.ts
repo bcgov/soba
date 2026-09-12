@@ -2,12 +2,14 @@ import { OpenAPIRegistry, OpenApiGeneratorV3 } from '@asteasolutions/zod-to-open
 import { registerFormsOpenApi } from '../../../../src/core/api/forms/schema';
 import { registerSubmissionsOpenApi } from '../../../../src/core/api/submissions/schema';
 import { registerWorkspacesOpenApi } from '../../../../src/core/api/workspaces/schema';
+import { registerAdminOpenApi } from '../../../../src/core/api/admin/schema';
 
 function componentSchemas(): unknown {
   const registry = new OpenAPIRegistry();
   registerFormsOpenApi(registry);
   registerSubmissionsOpenApi(registry);
   registerWorkspacesOpenApi(registry);
+  registerAdminOpenApi(registry);
   const doc = new OpenApiGeneratorV3(registry.definitions).generateDocument({
     openapi: '3.0.3',
     info: { title: 'test', version: '1' },
@@ -37,6 +39,9 @@ describe('OpenAPI components for lib-backed schemas', () => {
       'Submissions_SubmissionSort',
     ],
     ['Workspaces_ListWorkspacesResponse', 'Workspaces_WorkspaceItem', 'Workspaces_WorkspaceSort'],
+    ['Admin_ListSobaAdminsResponse', 'Admin_SobaAdminItem', 'Admin_SobaAdminSort'],
+    ['Admin_ListFeatureScopesResponse', 'Admin_FeatureScopeItem', 'Admin_FeatureScopeSort'],
+    ['Admin_ListDocumentGenerationAuditsResponse', 'Admin_DocumentGenerationAuditItem', 'Admin_DocgenAuditSort'],
   ])('%s references its item, page and sort components', (list, item, sort) => {
     expect(at(schemas, list, 'properties', 'items', 'items')).toEqual(ref(item));
     expect(at(schemas, list, 'properties', 'page')).toEqual(ref('Core_OffsetPage'));
