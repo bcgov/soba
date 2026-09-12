@@ -130,11 +130,18 @@ Backend public URL host (browser and NEXT_PUBLIC_SOBA_API_BASE_URL).
 {{- end }}
 
 {{/*
+URL path the API is served under (e.g. /soba). Blank serves at the host root.
+*/}}
+{{- define "soba.backendBasePath" -}}
+{{- .Values.backend.basePath | default "" -}}
+{{- end }}
+
+{{/*
 Cluster-internal API base URL for Next.js SSR (Server Components) — plain HTTP to backend Service.
 See frontend SOBA_API_INTERNAL_URL in runtimeConfig. Override with frontend.internalApiBaseUrl if needed.
 */}}
 {{- define "soba.sobaApiInternalBaseUrl" -}}
-{{- printf "http://%s-backend.%s.svc.cluster.local:%v/api/v1" (include "soba.fullname" .) .Release.Namespace (.Values.backend.service.port) }}
+{{- printf "http://%s-backend.%s.svc.cluster.local:%v%s/api/v1" (include "soba.fullname" .) .Release.Namespace (.Values.backend.service.port) (include "soba.backendBasePath" .) }}
 {{- end }}
 
 {{/*

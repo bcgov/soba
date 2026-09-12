@@ -5,6 +5,7 @@ import {
 } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import type { Router } from 'express';
+import { env } from '../../config/env';
 
 extendZodWithOpenApi(z);
 
@@ -45,7 +46,7 @@ export const buildOpenApiSpec = () => {
     },
     servers: [
       {
-        url: '/api/v1',
+        url: `${env.getApiBasePath()}/api/v1`,
         description: 'Core API v1',
       },
     ],

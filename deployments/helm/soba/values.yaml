@@ -33,6 +33,9 @@ backend:
       memory: 256Mi
   service:
     port: 4000
+  # URL path the API is served under. The app serves it, so Routes, probes and the advertised API
+  # URLs all use it as-is. PR deployments override it to keep each PR on its own path.
+  basePath: /soba
   route:
     enabled: true
     tls:
@@ -46,7 +49,8 @@ backend:
       # The router sets a session cookie on edge routes whether or not we ask; this just
       # names it. sobaFetch sends no credentials, so nothing returns it on this host.
       router.openshift.io/cookie_name: "soba-affinity"
-    # Path-scoped Routes on the same host, annotations merged over the ones above.
+    # Path-scoped Routes on the same host, annotations merged over the ones above. Paths are
+    # relative to backend.basePath, which the template prepends.
     extraPaths:
       - name: files
         path: /api/v1/submit/files
