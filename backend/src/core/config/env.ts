@@ -200,7 +200,7 @@ export function createEnvReader(source: EnvSource) {
     getRateLimitApiMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_API_MAX'),
     getRateLimitPublicWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_PUBLIC_WINDOW_MS'),
     getRateLimitPublicMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_PUBLIC_MAX'),
-    /** URL path the API is served under, e.g. `/soba`. Empty serves at the host root. */
+    /** URL path the API is served under, e.g. `/chefs`. Empty serves at the host root. */
     getApiBasePath: () => resolveApiBasePath(source),
     getTrustProxySetting: () => resolveTrustProxySetting(source),
     /** Production CORS allowlist (comma-separated trusted origins). */
@@ -281,7 +281,7 @@ export const env = {
   getRateLimitApiMax: () => getNumberEnv('RATE_LIMIT_API_MAX'),
   getRateLimitPublicWindowMs: () => getNumberEnv('RATE_LIMIT_PUBLIC_WINDOW_MS'),
   getRateLimitPublicMax: () => getNumberEnv('RATE_LIMIT_PUBLIC_MAX'),
-  /** URL path the API is served under, e.g. `/soba`. Empty serves at the host root. */
+  /** URL path the API is served under, e.g. `/chefs`. Empty serves at the host root. */
   getApiBasePath: () => resolveApiBasePath(process.env),
   getTrustProxySetting: () => resolveTrustProxySetting(process.env),
   /** Production CORS allowlist (comma-separated trusted origins). */

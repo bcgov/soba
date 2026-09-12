@@ -25,8 +25,8 @@ describe('withBasePath', () => {
   });
 
   it('prefixes a root-relative path', () => {
-    vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/soba');
-    expect(withBasePath('/silent-check-sso.html')).toBe('/soba/silent-check-sso.html');
+    vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/chefs');
+    expect(withBasePath('/silent-check-sso.html')).toBe('/chefs/silent-check-sso.html');
   });
 
   it('leaves the path alone at the root', () => {
