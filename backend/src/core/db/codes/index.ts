@@ -10,6 +10,7 @@ export const Roles = {
   form_submitter: 'form_submitter',
   submission_reviewer: 'submission_reviewer',
   submission_approver: 'submission_approver',
+  team_manager: 'team_manager',
 } as const;
 export type RoleCode = (typeof Roles)[keyof typeof Roles];
 
@@ -30,6 +31,9 @@ export const Permissions = {
   submission_review: 'submission_review',
   team_read: 'team_read',
   team_update: 'team_update',
+  document_template_create: 'document_template_create',
+  document_template_read: 'document_template_read',
+  document_template_delete: 'document_template_delete',
 } as const;
 export type PermissionCode = (typeof Permissions)[keyof typeof Permissions];
 
