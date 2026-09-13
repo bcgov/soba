@@ -16,7 +16,6 @@ vi.mock('@/app/[lang]/Providers', () => ({
     formioV5: {
       formRender: {
         loadError: 'Could not load the form.',
-        unavailable: 'This form is unavailable.',
         rendererError: 'The form could not be displayed.',
         submitSuccess: 'Submitted.',
         missingId: 'Missing submission id.',

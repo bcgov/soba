@@ -1,12 +1,11 @@
 import { and, count, eq, type SQL } from 'drizzle-orm';
+import { DOCGEN_AUDIT_SORT_FIELDS, type SortToken } from '@soba/lib';
 import { db } from '../client';
 import { documentGenerationAudits } from '../schema';
 import { orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 
 export type DocumentGenerationAuditRecord = typeof documentGenerationAudits.$inferSelect;
-
-import { DOCGEN_AUDIT_SORT_FIELDS, type SortToken } from '@soba/lib';
 
 export interface NewDocumentGenerationAudit {
   workspaceId: string;
