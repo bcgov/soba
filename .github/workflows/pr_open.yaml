@@ -6,11 +6,9 @@ run-name: PR-${{ github.event.number || github.event.inputs.pr-number }}
 
 env:
   ACRONYM: soba
-  # PR deployments map to a fixed pool of slots (PR_NUM % SLOT_COUNT) so login
-  # hostnames are a known, finite set. Sourced from the repo variable so
-  # pr_close.yaml and the Keycloak redirect URIs (soba-N-designer / soba-N-forms,
-  # N = 0 .. SLOT_COUNT-1) share one value; the literal is a fallback if unset.
-  SLOT_COUNT: ${{ vars.SLOT_COUNT || '20' }}
+  # PR deployments share the dev host and are told apart by path, so the Keycloak redirect URIs
+  # stay a finite set (one wildcard per environment) without a pool of slot hostnames.
+  DEV_HOST_PREFIX: soba-dev
 
 on:
   pull_request:
@@ -77,19 +75,19 @@ jobs:
       URL_FORMS: ${{ steps.vars.outputs.URL_FORMS }}
       ref: ${{ steps.vars.outputs.ref }}
       PR_NUM: ${{ steps.vars.outputs.PR_NUM }}
-      SLOT: ${{ steps.vars.outputs.SLOT }}
+      FRONTEND_HOST: ${{ steps.vars.outputs.FRONTEND_HOST }}
     steps:
       - name: Setting variables
         id: vars
         run: |
           PR_NUMBER="${{ github.event.number || github.event.inputs.pr-number }}"
           PR_NUMBER="${PR_NUMBER//[^0-9]/}"
-          SLOT=$(( PR_NUMBER % SLOT_COUNT ))
+          FRONTEND_HOST="${DEV_HOST_PREFIX}.${{ vars.OC_DOMAIN }}"
           echo "PR_NUM=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "SLOT=$SLOT" >> "$GITHUB_OUTPUT"
-          echo "JOB_NAME=pr-slot-$SLOT" >> "$GITHUB_OUTPUT"
-          echo "URL=https://soba-${SLOT}-designer.${{ vars.OC_DOMAIN }}" >> "$GITHUB_OUTPUT"
-          echo "URL_FORMS=https://soba-${SLOT}-forms.${{ vars.OC_DOMAIN }}" >> "$GITHUB_OUTPUT"
+          echo "JOB_NAME=pr-$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "FRONTEND_HOST=$FRONTEND_HOST" >> "$GITHUB_OUTPUT"
+          echo "URL=https://${FRONTEND_HOST}/designer-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "URL_FORMS=https://${FRONTEND_HOST}/forms-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
           echo "ref=refs/pull/$PR_NUMBER/head" >> "$GITHUB_OUTPUT"
 
   build:
@@ -100,7 +98,7 @@ jobs:
       ref: ${{ needs.set-vars.outputs.ref }}
       platforms: amd64
       image_version: pr-${{ needs.set-vars.outputs.PR_NUM }}
-      #base_path: /pr-${{ needs.set-vars.outputs.PR_NUM }}
+      base_path_suffix: -${{ needs.set-vars.outputs.PR_NUM }}
     secrets: inherit
     permissions:
       contents: read
@@ -194,7 +192,7 @@ jobs:
           SHORT_SHA: ${{ needs.build.outputs.short_sha }}
           DOMAIN: ${{ vars.OC_DOMAIN }}
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
-          SLOT: ${{ needs.set-vars.outputs.SLOT }}
+          FRONTEND_HOST: ${{ needs.set-vars.outputs.FRONTEND_HOST }}
         run: |
           # Pipeline performance fix: Revert if needed.
           set -euo pipefail
@@ -224,13 +222,14 @@ jobs:
             image:
               repository: "ghcr.io/${REPO_LC}/frontend"
               tag: "${TAG}"
-            # Slot hosts are decoupled from the release name, so pin them per app.
-            # Backend CORS_ORIGIN is derived from these two hosts by the chart.
+            # PRs share the dev host and are told apart by path, so pin the host and set each
+            # app's path. Backend CORS_ORIGIN is derived from this host by the chart.
+            host: "${FRONTEND_HOST}"
             apps:
               designer:
-                host: "soba-${SLOT}-designer.${DOMAIN}"
+                routePath: "/designer-${PR_NUM}"
               forms:
-                host: "soba-${SLOT}-forms.${DOMAIN}"
+                routePath: "/forms-${PR_NUM}"
           temporalWorkersImage:
             repository: "ghcr.io/${REPO_LC}/temporal-worker"
             tag: "${TAG}"

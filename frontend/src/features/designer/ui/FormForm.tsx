@@ -255,7 +255,7 @@ function FormForm({ formId }: { formId?: string }) {
         await publishSobaFormVersion(token as string, versionId);
       }
     }
-    router.push(`/${lang}/designer/${created.id}`);
+    router.push(`/${lang}/build/${created.id}`);
   };
 
   const saveForm = async (publish: boolean = false) => {
