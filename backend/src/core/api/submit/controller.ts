@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import type { SubmitFillBundle } from '@soba/lib';
 import { asyncHandler } from '../shared/asyncHandler';
 import { NotFoundError } from '../../errors';
 import { formVersionService, submissionsApiService } from '../../container';
@@ -45,6 +46,11 @@ export const getSubmitFillBundle = asyncHandler(
     const ctx = req.coreContext!;
     const { submission, schema } = await loadSubmissionSchema(ctx, req.params.id);
     const content = await submissionsApiService.getData(ctx, req.params.id);
-    res.json({ workflowState: submission.workflowState, schema, content: content ?? null });
+    const bundle: SubmitFillBundle = {
+      workflowState: submission.workflowState,
+      schema,
+      content: content ?? null,
+    };
+    res.json(bundle);
   },
 );

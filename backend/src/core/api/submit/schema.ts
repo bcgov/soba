@@ -6,17 +6,12 @@ import {
   SubmissionIdParamsSchema,
   SubmissionResponseSchema,
 } from '../submissions/schema';
+import { SubmitFillBundleSchema as LibSubmitFillBundleSchema } from '@soba/lib';
 
 extendZodWithOpenApi(z);
 
-export const SubmitFillBundleSchema = z
-  .object({
-    workflowState: z.string(),
-    schema: z.record(z.string(), z.unknown()),
-    // The submission's answer document; null for a just-opened submission (no engine document yet).
-    content: z.record(z.string(), z.unknown()).nullable(),
-  })
-  .openapi('Submit_FillBundle');
+export const SubmitFillBundleSchema =
+  LibSubmitFillBundleSchema.clone().openapi('Submit_FillBundle');
 
 const TAG = 'core.submit';
 const SUBMISSION_PATH = '/submit/submissions/{id}';

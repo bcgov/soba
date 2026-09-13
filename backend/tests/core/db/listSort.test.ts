@@ -1,6 +1,6 @@
 import { sql, type SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
-import { likePattern, orderByForSort, sortTokensFor } from '../../../src/core/db/listSort';
+import { likePattern, orderByForSort } from '../../../src/core/db/listSort';
 import { submissions, forms } from '../../../src/core/db/schema';
 
 const dialect = new PgDialect();
@@ -13,17 +13,6 @@ const SORT_COLUMNS = {
   submittedAt: { column: submissions.submittedAt, nullable: true },
   updatedAt: { column: submissions.updatedAt },
 };
-
-describe('sortTokensFor', () => {
-  it('declares both directions for every field', () => {
-    expect(sortTokensFor(['name', 'status'])).toEqual([
-      'name:asc',
-      'name:desc',
-      'status:asc',
-      'status:desc',
-    ]);
-  });
-});
 
 describe('orderByForSort', () => {
   it('orders ascending or descending on the named column', () => {

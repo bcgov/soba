@@ -1,5 +1,6 @@
 import { and, count, eq, exists, ilike, or, sql, inArray } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
+import { WORKSPACE_SORT_FIELDS, type SortToken } from '@soba/lib';
 import { db } from '../client';
 import {
   appUsers,
@@ -24,7 +25,7 @@ import {
   WorkspaceGroupRoleStatus,
   WorkspaceMembershipRole,
 } from '../codes';
-import { likePattern, orderByForSort, type SortColumns, type SortToken } from '../listSort';
+import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 
 /** Second int for `pg_advisory_xact_lock`; must not collide with workspaceRepo / sobaAdminRepo lock ids. */
@@ -191,7 +192,6 @@ export const invalidateMembershipCache = (workspaceId: string, userId: string): 
   }
 };
 
-import { WORKSPACE_SORT_FIELDS } from '@soba/lib';
 export type WorkspaceListSortField = (typeof WORKSPACE_SORT_FIELDS)[number];
 export type WorkspaceListSort = SortToken<WorkspaceListSortField>;
 

@@ -1,3 +1,4 @@
+import type { SetSubmitterAudienceBody, SubmitterAudience } from '@soba/lib';
 import { NotFoundError, ValidationError } from '../../errors';
 import { PUBLIC_PROVIDER_CODE, SystemGroup } from '../../db/codes';
 import { listLoginIdentityProviders } from '../../db/repos/identityProviderRepo';
@@ -7,17 +8,6 @@ import {
   setSubmitterAudience,
 } from '../../db/repos/workspaceGroupRepo';
 import type { GroupsContextInput } from './service';
-
-export type AudienceMode = 'public' | 'protected' | 'none';
-
-export interface SubmitterAudience {
-  mode: AudienceMode;
-  idps: string[];
-  users: { membershipId: string; displayLabel: string | null }[];
-  available: { code: string; name: string }[];
-}
-
-export type SetAudienceInput = { mode: 'public' } | { mode: 'protected'; idps: string[] };
 
 const SUBMITTERS_NOT_FOUND = 'Form submitters group not found';
 
@@ -42,7 +32,7 @@ async function readAudience(workspaceId: string, groupId: string): Promise<Submi
       idps.push(m.code);
     }
   }
-  let mode: AudienceMode = 'none';
+  let mode: SubmitterAudience['mode'] = 'none';
   if (isPublic) mode = 'public';
   else if (idps.length || users.length) mode = 'protected';
   return { mode, idps, users, available: await listLoginIdentityProviders() };
@@ -63,7 +53,7 @@ export const submitterAudienceService = {
     return readAudience(ctx.workspaceId, groupId);
   },
 
-  async set(ctx: GroupsContextInput, input: SetAudienceInput): Promise<SubmitterAudience> {
+  async set(ctx: GroupsContextInput, input: SetSubmitterAudienceBody): Promise<SubmitterAudience> {
     const groupId = await requireSubmittersGroupId(ctx.workspaceId);
     if (input.mode === 'public') {
       await setSubmitterAudience({

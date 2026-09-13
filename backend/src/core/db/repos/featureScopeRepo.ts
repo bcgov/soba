@@ -1,7 +1,8 @@
 import { and, count, eq, inArray, or, sql, type SQL } from 'drizzle-orm';
+import { FEATURE_SCOPE_SORT_FIELDS, type SortToken } from '@soba/lib';
 import { db } from '../client';
 import { featureScopes } from '../schema';
-import { orderByForSort, type SortColumns, type SortToken } from '../listSort';
+import { orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 import { FeatureScopeStatus, FeatureScopeType } from '../codes';
 
@@ -23,13 +24,6 @@ export interface UpsertFeatureScopeInput {
   updatedBy?: string | null;
 }
 
-export const FEATURE_SCOPE_SORT_FIELDS = [
-  'featureCode',
-  'scopeType',
-  'status',
-  'createdAt',
-  'updatedAt',
-] as const;
 export type FeatureScopeListSortField = (typeof FEATURE_SCOPE_SORT_FIELDS)[number];
 export type FeatureScopeListSort = SortToken<FeatureScopeListSortField>;
 

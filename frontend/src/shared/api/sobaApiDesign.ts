@@ -10,6 +10,7 @@ import type {
   SobaFormVersionType,
   ListFormsResponse,
   ListFormVersionsResponse,
+  SubmissionDataDocument,
 } from '../../types/forms';
 import type { ListSubmissionsResponse, SubmissionListItem } from '@/src/types/submissions';
 import { toListRequestQuery, type ListQueryArgs } from '@/src/types/list';
@@ -97,11 +98,11 @@ export async function getSobaSubmission(token: string, id: string): Promise<Subm
 /** Staff read of a submission's answer document (null if not yet provisioned). */
 export async function getSobaSubmissionData(
   token: string,
-  id: string,
-): Promise<{ data?: Record<string, unknown> } | null> {
-  const response = await sobaFetch(`/design/submissions/${id}/data`, { token });
+  submissionId: string,
+): Promise<SubmissionDataDocument | null> {
+  const response = await sobaFetch(`/design/submissions/${submissionId}/data`, { token });
   if (response.status === 404) return null;
-  return parseJson(response);
+  return parseJson<SubmissionDataDocument>(response);
 }
 
 /**
@@ -125,10 +126,7 @@ export async function getSobaFormVersions(
 }
 
 /** One version, by id. */
-export async function getSobaFormVersion(
-  token: string,
-  id: string,
-): Promise<SobaFormVersionType> {
+export async function getSobaFormVersion(token: string, id: string): Promise<SobaFormVersionType> {
   const response = await sobaFetch(`${FORM_VERSIONS_PATH}/${id}`, { token });
   return parseJson(response);
 }

@@ -1,31 +1,31 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import {
-  makeSortEnum,
+  SobaAdminItemSchema as LibSobaAdminItemSchema,
+  SobaAdminSortSchema as LibSobaAdminSortSchema,
+  ListSobaAdminsResponseSchema as LibListSobaAdminsResponseSchema,
+  FeatureScopeItemSchema as LibFeatureScopeItemSchema,
+  FeatureScopeSortSchema as LibFeatureScopeSortSchema,
+  ListFeatureScopesResponseSchema as LibListFeatureScopesResponseSchema,
+  AddSobaAdminBodySchema as LibAddSobaAdminBodySchema,
+  UpsertFeatureScopeBodySchema as LibUpsertFeatureScopeBodySchema,
+  DocumentGenerationAuditItemSchema as LibDocumentGenerationAuditItemSchema,
+  DocgenAuditSortSchema as LibDocgenAuditSortSchema,
+  ListDocumentGenerationAuditsResponseSchema as LibListDocumentGenerationAuditsResponseSchema,
+} from '@soba/lib';
+import {
   offsetQueryFields,
   rejectedCursorField,
   searchQueryField,
   OffsetPageSchema,
   OFFSET_DRIFT_NOTE,
 } from '../shared/offsetPagination';
-import { SOBA_ADMIN_SORT_FIELDS } from '../../db/repos/sobaAdminRepo';
-import { FEATURE_SCOPE_SORT_FIELDS } from '../../db/repos/featureScopeRepo';
-import { DOCGEN_AUDIT_SORT_FIELDS } from '../../db/repos/documentGenerationAuditRepo';
 
 extendZodWithOpenApi(z);
 
-export const SobaAdminItemSchema = z
-  .object({
-    userId: z.string(),
-    source: z.string(),
-    identityProviderCode: z.string().nullable(),
-    syncedAt: z.string().nullable(),
-    displayLabel: z.string().nullable(),
-  })
-  .openapi('Admin_SobaAdminItem');
+export const SobaAdminItemSchema = LibSobaAdminItemSchema.clone().openapi('Admin_SobaAdminItem');
 
-export const SobaAdminSortSchema =
-  makeSortEnum(SOBA_ADMIN_SORT_FIELDS).openapi('Admin_SobaAdminSort');
+export const SobaAdminSortSchema = LibSobaAdminSortSchema.clone().openapi('Admin_SobaAdminSort');
 
 export const ListSobaAdminsQuerySchema = z
   .object({
@@ -38,7 +38,7 @@ export const ListSobaAdminsQuerySchema = z
   .openapi('Admin_ListSobaAdminsQuery');
 
 export const DocgenAuditSortSchema =
-  makeSortEnum(DOCGEN_AUDIT_SORT_FIELDS).openapi('Admin_DocgenAuditSort');
+  LibDocgenAuditSortSchema.clone().openapi('Admin_DocgenAuditSort');
 
 export const ListDocumentGenerationAuditsQuerySchema = z
   .object({
@@ -54,64 +54,27 @@ export const ListDocumentGenerationAuditsQuerySchema = z
   })
   .openapi('Admin_ListDocumentGenerationAuditsQuery');
 
-export const ListSobaAdminsResponseSchema = z
-  .object({
-    items: z.array(SobaAdminItemSchema),
-    page: OffsetPageSchema,
-    filters: z.object({
-      source: z.string().optional(),
-      q: z.string().optional(),
-    }),
-    sort: SobaAdminSortSchema,
-  })
-  .openapi('Admin_ListSobaAdminsResponse');
+export const ListSobaAdminsResponseSchema = LibListSobaAdminsResponseSchema.extend({
+  items: z.array(SobaAdminItemSchema),
+  page: OffsetPageSchema,
+  sort: SobaAdminSortSchema,
+}).openapi('Admin_ListSobaAdminsResponse');
 
-export const DocumentGenerationAuditItemSchema = z
-  .object({
-    id: z.uuid(),
-    workspaceId: z.uuid(),
-    formId: z.uuid(),
-    submissionId: z.uuid(),
-    mode: z.string(),
-    backendCode: z.string(),
-    outcome: z.string(),
-    httpStatus: z.number().int().nullable(),
-    durationMs: z.number().int(),
-    errorDetail: z.string().nullable(),
-    requestId: z.string().nullable(),
-    createdBy: z.uuid(),
-    createdAt: z.string(),
-  })
-  .openapi('Admin_DocumentGenerationAuditItem');
+export const DocumentGenerationAuditItemSchema =
+  LibDocumentGenerationAuditItemSchema.clone().openapi('Admin_DocumentGenerationAuditItem');
 
-export const ListDocumentGenerationAuditsResponseSchema = z
-  .object({
+export const ListDocumentGenerationAuditsResponseSchema =
+  LibListDocumentGenerationAuditsResponseSchema.extend({
     items: z.array(DocumentGenerationAuditItemSchema),
     page: OffsetPageSchema,
-    filters: z.object({
-      workspaceId: z.string().optional(),
-      formId: z.string().optional(),
-    }),
     sort: DocgenAuditSortSchema,
-  })
-  .openapi('Admin_ListDocumentGenerationAuditsResponse');
+  }).openapi('Admin_ListDocumentGenerationAuditsResponse');
 
-export const FeatureScopeItemSchema = z
-  .object({
-    id: z.uuid(),
-    featureCode: z.string(),
-    scopeType: z.enum(['workspace', 'form']),
-    scopeId: z.uuid(),
-    status: z.enum(['active', 'inactive']),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-    createdBy: z.string().nullable(),
-    updatedBy: z.string().nullable(),
-  })
-  .openapi('Admin_FeatureScopeItem');
+export const FeatureScopeItemSchema =
+  LibFeatureScopeItemSchema.clone().openapi('Admin_FeatureScopeItem');
 
 export const FeatureScopeSortSchema =
-  makeSortEnum(FEATURE_SCOPE_SORT_FIELDS).openapi('Admin_FeatureScopeSort');
+  LibFeatureScopeSortSchema.clone().openapi('Admin_FeatureScopeSort');
 
 export const ListFeatureScopesQuerySchema = z
   .object({
@@ -138,33 +101,18 @@ export const ListFeatureScopesQuerySchema = z
   })
   .openapi('Admin_ListFeatureScopesQuery');
 
-export const ListFeatureScopesResponseSchema = z
-  .object({
-    items: z.array(FeatureScopeItemSchema),
-    page: OffsetPageSchema,
-    filters: z.object({
-      featureCode: z.string().optional(),
-      scopeType: z.string().optional(),
-      status: z.string().optional(),
-    }),
-    sort: FeatureScopeSortSchema,
-  })
-  .openapi('Admin_ListFeatureScopesResponse');
+export const ListFeatureScopesResponseSchema = LibListFeatureScopesResponseSchema.extend({
+  items: z.array(FeatureScopeItemSchema),
+  page: OffsetPageSchema,
+  sort: FeatureScopeSortSchema,
+}).openapi('Admin_ListFeatureScopesResponse');
 
-export const AddSobaAdminBodySchema = z
-  .object({
-    userId: z.string().uuid(),
-  })
-  .openapi('Admin_AddSobaAdminBody');
+export const AddSobaAdminBodySchema =
+  LibAddSobaAdminBodySchema.clone().openapi('Admin_AddSobaAdminBody');
 
-export const UpsertFeatureScopeBodySchema = z
-  .object({
-    featureCode: z.string().min(1),
-    scopeType: z.enum(['workspace', 'form']),
-    scopeId: z.uuid(),
-    status: z.enum(['active', 'inactive']).optional(),
-  })
-  .openapi('Admin_UpsertFeatureScopeBody');
+export const UpsertFeatureScopeBodySchema = LibUpsertFeatureScopeBodySchema.clone().openapi(
+  'Admin_UpsertFeatureScopeBody',
+);
 
 export const SobaAdminUserIdParamsSchema = z
   .object({

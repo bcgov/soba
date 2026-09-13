@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { OffsetPageSchema, makeSortEnum } from './pagination';
+import { WORKSPACE_SORT_FIELDS } from '../sort';
 
 export const WorkspaceItemSchema = z.object({
   id: z.string(),
@@ -40,8 +41,6 @@ export const UpdateWorkspaceBodySchema = z
 export type WorkspaceItem = z.infer<typeof WorkspaceItemSchema>;
 export type CreateWorkspaceBody = z.infer<typeof CreateWorkspaceBodySchema>;
 export type UpdateWorkspaceBody = z.infer<typeof UpdateWorkspaceBodySchema>;
-
-export const WORKSPACE_SORT_FIELDS = ['name', 'kind', 'status', 'updatedAt'] as const;
 
 export const WorkspaceSortSchema = makeSortEnum(WORKSPACE_SORT_FIELDS);
 

@@ -1,3 +1,11 @@
+import type {
+  BuildMetaResponse,
+  FeatureAvailabilityResponse,
+  FeaturesMetaResponse,
+  FormEnginesMetaResponse,
+  FrontendConfigMetaResponse,
+  PluginsMetaResponse,
+} from '@soba/lib';
 import packageJson from '../../../../package.json';
 import { env } from '../../config/env';
 import { authEnv } from '../../config/authEnv';
@@ -36,7 +44,7 @@ function resolveGitSha(): string {
 }
 
 export class MetaApiService {
-  async getPlugins() {
+  async getPlugins(): Promise<PluginsMetaResponse> {
     const plugins = getPluginCatalog();
     // Selectable adapter codes come from the registry; form engine has its own registry.
     const activeFormEngineCode =
@@ -63,7 +71,7 @@ export class MetaApiService {
     };
   }
 
-  async getFeatures() {
+  async getFeatures(): Promise<FeaturesMetaResponse> {
     const features = await listFeatures();
     return {
       features: features.map((f) => ({
@@ -82,7 +90,11 @@ export class MetaApiService {
    * Resolve whether a feature is available for a workspace/form scope (3-gate resolution). Lets the
    * frontend check a `scoped` feature it cannot resolve locally, since grants live server-side.
    */
-  async getFeatureAvailability(params: { code: string; workspaceId?: string; formId?: string }) {
+  async getFeatureAvailability(params: {
+    code: string;
+    workspaceId?: string;
+    formId?: string;
+  }): Promise<FeatureAvailabilityResponse> {
     const available = await isFeatureAvailable(params.code, {
       workspaceId: params.workspaceId,
       formId: params.formId,
@@ -90,7 +102,7 @@ export class MetaApiService {
     return { code: params.code, available };
   }
 
-  getBuild() {
+  getBuild(): BuildMetaResponse {
     return {
       name: packageJson.name,
       version: resolveAppVersion(),
@@ -101,7 +113,7 @@ export class MetaApiService {
     };
   }
 
-  getFrontendConfig() {
+  getFrontendConfig(): FrontendConfigMetaResponse {
     const issuer = authEnv.getIdpPluginDefaultSsoJwtIssuer();
     const { url, realm } = parseKeycloakIssuer(issuer);
     const clientId = authEnv.getIdpPluginDefaultSsoJwtAudience() ?? '';
@@ -133,7 +145,7 @@ export class MetaApiService {
     };
   }
 
-  async getFormEngines() {
+  async getFormEngines(): Promise<FormEnginesMetaResponse> {
     const plugins = getFormEnginePlugins();
     const defaultCode = env.getFormEngineDefaultCode();
     return {
