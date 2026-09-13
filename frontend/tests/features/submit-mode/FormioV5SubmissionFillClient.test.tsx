@@ -1,7 +1,6 @@
-import React, { act } from 'react';
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { Provider } from 'react-redux';
+import { screen, waitFor } from '@testing-library/react';
 
 const h = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -46,30 +45,10 @@ vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => ({
 }));
 
 import makeStore from '@/lib/store';
-import { initKeycloak } from '@/lib/slices/keycloakSlice';
 import FormioV5SubmissionFillClient from '@/src/features/formio-v5/ui/FormioV5SubmissionFillClient';
+import { answerInit, renderInStore } from './keycloakInit';
 
 let store: ReturnType<typeof makeStore>;
-
-async function renderFill() {
-  await act(async () => {
-    render(
-      <Provider store={store}>
-        <FormioV5SubmissionFillClient />
-      </Provider>,
-    );
-  });
-}
-
-// Keycloak never runs here, so the init lifecycle is driven directly.
-async function answerInit(payload: { authenticated: boolean; token?: string }) {
-  await act(async () => {
-    store.dispatch({ type: initKeycloak.pending.type });
-  });
-  await act(async () => {
-    store.dispatch({ type: initKeycloak.fulfilled.type, payload });
-  });
-}
 
 describe('FormioV5SubmissionFillClient', () => {
   beforeEach(() => {
@@ -85,22 +64,22 @@ describe('FormioV5SubmissionFillClient', () => {
   // Before Keycloak answers, "no token" is the default rather than an answer. Reading there sends a
   // signed-in visitor's request anonymously.
   it('reads nothing until Keycloak has answered', async () => {
-    await renderFill();
+    await renderInStore(store, <FormioV5SubmissionFillClient />);
     expect(h.getSubmitFillBundle).not.toHaveBeenCalled();
     expect(screen.getByRole('progressbar', { name: 'Loading...' })).toBeInTheDocument();
   });
 
   it('reads once without a token when there is no session', async () => {
-    await renderFill();
-    await answerInit({ authenticated: false });
+    await renderInStore(store, <FormioV5SubmissionFillClient />);
+    await answerInit(store, { authenticated: false });
     await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
     expect(h.getSubmitFillBundle).toHaveBeenCalledTimes(1);
     expect(h.getSubmitFillBundle).toHaveBeenCalledWith(undefined, 'sub-1');
   });
 
   it('reads once with the token when signed in', async () => {
-    await renderFill();
-    await answerInit({ authenticated: true, token: 'token' });
+    await renderInStore(store, <FormioV5SubmissionFillClient />);
+    await answerInit(store, { authenticated: true, token: 'token' });
     await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
     expect(h.getSubmitFillBundle).toHaveBeenCalledTimes(1);
     expect(h.getSubmitFillBundle).toHaveBeenCalledWith('token', 'sub-1');
