@@ -23,7 +23,6 @@ import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 type FillLabels = {
   loading: string;
   loadError: string;
-  unavailable: string;
   rendererError: string;
   submitSuccess: string;
   sessionExpired: string;
@@ -93,7 +92,6 @@ function SubmissionFillBody({
     locale,
     router,
     labels.loadError,
-    labels.unavailable,
     labels.sessionExpired,
   ]);
 
@@ -203,7 +201,6 @@ export default function FormioV5SubmissionFillClient() {
         labels={{
           loading: dict.form?.loading || 'Loading…',
           loadError: labels.loadError,
-          unavailable: labels.unavailable,
           rendererError: labels.rendererError,
           submitSuccess: labels.submitSuccess,
           sessionExpired: dict.general.sessionExpired,

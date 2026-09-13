@@ -1,4 +1,5 @@
 import { and, count, eq, inArray, or, sql, type SQL } from 'drizzle-orm';
+import { FEATURE_SCOPE_SORT_FIELDS, type SortToken } from '@soba/lib';
 import { db } from '../client';
 import { featureScopes } from '../schema';
 import { orderByForSort, type SortColumns } from '../listSort';
@@ -14,8 +15,6 @@ export interface NewFeatureScope {
   status?: string;
   createdBy?: string | null;
 }
-
-import { FEATURE_SCOPE_SORT_FIELDS, type SortToken } from '@soba/lib';
 
 export interface UpsertFeatureScopeInput {
   featureCode: string;

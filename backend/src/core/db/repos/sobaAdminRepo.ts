@@ -1,4 +1,5 @@
 import { and, count, eq, ilike, sql } from 'drizzle-orm';
+import { SOBA_ADMIN_SORT_FIELDS, type SortToken } from '@soba/lib';
 import { db } from '../client';
 import { appUsers, sobaAdmins } from '../schema';
 import { likePattern, orderByForSort, type SortColumns } from '../listSort';
@@ -9,8 +10,6 @@ const ADV_LOCK_UPSERT_SOBA_ADMIN = 1_774_566_321;
 
 export const SOBA_ADMIN_SOURCE_IDP = 'idp';
 export const SOBA_ADMIN_SOURCE_DIRECT = 'direct';
-
-import { SOBA_ADMIN_SORT_FIELDS, type SortToken } from '@soba/lib';
 
 export interface SobaAdminListRow {
   userId: string;

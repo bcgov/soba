@@ -4,6 +4,7 @@ import { registerSubmissionsOpenApi } from '../../../../src/core/api/submissions
 import { registerWorkspacesOpenApi } from '../../../../src/core/api/workspaces/schema';
 import { registerAdminOpenApi } from '../../../../src/core/api/admin/schema';
 import { registerMetaOpenApi } from '../../../../src/core/api/meta/schema';
+import { registerMeOpenApi } from '../../../../src/core/api/me/schema';
 
 function componentSchemas(): unknown {
   const registry = new OpenAPIRegistry();
@@ -12,6 +13,7 @@ function componentSchemas(): unknown {
   registerWorkspacesOpenApi(registry);
   registerAdminOpenApi(registry);
   registerMetaOpenApi(registry);
+  registerMeOpenApi(registry);
   const doc = new OpenApiGeneratorV3(registry.definitions).generateDocument({
     openapi: '3.0.3',
     info: { title: 'test', version: '1' },
@@ -61,6 +63,16 @@ describe('OpenAPI components for lib-backed schemas', () => {
     ['Meta_RolesResponse', 'roles', 'Meta_RoleWithSource'],
   ])('%s references its %s item component', (response, property, item) => {
     expect(at(schemas, response, 'properties', property, 'items')).toEqual(ref(item));
+  });
+
+  it.each([
+    ['Me_Response', 'actor', 'Me_Actor'],
+    ['Me_Response', 'profile', 'Me_Profile'],
+    ['Me_Response', 'preferences', 'Me_Preferences'],
+    ['Me_Response', 'capabilities', 'Me_Capabilities'],
+    ['Me_PatchBody', 'preferences', 'Me_Preferences'],
+  ])('%s references its %s component', (composite, property, child) => {
+    expect(at(schemas, composite, 'properties', property)).toEqual(ref(child));
   });
 
   it('builds the codes response on the named code row', () => {

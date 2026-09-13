@@ -6,6 +6,7 @@ import {
   SubmissionIdParamsSchema,
 } from './schema';
 import { submissionsApiService } from './service';
+import type { ListSubmissionsQueryInput } from './serviceFactory';
 import { asyncHandler } from '../shared/asyncHandler';
 import { NotFoundError } from '../../errors';
 import { filesService } from '../../../features/files/service';
@@ -15,7 +16,6 @@ import type { Request } from 'express';
 type OpenSubmissionBody = z.infer<typeof OpenSubmissionBodySchema>;
 type SubmissionIdParams = z.infer<typeof SubmissionIdParamsSchema>;
 type SubmissionDataBody = z.infer<typeof SubmissionDataBodySchema>;
-import type { ListSubmissionsQueryInput } from './serviceFactory';
 
 const SUBMISSION_NOT_FOUND = 'Submission not found';
 
