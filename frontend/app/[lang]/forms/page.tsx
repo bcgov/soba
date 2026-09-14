@@ -2,6 +2,7 @@ import { getDictionary, resolveLocale } from '../dictionaries';
 import FormList from '@/src/features/designer/ui/FormList';
 import { PageLayout } from '@/src/components/PageLayout';
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
+import { pageMetadata } from '@/src/shared/config/pageMetadata';
 import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 
 type PageProps = {
@@ -9,13 +10,10 @@ type PageProps = {
 };
 
 export async function generateMetadata({ params }: PageProps) {
-  const param = await params;
-  const locale = resolveLocale(param.lang);
-  const dict = await getDictionary(locale);
-  return {
-    title: `${dict.formioV5.formList.tableHeading} | ${dict.general.title}`,
-    description: dict.general.description,
-  };
+  return pageMetadata(
+    params,
+    (dict) => `${dict.formioV5.formList.tableHeading} | ${dict.general.title}`,
+  );
 }
 
 export default async function Page({ params }: Readonly<PageProps>) {
