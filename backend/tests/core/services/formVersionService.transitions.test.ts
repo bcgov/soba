@@ -9,6 +9,8 @@ jest.mock('../../../src/core/db/repos/formVersionRepo', () => ({
   getFormVersionById: jest.fn(),
   getFormVersionByIdIncludingDeleted: jest.fn(),
   getPublishedVersionForForm: jest.fn(),
+  lockFormVersion: jest.fn(),
+  getCurrentFormVersion: jest.fn(),
   updateFormVersionDraft: jest.fn(),
 }));
 
@@ -16,6 +18,8 @@ const getById = repo.getFormVersionById as unknown as jest.Mock;
 const getByIdInclDeleted = repo.getFormVersionByIdIncludingDeleted as unknown as jest.Mock;
 const getPublished = repo.getPublishedVersionForForm as unknown as jest.Mock;
 const updateDraft = repo.updateFormVersionDraft as unknown as jest.Mock;
+const lock = repo.lockFormVersion as unknown as jest.Mock;
+const getCurrent = repo.getCurrentFormVersion as unknown as jest.Mock;
 
 const actor = {
   workspaceId: 'ws1',
@@ -30,6 +34,9 @@ describe('FormVersionService state transitions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     updateDraft.mockResolvedValue({ id: 'v1' });
+    // The locked row is the row the service read; v1 is the form's current version.
+    lock.mockImplementation((workspaceId: string, id: string) => getById(workspaceId, id));
+    getCurrent.mockResolvedValue({ id: 'v1' });
   });
 
   it('publish: draft → published, sets publishedAt/By and demotes the incumbent', async () => {
@@ -175,6 +182,21 @@ describe('FormVersionService state transitions', () => {
   it('restore: throws NotFoundError when the version is missing', async () => {
     getByIdInclDeleted.mockResolvedValue(null);
     await expect(svc.restore(actor)).rejects.toThrow(/not found/i);
+    expect(updateDraft).not.toHaveBeenCalled();
+  });
+
+  // A stale designer publishing an older version would archive the version that is live.
+  it('publish: refuses a version that is no longer the current one', async () => {
+    getById.mockResolvedValue({
+      id: 'v1',
+      formId: 'f1',
+      state: 'archived',
+      engineSyncStatus: 'ready',
+    });
+    getCurrent.mockResolvedValue({ id: 'v2' });
+
+    await expect(svc.publish(actor)).rejects.toMatchObject({ statusCode: 409 });
+    expect(getPublished).not.toHaveBeenCalled();
     expect(updateDraft).not.toHaveBeenCalled();
   });
 });

@@ -1,19 +1,27 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import type { FormType } from '@formio/react';
-import { getFormVersionSchema, getSobaForm, getSobaFormVersions } from '@/src/shared/api/sobaApi';
+import {
+  getFormVersionSchema,
+  getSobaForm,
+  getSobaFormVersion,
+  lookupFormVersions,
+} from '@/src/shared/api/sobaApi';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { sessionReadConfig } from '@/src/shared/api/swrConfig';
-import type { SobaFormVersionListItem } from '@/src/types/forms';
+import type { FormVersionSummary } from '@/src/types/forms';
+import { versionsKey } from './useFormVersions';
 
 const schemaKey = (versionId: string) => ['form-version-schema', versionId];
 
+const EMPTY_VERSIONS: FormVersionSummary[] = [];
+
 /**
- * What the designer is editing: the form, its versions, the selected version's schema, and the
- * unsaved edits layered over them. Edits are held apart from the loaded values so a revalidation
- * can never overwrite what the user has typed.
+ * What the designer is editing: the form, its current version, the selected version's schema, and
+ * the unsaved edits layered over them. Edits are held apart from the loaded values so a
+ * revalidation can never overwrite what the user has typed.
  */
 export function useForm(formId?: string) {
   const {
@@ -26,34 +34,27 @@ export function useForm(formId?: string) {
     sessionReadConfig,
   );
 
-  const {
-    data: versionsData,
-    error: versionsError,
-  } = useAuthedSWR(
-    formId ? ['design-form-versions', formId] : null,
-    (token) => getSobaFormVersions(token, formId as string),
+  // Save and publish target this version, so it comes from the form and never from the options.
+  const currentVersion: FormVersionSummary | null = form?.currentVersion ?? null;
+
+  const { data: versionOptions, error: versionsError } = useAuthedSWR(
+    formId ? [...versionsKey(formId), 'lookup'] : null,
+    (token) => lookupFormVersions(token, formId as string),
     sessionReadConfig,
   );
-
-  const versions: SobaFormVersionListItem[] = useMemo(
-    () => (Array.isArray(versionsData?.items) ? versionsData.items : []),
-    [versionsData],
-  );
-
-  // The highest versionNo is the current one; a new draft becomes current as soon as it is listed.
-  const currentVersion = useMemo(
-    () =>
-      versions.reduce<SobaFormVersionListItem | null>(
-        (acc, v) => (!acc || v.versionNo > acc.versionNo ? v : acc),
-        null,
-      ),
-    [versions],
-  );
+  const versions = Array.isArray(versionOptions?.items) ? versionOptions.items : EMPTY_VERSIONS;
 
   const [selectedVersionId, setSelectedVersionId] = useState<string>('current');
   const isHistoryView = selectedVersionId !== 'current';
-  const activeVersion = isHistoryView
-    ? (versions.find((v) => v.id === selectedVersionId) ?? null)
+
+  // Read by id, so the history tab can open a version the options stopped short of.
+  const { data: selectedVersion, error: selectedVersionError } = useAuthedSWR(
+    isHistoryView ? ['form-version', selectedVersionId] : null,
+    (token) => getSobaFormVersion(token, selectedVersionId),
+    sessionReadConfig,
+  );
+  const activeVersion: FormVersionSummary | null = isHistoryView
+    ? (selectedVersion ?? null)
     : currentVersion;
 
   const {
@@ -79,34 +80,67 @@ export function useForm(formId?: string) {
     [globalMutate],
   );
 
-  const refreshVersions = useCallback(() => {
-    return globalMutate(
-      (key) => Array.isArray(key) && key[0] === 'design-form-versions' && key[1] === formId
-    );
-  }, [globalMutate, formId]);
+  /**
+   * After a version write. The form carries the current version; the key prefix reaches the
+   * version options and every page of the history table.
+   */
+  const refreshVersions = useCallback(async () => {
+    if (!formId) return;
+    const [prefix] = versionsKey(formId);
+    await Promise.all([
+      refreshForm(),
+      globalMutate((key) => Array.isArray(key) && key[0] === prefix && key[1] === formId),
+    ]);
+  }, [globalMutate, formId, refreshForm]);
 
-  const loadError = formError ?? versionsError ?? schemaError ?? null;
+  const loadError = formError ?? versionsError ?? selectedVersionError ?? schemaError ?? null;
 
   const [editedSchema, setEditedSchema] = useState<FormType | null>(null);
   const [editedName, setEditedName] = useState<string | null>(null);
+  // The version the unsaved edits were made on. Saving them onto another version would overwrite it.
+  const [editsBaseVersionId, setEditsBaseVersionId] = useState<string | null>(null);
+
+  const activeVersionId = activeVersion?.id ?? null;
+  const markEditsBase = useCallback(
+    () => setEditsBaseVersionId((base) => base ?? activeVersionId),
+    [activeVersionId],
+  );
+  const setSchema = useCallback(
+    (next: FormType | null) => {
+      setEditedSchema(next);
+      markEditsBase();
+    },
+    [markEditsBase],
+  );
+  const setName = useCallback(
+    (next: string) => {
+      setEditedName(next);
+      markEditsBase();
+    },
+    [markEditsBase],
+  );
 
   const discardEdits = useCallback(() => {
     setEditedSchema(null);
     setEditedName(null);
+    setEditsBaseVersionId(null);
   }, []);
 
+  const currentVersionId = currentVersion?.id;
   const selectVersion = useCallback(
     (versionId: string) => {
-      if (versionId !== 'current' && !versions.some((v) => v.id === versionId)) return;
-      setSelectedVersionId(versionId);
+      // The history table lists the current version too. Opening it there opens the draft.
+      setSelectedVersionId(versionId === currentVersionId ? 'current' : versionId);
       discardEdits();
     },
-    [versions, discardEdits],
+    [discardEdits, currentVersionId],
   );
 
   return {
     form: form ?? null,
     versions,
+    versionsTruncated: versionOptions?.truncated === true,
+    versionsLimit: versionOptions?.limit,
     currentVersion,
     activeVersion,
     selectedVersionId,
@@ -116,15 +150,20 @@ export function useForm(formId?: string) {
     name: editedName ?? form?.name ?? '',
     description: form?.description ?? '',
     isDirty: editedSchema !== null || editedName !== null,
-    // The draft is not assembled until the form and its versions have answered. A form whose
-    // versions are still loading has no schema key yet, so schemaLoading alone reports ready.
+    // Unsaved edits made on a version that is no longer the form's current one.
+    editsStale:
+      !isHistoryView && editsBaseVersionId !== null && editsBaseVersionId !== currentVersion?.id,
+    // The draft is not assembled until the form, and any selected version, have answered. Until
+    // then there is no schema key, so schemaLoading alone reports ready.
     // A read that failed has answered: these reads do not revalidate on their own, so reporting
     // loading here would leave the designer on a spinner for the life of the page.
     loading:
-      !!formId && !loadError && (form === undefined || versionsData === undefined || schemaLoading),
+      !!formId &&
+      !loadError &&
+      (form === undefined || (isHistoryView && selectedVersion === undefined) || schemaLoading),
     error: loadError,
-    setName: setEditedName,
-    setSchema: setEditedSchema,
+    setName,
+    setSchema,
     discardEdits,
     commitSchema,
     selectVersion,

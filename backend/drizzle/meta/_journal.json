@@ -211,6 +211,13 @@
       "when": 1772618003000,
       "tag": "0029_rbac_catalog_chefs1_parity",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1772618004000,
+      "tag": "0030_rbac_form_create_permission",
+      "breakpoints": true
     }
   ]
 }

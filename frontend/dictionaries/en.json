@@ -33,7 +33,8 @@
     "version": "Version",
     "clearFilters": "Reset Filters",
     "noAccess": "You do not have access to this.",
-    "sortBy": "Sort by"
+    "sortBy": "Sort by",
+    "lookupTruncated": "Showing the first {limit}."
   },
   "dataTable": {
     "emptyMessage": "No items found.",
@@ -229,6 +230,9 @@
   "form": {
     "saved": "Form saved successfully.",
     "saveError": "Error saving form.",
+    "versionConflict": "This form changed since you opened it. Save your edits as a new version, or discard them.",
+    "staleEdits": "Your unsaved edits were made on an older version of this form. Save them as a new version, or discard them.",
+    "discardEdits": "Discard edits",
     "noActiveWorkspace": "Select a workspace before creating a form.",
     "noActiveWorkspaceError": "Select a workspace before saving this form.",
     "published": "Form published successfully!",

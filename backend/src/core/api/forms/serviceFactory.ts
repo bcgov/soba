@@ -4,6 +4,7 @@ import { resolveFormPermissions } from '../../db/repos/formAccessRepo';
 import type { FormListSort } from '../../db/repos/formRepo';
 import type { FormVersionListSort } from '../../db/repos/formVersionRepo';
 import type { FormListItem, FormVersionListItem } from '@soba/lib';
+import { LOOKUP_FETCH_LIMIT, toLookupResponse } from '../shared/lookup';
 
 export interface FormsContextInput {
   workspaceId: string;
@@ -80,6 +81,7 @@ const toFormDto = (item: {
 const toFormListItemDto = (item: {
   id: string;
   workspaceId: string;
+  workspaceName: string;
   name: string;
   org: string;
   useCase: string;
@@ -91,6 +93,7 @@ const toFormListItemDto = (item: {
 }): FormListItem => ({
   id: item.id,
   workspaceId: item.workspaceId,
+  workspaceName: item.workspaceName,
   name: item.name,
   org: item.org,
   useCase: item.useCase,
@@ -192,10 +195,14 @@ export function createFormsApiService(
       const row = await formService.get(ctx.workspaceId, formId);
       if (!row) return null;
       // Caller's permissions on this form, so the UI can gate actions. Workspace-scoped today.
-      const permissions = await resolveFormPermissions(ctx.actorId, ctx.workspaceId);
+      const [permissions, currentVersion] = await Promise.all([
+        resolveFormPermissions(ctx.actorId, ctx.workspaceId),
+        formVersionService.getCurrent(ctx.workspaceId, formId),
+      ]);
       return {
         ...toFormDto(row),
         permissions: [...permissions].sort((a, b) => a.localeCompare(b)),
+        currentVersion,
       };
     },
 
@@ -261,6 +268,16 @@ export function createFormsApiService(
         sort: query.sort,
       };
     },
+
+    lookupFormVersions: async (scope: FormsListScopeInput, query: { formId: string; q?: string }) =>
+      toLookupResponse(
+        await formVersionService.lookup({
+          workspaceIds: scope.workspaceIds,
+          formId: query.formId,
+          q: query.q,
+          limit: LOOKUP_FETCH_LIMIT,
+        }),
+      ),
 
     createDraft: async (ctx: FormsContextInput, formId: string) =>
       toFormVersionDto(

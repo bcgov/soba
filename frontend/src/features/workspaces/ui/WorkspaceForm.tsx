@@ -24,7 +24,7 @@ import {
   useRefreshWorkspace,
   useRefreshWorkspaces,
 } from '@/src/shared/api/useWorkspaces';
-import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
+import { useCurrentUser, useRefreshCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { createWorkspace, updateWorkspace } from '@/src/shared/api/sobaApi';
 import { isWorkspaceManageRole } from '../workspaceRoles';
@@ -62,6 +62,7 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
   const { token } = useKeycloak();
   const refreshWorkspaces = useRefreshWorkspaces();
   const refreshWorkspace = useRefreshWorkspace();
+  const refreshCurrentUser = useRefreshCurrentUser();
   const { addNotification } = useNotificationStore();
 
   // What the fields were seeded from. The `workspace` prop moves with a revalidation while the
@@ -115,7 +116,9 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
         await refreshWorkspace(seed.id);
       }
 
-      await refreshWorkspaces();
+      // The current user carries whether they have a workspace and can create forms, and both move
+      // with a new workspace or a disclaimer change.
+      await Promise.all([refreshWorkspaces(), refreshCurrentUser()]);
       router.push(navLink(`/${locale}/workspaces`));
     } catch (error) {
       addNotification({
@@ -135,6 +138,7 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
     disclaimerAccepted,
     refreshWorkspace,
     refreshWorkspaces,
+    refreshCurrentUser,
     router,
     locale,
     addNotification,

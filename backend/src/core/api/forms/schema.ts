@@ -12,7 +12,10 @@ import {
   FormSortSchema as SobaFormSortSchema,
   FormVersionSortSchema as SobaFormVersionSortSchema,
   ListFormVersionsResponseSchema as SobaListFormVersionsResponseSchema,
+  FormVersionSummarySchema as SobaFormVersionSummarySchema,
+  FormVersionLookupResponseSchema as SobaFormVersionLookupResponseSchema,
 } from '@soba/lib';
+import { LOOKUP_NOTE } from '../shared/lookup';
 
 import {
   offsetQueryFields,
@@ -45,8 +48,15 @@ export const FormVersionResponseSchema = SobaFormVersionResponseSchema.clone().o
 export const FormWithVersionResponseSchema = FormResponseSchema.extend({
   formVersion: FormVersionResponseSchema.nullable(),
 }).openapi('Forms_FormWithVersionResponse');
+export const FormVersionSummarySchema = SobaFormVersionSummarySchema.clone().openapi(
+  'Forms_FormVersionSummary',
+);
 export const FormWithPermissionsResponseSchema = FormResponseSchema.extend({
   permissions: SobaFormWithPermissionsResponseSchema.shape.permissions,
+  currentVersion: FormVersionSummarySchema.nullable().openapi({
+    description:
+      'The highest-numbered version that is not deleted. Save and publish target this one.',
+  }),
 }).openapi('Forms_FormWithPermissionsResponse');
 export const FormVersionListItemSchema = SobaFormVersionListItemSchema.clone().openapi(
   'Forms_FormVersionListItem',
@@ -144,6 +154,19 @@ export const ListFormVersionsResponseSchema = SobaListFormVersionsResponseSchema
   sort: FormVersionSortSchema,
 }).openapi('Forms_ListFormVersionsResponse');
 
+export const FormVersionLookupQuerySchema = z
+  .object({
+    formId: z.string().min(1).openapi({
+      description: 'The form whose versions are returned. Workspace is derived from the form.',
+    }),
+    q: searchQueryField.openapi({ description: 'Matches the start of the version number.' }),
+  })
+  .openapi('Forms_FormVersionLookupQuery');
+
+export const FormVersionLookupResponseSchema = SobaFormVersionLookupResponseSchema.extend({
+  items: z.array(FormVersionSummarySchema),
+}).openapi('Forms_FormVersionLookupResponse');
+
 const TAG = 'core.forms';
 const FORMS_PATH = '/design/forms';
 const FORM_PATH = `${FORMS_PATH}/{id}`;
@@ -152,6 +175,8 @@ const FORM_VERSION_PATH = `${FORM_VERSIONS_PATH}/{id}`;
 const FORM_NOT_FOUND = 'Form not found';
 const FORM_VERSION_NOT_FOUND = 'Form version not found';
 const VALIDATION_ERROR = 'Validation or business rule error';
+const VERSION_CONFLICT = "Not the form's current version";
+const SCHEMA_WRITE_CONFLICT = `${VERSION_CONFLICT}, not a draft, or its schema is being saved`;
 
 export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
@@ -227,6 +252,10 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
       },
       400: {
         description: VALIDATION_ERROR,
+      },
+      403: {
+        description:
+          'Caller lacks form_create and design_create in the workspace (form_admin via *)',
       },
       409: {
         description: FORM_NAME_TAKEN,
@@ -323,6 +352,29 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'get',
+    path: `${FORM_VERSIONS_PATH}/lookup`,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: {
+      query: FormVersionLookupQuerySchema,
+    },
+    responses: {
+      200: {
+        description: `One form's versions for a select, newest first. ${LOOKUP_NOTE}`,
+        content: {
+          'application/json': {
+            schema: FormVersionLookupResponseSchema,
+          },
+        },
+      },
+      400: {
+        description: 'Missing formId or invalid query',
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
     path: FORM_VERSION_PATH,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
@@ -394,6 +446,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
       400: {
         description: VALIDATION_ERROR,
       },
+      409: { description: SCHEMA_WRITE_CONFLICT },
     },
   });
 
@@ -433,7 +486,24 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
     },
   });
 
-  for (const action of ['publish', 'unpublish', 'restore'] as const) {
+  registry.registerPath({
+    method: 'post',
+    path: `${FORM_VERSION_PATH}/publish`,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: { params: FormVersionIdParamsSchema },
+    responses: {
+      200: {
+        description: 'Form version publish action',
+        content: { 'application/json': { schema: FormVersionResponseSchema } },
+      },
+      400: { description: 'Invalid state transition, or not ready to publish' },
+      404: { description: FORM_VERSION_NOT_FOUND },
+      409: { description: VERSION_CONFLICT },
+    },
+  });
+
+  for (const action of ['unpublish', 'restore'] as const) {
     registry.registerPath({
       method: 'post',
       path: `${FORM_VERSION_PATH}/${action}`,
@@ -485,6 +555,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
       },
       400: { description: 'Engine rejected the schema' },
       404: { description: FORM_VERSION_NOT_FOUND },
+      409: { description: SCHEMA_WRITE_CONFLICT },
     },
   });
 };
