@@ -13,14 +13,16 @@ function getExpectedURL(depEnv?: string): string {
 
   // PR environments (numeric) — host-based routes (soba-pr-N), not path-based (/pr-N)
   if (/^\d+$/.test(process.env.DEP_ENV || "")) {
-    return `https://soba-pr-${depEnv}.apps.silver.devops.gov.bc.ca`;
+    const prNumber = Number(depEnv);
+    const slot = prNumber % 20;
+    return `https://soba-${slot}-designer.apps.silver.devops.gov.bc.ca`;
   }
 
   switch (depEnv) {
     case "dev":
-      return "https://soba-dev.apps.silver.devops.gov.bc.ca";
+      return "https://soba-dev-designer.apps.silver.devops.gov.bc.ca/en/forms";
     case "test":
-      return "https://soba-test.apps.silver.devops.gov.bc.ca";
+      return "https://soba-test.apps.silver.devops.gov.bc.ca/en/forms";
     default:
       throw new Error(`Invalid DEP_ENV: ${depEnv}`);
   }
