@@ -11,6 +11,12 @@ vi.mock('@/app/[lang]/Providers', () => ({
     general: { loading: 'Loading...', sessionExpired: 'Your session has ended.' },
     form: { nameLabel: 'Form' },
     submission: {
+      success: {
+        message: 'Submitted successfully.',
+        keepConfirmation: 'Keep this ID.',
+        viewSubmission: 'View your submission',
+        notSubmitted: 'Not submitted yet.',
+      },
       loading: 'Loading submission...',
       notFound: 'Submission not found.',
       noContent: 'No submitted answers to display.',
@@ -21,6 +27,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ submissionId: 'sub-1' }),
+  usePathname: () => '/en/submission/sub-1/success',
 }));
 
 vi.mock('@/src/features/formio-v5/ui/ReadOnlyFormView', () => ({
@@ -54,7 +61,7 @@ function viewTree() {
   );
 }
 
-async function renderView() {
+async function renderView(success = false) {
   let view: ReturnType<typeof render> | undefined;
   await act(async () => {
     view = render(
@@ -62,7 +69,7 @@ async function renderView() {
         <SWRConfig
           value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}
         >
-          <SubmissionView />
+          <SubmissionView success={success} />
         </SWRConfig>
       </Provider>,
     );
@@ -101,6 +108,28 @@ describe('SubmissionView', () => {
     await waitFor(() => expect(screen.getByTestId('submission-view-form')).toBeInTheDocument());
     expect(getSubmitSubmission).toHaveBeenCalledWith(undefined, 'sub-1');
     expect(screen.getByTestId('submission-view-version')).toHaveTextContent('v3');
+  });
+
+  it('shows confirmation without fetching answers and links to the submission', async () => {
+    initAnswered();
+    await renderView(true);
+    expect(await screen.findByTestId('submission-success')).toHaveTextContent(
+      'Submitted successfully.',
+    );
+    expect(screen.getByRole('link', { name: 'View your submission' })).toHaveAttribute(
+      'href',
+      '/en/submission/sub-1',
+    );
+    expect(getSubmitSubmissionSchema).not.toHaveBeenCalled();
+    expect(getSubmitSubmissionData).not.toHaveBeenCalled();
+  });
+
+  it('does not claim success for an unsubmitted form', async () => {
+    initAnswered();
+    getSubmitSubmission.mockResolvedValue({ id: 'sub-1', workflowState: 'draft' });
+    await renderView(true);
+    expect(await screen.findByText('Not submitted yet.')).toBeInTheDocument();
+    expect(screen.queryByTestId('submission-success')).not.toBeInTheDocument();
   });
 
   it('sends the token when signed in', async () => {

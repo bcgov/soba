@@ -307,6 +307,13 @@
     "submit": "Soumettre"
   },
   "submission": {
+    "success": {
+      "pageTitle": "Confirmation de Soumission",
+      "message": "Votre formulaire a été soumis avec succès.",
+      "keepConfirmation": "Conservez cet ID de confirmation dans vos dossiers.",
+      "viewSubmission": "Voir votre soumission",
+      "notSubmitted": "Ce formulaire n’a pas encore été soumis."
+    },
     "submissions": "Soumissions",
     "anon": "Anonyme",
     "pageTitle": "Soumission",

@@ -1,6 +1,7 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { useParams, usePathname } from 'next/navigation';
 import type { FormType, Submission } from '@formio/react';
 import { InlineAlert } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
@@ -16,10 +17,12 @@ import {
 } from '@/src/shared/api/sobaApi';
 import { isSessionExpired } from '@/src/shared/api/sobaFetch';
 import { useMaybeAuthedSWR } from '@/src/shared/api/useAuthedSWR';
+import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { convertSubmissionIdToConfirmationId } from '@/src/shared/util/stringUtils';
 
-export function SubmissionView() {
+export function SubmissionView({ success = false }: Readonly<{ success?: boolean }>) {
   const params = useParams();
+  const locale = getLocaleFromPath(usePathname());
   const dict = useDictionary();
   const dictSub = dict.submission;
   // Token optional: a public submitter can view a submission on a public-audience form.
@@ -30,7 +33,7 @@ export function SubmissionView() {
   const submissionId =
     typeof submissionIdRaw === 'string' ? decodeURIComponent(submissionIdRaw) : '';
 
-  const confirmationId = convertSubmissionIdToConfirmationId(submissionId);
+  const confirmationId = convertSubmissionIdToConfirmationId(submissionId).toLocaleUpperCase();
 
   const { data, isLoading, error } = useMaybeAuthedSWR(
     // Wait for Keycloak to answer before reading. Before init, "no token" is the default rather
@@ -38,11 +41,12 @@ export function SubmissionView() {
     // The identity is part of the key so signing in does not read the anonymous reader's copy.
     !initStarted || initializing || !submissionId
       ? null
-      : ['submit-submission', submissionId, token ? 'user' : 'anonymous'],
+      : ['submit-submission', submissionId, token ? 'user' : 'anonymous', success],
     async (authToken) => {
       // The confirmation view is submit-mode: read through the submit APIs regardless of sign-in so
       // audience members who aren't workspace members can still view.
       const submission = await getSubmitSubmission(authToken, submissionId);
+      if (success) return { submission, schema: null, content: null };
       const [schema, content] = await Promise.all([
         getSubmitSubmissionSchema(authToken, submissionId),
         getSubmitSubmissionData(authToken, submissionId),
@@ -81,6 +85,35 @@ export function SubmissionView() {
         <InlineAlert variant="danger" role="alert" data-testid="submission-view-notfound">
           {dictSub?.notFound || 'Submission not found.'}
         </InlineAlert>
+      );
+    }
+    if (success) {
+      if (submission.workflowState !== 'submitted') {
+        return (
+          <InlineAlert variant="info" role="status">
+            {dictSub.success.notSubmitted}
+          </InlineAlert>
+        );
+      }
+      return (
+        <div data-testid="submission-success">
+          <InlineAlert variant="success" role="status">
+            {dictSub.success.message}
+          </InlineAlert>
+          <h2 className="h5 mt-4">{submission.formName}</h2>
+          <p>
+            {dictSub.confirmationId}: <strong>{confirmationId}</strong>
+          </p>
+          {submission.submittedAt ? (
+            <p>
+              {dictSub.submittedOn} <strong>{formatLongDate(submission.submittedAt)}</strong>
+            </p>
+          ) : null}
+          <p>{dictSub.success.keepConfirmation}</p>
+          <Link href={`/${locale}/submission/${encodeURIComponent(submissionId)}`}>
+            {dictSub.success.viewSubmission}
+          </Link>
+        </div>
       );
     }
     return (

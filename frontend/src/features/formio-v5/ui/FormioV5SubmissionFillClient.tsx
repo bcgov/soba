@@ -74,7 +74,7 @@ function SubmissionFillBody({
         const bundle = await getSubmitFillBundle(authToken, submissionId);
         // An already-submitted submission isn't fillable; send them to its confirmation.
         if (bundle.workflowState === 'submitted') {
-          router.replace(`/${locale}/submission/${submissionId}`);
+          router.replace(`/${locale}/submission/${submissionId}/success`);
           return;
         }
         if (!bundle.schema) {
@@ -126,7 +126,7 @@ function SubmissionFillBody({
       addNotification({ text: labels.submitSuccess, type: 'success' });
       // Straight to the read-only confirmation; navigating away unmounts the form, so there's no
       // need to emit `submitDone` and no flash of Form.io's own success screen.
-      router.push(`/${locale}/submission/${submissionId}`);
+      router.replace(`/${locale}/submission/${submissionId}/success`);
     } catch (err) {
       setRenderError(normalizeFormioRenderError(err, labels.rendererError, labels.sessionExpired));
       formInstanceRef.current?.emit('submitError', labels.rendererError);
