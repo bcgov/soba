@@ -35,8 +35,6 @@ export default async function RootLayout({
   const headerNavItems = getHeaderNavigationItems(locale, dictionary, isFeatureAllowed);
   const overlayNavItems = getOverlayNavigationItems(locale, dictionary, isFeatureAllowed);
 
-  const showAppLinks =
-    isFeatureAllowed(FEATURE_CODES.SUBMIT_MODE) || isFeatureAllowed(FEATURE_CODES.DESIGN_MODE);
   const showHome = isFeatureAllowed(FEATURE_CODES.MARKETING);
   const showWorkspaces = isFeatureAllowed(FEATURE_CODES.WORKSPACES);
 
@@ -52,11 +50,7 @@ export default async function RootLayout({
         </div>
         <div className={shellStyles.row}>
           <AppAside>
-            <SideNav
-              showAppLinks={showAppLinks}
-              showHome={showHome}
-              showWorkspaces={showWorkspaces}
-            />
+            <SideNav showHome={showHome} showWorkspaces={showWorkspaces} />
           </AppAside>
           <main id="main-content" tabIndex={-1} className={shellStyles.main}>
             <AppAccessGuard locale={locale} workspacesEnabled={showWorkspaces}>

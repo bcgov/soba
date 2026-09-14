@@ -147,6 +147,8 @@ describe('FeatureScopePanel', () => {
 
     expect(await screen.findByDisplayValue(SCOPE_ID)).toBeInTheDocument();
     expect(mockFetchFeatureScope).toHaveBeenCalledWith('token', FEATURE_SCOPE_ID);
+    // The page heading belongs to PageLayout.
+    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
   });
 
   it('saves status changes in manage mode', async () => {
