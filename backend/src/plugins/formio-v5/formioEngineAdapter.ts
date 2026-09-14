@@ -7,7 +7,7 @@ import {
 import { PluginConfigReader } from '../../core/config/pluginConfig';
 import { ValidationError } from '../../core/errors';
 import { getAuthenticatedFormioClient } from './formioV5Client';
-import { normalizeSchema as normalizeFormioSchema } from './normalizeSchema';
+import { normalizeSchema as normalizeFormioSchema } from '@soba/lib';
 
 export interface FormioV5Config {
   apiBaseUrl: string;

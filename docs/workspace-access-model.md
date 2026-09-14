@@ -13,10 +13,12 @@ Two separate things control access:
 
 They don't overlap: being a workspace admin grants no form permissions, and vice versa.
 
-> **Current status.** The RBAC tables, the permission resolver, and the per-workspace groups all exist,
-> but enforcement is **not wired into the routes yet**. Right now any active workspace member can still
-> perform any form operation. The middleware that gates on permissions (`requireFormPermissions`) is
-> written but applied to no routes — it gets wired in with the form-visibility rework.
+> **Current status.** The design form routes (`api/forms/route.ts`) and the staff submission routes
+> (`api/submissions/route.ts`) are gated by `requireFormPermissions`, except schema normalize (no
+> workspace). Creating a form requires `form_create` and `design_create` — only `form_admin` satisfies
+> that, via `*`. Creating a design on an existing form requires `design_create` (`form_designer`). The
+> submit routes, file uploads and document generation are gated by `hasFormSubmitAccess`. Group and
+> member management is gated by workspace role (`requireWorkspaceManage`), not by RBAC.
 
 ```
                         User in a workspace
@@ -107,21 +109,25 @@ each role grants permissions. Users are members of groups.
 
 ### The catalog
 
-Five form roles are seeded (`role` + `role_permission`):
+Six form roles are seeded (`role` + `role_permission`):
 
 | role                  | permissions |
 |-----------------------|-------------|
 | `form_admin`          | `*` (everything) |
 | `form_designer`       | `form_read`, `design_create`, `design_read`, `design_update`, `design_delete` |
-| `form_submitter`      | `form_read`, `submission_create` |
-| `submission_reviewer` | `form_read`, `submission_read`, `submission_update`, `submission_delete`, `submission_review` |
+| `form_submitter`      | `form_read`, `submission_create`, `document_template_read` |
+| `submission_reviewer` | `form_read`, `submission_read`, `submission_update`, `submission_delete`, `submission_review`, `team_read` |
 | `submission_approver` | `form_read`, `submission_read`, `submission_review`, `team_read` |
+| `team_manager`        | `form_read`, `team_read`, `team_update` |
 
 `*` is a wildcard: a role holding it satisfies any permission check. Only `form_admin` has it, so adding
 new permissions later needs no change to that role.
 
-The permission codes are: `form_read/update/delete`, `design_create/read/update/delete`,
-`submission_create/read/update/delete/review`, `team_read/update`.
+`form_create` is catalogued but not assigned to any seeded role. Only `form_admin` can create a form
+(via `*`). `form_designer` can create a new design on an existing form (`design_create`).
+
+The permission codes are: `form_create/read/update/delete`, `design_create/read/update/delete`,
+`submission_create/read/update/delete/review`, `team_read/update`, `document_template_create/read/delete`.
 
 ### Group membership is "who", not "what"
 
@@ -134,9 +140,9 @@ The role lives on the group (`workspace_group_role`). `member_kind` selects the 
 | `idp`         | `identity_provider_code`   | anyone signing in through that provider (e.g. `azureidir`) |
 | `idp_group`   | `idp_group_code`           | anyone whose provider is in that IdP group (e.g. `bcgov` = `idir` + `azureidir`) |
 
-Only `user` members are resolved today. `idp` and `idp_group` exist for the upcoming form-visibility
-work; they're how "any IDIR user" or "public" will get submit access without naming individuals.
-`public` is a pseudo identity provider (`identity_provider.is_login_provider = false`) used as a
+`user` members are resolved for form permissions by `resolveFormPermissions`. `idp` members are
+resolved only for the Form submitters audience, by `hasFormSubmitAccess` in `formSubmitAccessRepo.ts`.
+`idp_group` members are not resolved. `public` is a pseudo identity provider (`identity_provider.is_login_provider = false`) used as a
 match-all selector.
 
 ### The special groups

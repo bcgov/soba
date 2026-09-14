@@ -23,7 +23,6 @@ import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 type FillLabels = {
   loading: string;
   loadError: string;
-  unavailable: string;
   rendererError: string;
   submitSuccess: string;
   sessionExpired: string;
@@ -42,7 +41,7 @@ function SubmissionFillBody({
   labels: FillLabels;
 }>) {
   // Token is optional: a public-audience submission is fillable without signing in.
-  const { token, initializing } = useKeycloak();
+  const { token, initializing, initStarted } = useKeycloak();
   const { addNotification } = useNotificationStore();
   const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
@@ -63,8 +62,9 @@ function SubmissionFillBody({
   } | null>(null);
 
   useEffect(() => {
-    // Wait for auth to settle so an authenticated caller sends their token; anonymous proceeds with none.
-    if (initializing || loadStartedRef.current) return;
+    // Wait for Keycloak to answer. Before init starts, `initializing` is still false and "no token" is
+    // the default rather than an answer, so a signed-in caller's read would go out anonymously.
+    if (!initStarted || initializing || loadStartedRef.current) return;
     loadStartedRef.current = true;
     void (async () => {
       try {
@@ -77,10 +77,6 @@ function SubmissionFillBody({
           router.replace(`/${locale}/submission/${submissionId}`);
           return;
         }
-        if (!bundle.schema) {
-          setLoadError(labels.unavailable);
-          return;
-        }
         setSchema(bundle.schema as FormType);
         // Resume: prefill with any saved answers (a just-opened submission has none).
         setInitialData((bundle.content?.data ?? {}) as Record<string, unknown>);
@@ -89,13 +85,13 @@ function SubmissionFillBody({
       }
     })();
   }, [
+    initStarted,
     initializing,
     token,
     submissionId,
     locale,
     router,
     labels.loadError,
-    labels.unavailable,
     labels.sessionExpired,
   ]);
 
@@ -205,7 +201,6 @@ export default function FormioV5SubmissionFillClient() {
         labels={{
           loading: dict.form?.loading || 'Loading…',
           loadError: labels.loadError,
-          unavailable: labels.unavailable,
           rendererError: labels.rendererError,
           submitSuccess: labels.submitSuccess,
           sessionExpired: dict.general.sessionExpired,

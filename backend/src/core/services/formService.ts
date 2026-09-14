@@ -55,6 +55,8 @@ interface UpdateInput {
   formId: string;
   name?: string;
   description?: string | null;
+  org?: string;
+  useCase?: string;
   status?: string;
 }
 

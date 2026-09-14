@@ -3,6 +3,7 @@ import { sobaFetch } from './sobaFetch';
 import { toListRequestQuery, type ListQueryArgs } from '../../types/list';
 
 import type {
+  AddSobaAdminBody,
   DocumentGenerationAuditsQuery,
   DocumentGenerationAuditsResponse,
   FeatureScopeItem,
@@ -28,10 +29,11 @@ export async function fetchSobaAdmins(
 }
 
 export async function addSobaAdmin(token: string, userId: string): Promise<void> {
+  const body: AddSobaAdminBody = { userId };
   const response = await sobaFetch('/admin/soba-admins', {
     token,
     method: 'POST',
-    json: { userId },
+    json: body,
   });
   if (!response.ok) await parseJson(response);
 }

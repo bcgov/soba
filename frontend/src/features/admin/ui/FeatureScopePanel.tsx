@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Button,
   Form,
-  Heading,
   InlineAlert,
   Select,
   TextField,
@@ -228,9 +227,6 @@ export function FeatureScopePanel({
 
   return (
     <div>
-      <Heading level={1} id="feature-scope-form-heading">
-        {isEdit ? dictScopes.manageHeading : dictScopes.createHeading}
-      </Heading>
       <p className={styles.panelIntro}>{dictScopes.intro}</p>
       {unavailable ? (
         <InlineAlert

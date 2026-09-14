@@ -20,7 +20,6 @@ vi.mock('@/app/[lang]/Providers', () => ({
     locale: 'en',
     general: { notAuthenticated: 'Not authed', loading: 'Loading…' },
     admin: {
-      heading: 'Administration',
       forbidden: 'You do not have the platform administrator role required for this section.',
       admins: { heading: 'Platform administrators' },
       featureScopes: { heading: 'Feature access' },
@@ -114,8 +113,9 @@ describe('AdminDashboard', () => {
 
     await renderDashboard();
 
-    expect(screen.getByText('Administration')).toBeInTheDocument();
     expect(screen.getByTestId('admins-panel')).toBeInTheDocument();
+    // The page heading belongs to PageLayout.
+    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Feature access' })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Document generation' })).not.toBeInTheDocument();
   });

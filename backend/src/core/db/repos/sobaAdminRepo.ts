@@ -1,7 +1,8 @@
 import { and, count, eq, ilike, sql } from 'drizzle-orm';
+import { SOBA_ADMIN_SORT_FIELDS, type SortToken } from '@soba/lib';
 import { db } from '../client';
 import { appUsers, sobaAdmins } from '../schema';
-import { likePattern, orderByForSort, type SortColumns, type SortToken } from '../listSort';
+import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 
 /** Second int for `pg_advisory_xact_lock`; must not collide with workspaceRepo / membershipRepo lock ids. */
@@ -18,7 +19,6 @@ export interface SobaAdminListRow {
   displayLabel: string | null;
 }
 
-export const SOBA_ADMIN_SORT_FIELDS = ['displayLabel', 'source', 'syncedAt'] as const;
 export type SobaAdminListSortField = (typeof SOBA_ADMIN_SORT_FIELDS)[number];
 export type SobaAdminListSort = SortToken<SobaAdminListSortField>;
 

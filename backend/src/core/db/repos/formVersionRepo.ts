@@ -1,7 +1,8 @@
-import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { FORM_VERSION_SORT_FIELDS, type SortToken } from '@soba/lib';
 import { db, type DbOrTx } from '../client';
 import { formVersionRevisions, formVersions } from '../schema';
-import { orderByForSort, type SortColumns, type SortToken } from '../listSort';
+import { orderByForSort, prefixPattern, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 
 interface CreateDraftInput {
@@ -21,7 +22,6 @@ interface SaveRevisionInput {
   engineSchemaRef?: string | null;
 }
 
-export const FORM_VERSION_SORT_FIELDS = ['versionNo', 'state', 'createdAt', 'updatedAt'] as const;
 export type FormVersionListSortField = (typeof FORM_VERSION_SORT_FIELDS)[number];
 export type FormVersionListSort = SortToken<FormVersionListSortField>;
 
@@ -185,6 +185,94 @@ export const listFormVersionsForWorkspace = async (
   });
 };
 
+export interface FormVersionSummaryRow {
+  id: string;
+  versionNo: number;
+  state: string;
+}
+
+const summaryColumns = {
+  id: formVersions.id,
+  versionNo: formVersions.versionNo,
+  state: formVersions.state,
+};
+
+export interface LookupFormVersionsInput {
+  /** Workspace resolved from the list scope anchor. */
+  workspaceIds: string[];
+  formId: string;
+  q?: string;
+  limit: number;
+}
+
+/** One form's versions, newest first. `q` matches the start of the version number. */
+export const lookupFormVersions = async (
+  input: LookupFormVersionsInput,
+): Promise<FormVersionSummaryRow[]> => {
+  // An empty scope means the actor holds the permission in no workspace, never "all workspaces".
+  if (input.workspaceIds.length === 0) {
+    return [];
+  }
+  const whereClauses = [
+    inArray(formVersions.workspaceId, input.workspaceIds),
+    eq(formVersions.formId, input.formId),
+    isNull(formVersions.deletedAt),
+  ];
+  if (input.q) {
+    whereClauses.push(sql`${formVersions.versionNo}::text like ${prefixPattern(input.q)}`);
+  }
+  return db
+    .select(summaryColumns)
+    .from(formVersions)
+    .where(and(...whereClauses))
+    .orderBy(desc(formVersions.versionNo))
+    .limit(input.limit);
+};
+
+/** The version save and publish target: the highest-numbered one that is not deleted. */
+export const getCurrentFormVersion = async (
+  workspaceId: string,
+  formId: string,
+  tx?: DbOrTx,
+): Promise<FormVersionSummaryRow | null> => {
+  const d = tx ?? db;
+  const row = await d
+    .select(summaryColumns)
+    .from(formVersions)
+    .where(
+      and(
+        eq(formVersions.workspaceId, workspaceId),
+        eq(formVersions.formId, formId),
+        isNull(formVersions.deletedAt),
+      ),
+    )
+    .orderBy(desc(formVersions.versionNo))
+    .limit(1);
+
+  return row[0] ?? null;
+};
+
+/**
+ * Holds the version row until the transaction ends. Writes to that row wait; a newer version can
+ * still be inserted.
+ */
+export const lockFormVersion = async (workspaceId: string, formVersionId: string, tx: DbOrTx) => {
+  const row = await tx
+    .select()
+    .from(formVersions)
+    .where(
+      and(
+        eq(formVersions.workspaceId, workspaceId),
+        eq(formVersions.id, formVersionId),
+        isNull(formVersions.deletedAt),
+      ),
+    )
+    .limit(1)
+    .for('no key update');
+
+  return row[0] ?? null;
+};
+
 export const updateFormVersionDraft = async (
   workspaceId: string,
   formVersionId: string,
@@ -210,6 +298,38 @@ export const updateFormVersionDraft = async (
       updatedAt: new Date(),
     })
     .where(and(eq(formVersions.id, formVersionId), eq(formVersions.workspaceId, workspaceId)))
+    .returning();
+
+  return updated[0] ?? null;
+};
+
+/**
+ * Records the outcome of a provision that claimed the version at `claimedAt`. Returns null and
+ * changes nothing when another provision has claimed it since, or it is no longer a live draft.
+ */
+export const finishFormVersionProvisioning = async (
+  workspaceId: string,
+  formVersionId: string,
+  actorDisplayLabel: string | null,
+  claimedAt: Date,
+  patch: Partial<{
+    engineSchemaRef: string;
+    engineSyncStatus: string;
+    engineSyncError: string | null;
+  }>,
+) => {
+  const updated = await db
+    .update(formVersions)
+    .set({ ...patch, updatedBy: actorDisplayLabel, updatedAt: new Date() })
+    .where(
+      and(
+        eq(formVersions.id, formVersionId),
+        eq(formVersions.workspaceId, workspaceId),
+        eq(formVersions.updatedAt, claimedAt),
+        eq(formVersions.state, 'draft'),
+        isNull(formVersions.deletedAt),
+      ),
+    )
     .returning();
 
   return updated[0] ?? null;

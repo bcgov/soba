@@ -14,13 +14,14 @@ import { hasAllPermissions, resolveFormPermissions } from './formAccessRepo';
 
 /**
  * Permissions the Form submitters audience conveys to non-staff (idp/public) members: read the form,
- * submit to it, and read a submission (submissions on a form are visible to that form's audience —
- * on a public form they are public data). Anything else (mutations, submission list) stays staff-only.
+ * submit to it, read a submission (on a public form submissions are public data), and read the form's
+ * document templates. Anything else (mutations, submission list) stays staff-only.
  */
 const AUDIENCE_PERMISSIONS = new Set<PermissionCode>([
   Permissions.form_read,
   Permissions.submission_create,
   Permissions.submission_read,
+  Permissions.document_template_read,
 ]);
 
 /** The identity of a caller on the public read/submit paths (the public user for anonymous). */
@@ -66,11 +67,9 @@ const isSubmitterAudienceMember = async (
 };
 
 /**
- * Authorizes a caller to read a form or create a submission against it. Grants when the caller's
- * workspace group roles satisfy `required` (staff, incl. user members of the Form submitters group),
- * or — for form_read / submission_create only — when the caller is in the Form submitters audience via
- * a `public`/`idp` member. Replaces the retired per-form-version visibility check, re-sourced from the
- * group.
+ * Authorizes a caller for `required` on a workspace's forms. Grants when the caller's workspace group
+ * roles satisfy `required` (staff, incl. user members of the Form submitters group), or, for a code in
+ * AUDIENCE_PERMISSIONS, when the caller is in the Form submitters audience via a `public`/`idp` member.
  */
 export const hasFormSubmitAccess = async (
   workspaceId: string,

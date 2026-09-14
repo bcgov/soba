@@ -1,6 +1,6 @@
 import './globals.css';
 
-const DEFAULT_API_BASE_URL = 'http://localhost:4000/api/v1';
+const DEFAULT_API_BASE_URL = 'http://localhost:4000/chefs/api/v1';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const apiBaseUrl = process.env.NEXT_PUBLIC_SOBA_API_BASE_URL || DEFAULT_API_BASE_URL;

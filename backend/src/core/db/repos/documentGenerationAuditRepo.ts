@@ -1,7 +1,8 @@
 import { and, count, eq, type SQL } from 'drizzle-orm';
+import { DOCGEN_AUDIT_SORT_FIELDS, type SortToken } from '@soba/lib';
 import { db } from '../client';
 import { documentGenerationAudits } from '../schema';
-import { orderByForSort, type SortColumns, type SortToken } from '../listSort';
+import { orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 
 export type DocumentGenerationAuditRecord = typeof documentGenerationAudits.$inferSelect;
@@ -20,7 +21,6 @@ export interface NewDocumentGenerationAudit {
   createdBy: string;
 }
 
-export const DOCGEN_AUDIT_SORT_FIELDS = ['createdAt', 'outcome', 'durationMs'] as const;
 export type DocgenAuditListSortField = (typeof DOCGEN_AUDIT_SORT_FIELDS)[number];
 export type DocgenAuditListSort = SortToken<DocgenAuditListSortField>;
 

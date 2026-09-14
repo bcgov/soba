@@ -1,5 +1,6 @@
 import LandingPage from '../ui/LandingPage';
 import { PageLayout } from '@/src/components/PageLayout';
+import { pageMetadata } from '@/src/shared/config/pageMetadata';
 import { getDictionary, resolveLocale } from './dictionaries';
 
 type PageProps = {
@@ -7,13 +8,7 @@ type PageProps = {
 };
 
 export async function generateMetadata({ params }: PageProps) {
-  const param = await params;
-  const locale = resolveLocale(param.lang);
-  const dict = await getDictionary(locale);
-  return {
-    title: `${dict.general.title}`,
-    description: dict.general.description,
-  };
+  return pageMetadata(params, (dict) => dict.general.title);
 }
 
 export default async function Page({ params }: PageProps) {

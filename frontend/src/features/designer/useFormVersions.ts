@@ -5,9 +5,9 @@ import { getSobaFormVersionPage } from '@/src/shared/api/sobaApi';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { listReadConfig } from '@/src/shared/api/swrConfig';
 import type { ListQueryArgs } from '@/src/types/list';
-import type { SobaFormVersionType } from '@/src/types/forms';
+import type { SobaFormVersionListItem } from '@/src/types/forms';
 
-const EMPTY: SobaFormVersionType[] = [];
+const EMPTY: SobaFormVersionListItem[] = [];
 
 /** The key every read of a form's versions shares, so one refresh reaches all of them. */
 export const versionsKey = (formId: string) => ['design-form-versions', formId];
@@ -26,7 +26,7 @@ export function useFormVersionPage(formId: string | undefined, query: ListQueryA
     listReadConfig,
   );
 
-  const versions: SobaFormVersionType[] = useMemo(
+  const versions: SobaFormVersionListItem[] = useMemo(
     () => (Array.isArray(data?.items) ? data.items : EMPTY),
     [data],
   );

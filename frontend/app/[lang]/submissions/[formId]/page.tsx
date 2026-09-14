@@ -1,35 +1,23 @@
 import { SubmissionList } from '@/src/features/submit-mode/ui/SubmissionList';
 import { PageLayout } from '@/src/components/PageLayout';
-import { getDictionary, hasLocale, Locale } from '../../dictionaries';
-import { notFound } from 'next/navigation';
-import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
-import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
+import { getDictionary, resolveLocale } from '../../dictionaries';
+import { pageMetadata } from '@/src/shared/config/pageMetadata';
+import { assertFeatureAllowed } from '@/src/shared/featureFlags/assertFeatureAllowed';
+import { FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 
 type PageProps = {
   params: Promise<{ lang: string; formId: string }>;
 };
 
 export async function generateMetadata({ params }: PageProps) {
-  const param = await params;
-  if (!hasLocale(param.lang)) {
-    param.lang = 'en';
-  }
-  const dict = await getDictionary(param.lang as Locale);
-  return {
-    title: `Submissions | ${dict.general.title}`,
-    description: dict.general.description,
-  };
+  return pageMetadata(params, (dict) => `${dict.submission.submissions} | ${dict.general.title}`);
 }
 
 export default async function Page({ params }: PageProps) {
-  const featuresMeta = await loadFeaturesMeta();
-  const isFeatureAllowed = createIsFeatureAllowed(featuresMeta);
-  if (!isFeatureAllowed(FEATURE_CODES.SUBMIT_MODE)) {
-    notFound();
-  }
+  await assertFeatureAllowed(FEATURE_CODES.SUBMIT_MODE);
 
   const param = await params;
-  const dict = await getDictionary((hasLocale(param.lang) ? param.lang : 'en') as Locale);
+  const dict = await getDictionary(resolveLocale(param.lang));
   return (
     <PageLayout headingId="submissions-heading" heading={dict.submission.submissions}>
       <SubmissionList formId={param.formId} />

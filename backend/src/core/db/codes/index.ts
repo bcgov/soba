@@ -10,12 +10,14 @@ export const Roles = {
   form_submitter: 'form_submitter',
   submission_reviewer: 'submission_reviewer',
   submission_approver: 'submission_approver',
+  team_manager: 'team_manager',
 } as const;
 export type RoleCode = (typeof Roles)[keyof typeof Roles];
 
 /** Form permissions. `all` is the `*` wildcard, held only by form_admin. */
 export const Permissions = {
   all: '*',
+  form_create: 'form_create',
   form_read: 'form_read',
   form_update: 'form_update',
   form_delete: 'form_delete',
@@ -30,8 +32,18 @@ export const Permissions = {
   submission_review: 'submission_review',
   team_read: 'team_read',
   team_update: 'team_update',
+  document_template_create: 'document_template_create',
+  document_template_read: 'document_template_read',
+  document_template_delete: 'document_template_delete',
 } as const;
 export type PermissionCode = (typeof Permissions)[keyof typeof Permissions];
+
+/**
+ * POST /forms writes the form and its first design. `form_create` is not seeded onto any role;
+ * only form_admin matches it (via `*`). form_designer has `design_create` for new designs on
+ * existing forms.
+ */
+export const FormCreatePermissions = [Permissions.form_create, Permissions.design_create] as const;
 
 export const RoleStatus = {
   active: 'active',

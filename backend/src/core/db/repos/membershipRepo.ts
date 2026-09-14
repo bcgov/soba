@@ -1,5 +1,6 @@
-import { and, count, eq, exists, ilike, or, sql, inArray } from 'drizzle-orm';
+import { and, count, eq, exists, ilike, isNotNull, isNull, or, sql, inArray } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
+import { WORKSPACE_SORT_FIELDS, type SortToken } from '@soba/lib';
 import { db } from '../client';
 import {
   appUsers,
@@ -24,7 +25,7 @@ import {
   WorkspaceGroupRoleStatus,
   WorkspaceMembershipRole,
 } from '../codes';
-import { likePattern, orderByForSort, type SortColumns, type SortToken } from '../listSort';
+import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 
 /** Second int for `pg_advisory_xact_lock`; must not collide with workspaceRepo / sobaAdminRepo lock ids. */
@@ -191,7 +192,6 @@ export const invalidateMembershipCache = (workspaceId: string, userId: string): 
   }
 };
 
-export const WORKSPACE_SORT_FIELDS = ['name', 'kind', 'status', 'updatedAt'] as const;
 export type WorkspaceListSortField = (typeof WORKSPACE_SORT_FIELDS)[number];
 export type WorkspaceListSort = SortToken<WorkspaceListSortField>;
 
@@ -202,15 +202,20 @@ const WORKSPACE_SORT_COLUMNS: SortColumns<WorkspaceListSortField> = {
   updatedAt: { column: workspaces.updatedAt },
 };
 
-export interface ListWorkspacesForUserInput {
+export interface WorkspaceMembershipFilter {
   userId: string;
-  offset: number;
-  limit: number;
-  sort: WorkspaceListSort;
   kind?: string;
   status?: string;
   q?: string;
-  requiredPermission?: string;
+  /** Every code must be held, through one of the actor's groups or the `*` wildcard. */
+  requiredPermissions?: readonly string[];
+  disclaimerAccepted?: boolean;
+}
+
+export interface ListWorkspacesForUserInput extends WorkspaceMembershipFilter {
+  offset: number;
+  limit: number;
+  sort: WorkspaceListSort;
 }
 
 export interface WorkspaceListRow {
@@ -225,50 +230,120 @@ export interface WorkspaceListRow {
   updatedAt: Date;
 }
 
+// Correlated to the actor's own membership row, not just any member of the workspace.
+const holdsPermission = (code: string) =>
+  exists(
+    db
+      .select({ permissionCode: rolePermissions.permissionCode })
+      .from(workspaceGroupMemberships)
+      .innerJoin(
+        workspaceGroupRoles,
+        eq(workspaceGroupRoles.groupId, workspaceGroupMemberships.groupId),
+      )
+      .innerJoin(rolePermissions, eq(rolePermissions.roleCode, workspaceGroupRoles.roleCode))
+      .where(
+        and(
+          eq(workspaceGroupMemberships.workspaceMembershipId, workspaceMemberships.id),
+          eq(workspaceGroupMemberships.workspaceId, workspaceMemberships.workspaceId),
+          eq(workspaceGroupMemberships.memberKind, GroupMemberKind.user),
+          eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
+          eq(workspaceGroupRoles.status, WorkspaceGroupRoleStatus.active),
+          inArray(rolePermissions.permissionCode, [code, Permissions.all]),
+        ),
+      ),
+  );
+
+/** Expects workspace_membership joined to workspace and left joined to the disclaimer acceptance. */
+const workspaceMembershipWhere = (filter: WorkspaceMembershipFilter) => {
+  const whereClauses = [
+    eq(workspaceMemberships.userId, filter.userId),
+    eq(workspaceMemberships.status, 'active'),
+  ];
+  if (filter.kind) {
+    whereClauses.push(eq(workspaces.kind, filter.kind));
+  }
+  if (filter.status) {
+    whereClauses.push(eq(workspaces.status, filter.status));
+  }
+  if (filter.q) {
+    const pattern = likePattern(filter.q);
+    whereClauses.push(or(ilike(workspaces.name, pattern), ilike(workspaces.org, pattern)));
+  }
+  for (const code of new Set(filter.requiredPermissions)) {
+    whereClauses.push(holdsPermission(code));
+  }
+  if (filter.disclaimerAccepted !== undefined) {
+    const acceptedAt = workspaceDisclaimerAcceptances.acceptedAt;
+    whereClauses.push(filter.disclaimerAccepted ? isNotNull(acceptedAt) : isNull(acceptedAt));
+  }
+  return and(...whereClauses);
+};
+
+export interface WorkspaceLookupRow {
+  id: string;
+  name: string;
+  kind: string;
+  role: string;
+  disclaimerAcceptedAt: Date | null;
+}
+
+/** Workspaces for a select, in name order. */
+export const lookupWorkspacesForUser = (
+  input: WorkspaceMembershipFilter & { limit: number },
+): Promise<WorkspaceLookupRow[]> =>
+  db
+    .select({
+      id: workspaces.id,
+      name: workspaces.name,
+      kind: workspaces.kind,
+      role: workspaceMemberships.role,
+      disclaimerAcceptedAt: workspaceDisclaimerAcceptances.acceptedAt,
+    })
+    .from(workspaceMemberships)
+    .innerJoin(workspaces, eq(workspaces.id, workspaceMemberships.workspaceId))
+    .leftJoin(
+      workspaceDisclaimerAcceptances,
+      eq(workspaceDisclaimerAcceptances.workspaceId, workspaces.id),
+    )
+    .where(workspaceMembershipWhere(input))
+    .orderBy(...orderByForSort(WORKSPACE_SORT_COLUMNS, 'name:asc', workspaces.id))
+    .limit(input.limit);
+
+export const hasActiveMembership = async (userId: string): Promise<boolean> => {
+  const rows = await db
+    .select({ id: workspaceMemberships.id })
+    .from(workspaceMemberships)
+    .where(and(eq(workspaceMemberships.userId, userId), eq(workspaceMemberships.status, 'active')))
+    .limit(1);
+  return rows.length > 0;
+};
+
+/**
+ * A workspace where the user holds every required code, preferring one whose disclaimer is
+ * accepted. Null when there is none.
+ */
+export const findPermittedWorkspace = async (
+  userId: string,
+  requiredPermissions: readonly string[],
+): Promise<{ disclaimerAccepted: boolean } | null> => {
+  const rows = await db
+    .select({ acceptedAt: workspaceDisclaimerAcceptances.acceptedAt })
+    .from(workspaceMemberships)
+    .innerJoin(workspaces, eq(workspaces.id, workspaceMemberships.workspaceId))
+    .leftJoin(
+      workspaceDisclaimerAcceptances,
+      eq(workspaceDisclaimerAcceptances.workspaceId, workspaces.id),
+    )
+    .where(workspaceMembershipWhere({ userId, requiredPermissions }))
+    .orderBy(sql`${workspaceDisclaimerAcceptances.acceptedAt} is null`)
+    .limit(1);
+  return rows[0] ? { disclaimerAccepted: rows[0].acceptedAt != null } : null;
+};
+
 export const listWorkspacesForUser = async (
   input: ListWorkspacesForUserInput,
 ): Promise<{ items: WorkspaceListRow[]; total: number }> => {
-  const whereClauses = [
-    eq(workspaceMemberships.userId, input.userId),
-    eq(workspaceMemberships.status, 'active'),
-  ];
-  if (input.kind) {
-    whereClauses.push(eq(workspaces.kind, input.kind));
-  }
-  if (input.status) {
-    whereClauses.push(eq(workspaces.status, input.status));
-  }
-  if (input.q) {
-    const pattern = likePattern(input.q);
-    whereClauses.push(or(ilike(workspaces.name, pattern), ilike(workspaces.org, pattern)));
-  }
-  if (input.requiredPermission) {
-    // Correlated to the actor's own membership row above, not just any member of the workspace.
-    whereClauses.push(
-      exists(
-        db
-          .select({ permissionCode: rolePermissions.permissionCode })
-          .from(workspaceGroupMemberships)
-          .innerJoin(
-            workspaceGroupRoles,
-            eq(workspaceGroupRoles.groupId, workspaceGroupMemberships.groupId),
-          )
-          .innerJoin(rolePermissions, eq(rolePermissions.roleCode, workspaceGroupRoles.roleCode))
-          .where(
-            and(
-              eq(workspaceGroupMemberships.workspaceMembershipId, workspaceMemberships.id),
-              eq(workspaceGroupMemberships.workspaceId, workspaceMemberships.workspaceId),
-              eq(workspaceGroupMemberships.memberKind, GroupMemberKind.user),
-              eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
-              eq(workspaceGroupRoles.status, WorkspaceGroupRoleStatus.active),
-              inArray(rolePermissions.permissionCode, [input.requiredPermission, Permissions.all]),
-            ),
-          ),
-      ),
-    );
-  }
-
-  const where = and(...whereClauses);
+  const where = workspaceMembershipWhere(input);
 
   return readListPage(async (tx) => {
     const items = await tx

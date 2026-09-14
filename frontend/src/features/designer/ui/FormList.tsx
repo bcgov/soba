@@ -12,11 +12,13 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { useRouter, usePathname } from 'next/navigation';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { getSobaForms } from '@/src/shared/api/sobaApi';
-import type { SobaFormSummary } from '@/src/shared/api/sobaApiDesign';
+import type { SobaFormSummary } from '@/src/types/forms';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import { usePageNotices } from '@/src/components/PageHeader';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
-import { useWorkspaces, useWritableWorkspaces } from '@/src/shared/api/useWorkspaces';
+import { useWorkspace, useWorkspaceOptions } from '@/src/shared/api/useWorkspaces';
+import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
+import { lookupTruncatedNote, withSelectedOption } from '@/src/shared/list/lookupOptions';
 import { FORMS_LIST_QUERY, rememberListQuery } from '@/src/shared/list/listQueryMemory';
 import { PAGE_SIZE_OPTIONS, useListQuery } from '@/src/shared/list/useListQuery';
 import { listReadConfig } from '@/src/shared/api/swrConfig';
@@ -24,15 +26,53 @@ import { WorkspaceSelector } from '@/app/ui/WorkspaceSelector';
 import { FaDatabase, FaLink } from 'react-icons/fa6';
 import styles from './FormList.module.css';
 import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';
+import { isForbidden, isNotFound } from '@/src/shared/api/sobaHelpers';
+import type { WorkspaceLookupItem } from '@/src/types/workspaces';
+
+const WORKSPACE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Resolves the URL's workspace filter, which can name a workspace that does not exist or that this
+ * user cannot see. A workspace in the options is taken from there; any other is read, because the
+ * options stop at the lookup limit.
+ */
+function useWorkspaceFilter(
+  workspaceParam: string | null,
+  options: Pick<ReturnType<typeof useWorkspaceOptions>, 'workspaces' | 'loaded' | 'error'>,
+) {
+  // Not a workspace id at all. Reading one fails as a server error rather than a refusal.
+  const paramIsId = !!workspaceParam && WORKSPACE_ID_PATTERN.test(workspaceParam);
+  const listed = paramIsId ? options.workspaces.find((w) => w.id === workspaceParam) : undefined;
+  const optionsSettled = options.loaded || !!options.error;
+  const { workspace: read, error } = useWorkspace(
+    paramIsId && optionsSettled && !listed ? (workspaceParam as string) : undefined,
+  );
+  const workspace: WorkspaceLookupItem | null = listed ?? read;
+  // Only a refusal says the workspace is not this user's. Any other failure is a failed load.
+  const refused = isForbidden(error) || isNotFound(error);
+  return {
+    workspace,
+    rejected: !!workspaceParam && !workspace && (!paramIsId || refused),
+    loadError: refused ? undefined : error,
+    // No answer yet, so the table is loading, not empty.
+    pending: paramIsId && !workspace && !error,
+    // A filter that could still name one of the user's workspaces never reads unscoped.
+    holdRequest: paramIsId && !workspace && !refused,
+  };
+}
 
 const CustomActionButtons = ({
   form,
   onAction,
   designModeEnabled,
+  submitLabel,
+  submissionsLabel,
 }: {
   form: SobaFormSummary;
   onAction: (name: string, id: string) => void;
   designModeEnabled?: boolean;
+  submitLabel: string;
+  submissionsLabel: string;
 }) => {
   // All actions (manage/submit/submissions) are keyed on the SOBA formId.
   const sobaFormId = form.id;
@@ -41,8 +81,8 @@ const CustomActionButtons = ({
   // Both quick links open designer tabs, and the designer page 404s without design mode.
   if (designModeEnabled) {
     actions.push(
-      { name: 'submit', icon: <FaLink /> },
-      { name: 'submissions', icon: <FaDatabase /> },
+      { name: 'submit', icon: <FaLink />, ariaLabel: submitLabel },
+      { name: 'submissions', icon: <FaDatabase />, ariaLabel: submissionsLabel },
     );
   }
 
@@ -51,6 +91,7 @@ const CustomActionButtons = ({
       {actions.map((action) => (
         <RowActionButton
           key={action.name}
+          aria-label={action.ariaLabel}
           data-testid={action.name + '-' + sobaFormId + '-button'}
           onPress={() => {
             if (!sobaFormId) return;
@@ -75,28 +116,26 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
 
   const locale = getLocaleFromPath(pathname);
 
-  const { workspaces, loaded: workspacesLoaded, error: workspacesError } = useWorkspaces();
-  const { workspaces: writableWorkspaces } = useWritableWorkspaces();
+  const { data: currentUser } = useCurrentUser();
+  const workspaceOptions = useWorkspaceOptions();
 
   const listQuery = useListQuery(FORMS_LIST_QUERY);
   const workspaceParam = listQuery.filters.workspace ?? null;
-  // The filter comes from the URL, so it can name a workspace that does not exist or that this user
-  // cannot see. Resolve it against their own list before it reaches the request.
-  const selectedWorkspaceId =
-    workspaceParam && workspaces.some((w) => w.id === workspaceParam) ? workspaceParam : undefined;
-  const workspaceRejected = workspacesLoaded && !!workspaceParam && !selectedWorkspaceId;
-  // The request is held back until the filter can be resolved, so the table is loading, not empty.
-  const waitingForWorkspaces = !!workspaceParam && !workspacesLoaded && !workspacesError;
+  const workspaceFilter = useWorkspaceFilter(workspaceParam, workspaceOptions);
+  const filterWorkspace = workspaceFilter.workspace;
+  const selectedWorkspaceId = filterWorkspace?.id;
+  const workspaceRejected = workspaceFilter.rejected;
+  const holdFormsRequest = workspaceFilter.holdRequest;
 
   const {
     data,
     isLoading,
     error: loadError,
   } = useAuthedSWR(
-    // Wait for the workspace list before reading, or the id resolves against nothing and every
-    // arrival scopes to no workspace. An id that never resolves reads unscoped on purpose: the
-    // picker reads "all workspaces" and the notice says the filter was not applied.
-    workspaceParam && !workspacesLoaded
+    // Wait for the filter to resolve before reading, or the first arrival scopes to no workspace. A
+    // refused or malformed id reads unscoped on purpose: the picker reads "all workspaces" and the
+    // notice says the filter was not applied.
+    holdFormsRequest
       ? null
       : [
           'forms',
@@ -122,8 +161,10 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
     [data],
   );
 
+  const workspaceOptionsError = workspaceOptions.error;
+  const filterLoadError = workspaceFilter.loadError;
   const error = useMemo(() => {
-    const failure = loadError ?? workspacesError;
+    const failure = loadError ?? workspaceOptionsError ?? filterLoadError;
     return failure
       ? loadErrorMessage(failure, {
           sessionExpired: dict.general.sessionExpired,
@@ -133,7 +174,8 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
       : null;
   }, [
     loadError,
-    workspacesError,
+    workspaceOptionsError,
+    filterLoadError,
     dict.general.sessionExpired,
     dict.general.noAccess,
     dict.form.loadFormsError,
@@ -147,12 +189,15 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
 
   // The picker filters this list only; a new form is targeted in the designer. So creation
   // depends on having any workspace the user can create in with its disclaimer accepted.
-  const canCreate = useMemo(
-    () => writableWorkspaces.some((w) => w.disclaimerAccepted),
-    [writableWorkspaces],
+  const formCreate = currentUser?.capabilities?.formCreate;
+  const canCreate = formCreate === 'allowed';
+  // Create permission somewhere but no disclaimer accepted yet: the case worth prompting on.
+  const needsDisclaimer = formCreate === 'disclaimer_required';
+
+  const pickerWorkspaces = useMemo(
+    () => withSelectedOption(workspaceOptions.workspaces, filterWorkspace),
+    [workspaceOptions.workspaces, filterWorkspace],
   );
-  // Create permission somewhere but no disclaimer accepted yet — the case worth prompting on.
-  const needsDisclaimer = writableWorkspaces.length > 0 && !canCreate;
 
   const { setFilters } = listQuery;
   const handleWorkspaceChange = useCallback(
@@ -164,14 +209,14 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
     (name: string, id: string) => {
       if (name === 'manage') {
         if (designModeEnabled) {
-          router.push(`/${locale}/designer/${id}`);
+          router.push(`/${locale}/build/${id}`);
         } else {
           router.push(`/${locale}/form/${id}`);
         }
       } else if (name === 'submit') {
-        router.push(`/${locale}/designer/${id}?tab=share`);
+        router.push(`/${locale}/build/${id}?tab=share`);
       } else if (name === 'submissions') {
-        router.push(`/${locale}/designer/${id}?tab=submissions`);
+        router.push(`/${locale}/build/${id}?tab=submissions`);
       }
     },
     [router, locale, designModeEnabled],
@@ -220,16 +265,9 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
       {
         key: 'workspace',
         label: dict.workspaces?.workspace || 'Workspace',
-        render: (form: SobaFormSummary) => {
-          const ws = workspaces.find((w) => w.id === form.workspaceId);
-          return (
-            <Tag
-              text={ws?.name || form.workspaceId}
-              color="yellow"
-              data-testid={`workspace-tag-${form.id}`}
-            />
-          );
-        },
+        render: (form: SobaFormSummary) => (
+          <Tag text={form.workspaceName} color="yellow" data-testid={`workspace-tag-${form.id}`} />
+        ),
       },
       {
         key: 'actions',
@@ -240,6 +278,8 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
             form={form}
             onAction={handleAction}
             designModeEnabled={designModeEnabled}
+            submitLabel={dictForm?.submit || 'Submit'}
+            submissionsLabel={dict.submission?.submissions || 'Submissions'}
           />
         ),
       },
@@ -262,13 +302,17 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
       },
     ],
     [
-      handleAction,
-      dictFormList,
-      dictForm,
-      dict.workspaces,
-      workspaces,
       designModeEnabled,
+      dictForm?.submit,
+      dict.submission?.submissions,
+      dict.workspaces?.workspace,
+      dictForm?.nameLabel,
+      dictFormList?.columns?.createdAt,
+      dictFormList?.columns?.createdBy,
+      dictFormList?.columns?.name,
+      dictFormList?.columns?.quickLinks,
       formatLongDate,
+      handleAction,
     ],
   );
 
@@ -292,7 +336,7 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
             variant="primary"
             data-testid="create-form-button"
             isDisabled={!canCreate}
-            onPress={() => router.push(`/${locale}/designer`)}
+            onPress={() => router.push(`/${locale}/build`)}
           >
             {dict.general.create}
           </DSButton>
@@ -301,18 +345,15 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
       <div className={`d-flex align-items-end gap-2`}>
         <WorkspaceSelector
           className={`${styles.workspaceField}`}
-          workspaces={workspaces}
+          workspaces={pickerWorkspaces}
           selectedWorkspaceId={selectedWorkspaceId ?? null}
           label={dict.workspaces.workspace}
           onChange={handleWorkspaceChange}
           allLabel={dict.workspaces.allWorkspaces}
+          description={lookupTruncatedNote(dict.general.lookupTruncated, workspaceOptions)}
           size="medium"
         />
-        <DSButton
-          variant="secondary"
-          data-testid="clear-filters-button"
-          onPress={listQuery.clear}
-        >
+        <DSButton variant="secondary" data-testid="clear-filters-button" onPress={listQuery.clear}>
           {dict.general.clearFilters || 'Clear'}
         </DSButton>
       </div>
@@ -320,7 +361,7 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
       <DataTable<SobaFormSummary>
         data={forms}
         columns={columns}
-        loading={isLoading || initializing || waitingForWorkspaces}
+        loading={isLoading || initializing || workspaceFilter.pending}
         error={error}
         emptyMessage="No forms found matching your criteria."
         loadingMessage={dict.general.loading}

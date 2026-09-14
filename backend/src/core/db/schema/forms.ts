@@ -13,6 +13,8 @@ export const forms = sobaSchema.table(
     formEngineCode: text('form_engine_code').notNull(),
     name: text('name').notNull(),
     description: text('description'),
+    org: text('org').notNull(),
+    useCase: text('use_case').notNull(),
     status: text('status').notNull(),
     ...auditColumns(),
     ...softDeleteColumns(),

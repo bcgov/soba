@@ -7,10 +7,15 @@ import type {
   SobaFormType,
   CreateSobaFormioFormResponse,
   SobaResponseFormType,
+  SobaFormDetail,
   SobaFormVersionType,
+  ListFormsResponse,
+  ListFormVersionsResponse,
+  FormVersionLookupResponse,
+  SubmissionDataDocument,
 } from '../../types/forms';
 import type { ListSubmissionsResponse, SubmissionListItem } from '@/src/types/submissions';
-import { toListRequestQuery, type ListPage, type ListQueryArgs } from '@/src/types/list';
+import { toListRequestQuery, type ListQueryArgs } from '@/src/types/list';
 
 export async function createSobaFormioForm(
   token: string,
@@ -44,23 +49,6 @@ export async function updateSobaForm(
   return parseJson(response);
 }
 
-/**
- * POST a Form.io schema to the server to normalize it into a clean, portable, builder-ready
- * form definition. Used both for import (file upload) and export (download).
- */
-export async function normalizeFormSchema(
-  token: string,
-  schema: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
-  const response = await sobaFetch('/design/forms/normalize', {
-    token,
-    method: 'POST',
-    json: { schema },
-  });
-  const data = await parseJson<{ schema: Record<string, unknown> }>(response);
-  return data.schema;
-}
-
 export async function publishSobaFormVersion(token: string, id: string) {
   const response = await sobaFetch(`/design/form-versions/${id}/publish`, {
     token,
@@ -69,26 +57,10 @@ export async function publishSobaFormVersion(token: string, id: string) {
   return parseJson(response);
 }
 
-export async function getSobaForm(token: string, id: string): Promise<SobaResponseFormType> {
+export async function getSobaForm(token: string, id: string): Promise<SobaFormDetail> {
   const response = await sobaFetch(`/design/forms/${id}`, { token });
   return parseJson(response);
 }
-
-/** Compact form row for the designer/submit list. */
-export type SobaFormSummary = {
-  id: string;
-  workspaceId: string;
-  name: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string | null;
-};
-
-export type ListFormsResponse = {
-  items: SobaFormSummary[];
-  page: ListPage;
-};
 
 /** One page of forms. Search, sort and paging are resolved by the server. */
 export async function getSobaForms(
@@ -128,38 +100,26 @@ export async function getSobaSubmission(token: string, id: string): Promise<Subm
 /** Staff read of a submission's answer document (null if not yet provisioned). */
 export async function getSobaSubmissionData(
   token: string,
-  id: string,
-): Promise<{ data?: Record<string, unknown> } | null> {
-  const response = await sobaFetch(`/design/submissions/${id}/data`, { token });
+  submissionId: string,
+): Promise<SubmissionDataDocument | null> {
+  const response = await sobaFetch(`/design/submissions/${submissionId}/data`, { token });
   if (response.status === 404) return null;
-  return parseJson(response);
+  return parseJson<SubmissionDataDocument>(response);
 }
-
-/**
- * Every version of one form, newest first. A version picker, not a paged list: it asks for the
- * endpoint's maximum in one request, and `page.total` is how a caller sees that a form has more
- * versions than the picker is showing.
- */
-export const FORM_VERSION_PICKER_LIMIT = 100;
 
 const FORM_VERSIONS_PATH = '/design/form-versions';
 
-export async function getSobaFormVersions(
+/** One form's versions for a select, newest first. */
+export async function lookupFormVersions(
   token: string,
   formId: string,
-): Promise<{ items: SobaFormVersionType[]; page: ListPage }> {
-  const response = await sobaFetch(FORM_VERSIONS_PATH, {
-    token,
-    query: { formId, limit: FORM_VERSION_PICKER_LIMIT, sort: 'versionNo:desc' },
-  });
+): Promise<FormVersionLookupResponse> {
+  const response = await sobaFetch(`${FORM_VERSIONS_PATH}/lookup`, { token, query: { formId } });
   return parseJson(response);
 }
 
 /** One version, by id. */
-export async function getSobaFormVersion(
-  token: string,
-  id: string,
-): Promise<SobaFormVersionType> {
+export async function getSobaFormVersion(token: string, id: string): Promise<SobaFormVersionType> {
   const response = await sobaFetch(`${FORM_VERSIONS_PATH}/${id}`, { token });
   return parseJson(response);
 }
@@ -168,7 +128,7 @@ export async function getSobaFormVersion(
 export async function getSobaFormVersionPage(
   token: string,
   args: ListQueryArgs & { formId: string },
-): Promise<{ items: SobaFormVersionType[]; page: ListPage }> {
+): Promise<ListFormVersionsResponse> {
   const response = await sobaFetch(FORM_VERSIONS_PATH, {
     token,
     query: { formId: args.formId, ...toListRequestQuery(args) },
