@@ -1,6 +1,7 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { useParams, usePathname } from 'next/navigation';
 import type { FormType, Submission } from '@formio/react';
 import { InlineAlert } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
@@ -16,10 +17,13 @@ import {
 } from '@/src/shared/api/sobaApi';
 import { isSessionExpired } from '@/src/shared/api/sobaFetch';
 import { useMaybeAuthedSWR } from '@/src/shared/api/useAuthedSWR';
+import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { convertSubmissionIdToConfirmationId } from '@/src/shared/util/stringUtils';
 
 export function SubmissionView({ success = false }: Readonly<{ success?: boolean }>) {
+export function SubmissionView({ success = false }: Readonly<{ success?: boolean }>) {
   const params = useParams();
+  const locale = getLocaleFromPath(usePathname());
   const dict = useDictionary();
   const dictSub = dict.submission;
   // Token optional: a public submitter can view a submission on a public-audience form.
@@ -43,6 +47,7 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
       // The confirmation view is submit-mode: read through the submit APIs regardless of sign-in so
       // audience members who aren't workspace members can still view.
       const submission = await getSubmitSubmission(authToken, submissionId);
+      if (success) return { submission, schema: null, content: null };
       const [schema, content] = await Promise.all([
         getSubmitSubmissionSchema(authToken, submissionId),
         getSubmitSubmissionData(authToken, submissionId),
