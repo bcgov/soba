@@ -124,6 +124,8 @@ describe('FeatureScopePanel', () => {
 
   it('creates a feature scope and returns to the feature access table', async () => {
     await renderPanel({ scopedFeatureCodes: ['document-generation-v3'] });
+    // The page heading belongs to PageLayout.
+    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
 
     await userEvent.type(screen.getByRole('textbox'), SCOPE_ID);
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
