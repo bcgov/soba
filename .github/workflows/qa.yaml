@@ -19,14 +19,20 @@ jobs:
             command: pnpm --filter frontend run type-check
           - name: Frontend · lint
             command: pnpm --filter frontend run lint
+          - name: Frontend · format
+            command: pnpm --filter frontend run format:check
           - name: Backend · type-check
             command: pnpm --filter backend run type-check
           - name: Backend · lint
             command: pnpm --filter backend run lint
+          - name: Backend · format
+            command: pnpm --filter backend run format:check
           - name: Lib · type-check
             command: pnpm --filter @soba/lib run type-check
           - name: Lib · lint
             command: pnpm --filter @soba/lib run lint
+          - name: Lib · format
+            command: pnpm --filter @soba/lib run format:check
           - name: Frontend · unit tests
             command: pnpm --filter frontend run test
           - name: Backend · unit tests
