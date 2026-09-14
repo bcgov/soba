@@ -22,7 +22,7 @@ function getExpectedURL(depEnv?: string): string {
     case "dev":
       return "https://soba-dev-designer.apps.silver.devops.gov.bc.ca/en/forms";
     case "test":
-      return "https://soba-test.apps.silver.devops.gov.bc.ca/en/forms";
+      return "https://soba-test.designer.apps.silver.devops.gov.bc.ca/en/forms";
     default:
       throw new Error(`Invalid DEP_ENV: ${depEnv}`);
   }
