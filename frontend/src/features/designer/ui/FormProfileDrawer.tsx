@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Select } from '@bcgov/design-system-react-components';
 
-import type { Dictionary } from '@/src/types/plugins';
+import type { Dictionary } from '@/src/types/dictionary';
 import FormSettingsDrawers from '@/src/features/designer/ui/FormSettingsDrawers';
 import { codeItems } from '@/src/shared/util/codeList';
 import { updateSobaForm } from '@/src/shared/api/sobaApiDesign';

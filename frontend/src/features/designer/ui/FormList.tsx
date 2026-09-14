@@ -64,27 +64,21 @@ function useWorkspaceFilter(
 const CustomActionButtons = ({
   form,
   onAction,
-  designModeEnabled,
   submitLabel,
   submissionsLabel,
 }: {
   form: SobaFormSummary;
   onAction: (name: string, id: string) => void;
-  designModeEnabled?: boolean;
   submitLabel: string;
   submissionsLabel: string;
 }) => {
-  // All actions (manage/submit/submissions) are keyed on the SOBA formId.
+  // Actions are keyed on the SOBA formId.
   const sobaFormId = form.id;
 
-  const actions = [];
-  // Both quick links open designer tabs, and the designer page 404s without design mode.
-  if (designModeEnabled) {
-    actions.push(
-      { name: 'submit', icon: <FaLink />, ariaLabel: submitLabel },
-      { name: 'submissions', icon: <FaDatabase />, ariaLabel: submissionsLabel },
-    );
-  }
+  const actions = [
+    { name: 'submit', icon: <FaLink />, ariaLabel: submitLabel },
+    { name: 'submissions', icon: <FaDatabase />, ariaLabel: submissionsLabel },
+  ];
 
   return (
     <div className="d-flex gap-2 justify-content-start">
@@ -105,7 +99,7 @@ const CustomActionButtons = ({
   );
 };
 
-function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean }) {
+function FormList() {
   const dict = useDictionary();
   const dictFormList = dict.submission?.formList;
   const dictForm = dict.form;
@@ -208,18 +202,14 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
   const handleAction = useCallback(
     (name: string, id: string) => {
       if (name === 'manage') {
-        if (designModeEnabled) {
-          router.push(`/${locale}/build/${id}`);
-        } else {
-          router.push(`/${locale}/form/${id}`);
-        }
+        router.push(`/${locale}/build/${id}`);
       } else if (name === 'submit') {
         router.push(`/${locale}/build/${id}?tab=share`);
       } else if (name === 'submissions') {
         router.push(`/${locale}/build/${id}?tab=submissions`);
       }
     },
-    [router, locale, designModeEnabled],
+    [router, locale],
   );
 
   usePageNotices([
@@ -277,7 +267,6 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
           <CustomActionButtons
             form={form}
             onAction={handleAction}
-            designModeEnabled={designModeEnabled}
             submitLabel={dictForm?.submit || 'Submit'}
             submissionsLabel={dict.submission?.submissions || 'Submissions'}
           />
@@ -302,7 +291,6 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
       },
     ],
     [
-      designModeEnabled,
       dictForm?.submit,
       dict.submission?.submissions,
       dict.workspaces?.workspace,
@@ -331,16 +319,14 @@ function FormList({ designModeEnabled = true }: { designModeEnabled?: boolean })
           onSubmit={listQuery.commitSearch}
           testIdPrefix="forms"
         />
-        {designModeEnabled ? (
-          <DSButton
-            variant="primary"
-            data-testid="create-form-button"
-            isDisabled={!canCreate}
-            onPress={() => router.push(`/${locale}/build`)}
-          >
-            {dict.general.create}
-          </DSButton>
-        ) : null}
+        <DSButton
+          variant="primary"
+          data-testid="create-form-button"
+          isDisabled={!canCreate}
+          onPress={() => router.push(`/${locale}/build`)}
+        >
+          {dict.general.create}
+        </DSButton>
       </ListPageToolbar>
       <div className={`d-flex align-items-end gap-2`}>
         <WorkspaceSelector

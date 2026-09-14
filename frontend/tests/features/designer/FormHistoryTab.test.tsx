@@ -44,7 +44,7 @@ vi.mock('next/navigation', async () => {
 import makeStore from '@/lib/store';
 import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import FormHistoryTab from '@/src/features/designer/ui/FormHistoryTab';
-import type { Dictionary } from '@/src/types/plugins';
+import type { Dictionary } from '@/src/types/dictionary';
 
 const version = (id: string, versionNo: number, state = 'draft') => ({
   id,

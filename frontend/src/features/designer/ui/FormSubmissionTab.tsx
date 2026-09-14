@@ -4,7 +4,7 @@ import { FaRegTrashCan, FaFile } from 'react-icons/fa6';
 import { Link, Button } from '@bcgov/design-system-react-components';
 import { useRouter, usePathname } from 'next/navigation';
 
-import type { Dictionary } from '@/src/types/plugins';
+import type { Dictionary } from '@/src/types/dictionary';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { Modal } from '@/src/components/Modal';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';

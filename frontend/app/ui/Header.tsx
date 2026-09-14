@@ -11,7 +11,6 @@ import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useDictionary } from '../[lang]/Providers';
 import { LoginButton } from './LoginButton';
 import { LanguageSelector, type LanguageOption } from './LanguageSelector';
-import type { PluginNavItem } from '@/src/types/plugins';
 import { WorkspaceModal, WORKSPACE_MODAL_DISMISSED_KEY } from '@/src/components/WorkspaceModal';
 import { forgetListQueries } from '@/src/shared/list/listQueryMemory';
 import { removeSessionValues } from '@/src/shared/storage/sessionStore';
@@ -20,12 +19,10 @@ import { isIdentityEnded } from '@/src/shared/auth/sessionIdentity';
 import styles from './Header.module.css';
 
 type HeaderProps = {
-  headerNavItems: PluginNavItem[];
-  overlayNavItems: PluginNavItem[];
-  showWorkspaces: boolean;
+  designMode: boolean;
 };
 
-function Header({ headerNavItems, showWorkspaces }: Readonly<HeaderProps>) {
+function Header({ designMode }: Readonly<HeaderProps>) {
   const dict = useDictionary();
   const locale = dict.locale === 'en' || dict.locale === 'fr' ? dict.locale : 'en';
   const languageOptions: LanguageOption[] = Object.entries(dict.header.languages).map(
@@ -203,30 +200,11 @@ function Header({ headerNavItems, showWorkspaces }: Readonly<HeaderProps>) {
           </a>,
         ]}
       >
-        <div className="d-flex align-items-center gap-3">
-          {headerNavItems.length > 0 ? (
-            <nav
-              aria-label={dict.header.primaryNavAria}
-              data-testid="primary-nav"
-              className="d-none d-md-block"
-            >
-              <ul className="list-unstyled d-flex align-items-center gap-3 mb-0">
-                {headerNavItems.map((item) => (
-                  <li key={item.id}>
-                    <Link href={item.href} className="text-decoration-underline">
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          ) : null}
-          <div className="d-flex flex-shrink-0 align-items-center justify-content-end gap-3">
-            {authActions()}
-          </div>
+        <div className="d-flex flex-shrink-0 align-items-center justify-content-end gap-3">
+          {authActions()}
         </div>
       </BCHeader>
-      {showWorkspaces && currentUser.loaded && !hasWorkspaces && (
+      {designMode && currentUser.loaded && !hasWorkspaces && (
         <WorkspaceModal canCreateWorkspace={canCreateWorkspace} />
       )}
     </div>

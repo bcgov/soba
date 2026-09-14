@@ -26,21 +26,17 @@ import { isWorkspaceManageRole } from '../workspaceRoles';
 const WorkspaceActionButtons = ({
   workspace,
   onAction,
-  showFormsAction,
   dictActions,
 }: {
   workspace: WorkspaceItem;
   onAction: (name: string, id: string) => void;
-  showFormsAction?: boolean;
   dictActions: { manage: string; forms: string };
 }) => {
   const actions = [];
   if (isWorkspaceManageRole(workspace.role)) {
     actions.push({ name: 'manage', title: dictActions.manage });
   }
-  if (showFormsAction) {
-    actions.push({ name: 'forms', title: dictActions.forms });
-  }
+  actions.push({ name: 'forms', title: dictActions.forms });
 
   return (
     <div className="d-flex gap-2 justify-content-start">
@@ -57,7 +53,7 @@ const WorkspaceActionButtons = ({
   );
 };
 
-function WorkspaceList({ showFormsAction = true }: Readonly<{ showFormsAction?: boolean }>) {
+function WorkspaceList() {
   const dict = useDictionary();
   const dictWorkspaces = dict.workspaces;
   const { authenticated, initializing } = useKeycloak();
@@ -148,7 +144,6 @@ function WorkspaceList({ showFormsAction = true }: Readonly<{ showFormsAction?: 
           <WorkspaceActionButtons
             workspace={workspace}
             onAction={handleAction}
-            showFormsAction={showFormsAction}
             dictActions={dictWorkspaces.actions}
           />
         ),
@@ -161,7 +156,7 @@ function WorkspaceList({ showFormsAction = true }: Readonly<{ showFormsAction?: 
         ),
       },
     ],
-    [handleSelect, handleAction, dictWorkspaces, showFormsAction],
+    [handleSelect, handleAction, dictWorkspaces],
   );
 
   const loading = workspacesLoading;
