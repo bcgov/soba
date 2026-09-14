@@ -23,10 +23,7 @@ export default async function Page({ params }: PageProps) {
   const locale = resolveLocale(lang);
   const dict = await getDictionary(locale);
   return (
-    <PageLayout
-      headingId="formio-v5-render-heading"
-      heading={dict.formioV5.formRender.pageTitle}
-    >
+    <PageLayout headingId="formio-v5-render-heading" heading={dict.formioV5.formRender.pageTitle}>
       <StartSubmission />
     </PageLayout>
   );
