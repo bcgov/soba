@@ -5,10 +5,13 @@ import type {
   FormResponse,
   FormVersionListItem,
   FormVersionResponse,
+  FormWithPermissionsResponse,
   FormWithVersionResponse,
 } from '@soba/lib';
 
 export type {
+  FormVersionLookupResponse,
+  FormVersionSummary,
   FormWithPermissionsResponse,
   ListFormsResponse,
   ListFormVersionsResponse,
@@ -31,6 +34,8 @@ export type SobaFormType = Partial<CreateFormBody> & Partial<UpdateFormBody>;
 export type CreateSobaFormioFormResponse = FormWithVersionResponse;
 
 export type SobaResponseFormType = FormResponse;
+
+export type SobaFormDetail = FormWithPermissionsResponse;
 
 export type SobaFormSummary = FormListItem;
 

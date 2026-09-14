@@ -8,17 +8,12 @@ import type { AppSessionSnapshot } from '@/src/app/routing/appRoutePolicy';
 const h = vi.hoisted(() => ({
   refresh: vi.fn(),
   replace: vi.fn(),
-  refreshWorkspaces: vi.fn(),
   refreshCurrentUser: vi.fn(),
   session: {} as AppSessionSnapshot,
 }));
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
   useKeycloak: () => ({ refresh: h.refresh }),
-}));
-
-vi.mock('@/src/shared/api/useWorkspaces', () => ({
-  useRefreshWorkspaces: () => h.refreshWorkspaces,
 }));
 
 vi.mock('@/src/shared/api/useCurrentUser', () => ({
@@ -75,7 +70,6 @@ describe('AppAccessGuard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     h.refresh.mockResolvedValue(undefined);
-    h.refreshWorkspaces.mockResolvedValue([]);
     h.refreshCurrentUser.mockResolvedValue(undefined);
     h.session = { ...READY };
   });
@@ -116,7 +110,6 @@ describe('AppAccessGuard', () => {
     await userEvent.click(screen.getByTestId('session-error-retry'));
 
     expect(h.refresh).toHaveBeenCalledTimes(1);
-    expect(h.refreshWorkspaces).toHaveBeenCalledTimes(1);
     expect(h.refreshCurrentUser).toHaveBeenCalledTimes(1);
   });
 

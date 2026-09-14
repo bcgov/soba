@@ -34,7 +34,8 @@
     "version": "Version",
     "clearFilters": "Effacer les filtres",
     "noAccess": "Vous n'avez pas accès à ceci.",
-    "sortBy": "Trier par"
+    "sortBy": "Trier par",
+    "lookupTruncated": "Affichage des {limit} premiers."
   },
   "dataTable": {
     "emptyMessage": "Aucun élément trouvé.",
@@ -230,6 +231,9 @@
   "form": {
     "saved": "Formulaire enregistré avec succès.",
     "saveError": "Erreur lors de l'enregistrement du formulaire.",
+    "versionConflict": "Ce formulaire a été modifié depuis son ouverture. Enregistrez vos modifications comme nouvelle version, ou abandonnez-les.",
+    "staleEdits": "Vos modifications non enregistrées ont été faites sur une version antérieure de ce formulaire. Enregistrez-les comme nouvelle version, ou abandonnez-les.",
+    "discardEdits": "Abandonner les modifications",
     "noActiveWorkspace": "Sélectionnez un espace de travail avant de créer un formulaire.",
     "noActiveWorkspaceError": "Sélectionnez un espace de travail avant d'enregistrer ce formulaire.",
     "published": "Formulaire publié avec succès !",

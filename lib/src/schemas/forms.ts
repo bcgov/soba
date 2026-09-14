@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { OffsetPageSchema, makeSortEnum } from './pagination';
+import { LookupMetaSchema, OffsetPageSchema, makeSortEnum } from './pagination';
 import { FORM_SORT_FIELDS, FORM_VERSION_SORT_FIELDS } from '../sort';
 
 export const CreateFormBodySchema = z.object({
@@ -20,6 +20,7 @@ export const UpdateFormBodySchema = z.object({
 export const FormListItemSchema = z.object({
   id: z.string(),
   workspaceId: z.string(),
+  workspaceName: z.string(),
   name: z.string(),
   org: z.string(),
   useCase: z.string(),
@@ -59,8 +60,16 @@ export const FormWithVersionResponseSchema = FormResponseSchema.extend({
   formVersion: FormVersionResponseSchema.nullable(),
 });
 
+export const FormVersionSummarySchema = z.object({
+  id: z.string(),
+  versionNo: z.number().int(),
+  state: z.string(),
+});
+
 export const FormWithPermissionsResponseSchema = FormResponseSchema.extend({
   permissions: z.array(z.string()),
+  /** The highest-numbered version that is not deleted. Save and publish target this one. */
+  currentVersion: FormVersionSummarySchema.nullable(),
 });
 
 export const FormVersionListItemSchema = z.object({
@@ -82,6 +91,7 @@ export type FormListItem = z.infer<typeof FormListItemSchema>;
 export type FormResponse = z.infer<typeof FormResponseSchema>;
 export type FormVersionResponse = z.infer<typeof FormVersionResponseSchema>;
 export type FormWithVersionResponse = z.infer<typeof FormWithVersionResponseSchema>;
+export type FormVersionSummary = z.infer<typeof FormVersionSummarySchema>;
 export type FormWithPermissionsResponse = z.infer<typeof FormWithPermissionsResponseSchema>;
 export type FormVersionListItem = z.infer<typeof FormVersionListItemSchema>;
 
@@ -116,3 +126,9 @@ export const ListFormVersionsResponseSchema = z.object({
 });
 
 export type ListFormVersionsResponse = z.infer<typeof ListFormVersionsResponseSchema>;
+
+export const FormVersionLookupResponseSchema = LookupMetaSchema.extend({
+  items: z.array(FormVersionSummarySchema),
+});
+
+export type FormVersionLookupResponse = z.infer<typeof FormVersionLookupResponseSchema>;

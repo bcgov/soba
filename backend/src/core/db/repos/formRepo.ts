@@ -30,6 +30,7 @@ export interface ListFormsForWorkspaceInput {
 export interface FormListRow {
   id: string;
   workspaceId: string;
+  workspaceName: string;
   name: string;
   status: string;
   org: string;
@@ -106,6 +107,7 @@ export const listFormsForWorkspace = async (
       .select({
         id: forms.id,
         workspaceId: forms.workspaceId,
+        workspaceName: workspaces.name,
         name: forms.name,
         org: forms.org,
         useCase: forms.useCase,
@@ -116,6 +118,7 @@ export const listFormsForWorkspace = async (
         updatedBy: forms.updatedBy,
       })
       .from(forms)
+      .innerJoin(workspaces, eq(workspaces.id, forms.workspaceId))
       .where(where)
       .orderBy(...orderByForSort(FORM_SORT_COLUMNS, input.sort, forms.id))
       .limit(input.limit)

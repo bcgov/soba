@@ -75,6 +75,16 @@ describe('OpenAPI components for lib-backed schemas', () => {
     expect(at(schemas, composite, 'properties', property)).toEqual(ref(child));
   });
 
+  it.each([
+    ['Workspaces_WorkspaceLookupResponse', 'Workspaces_WorkspaceLookupItem'],
+    ['Forms_FormVersionLookupResponse', 'Forms_FormVersionSummary'],
+  ])('%s references its item component', (response, item) => {
+    expect(at(schemas, response, 'properties', 'items', 'items')).toEqual(ref(item));
+    expect(at(schemas, response, 'required')).toEqual(
+      expect.arrayContaining(['items', 'limit', 'truncated']),
+    );
+  });
+
   it('builds the codes response on the named code row', () => {
     expect(at(schemas, 'Meta_CodesKeyedResponse', 'additionalProperties', 'items')).toEqual(
       ref('Meta_CodeRowWithSource'),

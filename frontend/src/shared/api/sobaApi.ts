@@ -8,6 +8,7 @@ import type { SobaFormType } from '../../types/forms';
 import type {
   WorkspaceItem,
   WorkspacesResponse,
+  WorkspaceLookupResponse,
   CreateWorkspaceBody,
   UpdateWorkspaceBody,
 } from '../../types/workspaces';
@@ -24,7 +25,7 @@ export {
   getSobaSubmissions,
   getSobaSubmission,
   getSobaSubmissionData,
-  getSobaFormVersions,
+  lookupFormVersions,
   getSobaFormVersion,
   getSobaFormVersionPage,
   createFormVersion,
@@ -155,7 +156,7 @@ export async function fetchRolesMeta(onlyEnabledFeatures = true): Promise<unknow
 
 export async function fetchWorkspaces(
   token: string,
-  options: Partial<ListQueryArgs> & { requiredPermission?: string } = {},
+  options: Partial<ListQueryArgs> = {},
 ): Promise<WorkspacesResponse> {
   const response = await sobaFetch('/workspaces', {
     token,
@@ -164,7 +165,21 @@ export async function fetchWorkspaces(
       limit: options.limit,
       sort: options.sort,
       q: options.q || undefined,
-      requiredPermission: options.requiredPermission,
+    },
+  });
+  return parseJson(response);
+}
+
+/** Workspaces for a select. The caller must hold every one of `requiredPermissions`. */
+export async function lookupWorkspaces(
+  token: string,
+  options: { requiredPermissions?: readonly string[]; disclaimerAccepted?: boolean } = {},
+): Promise<WorkspaceLookupResponse> {
+  const response = await sobaFetch('/workspaces/lookup', {
+    token,
+    query: {
+      requiredPermissions: options.requiredPermissions?.join(','),
+      disclaimerAccepted: options.disclaimerAccepted,
     },
   });
   return parseJson(response);

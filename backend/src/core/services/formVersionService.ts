@@ -2,18 +2,65 @@ import {
   FormVersionListSort,
   appendFormVersionRevision,
   createEmptyFormVersionDraft,
+  finishFormVersionProvisioning,
+  getCurrentFormVersion,
   getFormVersionById,
   getFormVersionByIdIncludingDeleted,
   getPublishedVersionForForm,
   listFormVersionsForWorkspace,
+  lockFormVersion,
+  lookupFormVersions,
   updateFormVersionDraft,
+  type LookupFormVersionsInput,
 } from '../db/repos/formVersionRepo';
 import { getFormById, getFormEngineCodeForForm } from '../db/repos/formRepo';
 import { createFormEngineAdapter } from '../integrations/form-engine/FormEngineRegistry';
-import { db } from '../db/client';
-import { NotFoundError, ValidationError } from '../errors';
+import { db, type DbOrTx } from '../db/client';
+import { ConflictError, NotFoundError, ValidationError } from '../errors';
 
 const FORM_VERSION_NOT_FOUND = 'Form version not found';
+
+type LockedFormVersion = NonNullable<Awaited<ReturnType<typeof lockFormVersion>>>;
+
+/**
+ * Runs `write` with the version row locked, once the version is confirmed as its form's current
+ * version. The check and the write share the lock, so a publish of the same version cannot land
+ * between them.
+ */
+function withCurrentVersion<T>(
+  input: { workspaceId: string; formVersionId: string },
+  write: (version: LockedFormVersion, tx: DbOrTx) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    const version = await lockFormVersion(input.workspaceId, input.formVersionId, tx);
+    if (!version) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
+
+    const current = await getCurrentFormVersion(input.workspaceId, version.formId, tx);
+    if (current?.id !== version.id) {
+      throw new ConflictError('Form version is not the current version of its form');
+    }
+    return write(version, tx);
+  });
+}
+
+/** A provision this old is taken to have died, and no longer blocks the version. */
+const PROVISIONING_STALE_MS = 2 * 60 * 1000;
+
+/**
+ * Only a draft's schema is written, and not while another save is still writing it: the engine
+ * call runs after the lock is released.
+ */
+function assertSchemaWritable(version: LockedFormVersion): void {
+  if (version.state !== 'draft') {
+    throw new ConflictError('Form version is not a draft');
+  }
+  if (
+    version.engineSyncStatus === 'provisioning' &&
+    Date.now() - version.updatedAt.getTime() < PROVISIONING_STALE_MS
+  ) {
+    throw new ConflictError('Form version schema is already being saved');
+  }
+}
 
 interface CreateDraftInput {
   workspaceId: string;
@@ -105,7 +152,8 @@ export class FormVersionService {
   }
 
   async save(input: SaveInput) {
-    const updated = await db.transaction(async (tx) => {
+    const updated = await withCurrentVersion(input, async (locked, tx) => {
+      assertSchemaWritable(locked);
       const revised = await appendFormVersionRevision(
         {
           workspaceId: input.workspaceId,
@@ -155,19 +203,17 @@ export class FormVersionService {
   }
 
   async publish(input: VersionActionInput) {
-    const version = await getFormVersionById(input.workspaceId, input.formVersionId);
-    if (!version) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
-    if (version.state === 'published') return version; // idempotent
-    assertTransition(version.state, 'published');
-    if (version.engineSyncStatus !== 'ready') {
-      throw new ValidationError('Form version is not ready to publish');
-    }
-    return db.transaction(async (tx) => {
-      const current = await getPublishedVersionForForm(input.workspaceId, version.formId, tx);
-      if (current && current.id !== version.id) {
+    return withCurrentVersion(input, async (version, tx) => {
+      if (version.state === 'published') return version; // idempotent
+      assertTransition(version.state, 'published');
+      if (version.engineSyncStatus !== 'ready') {
+        throw new ValidationError('Form version is not ready to publish');
+      }
+      const incumbent = await getPublishedVersionForForm(input.workspaceId, version.formId, tx);
+      if (incumbent && incumbent.id !== version.id) {
         await updateFormVersionDraft(
           input.workspaceId,
-          current.id,
+          incumbent.id,
           input.actorDisplayLabel,
           stateStamps('archived', input),
           tx,
@@ -221,43 +267,51 @@ export class FormVersionService {
     formVersionId: string;
     schema: Record<string, unknown>;
   }) {
-    const version = await getFormVersionById(input.workspaceId, input.formVersionId);
-    if (!version) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
+    // The engine document is updated in place, so writing a published version changes the live form.
+    const claim = await withCurrentVersion(input, async (locked, tx) => {
+      assertSchemaWritable(locked);
 
-    const engineCode = await getFormEngineCodeForForm(input.workspaceId, version.formId);
-    if (!engineCode) {
-      throw new ValidationError('Form has no form engine configured');
-    }
+      const engineCode = await getFormEngineCodeForForm(input.workspaceId, locked.formId);
+      if (!engineCode) {
+        throw new ValidationError('Form has no form engine configured');
+      }
+      const adapter = createFormEngineAdapter(engineCode);
+      if (typeof adapter.upsertSchema !== 'function') {
+        throw new ValidationError(
+          `Form engine '${engineCode}' does not support schema provisioning`,
+        );
+      }
+      const form = await getFormById(input.workspaceId, locked.formId);
 
-    const form = await getFormById(input.workspaceId, version.formId);
-    const adapter = createFormEngineAdapter(engineCode);
-    if (typeof adapter.upsertSchema !== 'function') {
-      throw new ValidationError(`Form engine '${engineCode}' does not support schema provisioning`);
-    }
-
-    await updateFormVersionDraft(input.workspaceId, input.formVersionId, input.actorDisplayLabel, {
-      engineSyncStatus: 'provisioning',
-      engineSyncError: null,
+      const claimed = await updateFormVersionDraft(
+        input.workspaceId,
+        input.formVersionId,
+        input.actorDisplayLabel,
+        { engineSyncStatus: 'provisioning', engineSyncError: null },
+        tx,
+      );
+      if (!claimed) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
+      return {
+        upsertSchema: adapter.upsertSchema.bind(adapter),
+        title: form?.name,
+        claimedAt: claimed.updatedAt,
+      };
     });
 
+    let engineRef: string;
     try {
-      const { engineRef } = await adapter.upsertSchema({
+      ({ engineRef } = await claim.upsertSchema({
         formVersionId: input.formVersionId,
         workspaceId: input.workspaceId,
         schema: input.schema,
-        title: form?.name,
-      });
-      return updateFormVersionDraft(
-        input.workspaceId,
-        input.formVersionId,
-        input.actorDisplayLabel,
-        { engineSchemaRef: engineRef, engineSyncStatus: 'ready', engineSyncError: null },
-      );
+        title: claim.title,
+      }));
     } catch (err) {
-      await updateFormVersionDraft(
+      await finishFormVersionProvisioning(
         input.workspaceId,
         input.formVersionId,
         input.actorDisplayLabel,
+        claim.claimedAt,
         {
           engineSyncStatus: 'error',
           engineSyncError: err instanceof Error ? err.message : String(err),
@@ -265,6 +319,19 @@ export class FormVersionService {
       );
       throw err;
     }
+
+    const finished = await finishFormVersionProvisioning(
+      input.workspaceId,
+      input.formVersionId,
+      input.actorDisplayLabel,
+      claim.claimedAt,
+      { engineSchemaRef: engineRef, engineSyncStatus: 'ready', engineSyncError: null },
+    );
+    // Another save took the version over after this one's stale window, or it stopped being a draft.
+    if (!finished) {
+      throw new ConflictError('Form version changed while its schema was being saved');
+    }
+    return finished;
   }
 
   /** Reads the form version's schema back from the form engine (null if unprovisioned). */
@@ -297,5 +364,13 @@ export class FormVersionService {
 
   async list(input: ListInput) {
     return listFormVersionsForWorkspace(input);
+  }
+
+  async lookup(input: LookupFormVersionsInput) {
+    return lookupFormVersions(input);
+  }
+
+  async getCurrent(workspaceId: string, formId: string) {
+    return getCurrentFormVersion(workspaceId, formId);
   }
 }

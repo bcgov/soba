@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { OffsetPageSchema, makeSortEnum } from './pagination';
+import { LookupMetaSchema, OffsetPageSchema, makeSortEnum } from './pagination';
 import { WORKSPACE_SORT_FIELDS } from '../sort';
 
 export const WorkspaceItemSchema = z.object({
@@ -57,3 +57,18 @@ export const ListWorkspacesResponseSchema = z.object({
 });
 
 export type ListWorkspacesResponse = z.infer<typeof ListWorkspacesResponseSchema>;
+
+export const WorkspaceLookupItemSchema = WorkspaceItemSchema.pick({
+  id: true,
+  name: true,
+  kind: true,
+  role: true,
+  disclaimerAccepted: true,
+});
+
+export const WorkspaceLookupResponseSchema = LookupMetaSchema.extend({
+  items: z.array(WorkspaceLookupItemSchema),
+});
+
+export type WorkspaceLookupItem = z.infer<typeof WorkspaceLookupItemSchema>;
+export type WorkspaceLookupResponse = z.infer<typeof WorkspaceLookupResponseSchema>;
