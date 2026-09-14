@@ -19,14 +19,16 @@ function getExpectedURL(depEnv?: string): string {
 
   // PR environments (numeric) share the dev host; the path tells them apart.
   if (/^\d+$/.test(process.env.DEP_ENV || "")) {
-    return `https://soba-dev.apps.silver.devops.gov.bc.ca/designer-${depEnv}/`;
+    const prNumber = Number(depEnv);
+    const slot = prNumber % 20;
+    return `https://soba-${slot}-designer.apps.silver.devops.gov.bc.ca`;
   }
 
   switch (depEnv) {
     case "dev":
-      return "https://soba-dev.apps.silver.devops.gov.bc.ca/designer/";
+      return "https://soba-dev-designer.apps.silver.devops.gov.bc.ca/en/forms";
     case "test":
-      return "https://soba-test.apps.silver.devops.gov.bc.ca/designer/";
+      return "https://soba-test.apps.silver.devops.gov.bc.ca/en/forms";
     default:
       throw new Error(`Invalid DEP_ENV: ${depEnv}`);
   }
