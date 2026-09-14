@@ -92,6 +92,11 @@ The repo is a **[pnpm](https://pnpm.io) workspace** (faster installs, shared sto
 | `pnpm lint:frontend` / `pnpm lint:backend`         | Lint one app                                                    |
 | `pnpm lint:fix:frontend` / `pnpm lint:fix:backend` | Lint fix one app                                                |
 | `pnpm lint:lib` / `pnpm lint:fix:lib`              | Lint or lint fix the shared lib                                 |
+| `pnpm format`                                      | Prettier write, lib and both apps                               |
+| `pnpm format:check`                                | Prettier check, lib and both apps (CI gate)                     |
+| `pnpm format:frontend` / `pnpm format:backend`     | Format one app                                                  |
+| `pnpm format:check:frontend` / `pnpm format:check:backend` | Format check one app                                    |
+| `pnpm format:lib` / `pnpm format:check:lib`        | Format or format check the shared lib                           |
 | `pnpm check`                                       | Type/style checks for lib and both apps                         |
 | `pnpm check:frontend` / `pnpm check:backend`       | Check one app                                                   |
 | `pnpm check:lib`                                   | Check the shared lib                                            |
