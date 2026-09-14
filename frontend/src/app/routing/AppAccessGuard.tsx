@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button, InlineAlert } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
+import { PageColumn } from '@/src/components/PageLayout';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useRefreshCurrentUser } from '@/src/shared/api/useCurrentUser';
@@ -50,21 +51,23 @@ export function AppAccessGuard({
   // the route either. The retry lives on the next full load.
   if (session.sessionFailed && !session.sessionLoadedOnce && !redirectTarget) {
     return (
-      <div className="mt-4" role="alert">
-        <InlineAlert variant="danger">{dict.general.sessionError}</InlineAlert>
-        <div className="mt-3">
-          <Button
-            type="button"
-            variant="primary"
-            onPress={() => {
-              handleRetry().catch(() => undefined);
-            }}
-            data-testid="session-error-retry"
-          >
-            {dict.general.tryAgain}
-          </Button>
+      <PageColumn>
+        <div className="mt-4" role="alert">
+          <InlineAlert variant="danger">{dict.general.sessionError}</InlineAlert>
+          <div className="mt-3">
+            <Button
+              type="button"
+              variant="primary"
+              onPress={() => {
+                handleRetry().catch(() => undefined);
+              }}
+              data-testid="session-error-retry"
+            >
+              {dict.general.tryAgain}
+            </Button>
+          </div>
         </div>
-      </div>
+      </PageColumn>
     );
   }
 
@@ -76,7 +79,11 @@ export function AppAccessGuard({
       (session.authenticated && !session.sessionReady && !session.sessionFailed));
 
   if (showLoading || redirectTarget !== null) {
-    return <CenteredProgress label={dict.general.loading} minHeight="50vh" />;
+    return (
+      <PageColumn>
+        <CenteredProgress label={dict.general.loading} minHeight="50vh" />
+      </PageColumn>
+    );
   }
 
   return <>{children}</>;

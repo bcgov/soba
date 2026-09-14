@@ -20,12 +20,11 @@ import { useIsSobaAdmin } from '@/src/features/admin/useIsSobaAdmin';
 import styles from './SideNav.module.css';
 
 interface SideNavProps {
-  showAppLinks: boolean;
   showHome: boolean;
   showWorkspaces: boolean;
 }
 
-export function SideNav({ showAppLinks, showHome, showWorkspaces }: Readonly<SideNavProps>) {
+export function SideNav({ showHome, showWorkspaces }: Readonly<SideNavProps>) {
   const { authenticated } = useKeycloak();
   const { isSobaAdmin } = useIsSobaAdmin();
   const dict = useDictionary();
@@ -69,24 +68,22 @@ export function SideNav({ showAppLinks, showHome, showWorkspaces }: Readonly<Sid
     });
   }
 
-  if (showAppLinks) {
-    navItems.push(
-      {
-        href: `/${locale}/feedback`,
-        title: dict.general.feedback,
-        testId: 'feedback-nav',
-        icon: <FaRegMessage size={20} />,
-        isActive: pathname.startsWith(`/${locale}/feedback`),
-      },
-      {
-        href: `/${locale}/help`,
-        title: dict.general.help,
-        testId: 'help-nav',
-        icon: <FaRegCircleQuestion size={20} />,
-        isActive: pathname.startsWith(`/${locale}/help`),
-      },
-    );
-  }
+  navItems.push(
+    {
+      href: `/${locale}/feedback`,
+      title: dict.general.feedback,
+      testId: 'feedback-nav',
+      icon: <FaRegMessage size={20} />,
+      isActive: pathname.startsWith(`/${locale}/feedback`),
+    },
+    {
+      href: `/${locale}/help`,
+      title: dict.general.help,
+      testId: 'help-nav',
+      icon: <FaRegCircleQuestion size={20} />,
+      isActive: pathname.startsWith(`/${locale}/help`),
+    },
+  );
 
   return (
     <nav className={`d-flex flex-column py-3 px-2 ${styles.sideNav}`}>

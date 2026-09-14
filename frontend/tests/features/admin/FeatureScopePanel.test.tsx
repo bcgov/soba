@@ -124,6 +124,8 @@ describe('FeatureScopePanel', () => {
 
   it('creates a feature scope and returns to the feature access table', async () => {
     await renderPanel({ scopedFeatureCodes: ['document-generation-v3'] });
+    // The page heading belongs to PageLayout.
+    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
 
     await userEvent.type(screen.getByRole('textbox'), SCOPE_ID);
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -147,6 +149,8 @@ describe('FeatureScopePanel', () => {
 
     expect(await screen.findByDisplayValue(SCOPE_ID)).toBeInTheDocument();
     expect(mockFetchFeatureScope).toHaveBeenCalledWith('token', FEATURE_SCOPE_ID);
+    // The page heading belongs to PageLayout.
+    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
   });
 
   it('saves status changes in manage mode', async () => {
