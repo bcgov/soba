@@ -7,9 +7,15 @@ import type {
   SobaFormType,
   CreateSobaFormioFormResponse,
   SobaResponseFormType,
+  SobaFormDetail,
   SobaFormVersionType,
+  ListFormsResponse,
+  ListFormVersionsResponse,
+  FormVersionLookupResponse,
+  SubmissionDataDocument,
 } from '../../types/forms';
 import type { ListSubmissionsResponse, SubmissionListItem } from '@/src/types/submissions';
+import { toListRequestQuery, type ListQueryArgs } from '@/src/types/list';
 
 export async function createSobaFormioForm(
   token: string,
@@ -18,30 +24,29 @@ export async function createSobaFormioForm(
 ): Promise<CreateSobaFormioFormResponse> {
   data.formEngineCode = 'formio-v5';
 
+  if (workspaceId) {
+    data.workspaceId = workspaceId;
+  }
+
   const response = await sobaFetch('/design/forms', {
     token,
     method: 'POST',
     json: data,
-    workspaceId,
   });
   return parseJson(response);
 }
 
-/**
- * POST a Form.io schema to the server to normalize it into a clean, portable, builder-ready
- * form definition. Used both for import (file upload) and export (download).
- */
-export async function normalizeFormSchema(
+export async function updateSobaForm(
   token: string,
-  schema: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
-  const response = await sobaFetch('/design/forms/normalize', {
+  id: string,
+  data: Partial<SobaFormType>,
+): Promise<SobaResponseFormType> {
+  const response = await sobaFetch(`/design/forms/${id}`, {
     token,
-    method: 'POST',
-    json: { schema },
+    method: 'PATCH',
+    json: data,
   });
-  const data = await parseJson<{ schema: Record<string, unknown> }>(response);
-  return data.schema;
+  return parseJson(response);
 }
 
 export async function publishSobaFormVersion(token: string, id: string) {
@@ -52,49 +57,36 @@ export async function publishSobaFormVersion(token: string, id: string) {
   return parseJson(response);
 }
 
-export async function getSobaForm(token: string, id: string): Promise<SobaResponseFormType> {
+export async function getSobaForm(token: string, id: string): Promise<SobaFormDetail> {
   const response = await sobaFetch(`/design/forms/${id}`, { token });
   return parseJson(response);
 }
 
-/** Compact form row for the designer/submit list. */
-export type SobaFormSummary = {
-  id: string;
-  name: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string | null;
-};
-
-/** List forms (PG-backed) with each form's representative version, for the designer/submit list. */
+/** One page of forms. Search, sort and paging are resolved by the server. */
 export async function getSobaForms(
   token: string,
-  workspaceId?: string,
-): Promise<{ items: SobaFormSummary[] }> {
+  args: ListQueryArgs & { workspaceId?: string },
+): Promise<ListFormsResponse> {
   const response = await sobaFetch('/design/forms', {
     token,
-    workspaceId,
-    query: { limit: 100 },
+    query: { ...toListRequestQuery(args), workspaceId: args.workspaceId },
   });
   return parseJson(response);
 }
 
+/** One page of submissions. Search, sort and paging are resolved by the server. */
 export async function getSobaSubmissions(
   token: string,
-  params?: Record<string, string | number | boolean>,
-  workspaceId?: string,
+  args: ListQueryArgs & { formId?: string; workspaceId?: string; workflowState?: string },
 ): Promise<ListSubmissionsResponse> {
-  const query: Record<string, string> = {};
-  if (params) {
-    for (const [key, value] of Object.entries(params)) {
-      query[key] = String(value);
-    }
-  }
   const response = await sobaFetch('/design/submissions', {
     token,
-    workspaceId,
-    query,
+    query: {
+      ...toListRequestQuery(args),
+      formId: args.formId,
+      workspaceId: args.workspaceId,
+      workflowState: args.workflowState,
+    },
   });
   return parseJson(response);
 }
@@ -108,20 +100,38 @@ export async function getSobaSubmission(token: string, id: string): Promise<Subm
 /** Staff read of a submission's answer document (null if not yet provisioned). */
 export async function getSobaSubmissionData(
   token: string,
-  id: string,
-): Promise<{ data?: Record<string, unknown> } | null> {
-  const response = await sobaFetch(`/design/submissions/${id}/data`, { token });
+  submissionId: string,
+): Promise<SubmissionDataDocument | null> {
+  const response = await sobaFetch(`/design/submissions/${submissionId}/data`, { token });
   if (response.status === 404) return null;
+  return parseJson<SubmissionDataDocument>(response);
+}
+
+const FORM_VERSIONS_PATH = '/design/form-versions';
+
+/** One form's versions for a select, newest first. */
+export async function lookupFormVersions(
+  token: string,
+  formId: string,
+): Promise<FormVersionLookupResponse> {
+  const response = await sobaFetch(`${FORM_VERSIONS_PATH}/lookup`, { token, query: { formId } });
   return parseJson(response);
 }
 
-export async function getSobaFormVersions(
+/** One version, by id. */
+export async function getSobaFormVersion(token: string, id: string): Promise<SobaFormVersionType> {
+  const response = await sobaFetch(`${FORM_VERSIONS_PATH}/${id}`, { token });
+  return parseJson(response);
+}
+
+/** One page of a form's versions, for the history table. */
+export async function getSobaFormVersionPage(
   token: string,
-  formId: string,
-): Promise<{ items: SobaFormVersionType[] }> {
-  const response = await sobaFetch('/design/form-versions', {
+  args: ListQueryArgs & { formId: string },
+): Promise<ListFormVersionsResponse> {
+  const response = await sobaFetch(FORM_VERSIONS_PATH, {
     token,
-    query: { formId, limit: 100 },
+    query: { formId: args.formId, ...toListRequestQuery(args) },
   });
   return parseJson(response);
 }
@@ -131,7 +141,7 @@ export async function createFormVersion(
   token: string,
   formId: string,
 ): Promise<SobaFormVersionType> {
-  const response = await sobaFetch('/design/form-versions', {
+  const response = await sobaFetch(FORM_VERSIONS_PATH, {
     token,
     method: 'POST',
     json: { formId },
@@ -158,4 +168,13 @@ export async function getFormVersionSchema(token: string, id: string): Promise<F
   const response = await sobaFetch(`/design/form-versions/${id}/schema`, { token });
   if (response.status === 404) return null;
   return parseJson(response);
+}
+
+/**
+ * A 404 means the submission was already gone, which is the outcome the caller asked for. Reporting
+ * it as a failure would contradict the refreshed list.
+ */
+export async function deleteSobaSubmission(token: string, id: string): Promise<void> {
+  const response = await sobaFetch(`/design/submissions/${id}`, { token, method: 'DELETE' });
+  if (!response.ok && response.status !== 404) await parseJson(response);
 }

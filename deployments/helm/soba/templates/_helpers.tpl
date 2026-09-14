@@ -84,10 +84,36 @@ If mongodb is internal, point at the in-cluster service; otherwise use mongodb.e
 {{- end }}
 
 {{/*
-Frontend public URL (Route / Ingress host).
+Public host shared by every frontend app (Route / Ingress); apps are told apart by routePath.
+Usage: {{ include "soba.frontendHost" $root }}
 */}}
 {{- define "soba.frontendHost" -}}
-{{- printf "%s.%s" (include "soba.fullname" .) .Values.global.domain }}
+{{- .Values.frontend.host | default (printf "%s.%s" (include "soba.fullname" .) .Values.global.domain) -}}
+{{- end }}
+
+{{/*
+Path a named frontend app is served under, e.g. /designer.
+Usage: {{ include "soba.frontendRoutePathFor" (dict "root" $root "name" "forms") }}
+*/}}
+{{- define "soba.frontendRoutePathFor" -}}
+{{- $app := index .root.Values.frontend.apps .name | default dict -}}
+{{- $app.routePath | default "" -}}
+{{- end }}
+
+{{/*
+Public https:// URL for a named frontend app. Backend and frontend both read these, so both take
+them from here and cannot drift.
+Usage: {{ include "soba.frontendAppUrlFor" (dict "root" $root "name" "forms") }}
+*/}}
+{{- define "soba.frontendAppUrlFor" -}}
+{{- printf "https://%s%s" (include "soba.frontendHost" .root) (include "soba.frontendRoutePathFor" (dict "root" .root "name" .name)) -}}
+{{- end }}
+
+{{/*
+The https:// origin every frontend app shares. Feeds the backend CORS allowlist.
+*/}}
+{{- define "soba.frontendOrigins" -}}
+{{- printf "https://%s" (include "soba.frontendHost" .) -}}
 {{- end }}
 
 {{/*
@@ -98,11 +124,18 @@ Backend public URL host (browser and NEXT_PUBLIC_SOBA_API_BASE_URL).
 {{- end }}
 
 {{/*
+URL path the API is served under (e.g. /chefs). Blank serves at the host root.
+*/}}
+{{- define "soba.backendBasePath" -}}
+{{- .Values.backend.basePath | default "" -}}
+{{- end }}
+
+{{/*
 Cluster-internal API base URL for Next.js SSR (Server Components) — plain HTTP to backend Service.
 See frontend SOBA_API_INTERNAL_URL in runtimeConfig. Override with frontend.internalApiBaseUrl if needed.
 */}}
 {{- define "soba.sobaApiInternalBaseUrl" -}}
-{{- printf "http://%s-backend.%s.svc.cluster.local:%v/api/v1" (include "soba.fullname" .) .Release.Namespace (.Values.backend.service.port) }}
+{{- printf "http://%s-backend.%s.svc.cluster.local:%v%s/api/v1" (include "soba.fullname" .) .Release.Namespace (.Values.backend.service.port) (include "soba.backendBasePath" .) }}
 {{- end }}
 
 {{/*
@@ -143,10 +176,56 @@ Any other code (e.g. virusscan-noop) needs no clamav wiring.
 {{- end }}
 
 {{/*
-Truthy ("true") only when the backend caches with cache-redis. Gates the valkey alias Service
-and the PLUGIN_CACHE_REDIS_URL env together so they cannot drift apart. Any other code (e.g.
-cache-memory) needs no valkey wiring.
+Truthy ("true") only when the backend caches with cache-redis. Gates the PLUGIN_CACHE_REDIS_URL
+env. Any other code (e.g. cache-memory) needs no cache wiring.
 */}}
 {{- define "soba.cacheUsesRedis" -}}
 {{- if eq .Values.backend.config.cacheDefaultCode "cache-redis" -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Truthy ("true") only when the backend runs the message bus on messagebus-redis. Gates the
+PLUGIN_MESSAGEBUS_REDIS_* env. Any other code (e.g. messagebus-memory) needs no bus wiring.
+*/}}
+{{- define "soba.messagebusUsesRedis" -}}
+{{- if eq .Values.backend.config.messagebusDefaultCode "messagebus-redis" -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Truthy ("true") only when the backend runs event streams on eventstream-redis. Gates the
+PLUGIN_EVENTSTREAM_REDIS_* env. Any other code (e.g. eventstream-memory) needs no stream wiring.
+*/}}
+{{- define "soba.eventstreamUsesRedis" -}}
+{{- if eq .Values.backend.config.eventStreamDefaultCode "eventstream-redis" -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Truthy ("true") when anything (cache, message bus or event stream) needs Valkey. Gates the single
+valkey alias Service, which they share — so it exists whenever any is on redis and never drifts.
+*/}}
+{{- define "soba.usesValkey" -}}
+{{- if or (eq .Values.backend.config.cacheDefaultCode "cache-redis") (eq .Values.backend.config.messagebusDefaultCode "messagebus-redis") (eq .Values.backend.config.eventStreamDefaultCode "eventstream-redis") -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Feature status env vars for the backend, consumed by the seed step.
+
+Must stay inline: the only consumer is a pre-install/pre-upgrade hook Job, and Helm creates hook
+resources before ConfigMaps.
+
+Name normalization matches featureEnvName() in backend/src/core/db/featureFlags.ts. An unrecognised
+value fails the render, so a typo or an unquoted YAML boolean cannot pass as "no opinion". The
+status list mirrors active rows in soba.feature_status; keep the two in step.
+*/}}
+{{- define "soba.featureEnv" -}}
+{{- $valid := list "enabled" "disabled" "experimental" "deprecated" -}}
+{{- range $code, $value := .Values.backend.features }}
+{{- $status := "" }}
+{{- if $value }}{{ $status = toString $value }}{{ else if kindIs "bool" $value }}{{ $status = toString $value }}{{ end }}
+{{- if and $status (not (has $status $valid)) }}
+{{- fail (printf "backend.features.%s: %s is not a feature status. Use one of: %s (quoted)." $code $status (join ", " $valid)) }}
+{{- end }}
+- name: FEATURE_{{ regexReplaceAll "[^A-Z0-9]" (upper $code) "_" }}_STATUS
+  value: {{ $status | quote }}
+{{- end }}
 {{- end }}

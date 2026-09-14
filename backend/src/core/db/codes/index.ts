@@ -10,12 +10,14 @@ export const Roles = {
   form_submitter: 'form_submitter',
   submission_reviewer: 'submission_reviewer',
   submission_approver: 'submission_approver',
+  team_manager: 'team_manager',
 } as const;
 export type RoleCode = (typeof Roles)[keyof typeof Roles];
 
 /** Form permissions. `all` is the `*` wildcard, held only by form_admin. */
 export const Permissions = {
   all: '*',
+  form_create: 'form_create',
   form_read: 'form_read',
   form_update: 'form_update',
   form_delete: 'form_delete',
@@ -30,8 +32,18 @@ export const Permissions = {
   submission_review: 'submission_review',
   team_read: 'team_read',
   team_update: 'team_update',
+  document_template_create: 'document_template_create',
+  document_template_read: 'document_template_read',
+  document_template_delete: 'document_template_delete',
 } as const;
 export type PermissionCode = (typeof Permissions)[keyof typeof Permissions];
+
+/**
+ * POST /forms writes the form and its first design. `form_create` is not seeded onto any role;
+ * only form_admin matches it (via `*`). form_designer has `design_create` for new designs on
+ * existing forms.
+ */
+export const FormCreatePermissions = [Permissions.form_create, Permissions.design_create] as const;
 
 export const RoleStatus = {
   active: 'active',
@@ -126,6 +138,8 @@ export const Features = {
   /** Per-backend: which document-generation engine is available (v3 is scoped). */
   document_generation_v2: 'document-generation-v2',
   document_generation_v3: 'document-generation-v3',
+  /** Backend-only: gates generating and purging development data. Off in production. */
+  dev_data: 'dev-data',
 } as const;
 export type FeatureCode = (typeof Features)[keyof typeof Features];
 
@@ -148,6 +162,14 @@ export const FeatureScopeType = {
   form: 'form',
 } as const;
 export type FeatureScopeTypeCode = (typeof FeatureScopeType)[keyof typeof FeatureScopeType];
+
+/** Lifecycle of a generated development data set (dev_data_run.status). */
+export const DevDataRunStatus = {
+  generating: 'generating',
+  active: 'active',
+  purged: 'purged',
+} as const;
+export type DevDataRunStatusCode = (typeof DevDataRunStatus)[keyof typeof DevDataRunStatus];
 
 /** Status of a feature_scope grant (feature_scope.status). */
 export const FeatureScopeStatus = {

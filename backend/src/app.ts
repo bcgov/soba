@@ -13,6 +13,8 @@ import {
   logTempStorageSelfTest,
   logVirusScanSelfTest,
   logCacheSelfTest,
+  logMessageBusSelfTest,
+  logEventStreamSelfTest,
   logDocumentGenerationReadiness,
 } from './core/api/health';
 import { metaRouter } from './core/api/meta';
@@ -30,13 +32,17 @@ import { Features } from './core/db/codes';
 const app = express();
 const port = Number(process.env.PORT) || 4000;
 
+// The app serves the base path itself, so Routes and probes address the same URLs the browser uses.
+const apiBasePath = env.getApiBasePath();
+const apiPath = (path: string) => `${apiBasePath}${path}`;
+
 // Trust X-Forwarded-* from a bounded number of proxies (not `true` — breaks express-rate-limit IP keys)
 app.set('trust proxy', env.getTrustProxySetting());
 
 initializePassport();
 
 // The browser can only read the echoed workspace header if it's explicitly exposed.
-const corsExposedHeaders = ['x-soba-workspace-id'];
+const corsExposedHeaders = [];
 // CORS is always restricted to an explicit allowlist of trusted origins (never `*`).
 // Production origins come from CORS_ORIGIN; in development we fall back to CORS_DEV_ORIGIN
 // (configurable per developer via .env) when CORS_ORIGIN is unset.
@@ -73,16 +79,16 @@ app.use(passport.initialize());
 app.use(globalRateLimit);
 
 // ——— Public routes (no authentication) ———
-app.get('/api/docs/openapi.json', publicRateLimit, (_req, res) => {
+app.get(apiPath('/api/docs/openapi.json'), publicRateLimit, (_req, res) => {
   res.json(buildOpenApiSpec());
 });
 app.use(
-  '/api/docs',
+  apiPath('/api/docs'),
   publicRateLimit,
   swaggerUi.serve,
   swaggerUi.setup(null, {
     swaggerOptions: {
-      url: '/api/docs/openapi.json',
+      url: apiPath('/api/docs/openapi.json'),
     },
   }),
 );
@@ -90,8 +96,8 @@ app.use(
 // ——— v1 API ———
 // Each surface has its own base path, so its middleware only runs for its own routes (no fall-through,
 // no double rate-limit) and its auth stack is uniform.
-app.use('/api/v1/meta', publicRateLimit, express.json(), metaRouter);
-app.use('/api/v1/health', publicRateLimit, healthRouter);
+app.use(apiPath('/api/v1/meta'), publicRateLimit, express.json(), metaRouter);
+app.use(apiPath('/api/v1/health'), publicRateLimit, healthRouter);
 
 // Body limit for the body-carrying surfaces — larger than express's 100kb default so document
 // generation can carry a base64 template inline (see env.getJsonBodyLimit). meta stays at the
@@ -101,7 +107,7 @@ const jsonBodyLimit = env.getJsonBodyLimit();
 // Submit feature (public-capable): anonymous resolves to the public user; the Form submitters audience
 // decides access. 404s when submit-mode is disabled.
 app.use(
-  '/api/v1/submit',
+  apiPath('/api/v1/submit'),
   apiRateLimit,
   express.json({ limit: jsonBodyLimit }),
   checkJwt({ allowPublic: true }),
@@ -112,7 +118,7 @@ app.use(
 
 // Design feature (staff): mandatory auth. 404s when design-mode is disabled.
 app.use(
-  '/api/v1/design',
+  apiPath('/api/v1/design'),
   apiRateLimit,
   express.json({ limit: jsonBodyLimit }),
   checkJwt(),
@@ -123,7 +129,7 @@ app.use(
 
 // Admin: platform administration.
 app.use(
-  '/api/v1/admin',
+  apiPath('/api/v1/admin'),
   apiRateLimit,
   express.json({ limit: jsonBodyLimit }),
   checkJwt(),
@@ -134,7 +140,7 @@ app.use(
 
 // Core: workspace/account management (mandatory auth). Mounted last so the more specific paths win.
 app.use(
-  '/api/v1',
+  apiPath('/api/v1'),
   apiRateLimit,
   express.json({ limit: jsonBodyLimit }),
   checkJwt(),
@@ -148,5 +154,8 @@ app.listen(port, () => {
     .then(logTempStorageSelfTest)
     .then(logVirusScanSelfTest)
     .then(logCacheSelfTest)
-    .then(logDocumentGenerationReadiness);
+    .then(logMessageBusSelfTest)
+    .then(logEventStreamSelfTest)
+    .then(logDocumentGenerationReadiness)
+    .catch((err) => log.warn({ err }, 'Startup diagnostics failed'));
 });

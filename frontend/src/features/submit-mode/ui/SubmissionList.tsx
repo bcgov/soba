@@ -1,64 +1,58 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { InlineAlert } from '@bcgov/design-system-react-components';
+import { useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
-import { getSobaSubmissions } from '@/src/shared/api/sobaApiDesign';
+import { useFormSubmissions } from '@/src/features/designer/useFormSubmissions';
+import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';
+import { SUBMISSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
+import { PAGE_SIZE_OPTIONS, useListQuery } from '@/src/shared/list/useListQuery';
 import type { SubmissionListItem } from '@/src/types/submissions';
 import { DataTable, Column } from '@/src/components/DataTable';
-import { ListPageLayout } from '@/src/components/ListPageLayout';
-import { DsPageHeading } from '@/app/ui/DsPageHeading';
 import { RowActionButton } from '@/src/components/RowActionButton';
 import { WorkflowStateBadge } from './WorkflowStateBadge';
-import { useAppSelector } from '@/lib/store';
 
 interface SubmissionListProps {
   formId?: string;
 }
 
 export function SubmissionList({ formId }: SubmissionListProps = {}) {
-  const { authenticated, token, initializing } = useKeycloak();
+  const { authenticated, initializing } = useKeycloak();
   const dict = useDictionary();
   const router = useRouter();
   const pathname = usePathname();
   const locale = getLocaleFromPath(pathname);
-  const [submissions, setSubmissions] = useState<SubmissionListItem[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [pageSize, setPageSize] = useState(10);
-  const [currentPage, setCurrentPage] = useState(1);
+  const listQuery = useListQuery(SUBMISSIONS_LIST_QUERY);
 
-  const { activeWorkspaceId } = useAppSelector((state) => state.workspace);
+  // The endpoint requires a scope anchor and rejects an unscoped list, so without a form there is
+  // no request to make. `formId` is the SOBA formId, routed from FormList.
+  const {
+    submissions,
+    total,
+    isLoading,
+    error: loadError,
+  } = useFormSubmissions(formId, true, {
+    offset: listQuery.offset,
+    limit: listQuery.pageSize,
+    sort: listQuery.sort,
+    q: listQuery.q,
+  });
 
-  const paginatedSubmissions = useMemo(
-    () => submissions.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [submissions, currentPage, pageSize],
+  const error = useMemo(
+    () =>
+      loadError
+        ? loadErrorMessage(loadError, {
+            sessionExpired: dict.general.sessionExpired,
+            noAccess: dict.general.noAccess,
+            failed: dict.submission.error,
+          })
+        : null,
+    [loadError, dict.general.sessionExpired, dict.general.noAccess, dict.submission.error],
   );
 
-  useEffect(() => {
-    if (authenticated && token && activeWorkspaceId) {
-      const fetchSubmissions = async () => {
-        try {
-          // `formId` is the SOBA formId (routed from FormList); list submissions for it directly.
-          const params = formId ? { formId } : undefined;
-          const data = await getSobaSubmissions(token, params, activeWorkspaceId);
-          setSubmissions(data.items || []);
-        } catch {
-          // Submissions failed to load; the empty state is shown to the user.
-        } finally {
-          setIsLoaded(true);
-        }
-      };
-
-      fetchSubmissions();
-    }
-    // No workspace selected for this tab: submissions are workspace-scoped, so we render a
-    // "select a workspace" prompt (below) instead of calling the API.
-  }, [authenticated, token, formId, activeWorkspaceId]);
-
-  const loading = initializing || (authenticated && (!token || !isLoaded));
+  const loading = initializing || isLoading;
 
   // Auth gate only — loading (including Keycloak init) is shown inside the table
   // body so the page heading stays visible throughout.
@@ -85,7 +79,9 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
       key: 'formName',
       label: dict.submission?.columns?.formName || dict.form?.nameLabel || 'Form Name',
       render: (sub) => (
-        <span className="fw-semibold">{sub.formName || dict.form?.nameLabel || 'Untitled Form'}</span>
+        <span className="fw-semibold">
+          {sub.formName || dict.form?.nameLabel || 'Untitled Form'}
+        </span>
       ),
     },
     {
@@ -106,34 +102,22 @@ export function SubmissionList({ formId }: SubmissionListProps = {}) {
   ];
 
   return (
-    <ListPageLayout>
-      <DsPageHeading id="submissions-heading">
-        {dict.submission?.submissions || 'Submissions'}
-      </DsPageHeading>
-      {authenticated && !initializing && !activeWorkspaceId ? (
-        <InlineAlert variant="info" data-testid="submissions-select-workspace">
-          {dict.general.selectWorkspace}
-        </InlineAlert>
-      ) : (
-        <DataTable<SubmissionListItem>
-          data={paginatedSubmissions}
-          columns={columns}
-          loading={loading}
-          emptyMessage={dict.submission?.empty || 'No submissions found yet.'}
-          loadingMessage={dict.submission?.loading || 'Loading submissions...'}
-          keyExtractor={(sub) => sub.id}
-          itemName={dict.submission?.submissions || 'submissions'}
-          caption={dict.submission?.submissions || 'Submissions'}
-          totalItems={submissions.length}
-          pageSize={pageSize}
-          currentPage={currentPage}
-          onPageChange={setCurrentPage}
-          onPageSizeChange={(size) => {
-            setPageSize(size);
-            setCurrentPage(1);
-          }}
-        />
-      )}
-    </ListPageLayout>
+    <DataTable<SubmissionListItem>
+      data={submissions}
+      columns={columns}
+      loading={loading}
+      error={error}
+      emptyMessage={dict.submission?.empty || 'No submissions found yet.'}
+      loadingMessage={dict.submission?.loading || 'Loading submissions...'}
+      keyExtractor={(sub) => sub.id}
+      itemName={dict.submission?.submissions || 'submissions'}
+      caption={dict.submission?.submissions || 'Submissions'}
+      totalItems={total}
+      pageSize={listQuery.pageSize}
+      currentPage={listQuery.page}
+      onPageChange={listQuery.setPage}
+      onPageSizeChange={listQuery.setPageSize}
+      pageSizeOptions={PAGE_SIZE_OPTIONS}
+    />
   );
 }

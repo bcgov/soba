@@ -1,6 +1,9 @@
-import { and, desc, eq, lt, sql } from 'drizzle-orm';
+import { and, count, eq, ilike, sql } from 'drizzle-orm';
+import { SOBA_ADMIN_SORT_FIELDS, type SortToken } from '@soba/lib';
 import { db } from '../client';
 import { appUsers, sobaAdmins } from '../schema';
+import { likePattern, orderByForSort, type SortColumns } from '../listSort';
+import { readListPage } from '../listRead';
 
 /** Second int for `pg_advisory_xact_lock`; must not collide with workspaceRepo / membershipRepo lock ids. */
 const ADV_LOCK_UPSERT_SOBA_ADMIN = 1_774_566_321;
@@ -16,33 +19,60 @@ export interface SobaAdminListRow {
   displayLabel: string | null;
 }
 
+export type SobaAdminListSortField = (typeof SOBA_ADMIN_SORT_FIELDS)[number];
+export type SobaAdminListSort = SortToken<SobaAdminListSortField>;
+
+const SOBA_ADMIN_SORT_COLUMNS: SortColumns<SobaAdminListSortField> = {
+  // A user who has never signed in has no label yet.
+  displayLabel: { column: appUsers.displayLabel, nullable: true, caseInsensitive: true },
+  source: { column: sobaAdmins.source },
+  // Only an IdP-sourced grant is synced; a direct grant has no timestamp.
+  syncedAt: { column: sobaAdmins.syncedAt, nullable: true },
+};
+
 export interface ListSobaAdminsInput {
+  offset: number;
   limit: number;
-  afterUserId?: string;
+  sort: SobaAdminListSort;
+  source?: string;
+  q?: string;
 }
 
-/**
- * List SOBA platform admins with user display label (cursor-paginated by userId).
- */
+/** List SOBA platform admins with user display label. */
 export async function listSobaAdmins(
   input: ListSobaAdminsInput,
-): Promise<{ items: SobaAdminListRow[]; hasMore: boolean }> {
-  const base = db
-    .select({
-      userId: sobaAdmins.userId,
-      source: sobaAdmins.source,
-      identityProviderCode: sobaAdmins.identityProviderCode,
-      syncedAt: sobaAdmins.syncedAt,
-      displayLabel: appUsers.displayLabel,
-    })
-    .from(sobaAdmins)
-    .innerJoin(appUsers, eq(appUsers.id, sobaAdmins.userId));
-  const withWhere = input.afterUserId ? base.where(lt(sobaAdmins.userId, input.afterUserId)) : base;
-  const rows = await withWhere.orderBy(desc(sobaAdmins.userId)).limit(input.limit + 1);
-  return {
-    items: rows.slice(0, input.limit),
-    hasMore: rows.length > input.limit,
-  };
+): Promise<{ items: SobaAdminListRow[]; total: number }> {
+  const whereClauses = [];
+  if (input.source) {
+    whereClauses.push(eq(sobaAdmins.source, input.source));
+  }
+  if (input.q) {
+    whereClauses.push(ilike(appUsers.displayLabel, likePattern(input.q)));
+  }
+  const where = whereClauses.length > 0 ? and(...whereClauses) : undefined;
+
+  return readListPage(async (tx) => {
+    const items = await tx
+      .select({
+        userId: sobaAdmins.userId,
+        source: sobaAdmins.source,
+        identityProviderCode: sobaAdmins.identityProviderCode,
+        syncedAt: sobaAdmins.syncedAt,
+        displayLabel: appUsers.displayLabel,
+      })
+      .from(sobaAdmins)
+      .innerJoin(appUsers, eq(appUsers.id, sobaAdmins.userId))
+      .where(where)
+      .orderBy(...orderByForSort(SOBA_ADMIN_SORT_COLUMNS, input.sort, sobaAdmins.userId))
+      .limit(input.limit)
+      .offset(input.offset);
+    const totals = await tx
+      .select({ total: count() })
+      .from(sobaAdmins)
+      .innerJoin(appUsers, eq(appUsers.id, sobaAdmins.userId))
+      .where(where);
+    return { items, total: totals[0]?.total ?? 0 };
+  });
 }
 
 /**
@@ -120,36 +150,33 @@ export async function upsertSobaAdminFromIdp(
 
 /**
  * Manually add (or pin) a user as SOBA admin (source='direct').
- * If they already have an idp-sourced row, converts to direct so they remain admin even if IdP revokes.
+ * An idp-sourced row becomes direct so they remain admin even if the IdP revokes.
+ * user_id is a foreign key to app_user, so the caller must confirm the user exists.
  */
 export async function addDirectSobaAdmin(
   userId: string,
   addedByDisplayLabel: string | null,
 ): Promise<void> {
-  const now = new Date();
-  const existing = await db.select().from(sobaAdmins).where(eq(sobaAdmins.userId, userId)).limit(1);
-
-  if (existing[0]) {
-    await db
-      .update(sobaAdmins)
-      .set({
-        source: SOBA_ADMIN_SOURCE_DIRECT,
-        identityProviderCode: null,
-        syncedAt: null,
-        updatedAt: now,
-        updatedBy: addedByDisplayLabel,
-      })
-      .where(eq(sobaAdmins.userId, userId));
-  } else {
-    await db.insert(sobaAdmins).values({
+  await db
+    .insert(sobaAdmins)
+    .values({
       userId,
       source: SOBA_ADMIN_SOURCE_DIRECT,
       identityProviderCode: null,
       syncedAt: null,
       createdBy: addedByDisplayLabel,
       updatedBy: addedByDisplayLabel,
+    })
+    .onConflictDoUpdate({
+      target: sobaAdmins.userId,
+      set: {
+        source: SOBA_ADMIN_SOURCE_DIRECT,
+        identityProviderCode: null,
+        syncedAt: null,
+        updatedAt: new Date(),
+        updatedBy: addedByDisplayLabel,
+      },
     });
-  }
 }
 
 /**

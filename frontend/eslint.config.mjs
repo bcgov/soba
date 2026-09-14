@@ -10,6 +10,9 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     '.next/**',
+    // Per-variant dev-server build dirs (NEXT_DIST_DIR).
+    '.next-designer/**',
+    '.next-forms/**',
     'out/**',
     'build/**',
     'next-env.d.ts',
@@ -27,6 +30,26 @@ const eslintConfig = defineConfig([
       'sonarjs/no-duplicate-string': ['error', { threshold: 3 }],
       // S3358: ternary operators should not be nested.
       'sonarjs/no-nested-conditional': 'error',
+    },
+  },
+  // Route files are Server Components. The design system is built on React Aria, so importing it
+  // here pulls createContext into the server graph and the route 500s at runtime - which nothing
+  // else in the toolchain catches. Reach it through a client wrapper instead (see SecondaryText).
+  {
+    files: ['app/**/page.tsx', 'app/**/layout.tsx', 'app/**/template.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@bcgov/design-system-react-components',
+              message:
+                'Server Components cannot import the design system. Use a client wrapper component.',
+            },
+          ],
+        },
+      ],
     },
   },
   // Tests and test/build config legitimately use/wrap console and repeat fixture literals.

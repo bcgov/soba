@@ -12,8 +12,8 @@ Work from **branches** (not forks) off `develop`. Open a **pull request** into `
 
 Before requesting review, ensure:
 
-- **All checks pass** — e.g. `pnpm check` at the repo root (type-check and lint for backend and frontend). See [pnpm](#pnpm) for root commands.
-- **Unit tests** — New or changed behaviour is covered by tests. See [Backend](#backend) and [Frontend](#frontend) for how tests are run and where they live.
+- **All checks pass** — e.g. `pnpm check` at the repo root (type-check and lint for lib, backend and frontend). See [pnpm](#pnpm) for root commands.
+- **Unit tests** — New or changed behaviour is covered by tests. See [Backend](#backend), [Frontend](#frontend) and [Lib](#lib) for how tests are run and where they live.
 
 ---
 
@@ -60,7 +60,7 @@ This starts:
 - **Temporal** (gRPC port 7233) — workflow engine
 - **Temporal UI** (port 8088) — workflow dashboard
 
-**Inside the devcontainer** use `host.docker.internal` to reach sidecars from backend processes (e.g. `mongodb://host.docker.internal:27017`, `postgresql://postgres:postgres@host.docker.internal:5432/postgres`, `http://host.docker.internal:3001`). The `app` service sets `extra_hosts: host.docker.internal:host-gateway` so that this hostname works on Linux as well as on Docker Desktop (Mac/Windows). **Committed `.env.example` files use `localhost`** for DB, Form.io, and API URLs — that works when the browser and forwarded ports are on the host (e.g. http://localhost:3000 with `NEXT_PUBLIC_SOBA_API_BASE_URL=http://localhost:4000/api/v1`). Use `host.docker.internal` in backend env when the API server runs inside the container and must reach compose services. Form.io login: `formio@localhost.com` / `formio`.
+**Inside the devcontainer** use `host.docker.internal` to reach sidecars from backend processes (e.g. `mongodb://host.docker.internal:27017`, `postgresql://postgres:postgres@host.docker.internal:5432/postgres`, `http://host.docker.internal:3001`). The `app` service sets `extra_hosts: host.docker.internal:host-gateway` so that this hostname works on Linux as well as on Docker Desktop (Mac/Windows). **Committed `.env.example` files use `localhost`** for DB, Form.io, and API URLs — that works when the browser and forwarded ports are on the host (e.g. http://localhost:3000 with `NEXT_PUBLIC_SOBA_API_BASE_URL=http://localhost:4000/chefs/api/v1`). Use `host.docker.internal` in backend env when the API server runs inside the container and must reach compose services. Form.io login: `formio@localhost.com` / `formio`.
 
 **Database (migrate + seed):** After the sidecars are up, from the repo root run `pnpm db:init` (or `pnpm dev:db:up` to start services and init in one step). See [Drizzle](#drizzle) for individual `db:migrate` / `db:seed` commands.
 
@@ -68,7 +68,7 @@ This starts:
 
 ## pnpm
 
-The repo is a **[pnpm](https://pnpm.io) workspace** (faster installs, shared store, strict dependency graph). Root `package.json` delegates to the `frontend` and `backend` workspaces.
+The repo is a **[pnpm](https://pnpm.io) workspace** (faster installs, shared store, strict dependency graph). Root `package.json` delegates to the `lib`, `frontend` and `backend` workspaces.
 
 **Why pnpm:** Single lockfile and workspace protocol for frontend + backend, disk-efficient store, and consistent installs across dev and CI.
 
@@ -77,19 +77,29 @@ The repo is a **[pnpm](https://pnpm.io) workspace** (faster installs, shared sto
 | Command                                            | What it does                                                    |
 | -------------------------------------------------- | --------------------------------------------------------------- |
 | `pnpm install`                                     | Install all workspace deps (run after clone / when deps change) |
-| `pnpm build`                                       | `build:frontend` then `build:backend`                           |
+| `pnpm build`                                       | `build:lib`, `build:frontend`, then `build:backend`             |
 | `pnpm build:frontend` / `pnpm build:backend`       | Build one app                                                   |
-| `pnpm test`                                        | Run frontend and backend tests                                  |
+| `pnpm build:lib`                                   | Build the shared lib into `lib/dist`                            |
+| `pnpm test`                                        | Run lib, frontend and backend tests                             |
 | `pnpm test:frontend` / `pnpm test:backend`         | Test one app                                                    |
-| `pnpm lint`                                        | Lint frontend and backend                                       |
-| `pnpm lint:fix`                                    | Lint with auto-fix both                                         |
+| `pnpm test:lib`                                    | Test the shared lib                                             |
+| `pnpm lint`                                        | Lint lib, frontend and backend                                  |
+| `pnpm lint:fix`                                    | Lint with auto-fix, all three                                   |
 | `pnpm db:migrate`                                  | Run pending DB migrations (backend)                             |
 | `pnpm db:seed`                                     | Seed DB (run after migrate)                                     |
 | `pnpm db:init`                                     | Migrate then seed (full DB setup)                               |
+| `pnpm db:dev-data`                                 | Build/remove development data ([guide](backend/src/features/dev-data/README.md)) |
 | `pnpm lint:frontend` / `pnpm lint:backend`         | Lint one app                                                    |
 | `pnpm lint:fix:frontend` / `pnpm lint:fix:backend` | Lint fix one app                                                |
-| `pnpm check`                                       | Type/style checks for both apps                                 |
+| `pnpm lint:lib` / `pnpm lint:fix:lib`              | Lint or lint fix the shared lib                                 |
+| `pnpm format`                                      | Prettier write, lib and both apps                               |
+| `pnpm format:check`                                | Prettier check, lib and both apps (CI gate)                     |
+| `pnpm format:frontend` / `pnpm format:backend`     | Format one app                                                  |
+| `pnpm format:check:frontend` / `pnpm format:check:backend` | Format check one app                                    |
+| `pnpm format:lib` / `pnpm format:check:lib`        | Format or format check the shared lib                           |
+| `pnpm check`                                       | Type/style checks for lib and both apps                         |
 | `pnpm check:frontend` / `pnpm check:backend`       | Check one app                                                   |
+| `pnpm check:lib`                                   | Check the shared lib                                            |
 | `pnpm qa`                                          | `check` then `test` (PR readiness shortcut)                     |
 | `pnpm qa:build`                                    | `qa` then `build`                                               |
 | `pnpm dev:services:up`                             | Start sidecars via docker compose (`up -d --wait`)              |
@@ -109,21 +119,22 @@ VS Code config lives in `.vscode/launch.json` and `.vscode/tasks.json`.
 
 **Launch (`launch.json`):** Run and debug from the Run and Debug view.
 
-| Configuration                          | Purpose                                                          |
-| -------------------------------------- | ---------------------------------------------------------------- |
-| **SOBA Backend**                       | Start backend dev server (`pnpm dev` in `backend/`)              |
-| **SOBA Temporal Worker**               | Start Temporal worker (`tsx watch temporal-worker.ts`)           |
-| **SOBA Frontend**                      | Start frontend dev server (`pnpm dev:watch` in `frontend/`)      |
-| **SOBA (Backend + Temporal + Frontend)** | Compound: backend, Temporal worker, and frontend               |
-| **SOBA (Backend + Temporal)**          | Compound: backend and Temporal worker                            |
-| **SOBA Frontend (Chrome)**             | Attach Chrome to frontend (URL `http://localhost:3000`)          |
+| Configuration                                  | Purpose                                                      |
+| ---------------------------------------------- | ------------------------------------------------------------ |
+| **SOBA Backend**                               | Start backend dev server (`pnpm dev` in `backend/`)          |
+| **SOBA Temporal Worker (soba)**                | Worker on the `soba` queue (health port 9090)                |
+| **SOBA Temporal Worker (document-generation)** | Worker on the `document-generation` queue (health port 9091) |
+| **SOBA Frontend**                              | Start frontend dev server (`pnpm dev:watch` in `frontend/`)  |
+| **SOBA (Backend + Temporal + Frontend)**       | Compound: backend, both Temporal workers, and frontend       |
+| **SOBA (Backend + Temporal)**                  | Compound: backend and both Temporal workers                  |
+| **SOBA Frontend (Chrome)**                     | Attach Chrome to frontend (URL `http://localhost:3000`)      |
 
 **Tasks (`tasks.json`):** Run from Command Palette → “Tasks: Run Task”.
 
-| Task                   | Purpose                                                         |
-| ---------------------- | --------------------------------------------------------------- |
-| **Dev Services: Up**   | Start sidecars (`docker compose ... up -d --build`)             |
-| **Dev Services: Down** | Stop and remove the dev service containers                    |
+| Task                   | Purpose                                             |
+| ---------------------- | --------------------------------------------------- |
+| **Dev Services: Up**   | Start sidecars (`docker compose ... up -d --build`) |
+| **Dev Services: Down** | Stop and remove the dev service containers          |
 
 You can also run `docker compose -f .devcontainer/docker-compose.yml up -d` in a terminal, or right-click `docker-compose.yml` and use **Compose Up**.
 
@@ -164,28 +175,48 @@ The devcontainer **initialize** and **post-create** steps copy from example file
 
 ### Scripts
 
-| Command                  | Purpose                                                    |
-| ------------------------ | ---------------------------------------------------------- |
-| `pnpm dev`               | nodemon: `tsc && node dist/src/app.js` on change (port 4000) |
-| `pnpm build`             | Compile TypeScript to `dist/`                              |
-| `pnpm serve`             | Build then run `node dist/src/app.js`                      |
-| `pnpm start`             | Run `node dist/src/app.js` (assumes already built)         |
-| `pnpm test`              | Run Jest unit tests                                        |
-| `pnpm test:watch`        | Jest in watch mode                                         |
-| `pnpm test:coverage`     | Jest with coverage report                                  |
-| `pnpm test:parallel`     | Jest with `--maxWorkers=2`                                 |
-| `pnpm lint` / `lint:fix` | ESLint; fix applies auto-fix                               |
-| `pnpm format` / `format:check` | Prettier write / check                             |
-| `pnpm type-check`        | `tsc --noEmit`                                             |
-| `pnpm check`             | Type-check + lint (run before PR)                          |
-| `pnpm temporal-worker`   | Run Temporal worker once (`tsx temporal-worker.ts`)        |
-| `pnpm temporal-worker:dev` | Run Temporal worker with watch                           |
+| Command                        | Purpose                                                      |
+| ------------------------------ | ------------------------------------------------------------ |
+| `pnpm dev`                     | nodemon: `tsc && node dist/src/app.js` on change (port 4000) |
+| `pnpm build`                   | Compile TypeScript to `dist/`                                |
+| `pnpm serve`                   | Build then run `node dist/src/app.js`                        |
+| `pnpm start`                   | Run `node dist/src/app.js` (assumes already built)           |
+| `pnpm test`                    | Run Jest unit tests                                          |
+| `pnpm test:watch`              | Jest in watch mode                                           |
+| `pnpm test:coverage`           | Jest with coverage report                                    |
+| `pnpm test:parallel`           | Jest with `--maxWorkers=2`                                   |
+| `pnpm lint` / `lint:fix`       | ESLint; fix applies auto-fix                                 |
+| `pnpm format` / `format:check` | Prettier write / check                                       |
+| `pnpm type-check`              | `tsc --noEmit`                                               |
+| `pnpm check`                   | Type-check + lint (run before PR)                            |
+| `pnpm temporal-worker`         | Run Temporal worker once (`tsx temporal-worker.ts`)          |
+| `pnpm temporal-worker:dev`     | Run Temporal worker with watch                               |
+| `pnpm db:dev-data`             | Build/remove a development data set (see below)              |
 
 Tests live under `backend/tests/`. See [In Detail — Testing](#testing) for approach and supertest usage.
 
+### Development data
+
+`pnpm db:dev-data --seed --username <idir-username>` builds a disposable set of workspaces, forms,
+submissions, users, and groups, in Postgres and in the form engine, sized to exercise list paging
+(`--size small|medium|large`, default `large`). `--purge` removes it again. Generated workspaces,
+forms, groups and users are named with a `[dev] ` prefix. Run it after `pnpm db:init`.
+
+Gated on the `dev-data` feature, which the migration inserts disabled. Set
+`FEATURE_DEV_DATA_STATUS=enabled` and run `pnpm db:seed`; deployments set it per environment
+through `backend.features` in the Helm values. Left disabled in production.
+
+`FEATURE_<CODE>_STATUS` works for any backend feature: empty leaves the migrated status alone, and
+any `feature_status` code (`enabled`, `disabled`, `experimental`, `deprecated`) overrides it. Only
+`db:seed` reads it; everything else reads the stored status, so a change to the variable takes
+effect on the next seed and not before.
+
+See [`backend/src/features/dev-data/README.md`](backend/src/features/dev-data/README.md) for what
+gets built and for the gitignored owner file that seeds a fresh database without signing in first.
+
 ### Temporal
 
-[Temporal](https://temporal.io) sidecar runs in compose (port 7233; UI on 8088). Worker scripts above poll `TEMPORAL_TASK_QUEUE` (default `soba`). **`TEMPORAL_ALLOWED=false`** by default — worker exits without connecting; set `true` for local workflow dev. See `docs/temporal.md` for workflow details.
+[Temporal](https://temporal.io) sidecar runs in compose (port 7233; UI on 8088). Worker scripts above poll `TEMPORAL_TASK_QUEUE` (default `soba`). Queue can be overridden per worker deployment (for example a dedicated `document-generation` queue). `.env.example` ships **`TEMPORAL_ALLOWED=true`** so the compound launch configs connect out of the box; set it to `false` to make the workers exit without connecting. The code default (when the variable is unset) is still `false`. See `docs/temporal.md` for workflow details.
 
 ### API layout
 
@@ -197,16 +228,16 @@ Tests live under `backend/tests/`. See [In Detail — Testing](#testing) for app
 
 ### Core domains
 
-| API path                                           | Purpose                                                               | Access    |
-| -------------------------------------------------- | --------------------------------------------------------------------- | --------- |
-| `/api/v1/meta`                                     | Plugins, features, form-engines, build, frontend-config, codes, roles | Public    |
-| `/api/v1/health`, `/api/v1/health/ready`           | Liveness and readiness                                                | Public    |
-| `/api/v1/workspaces`, `/api/v1/workspaces/current` | List workspaces, current workspace                                    | Protected |
-| `/api/v1/me`                                       | Current actor                                                         | Protected |
-| `/api/v1/members`                                  | Workspace members                                                     | Protected |
-| `/api/v1/forms`, `/api/v1/form-versions`, …        | Forms and form versions CRUD, save, publish/unpublish/restore, schema | Protected |
+| API path                                           | Purpose                                                               | Access                                 |
+| -------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------- |
+| `/api/v1/meta`                                     | Plugins, features, form-engines, build, frontend-config, codes, roles | Public                                 |
+| `/api/v1/health`, `/api/v1/health/ready`           | Liveness and readiness                                                | Public                                 |
+| `/api/v1/workspaces`, `/api/v1/workspaces/current` | List workspaces, current workspace                                    | Protected                              |
+| `/api/v1/me`                                       | Current actor                                                         | Protected                              |
+| `/api/v1/members`                                  | Workspace members                                                     | Protected                              |
+| `/api/v1/forms`, `/api/v1/form-versions`, …        | Forms and form versions CRUD, save, publish/unpublish/restore, schema | Protected                              |
 | `/api/v1/submissions`, …                           | Submissions CRUD, save, read data (`GET /:id/data`)                   | Protected (+ public create/save above) |
-| `/api/v1/admin`                                    | SOBA platform admins (list, add, remove)                              | Admin     |
+| `/api/v1/admin`                                    | SOBA platform admins (list, add, remove)                              | Admin                                  |
 
 Key form-version routes: `POST /:id/publish`, `POST /:id/unpublish`, `POST /:id/restore`, `GET|POST /:id/schema` (read/provision schema in the form engine).
 
@@ -216,19 +247,15 @@ The backend uses a **plugin architecture** so that form engines, auth (IdP), cac
 
 **Plugin types and current implementations:**
 
-| Type                   | Purpose                                | Implementations                                                     |
-| ---------------------- | -------------------------------------- | ------------------------------------------------------------------- |
-| **Form engine**        | Render/store forms and submissions     | `formio-v5` (Form.io v5)                                            |
-| **IdP (auth)**         | JWT validation, claim mapping          | `idp-bcgov-sso` (BC Gov Keycloak), `idp-github`                     |
-| **Cache**              | Key-value cache                        | `cache-memory`; future: Redis                                       |
-| **Message bus**        | Async messaging                        | `messagebus-memory`; future: Redis, NATS                            |
-| **Feature API**        | Optional REST API per plugin           | none; `pluginApiDefinition` extension point stays for plugins with REST endpoints |
+| Type            | Purpose                            | Implementations                                                                   |
+| --------------- | ---------------------------------- | --------------------------------------------------------------------------------- |
+| **Form engine** | Render/store forms and submissions | `formio-v5` (Form.io v5)                                                          |
+| **IdP (auth)**  | JWT validation, claim mapping      | `idp-bcgov-sso` (BC Gov Keycloak), `idp-github`                                   |
+| **Cache**       | Key-value cache                    | `cache-memory`; future: Redis                                                     |
+| **Message bus** | Async messaging                    | `messagebus-memory`; future: Redis, NATS                                          |
+| **Feature API** | Optional REST API per plugin       | none; `pluginApiDefinition` extension point stays for plugins with REST endpoints |
 
 IdP plugins are ordered via env (`IDP_PLUGINS`); the first successful IdP wins. Passport orchestrates the ordered plugin attempts and the winning plugin supplies the mapped identity used by core. IdP env prefixes follow plugin codes (e.g. `bcgov-sso` → `PLUGIN_BCGOV_SSO_*`, `idp-github` → `PLUGIN_IDP_GITHUB_*`).
-
-### Workspace context
-
-Resolved per route by the `workspaceContext` middleware, not a plugin chain. List/create routes read the `workspaceId` query param; deep-link routes derive it from the target resource. Both check membership and echo the workspace back in the `x-soba-workspace-id` response header.
 
 ### Features
 
@@ -336,7 +363,7 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 ### UI and styling
 
- `@bcgov/bc-sans`. **Bootstrap** is used.
+`@bcgov/bc-sans`. **Bootstrap** is used.
 
 ### Forms
 
@@ -354,11 +381,40 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 ---
 
+## Lib
+
+Shared code for the backend and frontend, used in the workspace as `@soba/lib`:
+
+- Zod schemas and inferred types for the request bodies and responses both sides use, with the sort-field constants and sort enums of each list.
+- `normalizeSchema` for Form.io schema import and export.
+
+Query and params schemas stay in the backend. The frontend re-exports the lib types from `frontend/src/types/<domain>.ts`. A runtime import from `@soba/lib` bundles zod and every schema, so frontend code that loads on every page takes the sort fields from `@soba/lib/sort` instead.
+
+lib builds its schemas before the backend extends zod, so calling `.openapi()` on a lib schema directly works or fails depending on which module requires lib first. The backend names a lib schema by cloning it: `XSchema.clone().openapi('Domain_X')`. A composite, such as a list response, is rebuilt with `.extend()` on the named children so the spec references each child with `$ref`. Cloning a composite inlines its children. `libSchemaLoadOrder.test.ts` and `libSchemaOpenApi.test.ts` in `backend/tests/core/api/shared/` check both, and each new schema module and composite needs a row there.
+
+`lib/dist/` is generated and not committed. `pnpm install` builds it (the `prepare` script) and the devcontainer rebuilds it on start. While editing lib, run `pnpm dev` in `lib/` to keep `dist/` current. The backend's watcher follows `backend/src` only, so restart the backend after a lib change.
+
+### Scripts
+
+| Command                        | Purpose                                  |
+| ------------------------------ | ---------------------------------------- |
+| `pnpm build`                   | Clean `dist/` and compile `src/` into it |
+| `pnpm dev`                     | Compile `src/` into `dist/` on change    |
+| `pnpm test`                    | Run Jest unit tests                      |
+| `pnpm lint` / `lint:fix`       | ESLint; fix applies auto-fix             |
+| `pnpm format` / `format:check` | Prettier write / check                   |
+| `pnpm type-check`              | `tsc --noEmit` over `src/` and `tests/`  |
+| `pnpm check`                   | Type-check + lint (run before PR)        |
+
+Tests live under `lib/tests/`.
+
+---
+
 ## Integration
 
 Integration tests live in the **integration** app (repo root). An integration test specialist will own and expand this area; below is the minimum for running tests and for frontend support.
 
-**Tech:** [Playwright](https://playwright.dev) (Chromium). Tests target the running frontend and backend (default: `http://localhost:3000`, `http://localhost:4000/api/v1`; override with `E2E_BASE_URL`, `E2E_API_BASE_URL`).
+**Tech:** [Playwright](https://playwright.dev) (Chromium). Tests target the running frontend and backend (default: `http://localhost:3000`, `http://localhost:4000/chefs/api/v1`; override with `E2E_BASE_URL`, `E2E_API_BASE_URL`).
 
 **Run tests:** From repo root, `pnpm -C integration/playwright test`. In the devcontainer, dependencies and Playwright Chromium are installed by post-create; otherwise run `npm ci --prefix integration/playwright` and `npm exec --prefix integration/playwright -- playwright install chromium` once.
 
@@ -427,8 +483,8 @@ Auth-related env: `IDP_PLUGINS`, `IDP_PLUGIN_DEFAULT_*`, and per-IdP `PLUGIN_<ID
 
 ### Runtime config (frontend)
 
-- **Load:** `loadFrontendRuntimeConfig()` fetches `GET {baseUrl}/meta/frontend-config`; baseUrl comes from `NEXT_PUBLIC_SOBA_API_BASE_URL` until config is loaded. Called from Keycloak init (so the first client-side auth step triggers the fetch). Result is cached in memory; subsequent calls return the cache.
-- **Shape:** Config includes `auth.keycloak` (url, realm, clientId, pkceMethod), `api.baseUrl`, `build` (name, version). Use `getSobaApiBaseUrl()` for API calls; use config.auth in Keycloak constructor.
+- **Load:** `loadFrontendRuntimeConfig()` fetches `GET {baseUrl}/meta/frontend-config`; baseUrl comes from `NEXT_PUBLIC_SOBA_API_BASE_URL` until config is loaded. Called from the locale layout server-side (for the footer version) and from Keycloak init client-side. Result is cached in memory; subsequent calls return the cache.
+- **Shape:** Config includes `auth.keycloak` (url, realm, clientId, pkceMethod), `api.baseUrl`, `build` (name, version, gitSha). Use `getSobaApiBaseUrl()` for API calls; use config.auth in Keycloak constructor. `getSobaApiBaseUrl()` returns the internal URL on the server — `api.baseUrl` is the browser-facing route and is not reachable from inside the cluster.
 
 ### Auth flow (frontend)
 

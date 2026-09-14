@@ -1,6 +1,21 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
-import { CursorSortSchema } from '../shared/pagination';
+import {
+  SubmissionListItemSchema as SobaSubmissionListItemSchema,
+  SubmissionDataBodySchema as SobaSubmissionDataBodySchema,
+  OpenSubmissionBodySchema as SobaOpenSubmissionBodySchema,
+  SubmissionResponseSchema as SobaSubmissionResponseSchema,
+  ListSubmissionsResponseSchema as SobaListSubmissionsResponseSchema,
+  SubmissionSortSchema as SobaSubmissionSortSchema,
+} from '@soba/lib';
+
+import {
+  offsetQueryFields,
+  rejectedCursorField,
+  searchQueryField,
+  OffsetPageSchema,
+  OFFSET_DRIFT_NOTE,
+} from '../shared/offsetPagination';
 import {
   workspaceIdQueryField,
   formIdQueryField,
@@ -11,15 +26,15 @@ import {
 
 extendZodWithOpenApi(z);
 
+// @soba/lib builds its schemas before zod is extended, so they only get `.openapi()` once cloned.
+// Composites are rebuilt on the named children so the spec references them instead of inlining.
+
 // The client mints the submission id (uuidv7) so it can originate a submission without a round-trip.
 // Create is idempotent on this id (see openSubmission), which is what makes a retry safe. Enforce v7
 // specifically: the id is the record's identity, so we reject nil/low-entropy or wrong-version uuids.
-export const OpenSubmissionBodySchema = z
-  .object({
-    id: z.uuidv7(),
-    formId: z.string().min(1),
-  })
-  .openapi('Submissions_OpenSubmissionBody');
+export const OpenSubmissionBodySchema = SobaOpenSubmissionBodySchema.clone().openapi(
+  'Submissions_OpenSubmissionBody',
+);
 
 // The submission id path param, shared by every /:id route (read/save/submit/delete).
 export const SubmissionIdParamsSchema = z
@@ -29,11 +44,14 @@ export const SubmissionIdParamsSchema = z
   .openapi('Submissions_SubmissionIdParams');
 
 // The answer-data body, shared by save (draft) and submit.
-export const SubmissionDataBodySchema = z
-  .object({
-    data: z.record(z.string(), z.unknown()),
-  })
-  .openapi('Submissions_SubmissionDataBody');
+export const SubmissionDataBodySchema = SobaSubmissionDataBodySchema.clone().openapi(
+  'Submissions_SubmissionDataBody',
+);
+
+export const SubmissionSortSchema = SobaSubmissionSortSchema.clone().openapi(
+  'Submissions_SubmissionSort',
+  { description: 'Valid submission sort tokens: `field:asc` or `field:desc`.' },
+);
 
 export const ListSubmissionsQuerySchema = requireAtLeastOneQueryField(
   z.object({
@@ -41,67 +59,33 @@ export const ListSubmissionsQuerySchema = requireAtLeastOneQueryField(
     formId: formIdQueryField,
     formVersionId: formVersionIdQueryField,
     submissionId: submissionIdQueryField,
-    limit: z.coerce.number().int().min(1).max(100).default(20),
-    cursor: z.string().min(1).optional(),
+    ...offsetQueryFields,
+    cursor: rejectedCursorField,
+    // Workflow state orders by code, not by where the workflow has reached, so it is a filter only.
     workflowState: z.string().trim().min(1).optional(),
     createdBy: z.string().trim().min(1).optional(),
-    // Order by server updatedAt (ts_id cursor), not by id: the submission id is client-minted
-    // (uuidv7) so it's no longer a reliable time proxy. id:desc stays available on request.
-    sort: CursorSortSchema.default('updatedAt:desc'),
+    q: searchQueryField.openapi({
+      description: 'Matches anywhere in the form name or the submission id.',
+    }),
+    sort: SubmissionSortSchema.default('updatedAt:desc'),
   }),
   ['workspaceId', 'formId', 'formVersionId', 'submissionId'],
   'At least one of workspaceId, formId, formVersionId, or submissionId is required',
 ).openapi('Submissions_ListSubmissionsQuery');
 
-export const SubmissionListItemSchema = z
-  .object({
-    id: z.string(),
-    formId: z.string(),
-    formName: z.string().optional(),
-    formVersionId: z.string(),
-    versionNo: z.number().int().optional(),
-    workflowState: z.string(),
-    engineSyncStatus: z.string(),
-    submittedAt: z.string().nullable(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-  })
-  .openapi('Submissions_SubmissionListItem');
+export const SubmissionListItemSchema = SobaSubmissionListItemSchema.clone().openapi(
+  'Submissions_SubmissionListItem',
+);
 
-export const SubmissionResponseSchema = z
-  .object({
-    id: z.string(),
-    formId: z.string(),
-    formVersionId: z.string(),
-    workflowState: z.string(),
-    engineSyncStatus: z.string(),
-    currentRevisionNo: z.number().int(),
-    submittedAt: z.string().nullable(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-  })
-  .openapi('Submissions_SubmissionResponse');
+export const SubmissionResponseSchema = SobaSubmissionResponseSchema.clone().openapi(
+  'Submissions_SubmissionResponse',
+);
 
-export const ListSubmissionsResponseSchema = z
-  .object({
-    items: z.array(SubmissionListItemSchema),
-    page: z.object({
-      limit: z.number().int().min(1),
-      hasMore: z.boolean(),
-      nextCursor: z.string().nullable(),
-      cursorMode: z.enum(['id', 'ts_id']),
-    }),
-    filters: z.object({
-      workspaceId: z.string().optional(),
-      formId: z.string().optional(),
-      formVersionId: z.string().optional(),
-      submissionId: z.string().optional(),
-      workflowState: z.string().optional(),
-      createdBy: z.string().optional(),
-    }),
-    sort: CursorSortSchema,
-  })
-  .openapi('Submissions_ListSubmissionsResponse');
+export const ListSubmissionsResponseSchema = SobaListSubmissionsResponseSchema.extend({
+  items: z.array(SubmissionListItemSchema),
+  page: OffsetPageSchema,
+  sort: SubmissionSortSchema,
+}).openapi('Submissions_ListSubmissionsResponse');
 
 const TAG = 'core.submissions';
 const SUBMISSION_PATH = '/design/submissions/{id}';
@@ -118,7 +102,7 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
     },
     responses: {
       200: {
-        description: 'List submissions with cursor pagination',
+        description: `List submissions with search and offset pagination. ${OFFSET_DRIFT_NOTE}`,
         content: {
           'application/json': {
             schema: ListSubmissionsResponseSchema,
@@ -126,7 +110,7 @@ export const registerSubmissionsOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       400: {
-        description: 'Missing scope anchor, inconsistent hierarchy ids, invalid query, or cursor',
+        description: 'Missing scope anchor, inconsistent hierarchy ids, or invalid query',
       },
     },
   });

@@ -1,24 +1,66 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
-import { CursorSortSchema } from '../shared/pagination';
+import {
+  CreateFormBodySchema as SobaCreateFormBodySchema,
+  FormVersionResponseSchema as SobaFormVersionResponseSchema,
+  FormVersionListItemSchema as SobaFormVersionListItemSchema,
+  FormResponseSchema as SobaFormResponseSchema,
+  UpdateFormBodySchema as SobaUpdateFormBodySchema,
+  FormWithPermissionsResponseSchema as SobaFormWithPermissionsResponseSchema,
+  FormListItemSchema as SobaFormListItemSchema,
+  ListFormsResponseSchema as SobaListFormsResponseSchema,
+  FormSortSchema as SobaFormSortSchema,
+  FormVersionSortSchema as SobaFormVersionSortSchema,
+  ListFormVersionsResponseSchema as SobaListFormVersionsResponseSchema,
+  FormVersionSummarySchema as SobaFormVersionSummarySchema,
+  FormVersionLookupResponseSchema as SobaFormVersionLookupResponseSchema,
+} from '@soba/lib';
+import { LOOKUP_NOTE } from '../shared/lookup';
+
+import {
+  offsetQueryFields,
+  rejectedCursorField,
+  searchQueryField,
+  OffsetPageSchema,
+  OFFSET_DRIFT_NOTE,
+} from '../shared/offsetPagination';
 import { FORM_NAME_TAKEN } from '../../messages';
 import {
   workspaceIdQueryField,
   formIdQueryField,
   formVersionIdQueryField,
-  requireAtLeastOneQueryField,
   WorkspaceScopedQuerySchema,
 } from '../shared/schema';
 
 extendZodWithOpenApi(z);
 
-export const CreateFormBodySchema = z
-  .object({
-    name: z.string().trim().min(1),
-    description: z.string().optional(),
-    formEngineCode: z.string().trim().min(1).optional(),
-  })
-  .openapi('Forms_CreateFormBody');
+// @soba/lib builds its schemas before zod is extended, so they only get `.openapi()` once cloned.
+// Composites are rebuilt on the named children so the spec references them instead of inlining.
+export const CreateFormBodySchema =
+  SobaCreateFormBodySchema.clone().openapi('Forms_CreateFormBody');
+export const UpdateFormBodySchema =
+  SobaUpdateFormBodySchema.clone().openapi('Forms_UpdateFormBody');
+export const FormListItemSchema = SobaFormListItemSchema.clone().openapi('Forms_FormListItem');
+export const FormResponseSchema = SobaFormResponseSchema.clone().openapi('Forms_FormResponse');
+export const FormVersionResponseSchema = SobaFormVersionResponseSchema.clone().openapi(
+  'Forms_FormVersionResponse',
+);
+export const FormWithVersionResponseSchema = FormResponseSchema.extend({
+  formVersion: FormVersionResponseSchema.nullable(),
+}).openapi('Forms_FormWithVersionResponse');
+export const FormVersionSummarySchema = SobaFormVersionSummarySchema.clone().openapi(
+  'Forms_FormVersionSummary',
+);
+export const FormWithPermissionsResponseSchema = FormResponseSchema.extend({
+  permissions: SobaFormWithPermissionsResponseSchema.shape.permissions,
+  currentVersion: FormVersionSummarySchema.nullable().openapi({
+    description:
+      'The highest-numbered version that is not deleted. Save and publish target this one.',
+  }),
+}).openapi('Forms_FormWithPermissionsResponse');
+export const FormVersionListItemSchema = SobaFormVersionListItemSchema.clone().openapi(
+  'Forms_FormVersionListItem',
+);
 
 export const CreateFormVersionBodySchema = z
   .object({
@@ -37,14 +79,6 @@ export const FormVersionIdParamsSchema = z
     id: z.string().min(1),
   })
   .openapi('Forms_FormVersionIdParams');
-
-export const UpdateFormBodySchema = z
-  .object({
-    name: z.string().trim().min(1).optional(),
-    description: z.string().nullable().optional(),
-    status: z.string().trim().min(1).optional(),
-  })
-  .openapi('Forms_UpdateFormBody');
 
 export const SaveFormVersionParamsSchema = z
   .object({
@@ -79,129 +113,59 @@ export const NormalizeSchemaResponseSchema = z
   })
   .openapi('Forms_NormalizeSchemaResponse');
 
-export const ListFormsQuerySchema = requireAtLeastOneQueryField(
-  z.object({
+export const FormSortSchema = SobaFormSortSchema.clone().openapi('Forms_FormSort');
+
+export const ListFormsQuerySchema = z
+  .object({
     workspaceId: workspaceIdQueryField.optional(),
     formId: formIdQueryField,
-    limit: z.coerce.number().int().min(1).max(100).default(20),
-    cursor: z.string().min(1).optional(),
-    q: z.string().trim().min(1).optional(),
+    ...offsetQueryFields,
+    cursor: rejectedCursorField,
+    q: searchQueryField.openapi({ description: 'Matches anywhere in the form name.' }),
     status: z.string().trim().min(1).optional(),
-    sort: CursorSortSchema.default('id:desc'),
-  }),
-  ['workspaceId', 'formId'],
-  'At least one of workspaceId or formId is required',
-).openapi('Forms_ListFormsQuery');
-
-export const FormListItemSchema = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-    status: z.string(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-    createdBy: z.string().nullable(),
+    sort: FormSortSchema.default('createdAt:desc'),
   })
-  .openapi('Forms_FormListItem');
+  .openapi('Forms_ListFormsQuery');
 
-export const FormResponseSchema = z
+export const ListFormsResponseSchema = SobaListFormsResponseSchema.extend({
+  items: z.array(FormListItemSchema),
+  page: OffsetPageSchema,
+  sort: FormSortSchema,
+}).openapi('Forms_ListFormsResponse');
+
+export const FormVersionSortSchema =
+  SobaFormVersionSortSchema.clone().openapi('Forms_FormVersionSort');
+
+export const ListFormVersionsQuerySchema = z
   .object({
-    id: z.string(),
-    name: z.string(),
-    description: z.string().nullable(),
-    status: z.string(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-  })
-  .openapi('Forms_FormResponse');
-
-export const FormVersionResponseSchema = z
-  .object({
-    id: z.string(),
-    formId: z.string(),
-    versionNo: z.number().int(),
-    state: z.string(),
-    engineSyncStatus: z.string(),
-    engineSchemaRef: z.string().nullable(),
-    currentRevisionNo: z.number().int(),
-    publishedAt: z.string().nullable(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-  })
-  .openapi('Forms_FormVersionResponse');
-
-export const FormWithVersionResponseSchema = FormResponseSchema.extend({
-  formVersion: FormVersionResponseSchema.nullable(),
-}).openapi('Forms_FormWithVersionResponse');
-
-export const FormWithPermissionsResponseSchema = FormResponseSchema.extend({
-  permissions: z.array(z.string()),
-}).openapi('Forms_FormWithPermissionsResponse');
-
-export const ListFormsResponseSchema = z
-  .object({
-    items: z.array(FormListItemSchema),
-    page: z.object({
-      limit: z.number().int().min(1),
-      hasMore: z.boolean(),
-      nextCursor: z.string().nullable(),
-      cursorMode: z.enum(['id', 'ts_id']),
-    }),
-    filters: z.object({
-      workspaceId: z.string().optional(),
-      formId: z.string().optional(),
-      q: z.string().optional(),
-      status: z.string().optional(),
-    }),
-    sort: CursorSortSchema,
-  })
-  .openapi('Forms_ListFormsResponse');
-
-export const ListFormVersionsQuerySchema = requireAtLeastOneQueryField(
-  z.object({
     workspaceId: workspaceIdQueryField.optional(),
     formId: formIdQueryField,
     formVersionId: formVersionIdQueryField,
-    limit: z.coerce.number().int().min(1).max(100).default(20),
-    cursor: z.string().min(1).optional(),
+    ...offsetQueryFields,
+    cursor: rejectedCursorField,
     state: z.string().trim().min(1).optional(),
-    sort: CursorSortSchema.default('id:desc'),
-  }),
-  ['workspaceId', 'formId', 'formVersionId'],
-  'At least one of workspaceId, formId, or formVersionId is required',
-).openapi('Forms_ListFormVersionsQuery');
-
-export const FormVersionListItemSchema = z
-  .object({
-    id: z.string(),
-    formId: z.string(),
-    versionNo: z.number().int(),
-    state: z.string(),
-    engineSyncStatus: z.string(),
-    engineSchemaRef: z.string().nullable(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
+    sort: FormVersionSortSchema.default('versionNo:desc'),
   })
-  .openapi('Forms_FormVersionListItem');
+  .openapi('Forms_ListFormVersionsQuery');
 
-export const ListFormVersionsResponseSchema = z
+export const ListFormVersionsResponseSchema = SobaListFormVersionsResponseSchema.extend({
+  items: z.array(FormVersionListItemSchema),
+  page: OffsetPageSchema,
+  sort: FormVersionSortSchema,
+}).openapi('Forms_ListFormVersionsResponse');
+
+export const FormVersionLookupQuerySchema = z
   .object({
-    items: z.array(FormVersionListItemSchema),
-    page: z.object({
-      limit: z.number().int().min(1),
-      hasMore: z.boolean(),
-      nextCursor: z.string().nullable(),
-      cursorMode: z.enum(['id', 'ts_id']),
+    formId: z.string().min(1).openapi({
+      description: 'The form whose versions are returned. Workspace is derived from the form.',
     }),
-    filters: z.object({
-      workspaceId: z.string().optional(),
-      formId: z.string().optional(),
-      formVersionId: z.string().optional(),
-      state: z.string().optional(),
-    }),
-    sort: CursorSortSchema,
+    q: searchQueryField.openapi({ description: 'Matches the start of the version number.' }),
   })
-  .openapi('Forms_ListFormVersionsResponse');
+  .openapi('Forms_FormVersionLookupQuery');
+
+export const FormVersionLookupResponseSchema = SobaFormVersionLookupResponseSchema.extend({
+  items: z.array(FormVersionSummarySchema),
+}).openapi('Forms_FormVersionLookupResponse');
 
 const TAG = 'core.forms';
 const FORMS_PATH = '/design/forms';
@@ -211,6 +175,8 @@ const FORM_VERSION_PATH = `${FORM_VERSIONS_PATH}/{id}`;
 const FORM_NOT_FOUND = 'Form not found';
 const FORM_VERSION_NOT_FOUND = 'Form version not found';
 const VALIDATION_ERROR = 'Validation or business rule error';
+const VERSION_CONFLICT = "Not the form's current version";
+const SCHEMA_WRITE_CONFLICT = `${VERSION_CONFLICT}, not a draft, or its schema is being saved`;
 
 export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
@@ -223,7 +189,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
     },
     responses: {
       200: {
-        description: 'List forms with search and cursor pagination',
+        description: `List forms with search and offset pagination. ${OFFSET_DRIFT_NOTE}`,
         content: {
           'application/json': {
             schema: ListFormsResponseSchema,
@@ -231,7 +197,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       400: {
-        description: 'Missing scope anchor, inconsistent hierarchy ids, invalid query, or cursor',
+        description: 'Missing scope anchor, inconsistent hierarchy ids, or invalid query',
       },
     },
   });
@@ -286,6 +252,10 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
       },
       400: {
         description: VALIDATION_ERROR,
+      },
+      403: {
+        description:
+          'Caller lacks form_create and design_create in the workspace (form_admin via *)',
       },
       409: {
         description: FORM_NAME_TAKEN,
@@ -367,7 +337,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
     },
     responses: {
       200: {
-        description: 'List form versions with cursor pagination',
+        description: `List form versions with offset pagination. ${OFFSET_DRIFT_NOTE}`,
         content: {
           'application/json': {
             schema: ListFormVersionsResponseSchema,
@@ -375,7 +345,30 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       400: {
-        description: 'Missing scope anchor, inconsistent hierarchy ids, invalid query, or cursor',
+        description: 'Missing scope anchor, inconsistent hierarchy ids, or invalid query',
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: `${FORM_VERSIONS_PATH}/lookup`,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: {
+      query: FormVersionLookupQuerySchema,
+    },
+    responses: {
+      200: {
+        description: `One form's versions for a select, newest first. ${LOOKUP_NOTE}`,
+        content: {
+          'application/json': {
+            schema: FormVersionLookupResponseSchema,
+          },
+        },
+      },
+      400: {
+        description: 'Missing formId or invalid query',
       },
     },
   });
@@ -453,6 +446,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
       400: {
         description: VALIDATION_ERROR,
       },
+      409: { description: SCHEMA_WRITE_CONFLICT },
     },
   });
 
@@ -492,7 +486,24 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
     },
   });
 
-  for (const action of ['publish', 'unpublish', 'restore'] as const) {
+  registry.registerPath({
+    method: 'post',
+    path: `${FORM_VERSION_PATH}/publish`,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: { params: FormVersionIdParamsSchema },
+    responses: {
+      200: {
+        description: 'Form version publish action',
+        content: { 'application/json': { schema: FormVersionResponseSchema } },
+      },
+      400: { description: 'Invalid state transition, or not ready to publish' },
+      404: { description: FORM_VERSION_NOT_FOUND },
+      409: { description: VERSION_CONFLICT },
+    },
+  });
+
+  for (const action of ['unpublish', 'restore'] as const) {
     registry.registerPath({
       method: 'post',
       path: `${FORM_VERSION_PATH}/${action}`,
@@ -544,6 +555,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
       },
       400: { description: 'Engine rejected the schema' },
       404: { description: FORM_VERSION_NOT_FOUND },
+      409: { description: SCHEMA_WRITE_CONFLICT },
     },
   });
 };

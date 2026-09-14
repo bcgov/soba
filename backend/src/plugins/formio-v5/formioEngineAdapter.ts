@@ -7,7 +7,7 @@ import {
 import { PluginConfigReader } from '../../core/config/pluginConfig';
 import { ValidationError } from '../../core/errors';
 import { getAuthenticatedFormioClient } from './formioV5Client';
-import { normalizeSchema as normalizeFormioSchema } from './normalizeSchema';
+import { normalizeSchema as normalizeFormioSchema } from '@soba/lib';
 
 export interface FormioV5Config {
   apiBaseUrl: string;
@@ -279,5 +279,14 @@ export class FormioEngineAdapter implements FormEngineAdapter {
     const cleaned = stripEngineManagedFields(doc);
     delete cleaned.metadata;
     return cleaned;
+  }
+
+  /** Delete a Form.io submission by form ref + submission ref (compensation / cleanup). */
+  async deleteSubmission(engineFormRef: string, engineRef: string): Promise<void> {
+    const client = await getAuthenticatedFormioClient(this.pluginConfig);
+    if (!client) {
+      throw new Error('Form.io admin client unavailable; cannot delete submission');
+    }
+    await client.deleteSubmission(engineFormRef, engineRef);
   }
 }

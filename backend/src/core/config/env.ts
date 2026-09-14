@@ -124,6 +124,20 @@ export function resolveTrustProxySetting(source: EnvSource): number | boolean {
   return getOptionalEnvFrom(source, 'NODE_ENV') === 'development' ? false : 1;
 }
 
+/**
+ * URL path the API is served under, normalised to a leading slash and no trailing one. Express
+ * mounts a path without a leading slash against the wrong prefix rather than failing, and nothing
+ * else validates this value.
+ */
+export function resolveApiBasePath(source: EnvSource): string {
+  const raw = (getOptionalEnvFrom(source, 'API_BASE_PATH') ?? '').trim();
+  if (raw === '' || raw === '/') {
+    return '';
+  }
+  const withLeadingSlash = raw.startsWith('/') ? raw : `/${raw}`;
+  return withLeadingSlash.endsWith('/') ? withLeadingSlash.slice(0, -1) : withLeadingSlash;
+}
+
 /** Build an env reader that reads from the given source. Use in tests with a simulated .env object. */
 export function createEnvReader(source: EnvSource) {
   return {
@@ -157,6 +171,7 @@ export function createEnvReader(source: EnvSource) {
       getOptionalEnvFrom(source, 'WORKSPACE_PLUGINS_PATH'),
     getCacheDefaultCode: () => getOptionalEnvFrom(source, 'CACHE_DEFAULT_CODE'),
     getMessageBusDefaultCode: () => getOptionalEnvFrom(source, 'MESSAGEBUS_DEFAULT_CODE'),
+    getEventStreamDefaultCode: () => getOptionalEnvFrom(source, 'EVENTSTREAM_DEFAULT_CODE'),
     getTempStorageDefaultCode: () => getOptionalEnvFrom(source, 'TEMPSTORAGE_DEFAULT_CODE'),
     getVirusScanDefaultCode: () => getOptionalEnvFrom(source, 'VIRUSSCAN_DEFAULT_CODE'),
     getFormEngineDefaultCode: () => getOptionalEnvFrom(source, 'FORM_ENGINE_DEFAULT_CODE'),
@@ -169,12 +184,24 @@ export function createEnvReader(source: EnvSource) {
       const raw = getOptionalEnvFrom(source, 'STORAGE_PROFILES');
       return raw ? parseCsvValue(raw) : [];
     },
+    /** Public URL of the designer (staff) app. Unset is reported as absent, never guessed. */
+    getDesignerAppUrl: () => getOptionalEnvFrom(source, 'DESIGNER_APP_URL'),
+    /** Public URL of the forms (submitter) app. Unset is reported as absent, never guessed. */
+    getFormsAppUrl: () => getOptionalEnvFrom(source, 'FORMS_APP_URL'),
+    /**
+     * Same values for composing links that leave the system, such as email. These throw rather than
+     * fall back: a message carrying a wrong or localhost link cannot be recalled.
+     */
+    requireDesignerAppUrl: () => getRequiredEnvFrom(source, 'DESIGNER_APP_URL'),
+    requireFormsAppUrl: () => getRequiredEnvFrom(source, 'FORMS_APP_URL'),
     getRateLimitWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_WINDOW_MS'),
     getRateLimitMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_MAX'),
     getRateLimitApiWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_API_WINDOW_MS'),
     getRateLimitApiMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_API_MAX'),
     getRateLimitPublicWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_PUBLIC_WINDOW_MS'),
     getRateLimitPublicMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_PUBLIC_MAX'),
+    /** URL path the API is served under, e.g. `/chefs`. Empty serves at the host root. */
+    getApiBasePath: () => resolveApiBasePath(source),
     getTrustProxySetting: () => resolveTrustProxySetting(source),
     /** Production CORS allowlist (comma-separated trusted origins). */
     getCorsOrigins: () => getCsvEnvFrom(source, 'CORS_ORIGIN'),
@@ -226,6 +253,7 @@ export const env = {
   getPluginsPath: () => getOptionalEnv('PLUGINS_PATH') ?? getOptionalEnv('WORKSPACE_PLUGINS_PATH'),
   getCacheDefaultCode: () => getOptionalEnv('CACHE_DEFAULT_CODE'),
   getMessageBusDefaultCode: () => getOptionalEnv('MESSAGEBUS_DEFAULT_CODE'),
+  getEventStreamDefaultCode: () => getOptionalEnv('EVENTSTREAM_DEFAULT_CODE'),
   getTempStorageDefaultCode: () => getOptionalEnv('TEMPSTORAGE_DEFAULT_CODE'),
   getVirusScanDefaultCode: () => getOptionalEnv('VIRUSSCAN_DEFAULT_CODE'),
   getFormEngineDefaultCode: () => getOptionalEnv('FORM_ENGINE_DEFAULT_CODE'),
@@ -237,12 +265,24 @@ export const env = {
     const raw = getOptionalEnv('STORAGE_PROFILES');
     return raw ? parseCsvValue(raw) : [];
   },
+  /** Public URL of the designer (staff) app. Unset is reported as absent, never guessed. */
+  getDesignerAppUrl: () => getOptionalEnv('DESIGNER_APP_URL'),
+  /** Public URL of the forms (submitter) app. Unset is reported as absent, never guessed. */
+  getFormsAppUrl: () => getOptionalEnv('FORMS_APP_URL'),
+  /**
+   * Same values for composing links that leave the system, such as email. These throw rather than
+   * fall back: a message carrying a wrong or localhost link cannot be recalled.
+   */
+  requireDesignerAppUrl: () => getRequiredEnv('DESIGNER_APP_URL'),
+  requireFormsAppUrl: () => getRequiredEnv('FORMS_APP_URL'),
   getRateLimitWindowMs: () => getNumberEnv('RATE_LIMIT_WINDOW_MS'),
   getRateLimitMax: () => getNumberEnv('RATE_LIMIT_MAX'),
   getRateLimitApiWindowMs: () => getNumberEnv('RATE_LIMIT_API_WINDOW_MS'),
   getRateLimitApiMax: () => getNumberEnv('RATE_LIMIT_API_MAX'),
   getRateLimitPublicWindowMs: () => getNumberEnv('RATE_LIMIT_PUBLIC_WINDOW_MS'),
   getRateLimitPublicMax: () => getNumberEnv('RATE_LIMIT_PUBLIC_MAX'),
+  /** URL path the API is served under, e.g. `/chefs`. Empty serves at the host root. */
+  getApiBasePath: () => resolveApiBasePath(process.env),
   getTrustProxySetting: () => resolveTrustProxySetting(process.env),
   /** Production CORS allowlist (comma-separated trusted origins). */
   getCorsOrigins: () => getCsvEnv('CORS_ORIGIN'),
@@ -253,6 +293,10 @@ export const env = {
   getTemporalNamespace: () => getOptionalEnv('TEMPORAL_NAMESPACE') ?? 'default',
   getTemporalTaskQueue: () => getOptionalEnv('TEMPORAL_TASK_QUEUE') ?? 'soba',
   getTemporalWorkerHealthPort: () => getNumberEnv('TEMPORAL_WORKER_HEALTH_PORT') ?? 9090,
+  // Match the chart's haproxy.router.openshift.io/timeout annotation.
+  getHttpRouteTimeoutMs: () => getNumberEnv('HTTP_ROUTE_TIMEOUT_MS'),
+  // Budget for one outbound call. Unset derives it from the route timeout.
+  getHttpOutboundTimeoutMs: () => getNumberEnv('HTTP_OUTBOUND_TIMEOUT_MS'),
   // Max upload size accepted by the files API. Feature-level (not per storage backend).
   getFilesMaxFileSizeMb: () => getNumberEnv('FILES_MAX_FILE_SIZE_MB') || 10,
   // Storage profile the files feature reads/writes. Defaults to 'default'.

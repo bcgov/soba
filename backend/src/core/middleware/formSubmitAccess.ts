@@ -9,7 +9,6 @@ import {
 } from '../db/codes';
 import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from '../errors';
 import { resolveCaller } from './actor';
-import { WORKSPACE_HEADER } from './workspaceContext';
 import type { Request, Response, NextFunction } from 'express';
 
 /** A denial that distinguishes an authenticated caller (403) from an anonymous one (401). */
@@ -46,8 +45,9 @@ const resolveSubmitTarget = async (req: Request): Promise<SubmitTarget> => {
 
 /**
  * Authorizes a read of a form resource whose workspace was already resolved into req.coreContext (see
- * the open workspace resolvers). Grants staff with `required`, or the Form submitters audience for
- * form_read. On denial, 401 for anonymous / 403 for an authenticated non-member.
+ * the open workspace resolvers). Grants staff with `required`, or the Form submitters audience when
+ * `required` is in AUDIENCE_PERMISSIONS. On denial, 401 for anonymous / 403 for an authenticated
+ * non-member.
  */
 export const requireFormAccess = (required: PermissionCode) => {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
@@ -96,7 +96,6 @@ export const authorizeSubmitterForWorkspace = async (
     // Public submitters have no membership; a non-manage role keeps them off workspace-admin routes.
     role: WorkspaceMembershipRole.member,
   };
-  res.set(WORKSPACE_HEADER, workspaceId);
 };
 
 /**

@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useState, useCallback } from 'react';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { Tabs, Tab } from 'react-bootstrap';
 import {
   InlineAlert,
@@ -19,23 +19,107 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import FormDesigner from '@/src/features/designer/ui/FormDesigner';
 import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
+import { WorkspaceSelector } from '@/app/ui/WorkspaceSelector';
+import { usePageHeading, usePageNotices, type PageNotice } from '@/src/components/PageHeader';
 import FormSettingsTab from './FormSettingsTab';
 import FormTeamTab from './FormTeamTab';
+import FormHistoryTab from './FormHistoryTab';
+import FormSubmissionTab from './FormSubmissionTab';
+import FormShareTab from './FormShareTab';
 import { FormSubmitterAudience } from './FormSubmitterAudience';
 import { isWorkspaceManageRole } from '@/src/features/workspaces/workspaceRoles';
-import { useAppSelector } from '@/lib/store';
+import { useFormCreateWorkspaceOptions, useWorkspace } from '@/src/shared/api/useWorkspaces';
+import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
+import { lookupTruncatedNote, withSelectedOption } from '@/src/shared/list/lookupOptions';
+import { useForm } from '@/src/features/designer/useForm';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
 import {
   createSobaFormioForm,
   createFormVersion,
   saveFormVersionSchema,
-  getFormVersionSchema,
-  getSobaForm,
-  getSobaFormVersions,
   publishSobaFormVersion,
+  updateSobaForm,
+  getFormVersionSchema,
 } from '@/src/shared/api/sobaApi';
-import type { SobaFormType, SobaFormVersionType } from '@/src/types/forms';
+import type { FormVersionSummary, SobaFormType, SobaFormVersionListItem } from '@/src/types/forms';
+import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';
+import { isConflict } from '@/src/shared/api/sobaHelpers';
+
+type Dict = ReturnType<typeof useDictionary>;
+
+function noticeForLoadError(dict: Dict, loadError: unknown): string {
+  return loadErrorMessage(loadError, {
+    sessionExpired: dict.general.sessionExpired,
+    noAccess: dict.general.noAccess,
+    failed: dict.form.loadFormError,
+  });
+}
+
+function draftNotices(args: {
+  dict: Dict;
+  loadError: unknown;
+  isHistoryView: boolean;
+  historicalVersionNo: number | null;
+  isCurrentPublished: boolean;
+  editsStale: boolean;
+  onSwitchToCurrent: () => void;
+  onDiscardEdits: () => void;
+}): Array<PageNotice | false> {
+  const { dict, loadError, isHistoryView, historicalVersionNo, isCurrentPublished } = args;
+  return [
+    !!loadError && {
+      id: 'load-error',
+      variant: 'danger' as const,
+      body: noticeForLoadError(dict, loadError),
+    },
+    args.editsStale && {
+      id: 'stale-edits',
+      variant: 'warning' as const,
+      body: dict.form.staleEdits,
+      action: { label: dict.form.discardEdits, onPress: args.onDiscardEdits },
+    },
+    isHistoryView && {
+      id: 'history-view',
+      variant: 'info' as const,
+      title: dict.form.readOnlyMode || 'Read-Only Mode:',
+      body: `${dict.form.viewingHistoricalVersion || 'You are viewing historical version'} v${historicalVersionNo}. ${dict.form.savePublishDisabled || 'Save and Publish options are disabled.'}`,
+      action: {
+        label:
+          dict.form.switchToCurrentDraft ||
+          'Switch to ' + (dict.form.currentDraft || 'Current Draft'),
+        onPress: args.onSwitchToCurrent,
+      },
+    },
+    !isHistoryView &&
+      isCurrentPublished && {
+        id: 'published-version',
+        variant: 'info' as const,
+        title: dict.form.publishedVersion || 'Published Version:',
+        body:
+          dict.form.publishedVersionCannotBeModified ||
+          'This version is published and cannot be modified',
+      },
+  ];
+}
+
+function versionSelectItems(
+  currentLabel: string,
+  currentVersion: FormVersionSummary | null,
+  options: FormVersionSummary[],
+) {
+  return [
+    {
+      id: 'current',
+      label: currentVersion?.versionNo
+        ? `${currentLabel} (v${currentVersion.versionNo})`
+        : currentLabel,
+    },
+    ...options
+      .filter((v) => v.id !== currentVersion?.id)
+      .map((v) => ({ id: v.id, label: `v${v.versionNo} (${v.state})` })),
+  ];
+}
 
 function FormForm({ formId }: { formId?: string }) {
   const dict = useDictionary();
@@ -44,146 +128,119 @@ function FormForm({ formId }: { formId?: string }) {
   const lang = params.lang as string;
 
   const { authenticated, token, initializing } = useKeycloak();
-  const {
-    activeWorkspaceId,
-    status: workspaceStatus,
-    workspaces,
-  } = useAppSelector((state) => state.workspace);
+  const { data: currentUser, loaded: currentUserLoaded } = useCurrentUser();
+  const formCreate = currentUser?.capabilities?.formCreate;
   const { addNotification } = useNotificationStore();
-  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
-  const canManageWorkspace = !!activeWorkspace && isWorkspaceManageRole(activeWorkspace.role);
-  // A new form can't be created until the workspace disclaimer is accepted (backend gate).
-  const needsDisclaimer = !formId && !!activeWorkspace && !activeWorkspace.disclaimerAccepted;
-  const [activeTab, setActiveTab] = useState('designer');
-  const [formName, setFormName] = useState('');
-  const [formDesc, setFormDesc] = useState('');
-  const [formSchema, setFormSchema] = useState<FormType | null>(null);
-  const [currentVersion, setCurrentVersion] = useState<SobaFormVersionType | null>(null);
-
-  const [versions, setVersions] = useState<SobaFormVersionType[]>([]);
-  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
-  const [isHistoryView, setIsHistoryView] = useState(false);
-  const [historicalVersionNo, setHistoricalVersionNo] = useState<number | null>(null);
-
-  const [loading, setLoading] = useState(false);
+  // A new form can only go to a workspace the user can create in whose disclaimer is accepted
+  // (the backend rejects the rest), so those are the only ones ever offered.
+  const creatableWorkspaces = useFormCreateWorkspaceOptions(!formId);
+  // Not seeded from the forms-list filter: that scopes what you are looking at, not where a
+  // new form belongs. An existing form's workspace is the one it was created in.
+  const [pickedWorkspaceId, setPickedWorkspaceId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'designer');
+  // A tab's read starts when it is first opened and stays cached after: leaving is not a reason to
+  // drop what it loaded, and the reads behind these tabs are gated on permissions a user may lack.
+  const [openedTabs, setOpenedTabs] = useState<string[]>(() => [activeTab]);
+  const openTab = useCallback((key: string) => {
+    setActiveTab(key);
+    setOpenedTabs((opened) => (opened.includes(key) ? opened : [...opened, key]));
+  }, []);
   const [isSaving, setIsSaving] = useState(false);
-  const [isDirty, setIsDirty] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
+  const {
+    form,
+    versions,
+    versionsTruncated,
+    versionsLimit,
+    currentVersion,
+    activeVersion,
+    isHistoryView,
+    historicalVersionNo,
+    selectedVersionId,
+    schema: formSchema,
+    name: formName,
+    description: formDesc,
+    isDirty,
+    editsStale,
+    loading,
+    error: loadError,
+    setName,
+    setSchema,
+    discardEdits,
+    commitSchema,
+    selectVersion,
+    refreshForm,
+    refreshVersions,
+  } = useForm(formId);
 
-  useEffect(() => {
-    if (formId && token) {
-      async function loadForm() {
-        setLoading(true);
-        try {
-          const [form, versionsData] = await Promise.all([
-            getSobaForm(token as string, formId as string),
-            getSobaFormVersions(token as string, formId as string),
-          ]);
-
-          setFormName(form?.name ?? '');
-          setFormDesc(form?.description ?? '');
-
-          const items = versionsData.items || [];
-          setVersions(items);
-
-          // Default to the highest versionNo (the current/latest version).
-          const current = items.reduce<SobaFormVersionType | null>(
-            (acc, v) => (!acc || v.versionNo > acc.versionNo ? v : acc),
-            null,
-          );
-          setCurrentVersion(current);
-          setSelectedVersionId('current');
-          setIsHistoryView(false);
-
-          if (current?.id) {
-            const schema = await getFormVersionSchema(token as string, current.id);
-            setFormSchema((schema as FormType) ?? null);
-          } else {
-            setFormSchema(null);
-          }
-          setIsDirty(false);
-        } catch (e: unknown) {
-          addNotification({
-            text: `${dict.form.loadFormError || 'Failed to load form:'} ${(e as Error).message}`,
-            type: 'error',
-            consoleError: e,
-          });
-        } finally {
-          setLoading(false);
-        }
-      }
-      loadForm();
-    }
-  }, [formId, token, dict.form.loadFormError, addNotification]);
-
-  const handleNameChange = useCallback((name: string) => {
-    setFormName(name);
-    setIsDirty(true);
-  }, []);
-
-  const updateFormSchema = useCallback((data: FormType) => {
-    setFormSchema(data);
-    setIsDirty(true);
-  }, []);
-
-  const loadVersionSchema = async (version: SobaFormVersionType) => {
-    setLoading(true);
-    try {
-      const schema = await getFormVersionSchema(token as string, version.id);
-      setFormSchema((schema as FormType) ?? null);
-      setIsDirty(false);
-    } catch (err) {
-      addNotification({
-        text: dict.form.loadVersionSchemaError || 'Failed to load version schema.',
-        type: 'error',
-        consoleError: err,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVersionChange = async (versionId: string) => {
-    if (!token) return;
-
-    if (versionId === 'current') {
-      setIsHistoryView(false);
-      setSelectedVersionId('current');
-      setHistoricalVersionNo(null);
-      if (currentVersion) await loadVersionSchema(currentVersion);
-      return;
-    }
-
-    const targetVersion = versions.find((v: SobaFormVersionType) => v.id === versionId);
-    if (!targetVersion) return;
-
-    setIsHistoryView(true);
-    setSelectedVersionId(versionId);
-    setHistoricalVersionNo(targetVersion.versionNo);
-    await loadVersionSchema(targetVersion);
-  };
+  // A draft that failed to load leaves nothing to edit, save or publish. Distinct from `loading`,
+  // which these reads leave behind for good once a read has failed.
+  const draftUnavailable = loading || !!loadError;
 
   const isCurrentPublished = currentVersion?.state === 'published';
 
-  const createNewVersion = async () => {
-    if (isSaving || loading || !token) return;
-    if (!formId) return;
+  const selectedWorkspaceId = formId ? (form?.workspaceId ?? null) : pickedWorkspaceId;
+  const { workspace: formWorkspace } = useWorkspace(formId ? form?.workspaceId : undefined);
+  // A picked workspace is one of the create options, which already carry the role.
+  const activeWorkspace = formId
+    ? formWorkspace
+    : creatableWorkspaces.workspaces.find((w) => w.id === pickedWorkspaceId);
+  const canManageWorkspace = !!activeWorkspace && isWorkspaceManageRole(activeWorkspace.role);
+
+  usePageHeading({
+    // Editing claims no heading until the name arrives, so the page's own stands rather than
+    // flashing the create-form label on an existing form.
+    heading: formId ? formName || undefined : dict.form.createForm,
+    eyebrow:
+      formId && selectedWorkspaceId ? activeWorkspace?.name || selectedWorkspaceId : undefined,
+  });
+
+  usePageNotices(
+    draftNotices({
+      dict,
+      loadError,
+      isHistoryView,
+      historicalVersionNo,
+      isCurrentPublished,
+      editsStale,
+      onSwitchToCurrent: () => selectVersion('current'),
+      onDiscardEdits: discardEdits,
+    }),
+  );
+
+  const reportWriteFailure = async (e: unknown, failedText: string) => {
+    if (!isConflict(e)) {
+      addNotification({ text: failedText, type: 'error', consoleError: e });
+      return;
+    }
+    addNotification({ text: dict.form.versionConflict, type: 'error', consoleError: e });
+    // Unsaved edits are kept. The re-read shows the version the server now treats as current.
+    await refreshVersions().catch(() => undefined);
+  };
+
+  const clickNewVersion = async () => {
+    await createNewVersion();
+  };
+
+  /** True once the new version exists and is selected. Callers navigate only on true. */
+  const createNewVersion = async (sourceSchema?: FormType): Promise<boolean> => {
+    if (isSaving || draftUnavailable || !token) return false;
+    if (!formId) return false;
     setIsSaving(true);
-    setLoading(true);
 
     try {
       // The engine strips engine-managed fields on save, so the raw schema can be submitted as-is.
       const newVersion = await createFormVersion(token as string, formId);
-      await saveFormVersionSchema(token as string, newVersion.id, (formSchema ?? {}) as FormType);
+      const newSchema = (sourceSchema ?? formSchema ?? {}) as FormType;
+      await saveFormVersionSchema(token as string, newVersion.id, newSchema);
+      await commitSchema(newVersion.id, newSchema);
 
-      // Refresh the version list and select the new draft in-page.
-      const versionsData = await getSobaFormVersions(token as string, formId);
-      setVersions(versionsData.items || []);
-      setCurrentVersion(newVersion);
-      setSelectedVersionId('current');
-      setIsHistoryView(false);
-      setIsDirty(false);
+      // Select the new draft in-page. It has the highest versionNo, so it is the form's current
+      // version once the form has been read again.
+      await refreshVersions();
+      selectVersion('current');
 
       addNotification({
         text: (
@@ -191,16 +248,29 @@ function FormForm({ formId }: { formId?: string }) {
         ).replace('{version}', String(newVersion.versionNo)),
         type: 'success',
       });
+      return true;
+    } catch (e: unknown) {
+      await reportWriteFailure(e, dict.form.createVersionError || 'Failed to create new version.');
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const restoreVersionAsNew = async (version: SobaFormVersionListItem): Promise<boolean> => {
+    if (!token) return false;
+    let schema: FormType | null;
+    try {
+      schema = (await getFormVersionSchema(token, version.id)) as FormType | null;
     } catch (e: unknown) {
       addNotification({
         text: dict.form.createVersionError || 'Failed to create new version.',
         type: 'error',
         consoleError: e,
       });
-    } finally {
-      setIsSaving(false);
-      setLoading(false);
+      return false;
     }
+    return createNewVersion(schema ?? undefined);
   };
 
   const saveFormPublish = async () => {
@@ -214,7 +284,11 @@ function FormForm({ formId }: { formId?: string }) {
   // CREATE: one-call create (form + empty v1), scoped to the active workspace, then provision.
   const createAndProvisionForm = async (schema: FormType, publish: boolean) => {
     const data: SobaFormType = { name: formName, description: formDesc };
-    const created = await createSobaFormioForm(token as string, data, activeWorkspaceId || undefined);
+    const created = await createSobaFormioForm(
+      token as string,
+      data,
+      pickedWorkspaceId || undefined,
+    );
     const versionId = created.formVersion?.id;
     if (versionId) {
       await saveFormVersionSchema(token as string, versionId, schema);
@@ -222,14 +296,14 @@ function FormForm({ formId }: { formId?: string }) {
         await publishSobaFormVersion(token as string, versionId);
       }
     }
-    router.push(`/${lang}/designer/${created.id}`);
+    router.push(`/${lang}/build/${created.id}`);
   };
 
   const saveForm = async (publish: boolean = false) => {
-    if (isSaving || loading) return;
-    // Creating a form is workspace-scoped: without an active workspace the backend
+    if (isSaving || draftUnavailable) return;
+    // Creating a form is workspace-scoped: without a selected workspace the backend
     // rejects the request with a generic error, so surface a clear message instead.
-    if (!formId && !activeWorkspaceId) {
+    if (!formId && !pickedWorkspaceId) {
       addNotification({ text: dict.form.noActiveWorkspaceError, type: 'error' });
       return;
     }
@@ -238,22 +312,33 @@ function FormForm({ formId }: { formId?: string }) {
 
     try {
       if (currentVersion?.id) {
-        // UPDATE: re-provision the current version's schema (server owns name/path).
+        // Only the name is edited here. Sending any other field would write back whatever this
+        // screen last read over a change made from the settings tab.
+        await updateSobaForm(token as string, formId as string, { name: formName });
         await saveFormVersionSchema(token as string, currentVersion.id, schema);
         if (publish) {
           await publishSobaFormVersion(token as string, currentVersion.id);
+          // Publishing changes the version's state, which gates Save and the read-only notice.
+          await refreshVersions();
         }
-      } else {
+        await commitSchema(currentVersion.id, schema);
+      } else if (!formId) {
         await createAndProvisionForm(schema, publish);
+      } else {
+        // An existing form with no current version. Creating here would file the edits under a
+        // second form.
+        return;
       }
 
+      // The name is server-owned once saved, so re-read it rather than leaving the edit in place.
+      await refreshForm();
       addNotification({
         text: publish ? dict.form.published || 'Form published successfully!' : dict.form.saved,
         type: 'success',
       });
-      setIsDirty(false);
+      discardEdits();
     } catch (e: unknown) {
-      addNotification({ text: dict.form.saveError, type: 'error', consoleError: e });
+      await reportWriteFailure(e, dict.form.saveError);
     } finally {
       setIsSaving(false);
     }
@@ -267,27 +352,95 @@ function FormForm({ formId }: { formId?: string }) {
     return <div className="p-5 text-center">{dict.general.notAuthenticated}</div>;
   }
 
-  // New-form mode requires a workspace to own the form. Once workspaces have loaded and
-  // the user has none, block designer access with a clear prompt instead of a save failure.
-  if (!formId && workspaceStatus === 'succeeded' && workspaces.length === 0) {
+  // New-form mode requires a workspace to own the form. When none qualifies, block designer access
+  // with a clear prompt instead of a save failure. Having the permission but no accepted disclaimer
+  // is actionable, so it gets its own message.
+  if (!formId && currentUserLoaded && formCreate !== 'allowed') {
+    const blocked =
+      formCreate === 'disclaimer_required'
+        ? {
+            variant: 'warning' as const,
+            testId: 'disclaimer-required-alert',
+            text: dict.form.disclaimerRequired,
+          }
+        : {
+            variant: 'info' as const,
+            testId: 'designer-select-workspace',
+            text: dict.form.noActiveWorkspace,
+          };
     return (
       <div className="p-4">
-        <InlineAlert variant="info" data-testid="designer-select-workspace">
-          {dict.form.noActiveWorkspace}
+        <InlineAlert variant={blocked.variant} data-testid={blocked.testId}>
+          {blocked.text}
         </InlineAlert>
       </div>
     );
   }
 
+  const renderToolBar = () => {
+    if (draftUnavailable) {
+      return <></>;
+    }
+    return (
+      <div className={`${styles.stickyActions} p-3 d-flex gap-2 w-100`}>
+        {formId && (
+          <Button
+            variant="secondary"
+            data-testid="new-version-button"
+            onPress={clickNewVersion}
+            isDisabled={isSaving || loading}
+          >
+            {getNewVersionLabel()}
+          </Button>
+        )}
+        <Button
+          variant="secondary"
+          onPress={saveFormDraft}
+          data-testid="save-form-button"
+          isDisabled={isHistoryView || isCurrentPublished || editsStale || isSaving || loading}
+        >
+          {isSaving ? dict.form.saving || 'Saving...' : dict.form.save || 'Save'}
+        </Button>
+        <Button
+          variant="secondary"
+          data-testid="preview-form-button"
+          onPress={() => setShowPreview(true)}
+          isDisabled={isSaving || loading}
+        >
+          {dict.form.preview || 'Preview'}
+        </Button>
+        {formId && (
+          <span className="d-inline-flex" title={getPublishTitle()}>
+            <Button
+              variant="primary"
+              data-testid="publish-form-button"
+              onPress={saveFormPublish}
+              isDisabled={isHistoryView || isCurrentPublished || isDirty || isSaving || loading}
+            >
+              {dict.form.publish || 'Publish'}
+            </Button>
+          </span>
+        )}
+      </div>
+    );
+  };
+
   const renderFormBuilder = () => {
     if (!formId) {
       return (
         <FormDesigner
-          onUpdateModel={updateFormSchema}
+          onUpdateModel={setSchema}
           initialModel={null}
           formName={formName}
           isDirty={isDirty}
         />
+      );
+    }
+    if (loadError) {
+      return (
+        <div className="my-4" data-testid="designer-load-error">
+          {noticeForLoadError(dict, loadError)}
+        </div>
       );
     }
     if (loading) {
@@ -298,7 +451,10 @@ function FormForm({ formId }: { formId?: string }) {
     }
     return (
       <FormDesigner
-        onUpdateModel={updateFormSchema}
+        // FormDesigner takes its model once at mount. Switching to a version already in the cache
+        // produces no loading frame, so without this the previous version stays on screen.
+        key={activeVersion?.id}
+        onUpdateModel={setSchema}
         initialModel={formSchema}
         formName={formName}
         versionNo={currentVersion?.versionNo ?? null}
@@ -316,8 +472,7 @@ function FormForm({ formId }: { formId?: string }) {
 
   const getPublishTitle = (): string => {
     if (isHistoryView) return dict.form.cannotPublishHistory || 'Cannot publish history';
-    if (isCurrentPublished)
-      return dict.form.versionAlreadyPublished || 'Version already published';
+    if (isCurrentPublished) return dict.form.versionAlreadyPublished || 'Version already published';
     if (isDirty) return dict.form.saveChangesBeforePublishing || 'Save changes before publishing';
     return dict.form.publishForm || 'Publish form';
   };
@@ -332,151 +487,127 @@ function FormForm({ formId }: { formId?: string }) {
         <TextField
           label={dict.form.nameLabel}
           value={formName}
-          onChange={handleNameChange}
+          onChange={setName}
           isDisabled={isHistoryView || isCurrentPublished}
         />
 
-        {versions.length > 0 && (
+        {!formId && creatableWorkspaces.workspaces.length > 0 && (
+          <WorkspaceSelector
+            label={dict.workspaces.workspace}
+            workspaces={creatableWorkspaces.workspaces}
+            selectedWorkspaceId={selectedWorkspaceId}
+            onChange={(id) => setPickedWorkspaceId(id as string)}
+            description={lookupTruncatedNote(dict.general.lookupTruncated, creatableWorkspaces)}
+            size="medium"
+          />
+        )}
+
+        {form && versions.length > 0 && (
           <Select
+            data-testid="form-version-select"
             label={dict.form.formVersion || 'Form Version'}
             selectedKey={selectedVersionId || 'current'}
-            onSelectionChange={(key) => handleVersionChange(String(key))}
-            items={[
-              {
-                id: 'current',
-                label: `${dict.form.currentDraft || 'Current Draft'}${
-                  currentVersion?.versionNo ? ` (v${currentVersion.versionNo})` : ''
-                }`,
-              },
-              ...versions
-                .filter((v) => v.id !== currentVersion?.id)
-                .map((v) => ({ id: v.id, label: `v${v.versionNo} (${v.state})` })),
-            ]}
+            onSelectionChange={(key) => selectVersion(String(key))}
+            description={lookupTruncatedNote(dict.general.lookupTruncated, {
+              truncated: versionsTruncated,
+              limit: versionsLimit,
+            })}
+            items={versionSelectItems(
+              dict.form.currentDraft || 'Current Draft',
+              currentVersion,
+              withSelectedOption(versions, isHistoryView ? activeVersion : null),
+            )}
           />
         )}
 
         <FormSubmitterAudience
-          key={activeWorkspaceId ?? 'none'}
-          workspaceId={activeWorkspaceId}
-          token={token ?? undefined}
+          key={selectedWorkspaceId ?? 'none'}
+          workspaceId={selectedWorkspaceId}
           canManage={canManageWorkspace}
         />
-
-        {needsDisclaimer && (
-          <InlineAlert
-            variant="warning"
-            title={
-              dict.form.disclaimerRequired ||
-              'Accept the workspace disclaimer in workspace Settings before creating a form.'
-            }
-            data-testid="disclaimer-required-alert"
-          />
-        )}
       </Form>
 
+      {renderToolBar()}
       {/* Form Builder */}
       <div className={styles.designerWrapper}>{renderFormBuilder()}</div>
-
-      {/* Spacer so the builder clears the fixed action bar */}
-      <div className="mb-5 pb-5" />
-
-      <div
-        className={`${styles.floatingActions} shadow-lg p-3 rounded-pill d-flex gap-2 bg-white border`}
-      >
-        {formId && (
-          <Button
-            variant="secondary"
-            onPress={createNewVersion}
-            isDisabled={isSaving || loading}
-          >
-            {getNewVersionLabel()}
-          </Button>
-        )}
-        <Button
-          variant="primary"
-          onPress={saveFormDraft}
-          isDisabled={isHistoryView || isCurrentPublished || isSaving || loading || needsDisclaimer}
-        >
-          {isSaving ? dict.form.saving || 'Saving...' : dict.form.save || 'Save'}
-        </Button>
-        <Button variant="tertiary" onPress={() => setShowPreview(true)} isDisabled={isSaving || loading}>
-          {dict.form.preview || 'Preview'}
-        </Button>
-        {formId && (
-          <span
-            className="d-inline-flex"
-            title={getPublishTitle()}
-          >
-            <Button
-              variant="primary"
-              onPress={saveFormPublish}
-              isDisabled={
-                isHistoryView ||
-                isCurrentPublished ||
-                isDirty ||
-                isSaving ||
-                loading
-              }
-            >
-              {dict.form.publish || 'Publish'}
-            </Button>
-          </span>
-        )}
-      </div>
     </>
   );
 
   return (
     <>
-
-      {isHistoryView && (
-        <div className="mb-4">
-          <InlineAlert
-            variant="info"
-            buttons={
-              <Button
-                size="small"
-                variant="secondary"
-                onPress={() => handleVersionChange('current')}
-              >
-                {dict.form.switchToCurrentDraft ||
-                  'Switch to ' + (dict.form.currentDraft || 'Current Draft')}
-              </Button>
-            }
-          >
-            <strong>{dict.form.readOnlyMode || 'Read-Only Mode:'}</strong>{' '}
-            {dict.form.viewingHistoricalVersion || 'You are viewing historical version'}{' '}
-            <strong>v{historicalVersionNo}</strong>.{' '}
-            {dict.form.savePublishDisabled || 'Save and Publish options are disabled.'}
-          </InlineAlert>
-        </div>
-      )}
-
-      {!isHistoryView && isCurrentPublished && (
-        <div className="mb-4">
-          <InlineAlert variant="info">
-            <strong>{dict.form.publishedVersion || 'Published Version:'}</strong>{' '}
-            {dict.form.publishedVersionCannotBeModified ||
-              'This version is published and cannot be modified'}
-          </InlineAlert>
-        </div>
-      )}
-
       {formId ? (
         <Tabs
           id="form-designer-tabs"
+          aria-label={dict.form.designerTabs || 'Form Designer tabs'}
           activeKey={activeTab}
-          onSelect={(k) => setActiveTab(k || 'designer')}
+          onSelect={(k) => openTab(k || 'designer')}
           className="mb-3"
+          // A tab's data is read when it is opened, not before: the reads behind these tabs are
+          // gated on permissions a given user may not hold.
+          mountOnEnter
         >
-          <Tab eventKey="designer" title={dict.form.designerTab || 'Designer'}>
+          <Tab
+            eventKey="designer"
+            data-testid="designer-tab"
+            title={dict.form.designerTab || 'Designer'}
+          >
             {renderDesignerContent()}
           </Tab>
-          <Tab eventKey="settings" title={dict.form.settingsTab || 'Settings'}>
-            <FormSettingsTab dict={dict} />
+          <Tab
+            eventKey="settings"
+            data-testid="settings-tab"
+            disabled={isSaving || draftUnavailable}
+            title={dict.form.settingsTab || 'Settings'}
+          >
+            <FormSettingsTab dict={dict} formId={formId} />
           </Tab>
-          <Tab eventKey="team" title={dict.form.teamTab || 'Team'}>
+          <Tab
+            eventKey="team"
+            data-testid="team-tab"
+            disabled={isSaving || draftUnavailable}
+            title={dict.form.teamTab || 'Team'}
+          >
             <FormTeamTab dict={dict} />
+          </Tab>
+          <Tab
+            eventKey="version"
+            data-testid="version-tab"
+            disabled={isSaving || draftUnavailable}
+            title={dict.form.historyTab || 'History'}
+          >
+            <FormHistoryTab
+              dict={dict}
+              formId={formId}
+              onSelectVersion={selectVersion}
+              onRestoreVersion={restoreVersionAsNew}
+              onNavigateToDesigner={() => openTab('designer')}
+            />
+          </Tab>
+          <Tab
+            eventKey="submissions"
+            data-testid="submission-tab"
+            disabled={isSaving || draftUnavailable}
+            title={dict.form.submissionTab || 'Submissions'}
+          >
+            <FormSubmissionTab
+              dict={dict}
+              formId={formId}
+              opened={openedTabs.includes('submissions')}
+            />
+          </Tab>
+          <Tab
+            eventKey="share"
+            data-testid="share-tab"
+            disabled={isSaving || draftUnavailable}
+            title={dict.form.shareTab || 'Share'}
+          >
+            <FormShareTab
+              dict={dict}
+              formId={formId}
+              formName={formName}
+              formDesc={formDesc}
+              workspaceId={selectedWorkspaceId}
+            />
           </Tab>
         </Tabs>
       ) : (
@@ -490,7 +621,11 @@ function FormForm({ formId }: { formId?: string }) {
         onClose={() => setShowPreview(false)}
         size="lg"
         footer={
-          <Button variant="secondary" onPress={() => setShowPreview(false)}>
+          <Button
+            variant="secondary"
+            data-testid="close-preview-button"
+            onPress={() => setShowPreview(false)}
+          >
             {dict.form.closePreview || 'Close Preview'}
           </Button>
         }

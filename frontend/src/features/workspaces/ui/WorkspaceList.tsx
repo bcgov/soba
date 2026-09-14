@@ -1,24 +1,26 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
 import { Button as DSButton } from '@bcgov/design-system-react-components';
 import { DataTable, type Column } from '@/src/components/DataTable';
-import { ListPageLayout, ListPageToolbar, ListPageAuthGate } from '@/src/components/ListPageLayout';
+import { ListPageToolbar, ListPageAuthGate } from '@/src/components/ListPageLayout';
 import { ListPageSearchField } from '@/src/components/ListPageSearchField';
-import { MutedHint } from '@/src/components/MutedHint';
-import { DsPageHeading } from '@/app/ui/DsPageHeading';
 import { RowActionButton } from '@/src/components/RowActionButton';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useRouter, usePathname } from 'next/navigation';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
-import { useAppDispatch, useAppSelector } from '@/lib/store';
-import { loadWorkspaces, selectActiveWorkspace } from '@/lib/slices/workspaceSlice';
-import { loadCurrentUser } from '@/lib/slices/currentUserSlice';
-import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
+import { useWorkspaceList } from '@/src/shared/api/useWorkspaces';
+import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';
+import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
+import {
+  FORMS_LIST_QUERY,
+  listLink,
+  WORKSPACES_LIST_QUERY,
+} from '@/src/shared/list/listQueryMemory';
+import { PAGE_SIZE_OPTIONS, useListQuery } from '@/src/shared/list/useListQuery';
 import type { WorkspaceItem } from '@/src/types/workspaces';
 import { WorkspaceRoleBadge } from './WorkspaceRoleBadge';
-import { DefaultWorkspaceSwitch } from './DefaultWorkspaceSwitch';
 import { isWorkspaceManageRole } from '../workspaceRoles';
 
 const WorkspaceActionButtons = ({
@@ -58,83 +60,54 @@ const WorkspaceActionButtons = ({
 function WorkspaceList({ showFormsAction = true }: Readonly<{ showFormsAction?: boolean }>) {
   const dict = useDictionary();
   const dictWorkspaces = dict.workspaces;
-  const { authenticated, token, initializing } = useKeycloak();
-  const dispatch = useAppDispatch();
-  const { addNotification } = useNotificationStore();
+  const { authenticated, initializing } = useKeycloak();
 
   const router = useRouter();
   const pathname = usePathname();
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [pageSize, setPageSize] = useState(10);
-  const [currentPage, setCurrentPage] = useState(1);
-
   const locale = getLocaleFromPath(pathname);
 
-  const { workspaces, activeWorkspaceId, status: workspaceStatus, error: workspaceError } =
-    useAppSelector((state) => state.workspace);
-  const { data: currentUser, status: currentUserStatus } = useAppSelector(
-    (state) => state.currentUser,
+  const listQuery = useListQuery(WORKSPACES_LIST_QUERY);
+  const {
+    workspaces,
+    total,
+    isLoading: workspacesLoading,
+    error: workspacesError,
+  } = useWorkspaceList({
+    offset: listQuery.offset,
+    limit: listQuery.pageSize,
+    sort: listQuery.sort,
+    q: listQuery.q,
+  });
+
+  const error = useMemo(
+    () =>
+      workspacesError
+        ? loadErrorMessage(workspacesError, {
+            sessionExpired: dict.general.sessionExpired,
+            noAccess: dict.general.noAccess,
+            failed: dictWorkspaces.listLoadError,
+          })
+        : null,
+    [
+      workspacesError,
+      dict.general.sessionExpired,
+      dict.general.noAccess,
+      dictWorkspaces.listLoadError,
+    ],
   );
-  const defaultWorkspaceId = currentUser?.preferences?.defaultWorkspaceId ?? null;
-
-  useEffect(() => {
-    if (authenticated && token && workspaceStatus === 'idle') {
-      dispatch(loadWorkspaces(token));
-    }
-  }, [authenticated, token, workspaceStatus, dispatch]);
-
-  useEffect(() => {
-    if (authenticated && token && currentUserStatus === 'idle') {
-      dispatch(loadCurrentUser(token));
-    }
-  }, [authenticated, token, currentUserStatus, dispatch]);
-
-  const filteredWorkspaces = useMemo(() => {
-    if (!searchQuery.trim()) return workspaces;
-    const query = searchQuery.toLowerCase();
-    return workspaces.filter((w) => (w.name || '').toLowerCase().includes(query));
-  }, [workspaces, searchQuery]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredWorkspaces.length / pageSize));
-  const effectivePage = Math.min(currentPage, totalPages);
-
-  const paginatedWorkspaces = useMemo(() => {
-    const start = (effectivePage - 1) * pageSize;
-    return filteredWorkspaces.slice(start, start + pageSize);
-  }, [filteredWorkspaces, effectivePage, pageSize]);
-
-  const handleSearchChange = useCallback((value: string) => {
-    setSearchQuery(value);
-    setCurrentPage(1);
-  }, []);
-
-  const handlePageSizeChange = useCallback((size: number) => {
-    setPageSize(size);
-    setCurrentPage(1);
-  }, []);
+  const { data: currentUser } = useCurrentUser();
 
   const handleSelect = useCallback(
     (workspaceId: string, destination: 'forms' | 'manage') => {
-      if (!token) return;
-      dispatch(selectActiveWorkspace({ token, workspaceId }))
-        .unwrap()
-        .then(() => {
-          if (destination === 'forms') {
-            router.push(`/${locale}/forms`);
-          } else {
-            router.push(`/${locale}/workspace/${workspaceId}`);
-          }
-        })
-        .catch((error) => {
-          addNotification({
-            text: dict.general.workspaceSwitchError,
-            type: 'error',
-            consoleError: error,
-          });
-        });
+      if (destination === 'forms') {
+        // Opening a workspace's forms is an explicit scope choice, so it seeds the list filter.
+        router.push(listLink(`/${locale}/forms`, FORMS_LIST_QUERY, { workspace: workspaceId }));
+      } else {
+        router.push(`/${locale}/workspace/${workspaceId}`);
+      }
     },
-    [token, dispatch, router, locale, addNotification, dict.general.workspaceSwitchError],
+    [router, locale],
   );
 
   const handleAction = useCallback(
@@ -154,6 +127,7 @@ function WorkspaceList({ showFormsAction = true }: Readonly<{ showFormsAction?: 
         key: 'name',
         label: dictWorkspaces.columns.name,
         width: '40%',
+        sortField: 'name',
         render: (workspace: WorkspaceItem) => (
           <span className="d-inline-flex align-items-center gap-2">
             <RowActionButton
@@ -163,9 +137,6 @@ function WorkspaceList({ showFormsAction = true }: Readonly<{ showFormsAction?: 
             >
               {workspace.name}
             </RowActionButton>
-            {workspace.id === activeWorkspaceId ? (
-              <MutedHint>({dictWorkspaces.active})</MutedHint>
-            ) : null}
           </span>
         ),
       },
@@ -189,32 +160,11 @@ function WorkspaceList({ showFormsAction = true }: Readonly<{ showFormsAction?: 
           <WorkspaceRoleBadge role={workspace.role} data-testid={'role-' + workspace.id} />
         ),
       },
-      {
-        key: 'default',
-        label: dictWorkspaces.columns.default,
-        align: 'center',
-        render: (workspace: WorkspaceItem) => (
-          <DefaultWorkspaceSwitch
-            workspaceId={workspace.id}
-            workspaceName={workspace.name}
-            defaultWorkspaceId={defaultWorkspaceId}
-            ariaLabelTemplate={dictWorkspaces.defaultWorkspaceLabel}
-            errorMessage={dictWorkspaces.defaultWorkspaceError}
-          />
-        ),
-      },
     ],
-    [
-      handleSelect,
-      handleAction,
-      dictWorkspaces,
-      activeWorkspaceId,
-      showFormsAction,
-      defaultWorkspaceId,
-    ],
+    [handleSelect, handleAction, dictWorkspaces, showFormsAction],
   );
 
-  const loading = workspaceStatus === 'loading' || workspaceStatus === 'idle';
+  const loading = workspacesLoading;
   const showCreateAction = currentUser?.capabilities?.canCreateWorkspace === true;
 
   if (!authenticated && !initializing) {
@@ -222,9 +172,14 @@ function WorkspaceList({ showFormsAction = true }: Readonly<{ showFormsAction?: 
   }
 
   return (
-    <ListPageLayout>
-      <DsPageHeading id="workspaces-heading">{dictWorkspaces.tableHeading}</DsPageHeading>
-      <ListPageToolbar align={showCreateAction ? 'between' : 'end'}>
+    <>
+      <ListPageToolbar>
+        <ListPageSearchField
+          value={listQuery.searchInput}
+          onChange={listQuery.setSearchInput}
+          onSubmit={listQuery.commitSearch}
+          testIdPrefix="workspaces"
+        />
         {showCreateAction ? (
           <DSButton
             variant="primary"
@@ -234,31 +189,28 @@ function WorkspaceList({ showFormsAction = true }: Readonly<{ showFormsAction?: 
             {dictWorkspaces.createAction}
           </DSButton>
         ) : null}
-        <ListPageSearchField
-          value={searchQuery}
-          onChange={handleSearchChange}
-          testIdPrefix="workspaces"
-        />
       </ListPageToolbar>
 
       <DataTable<WorkspaceItem>
-        data={paginatedWorkspaces}
+        data={workspaces}
         columns={columns}
         loading={loading || initializing}
-        error={workspaceError}
+        error={error}
         emptyMessage={dictWorkspaces.empty}
         loadingMessage={dict.general.loading}
         itemName="items"
         caption={dictWorkspaces.tableHeading}
-        pageSize={pageSize}
-        currentPage={effectivePage}
-        totalItems={filteredWorkspaces.length}
-        onPageChange={setCurrentPage}
-        onPageSizeChange={handlePageSizeChange}
-        pageSizeOptions={[5, 10, 25, 50]}
+        pageSize={listQuery.pageSize}
+        currentPage={listQuery.page}
+        totalItems={total}
+        onPageChange={listQuery.setPage}
+        onPageSizeChange={listQuery.setPageSize}
+        pageSizeOptions={PAGE_SIZE_OPTIONS}
+        sort={listQuery.sort}
+        onSortChange={listQuery.setSort}
         keyExtractor={(workspace) => workspace.id}
       />
-    </ListPageLayout>
+    </>
   );
 }
 

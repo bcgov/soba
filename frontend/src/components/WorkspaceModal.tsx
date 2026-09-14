@@ -1,40 +1,39 @@
+'use client';
+
+import { useState } from 'react';
 import WorkspaceForm from '@/src/features/workspaces/ui/WorkspaceForm';
-import { Modal, Heading, Button } from '@bcgov/design-system-react-components';
+import { Modal } from '@/src/components/Modal';
 import { useDictionary } from '../../app/[lang]/Providers';
-import { setCanceledDefaultModal } from '@/lib/slices/workspaceSlice';
-import { useAppDispatch, useAppSelector } from '@/lib/store';
-import { FaTimes } from 'react-icons/fa';
+import { readSessionValue, writeSessionValue } from '@/src/shared/storage/sessionStore';
 
 type WorkspaceModalProps = {
   readonly canCreateWorkspace: boolean;
 };
 
+export const WORKSPACE_MODAL_DISMISSED_KEY = 'soba.workspaceModalDismissed';
+
 export function WorkspaceModal({ canCreateWorkspace }: WorkspaceModalProps) {
-  const dispatch = useAppDispatch();
   const dict = useDictionary();
-  const { canceledDefaultModal } = useAppSelector((state) => state.workspace);
+  // sessionStorage is not reactive, so the dismissal is component state that happens to persist.
+  // Reading it from storage alone would leave the modal on screen after its close button.
+  const [dismissed, setDismissed] = useState(
+    () => readSessionValue<boolean>(WORKSPACE_MODAL_DISMISSED_KEY) === true,
+  );
+
+  const handleClose = () => {
+    setDismissed(true);
+    writeSessionValue(WORKSPACE_MODAL_DISMISSED_KEY, true);
+  };
 
   return (
     <Modal
-      isKeyboardDismissDisabled={true}
-      isOpen={!canceledDefaultModal}
-      style={{ overflow: 'scroll' }}
-      onOpenChange={(open) => dispatch(setCanceledDefaultModal(!open))}
+      show={!dismissed}
+      title={dict.workspaces.modalTitle}
+      size="md"
+      isDismissable={false}
+      onClose={handleClose}
     >
-      <Heading className="mt-2 mx-3">
-        <span>{dict.workspaces.modalTitle}</span>
-        <Button
-          variant="link"
-          onClick={() => dispatch(setCanceledDefaultModal(true))}
-          className="float-end border-0 bg-transparent"
-        >
-          <FaTimes />
-        </Button>
-      </Heading>
-      <div className="mt-3 mx-3">
-        {canCreateWorkspace && <WorkspaceForm first={true} />}
-        {!canCreateWorkspace && <p>{dict.general.needWorkspace}</p>}
-      </div>
+      {canCreateWorkspace ? <WorkspaceForm first={true} /> : <p>{dict.general.needWorkspace}</p>}
     </Modal>
   );
 }
