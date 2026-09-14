@@ -13,16 +13,12 @@ import { useAppSession } from './useAppSession';
 
 type AppAccessGuardProps = {
   locale: string;
-  workspacesEnabled: boolean;
+  designMode: boolean;
   children: React.ReactNode;
 };
 
 /** Central session bootstrap and route access policy for localized app routes. */
-export function AppAccessGuard({
-  locale,
-  workspacesEnabled,
-  children,
-}: Readonly<AppAccessGuardProps>) {
+export function AppAccessGuard({ locale, designMode, children }: Readonly<AppAccessGuardProps>) {
   const dict = useDictionary();
   const router = useRouter();
   const pathname = usePathname();
@@ -31,8 +27,8 @@ export function AppAccessGuard({
   const session = useAppSession();
 
   const redirectTarget = useMemo(() => {
-    return resolveRedirect(pathname, locale, session, workspacesEnabled);
-  }, [pathname, locale, session, workspacesEnabled]);
+    return resolveRedirect(pathname, locale, session, designMode);
+  }, [pathname, locale, session, designMode]);
 
   useEffect(() => {
     if (redirectTarget) {

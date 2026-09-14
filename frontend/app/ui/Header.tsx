@@ -22,10 +22,10 @@ import styles from './Header.module.css';
 type HeaderProps = {
   headerNavItems: PluginNavItem[];
   overlayNavItems: PluginNavItem[];
-  showWorkspaces: boolean;
+  designMode: boolean;
 };
 
-function Header({ headerNavItems, showWorkspaces }: Readonly<HeaderProps>) {
+function Header({ headerNavItems, designMode }: Readonly<HeaderProps>) {
   const dict = useDictionary();
   const locale = dict.locale === 'en' || dict.locale === 'fr' ? dict.locale : 'en';
   const languageOptions: LanguageOption[] = Object.entries(dict.header.languages).map(
@@ -226,7 +226,7 @@ function Header({ headerNavItems, showWorkspaces }: Readonly<HeaderProps>) {
           </div>
         </div>
       </BCHeader>
-      {showWorkspaces && currentUser.loaded && !hasWorkspaces && (
+      {designMode && currentUser.loaded && !hasWorkspaces && (
         <WorkspaceModal canCreateWorkspace={canCreateWorkspace} />
       )}
     </div>
