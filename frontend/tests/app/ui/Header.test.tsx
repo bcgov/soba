@@ -39,9 +39,6 @@ vi.mock('@/src/shared/api/useCurrentUser', () => ({
     hasError: false,
   }),
 }));
-vi.mock('@/src/shared/api/useWorkspaces', () => ({
-  useWorkspaces: () => ({ workspaces: [], loaded: false }),
-}));
 
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({

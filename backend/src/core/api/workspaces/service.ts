@@ -1,11 +1,13 @@
 import {
   getWorkspaceForUser,
   listWorkspacesForUser,
+  lookupWorkspacesForUser,
   type WorkspaceListSort,
 } from '../../db/repos/membershipRepo';
 import { canCreateWorkspaceByIdp } from '../../db/repos/idpGroupRepo';
 import { createTeamWorkspace, updateWorkspace } from '../../db/repos/workspaceRepo';
 import { ForbiddenError } from '../../errors';
+import { LOOKUP_FETCH_LIMIT, toLookupResponse } from '../shared/lookup';
 
 export class WorkspacesApiService {
   async list(
@@ -28,7 +30,7 @@ export class WorkspacesApiService {
       kind: query.kind,
       status: query.status,
       q: query.q,
-      requiredPermission: query.requiredPermission,
+      requiredPermissions: query.requiredPermission ? [query.requiredPermission] : undefined,
     });
     return {
       items: items.map((r) => ({
@@ -54,6 +56,29 @@ export class WorkspacesApiService {
       },
       sort: query.sort,
     };
+  }
+
+  async lookup(
+    actorId: string,
+    query: { q?: string; requiredPermissions?: string; disclaimerAccepted?: 'true' | 'false' },
+  ) {
+    const rows = await lookupWorkspacesForUser({
+      userId: actorId,
+      q: query.q,
+      requiredPermissions: query.requiredPermissions?.split(','),
+      disclaimerAccepted:
+        query.disclaimerAccepted === undefined ? undefined : query.disclaimerAccepted === 'true',
+      limit: LOOKUP_FETCH_LIMIT,
+    });
+    return toLookupResponse(
+      rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        kind: r.kind,
+        role: r.role,
+        disclaimerAccepted: r.disclaimerAcceptedAt != null,
+      })),
+    );
   }
 
   async getCurrent(workspaceId: string, actorId: string) {

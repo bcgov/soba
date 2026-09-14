@@ -6,6 +6,8 @@ import {
   UpdateWorkspaceBodySchema as SobaUpdateWorkspaceBodySchema,
   WorkspaceSortSchema as SobaWorkspaceSortSchema,
   ListWorkspacesResponseSchema as SobaListWorkspacesResponseSchema,
+  WorkspaceLookupItemSchema as SobaWorkspaceLookupItemSchema,
+  WorkspaceLookupResponseSchema as SobaWorkspaceLookupResponseSchema,
 } from '@soba/lib';
 
 import {
@@ -15,6 +17,7 @@ import {
   OffsetPageSchema,
   OFFSET_DRIFT_NOTE,
 } from '../shared/offsetPagination';
+import { LOOKUP_NOTE } from '../shared/lookup';
 import { WORKSPACE_NAME_TAKEN } from '../../messages';
 
 extendZodWithOpenApi(z);
@@ -49,6 +52,37 @@ export const ListWorkspacesResponseSchema = SobaListWorkspacesResponseSchema.ext
   page: OffsetPageSchema,
   sort: WorkspaceSortSchema,
 }).openapi('Workspaces_ListWorkspacesResponse');
+
+const MAX_REQUIRED_PERMISSIONS = 10;
+
+export const WorkspaceLookupQuerySchema = z
+  .object({
+    q: searchQueryField.openapi({
+      description: 'Matches anywhere in the workspace name or organization.',
+    }),
+    requiredPermissions: z
+      .string()
+      .trim()
+      .regex(/^[a-z_]+(?:,[a-z_]+)*$/)
+      .refine((codes) => codes.split(',').length <= MAX_REQUIRED_PERMISSIONS, {
+        message: `at most ${MAX_REQUIRED_PERMISSIONS} permission codes`,
+      })
+      .optional()
+      .openapi({
+        description: `Comma-separated permission codes, at most ${MAX_REQUIRED_PERMISSIONS}. The caller must hold every one.`,
+        example: 'form_create,design_create',
+      }),
+    disclaimerAccepted: z.enum(['true', 'false']).optional(),
+  })
+  .openapi('Workspaces_WorkspaceLookupQuery');
+
+export const WorkspaceLookupItemSchema = SobaWorkspaceLookupItemSchema.clone().openapi(
+  'Workspaces_WorkspaceLookupItem',
+);
+
+export const WorkspaceLookupResponseSchema = SobaWorkspaceLookupResponseSchema.extend({
+  items: z.array(WorkspaceLookupItemSchema),
+}).openapi('Workspaces_WorkspaceLookupResponse');
 
 export const CurrentWorkspaceResponseSchema = WorkspaceItemSchema.openapi(
   'Workspaces_CurrentWorkspaceResponse',
@@ -87,6 +121,27 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
         content: {
           'application/json': {
             schema: ListWorkspacesResponseSchema,
+          },
+        },
+      },
+      400: { description: 'Invalid query' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: `${WORKSPACES_PATH}/lookup`,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: {
+      query: WorkspaceLookupQuerySchema,
+    },
+    responses: {
+      200: {
+        description: `Workspaces the current user belongs to, for a select. ${LOOKUP_NOTE}`,
+        content: {
+          'application/json': {
+            schema: WorkspaceLookupResponseSchema,
           },
         },
       },

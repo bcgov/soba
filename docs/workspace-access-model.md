@@ -14,10 +14,11 @@ Two separate things control access:
 They don't overlap: being a workspace admin grants no form permissions, and vice versa.
 
 > **Current status.** The design form routes (`api/forms/route.ts`) and the staff submission routes
-> (`api/submissions/route.ts`) are gated by `requireFormPermissions`, except creating a form (workspace
-> membership only) and schema normalize (no workspace). The submit routes, file uploads and document
-> generation are gated by `hasFormSubmitAccess`. Group and member management is gated by workspace role
-> (`requireWorkspaceManage`), not by RBAC.
+> (`api/submissions/route.ts`) are gated by `requireFormPermissions`, except schema normalize (no
+> workspace). Creating a form requires `form_create` and `design_create` — only `form_admin` satisfies
+> that, via `*`. Creating a design on an existing form requires `design_create` (`form_designer`). The
+> submit routes, file uploads and document generation are gated by `hasFormSubmitAccess`. Group and
+> member management is gated by workspace role (`requireWorkspaceManage`), not by RBAC.
 
 ```
                         User in a workspace
@@ -122,7 +123,10 @@ Six form roles are seeded (`role` + `role_permission`):
 `*` is a wildcard: a role holding it satisfies any permission check. Only `form_admin` has it, so adding
 new permissions later needs no change to that role.
 
-The permission codes are: `form_read/update/delete`, `design_create/read/update/delete`,
+`form_create` is catalogued but not assigned to any seeded role. Only `form_admin` can create a form
+(via `*`). `form_designer` can create a new design on an existing form (`design_create`).
+
+The permission codes are: `form_create/read/update/delete`, `design_create/read/update/delete`,
 `submission_create/read/update/delete/review`, `team_read/update`, `document_template_create/read/delete`.
 
 ### Group membership is "who", not "what"

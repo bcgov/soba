@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useMemo } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useSWRConfig } from 'swr';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -8,7 +8,6 @@ import { Header as BCHeader } from '@bcgov/design-system-react-components';
 import { FaUser } from 'react-icons/fa6';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
-import { useWorkspaces } from '@/src/shared/api/useWorkspaces';
 import { useDictionary } from '../[lang]/Providers';
 import { LoginButton } from './LoginButton';
 import { LanguageSelector, type LanguageOption } from './LanguageSelector';
@@ -38,7 +37,6 @@ function Header({ headerNavItems, showWorkspaces }: Readonly<HeaderProps>) {
   const { authenticated, idTokenParsed, token, logout, init, refresh, initStarted, initializing } =
     useKeycloak();
   const currentUser = useCurrentUser();
-  const { workspaces, loaded: workspacesLoaded } = useWorkspaces();
   const { mutate } = useSWRConfig();
 
   const headerChromeRef = useRef<HTMLDivElement>(null);
@@ -108,7 +106,7 @@ function Header({ headerNavItems, showWorkspaces }: Readonly<HeaderProps>) {
     }
   }, [authenticated, token, idTokenParsed, refresh, clearSessionState, initStarted, initializing]);
 
-  const hasWorkspaces = useMemo(() => workspaces.length > 0, [workspaces.length]);
+  const hasWorkspaces = currentUser.data?.capabilities?.hasWorkspaces === true;
   const canCreateWorkspace = currentUser.data?.capabilities?.canCreateWorkspace === true;
 
   const handleLogout = () => {
@@ -228,7 +226,7 @@ function Header({ headerNavItems, showWorkspaces }: Readonly<HeaderProps>) {
           </div>
         </div>
       </BCHeader>
-      {showWorkspaces && workspacesLoaded && !hasWorkspaces && (
+      {showWorkspaces && currentUser.loaded && !hasWorkspaces && (
         <WorkspaceModal canCreateWorkspace={canCreateWorkspace} />
       )}
     </div>

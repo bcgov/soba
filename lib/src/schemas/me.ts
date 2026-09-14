@@ -19,8 +19,18 @@ export const MePreferencesSchema = z.object({
 });
 export type MePreferences = z.infer<typeof MePreferencesSchema>;
 
+/**
+ * `disclaimer_required`: the user may create forms in some workspace, but none of those workspaces
+ * has accepted the disclaimer.
+ */
+export const FormCreateCapabilitySchema = z.enum(['allowed', 'disclaimer_required', 'none']);
+export type FormCreateCapability = z.infer<typeof FormCreateCapabilitySchema>;
+
 export const MeCapabilitiesSchema = z.object({
   canCreateWorkspace: z.boolean(),
+  /** Active member of at least one workspace. */
+  hasWorkspaces: z.boolean(),
+  formCreate: FormCreateCapabilitySchema,
   /** Platform admin via the soba_admin table: IdP-sourced or granted directly. */
   isSobaAdmin: z.boolean(),
 });
