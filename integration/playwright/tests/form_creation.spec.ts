@@ -25,7 +25,7 @@ test.describe.serial("Landing page tests", () => {
   });
 
   test("Validate form designing page", async ({ title }) => {
-    await sharedPage.goto("/");
+    await sharedPage.goto("");
     await expect(
       sharedPage.locator('[data-testid="login-button"]'),
     ).toBeVisible();
@@ -92,7 +92,6 @@ test.describe.serial("Landing page tests", () => {
       await formsNav.click();
       await sharedPage.click('[data-testid="create-form-button"]');
       const workspaceSelect = sharedPage.getByTestId("#workspace-select");
-      await expect(workspaceSelect).toBeVisible();
       await workspaceSelect.click();
       await sharedPage.waitForTimeout(1000);
       const workspaceOption = sharedPage.getByRole("option", {
@@ -130,22 +129,20 @@ test.describe.serial("Landing page tests", () => {
       // Continue with normal flow
       //Form creation
       await sharedPage.click('[data-testid="create-form-button"]');
-      if (depEnv === "dev" || /^\d+$/.test(depEnv ?? "")) {
-        const selectItem = sharedPage.getByText("Select an item", {
-          exact: true,
-        });
-        await selectItem.click();
-        const workspaceOption = sharedPage.getByRole("option", {
-          name: "Test (team)",
-          exact: true,
-        });
-        await workspaceOption.click();
-      }
       const formNameInput = sharedPage
         .locator("label", { hasText: "Form Name" })
         .locator("xpath=following-sibling::div//input");
       await formNameInput.fill(title);
       form_name = title;
+      const workspaceSelect = sharedPage.locator("#workspace-select");
+      await expect(workspaceSelect).toBeVisible();
+      await workspaceSelect.click();
+      await sharedPage.waitForTimeout(1000);
+      const workspaceOption = sharedPage.getByRole("option", {
+        name: "Test Workspace (team)",
+        exact: true,
+      });
+      await workspaceOption.click();
       await sharedPage.getByTestId("submitter-audience-trigger").click();
       await expect(
         sharedPage.getByTestId("audience-mode-public"),
