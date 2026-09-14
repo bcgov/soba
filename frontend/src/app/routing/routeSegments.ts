@@ -29,7 +29,6 @@ export const ROUTE_KIND_BY_SEGMENT: Readonly<Record<string, RouteKind>> = {
   form: PUBLIC, // app/[lang]/form/[formId]
   // Public fill route for an already-opened submission (resume by id); same audience authorization.
   submit: PUBLIC, // app/[lang]/submit/[submissionId]
-  submissions: WORKSPACE_APP, // app/[lang]/submissions (staff management table)
   // Single-submission view: public so an anonymous submitter sees their confirmation; the backend
   // authorizes the read against the form's audience (public-form submissions are public data).
   submission: PUBLIC, // app/[lang]/submission/[submissionId]

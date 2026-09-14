@@ -29,8 +29,6 @@ describe('classifyRoute', () => {
     expect(classifyRoute('/en/form/abc')).toBe('public');
     expect(classifyRoute('/en/submit/sub1')).toBe('public');
     expect(classifyRoute('/en/submission/sub1')).toBe('public');
-    // The submissions management table stays staff-only.
-    expect(classifyRoute('/en/submissions/f1')).toBe('workspace-app');
   });
 });
 
