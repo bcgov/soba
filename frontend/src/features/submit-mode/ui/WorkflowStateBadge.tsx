@@ -13,11 +13,5 @@ type WorkflowStateBadgeProps = {
  */
 export function WorkflowStateBadge({ state, 'data-testid': testId }: WorkflowStateBadgeProps) {
   const label = (state || '').toUpperCase();
-  return (
-    <StatusTag
-      label={label}
-      variant={workflowStateToVariant(state)}
-      data-testid={testId}
-    />
-  );
+  return <StatusTag label={label} variant={workflowStateToVariant(state)} data-testid={testId} />;
 }

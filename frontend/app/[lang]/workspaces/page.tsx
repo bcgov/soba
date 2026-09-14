@@ -24,8 +24,7 @@ export default async function Page({ params }: Readonly<PageProps>) {
     <PageLayout headingId="workspaces-heading" heading={dict.workspaces.tableHeading}>
       <WorkspaceList
         showFormsAction={
-          isFeatureAllowed(FEATURE_CODES.SUBMIT_MODE) ||
-          isFeatureAllowed(FEATURE_CODES.DESIGN_MODE)
+          isFeatureAllowed(FEATURE_CODES.SUBMIT_MODE) || isFeatureAllowed(FEATURE_CODES.DESIGN_MODE)
         }
       />
     </PageLayout>

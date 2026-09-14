@@ -42,4 +42,3 @@ export type SobaFormSummary = FormListItem;
 export type SobaFormVersionType = FormVersionResponse;
 
 export type SobaFormVersionListItem = FormVersionListItem;
-

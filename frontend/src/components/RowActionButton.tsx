@@ -30,7 +30,13 @@ export function RowActionButton({
 }: RowActionButtonProps) {
   return (
     <span className={main ? styles.main : undefined}>
-      <Button variant="link" size="small" aria-label={ariaLabel} data-testid={testId} onPress={onPress}>
+      <Button
+        variant="link"
+        size="small"
+        aria-label={ariaLabel}
+        data-testid={testId}
+        onPress={onPress}
+      >
         {children}
       </Button>
     </span>

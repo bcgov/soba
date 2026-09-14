@@ -195,7 +195,9 @@ describe('WorkspaceList', () => {
       );
     });
 
-    await waitFor(() => expect(fetchWorkspaces.mock.calls.at(-1)?.[1]).toMatchObject({ q: 'team' }));
+    await waitFor(() =>
+      expect(fetchWorkspaces.mock.calls.at(-1)?.[1]).toMatchObject({ q: 'team' }),
+    );
     replaceState.mockRestore();
   });
 

@@ -85,14 +85,7 @@ export function FeatureScopeListPanel({
           setPendingId(null);
         });
     },
-    [
-      token,
-      pendingId,
-      addNotification,
-      dictScopes.saveSuccess,
-      dictScopes.saveError,
-      reload,
-    ],
+    [token, pendingId, addNotification, dictScopes.saveSuccess, dictScopes.saveError, reload],
   );
 
   const handleDelete = useCallback(() => {

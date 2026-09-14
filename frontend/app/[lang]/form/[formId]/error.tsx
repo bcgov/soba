@@ -33,10 +33,7 @@ export default function FormIdRouteError({
         <Button type="button" variant="primary" onPress={() => reset()}>
           {labels.tryAgain}
         </Button>
-        <Link
-          className="text-decoration-underline"
-          href={`/${locale}/forms`}
-        >
+        <Link className="text-decoration-underline" href={`/${locale}/forms`}>
           {labels.backToList}
         </Link>
       </div>
