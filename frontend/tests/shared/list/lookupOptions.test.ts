@@ -3,9 +3,9 @@ import { lookupTruncatedNote, withSelectedOption } from '@/src/shared/list/looku
 
 describe('lookupTruncatedNote', () => {
   it('says nothing when every match was returned', () => {
-    expect(lookupTruncatedNote('Showing the first {limit}.', { truncated: false, limit: 500 })).toBe(
-      undefined,
-    );
+    expect(
+      lookupTruncatedNote('Showing the first {limit}.', { truncated: false, limit: 500 }),
+    ).toBeUndefined();
   });
 
   it('names the limit when the options were cut off', () => {
@@ -24,6 +24,10 @@ describe('withSelectedOption', () => {
   });
 
   it('adds a selection the lookup did not return', () => {
-    expect(withSelectedOption(options, { id: 'z' })).toEqual([{ id: 'a' }, { id: 'b' }, { id: 'z' }]);
+    expect(withSelectedOption(options, { id: 'z' })).toEqual([
+      { id: 'a' },
+      { id: 'b' },
+      { id: 'z' },
+    ]);
   });
 });
