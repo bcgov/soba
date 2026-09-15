@@ -1,16 +1,8 @@
-import { and, eq, inArray } from 'drizzle-orm';
-import { db } from '../client';
-import { workspaceGroupMemberships } from '../schema';
-import {
-  GroupMemberKind,
-  PUBLIC_PROVIDER_CODE,
-  Permissions,
-  SystemGroup,
-  WorkspaceGroupMembershipStatus,
-} from '../codes';
+import { GroupMemberKind, PUBLIC_PROVIDER_CODE, Permissions, SystemGroup } from '../codes';
 import type { PermissionCode } from '../codes';
 import { getSystemGroupId } from './workspaceGroupRepo';
-import { hasAllPermissions, resolveFormPermissions } from './formAccessRepo';
+import { hasAllPermissions, resolveFormPermissionsForForm } from './formAccessRepo';
+import { effectiveGroupMembers } from './formGroupOverrideRepo';
 
 /**
  * Permissions the Form submitters audience conveys to non-staff (idp/public) members: read the form,
@@ -32,61 +24,54 @@ export interface CallerIdentity {
   idpCode?: string | null;
 }
 
+/** The form an access check is for, with the workspace that owns it. */
+export interface FormAccessTarget {
+  workspaceId: string;
+  formId: string;
+}
+
 /**
- * True when a workspace's Form submitters group admits the caller via a `public` idp member (matches
- * everyone, including anonymous) or an `idp` member matching the caller's provider. User members are
- * not checked here — they are resolved through the staff permission path. idp_group is not resolved yet.
+ * True when the form's effective Form submitters members (the form's override, else the workspace
+ * group) admit the caller via a `public` idp member (matches everyone, including anonymous) or an `idp`
+ * member matching the caller's provider. User members are not checked here; they are resolved through
+ * the staff permission path. idp_group is not resolved yet.
  */
 const isSubmitterAudienceMember = async (
-  workspaceId: string,
+  target: FormAccessTarget,
   caller: CallerIdentity,
 ): Promise<boolean> => {
-  const groupId = await getSystemGroupId(workspaceId, SystemGroup.form_submitters);
+  const groupId = await getSystemGroupId(target.workspaceId, SystemGroup.form_submitters);
   if (!groupId) return false;
 
-  // `public` admits everyone; the caller's own provider admits an idp member. One lookup covers both.
-  const codes = [PUBLIC_PROVIDER_CODE];
-  if (caller.idpCode && caller.idpCode !== PUBLIC_PROVIDER_CODE) {
-    codes.push(caller.idpCode);
-  }
+  const codes = new Set<string>([PUBLIC_PROVIDER_CODE]);
+  if (caller.idpCode) codes.add(caller.idpCode);
 
-  const row = await db
-    .select({ id: workspaceGroupMemberships.id })
-    .from(workspaceGroupMemberships)
-    .where(
-      and(
-        eq(workspaceGroupMemberships.groupId, groupId),
-        eq(workspaceGroupMemberships.memberKind, GroupMemberKind.idp),
-        inArray(workspaceGroupMemberships.identityProviderCode, codes),
-        eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
-      ),
-    )
-    .limit(1);
-
-  return row.length > 0;
+  const members = await effectiveGroupMembers({
+    workspaceId: target.workspaceId,
+    formId: target.formId,
+    groupId,
+    memberKind: GroupMemberKind.idp,
+  });
+  return members.some((m) => m.identityProviderCode != null && codes.has(m.identityProviderCode));
 };
 
 /**
- * Authorizes a caller for `required` on a workspace's forms. Grants when the caller's workspace group
- * roles satisfy `required` (staff, incl. user members of the Form submitters group), or, for a code in
- * AUDIENCE_PERMISSIONS, when the caller is in the Form submitters audience via a `public`/`idp` member.
+ * Authorizes a caller for `required` on a form. Grants when the roles of the groups the caller is an
+ * effective member of for this form satisfy `required` (staff, incl. user members of the Form
+ * submitters group, where a form's override of a group replaces its members), or, for a code in
+ * AUDIENCE_PERMISSIONS, when the caller is in the form's Form submitters audience via a `public`/`idp`
+ * member.
  */
 export const hasFormSubmitAccess = async (
-  workspaceId: string,
+  target: FormAccessTarget,
   caller: CallerIdentity,
   required: PermissionCode,
 ): Promise<boolean> => {
   // Staff permissions apply only to real (non-public) users. The anonymous public user belongs to no
   // workspace, so skip the always-empty permission join and go straight to the audience check.
   if (caller.actorId && caller.idpCode !== PUBLIC_PROVIDER_CODE) {
-    const perms = await resolveFormPermissions(caller.actorId, workspaceId);
+    const perms = await resolveFormPermissionsForForm(caller.actorId, target);
     if (hasAllPermissions(perms, [required])) return true;
   }
-  if (
-    AUDIENCE_PERMISSIONS.has(required) &&
-    (await isSubmitterAudienceMember(workspaceId, caller))
-  ) {
-    return true;
-  }
-  return false;
+  return AUDIENCE_PERMISSIONS.has(required) && (await isSubmitterAudienceMember(target, caller));
 };

@@ -110,6 +110,11 @@ describe('documentGenerationService.preview', () => {
       data: { field: 'live' },
     });
     expect(outcome).toMatchObject({ status: 'ok', code: 'cdogs-v2' });
+    expect(hasFormSubmitAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: 'ws-1', formId: 'form-1' }),
+      caller,
+      'submission_create',
+    );
     expect(createAdapter).toHaveBeenCalledWith('cdogs-v2');
     // Service passes the payload through untouched; CDOGS-specific shaping is in the plugin.
     expect(renderMock).toHaveBeenCalledWith({
@@ -183,6 +188,11 @@ describe('documentGenerationService.print', () => {
     const outcome = await documentGenerationService.print(caller, { submissionId: 's1', template });
 
     expect(outcome).toMatchObject({ status: 'ok' });
+    expect(hasFormSubmitAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: 'ws-1', formId: 'form-1' }),
+      caller,
+      'submission_read',
+    );
     // Service passes the raw persisted doc through; the plugin flattens it for the template.
     expect(renderMock).toHaveBeenCalledWith(
       expect.objectContaining({ data: { data: { field: 'saved' } } }),
