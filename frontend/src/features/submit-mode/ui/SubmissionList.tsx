@@ -12,7 +12,7 @@ import { PAGE_SIZE_OPTIONS, useListQuery } from '@/src/shared/list/useListQuery'
 import type { SubmissionListItem } from '@/src/types/submissions';
 import { DataTable, Column } from '@/src/components/DataTable';
 import { RowActionButton } from '@/src/components/RowActionButton';
-import { WorkflowStateBadge } from './WorkflowStateBadge';
+import { WorkflowStateBadge } from '@/src/features/submissions/ui/WorkflowStateBadge';
 
 interface SubmissionListProps {
   formId?: string;

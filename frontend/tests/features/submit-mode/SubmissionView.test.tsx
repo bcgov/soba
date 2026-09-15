@@ -8,11 +8,16 @@ import { SWRConfig } from 'swr';
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
     locale: 'en',
-    general: { loading: 'Loading...', sessionExpired: 'Your session has ended.' },
+    general: {
+      loading: 'Loading...',
+      sessionExpired: 'Your session has ended.',
+      noAccess: 'You do not have access to this.',
+    },
     form: { nameLabel: 'Form' },
     submission: {
-      loading: 'Loading submission...',
+      confirmationId: 'Confirmation ID',
       notFound: 'Submission not found.',
+      loadError: 'Could not load this submission.',
       noContent: 'No submitted answers to display.',
       submittedOn: 'Submitted',
     },
@@ -38,6 +43,7 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
 
 import makeStore from '@/lib/store';
 import { initKeycloak, setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
+import { ApiError } from '@/src/shared/api/sobaHelpers';
 import { SubmissionView } from '@/src/features/submit-mode/ui/SubmissionView';
 
 let store: ReturnType<typeof makeStore>;
@@ -101,6 +107,8 @@ describe('SubmissionView', () => {
     await waitFor(() => expect(screen.getByTestId('submission-view-form')).toBeInTheDocument());
     expect(getSubmitSubmission).toHaveBeenCalledWith(undefined, 'sub-1');
     expect(screen.getByTestId('submission-view-version')).toHaveTextContent('v3');
+    expect(screen.getByTestId('submission-view-header')).toHaveTextContent('Confirmation ID: sub');
+    expect(screen.queryByTestId('submission-view-submitter')).not.toBeInTheDocument();
   });
 
   it('sends the token when signed in', async () => {
@@ -113,9 +121,19 @@ describe('SubmissionView', () => {
 
   it('says not found when the submission does not resolve', async () => {
     initAnswered();
-    getSubmitSubmission.mockRejectedValue(new Error('Request failed (404)'));
+    getSubmitSubmission.mockRejectedValue(new ApiError('Submission not found', 404));
     await renderView();
     await waitFor(() => expect(screen.getByTestId('submission-view-notfound')).toBeInTheDocument());
+  });
+
+  it('reports a server failure as a failed load, not a missing submission', async () => {
+    initAnswered();
+    getSubmitSubmissionData.mockRejectedValue(new ApiError('Request failed (500)', 500));
+    await renderView();
+    await waitFor(() =>
+      expect(screen.getByTestId('submission-view-loaderror')).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId('submission-view-notfound')).not.toBeInTheDocument();
   });
 
   // An ended session is not a missing submission; saying "not found" hides why.
