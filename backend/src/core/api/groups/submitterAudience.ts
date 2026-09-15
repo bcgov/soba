@@ -11,13 +11,16 @@ import type { GroupsContextInput } from './service';
 
 const SUBMITTERS_NOT_FOUND = 'Form submitters group not found';
 
-async function requireSubmittersGroupId(workspaceId: string): Promise<string> {
+export async function requireSubmittersGroupId(workspaceId: string): Promise<string> {
   const id = await getSystemGroupId(workspaceId, SystemGroup.form_submitters);
   if (!id) throw new NotFoundError(SUBMITTERS_NOT_FOUND);
   return id;
 }
 
-async function readAudience(workspaceId: string, groupId: string): Promise<SubmitterAudience> {
+export async function readAudience(
+  workspaceId: string,
+  groupId: string,
+): Promise<SubmitterAudience> {
   const group = await getWorkspaceGroup(workspaceId, groupId);
   const members = group?.members ?? [];
   const idps: string[] = [];
@@ -39,7 +42,7 @@ async function readAudience(workspaceId: string, groupId: string): Promise<Submi
 }
 
 /** Rejects codes that aren't active login providers (also excludes `public`/`system`). */
-async function assertLoginProviders(codes: string[]): Promise<void> {
+export async function assertLoginProviders(codes: string[]): Promise<void> {
   const valid = new Set((await listLoginIdentityProviders()).map((p) => p.code));
   const bad = [...new Set(codes)].filter((c) => !valid.has(c));
   if (bad.length) {

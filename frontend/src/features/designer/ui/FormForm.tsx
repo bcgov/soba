@@ -27,7 +27,6 @@ import FormHistoryTab from './FormHistoryTab';
 import FormSubmissionTab from './FormSubmissionTab';
 import FormShareTab from './FormShareTab';
 import { FormSubmitterAudience } from './FormSubmitterAudience';
-import { isWorkspaceManageRole } from '@/src/features/workspaces/workspaceRoles';
 import { useFormCreateWorkspaceOptions, useWorkspace } from '@/src/shared/api/useWorkspaces';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { lookupTruncatedNote, withSelectedOption } from '@/src/shared/list/lookupOptions';
@@ -187,7 +186,8 @@ function FormForm({ formId }: { formId?: string }) {
   const activeWorkspace = formId
     ? formWorkspace
     : creatableWorkspaces.workspaces.find((w) => w.id === pickedWorkspaceId);
-  const canManageWorkspace = !!activeWorkspace && isWorkspaceManageRole(activeWorkspace.role);
+  // A form's audience is changed per form; a form being created shows its workspace's, read-only.
+  const canUpdateForm = !!form?.permissions.some((p: string) => p === '*' || p === 'form_update');
 
   usePageHeading({
     // Editing claims no heading until the name arrives, so the page's own stands rather than
@@ -521,9 +521,10 @@ function FormForm({ formId }: { formId?: string }) {
         )}
 
         <FormSubmitterAudience
-          key={selectedWorkspaceId ?? 'none'}
+          key={formId ?? selectedWorkspaceId ?? 'none'}
           workspaceId={selectedWorkspaceId}
-          canManage={canManageWorkspace}
+          formId={formId}
+          canManage={canUpdateForm}
         />
       </Form>
 
