@@ -116,12 +116,13 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
           <p>
             {dictSub.confirmationId}: <strong>{confirmationId}</strong>
           </p>
+          <p>{dictSub.success.keepConfirmation}</p>
           {submission.submittedAt ? (
             <p>
               {dictSub.submittedOn} <strong>{formatLongDate(submission.submittedAt)}</strong>
             </p>
           ) : null}
-          <p>{dictSub.success.keepConfirmation}</p>
+
           <hr></hr>
           <div className="mt-4">{formContent}</div>
         </div>
