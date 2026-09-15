@@ -21,11 +21,7 @@ export async function generateMetadata({ params }: PageProps) {
   };
 }
 
-<<<<<<< HEAD
-export default async function Page({ params }: Readonly<PageProps>) {
-=======
 export default async function Page({ params }: PageProps) {
->>>>>>> 9180a42 (Added Confirmation screen, translation, and tests)
   const featuresMeta = await loadFeaturesMeta();
   const isFeatureAllowed = createIsFeatureAllowed(featuresMeta);
   if (!isFeatureAllowed(FEATURE_CODES.SUBMIT_MODE)) {
