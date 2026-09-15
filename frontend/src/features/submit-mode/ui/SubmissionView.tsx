@@ -46,7 +46,6 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
       // The confirmation view is submit-mode: read through the submit APIs regardless of sign-in so
       // audience members who aren't workspace members can still view.
       const submission = await getSubmitSubmission(authToken, submissionId);
-      if (success) return { submission, schema: null, content: null };
       const [schema, content] = await Promise.all([
         getSubmitSubmissionSchema(authToken, submissionId),
         getSubmitSubmissionData(authToken, submissionId),
@@ -68,6 +67,19 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
   if (!initStarted || initializing) {
     return <CenteredProgress label={dict.general.loading} />;
   }
+
+  const formContent =
+    schema && content !== null ? (
+      <ReadOnlyFormView
+        schema={schema}
+        submission={{ data: (content.data ?? {}) as Submission['data'] }}
+        testId="submission-view-form"
+      />
+    ) : (
+      <InlineAlert variant="info" role="alert" data-testid="submission-view-nocontent">
+        {dictSub?.noContent || 'No submitted answers to display.'}
+      </InlineAlert>
+    );
 
   const renderContent = () => {
     if (isLoading) {
@@ -100,7 +112,7 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
           <InlineAlert variant="success" role="status">
             {dictSub.success.message}
           </InlineAlert>
-          <h2 className="h5 mt-4">{submission.formName}</h2>
+          <h2 className="h3 mt-4">{submission.formName}</h2>
           <p>
             {dictSub.confirmationId}: <strong>{confirmationId}</strong>
           </p>
@@ -110,9 +122,8 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
             </p>
           ) : null}
           <p>{dictSub.success.keepConfirmation}</p>
-          <Link href={`/${locale}/submission/${encodeURIComponent(submissionId)}`}>
-            {dictSub.success.viewSubmission}
-          </Link>
+          <hr></hr>
+          <div className="mt-4">{formContent}</div>
         </div>
       );
     }
@@ -141,17 +152,7 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
           </div>
         </div>
 
-        {schema && content !== null ? (
-          <ReadOnlyFormView
-            schema={schema}
-            submission={{ data: (content.data ?? {}) as Submission['data'] }}
-            testId="submission-view-form"
-          />
-        ) : (
-          <InlineAlert variant="info" role="alert" data-testid="submission-view-nocontent">
-            {dictSub?.noContent || 'No submitted answers to display.'}
-          </InlineAlert>
-        )}
+        {formContent}
       </>
     );
   };

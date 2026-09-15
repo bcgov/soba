@@ -110,7 +110,7 @@ describe('SubmissionView', () => {
     expect(screen.getByTestId('submission-view-version')).toHaveTextContent('v3');
   });
 
-  it('shows confirmation without fetching answers and links to the submission', async () => {
+  it('shows the submitted form below confirmation and links to the submission', async () => {
     initAnswered();
     await renderView(true);
     expect(await screen.findByTestId('submission-success')).toHaveTextContent(
@@ -120,8 +120,9 @@ describe('SubmissionView', () => {
       'href',
       '/en/submission/sub-1',
     );
-    expect(getSubmitSubmissionSchema).not.toHaveBeenCalled();
-    expect(getSubmitSubmissionData).not.toHaveBeenCalled();
+    expect(getSubmitSubmissionSchema).toHaveBeenCalledWith(undefined, 'sub-1');
+    expect(getSubmitSubmissionData).toHaveBeenCalledWith(undefined, 'sub-1');
+    expect(screen.getByTestId('submission-view-form')).toBeInTheDocument();
   });
 
   it('does not claim success for an unsubmitted form', async () => {
