@@ -31,7 +31,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/src/features/formio-v5/ui/ReadOnlyFormView', () => ({
-  ReadOnlyFormView: () => <div data-testid="submission-view-form">rendered</div>,
+  ReadOnlyFormView: vi.fn(() => <div data-testid="submission-view-form">rendered</div>),
 }));
 
 const getSubmitSubmission = vi.fn();
@@ -46,6 +46,7 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
 import makeStore from '@/lib/store';
 import { initKeycloak, setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import { SubmissionView } from '@/src/features/submit-mode/ui/SubmissionView';
+import { ReadOnlyFormView } from '@/src/features/formio-v5/ui/ReadOnlyFormView';
 
 let store: ReturnType<typeof makeStore>;
 
@@ -110,19 +111,28 @@ describe('SubmissionView', () => {
     expect(screen.getByTestId('submission-view-version')).toHaveTextContent('v3');
   });
 
-  it('shows the submitted form below confirmation and links to the submission', async () => {
+  it('renders the completed submission below the success confirmation', async () => {
     initAnswered();
+    const schema = {
+      components: [{ type: 'textfield', key: 'fullName', label: 'Full name', input: true }],
+    };
+    const answers = { fullName: 'Taylor Smith' };
+    getSubmitSubmissionSchema.mockResolvedValue(schema);
+    getSubmitSubmissionData.mockResolvedValue({ data: answers });
+
     await renderView(true);
-    expect(await screen.findByTestId('submission-success')).toHaveTextContent(
-      'Submitted successfully.',
+
+    const form = await screen.findByTestId('submission-view-form');
+    const confirmation = screen.getByText('Keep this ID.');
+    expect(screen.getByTestId('submission-success')).toHaveTextContent('Submitted successfully.');
+    expect(confirmation.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
     );
-    expect(screen.getByRole('link', { name: 'View your submission' })).toHaveAttribute(
-      'href',
-      '/en/submission/sub-1',
+    expect(vi.mocked(ReadOnlyFormView).mock.lastCall?.[0]).toEqual(
+      expect.objectContaining({ schema, submission: { data: answers } }),
     );
     expect(getSubmitSubmissionSchema).toHaveBeenCalledWith(undefined, 'sub-1');
     expect(getSubmitSubmissionData).toHaveBeenCalledWith(undefined, 'sub-1');
-    expect(screen.getByTestId('submission-view-form')).toBeInTheDocument();
   });
 
   it('does not claim success for an unsubmitted form', async () => {
