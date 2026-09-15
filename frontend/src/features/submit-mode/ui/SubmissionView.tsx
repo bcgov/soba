@@ -18,7 +18,7 @@ import { isSessionExpired } from '@/src/shared/api/sobaFetch';
 import { useMaybeAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { convertSubmissionIdToConfirmationId } from '@/src/shared/util/stringUtils';
 
-export function SubmissionView() {
+export function SubmissionView({ success = false }: Readonly<{ success?: boolean }>) {
   const params = useParams();
   const dict = useDictionary();
   const dictSub = dict.submission;
@@ -30,7 +30,7 @@ export function SubmissionView() {
   const submissionId =
     typeof submissionIdRaw === 'string' ? decodeURIComponent(submissionIdRaw) : '';
 
-  const confirmationId = convertSubmissionIdToConfirmationId(submissionId);
+  const confirmationId = convertSubmissionIdToConfirmationId(submissionId).toLocaleUpperCase();
 
   const { data, isLoading, error } = useMaybeAuthedSWR(
     // Wait for Keycloak to answer before reading. Before init, "no token" is the default rather
@@ -38,7 +38,7 @@ export function SubmissionView() {
     // The identity is part of the key so signing in does not read the anonymous reader's copy.
     !initStarted || initializing || !submissionId
       ? null
-      : ['submit-submission', submissionId, token ? 'user' : 'anonymous'],
+      : ['submit-submission', submissionId, token ? 'user' : 'anonymous', success],
     async (authToken) => {
       // The confirmation view is submit-mode: read through the submit APIs regardless of sign-in so
       // audience members who aren't workspace members can still view.
@@ -65,6 +65,19 @@ export function SubmissionView() {
     return <CenteredProgress label={dict.general.loading} />;
   }
 
+  const formContent =
+    schema && content !== null ? (
+      <ReadOnlyFormView
+        schema={schema}
+        submission={{ data: (content.data ?? {}) as Submission['data'] }}
+        testId="submission-view-form"
+      />
+    ) : (
+      <InlineAlert variant="info" role="alert" data-testid="submission-view-nocontent">
+        {dictSub?.noContent || 'No submitted answers to display.'}
+      </InlineAlert>
+    );
+
   const renderContent = () => {
     if (isLoading) {
       return <CenteredProgress label={dictSub?.loading || dict.general.loading} />;
@@ -81,6 +94,35 @@ export function SubmissionView() {
         <InlineAlert variant="danger" role="alert" data-testid="submission-view-notfound">
           {dictSub?.notFound || 'Submission not found.'}
         </InlineAlert>
+      );
+    }
+    if (success) {
+      if (submission.workflowState !== 'submitted') {
+        return (
+          <InlineAlert variant="info" role="status">
+            {dictSub.success.notSubmitted}
+          </InlineAlert>
+        );
+      }
+      return (
+        <div data-testid="submission-success">
+          <InlineAlert variant="success" role="status">
+            {dictSub.success.message}
+          </InlineAlert>
+          <h2 className="h3 mt-4">{submission.formName}</h2>
+          <p>
+            {dictSub.confirmationId}: <strong>{confirmationId}</strong>
+          </p>
+          <p>{dictSub.success.keepConfirmation}</p>
+          {submission.submittedAt ? (
+            <p>
+              {dictSub.submittedOn} <strong>{formatLongDate(submission.submittedAt)}</strong>
+            </p>
+          ) : null}
+
+          <hr></hr>
+          <div className="mt-4">{formContent}</div>
+        </div>
       );
     }
     return (
@@ -108,17 +150,7 @@ export function SubmissionView() {
           </div>
         </div>
 
-        {schema && content !== null ? (
-          <ReadOnlyFormView
-            schema={schema}
-            submission={{ data: (content.data ?? {}) as Submission['data'] }}
-            testId="submission-view-form"
-          />
-        ) : (
-          <InlineAlert variant="info" role="alert" data-testid="submission-view-nocontent">
-            {dictSub?.noContent || 'No submitted answers to display.'}
-          </InlineAlert>
-        )}
+        {formContent}
       </>
     );
   };
