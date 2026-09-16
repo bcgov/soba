@@ -51,7 +51,7 @@ function StartSubmissionBody({
         // Mint the id client-side; a retry of this same id is idempotent server-side.
         const created = await openSobaFormSubmission(token ?? undefined, formId, uuidv7());
         // replace, not push: the start URL shouldn't sit in history and re-open on Back.
-        router.replace(`/${locale}/submit/${created.id}`);
+        router.push(`/${locale}/submit/${created.id}`);
       } catch (err) {
         setError(normalizeFormioRenderError(err, labels.startError, labels.sessionExpired));
       }
