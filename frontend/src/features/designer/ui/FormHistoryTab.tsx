@@ -3,7 +3,7 @@
 import { useMemo, useCallback } from 'react';
 import { Link } from '@bcgov/design-system-react-components';
 
-import type { Dictionary } from '@/src/types/plugins';
+import type { Dictionary } from '@/src/types/dictionary';
 import { Tag, TagColor } from '@/src/components/Tag';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';

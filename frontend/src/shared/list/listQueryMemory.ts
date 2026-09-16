@@ -77,13 +77,6 @@ export const FORM_VERSIONS_LIST_QUERY: ListQuerySpec = {
   defaultSort: 'versionNo:desc',
 };
 
-export const SUBMISSIONS_LIST_QUERY: ListQuerySpec = {
-  resource: 'submissions',
-  filters: [],
-  sortOptions: sortTokensFor(SUBMISSION_SORT_FIELDS),
-  defaultSort: 'updatedAt:desc',
-};
-
 export const SOBA_ADMINS_LIST_QUERY: ListQuerySpec = {
   resource: 'sobaAdmins',
   filters: [],

@@ -54,7 +54,6 @@ vi.mock('@/app/[lang]/Providers', () => ({
       selectLanguage: 'Language',
       bcgovTitle: 'BC Gov',
       skipToMain: 'Skip',
-      primaryNavAria: 'Primary',
     },
   }),
 }));
@@ -68,7 +67,7 @@ vi.mock('next/navigation', () => ({
 import { Header } from '@/app/ui/Header';
 
 function renderHeader(designMode = false) {
-  return render(<Header headerNavItems={[]} overlayNavItems={[]} designMode={designMode} />);
+  return render(<Header designMode={designMode} />);
 }
 
 function cleared() {
@@ -120,7 +119,7 @@ describe('Header session cleanup', () => {
     session.token = undefined;
     session.idTokenParsed = undefined;
     await act(async () => {
-      view.rerender(<Header headerNavItems={[]} overlayNavItems={[]} designMode={false} />);
+      view.rerender(<Header designMode={false} />);
     });
 
     expect(cleared()).toBe(true);
