@@ -303,10 +303,6 @@
       "formSettingsDrawerLabel": "Paramètres du Formulaire",
       "formSettingsDrawerSaveSuccessMessage": "Modifications mises à jour avec succès.",
       "formSettingsDrawerSaveErrorMessage": "Échec de l'enregistrement des modifications.",
-      "submitterSettingsDrawerLabel": "Paramètres des Soumissionnaires",
-      "allowSubmitterDraftsLabel": "Permettre aux soumissionnaires d'enregistrer et de modifier des brouillons",
-      "allowSubmitterDraftsPublicNote": "Les brouillons ne sont pas disponibles pour les formulaires publics.",
-      "submitterSettingsLoadError": "Impossible de charger les paramètres des soumissionnaires.",
       "profileDrawerInfo": "L'équipe CHEFS recueille et organise des informations pour servir d'entrée cruciale à l'élaboration de dossiers d'affaires complets. Ces dossiers joueront un rôle central dans l'orientation de l'exploitation stratégique et de l'amélioration continue de CHEFS dans les années à venir. Cette initiative de collecte de données est essentielle pour éclairer les décisions critiques et façonner la trajectoire de CHEFS, garantissant son adaptabilité et son efficacité face aux besoins et défis évolutifs.",
       "profileDrawerLabel": "Profil du Formulaire"
     },

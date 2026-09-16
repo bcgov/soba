@@ -5,7 +5,6 @@
  * best-effort. Deleting documents first would leave live rows pointing at nothing.
  */
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
-import { getTableConfig } from 'drizzle-orm/pg-core';
 
 import { db, type DbOrTx } from '../../core/db/client';
 import {
@@ -34,11 +33,7 @@ import {
 } from '../../core/db/schema';
 import { createFormEngineAdapter } from '../../core/integrations/form-engine/FormEngineRegistry';
 import { log } from '../../core/logging';
-import { formSettingsModules } from '../form-settings/registry';
 import { idsFromRuns, listOpenRuns, markRunsPurged } from './runs';
-
-/** Tables owned by form settings groups; each is cleared by workspace before forms are deleted. */
-const FORM_SETTINGS_TABLES = formSettingsModules.flatMap((module) => module.tables);
 
 export interface PurgeResult {
   rowsDeleted: Record<string, number>;
@@ -220,14 +215,13 @@ async function purgeUserScoped(tx: DbOrTx, userIds: string[], record: RecordFn):
  * table carrying a workspace_id, so a new one cannot be added without purge being updated. The test
  * checks this list, not the function body: adding a name here without a delete below defeats it.
  */
-export const WORKSPACE_SCOPED_TABLES: readonly string[] = [
+export const WORKSPACE_SCOPED_TABLES = [
   'document_generation_audit',
   'submission_revision',
   'submission',
   'file',
   'form_version_revision',
   'form_version',
-  ...FORM_SETTINGS_TABLES.map((table) => getTableConfig(table).name),
   'form',
   'workspace_group_role',
   'workspace_group_membership',
@@ -241,7 +235,7 @@ export const WORKSPACE_SCOPED_TABLES: readonly string[] = [
   'enterprise_membership_binding',
   'enterprise_workspace_binding',
   'workspace',
-];
+] as const;
 
 /**
  * Tables handled by user id rather than workspace id, plus app_user itself. Together with
@@ -297,12 +291,6 @@ async function purgeWorkspaceScoped(
     'form_version',
     tx.delete(formVersions).where(inArray(formVersions.workspaceId, ids)),
   );
-  for (const table of FORM_SETTINGS_TABLES) {
-    await record(
-      getTableConfig(table).name,
-      tx.delete(table).where(inArray(table.workspaceId, ids)),
-    );
-  }
   await record('form', tx.delete(forms).where(inArray(forms.workspaceId, ids)));
   await record(
     'workspace_group_role',

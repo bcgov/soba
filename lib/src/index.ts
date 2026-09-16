@@ -1,5 +1,4 @@
 export * from './schemas/forms';
-export * from './schemas/formSettings';
 export * from './schemas/submissions';
 export * from './schemas/pagination';
 export * from './sort';
