@@ -14,7 +14,7 @@ export type AppPlugin = {
   id: string;
   /**
    * When set, the plugin is included only if `isFeatureAllowed(featureCode)` is true
-   * (platform + `NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`). Omit for always-on shell (e.g. workspaces).
+   * (platform + `NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`). Omit for always-on shell.
    */
   featureCode?: string;
   /**
