@@ -1,6 +1,6 @@
 import { getDictionary, resolveLocale } from '../dictionaries';
-import FormList from '@/src/features/designer/ui/FormList';
 import { PageLayout } from '@/src/components/PageLayout';
+import { SecondaryText } from '@/src/components/SecondaryText';
 import { pageMetadata } from '@/src/shared/config/pageMetadata';
 
 type PageProps = {
@@ -8,10 +8,7 @@ type PageProps = {
 };
 
 export async function generateMetadata({ params }: PageProps) {
-  return pageMetadata(
-    params,
-    (dict) => `${dict.formioV5.formList.tableHeading} | ${dict.general.title}`,
-  );
+  return pageMetadata(params, (dict) => `${dict.general.myForms} | ${dict.general.title}`);
 }
 
 export default async function Page({ params }: Readonly<PageProps>) {
@@ -20,8 +17,10 @@ export default async function Page({ params }: Readonly<PageProps>) {
   const dict = await getDictionary(locale);
 
   return (
-    <PageLayout headingId="forms-heading" heading={dict.general.forms}>
-      <FormList />
+    <PageLayout headingId="my-forms-heading" heading={dict.general.myForms}>
+      <SecondaryText elementType="p" size="medium" data-testid="my-forms-coming-soon">
+        {dict.general.comingSoon}
+      </SecondaryText>
     </PageLayout>
   );
 }

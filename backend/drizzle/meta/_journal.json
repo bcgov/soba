@@ -220,6 +220,13 @@
       "breakpoints": true
     },
     {
+      "idx": 31,
+      "version": "7",
+      "when": 1772618005000,
+      "tag": "0031_remove_workspaces_feature",
+      "breakpoints": true
+    },
+    {
       "idx": 32,
       "version": "7",
       "when": 1772618006000,
