@@ -11,7 +11,10 @@ type WorkflowStateBadgeProps = {
  * The submission workflow-state pill, shared by the submissions list and the
  * single-submission viewer so the status looks identical in both places.
  */
-export function WorkflowStateBadge({ state, 'data-testid': testId }: WorkflowStateBadgeProps) {
+export function WorkflowStateBadge({
+  state,
+  'data-testid': testId,
+}: Readonly<WorkflowStateBadgeProps>) {
   const label = (state || '').toUpperCase();
   return <StatusTag label={label} variant={workflowStateToVariant(state)} data-testid={testId} />;
 }

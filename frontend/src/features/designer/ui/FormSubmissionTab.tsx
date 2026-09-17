@@ -125,7 +125,7 @@ export default function FormSubmissionTab({
               className="bcds-react-aria-Link medium false me-2"
               aria-label={dict.submission.view}
               data-testid={`${sub.id}-view-link`}
-              onPress={() => router.push(`/${locale}/submission/${sub.id}`)}
+              onPress={() => router.push(`/${locale}/build/${sub.formId}/submissions/${sub.id}`)}
             >
               <FaFile />
             </Link>
