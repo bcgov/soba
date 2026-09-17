@@ -11,6 +11,8 @@ jest.mock('../../../../src/core/db/repos/idpGroupRepo', () => ({
 
 jest.mock('../../../../src/core/db/repos/membershipRepo', () => ({
   actorBelongsToWorkspace: jest.fn(),
+  hasActiveMembership: jest.fn().mockResolvedValue(false),
+  findPermittedWorkspace: jest.fn().mockResolvedValue(null),
 }));
 
 import { meApiService } from '../../../../src/core/api/me/service';
@@ -52,7 +54,7 @@ describe('MeApiService', () => {
     jest.mocked(membershipRepo.actorBelongsToWorkspace).mockResolvedValue(true);
     jest.mocked(idpGroupRepo.canCreateWorkspaceByIdp).mockResolvedValue(true);
 
-    const result = await meApiService.get(actorId, 'idir');
+    const result = await meApiService.get(actorId, 'idir', false);
 
     expect(result?.preferences.defaultWorkspaceId).toBe(workspaceId);
     expect(result?.capabilities.canCreateWorkspace).toBe(true);
@@ -70,7 +72,7 @@ describe('MeApiService', () => {
     jest.mocked(membershipRepo.actorBelongsToWorkspace).mockResolvedValue(false);
     jest.mocked(idpGroupRepo.canCreateWorkspaceByIdp).mockResolvedValue(false);
 
-    const result = await meApiService.get(actorId, 'bceidbusiness');
+    const result = await meApiService.get(actorId, 'bceidbusiness', false);
 
     expect(result?.preferences.defaultWorkspaceId).toBeNull();
     expect(result?.capabilities.canCreateWorkspace).toBe(false);
@@ -88,9 +90,14 @@ describe('MeApiService', () => {
       },
     });
 
-    const result = await meApiService.patch(actorId, 'idir', {
-      preferences: { defaultWorkspaceId: workspaceId },
-    });
+    const result = await meApiService.patch(
+      actorId,
+      'idir',
+      {
+        preferences: { defaultWorkspaceId: workspaceId },
+      },
+      false,
+    );
 
     expect(appUserRepo.updateAppUserProfile).toHaveBeenCalledWith(
       actorId,
@@ -120,9 +127,14 @@ describe('MeApiService', () => {
       },
     });
 
-    const result = await meApiService.patch(actorId, 'idir', {
-      preferences: { defaultWorkspaceId: null },
-    });
+    const result = await meApiService.patch(
+      actorId,
+      'idir',
+      {
+        preferences: { defaultWorkspaceId: null },
+      },
+      false,
+    );
 
     expect(appUserRepo.updateAppUserProfile).toHaveBeenCalledWith(
       actorId,
@@ -134,14 +146,48 @@ describe('MeApiService', () => {
     expect(result?.preferences.defaultWorkspaceId).toBeNull();
   });
 
+  // resolveActor sets req.isSobaAdmin from the soba_admin table, which includes grants added
+  // directly; those never appear in a token.
+  it.each([true, false])('get reports isSobaAdmin %s from the resolved actor', async (admin) => {
+    jest.mocked(appUserRepo.findAppUserById).mockResolvedValue(baseUser);
+    jest.mocked(idpGroupRepo.canCreateWorkspaceByIdp).mockResolvedValue(false);
+
+    const result = await meApiService.get(actorId, 'idir', admin);
+
+    expect(result?.capabilities.isSobaAdmin).toBe(admin);
+  });
+
+  it.each([
+    [null, 'none'],
+    [{ disclaimerAccepted: false }, 'disclaimer_required'],
+    [{ disclaimerAccepted: true }, 'allowed'],
+  ] as const)('get maps the permitted workspace %o to formCreate %s', async (found, expected) => {
+    jest.mocked(appUserRepo.findAppUserById).mockResolvedValue(baseUser);
+    jest.mocked(idpGroupRepo.canCreateWorkspaceByIdp).mockResolvedValue(false);
+    jest.mocked(membershipRepo.findPermittedWorkspace).mockResolvedValueOnce(found);
+
+    const result = await meApiService.get(actorId, 'idir', false);
+
+    expect(result?.capabilities.formCreate).toBe(expected);
+    expect(membershipRepo.findPermittedWorkspace).toHaveBeenCalledWith(actorId, [
+      'form_create',
+      'design_create',
+    ]);
+  });
+
   it('patch rejects defaultWorkspaceId when user is not a member', async () => {
     jest.mocked(appUserRepo.findAppUserById).mockResolvedValue(baseUser);
     jest.mocked(membershipRepo.actorBelongsToWorkspace).mockResolvedValue(false);
 
     await expect(
-      meApiService.patch(actorId, 'idir', {
-        preferences: { defaultWorkspaceId: workspaceId },
-      }),
+      meApiService.patch(
+        actorId,
+        'idir',
+        {
+          preferences: { defaultWorkspaceId: workspaceId },
+        },
+        false,
+      ),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

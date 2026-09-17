@@ -84,32 +84,36 @@ If mongodb is internal, point at the in-cluster service; otherwise use mongodb.e
 {{- end }}
 
 {{/*
-Public host for a named frontend app (Route / Ingress).
-Per-app `host` override wins; otherwise <fullname>-<name>.<domain>.
-Usage: {{ include "soba.frontendHostFor" (dict "root" $root "name" $name "app" $app) }}
+Public host shared by every frontend app (Route / Ingress); apps are told apart by routePath.
+Usage: {{ include "soba.frontendHost" $root }}
 */}}
-{{- define "soba.frontendHostFor" -}}
-{{- if .app.host -}}
-{{- .app.host -}}
-{{- else -}}
-{{- printf "%s-%s.%s" (include "soba.fullname" .root) .name .root.Values.global.domain -}}
-{{- end -}}
+{{- define "soba.frontendHost" -}}
+{{- .Values.frontend.host | default (printf "%s.%s" (include "soba.fullname" .) .Values.global.domain) -}}
 {{- end }}
 
 {{/*
-Comma-separated https:// origins for every enabled frontend app.
-Feeds the backend CORS allowlist so both modes can call the API.
+Path a named frontend app is served under, e.g. /designer.
+Usage: {{ include "soba.frontendRoutePathFor" (dict "root" $root "name" "forms") }}
+*/}}
+{{- define "soba.frontendRoutePathFor" -}}
+{{- $app := index .root.Values.frontend.apps .name | default dict -}}
+{{- $app.routePath | default "" -}}
+{{- end }}
+
+{{/*
+Public https:// URL for a named frontend app. Backend and frontend both read these, so both take
+them from here and cannot drift.
+Usage: {{ include "soba.frontendAppUrlFor" (dict "root" $root "name" "forms") }}
+*/}}
+{{- define "soba.frontendAppUrlFor" -}}
+{{- printf "https://%s%s" (include "soba.frontendHost" .root) (include "soba.frontendRoutePathFor" (dict "root" .root "name" .name)) -}}
+{{- end }}
+
+{{/*
+The https:// origin every frontend app shares. Feeds the backend CORS allowlist.
 */}}
 {{- define "soba.frontendOrigins" -}}
-{{- $root := . -}}
-{{- $origins := list -}}
-{{- range $name, $app := .Values.frontend.apps -}}
-{{- if ne $app.enabled false -}}
-{{- $host := include "soba.frontendHostFor" (dict "root" $root "name" $name "app" $app) -}}
-{{- $origins = append $origins (printf "https://%s" $host) -}}
-{{- end -}}
-{{- end -}}
-{{- join "," $origins -}}
+{{- printf "https://%s" (include "soba.frontendHost" .) -}}
 {{- end }}
 
 {{/*
@@ -120,11 +124,18 @@ Backend public URL host (browser and NEXT_PUBLIC_SOBA_API_BASE_URL).
 {{- end }}
 
 {{/*
+URL path the API is served under (e.g. /chefs). Blank serves at the host root.
+*/}}
+{{- define "soba.backendBasePath" -}}
+{{- .Values.backend.basePath | default "" -}}
+{{- end }}
+
+{{/*
 Cluster-internal API base URL for Next.js SSR (Server Components) — plain HTTP to backend Service.
 See frontend SOBA_API_INTERNAL_URL in runtimeConfig. Override with frontend.internalApiBaseUrl if needed.
 */}}
 {{- define "soba.sobaApiInternalBaseUrl" -}}
-{{- printf "http://%s-backend.%s.svc.cluster.local:%v/api/v1" (include "soba.fullname" .) .Release.Namespace (.Values.backend.service.port) }}
+{{- printf "http://%s-backend.%s.svc.cluster.local:%v%s/api/v1" (include "soba.fullname" .) .Release.Namespace (.Values.backend.service.port) (include "soba.backendBasePath" .) }}
 {{- end }}
 
 {{/*
@@ -194,4 +205,27 @@ valkey alias Service, which they share — so it exists whenever any is on redis
 */}}
 {{- define "soba.usesValkey" -}}
 {{- if or (eq .Values.backend.config.cacheDefaultCode "cache-redis") (eq .Values.backend.config.messagebusDefaultCode "messagebus-redis") (eq .Values.backend.config.eventStreamDefaultCode "eventstream-redis") -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Feature status env vars for the backend, consumed by the seed step.
+
+Must stay inline: the only consumer is a pre-install/pre-upgrade hook Job, and Helm creates hook
+resources before ConfigMaps.
+
+Name normalization matches featureEnvName() in backend/src/core/db/featureFlags.ts. An unrecognised
+value fails the render, so a typo or an unquoted YAML boolean cannot pass as "no opinion". The
+status list mirrors active rows in soba.feature_status; keep the two in step.
+*/}}
+{{- define "soba.featureEnv" -}}
+{{- $valid := list "enabled" "disabled" "experimental" "deprecated" -}}
+{{- range $code, $value := .Values.backend.features }}
+{{- $status := "" }}
+{{- if $value }}{{ $status = toString $value }}{{ else if kindIs "bool" $value }}{{ $status = toString $value }}{{ end }}
+{{- if and $status (not (has $status $valid)) }}
+{{- fail (printf "backend.features.%s: %s is not a feature status. Use one of: %s (quoted)." $code $status (join ", " $valid)) }}
+{{- end }}
+- name: FEATURE_{{ regexReplaceAll "[^A-Z0-9]" (upper $code) "_" }}_STATUS
+  value: {{ $status | quote }}
+{{- end }}
 {{- end }}

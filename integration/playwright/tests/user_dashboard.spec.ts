@@ -17,7 +17,7 @@ test.describe.serial("Landing page tests", () => {
   });
 
   test("Checks the login functionality", async () => {
-    await sharedPage.goto("/");
+    await sharedPage.goto("./");
     await expect(
       sharedPage.locator('[data-testid="login-button"]'),
     ).toBeVisible();
@@ -30,14 +30,10 @@ test.describe.serial("Landing page tests", () => {
 
   test("Checks the navigation links", async () => {
     // The SideNav is always visible for authenticated users (no menu toggle).
-    await expect(
-      sharedPage.locator('[data-testid="forms-nav"]'),
-    ).toBeVisible();
+    await expect(sharedPage.locator('[data-testid="home-nav"]')).toBeVisible();
     await expect(
       sharedPage.locator('[data-testid="feedback-nav"]'),
     ).toBeVisible();
-    await expect(
-      sharedPage.locator('[data-testid="help-nav"]'),
-    ).toBeVisible();
+    await expect(sharedPage.locator('[data-testid="help-nav"]')).toBeVisible();
   });
 });

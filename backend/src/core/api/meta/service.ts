@@ -1,3 +1,11 @@
+import type {
+  BuildMetaResponse,
+  FeatureAvailabilityResponse,
+  FeaturesMetaResponse,
+  FormEnginesMetaResponse,
+  FrontendConfigMetaResponse,
+  PluginsMetaResponse,
+} from '@soba/lib';
 import packageJson from '../../../../package.json';
 import { env } from '../../config/env';
 import { authEnv } from '../../config/authEnv';
@@ -24,8 +32,19 @@ function parseKeycloakIssuer(issuer: string): { url: string; realm: string } {
   return { url, realm };
 }
 
+// Deployments set APP_VERSION; package.json is the fallback for local runs. Release tags are
+// conventionally `vX.Y.Z`, so drop the prefix rather than reporting "v2.1.0" as the version.
+function resolveAppVersion(): string {
+  const configured = env.getOptionalEnv('APP_VERSION');
+  return configured ? configured.replace(/^v(?=\d)/, '') : packageJson.version;
+}
+
+function resolveGitSha(): string {
+  return env.getOptionalEnv('GIT_SHA') ?? 'unknown';
+}
+
 export class MetaApiService {
-  async getPlugins() {
+  async getPlugins(): Promise<PluginsMetaResponse> {
     const plugins = getPluginCatalog();
     // Selectable adapter codes come from the registry; form engine has its own registry.
     const activeFormEngineCode =
@@ -52,7 +71,7 @@ export class MetaApiService {
     };
   }
 
-  async getFeatures() {
+  async getFeatures(): Promise<FeaturesMetaResponse> {
     const features = await listFeatures();
     return {
       features: features.map((f) => ({
@@ -71,7 +90,11 @@ export class MetaApiService {
    * Resolve whether a feature is available for a workspace/form scope (3-gate resolution). Lets the
    * frontend check a `scoped` feature it cannot resolve locally, since grants live server-side.
    */
-  async getFeatureAvailability(params: { code: string; workspaceId?: string; formId?: string }) {
+  async getFeatureAvailability(params: {
+    code: string;
+    workspaceId?: string;
+    formId?: string;
+  }): Promise<FeatureAvailabilityResponse> {
     const available = await isFeatureAvailable(params.code, {
       workspaceId: params.workspaceId,
       formId: params.formId,
@@ -79,18 +102,18 @@ export class MetaApiService {
     return { code: params.code, available };
   }
 
-  getBuild() {
+  getBuild(): BuildMetaResponse {
     return {
       name: packageJson.name,
-      version: packageJson.version,
+      version: resolveAppVersion(),
       nodeVersion: process.version,
-      gitSha: env.getOptionalEnv('GIT_SHA') ?? 'unknown',
+      gitSha: resolveGitSha(),
       gitTag: env.getOptionalEnv('GIT_TAG') ?? 'unknown',
       imageTag: env.getOptionalEnv('IMAGE_TAG') ?? 'unknown',
     };
   }
 
-  getFrontendConfig() {
+  getFrontendConfig(): FrontendConfigMetaResponse {
     const issuer = authEnv.getIdpPluginDefaultSsoJwtIssuer();
     const { url, realm } = parseKeycloakIssuer(issuer);
     const clientId = authEnv.getIdpPluginDefaultSsoJwtAudience() ?? '';
@@ -106,16 +129,25 @@ export class MetaApiService {
         },
       },
       api: {
-        baseUrl: env.getOptionalEnv('SOBA_API_BASE_URL') ?? 'http://localhost:4000/api/v1',
+        baseUrl:
+          env.getOptionalEnv('SOBA_API_BASE_URL') ??
+          `http://localhost:4000${env.getApiBasePath()}/api/v1`,
+      },
+      // Reported only when configured. A guessed URL would be served to every client and silently
+      // produce links to the wrong host.
+      app: {
+        designerUrl: env.getDesignerAppUrl(),
+        formsUrl: env.getFormsAppUrl(),
       },
       build: {
         name: packageJson.name,
-        version: packageJson.version,
+        version: resolveAppVersion(),
+        gitSha: resolveGitSha(),
       },
     };
   }
 
-  async getFormEngines() {
+  async getFormEngines(): Promise<FormEnginesMetaResponse> {
     const plugins = getFormEnginePlugins();
     const defaultCode = env.getFormEngineDefaultCode();
     return {

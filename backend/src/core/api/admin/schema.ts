@@ -1,42 +1,118 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
+import {
+  SobaAdminItemSchema as LibSobaAdminItemSchema,
+  SobaAdminSortSchema as LibSobaAdminSortSchema,
+  ListSobaAdminsResponseSchema as LibListSobaAdminsResponseSchema,
+  FeatureScopeItemSchema as LibFeatureScopeItemSchema,
+  FeatureScopeSortSchema as LibFeatureScopeSortSchema,
+  ListFeatureScopesResponseSchema as LibListFeatureScopesResponseSchema,
+  AddSobaAdminBodySchema as LibAddSobaAdminBodySchema,
+  UpsertFeatureScopeBodySchema as LibUpsertFeatureScopeBodySchema,
+  DocumentGenerationAuditItemSchema as LibDocumentGenerationAuditItemSchema,
+  DocgenAuditSortSchema as LibDocgenAuditSortSchema,
+  ListDocumentGenerationAuditsResponseSchema as LibListDocumentGenerationAuditsResponseSchema,
+} from '@soba/lib';
+import {
+  offsetQueryFields,
+  rejectedCursorField,
+  searchQueryField,
+  OffsetPageSchema,
+  OFFSET_DRIFT_NOTE,
+} from '../shared/offsetPagination';
 
 extendZodWithOpenApi(z);
 
-export const SobaAdminItemSchema = z
-  .object({
-    userId: z.string(),
-    source: z.string(),
-    identityProviderCode: z.string().nullable(),
-    syncedAt: z.string().nullable(),
-    displayLabel: z.string().nullable(),
-  })
-  .openapi('Admin_SobaAdminItem');
+export const SobaAdminItemSchema = LibSobaAdminItemSchema.clone().openapi('Admin_SobaAdminItem');
+
+export const SobaAdminSortSchema = LibSobaAdminSortSchema.clone().openapi('Admin_SobaAdminSort');
 
 export const ListSobaAdminsQuerySchema = z
   .object({
-    limit: z.coerce.number().int().min(1).max(100).default(20),
-    cursor: z.string().min(1).optional(),
+    ...offsetQueryFields,
+    cursor: rejectedCursorField,
+    source: z.string().trim().min(1).optional(),
+    q: searchQueryField.openapi({ description: 'Matches anywhere in the admin display label.' }),
+    sort: SobaAdminSortSchema.default('displayLabel:asc'),
   })
   .openapi('Admin_ListSobaAdminsQuery');
 
-export const ListSobaAdminsResponseSchema = z
-  .object({
-    items: z.array(SobaAdminItemSchema),
-    page: z.object({
-      limit: z.number().int().min(1),
-      hasMore: z.boolean(),
-      nextCursor: z.string().nullable(),
-      cursorMode: z.enum(['id']),
-    }),
-  })
-  .openapi('Admin_ListSobaAdminsResponse');
+export const DocgenAuditSortSchema =
+  LibDocgenAuditSortSchema.clone().openapi('Admin_DocgenAuditSort');
 
-export const AddSobaAdminBodySchema = z
+export const ListDocumentGenerationAuditsQuerySchema = z
   .object({
-    userId: z.string().uuid(),
+    workspaceId: z.uuid().optional(),
+    formId: z.uuid().optional(),
+    ...offsetQueryFields,
+    cursor: rejectedCursorField,
+    sort: DocgenAuditSortSchema.default('createdAt:desc'),
   })
-  .openapi('Admin_AddSobaAdminBody');
+  .refine((value) => !!value.workspaceId || !!value.formId, {
+    message: 'At least one of workspaceId or formId is required',
+    path: ['workspaceId'],
+  })
+  .openapi('Admin_ListDocumentGenerationAuditsQuery');
+
+export const ListSobaAdminsResponseSchema = LibListSobaAdminsResponseSchema.extend({
+  items: z.array(SobaAdminItemSchema),
+  page: OffsetPageSchema,
+  sort: SobaAdminSortSchema,
+}).openapi('Admin_ListSobaAdminsResponse');
+
+export const DocumentGenerationAuditItemSchema =
+  LibDocumentGenerationAuditItemSchema.clone().openapi('Admin_DocumentGenerationAuditItem');
+
+export const ListDocumentGenerationAuditsResponseSchema =
+  LibListDocumentGenerationAuditsResponseSchema.extend({
+    items: z.array(DocumentGenerationAuditItemSchema),
+    page: OffsetPageSchema,
+    sort: DocgenAuditSortSchema,
+  }).openapi('Admin_ListDocumentGenerationAuditsResponse');
+
+export const FeatureScopeItemSchema =
+  LibFeatureScopeItemSchema.clone().openapi('Admin_FeatureScopeItem');
+
+export const FeatureScopeSortSchema =
+  LibFeatureScopeSortSchema.clone().openapi('Admin_FeatureScopeSort');
+
+export const ListFeatureScopesQuerySchema = z
+  .object({
+    featureCode: z.string().min(1).optional(),
+    // Comma-separated, because the caller filters to the features this deployment scopes. An
+    // absent param is no filter; an empty one is a filter nothing matches.
+    featureCodes: z
+      .string()
+      .max(2048)
+      .optional()
+      .transform((value) =>
+        value === undefined
+          ? undefined
+          : value
+              .split(',')
+              .map((code) => code.trim())
+              .filter(Boolean),
+      ),
+    scopeType: z.enum(['workspace', 'form']).optional(),
+    status: z.enum(['active', 'inactive']).optional(),
+    ...offsetQueryFields,
+    cursor: rejectedCursorField,
+    sort: FeatureScopeSortSchema.default('updatedAt:desc'),
+  })
+  .openapi('Admin_ListFeatureScopesQuery');
+
+export const ListFeatureScopesResponseSchema = LibListFeatureScopesResponseSchema.extend({
+  items: z.array(FeatureScopeItemSchema),
+  page: OffsetPageSchema,
+  sort: FeatureScopeSortSchema,
+}).openapi('Admin_ListFeatureScopesResponse');
+
+export const AddSobaAdminBodySchema =
+  LibAddSobaAdminBodySchema.clone().openapi('Admin_AddSobaAdminBody');
+
+export const UpsertFeatureScopeBodySchema = LibUpsertFeatureScopeBodySchema.clone().openapi(
+  'Admin_UpsertFeatureScopeBody',
+);
 
 export const SobaAdminUserIdParamsSchema = z
   .object({
@@ -44,7 +120,14 @@ export const SobaAdminUserIdParamsSchema = z
   })
   .openapi('Admin_SobaAdminUserIdParams');
 
+export const FeatureScopeIdParamsSchema = z
+  .object({
+    featureScopeId: z.uuid(),
+  })
+  .openapi('Admin_FeatureScopeIdParams');
+
 const TAG = 'core.admin';
+const REQUIRES_SOBA_ADMIN = 'Requires soba_admin role';
 
 export const registerAdminOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
@@ -57,14 +140,14 @@ export const registerAdminOpenApi = (registry: OpenAPIRegistry) => {
     },
     responses: {
       200: {
-        description: 'List SOBA platform admins with cursor pagination',
+        description: `List SOBA platform admins with search and offset pagination. ${OFFSET_DRIFT_NOTE}`,
         content: {
           'application/json': {
             schema: ListSobaAdminsResponseSchema,
           },
         },
       },
-      400: { description: 'Invalid query or cursor' },
+      400: { description: 'Invalid query' },
     },
   });
 
@@ -85,7 +168,7 @@ export const registerAdminOpenApi = (registry: OpenAPIRegistry) => {
     },
     responses: {
       204: { description: 'Direct SOBA admin grant added or converted' },
-      400: { description: 'Invalid body (e.g. userId not a UUID)' },
+      400: { description: 'Invalid body: userId not a UUID, or no such user' },
     },
   });
 
@@ -95,8 +178,118 @@ export const registerAdminOpenApi = (registry: OpenAPIRegistry) => {
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     responses: {
-      204: { description: 'Direct grant removed (or no-op if not direct)' },
+      204: { description: 'Direct grant removed' },
       400: { description: 'Invalid userId' },
+      404: { description: 'No direct grant for that user' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/admin/feature-scopes',
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: {
+      query: ListFeatureScopesQuerySchema,
+    },
+    responses: {
+      200: {
+        description: 'List feature scope grants',
+        content: {
+          'application/json': {
+            schema: ListFeatureScopesResponseSchema,
+          },
+        },
+      },
+      400: { description: 'Invalid query' },
+      403: { description: REQUIRES_SOBA_ADMIN },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/admin/feature-scopes/{featureScopeId}',
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: FeatureScopeIdParamsSchema,
+    },
+    responses: {
+      200: {
+        description: 'Read a feature scope grant',
+        content: {
+          'application/json': {
+            schema: FeatureScopeItemSchema,
+          },
+        },
+      },
+      400: { description: 'Invalid featureScopeId' },
+      403: { description: REQUIRES_SOBA_ADMIN },
+      404: { description: 'Feature scope not found' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/admin/feature-scopes/{featureScopeId}',
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: FeatureScopeIdParamsSchema,
+    },
+    responses: {
+      204: { description: 'Feature scope grant deleted' },
+      400: { description: 'Invalid featureScopeId' },
+      403: { description: REQUIRES_SOBA_ADMIN },
+      404: { description: 'Feature scope not found' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/admin/feature-scopes',
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: {
+      body: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: UpsertFeatureScopeBodySchema,
+          },
+        },
+      },
+    },
+    responses: {
+      204: {
+        description:
+          'Feature scope upserted. Creates when missing, otherwise updates existing row status.',
+      },
+      400: { description: 'Invalid request body, unknown feature code, or feature is not scoped' },
+      403: { description: REQUIRES_SOBA_ADMIN },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/admin/document-generation/audits',
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: {
+      query: ListDocumentGenerationAuditsQuerySchema,
+    },
+    responses: {
+      200: {
+        description: 'Recent document generation audit rows for workspace/form scope',
+        content: {
+          'application/json': {
+            schema: ListDocumentGenerationAuditsResponseSchema,
+          },
+        },
+      },
+      400: { description: 'Invalid query (workspaceId/formId/limit)' },
+      403: { description: REQUIRES_SOBA_ADMIN },
+      404: { description: 'Document generation feature is disabled' },
     },
   });
 };

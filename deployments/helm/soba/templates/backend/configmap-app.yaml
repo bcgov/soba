@@ -6,11 +6,21 @@ metadata:
     {{- include "soba.labels" (dict "root" . "component" "backend") | nindent 4 }}
 data:
   LOG_LEVEL: {{ .Values.backend.config.logLevel | quote }}
+  {{- with .Values.backend.config.httpRouteTimeoutMs }}
+  HTTP_ROUTE_TIMEOUT_MS: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.backend.config.httpOutboundTimeoutMs }}
+  HTTP_OUTBOUND_TIMEOUT_MS: {{ . | quote }}
+  {{- end }}
   NODE_ENV: {{ .Values.backend.config.nodeEnv | quote }}
   {{- $frontendOrigins := include "soba.frontendOrigins" . }}
   CORS_ORIGIN: {{ .Values.backend.config.corsOrigin | default $frontendOrigins | quote }}
-  {{- $backendApiBase := printf "https://%s/api/v1" (include "soba.backendHost" .) }}
+  API_BASE_PATH: {{ include "soba.backendBasePath" . | quote }}
+  {{- $backendApiBase := printf "https://%s%s/api/v1" (include "soba.backendHost" .) (include "soba.backendBasePath" .) }}
   SOBA_API_BASE_URL: {{ .Values.backend.config.sobaApiBaseUrl | default $backendApiBase | quote }}
+  {{- if .Values.backend.config.appVersion }}
+  APP_VERSION: {{ .Values.backend.config.appVersion | quote }}
+  {{- end }}
   {{- if .Values.backend.config.gitSha }}
   GIT_SHA: {{ .Values.backend.config.gitSha | quote }}
   {{- end }}
@@ -67,4 +77,6 @@ data:
   DB_LOCK_TIMEOUT_MS: {{ .Values.database.lockTimeoutMs | quote }}
   DB_MIGRATION_READY_ATTEMPTS: {{ .Values.database.migrationReadyAttempts | quote }}
   DB_MIGRATION_READY_SLEEP_MS: {{ .Values.database.migrationReadySleepMs | quote }}
-  # Pipeline performance fix: Revert if needed.
+  # Frontend app URLs, for links the backend composes (email) and for /meta/frontend-config.
+  DESIGNER_APP_URL: {{ include "soba.frontendAppUrlFor" (dict "root" . "name" "designer") | quote }}
+  FORMS_APP_URL: {{ include "soba.frontendAppUrlFor" (dict "root" . "name" "forms") | quote }}

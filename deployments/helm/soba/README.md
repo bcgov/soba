@@ -187,6 +187,7 @@ app pods start (Helm `pre-install,pre-upgrade` hook). The Job:
 1. Creates the database if it doesn't exist (via `DB_ADMIN_DATABASE`)
 2. Runs Drizzle schema migrations
 3. Seeds reference data (roles, statuses, features, system user)
+4. Applies per-environment feature status (see below)
 
 The seed is fully idempotent (`ON CONFLICT DO NOTHING`), so it's safe to run on
 every deploy.
@@ -196,6 +197,36 @@ To disable automatic migration:
 ```bash
 --set backend.migration.enabled=false
 ```
+
+## Feature Status per Environment
+
+Migrations insert each feature with the same status everywhere. `backend.features`
+overrides that per environment, rendered into the migration Job's `env` and
+applied to `soba.feature` by the seed step.
+
+It is rendered inline rather than through a ConfigMap because the Job is a
+`pre-install,pre-upgrade` hook, and Helm creates hook resources before
+ConfigMaps.
+
+| Helm value                       | Env var                     | Effect                          |
+| -------------------------------- | --------------------------- | ------------------------------- |
+| `backend.features.<code>: ""`    | `FEATURE_<CODE>_STATUS=""`  | leave the migrated status alone |
+| `backend.features.<code>: "..."` | `FEATURE_<CODE>_STATUS=...` | set the feature to that status  |
+
+Values are quoted `feature_status` codes: `enabled`, `disabled`, `experimental`,
+`deprecated`. Anything else fails `helm template`, including an unquoted `false`
+or `off`, which YAML would otherwise turn into "no opinion".
+
+The value is applied by the seed inside the migration Job, so it takes effect on
+the next deploy rather than immediately, and the stored status is what the
+application reads thereafter.
+
+```bash
+# enable the development data generator in a PR or dev namespace
+--set backend.features.dev-data=enabled
+```
+
+`dev-data` gates `pnpm db:dev-data` and must stay disabled in production.
 
 ## Internal Sub-Charts
 
@@ -230,15 +261,17 @@ them in pairs.
 
 Hostnames are derived from the release name and `global.domain`:
 
-- **Frontend:** one host per `frontend.apps` entry, `<fullname>-<name>.<domain>`
-  (e.g. `soba-dev-designer.apps.gov.bc.ca`, `soba-dev-forms.apps.gov.bc.ca`).
-  Override a single app with `frontend.apps.<name>.host` (PR slots pin the host this way).
-- **Backend API:** `<fullname>-api.<domain>` (e.g. `soba-pr-42-api.apps.gov.bc.ca`)
+- **Frontend:** one host for every `frontend.apps` entry, `<fullname>.<domain>`
+  (e.g. `soba-dev.apps.gov.bc.ca`), with each app at its own `routePath`
+  (`/designer`, `/forms`). Pin it with `frontend.host` (PR deployments point at the dev host).
+- **Backend API:** `<fullname>-api.<domain>` (e.g. `soba-pr-42-api.apps.gov.bc.ca`),
+  served under `backend.basePath` (e.g. `/chefs`).
 
-Each `frontend.apps` entry renders its own Deployment/Service/Route/ConfigMap from the
-same image, differing only by `featuresAllowed` (the mode). The backend `CORS_ORIGIN`
-defaults to the origins of all enabled frontend apps; set `backend.config.corsOrigin`
-to override.
+Each `frontend.apps` entry renders its own Deployment/Service/Route/ConfigMap, differing by
+`featuresAllowed` (the mode) and `routePath` (the URL). They share an image repository, but
+the tag carries the app name: Next bakes `basePath` at build time, so each path needs its own
+image. The backend `CORS_ORIGIN` defaults to the shared frontend origin; set
+`backend.config.corsOrigin` to override.
 
 ### Route annotations
 

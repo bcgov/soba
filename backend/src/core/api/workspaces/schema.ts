@@ -1,50 +1,88 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
-import { CursorSortSchema } from '../shared/pagination';
+import {
+  WorkspaceItemSchema as SobaWorkspaceItemSchema,
+  CreateWorkspaceBodySchema as SobaCreateWorkspaceBodySchema,
+  UpdateWorkspaceBodySchema as SobaUpdateWorkspaceBodySchema,
+  WorkspaceSortSchema as SobaWorkspaceSortSchema,
+  ListWorkspacesResponseSchema as SobaListWorkspacesResponseSchema,
+  WorkspaceLookupItemSchema as SobaWorkspaceLookupItemSchema,
+  WorkspaceLookupResponseSchema as SobaWorkspaceLookupResponseSchema,
+} from '@soba/lib';
+
+import {
+  offsetQueryFields,
+  rejectedCursorField,
+  searchQueryField,
+  OffsetPageSchema,
+  OFFSET_DRIFT_NOTE,
+} from '../shared/offsetPagination';
+import { LOOKUP_NOTE } from '../shared/lookup';
 import { WORKSPACE_NAME_TAKEN } from '../../messages';
-import { WorkspaceScopedQuerySchema } from '../shared/schema';
 
 extendZodWithOpenApi(z);
 
-export const WorkspaceItemSchema = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-    kind: z.string(),
-    role: z.string(),
-    status: z.string(),
-    org: z.string().nullable(),
-    useCase: z.string().nullable(),
-    disclaimerAccepted: z.boolean(),
-  })
-  .openapi('Workspaces_WorkspaceItem');
+// @soba/lib builds its schemas before zod is extended, so they only get `.openapi()` once cloned.
+// Composites are rebuilt on the named children so the spec references them instead of inlining.
+export const WorkspaceItemSchema = SobaWorkspaceItemSchema.clone().openapi(
+  'Workspaces_WorkspaceItem',
+);
+
+export const WorkspaceSortSchema = SobaWorkspaceSortSchema.clone().openapi(
+  'Workspaces_WorkspaceSort',
+  { description: 'Valid workspace sort tokens: `field:asc` or `field:desc`.' },
+);
 
 export const ListWorkspacesQuerySchema = z
   .object({
-    limit: z.coerce.number().int().min(1).max(100).default(20),
-    cursor: z.string().min(1).optional(),
+    ...offsetQueryFields,
+    cursor: rejectedCursorField,
     kind: z.string().trim().min(1).optional(),
     status: z.string().trim().min(1).optional(),
-    sort: CursorSortSchema.default('id:desc'),
+    q: searchQueryField.openapi({
+      description: 'Matches anywhere in the workspace name or organization.',
+    }),
+    requiredPermission: z.string().trim().min(1).optional(),
+    sort: WorkspaceSortSchema.default('name:asc'),
   })
   .openapi('Workspaces_ListWorkspacesQuery');
 
-export const ListWorkspacesResponseSchema = z
+export const ListWorkspacesResponseSchema = SobaListWorkspacesResponseSchema.extend({
+  items: z.array(WorkspaceItemSchema),
+  page: OffsetPageSchema,
+  sort: WorkspaceSortSchema,
+}).openapi('Workspaces_ListWorkspacesResponse');
+
+const MAX_REQUIRED_PERMISSIONS = 10;
+
+export const WorkspaceLookupQuerySchema = z
   .object({
-    items: z.array(WorkspaceItemSchema),
-    page: z.object({
-      limit: z.number().int().min(1),
-      hasMore: z.boolean(),
-      nextCursor: z.string().nullable(),
-      cursorMode: z.enum(['id', 'ts_id']),
+    q: searchQueryField.openapi({
+      description: 'Matches anywhere in the workspace name or organization.',
     }),
-    filters: z.object({
-      kind: z.string().optional(),
-      status: z.string().optional(),
-    }),
-    sort: CursorSortSchema,
+    requiredPermissions: z
+      .string()
+      .trim()
+      .regex(/^[a-z_]+(?:,[a-z_]+)*$/)
+      .refine((codes) => codes.split(',').length <= MAX_REQUIRED_PERMISSIONS, {
+        message: `at most ${MAX_REQUIRED_PERMISSIONS} permission codes`,
+      })
+      .optional()
+      .openapi({
+        description: `Comma-separated permission codes, at most ${MAX_REQUIRED_PERMISSIONS}. The caller must hold every one.`,
+        example: 'form_create,design_create',
+      }),
+    disclaimerAccepted: z.enum(['true', 'false']).optional(),
   })
-  .openapi('Workspaces_ListWorkspacesResponse');
+  .openapi('Workspaces_WorkspaceLookupQuery');
+
+export const WorkspaceLookupItemSchema = SobaWorkspaceLookupItemSchema.clone().openapi(
+  'Workspaces_WorkspaceLookupItem',
+);
+
+export const WorkspaceLookupResponseSchema = SobaWorkspaceLookupResponseSchema.extend({
+  items: z.array(WorkspaceLookupItemSchema),
+}).openapi('Workspaces_WorkspaceLookupResponse');
 
 export const CurrentWorkspaceResponseSchema = WorkspaceItemSchema.openapi(
   'Workspaces_CurrentWorkspaceResponse',
@@ -56,33 +94,13 @@ export const WorkspaceIdParamsSchema = z
   })
   .openapi('Workspaces_WorkspaceIdParams');
 
-export const CreateWorkspaceBodySchema = z
-  .object({
-    name: z.string().trim().min(1),
-    org: z.string().trim().min(1),
-    useCase: z.string().trim().min(1),
-    disclaimerAccepted: z.boolean().optional(),
-  })
-  .openapi('Workspaces_CreateWorkspaceBody');
+export const CreateWorkspaceBodySchema = SobaCreateWorkspaceBodySchema.clone().openapi(
+  'Workspaces_CreateWorkspaceBody',
+);
 
-export const UpdateWorkspaceBodySchema = z
-  .object({
-    name: z.string().trim().min(1).optional(),
-    org: z.string().trim().min(1).optional(),
-    useCase: z.string().trim().min(1).optional(),
-    disclaimerAccepted: z.boolean().optional(),
-  })
-  .refine(
-    (body) =>
-      body.name !== undefined ||
-      body.org !== undefined ||
-      body.useCase !== undefined ||
-      body.disclaimerAccepted !== undefined,
-    {
-      message: 'Provide a field to update',
-    },
-  )
-  .openapi('Workspaces_UpdateWorkspaceBody');
+export const UpdateWorkspaceBodySchema = SobaUpdateWorkspaceBodySchema.clone().openapi(
+  'Workspaces_UpdateWorkspaceBody',
+);
 
 const TAG = 'core.workspaces';
 const WORKSPACES_PATH = '/workspaces';
@@ -99,37 +117,35 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
     },
     responses: {
       200: {
-        description: 'List workspaces for the current user with cursor pagination',
+        description: `List workspaces for the current user with search and offset pagination. ${OFFSET_DRIFT_NOTE}`,
         content: {
           'application/json': {
             schema: ListWorkspacesResponseSchema,
           },
         },
       },
-      400: { description: 'Invalid query or cursor' },
+      400: { description: 'Invalid query' },
     },
   });
 
   registry.registerPath({
     method: 'get',
-    path: `${WORKSPACES_PATH}/current`,
+    path: `${WORKSPACES_PATH}/lookup`,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
-      query: WorkspaceScopedQuerySchema,
+      query: WorkspaceLookupQuerySchema,
     },
     responses: {
       200: {
-        description: 'Current workspace resolved from the workspaceId query parameter',
+        description: `Workspaces the current user belongs to, for a select. ${LOOKUP_NOTE}`,
         content: {
           'application/json': {
-            schema: CurrentWorkspaceResponseSchema,
+            schema: WorkspaceLookupResponseSchema,
           },
         },
       },
-      404: {
-        description: 'Current workspace not found',
-      },
+      400: { description: 'Invalid query' },
     },
   });
 
@@ -143,8 +159,7 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
     },
     responses: {
       200: {
-        description:
-          'Select a workspace by id (verifies membership; echoes x-soba-workspace-id response header)',
+        description: 'Select a workspace by id (verifies membership)',
         content: {
           'application/json': {
             schema: CurrentWorkspaceResponseSchema,

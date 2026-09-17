@@ -25,22 +25,29 @@
   cursor: grab !important;
 }
 
-:global(.builder-sidebar) {
-  position: sticky;
-  top: 1rem;
-  align-self: flex-start;
-  max-height: none;
-  padding-right: 0.5rem;
-  z-index: 10;
+/* Force the row to use flexbox so the sidebar's parent column stretches to provide a tall track */
+:global(.formbuilder > .row) {
+  display: flex !important;
+  align-items: stretch !important;
 }
 
-/* Custom scrollbar for the sidebar */
+:global(.builder-sidebar) {
+  position: -webkit-sticky !important;
+  position: sticky !important;
+  top: calc(var(--app-header-height, 0px) * 2 + var(--layout-margin-medium));
+  align-self: flex-start;
+  max-height: calc(100vh - (var(--app-header-height, 0px) * 2 + var(--layout-margin-medium)));
+  padding-right: var(--layout-padding-small);
+  z-index: 10;
+  overflow-y: scroll;
+}
+
 :global(.builder-sidebar::-webkit-scrollbar) {
   width: 4px;
 }
 :global(.builder-sidebar::-webkit-scrollbar-thumb) {
-  background: #ccc;
-  border-radius: 4px;
+  background: var(--theme-gray-50);
+  border-radius: var(--layout-border-radius-medium);
 }
 
 /* Form.io builder per-component action buttons (Edit / Move / Edit JSON / Paste /

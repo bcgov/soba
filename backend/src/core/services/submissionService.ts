@@ -1,7 +1,9 @@
+import type { SubmissionListSort } from '@soba/lib';
+import { v7 as uuidv7 } from 'uuid';
 import {
-  SubmissionCursorMode,
-  SubmissionListSort,
   appendSubmissionRevision,
+  clearSubmissionProvisioning,
+  failSubmissionProvisioning,
   openSubmission,
   getSubmissionById,
   getSubmissionRecordById,
@@ -44,16 +46,15 @@ interface DeleteInput {
 interface ListInput {
   workspaceIds: string[];
   actorId: string;
+  offset: number;
   limit: number;
   formId?: string;
   formVersionId?: string;
   submissionId?: string;
   workflowState?: string;
   createdBy?: string;
+  q?: string;
   sort: SubmissionListSort;
-  cursorMode: SubmissionCursorMode;
-  afterId?: string;
-  afterUpdatedAt?: Date;
 }
 
 export class SubmissionService {
@@ -85,9 +86,9 @@ export class SubmissionService {
 
   /**
    * Record a save/submit: gate the transition (lifecycle policy) up front, create a new (immutable)
-   * submission document in the form engine, then advance the PG submission + append a revision
-   * capturing the before→after engine refs. Mirrors the forms provisioning flow — status
-   * 'provisioning' → 'ready' (in appendSubmissionRevision) or 'error'.
+   * submission document in the form engine, then append a revision on top of the head read here,
+   * capturing the before and after engine refs. Sync status goes 'provisioning' then 'ready' or
+   * 'error'. A moved head is a 409 and a deleted submission a 404; both reset 'provisioning'.
    */
   private async record(input: SaveInput, eventType: SubmissionEventTypeCode) {
     const submission = await getSubmissionRecordById(input.workspaceId, input.submissionId);
@@ -116,18 +117,22 @@ export class SubmissionService {
       engineSyncError: null,
     });
 
+    const revisionId = uuidv7();
+
     try {
       const { engineRef } = await adapter.createSubmission({
         engineFormRef: version.engineSchemaRef,
         submissionId: input.submissionId,
-        revisionNo: submission.currentRevisionNo + 1,
+        revisionId,
         workspaceId: input.workspaceId,
         data: input.data,
       });
 
-      const updated = await appendSubmissionRevision({
+      const result = await appendSubmissionRevision({
         workspaceId: input.workspaceId,
         submissionId: input.submissionId,
+        revisionId,
+        parentRevisionId: submission.headRevisionId,
         actorId: input.actorId,
         actorDisplayLabel: input.actorDisplayLabel,
         eventType,
@@ -135,14 +140,24 @@ export class SubmissionService {
         afterEngineSubmissionRef: engineRef,
       });
 
-      if (!updated) throw new NotFoundError('Submission not found');
+      if (result.outcome === 'not_found') throw new NotFoundError('Submission not found');
+      if (result.outcome === 'stale') {
+        throw new ConflictError('Submission changed since it was loaded');
+      }
 
-      return updated;
+      return result.record;
     } catch (err) {
-      await updateSubmissionDraft(input.workspaceId, input.submissionId, input.actorDisplayLabel, {
-        engineSyncStatus: 'error',
-        engineSyncError: err instanceof Error ? err.message : String(err),
-      });
+      // A stale or deleted submission is not an engine failure.
+      if (err instanceof ConflictError || err instanceof NotFoundError) {
+        await clearSubmissionProvisioning(input.workspaceId, input.submissionId);
+        throw err;
+      }
+      await failSubmissionProvisioning(
+        input.workspaceId,
+        input.submissionId,
+        input.actorDisplayLabel,
+        err instanceof Error ? err.message : String(err),
+      );
       throw err;
     }
   }

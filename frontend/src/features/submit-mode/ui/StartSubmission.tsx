@@ -14,20 +14,24 @@ import { v7 as uuidv7 } from 'uuid';
 type StartLabels = {
   starting: string;
   startError: string;
+  sessionExpired: string;
 };
 
 /**
- * Start action for filling a form, reached by navigating to /form/[formId] (the Forms-table "Submit"
- * action, or a pasted link). It opens a submission for the form's published version, then redirects to
+ * Start action for filling a form, reached by navigating to /form/[formId] from a shared or
+ * pasted link. It opens a submission for the form's published version, then redirects to
  * the fill page addressed by the new submission id. It renders nothing but a spinner — creating the
  * record is the whole job; rendering the form is the fill page's.
  *
  * Every visit opens a new submission (that's the intent of the URL). It runs in a client effect, so
  * Next's <Link> prefetch — which renders the RSC but not client effects — never spawns a stray record.
  */
-function StartSubmissionBody({ formId, labels }: Readonly<{ formId: string; labels: StartLabels }>) {
+function StartSubmissionBody({
+  formId,
+  labels,
+}: Readonly<{ formId: string; labels: StartLabels }>) {
   // Token is optional: a public-audience form can be started without signing in.
-  const { token, initializing } = useKeycloak();
+  const { token, initializing, initStarted } = useKeycloak();
   const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
 
@@ -36,10 +40,11 @@ function StartSubmissionBody({ formId, labels }: Readonly<{ formId: string; labe
   const startedRef = useRef(false);
 
   useEffect(() => {
-    // Wait for auth to settle so a signed-in caller sends their token; anonymous proceeds with none.
+    // Wait for Keycloak to answer. Before init starts, `initializing` is still false and "no token" is
+    // the default rather than an answer, so a public form would be opened for the public user.
     // Fire exactly once (startedRef) and run to completion — deliberately no unmount/active guard:
     // StrictMode's dev remount would otherwise cancel the only in-flight open and strand the spinner.
-    if (initializing || startedRef.current) return;
+    if (!initStarted || initializing || startedRef.current) return;
     startedRef.current = true;
     void (async () => {
       try {
@@ -48,10 +53,19 @@ function StartSubmissionBody({ formId, labels }: Readonly<{ formId: string; labe
         // replace, not push: the start URL shouldn't sit in history and re-open on Back.
         router.replace(`/${locale}/submit/${created.id}`);
       } catch (err) {
-        setError(normalizeFormioRenderError(err, labels.startError));
+        setError(normalizeFormioRenderError(err, labels.startError, labels.sessionExpired));
       }
     })();
-  }, [initializing, token, formId, locale, router, labels.startError]);
+  }, [
+    initStarted,
+    initializing,
+    token,
+    formId,
+    locale,
+    router,
+    labels.startError,
+    labels.sessionExpired,
+  ]);
 
   if (error) {
     return (
@@ -85,6 +99,7 @@ export default function StartSubmission() {
       labels={{
         starting: labels.starting,
         startError: labels.startError,
+        sessionExpired: dict.general.sessionExpired,
       }}
     />
   );

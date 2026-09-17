@@ -1,0 +1,265 @@
+import React, { act } from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Provider } from 'react-redux';
+import { SWRConfig } from 'swr';
+
+const {
+  mockFetchFeatureScopes,
+  mockRemoveFeatureScope,
+  mockUpsertFeatureScope,
+  mockAddNotification,
+  mockPush,
+} = vi.hoisted(() => ({
+  mockFetchFeatureScopes: vi.fn(),
+  mockRemoveFeatureScope: vi.fn(),
+  mockUpsertFeatureScope: vi.fn(),
+  mockAddNotification: vi.fn(),
+  mockPush: vi.fn(),
+}));
+
+vi.mock('@/lib/hooks/useKeycloak', () => ({
+  useKeycloak: () => ({ authenticated: true, token: 'token', initializing: false }),
+}));
+
+vi.mock('@/lib/hooks/useNotificationStore', () => ({
+  useNotificationStore: () => ({ addNotification: mockAddNotification }),
+}));
+
+vi.mock('next/navigation', async () => {
+  const actual = await vi.importActual<unknown>('next/navigation');
+  return {
+    ...(actual as Record<string, unknown>),
+    useRouter: () => ({ push: mockPush }),
+    usePathname: () => '/en/admin/feature-scopes',
+    useSearchParams: () => new URLSearchParams(''),
+  };
+});
+
+vi.mock('@/src/shared/api/sobaApiAdmin', () => ({
+  fetchFeatureScopes: (...args: unknown[]) => mockFetchFeatureScopes(...args),
+  removeFeatureScope: (...args: unknown[]) => mockRemoveFeatureScope(...args),
+  upsertFeatureScope: (...args: unknown[]) => mockUpsertFeatureScope(...args),
+}));
+
+vi.mock('@/app/[lang]/Providers', () => ({
+  useDictionary: () => ({
+    locale: 'en',
+    general: { loading: 'Loading…', cancel: 'Cancel' },
+    dataTable: { itemName: 'items', pageOf: 'of {totalPages} page(s)' },
+    modal: { dialogActions: 'Dialog actions' },
+    admin: {
+      featureScopes: {
+        deleteConfirmTitle: 'Delete feature access',
+        deleteConfirmMessage:
+          '{featureCode} stops being available to this {scopeType} immediately.',
+        heading: 'Feature access',
+        intro: 'Enable or disable a scoped feature for a single workspace or form.',
+        featureCodeLabel: 'Feature',
+        create: 'Scope feature',
+        manage: 'Manage',
+        delete: 'Delete',
+        saveSuccess: 'Feature access updated.',
+        saveError: 'Failed to update feature access.',
+        loadError: 'Failed to load feature access.',
+        deleteSuccess: 'Feature access deleted.',
+        deleteError: 'Failed to delete feature access.',
+        empty: 'No feature access grants found.',
+        noScopedFeatures: 'No features support per-workspace or per-form grants right now.',
+        statusToggleLabel: 'Toggle {featureCode} for {scopeType} {scopeId}',
+        columns: {
+          feature: 'Feature',
+          scope: 'Scope',
+          scopeId: 'Scope ID',
+          status: 'Status',
+          updated: 'Updated',
+          actions: 'Actions',
+        },
+        scopeTypes: { workspace: 'Workspace', form: 'Form' },
+      },
+    },
+  }),
+}));
+
+import makeStore from '@/lib/store';
+import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
+import { FeatureScopeListPanel } from '@/src/features/admin/ui/FeatureScopeListPanel';
+
+let store: ReturnType<typeof makeStore>;
+
+function renderPanel(scopedFeatureCodes: string[]) {
+  return render(
+    <Provider store={store}>
+      <SWRConfig
+        value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}
+      >
+        <FeatureScopeListPanel scopedFeatureCodes={scopedFeatureCodes} />
+      </SWRConfig>
+    </Provider>,
+  );
+}
+
+const FEATURE_SCOPE = {
+  id: '11111111-1111-4111-8111-111111111111',
+  featureCode: 'document-generation-v3',
+  scopeType: 'workspace' as const,
+  scopeId: '22222222-2222-4222-8222-222222222222',
+  status: 'active' as const,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-02T00:00:00.000Z',
+  createdBy: null,
+  updatedBy: null,
+};
+
+describe('FeatureScopeListPanel', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store = makeStore();
+    store.dispatch(setToken('token'));
+    store.dispatch(setAuthenticated(true));
+    mockFetchFeatureScopes.mockResolvedValue({
+      items: [FEATURE_SCOPE],
+      page: { offset: 0, limit: 10, total: 1 },
+    });
+    mockRemoveFeatureScope.mockImplementation(() => {
+      mockFetchFeatureScopes.mockResolvedValue({
+        items: [],
+        page: { offset: 0, limit: 10, total: 0 },
+      });
+      return Promise.resolve(undefined);
+    });
+    mockUpsertFeatureScope.mockResolvedValue(undefined);
+  });
+
+  it('lists administrable feature scopes and asks the server for only those codes', async () => {
+    await act(async () => {
+      renderPanel(['document-generation-v3']);
+    });
+
+    expect(await screen.findByText('document-generation-v3')).toBeInTheDocument();
+    expect(screen.getByText(FEATURE_SCOPE.scopeId)).toBeInTheDocument();
+    expect(mockFetchFeatureScopes).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ featureCodes: ['document-generation-v3'] }),
+    );
+  });
+
+  it('routes to create and manage pages', async () => {
+    await act(async () => {
+      renderPanel(['document-generation-v3']);
+    });
+    await screen.findByText('document-generation-v3');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Scope feature' }));
+    expect(mockPush).toHaveBeenCalledWith('/en/admin/feature-scopes/create');
+
+    await userEvent.click(screen.getByTestId(`manage-feature-scope-${FEATURE_SCOPE.id}`));
+    expect(mockPush).toHaveBeenCalledWith(`/en/admin/feature-scopes/${FEATURE_SCOPE.id}`);
+  });
+
+  it('toggles feature-scope status in place', async () => {
+    await act(async () => {
+      renderPanel(['document-generation-v3']);
+    });
+    await screen.findByText('document-generation-v3');
+
+    await userEvent.click(screen.getByTestId(`feature-scope-status-${FEATURE_SCOPE.id}`));
+
+    await waitFor(() => {
+      expect(mockUpsertFeatureScope).toHaveBeenCalledWith('token', {
+        featureCode: FEATURE_SCOPE.featureCode,
+        scopeType: FEATURE_SCOPE.scopeType,
+        scopeId: FEATURE_SCOPE.scopeId,
+        status: 'inactive',
+      });
+    });
+  });
+
+  // The row is patched into the cached list rather than refetched. A reload would answer with the
+  // pre-toggle status from the server fixture and the switch would snap back.
+  // The status decides where the row sorts and whether it is on this page at all, so the table
+  // shows what the server returns after the write rather than a locally patched row.
+  it('re-reads the page after a status change', async () => {
+    mockUpsertFeatureScope.mockImplementation(() => {
+      mockFetchFeatureScopes.mockResolvedValue({
+        items: [{ ...FEATURE_SCOPE, status: 'inactive' }],
+        page: { offset: 0, limit: 10, total: 1 },
+      });
+      return Promise.resolve(undefined);
+    });
+
+    await act(async () => {
+      renderPanel(['document-generation-v3']);
+    });
+    await screen.findByText('document-generation-v3');
+    const toggleId = `feature-scope-status-${FEATURE_SCOPE.id}`;
+    const checked = () =>
+      screen.getByTestId(toggleId).querySelector('input')?.checked ??
+      screen.getByTestId(toggleId).getAttribute('data-selected') !== null;
+    expect(checked()).toBe(true);
+
+    await userEvent.click(screen.getByTestId(toggleId));
+
+    await waitFor(() => expect(mockUpsertFeatureScope).toHaveBeenCalled());
+    await waitFor(() => expect(checked()).toBe(false));
+    expect(mockFetchFeatureScopes).toHaveBeenCalledTimes(2);
+  });
+
+  it('deletes a feature scope from the table', async () => {
+    await act(async () => {
+      renderPanel(['document-generation-v3']);
+    });
+    await screen.findByText('document-generation-v3');
+
+    await userEvent.click(screen.getByTestId(`delete-feature-scope-${FEATURE_SCOPE.id}`));
+    await userEvent.click(await screen.findByTestId('confirm-modal-confirm'));
+
+    await waitFor(() => {
+      expect(mockRemoveFeatureScope).toHaveBeenCalledWith('token', FEATURE_SCOPE.id);
+    });
+    await waitFor(() => {
+      expect(screen.queryByText('document-generation-v3')).not.toBeInTheDocument();
+    });
+    // The row a deletion leaves room for comes from the next page, which only a fresh read holds.
+    expect(mockFetchFeatureScopes).toHaveBeenCalledTimes(2);
+  });
+
+  // Irreversible, so the row action only opens the prompt.
+  it('does not delete until the prompt is confirmed', async () => {
+    await act(async () => {
+      renderPanel(['document-generation-v3']);
+    });
+    await screen.findByText('document-generation-v3');
+
+    await userEvent.click(screen.getByTestId(`delete-feature-scope-${FEATURE_SCOPE.id}`));
+    expect(mockRemoveFeatureScope).not.toHaveBeenCalled();
+
+    await userEvent.click(await screen.findByTestId('confirm-modal-cancel'));
+
+    expect(mockRemoveFeatureScope).not.toHaveBeenCalled();
+    expect(screen.getByText('document-generation-v3')).toBeInTheDocument();
+  });
+
+  it('pages against the total the server reports', async () => {
+    mockFetchFeatureScopes.mockResolvedValue({
+      items: [FEATURE_SCOPE],
+      page: { offset: 0, limit: 10, total: 42 },
+    });
+
+    await act(async () => {
+      renderPanel(['document-generation-v3']);
+    });
+
+    expect(await screen.findByText(/of 5 page\(s\)/)).toBeInTheDocument();
+  });
+
+  it('does not render the table when no scoped features are available', async () => {
+    await act(async () => {
+      renderPanel([]);
+    });
+
+    expect(screen.getByTestId('feature-scope-none')).toBeInTheDocument();
+    expect(screen.queryByText('document-generation-v3')).not.toBeInTheDocument();
+  });
+});

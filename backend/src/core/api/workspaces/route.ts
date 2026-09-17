@@ -1,10 +1,10 @@
 import express from 'express';
 import { validateRequest } from '../shared/validation';
-import { workspaceFromQuery, workspaceFromResource } from '../../middleware/workspaceContext';
+import { workspaceFromResource } from '../../middleware/workspaceContext';
 import {
   listWorkspaces,
+  lookupWorkspaces,
   createWorkspace,
-  getCurrentWorkspace,
   getWorkspaceById,
   updateWorkspace,
 } from './controller';
@@ -13,6 +13,7 @@ import {
   CreateWorkspaceBodySchema,
   UpdateWorkspaceBodySchema,
   WorkspaceIdParamsSchema,
+  WorkspaceLookupQuerySchema,
 } from './schema';
 
 const router = express.Router();
@@ -20,10 +21,13 @@ const router = express.Router();
 // Actor-only: lists the workspaces the caller belongs to (no workspace context required).
 router.get('/workspaces', validateRequest({ query: ListWorkspacesQuerySchema }), listWorkspaces);
 router.post('/workspaces', validateRequest({ body: CreateWorkspaceBodySchema }), createWorkspace);
-// "Current" resolves from the tab's ?workspaceId; echoes the header like other scoped routes.
-// Registered before '/workspaces/:id' so the literal isn't captured as an id.
-router.get('/workspaces/current', workspaceFromQuery, getCurrentWorkspace);
-// Selection endpoint: verifies membership, returns the workspace, and echoes x-soba-workspace-id.
+// Registered before the `:id` route, which would otherwise take `lookup` as an id.
+router.get(
+  '/workspaces/lookup',
+  validateRequest({ query: WorkspaceLookupQuerySchema }),
+  lookupWorkspaces,
+);
+
 router.get(
   '/workspaces/:id',
   workspaceFromResource({ kind: 'workspace', idFrom: 'paramsId' }),

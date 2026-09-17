@@ -1,7 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { selectWorkspace } from '@/src/shared/api/sobaApi';
-import { getWorkspaceId, clearWorkspaceId } from '@/src/shared/workspace/workspaceStore';
-import { setWorkspaceResolvedListener } from '@/src/shared/workspace/workspaceSync';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { deleteSobaSubmission, selectWorkspace } from '@/src/shared/api/sobaApi';
 
 function mockResponse() {
   return {
@@ -19,11 +17,6 @@ function mockResponse() {
 }
 
 describe('selectWorkspace', () => {
-  beforeEach(() => {
-    clearWorkspaceId();
-    setWorkspaceResolvedListener(null);
-  });
-
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -40,16 +33,50 @@ describe('selectWorkspace', () => {
     expect(init.headers.Authorization).toBe('Bearer tok');
     expect(result.id).toBe('w1');
   });
+});
 
-  it('persists the workspace id to sessionStorage and notifies listeners', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(mockResponse());
+function deleteResponse(status: number, body?: unknown) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: () => null },
+    json: async () => {
+      if (body === undefined) throw new SyntaxError('Unexpected end of JSON input');
+      return body;
+    },
+  } as unknown as Response;
+}
+
+describe('deleteSobaSubmission', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('DELETEs the design route and resolves on a 204 with no body', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(deleteResponse(204));
     vi.stubGlobal('fetch', fetchMock);
-    const seen: string[] = [];
-    setWorkspaceResolvedListener((id) => seen.push(id));
 
-    await selectWorkspace('tok', 'w1');
+    await expect(deleteSobaSubmission('tok', 's1')).resolves.toBeUndefined();
 
-    expect(getWorkspaceId()).toBe('w1');
-    expect(seen).toEqual(['w1']);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain('/design/submissions/s1');
+    expect(init.method).toBe('DELETE');
+  });
+
+  it('treats a 404 as already deleted', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(deleteResponse(404, { error: 'Not found' })));
+
+    await expect(deleteSobaSubmission('tok', 's1')).resolves.toBeUndefined();
+  });
+
+  it('throws the backend message on a 403', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(deleteResponse(403, { error: 'Insufficient form permissions' })),
+    );
+
+    await expect(deleteSobaSubmission('tok', 's1')).rejects.toThrow(
+      'Insufficient form permissions',
+    );
   });
 });

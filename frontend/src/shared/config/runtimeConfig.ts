@@ -1,3 +1,5 @@
+import { getBasePath } from '@/src/shared/config/basePath';
+
 export type FrontendRuntimeConfig = {
   auth: {
     provider: 'keycloak';
@@ -12,13 +14,20 @@ export type FrontendRuntimeConfig = {
   api: {
     baseUrl: string;
   };
+  /** Absent when the deployment has not configured the frontend app URLs. */
+  app?: {
+    designerUrl?: string;
+    formsUrl?: string;
+  };
   build: {
     name: string;
     version: string;
+    /** Absent on backends that predate the field; the footer degrades to a bare version. */
+    gitSha?: string;
   };
 };
 
-const DEFAULT_SOBA_API_BASE_URL = 'http://localhost:4000/api/v1';
+const DEFAULT_SOBA_API_BASE_URL = 'http://localhost:4000/chefs/api/v1';
 
 /**
  * API base URL used before runtime config is loaded (and for the initial
@@ -28,7 +37,7 @@ const DEFAULT_SOBA_API_BASE_URL = 'http://localhost:4000/api/v1';
  *
  * In Docker Compose, the browser must use host-exposed ports (NEXT_PUBLIC → localhost:4000).
  * Server Components run inside the frontend container and need SOBA_API_INTERNAL_URL
- * (e.g. http://backend:4000/api/v1) — localhost:4000 there is this container, not the API.
+ * (e.g. http://backend:4000/chefs/api/v1) — localhost:4000 there is this container, not the API.
  */
 export function getBootstrapApiBaseUrl(): string {
   if (typeof window !== 'undefined' && window.__SOBA_API_BASE_URL) {
@@ -40,6 +49,8 @@ export function getBootstrapApiBaseUrl(): string {
   return process.env.NEXT_PUBLIC_SOBA_API_BASE_URL || DEFAULT_SOBA_API_BASE_URL;
 }
 
+// Browser-scoped: a page load starts empty. Not for Server Components, where this would last the
+// pod's lifetime. See loadBuildMeta.
 let cachedConfig: FrontendRuntimeConfig | null = null;
 let configPromise: Promise<FrontendRuntimeConfig> | null = null;
 
@@ -50,7 +61,9 @@ export function isRuntimeConfigPayload(config: unknown): config is FrontendRunti
     parsed.auth?.keycloak?.url &&
     parsed.auth.keycloak.realm &&
     parsed.auth.keycloak.clientId &&
-    parsed.api?.baseUrl
+    parsed.api?.baseUrl &&
+    parsed.build?.name &&
+    parsed.build.version
   );
 }
 
@@ -88,5 +101,69 @@ export async function loadFrontendRuntimeConfig(): Promise<FrontendRuntimeConfig
 }
 
 export function getSobaApiBaseUrl(): string {
+  // api.baseUrl is the browser-facing route, so it is wrong on the server: in-cluster it is the
+  // public ingress, and under Docker Compose it resolves to the frontend container itself.
+  if (typeof window === 'undefined') return getBootstrapApiBaseUrl();
   return cachedConfig?.api.baseUrl ?? getBootstrapApiBaseUrl();
+}
+
+/**
+ * Public URL of a frontend app. Runtime config wins, then the value the server injected from its
+ * own env, then this app's own URL, which is correct for a deployment serving both modes.
+ */
+function getAppBaseUrl(
+  fromConfig: string | undefined,
+  injected: string | undefined,
+  fromEnv: string | undefined,
+): string {
+  const configured = fromConfig || injected || fromEnv;
+  if (configured) return configured;
+  return typeof window === 'undefined' ? '' : window.location.origin + getBasePath();
+}
+
+export function getDesignerAppBaseUrl(): string {
+  return getAppBaseUrl(
+    cachedConfig?.app?.designerUrl,
+    typeof window === 'undefined' ? undefined : window.__SOBA_DESIGNER_APP_URL,
+    process.env.NEXT_PUBLIC_SOBA_DESIGNER_APP_URL,
+  );
+}
+
+export function getFormsAppBaseUrl(): string {
+  return getAppBaseUrl(
+    cachedConfig?.app?.formsUrl,
+    typeof window === 'undefined' ? undefined : window.__SOBA_FORMS_APP_URL,
+    process.env.NEXT_PUBLIC_SOBA_FORMS_APP_URL,
+  );
+}
+
+/**
+ * Build info for server-side display, read fresh each render. Frontend and backend Deployments
+ * roll independently, so anything memoised here would report the previous release until the pod
+ * restarts. Null when the backend is unreachable or the shape is wrong.
+ */
+export async function loadBuildMeta(): Promise<FrontendRuntimeConfig['build'] | null> {
+  try {
+    const response = await fetch(`${getBootstrapApiBaseUrl()}/meta/build`, {
+      method: 'GET',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) return null;
+    const payload = (await response.json()) as Partial<FrontendRuntimeConfig['build']>;
+    if (!payload?.name || !payload.version) return null;
+    return { name: payload.name, version: payload.version, gitSha: payload.gitSha };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Semver string for display: `2.0.0-beta.1+abc1234`. Versions that already carry build metadata
+ * (PR deployments send `+pr.<number>.<sha>`) are left alone; semver allows only one `+`.
+ */
+export function formatAppVersion(build: FrontendRuntimeConfig['build']): string {
+  if (build.version.includes('+')) return build.version;
+  const sha = build.gitSha && build.gitSha !== 'unknown' ? build.gitSha : null;
+  return sha ? `${build.version}+${sha}` : build.version;
 }

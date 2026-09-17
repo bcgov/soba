@@ -1,68 +1,46 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import { useAppDispatch, useAppSelector } from '@/lib/store';
-import { loadCurrentUser } from '@/lib/slices/currentUserSlice';
-import { loadWorkspaces } from '@/lib/slices/workspaceSlice';
+import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { needsWorkspaceOnboarding } from '@/src/features/onboarding/workspaceOnboarding';
 import type { AppSessionSnapshot } from './appRoutePolicy';
 
 export function useAppSession(): AppSessionSnapshot {
-  const { authenticated, token, initializing } = useKeycloak();
-  const dispatch = useAppDispatch();
+  const { authenticated, initializing, initStarted } = useKeycloak();
 
-  const { workspaces, status: workspaceStatus } = useAppSelector((state) => state.workspace);
-  const { data: currentUser, status: currentUserStatus } = useAppSelector(
-    (state) => state.currentUser,
-  );
-
-  useEffect(() => {
-    if (authenticated && token && workspaceStatus === 'idle') {
-      dispatch(loadWorkspaces(token));
-    }
-  }, [authenticated, token, workspaceStatus, dispatch]);
-
-  useEffect(() => {
-    if (authenticated && token && currentUserStatus === 'idle') {
-      dispatch(loadCurrentUser(token));
-    }
-  }, [authenticated, token, currentUserStatus, dispatch]);
+  const {
+    data: currentUser,
+    loaded: currentUserLoaded,
+    error: currentUserError,
+  } = useCurrentUser();
 
   return useMemo(() => {
     const sessionReady = authenticated
-      ? !initializing &&
-        workspaceStatus === 'succeeded' &&
-        currentUserStatus === 'succeeded'
+      ? !initializing && currentUserLoaded && !currentUserError
       : !initializing;
 
-    const sessionFailed =
-      authenticated && (workspaceStatus === 'failed' || currentUserStatus === 'failed');
+    const sessionFailed = authenticated && !!currentUserError;
 
     const needsOnboarding = needsWorkspaceOnboarding({
       authenticated,
       initializing,
-      workspaceStatus,
-      currentUserStatus,
-      workspaces,
+      currentUserLoaded,
       currentUser,
     });
 
     return {
       authenticated,
       initializing,
+      initStarted,
       sessionReady,
+      // Derived, not latched: SWR keeps the last data on error, so a failed reload does not move
+      // it, and it goes false when the key goes empty, which is what the sign-out cache clear does.
+      sessionLoadedOnce: currentUserLoaded,
       sessionFailed,
       needsOnboarding,
       canCreateWorkspace: currentUser?.capabilities?.canCreateWorkspace === true,
-      hasWorkspaces: workspaces.length > 0,
+      hasWorkspaces: currentUser?.capabilities?.hasWorkspaces === true,
     };
-  }, [
-    authenticated,
-    initializing,
-    workspaceStatus,
-    currentUserStatus,
-    workspaces,
-    currentUser,
-  ]);
+  }, [authenticated, initializing, initStarted, currentUserLoaded, currentUserError, currentUser]);
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useRouter, usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Submission } from '@formio/react';
 import type { FormType } from '@formio/react';
 import { InlineAlert } from '@bcgov/design-system-react-components';
@@ -23,9 +23,9 @@ import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 type FillLabels = {
   loading: string;
   loadError: string;
-  unavailable: string;
   rendererError: string;
   submitSuccess: string;
+  sessionExpired: string;
 };
 
 /**
@@ -41,7 +41,7 @@ function SubmissionFillBody({
   labels: FillLabels;
 }>) {
   // Token is optional: a public-audience submission is fillable without signing in.
-  const { token, initializing } = useKeycloak();
+  const { token, initializing, initStarted } = useKeycloak();
   const { addNotification } = useNotificationStore();
   const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
@@ -62,8 +62,9 @@ function SubmissionFillBody({
   } | null>(null);
 
   useEffect(() => {
-    // Wait for auth to settle so an authenticated caller sends their token; anonymous proceeds with none.
-    if (initializing || loadStartedRef.current) return;
+    // Wait for Keycloak to answer. Before init starts, `initializing` is still false and "no token" is
+    // the default rather than an answer, so a signed-in caller's read would go out anonymously.
+    if (!initStarted || initializing || loadStartedRef.current) return;
     loadStartedRef.current = true;
     void (async () => {
       try {
@@ -76,18 +77,23 @@ function SubmissionFillBody({
           router.replace(`/${locale}/submission/${submissionId}`);
           return;
         }
-        if (!bundle.schema) {
-          setLoadError(labels.unavailable);
-          return;
-        }
         setSchema(bundle.schema as FormType);
         // Resume: prefill with any saved answers (a just-opened submission has none).
         setInitialData((bundle.content?.data ?? {}) as Record<string, unknown>);
       } catch (err) {
-        setLoadError(normalizeFormioRenderError(err, labels.loadError));
+        setLoadError(normalizeFormioRenderError(err, labels.loadError, labels.sessionExpired));
       }
     })();
-  }, [initializing, token, submissionId, locale, router, labels.loadError, labels.unavailable]);
+  }, [
+    initStarted,
+    initializing,
+    token,
+    submissionId,
+    locale,
+    router,
+    labels.loadError,
+    labels.sessionExpired,
+  ]);
 
   // Expose the submission being filled to the CHEFS upload provider; clear it when leaving so a stale
   // id can't tag an unrelated upload (e.g. a designer preview).
@@ -95,6 +101,16 @@ function SubmissionFillBody({
     setActiveSubmissionId(submissionId);
     return () => clearActiveSubmissionId();
   }, [submissionId]);
+
+  // Form.io resets the live webform when the submission prop isn't deep-equal to what the user has
+  // typed, and a token refresh re-renders this — a fresh literal would discard answers in progress.
+  const submissionProp = useMemo(
+    () => ({ data: initialData as Submission['data'] }),
+    [initialData],
+  );
+  // We own all submit messaging (success toast + redirect, inline error), so suppress Form.io's
+  // built-in green "Submission Complete" alert.
+  const formOptions = useMemo(() => ({ noAlerts: true, ...bcgovFileOption }), [bcgovFileOption]);
 
   const submitForm = async (submission: Submission) => {
     try {
@@ -108,7 +124,7 @@ function SubmissionFillBody({
       // need to emit `submitDone` and no flash of Form.io's own success screen.
       router.push(`/${locale}/submission/${submissionId}`);
     } catch (err) {
-      setRenderError(normalizeFormioRenderError(err, labels.rendererError));
+      setRenderError(normalizeFormioRenderError(err, labels.rendererError, labels.sessionExpired));
       formInstanceRef.current?.emit('submitError', labels.rendererError);
     }
   };
@@ -144,15 +160,15 @@ function SubmissionFillBody({
             className="formio-v5-form-root"
             src=""
             form={schema}
-            submission={{ data: initialData as Submission['data'] }}
-            // We own all submit messaging (success toast + redirect, inline error), so suppress
-            // Form.io's built-in green "Submission Complete" alert.
-            options={{ noAlerts: true, ...bcgovFileOption }}
+            submission={submissionProp}
+            options={formOptions}
             onFormReady={(instance) => {
               formInstanceRef.current = instance;
             }}
             onError={(err) => {
-              setRenderError(normalizeFormioRenderError(err, labels.loadError));
+              setRenderError(
+                normalizeFormioRenderError(err, labels.loadError, labels.sessionExpired),
+              );
             }}
             onSubmit={submitForm}
           />
@@ -185,9 +201,9 @@ export default function FormioV5SubmissionFillClient() {
         labels={{
           loading: dict.form?.loading || 'Loading…',
           loadError: labels.loadError,
-          unavailable: labels.unavailable,
           rendererError: labels.rendererError,
           submitSuccess: labels.submitSuccess,
+          sessionExpired: dict.general.sessionExpired,
         }}
       />
     </div>

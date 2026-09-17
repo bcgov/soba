@@ -8,6 +8,7 @@ import {
   NormalizeSchemaBodySchema,
   ListFormsQuerySchema,
   ListFormVersionsQuerySchema,
+  FormVersionLookupQuerySchema,
   ProvisionSchemaBodySchema,
   SaveFormVersionBodySchema,
   SaveFormVersionParamsSchema,
@@ -28,6 +29,7 @@ type SaveFormVersionBody = z.infer<typeof SaveFormVersionBodySchema>;
 type SaveFormVersionParams = z.infer<typeof SaveFormVersionParamsSchema>;
 type ListFormsQuery = z.infer<typeof ListFormsQuerySchema>;
 type ListFormVersionsQuery = z.infer<typeof ListFormVersionsQuerySchema>;
+type FormVersionLookupQuery = z.infer<typeof FormVersionLookupQuerySchema>;
 type NormalizeSchemaBody = z.infer<typeof NormalizeSchemaBodySchema>;
 
 const FORM_NOT_FOUND = 'Form not found';
@@ -94,6 +96,15 @@ export const listFormVersions = asyncHandler(async (req: Request, res: Response)
   const result = await formsApiService.listFormVersions(
     { workspaceIds: scope.workspaceIds, actorId: scope.actorId },
     req.query as unknown as ListFormVersionsQuery,
+  );
+  res.json(result);
+});
+
+export const lookupFormVersions = asyncHandler(async (req: Request, res: Response) => {
+  const scope = req.listScope!;
+  const result = await formsApiService.lookupFormVersions(
+    { workspaceIds: scope.workspaceIds, actorId: scope.actorId },
+    req.query as unknown as FormVersionLookupQuery,
   );
   res.json(result);
 });

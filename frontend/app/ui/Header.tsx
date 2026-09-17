@@ -1,180 +1,132 @@
 'use client';
-import { useEffect, useRef, useMemo } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { useSWRConfig } from 'swr';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Dropdown } from 'react-bootstrap';
 import { Header as BCHeader } from '@bcgov/design-system-react-components';
 import { FaUser } from 'react-icons/fa6';
-import { useAppDispatch } from '@/lib/store';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import { useClientMounted } from '@/lib/hooks/useClientMounted';
-import { useCurrentUser } from '@/lib/useCurrentUser';
-import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { clearCurrentUser, loadCurrentUser } from '@/lib/slices/currentUserSlice';
-import {
-  loadWorkspaces,
-  pickWorkspaceToEstablish,
-  selectActiveWorkspace,
-} from '@/lib/slices/workspaceSlice';
-import { useAppSelector } from '@/lib/store';
+import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useDictionary } from '../[lang]/Providers';
 import { LoginButton } from './LoginButton';
 import { LanguageSelector, type LanguageOption } from './LanguageSelector';
-import { WorkspaceSelector } from './WorkspaceSelector';
-import type { PluginNavItem } from '@/src/types/plugins';
-import { WorkspaceModal } from '@/src/components/WorkspaceModal';
+import { WorkspaceModal, WORKSPACE_MODAL_DISMISSED_KEY } from '@/src/components/WorkspaceModal';
+import { forgetListQueries } from '@/src/shared/list/listQueryMemory';
+import { removeSessionValues } from '@/src/shared/storage/sessionStore';
+import { isIdentityEnded } from '@/src/shared/auth/sessionIdentity';
 
 import styles from './Header.module.css';
 
 type HeaderProps = {
-  headerNavItems: PluginNavItem[];
-  overlayNavItems: PluginNavItem[];
-  showWorkspaces: boolean;
+  designMode: boolean;
 };
 
-function Header({ headerNavItems, showWorkspaces }: Readonly<HeaderProps>) {
-  const dispatch = useAppDispatch();
+function Header({ designMode }: Readonly<HeaderProps>) {
   const dict = useDictionary();
-  const { addNotification } = useNotificationStore();
-
   const locale = dict.locale === 'en' || dict.locale === 'fr' ? dict.locale : 'en';
   const languageOptions: LanguageOption[] = Object.entries(dict.header.languages).map(
     ([value, label]) => ({ value, label }),
   );
   const pathname = usePathname();
   const router = useRouter();
-  const { authenticated, idTokenParsed, token, logout, init, refresh } = useKeycloak();
+  const searchParams = useSearchParams();
+  const { authenticated, idTokenParsed, token, logout, init, refresh, initStarted, initializing } =
+    useKeycloak();
   const currentUser = useCurrentUser();
-  const {
-    workspaces,
-    activeWorkspaceId,
-    status: workspaceStatus,
-    canceledDefaultModal,
-  } = useAppSelector((state) => state.workspace);
+  const { mutate } = useSWRConfig();
 
   const headerChromeRef = useRef<HTMLDivElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
-  const establishingWorkspaceRef = useRef(false);
-  const clientMounted = useClientMounted();
-
-  const { data: currentStateUser } = useAppSelector((state) => state.currentUser);
+  const previousSubjectRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     init();
   }, [init]);
 
+  // The aside sticks below the header, so its height has to be a real number. It is a design system
+  // component and varies with viewport and signed-in state, so measure rather than assume.
   useEffect(() => {
-    if (!authenticated || !token) {
-      if (intervalRef) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = undefined;
-      }
-      dispatch(clearCurrentUser());
-      return;
+    const chrome = headerChromeRef.current;
+    if (!chrome) return;
+    const publishHeight = () => {
+      document.documentElement.style.setProperty(
+        '--app-header-height',
+        `${chrome.getBoundingClientRect().height}px`,
+      );
+    };
+    publishHeight();
+    const observer = new ResizeObserver(publishHeight);
+    observer.observe(chrome);
+    return () => observer.disconnect();
+  }, []);
+
+  // The cache and this tab's view state outlive the session. The next person signing in here would
+  // otherwise be served the previous user's workspaces and their list filters. Revalidating rather
+  // than only emptying: a key still on screen would otherwise hold `undefined` for the life of the
+  // page, because a mounted hook only refetches when its key changes.
+  const clearSessionState = useCallback(() => {
+    void mutate(() => true, undefined, { revalidate: true });
+    removeSessionValues((key) => key === WORKSPACE_MODAL_DISMISSED_KEY);
+    forgetListQueries();
+  }, [mutate]);
+
+  useEffect(() => {
+    const currentSubject =
+      authenticated && typeof idTokenParsed?.sub === 'string' ? idTokenParsed.sub : undefined;
+
+    if (
+      isIdentityEnded({
+        previousSubject: previousSubjectRef.current,
+        currentSubject,
+        authenticated,
+        initStarted,
+        initializing,
+      })
+    ) {
+      clearSessionState();
     }
-    if (currentUser.token !== token || currentUser.status === 'idle') {
-      dispatch(loadCurrentUser(token));
+    // Held past a transient: a rotation between renders must not read as a departure.
+    if (currentSubject !== undefined || (initStarted && !initializing)) {
+      previousSubjectRef.current = currentSubject;
     }
 
-    if (authenticated && !intervalRef.current) {
+    if (!authenticated || !token) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = undefined;
+      return;
+    }
+    if (!intervalRef.current) {
       intervalRef.current = setInterval(() => {
         refresh();
       }, 30000);
     }
-  }, [authenticated, token, currentUser.token, currentUser.status, dispatch, refresh]);
+  }, [authenticated, token, idTokenParsed, refresh, clearSessionState, initStarted, initializing]);
 
-  useEffect(() => {
-    if (authenticated && token && workspaceStatus === 'idle') {
-      dispatch(loadWorkspaces(token));
-    }
-  }, [authenticated, token, workspaceStatus, dispatch]);
-
-  // Establish the tab workspace through the backend so sobaFetch can capture the echoed
-  // x-soba-workspace-id header into sessionStorage (soba.workspaceId). Without this,
-  // users with a single workspace never see the chooser and nothing writes the store.
-  useEffect(() => {
-    if (
-      !authenticated ||
-      !token ||
-      workspaceStatus !== 'succeeded' ||
-      activeWorkspaceId ||
-      establishingWorkspaceRef.current ||
-      currentUser.status === 'idle' ||
-      currentUser.status === 'loading'
-    ) {
-      return;
-    }
-
-    const defaultWorkspaceId = currentUser.data?.preferences?.defaultWorkspaceId ?? null;
-    const target = pickWorkspaceToEstablish(workspaces, defaultWorkspaceId);
-    if (!target) return;
-
-    establishingWorkspaceRef.current = true;
-    dispatch(selectActiveWorkspace({ token, workspaceId: target.id }))
-      .unwrap()
-      .catch((error) => {
-        addNotification({
-          text: dict.general.workspaceSwitchError,
-          type: 'error',
-          consoleError: error,
-        });
-      })
-      .finally(() => {
-        establishingWorkspaceRef.current = false;
-      });
-  }, [
-    authenticated,
-    token,
-    workspaceStatus,
-    activeWorkspaceId,
-    workspaces,
-    currentUser.status,
-    currentUser.data?.preferences?.defaultWorkspaceId,
-    dispatch,
-    addNotification,
-    dict.general.workspaceSwitchError,
-  ]);
-
-  const hasWorkspaces = useMemo(() => workspaces.length > 0, [workspaces.length]);
-  const canCreateWorkspace = currentStateUser?.capabilities?.canCreateWorkspace === true;
+  const hasWorkspaces = currentUser.data?.capabilities?.hasWorkspaces === true;
+  const canCreateWorkspace = currentUser.data?.capabilities?.canCreateWorkspace === true;
 
   const handleLogout = () => {
-    dispatch(clearCurrentUser());
+    // Cleared here rather than left to the identity effect: `logout()` navigates away, and an
+    // effect that does not run before the page unloads leaves this tab's state for the next user.
+    clearSessionState();
     logout();
-  };
-
-  // Round-trip through GET /workspaces/:id so the backend verifies membership before we
-  // persist the tab workspace to sessionStorage and Redux, then open the forms list.
-  const handleWorkspaceChange = (key: string | number | null) => {
-    if (!token || key == null) return;
-    const workspaceId = String(key);
-    if (workspaceId === activeWorkspaceId) return;
-    dispatch(selectActiveWorkspace({ token, workspaceId }))
-      .unwrap()
-      .then(() => {
-        router.push(`/${locale}/forms`);
-      })
-      .catch((error) => {
-        addNotification({
-          text: dict.general.workspaceSwitchError,
-          type: 'error',
-          consoleError: error,
-        });
-      });
   };
 
   const handleLanguageChange = (newLocale: string) => {
     if (pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`) {
       const newPath = pathname.replace(`/${locale}`, `/${newLocale}`);
-      router.push(newPath);
+      const search = searchParams.toString();
+      router.push(search ? `${newPath}?${search}` : newPath);
     } else {
       router.push(`/${newLocale}/`);
     }
   };
 
   const authActions = () => {
-    const isCurrentTokenUser = currentUser.token === token;
-    const backendDisplayName = isCurrentTokenUser ? currentUser.displayName : null;
+    // The cache is cleared on sign-out, so anything loaded belongs to the current session. Matching
+    // on the token instead would blank the name every time the token rotates.
+    const backendDisplayName = currentUser.displayName;
     const keycloakDisplayName =
       typeof idTokenParsed?.display_name === 'string' &&
       idTokenParsed.display_name.trim().length > 0
@@ -183,9 +135,9 @@ function Header({ headerNavItems, showWorkspaces }: Readonly<HeaderProps>) {
     let displayName: string | null;
     if (typeof backendDisplayName === 'string' && backendDisplayName.trim().length > 0) {
       displayName = backendDisplayName;
-    } else if (isCurrentTokenUser && currentUser.hasError) {
+    } else if (currentUser.hasError) {
       displayName = keycloakDisplayName ?? 'Authenticated User';
-    } else if (isCurrentTokenUser && currentUser.isLoaded) {
+    } else if (currentUser.loaded) {
       displayName = 'Authenticated User';
     } else {
       displayName = null;
@@ -209,15 +161,6 @@ function Header({ headerNavItems, showWorkspaces }: Readonly<HeaderProps>) {
 
     return (
       <div className="d-flex align-items-center justify-content-end gap-3">
-        {authenticated && clientMounted && workspaces.length > 0 ? (
-          <WorkspaceSelector
-            workspaces={workspaces}
-            activeWorkspaceId={activeWorkspaceId}
-            label={dict.header.selectWorkspace}
-            onChange={handleWorkspaceChange}
-          />
-        ) : null}
-
         <LanguageSelector
           locale={locale}
           label={dict.header.selectLanguage}
@@ -234,44 +177,34 @@ function Header({ headerNavItems, showWorkspaces }: Readonly<HeaderProps>) {
     );
   };
 
+  // Both are rendered; CSS picks one by viewport width. BCDS types `title` as a string but renders
+  // it as a child node, so an element works at runtime. Cast until the upstream prop widens.
+  const headerTitle = (
+    <>
+      <span className={styles.titleFull}>{dict.general.title}</span>
+      <span className={styles.titleShort}>{dict.general.acronym}</span>
+    </>
+  );
+
   return (
-    <div ref={headerChromeRef} data-testid="app-header">
+    <div ref={headerChromeRef} className={styles.chrome} data-testid="app-header">
       <BCHeader
         logoLinkElement={
           <Link href="/" data-testid="bcgov-header-logo" title={dict.header.bcgovTitle} />
         }
-        title={dict.general.title}
-        titleElement="h1"
+        title={headerTitle as unknown as string}
+        titleElement="span"
         skipLinks={[
           <a key="skip-to-main" href="#main-content">
             {dict.header.skipToMain}
           </a>,
         ]}
       >
-        <div className="d-flex align-items-center gap-3">
-          {headerNavItems.length > 0 ? (
-            <nav
-              aria-label={dict.header.primaryNavAria}
-              data-testid="primary-nav"
-              className="d-none d-md-block"
-            >
-              <ul className="list-unstyled d-flex align-items-center gap-3 mb-0">
-                {headerNavItems.map((item) => (
-                  <li key={item.id}>
-                    <Link href={item.href} className="text-decoration-underline">
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          ) : null}
-          <div className="d-flex flex-shrink-0 align-items-center justify-content-end gap-3">
-            {authActions()}
-          </div>
+        <div className="d-flex flex-shrink-0 align-items-center justify-content-end gap-3">
+          {authActions()}
         </div>
       </BCHeader>
-      {showWorkspaces && workspaceStatus === 'succeeded' && !hasWorkspaces && !canceledDefaultModal && (
+      {designMode && currentUser.loaded && !hasWorkspaces && (
         <WorkspaceModal canCreateWorkspace={canCreateWorkspace} />
       )}
     </div>

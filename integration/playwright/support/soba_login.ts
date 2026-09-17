@@ -15,8 +15,12 @@ export function formsettings() {
 
 export async function login(page: Page) {
   const { username, password, mfaCode } = formsettings();
-  await page.goto("/");
+  await page.goto("./");
   await page.click('[data-testid="login-button"]');
+  //Verify login option
+  await expect(page.locator("#social-azureidir")).toBeVisible();
+  await expect(page.locator("#social-bceidbusiness")).toBeVisible();
+  await page.locator("#social-azureidir").click();
   await page.fill('input[type="email"]', username);
   await page.click('input[type="submit"]');
   await page.fill('input[name="passwd"]', password);
