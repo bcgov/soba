@@ -118,7 +118,10 @@ vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => ({
 }));
 
 vi.mock('@bcgov/design-system-react-components', async (importOriginal) => {
-  type DesignSystem = typeof import('@bcgov/design-system-react-components') & { Tab: React.ElementType; Tabs: React.ElementType };
+  type DesignSystem = typeof import('@bcgov/design-system-react-components') & {
+    Tab: React.ElementType;
+    Tabs: React.ElementType;
+  };
   const mod = await importOriginal<DesignSystem & { default?: DesignSystem }>();
   const actual = mod.default || mod;
   return {
@@ -136,7 +139,14 @@ vi.mock('@bcgov/design-system-react-components', async (importOriginal) => {
       'aria-label': ariaLabel,
       description,
       'data-testid': testId,
-    }: {selectedKey: string, onSelectionChange: (newVal: unknown) => void, items: {id: string, label: string}[], 'aria-label': string, 'data-testid': string, description: string}) => {
+    }: {
+      selectedKey: string;
+      onSelectionChange: (newVal: unknown) => void;
+      items: { id: string; label: string }[];
+      'aria-label': string;
+      'data-testid': string;
+      description: string;
+    }) => {
       return (
         <div data-testid={testId}>
           <select
@@ -145,7 +155,7 @@ vi.mock('@bcgov/design-system-react-components', async (importOriginal) => {
             aria-label={ariaLabel}
           >
             <option value="">Select...</option>
-            {items?.map((item: {id: string, label: string}) => (
+            {items?.map((item: { id: string; label: string }) => (
               <option key={item.id} value={item.id}>
                 {item.label}
               </option>
