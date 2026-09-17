@@ -57,7 +57,7 @@ vi.mock('next/navigation', async () => {
 import makeStore from '@/lib/store';
 import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import FormSubmissionTab from '@/src/features/designer/ui/FormSubmissionTab';
-import type { Dictionary } from '@/src/types/plugins';
+import type { Dictionary } from '@/src/types/dictionary';
 
 describe('FormSubmissionTab', () => {
   beforeEach(() => {

@@ -2,7 +2,7 @@
 
 import { Button, Accordion, Form } from '@bcgov/design-system-react-components';
 
-import type { Dictionary } from '@/src/types/plugins';
+import type { Dictionary } from '@/src/types/dictionary';
 
 interface FormSettingsDrawersProps {
   dict: Dictionary;
