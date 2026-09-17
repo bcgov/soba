@@ -94,7 +94,7 @@ function draftNotices(args: {
   ];
 }
 
-function FormForm({ formId }: { formId: string }) {
+function FormForm({ formId }: Readonly<{ formId: string }>) {
   const dict = useDictionary();
   const { authenticated, token, initializing } = useKeycloak();
   const { addNotification } = useNotificationStore();

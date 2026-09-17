@@ -32,7 +32,7 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
 
   const formCreate = currentUser?.capabilities?.formCreate;
 
-  const [formName, setName] = useState('');
+  const [formName, setFormName] = useState('');
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -111,7 +111,7 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
       <TextField
         label={dict.form.nameLabel}
         value={formName}
-        onChange={setName}
+        onChange={setFormName}
         data-testid="form-name-modal"
       />
 
