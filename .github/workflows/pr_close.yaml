@@ -91,11 +91,10 @@ jobs:
           RELEASE: ${{ needs.set-vars.outputs.RELEASE }}
           NAMESPACE: ${{ secrets.OC_NAMESPACE }}
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
-          SLOT: ${{ needs.set-vars.outputs.SLOT }}
         run: |
           set -euo pipefail
 
-          MONGO_RELEASE="soba-pr-${PR_NUM}-slot-${SLOT}-mongodb"
+          MONGO_RELEASE="soba-pr-${PR_NUM}-mongodb"
           MONGO_LABEL="app.kubernetes.io/instance=${MONGO_RELEASE}"
           LABEL="app.kubernetes.io/instance=${RELEASE}"
 

@@ -187,12 +187,11 @@ jobs:
         env:
           NAMESPACE: ${{ secrets.OC_NAMESPACE }}
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
-          SLOT: ${{ needs.set-vars.outputs.SLOT }}
         run: |
           set -euo pipefail
 
-          MONGO_RELEASE="soba-pr-${PR_NUM}-slot-${SLOT}-mongodb"
-          APP_RELEASE="soba-pr-slot-${SLOT}"
+          MONGO_RELEASE="soba-pr-${PR_NUM}-mongodb"
+          APP_RELEASE="soba-pr-${PR_NUM}"
 
           cat > /tmp/mongodb-values-override.yaml <<OVERRIDE
           mongodb:
@@ -227,14 +226,7 @@ jobs:
           # Pipeline performance fix: Revert if needed.
           set -euo pipefail
           REPO_LC=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
-          MONGO_RELEASE="soba-pr-${PR_NUM}-slot-${SLOT}-mongodb"
-          MONGODB_FORMIO_PASSWORD=$(
-            oc get secret soba-pr-mongodb-auth \
-              -n "${NAMESPACE}" \
-              -o jsonpath='{.data.mongodb-passwords}' | base64 -d
-          )
-          MONGODB_FORMIO_PASSWORD_ENCODED=$(jq -rn --arg v "${MONGODB_FORMIO_PASSWORD}" '$v|@uri')
-          MONGODB_URI="mongodb://formio:${MONGODB_FORMIO_PASSWORD_ENCODED}@${MONGO_RELEASE}-0.${MONGO_RELEASE}-headless:27017/formio-ce?replicaSet=rs0&authSource=formio-ce"
+          MONGO_RELEASE="soba-pr-${PR_NUM}-mongodb"
 
           # Version /meta reports, e.g. 2.0.0-beta.0+pr.114.a1b2c3d. Empty if unreadable: the
           # chart then omits APP_VERSION and the backend falls back to package.json.
@@ -282,7 +274,8 @@ jobs:
             internal:
               enabled: false
             external:
-              uri: "${MONGODB_URI}"
+              host: "${MONGO_RELEASE}-0.${MONGO_RELEASE}-headless"
+              authSecretName: soba-pr-mongodb-auth
           temporal:
             address: "temporal-frontend.${NAMESPACE}.svc.cluster.local:7233"
             namespace: "soba-pr-${PR_NUM}"

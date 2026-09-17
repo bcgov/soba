@@ -137,13 +137,6 @@ jobs:
         run: |
           set -euo pipefail
           REPO_LC=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
-          MONGODB_FORMIO_PASSWORD=$(
-            oc get secret soba-dev-mongodb-auth \
-              -n "${NAMESPACE}" \
-              -o jsonpath='{.data.mongodb-passwords}' | base64 -d
-          )
-          MONGODB_FORMIO_PASSWORD_ENCODED=$(jq -rn --arg v "${MONGODB_FORMIO_PASSWORD}" '$v|@uri')
-          MONGODB_URI="mongodb://formio:${MONGODB_FORMIO_PASSWORD_ENCODED}@soba-dev-mongodb-0.soba-dev-mongodb-headless:27017/formio-ce?replicaSet=rs0&authSource=formio-ce"
 
           # Version /meta reports, e.g. 2.0.0-beta.0+dev.a1b2c3d. Empty if unreadable: the
           # chart then omits APP_VERSION and the backend falls back to package.json.
@@ -180,7 +173,8 @@ jobs:
             internal:
               enabled: false
             external:
-              uri: "${MONGODB_URI}"
+              host: "soba-dev-mongodb-0.soba-dev-mongodb-headless"
+              authSecretName: soba-dev-mongodb-auth
           temporal:
             address: "temporal-frontend.${NAMESPACE}.svc.cluster.local:7233"
             namespace: "soba-dev"
