@@ -34,11 +34,12 @@ vi.mock('@/app/[lang]/Providers', () => ({
       dialogActions: 'Dialog actions',
     },
     useCases: {
-      application: "Applications that will be evaluated followed by a decision",
-      collection: "Collection of Datasets, data submission",
-      feedback: "Feedback Form to determine satisfaction, agreement, likelihood, or other qualitative questions",
-      report: "Reporting usually on a repeating schedule or event driven like follow-ups",
-      registration: "Registrations or Sign up - no evaluation"
+      application: 'Applications that will be evaluated followed by a decision',
+      collection: 'Collection of Datasets, data submission',
+      feedback:
+        'Feedback Form to determine satisfaction, agreement, likelihood, or other qualitative questions',
+      report: 'Reporting usually on a repeating schedule or event driven like follow-ups',
+      registration: 'Registrations or Sign up - no evaluation',
     },
   }),
 }));
@@ -117,7 +118,8 @@ vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => ({
 }));
 
 vi.mock('@bcgov/design-system-react-components', async (importOriginal) => {
-  const mod = await importOriginal<any>();
+  type DesignSystem = typeof import('@bcgov/design-system-react-components') & { Tab: React.ElementType; Tabs: React.ElementType };
+  const mod = await importOriginal<DesignSystem & { default?: DesignSystem }>();
   const actual = mod.default || mod;
   return {
     __esModule: true,
@@ -127,7 +129,14 @@ vi.mock('@bcgov/design-system-react-components', async (importOriginal) => {
     InlineAlert: actual.InlineAlert,
     Tab: actual.Tab,
     Tabs: actual.Tabs,
-    Select: ({ selectedKey, onSelectionChange, items, 'aria-label': ariaLabel, description, 'data-testid': testId }: any) => {
+    Select: ({
+      selectedKey,
+      onSelectionChange,
+      items,
+      'aria-label': ariaLabel,
+      description,
+      'data-testid': testId,
+    }: {selectedKey: string, onSelectionChange: (newVal: unknown) => void, items: {id: string, label: string}[], 'aria-label': string, 'data-testid': string, description: string}) => {
       return (
         <div data-testid={testId}>
           <select
@@ -136,7 +145,7 @@ vi.mock('@bcgov/design-system-react-components', async (importOriginal) => {
             aria-label={ariaLabel}
           >
             <option value="">Select...</option>
-            {items?.map((item: any) => (
+            {items?.map((item: {id: string, label: string}) => (
               <option key={item.id} value={item.id}>
                 {item.label}
               </option>
@@ -148,7 +157,6 @@ vi.mock('@bcgov/design-system-react-components', async (importOriginal) => {
     },
   };
 });
-
 
 // The real FormDesigner takes its model once at mount and ignores later changes. The stub does the
 // same, so a version switch that fails to remount it is visible here.
@@ -186,7 +194,7 @@ let store: ReturnType<typeof makeStore>;
 const newestFirst = (versions: Version[]) =>
   [...versions].sort((a, b) => b.versionNo - a.versionNo);
 
-async function renderForm(props: { formId?: string } = {}) {
+async function renderForm(props: { formId: string }) {
   const view: ReturnType<typeof render> | undefined = render(
     <Provider store={store}>
       <SWRConfig
@@ -249,7 +257,6 @@ describe('FormForm', () => {
     // The designer area includes a form name input; assert it renders with loaded value
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Test' })).toBeInTheDocument());
   });
-
 
   // The form's current version is what the builder is fed.
   it('reads the schema of the current version', async () => {
@@ -315,7 +322,9 @@ describe('FormForm', () => {
     expect(screen.getAllByText('Current Draft (v2)').length).toBeGreaterThan(0);
     expect(screen.getByTestId('save-form-button')).toBeDisabled();
     expect(screen.getByTestId('publish-form-button')).toBeDisabled();
-    const picker = screen.getByTestId('form-version-select').querySelector('select') as HTMLSelectElement;
+    const picker = screen
+      .getByTestId('form-version-select')
+      .querySelector('select') as HTMLSelectElement;
     expect(picker).not.toBeDisabled();
 
     await userEvent.click(screen.getByTestId('page-notice-stale-edits-action'));
@@ -399,7 +408,9 @@ describe('FormForm', () => {
     await userEvent.selectOptions(picker, 'v1');
     await waitFor(() => expect(screen.getByTestId('form-designer')).toHaveTextContent('from-v1'));
 
-    const picker2 = screen.getByTestId('form-version-select').querySelector('select') as HTMLSelectElement;
+    const picker2 = screen
+      .getByTestId('form-version-select')
+      .querySelector('select') as HTMLSelectElement;
     fireEvent.change(picker2, { target: { value: 'current' } });
     await waitFor(() => expect(screen.getByTestId('form-designer')).toHaveTextContent('from-v2'));
   });
@@ -441,8 +452,10 @@ describe('FormForm', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.saveFormVersionSchema).toHaveBeenCalledTimes(1));
 
-    const picker = screen.getByTestId('form-version-select').querySelector('select') as HTMLSelectElement;
-    await userEvent.selectOptions(picker, 'create'); 
+    const picker = screen
+      .getByTestId('form-version-select')
+      .querySelector('select') as HTMLSelectElement;
+    await userEvent.selectOptions(picker, 'create');
     await waitFor(() => expect(api.createFormVersion).toHaveBeenCalled());
     const newVersionCall = api.saveFormVersionSchema.mock.calls.find((c) => c[1] === 'v-new');
     expect(newVersionCall?.[2]).toEqual({ components: [{ key: 'edited' }] });
@@ -463,8 +476,10 @@ describe('FormForm', () => {
     });
     await waitFor(() => expect(screen.getByTestId('form-designer')).toHaveTextContent('original'));
 
-    const picker = screen.getByTestId('form-version-select').querySelector('select') as HTMLSelectElement;
-    await userEvent.selectOptions(picker, 'create'); 
+    const picker = screen
+      .getByTestId('form-version-select')
+      .querySelector('select') as HTMLSelectElement;
+    await userEvent.selectOptions(picker, 'create');
     await waitFor(() =>
       expect(screen.getAllByText('Current Draft (v2)').length).toBeGreaterThan(0),
     );

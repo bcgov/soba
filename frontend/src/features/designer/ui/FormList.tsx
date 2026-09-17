@@ -335,16 +335,14 @@ function FormList() {
           onSubmit={listQuery.commitSearch}
           testIdPrefix="forms"
         />
-        {designModeEnabled ? (
-          <DSButton
-            variant="primary"
-            data-testid="create-form-button"
-            isDisabled={!canCreate}
-            onPress={() => setShowCreateModal(true)}
-          >
-            {dict.general.create}
-          </DSButton>
-        ) : null}
+        <DSButton
+          variant="primary"
+          data-testid="create-form-button"
+          isDisabled={!canCreate}
+          onPress={() => setShowCreateModal(true)}
+        >
+          {dict.general.create}
+        </DSButton>
       </ListPageToolbar>
       <div className={`d-flex align-items-end gap-2`}>
         <WorkspaceSelector

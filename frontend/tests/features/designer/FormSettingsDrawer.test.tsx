@@ -1,5 +1,5 @@
 import { Provider } from 'react-redux';
-import makeStore from '@/lib/store'
+import makeStore from '@/lib/store';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -66,7 +66,7 @@ describe('FormSettingsDrawer', () => {
     return render(
       <Provider store={store}>
         <FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />
-      </Provider>
+      </Provider>,
     );
   }
 
@@ -157,9 +157,9 @@ describe('FormSettingsDrawer', () => {
 
     loaded.description = 'Written somewhere else';
     rerender(
-    <Provider store={store}>
-      <FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />
-    </Provider>
+      <Provider store={store}>
+        <FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />
+      </Provider>,
     );
 
     const textarea = screen.getByTestId('form-settings-description').querySelector('textarea')!;
@@ -175,9 +175,9 @@ describe('FormSettingsDrawer', () => {
 
     loaded.description = 'Written somewhere else';
     rerender(
-    <Provider store={store}>
-      <FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />
-    </Provider>
+      <Provider store={store}>
+        <FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />
+      </Provider>,
     );
 
     expect(textarea).toHaveValue('Half typed');

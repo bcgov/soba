@@ -52,14 +52,14 @@ export default function FormSettingsDrawer({
     if (token !== undefined) {
       setSaving(true);
       try {
-        const payload = {}
+        const payload: { name?: string; description?: string } = {};
         if (editedName !== null) {
-          payload.name = editedName
+          payload.name = editedName;
         }
-        if (editedDescription !== null){
-          payload.description = editedDescription
+        if (editedDescription !== null) {
+          payload.description = editedDescription;
         }
-        if (Object.keys(payload).length === 0){
+        if (Object.keys(payload).length === 0) {
           setSaving(false);
           return; //no changes
         }

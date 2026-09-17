@@ -169,7 +169,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
 
   useEffect(() => {
     if (!loading && form && !formSchema) {
-      setSchema({components: []});
+      setSchema({ components: [] });
     }
   }, [loading, form, formSchema, setSchema]);
 
@@ -324,7 +324,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     return [
       {
         id: CREATE_NEW_VERSION_KEY,
-        label: getNewVersionLabel()
+        label: getNewVersionLabel(),
       },
       {
         id: 'current',
@@ -403,11 +403,11 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
 
   const selectVersionFromDrop = (key: string): void => {
     if (key === CREATE_NEW_VERSION_KEY) {
-      createNewVersion()
+      createNewVersion();
     } else {
-      selectVersion(key)
+      selectVersion(key);
     }
-  }
+  };
 
   const renderDesignerContent = () => (
     <>
