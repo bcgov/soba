@@ -11,6 +11,7 @@ export interface NewFileRecord {
   filename: string;
   contentType?: string | null;
   size?: number | null;
+  formId?: string | null;
   submissionId?: string | null;
   createdBy?: string | null;
 }
@@ -25,6 +26,7 @@ export const createFileRecord = async (input: NewFileRecord): Promise<FileRecord
       filename: input.filename,
       contentType: input.contentType ?? null,
       size: input.size ?? null,
+      formId: input.formId ?? null,
       submissionId: input.submissionId ?? null,
       createdBy: input.createdBy ?? null,
     })
@@ -34,6 +36,19 @@ export const createFileRecord = async (input: NewFileRecord): Promise<FileRecord
 
 export const getFileRecordById = async (id: string): Promise<FileRecord | null> => {
   const rows = await db.select().from(files).where(eq(files.id, id)).limit(1);
+  return rows[0] ?? null;
+};
+
+export const getFormFileRecordById = async (
+  id: string,
+  formId: string,
+  workspaceId: string,
+): Promise<FileRecord | null> => {
+  const rows = await db
+    .select()
+    .from(files)
+    .where(and(eq(files.id, id), eq(files.formId, formId), eq(files.workspaceId, workspaceId)))
+    .limit(1);
   return rows[0] ?? null;
 };
 

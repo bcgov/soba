@@ -6,7 +6,7 @@ import { designFormsRouter, registerFormsOpenApi } from './forms';
 import { designSubmissionsRouter, registerSubmissionsOpenApi } from './submissions';
 import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
 import { groupsDomain } from './groups';
-import { filesDomain } from '../../features/files';
+import { designFilesRouter, filesDomain } from '../../features/files';
 import { documentGenerationDomain } from '../../features/document-generation';
 import { meDomain } from './me';
 import { membersDomain } from './members';
@@ -36,6 +36,7 @@ registerOpenApiPaths((registry) => {
 // Design feature: form authoring + submission management.
 const designRouter = express.Router();
 designRouter.use('/', designFormsRouter);
+designRouter.use('/forms/:id/files', designFilesRouter);
 designRouter.use('/submissions', designSubmissionsRouter);
 designRouter.use(coreErrorHandler);
 

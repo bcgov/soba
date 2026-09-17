@@ -1,5 +1,6 @@
 import type { NormalizedProfile, IdpAttributes } from '../core/auth/jwtClaims';
 import type { CoreRequestContext, CoreListScope } from '../core/middleware/requestContext';
+import type { FileRecord } from '../features/files/schema';
 
 declare global {
   namespace Express {
@@ -23,6 +24,8 @@ declare global {
       listScope?: CoreListScope;
       actorId?: string;
       isSobaAdmin?: boolean;
+      fileRecord?: FileRecord;
+      fileDownloadDisposition?: 'inline' | 'attachment';
     }
   }
 }
