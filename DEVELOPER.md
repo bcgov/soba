@@ -315,9 +315,9 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 ### App structure and routing
 
-- **App Router:** `app/layout.tsx` is the root (html/body, globals.css). `app/[lang]/layout.tsx` wraps locale routes with `DictionaryProvider`, `Header`, `SideNav`, `<main>`, and `Footer`. Locale is required (e.g. `/en`, `/fr`). Home (`app/[lang]/page.tsx`) redirects logged-in users to `/forms`.
-- **Key routes:** `/{lang}/designer` (design-mode), `/{lang}/forms` (form list), `/{lang}/form/{formId}` (submit/render), `/{lang}/submissions/...`, `/{lang}/meta` (meta-review).
-- **Where code lives:** `app/` — pages, layouts, shared UI (`app/ui/`). `src/features/` — feature UI (designer, submit-mode, formio-v5, workspaces, meta-review). `src/shared/` — API, config, feature flags. `src/app/` — plugin types and registry. `lib/` — Redux store, slices, hooks, runtime config. Path aliases: `@/lib`, `@/app`, `@/src`.
+- **App Router:** `app/layout.tsx` is the root (html/body, globals.css). `app/[lang]/layout.tsx` wraps locale routes with `DictionaryProvider`, `Header`, `SideNav`, `<main>`, and `Footer`. Locale is required (e.g. `/en`, `/fr`). Home (`app/[lang]/page.tsx`) is the signed-out landing page. `AppAccessGuard` redirects signed-in users from it to `/forms` (or `/onboarding` or `/workspaces` for users without workspaces) when `design-mode` is allowed, otherwise to `/my-forms`.
+- **Key routes:** `/{lang}/build` (design-mode), `/{lang}/forms` (form list), `/{lang}/my-forms` and `/{lang}/my-submissions` (submit-mode), `/{lang}/form/{formId}` (submit/render), `/{lang}/meta` (feature support).
+- **Where code lives:** `app/` - pages, layouts, shared UI (`app/ui/`). `src/features/` - feature UI (admin, designer, formio-v5, onboarding, submit-mode, workspaces). `src/shared/` - API, config, feature flags. `src/app/` - providers and routing. `lib/` - Redux store, slices, hooks, runtime config. Path aliases: `@/lib`, `@/app`, `@/src`.
 - **Adding pages:** Add under `app/[lang]/`; use the locale layout for nav and dictionary.
 
 ### Runtime config and env
@@ -342,14 +342,14 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 - **Location:** `src/shared/api/sobaApi.ts` and `sobaApiForms.ts`. Functions use `getSobaApiBaseUrl()` (from runtime config cache or env fallback). Protected endpoints send `Authorization: Bearer ${token}` and, for form/submission calls, **`x-workspace-id`** from the active workspace. Examples: `fetchHealth()`, `fetchWorkspaces(token)`, `fetchCurrentUser(token)`, `getFormVersionSchema(token, ...)`. See [In Detail — API layer (frontend)](#api-layer-frontend).
 
-### Plugins and navigation
+### Navigation
 
-- **AppPlugin:** id, optional `featureCode`, order, `getNavItem`, optional `showInHeaderNav`. The **registry** (`src/app/plugins/registry.ts`) registers: **workspaces** (always on), **designer** (`design-mode`), **submit-mode**, **meta-review** (`meta`). Plugins are filtered with `createIsFeatureAllowed(meta)`; `getHeaderNavigationItems` and `getOverlayNavigationItems` drive Header and SideNav. See [In Detail — Plugins (frontend)](#plugins-frontend).
+- **SideNav** (`app/ui/SideNav.tsx`) builds its items from the `design-mode` and `submit-mode` flags, which the locale layout resolves server-side with `createIsFeatureAllowed(meta)`.
 
 ### Feature flags
 
 - **Platform:** `GET /meta/features` returns each row with **`platformAllowed`** (from `soba.feature` status). Loaded via `src/shared/config/featuresMeta.ts` (`loadFeaturesMeta`).
-- **Per-frontend deployment:** **`NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`** — comma-separated codes (same as meta, e.g. `workspaces`, `design-mode`, `submit-mode`, `marketing`), or **`*`** / **`all`** alone to allow every platform-allowed feature. **Empty/unset** = no codes allowed at the frontend layer (intersected with `platformAllowed`). Use a subset for submit-only or design-only Next.js images that share one API.
+- **Per-frontend deployment:** **`NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`** - comma-separated codes (same as meta, e.g. `design-mode`, `submit-mode`, `files`, `marketing`), or **`*`** / **`all`** alone to allow every platform-allowed feature. **Empty/unset** = no codes allowed at the frontend layer (intersected with `platformAllowed`). Use a subset for submit-only or design-only Next.js images that share one API.
 - **`createIsFeatureAllowed(meta)`** returns `isFeatureAllowed(code)` = `platformAllowed && frontendAllowlist`. Constants: `FEATURE_CODES` in `src/shared/featureFlags/flags.ts`.
 
 ### IDP groups and form visibility
@@ -367,8 +367,8 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 ### Forms
 
-- **Designer** (`src/features/designer/`, `design-mode`): form list and builder at `/{lang}/designer`; provisions schema via `POST /form-versions/:id/schema`, loads schema via `GET /form-versions/:id/schema`.
-- **Submit** (`src/features/submit-mode/`, `submit-mode`): form list at `/{lang}/forms`; render at `/{lang}/form/{formId}` via **`src/features/formio-v5/`** (`FormioProvider` + `DynamicForm` from `@formio/react`). **The browser does not call Form.io** — schema and submissions go through the SOBA API only.
+- **Designer** (`src/features/designer/`, `design-mode`): form list at `/{lang}/forms` and builder at `/{lang}/build`; provisions schema via `POST /form-versions/:id/schema`, loads schema via `GET /form-versions/:id/schema`.
+- **Submit** (`src/features/submit-mode/`, `submit-mode`): My Forms and My Submissions at `/{lang}/my-forms` and `/{lang}/my-submissions`; render at `/{lang}/form/{formId}` via **`src/features/formio-v5/`** (`FormioProvider` + `DynamicForm` from `@formio/react`). **The browser does not call Form.io** - schema and submissions go through the SOBA API only.
 - **Renderer CSS:** static copies under `public/formio-v5/`; `useFormioV5FormChrome` loads them next to `<Form />` (avoid global Form.io CSS imports with Turbopack).
 
 ### Testing
@@ -478,8 +478,8 @@ Auth-related env: `IDP_PLUGINS`, `IDP_PLUGIN_DEFAULT_*`, and per-IdP `PLUGIN_<ID
 ### App structure (frontend)
 
 - **Root layout** (`app/layout.tsx`): Minimal — html/body, globals.css. No providers here so the tree stays simple.
-- **Locale layout** (`app/[lang]/layout.tsx`): Wraps all `[lang]` routes. Loads dictionary and features meta server-side, provides `DictionaryProvider`, renders `Header`, `SideNav`, `<main>{children}</main>`, and `Footer`. SideNav shows home (when `marketing` allowed) and app links (when `design-mode` or `submit-mode` allowed).
-- **Folders:** `app/ui/` — shared UI (Header, SideNav, Footer, forms). `lib/` — Redux store, slices, hooks, Keycloak init, runtime config. `src/features/` — designer, submit-mode, formio-v5, workspaces, meta-review. `src/shared/` — API client, config, feature flags. `src/app/` — plugin types and registry. Use `@/lib`, `@/app`, `@/src` for imports.
+- **Locale layout** (`app/[lang]/layout.tsx`): Wraps all `[lang]` routes. Loads dictionary and features meta server-side, provides `DictionaryProvider`, renders `Header`, `SideNav`, `<main>{children}</main>`, and `Footer`. For signed-in users, SideNav shows Forms and Workspaces when `design-mode` is allowed, then My Forms and My Submissions when `submit-mode` is allowed, then Administration for SOBA admins. Feedback and Help always show.
+- **Folders:** `app/ui/` - shared UI (Header, SideNav, Footer, forms). `lib/` - Redux store, slices, hooks, Keycloak init, runtime config. `src/features/` - admin, designer, formio-v5, onboarding, submit-mode, workspaces. `src/shared/` - API client, config, feature flags. `src/app/` - providers and routing. Use `@/lib`, `@/app`, `@/src` for imports.
 
 ### Runtime config (frontend)
 
@@ -510,12 +510,6 @@ Auth-related env: `IDP_PLUGINS`, `IDP_PLUGIN_DEFAULT_*`, and per-IdP `PLUGIN_<ID
 
 - **Base URL:** From `getSobaApiBaseUrl()` in `src/shared/config/runtimeConfig.ts` (cached config or `NEXT_PUBLIC_SOBA_API_BASE_URL`).
 - **Pattern:** Protected calls set `Authorization: Bearer ${token}`. Form/submission helpers in `sobaApiForms.ts` also send **`x-workspace-id`** when a workspace is selected. Use fetch with cache: 'no-store' for dynamic data. Types for responses live in sobaApi.ts / sobaApiForms.ts.
-
-### Plugins (frontend)
-
-- **Registered plugins:** workspaces (no `featureCode`), designer (`design-mode`), submit-mode, meta-review (`meta`). Marketing is a feature flag only (SideNav home link), not a separate plugin.
-- **Adding a plugin:** (1) Optionally add a row to `soba.feature` if platform-gated; set `featureCode` on the plugin. Omit for always-on shell (e.g. workspaces). (2) Create `src/features/<name>/plugin.tsx` exporting `AppPlugin`: id, optional featureCode, order, getNavItem, optional showInHeaderNav. (3) Register in `src/app/plugins/registry.ts`.
-- **getNavItem** returns { id, href, label }; href includes locale (e.g. `/${locale}/designer`).
 
 ### Testing
 

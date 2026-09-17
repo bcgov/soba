@@ -4,7 +4,7 @@ import { FaRegTrashCan, FaFile } from 'react-icons/fa6';
 import { Link, Button } from '@bcgov/design-system-react-components';
 import { useRouter, usePathname } from 'next/navigation';
 
-import type { Dictionary } from '@/src/types/plugins';
+import type { Dictionary } from '@/src/types/dictionary';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { Modal } from '@/src/components/Modal';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
@@ -125,7 +125,7 @@ export default function FormSubmissionTab({
               className="bcds-react-aria-Link medium false me-2"
               aria-label={dict.submission.view}
               data-testid={`${sub.id}-view-link`}
-              onPress={() => router.push(`/${locale}/submission/${sub.id}`)}
+              onPress={() => router.push(`/${locale}/build/${sub.formId}/submissions/${sub.id}`)}
             >
               <FaFile />
             </Link>

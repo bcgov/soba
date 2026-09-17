@@ -1,4 +1,5 @@
 import { and, count, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { v7 as uuidv7 } from 'uuid';
 import { SUBMISSION_SORT_FIELDS, type SubmissionListSort } from '@soba/lib';
 import { db } from '../client';
 import { submissionRevisions, submissions, forms, formVersions } from '../schema';
@@ -55,6 +56,10 @@ export type OpenSubmissionResult =
 interface SaveSubmissionInput {
   workspaceId: string;
   submissionId: string;
+  /** Minted before the engine write; the engine document is keyed on it. */
+  revisionId: string;
+  /** Head the write was based on. The append is refused when the head has moved since. */
+  parentRevisionId: string | null;
   actorId: string;
   actorDisplayLabel: string | null;
   eventType: SubmissionEventTypeCode;
@@ -63,6 +68,16 @@ interface SaveSubmissionInput {
   /** Engine ref of the newly-created submission document for this revision (the "after" ref). */
   afterEngineSubmissionRef: string;
 }
+
+/**
+ * appended: the revision was recorded and is the new head.
+ * not_found: the submission is missing or soft-deleted.
+ * stale: another write moved the head after this one read it (caller maps to 409).
+ */
+export type AppendSubmissionRevisionResult =
+  | { outcome: 'appended'; record: SubmissionRecord }
+  | { outcome: 'not_found' }
+  | { outcome: 'stale' };
 
 export type SubmissionListSortField = (typeof SUBMISSION_SORT_FIELDS)[number];
 
@@ -121,7 +136,9 @@ export const openSubmission = async (
       .returning();
 
     if (created) {
+      const revisionId = uuidv7();
       await tx.insert(submissionRevisions).values({
+        id: revisionId,
         workspaceId: input.workspaceId,
         submissionId: created.id,
         revisionNo: 0,
@@ -130,7 +147,13 @@ export const openSubmission = async (
         afterEngineSubmissionRef: null,
         changedBy: input.actorId,
       });
-      return { outcome: 'created', record: created };
+      const [record] = await tx
+        .update(submissions)
+        .set({ headRevisionId: revisionId })
+        .where(eq(submissions.id, created.id))
+        .returning();
+      if (!record) throw new Error(`Submission ${created.id} missing after insert`);
+      return { outcome: 'created', record };
     }
 
     // Only a live row is a valid idempotent retry; a soft-deleted tombstone on the same id is a
@@ -344,38 +367,95 @@ export const updateSubmissionDraft = async (
 };
 
 /**
- * Record a submission revision and advance the submission's current pointer in one transaction.
- * `beforeEngineSubmissionRef` is the submission's current ref; `afterEngineSubmissionRef` is the
- * newly-created engine document for this save — so the revision captures the real change. Applies the
- * lifecycle-decided workflow state, marks the engine sync `ready`, and stamps `submitted_at` on submit.
+ * Reset a `provisioning` flag left by a write that did not land. The flag may belong to another write
+ * still in flight; that write sets its own final status.
  */
-export const appendSubmissionRevision = async (input: SaveSubmissionInput) => {
+export const clearSubmissionProvisioning = async (workspaceId: string, submissionId: string) => {
+  await db
+    .update(submissions)
+    .set({ engineSyncStatus: 'ready' })
+    .where(
+      and(
+        eq(submissions.id, submissionId),
+        eq(submissions.workspaceId, workspaceId),
+        eq(submissions.engineSyncStatus, 'provisioning'),
+      ),
+    );
+};
+
+/**
+ * Record an engine failure. Skipped when another write already settled the status or the submission
+ * is deleted, so a failed write never overwrites a successful one.
+ */
+export const failSubmissionProvisioning = async (
+  workspaceId: string,
+  submissionId: string,
+  actorDisplayLabel: string | null,
+  message: string,
+) => {
+  await db
+    .update(submissions)
+    .set({
+      engineSyncStatus: 'error',
+      engineSyncError: message,
+      updatedBy: actorDisplayLabel,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(submissions.id, submissionId),
+        eq(submissions.workspaceId, workspaceId),
+        eq(submissions.engineSyncStatus, 'provisioning'),
+        isNull(submissions.deletedAt),
+      ),
+    );
+};
+
+/**
+ * Record a submission revision as the new head, in one transaction. `beforeEngineSubmissionRef` is
+ * the submission's current ref; `afterEngineSubmissionRef` is the engine document created for this
+ * save. Applies the lifecycle-decided workflow state, marks the engine sync `ready`, and stamps
+ * `submitted_at` on submit.
+ */
+export const appendSubmissionRevision = async (
+  input: SaveSubmissionInput,
+): Promise<AppendSubmissionRevisionResult> => {
   return db.transaction(async (tx) => {
-    const current = await tx
+    // The row lock holds other writers on this submission until commit, so the head check and the
+    // head move cannot interleave with a concurrent save, submit or delete.
+    const [submission] = await tx
       .select()
       .from(submissions)
       .where(
-        and(eq(submissions.id, input.submissionId), eq(submissions.workspaceId, input.workspaceId)),
+        and(
+          eq(submissions.id, input.submissionId),
+          eq(submissions.workspaceId, input.workspaceId),
+          isNull(submissions.deletedAt),
+        ),
       )
-      .limit(1);
+      .limit(1)
+      .for('no key update');
 
-    const submission = current[0];
-    if (!submission) return null;
+    if (!submission) return { outcome: 'not_found' };
+    if (submission.headRevisionId !== input.parentRevisionId) return { outcome: 'stale' };
 
     const nextRevision = submission.currentRevisionNo + 1;
 
     await tx.insert(submissionRevisions).values({
+      id: input.revisionId,
       workspaceId: input.workspaceId,
       submissionId: input.submissionId,
       revisionNo: nextRevision,
+      parentRevisionId: input.parentRevisionId,
       eventType: input.eventType,
       beforeEngineSubmissionRef: submission.engineSubmissionRef,
       afterEngineSubmissionRef: input.afterEngineSubmissionRef,
       changedBy: input.actorId,
     });
 
-    const updates: Record<string, unknown> = {
+    const updates: Partial<typeof submissions.$inferInsert> = {
       currentRevisionNo: nextRevision,
+      headRevisionId: input.revisionId,
       engineSubmissionRef: input.afterEngineSubmissionRef,
       engineSyncStatus: 'ready',
       engineSyncError: null,
@@ -389,7 +469,7 @@ export const appendSubmissionRevision = async (input: SaveSubmissionInput) => {
       updates.submittedAt = new Date();
     }
 
-    const updated = await tx
+    const [updated] = await tx
       .update(submissions)
       .set(updates)
       .where(
@@ -397,7 +477,8 @@ export const appendSubmissionRevision = async (input: SaveSubmissionInput) => {
       )
       .returning();
 
-    return updated[0] ?? null;
+    if (!updated) throw new Error(`Submission ${input.submissionId} missing after head move`);
+    return { outcome: 'appended', record: updated };
   });
 };
 
@@ -415,7 +496,13 @@ export const markSubmissionDeleted = async (
       updatedBy: actorDisplayLabel,
       updatedAt: new Date(),
     })
-    .where(and(eq(submissions.id, submissionId), eq(submissions.workspaceId, workspaceId)))
+    .where(
+      and(
+        eq(submissions.id, submissionId),
+        eq(submissions.workspaceId, workspaceId),
+        isNull(submissions.deletedAt),
+      ),
+    )
     .returning();
 
   return updated[0] ?? null;

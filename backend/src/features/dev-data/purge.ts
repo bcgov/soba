@@ -287,6 +287,11 @@ async function purgeWorkspaceScoped(
     'document_generation_audit',
     tx.delete(documentGenerationAudits).where(inArray(documentGenerationAudits.workspaceId, ids)),
   );
+  // submission.head_revision_id references the revisions, so the pointer is cleared first.
+  await tx
+    .update(submissions)
+    .set({ headRevisionId: null })
+    .where(inArray(submissions.workspaceId, ids));
   await record(
     'submission_revision',
     tx.delete(submissionRevisions).where(inArray(submissionRevisions.workspaceId, ids)),

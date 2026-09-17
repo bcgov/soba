@@ -12,6 +12,8 @@
     "unknown": "Inconnu",
     "home": "Accueil",
     "forms": "Formulaires",
+    "myForms": "Mes formulaires",
+    "mySubmissions": "Mes soumissions",
     "formDesigner": "Concepteur de formulaires",
     "feedback": "Retour d'information",
     "help": "Aidé",
@@ -190,12 +192,9 @@
   "header": {
     "workspaces": "Espaces de travail",
     "design": "Conception",
-    "submit": "Soumettre",
     "skipToMain": "Aller au contenu principal",
-    "designer": "Générateur de Formulaire",
     "selectLanguage": "Choisir la langue",
     "bcgovTitle": "Gouvernement de la Colombie-Britannique",
-    "primaryNavAria": "Principal",
     "languages": {
       "en": "EN",
       "fr": "FR"
@@ -221,7 +220,7 @@
       "segmentError": {
         "title": "Un problème est survenu lors du chargement de cette page de formulaire.",
         "tryAgain": "Réessayer",
-        "backToList": "Retour à la liste"
+        "backToHome": "Retour à l'accueil"
       },
       "submitSuccess": "Formulaire soumis avec succès.",
       "starting": "Démarrage de votre soumission…",
@@ -317,15 +316,16 @@
     "anon": "Anonyme",
     "pageTitle": "Soumission",
     "loading": "Chargement des soumissions…",
-    "empty": "Aucune soumission dans cet espace pour l’instant.",
     "error": "Impossible de charger les soumissions.",
     "submittedOn": "Soumis le",
     "noContent": "Aucune réponse soumise à afficher.",
     "notFound": "Soumission introuvable.",
+    "loadError": "Impossible de charger cette soumission.",
     "workflow": "Flux de travail",
     "confirmationId": "ID de confirmation",
     "submittedAt": "Date de Soumission",
     "submitter": "Soumissionnaire",
+    "backToSubmissions": "Retour aux soumissions",
     "deleteConfirm": "Confirmer la suppression",
     "deleteConfirmText": "Voulez-vous vraiment supprimer cette soumission",
     "delete": "Suppression",
@@ -335,14 +335,6 @@
     "emptyList": "Aucune soumission",
     "deleteSuccess": "Soumission supprimée avec succès",
     "deleteFailure": "Échec de la suppression de la soumission",
-    "columns": {
-      "id": "ID de Soumission",
-      "formName": "Nom du Formulaire",
-      "formId": "ID du Formulaire",
-      "version": "Version",
-      "status": "Statut",
-      "user": "Utilisateur"
-    },
     "formList": {
       "columns": {
         "name": "Nom du Formulaire",
