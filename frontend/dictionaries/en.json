@@ -36,7 +36,8 @@
     "clearFilters": "Reset Filters",
     "noAccess": "You do not have access to this.",
     "sortBy": "Sort by",
-    "lookupTruncated": "Showing the first {limit}."
+    "lookupTruncated": "Showing the first {limit}.",
+    "next": "Next"
   },
   "dataTable": {
     "emptyMessage": "No items found.",

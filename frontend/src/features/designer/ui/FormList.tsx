@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useCallback, useEffect } from 'react';
+import { useMemo, useCallback, useEffect, useState } from 'react';
 import { Button as DSButton } from '@bcgov/design-system-react-components';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { Tag } from '@/src/components/Tag';
@@ -28,6 +28,8 @@ import styles from './FormList.module.css';
 import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';
 import { isForbidden, isNotFound } from '@/src/shared/api/sobaHelpers';
 import type { WorkspaceLookupItem } from '@/src/types/workspaces';
+import { Modal } from '@/src/components/Modal';
+import { FormCreateContent } from './FormCreateContent';
 
 const WORKSPACE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -120,6 +122,8 @@ function FormList() {
   const selectedWorkspaceId = filterWorkspace?.id;
   const workspaceRejected = workspaceFilter.rejected;
   const holdFormsRequest = workspaceFilter.holdRequest;
+
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const {
     data,
@@ -304,6 +308,10 @@ function FormList() {
     ],
   );
 
+  const hideModal = () => {
+    setShowCreateModal(false);
+  };
+
   // Auth gate only — loading (including Keycloak init) is shown inside the table
   // body so the page heading stays visible throughout.
   if (!authenticated && !initializing) {
@@ -312,6 +320,14 @@ function FormList() {
 
   return (
     <>
+      <Modal
+        show={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title={dict.form.createForm}
+        isDismissable={true}
+      >
+        <FormCreateContent onCancelPress={hideModal} />
+      </Modal>
       <ListPageToolbar>
         <ListPageSearchField
           value={listQuery.searchInput}
@@ -319,14 +335,16 @@ function FormList() {
           onSubmit={listQuery.commitSearch}
           testIdPrefix="forms"
         />
-        <DSButton
-          variant="primary"
-          data-testid="create-form-button"
-          isDisabled={!canCreate}
-          onPress={() => router.push(`/${locale}/build`)}
-        >
-          {dict.general.create}
-        </DSButton>
+        {designModeEnabled ? (
+          <DSButton
+            variant="primary"
+            data-testid="create-form-button"
+            isDisabled={!canCreate}
+            onPress={() => setShowCreateModal(true)}
+          >
+            {dict.general.create}
+          </DSButton>
+        ) : null}
       </ListPageToolbar>
       <div className={`d-flex align-items-end gap-2`}>
         <WorkspaceSelector

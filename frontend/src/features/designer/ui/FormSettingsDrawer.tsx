@@ -1,14 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { TextArea } from '@bcgov/design-system-react-components';
+import { TextArea, TextField } from '@bcgov/design-system-react-components';
 
 import type { Dictionary } from '@/src/types/dictionary';
 import FormSettingsDrawers from '@/src/features/designer/ui/FormSettingsDrawers';
+import { FormSubmitterAudience } from './FormSubmitterAudience';
 import { updateSobaForm } from '@/src/shared/api/sobaApiDesign';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useForm } from '@/src/features/designer/useForm';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
+import { useFormCreateWorkspaceOptions, useWorkspace } from '@/src/shared/api/useWorkspaces';
+import { isWorkspaceManageRole } from '@/src/features/workspaces/workspaceRoles';
 
 interface FormSettingsDrawerProps {
   dict: Dictionary;
@@ -28,19 +31,42 @@ export default function FormSettingsDrawer({
   // An edit layered over the loaded value. Null means no edit, so a refresh from anywhere shows
   // through until the user types.
   const [editedDescription, setEditedDescription] = useState<string | null>(null);
+  const [editedName, setEditedName] = useState<string | null>(null);
+
+  const selectedWorkspaceId = form?.workspaceId ?? null;
+
   const [saving, setSaving] = useState(false);
 
   const description = editedDescription ?? form?.description ?? '';
+  const formName = editedName ?? form?.name ?? '';
+
+  const { workspace: formWorkspace } = useWorkspace(formId ? form?.workspaceId : undefined);
+  const creatableWorkspaces = useFormCreateWorkspaceOptions(!formId);
+
+  const activeWorkspace = formId
+    ? formWorkspace
+    : creatableWorkspaces.workspaces.find((w) => w.id === selectedWorkspaceId);
+  const canManageWorkspace = !!activeWorkspace && isWorkspaceManageRole(activeWorkspace.role);
 
   const saveChanges = async () => {
     if (token !== undefined) {
       setSaving(true);
       try {
-        await updateSobaForm(token, formId, {
-          description: description,
-        });
+        const payload = {}
+        if (editedName !== null) {
+          payload.name = editedName
+        }
+        if (editedDescription !== null){
+          payload.description = editedDescription
+        }
+        if (Object.keys(payload).length === 0){
+          setSaving(false);
+          return; //no changes
+        }
+        await updateSobaForm(token, formId, payload);
         await refreshForm();
         setEditedDescription(null);
+        setEditedName(null);
         addNotification({
           type: 'success',
           text:
@@ -61,6 +87,7 @@ export default function FormSettingsDrawer({
 
   const cancelChanges = () => {
     setEditedDescription(null);
+    setEditedName(null);
   };
 
   return (
@@ -71,6 +98,12 @@ export default function FormSettingsDrawer({
       onSave={saveChanges}
       onCancel={cancelChanges}
     >
+      <TextField
+        label={dict.form.nameLabel}
+        value={formName}
+        isDisabled={saving}
+        onChange={(newName) => setEditedName(newName)}
+      />
       <TextArea
         id="form-settings-description"
         className="bcds-react-aria-TextArea w-100"
@@ -79,6 +112,11 @@ export default function FormSettingsDrawer({
         isDisabled={saving}
         data-testid="form-settings-description"
         onChange={(newDescription) => setEditedDescription(newDescription)}
+      />
+      <FormSubmitterAudience
+        key={selectedWorkspaceId ?? 'none'}
+        workspaceId={selectedWorkspaceId}
+        canManage={canManageWorkspace}
       />
     </FormSettingsDrawers>
   );

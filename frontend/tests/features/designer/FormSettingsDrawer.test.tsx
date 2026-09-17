@@ -1,4 +1,5 @@
-import React from 'react';
+import { Provider } from 'react-redux';
+import makeStore from '@/lib/store'
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -54,13 +55,19 @@ vi.mock('@/app/[lang]/Providers', () => ({
 }));
 
 describe('FormSettingsDrawer', () => {
+  let store: ReturnType<typeof makeStore>;
   beforeEach(() => {
     vi.clearAllMocks();
     loaded.description = 'Initial description';
+    store = makeStore();
   });
 
   function renderDrawer() {
-    return render(<FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />);
+    return render(
+      <Provider store={store}>
+        <FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />
+      </Provider>
+    );
   }
 
   it('renders correctly with initial description', () => {
@@ -149,7 +156,11 @@ describe('FormSettingsDrawer', () => {
     const { rerender } = renderDrawer();
 
     loaded.description = 'Written somewhere else';
-    rerender(<FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />);
+    rerender(
+    <Provider store={store}>
+      <FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />
+    </Provider>
+    );
 
     const textarea = screen.getByTestId('form-settings-description').querySelector('textarea')!;
     expect(textarea).toHaveValue('Written somewhere else');
@@ -163,7 +174,11 @@ describe('FormSettingsDrawer', () => {
     await userEvent.type(textarea, 'Half typed');
 
     loaded.description = 'Written somewhere else';
-    rerender(<FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />);
+    rerender(
+    <Provider store={store}>
+      <FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />
+    </Provider>
+    );
 
     expect(textarea).toHaveValue('Half typed');
   });

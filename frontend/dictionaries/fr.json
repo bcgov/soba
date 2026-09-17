@@ -37,7 +37,8 @@
     "clearFilters": "Effacer les filtres",
     "noAccess": "Vous n'avez pas accès à ceci.",
     "sortBy": "Trier par",
-    "lookupTruncated": "Affichage des {limit} premiers."
+    "lookupTruncated": "Affichage des {limit} premiers.",
+    "next": "Suivant"
   },
   "dataTable": {
     "emptyMessage": "Aucun élément trouvé.",
