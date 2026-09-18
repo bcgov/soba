@@ -11,6 +11,7 @@ interface FormSettingsDrawersProps {
   label: string;
   onSave: () => void;
   onCancel: () => void;
+  canSave?: boolean;
 }
 
 export default function FormSettingsDrawers({
@@ -20,6 +21,7 @@ export default function FormSettingsDrawers({
   label,
   onSave,
   onCancel,
+  canSave = true,
 }: Readonly<FormSettingsDrawersProps>) {
   return (
     <Accordion id={id} data-testid={`accordion-${id}`} label={label}>
@@ -27,7 +29,7 @@ export default function FormSettingsDrawers({
         <Form>
           {children}
           <div className="d-md-flex mt-2 justify-content-start gap-2 mt-3 w-100">
-            <Button data-testid={`form-settings-${id}-save`} onClick={onSave}>
+            <Button data-testid={`form-settings-${id}-save`} onClick={onSave} isDisabled={!canSave}>
               {dict.form.save}
             </Button>
             <Button
