@@ -6,6 +6,7 @@ export * from './permissions';
 export * from './codes';
 export * from './forms';
 export * from './formGroupOverride';
+export * from './formSubmitterSetting';
 export * from './file';
 export * from './documentGenerationAudit';
 export * from './devData';
