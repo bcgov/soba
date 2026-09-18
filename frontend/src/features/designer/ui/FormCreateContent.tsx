@@ -137,10 +137,15 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
         canManage={false}
       />
       <div className="d-flex justify-content-end gap-2">
-        <Button isDisabled={isSaving} variant="secondary" onPress={onCancelPress} data-testid="cancel-create-form">
+        <Button
+          isDisabled={isSaving}
+          variant="secondary"
+          onPress={onCancelPress}
+          data-testid="cancel-create-form"
+        >
           {dict.general.cancel}
         </Button>
-        <Button isDisabled={isSaving} onPress={saveForm} data-testid='save-create-form'>
+        <Button isDisabled={isSaving} onPress={saveForm} data-testid="save-create-form">
           {dict.general.next}
         </Button>
       </div>

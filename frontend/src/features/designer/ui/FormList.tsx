@@ -320,11 +320,7 @@ function FormList() {
 
   return (
     <>
-      <Modal
-        show={showCreateModal}
-        onClose={hideModal}
-        title={dict.form.createForm}
-      >
+      <Modal show={showCreateModal} onClose={hideModal} title={dict.form.createForm}>
         <FormCreateContent onCancelPress={hideModal} />
       </Modal>
       <ListPageToolbar>

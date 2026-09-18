@@ -49,8 +49,8 @@ export default function FormSettingsDrawer({
   const canManageWorkspace = !!activeWorkspace && isWorkspaceManageRole(activeWorkspace.role);
 
   const edited = useMemo(() => {
-    return editedName !== null || editedDescription !== null
-  }, [editedName, editedDescription])
+    return editedName !== null || editedDescription !== null;
+  }, [editedName, editedDescription]);
 
   const saveChanges = async () => {
     if (token !== undefined) {
