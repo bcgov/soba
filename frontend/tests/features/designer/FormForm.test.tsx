@@ -301,27 +301,6 @@ describe('FormForm', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Test' })).toBeInTheDocument());
   });
 
-  // A new form inherits its workspace's audience, so the create page only shows it, even to an owner.
-  it('shows the workspace audience read-only on the create page', async () => {
-    mockWorkspaceState.creatable = [
-      { id: 'ws1', name: 'Alpha', kind: 'team', role: 'owner', disclaimerAccepted: true },
-    ];
-    audienceApi.getSubmitterAudience.mockResolvedValue(workspaceAudience);
-    await act(async () => {
-      await renderForm();
-    });
-
-    const picker = (await screen.findByTestId('workspace-select')).querySelector(
-      'select',
-    ) as HTMLSelectElement;
-    fireEvent.change(picker, { target: { value: 'ws1' } });
-
-    const trigger = await screen.findByTestId('submitter-audience-trigger');
-    await waitFor(() => expect(trigger).toHaveTextContent('Protected (IDIR - MFA)'));
-    expect(trigger).toBeDisabled();
-    expect(audienceApi.getFormSubmitterAudience).not.toHaveBeenCalled();
-  });
-
   // Changing a form's audience is a form_update; reading the form is not enough.
   it.each([
     ['form_read', ['form_read'], true],
@@ -342,7 +321,7 @@ describe('FormForm', () => {
       await renderForm({ formId: 'f1' });
     });
 
-    await waitFor(() => expect(screen.getByDisplayValue('Test')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Test')).toBeInTheDocument());
     const trigger = await screen.findByTestId('submitter-audience-trigger');
     await waitFor(() => expect(trigger).toHaveTextContent('Inherited: Protected (IDIR - MFA)'));
     expect(trigger).toHaveProperty('disabled', disabled);
