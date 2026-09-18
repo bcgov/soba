@@ -178,10 +178,6 @@ test.describe.serial("Landing page tests", () => {
     }
   });
   test("Checks form creation with basic components", async ({ title }) => {
-    const saveButton = sharedPage.getByRole("button", {
-      name: "Save",
-      exact: true,
-    });
     await expect(
       sharedPage
         .locator(".drag-and-drop-alert")
@@ -250,7 +246,14 @@ test.describe.serial("Landing page tests", () => {
     await formNameInput.click();
     await formNameInput.fill(title);
     form_name = title;
-    await saveButton.click();
+    const saveButton = sharedPage.getByRole("button", {
+      name: "Save",
+      exact: true,
+    });
+    await saveButton.click({ force: true });
+    await expect(
+      sharedPage.getByText("Form saved successfully.", { exact: true }),
+    ).toBeVisible();
     await sharedPage.waitForTimeout(1000);
     const formsNav = sharedPage.getByTestId("home-nav");
     await expect(sharedPage.getByTestId("home-nav")).toBeVisible({
