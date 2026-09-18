@@ -310,7 +310,8 @@
       "profileDrawerLabel": "Profil du Formulaire"
     },
     "descriptionLabel": "Description du Formulaire",
-    "submit": "Soumettre"
+    "submit": "Soumettre",
+    "noFormName": "Nom de formulaire est requise"
   },
   "submission": {
     "submissions": "Soumissions",

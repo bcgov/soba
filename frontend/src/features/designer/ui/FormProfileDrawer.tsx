@@ -76,6 +76,7 @@ export default function FormProfileDrawer({
       label={dict.form.settings.profileDrawerLabel}
       onSave={saveChanges}
       onCancel={cancelChanges}
+      canSave={!saving}
     >
       <p>{dict.form.settings.profileDrawerInfo}</p>
       <Select

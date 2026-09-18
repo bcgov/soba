@@ -322,9 +322,8 @@ function FormList() {
     <>
       <Modal
         show={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={hideModal}
         title={dict.form.createForm}
-        isDismissable={true}
       >
         <FormCreateContent onCancelPress={hideModal} />
       </Modal>

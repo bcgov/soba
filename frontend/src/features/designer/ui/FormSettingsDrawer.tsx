@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { TextArea, TextField } from '@bcgov/design-system-react-components';
 
 import type { Dictionary } from '@/src/types/dictionary';
@@ -41,12 +41,16 @@ export default function FormSettingsDrawer({
   const formName = editedName ?? form?.name ?? '';
 
   const { workspace: formWorkspace } = useWorkspace(formId ? form?.workspaceId : undefined);
-  const creatableWorkspaces = useFormCreateWorkspaceOptions(!formId);
+  const creatableWorkspaces = useFormCreateWorkspaceOptions(false);
 
   const activeWorkspace = formId
     ? formWorkspace
     : creatableWorkspaces.workspaces.find((w) => w.id === selectedWorkspaceId);
   const canManageWorkspace = !!activeWorkspace && isWorkspaceManageRole(activeWorkspace.role);
+
+  const edited = useMemo(() => {
+    return editedName !== null || editedDescription !== null
+  }, [editedName, editedDescription])
 
   const saveChanges = async () => {
     if (token !== undefined) {
@@ -97,11 +101,13 @@ export default function FormSettingsDrawer({
       label={dict.form.settings.formSettingsDrawerLabel}
       onSave={saveChanges}
       onCancel={cancelChanges}
+      canSave={!saving && edited}
     >
       <TextField
         label={dict.form.nameLabel}
         value={formName}
         isDisabled={saving}
+        data-testid="form-settings-name"
         onChange={(newName) => setEditedName(newName)}
       />
       <TextArea
@@ -116,6 +122,7 @@ export default function FormSettingsDrawer({
       <FormSubmitterAudience
         key={selectedWorkspaceId ?? 'none'}
         workspaceId={selectedWorkspaceId}
+        formId={formId}
         canManage={canManageWorkspace}
       />
     </FormSettingsDrawers>

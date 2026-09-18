@@ -309,7 +309,8 @@
       "profileDrawerLabel": "Form Profile"
     },
     "descriptionLabel": "Description",
-    "submit": "Submit"
+    "submit": "Submit",
+    "noFormName": "Form name is required"
   },
   "submission": {
     "submissions": "Submissions",

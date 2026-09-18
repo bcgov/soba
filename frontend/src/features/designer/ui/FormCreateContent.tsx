@@ -56,6 +56,10 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
       addNotification({ text: dict.form.noActiveWorkspaceError, type: 'error' });
       return;
     }
+    if (!formName) {
+      addNotification({ text: dict.form.noFormName, type: 'error' });
+      return;
+    }
     setIsSaving(true);
 
     try {
@@ -112,6 +116,7 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
         label={dict.form.nameLabel}
         value={formName}
         onChange={setFormName}
+        isRequired={true}
         data-testid="form-name-modal"
       />
 
@@ -119,7 +124,6 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
         <WorkspaceSelector
           label={dict.workspaces.workspace}
           workspaces={creatableWorkspaces.workspaces}
-          data-testid="form-workspace-modal"
           selectedWorkspaceId={selectedWorkspaceId}
           onChange={(id) => setSelectedWorkspaceId(id as string)}
           description={lookupTruncatedNote(dict.general.lookupTruncated, creatableWorkspaces)}
@@ -129,15 +133,14 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
 
       <FormSubmitterAudience
         key={selectedWorkspaceId ?? 'none'}
-        data-testid="form-audience-modal"
         workspaceId={selectedWorkspaceId}
-        canManage={canManageWorkspace}
+        canManage={false}
       />
       <div className="d-flex justify-content-end gap-2">
-        <Button isDisabled={isSaving} variant="secondary" onPress={onCancelPress}>
+        <Button isDisabled={isSaving} variant="secondary" onPress={onCancelPress} data-testid="cancel-create-form">
           {dict.general.cancel}
         </Button>
-        <Button isDisabled={isSaving} onPress={saveForm}>
+        <Button isDisabled={isSaving} onPress={saveForm} data-testid='save-create-form'>
           {dict.general.next}
         </Button>
       </div>

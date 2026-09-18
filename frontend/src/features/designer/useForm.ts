@@ -64,7 +64,7 @@ export function useForm(formId?: string) {
   } = useAuthedSWR(
     activeVersion?.id ? schemaKey(activeVersion.id) : null,
     (token) => getFormVersionSchema(token, activeVersion?.id as string),
-    { ...sessionReadConfig, keepPreviousData: false },
+    { ...sessionReadConfig },
   );
 
   const { mutate: globalMutate } = useSWRConfig();

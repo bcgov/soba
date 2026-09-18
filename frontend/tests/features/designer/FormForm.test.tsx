@@ -297,7 +297,7 @@ describe('FormForm', () => {
     await act(async () => {
       await renderForm({ formId: 'f1' });
     });
-    // The designer area includes a form name input; assert it renders with loaded value
+    // The designer area includes a form name heading; assert it renders with loaded value
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Test' })).toBeInTheDocument());
   });
 

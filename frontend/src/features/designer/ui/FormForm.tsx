@@ -249,9 +249,6 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
 
     try {
       if (currentVersion?.id) {
-        // Only the name is edited here. Sending any other field would write back whatever this
-        // screen last read over a change made from the settings tab.
-        await updateSobaForm(token as string, formId as string, { name: formName });
         await saveFormVersionSchema(token as string, currentVersion.id, schema);
         if (publish) {
           await publishSobaFormVersion(token as string, currentVersion.id);
@@ -376,7 +373,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
           </span>
           <div className="border-start border-secondary mx-2" style={{ borderWidth: '2px' }} />
         </div>
-        <span className="d-inline-flex" title={getPublishTitle()}>
+        <span className="d-inline-flex">
           <Select
             data-testid="form-version-select"
             aria-label={dict.form.formVersion || 'Form Version'}
@@ -414,18 +411,12 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
 
   const renderDesignerContent = () => (
     <>
-      <Form
-        onSubmit={(e) => e.preventDefault()}
-        className="d-flex flex-column gap-3 mb-3"
-        style={{ maxWidth: '640px' }}
-      >
-        <FormSubmitterAudience
-          key={formId ?? selectedWorkspaceId ?? 'none'}
-          workspaceId={selectedWorkspaceId}
-          formId={formId}
-          canManage={canUpdateForm}
-        />
-      </Form>
+      <FormSubmitterAudience
+        key={formId ?? selectedWorkspaceId ?? 'none'}
+        workspaceId={selectedWorkspaceId}
+        formId={formId}
+        canManage={canUpdateForm}
+      />
 
       {renderToolBar()}
       {/* Form Builder */}
