@@ -24,8 +24,7 @@ mongodb:
       memory: 512Mi
 
   pdb:
-    create: true
-    minAvailable: 1
+    create: false
 
   podAntiAffinityPreset: soft
 
