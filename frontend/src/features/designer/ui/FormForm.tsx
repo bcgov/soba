@@ -29,7 +29,6 @@ import {
   createFormVersion,
   saveFormVersionSchema,
   publishSobaFormVersion,
-  updateSobaForm,
   getFormVersionSchema,
 } from '@/src/shared/api/sobaApi';
 import type { FormVersionSummary, SobaFormVersionListItem } from '@/src/types/forms';

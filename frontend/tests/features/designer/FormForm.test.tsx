@@ -2,7 +2,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { FormSubmitterAudience, SubmitterAudience } from '@/src/types/groups';
+import type { FormSubmitterAudience } from '@/src/types/groups';
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
   useKeycloak: () => ({ authenticated: true, token: 'token', initializing: false }),
@@ -128,12 +128,6 @@ vi.mock('@/src/shared/api/sobaApiGroups', () => ({
 }));
 
 const providers = [{ code: 'azureidir', name: 'IDIR - MFA' }];
-const workspaceAudience: SubmitterAudience = {
-  mode: 'protected',
-  idps: ['azureidir'],
-  users: [],
-  available: providers,
-};
 const formAudience: FormSubmitterAudience = {
   inherit: true,
   mode: 'protected',

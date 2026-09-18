@@ -47,7 +47,7 @@ vi.mock('@/lib/hooks/useNotificationStore', () => ({
 
 const mockCreateSobaFormioForm = vi.fn();
 vi.mock('@/src/shared/api/sobaApi', () => ({
-  createSobaFormioForm: (...args: any[]) => mockCreateSobaFormioForm(...args),
+  createSobaFormioForm: (...args: unknown[]) => mockCreateSobaFormioForm(...args),
 }));
 
 vi.mock('@/src/shared/api/useCurrentUser', () => ({
@@ -63,33 +63,75 @@ vi.mock('@/src/features/designer/ui/FormSubmitterAudience', () => ({
 }));
 
 vi.mock('@bcgov/design-system-react-components', async (importOriginal) => {
-  const actual = await importOriginal<any>();
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
-    Form: ({ children, onSubmit, ...rest }: any) => (
+    Form: ({
+      children,
+      onSubmit,
+      ...rest
+    }: {
+      children: React.ReactNode;
+      onSubmit?: React.FormEventHandler<HTMLFormElement>;
+      [key: string]: unknown;
+    }) => (
       <form onSubmit={onSubmit} {...rest}>
         {children}
       </form>
     ),
-    TextField: ({ label, value, onChange, 'data-testid': testid }: any) => (
+    TextField: ({
+      label,
+      value,
+      onChange,
+      'data-testid': testid,
+    }: {
+      label: string;
+      value: string;
+      onChange: (val: string) => void;
+      'data-testid': string;
+    }) => (
       <div>
         <label>{label}</label>
         <input data-testid={testid} value={value} onChange={(e) => onChange(e.target.value)} />
       </div>
     ),
-    Button: ({ children, onPress, isDisabled, 'data-testid': testid }: any) => (
+    Button: ({
+      children,
+      onPress,
+      isDisabled,
+      'data-testid': testid,
+    }: {
+      children: React.ReactNode;
+      onPress: () => void;
+      isDisabled?: boolean;
+      'data-testid': string;
+    }) => (
       <button data-testid={testid} disabled={isDisabled} onClick={onPress}>
         {children}
       </button>
     ),
-    InlineAlert: ({ children, 'data-testid': testid }: any) => (
-      <div data-testid={testid}>{children}</div>
-    ),
+    InlineAlert: ({
+      children,
+      'data-testid': testid,
+    }: {
+      children: React.ReactNode;
+      'data-testid': string;
+    }) => <div data-testid={testid}>{children}</div>,
   };
 });
 
 vi.mock('@/app/ui/WorkspaceSelector', () => ({
-  WorkspaceSelector: ({ selectedWorkspaceId, onChange, workspaces, label }: any) => (
+  WorkspaceSelector: ({
+    selectedWorkspaceId,
+    onChange,
+    workspaces,
+    label,
+  }: {
+    selectedWorkspaceId: string | null;
+    onChange: (id: string) => void;
+    workspaces: Array<{ id: string; name: string }>;
+    label: string;
+  }) => (
     <div>
       <label>{label}</label>
       <select
@@ -98,7 +140,7 @@ vi.mock('@/app/ui/WorkspaceSelector', () => ({
         onChange={(e) => onChange(e.target.value)}
       >
         <option value="">Select workspace</option>
-        {workspaces.map((w: any) => (
+        {workspaces.map((w: { id: string; name: string }) => (
           <option key={w.id} value={w.id}>
             {w.name}
           </option>
@@ -108,17 +150,18 @@ vi.mock('@/app/ui/WorkspaceSelector', () => ({
   ),
 }));
 
+import type { Mock } from 'vitest';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useFormCreateWorkspaceOptions } from '@/src/shared/api/useWorkspaces';
 
 describe('FormCreateContent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (useCurrentUser as any).mockReturnValue({
+    (useCurrentUser as Mock).mockReturnValue({
       data: { capabilities: { formCreate: 'allowed' } },
       loaded: true,
     });
-    (useFormCreateWorkspaceOptions as any).mockReturnValue({
+    (useFormCreateWorkspaceOptions as Mock).mockReturnValue({
       workspaces: [
         { id: 'ws-1', name: 'Workspace 1', role: 'owner' },
         { id: 'ws-2', name: 'Workspace 2', role: 'editor' },
@@ -138,28 +181,31 @@ describe('FormCreateContent', () => {
   it('shows notification if form name is empty on save', async () => {
     renderComponent();
     const saveButton = screen.getByTestId('save-create-form');
-    
+
     // Select workspace
     const select = screen.getByTestId('workspace-selector');
     await userEvent.selectOptions(select, 'ws-1');
 
     await userEvent.click(saveButton);
     expect(mockAddNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ text: 'Enter a form name.', type: 'error' })
+      expect.objectContaining({ text: 'Enter a form name.', type: 'error' }),
     );
   });
 
   it('shows notification if workspace is not selected on save', async () => {
     renderComponent();
     const saveButton = screen.getByTestId('save-create-form');
-    
+
     // Enter form name
     const input = screen.getByTestId('form-name-modal');
     await userEvent.type(input, 'My New Form');
 
     await userEvent.click(saveButton);
     expect(mockAddNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ text: 'Select a workspace before saving this form.', type: 'error' })
+      expect.objectContaining({
+        text: 'Select a workspace before saving this form.',
+        type: 'error',
+      }),
     );
   });
 
@@ -181,10 +227,10 @@ describe('FormCreateContent', () => {
     expect(mockCreateSobaFormioForm).toHaveBeenCalledWith(
       'mock-token',
       { name: 'My New Form' },
-      'ws-1'
+      'ws-1',
     );
     expect(mockAddNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ text: 'Form saved successfully.', type: 'success' })
+      expect.objectContaining({ text: 'Form saved successfully.', type: 'success' }),
     );
     expect(mockRouterPush).toHaveBeenCalledWith('/en/build/form-123');
   });
@@ -203,12 +249,12 @@ describe('FormCreateContent', () => {
     await userEvent.click(saveButton);
 
     expect(mockAddNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ text: 'Version conflict.', type: 'error' })
+      expect.objectContaining({ text: 'Version conflict.', type: 'error' }),
     );
   });
 
   it('shows disclaimer required warning if user capability is disclaimer_required', () => {
-    (useCurrentUser as any).mockReturnValue({
+    (useCurrentUser as Mock).mockReturnValue({
       data: { capabilities: { formCreate: 'disclaimer_required' } },
       loaded: true,
     });
@@ -217,7 +263,7 @@ describe('FormCreateContent', () => {
   });
 
   it('shows no workspace warning if user capability is not allowed', () => {
-    (useCurrentUser as any).mockReturnValue({
+    (useCurrentUser as Mock).mockReturnValue({
       data: { capabilities: { formCreate: 'not_allowed' } },
       loaded: true,
     });

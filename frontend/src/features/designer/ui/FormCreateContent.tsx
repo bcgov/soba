@@ -8,7 +8,6 @@ import { WorkspaceSelector } from '@/app/ui/WorkspaceSelector';
 import { FormSubmitterAudience } from './FormSubmitterAudience';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useFormCreateWorkspaceOptions } from '@/src/shared/api/useWorkspaces';
-import { isWorkspaceManageRole } from '@/src/features/workspaces/workspaceRoles';
 import { lookupTruncatedNote } from '@/src/shared/list/lookupOptions';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { createSobaFormioForm } from '@/src/shared/api/sobaApi';
@@ -37,7 +36,6 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const creatableWorkspaces = useFormCreateWorkspaceOptions(true);
-  const activeWorkspace = creatableWorkspaces.workspaces.find((w) => w.id === selectedWorkspaceId);
 
   const reportWriteFailure = async (e: unknown, failedText: string) => {
     if (!isConflict(e)) {
