@@ -19,10 +19,11 @@ import FormTeamTab from './FormTeamTab';
 import FormHistoryTab from './FormHistoryTab';
 import FormSubmissionTab from './FormSubmissionTab';
 import FormShareTab from './FormShareTab';
+import { FormSubmitterAudience } from './FormSubmitterAudience';
+import { useWorkspace } from '@/src/shared/api/useWorkspaces';
 import { lookupTruncatedNote, withSelectedOption } from '@/src/shared/list/lookupOptions';
 import { useForm } from '@/src/features/designer/useForm';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { useWorkspace } from '@/src/shared/api/useWorkspaces';
 
 import {
   createFormVersion,
@@ -146,6 +147,8 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   const { workspace: formWorkspace } = useWorkspace(form?.workspaceId);
   // A picked workspace is one of the create options, which already carry the role.
   const activeWorkspace = formWorkspace;
+  // A form's audience is changed per form; a form being created shows its workspace's, read-only.
+  const canUpdateForm = !!form?.permissions.some((p: string) => p === '*' || p === 'form_update');
 
   usePageHeading({
     // Editing claims no heading until the name arrives, so the page's own stands rather than
@@ -415,7 +418,14 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
         onSubmit={(e) => e.preventDefault()}
         className="d-flex flex-column gap-3 mb-3"
         style={{ maxWidth: '640px' }}
-      ></Form>
+      >
+        <FormSubmitterAudience
+          key={formId ?? selectedWorkspaceId ?? 'none'}
+          workspaceId={selectedWorkspaceId}
+          formId={formId}
+          canManage={canUpdateForm}
+        />
+      </Form>
 
       {renderToolBar()}
       {/* Form Builder */}

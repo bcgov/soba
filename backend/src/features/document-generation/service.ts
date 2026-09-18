@@ -16,7 +16,11 @@ import {
   getSubmissionRecordById,
   type SubmissionRecord,
 } from '../../core/db/repos/submissionRepo';
-import { hasFormSubmitAccess, type CallerIdentity } from '../../core/db/repos/formSubmitAccessRepo';
+import {
+  hasFormSubmitAccess,
+  type CallerIdentity,
+  type FormAccessTarget,
+} from '../../core/db/repos/formSubmitAccessRepo';
 import { createDocumentGenerationAudit } from '../../core/db/repos/documentGenerationAuditRepo';
 import { SubmissionService } from '../../core/services/submissionService';
 import { AppError, ServiceUnavailableError } from '../../core/errors';
@@ -194,15 +198,15 @@ async function renderWith(
  * there bounds the shared public-user id to forms the caller can submit to.
  */
 async function canPrint(
-  workspaceId: string,
+  target: FormAccessTarget,
   caller: CallerIdentity,
   record: SubmissionRecord,
 ): Promise<boolean> {
-  if (await hasFormSubmitAccess(workspaceId, caller, Permissions.submission_read)) return true;
+  if (await hasFormSubmitAccess(target, caller, Permissions.submission_read)) return true;
   return (
     !!caller.actorId &&
     record.submittedBy === caller.actorId &&
-    (await hasFormSubmitAccess(workspaceId, caller, Permissions.submission_create))
+    (await hasFormSubmitAccess(target, caller, Permissions.submission_create))
   );
 }
 
@@ -211,11 +215,7 @@ export const documentGenerationService = {
   async preview(caller: CallerIdentity, input: PreviewInput): Promise<DocumentRenderOutcome> {
     const scope = await getSubmissionListContext(input.submissionId);
     if (!scope) return { status: 'notfound' };
-    const allowed = await hasFormSubmitAccess(
-      scope.workspaceId,
-      caller,
-      Permissions.submission_create,
-    );
+    const allowed = await hasFormSubmitAccess(scope, caller, Permissions.submission_create);
     if (!allowed) return { status: 'denied' };
     return renderWith(
       scope,
@@ -230,7 +230,7 @@ export const documentGenerationService = {
     if (!scope) return { status: 'notfound' };
     const record = await getSubmissionRecordById(scope.workspaceId, input.submissionId);
     if (!record) return { status: 'notfound' };
-    if (!(await canPrint(scope.workspaceId, caller, record))) return { status: 'denied' };
+    if (!(await canPrint(scope, caller, record))) return { status: 'denied' };
 
     // Persisted answer document from the engine (the plugin shapes it for the template). Pass the
     // record we already loaded so getContent doesn't re-read it.

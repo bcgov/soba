@@ -2,6 +2,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { FormSubmitterAudience, SubmitterAudience } from '@/src/types/groups';
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
   useKeycloak: () => ({ authenticated: true, token: 'token', initializing: false }),
@@ -25,6 +26,13 @@ vi.mock('@/app/[lang]/Providers', () => ({
         formSettingsDrawerLabel: 'Form Settings',
         formKindList: { team: 'Team', public: 'Public' },
       },
+      submitterAudienceLabel: 'Who can submit',
+      submitterAudiencePublic: 'Public',
+      submitterAudienceProtected: 'Protected',
+      submitterAudienceNotSet: 'Not set',
+      submitterAudiencePeople: 'people',
+      submitterAudienceInheritedSummary: 'Inherited: {summary}',
+      submitterAudienceLoadError: 'load error',
     },
     general: { notAuthenticated: 'Not authed', lookupTruncated: 'Showing the first {limit}.' },
     workspaces: { workspace: 'Workspace' },
@@ -53,7 +61,11 @@ type Workspace = {
 };
 type Version = { id: string; versionNo: number; state: string };
 
-const { mockWorkspaceState, api, builder } = vi.hoisted(() => ({
+const { mockWorkspaceState, api, builder, audienceApi } = vi.hoisted(() => ({
+  audienceApi: {
+    getSubmitterAudience: vi.fn(),
+    getFormSubmitterAudience: vi.fn(),
+  },
   mockWorkspaceState: {
     creatable: [{ id: 'ws1', disclaimerAccepted: true }] as Workspace[],
     formCreate: 'allowed' as string,
@@ -106,11 +118,29 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
   ),
 }));
 
-// A picked workspace mounts the submitter audience, which reads through its own API module.
+// The submitter audience control reads through its own API module: the workspace's on the create
+// page, the form's on an existing form.
 vi.mock('@/src/shared/api/sobaApiGroups', () => ({
-  getSubmitterAudience: vi.fn(() => new Promise(() => {})),
+  getSubmitterAudience: audienceApi.getSubmitterAudience,
   setSubmitterAudience: vi.fn(),
+  getFormSubmitterAudience: audienceApi.getFormSubmitterAudience,
+  setFormSubmitterAudience: vi.fn(),
 }));
+
+const providers = [{ code: 'azureidir', name: 'IDIR - MFA' }];
+const workspaceAudience: SubmitterAudience = {
+  mode: 'protected',
+  idps: ['azureidir'],
+  users: [],
+  available: providers,
+};
+const formAudience: FormSubmitterAudience = {
+  inherit: true,
+  mode: 'protected',
+  idps: ['azureidir'],
+  available: providers,
+  workspace: { mode: 'protected', idps: ['azureidir'], users: [] },
+};
 
 // Mock DynamicForm and FormDesigner components used in FormForm
 vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => ({
@@ -239,6 +269,7 @@ describe('FormForm', () => {
         id: 'f1',
         name: 'Test',
         description: '',
+        permissions: ['*'],
         currentVersion: newestFirst(mockWorkspaceState.versions)[0] ?? null,
       }),
     );
@@ -257,6 +288,8 @@ describe('FormForm', () => {
     api.createFormVersion.mockResolvedValue({ id: 'v-new', versionNo: 3, state: 'draft' });
     api.saveFormVersionSchema.mockResolvedValue({});
     api.publishSobaFormVersion.mockResolvedValue({});
+    audienceApi.getSubmitterAudience.mockImplementation(() => new Promise(() => {}));
+    audienceApi.getFormSubmitterAudience.mockImplementation(() => new Promise(() => {}));
     builder.onUpdateModel = null;
   });
 
@@ -266,6 +299,55 @@ describe('FormForm', () => {
     });
     // The designer area includes a form name input; assert it renders with loaded value
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Test' })).toBeInTheDocument());
+  });
+
+  // A new form inherits its workspace's audience, so the create page only shows it, even to an owner.
+  it('shows the workspace audience read-only on the create page', async () => {
+    mockWorkspaceState.creatable = [
+      { id: 'ws1', name: 'Alpha', kind: 'team', role: 'owner', disclaimerAccepted: true },
+    ];
+    audienceApi.getSubmitterAudience.mockResolvedValue(workspaceAudience);
+    await act(async () => {
+      await renderForm();
+    });
+
+    const picker = (await screen.findByTestId('workspace-select')).querySelector(
+      'select',
+    ) as HTMLSelectElement;
+    fireEvent.change(picker, { target: { value: 'ws1' } });
+
+    const trigger = await screen.findByTestId('submitter-audience-trigger');
+    await waitFor(() => expect(trigger).toHaveTextContent('Protected (IDIR - MFA)'));
+    expect(trigger).toBeDisabled();
+    expect(audienceApi.getFormSubmitterAudience).not.toHaveBeenCalled();
+  });
+
+  // Changing a form's audience is a form_update; reading the form is not enough.
+  it.each([
+    ['form_read', ['form_read'], true],
+    ['form_update', ['form_read', 'form_update'], false],
+    ['the wildcard', ['*'], false],
+  ])('gates the form audience for %s', async (_label, permissions, disabled) => {
+    api.getSobaForm.mockImplementation(() =>
+      Promise.resolve({
+        id: 'f1',
+        name: 'Test',
+        description: '',
+        permissions,
+        currentVersion: null,
+      }),
+    );
+    audienceApi.getFormSubmitterAudience.mockResolvedValue(formAudience);
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+
+    await waitFor(() => expect(screen.getByDisplayValue('Test')).toBeInTheDocument());
+    const trigger = await screen.findByTestId('submitter-audience-trigger');
+    await waitFor(() => expect(trigger).toHaveTextContent('Inherited: Protected (IDIR - MFA)'));
+    expect(trigger).toHaveProperty('disabled', disabled);
+    expect(audienceApi.getFormSubmitterAudience).toHaveBeenCalledWith('token', 'f1');
+    expect(audienceApi.getSubmitterAudience).not.toHaveBeenCalled();
   });
 
   // The form's current version is what the builder is fed.

@@ -71,18 +71,6 @@ export const getFormVersionListContext = async (
   return row[0] ?? null;
 };
 
-/**
- * Resolve the workspace that owns a form version, by form-version id alone. Used to derive request
- * workspace context for deep links. Neutral: returns null for missing/deleted versions (caller maps
- * to 404); access is still enforced downstream via membership.
- */
-export const getWorkspaceIdForFormVersion = async (
-  formVersionId: string,
-): Promise<string | null> => {
-  const context = await getFormVersionListContext(formVersionId);
-  return context?.workspaceId ?? null;
-};
-
 export const createEmptyFormVersionDraft = async (input: CreateDraftInput, tx?: DbOrTx) => {
   const run = async (d: DbOrTx) => {
     const latest = await d

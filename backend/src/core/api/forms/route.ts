@@ -25,6 +25,8 @@ import {
   restoreFormVersion,
   provisionFormVersionSchema,
   getFormVersionSchema,
+  getFormSubmitterAudience,
+  setFormSubmitterAudience,
 } from './controller';
 import {
   CreateFormBodySchema,
@@ -38,6 +40,7 @@ import {
   ProvisionSchemaBodySchema,
   SaveFormVersionBodySchema,
   SaveFormVersionParamsSchema,
+  SetFormSubmitterAudienceBodySchema,
   UpdateFormBodySchema,
 } from './schema';
 
@@ -48,6 +51,7 @@ const router = express.Router();
 
 const FORMS_PATH = '/forms';
 const FORMS_ID_PATH = `${FORMS_PATH}/:id`;
+const FORM_SUBMITTER_AUDIENCE_PATH = `${FORMS_ID_PATH}/submitter-audience`;
 const FORM_VERSIONS_PATH = '/form-versions';
 const FORM_VERSIONS_ID_PATH = `${FORM_VERSIONS_PATH}/:id`;
 
@@ -90,6 +94,20 @@ router.patch(
   formResource,
   requireFormPermissions([Permissions.form_update]),
   updateForm,
+);
+router.get(
+  FORM_SUBMITTER_AUDIENCE_PATH,
+  validateRequest({ params: FormIdParamsSchema }),
+  formResource,
+  requireFormPermissions([Permissions.form_read]),
+  getFormSubmitterAudience,
+);
+router.put(
+  FORM_SUBMITTER_AUDIENCE_PATH,
+  validateRequest({ params: FormIdParamsSchema, body: SetFormSubmitterAudienceBodySchema }),
+  formResource,
+  requireFormPermissions([Permissions.form_update]),
+  setFormSubmitterAudience,
 );
 router.get(
   FORM_VERSIONS_PATH,

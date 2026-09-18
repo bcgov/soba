@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { Popover, Dialog } from 'react-aria-components';
 import {
   Button,
@@ -10,19 +10,45 @@ import {
   InlineAlert,
 } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
-import { getSubmitterAudience, setSubmitterAudience } from '@/src/shared/api/sobaApiGroups';
-import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import type { SubmitterAudience } from '@/src/types/groups';
+import type { SetFormSubmitterAudienceBody } from '@/src/types/groups';
+import { useSubmitterAudience, type AudienceView } from '../useSubmitterAudience';
 import styles from './FormSubmitterAudience.module.css';
 
 type Props = Readonly<{
   workspaceId: string | null;
+  /** Shows and edits this form's audience, which can inherit the workspace's. */
+  formId?: string;
   canManage: boolean;
 }>;
 
-export function FormSubmitterAudience({ workspaceId, canManage }: Props) {
+type FormDict = ReturnType<typeof useDictionary>['form'];
+
+function describeAudience(
+  audience: Pick<AudienceView, 'mode' | 'idps' | 'users'>,
+  available: AudienceView['available'],
+  t: FormDict,
+): string {
+  if (audience.mode === 'public') return t.submitterAudiencePublic;
+  if (audience.mode === 'none') return t.submitterAudienceNotSet;
+  const names = audience.idps.map((c) => available.find((p) => p.code === c)?.name ?? c);
+  if (audience.users.length) names.push(`${audience.users.length} ${t.submitterAudiencePeople}`);
+  return `${t.submitterAudienceProtected} (${names.join(', ')})`;
+}
+
+function initialMode(audience: AudienceView): string {
+  if (audience.inherit) return 'inherit';
+  return audience.mode === 'none' ? '' : audience.mode;
+}
+
+function saveBody(mode: string, idps: string[]): SetFormSubmitterAudienceBody {
+  if (mode === 'inherit') return { mode: 'inherit' };
+  if (mode === 'public') return { mode: 'public' };
+  return { mode: 'protected', idps };
+}
+
+export function FormSubmitterAudience({ workspaceId, formId, canManage }: Props) {
   const dict = useDictionary();
   const t = dict.form;
   const { token } = useKeycloak();
@@ -32,18 +58,13 @@ export function FormSubmitterAudience({ workspaceId, canManage }: Props) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const triggerRef = useRef<HTMLSpanElement>(null);
+  const summaryId = useId();
+  const isForm = !!formId;
 
-  const {
-    data: audience,
-    error: loadError,
-    mutate,
-  } = useAuthedSWR<SubmitterAudience>(
-    workspaceId ? ['submitter-audience', workspaceId] : null,
-    (authToken) => getSubmitterAudience(authToken, workspaceId as string),
-  );
+  const { view: audience, error: loadError, save } = useSubmitterAudience(workspaceId, formId);
 
-  // Reading the audience needs a workspace permission the form's designer need not hold, so the
-  // no-access branch is a normal outcome here rather than a misconfiguration.
+  // Reading the audience needs a permission the form's designer need not hold, so the no-access
+  // branch is a normal outcome here rather than a misconfiguration.
   const readError = useMemo(
     () =>
       loadError
@@ -56,37 +77,41 @@ export function FormSubmitterAudience({ workspaceId, canManage }: Props) {
     [loadError, dict.general.sessionExpired, dict.general.noAccess, t.submitterAudienceLoadError],
   );
 
-  // Seed the editable state from the saved audience whenever the panel opens.
+  // Seed the editable state from the saved audience whenever the panel opens. An inherited
+  // protected audience seeds its providers, so an override starts from the workspace's.
   const openPanel = () => {
     if (!audience) return;
-    setMode(audience.mode === 'none' ? '' : audience.mode);
-    setIdps(audience.mode === 'protected' ? audience.idps : []);
+    setMode(initialMode(audience));
+    // A saved provider that is no longer offered has no checkbox to untick, so it is left out.
+    const offered = new Set(audience.available.map((p) => p.code));
+    setIdps(audience.mode === 'protected' ? audience.idps.filter((c) => offered.has(c)) : []);
     setSaveError(null);
     setOpen(true);
   };
 
   const summary = useMemo(() => {
     if (!audience) return '…';
-    if (audience.mode === 'public') return t.submitterAudiencePublic;
-    if (audience.mode === 'none') return t.submitterAudienceNotSet;
-    const names = audience.idps.map((c) => audience.available.find((p) => p.code === c)?.name ?? c);
-    if (audience.users.length) names.push(`${audience.users.length} ${t.submitterAudiencePeople}`);
-    return `${t.submitterAudienceProtected} (${names.join(', ')})`;
+    const text = describeAudience(audience, audience.available, t);
+    return audience.inherit ? t.submitterAudienceInheritedSummary.replace('{summary}', text) : text;
   }, [audience, t]);
 
-  // Protected needs a principal; an existing direct user counts even with no idps selected.
-  const noPrincipal =
-    mode === 'protected' && idps.length === 0 && (audience?.users.length ?? 0) === 0;
+  const workspaceSummary =
+    audience?.workspace && describeAudience(audience.workspace, audience.available, t);
+
+  // Protected needs a principal. A workspace's existing direct user counts; a form override holds
+  // providers only.
+  const directUsers = isForm ? 0 : (audience?.users.length ?? 0);
+  const noPrincipal = mode === 'protected' && idps.length === 0 && directUsers === 0;
   const saveDisabled = saving || mode === '' || noPrincipal;
+  const overridesPeople =
+    (mode === 'public' || mode === 'protected') && (audience?.workspace?.users.length ?? 0) > 0;
 
   const onSave = async () => {
-    if (!workspaceId || !token) return;
+    if (!token) return;
     setSaving(true);
     setSaveError(null);
     try {
-      const body =
-        mode === 'public' ? ({ mode: 'public' } as const) : ({ mode: 'protected', idps } as const);
-      await mutate(setSubmitterAudience(token, workspaceId, body), { revalidate: false });
+      await save(token, saveBody(mode, idps));
       setOpen(false);
     } catch {
       setSaveError(t.submitterAudienceSaveError);
@@ -129,6 +154,15 @@ export function FormSubmitterAudience({ workspaceId, canManage }: Props) {
               isDisabled={saving}
               label={t.submitterAudienceLabel}
             >
+              {isForm && (
+                <Radio
+                  value="inherit"
+                  data-testid="audience-mode-inherit"
+                  aria-describedby={mode === 'inherit' && workspaceSummary ? summaryId : undefined}
+                >
+                  {t.submitterAudienceInherit}
+                </Radio>
+              )}
               <Radio value="public" data-testid="audience-mode-public">
                 {t.submitterAudiencePublic}
               </Radio>
@@ -136,6 +170,18 @@ export function FormSubmitterAudience({ workspaceId, canManage }: Props) {
                 {t.submitterAudienceProtected}
               </Radio>
             </RadioGroup>
+            {mode === 'inherit' && workspaceSummary && (
+              <span id={summaryId} data-testid="audience-workspace-summary">
+                {workspaceSummary}
+              </span>
+            )}
+            {overridesPeople && (
+              <InlineAlert
+                variant="info"
+                data-testid="audience-people-note"
+                title={t.submitterAudienceUsersNotApplied}
+              />
+            )}
             {mode === 'protected' && (
               <CheckboxGroup
                 value={idps}
