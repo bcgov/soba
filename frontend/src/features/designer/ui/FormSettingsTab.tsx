@@ -1,6 +1,6 @@
 'use client';
 
-import type { Dictionary } from '@/src/types/plugins';
+import type { Dictionary } from '@/src/types/dictionary';
 import { AccordionGroup } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useForm } from '@/src/features/designer/useForm';

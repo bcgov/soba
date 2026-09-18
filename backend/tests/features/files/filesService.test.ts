@@ -127,7 +127,11 @@ describe('filesService', () => {
     expect(record.id).toBeTruthy();
 
     audienceMock.mockResolvedValue(true); // submission_read + submission_create granted
-    submissionMock.mockResolvedValue({ workflowState: 'draft', submittedBy: 'actor1' });
+    submissionMock.mockResolvedValue({
+      workflowState: 'draft',
+      submittedBy: 'actor1',
+      formId: 'form1',
+    });
     const got = await filesService.getForCaller(record.id, owner);
     if (got === 'notfound' || got === 'denied' || !got.file.downloadStream) {
       throw new Error('expected a file with a download stream');
@@ -137,6 +141,11 @@ describe('filesService', () => {
 
     // Un-submitted: the submission's owner (submittedBy) may delete.
     expect(await filesService.deleteForCaller(record.id, owner)).toBe('deleted');
+
+    // Both checks run against the submission's form, whose audience may override the workspace's.
+    const target = { workspaceId: 'ws1', formId: 'form1' };
+    expect(audienceMock).toHaveBeenCalledWith(target, owner, 'submission_read');
+    expect(audienceMock).toHaveBeenCalledWith(target, owner, 'submission_create');
   });
 
   it('associates only same-workspace files referenced in submission data', async () => {

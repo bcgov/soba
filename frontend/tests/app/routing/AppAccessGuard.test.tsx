@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({
   replace: vi.fn(),
   refreshCurrentUser: vi.fn(),
   session: {} as AppSessionSnapshot,
+  pathname: '/en/forms',
 }));
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
@@ -40,7 +41,7 @@ vi.mock('next/navigation', async () => {
   return {
     ...(actual as Record<string, unknown>),
     useRouter: () => ({ replace: h.replace }),
-    usePathname: () => '/en/forms',
+    usePathname: () => h.pathname,
   };
 });
 
@@ -58,9 +59,9 @@ const READY: AppSessionSnapshot = {
   hasWorkspaces: true,
 };
 
-function renderGuard() {
+function renderGuard(designMode = true) {
   return render(
-    <AppAccessGuard locale="en" workspacesEnabled={true}>
+    <AppAccessGuard locale="en" designMode={designMode}>
       visible child
     </AppAccessGuard>,
   );
@@ -72,6 +73,7 @@ describe('AppAccessGuard', () => {
     h.refresh.mockResolvedValue(undefined);
     h.refreshCurrentUser.mockResolvedValue(undefined);
     h.session = { ...READY };
+    h.pathname = '/en/forms';
   });
 
   it('shows the spinner (not the error) while bootstrap loads are pending', async () => {
@@ -134,6 +136,23 @@ describe('AppAccessGuard', () => {
     expect(screen.queryByText('visible child')).not.toBeInTheDocument();
   });
 
+  it('renders my forms for a user without workspaces when design mode is off', async () => {
+    h.session = {
+      ...READY,
+      needsOnboarding: true,
+      hasWorkspaces: false,
+      canCreateWorkspace: false,
+    };
+    h.pathname = '/en/my-forms';
+
+    await act(async () => {
+      renderGuard(false);
+    });
+
+    expect(h.replace).not.toHaveBeenCalled();
+    expect(screen.getByText('visible child')).toBeInTheDocument();
+  });
+
   // Swapping children for the spinner unmounts the route: a form being filled loses its answers.
   it('keeps children mounted when a background load runs after bootstrap', async () => {
     const view = await act(async () => renderGuard());
@@ -143,7 +162,7 @@ describe('AppAccessGuard', () => {
     h.session = { ...READY, sessionReady: false };
     await act(async () => {
       view.rerender(
-        <AppAccessGuard locale="en" workspacesEnabled={true}>
+        <AppAccessGuard locale="en" designMode={true}>
           visible child
         </AppAccessGuard>,
       );
@@ -159,7 +178,7 @@ describe('AppAccessGuard', () => {
     h.session = { ...READY, sessionReady: false, sessionFailed: true };
     await act(async () => {
       view.rerender(
-        <AppAccessGuard locale="en" workspacesEnabled={true}>
+        <AppAccessGuard locale="en" designMode={true}>
           visible child
         </AppAccessGuard>,
       );

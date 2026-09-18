@@ -3,7 +3,7 @@ import { useCallback, useMemo } from 'react';
 import { Heading, Button, Link } from '@bcgov/design-system-react-components';
 import { useRouter, usePathname } from 'next/navigation';
 
-import type { Dictionary } from '@/src/types/plugins';
+import type { Dictionary } from '@/src/types/dictionary';
 import { useForm } from '@/src/features/designer/useForm';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';

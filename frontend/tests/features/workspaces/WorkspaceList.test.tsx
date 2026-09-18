@@ -71,13 +71,13 @@ const WORKSPACES = [
 
 let store: ReturnType<typeof makeStore>;
 
-function renderList(props: { showFormsAction?: boolean } = {}) {
+function renderList() {
   return render(
     <Provider store={store}>
       <SWRConfig
         value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}
       >
-        <WorkspaceList {...props} />
+        <WorkspaceList />
       </SWRConfig>
     </Provider>,
   );
@@ -148,7 +148,7 @@ describe('WorkspaceList', () => {
   it('navigates to forms on Forms action', async () => {
     let container: HTMLElement | null = null;
     await act(async () => {
-      const res = renderList({ showFormsAction: true });
+      const res = renderList();
       container = res.container;
     });
     const btn = container!.querySelector(
