@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 
 const h = vi.hoisted(() => ({
-  replace: vi.fn(),
+  push: vi.fn(),
   openSobaFormSubmission: vi.fn(),
 }));
 
@@ -22,7 +22,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ formId: 'form-1' }),
-  useRouter: () => ({ replace: h.replace }),
+  useRouter: () => ({ push: h.push }),
   usePathname: () => '/en/form/form-1',
 }));
 
@@ -54,7 +54,7 @@ describe('StartSubmission', () => {
   it('opens one anonymous submission when there is no session', async () => {
     await renderInStore(store, <StartSubmission />);
     await answerInit(store, { authenticated: false });
-    await waitFor(() => expect(h.replace).toHaveBeenCalledWith('/en/submit/sub-1'));
+    await waitFor(() => expect(h.push).toHaveBeenCalledWith('/en/submit/sub-1'));
     expect(h.openSobaFormSubmission).toHaveBeenCalledTimes(1);
     expect(h.openSobaFormSubmission).toHaveBeenCalledWith(undefined, 'form-1', expect.any(String));
   });
@@ -62,7 +62,7 @@ describe('StartSubmission', () => {
   it('opens one submission with the token when signed in', async () => {
     await renderInStore(store, <StartSubmission />);
     await answerInit(store, { authenticated: true, token: 'token' });
-    await waitFor(() => expect(h.replace).toHaveBeenCalledWith('/en/submit/sub-1'));
+    await waitFor(() => expect(h.push).toHaveBeenCalledWith('/en/submit/sub-1'));
     expect(h.openSobaFormSubmission).toHaveBeenCalledTimes(1);
     expect(h.openSobaFormSubmission).toHaveBeenCalledWith('token', 'form-1', expect.any(String));
   });

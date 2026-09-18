@@ -311,6 +311,13 @@
     "submit": "Submit"
   },
   "submission": {
+    "success": {
+      "pageTitle": "Submission Confirmation",
+      "message": "Your form has been submitted successfully.",
+      "keepConfirmation": "Keep this confirmation ID for your records.",
+      "viewSubmission": "View your submission",
+      "notSubmitted": "This form has not been submitted yet."
+    },
     "submissions": "Submissions",
     "anon": "Anonymous",
     "pageTitle": "Submission",

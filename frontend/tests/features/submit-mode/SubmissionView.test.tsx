@@ -15,6 +15,13 @@ vi.mock('@/app/[lang]/Providers', () => ({
     },
     form: { nameLabel: 'Form' },
     submission: {
+      success: {
+        message: 'Submitted successfully.',
+        keepConfirmation: 'Keep this ID.',
+        viewSubmission: 'View your submission',
+        notSubmitted: 'Not submitted yet.',
+      },
+      loading: 'Loading submission...',
       confirmationId: 'Confirmation ID',
       notFound: 'Submission not found.',
       loadError: 'Could not load this submission.',
@@ -26,10 +33,11 @@ vi.mock('@/app/[lang]/Providers', () => ({
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ submissionId: 'sub-1' }),
+  usePathname: () => '/en/submission/sub-1/success',
 }));
 
 vi.mock('@/src/features/formio-v5/ui/ReadOnlyFormView', () => ({
-  ReadOnlyFormView: () => <div data-testid="submission-view-form">rendered</div>,
+  ReadOnlyFormView: vi.fn(() => <div data-testid="submission-view-form">rendered</div>),
 }));
 
 const getSubmitSubmission = vi.fn();
@@ -45,6 +53,7 @@ import makeStore from '@/lib/store';
 import { initKeycloak, setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 import { SubmissionView } from '@/src/features/submit-mode/ui/SubmissionView';
+import { ReadOnlyFormView } from '@/src/features/formio-v5/ui/ReadOnlyFormView';
 
 let store: ReturnType<typeof makeStore>;
 
@@ -60,7 +69,7 @@ function viewTree() {
   );
 }
 
-async function renderView() {
+async function renderView(success = false) {
   let view: ReturnType<typeof render> | undefined;
   await act(async () => {
     view = render(
@@ -68,7 +77,7 @@ async function renderView() {
         <SWRConfig
           value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}
         >
-          <SubmissionView />
+          <SubmissionView success={success} />
         </SWRConfig>
       </Provider>,
     );
@@ -109,6 +118,38 @@ describe('SubmissionView', () => {
     expect(screen.getByTestId('submission-view-version')).toHaveTextContent('v3');
     expect(screen.getByTestId('submission-view-header')).toHaveTextContent('Confirmation ID: sub');
     expect(screen.queryByTestId('submission-view-submitter')).not.toBeInTheDocument();
+  });
+
+  it('renders the completed submission below the success confirmation', async () => {
+    initAnswered();
+    const schema = {
+      components: [{ type: 'textfield', key: 'fullName', label: 'Full name', input: true }],
+    };
+    const answers = { fullName: 'Taylor Smith' };
+    getSubmitSubmissionSchema.mockResolvedValue(schema);
+    getSubmitSubmissionData.mockResolvedValue({ data: answers });
+
+    await renderView(true);
+
+    const form = await screen.findByTestId('submission-view-form');
+    const confirmation = screen.getByText('Keep this ID.');
+    expect(screen.getByTestId('submission-success')).toHaveTextContent('Submitted successfully.');
+    expect(confirmation.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(vi.mocked(ReadOnlyFormView).mock.lastCall?.[0]).toEqual(
+      expect.objectContaining({ schema, submission: { data: answers } }),
+    );
+    expect(getSubmitSubmissionSchema).toHaveBeenCalledWith(undefined, 'sub-1');
+    expect(getSubmitSubmissionData).toHaveBeenCalledWith(undefined, 'sub-1');
+  });
+
+  it('does not claim success for an unsubmitted form', async () => {
+    initAnswered();
+    getSubmitSubmission.mockResolvedValue({ id: 'sub-1', workflowState: 'draft' });
+    await renderView(true);
+    expect(await screen.findByText('Not submitted yet.')).toBeInTheDocument();
+    expect(screen.queryByTestId('submission-success')).not.toBeInTheDocument();
   });
 
   it('sends the token when signed in', async () => {
