@@ -203,6 +203,7 @@ jobs:
                 app.kubernetes.io/component: formio
           OVERRIDE
 
+          helm repo add bitnami https://charts.bitnami.com/bitnami --force-update
           helm dependency build deployments/helm/action-mongodb
 
           helm upgrade --install "${MONGO_RELEASE}" deployments/helm/action-mongodb \

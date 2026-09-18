@@ -119,6 +119,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          helm repo add bitnami https://charts.bitnami.com/bitnami --force-update
           helm dependency build deployments/helm/action-mongodb
 
           helm upgrade --install "soba-dev-mongodb" deployments/helm/action-mongodb \
