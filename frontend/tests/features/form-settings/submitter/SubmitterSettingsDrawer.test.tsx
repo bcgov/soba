@@ -4,8 +4,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { SWRConfig, useSWRConfig } from 'swr';
-import type { Dictionary } from '@/src/types/plugins';
-import type { SubmitterAudience } from '@/src/types/groups';
+import type { Dictionary } from '@/src/types/dictionary';
+import type { FormSubmitterAudience } from '@/src/types/groups';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 
 const { mockGetSettings, mockSetSettings, mockGetAudience, mockAddNotification } = vi.hoisted(
@@ -23,11 +23,10 @@ vi.mock('@/src/features/form-settings/api', () => ({
 }));
 
 vi.mock('@/src/shared/api/sobaApiGroups', () => ({
-  getSubmitterAudience: mockGetAudience,
-}));
-
-vi.mock('@/src/features/designer/useForm', () => ({
-  useForm: () => ({ form: { id: 'f1', workspaceId: 'ws1' } }),
+  getFormSubmitterAudience: mockGetAudience,
+  setFormSubmitterAudience: vi.fn(),
+  getSubmitterAudience: vi.fn(),
+  setSubmitterAudience: vi.fn(),
 }));
 
 vi.mock('@/lib/hooks/useNotificationStore', () => ({
@@ -60,11 +59,13 @@ const mockDict = {
   },
 } as unknown as Dictionary;
 
-const audience = (mode: SubmitterAudience['mode']): SubmitterAudience => ({
+// The form's effective audience, as the form endpoint returns it while the form inherits.
+const audience = (mode: FormSubmitterAudience['mode']): FormSubmitterAudience => ({
+  inherit: true,
   mode,
   idps: [],
-  users: [],
   available: [],
+  workspace: { mode, idps: [], users: [] },
 });
 
 let store: ReturnType<typeof makeStore>;
@@ -77,7 +78,7 @@ function MakeAudiencePublic() {
       type="button"
       data-testid="make-audience-public"
       onClick={() =>
-        mutate(['submitter-audience', 'ws1'], audience('public'), { revalidate: false })
+        mutate(['form-submitter-audience', 'f1'], audience('public'), { revalidate: false })
       }
     >
       make public
@@ -211,7 +212,7 @@ describe('SubmitterSettingsDrawer', () => {
 
     await user.click(saveButton());
     expect(mockSetSettings).not.toHaveBeenCalled();
-    expect(mockGetAudience).toHaveBeenCalledWith('token', 'ws1');
+    expect(mockGetAudience).toHaveBeenCalledWith('token', 'f1');
   });
 
   it('drops an edit when the audience turns out to be Public', async () => {

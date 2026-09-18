@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import type { Dictionary } from '@/src/types/plugins';
+import type { Dictionary } from '@/src/types/dictionary';
 
 export type FormSettingsSectionProps = Readonly<{
   dict: Dictionary;

@@ -11,11 +11,8 @@ import {
   type SetSubmitterSettingsBody,
   type SubmitterSettings,
 } from '@/src/types/formSettings';
-import type { SubmitterAudience } from '@/src/types/groups';
-import { useForm } from '@/src/features/designer/useForm';
-import { getSubmitterAudience } from '@/src/shared/api/sobaApiGroups';
+import { useSubmitterAudience } from '@/src/features/designer/useSubmitterAudience';
 import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';
-import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
@@ -26,7 +23,6 @@ export default function SubmitterSettingsDrawer({
 }: FormSettingsSectionProps) {
   const t = dict.form.settings;
   const { token } = useKeycloak();
-  const { form } = useForm(formId);
   const {
     settings,
     error: settingsError,
@@ -35,12 +31,9 @@ export default function SubmitterSettingsDrawer({
   const { addNotification } = useNotificationStore();
   const noteId = useId();
 
-  // Drafts are not offered to a Public audience.
-  const workspaceId = form?.workspaceId ?? null;
-  const { data: audience, error: audienceError } = useAuthedSWR<SubmitterAudience>(
-    workspaceId ? ['submitter-audience', workspaceId] : null,
-    (authToken) => getSubmitterAudience(authToken, workspaceId as string),
-  );
+  // Drafts are not offered to a Public audience. This is the form's effective audience: its own
+  // override when it has one, otherwise the workspace audience it inherits.
+  const { view: audience, error: audienceError } = useSubmitterAudience(null, formId);
 
   // An edit layered over the loaded value. Null means no edit, so a refresh shows through until the
   // user changes it.
