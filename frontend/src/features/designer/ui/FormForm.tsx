@@ -2,7 +2,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Tabs, Tab } from 'react-bootstrap';
-import { Button, Form, Select } from '@bcgov/design-system-react-components';
+import { Button, Select } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { Modal as CommonModal } from '@/src/components/Modal';
 import styles from './FormForm.module.css';

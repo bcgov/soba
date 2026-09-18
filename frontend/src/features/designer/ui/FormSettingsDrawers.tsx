@@ -11,7 +11,7 @@ interface FormSettingsDrawersProps {
   label: string;
   onSave: () => void;
   onCancel: () => void;
-  canSave?: boolean | undefined;
+  canSave?: boolean;
 }
 
 export default function FormSettingsDrawers({

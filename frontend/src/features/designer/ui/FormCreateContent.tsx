@@ -38,7 +38,6 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
 
   const creatableWorkspaces = useFormCreateWorkspaceOptions(true);
   const activeWorkspace = creatableWorkspaces.workspaces.find((w) => w.id === selectedWorkspaceId);
-  const canManageWorkspace = !!activeWorkspace && isWorkspaceManageRole(activeWorkspace.role);
 
   const reportWriteFailure = async (e: unknown, failedText: string) => {
     if (!isConflict(e)) {
