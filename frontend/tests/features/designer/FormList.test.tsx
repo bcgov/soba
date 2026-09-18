@@ -233,6 +233,24 @@ describe('FormList', () => {
     expect(screen.getByTestId('create-form-button')).toBeDisabled();
   });
 
+  it('opens the form in the designer from the row and its quick links', async () => {
+    seed([{ id: WS1 }]);
+    await renderList();
+    await waitFor(() => expect(screen.getByText('Form One')).toBeInTheDocument());
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('form-link-f1'));
+      fireEvent.click(screen.getByTestId('submit-f1-button'));
+      fireEvent.click(screen.getByTestId('submissions-f1-button'));
+    });
+
+    expect(mockPush.mock.calls).toEqual([
+      ['/en/build/f1'],
+      ['/en/build/f1?tab=share'],
+      ['/en/build/f1?tab=submissions'],
+    ]);
+  });
+
   it('renders the search input', async () => {
     seed([{ id: WS1 }]);
     await renderList();

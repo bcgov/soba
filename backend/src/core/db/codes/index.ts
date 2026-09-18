@@ -255,6 +255,14 @@ export const WorkspaceGroupMembershipStatus = {
 export type WorkspaceGroupMembershipStatusCode =
   (typeof WorkspaceGroupMembershipStatus)[keyof typeof WorkspaceGroupMembershipStatus];
 
+/** Status of a form_group_override row; an active row replaces the group's membership for that form. */
+export const FormGroupOverrideStatus = {
+  active: 'active',
+  inactive: 'inactive',
+} as const;
+export type FormGroupOverrideStatusCode =
+  (typeof FormGroupOverrideStatus)[keyof typeof FormGroupOverrideStatus];
+
 /** Status of a role assigned to a workspace group (workspace_group_role.status). */
 export const WorkspaceGroupRoleStatus = {
   active: 'active',

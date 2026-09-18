@@ -1,13 +1,13 @@
 import type { NextFunction, Request, Response } from 'express';
 import { getSubmissionWorkspaceAndState } from '../../core/db/repos/submissionRepo';
-import { authorizeSubmitterForWorkspace } from '../../core/middleware/formSubmitAccess';
+import { authorizeSubmitterForForm } from '../../core/middleware/formSubmitAccess';
 import { Permissions, SubmissionWorkflowState } from '../../core/db/codes';
 import { ConflictError, NotFoundError, ValidationError } from '../../core/errors';
 
 /**
  * Authorize a file upload against the submission it belongs to. The submission id is the source of
  * truth for the workspace; only an in-progress submission (opened/draft) accepts uploads, and the
- * caller must be in that workspace's Form submitters audience (submission_create). Runs after multer
+ * caller must be in the form's Form submitters audience (submission_create). Runs after multer
  * so the multipart `submissionId` field is parsed.
  */
 export const requireUploadAccess = async (
@@ -30,10 +30,10 @@ export const requireUploadAccess = async (
     ) {
       throw new ConflictError('Submission is not accepting file uploads');
     }
-    await authorizeSubmitterForWorkspace(
+    await authorizeSubmitterForForm(
       req,
       res,
-      submission.workspaceId,
+      { workspaceId: submission.workspaceId, formId: submission.formId },
       Permissions.submission_create,
     );
     next();

@@ -11,6 +11,8 @@
     "unknown": "Unknown",
     "home": "Home",
     "forms": "Forms",
+    "myForms": "My Forms",
+    "mySubmissions": "My Submissions",
     "formDesigner": "Form Designer",
     "feedback": "Feedback",
     "help": "Help",
@@ -189,12 +191,9 @@
   "header": {
     "workspaces": "Workspaces",
     "design": "Design",
-    "submit": "Submit",
     "skipToMain": "Skip to main content",
-    "designer": "Designer",
     "selectLanguage": "Select Language",
     "bcgovTitle": "Government of British Columbia",
-    "primaryNavAria": "Primary",
     "languages": {
       "en": "EN",
       "fr": "FR"
@@ -220,7 +219,7 @@
       "segmentError": {
         "title": "Something went wrong loading this form page.",
         "tryAgain": "Try again",
-        "backToList": "Back to form list"
+        "backToHome": "Back to home"
       },
       "submitSuccess": "Form submitted successfully.",
       "starting": "Starting your submission…",
@@ -255,6 +254,9 @@
     "submitterAudienceCancel": "Cancel",
     "submitterAudienceLoadError": "Could not load submit access",
     "submitterAudienceSaveError": "Could not save submit access",
+    "submitterAudienceInherit": "Inherit from workspace",
+    "submitterAudienceInheritedSummary": "Inherited: {summary}",
+    "submitterAudienceUsersNotApplied": "People named in the workspace audience cannot submit this form unless another group gives them access.",
     "disclaimerLabel": "I agree to the disclaimer and statement of responsibility",
     "disclaimerRequired": "Accept the workspace disclaimer in workspace Settings before creating a form.",
     "exportJson": "Export JSON",
@@ -320,15 +322,16 @@
     "anon": "Anonymous",
     "pageTitle": "Submission",
     "loading": "Loading submissions…",
-    "empty": "No submissions in this workspace yet.",
     "error": "Could not load submissions.",
     "submittedOn": "Submitted",
     "noContent": "No submitted answers to display.",
     "notFound": "Submission not found.",
+    "loadError": "Could not load this submission.",
     "workflow": "Workflow",
     "confirmationId": "Confirmation ID",
     "submittedAt": "Submission Date",
     "submitter": "Submitter",
+    "backToSubmissions": "Back to submissions",
     "deleteConfirm": "Confirm Delete",
     "deleteConfirmText": "Do you really want to delete submission",
     "confirm": "Confirm",
@@ -338,14 +341,6 @@
     "emptyList": "No submissions",
     "deleteSuccess": "Submission deleted successfully",
     "deleteFailure": "Failed to delete submission",
-    "columns": {
-      "id": "Submission ID",
-      "formName": "Form Name",
-      "formId": "Form ID",
-      "version": "Version",
-      "status": "Status",
-      "user": "User"
-    },
     "formList": {
       "columns": {
         "name": "Form Name",

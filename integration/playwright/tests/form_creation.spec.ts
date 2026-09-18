@@ -105,27 +105,13 @@ test.describe.serial("Landing page tests", () => {
         .locator("xpath=following-sibling::div//input");
       await formNameInput.fill(title);
       form_name = title;
-      await sharedPage.getByTestId("submitter-audience-trigger").click();
-      await expect(
-        sharedPage.getByTestId("audience-mode-public"),
-      ).toBeVisible();
-      await expect(
-        sharedPage.getByTestId("audience-mode-protected"),
-      ).toBeVisible();
-      await expect(
-        sharedPage.locator('input[type="radio"][value="protected"]'),
-      ).toBeChecked();
-      const bceidBusiness = sharedPage.getByTestId(
-        "audience-idp-bceidbusiness",
+      // A new form inherits the workspace audience, shown read-only until the form exists.
+      const audienceTrigger = sharedPage.getByTestId(
+        "submitter-audience-trigger",
       );
-      const idirMfa = sharedPage.getByTestId("audience-idp-azureidir");
-      // Verify both options are visible
-      await expect(bceidBusiness).toBeVisible();
-      await expect(idirMfa).toBeVisible();
-      // Verify IDIR - MFA is selected
-      await expect(idirMfa.locator('input[type="checkbox"]')).toBeChecked();
-      await expect(sharedPage.getByTestId("audience-cancel")).toBeVisible();
-      await sharedPage.getByTestId("audience-save").click();
+      // The summary first: the trigger is also disabled while the audience loads.
+      await expect(audienceTrigger).toContainText("IDIR - MFA");
+      await expect(audienceTrigger).toBeDisabled();
     } else {
       // Continue with normal flow
       //Form creation
@@ -146,27 +132,13 @@ test.describe.serial("Landing page tests", () => {
         .locator("xpath=following-sibling::div//input");
       await formNameInput.fill(title);
       form_name = title;
-      await sharedPage.getByTestId("submitter-audience-trigger").click();
-      await expect(
-        sharedPage.getByTestId("audience-mode-public"),
-      ).toBeVisible();
-      await expect(
-        sharedPage.getByTestId("audience-mode-protected"),
-      ).toBeVisible();
-      await expect(
-        sharedPage.locator('input[type="radio"][value="protected"]'),
-      ).toBeChecked();
-      const bceidBusiness = sharedPage.getByTestId(
-        "audience-idp-bceidbusiness",
+      // A new form inherits the workspace audience, shown read-only until the form exists.
+      const audienceTrigger = sharedPage.getByTestId(
+        "submitter-audience-trigger",
       );
-      const idirMfa = sharedPage.getByTestId("audience-idp-azureidir");
-      // Verify both options are visible
-      await expect(bceidBusiness).toBeVisible();
-      await expect(idirMfa).toBeVisible();
-      // Verify IDIR - MFA is selected
-      await expect(idirMfa.locator('input[type="checkbox"]')).toBeChecked();
-      await expect(sharedPage.getByTestId("audience-cancel")).toBeVisible();
-      await sharedPage.getByTestId("audience-save").click();
+      // The summary first: the trigger is also disabled while the audience loads.
+      await expect(audienceTrigger).toContainText("IDIR - MFA");
+      await expect(audienceTrigger).toBeDisabled();
       await expect(
         sharedPage
           .locator(".drag-and-drop-alert")

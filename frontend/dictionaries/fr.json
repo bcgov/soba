@@ -12,6 +12,8 @@
     "unknown": "Inconnu",
     "home": "Accueil",
     "forms": "Formulaires",
+    "myForms": "Mes formulaires",
+    "mySubmissions": "Mes soumissions",
     "formDesigner": "Concepteur de formulaires",
     "feedback": "Retour d'information",
     "help": "Aidé",
@@ -190,12 +192,9 @@
   "header": {
     "workspaces": "Espaces de travail",
     "design": "Conception",
-    "submit": "Soumettre",
     "skipToMain": "Aller au contenu principal",
-    "designer": "Générateur de Formulaire",
     "selectLanguage": "Choisir la langue",
     "bcgovTitle": "Gouvernement de la Colombie-Britannique",
-    "primaryNavAria": "Principal",
     "languages": {
       "en": "EN",
       "fr": "FR"
@@ -221,7 +220,7 @@
       "segmentError": {
         "title": "Un problème est survenu lors du chargement de cette page de formulaire.",
         "tryAgain": "Réessayer",
-        "backToList": "Retour à la liste"
+        "backToHome": "Retour à l'accueil"
       },
       "submitSuccess": "Formulaire soumis avec succès.",
       "starting": "Démarrage de votre soumission…",
@@ -256,6 +255,9 @@
     "submitterAudienceCancel": "Annuler",
     "submitterAudienceLoadError": "Impossible de charger l'accès de soumission",
     "submitterAudienceSaveError": "Impossible d'enregistrer l'accès de soumission",
+    "submitterAudienceInherit": "Hériter de l'espace de travail",
+    "submitterAudienceInheritedSummary": "Hérité : {summary}",
+    "submitterAudienceUsersNotApplied": "Les personnes nommées dans l'audience de l'espace de travail ne peuvent pas soumettre ce formulaire, sauf si un autre groupe leur en donne l'accès.",
     "disclaimerLabel": "J'accepte l'avis de non-responsabilité et la déclaration de responsabilité",
     "disclaimerRequired": "Acceptez l'avis de non-responsabilité de l'espace de travail dans les paramètres avant de créer un formulaire.",
     "exportJson": "Exporter JSON",
@@ -321,15 +323,16 @@
     "anon": "Anonyme",
     "pageTitle": "Soumission",
     "loading": "Chargement des soumissions…",
-    "empty": "Aucune soumission dans cet espace pour l’instant.",
     "error": "Impossible de charger les soumissions.",
     "submittedOn": "Soumis le",
     "noContent": "Aucune réponse soumise à afficher.",
     "notFound": "Soumission introuvable.",
+    "loadError": "Impossible de charger cette soumission.",
     "workflow": "Flux de travail",
     "confirmationId": "ID de confirmation",
     "submittedAt": "Date de Soumission",
     "submitter": "Soumissionnaire",
+    "backToSubmissions": "Retour aux soumissions",
     "deleteConfirm": "Confirmer la suppression",
     "deleteConfirmText": "Voulez-vous vraiment supprimer cette soumission",
     "delete": "Suppression",
@@ -339,14 +342,6 @@
     "emptyList": "Aucune soumission",
     "deleteSuccess": "Soumission supprimée avec succès",
     "deleteFailure": "Échec de la suppression de la soumission",
-    "columns": {
-      "id": "ID de Soumission",
-      "formName": "Nom du Formulaire",
-      "formId": "ID du Formulaire",
-      "version": "Version",
-      "status": "Statut",
-      "user": "Utilisateur"
-    },
     "formList": {
       "columns": {
         "name": "Nom du Formulaire",

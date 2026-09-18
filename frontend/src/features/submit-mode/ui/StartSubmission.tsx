@@ -18,8 +18,8 @@ type StartLabels = {
 };
 
 /**
- * Start action for filling a form, reached by navigating to /form/[formId] (the Forms-table "Submit"
- * action, or a pasted link). It opens a submission for the form's published version, then redirects to
+ * Start action for filling a form, reached by navigating to /form/[formId] from a shared or
+ * pasted link. It opens a submission for the form's published version, then redirects to
  * the fill page addressed by the new submission id. It renders nothing but a spinner — creating the
  * record is the whole job; rendering the form is the fill page's.
  *

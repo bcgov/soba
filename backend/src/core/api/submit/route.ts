@@ -18,7 +18,7 @@ import {
 } from '../submissions/schema';
 
 // Submit-mode: mounted under /api/v1/submit with optional auth (anonymous resolves to the public user).
-// Access is decided by the workspace Form submitters audience (requireFormAccess / requireFormSubmitAccess),
+// Access is decided by the form's Form submitters audience (requireFormAccess / requireFormSubmitAccess),
 // so non-members and anonymous callers can read a published form, submit to it, and view the confirmation.
 const router = express.Router();
 
