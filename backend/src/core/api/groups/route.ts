@@ -33,7 +33,8 @@ const GROUP_MEMBERS_PATH = '/workspaces/:id/groups/:groupId/members';
 const GROUP_MEMBER_PATH = '/workspaces/:id/groups/:groupId/members/:memberId';
 const SUBMITTER_AUDIENCE_PATH = '/workspaces/:id/submitter-audience';
 
-// The workspace is resolved from :id; every route requires workspace-management authority.
+// The workspace is resolved from :id, so every route requires workspace membership. Reads are open
+// to any member; writes also require workspace-management authority.
 const workspaceResource = workspaceFromResource({ kind: 'workspace', idFrom: 'paramsId' });
 
 router.get(

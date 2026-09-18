@@ -66,7 +66,7 @@ export const filesService = {
 
   /**
    * Fetch a file for a caller, scoped to its owning submission: the file must belong to a still-present
-   * submission, and the caller must have submission_read on that submission's workspace (Form submitters
+   * submission, and the caller must have submission_read on that submission's form (Form submitters
    * audience or staff). 'notfound' when missing / no live owning submission; 'denied' when unauthorized.
    */
   async getForCaller(
@@ -78,7 +78,7 @@ export const filesService = {
     const submission = await getSubmissionRecordById(record.workspaceId, record.submissionId);
     if (!submission) return 'notfound';
     const allowed = await hasFormSubmitAccess(
-      record.workspaceId,
+      { workspaceId: record.workspaceId, formId: submission.formId },
       caller,
       Permissions.submission_read,
     );
@@ -114,14 +114,15 @@ export const filesService = {
     if (!record?.submissionId) return 'notfound';
     const submission = await getSubmissionRecordById(record.workspaceId, record.submissionId);
     if (!submission) return 'notfound';
+    const target = { workspaceId: record.workspaceId, formId: submission.formId };
     const allowed =
       submission.workflowState === SubmissionWorkflowState.submitted
-        ? await hasFormSubmitAccess(record.workspaceId, caller, Permissions.submission_update)
+        ? await hasFormSubmitAccess(target, caller, Permissions.submission_update)
         : // Un-submitted: the submission owner may delete, but only where they're actually in the
           // submit audience — this bounds anonymous (shared public id) to forms they can submit to.
           !!caller.actorId &&
           submission.submittedBy === caller.actorId &&
-          (await hasFormSubmitAccess(record.workspaceId, caller, Permissions.submission_create));
+          (await hasFormSubmitAccess(target, caller, Permissions.submission_create));
     if (!allowed) return 'denied';
     // Row first: if the row delete throws, nothing is destroyed (retryable). A blob delete failing
     // after the row is gone leaves a reclaimable orphan, not a dangling, un-downloadable row.

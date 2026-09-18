@@ -7,14 +7,8 @@ jest.mock('../../../../src/core/db/client', () => ({
 }));
 
 import { getFormListContext, getWorkspaceIdForForm } from '../../../../src/core/db/repos/formRepo';
-import {
-  getFormVersionListContext,
-  getWorkspaceIdForFormVersion,
-} from '../../../../src/core/db/repos/formVersionRepo';
-import {
-  getSubmissionListContext,
-  getWorkspaceIdForSubmission,
-} from '../../../../src/core/db/repos/submissionRepo';
+import { getFormVersionListContext } from '../../../../src/core/db/repos/formVersionRepo';
+import { getSubmissionListContext } from '../../../../src/core/db/repos/submissionRepo';
 
 function selectChain(result: unknown) {
   return {
@@ -59,11 +53,6 @@ describe('read-only workspace lookups', () => {
     await expect(getFormVersionListContext('missing')).resolves.toBeNull();
   });
 
-  it('getWorkspaceIdForFormVersion delegates to getFormVersionListContext', async () => {
-    selectMock.mockReturnValue(selectChain([{ workspaceId: 'ws2', formId: 'form1' }]));
-    await expect(getWorkspaceIdForFormVersion('fv1')).resolves.toBe('ws2');
-  });
-
   it('getSubmissionListContext returns full hierarchy when present', async () => {
     selectMock.mockReturnValue(
       selectChain([{ workspaceId: 'ws3', formId: 'form1', formVersionId: 'fv1' }]),
@@ -78,12 +67,5 @@ describe('read-only workspace lookups', () => {
   it('getSubmissionListContext returns null when missing', async () => {
     selectMock.mockReturnValue(selectChain([]));
     await expect(getSubmissionListContext('missing')).resolves.toBeNull();
-  });
-
-  it('getWorkspaceIdForSubmission delegates to getSubmissionListContext', async () => {
-    selectMock.mockReturnValue(
-      selectChain([{ workspaceId: 'ws3', formId: 'form1', formVersionId: 'fv1' }]),
-    );
-    await expect(getWorkspaceIdForSubmission('sub1')).resolves.toBe('ws3');
   });
 });

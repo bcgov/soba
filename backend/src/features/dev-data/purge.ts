@@ -17,6 +17,8 @@ import {
   enterpriseWorkspaceBindings,
   featureScopes,
   files,
+  formGroupOverrideMembers,
+  formGroupOverrides,
   formVersionRevisions,
   formVersions,
   forms,
@@ -193,6 +195,12 @@ async function purgeUserScoped(tx: DbOrTx, userIds: string[], record: RecordFn):
 
   if (membershipIds.length > 0) {
     await record(
+      'form_group_override_member (by user)',
+      tx
+        .delete(formGroupOverrideMembers)
+        .where(inArray(formGroupOverrideMembers.workspaceMembershipId, membershipIds)),
+    );
+    await record(
       'workspace_group_membership (by user)',
       tx
         .delete(workspaceGroupMemberships)
@@ -222,6 +230,8 @@ export const WORKSPACE_SCOPED_TABLES = [
   'file',
   'form_version_revision',
   'form_version',
+  'form_group_override_member',
+  'form_group_override',
   'form',
   'workspace_group_role',
   'workspace_group_membership',
@@ -295,6 +305,14 @@ async function purgeWorkspaceScoped(
   await record(
     'form_version',
     tx.delete(formVersions).where(inArray(formVersions.workspaceId, ids)),
+  );
+  await record(
+    'form_group_override_member',
+    tx.delete(formGroupOverrideMembers).where(inArray(formGroupOverrideMembers.workspaceId, ids)),
+  );
+  await record(
+    'form_group_override',
+    tx.delete(formGroupOverrides).where(inArray(formGroupOverrides.workspaceId, ids)),
   );
   await record('form', tx.delete(forms).where(inArray(forms.workspaceId, ids)));
   await record(

@@ -246,22 +246,16 @@ export const getSubmissionListContext = async (
   return row[0] ?? null;
 };
 
-/**
- * Resolve the workspace that owns a submission, by submission id alone. Used to derive request
- * workspace context for deep links. Neutral: returns null for missing/deleted submissions (caller
- * maps to 404); access is still enforced downstream via membership.
- */
-export const getWorkspaceIdForSubmission = async (submissionId: string): Promise<string | null> => {
-  const context = await getSubmissionListContext(submissionId);
-  return context?.workspaceId ?? null;
-};
-
-/** Resolve a submission's workspace + workflow state by id alone (for the file-upload gate). */
+/** Resolve a submission's workspace, form + workflow state by id alone (for the file-upload gate). */
 export const getSubmissionWorkspaceAndState = async (
   submissionId: string,
-): Promise<{ workspaceId: string; workflowState: string } | null> => {
+): Promise<{ workspaceId: string; formId: string; workflowState: string } | null> => {
   const rows = await db
-    .select({ workspaceId: submissions.workspaceId, workflowState: submissions.workflowState })
+    .select({
+      workspaceId: submissions.workspaceId,
+      formId: submissions.formId,
+      workflowState: submissions.workflowState,
+    })
     .from(submissions)
     .where(and(eq(submissions.id, submissionId), isNull(submissions.deletedAt)))
     .limit(1);
