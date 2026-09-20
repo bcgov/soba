@@ -3,7 +3,7 @@ import makeStore from '@/lib/store';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import FormSettingsDrawer from '@/src/features/designer/ui/FormSettingsDrawer';
+import FormSettingsDrawer from '@/src/features/form-settings/form/FormSettingsDrawer';
 import type { Dictionary } from '@/src/types/dictionary';
 
 const { mockUpdateSobaForm, mockRefreshForm, mockAddNotification, loaded } = vi.hoisted(() => ({

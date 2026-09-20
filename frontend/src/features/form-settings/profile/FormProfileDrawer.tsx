@@ -3,25 +3,15 @@
 import { useState } from 'react';
 import { Select } from '@bcgov/design-system-react-components';
 
-import type { Dictionary } from '@/src/types/dictionary';
-import FormSettingsDrawers from '@/src/features/designer/ui/FormSettingsDrawers';
+import FormSettingsDrawers from '@/src/features/form-settings/ui/FormSettingsDrawers';
+import type { FormSettingsSectionProps } from '@/src/features/form-settings/types';
 import { codeItems } from '@/src/shared/util/codeList';
 import { updateSobaForm } from '@/src/shared/api/sobaApiDesign';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useForm } from '@/src/features/designer/useForm';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
-interface FormProfileDrawerProps {
-  dict: Dictionary;
-  drawerName: string;
-  formId: string;
-}
-
-export default function FormProfileDrawer({
-  dict,
-  drawerName,
-  formId,
-}: Readonly<FormProfileDrawerProps>) {
+export default function FormProfileDrawer({ dict, drawerName, formId }: FormSettingsSectionProps) {
   const { token } = useKeycloak();
   const { form, refreshForm } = useForm(formId);
   const { addNotification } = useNotificationStore();

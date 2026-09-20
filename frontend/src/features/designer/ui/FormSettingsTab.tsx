@@ -3,9 +3,8 @@
 import type { Dictionary } from '@/src/types/dictionary';
 import { AccordionGroup } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
-import FormSettingsDrawer from '@/src/features/designer/ui/FormSettingsDrawer';
-import FormProfileDrawer from '@/src/features/designer/ui/FormProfileDrawer';
 import { useForm } from '@/src/features/designer/useForm';
+import { useFormSettingsSections } from '@/src/features/form-settings/sections';
 
 interface FormSettingsTabProps {
   dict: Dictionary;
@@ -14,9 +13,10 @@ interface FormSettingsTabProps {
 
 export default function FormSettingsTab({ dict, formId }: Readonly<FormSettingsTabProps>) {
   const defExpanded = ['form-settings'];
-  // The drawers edit the loaded form, so none of them render until it is here. One read for the
-  // tab: the drawers share its key.
+  // One read for the tab: the section list needs the form's workspace, and the drawers that edit
+  // the form itself share this key.
   const { form, loading } = useForm(formId);
+  const sections = useFormSettingsSections(formId, form?.workspaceId ?? null);
 
   if (loading) {
     return <CenteredProgress label={dict.general.loading} />;
@@ -29,8 +29,9 @@ export default function FormSettingsTab({ dict, formId }: Readonly<FormSettingsT
 
   return (
     <AccordionGroup allowsMultipleExpanded={false} defaultExpandedKeys={defExpanded}>
-      <FormSettingsDrawer drawerName="form-settings" dict={dict} formId={formId} />
-      <FormProfileDrawer drawerName="form-profile" dict={dict} formId={formId} />
+      {sections.map(({ id, Drawer }) => (
+        <Drawer key={id} drawerName={id} dict={dict} formId={formId} />
+      ))}
     </AccordionGroup>
   );
 }

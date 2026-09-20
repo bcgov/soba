@@ -3,27 +3,14 @@
 import { useState, useMemo } from 'react';
 import { TextArea, TextField } from '@bcgov/design-system-react-components';
 
-import type { Dictionary } from '@/src/types/dictionary';
-import FormSettingsDrawers from '@/src/features/designer/ui/FormSettingsDrawers';
-import { FormSubmitterAudience } from './FormSubmitterAudience';
+import FormSettingsDrawers from '@/src/features/form-settings/ui/FormSettingsDrawers';
+import type { FormSettingsSectionProps } from '@/src/features/form-settings/types';
 import { updateSobaForm } from '@/src/shared/api/sobaApiDesign';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useForm } from '@/src/features/designer/useForm';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { useFormCreateWorkspaceOptions, useWorkspace } from '@/src/shared/api/useWorkspaces';
-import { isWorkspaceManageRole } from '@/src/features/workspaces/workspaceRoles';
 
-interface FormSettingsDrawerProps {
-  dict: Dictionary;
-  drawerName: string;
-  formId: string;
-}
-
-export default function FormSettingsDrawer({
-  dict,
-  drawerName,
-  formId,
-}: Readonly<FormSettingsDrawerProps>) {
+export default function FormSettingsDrawer({ dict, drawerName, formId }: FormSettingsSectionProps) {
   const { token } = useKeycloak();
   const { form, refreshForm } = useForm(formId);
   const { addNotification } = useNotificationStore();
@@ -33,20 +20,10 @@ export default function FormSettingsDrawer({
   const [editedDescription, setEditedDescription] = useState<string | null>(null);
   const [editedName, setEditedName] = useState<string | null>(null);
 
-  const selectedWorkspaceId = form?.workspaceId ?? null;
-
   const [saving, setSaving] = useState(false);
 
   const description = editedDescription ?? form?.description ?? '';
   const formName = editedName ?? form?.name ?? '';
-
-  const { workspace: formWorkspace } = useWorkspace(formId ? form?.workspaceId : undefined);
-  const creatableWorkspaces = useFormCreateWorkspaceOptions(false);
-
-  const activeWorkspace = formId
-    ? formWorkspace
-    : creatableWorkspaces.workspaces.find((w) => w.id === selectedWorkspaceId);
-  const canManageWorkspace = !!activeWorkspace && isWorkspaceManageRole(activeWorkspace.role);
 
   const edited = useMemo(() => {
     return editedName !== null || editedDescription !== null;
@@ -63,9 +40,10 @@ export default function FormSettingsDrawer({
         if (editedDescription !== null) {
           payload.description = editedDescription;
         }
+        // Save is disabled with nothing edited, but Enter in a field still submits the form.
         if (Object.keys(payload).length === 0) {
           setSaving(false);
-          return; //no changes
+          return;
         }
         await updateSobaForm(token, formId, payload);
         await refreshForm();
@@ -107,6 +85,9 @@ export default function FormSettingsDrawer({
         label={dict.form.nameLabel}
         value={formName}
         isDisabled={saving}
+        isRequired
+        validate={(value) => (value.trim() ? null : dict.form.noFormName)}
+        errorMessage={dict.form.noFormName}
         data-testid="form-settings-name"
         onChange={(newName) => setEditedName(newName)}
       />
@@ -118,12 +99,6 @@ export default function FormSettingsDrawer({
         isDisabled={saving}
         data-testid="form-settings-description"
         onChange={(newDescription) => setEditedDescription(newDescription)}
-      />
-      <FormSubmitterAudience
-        key={selectedWorkspaceId ?? 'none'}
-        workspaceId={selectedWorkspaceId}
-        formId={formId}
-        canManage={canManageWorkspace}
       />
     </FormSettingsDrawers>
   );
