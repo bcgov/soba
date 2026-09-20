@@ -26,4 +26,7 @@ integration/playwright-report/
 integration/.playwright/
 integration/.cache/
 
+# Subcharts fetched by `helm dependency build`; Chart.lock pins the versions
+deployments/helm/*/charts/
+
 lib/dist
