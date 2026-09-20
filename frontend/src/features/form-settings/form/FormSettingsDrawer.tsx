@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { TextArea } from '@bcgov/design-system-react-components';
+import { useState, useMemo } from 'react';
+import { TextArea, TextField } from '@bcgov/design-system-react-components';
 
 import FormSettingsDrawers from '@/src/features/form-settings/ui/FormSettingsDrawers';
 import type { FormSettingsSectionProps } from '@/src/features/form-settings/types';
@@ -18,19 +18,36 @@ export default function FormSettingsDrawer({ dict, drawerName, formId }: FormSet
   // An edit layered over the loaded value. Null means no edit, so a refresh from anywhere shows
   // through until the user types.
   const [editedDescription, setEditedDescription] = useState<string | null>(null);
+  const [editedName, setEditedName] = useState<string | null>(null);
+
   const [saving, setSaving] = useState(false);
 
   const description = editedDescription ?? form?.description ?? '';
+  const formName = editedName ?? form?.name ?? '';
+
+  const edited = useMemo(() => {
+    return editedName !== null || editedDescription !== null;
+  }, [editedName, editedDescription]);
 
   const saveChanges = async () => {
     if (token !== undefined) {
       setSaving(true);
       try {
-        await updateSobaForm(token, formId, {
-          description: description,
-        });
+        const payload: { name?: string; description?: string } = {};
+        if (editedName !== null) {
+          payload.name = editedName.trim();
+        }
+        if (editedDescription !== null) {
+          payload.description = editedDescription;
+        }
+        if (Object.keys(payload).length === 0) {
+          setSaving(false);
+          return;
+        }
+        await updateSobaForm(token, formId, payload);
         await refreshForm();
         setEditedDescription(null);
+        setEditedName(null);
         addNotification({
           type: 'success',
           text:
@@ -51,6 +68,7 @@ export default function FormSettingsDrawer({ dict, drawerName, formId }: FormSet
 
   const cancelChanges = () => {
     setEditedDescription(null);
+    setEditedName(null);
   };
 
   return (
@@ -60,7 +78,18 @@ export default function FormSettingsDrawer({ dict, drawerName, formId }: FormSet
       label={dict.form.settings.formSettingsDrawerLabel}
       onSave={saveChanges}
       onCancel={cancelChanges}
+      canSave={!saving && edited}
     >
+      <TextField
+        label={dict.form.nameLabel}
+        value={formName}
+        isDisabled={saving}
+        isRequired
+        validate={(value) => (value.trim() ? null : dict.form.noFormName)}
+        errorMessage={dict.form.noFormName}
+        data-testid="form-settings-name"
+        onChange={(newName) => setEditedName(newName)}
+      />
       <TextArea
         id="form-settings-description"
         className="bcds-react-aria-TextArea w-100"

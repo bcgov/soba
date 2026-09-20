@@ -1,4 +1,5 @@
-import React from 'react';
+import { Provider } from 'react-redux';
+import makeStore from '@/lib/store';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -10,7 +11,7 @@ const { mockUpdateSobaForm, mockRefreshForm, mockAddNotification, loaded } = vi.
   mockRefreshForm: vi.fn(),
   mockAddNotification: vi.fn(),
   // Stands in for the shared SWR key: a write anywhere changes what every reader sees.
-  loaded: { description: 'Initial description' },
+  loaded: { name: 'Initial name', description: 'Initial description' },
 }));
 
 vi.mock('@/src/shared/api/sobaApiDesign', () => ({
@@ -43,6 +44,8 @@ const mockDict = {
       formSettingsDrawerSaveErrorMessage: 'Failed to save changes. Please try again.',
     },
     descriptionLabel: 'Description',
+    nameLabel: 'Form Name',
+    noFormName: 'Form name is required',
   },
   general: {
     cancel: 'Cancel',
@@ -54,13 +57,20 @@ vi.mock('@/app/[lang]/Providers', () => ({
 }));
 
 describe('FormSettingsDrawer', () => {
+  let store: ReturnType<typeof makeStore>;
   beforeEach(() => {
     vi.clearAllMocks();
+    loaded.name = 'Initial name';
     loaded.description = 'Initial description';
+    store = makeStore();
   });
 
   function renderDrawer() {
-    return render(<FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />);
+    return render(
+      <Provider store={store}>
+        <FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />
+      </Provider>,
+    );
   }
 
   it('renders correctly with initial description', () => {
@@ -106,6 +116,67 @@ describe('FormSettingsDrawer', () => {
     });
   });
 
+  // Only the edited fields are sent, so a save never writes back a value read from somewhere else.
+  it('sends only the name when only the name is edited', async () => {
+    mockUpdateSobaForm.mockResolvedValueOnce({});
+    renderDrawer();
+
+    const input = screen.getByTestId('form-settings-name').querySelector('input')!;
+    await userEvent.clear(input);
+    await userEvent.type(input, '  Renamed  ');
+    await userEvent.click(screen.getByTestId('form-settings-test-drawer-save'));
+
+    expect(mockUpdateSobaForm).toHaveBeenCalledWith('mock-token', 'f1', { name: 'Renamed' });
+    expect(mockAddNotification).toHaveBeenCalledWith({
+      type: 'success',
+      text: 'Changes saved successfully.',
+    });
+  });
+
+  it('sends both fields when both are edited', async () => {
+    mockUpdateSobaForm.mockResolvedValueOnce({});
+    renderDrawer();
+
+    const input = screen.getByTestId('form-settings-name').querySelector('input')!;
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Renamed');
+    const textarea = screen.getByTestId('form-settings-description').querySelector('textarea')!;
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, 'New description');
+    await userEvent.click(screen.getByTestId('form-settings-test-drawer-save'));
+
+    expect(mockUpdateSobaForm).toHaveBeenCalledWith('mock-token', 'f1', {
+      name: 'Renamed',
+      description: 'New description',
+    });
+  });
+
+  it('disables Save until something is edited', async () => {
+    renderDrawer();
+
+    expect(screen.getByTestId('form-settings-test-drawer-save')).toBeDisabled();
+    const input = screen.getByTestId('form-settings-name').querySelector('input')!;
+    await userEvent.type(input, 'X');
+    expect(screen.getByTestId('form-settings-test-drawer-save')).toBeEnabled();
+  });
+
+  // The name is a required field, so a blank one is reported on the field and never reaches the
+  // backend, which rejects it with a generic error.
+  it.each([
+    ['empty', ''],
+    ['blank', '   '],
+  ])('reports a %s name on the field and saves nothing', async (_label, value) => {
+    renderDrawer();
+
+    const input = screen.getByTestId('form-settings-name').querySelector('input')!;
+    await userEvent.clear(input);
+    if (value) await userEvent.type(input, value);
+    await userEvent.click(screen.getByTestId('form-settings-test-drawer-save'));
+
+    expect(await screen.findByText('Form name is required')).toBeInTheDocument();
+    expect(mockUpdateSobaForm).not.toHaveBeenCalled();
+  });
+
   it('shows error notification on save failure', async () => {
     mockUpdateSobaForm.mockRejectedValueOnce(new Error('Save failed'));
     renderDrawer();
@@ -149,7 +220,11 @@ describe('FormSettingsDrawer', () => {
     const { rerender } = renderDrawer();
 
     loaded.description = 'Written somewhere else';
-    rerender(<FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />);
+    rerender(
+      <Provider store={store}>
+        <FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />
+      </Provider>,
+    );
 
     const textarea = screen.getByTestId('form-settings-description').querySelector('textarea')!;
     expect(textarea).toHaveValue('Written somewhere else');
@@ -163,7 +238,11 @@ describe('FormSettingsDrawer', () => {
     await userEvent.type(textarea, 'Half typed');
 
     loaded.description = 'Written somewhere else';
-    rerender(<FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />);
+    rerender(
+      <Provider store={store}>
+        <FormSettingsDrawer dict={mockDict} drawerName="test-drawer" formId="f1" />
+      </Provider>,
+    );
 
     expect(textarea).toHaveValue('Half typed');
   });

@@ -66,8 +66,10 @@ export default function FormProfileDrawer({ dict, drawerName, formId }: FormSett
       label={dict.form.settings.profileDrawerLabel}
       onSave={saveChanges}
       onCancel={cancelChanges}
+      canSave={!saving}
     >
       <p>{dict.form.settings.profileDrawerInfo}</p>
+      {/* A Select's native control is visually hidden, so both carry their own error message. */}
       <Select
         items={codeItems(dict.ministries, form?.org)}
         label={dict.workspaces.yourOrgReq}
@@ -75,6 +77,9 @@ export default function FormProfileDrawer({ dict, drawerName, formId }: FormSett
         size="medium"
         data-testid="form-profile-org"
         isRequired={true}
+        // The native control behind a Select is visually hidden, so a native validation message
+        // would point at nothing. This renders under the visible field instead.
+        errorMessage={dict.general.fieldRequired}
         isDisabled={saving}
         value={ministryOrg}
         onChange={(newOrg) => setEditedOrg(newOrg?.toString() ?? '')}
@@ -86,6 +91,7 @@ export default function FormProfileDrawer({ dict, drawerName, formId }: FormSett
         size="medium"
         data-testid="form-profile-use-case"
         isRequired={true}
+        errorMessage={dict.general.fieldRequired}
         isDisabled={saving}
         value={useCase}
         onChange={(newUseCase) => setEditedUseCase(newUseCase?.toString() ?? '')}
