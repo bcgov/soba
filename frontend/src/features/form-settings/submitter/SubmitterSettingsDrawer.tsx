@@ -12,6 +12,8 @@ import {
   type SubmitterSettings,
 } from '@/src/types/formSettings';
 import { useSubmitterAudience } from '@/src/features/designer/useSubmitterAudience';
+import { FormSubmitterAudience } from '@/src/features/designer/ui/FormSubmitterAudience';
+import { useForm } from '@/src/features/designer/useForm';
 import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
@@ -30,6 +32,8 @@ export default function SubmitterSettingsDrawer({
   } = useFormSettings<SubmitterSettings, SetSubmitterSettingsBody>(SUBMITTER_SETTINGS_KEY, formId);
   const { addNotification } = useNotificationStore();
   const noteId = useId();
+  const { form } = useForm(formId);
+  const canUpdateForm = !!form?.permissions.some((p: string) => p === '*' || p === 'form_update');
 
   // Drafts are not offered to a Public audience. This is the form's effective audience: its own
   // override when it has one, otherwise the workspace audience it inherits.
@@ -94,6 +98,7 @@ export default function SubmitterSettingsDrawer({
           data-testid="form-settings-submitter-settings-error"
         />
       )}
+      <FormSubmitterAudience workspaceId={null} formId={formId} canManage={canUpdateForm} />
       <Checkbox
         isSelected={allowSubmitterDrafts}
         onChange={setEditedAllowDrafts}

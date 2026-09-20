@@ -19,7 +19,6 @@ import FormTeamTab from './FormTeamTab';
 import FormHistoryTab from './FormHistoryTab';
 import FormSubmissionTab from './FormSubmissionTab';
 import FormShareTab from './FormShareTab';
-import { FormSubmitterAudience } from './FormSubmitterAudience';
 import { useWorkspace } from '@/src/shared/api/useWorkspaces';
 import { lookupTruncatedNote, withSelectedOption } from '@/src/shared/list/lookupOptions';
 import { useForm } from '@/src/features/designer/useForm';
@@ -144,16 +143,10 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
 
   const selectedWorkspaceId = form?.workspaceId ?? null;
   const { workspace: formWorkspace } = useWorkspace(form?.workspaceId);
-  // A picked workspace is one of the create options, which already carry the role.
-  const activeWorkspace = formWorkspace;
-  // A form's audience is changed per form; a form being created shows its workspace's, read-only.
-  const canUpdateForm = !!form?.permissions.some((p: string) => p === '*' || p === 'form_update');
 
   usePageHeading({
-    // Editing claims no heading until the name arrives, so the page's own stands rather than
-    // flashing the create-form label on an existing form.
     heading: formName || undefined,
-    eyebrow: activeWorkspace?.name || selectedWorkspaceId,
+    eyebrow: formWorkspace?.name || selectedWorkspaceId,
   });
 
   usePageNotices(
@@ -261,7 +254,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
         return;
       }
 
-      // The name is server-owned once saved, so re-read it rather than leaving the edit in place.
+      // A save moves the form on: the heading and the current version come from this read.
       await refreshForm();
       addNotification({
         text: publish ? dict.form.published || 'Form published successfully!' : dict.form.saved,
@@ -410,13 +403,6 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
 
   const renderDesignerContent = () => (
     <>
-      <FormSubmitterAudience
-        key={formId ?? selectedWorkspaceId ?? 'none'}
-        workspaceId={selectedWorkspaceId}
-        formId={formId}
-        canManage={canUpdateForm}
-      />
-
       {renderToolBar()}
       {/* Form Builder */}
       <div className={styles.designerWrapper}>{renderFormBuilder()}</div>

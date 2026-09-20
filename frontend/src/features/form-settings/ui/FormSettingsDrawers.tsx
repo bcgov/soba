@@ -26,13 +26,19 @@ export default function FormSettingsDrawers({
   return (
     <Accordion id={id} data-testid={`accordion-${id}`} label={label}>
       <div className="d-block w-100">
-        <Form>
+        <Form
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSave();
+          }}
+        >
           {children}
           <div className="d-md-flex mt-2 justify-content-start gap-2 mt-3 w-100">
-            <Button data-testid={`form-settings-${id}-save`} onClick={onSave} isDisabled={!canSave}>
+            <Button type="submit" data-testid={`form-settings-${id}-save`} isDisabled={!canSave}>
               {dict.form.save}
             </Button>
             <Button
+              type="button"
               data-testid={`form-settings-${id}-cancel`}
               onClick={onCancel}
               variant="secondary"

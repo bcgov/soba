@@ -35,12 +35,11 @@ export default function FormSettingsDrawer({ dict, drawerName, formId }: FormSet
       try {
         const payload: { name?: string; description?: string } = {};
         if (editedName !== null) {
-          payload.name = editedName;
+          payload.name = editedName.trim();
         }
         if (editedDescription !== null) {
           payload.description = editedDescription;
         }
-        // Save is disabled with nothing edited, but Enter in a field still submits the form.
         if (Object.keys(payload).length === 0) {
           setSaving(false);
           return;

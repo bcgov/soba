@@ -38,7 +38,8 @@
     "noAccess": "Vous n'avez pas accès à ceci.",
     "sortBy": "Trier par",
     "lookupTruncated": "Affichage des {limit} premiers.",
-    "next": "Suivant"
+    "next": "Suivant",
+    "fieldRequired": "Ce champ est obligatoire."
   },
   "dataTable": {
     "emptyMessage": "Aucun élément trouvé.",

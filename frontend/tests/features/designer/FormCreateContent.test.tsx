@@ -46,8 +46,10 @@ vi.mock('@/lib/hooks/useNotificationStore', () => ({
 }));
 
 const mockCreateSobaFormioForm = vi.fn();
+const mockSaveFormVersionSchema = vi.fn();
 vi.mock('@/src/shared/api/sobaApi', () => ({
   createSobaFormioForm: (...args: unknown[]) => mockCreateSobaFormioForm(...args),
+  saveFormVersionSchema: (...args: unknown[]) => mockSaveFormVersionSchema(...args),
 }));
 
 vi.mock('@/src/shared/api/useCurrentUser', () => ({
@@ -61,64 +63,6 @@ vi.mock('@/src/shared/api/useWorkspaces', () => ({
 vi.mock('@/src/features/designer/ui/FormSubmitterAudience', () => ({
   FormSubmitterAudience: () => <div data-testid="form-submitter-audience" />,
 }));
-
-vi.mock('@bcgov/design-system-react-components', async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    Form: ({
-      children,
-      onSubmit,
-      ...rest
-    }: {
-      children: React.ReactNode;
-      onSubmit?: React.FormEventHandler<HTMLFormElement>;
-      [key: string]: unknown;
-    }) => (
-      <form onSubmit={onSubmit} {...rest}>
-        {children}
-      </form>
-    ),
-    TextField: ({
-      label,
-      value,
-      onChange,
-      'data-testid': testid,
-    }: {
-      label: string;
-      value: string;
-      onChange: (val: string) => void;
-      'data-testid': string;
-    }) => (
-      <div>
-        <label>{label}</label>
-        <input data-testid={testid} value={value} onChange={(e) => onChange(e.target.value)} />
-      </div>
-    ),
-    Button: ({
-      children,
-      onPress,
-      isDisabled,
-      'data-testid': testid,
-    }: {
-      children: React.ReactNode;
-      onPress: () => void;
-      isDisabled?: boolean;
-      'data-testid': string;
-    }) => (
-      <button data-testid={testid} disabled={isDisabled} onClick={onPress}>
-        {children}
-      </button>
-    ),
-    InlineAlert: ({
-      children,
-      'data-testid': testid,
-    }: {
-      children: React.ReactNode;
-      'data-testid': string;
-    }) => <div data-testid={testid}>{children}</div>,
-  };
-});
 
 vi.mock('@/app/ui/WorkspaceSelector', () => ({
   WorkspaceSelector: ({
@@ -168,9 +112,17 @@ describe('FormCreateContent', () => {
       ],
       truncated: false,
     });
+    mockCreateSobaFormioForm.mockResolvedValue({
+      id: 'form-123',
+      formVersion: { id: 'v-1', versionNo: 1, state: 'draft' },
+    });
+    mockSaveFormVersionSchema.mockResolvedValue({});
   });
 
   const renderComponent = () => render(<FormCreateContent onCancelPress={vi.fn()} />);
+
+  const nameInput = () =>
+    screen.getByTestId('form-name-modal').querySelector('input') as HTMLInputElement;
 
   it('renders form name input and workspace selector', () => {
     renderComponent();
@@ -178,27 +130,29 @@ describe('FormCreateContent', () => {
     expect(screen.getByTestId('workspace-selector')).toBeInTheDocument();
   });
 
-  it('shows notification if form name is empty on save', async () => {
+  // The name is a required field, so a blank one is reported on the field and never reaches the
+  // backend, which rejects it with a generic error.
+  it.each([
+    ['empty', ''],
+    ['blank', '   '],
+  ])('reports a %s form name on the field and does not create', async (_label, value) => {
     renderComponent();
-    const saveButton = screen.getByTestId('save-create-form');
+    await userEvent.selectOptions(screen.getByTestId('workspace-selector'), 'ws-1');
+    if (value) {
+      await userEvent.type(nameInput(), value);
+    }
 
-    // Select workspace
-    const select = screen.getByTestId('workspace-selector');
-    await userEvent.selectOptions(select, 'ws-1');
+    await userEvent.click(screen.getByTestId('save-create-form'));
 
-    await userEvent.click(saveButton);
-    expect(mockAddNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ text: 'Enter a form name.', type: 'error' }),
-    );
+    expect(await screen.findByText('Enter a form name.')).toBeInTheDocument();
+    expect(mockCreateSobaFormioForm).not.toHaveBeenCalled();
   });
 
   it('shows notification if workspace is not selected on save', async () => {
     renderComponent();
     const saveButton = screen.getByTestId('save-create-form');
 
-    // Enter form name
-    const input = screen.getByTestId('form-name-modal');
-    await userEvent.type(input, 'My New Form');
+    await userEvent.type(nameInput(), 'My New Form');
 
     await userEvent.click(saveButton);
     expect(mockAddNotification).toHaveBeenCalledWith(
@@ -210,12 +164,9 @@ describe('FormCreateContent', () => {
   });
 
   it('creates form successfully and redirects', async () => {
-    mockCreateSobaFormioForm.mockResolvedValue({ id: 'form-123' });
     renderComponent();
 
-    // Enter form name
-    const input = screen.getByTestId('form-name-modal');
-    await userEvent.type(input, 'My New Form');
+    await userEvent.type(nameInput(), 'My New Form');
 
     // Select workspace
     const select = screen.getByTestId('workspace-selector');
@@ -235,21 +186,65 @@ describe('FormCreateContent', () => {
     expect(mockRouterPush).toHaveBeenCalledWith('/en/build/form-123');
   });
 
-  it('handles conflict error on save', async () => {
-    mockCreateSobaFormioForm.mockRejectedValue(new ApiError('Conflict', 409));
+  // A version with no schema answers a read with 404, which leaves the designer nothing to open.
+  it('writes the empty schema to the version the form is created with', async () => {
     renderComponent();
 
-    const input = screen.getByTestId('form-name-modal');
-    await userEvent.type(input, 'My New Form');
+    await userEvent.type(nameInput(), 'My New Form');
+    await userEvent.selectOptions(screen.getByTestId('workspace-selector'), 'ws-1');
+    await userEvent.click(screen.getByTestId('save-create-form'));
 
-    const select = screen.getByTestId('workspace-selector');
-    await userEvent.selectOptions(select, 'ws-1');
+    expect(mockSaveFormVersionSchema).toHaveBeenCalledWith('mock-token', 'v-1', {
+      components: [],
+    });
+    expect(mockRouterPush).toHaveBeenCalledWith('/en/build/form-123');
+  });
 
-    const saveButton = screen.getByTestId('save-create-form');
-    await userEvent.click(saveButton);
+  it('sends the name without surrounding whitespace', async () => {
+    renderComponent();
+
+    await userEvent.type(nameInput(), '  My New Form  ');
+    await userEvent.selectOptions(screen.getByTestId('workspace-selector'), 'ws-1');
+    await userEvent.click(screen.getByTestId('save-create-form'));
+
+    expect(mockCreateSobaFormioForm).toHaveBeenCalledWith(
+      'mock-token',
+      { name: 'My New Form' },
+      'ws-1',
+    );
+  });
+
+  // A 409 here means the name is taken or the disclaimer is unaccepted, so the backend's own
+  // message is the useful one. Nothing in this dialog has versions to conflict over.
+  it('reports the reason a conflicting create was refused', async () => {
+    mockCreateSobaFormioForm.mockRejectedValue(
+      new ApiError('A form with this name already exists in this workspace.', 409),
+    );
+    renderComponent();
+
+    await userEvent.type(nameInput(), 'My New Form');
+    await userEvent.selectOptions(screen.getByTestId('workspace-selector'), 'ws-1');
+    await userEvent.click(screen.getByTestId('save-create-form'));
 
     expect(mockAddNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ text: 'Version conflict.', type: 'error' }),
+      expect.objectContaining({
+        text: 'A form with this name already exists in this workspace.',
+        type: 'error',
+      }),
+    );
+    expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the generic message when a create fails without one', async () => {
+    mockCreateSobaFormioForm.mockRejectedValue(new ApiError('', 500));
+    renderComponent();
+
+    await userEvent.type(nameInput(), 'My New Form');
+    await userEvent.selectOptions(screen.getByTestId('workspace-selector'), 'ws-1');
+    await userEvent.click(screen.getByTestId('save-create-form'));
+
+    expect(mockAddNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'Failed to save form.', type: 'error' }),
     );
   });
 

@@ -10,11 +10,12 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { useFormCreateWorkspaceOptions } from '@/src/shared/api/useWorkspaces';
 import { lookupTruncatedNote } from '@/src/shared/list/lookupOptions';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { createSobaFormioForm } from '@/src/shared/api/sobaApi';
+import { createSobaFormioForm, saveFormVersionSchema } from '@/src/shared/api/sobaApi';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { isConflict } from '@/src/shared/api/sobaHelpers';
 import type { SobaFormType } from '@/src/types/forms';
+import type { FormType } from '@formio/react';
 
 interface FormCreateContentProps {
   onCancelPress: () => void;
@@ -37,14 +38,6 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
 
   const creatableWorkspaces = useFormCreateWorkspaceOptions(true);
 
-  const reportWriteFailure = async (e: unknown, failedText: string) => {
-    if (!isConflict(e)) {
-      addNotification({ text: failedText, type: 'error', consoleError: e });
-      return;
-    }
-    addNotification({ text: dict.form.versionConflict, type: 'error', consoleError: e });
-  };
-
   const saveForm = async () => {
     if (isSaving) return;
     // Creating a form is workspace-scoped: without a selected workspace the backend
@@ -53,26 +46,36 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
       addNotification({ text: dict.form.noActiveWorkspaceError, type: 'error' });
       return;
     }
-    if (!formName) {
-      addNotification({ text: dict.form.noFormName, type: 'error' });
-      return;
-    }
     setIsSaving(true);
 
     try {
-      const data: SobaFormType = { name: formName };
+      const data: SobaFormType = { name: formName.trim() };
       const created = await createSobaFormioForm(
         token as string,
         data,
         selectedWorkspaceId || undefined,
       );
+      // The version the form is created with holds no schema, and a read of one that has none is a
+      // 404. Writing the empty schema here leaves the designer a draft it can open and publish.
+      if (created.formVersion?.id) {
+        await saveFormVersionSchema(token as string, created.formVersion.id, {
+          components: [],
+        } as FormType);
+      }
       addNotification({
         text: dict.form.saved,
         type: 'success',
       });
       router.push(`/${lang}/build/${created.id}`);
     } catch (e: unknown) {
-      await reportWriteFailure(e, dict.form.saveError);
+      // A 409 carries the backend's own reason: the name is taken, or the workspace disclaimer is
+      // unaccepted. Nothing in this dialog has versions, so the version-conflict wording is wrong.
+      const conflict = isConflict(e) && e instanceof Error && e.message;
+      addNotification({
+        text: conflict ? e.message : dict.form.saveError,
+        type: 'error',
+        consoleError: e,
+      });
     } finally {
       setIsSaving(false);
     }
@@ -105,7 +108,10 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
 
   return (
     <Form
-      onSubmit={(e) => e.preventDefault()}
+      onSubmit={(e) => {
+        e.preventDefault();
+        saveForm();
+      }}
       className="d-flex flex-column gap-3 mb-3"
       style={{ maxWidth: '640px' }}
     >
@@ -114,6 +120,8 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
         value={formName}
         onChange={setFormName}
         isRequired={true}
+        validate={(value) => (value.trim() ? null : dict.form.noFormName)}
+        errorMessage={dict.form.noFormName}
         data-testid="form-name-modal"
       />
 
@@ -135,6 +143,7 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
       />
       <div className="d-flex justify-content-end gap-2">
         <Button
+          type="button"
           isDisabled={isSaving}
           variant="secondary"
           onPress={onCancelPress}
@@ -142,7 +151,7 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
         >
           {dict.general.cancel}
         </Button>
-        <Button isDisabled={isSaving} onPress={saveForm} data-testid="save-create-form">
+        <Button type="submit" isDisabled={isSaving} data-testid="save-create-form">
           {dict.general.next}
         </Button>
       </div>

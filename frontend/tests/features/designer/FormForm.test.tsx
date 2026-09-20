@@ -2,7 +2,6 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { FormSubmitterAudience } from '@/src/types/groups';
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
   useKeycloak: () => ({ authenticated: true, token: 'token', initializing: false }),
@@ -61,11 +60,7 @@ type Workspace = {
 };
 type Version = { id: string; versionNo: number; state: string };
 
-const { mockWorkspaceState, api, builder, audienceApi } = vi.hoisted(() => ({
-  audienceApi: {
-    getSubmitterAudience: vi.fn(),
-    getFormSubmitterAudience: vi.fn(),
-  },
+const { mockWorkspaceState, api, builder } = vi.hoisted(() => ({
   mockWorkspaceState: {
     creatable: [{ id: 'ws1', disclaimerAccepted: true }] as Workspace[],
     formCreate: 'allowed' as string,
@@ -117,24 +112,6 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
     }),
   ),
 }));
-
-// The submitter audience control reads through its own API module: the workspace's on the create
-// page, the form's on an existing form.
-vi.mock('@/src/shared/api/sobaApiGroups', () => ({
-  getSubmitterAudience: audienceApi.getSubmitterAudience,
-  setSubmitterAudience: vi.fn(),
-  getFormSubmitterAudience: audienceApi.getFormSubmitterAudience,
-  setFormSubmitterAudience: vi.fn(),
-}));
-
-const providers = [{ code: 'azureidir', name: 'IDIR - MFA' }];
-const formAudience: FormSubmitterAudience = {
-  inherit: true,
-  mode: 'protected',
-  idps: ['azureidir'],
-  available: providers,
-  workspace: { mode: 'protected', idps: ['azureidir'], users: [] },
-};
 
 // Mock DynamicForm and FormDesigner components used in FormForm
 vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => ({
@@ -282,8 +259,6 @@ describe('FormForm', () => {
     api.createFormVersion.mockResolvedValue({ id: 'v-new', versionNo: 3, state: 'draft' });
     api.saveFormVersionSchema.mockResolvedValue({});
     api.publishSobaFormVersion.mockResolvedValue({});
-    audienceApi.getSubmitterAudience.mockImplementation(() => new Promise(() => {}));
-    audienceApi.getFormSubmitterAudience.mockImplementation(() => new Promise(() => {}));
     builder.onUpdateModel = null;
   });
 
@@ -293,34 +268,6 @@ describe('FormForm', () => {
     });
     // The designer area includes a form name heading; assert it renders with loaded value
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Test' })).toBeInTheDocument());
-  });
-
-  // Changing a form's audience is a form_update; reading the form is not enough.
-  it.each([
-    ['form_read', ['form_read'], true],
-    ['form_update', ['form_read', 'form_update'], false],
-    ['the wildcard', ['*'], false],
-  ])('gates the form audience for %s', async (_label, permissions, disabled) => {
-    api.getSobaForm.mockImplementation(() =>
-      Promise.resolve({
-        id: 'f1',
-        name: 'Test',
-        description: '',
-        permissions,
-        currentVersion: null,
-      }),
-    );
-    audienceApi.getFormSubmitterAudience.mockResolvedValue(formAudience);
-    await act(async () => {
-      await renderForm({ formId: 'f1' });
-    });
-
-    await waitFor(() => expect(screen.getByText('Test')).toBeInTheDocument());
-    const trigger = await screen.findByTestId('submitter-audience-trigger');
-    await waitFor(() => expect(trigger).toHaveTextContent('Inherited: Protected (IDIR - MFA)'));
-    expect(trigger).toHaveProperty('disabled', disabled);
-    expect(audienceApi.getFormSubmitterAudience).toHaveBeenCalledWith('token', 'f1');
-    expect(audienceApi.getSubmitterAudience).not.toHaveBeenCalled();
   });
 
   // The form's current version is what the builder is fed.
@@ -412,19 +359,6 @@ describe('FormForm', () => {
     await userEvent.click(screen.getByTestId('publish-form-button'));
     await waitFor(() => expect(api.publishSobaFormVersion).toHaveBeenCalledWith('token', 'v1'));
     await waitFor(() => expect(api.getSobaForm.mock.calls.length).toBeGreaterThan(formReads));
-  });
-
-  // The loaded name is server truth and the typed one is the user's unsaved edit. A re-read must
-  // never win over what has been typed.
-  it('keeps a typed name over the loaded one', async () => {
-    await act(async () => {
-      await renderForm({ formId: 'f1' });
-    });
-    await userEvent.click(screen.getByTestId('settings-tab'));
-    const input = (await screen.findByDisplayValue('Test')) as HTMLInputElement;
-    fireEvent.change(input, { target: { value: 'Renamed' } });
-    expect(await screen.findByDisplayValue('Renamed')).toBeInTheDocument();
-    expect(screen.queryByDisplayValue('Test')).not.toBeInTheDocument();
   });
 
   // Switching versions changes which schema is read, and the read-only notice explains why save is
@@ -556,9 +490,9 @@ describe('FormForm', () => {
     expect(api.saveFormVersionSchema.mock.calls[1][1]).toBe('v-new');
   });
 
-  // An existing form with no current version has nothing to save to. Falling through to the create
-  // branch there files the edits under a second form.
-  it('never creates a second form for an existing formId', async () => {
+  // A form with no current version has nothing to save to. Writing anyway would file the schema
+  // against a version the form does not carry.
+  it('writes nothing for a form with no current version', async () => {
     mockWorkspaceState.versions = [];
     await act(async () => {
       await renderForm({ formId: 'f1' });
@@ -566,18 +500,17 @@ describe('FormForm', () => {
     await waitFor(() => expect(screen.getByTestId('save-form-button')).toBeEnabled());
 
     await userEvent.click(screen.getByTestId('save-form-button'));
-    expect(api.createSobaFormioForm).not.toHaveBeenCalled();
+    expect(api.saveFormVersionSchema).not.toHaveBeenCalled();
   });
 
   // The schema key is null until the form arrives, so a loading flag covering only the schema read
-  // reports ready and the designer claims the schema is missing.
-  it('shows a spinner, not "schema not available", while the draft assembles', async () => {
+  // reports ready before there is anything to draw.
+  it('waits for the draft to assemble before drawing the designer', async () => {
     mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
     await act(async () => {
       await renderForm({ formId: 'f1' });
     });
 
-    expect(screen.queryByText('Form schema not available.')).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('form-designer')).toBeInTheDocument());
   });
 

@@ -8,14 +8,21 @@ import type { Dictionary } from '@/src/types/dictionary';
 import type { FormSubmitterAudience } from '@/src/types/groups';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 
-const { mockGetSettings, mockSetSettings, mockGetAudience, mockAddNotification } = vi.hoisted(
-  () => ({
+const { mockGetSettings, mockSetSettings, mockGetAudience, mockAddNotification, mockGetForm } =
+  vi.hoisted(() => ({
     mockGetSettings: vi.fn(),
     mockSetSettings: vi.fn(),
     mockGetAudience: vi.fn(),
     mockAddNotification: vi.fn(),
-  }),
-);
+    mockGetForm: vi.fn(),
+  }));
+
+vi.mock('@/src/shared/api/sobaApi', () => ({
+  getSobaForm: mockGetForm,
+  getSobaFormVersion: vi.fn(),
+  lookupFormVersions: vi.fn().mockResolvedValue({ items: [] }),
+  getFormVersionSchema: vi.fn(),
+}));
 
 vi.mock('@/src/features/form-settings/api', () => ({
   getFormSettings: mockGetSettings,
@@ -31,6 +38,13 @@ vi.mock('@/src/shared/api/sobaApiGroups', () => ({
 
 vi.mock('@/lib/hooks/useNotificationStore', () => ({
   useNotificationStore: () => ({ addNotification: mockAddNotification }),
+}));
+
+// The audience control reads the dictionary from context and has its own suite.
+vi.mock('@/src/features/designer/ui/FormSubmitterAudience', () => ({
+  FormSubmitterAudience: ({ canManage }: { canManage: boolean }) => (
+    <div data-testid="submitter-audience" data-can-manage={String(canManage)} />
+  ),
 }));
 
 import makeStore from '@/lib/store';
@@ -110,6 +124,24 @@ describe('SubmitterSettingsDrawer', () => {
     store.dispatch(setToken('token'));
     store.dispatch(setAuthenticated(true));
     mockGetAudience.mockResolvedValue(audience('protected'));
+    mockGetForm.mockResolvedValue({ id: 'f1', workspaceId: 'ws1', permissions: ['form_update'] });
+  });
+
+  // The audience is the form's, so editing it follows form_update rather than a workspace role.
+  it.each([
+    [['form_update'], 'true'],
+    [['*'], 'true'],
+    [['form_read'], 'false'],
+  ])('gates the audience control on %s', async (permissions, canManage) => {
+    mockGetSettings.mockResolvedValue({ allowSubmitterDrafts: false });
+    mockGetForm.mockResolvedValue({ id: 'f1', workspaceId: 'ws1', permissions });
+    renderDrawer();
+    await waitFor(() =>
+      expect(screen.getByTestId('submitter-audience')).toHaveAttribute(
+        'data-can-manage',
+        canManage,
+      ),
+    );
   });
 
   it('shows the saved setting', async () => {
