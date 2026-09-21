@@ -44,9 +44,9 @@ export async function requireSubmissionFileReadAccess(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { record } = await getSubmissionFile(req);
+    const { record, submission } = await getSubmissionFile(req);
     const allowed = await hasFormSubmitAccess(
-      record.workspaceId,
+      { workspaceId: record.workspaceId, formId: submission.formId },
       resolveCaller(req),
       Permissions.submission_read,
     );
@@ -67,12 +67,13 @@ export async function requireSubmissionFileDeleteAccess(
   try {
     const { record, submission } = await getSubmissionFile(req);
     const caller = resolveCaller(req);
+    const target = { workspaceId: record.workspaceId, formId: submission.formId };
     const allowed =
       submission.workflowState === SubmissionWorkflowState.submitted
-        ? await hasFormSubmitAccess(record.workspaceId, caller, Permissions.submission_update)
+        ? await hasFormSubmitAccess(target, caller, Permissions.submission_update)
         : !!caller.actorId &&
           submission.submittedBy === caller.actorId &&
-          (await hasFormSubmitAccess(record.workspaceId, caller, Permissions.submission_create));
+          (await hasFormSubmitAccess(target, caller, Permissions.submission_create));
     if (!allowed) throw accessDenial(req, 'Not authorized to access this file');
     req.fileRecord = record;
     next();

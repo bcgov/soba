@@ -60,7 +60,10 @@ describe('file access middleware', () => {
 
   it('allows submission reads only for callers with submission_read', async () => {
     fileByIdMock.mockResolvedValue(fileRecord);
-    submissionMock.mockResolvedValue({ workflowState: SubmissionWorkflowState.draft });
+    submissionMock.mockResolvedValue({
+      formId: 'form-id',
+      workflowState: SubmissionWorkflowState.draft,
+    });
     accessMock.mockResolvedValue(true);
     const request = {
       params: { id: 'file-id' },
@@ -72,7 +75,7 @@ describe('file access middleware', () => {
     await requireSubmissionFileReadAccess(request, response, next);
 
     expect(accessMock).toHaveBeenCalledWith(
-      'workspace-id',
+      { workspaceId: 'workspace-id', formId: 'form-id' },
       { actorId: 'actor-id', idpCode: 'idir' },
       Permissions.submission_read,
     );
@@ -84,6 +87,7 @@ describe('file access middleware', () => {
   it('denies deletion of a draft file when the caller is not its owner', async () => {
     fileByIdMock.mockResolvedValue(fileRecord);
     submissionMock.mockResolvedValue({
+      formId: 'form-id',
       workflowState: SubmissionWorkflowState.draft,
       submittedBy: 'another-actor',
     });
@@ -106,6 +110,7 @@ describe('file access middleware', () => {
   it('uses submission_update for deleting a submitted file', async () => {
     fileByIdMock.mockResolvedValue(fileRecord);
     submissionMock.mockResolvedValue({
+      formId: 'form-id',
       workflowState: SubmissionWorkflowState.submitted,
       submittedBy: 'another-actor',
     });
@@ -120,7 +125,7 @@ describe('file access middleware', () => {
     await requireSubmissionFileDeleteAccess(request, response, next);
 
     expect(accessMock).toHaveBeenCalledWith(
-      'workspace-id',
+      { workspaceId: 'workspace-id', formId: 'form-id' },
       { actorId: 'actor-id', idpCode: 'idir' },
       Permissions.submission_update,
     );

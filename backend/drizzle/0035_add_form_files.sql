@@ -1,3 +1,4 @@
+-- These are files associated with forms at the designer level
 ALTER TABLE "soba"."file" ADD COLUMN "form_id" uuid;
 --> statement-breakpoint
 ALTER TABLE "soba"."file" ADD CONSTRAINT "file_form_id_fkey" FOREIGN KEY ("form_id") REFERENCES "soba"."form"("id") ON DELETE no action ON UPDATE no action;
