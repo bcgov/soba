@@ -246,15 +246,21 @@ export const getSubmissionListContext = async (
   return row[0] ?? null;
 };
 
-/** Resolve a submission's workspace, form + workflow state by id alone (for the file-upload gate). */
+/** Resolve a submission's workspace, form, workflow state + owner by id alone (for the write gates). */
 export const getSubmissionWorkspaceAndState = async (
   submissionId: string,
-): Promise<{ workspaceId: string; formId: string; workflowState: string } | null> => {
+): Promise<{
+  workspaceId: string;
+  formId: string;
+  workflowState: string;
+  submittedBy: string | null;
+} | null> => {
   const rows = await db
     .select({
       workspaceId: submissions.workspaceId,
       formId: submissions.formId,
       workflowState: submissions.workflowState,
+      submittedBy: submissions.submittedBy,
     })
     .from(submissions)
     .where(and(eq(submissions.id, submissionId), isNull(submissions.deletedAt)))

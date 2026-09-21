@@ -1,5 +1,5 @@
 import { hasFormSubmitAccess, type FormAccessTarget } from '../db/repos/formSubmitAccessRepo';
-import { getSubmissionListContext } from '../db/repos/submissionRepo';
+import { getSubmissionWorkspaceAndState } from '../db/repos/submissionRepo';
 import { getWorkspaceIdForForm } from '../db/repos/formRepo';
 import {
   Permissions,
@@ -8,6 +8,7 @@ import {
   type PermissionCode,
 } from '../db/codes';
 import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from '../errors';
+import { log } from '../logging';
 import { resolveCaller } from './actor';
 import type { Request, Response, NextFunction } from 'express';
 
@@ -15,24 +16,36 @@ import type { Request, Response, NextFunction } from 'express';
 export const accessDenial = (req: Request, message: string): Error =>
   req.user ? new ForbiddenError(message) : new UnauthorizedError(message);
 
+export interface SubmissionOwnership {
+  id: string;
+  formId: string;
+  submittedBy: string | null;
+}
+
 /**
  * Resolve the form a submission request authorizes against. POST /submissions (open) names its form in
  * the body; the published version is resolved server-side by the service. POST
  * /submissions/:id/{save,submit} carry the submission id. Throws 404 when the named form or submission
  * doesn't exist, so the downstream controller never runs without a context.
  */
-const resolveSubmitTarget = async (req: Request): Promise<FormAccessTarget> => {
+const resolveSubmitTarget = async (
+  req: Request,
+): Promise<{ target: FormAccessTarget; submission?: SubmissionOwnership }> => {
+  // The :id branch goes first so a body formId can never skip the owner check.
+  if (req.params.id) {
+    const submission = await getSubmissionWorkspaceAndState(req.params.id);
+    if (!submission) throw new NotFoundError('Submission not found');
+    return {
+      target: { workspaceId: submission.workspaceId, formId: submission.formId },
+      submission: { id: req.params.id, ...submission },
+    };
+  }
+
   const bodyFormId = (req.body as { formId?: unknown } | undefined)?.formId;
   if (typeof bodyFormId === 'string' && bodyFormId) {
     const workspaceId = await getWorkspaceIdForForm(bodyFormId);
     if (!workspaceId) throw new NotFoundError('Form not found');
-    return { workspaceId, formId: bodyFormId };
-  }
-
-  if (req.params.id) {
-    const submission = await getSubmissionListContext(req.params.id);
-    if (!submission) throw new NotFoundError('Submission not found');
-    return { workspaceId: submission.workspaceId, formId: submission.formId };
+    return { target: { workspaceId, formId: bodyFormId } };
   }
 
   throw new ValidationError('Missing submission target');
@@ -101,6 +114,7 @@ export const authorizeSubmitterForForm = async (
 /**
  * Authorizes a submission (open / save / submit) against the target form's Form submitters audience
  * (or the caller's staff permissions), then populates req.coreContext for the downstream controller.
+ * Save and submit also require the caller to own the submission.
  */
 export const requireFormSubmitAccess = async (
   req: Request,
@@ -108,10 +122,29 @@ export const requireFormSubmitAccess = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const target = await resolveSubmitTarget(req);
+    const { target, submission } = await resolveSubmitTarget(req);
     await authorizeSubmitterForForm(req, res, target, Permissions.submission_create);
+    if (submission) assertSubmissionOwner(req, submission);
     next();
   } catch (error) {
     next(error);
   }
+};
+
+/**
+ * Throws unless req.actorId owns the submission. Anonymous callers share the public user, so they
+ * pass for any anonymous submission.
+ */
+export const assertSubmissionOwner = (req: Request, submission: SubmissionOwnership): void => {
+  if (req.actorId && submission.submittedBy === req.actorId) return;
+  log.warn(
+    {
+      submissionId: submission.id,
+      formId: submission.formId,
+      actorId: req.actorId,
+      ownerId: submission.submittedBy,
+    },
+    'Submission write refused: caller is not the owner',
+  );
+  throw accessDenial(req, 'Not authorized to change this submission');
 };
