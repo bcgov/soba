@@ -91,7 +91,10 @@ export function registerFilesOpenApi(registry: OpenAPIRegistry) {
         required: true,
         content: {
           'multipart/form-data': {
-            schema: z.object({ file: z.string(), storageProfile: z.string().optional() }),
+            schema: z.object({
+              file: z.string().openapi({ format: 'binary' }),
+              storageProfile: z.string().optional(),
+            }),
           },
         },
       },
