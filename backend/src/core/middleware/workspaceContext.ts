@@ -19,11 +19,8 @@ import { ForbiddenError, NotFoundError, ValidationError } from '../errors';
 import { WorkspaceMembershipRole } from '../db/codes';
 import { getActorId } from './actor';
 import { getFormListContext, getWorkspaceIdForForm } from '../db/repos/formRepo';
-import {
-  getFormVersionListContext,
-  getWorkspaceIdForFormVersion,
-} from '../db/repos/formVersionRepo';
-import { getSubmissionListContext, getWorkspaceIdForSubmission } from '../db/repos/submissionRepo';
+import { getFormVersionListContext } from '../db/repos/formVersionRepo';
+import { getSubmissionListContext } from '../db/repos/submissionRepo';
 import type { CoreRequestContext } from './requestContext';
 
 const RESOURCE_NOT_FOUND = 'Resource not found';
@@ -174,12 +171,14 @@ export const buildCoreContext = async (
  */
 const buildSubmitContext = async (
   actorId: string,
-  workspaceId: string,
+  scope: ResourceScope,
   source: string,
 ): Promise<CoreRequestContext> => {
+  const { workspaceId, formId } = scope;
   const membership = await loadMembership(workspaceId, actorId);
   return {
     workspaceId,
+    ...(formId ? { formId } : {}),
     actorId,
     actorDisplayLabel: await loadActorDisplayLabel(actorId),
     workspaceSource: source,
@@ -206,11 +205,11 @@ export const openWorkspaceFromResource = (config: {
       if (!resourceId) {
         throw new ValidationError('Missing resource identifier for workspace resolution');
       }
-      const workspaceId = await lookupWorkspaceId(config.kind, resourceId);
-      if (!workspaceId) {
+      const scope = await lookupResourceScope(config.kind, resourceId);
+      if (!scope) {
         throw new NotFoundError(RESOURCE_NOT_FOUND);
       }
-      req.coreContext = await buildSubmitContext(actorId, workspaceId, `submit:${config.kind}`);
+      req.coreContext = await buildSubmitContext(actorId, scope, `submit:${config.kind}`);
       next();
     } catch (error) {
       next(error);
@@ -320,23 +319,28 @@ export const workspaceListScope = (config: {
 export type WorkspaceResourceKind = 'form' | 'formVersion' | 'submission' | 'workspace';
 export type ResourceIdSource = 'paramsId' | 'queryFormId' | 'bodyFormId';
 
-const lookupWorkspaceId = async (
+/** The workspace a resource belongs to and, for a form or anything under one, the form. */
+type ResourceScope = { workspaceId: string; formId?: string };
+
+const lookupResourceScope = async (
   kind: WorkspaceResourceKind,
   resourceId: string,
-): Promise<string | null> => {
+): Promise<ResourceScope | null> => {
   switch (kind) {
-    case 'form':
-      return getWorkspaceIdForForm(resourceId);
+    case 'form': {
+      const workspaceId = await getWorkspaceIdForForm(resourceId);
+      return workspaceId ? { workspaceId, formId: resourceId } : null;
+    }
     case 'formVersion':
-      return getWorkspaceIdForFormVersion(resourceId);
+      return getFormVersionListContext(resourceId);
     case 'submission':
-      return getWorkspaceIdForSubmission(resourceId);
+      return getSubmissionListContext(resourceId);
     case 'workspace': {
       // The resource is the workspace itself. Confirm it exists so a missing workspace
       // yields 404 (matching workspaces/schema.ts); membership is then verified by
       // buildCoreContext, which yields 403 for an existing workspace the actor can't access.
       const workspace = await getWorkspaceById(resourceId);
-      return workspace ? resourceId : null;
+      return workspace ? { workspaceId: resourceId } : null;
     }
   }
 };
@@ -370,11 +374,12 @@ export const workspaceFromResource = (config: {
       if (!resourceId) {
         throw new ValidationError('Missing resource identifier for workspace resolution');
       }
-      const workspaceId = await lookupWorkspaceId(config.kind, resourceId);
-      if (!workspaceId) {
+      const scope = await lookupResourceScope(config.kind, resourceId);
+      if (!scope) {
         throw new NotFoundError(RESOURCE_NOT_FOUND);
       }
-      req.coreContext = await buildCoreContext(actorId, workspaceId, `resource:${config.kind}`);
+      const context = await buildCoreContext(actorId, scope.workspaceId, `resource:${config.kind}`);
+      req.coreContext = scope.formId ? { ...context, formId: scope.formId } : context;
 
       next();
     } catch (error) {

@@ -62,8 +62,9 @@ Group names are unique among **active** groups in a workspace. Delete is a soft-
 its roles and memberships are set to `inactive` in one transaction, so the resolver (which only reads
 active roles/memberships) stops granting through it, and the name frees up for reuse.
 
-Only `user` members are managed here; `idp`/`idp_group` members and per-form overrides are a later
-phase. The repo (`workspaceGroupRepo.ts`) is shared with workspace bootstrap.
+Only `user` members are managed here. Per-form overrides are covered in
+[Form-level overrides](#form-level-overrides). The repo (`workspaceGroupRepo.ts`) is shared with
+workspace bootstrap.
 
 **Protected groups.** The two bootstrap groups carry a hidden `workspace_group.system_code`
 (`form_admins`/`form_submitters`) so protections don't depend on the renameable name. Both can be
@@ -76,7 +77,8 @@ via `POST …/members` with `{kind:'user', membershipId}` or `{kind:'idp', code}
 Only *Form submitters* accepts `idp` members (all other groups are user-only); an `idp` must be an active
 login provider or `public`, never `system`. `public` is exclusive — it can only be the group's sole
 member (blocks all other adds, and can't be added to a non-empty group). This is the workspace-level
-submit audience; enforcement (retiring `form_version.visibility`) is a later stage.
+submit audience. `GET /workspaces/:id/submitter-audience` (any member) reads it and `PUT` (owner/admin)
+sets it: `{mode:'public'}` or `{mode:'protected', idps}`.
 
 ## Form access (RBAC)
 
@@ -141,7 +143,8 @@ The role lives on the group (`workspace_group_role`). `member_kind` selects the 
 | `idp_group`   | `idp_group_code`           | anyone whose provider is in that IdP group (e.g. `bcgov` = `idir` + `azureidir`) |
 
 `user` members are resolved for form permissions by `resolveFormPermissions`. `idp` members are
-resolved only for the Form submitters audience, by `hasFormSubmitAccess` in `formSubmitAccessRepo.ts`.
+resolved only for the Form submitters audience, by `hasFormSubmitAccess` in `formSubmitAccessRepo.ts`,
+against the form's effective members (see [Form-level overrides](#form-level-overrides)).
 `idp_group` members are not resolved. `public` is a pseudo identity provider (`identity_provider.is_login_provider = false`) used as a
 match-all selector.
 
@@ -152,10 +155,39 @@ Creating a workspace bootstraps two form groups (`bootstrapWorkspaceOwner` in `w
 | group                | role             | members on create |
 |----------------------|------------------|-------------------|
 | Form administrators  | `form_admin`     | the workspace creator |
-| Form submitters      | `form_submitter` | none (empty) |
+| Form submitters      | `form_submitter` | an `idp` member for the default submitter provider |
 
-So the creator can do everything with the workspace's forms. The Submitter group sits empty until
-submitter access is configured; the visibility work fills it with `idp`/`public`/user members.
+So the creator can do everything with the workspace's forms. The default submitter provider is
+`DEFAULT_SUBMITTER_PROVIDER` (`azureidir` when unset); it is seeded only when it is an active login
+provider, otherwise the Form submitters group starts empty.
+
+### Form-level overrides
+
+A form can override a workspace group's membership for itself. A new form overrides nothing and
+inherits every group, so a change to a workspace group reaches every form that has not overridden it.
+
+- `form_group_override` - one active row per (form, group) marks an explicit override.
+- `form_group_override_member` - the override's members, with the same `member_kind` references and
+  constraints as `workspace_group_membership`.
+
+An override replaces the group's whole membership for that form; roles stay on the workspace group.
+Returning to inherit sets the override `inactive` and deletes its members.
+`effectiveGroupMembers` in `formGroupOverrideRepo.ts` returns, for a form, each active group's override
+members where the form has an active override, otherwise the workspace group's members.
+
+The submit surface reads overrides: `hasFormSubmitAccess({workspaceId, formId}, ...)` checks the
+form's effective `idp` members, and resolves roles with `resolveFormPermissionsForForm`, which follows
+the form's effective `user` members. That covers open, save, submit, the confirmation reads, uploads,
+file download/delete and document generation. Design routes and lists still use
+`resolveFormPermissions`, which reads workspace group membership, so they are not form-aware yet.
+
+| method | path | effect |
+|--------|------|--------|
+| `GET` | `/design/forms/:id/submitter-audience` | `inherit`, the effective `mode` and `idps`, and the workspace audience (`form_read`) |
+| `PUT` | `/design/forms/:id/submitter-audience` | `{mode:'inherit'}`, `{mode:'public'}` or `{mode:'protected', idps}` with at least one provider (`form_update`) |
+
+A form override holds `public` or login providers only. Named people in the workspace audience cannot
+submit a form that overrides it unless another group gives them access.
 
 ### Resolving a user's permissions
 
@@ -179,9 +211,8 @@ codes a user holds:
 ```
 
 It's workspace-scoped: a user's form permissions are the same for every form in the workspace, because
-there's no per-form override yet. `effectiveFormPermissions(actorId, formId)` is a thin wrapper that
-looks up the form's workspace and calls the same function. `hasAllPermissions(perms, required)` does the
-check and treats `*` as a match for anything.
+it reads workspace group membership and not form overrides. `hasAllPermissions(perms, required)` does
+the check and treats `*` as a match for anything.
 
 `GET /forms/:id` returns the caller's resolved codes as `permissions` (a sorted array, `['*']` for
 admins) so the UI can gate actions. This reads the same resolver, so it upgrades automatically when
@@ -195,7 +226,8 @@ Creating a workspace writes, in one transaction:
 - 1 `workspace_membership` for the creator (`role = 'owner'`)
 - 2 `workspace_group` — "Form administrators", "Form submitters"
 - 2 `workspace_group_role` — those groups' `form_admin` / `form_submitter` roles
-- 1 `workspace_group_membership` — the creator in "Form administrators" (the Submitter group starts empty)
+- 1 or 2 `workspace_group_membership` - the creator in "Form administrators", and the default submitter
+  provider in "Form submitters" when it is an active login provider
 
 ## CSTAR tenants
 

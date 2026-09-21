@@ -8,6 +8,7 @@ import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
 import { groupsDomain } from './groups';
 import { designFilesRouter, filesDomain } from '../../features/files';
 import { documentGenerationDomain } from '../../features/document-generation';
+import { formSettingsRouter, registerFormSettingsOpenApi } from '../../features/form-settings';
 import { meDomain } from './me';
 import { membersDomain } from './members';
 import { workspacesDomain } from './workspaces';
@@ -20,6 +21,7 @@ import { registerOpenApiPaths } from './shared/openapi';
 //  - coreRouter    (/api/v1):        workspace/account management (not a toggled feature).
 registerOpenApiPaths((registry) => {
   registerFormsOpenApi(registry);
+  registerFormSettingsOpenApi(registry);
   registerSubmissionsOpenApi(registry);
   registerSubmitOpenApi(registry);
   groupsDomain.registerOpenApi(registry);
@@ -33,8 +35,10 @@ registerOpenApiPaths((registry) => {
   registerHealthOpenApi(registry);
 });
 
-// Design feature: form authoring + submission management.
+// Design feature: form authoring + submission management. Form settings groups are self-contained
+// modules under /forms/:id/settings (features/form-settings).
 const designRouter = express.Router();
+designRouter.use('/forms/:id/settings', formSettingsRouter);
 designRouter.use('/', designFormsRouter);
 designRouter.use('/forms/:id/files', designFilesRouter);
 designRouter.use('/submissions', designSubmissionsRouter);

@@ -76,8 +76,10 @@ formio:
     initialDelaySeconds: 60
 
 mongodb:
+  # MongoDB runs as its own release from deployments/helm/action-mongodb. The deploy
+  # workflow supplies external.host and external.authSecretName.
   internal:
-    enabled: true
+    enabled: false
   replicas: 1
   resources:
     requests:

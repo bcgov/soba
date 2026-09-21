@@ -48,8 +48,10 @@ formio:
       memory: 512Mi
 
 mongodb:
+  # MongoDB runs as its own release from deployments/helm/action-mongodb. The deploy
+  # workflow supplies external.host and external.authSecretName.
   internal:
-    enabled: true
+    enabled: false
   replicas: 1
   persistence:
     size: 1Gi

@@ -1,4 +1,4 @@
-import type { Dictionary } from '@/src/types/plugins';
+import type { Dictionary } from '@/src/types/dictionary';
 
 interface FormTeamTabProps {
   dict: Dictionary;

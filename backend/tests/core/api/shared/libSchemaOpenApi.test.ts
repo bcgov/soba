@@ -5,10 +5,12 @@ import { registerWorkspacesOpenApi } from '../../../../src/core/api/workspaces/s
 import { registerAdminOpenApi } from '../../../../src/core/api/admin/schema';
 import { registerMetaOpenApi } from '../../../../src/core/api/meta/schema';
 import { registerMeOpenApi } from '../../../../src/core/api/me/schema';
+import { registerFormSettingsOpenApi } from '../../../../src/features/form-settings';
 
 function componentSchemas(): unknown {
   const registry = new OpenAPIRegistry();
   registerFormsOpenApi(registry);
+  registerFormSettingsOpenApi(registry);
   registerSubmissionsOpenApi(registry);
   registerWorkspacesOpenApi(registry);
   registerAdminOpenApi(registry);
@@ -89,6 +91,15 @@ describe('OpenAPI components for lib-backed schemas', () => {
     expect(at(schemas, 'Meta_CodesKeyedResponse', 'additionalProperties', 'items')).toEqual(
       ref('Meta_CodeRowWithSource'),
     );
+  });
+
+  it('names the submitter settings response and body', () => {
+    expect(
+      at(schemas, 'FormSettings_Submitter', 'properties', 'allowSubmitterDrafts', 'type'),
+    ).toBe('boolean');
+    expect(at(schemas, 'FormSettings_SetSubmitterBody', 'required')).toEqual([
+      'allowSubmitterDrafts',
+    ]);
   });
 
   it('builds the form-with-version response on the named form response', () => {

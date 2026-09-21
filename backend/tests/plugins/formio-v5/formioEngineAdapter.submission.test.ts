@@ -39,7 +39,7 @@ function makeClient(overrides: Partial<FakeClient> = {}): FakeClient {
 const createInput = {
   engineFormRef: 'form-ref-1',
   submissionId: 's1',
-  revisionNo: 3,
+  revisionId: 'rev-3',
   workspaceId: 'ws1',
   data: { firstName: 'Ada' },
 };
@@ -54,8 +54,7 @@ describe('FormioEngineAdapter submission methods', () => {
     expect(body.metadata).toEqual({
       soba_workspace_id: 'ws1',
       soba_submission_id: 's1',
-      soba_revision_no: 3,
-      soba_revision_key: 'soba-s1-r3',
+      soba_revision_id: 'rev-3',
     });
   });
 
@@ -77,7 +76,7 @@ describe('FormioEngineAdapter submission methods', () => {
 
     expect(res).toEqual({ engineRef: 'sub-new' });
     expect(client.loadSubmissions).toHaveBeenCalledWith('form-ref-1', {
-      params: { 'metadata.soba_revision_key': 'soba-s1-r3' },
+      params: { 'metadata.soba_revision_id': 'rev-3' },
     });
     const body = client.saveSubmission.mock.calls[0][1] as Record<string, unknown>;
     expect(body._id).toBeUndefined(); // POST (new doc), not PUT
@@ -119,7 +118,7 @@ describe('FormioEngineAdapter submission methods', () => {
         owner: 'o',
         created: 'c',
         data: { firstName: 'Ada' },
-        metadata: { soba_revision_key: 'soba-s1-r3', headers: { host: 'x' } },
+        metadata: { soba_revision_id: 'rev-3', headers: { host: 'x' } },
       }),
     });
     mockedGetClient.mockResolvedValue(client);
