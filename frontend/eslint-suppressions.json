@@ -1,2 +1,72 @@
 {
+  "src/features/admin/ui/FeatureScopeListPanel.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "src/features/admin/ui/FeatureScopePanel.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "src/features/admin/ui/SobaAdminsPanel.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "src/features/designer/ui/DesignSubmissionView.tsx": {
+    "no-restricted-imports": {
+      "count": 2
+    }
+  },
+  "src/features/designer/ui/FormCreateContent.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "src/features/designer/ui/FormForm.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "src/features/designer/ui/FormList.tsx": {
+    "no-restricted-imports": {
+      "count": 2
+    }
+  },
+  "src/features/designer/ui/FormSubmissionTab.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "src/features/form-settings/form/FormSettingsDrawer.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "src/features/form-settings/profile/FormProfileDrawer.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "src/features/formio-v5/ui/FormioV5SubmissionFillClient.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "src/features/submit-mode/ui/StartSubmission.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "src/features/submit-mode/ui/SubmissionView.tsx": {
+    "no-restricted-imports": {
+      "count": 2
+    }
+  },
+  "src/features/workspaces/ui/WorkspaceForm.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  }
 }
