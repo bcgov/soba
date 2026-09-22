@@ -6,6 +6,7 @@ import {
   SubmitSubmissionBodySchema as SobaSubmitSubmissionBodySchema,
   OpenSubmissionBodySchema as SobaOpenSubmissionBodySchema,
   SubmissionResponseSchema as SobaSubmissionResponseSchema,
+  SubmissionRevisionInfoSchema as SobaSubmissionRevisionInfoSchema,
   ListSubmissionsResponseSchema as SobaListSubmissionsResponseSchema,
   SubmissionSortSchema as SobaSubmissionSortSchema,
 } from '@soba/lib';
@@ -86,6 +87,15 @@ export const SubmissionListItemSchema = SobaSubmissionListItemSchema.clone().ope
 export const SubmissionResponseSchema = SobaSubmissionResponseSchema.clone().openapi(
   'Submissions_SubmissionResponse',
 );
+
+export const SubmissionRevisionInfoSchema = SobaSubmissionRevisionInfoSchema.clone().openapi(
+  'Submissions_SubmissionRevisionInfo',
+);
+
+// Save/submit response: the submission plus the revision this write produced (current or pending).
+export const SubmissionWriteResponseSchema = SobaSubmissionResponseSchema.extend({
+  revision: SubmissionRevisionInfoSchema,
+}).openapi('Submissions_SubmissionWriteResponse');
 
 export const ListSubmissionsResponseSchema = SobaListSubmissionsResponseSchema.extend({
   items: z.array(SubmissionListItemSchema),

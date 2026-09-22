@@ -1,6 +1,8 @@
 export type {
   SubmissionListItem,
   SubmissionResponse,
+  SubmissionRevisionInfo,
+  SubmissionWriteResponse,
   ListSubmissionsResponse,
   SubmissionDataBody,
   SubmitSubmissionBody,

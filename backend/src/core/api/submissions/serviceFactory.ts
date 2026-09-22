@@ -1,4 +1,4 @@
-import { SubmissionService } from '../../services/submissionService';
+import { SubmissionService, type SubmissionWriteOutcome } from '../../services/submissionService';
 import type {
   SubmissionRecord,
   SubmissionListRow,
@@ -55,6 +55,11 @@ const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
     submittedBy: detail.submittedBy ?? null,
   };
 };
+
+const toSubmissionWriteDto = (outcome: SubmissionWriteOutcome) => ({
+  ...toSubmissionDto(outcome.record),
+  revision: outcome.revision,
+});
 
 const toSubmissionListItemDto = (item: SubmissionListRow) => ({
   id: item.id,
@@ -122,12 +127,14 @@ export function createSubmissionsApiService(submissionService: SubmissionService
     },
 
     save: (ctx: SubmissionsContextInput, submissionId: string, body: SubmissionDataBody) =>
-      submissionService.save({ ...ctx, submissionId, ...body }).then((row) => toSubmissionDto(row)),
+      submissionService
+        .save({ ...ctx, submissionId, ...body })
+        .then((outcome) => toSubmissionWriteDto(outcome)),
 
     submit: (ctx: SubmissionsContextInput, submissionId: string, body: SubmitSubmissionBody) =>
       submissionService
         .submit({ ...ctx, submissionId, ...body })
-        .then((row) => toSubmissionDto(row)),
+        .then((outcome) => toSubmissionWriteDto(outcome)),
 
     delete: (ctx: SubmissionsContextInput, submissionId: string) =>
       submissionService.delete({ ...ctx, submissionId }),

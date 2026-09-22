@@ -21,6 +21,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
         loadError: 'Could not load the form.',
         rendererError: 'The form could not be displayed.',
         submitSuccess: 'Submitted.',
+        submitPending: 'Saved for review.',
         missingId: 'Missing submission id.',
       },
     },
@@ -104,9 +105,12 @@ describe('FormioV5SubmissionFillClient', () => {
         revisionId: string;
         baseRevisionId: string;
       };
+    const writeResponse = (status: 'current' | 'pending') => ({
+      revision: { id: 'r-1', revisionNo: 1, status, reason: 'accepted' },
+    });
 
     it('sends a new revision id based on the loaded head', async () => {
-      h.submitSobaFormSubmission.mockResolvedValue({});
+      h.submitSobaFormSubmission.mockResolvedValue(writeResponse('current'));
       await renderReady();
       await submit({ a: 1 });
       expect(h.submitSobaFormSubmission).toHaveBeenCalledWith(undefined, 'sub-1', {
@@ -118,7 +122,7 @@ describe('FormioV5SubmissionFillClient', () => {
 
     it('reuses the revision id when unchanged answers are resubmitted after a failure', async () => {
       h.submitSobaFormSubmission.mockRejectedValueOnce(new Error('Failed to fetch'));
-      h.submitSobaFormSubmission.mockResolvedValue({});
+      h.submitSobaFormSubmission.mockResolvedValue(writeResponse('current'));
       await renderReady();
       await submit({ a: 1 });
       await submit({ a: 1 });
@@ -127,12 +131,51 @@ describe('FormioV5SubmissionFillClient', () => {
 
     it('mints a new revision id when the answers change', async () => {
       h.submitSobaFormSubmission.mockRejectedValueOnce(new Error('Failed to fetch'));
-      h.submitSobaFormSubmission.mockResolvedValue({});
+      h.submitSobaFormSubmission.mockResolvedValue(writeResponse('current'));
       await renderReady();
       await submit({ a: 1 });
       await submit({ a: 2 });
       expect(sentBody(1).revisionId).not.toBe(sentBody(0).revisionId);
       expect(sentBody(1).baseRevisionId).toBe('rev-0');
+    });
+
+    it('navigates to the confirmation when the submit becomes current', async () => {
+      h.submitSobaFormSubmission.mockResolvedValue(writeResponse('current'));
+      await renderReady();
+      await submit({ a: 1 });
+      expect(h.push).toHaveBeenCalledWith('/en/submission/sub-1');
+    });
+
+    it('stays on the form when the submit is held as pending', async () => {
+      h.submitSobaFormSubmission.mockResolvedValue(writeResponse('pending'));
+      await renderReady();
+      await submit({ a: 1 });
+      expect(h.push).not.toHaveBeenCalled();
+      expect(screen.getByTestId('fill-form')).toBeInTheDocument();
+    });
+
+    it('redirects to the confirmation when a pending submit finds the record already submitted', async () => {
+      h.submitSobaFormSubmission.mockResolvedValue(writeResponse('pending'));
+      await renderReady();
+      // The base-refresh after a pending result reports the record is now submitted.
+      h.getSubmitFillBundle.mockResolvedValueOnce({
+        workflowState: 'submitted',
+        formVersionId: 'ver-1',
+        headRevisionId: 'rev-1',
+        schema: { components: [] },
+        content: null,
+      });
+      await submit({ a: 1 });
+      expect(h.replace).toHaveBeenCalledWith('/en/submission/sub-1');
+      expect(h.push).not.toHaveBeenCalled();
+    });
+
+    it('mints a fresh revision id for a retry after a pending result', async () => {
+      h.submitSobaFormSubmission.mockResolvedValue(writeResponse('pending'));
+      await renderReady();
+      await submit({ a: 1 });
+      await submit({ a: 1 });
+      expect(sentBody(1).revisionId).not.toBe(sentBody(0).revisionId);
     });
   });
 });

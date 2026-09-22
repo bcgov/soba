@@ -24,6 +24,9 @@ const TERMINAL_STATES: ReadonlySet<string> = new Set([
   SubmissionWorkflowState.deleted,
 ]);
 
+/** A terminal submission accepts no new current version; a write against it is held as pending. */
+export const isTerminalSubmissionState = (state: string): boolean => TERMINAL_STATES.has(state);
+
 /** The state each recordable event drives a non-terminal submission into. */
 const TARGET_STATE: Record<SubmissionEventTypeCode, SubmissionWorkflowStateCode> = {
   [SubmissionEventType.opened]: SubmissionWorkflowState.opened,

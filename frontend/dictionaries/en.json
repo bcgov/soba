@@ -224,6 +224,7 @@
         "backToHome": "Back to home"
       },
       "submitSuccess": "Form submitted successfully.",
+      "submitPending": "This form changed since you opened it, so your answers were saved for review instead of submitted.",
       "starting": "Starting your submission…",
       "startError": "The submission could not be started. Please try again."
     }
