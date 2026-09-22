@@ -4,7 +4,12 @@ import type {
   SubmissionListRow,
   SubmissionDetailRow,
 } from '../../db/repos/submissionRepo';
-import type { SubmissionListSort } from '@soba/lib';
+import type {
+  OpenSubmissionBody,
+  SubmissionDataBody,
+  SubmissionListSort,
+  SubmitSubmissionBody,
+} from '@soba/lib';
 
 export interface SubmissionsContextInput {
   workspaceId: string;
@@ -42,6 +47,7 @@ const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
     workflowState: item.workflowState,
     engineSyncStatus: item.engineSyncStatus,
     currentRevisionNo: item.currentRevisionNo,
+    headRevisionId: item.headRevisionId,
     submittedAt: item.submittedAt?.toISOString() ?? null,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
@@ -110,16 +116,18 @@ export function createSubmissionsApiService(submissionService: SubmissionService
       };
     },
 
-    open: async (ctx: SubmissionsContextInput, formId: string, id: string) => {
-      const { created, record } = await submissionService.open({ ...ctx, formId, id });
+    open: async (ctx: SubmissionsContextInput, body: OpenSubmissionBody) => {
+      const { created, record } = await submissionService.open({ ...ctx, ...body });
       return { created, submission: toSubmissionDto(record) };
     },
 
-    save: (ctx: SubmissionsContextInput, submissionId: string, data: Record<string, unknown>) =>
-      submissionService.save({ ...ctx, submissionId, data }).then((row) => toSubmissionDto(row)),
+    save: (ctx: SubmissionsContextInput, submissionId: string, body: SubmissionDataBody) =>
+      submissionService.save({ ...ctx, submissionId, ...body }).then((row) => toSubmissionDto(row)),
 
-    submit: (ctx: SubmissionsContextInput, submissionId: string, data: Record<string, unknown>) =>
-      submissionService.submit({ ...ctx, submissionId, data }).then((row) => toSubmissionDto(row)),
+    submit: (ctx: SubmissionsContextInput, submissionId: string, body: SubmitSubmissionBody) =>
+      submissionService
+        .submit({ ...ctx, submissionId, ...body })
+        .then((row) => toSubmissionDto(row)),
 
     delete: (ctx: SubmissionsContextInput, submissionId: string) =>
       submissionService.delete({ ...ctx, submissionId }),

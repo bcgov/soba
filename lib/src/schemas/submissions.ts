@@ -6,10 +6,24 @@ export const OpenSubmissionBodySchema = z.object({
   // v7 only: the client mints this id, and it is the submission's identity.
   id: z.uuidv7(),
   formId: z.string().min(1),
+  // Must be the form's published version when given.
+  formVersionId: z.uuid().optional(),
 });
 
 export const SubmissionDataBodySchema = z.object({
   data: z.record(z.string(), z.unknown()),
+  // Client-minted id for the revision this write creates. A retry reuses it.
+  revisionId: z.uuidv7(),
+  // The head revision the client loaded. A write whose base is no longer the head is refused.
+  baseRevisionId: z.uuid(),
+});
+
+// Revision ids are optional on submit; send both or neither.
+export const SubmitSubmissionBodySchema = SubmissionDataBodySchema.partial({
+  revisionId: true,
+  baseRevisionId: true,
+}).refine((body) => (body.revisionId === undefined) === (body.baseRevisionId === undefined), {
+  message: 'revisionId and baseRevisionId must be sent together',
 });
 
 export const SubmissionListItemSchema = z.object({
@@ -34,6 +48,7 @@ export const SubmissionResponseSchema = z.object({
   workflowState: z.string(),
   engineSyncStatus: z.string(),
   currentRevisionNo: z.number().int(),
+  headRevisionId: z.string().nullable(),
   submittedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -43,6 +58,7 @@ export const SubmissionResponseSchema = z.object({
 
 export type OpenSubmissionBody = z.infer<typeof OpenSubmissionBodySchema>;
 export type SubmissionDataBody = z.infer<typeof SubmissionDataBodySchema>;
+export type SubmitSubmissionBody = z.infer<typeof SubmitSubmissionBodySchema>;
 export type SubmissionListItem = z.infer<typeof SubmissionListItemSchema>;
 export type SubmissionResponse = z.infer<typeof SubmissionResponseSchema>;
 

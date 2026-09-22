@@ -4,6 +4,7 @@ import {
   OpenSubmissionBodySchema,
   SubmissionDataBodySchema,
   SubmissionIdParamsSchema,
+  SubmitSubmissionBodySchema,
 } from './schema';
 import { submissionsApiService } from './service';
 import type { ListSubmissionsQueryInput } from './serviceFactory';
@@ -16,6 +17,7 @@ import type { Request } from 'express';
 type OpenSubmissionBody = z.infer<typeof OpenSubmissionBodySchema>;
 type SubmissionIdParams = z.infer<typeof SubmissionIdParamsSchema>;
 type SubmissionDataBody = z.infer<typeof SubmissionDataBodySchema>;
+type SubmitSubmissionBody = z.infer<typeof SubmitSubmissionBodySchema>;
 
 const SUBMISSION_NOT_FOUND = 'Submission not found';
 
@@ -54,11 +56,7 @@ export const openSubmission = asyncHandler(
   async (req: Request<unknown, unknown, OpenSubmissionBody>, res: Response) => {
     const ctx = req.coreContext!;
     // 201 when this call created the row, 200 when it idempotently returned an existing one.
-    const { created, submission } = await submissionsApiService.open(
-      ctx,
-      req.body.formId,
-      req.body.id,
-    );
+    const { created, submission } = await submissionsApiService.open(ctx, req.body);
     res.status(created ? 201 : 200).json(submission);
   },
 );
@@ -83,16 +81,16 @@ const associateSubmissionFiles = async (
 export const saveSubmission = asyncHandler(
   async (req: Request<SubmissionIdParams, unknown, SubmissionDataBody>, res: Response) => {
     const ctx = req.coreContext!;
-    const result = await submissionsApiService.save(ctx, req.params.id, req.body.data);
+    const result = await submissionsApiService.save(ctx, req.params.id, req.body);
     await associateSubmissionFiles(req.params.id, ctx.workspaceId, req.body.data);
     res.json(result);
   },
 );
 
 export const submitSubmission = asyncHandler(
-  async (req: Request<SubmissionIdParams, unknown, SubmissionDataBody>, res: Response) => {
+  async (req: Request<SubmissionIdParams, unknown, SubmitSubmissionBody>, res: Response) => {
     const ctx = req.coreContext!;
-    const result = await submissionsApiService.submit(ctx, req.params.id, req.body.data);
+    const result = await submissionsApiService.submit(ctx, req.params.id, req.body);
     await associateSubmissionFiles(req.params.id, ctx.workspaceId, req.body.data);
     res.json(result);
   },

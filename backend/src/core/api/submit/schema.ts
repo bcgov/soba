@@ -5,6 +5,7 @@ import {
   SubmissionDataBodySchema,
   SubmissionIdParamsSchema,
   SubmissionResponseSchema,
+  SubmitSubmissionBodySchema,
 } from '../submissions/schema';
 import { SubmitFillBundleSchema as LibSubmitFillBundleSchema } from '@soba/lib';
 
@@ -18,7 +19,10 @@ const SUBMISSION_PATH = '/submit/submissions/{id}';
 const SUBMISSION_NOT_FOUND = 'Submission not found';
 const AUTHZ = 'Not in the form submitters audience';
 const AUTH_REQUIRED = 'Authentication required (form is not public)';
-const TERMINAL_CONFLICT = 'Submission is already submitted or deleted';
+const INVALID_WRITE_BODY =
+  'Invalid body (save requires revisionId and baseRevisionId; submit takes both or neither)';
+const WRITE_CONFLICT =
+  'Submission is already submitted or deleted, the base revision is no longer the head, or the revision id is used by another write';
 // Optional auth: anonymous is allowed (public audience), or a bearer token for an authenticated
 // audience member. `{}` marks the no-auth case explicit rather than leaving security unset.
 const PUBLIC_SECURITY = [{}, { bearerAuth: [] }];
@@ -80,7 +84,10 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
       },
       401: { description: AUTH_REQUIRED },
       403: { description: AUTHZ },
-      409: { description: 'Submission id already in use by a different owner' },
+      409: {
+        description:
+          'Submission id already in use by a different owner, or formVersionId is not the published version',
+      },
     },
   });
 
@@ -98,13 +105,14 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
     },
     responses: {
       200: {
-        description: 'Saved draft submission',
+        description: 'Saved draft submission, or the current submission for a retried revision id',
         content: { 'application/json': { schema: SubmissionResponseSchema } },
       },
       401: { description: AUTH_REQUIRED },
       403: { description: AUTHZ },
       404: { description: SUBMISSION_NOT_FOUND },
-      409: { description: TERMINAL_CONFLICT },
+      400: { description: INVALID_WRITE_BODY },
+      409: { description: WRITE_CONFLICT },
     },
   });
 
@@ -117,18 +125,19 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
       params: SubmissionIdParamsSchema,
       body: {
         required: true,
-        content: { 'application/json': { schema: SubmissionDataBodySchema } },
+        content: { 'application/json': { schema: SubmitSubmissionBodySchema } },
       },
     },
     responses: {
       200: {
-        description: 'Submitted submission',
+        description: 'Submitted submission, or the current submission for a retried revision id',
         content: { 'application/json': { schema: SubmissionResponseSchema } },
       },
       401: { description: AUTH_REQUIRED },
       403: { description: AUTHZ },
       404: { description: SUBMISSION_NOT_FOUND },
-      409: { description: TERMINAL_CONFLICT },
+      400: { description: INVALID_WRITE_BODY },
+      409: { description: WRITE_CONFLICT },
     },
   });
 

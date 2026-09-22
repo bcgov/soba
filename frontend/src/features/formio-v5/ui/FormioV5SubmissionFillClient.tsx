@@ -2,6 +2,7 @@
 
 import { useParams, useRouter, usePathname } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { v7 as uuidv7 } from 'uuid';
 import { Submission } from '@formio/react';
 import type { FormType } from '@formio/react';
 import { InlineAlert } from '@bcgov/design-system-react-components';
@@ -55,6 +56,10 @@ function SubmissionFillBody({
   // Load the bundle once. A ref (not state) guard dedupes StrictMode's dev double-invoke, so /fill
   // isn't fetched twice; no unmount/active flag, so the one in-flight load always applies its result.
   const loadStartedRef = useRef(false);
+  // The head revision loaded with the bundle; each submit is based on it.
+  const baseRevisionIdRef = useRef<string | null>(null);
+  // Reused while the kind of write and the answers are unchanged, so a retried write replays.
+  const pendingRevisionRef = useRef<{ revisionId: string; key: string } | null>(null);
   // The Form.io webform instance; in JSON mode (no `src`) we must signal it on a failed submit,
   // or its submit button spins forever. On success we navigate away instead.
   const formInstanceRef = useRef<{
@@ -77,6 +82,7 @@ function SubmissionFillBody({
           router.replace(`/${locale}/submission/${submissionId}`);
           return;
         }
+        baseRevisionIdRef.current = bundle.headRevisionId;
         setSchema(bundle.schema as FormType);
         // Resume: prefill with any saved answers (a just-opened submission has none).
         setInitialData((bundle.content?.data ?? {}) as Record<string, unknown>);
@@ -112,13 +118,23 @@ function SubmissionFillBody({
   // built-in green "Submission Complete" alert.
   const formOptions = useMemo(() => ({ noAlerts: true, ...bcgovFileOption }), [bcgovFileOption]);
 
+  const revisionIdsFor = (write: 'save' | 'submit', data: Record<string, unknown>) => {
+    const baseRevisionId = baseRevisionIdRef.current;
+    if (!baseRevisionId) return {};
+    const key = `${write}:${JSON.stringify(data)}`;
+    if (pendingRevisionRef.current?.key !== key) {
+      pendingRevisionRef.current = { revisionId: uuidv7(), key };
+    }
+    return { revisionId: pendingRevisionRef.current.revisionId, baseRevisionId };
+  };
+
   const submitForm = async (submission: Submission) => {
     try {
-      await submitSobaFormSubmission(
-        token ?? undefined,
-        submissionId,
-        (submission?.data ?? {}) as Record<string, unknown>,
-      );
+      const data = (submission?.data ?? {}) as Record<string, unknown>;
+      await submitSobaFormSubmission(token ?? undefined, submissionId, {
+        data,
+        ...revisionIdsFor('submit', data),
+      });
       addNotification({ text: labels.submitSuccess, type: 'success' });
       // Straight to the read-only confirmation; navigating away unmounts the form, so there's no
       // need to emit `submitDone` and no flash of Form.io's own success screen.
