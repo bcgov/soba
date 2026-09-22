@@ -10,6 +10,7 @@ import {
 import { unstable_serialize, useSWRConfig } from 'swr';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { listReadConfig } from '@/src/shared/api/swrConfig';
+import { classifyDataError } from '@/src/shared/api/dataError';
 import type { ListQueryArgs } from '@/src/types/list';
 import type {
   DocumentGenerationAuditItem,
@@ -125,5 +126,5 @@ export function useFeatureScope(
     };
   }, [featureScopeId, cache]);
 
-  return { featureScope: data ?? null, isLoading, error };
+  return { featureScope: data ?? null, isLoading, error: error ? classifyDataError(error) : null };
 }

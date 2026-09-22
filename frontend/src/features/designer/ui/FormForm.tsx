@@ -31,24 +31,25 @@ import {
   getFormVersionSchema,
 } from '@/src/shared/api/sobaApi';
 import type { FormVersionSummary, SobaFormVersionListItem } from '@/src/types/forms';
-import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';
+import { messageForDataError } from '@/src/shared/api/dataError';
 import { isConflict } from '@/src/shared/api/sobaHelpers';
+import type { DataError } from '@/src/shared/api/dataContracts';
 
 type Dict = ReturnType<typeof useDictionary>;
 
 const CREATE_NEW_VERSION_KEY = 'create';
 
-function noticeForLoadError(dict: Dict, loadError: unknown): string {
-  return loadErrorMessage(loadError, {
+function noticeForLoadError(dict: Dict, loadError: DataError): string {
+  return messageForDataError(loadError, {
     sessionExpired: dict.general.sessionExpired,
-    noAccess: dict.general.noAccess,
+    forbidden: dict.general.noAccess,
     failed: dict.form.loadFormError,
   });
 }
 
 function draftNotices(args: {
   dict: Dict;
-  loadError: unknown;
+  loadError: DataError | null;
   isHistoryView: boolean;
   historicalVersionNo: number | null;
   isCurrentPublished: boolean;

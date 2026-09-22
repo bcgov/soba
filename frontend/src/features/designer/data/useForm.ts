@@ -11,6 +11,8 @@ import {
 } from '@/src/shared/api/sobaApi';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { sessionReadConfig } from '@/src/shared/api/swrConfig';
+import { classifyDataError } from '@/src/shared/api/dataError';
+import type { DataError } from '@/src/shared/api/dataContracts';
 import type { FormVersionSummary } from '@/src/types/forms';
 import { versionsKey } from './useFormVersions';
 
@@ -93,7 +95,8 @@ export function useForm(formId?: string) {
     ]);
   }, [globalMutate, formId, refreshForm]);
 
-  const loadError = formError ?? versionsError ?? selectedVersionError ?? schemaError ?? null;
+  const rawError = formError ?? versionsError ?? selectedVersionError ?? schemaError ?? null;
+  const loadError: DataError | null = rawError ? classifyDataError(rawError) : null;
 
   const [editedSchema, setEditedSchema] = useState<FormType | null>(null);
   const [editedName, setEditedName] = useState<string | null>(null);
