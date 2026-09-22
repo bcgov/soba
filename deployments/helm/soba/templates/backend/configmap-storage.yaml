@@ -31,3 +31,16 @@ data:
   {{- with .Values.backend.storage.defaultUseSsl }}
   STORAGE_PROFILE_DEFAULT_USE_SSL: {{ . | quote }}
   {{- end }}
+  {{- $storageProfiles := list }}
+  {{- range $profile := splitList "," (default "" .Values.backend.storage.profiles) }}
+  {{- $storageProfiles = append $storageProfiles (trim $profile) }}
+  {{- end }}
+  {{- if and .Values.backend.templateStorage.enabled (has "templates" $storageProfiles) }}
+  {{- $templateStoragePath := include "soba.templateStoragePath" . | trim }}
+  # Dedicated profile for document-generation templates. Enabled only when 'templates' is in
+  # backend.storage.profiles; independent of the 'default' profile above.
+  STORAGE_PROFILE_TEMPLATES_BACKEND: {{ .Values.backend.templateStorage.backend | quote }}
+  {{- if $templateStoragePath }}
+  STORAGE_PROFILE_TEMPLATES_BASE_PATH: {{ $templateStoragePath | quote }}
+  {{- end }}
+  {{- end }}

@@ -18,6 +18,20 @@ backend:
     messagebusDefaultCode: messagebus-redis
     eventStreamDefaultCode: eventstream-redis
     documentGenerationDefaultCode: cdogs-v2
+  storage:
+    # 'default' profile stays on storage-memory (inherited); templates gets its own profile below.
+    profiles: "default,templates"
+  templateStorage:
+    # Dedicated template storage for the MVP. The PVC keeps uploaded templates across pod restarts,
+    # independent of the 'default' files profile and of tempStorage.
+    enabled: true
+    backend: storage-local
+    basePath: /app/templates
+    persistence:
+      enabled: true
+      mountPath: /app/templates
+      accessMode: ReadWriteMany
+      size: 1Gi
   documentGeneration:
     cdogsV2:
       endpoint: https://cdogs-dev.api.gov.bc.ca/api
