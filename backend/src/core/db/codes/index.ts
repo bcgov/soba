@@ -115,6 +115,31 @@ export const SubmissionEventType = {
 export type SubmissionEventTypeCode =
   (typeof SubmissionEventType)[keyof typeof SubmissionEventType];
 
+/**
+ * Standing of a revision within its submission (submission_revision.status).
+ * current — the submission's live version. superseded — a former current, replaced by a later one.
+ * pending — a conflicting or post-submit write held for staff to resolve; not on the current chain.
+ */
+export const RevisionStatus = {
+  current: 'current',
+  superseded: 'superseded',
+  pending: 'pending',
+} as const;
+export type RevisionStatusCode = (typeof RevisionStatus)[keyof typeof RevisionStatus];
+
+/**
+ * Why a revision holds its status (submission_revision.reason).
+ * accepted — applied as the current version. replaced — superseded by a later current version.
+ * conflict — its base was no longer the head. closed — the submission was already submitted.
+ */
+export const RevisionReason = {
+  accepted: 'accepted',
+  replaced: 'replaced',
+  conflict: 'conflict',
+  closed: 'closed',
+} as const;
+export type RevisionReasonCode = (typeof RevisionReason)[keyof typeof RevisionReason];
+
 export const FeatureStatus = {
   enabled: 'enabled',
   disabled: 'disabled',

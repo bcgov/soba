@@ -26,6 +26,7 @@ type FillLabels = {
   loadError: string;
   rendererError: string;
   submitSuccess: string;
+  submitPending: string;
   sessionExpired: string;
 };
 
@@ -131,10 +132,32 @@ function SubmissionFillBody({
   const submitForm = async (submission: Submission) => {
     try {
       const data = (submission?.data ?? {}) as Record<string, unknown>;
-      await submitSobaFormSubmission(token ?? undefined, submissionId, {
+      const result = await submitSobaFormSubmission(token ?? undefined, submissionId, {
         data,
         ...revisionIdsFor('submit', data),
       });
+      // A pending revision means the record changed under the filler (a conflict, or it was already
+      // submitted); the work is kept for review but this submit did not go through. Keep them on the
+      // form with a notice, refresh the base so a retry is not permanently stale, and release the
+      // submit button. The typed answers stay in the live form (initialData is not reset).
+      if (result.revision.status === 'pending') {
+        addNotification({ text: labels.submitPending, type: 'warning' });
+        setRenderError(null);
+        try {
+          const bundle = await getSubmitFillBundle(token ?? undefined, submissionId);
+          if (bundle.workflowState === 'submitted') {
+            router.replace(`/${locale}/submission/${submissionId}`);
+            return;
+          }
+          baseRevisionIdRef.current = bundle.headRevisionId;
+        } catch {
+          // Leave the base as loaded; the notice already asked the filler to try again.
+        }
+        // Reusing the same revision id would replay this pending write, so force a fresh one.
+        pendingRevisionRef.current = null;
+        formInstanceRef.current?.emit('submitDone');
+        return;
+      }
       addNotification({ text: labels.submitSuccess, type: 'success' });
       // Straight to the read-only confirmation; navigating away unmounts the form, so there's no
       // need to emit `submitDone` and no flash of Form.io's own success screen.
@@ -219,6 +242,7 @@ export default function FormioV5SubmissionFillClient() {
           loadError: labels.loadError,
           rendererError: labels.rendererError,
           submitSuccess: labels.submitSuccess,
+          submitPending: labels.submitPending,
           sessionExpired: dict.general.sessionExpired,
         }}
       />

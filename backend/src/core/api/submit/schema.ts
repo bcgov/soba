@@ -5,6 +5,7 @@ import {
   SubmissionDataBodySchema,
   SubmissionIdParamsSchema,
   SubmissionResponseSchema,
+  SubmissionWriteResponseSchema,
   SubmitSubmissionBodySchema,
 } from '../submissions/schema';
 import { SubmitFillBundleSchema as LibSubmitFillBundleSchema } from '@soba/lib';
@@ -21,8 +22,7 @@ const AUTHZ = 'Not in the form submitters audience';
 const AUTH_REQUIRED = 'Authentication required (form is not public)';
 const INVALID_WRITE_BODY =
   'Invalid body (save requires revisionId and baseRevisionId; submit takes both or neither)';
-const WRITE_CONFLICT =
-  'Submission is already submitted or deleted, the base revision is no longer the head, or the revision id is used by another write';
+const WRITE_CONFLICT = 'The revision id is already used by another write';
 // Optional auth: anonymous is allowed (public audience), or a bearer token for an authenticated
 // audience member. `{}` marks the no-auth case explicit rather than leaving security unset.
 const PUBLIC_SECURITY = [{}, { bearerAuth: [] }];
@@ -105,8 +105,9 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
     },
     responses: {
       200: {
-        description: 'Saved draft submission, or the current submission for a retried revision id',
-        content: { 'application/json': { schema: SubmissionResponseSchema } },
+        description:
+          'The submission plus the revision this save produced. `revision.status` is `current` when it became the draft, or `pending` when it was held for review (a conflict or a save against a submitted record).',
+        content: { 'application/json': { schema: SubmissionWriteResponseSchema } },
       },
       401: { description: AUTH_REQUIRED },
       403: { description: AUTHZ },
@@ -130,8 +131,9 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
     },
     responses: {
       200: {
-        description: 'Submitted submission, or the current submission for a retried revision id',
-        content: { 'application/json': { schema: SubmissionResponseSchema } },
+        description:
+          'The submission plus the revision this submit produced. `revision.status` is `current` when it submitted the record, or `pending` when it was held for review (a conflict or a submit against an already-submitted record).',
+        content: { 'application/json': { schema: SubmissionWriteResponseSchema } },
       },
       401: { description: AUTH_REQUIRED },
       403: { description: AUTHZ },

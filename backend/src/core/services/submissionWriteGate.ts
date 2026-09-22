@@ -1,8 +1,11 @@
-import type { SubmissionEventTypeCode, SubmissionWorkflowStateCode } from '../db/codes';
+import {
+  RevisionReason,
+  type RevisionReasonCode,
+  type SubmissionEventTypeCode,
+  type SubmissionWorkflowStateCode,
+} from '../db/codes';
 import { ConflictError } from '../errors';
-import { resolveSubmissionTransition } from './submissionLifecycle';
-
-export const STALE_WRITE = 'Submission changed since it was loaded';
+import { isTerminalSubmissionState, resolveSubmissionTransition } from './submissionLifecycle';
 
 export interface SubmissionWriteRequest {
   submission: { id: string; workflowState: string; headRevisionId: string | null };
@@ -16,15 +19,22 @@ export interface SubmissionWriteRequest {
 export type SubmissionWriteDecision =
   | { kind: 'replay' }
   | {
-      kind: 'write';
+      kind: 'current';
       workflowState: SubmissionWorkflowStateCode;
+      parentRevisionId: string | null;
+    }
+  | {
+      kind: 'pending';
+      reason: RevisionReasonCode;
       parentRevisionId: string | null;
     };
 
 /**
- * Decide a save/submit before any write. A recorded revision id is a replay, checked ahead of the
- * lifecycle so a retried submit that already succeeded is not a 409. Throws ConflictError when the
- * revision id belongs to another write, the submission is terminal, or the base is not the head.
+ * Decide a save/submit before any write. A recorded revision id is a replay, checked ahead of
+ * everything so a retried write that already landed is not repeated. A write against a submitted
+ * submission, or one whose base is no longer the head, is kept as a pending revision rather than
+ * rejected: the current version and workflow state stay put and staff resolve it later. Only a
+ * revision id already bound to a different write is a hard ConflictError.
  */
 export const decideSubmissionWrite = (request: SubmissionWriteRequest): SubmissionWriteDecision => {
   const { submission, eventType, recorded } = request;
@@ -35,10 +45,16 @@ export const decideSubmissionWrite = (request: SubmissionWriteRequest): Submissi
     return { kind: 'replay' };
   }
 
+  const base = request.baseRevisionId ?? submission.headRevisionId;
+
+  if (isTerminalSubmissionState(submission.workflowState)) {
+    return { kind: 'pending', reason: RevisionReason.closed, parentRevisionId: base };
+  }
+
+  if (base !== submission.headRevisionId) {
+    return { kind: 'pending', reason: RevisionReason.conflict, parentRevisionId: base };
+  }
+
   const workflowState = resolveSubmissionTransition(submission.workflowState, eventType);
-
-  const parentRevisionId = request.baseRevisionId ?? submission.headRevisionId;
-  if (parentRevisionId !== submission.headRevisionId) throw new ConflictError(STALE_WRITE);
-
-  return { kind: 'write', workflowState, parentRevisionId };
+  return { kind: 'current', workflowState, parentRevisionId: submission.headRevisionId };
 };

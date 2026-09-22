@@ -56,6 +56,22 @@ export const SubmissionResponseSchema = z.object({
   submittedBy: z.string().nullable().optional(),
 });
 
+/** Where a save/submit landed: `current` applied it as the live version, `pending` held it for review. */
+export const SubmissionRevisionInfoSchema = z.object({
+  id: z.string(),
+  revisionNo: z.number().int(),
+  status: z.string(),
+  reason: z.string(),
+});
+
+/** Save/submit response: the submission plus the revision this write produced. */
+export const SubmissionWriteResponseSchema = SubmissionResponseSchema.extend({
+  revision: SubmissionRevisionInfoSchema,
+});
+
+export type SubmissionRevisionInfo = z.infer<typeof SubmissionRevisionInfoSchema>;
+export type SubmissionWriteResponse = z.infer<typeof SubmissionWriteResponseSchema>;
+
 export type OpenSubmissionBody = z.infer<typeof OpenSubmissionBodySchema>;
 export type SubmissionDataBody = z.infer<typeof SubmissionDataBodySchema>;
 export type SubmitSubmissionBody = z.infer<typeof SubmitSubmissionBodySchema>;

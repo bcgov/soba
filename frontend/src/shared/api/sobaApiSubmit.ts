@@ -8,6 +8,7 @@ import type { SubmitFillBundle, SubmissionDataDocument } from '../../types/forms
 import type {
   SubmissionDataBody,
   SubmissionResponse,
+  SubmissionWriteResponse,
   SubmissionListItem,
   SubmitSubmissionBody,
 } from '@/src/types/submissions';
@@ -58,36 +59,38 @@ export async function openSobaFormSubmission(
 /**
  * Save a submission's answer data as a draft; the server writes a new engine document + revision.
  * Reserved for the (deferred) draft-save UI — the fill flow is resume-only for now, so nothing calls
- * this yet. Kept as the client half of POST /submit/submissions/:id/save.
+ * this yet. Kept as the client half of POST /submit/submissions/:id/save. `revision.status` reports
+ * whether the save became current or was held as pending.
  */
 export async function saveSobaFormSubmission(
   token: string | undefined,
   submissionId: string,
   body: SubmissionDataBody,
-): Promise<SubmissionResponse> {
+): Promise<SubmissionWriteResponse> {
   const response = await sobaFetch(`/submit/submissions/${submissionId}/save`, {
     token,
     method: 'POST',
     json: body,
   });
-  return parseJson<SubmissionResponse>(response);
+  return parseJson<SubmissionWriteResponse>(response);
 }
 
 /**
- * Submit a submission's answer data; the server records the submit and marks it submitted. A retry
- * with the same revisionId returns the current submission.
+ * Submit a submission's answer data. `revision.status` is `current` when the submit landed, or
+ * `pending` when it was held for review (a conflict, or a submit against an already-submitted
+ * record). A retry with the same revisionId replays the recorded revision.
  */
 export async function submitSobaFormSubmission(
   token: string | undefined,
   submissionId: string,
   body: SubmitSubmissionBody,
-): Promise<SubmissionResponse> {
+): Promise<SubmissionWriteResponse> {
   const response = await sobaFetch(`/submit/submissions/${submissionId}/submit`, {
     token,
     method: 'POST',
     json: body,
   });
-  return parseJson<SubmissionResponse>(response);
+  return parseJson<SubmissionWriteResponse>(response);
 }
 
 /** Read a submission's metadata for the confirmation view (audience-readable). */
