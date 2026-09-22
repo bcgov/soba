@@ -13,7 +13,7 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { addSobaAdmin, removeSobaAdmin } from '@/src/shared/api/sobaApiAdmin';
 import { useCurrentUser, useRefreshCurrentUser } from '@/src/shared/api/useCurrentUser';
-import { useSobaAdmins } from '../useAdminData';
+import { useSobaAdmins } from '../data/useAdminData';
 import { SOBA_ADMINS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { PAGE_SIZE_OPTIONS, useListQuery } from '@/src/shared/list/useListQuery';
 import type { SobaAdminItem } from '@/src/types/admin';

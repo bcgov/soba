@@ -21,7 +21,7 @@ import FormSubmissionTab from './FormSubmissionTab';
 import FormShareTab from './FormShareTab';
 import { useWorkspace } from '@/src/shared/api/useWorkspaces';
 import { lookupTruncatedNote, withSelectedOption } from '@/src/shared/list/lookupOptions';
-import { useForm } from '@/src/features/designer/useForm';
+import { useForm } from '@/src/features/designer/data/useForm';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
 import {
