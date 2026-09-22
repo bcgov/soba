@@ -3,6 +3,7 @@
 import { useDictionary } from '@/app/[lang]/Providers';
 import type { DataError } from '@/src/shared/api/dataContracts';
 import { classifyDataError } from '@/src/shared/api/dataError';
+import { useAuthErrorDefaults } from '@/src/shared/api/useDataErrorNotice';
 import { LoadErrorAlert } from '@/src/shared/ui/LoadErrorAlert';
 
 export type SubmissionLoadFailure = 'sessionExpired' | 'noAccess' | 'notFound' | 'loadFailed';
@@ -25,12 +26,12 @@ export function submissionLoadFailure(error: unknown): SubmissionLoadFailure {
 
 export function SubmissionLoadAlert({ failure }: Readonly<{ failure: SubmissionLoadFailure }>) {
   const dict = useDictionary();
+  const authDefaults = useAuthErrorDefaults();
   return (
     <LoadErrorAlert
       error={{ kind: FAILURE_KIND[failure], cause: null }}
       messages={{
-        sessionExpired: dict.general.sessionExpired,
-        forbidden: dict.general.noAccess,
+        ...authDefaults,
         notFound: dict.submission.notFound,
         failed: dict.submission.loadError,
       }}
