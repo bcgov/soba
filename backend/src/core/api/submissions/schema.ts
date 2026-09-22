@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   SubmissionListItemSchema as SobaSubmissionListItemSchema,
   SubmissionDataBodySchema as SobaSubmissionDataBodySchema,
+  SubmitSubmissionBodySchema as SobaSubmitSubmissionBodySchema,
   OpenSubmissionBodySchema as SobaOpenSubmissionBodySchema,
   SubmissionResponseSchema as SobaSubmissionResponseSchema,
   ListSubmissionsResponseSchema as SobaListSubmissionsResponseSchema,
@@ -43,9 +44,14 @@ export const SubmissionIdParamsSchema = z
   })
   .openapi('Submissions_SubmissionIdParams');
 
-// The answer-data body, shared by save (draft) and submit.
+// The save body.
 export const SubmissionDataBodySchema = SobaSubmissionDataBodySchema.clone().openapi(
   'Submissions_SubmissionDataBody',
+);
+
+// The submit body.
+export const SubmitSubmissionBodySchema = SobaSubmitSubmissionBodySchema.clone().openapi(
+  'Submissions_SubmitSubmissionBody',
 );
 
 export const SubmissionSortSchema = SobaSubmissionSortSchema.clone().openapi(

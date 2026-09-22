@@ -5,9 +5,17 @@ import { sobaFetch } from './sobaFetch';
 import { parseJson } from './sobaHelpers';
 import { FormType } from '@formio/react';
 import type { SubmitFillBundle, SubmissionDataDocument } from '../../types/forms';
-import type { SubmissionResponse, SubmissionListItem } from '@/src/types/submissions';
+import type {
+  SubmissionDataBody,
+  SubmissionResponse,
+  SubmissionListItem,
+  SubmitSubmissionBody,
+} from '@/src/types/submissions';
 
-/** The one payload the fill page needs: workflow state + schema + any saved answers (resume). */
+/**
+ * The one payload the fill page needs: workflow state, form version, head revision, schema and any
+ * saved answers (resume).
+ */
 export async function getSubmitFillBundle(
   token: string | undefined,
   submissionId: string,
@@ -29,18 +37,20 @@ export async function getSubmitSubmissionSchema(
 /**
  * Open a SOBA submission (a PG row in the `opened` state) under a client-minted id (uuidv7); its
  * answer data is written later via saveSobaFormSubmission (draft) or submitSobaFormSubmission (submit).
- * The create is idempotent on the id, so a retry with the same id returns the same record. Token is
- * optional: anonymous submissions to a public-audience form are attributed to the public user.
+ * The create is idempotent on the id, so a retry with the same id returns the same record. A
+ * formVersionId must be the published version (409 otherwise). Token is optional: anonymous
+ * submissions to a public-audience form are attributed to the public user.
  */
 export async function openSobaFormSubmission(
   token: string | undefined,
   formId: string,
   id: string,
+  formVersionId?: string,
 ): Promise<SubmissionResponse> {
   const response = await sobaFetch('/submit/submissions', {
     token,
     method: 'POST',
-    json: { id, formId },
+    json: { id, formId, formVersionId },
   });
   return parseJson<SubmissionResponse>(response);
 }
@@ -53,26 +63,29 @@ export async function openSobaFormSubmission(
 export async function saveSobaFormSubmission(
   token: string | undefined,
   submissionId: string,
-  data: Record<string, unknown>,
+  body: SubmissionDataBody,
 ): Promise<SubmissionResponse> {
   const response = await sobaFetch(`/submit/submissions/${submissionId}/save`, {
     token,
     method: 'POST',
-    json: { data },
+    json: body,
   });
   return parseJson<SubmissionResponse>(response);
 }
 
-/** Submit a submission's answer data; the server records the submit and marks it submitted. */
+/**
+ * Submit a submission's answer data; the server records the submit and marks it submitted. A retry
+ * with the same revisionId returns the current submission.
+ */
 export async function submitSobaFormSubmission(
   token: string | undefined,
   submissionId: string,
-  data: Record<string, unknown>,
+  body: SubmitSubmissionBody,
 ): Promise<SubmissionResponse> {
   const response = await sobaFetch(`/submit/submissions/${submissionId}/submit`, {
     token,
     method: 'POST',
-    json: { data },
+    json: body,
   });
   return parseJson<SubmissionResponse>(response);
 }

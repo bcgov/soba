@@ -31,6 +31,7 @@ export interface SubmissionListRow {
 
 export interface SubmissionDetailRow extends SubmissionListRow {
   currentRevisionNo: number;
+  headRevisionId: string | null;
 }
 
 interface CreateSubmissionInput {
@@ -71,11 +72,13 @@ interface SaveSubmissionInput {
 
 /**
  * appended: the revision was recorded and is the new head.
+ * replayed: this revision id was already recorded on the submission; nothing was written.
  * not_found: the submission is missing or soft-deleted.
  * stale: another write moved the head after this one read it (caller maps to 409).
  */
 export type AppendSubmissionRevisionResult =
   | { outcome: 'appended'; record: SubmissionRecord }
+  | { outcome: 'replayed'; record: SubmissionRecord }
   | { outcome: 'not_found' }
   | { outcome: 'stale' };
 
@@ -172,6 +175,21 @@ export const openSubmission = async (
   });
 };
 
+/** Look up a revision by id alone, to recognise a retried write. */
+export const getSubmissionRevisionById = async (
+  revisionId: string,
+): Promise<{ submissionId: string; eventType: string } | null> => {
+  const rows = await db
+    .select({
+      submissionId: submissionRevisions.submissionId,
+      eventType: submissionRevisions.eventType,
+    })
+    .from(submissionRevisions)
+    .where(eq(submissionRevisions.id, revisionId))
+    .limit(1);
+  return rows[0] ?? null;
+};
+
 /** Fetch the raw (non-deleted) submission row — used by the engine write path. */
 export const getSubmissionRecordById = async (
   workspaceId: string,
@@ -206,6 +224,7 @@ export const getSubmissionById = async (
       workflowState: submissions.workflowState,
       engineSyncStatus: submissions.engineSyncStatus,
       currentRevisionNo: submissions.currentRevisionNo,
+      headRevisionId: submissions.headRevisionId,
       submittedAt: submissions.submittedAt,
       createdAt: submissions.createdAt,
       updatedAt: submissions.updatedAt,
@@ -421,7 +440,7 @@ export const failSubmissionProvisioning = async (
  * Record a submission revision as the new head, in one transaction. `beforeEngineSubmissionRef` is
  * the submission's current ref; `afterEngineSubmissionRef` is the engine document created for this
  * save. Applies the lifecycle-decided workflow state, marks the engine sync `ready`, and stamps
- * `submitted_at` on submit.
+ * `submitted_at` on submit. A revision id already on the submission is answered as replayed.
  */
 export const appendSubmissionRevision = async (
   input: SaveSubmissionInput,
@@ -443,6 +462,34 @@ export const appendSubmissionRevision = async (
       .for('no key update');
 
     if (!submission) return { outcome: 'not_found' };
+
+    // A concurrent duplicate of this write committed first.
+    const [replayed] = await tx
+      .select({ id: submissionRevisions.id })
+      .from(submissionRevisions)
+      .where(
+        and(
+          eq(submissionRevisions.id, input.revisionId),
+          eq(submissionRevisions.submissionId, input.submissionId),
+          eq(submissionRevisions.eventType, input.eventType),
+        ),
+      )
+      .limit(1);
+    if (replayed) {
+      // This write set 'provisioning' after the winner settled the status.
+      const [settled] = await tx
+        .update(submissions)
+        .set({ engineSyncStatus: 'ready' })
+        .where(
+          and(
+            eq(submissions.id, input.submissionId),
+            eq(submissions.engineSyncStatus, 'provisioning'),
+          ),
+        )
+        .returning();
+      return { outcome: 'replayed', record: settled ?? submission };
+    }
+
     if (submission.headRevisionId !== input.parentRevisionId) return { outcome: 'stale' };
 
     const nextRevision = submission.currentRevisionNo + 1;
