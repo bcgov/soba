@@ -157,7 +157,7 @@ export class SubmissionService {
     // submissions. A base equal to the head is trivially valid.
     if (input.baseRevisionId && input.baseRevisionId !== submission.headRevisionId) {
       const base = await getSubmissionRevisionById(input.baseRevisionId);
-      if (!base || base.submissionId !== input.submissionId) {
+      if (base?.submissionId !== input.submissionId) {
         throw new ValidationError('baseRevisionId is not a revision of this submission');
       }
     }
