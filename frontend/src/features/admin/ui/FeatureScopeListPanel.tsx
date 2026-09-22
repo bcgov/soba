@@ -13,7 +13,7 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { removeFeatureScope, upsertFeatureScope } from '@/src/shared/api/sobaApiAdmin';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
-import { useFeatureScopes } from '../useAdminData';
+import { useFeatureScopes } from '../data/useAdminData';
 import { FEATURE_SCOPES_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { PAGE_SIZE_OPTIONS, useListQuery } from '@/src/shared/list/useListQuery';
 import type { FeatureScopeItem, FeatureScopeStatus } from '@/src/types/admin';

@@ -13,7 +13,7 @@ import { Tag } from '@/src/components/Tag';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { deleteSobaSubmission } from '@/src/shared/api/sobaApi';
-import { useFormSubmissions } from '@/src/features/designer/useFormSubmissions';
+import { useFormSubmissions } from '@/src/features/designer/data/useFormSubmissions';
 import { FORM_SUBMISSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { PAGE_SIZE_OPTIONS, useListQuery } from '@/src/shared/list/useListQuery';
 import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';

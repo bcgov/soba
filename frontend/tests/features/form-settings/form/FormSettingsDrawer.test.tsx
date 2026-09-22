@@ -22,7 +22,7 @@ vi.mock('@/lib/hooks/useKeycloak', () => ({
   useKeycloak: () => ({ token: 'mock-token' }),
 }));
 
-vi.mock('@/src/features/designer/useForm', () => ({
+vi.mock('@/src/features/designer/data/useForm', () => ({
   useForm: () => ({
     form: loaded,
     refreshForm: mockRefreshForm,

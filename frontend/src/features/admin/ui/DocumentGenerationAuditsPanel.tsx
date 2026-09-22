@@ -7,7 +7,7 @@ import { SecondaryText } from '@/src/components/SecondaryText';
 import { StatusTag } from '@/src/components/StatusTag';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { useDocumentGenerationAudits } from '../useAdminData';
+import { useDocumentGenerationAudits } from '../data/useAdminData';
 import { DOCGEN_AUDITS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { PAGE_SIZE_OPTIONS, useListQuery } from '@/src/shared/list/useListQuery';
 import type { DocumentGenerationAuditItem } from '@/src/types/admin';

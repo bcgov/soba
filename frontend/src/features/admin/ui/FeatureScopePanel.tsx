@@ -18,7 +18,7 @@ import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { upsertFeatureScope } from '@/src/shared/api/sobaApiAdmin';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import type { FeatureScopeItem, FeatureScopeStatus, FeatureScopeType } from '@/src/types/admin';
-import { useFeatureScope } from '../useAdminData';
+import { useFeatureScope } from '../data/useAdminData';
 import { useIsSobaAdmin } from '../useIsSobaAdmin';
 import styles from './AdminPanel.module.css';
 

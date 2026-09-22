@@ -24,7 +24,7 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
   getFormVersionSchema: vi.fn(),
 }));
 
-vi.mock('@/src/features/form-settings/api', () => ({
+vi.mock('@/src/features/form-settings/data/api', () => ({
   getFormSettings: mockGetSettings,
   setFormSettings: mockSetSettings,
 }));

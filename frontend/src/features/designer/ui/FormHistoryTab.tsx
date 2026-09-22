@@ -9,7 +9,7 @@ import { DataTable, type Column } from '@/src/components/DataTable';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import { FORM_VERSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { PAGE_SIZE_OPTIONS, useListQuery } from '@/src/shared/list/useListQuery';
-import { useFormVersionPage } from '../useFormVersions';
+import { useFormVersionPage } from '../data/useFormVersions';
 import type { SobaFormVersionListItem } from '@/src/types/forms';
 import { capitalizeFirstLetter } from '@/src/shared/util/stringUtils';
 
