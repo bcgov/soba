@@ -14,7 +14,7 @@ vi.mock('@/src/shared/featureFlags/featureAvailability', () => ({
   fetchFeatureAvailability: mockFetchFeatureAvailability,
 }));
 
-import { resolveAvailableSectionIds } from '@/src/features/form-settings/sections';
+import { resolveAvailableSectionIds } from '@/src/features/form-settings/data/sections';
 import { formSettingsSections } from '@/src/features/form-settings/registry';
 
 const Drawer = () => null;

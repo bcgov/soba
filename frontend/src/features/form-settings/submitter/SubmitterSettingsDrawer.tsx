@@ -5,15 +5,15 @@ import { Checkbox, InlineAlert } from '@bcgov/design-system-react-components';
 
 import FormSettingsDrawers from '@/src/features/form-settings/ui/FormSettingsDrawers';
 import type { FormSettingsSectionProps } from '@/src/features/form-settings/types';
-import { useFormSettings } from '@/src/features/form-settings/useFormSettings';
+import { useFormSettings } from '@/src/features/form-settings/data/useFormSettings';
 import {
   SUBMITTER_SETTINGS_KEY,
   type SetSubmitterSettingsBody,
   type SubmitterSettings,
 } from '@/src/types/formSettings';
-import { useSubmitterAudience } from '@/src/features/designer/useSubmitterAudience';
+import { useSubmitterAudience } from '@/src/features/designer/data/useSubmitterAudience';
 import { FormSubmitterAudience } from '@/src/features/designer/ui/FormSubmitterAudience';
-import { useForm } from '@/src/features/designer/useForm';
+import { useForm } from '@/src/features/designer/data/useForm';
 import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';

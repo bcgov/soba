@@ -7,7 +7,7 @@ import FormSettingsDrawers from '@/src/features/form-settings/ui/FormSettingsDra
 import type { FormSettingsSectionProps } from '@/src/features/form-settings/types';
 import { updateSobaForm } from '@/src/shared/api/sobaApiDesign';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import { useForm } from '@/src/features/designer/useForm';
+import { useForm } from '@/src/features/designer/data/useForm';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
 export default function FormSettingsDrawer({ dict, drawerName, formId }: FormSettingsSectionProps) {

@@ -13,7 +13,7 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import type { SetFormSubmitterAudienceBody } from '@/src/types/groups';
-import { useSubmitterAudience, type AudienceView } from '../useSubmitterAudience';
+import { useSubmitterAudience, type AudienceView } from '../data/useSubmitterAudience';
 import styles from './FormSubmitterAudience.module.css';
 
 type Props = Readonly<{
