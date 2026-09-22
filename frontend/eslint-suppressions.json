@@ -14,11 +14,6 @@
       "count": 1
     }
   },
-  "src/features/designer/ui/DesignSubmissionView.tsx": {
-    "no-restricted-imports": {
-      "count": 2
-    }
-  },
   "src/features/designer/ui/FormCreateContent.tsx": {
     "no-restricted-imports": {
       "count": 1
@@ -57,11 +52,6 @@
   "src/features/submit-mode/ui/StartSubmission.tsx": {
     "no-restricted-imports": {
       "count": 1
-    }
-  },
-  "src/features/submit-mode/ui/SubmissionView.tsx": {
-    "no-restricted-imports": {
-      "count": 2
     }
   },
   "src/features/workspaces/ui/WorkspaceForm.tsx": {
