@@ -15,6 +15,7 @@ import {
   OpenSubmissionBodySchema,
   SubmissionDataBodySchema,
   SubmissionIdParamsSchema,
+  SubmitSubmissionBodySchema,
 } from '../submissions/schema';
 
 // Submit-mode: mounted under /api/v1/submit with optional auth (anonymous resolves to the public user).
@@ -41,7 +42,7 @@ router.post(
 );
 router.post(
   '/submissions/:id/submit',
-  validateRequest({ params: SubmissionIdParamsSchema, body: SubmissionDataBodySchema }),
+  validateRequest({ params: SubmissionIdParamsSchema, body: SubmitSubmissionBodySchema }),
   requireFormSubmitAccess,
   submitSubmission,
 );

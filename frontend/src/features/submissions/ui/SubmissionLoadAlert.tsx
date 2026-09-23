@@ -1,39 +1,28 @@
 'use client';
 
-import { InlineAlert } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
-import { isSessionExpired } from '@/src/shared/api/sobaFetch';
-import { isForbidden, isNotFound } from '@/src/shared/api/sobaHelpers';
+import type { DataError } from '@/src/shared/api/dataContracts';
+import { useAuthErrorDefaults } from '@/src/shared/api/useDataErrorNotice';
+import { LoadErrorAlert } from '@/src/shared/ui/LoadErrorAlert';
 
-export type SubmissionLoadFailure = 'sessionExpired' | 'noAccess' | 'notFound' | 'loadFailed';
-
-/** Only a 404 means the submission is missing; any other failure is a failed load. */
-export function submissionLoadFailure(error: unknown): SubmissionLoadFailure {
-  if (isSessionExpired(error)) return 'sessionExpired';
-  if (isForbidden(error)) return 'noAccess';
-  if (isNotFound(error)) return 'notFound';
-  return 'loadFailed';
-}
-
-const TEST_IDS: Record<SubmissionLoadFailure, string> = {
-  sessionExpired: 'submission-view-session-expired',
-  noAccess: 'submission-view-noaccess',
-  notFound: 'submission-view-notfound',
-  loadFailed: 'submission-view-loaderror',
-};
-
-export function SubmissionLoadAlert({ failure }: Readonly<{ failure: SubmissionLoadFailure }>) {
+/** A submission read failure, with the submission-specific copy and test ids. */
+export function SubmissionLoadAlert({ error }: Readonly<{ error: DataError }>) {
   const dict = useDictionary();
-  const messages: Record<SubmissionLoadFailure, string> = {
-    sessionExpired: dict.general.sessionExpired,
-    noAccess: dict.general.noAccess,
-    notFound: dict.submission.notFound,
-    loadFailed: dict.submission.loadError,
-  };
-
+  const authDefaults = useAuthErrorDefaults();
   return (
-    <InlineAlert variant="danger" role="alert" data-testid={TEST_IDS[failure]}>
-      {messages[failure]}
-    </InlineAlert>
+    <LoadErrorAlert
+      error={error}
+      messages={{
+        ...authDefaults,
+        notFound: dict.submission.notFound,
+        failed: dict.submission.loadError,
+      }}
+      testIds={{
+        sessionExpired: 'submission-view-session-expired',
+        forbidden: 'submission-view-noaccess',
+        notFound: 'submission-view-notfound',
+        failed: 'submission-view-loaderror',
+      }}
+    />
   );
 }

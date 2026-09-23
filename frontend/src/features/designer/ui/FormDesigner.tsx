@@ -18,7 +18,7 @@ import { buildExportFilename } from '@/src/features/designer/exportFilename';
 
 // Import Types
 import type { FormBuilder as FormioBuilderInstance } from '@formio/js';
-import { isSessionExpired } from '@/src/shared/api/sobaFetch';
+import { isSessionExpired } from '@/src/shared/api/dataError';
 
 /**
  * We use a type assertion on the dynamic import to ensure

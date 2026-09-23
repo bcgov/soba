@@ -7,7 +7,7 @@ import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFormioRenderError';
-import { openSobaFormSubmission } from '@/src/shared/api/sobaApi';
+import { useSubmissionStarter } from '@/src/features/submit-mode/data/useSubmissionStarter';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { v7 as uuidv7 } from 'uuid';
 
@@ -32,6 +32,7 @@ function StartSubmissionBody({
 }: Readonly<{ formId: string; labels: StartLabels }>) {
   // Token is optional: a public-audience form can be started without signing in.
   const { token, initializing, initStarted } = useKeycloak();
+  const starter = useSubmissionStarter();
   const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
 
@@ -49,9 +50,11 @@ function StartSubmissionBody({
     void (async () => {
       try {
         // Mint the id client-side; a retry of this same id is idempotent server-side.
-        const created = await openSobaFormSubmission(token ?? undefined, formId, uuidv7());
+        const outcome = await starter.open(token ?? undefined, formId, uuidv7());
         // replace, not push: the start URL shouldn't sit in history and re-open on Back.
-        router.replace(`/${locale}/submit/${created.id}`);
+        if (outcome.status === 'applied') {
+          router.replace(`/${locale}/submit/${outcome.value.id}`);
+        }
       } catch (err) {
         setError(normalizeFormioRenderError(err, labels.startError, labels.sessionExpired));
       }
@@ -63,6 +66,7 @@ function StartSubmissionBody({
     formId,
     locale,
     router,
+    starter,
     labels.startError,
     labels.sessionExpired,
   ]);

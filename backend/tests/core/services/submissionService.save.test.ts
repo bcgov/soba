@@ -3,12 +3,13 @@ import * as submissionRepo from '../../../src/core/db/repos/submissionRepo';
 import * as versionRepo from '../../../src/core/db/repos/formVersionRepo';
 import * as formRepo from '../../../src/core/db/repos/formRepo';
 import * as registry from '../../../src/core/integrations/form-engine/FormEngineRegistry';
-import { ConflictError, NotFoundError } from '../../../src/core/errors';
+import { NotFoundError, ValidationError } from '../../../src/core/errors';
 
 jest.mock('../../../src/core/db/client', () => ({ db: {} }));
 
 jest.mock('../../../src/core/db/repos/submissionRepo', () => ({
   getSubmissionRecordById: jest.fn(),
+  getSubmissionRevisionById: jest.fn(),
   updateSubmissionDraft: jest.fn(),
   appendSubmissionRevision: jest.fn(),
   clearSubmissionProvisioning: jest.fn(),
@@ -32,6 +33,7 @@ jest.mock('../../../src/core/integrations/form-engine/FormEngineRegistry', () =>
 }));
 
 const getRecord = submissionRepo.getSubmissionRecordById as unknown as jest.Mock;
+const getRevisionById = submissionRepo.getSubmissionRevisionById as unknown as jest.Mock;
 const updateDraft = submissionRepo.updateSubmissionDraft as unknown as jest.Mock;
 const appendRevision = submissionRepo.appendSubmissionRevision as unknown as jest.Mock;
 const clearProvisioning = submissionRepo.clearSubmissionProvisioning as unknown as jest.Mock;
@@ -69,6 +71,10 @@ describe('SubmissionService save (versioned engine write)', () => {
     appendRevision.mockResolvedValue({
       outcome: 'appended',
       record: { id: 's1', currentRevisionNo: 3 },
+      revisionId: 'rev-3',
+      revisionNo: 3,
+      status: 'current',
+      reason: 'accepted',
     });
   });
 
@@ -100,10 +106,15 @@ describe('SubmissionService save (versioned engine write)', () => {
         parentRevisionId: 'rev-2',
         afterEngineSubmissionRef: 'eng-new',
         eventType: 'submitted',
+        status: 'current',
+        reason: 'accepted',
         workflowState: 'submitted',
       }),
     );
-    expect(result).toEqual({ id: 's1', currentRevisionNo: 3 });
+    expect(result).toEqual({
+      record: { id: 's1', currentRevisionNo: 3 },
+      revision: { id: 'rev-3', revisionNo: 3, status: 'current', reason: 'accepted' },
+    });
   });
 
   it('mints a distinct revision id for each write', async () => {
@@ -119,14 +130,35 @@ describe('SubmissionService save (versioned engine write)', () => {
     expect(first).not.toEqual(second);
   });
 
-  it('refuses a write whose head moved after it was read, without flagging an engine error', async () => {
+  it('keeps a write whose head moved after it was read as pending, without an engine error', async () => {
     const createSubmission = jest.fn().mockResolvedValue({ engineRef: 'eng-new' });
     createAdapter.mockReturnValue({ createSubmission });
-    appendRevision.mockResolvedValue({ outcome: 'stale' });
+    appendRevision.mockResolvedValue({
+      outcome: 'pending',
+      record: { id: 's1', currentRevisionNo: 2 },
+      revisionId: 'rev-3',
+      revisionNo: 3,
+      status: 'pending',
+      reason: 'conflict',
+    });
 
-    await expect(svc.save(input)).rejects.toBeInstanceOf(ConflictError);
+    const result = await svc.save(input);
 
-    expect(clearProvisioning).toHaveBeenCalledWith('ws1', 's1');
+    expect(result.revision).toEqual({
+      id: 'rev-3',
+      revisionNo: 3,
+      status: 'pending',
+      reason: 'conflict',
+    });
+    // This is a current intent (base == loaded head) that the repo downgraded to pending under the
+    // lock, so provisioning was advertised; the repo clears it, and the service does not fail it.
+    expect(updateDraft).toHaveBeenCalledWith(
+      'ws1',
+      's1',
+      'Filler',
+      expect.objectContaining({ engineSyncStatus: 'provisioning' }),
+    );
+    expect(clearProvisioning).not.toHaveBeenCalled();
     expect(failProvisioning).not.toHaveBeenCalled();
   });
 
@@ -140,24 +172,41 @@ describe('SubmissionService save (versioned engine write)', () => {
     expect(failProvisioning).not.toHaveBeenCalled();
   });
 
-  it('rejects a submit on a terminal submission without writing to the engine', async () => {
+  it('keeps a submit on a terminal submission as pending (closed), writing the engine document', async () => {
     getRecord.mockResolvedValue({
       id: 's1',
       formId: 'f1',
       formVersionId: 'v1',
       currentRevisionNo: 3,
+      headRevisionId: 'rev-3',
       engineSubmissionRef: 'eng-prev',
       workflowState: 'submitted',
       submittedBy: 'actor-1',
     });
-    const createSubmission = jest.fn();
+    const createSubmission = jest.fn().mockResolvedValue({ engineRef: 'eng-new' });
     createAdapter.mockReturnValue({ createSubmission });
+    appendRevision.mockResolvedValue({
+      outcome: 'pending',
+      record: { id: 's1', currentRevisionNo: 3, workflowState: 'submitted' },
+      revisionId: 'rev-4',
+      revisionNo: 4,
+      status: 'pending',
+      reason: 'closed',
+    });
 
-    await expect(svc.submit(input)).rejects.toThrow(/submitted/i);
+    const result = await svc.submit(input);
 
-    expect(createSubmission).not.toHaveBeenCalled();
+    expect(createSubmission).toHaveBeenCalled();
     expect(updateDraft).not.toHaveBeenCalled();
-    expect(appendRevision).not.toHaveBeenCalled();
+    expect(appendRevision).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'pending', reason: 'closed' }),
+    );
+    expect(result.revision).toEqual({
+      id: 'rev-4',
+      revisionNo: 4,
+      status: 'pending',
+      reason: 'closed',
+    });
   });
 
   it('records error status and rethrows when the engine rejects the submission', async () => {
@@ -192,5 +241,83 @@ describe('SubmissionService save (versioned engine write)', () => {
     createAdapter.mockReturnValue({}); // no createSubmission
     await expect(svc.submit(input)).rejects.toThrow(/does not support/i);
     expect(updateDraft).not.toHaveBeenCalled();
+  });
+
+  it('rejects a base revision from another submission before any engine write', async () => {
+    const createSubmission = jest.fn().mockResolvedValue({ engineRef: 'eng-new' });
+    createAdapter.mockReturnValue({ createSubmission });
+    getRevisionById.mockResolvedValue({
+      submissionId: 'other-submission',
+      eventType: 'saved',
+      revisionNo: 5,
+      status: 'current',
+      reason: 'accepted',
+    });
+
+    await expect(svc.save({ ...input, baseRevisionId: 'rev-foreign' })).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+
+    expect(createSubmission).not.toHaveBeenCalled();
+    expect(appendRevision).not.toHaveBeenCalled();
+    expect(updateDraft).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown base revision before any engine write', async () => {
+    const createSubmission = jest.fn();
+    createAdapter.mockReturnValue({ createSubmission });
+    getRevisionById.mockResolvedValue(null);
+
+    await expect(svc.save({ ...input, baseRevisionId: 'rev-ghost' })).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+
+    expect(createSubmission).not.toHaveBeenCalled();
+    expect(appendRevision).not.toHaveBeenCalled();
+  });
+
+  it('replays a since-superseded revision as current (landing disposition, not standing)', async () => {
+    getRevisionById.mockResolvedValue({
+      submissionId: 's1',
+      eventType: 'saved',
+      revisionNo: 1,
+      status: 'superseded',
+      reason: 'replaced',
+    });
+    const createSubmission = jest.fn();
+    createAdapter.mockReturnValue({ createSubmission });
+
+    const result = await svc.save({ ...input, revisionId: 'rev-1' });
+
+    expect(result.revision).toEqual({
+      id: 'rev-1',
+      revisionNo: 1,
+      status: 'current',
+      reason: 'accepted',
+    });
+    expect(createSubmission).not.toHaveBeenCalled();
+    expect(appendRevision).not.toHaveBeenCalled();
+  });
+
+  it('replays a pending revision as pending with its reason', async () => {
+    getRevisionById.mockResolvedValue({
+      submissionId: 's1',
+      eventType: 'saved',
+      revisionNo: 2,
+      status: 'pending',
+      reason: 'conflict',
+    });
+    const createSubmission = jest.fn();
+    createAdapter.mockReturnValue({ createSubmission });
+
+    const result = await svc.save({ ...input, revisionId: 'rev-2' });
+
+    expect(result.revision).toEqual({
+      id: 'rev-2',
+      revisionNo: 2,
+      status: 'pending',
+      reason: 'conflict',
+    });
+    expect(createSubmission).not.toHaveBeenCalled();
   });
 });

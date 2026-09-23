@@ -9,6 +9,8 @@ export type SubmissionDataDocument = z.infer<typeof SubmissionDataDocumentSchema
 
 export const SubmitFillBundleSchema = z.object({
   workflowState: z.string(),
+  formVersionId: z.string(),
+  headRevisionId: z.string().nullable(),
   schema: z.record(z.string(), z.unknown()),
   content: SubmissionDataDocumentSchema.nullable(),
 });

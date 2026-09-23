@@ -225,6 +225,7 @@
         "backToHome": "Retour à l'accueil"
       },
       "submitSuccess": "Formulaire soumis avec succès.",
+      "submitPending": "Ce formulaire a changé depuis son ouverture; vos réponses ont été enregistrées pour examen au lieu d'être soumises.",
       "starting": "Démarrage de votre soumission…",
       "startError": "La soumission n’a pas pu être démarrée. Veuillez réessayer."
     }

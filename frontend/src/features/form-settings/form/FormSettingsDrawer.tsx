@@ -5,14 +5,14 @@ import { TextArea, TextField } from '@bcgov/design-system-react-components';
 
 import FormSettingsDrawers from '@/src/features/form-settings/ui/FormSettingsDrawers';
 import type { FormSettingsSectionProps } from '@/src/features/form-settings/types';
-import { updateSobaForm } from '@/src/shared/api/sobaApiDesign';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import { useForm } from '@/src/features/designer/useForm';
+import { useForm, useFormWriter } from '@/src/features/designer/data/useForm';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
 export default function FormSettingsDrawer({ dict, drawerName, formId }: FormSettingsSectionProps) {
   const { token } = useKeycloak();
-  const { form, refreshForm } = useForm(formId);
+  const { form } = useForm(formId);
+  const formWriter = useFormWriter(formId);
   const { addNotification } = useNotificationStore();
 
   // An edit layered over the loaded value. Null means no edit, so a refresh from anywhere shows
@@ -44,8 +44,7 @@ export default function FormSettingsDrawer({ dict, drawerName, formId }: FormSet
           setSaving(false);
           return;
         }
-        await updateSobaForm(token, formId, payload);
-        await refreshForm();
+        await formWriter.update(token, payload);
         setEditedDescription(null);
         setEditedName(null);
         addNotification({

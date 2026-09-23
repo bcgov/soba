@@ -3,8 +3,8 @@
 import type { Dictionary } from '@/src/types/dictionary';
 import { AccordionGroup } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
-import { useForm } from '@/src/features/designer/useForm';
-import { useFormSettingsSections } from '@/src/features/form-settings/sections';
+import { useForm } from '@/src/features/designer/data/useForm';
+import { useFormSettingsSections } from '@/src/features/form-settings/data/sections';
 
 interface FormSettingsTabProps {
   dict: Dictionary;

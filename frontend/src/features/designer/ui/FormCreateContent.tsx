@@ -10,12 +10,11 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { useFormCreateWorkspaceOptions } from '@/src/shared/api/useWorkspaces';
 import { lookupTruncatedNote } from '@/src/shared/list/lookupOptions';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { createSobaFormioForm, saveFormVersionSchema } from '@/src/shared/api/sobaApi';
+import { useFormCreator } from '@/src/features/designer/data/useForm';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { isConflict } from '@/src/shared/api/sobaHelpers';
 import type { SobaFormType } from '@/src/types/forms';
-import type { FormType } from '@formio/react';
 
 interface FormCreateContentProps {
   onCancelPress: () => void;
@@ -26,6 +25,7 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
   const { token } = useKeycloak();
   const { addNotification } = useNotificationStore();
   const { data: currentUser, loaded: currentUserLoaded } = useCurrentUser();
+  const formCreator = useFormCreator();
   const router = useRouter();
   const params = useParams();
   const lang = params.lang as string;
@@ -50,23 +50,18 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
 
     try {
       const data: SobaFormType = { name: formName.trim() };
-      const created = await createSobaFormioForm(
+      const outcome = await formCreator.create(
         token as string,
         data,
         selectedWorkspaceId || undefined,
       );
-      // The version the form is created with holds no schema, and a read of one that has none is a
-      // 404. Writing the empty schema here leaves the designer a draft it can open and publish.
-      if (created.formVersion?.id) {
-        await saveFormVersionSchema(token as string, created.formVersion.id, {
-          components: [],
-        } as FormType);
-      }
       addNotification({
         text: dict.form.saved,
         type: 'success',
       });
-      router.push(`/${lang}/build/${created.id}`);
+      if (outcome.status === 'applied') {
+        router.push(`/${lang}/build/${outcome.value.id}`);
+      }
     } catch (e: unknown) {
       // A 409 carries the backend's own reason: the name is taken, or the workspace disclaimer is
       // unaccepted. Nothing in this dialog has versions, so the version-conflict wording is wrong.
