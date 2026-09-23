@@ -190,6 +190,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {} }),
   useParams: () => ({ lang: 'en' }),
   useSearchParams: () => new URLSearchParams(''),
+  usePathname: () => '',
 }));
 
 import { Provider } from 'react-redux';

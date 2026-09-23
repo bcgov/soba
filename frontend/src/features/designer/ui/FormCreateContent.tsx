@@ -64,7 +64,7 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
 
       // The version the form is created with holds no schema, and a read of one that has none is a
       // 404. Writing the empty schema here leaves the designer a draft it can open and publish.
-      if (outcome.status === 'applied' && outcome.value?.formVersion?.id) {
+      if (outcome.status === 'applied') {
         if (audienceOverride.mode !== 'inherit') {
           await saveFormAudience(token as string, outcome.value.id, audienceOverride);
         }

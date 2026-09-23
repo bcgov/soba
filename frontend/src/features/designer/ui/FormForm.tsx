@@ -319,13 +319,6 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   }
 
   const renderFormBuilder = () => {
-    if (loadError) {
-      return (
-        <div className="my-4" data-testid="designer-load-error">
-          {noticeForLoadError(dict, loadError)}
-        </div>
-      );
-    }
     if (loading) {
       return <CenteredProgress label={dict.form.loading} />;
     }
@@ -453,6 +446,11 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
 
   return (
     <>
+      {loadError && (
+        <div className="my-4" data-testid="designer-load-error">
+          {noticeForLoadError(dict, loadError)}
+        </div>
+      )}
       <Tabs
         id="form-designer-tabs"
         aria-label={dict.form.designerTabs || 'Form Designer tabs'}
