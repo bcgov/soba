@@ -48,10 +48,5 @@
     "no-restricted-imports": {
       "count": 1
     }
-  },
-  "src/features/workspaces/ui/WorkspaceForm.tsx": {
-    "no-restricted-imports": {
-      "count": 1
-    }
   }
 }
