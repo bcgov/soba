@@ -1,7 +1,2 @@
 {
-  "src/features/formio-v5/ui/FormioV5SubmissionFillClient.tsx": {
-    "no-restricted-imports": {
-      "count": 1
-    }
-  }
 }
