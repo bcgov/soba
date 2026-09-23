@@ -1,9 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { getSobaSubmissions } from '@/src/shared/api/sobaApi';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { listReadConfig } from '@/src/shared/api/swrConfig';
+import { classifyDataError } from '@/src/shared/api/dataError';
+import type { ListResult } from '@/src/shared/api/dataContracts';
 import type { ListQueryArgs } from '@/src/types/list';
 import type { SubmissionListItem } from '@/src/types/submissions';
 
@@ -17,8 +19,8 @@ export function useFormSubmissions(
   formId: string | undefined,
   opened: boolean,
   query: ListQueryArgs,
-) {
-  const { data, isLoading, error, mutate } = useAuthedSWR(
+): ListResult<SubmissionListItem> {
+  const { data, isLoading, isValidating, error, mutate } = useAuthedSWR(
     formId && opened
       ? ['form-submissions', formId, query.offset, query.limit, query.sort, query.q ?? '']
       : null,
@@ -33,10 +35,20 @@ export function useFormSubmissions(
     listReadConfig,
   );
 
-  const submissions: SubmissionListItem[] = useMemo(
+  const rows: SubmissionListItem[] = useMemo(
     () => (Array.isArray(data?.items) ? data.items : EMPTY),
     [data],
   );
+  const refresh = useCallback(async () => {
+    await mutate();
+  }, [mutate]);
 
-  return { submissions, total: data?.page?.total, isLoading, error, refresh: mutate };
+  return {
+    rows,
+    total: data?.page?.total,
+    isLoading,
+    isRefreshing: isValidating && data !== undefined,
+    error: error ? classifyDataError(error) : null,
+    refresh,
+  };
 }

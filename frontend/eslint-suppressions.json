@@ -24,11 +24,6 @@
       "count": 1
     }
   },
-  "src/features/designer/ui/FormList.tsx": {
-    "no-restricted-imports": {
-      "count": 2
-    }
-  },
   "src/features/designer/ui/FormSubmissionTab.tsx": {
     "no-restricted-imports": {
       "count": 1

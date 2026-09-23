@@ -15,8 +15,8 @@ import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { deleteSobaSubmission } from '@/src/shared/api/sobaApi';
 import { useFormSubmissions } from '@/src/features/designer/data/useFormSubmissions';
 import { FORM_SUBMISSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
-import { PAGE_SIZE_OPTIONS, useListQuery } from '@/src/shared/list/useListQuery';
-import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';
+import { useListQuery } from '@/src/shared/list/useListQuery';
+import { useDataTable } from '@/src/shared/list/useDataTable';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import {
   capitalizeFirstLetter,
@@ -35,13 +35,14 @@ export default function FormSubmissionTab({
   formId,
   opened,
 }: Readonly<FormSubmissionTabProps>) {
-  const listQuery = useListQuery(FORM_SUBMISSIONS_LIST_QUERY);
-  const { submissions, total, isLoading, error, refresh } = useFormSubmissions(formId, opened, {
-    offset: listQuery.offset,
-    limit: listQuery.pageSize,
-    sort: listQuery.sort,
-    q: listQuery.q,
+  const query = useListQuery(FORM_SUBMISSIONS_LIST_QUERY);
+  const submissionsResult = useFormSubmissions(formId, opened, {
+    offset: query.offset,
+    limit: query.pageSize,
+    sort: query.sort,
+    q: query.q,
   });
+  const { table, refresh } = useDataTable(query, submissionsResult, dict.submission.error);
   const formatLongDate = useFormatLongDate();
   const { token } = useKeycloak();
   const pathname = usePathname();
@@ -146,37 +147,15 @@ export default function FormSubmissionTab({
     [dict, formatLongDate, deletePress, locale, router],
   );
 
-  const loadError = useMemo(
-    () =>
-      error
-        ? loadErrorMessage(error, {
-            sessionExpired: dict.general.sessionExpired,
-            noAccess: dict.general.noAccess,
-            failed: dict.submission.error,
-          })
-        : null,
-    [error, dict.general.sessionExpired, dict.general.noAccess, dict.submission.error],
-  );
-
   return (
     <>
       <DataTable<SubmissionListItem>
-        data={submissions}
+        {...table}
         columns={columns}
-        loading={isLoading}
-        error={loadError}
         emptyMessage={dict.submission.emptyList}
         loadingMessage={dict.general.loading}
         itemName="submissions"
         caption={dict.submission?.submissions || 'Submissions'}
-        pageSize={listQuery.pageSize}
-        currentPage={listQuery.page}
-        totalItems={total}
-        onPageChange={listQuery.setPage}
-        onPageSizeChange={listQuery.setPageSize}
-        pageSizeOptions={PAGE_SIZE_OPTIONS}
-        sort={listQuery.sort}
-        onSortChange={listQuery.setSort}
         keyExtractor={(sub) => sub.id}
       />
       <Modal

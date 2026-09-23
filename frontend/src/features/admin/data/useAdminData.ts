@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import {
   fetchDocumentGenerationAudits,
   fetchFeatureScope,
@@ -11,6 +11,7 @@ import { unstable_serialize, useSWRConfig } from 'swr';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { listReadConfig } from '@/src/shared/api/swrConfig';
 import { classifyDataError } from '@/src/shared/api/dataError';
+import type { ListResult } from '@/src/shared/api/dataContracts';
 import type { ListQueryArgs } from '@/src/types/list';
 import type {
   DocumentGenerationAuditItem,
@@ -30,16 +31,26 @@ const reportOnce = (onError: (cause: unknown) => void) => ({
   onError,
 });
 
-export function useSobaAdmins(query: ListQueryArgs, onError: (cause: unknown) => void) {
-  const { data, isLoading, error, mutate } = useAuthedSWR(
+export function useSobaAdmins(query: ListQueryArgs): ListResult<SobaAdminItem> {
+  const { data, isLoading, isValidating, error, mutate } = useAuthedSWR(
     ['soba-admins', query.offset, query.limit, query.sort, query.q ?? ''],
     (token) => fetchSobaAdmins(token, query),
-    { ...listReadConfig, ...reportOnce(onError) },
+    { ...listReadConfig, shouldRetryOnError: false },
   );
 
-  const admins: SobaAdminItem[] = useMemo(() => data?.items ?? [], [data]);
+  const rows: SobaAdminItem[] = useMemo(() => data?.items ?? [], [data]);
+  const refresh = useCallback(async () => {
+    await mutate();
+  }, [mutate]);
 
-  return { admins, total: data?.page?.total, isLoading, error, refresh: mutate };
+  return {
+    rows,
+    total: data?.page?.total,
+    isLoading,
+    isRefreshing: isValidating && data !== undefined,
+    error: error ? classifyDataError(error) : null,
+    refresh,
+  };
 }
 
 /**
@@ -48,28 +59,31 @@ export function useSobaAdmins(query: ListQueryArgs, onError: (cause: unknown) =>
 export function useFeatureScopes(
   allowedFeatureCodes: string[],
   query: ListQueryArgs,
-  onError: (cause: unknown) => void,
-) {
+): ListResult<FeatureScopeItem> {
   const codes = useMemo(
     () => [...allowedFeatureCodes].sort((a, b) => a.localeCompare(b)).join(','),
     [allowedFeatureCodes],
   );
-  const { data, isLoading, error, mutate } = useAuthedSWR(
+  const { data, isLoading, isValidating, error, mutate } = useAuthedSWR(
     allowedFeatureCodes.length > 0
       ? ['feature-scopes', codes, query.offset, query.limit, query.sort, query.q ?? '']
       : null,
     (token) => fetchFeatureScopes(token, { ...query, featureCodes: allowedFeatureCodes }),
-    { ...listReadConfig, ...reportOnce(onError) },
+    { ...listReadConfig, shouldRetryOnError: false },
   );
 
-  const featureScopes: FeatureScopeItem[] = useMemo(() => data?.items ?? [], [data]);
+  const rows: FeatureScopeItem[] = useMemo(() => data?.items ?? [], [data]);
+  const refresh = useCallback(async () => {
+    await mutate();
+  }, [mutate]);
 
   return {
-    featureScopes,
+    rows,
     total: data?.page?.total,
     isLoading,
-    error,
-    refresh: mutate,
+    isRefreshing: isValidating && data !== undefined,
+    error: error ? classifyDataError(error) : null,
+    refresh,
   };
 }
 
@@ -80,9 +94,8 @@ export function useFeatureScopes(
 export function useDocumentGenerationAudits(
   filter: { workspaceId?: string; formId?: string } | null,
   query: ListQueryArgs,
-  onError: (cause: unknown) => void,
-) {
-  const { data, isLoading, error } = useAuthedSWR(
+): ListResult<DocumentGenerationAuditItem> {
+  const { data, isLoading, isValidating, error, mutate } = useAuthedSWR(
     filter
       ? [
           'docgen-audits',
@@ -94,12 +107,22 @@ export function useDocumentGenerationAudits(
         ]
       : null,
     (token) => fetchDocumentGenerationAudits(token, { ...query, ...filter }),
-    { ...listReadConfig, ...reportOnce(onError) },
+    { ...listReadConfig, shouldRetryOnError: false },
   );
 
-  const audits: DocumentGenerationAuditItem[] = useMemo(() => data?.items ?? [], [data]);
+  const rows: DocumentGenerationAuditItem[] = useMemo(() => data?.items ?? [], [data]);
+  const refresh = useCallback(async () => {
+    await mutate();
+  }, [mutate]);
 
-  return { audits, total: data?.page?.total, isLoading, error };
+  return {
+    rows,
+    total: data?.page?.total,
+    isLoading,
+    isRefreshing: isValidating && data !== undefined,
+    error: error ? classifyDataError(error) : null,
+    refresh,
+  };
 }
 
 export function useFeatureScope(
