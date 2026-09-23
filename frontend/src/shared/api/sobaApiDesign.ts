@@ -16,6 +16,7 @@ import type {
 } from '../../types/forms';
 import type { ListSubmissionsResponse, SubmissionListItem } from '@/src/types/submissions';
 import { toListRequestQuery, type ListQueryArgs } from '@/src/types/list';
+import { sortLocaleHeaders } from './sortLocaleRequest';
 
 export async function createSobaFormioForm(
   token: string,
@@ -70,6 +71,7 @@ export async function getSobaForms(
   const response = await sobaFetch('/design/forms', {
     token,
     query: { ...toListRequestQuery(args), workspaceId: args.workspaceId },
+    headers: sortLocaleHeaders(args.locale),
   });
   return parseJson(response);
 }
@@ -87,6 +89,7 @@ export async function getSobaSubmissions(
       workspaceId: args.workspaceId,
       workflowState: args.workflowState,
     },
+    headers: sortLocaleHeaders(args.locale),
   });
   return parseJson(response);
 }

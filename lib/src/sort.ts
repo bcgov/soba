@@ -34,23 +34,50 @@ export const DOCGEN_AUDIT_SORT_FIELDS = ['createdAt', 'outcome', 'durationMs'] a
 
 export type SortDirection = 'asc' | 'desc';
 
+export const SORT_LOCALES = ['en', 'fr'] as const;
+export type SortLocale = (typeof SORT_LOCALES)[number];
+export const DEFAULT_SORT_LOCALE: SortLocale = 'en';
+
+/**
+ * The sort locale for a language tag or an `Accept-Language` value: `fr` for any French tag,
+ * otherwise `en`. Only the first listed language is read.
+ */
+export function resolveSortLocale(tag: string | null | undefined): SortLocale {
+  const primary = (tag ?? '').split(/[,;]/)[0].trim().toLowerCase();
+  return primary === 'fr' || primary.startsWith('fr-') ? 'fr' : DEFAULT_SORT_LOCALE;
+}
+
+// Each must order as the DB collation `orderByForSort` uses for the same locale: `en` has no
+// tailoring, so it matches `und-x-icu`, and `fr-CA` matches `fr-CA-x-icu`. `und` is not a supported
+// Intl locale and silently resolves to the runtime default.
+export const sortCollators: Record<SortLocale, Intl.Collator> = {
+  en: new Intl.Collator('en'),
+  fr: new Intl.Collator('fr-CA'),
+};
+
 export interface TextSortRules {
-  /** Fold to lower case before comparing, matching a DB `lower(col)` sort. */
-  caseInsensitive?: boolean;
+  /** Compare with the locale's ICU collation, matching a DB `linguistic` sort. */
+  linguistic?: boolean;
   /** Missing values sort last in both directions. */
   nullable?: boolean;
 }
 
+const compareCodeUnits = (a: string, b: string): number => {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+};
+
 /**
  * Order two text values for one sort field the way the backend `orderByForSort` does, so a
- * client-resolved list matches a server-paged one. Compares by code unit, not `Intl.Collator`: the
- * `en_US.utf8` database orders accents (e vs e-acute, a-ring) by code point, and EN/FR data has
- * accents, so a locale comparator would order them differently from the DB.
+ * client-resolved list matches a server-paged one. Strings the collator ranks equal fall back to
+ * code unit order.
  */
 export function compareTextForSort(
   a: string | null | undefined,
   b: string | null | undefined,
   direction: SortDirection,
+  locale: SortLocale,
   rules: TextSortRules = {},
 ): number {
   const aMissing = a == null;
@@ -58,11 +85,10 @@ export function compareTextForSort(
   if (aMissing && bMissing) return 0;
   if (aMissing) return 1;
   if (bMissing) return -1;
-  const av = rules.caseInsensitive ? a.toLowerCase() : a;
-  const bv = rules.caseInsensitive ? b.toLowerCase() : b;
-  let cmp = 0;
-  if (av < bv) cmp = -1;
-  else if (av > bv) cmp = 1;
+  const collator = sortCollators[locale] ?? sortCollators[DEFAULT_SORT_LOCALE];
+  const cmp = rules.linguistic
+    ? collator.compare(a, b) || compareCodeUnits(a, b)
+    : compareCodeUnits(a, b);
   return direction === 'desc' ? -cmp : cmp;
 }
 

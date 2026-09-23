@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { SWRConfig } from 'swr';
+import { I18nProvider } from 'react-aria-components';
 
 const fetchWorkspaces = vi.fn();
 const lookupWorkspaces = vi.fn();
@@ -89,6 +90,7 @@ describe('useWorkspaces', () => {
     expect(lookupWorkspaces).toHaveBeenCalledWith('token', {
       requiredPermissions: ['form_create', 'design_create'],
       disclaimerAccepted: true,
+      locale: 'en',
     });
   });
 
@@ -120,7 +122,24 @@ describe('useWorkspaces', () => {
       limit: 5,
       sort: 'name:asc',
       q: 'pay',
+      locale: 'en',
     });
+  });
+
+  it('sorts the list screen in the app language', async () => {
+    fetchWorkspaces.mockResolvedValue({ items: [], page: { offset: 0, limit: 5, total: 0 } });
+    const french = ({ children }: { children: React.ReactNode }) => (
+      <I18nProvider locale="fr-CA">{wrapper({ children })}</I18nProvider>
+    );
+    renderHook(() => useWorkspaceList({ offset: 0, limit: 5, sort: 'name:asc' }), {
+      wrapper: french,
+    });
+    await waitFor(() =>
+      expect(fetchWorkspaces).toHaveBeenCalledWith(
+        'token',
+        expect.objectContaining({ locale: 'fr' }),
+      ),
+    );
   });
 
   // The form-create options filter on the disclaimer. Refreshing only the list screen leaves the

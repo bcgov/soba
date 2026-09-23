@@ -1,5 +1,7 @@
 import express from 'express';
 import { validateRequest } from '../shared/validation';
+import { SortLocaleQuerySchema } from '../shared/offsetPagination';
+import { sortLocale } from '../../middleware/sortLocale';
 import { workspaceFromResource } from '../../middleware/workspaceContext';
 import { requireWorkspaceManage } from '../../middleware/requireWorkspaceManage';
 import {
@@ -39,61 +41,90 @@ const workspaceResource = workspaceFromResource({ kind: 'workspace', idFrom: 'pa
 
 router.get(
   GROUPS_PATH,
-  validateRequest({ params: WorkspaceGroupParamsSchema }),
+  validateRequest({ query: SortLocaleQuerySchema, params: WorkspaceGroupParamsSchema }),
+  sortLocale,
   workspaceResource,
   listGroups,
 );
 router.post(
   GROUPS_PATH,
-  validateRequest({ params: WorkspaceGroupParamsSchema, body: CreateGroupBodySchema }),
+  validateRequest({
+    query: SortLocaleQuerySchema,
+    params: WorkspaceGroupParamsSchema,
+    body: CreateGroupBodySchema,
+  }),
+  sortLocale,
   workspaceResource,
   requireWorkspaceManage,
   createGroup,
 );
 router.patch(
   GROUP_PATH,
-  validateRequest({ params: GroupIdParamsSchema, body: UpdateGroupBodySchema }),
+  validateRequest({
+    query: SortLocaleQuerySchema,
+    params: GroupIdParamsSchema,
+    body: UpdateGroupBodySchema,
+  }),
+  sortLocale,
   workspaceResource,
   requireWorkspaceManage,
   updateGroup,
 );
 router.delete(
   GROUP_PATH,
-  validateRequest({ params: GroupIdParamsSchema }),
+  validateRequest({ query: SortLocaleQuerySchema, params: GroupIdParamsSchema }),
+  sortLocale,
   workspaceResource,
   requireWorkspaceManage,
   deleteGroup,
 );
 router.put(
   GROUP_ROLES_PATH,
-  validateRequest({ params: GroupIdParamsSchema, body: SetGroupRolesBodySchema }),
+  validateRequest({
+    query: SortLocaleQuerySchema,
+    params: GroupIdParamsSchema,
+    body: SetGroupRolesBodySchema,
+  }),
+  sortLocale,
   workspaceResource,
   requireWorkspaceManage,
   setGroupRoles,
 );
 router.post(
   GROUP_MEMBERS_PATH,
-  validateRequest({ params: GroupIdParamsSchema, body: AddGroupMemberBodySchema }),
+  validateRequest({
+    query: SortLocaleQuerySchema,
+    params: GroupIdParamsSchema,
+    body: AddGroupMemberBodySchema,
+  }),
+  sortLocale,
   workspaceResource,
   requireWorkspaceManage,
   addGroupMember,
 );
 router.delete(
   GROUP_MEMBER_PATH,
-  validateRequest({ params: GroupMemberParamsSchema }),
+  validateRequest({ query: SortLocaleQuerySchema, params: GroupMemberParamsSchema }),
+  sortLocale,
   workspaceResource,
   requireWorkspaceManage,
   removeGroupMember,
 );
 router.get(
   SUBMITTER_AUDIENCE_PATH,
-  validateRequest({ params: WorkspaceGroupParamsSchema }),
+  validateRequest({ query: SortLocaleQuerySchema, params: WorkspaceGroupParamsSchema }),
+  sortLocale,
   workspaceResource,
   getSubmitterAudience,
 );
 router.put(
   SUBMITTER_AUDIENCE_PATH,
-  validateRequest({ params: WorkspaceGroupParamsSchema, body: SetSubmitterAudienceBodySchema }),
+  validateRequest({
+    query: SortLocaleQuerySchema,
+    params: WorkspaceGroupParamsSchema,
+    body: SetSubmitterAudienceBodySchema,
+  }),
+  sortLocale,
   workspaceResource,
   requireWorkspaceManage,
   setSubmitterAudience,

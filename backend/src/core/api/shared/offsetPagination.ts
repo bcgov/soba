@@ -43,3 +43,10 @@ export const rejectedCursorField = z
 export const OffsetPageSchema = LibOffsetPageSchema.clone().openapi('Core_OffsetPage');
 
 export const searchQueryField = z.string().trim().min(1).optional();
+
+export const sortLocaleQueryField = z.string().trim().optional().openapi({
+  description:
+    'Language to sort text in: fr for any French tag, otherwise en. Accept-Language wins when both are sent.',
+});
+
+export const SortLocaleQuerySchema = z.object({ locale: sortLocaleQueryField });

@@ -47,7 +47,7 @@ export const listSubmissions = asyncHandler(async (req: Request, res: Response) 
   const scope = req.listScope!;
   const result = await submissionsApiService.list(
     { workspaceIds: scope.workspaceIds, actorId: scope.actorId },
-    req.query as unknown as ListSubmissionsQueryInput,
+    { ...(req.query as unknown as ListSubmissionsQueryInput), locale: req.sortLocale! },
   );
   res.json(result);
 });

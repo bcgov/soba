@@ -92,7 +92,7 @@ function MakeAudiencePublic() {
       type="button"
       data-testid="make-audience-public"
       onClick={() =>
-        mutate(['form-submitter-audience', 'f1'], audience('public'), { revalidate: false })
+        mutate(['form-submitter-audience', 'f1', 'en'], audience('public'), { revalidate: false })
       }
     >
       make public
@@ -244,7 +244,7 @@ describe('SubmitterSettingsDrawer', () => {
 
     await user.click(saveButton());
     expect(mockSetSettings).not.toHaveBeenCalled();
-    expect(mockGetAudience).toHaveBeenCalledWith('token', 'f1');
+    expect(mockGetAudience).toHaveBeenCalledWith('token', 'f1', 'en');
   });
 
   it('drops an edit when the audience turns out to be Public', async () => {

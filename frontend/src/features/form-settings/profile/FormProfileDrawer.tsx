@@ -6,6 +6,7 @@ import { Select } from '@bcgov/design-system-react-components';
 import FormSettingsDrawers from '@/src/features/form-settings/ui/FormSettingsDrawers';
 import type { FormSettingsSectionProps } from '@/src/features/form-settings/types';
 import { codeItems } from '@/src/shared/util/codeList';
+import { useSortLocale } from '@/src/shared/list/useSortLocale';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useForm, useFormWriter } from '@/src/features/designer/data/useForm';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
@@ -15,6 +16,7 @@ export default function FormProfileDrawer({ dict, drawerName, formId }: FormSett
   const { form } = useForm(formId);
   const formWriter = useFormWriter(formId);
   const { addNotification } = useNotificationStore();
+  const sortLocale = useSortLocale();
 
   // Edits layered over the loaded values. Null means no edit, so a refresh from anywhere shows
   // through until the user picks something.
@@ -70,7 +72,7 @@ export default function FormProfileDrawer({ dict, drawerName, formId }: FormSett
       <p>{dict.form.settings.profileDrawerInfo}</p>
       {/* A Select's native control is visually hidden, so both carry their own error message. */}
       <Select
-        items={codeItems(dict.ministries, form?.org)}
+        items={codeItems(dict.ministries, form?.org, sortLocale)}
         label={dict.workspaces.yourOrgReq}
         selectionMode="single"
         size="medium"
@@ -84,7 +86,7 @@ export default function FormProfileDrawer({ dict, drawerName, formId }: FormSett
         onChange={(newOrg) => setEditedOrg(newOrg?.toString() ?? '')}
       />
       <Select
-        items={codeItems(dict.useCases, form?.useCase)}
+        items={codeItems(dict.useCases, form?.useCase, sortLocale)}
         label={dict.workspaces.useCase}
         selectionMode="single"
         size="medium"
