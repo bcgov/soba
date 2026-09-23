@@ -15,7 +15,8 @@ import { addSobaAdmin, removeSobaAdmin } from '@/src/shared/api/sobaApiAdmin';
 import { useCurrentUser, useRefreshCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useSobaAdmins } from '../data/useAdminData';
 import { SOBA_ADMINS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
-import { PAGE_SIZE_OPTIONS, useListQuery } from '@/src/shared/list/useListQuery';
+import { useListQuery } from '@/src/shared/list/useListQuery';
+import { useDataTable } from '@/src/shared/list/useDataTable';
 import type { SobaAdminItem } from '@/src/types/admin';
 import styles from './AdminPanel.module.css';
 
@@ -34,29 +35,14 @@ export function SobaAdminsPanel() {
   const [saving, setSaving] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<SobaAdminItem | null>(null);
 
-  const reportLoadError = useCallback(
-    (cause: unknown) => {
-      addNotification({ text: dictAdmin.admins.loadError, type: 'error', consoleError: cause });
-    },
-    [addNotification, dictAdmin.admins.loadError],
-  );
-  const listQuery = useListQuery(SOBA_ADMINS_LIST_QUERY);
-  const {
-    admins,
-    total,
-    isLoading: loading,
-    error: loadError,
-    refresh: reload,
-  } = useSobaAdmins(
-    {
-      offset: listQuery.offset,
-      limit: listQuery.pageSize,
-      sort: listQuery.sort,
-      q: listQuery.q,
-    },
-    reportLoadError,
-  );
-  const error = loadError ? dictAdmin.admins.loadError : null;
+  const query = useListQuery(SOBA_ADMINS_LIST_QUERY);
+  const admins = useSobaAdmins({
+    offset: query.offset,
+    limit: query.pageSize,
+    sort: query.sort,
+    q: query.q,
+  });
+  const { table, refresh: reload } = useDataTable(query, admins, dictAdmin.admins.loadError);
 
   const handleAdd = useCallback(async () => {
     const trimmed = userId.trim();
@@ -164,9 +150,9 @@ export function SobaAdminsPanel() {
       <p className={styles.panelIntro}>{dictAdmin.admins.intro}</p>
       <ListPageToolbar align="between">
         <ListPageSearchField
-          value={listQuery.searchInput}
-          onChange={listQuery.setSearchInput}
-          onSubmit={listQuery.commitSearch}
+          value={query.searchInput}
+          onChange={query.setSearchInput}
+          onSubmit={query.commitSearch}
           testIdPrefix="admins"
         />
         <Form
@@ -195,21 +181,11 @@ export function SobaAdminsPanel() {
       </ListPageToolbar>
 
       <DataTable<SobaAdminItem>
-        data={admins}
+        {...table}
         columns={columns}
-        loading={loading}
-        error={error}
         emptyMessage={dictAdmin.admins.empty}
         loadingMessage={dict.general.loading}
         caption={dictAdmin.admins.heading}
-        totalItems={total}
-        pageSize={listQuery.pageSize}
-        currentPage={listQuery.page}
-        onPageChange={listQuery.setPage}
-        onPageSizeChange={listQuery.setPageSize}
-        pageSizeOptions={PAGE_SIZE_OPTIONS}
-        sort={listQuery.sort}
-        onSortChange={listQuery.setSort}
         keyExtractor={(admin) => admin.userId}
       />
 
