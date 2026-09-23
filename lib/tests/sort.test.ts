@@ -47,24 +47,21 @@ describe('compareTextForSort', () => {
 });
 
 describe('matchesSearchTerm', () => {
-  it('matches a case-insensitive substring', () => {
-    expect(matchesSearchTerm('Budget Report', 'budget')).toBe(true);
-    expect(matchesSearchTerm('Budget Report', 'xyz')).toBe(false);
-  });
+  // [what it checks, value, term, expected]. Mirrors ilike: case insensitive, literal wildcards,
+  // no accent folding, empty term matches all, missing value matches nothing.
+  const cases: [string, string | null | undefined, string, boolean][] = [
+    ['case-insensitive substring hit', 'Budget Report', 'budget', true],
+    ['substring miss', 'Budget Report', 'xyz', false],
+    ['percent is literal and present', '50% off', '50%', true],
+    ['percent is literal and absent', '50 off', '%', false],
+    ['accent kept, exact hit', 'café', 'café', true],
+    ['accent not folded to plain', 'café', 'cafe', false],
+    ['empty term matches anything', 'anything', '', true],
+    ['null value matches nothing', null, 'x', false],
+    ['undefined value matches nothing', undefined, 'x', false],
+  ];
 
-  it('treats wildcards as literal characters', () => {
-    expect(matchesSearchTerm('50% off', '50%')).toBe(true);
-    expect(matchesSearchTerm('50 off', '%')).toBe(false);
-  });
-
-  it('does not fold accents, matching ilike', () => {
-    expect(matchesSearchTerm('café', 'café')).toBe(true);
-    expect(matchesSearchTerm('café', 'cafe')).toBe(false);
-  });
-
-  it('matches everything on an empty term and nothing on a missing value', () => {
-    expect(matchesSearchTerm('anything', '')).toBe(true);
-    expect(matchesSearchTerm(null, 'x')).toBe(false);
-    expect(matchesSearchTerm(undefined, 'x')).toBe(false);
+  it.each(cases)('%s', (_label, value, term, expected) => {
+    expect(matchesSearchTerm(value, term)).toBe(expected);
   });
 });
