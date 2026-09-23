@@ -158,16 +158,6 @@ export function FormSubmitterAudience({
       if (!document.contains(target)) {
         return;
       }
-
-      if (
-        open &&
-        triggerRef.current &&
-        !triggerRef.current.contains(target) &&
-        popoverRef.current &&
-        !popoverRef.current.contains(target)
-      ) {
-        // setOpen(false); // TEMPORARILY DISABLED
-      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('touchstart', handleClickOutside);
