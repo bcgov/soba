@@ -22,6 +22,7 @@
   box-shadow: var(--surface-shadow-medium);
   min-width: 20rem;
   max-width: 24rem;
+  z-index: 10000;
 }
 
 .dialog {

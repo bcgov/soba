@@ -11,10 +11,12 @@ import { useFormCreateWorkspaceOptions } from '@/src/shared/api/useWorkspaces';
 import { lookupTruncatedNote } from '@/src/shared/list/lookupOptions';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { useFormCreator } from '@/src/features/designer/data/useForm';
+import { useFormAudienceWriter } from '@/src/features/designer/data/useSubmitterAudience';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { isConflict } from '@/src/shared/api/sobaHelpers';
 import type { SobaFormType } from '@/src/types/forms';
+import type { SetFormSubmitterAudienceBody } from '@/src/types/groups';
 
 interface FormCreateContentProps {
   onCancelPress: () => void;
@@ -26,6 +28,7 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
   const { addNotification } = useNotificationStore();
   const { data: currentUser, loaded: currentUserLoaded } = useCurrentUser();
   const formCreator = useFormCreator();
+  const { saveFormAudience } = useFormAudienceWriter();
   const router = useRouter();
   const params = useParams();
   const lang = params.lang as string;
@@ -34,6 +37,9 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
 
   const [formName, setFormName] = useState('');
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
+  const [audienceOverride, setAudienceOverride] = useState<SetFormSubmitterAudienceBody>({
+    mode: 'inherit',
+  });
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const creatableWorkspaces = useFormCreateWorkspaceOptions(true);
@@ -55,6 +61,14 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
         data,
         selectedWorkspaceId || undefined,
       );
+
+      // The version the form is created with holds no schema, and a read of one that has none is a
+      // 404. Writing the empty schema here leaves the designer a draft it can open and publish.
+      if (outcome.status === 'applied' && outcome.value?.formVersion?.id) {
+        if (audienceOverride.mode !== 'inherit') {
+          await saveFormAudience(token as string, outcome.value.id, audienceOverride);
+        }
+      }
       addNotification({
         text: dict.form.saved,
         type: 'success',
@@ -125,7 +139,10 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
           label={dict.workspaces.workspace}
           workspaces={creatableWorkspaces.workspaces}
           selectedWorkspaceId={selectedWorkspaceId}
-          onChange={(id) => setSelectedWorkspaceId(id as string)}
+          onChange={(id) => {
+            setSelectedWorkspaceId(id as string);
+            setAudienceOverride({ mode: 'inherit' });
+          }}
           description={lookupTruncatedNote(dict.general.lookupTruncated, creatableWorkspaces)}
           size="medium"
         />
@@ -134,7 +151,10 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
       <FormSubmitterAudience
         key={selectedWorkspaceId ?? 'none'}
         workspaceId={selectedWorkspaceId}
-        canManage={false}
+        canManage={selectedWorkspaceId !== null}
+        createForm={true}
+        value={audienceOverride}
+        onChange={setAudienceOverride}
       />
       <div className="d-flex justify-content-end gap-2">
         <Button

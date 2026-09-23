@@ -21,6 +21,9 @@ type Props = Readonly<{
   /** Shows and edits this form's audience, which can inherit the workspace's. */
   formId?: string;
   canManage: boolean;
+  createForm?: boolean;
+  value?: SetFormSubmitterAudienceBody;
+  onChange?: (value: SetFormSubmitterAudienceBody) => void;
 }>;
 
 type FormDict = ReturnType<typeof useDictionary>['form'];
@@ -48,7 +51,14 @@ function saveBody(mode: string, idps: string[]): SetFormSubmitterAudienceBody {
   return { mode: 'protected', idps };
 }
 
-export function FormSubmitterAudience({ workspaceId, formId, canManage }: Props) {
+export function FormSubmitterAudience({
+  workspaceId,
+  formId,
+  canManage,
+  createForm,
+  value,
+  onChange,
+}: Props) {
   const dict = useDictionary();
   const t = dict.form;
   const { token } = useKeycloak();
@@ -59,7 +69,7 @@ export function FormSubmitterAudience({ workspaceId, formId, canManage }: Props)
   const [saveError, setSaveError] = useState<string | null>(null);
   const triggerRef = useRef<HTMLSpanElement>(null);
   const summaryId = useId();
-  const isForm = !!formId;
+  const isForm = !!formId || !!createForm;
 
   const { view: audience, error: loadError, save } = useSubmitterAudience(workspaceId, formId);
 
@@ -77,36 +87,82 @@ export function FormSubmitterAudience({ workspaceId, formId, canManage }: Props)
     [loadError, dict.general.sessionExpired, dict.general.noAccess, t.submitterAudienceLoadError],
   );
 
+  const effectiveAudience = useMemo(() => {
+    if (!audience) return null;
+    const ws = audience.workspace ?? {
+      mode: audience.mode,
+      idps: audience.idps,
+      users: audience.users,
+    };
+    if (value) {
+      const alternateIdps = value.mode === 'inherit' ? ws.idps : [];
+      const idps = value.mode === 'protected' ? value.idps : alternateIdps;
+      return {
+        ...audience,
+        inherit: value.mode === 'inherit',
+        mode: value.mode === 'inherit' ? ws.mode : value.mode,
+        idps: idps,
+        users: value.mode === 'inherit' ? ws.users : [],
+        workspace: ws,
+      };
+    }
+    return { ...audience, workspace: ws };
+  }, [audience, value]);
+
   // Seed the editable state from the saved audience whenever the panel opens. An inherited
   // protected audience seeds its providers, so an override starts from the workspace's.
   const openPanel = () => {
-    if (!audience) return;
-    setMode(initialMode(audience));
-    // A saved provider that is no longer offered has no checkbox to untick, so it is left out.
-    const offered = new Set(audience.available.map((p) => p.code));
-    setIdps(audience.mode === 'protected' ? audience.idps.filter((c) => offered.has(c)) : []);
+    if (!effectiveAudience) return;
+    if (value) {
+      setMode(value.mode);
+      const offered = new Set(effectiveAudience.available.map((p) => p.code));
+      const alternateIdps =
+        effectiveAudience.mode === 'protected'
+          ? effectiveAudience.idps.filter((c) => offered.has(c))
+          : [];
+      const idps = value.mode === 'protected' ? value.idps : alternateIdps;
+      setIdps(idps);
+    } else {
+      setMode(initialMode(effectiveAudience));
+      // A saved provider that is no longer offered has no checkbox to untick, so it is left out.
+      const offered = new Set(effectiveAudience.available.map((p) => p.code));
+      setIdps(
+        effectiveAudience.mode === 'protected'
+          ? effectiveAudience.idps.filter((c) => offered.has(c))
+          : [],
+      );
+    }
     setSaveError(null);
     setOpen(true);
   };
 
   const summary = useMemo(() => {
-    if (!audience) return '…';
-    const text = describeAudience(audience, audience.available, t);
-    return audience.inherit ? t.submitterAudienceInheritedSummary.replace('{summary}', text) : text;
-  }, [audience, t]);
+    if (!effectiveAudience) return '…';
+    const text = describeAudience(effectiveAudience, effectiveAudience.available, t);
+    return effectiveAudience.inherit
+      ? t.submitterAudienceInheritedSummary.replace('{summary}', text)
+      : text;
+  }, [effectiveAudience, t]);
 
   const workspaceSummary =
-    audience?.workspace && describeAudience(audience.workspace, audience.available, t);
+    effectiveAudience?.workspace &&
+    describeAudience(effectiveAudience.workspace, effectiveAudience.available, t);
 
   // Protected needs a principal. A workspace's existing direct user counts; a form override holds
   // providers only.
-  const directUsers = isForm ? 0 : (audience?.users.length ?? 0);
+  const directUsers = isForm ? 0 : (effectiveAudience?.users.length ?? 0);
   const noPrincipal = mode === 'protected' && idps.length === 0 && directUsers === 0;
   const saveDisabled = saving || mode === '' || noPrincipal;
   const overridesPeople =
-    (mode === 'public' || mode === 'protected') && (audience?.workspace?.users.length ?? 0) > 0;
+    (mode === 'public' || mode === 'protected') &&
+    (effectiveAudience?.workspace?.users.length ?? 0) > 0;
 
   const onSave = async () => {
+    if (onChange) {
+      onChange(saveBody(mode, idps));
+      setOpen(false);
+      return;
+    }
     if (!token) return;
     setSaving(true);
     setSaveError(null);
@@ -130,8 +186,9 @@ export function FormSubmitterAudience({ workspaceId, formId, canManage }: Props)
       ) : (
         <span ref={triggerRef} className={styles.triggerWrap}>
           <Button
+            type="button"
             variant="secondary"
-            isDisabled={!canManage || !audience}
+            isDisabled={!canManage || !effectiveAudience}
             onPress={openPanel}
             data-testid="submitter-audience-trigger"
           >
@@ -139,12 +196,7 @@ export function FormSubmitterAudience({ workspaceId, formId, canManage }: Props)
           </Button>
         </span>
       )}
-      <Popover
-        triggerRef={triggerRef}
-        isOpen={open}
-        onOpenChange={setOpen}
-        className={styles.panel}
-      >
+      <Popover triggerRef={triggerRef} isOpen={open} isNonModal={true} className={styles.panel}>
         <Dialog aria-label={t.submitterAudienceLabel} className={styles.dialog}>
           <div className={styles.sections}>
             {saveError && <InlineAlert variant="danger" title={saveError} />}
@@ -189,7 +241,7 @@ export function FormSubmitterAudience({ workspaceId, formId, canManage }: Props)
                 isDisabled={saving}
                 label={t.submitterAudienceProviders}
               >
-                {(audience?.available ?? []).map((p) => (
+                {(effectiveAudience?.available ?? []).map((p) => (
                   <Checkbox key={p.code} value={p.code} data-testid={`audience-idp-${p.code}`}>
                     {p.name}
                   </Checkbox>

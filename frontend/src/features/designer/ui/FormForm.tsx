@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Tabs, Tab } from 'react-bootstrap';
 import { Button, Select } from '@bcgov/design-system-react-components';
@@ -28,6 +28,8 @@ import type { FormVersionSummary, SobaFormVersionListItem } from '@/src/types/fo
 import { messageForDataError } from '@/src/shared/api/dataError';
 import { isConflict } from '@/src/shared/api/sobaHelpers';
 import type { DataError } from '@/src/shared/api/dataContracts';
+import { Permissions } from '@/src/types/permissions';
+import { hasPermission } from '@/src/shared/util/permissions';
 
 type Dict = ReturnType<typeof useDictionary>;
 
@@ -93,8 +95,15 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   const { authenticated, token, initializing } = useKeycloak();
   const { addNotification } = useNotificationStore();
 
+  const DESIGNER_TAB = 'designer';
+  const SETTINGS_TAB = 'settings';
+  const ACCESS_TAB = 'team';
+  const HISTORY_TAB = 'version';
+  const SUBMISSIONS_TAB = 'submissions';
+  const SHARE_TAB = 'share';
+
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'designer');
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || '');
   // A tab's read starts when it is first opened and stays cached after: leaving is not a reason to
   // drop what it loaded, and the reads behind these tabs are gated on permissions a user may lack.
   const [openedTabs, setOpenedTabs] = useState<string[]>(() => [activeTab]);
@@ -161,6 +170,66 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
       setSchema({ components: [] });
     }
   }, [loading, form, formSchema, setSchema]);
+
+  const permissions = useMemo(() => {
+    return form?.permissions;
+  }, [form?.permissions]);
+
+  const canSeeDesignTab = useMemo(() => {
+    return hasPermission(permissions, Permissions.design_create);
+  }, [permissions]);
+
+  const canSeeSettingsTab = useMemo(() => {
+    return hasPermission(permissions, Permissions.all);
+  }, [permissions]);
+
+  const canSeeAccessTab = useMemo(() => {
+    return hasPermission(permissions, Permissions.team_update);
+  }, [permissions]);
+
+  const canSeeHistoryTab = useMemo(() => {
+    return hasPermission(permissions, Permissions.design_update);
+  }, [permissions]);
+
+  const canSeeSubmissionsTab = useMemo(() => {
+    return hasPermission(permissions, Permissions.submission_read);
+  }, [permissions]);
+
+  useEffect(() => {
+    if (
+      activeTab === '' &&
+      canSeeDesignTab !== undefined &&
+      canSeeSettingsTab !== undefined &&
+      canSeeAccessTab !== undefined &&
+      canSeeHistoryTab !== undefined &&
+      canSeeSubmissionsTab !== undefined
+    ) {
+      const setT = async (tab: string) => {
+        setActiveTab(tab);
+      };
+      if (canSeeDesignTab) {
+        setT(DESIGNER_TAB);
+      } else if (canSeeSettingsTab) {
+        setT(SETTINGS_TAB);
+      } else if (canSeeAccessTab) {
+        setT(ACCESS_TAB);
+      } else if (canSeeHistoryTab) {
+        setT(HISTORY_TAB);
+      } else if (canSeeSubmissionsTab) {
+        setT(SUBMISSIONS_TAB);
+      } else {
+        setT(SHARE_TAB);
+      }
+    }
+  }, [
+    activeTab,
+    setActiveTab,
+    canSeeDesignTab,
+    canSeeSettingsTab,
+    canSeeAccessTab,
+    canSeeHistoryTab,
+    canSeeSubmissionsTab,
+  ]);
 
   const reportWriteFailure = async (e: unknown, failedText: string) => {
     if (!isConflict(e)) {
@@ -394,57 +463,67 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
         // gated on permissions a given user may not hold.
         mountOnEnter
       >
+        {canSeeDesignTab && (
+          <Tab
+            eventKey={DESIGNER_TAB}
+            tabAttrs={{ 'data-testid': 'designer-tab' }}
+            title={dict.form.designerTab || 'Designer'}
+          >
+            {renderDesignerContent()}
+          </Tab>
+        )}
+        {canSeeSettingsTab && (
+          <Tab
+            eventKey={SETTINGS_TAB}
+            tabAttrs={{ 'data-testid': 'settings-tab' }}
+            disabled={isSaving || draftUnavailable}
+            title={dict.form.settingsTab || 'Settings'}
+          >
+            <FormSettingsTab dict={dict} formId={formId} />
+          </Tab>
+        )}
+        {canSeeAccessTab && (
+          <Tab
+            eventKey={ACCESS_TAB}
+            tabAttrs={{ 'data-testid': 'team-tab' }}
+            disabled={isSaving || draftUnavailable}
+            title={dict.form.teamTab || 'Team'}
+          >
+            <FormTeamTab dict={dict} />
+          </Tab>
+        )}
+        {canSeeHistoryTab && (
+          <Tab
+            eventKey={HISTORY_TAB}
+            tabAttrs={{ 'data-testid': 'version-tab' }}
+            disabled={isSaving || draftUnavailable}
+            title={dict.form.historyTab || 'History'}
+          >
+            <FormHistoryTab
+              dict={dict}
+              formId={formId}
+              onSelectVersion={selectVersion}
+              onRestoreVersion={restoreVersionAsNew}
+              onNavigateToDesigner={() => openTab('designer')}
+            />
+          </Tab>
+        )}
+        {canSeeSubmissionsTab && (
+          <Tab
+            eventKey={SUBMISSIONS_TAB}
+            tabAttrs={{ 'data-testid': 'submission-tab' }}
+            disabled={isSaving || draftUnavailable}
+            title={dict.form.submissionTab || 'Submissions'}
+          >
+            <FormSubmissionTab
+              dict={dict}
+              formId={formId}
+              opened={openedTabs.includes('submissions')}
+            />
+          </Tab>
+        )}
         <Tab
-          eventKey="designer"
-          tabAttrs={{ 'data-testid': 'designer-tab' }}
-          title={dict.form.designerTab || 'Designer'}
-        >
-          {renderDesignerContent()}
-        </Tab>
-        <Tab
-          eventKey="settings"
-          tabAttrs={{ 'data-testid': 'settings-tab' }}
-          disabled={isSaving || draftUnavailable}
-          title={dict.form.settingsTab || 'Settings'}
-        >
-          <FormSettingsTab dict={dict} formId={formId} />
-        </Tab>
-        <Tab
-          eventKey="team"
-          tabAttrs={{ 'data-testid': 'team-tab' }}
-          disabled={isSaving || draftUnavailable}
-          title={dict.form.teamTab || 'Team'}
-        >
-          <FormTeamTab dict={dict} />
-        </Tab>
-        <Tab
-          eventKey="version"
-          tabAttrs={{ 'data-testid': 'version-tab' }}
-          disabled={isSaving || draftUnavailable}
-          title={dict.form.historyTab || 'History'}
-        >
-          <FormHistoryTab
-            dict={dict}
-            formId={formId}
-            onSelectVersion={selectVersion}
-            onRestoreVersion={restoreVersionAsNew}
-            onNavigateToDesigner={() => openTab('designer')}
-          />
-        </Tab>
-        <Tab
-          eventKey="submissions"
-          tabAttrs={{ 'data-testid': 'submission-tab' }}
-          disabled={isSaving || draftUnavailable}
-          title={dict.form.submissionTab || 'Submissions'}
-        >
-          <FormSubmissionTab
-            dict={dict}
-            formId={formId}
-            opened={openedTabs.includes('submissions')}
-          />
-        </Tab>
-        <Tab
-          eventKey="share"
+          eventKey={SHARE_TAB}
           tabAttrs={{ 'data-testid': 'share-tab' }}
           disabled={isSaving || draftUnavailable}
           title={dict.form.shareTab || 'Share'}
