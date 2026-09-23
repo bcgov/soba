@@ -1,37 +1,41 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { getSobaFormVersionPage } from '@/src/shared/api/sobaApi';
+import { getSobaForms } from '@/src/shared/api/sobaApi';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { listReadConfig } from '@/src/shared/api/swrConfig';
 import { classifyDataError } from '@/src/shared/api/dataError';
 import type { ListResult } from '@/src/shared/api/dataContracts';
 import type { ListQueryArgs } from '@/src/types/list';
-import type { SobaFormVersionListItem } from '@/src/types/forms';
+import type { SobaFormSummary } from '@/src/types/forms';
 
-const EMPTY: SobaFormVersionListItem[] = [];
+const EMPTY: SobaFormSummary[] = [];
 
-/** The key every read of a form's versions shares, so one refresh reaches all of them. */
-export const versionsKey = (formId: string) => ['design-form-versions', formId];
-
-/** One page of a form's versions, for the history table. */
-export function useFormVersionPage(
-  formId: string | undefined,
+/**
+ * One page of forms, optionally scoped to a workspace. `holdRequest` waits for the workspace filter
+ * to resolve, so the first arrival does not read unscoped.
+ */
+export function useFormsList(
   query: ListQueryArgs,
-): ListResult<SobaFormVersionListItem> {
+  workspaceId: string | undefined,
+  holdRequest: boolean,
+): ListResult<SobaFormSummary> {
   const { data, isLoading, isValidating, error, mutate } = useAuthedSWR(
-    formId ? [...versionsKey(formId), query.offset, query.limit, query.sort] : null,
+    holdRequest
+      ? null
+      : ['forms', workspaceId ?? null, query.offset, query.limit, query.sort, query.q],
     (token) =>
-      getSobaFormVersionPage(token, {
-        formId: formId as string,
+      getSobaForms(token, {
         offset: query.offset,
         limit: query.limit,
         sort: query.sort,
+        q: query.q,
+        workspaceId,
       }),
     listReadConfig,
   );
 
-  const rows: SobaFormVersionListItem[] = useMemo(
+  const rows: SobaFormSummary[] = useMemo(
     () => (Array.isArray(data?.items) ? data.items : EMPTY),
     [data],
   );

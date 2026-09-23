@@ -7,6 +7,8 @@ import { useAuthedSWR } from './useAuthedSWR';
 import { listReadConfig } from './swrConfig';
 import { isSessionExpired } from './sobaFetch';
 import { isForbidden, isNotFound } from './sobaHelpers';
+import { classifyDataError } from './dataError';
+import type { ListResult } from './dataContracts';
 import { EMPTY_LIST_PAGE, type ListQueryArgs, type OffsetPage } from '@/src/types/list';
 import type {
   WorkspaceItem,
@@ -73,15 +75,18 @@ export function useWorkspace(workspaceId: string | undefined) {
     (token) => selectWorkspace(token, workspaceId as string),
     workspaceReadConfig,
   );
-  return { workspace: data ?? null, isLoading, error };
+  return { workspace: data ?? null, isLoading, error: error ? classifyDataError(error) : null };
 }
 
 /**
  * One page of workspaces for the list screen. Not a session read: it revalidates normally, so a
  * workspace created or renamed on another screen shows up on the way back.
  */
-export function useWorkspaceList(query: ListQueryArgs) {
-  const { data, isLoading, error } = useAuthedSWR<{ items: WorkspaceItem[]; page: OffsetPage }>(
+export function useWorkspaceList(query: ListQueryArgs): ListResult<WorkspaceItem> {
+  const { data, isLoading, isValidating, error, mutate } = useAuthedSWR<{
+    items: WorkspaceItem[];
+    page: OffsetPage;
+  }>(
     ['workspaces', 'list', query.offset, query.limit, query.sort, query.q ?? ''],
     async (token) => {
       const response = await fetchWorkspaces(token, query);
@@ -89,11 +94,16 @@ export function useWorkspaceList(query: ListQueryArgs) {
     },
     listReadConfig,
   );
+  const refresh = useCallback(async () => {
+    await mutate();
+  }, [mutate]);
   return {
-    workspaces: data?.items ?? EMPTY,
+    rows: data?.items ?? EMPTY,
     total: data?.page.total,
     isLoading,
-    error,
+    isRefreshing: isValidating && data !== undefined,
+    error: error ? classifyDataError(error) : null,
+    refresh,
   };
 }
 
