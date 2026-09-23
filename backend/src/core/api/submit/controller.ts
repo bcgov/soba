@@ -37,9 +37,10 @@ export const getSubmitSubmissionSchema = asyncHandler(
 );
 
 /**
- * The one payload the fill page needs for an in-progress submission: its workflow state, its form
- * version schema, and any saved answers. `content` is null for a just-`opened` submission (no engine
- * document yet), so the client renders an empty form without a second, 404-ing data call.
+ * The one payload the fill page needs for an in-progress submission: its workflow state, form
+ * version and schema, head revision (the base for the next write), and any saved answers. `content`
+ * is null for a just-`opened` submission (no engine document yet), so the client renders an empty
+ * form without a second, 404-ing data call.
  */
 export const getSubmitFillBundle = asyncHandler(
   async (req: Request<{ id: string }>, res: Response) => {
@@ -48,6 +49,8 @@ export const getSubmitFillBundle = asyncHandler(
     const content = await submissionsApiService.getData(ctx, req.params.id);
     const bundle: SubmitFillBundle = {
       workflowState: submission.workflowState,
+      formVersionId: submission.formVersionId,
+      headRevisionId: submission.headRevisionId,
       schema,
       content: content ?? null,
     };

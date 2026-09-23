@@ -17,7 +17,7 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
 
 import makeStore from '@/lib/store';
 import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
-import { useForm } from '@/src/features/designer/useForm';
+import { useForm } from '@/src/features/designer/data/useForm';
 
 const V1 = { id: 'v1', versionNo: 1, state: 'published' };
 const V2 = { id: 'v2', versionNo: 2, state: 'draft' };

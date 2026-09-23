@@ -2,13 +2,24 @@
 
 import { useSWRConfig, type SWRConfiguration } from 'swr';
 import { useCallback } from 'react';
-import { fetchWorkspaces, lookupWorkspaces, selectWorkspace } from './sobaApi';
+import {
+  createWorkspace,
+  fetchWorkspaces,
+  lookupWorkspaces,
+  selectWorkspace,
+  updateWorkspace,
+} from './sobaApi';
 import { useAuthedSWR } from './useAuthedSWR';
 import { listReadConfig } from './swrConfig';
 import { isSessionExpired } from './sobaFetch';
 import { isForbidden, isNotFound } from './sobaHelpers';
+import { classifyDataError } from './dataError';
+import { useRefreshCurrentUser } from './useCurrentUser';
+import type { ListResult, WriteOutcome } from './dataContracts';
 import { EMPTY_LIST_PAGE, type ListQueryArgs, type OffsetPage } from '@/src/types/list';
 import type {
+  CreateWorkspaceBody,
+  UpdateWorkspaceBody,
   WorkspaceItem,
   WorkspaceLookupItem,
   WorkspaceLookupResponse,
@@ -73,15 +84,18 @@ export function useWorkspace(workspaceId: string | undefined) {
     (token) => selectWorkspace(token, workspaceId as string),
     workspaceReadConfig,
   );
-  return { workspace: data ?? null, isLoading, error };
+  return { workspace: data ?? null, isLoading, error: error ? classifyDataError(error) : null };
 }
 
 /**
  * One page of workspaces for the list screen. Not a session read: it revalidates normally, so a
  * workspace created or renamed on another screen shows up on the way back.
  */
-export function useWorkspaceList(query: ListQueryArgs) {
-  const { data, isLoading, error } = useAuthedSWR<{ items: WorkspaceItem[]; page: OffsetPage }>(
+export function useWorkspaceList(query: ListQueryArgs): ListResult<WorkspaceItem> {
+  const { data, isLoading, isValidating, error, mutate } = useAuthedSWR<{
+    items: WorkspaceItem[];
+    page: OffsetPage;
+  }>(
     ['workspaces', 'list', query.offset, query.limit, query.sort, query.q ?? ''],
     async (token) => {
       const response = await fetchWorkspaces(token, query);
@@ -89,11 +103,16 @@ export function useWorkspaceList(query: ListQueryArgs) {
     },
     listReadConfig,
   );
+  const refresh = useCallback(async () => {
+    await mutate();
+  }, [mutate]);
   return {
-    workspaces: data?.items ?? EMPTY,
+    rows: data?.items ?? EMPTY,
     total: data?.page.total,
     isLoading,
-    error,
+    isRefreshing: isValidating && data !== undefined,
+    error: error ? classifyDataError(error) : null,
+    refresh,
   };
 }
 
@@ -113,4 +132,39 @@ export function useRefreshWorkspaces() {
 export function useRefreshWorkspace() {
   const { mutate } = useSWRConfig();
   return useCallback((workspaceId: string) => mutate(workspaceKey(workspaceId)), [mutate]);
+}
+
+/**
+ * Create or update a workspace, refreshing the caches each write affects. The current user carries
+ * whether they have a workspace and can create forms, and both move with a create or disclaimer
+ * change, so it is refreshed too.
+ */
+export function useWorkspaceWriter() {
+  const refreshWorkspaces = useRefreshWorkspaces();
+  const refreshWorkspace = useRefreshWorkspace();
+  const refreshCurrentUser = useRefreshCurrentUser();
+
+  const create = useCallback(
+    async (token: string, body: CreateWorkspaceBody): Promise<WriteOutcome<WorkspaceItem>> => {
+      const value = await createWorkspace(token, body);
+      await Promise.all([refreshWorkspaces(), refreshCurrentUser()]);
+      return { status: 'applied', value };
+    },
+    [refreshWorkspaces, refreshCurrentUser],
+  );
+
+  const update = useCallback(
+    async (
+      token: string,
+      id: string,
+      patch: UpdateWorkspaceBody,
+    ): Promise<WriteOutcome<WorkspaceItem>> => {
+      const value = await updateWorkspace(token, id, patch);
+      await Promise.all([refreshWorkspace(id), refreshWorkspaces(), refreshCurrentUser()]);
+      return { status: 'applied', value };
+    },
+    [refreshWorkspace, refreshWorkspaces, refreshCurrentUser],
+  );
+
+  return { create, update };
 }

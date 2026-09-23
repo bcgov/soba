@@ -1,9 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { getSobaFormVersionPage } from '@/src/shared/api/sobaApi';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { listReadConfig } from '@/src/shared/api/swrConfig';
+import { classifyDataError } from '@/src/shared/api/dataError';
+import type { ListResult } from '@/src/shared/api/dataContracts';
 import type { ListQueryArgs } from '@/src/types/list';
 import type { SobaFormVersionListItem } from '@/src/types/forms';
 
@@ -13,8 +15,11 @@ const EMPTY: SobaFormVersionListItem[] = [];
 export const versionsKey = (formId: string) => ['design-form-versions', formId];
 
 /** One page of a form's versions, for the history table. */
-export function useFormVersionPage(formId: string | undefined, query: ListQueryArgs) {
-  const { data, isLoading, error } = useAuthedSWR(
+export function useFormVersionPage(
+  formId: string | undefined,
+  query: ListQueryArgs,
+): ListResult<SobaFormVersionListItem> {
+  const { data, isLoading, isValidating, error, mutate } = useAuthedSWR(
     formId ? [...versionsKey(formId), query.offset, query.limit, query.sort] : null,
     (token) =>
       getSobaFormVersionPage(token, {
@@ -26,10 +31,20 @@ export function useFormVersionPage(formId: string | undefined, query: ListQueryA
     listReadConfig,
   );
 
-  const versions: SobaFormVersionListItem[] = useMemo(
+  const rows: SobaFormVersionListItem[] = useMemo(
     () => (Array.isArray(data?.items) ? data.items : EMPTY),
     [data],
   );
+  const refresh = useCallback(async () => {
+    await mutate();
+  }, [mutate]);
 
-  return { versions, total: data?.page?.total, isLoading, error };
+  return {
+    rows,
+    total: data?.page?.total,
+    isLoading,
+    isRefreshing: isValidating && data !== undefined,
+    error: error ? classifyDataError(error) : null,
+    refresh,
+  };
 }

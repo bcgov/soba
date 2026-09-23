@@ -6,27 +6,20 @@ import userEvent from '@testing-library/user-event';
 import FormSettingsDrawer from '@/src/features/form-settings/form/FormSettingsDrawer';
 import type { Dictionary } from '@/src/types/dictionary';
 
-const { mockUpdateSobaForm, mockRefreshForm, mockAddNotification, loaded } = vi.hoisted(() => ({
-  mockUpdateSobaForm: vi.fn(),
-  mockRefreshForm: vi.fn(),
+const { mockFormUpdate, mockAddNotification, loaded } = vi.hoisted(() => ({
+  mockFormUpdate: vi.fn(),
   mockAddNotification: vi.fn(),
   // Stands in for the shared SWR key: a write anywhere changes what every reader sees.
   loaded: { name: 'Initial name', description: 'Initial description' },
-}));
-
-vi.mock('@/src/shared/api/sobaApiDesign', () => ({
-  updateSobaForm: (...args: unknown[]) => mockUpdateSobaForm(...args),
 }));
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
   useKeycloak: () => ({ token: 'mock-token' }),
 }));
 
-vi.mock('@/src/features/designer/useForm', () => ({
-  useForm: () => ({
-    form: loaded,
-    refreshForm: mockRefreshForm,
-  }),
+vi.mock('@/src/features/designer/data/useForm', () => ({
+  useForm: () => ({ form: loaded }),
+  useFormWriter: () => ({ update: mockFormUpdate }),
 }));
 
 vi.mock('@/lib/hooks/useNotificationStore', () => ({
@@ -95,7 +88,7 @@ describe('FormSettingsDrawer', () => {
   });
 
   it('saves changes successfully', async () => {
-    mockUpdateSobaForm.mockResolvedValueOnce({});
+    mockFormUpdate.mockResolvedValueOnce({});
     renderDrawer();
 
     const textarea = screen.getByTestId('form-settings-description').querySelector('textarea')!;
@@ -105,11 +98,10 @@ describe('FormSettingsDrawer', () => {
     const saveButton = screen.getByTestId('form-settings-test-drawer-save');
     await userEvent.click(saveButton);
 
-    expect(mockUpdateSobaForm).toHaveBeenCalledWith('mock-token', 'f1', {
+    expect(mockFormUpdate).toHaveBeenCalledWith('mock-token', {
       description: 'New description',
     });
 
-    expect(mockRefreshForm).toHaveBeenCalled();
     expect(mockAddNotification).toHaveBeenCalledWith({
       type: 'success',
       text: 'Changes saved successfully.',
@@ -118,7 +110,7 @@ describe('FormSettingsDrawer', () => {
 
   // Only the edited fields are sent, so a save never writes back a value read from somewhere else.
   it('sends only the name when only the name is edited', async () => {
-    mockUpdateSobaForm.mockResolvedValueOnce({});
+    mockFormUpdate.mockResolvedValueOnce({});
     renderDrawer();
 
     const input = screen.getByTestId('form-settings-name').querySelector('input')!;
@@ -126,7 +118,7 @@ describe('FormSettingsDrawer', () => {
     await userEvent.type(input, '  Renamed  ');
     await userEvent.click(screen.getByTestId('form-settings-test-drawer-save'));
 
-    expect(mockUpdateSobaForm).toHaveBeenCalledWith('mock-token', 'f1', { name: 'Renamed' });
+    expect(mockFormUpdate).toHaveBeenCalledWith('mock-token', { name: 'Renamed' });
     expect(mockAddNotification).toHaveBeenCalledWith({
       type: 'success',
       text: 'Changes saved successfully.',
@@ -134,7 +126,7 @@ describe('FormSettingsDrawer', () => {
   });
 
   it('sends both fields when both are edited', async () => {
-    mockUpdateSobaForm.mockResolvedValueOnce({});
+    mockFormUpdate.mockResolvedValueOnce({});
     renderDrawer();
 
     const input = screen.getByTestId('form-settings-name').querySelector('input')!;
@@ -145,7 +137,7 @@ describe('FormSettingsDrawer', () => {
     await userEvent.type(textarea, 'New description');
     await userEvent.click(screen.getByTestId('form-settings-test-drawer-save'));
 
-    expect(mockUpdateSobaForm).toHaveBeenCalledWith('mock-token', 'f1', {
+    expect(mockFormUpdate).toHaveBeenCalledWith('mock-token', {
       name: 'Renamed',
       description: 'New description',
     });
@@ -174,11 +166,11 @@ describe('FormSettingsDrawer', () => {
     await userEvent.click(screen.getByTestId('form-settings-test-drawer-save'));
 
     expect(await screen.findByText('Form name is required')).toBeInTheDocument();
-    expect(mockUpdateSobaForm).not.toHaveBeenCalled();
+    expect(mockFormUpdate).not.toHaveBeenCalled();
   });
 
   it('shows error notification on save failure', async () => {
-    mockUpdateSobaForm.mockRejectedValueOnce(new Error('Save failed'));
+    mockFormUpdate.mockRejectedValueOnce(new Error('Save failed'));
     renderDrawer();
 
     const textarea = screen.getByTestId('form-settings-description').querySelector('textarea')!;
@@ -188,11 +180,10 @@ describe('FormSettingsDrawer', () => {
     const saveButton = screen.getByTestId('form-settings-test-drawer-save');
     await userEvent.click(saveButton);
 
-    expect(mockUpdateSobaForm).toHaveBeenCalledWith('mock-token', 'f1', {
+    expect(mockFormUpdate).toHaveBeenCalledWith('mock-token', {
       description: 'New description',
     });
 
-    expect(mockRefreshForm).not.toHaveBeenCalled();
     expect(mockAddNotification).toHaveBeenCalledWith({
       type: 'error',
       text: 'Failed to save changes. Please try again.',
@@ -211,7 +202,7 @@ describe('FormSettingsDrawer', () => {
     await userEvent.click(cancelButton);
 
     expect(textarea).toHaveValue('Initial description');
-    expect(mockUpdateSobaForm).not.toHaveBeenCalled();
+    expect(mockFormUpdate).not.toHaveBeenCalled();
   });
 
   // The description is edited here and written from the designer's save, so a field left alone has

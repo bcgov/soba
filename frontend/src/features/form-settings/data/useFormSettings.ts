@@ -1,5 +1,6 @@
 import { sessionReadConfig } from '@/src/shared/api/swrConfig';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
+import { classifyDataError } from '@/src/shared/api/dataError';
 import { getFormSettings, setFormSettings } from './api';
 
 /** A settings group of a form, and a save that puts the saved settings in the cache. */
@@ -16,5 +17,5 @@ export function useFormSettings<TSettings, TBody = TSettings>(key: string, formI
     });
   };
 
-  return { settings: data, error, save };
+  return { settings: data, error: error ? classifyDataError(error) : null, save };
 }

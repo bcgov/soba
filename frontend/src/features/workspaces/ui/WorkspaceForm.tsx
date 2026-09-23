@@ -19,14 +19,9 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { codeItems } from '@/src/shared/util/codeList';
-import {
-  useWorkspace,
-  useRefreshWorkspace,
-  useRefreshWorkspaces,
-} from '@/src/shared/api/useWorkspaces';
-import { useCurrentUser, useRefreshCurrentUser } from '@/src/shared/api/useCurrentUser';
+import { useWorkspace, useWorkspaceWriter } from '@/src/shared/api/useWorkspaces';
+import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { createWorkspace, updateWorkspace } from '@/src/shared/api/sobaApi';
 import { isWorkspaceManageRole } from '../workspaceRoles';
 import type { UpdateWorkspaceBody, WorkspaceItem } from '@/src/types/workspaces';
 import styles from './WorkspaceForm.module.css';
@@ -60,9 +55,7 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
   const pathname = usePathname();
   const locale = getLocaleFromPath(pathname);
   const { token } = useKeycloak();
-  const refreshWorkspaces = useRefreshWorkspaces();
-  const refreshWorkspace = useRefreshWorkspace();
-  const refreshCurrentUser = useRefreshCurrentUser();
+  const workspaceWriter = useWorkspaceWriter();
   const { addNotification } = useNotificationStore();
 
   // What the fields were seeded from. The `workspace` prop moves with a revalidation while the
@@ -97,7 +90,7 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
     setSaving(true);
     try {
       if (!seed) {
-        await createWorkspace(token, {
+        await workspaceWriter.create(token, {
           name: trimmedName,
           disclaimerAccepted,
           useCase,
@@ -112,13 +105,9 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
           router.push(navLink(`/${locale}/workspaces`));
           return;
         }
-        await updateWorkspace(token, seed.id, patch);
-        await refreshWorkspace(seed.id);
+        await workspaceWriter.update(token, seed.id, patch);
       }
 
-      // The current user carries whether they have a workspace and can create forms, and both move
-      // with a new workspace or a disclaimer change.
-      await Promise.all([refreshWorkspaces(), refreshCurrentUser()]);
       router.push(navLink(`/${locale}/workspaces`));
     } catch (error) {
       addNotification({
@@ -136,9 +125,7 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
     token,
     seed,
     disclaimerAccepted,
-    refreshWorkspace,
-    refreshWorkspaces,
-    refreshCurrentUser,
+    workspaceWriter,
     router,
     locale,
     addNotification,

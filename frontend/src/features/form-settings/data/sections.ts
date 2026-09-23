@@ -3,8 +3,8 @@ import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed } from '@/src/shared/featureFlags/flags';
 import { fetchFeatureAvailability } from '@/src/shared/featureFlags/featureAvailability';
 import { sessionReadConfig } from '@/src/shared/api/swrConfig';
-import { formSettingsSections } from './registry';
-import type { FormSettingsSection } from './types';
+import { formSettingsSections } from '../registry';
+import type { FormSettingsSection } from '../types';
 
 const hideAll = () => () => false;
 
