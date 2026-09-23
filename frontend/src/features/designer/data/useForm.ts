@@ -3,12 +3,26 @@
 import { useCallback, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import type { FormType } from '@formio/react';
-import { getSobaForm, getSobaFormVersion, lookupFormVersions } from '@/src/shared/api/sobaApi';
+import {
+  createFormVersion,
+  createSobaFormioForm,
+  getFormVersionSchema,
+  getSobaForm,
+  getSobaFormVersion,
+  lookupFormVersions,
+  publishSobaFormVersion,
+  saveFormVersionSchema,
+} from '@/src/shared/api/sobaApi';
+import { updateSobaForm } from '@/src/shared/api/sobaApiDesign';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { sessionReadConfig } from '@/src/shared/api/swrConfig';
 import { classifyDataError } from '@/src/shared/api/dataError';
-import type { DataError } from '@/src/shared/api/dataContracts';
-import type { FormVersionSummary } from '@/src/types/forms';
+import type { DataError, WriteOutcome } from '@/src/shared/api/dataContracts';
+import type {
+  CreateSobaFormioFormResponse,
+  FormVersionSummary,
+  SobaFormType,
+} from '@/src/types/forms';
 import { versionsKey } from './useFormVersions';
 import { formVersionSchemaKey, useFormVersionSchema } from './useFormVersionSchema';
 
@@ -164,4 +178,103 @@ export function useForm(formId?: string) {
     refreshForm,
     refreshVersions,
   };
+}
+
+type FormPatch = Parameters<typeof updateSobaForm>[2];
+type FormRecord = Awaited<ReturnType<typeof updateSobaForm>>;
+type NewVersion = Awaited<ReturnType<typeof createFormVersion>>;
+
+/**
+ * The write side of one form: its record, its version schemas, and new versions. Each action
+ * refreshes the caches it affects (the form, the version list, and the schema just written), so a
+ * component never refreshes by hand.
+ */
+export function useFormWriter(formId: string) {
+  const { mutate } = useSWRConfig();
+
+  const refreshForm = useCallback(() => mutate(['design-form', formId]), [mutate, formId]);
+  // The form carries the current version, so a new version changes it too: refresh both.
+  const refreshVersions = useCallback(() => {
+    const [prefix] = versionsKey(formId);
+    return Promise.all([
+      refreshForm(),
+      mutate((key) => Array.isArray(key) && key[0] === prefix && key[1] === formId),
+    ]);
+  }, [mutate, formId, refreshForm]);
+  // The schema just written, seeded into the cache so the next read does not drop back to the
+  // pre-save body (these reads do not revalidate on their own).
+  const commitSchema = useCallback(
+    (versionId: string, schema: FormType) =>
+      mutate(formVersionSchemaKey(versionId), schema, { revalidate: false }),
+    [mutate],
+  );
+
+  const update = useCallback(
+    async (token: string, patch: FormPatch): Promise<WriteOutcome<FormRecord>> => {
+      const value = await updateSobaForm(token, formId, patch);
+      await Promise.all([refreshForm(), mutate((key) => Array.isArray(key) && key[0] === 'forms')]);
+      return { status: 'applied', value };
+    },
+    [mutate, formId, refreshForm],
+  );
+
+  const createVersion = useCallback(
+    async (token: string, sourceSchema: FormType): Promise<WriteOutcome<NewVersion>> => {
+      const value = await createFormVersion(token, formId);
+      await saveFormVersionSchema(token, value.id, sourceSchema);
+      await commitSchema(value.id, sourceSchema);
+      await refreshVersions();
+      return { status: 'applied', value };
+    },
+    [formId, commitSchema, refreshVersions],
+  );
+
+  const restoreVersion = useCallback(
+    async (token: string, fromVersionId: string): Promise<WriteOutcome<NewVersion>> => {
+      const sourceSchema = ((await getFormVersionSchema(token, fromVersionId)) ?? {}) as FormType;
+      return createVersion(token, sourceSchema);
+    },
+    [createVersion],
+  );
+
+  const saveSchema = useCallback(
+    async (
+      token: string,
+      versionId: string,
+      schema: FormType,
+      publish: boolean,
+    ): Promise<WriteOutcome<void>> => {
+      await saveFormVersionSchema(token, versionId, schema);
+      if (publish) {
+        await publishSobaFormVersion(token, versionId);
+        await refreshVersions();
+      }
+      await commitSchema(versionId, schema);
+      await refreshForm();
+      return { status: 'applied', value: undefined };
+    },
+    [commitSchema, refreshVersions, refreshForm],
+  );
+
+  return { update, createVersion, restoreVersion, saveSchema };
+}
+
+/** Create a new form with an empty first-version schema, ready to open in the designer. */
+export function useFormCreator() {
+  const create = useCallback(
+    async (
+      token: string,
+      data: SobaFormType,
+      workspaceId?: string,
+    ): Promise<WriteOutcome<CreateSobaFormioFormResponse>> => {
+      const value = await createSobaFormioForm(token, data, workspaceId);
+      // A version with no schema 404s when read; the empty schema leaves an openable draft.
+      if (value.formVersion?.id) {
+        await saveFormVersionSchema(token, value.formVersion.id, { components: [] } as FormType);
+      }
+      return { status: 'applied', value };
+    },
+    [],
+  );
+  return { create };
 }

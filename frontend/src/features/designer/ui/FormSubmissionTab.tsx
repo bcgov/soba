@@ -12,8 +12,10 @@ import type { SubmissionListItem } from '@/src/types/submissions';
 import { Tag } from '@/src/components/Tag';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { deleteSobaSubmission } from '@/src/shared/api/sobaApi';
-import { useFormSubmissions } from '@/src/features/designer/data/useFormSubmissions';
+import {
+  useFormSubmissions,
+  useSubmissionDeleter,
+} from '@/src/features/designer/data/useFormSubmissions';
 import { FORM_SUBMISSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { useListQuery } from '@/src/shared/list/useListQuery';
 import { useDataTable } from '@/src/shared/list/useDataTable';
@@ -42,7 +44,8 @@ export default function FormSubmissionTab({
     sort: query.sort,
     q: query.q,
   });
-  const { table, refresh } = useDataTable(query, submissionsResult, dict.submission.error);
+  const { table } = useDataTable(query, submissionsResult, dict.submission.error);
+  const submissionDeleter = useSubmissionDeleter();
   const formatLongDate = useFormatLongDate();
   const { token } = useKeycloak();
   const pathname = usePathname();
@@ -60,8 +63,7 @@ export default function FormSubmissionTab({
   const confirmDelete = useCallback(async () => {
     setShowDeleteConfirm(false);
     try {
-      await deleteSobaSubmission(token as string, deleteId);
-      await refresh();
+      await submissionDeleter.remove(token as string, deleteId);
       addNotification({
         text: dict.submission.deleteSuccess || 'Submission deleted successfully',
         type: 'success',
@@ -73,7 +75,7 @@ export default function FormSubmissionTab({
         consoleError: e,
       });
     }
-  }, [token, deleteId, refresh, addNotification, dict]);
+  }, [token, deleteId, submissionDeleter, addNotification, dict]);
 
   const columns: Column<SubmissionListItem>[] = useMemo(
     () => [

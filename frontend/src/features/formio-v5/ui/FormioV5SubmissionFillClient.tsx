@@ -2,7 +2,6 @@
 
 import { useParams, useRouter, usePathname } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { v7 as uuidv7 } from 'uuid';
 import { Submission } from '@formio/react';
 import type { FormType } from '@formio/react';
 import { InlineAlert } from '@bcgov/design-system-react-components';
@@ -17,8 +16,8 @@ import {
   setActiveSubmissionId,
   clearActiveSubmissionId,
 } from '@/src/features/formio-v5/activeSubmission';
-import { getSubmitFillBundle, submitSobaFormSubmission } from '@/src/shared/api/sobaApi';
 import { useSubmitFill } from '@/src/features/formio-v5/data/useSubmitFill';
+import { useSubmissionWriter } from '@/src/features/formio-v5/data/useSubmissionWriter';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
@@ -50,14 +49,13 @@ function SubmissionFillBody({
   const locale = getLocaleFromPath(usePathname());
 
   const fill = useSubmitFill(submissionId);
+  const writer = useSubmissionWriter(submissionId);
 
   // Host file constraints (blocked extensions + max size) for the BCGovFile component; {} when files off.
   const bcgovFileOption = useBcgovFileOption();
   const [renderError, setRenderError] = useState<string | null>(null);
   // The head revision loaded with the bundle; each submit is based on it.
   const baseRevisionIdRef = useRef<string | null>(null);
-  // Reused while the kind of write and the answers are unchanged, so a retried write replays.
-  const pendingRevisionRef = useRef<{ revisionId: string; key: string } | null>(null);
   // The Form.io webform instance; in JSON mode (no `src`) we must signal it on a failed submit,
   // or its submit button spins forever. On success we navigate away instead.
   const formInstanceRef = useRef<{
@@ -97,42 +95,23 @@ function SubmissionFillBody({
   // built-in green "Submission Complete" alert.
   const formOptions = useMemo(() => ({ noAlerts: true, ...bcgovFileOption }), [bcgovFileOption]);
 
-  const revisionIdsFor = (write: 'save' | 'submit', data: Record<string, unknown>) => {
-    const baseRevisionId = baseRevisionIdRef.current;
-    if (!baseRevisionId) return {};
-    const key = `${write}:${JSON.stringify(data)}`;
-    if (pendingRevisionRef.current?.key !== key) {
-      pendingRevisionRef.current = { revisionId: uuidv7(), key };
-    }
-    return { revisionId: pendingRevisionRef.current.revisionId, baseRevisionId };
-  };
-
   const submitForm = async (submission: Submission) => {
     try {
       const data = (submission?.data ?? {}) as Record<string, unknown>;
-      const result = await submitSobaFormSubmission(token ?? undefined, submissionId, {
-        data,
-        ...revisionIdsFor('submit', data),
-      });
+      const outcome = await writer.submit(token ?? undefined, data, baseRevisionIdRef.current);
       // A pending revision means the record changed under the filler (a conflict, or it was already
       // submitted); the work is kept for review but this submit did not go through. Keep them on the
-      // form with a notice, refresh the base so a retry is not permanently stale, and release the
+      // form with a notice, resync the base so a retry is not permanently stale, and release the
       // submit button. The typed answers stay in the live form (initialData is not reset).
-      if (result.revision.status === 'pending') {
+      if (outcome.status === 'held') {
         addNotification({ text: labels.submitPending, type: 'warning' });
         setRenderError(null);
-        try {
-          const bundle = await getSubmitFillBundle(token ?? undefined, submissionId);
-          if (bundle.workflowState === 'submitted') {
-            router.replace(`/${locale}/submission/${submissionId}`);
-            return;
-          }
-          baseRevisionIdRef.current = bundle.headRevisionId;
-        } catch {
-          // Leave the base as loaded; the notice already asked the filler to try again.
+        const head = await writer.reloadHead(token ?? undefined);
+        if (head?.workflowState === 'submitted') {
+          router.replace(`/${locale}/submission/${submissionId}`);
+          return;
         }
-        // Reusing the same revision id would replay this pending write, so force a fresh one.
-        pendingRevisionRef.current = null;
+        if (head) baseRevisionIdRef.current = head.headRevisionId;
         formInstanceRef.current?.emit('submitDone');
         return;
       }
