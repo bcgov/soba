@@ -4,10 +4,11 @@ import { useCallback, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import type { FormType } from '@formio/react';
 import { getSobaForm, getSobaFormVersion, lookupFormVersions } from '@/src/shared/api/sobaApi';
+import { updateSobaForm } from '@/src/shared/api/sobaApiDesign';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { sessionReadConfig } from '@/src/shared/api/swrConfig';
 import { classifyDataError } from '@/src/shared/api/dataError';
-import type { DataError } from '@/src/shared/api/dataContracts';
+import type { DataError, WriteOutcome } from '@/src/shared/api/dataContracts';
 import type { FormVersionSummary } from '@/src/types/forms';
 import { versionsKey } from './useFormVersions';
 import { formVersionSchemaKey, useFormVersionSchema } from './useFormVersionSchema';
@@ -164,4 +165,24 @@ export function useForm(formId?: string) {
     refreshForm,
     refreshVersions,
   };
+}
+
+type FormPatch = Parameters<typeof updateSobaForm>[2];
+type FormRecord = Awaited<ReturnType<typeof updateSobaForm>>;
+
+/** Update a form's record, refreshing the form itself and the forms list where its name shows. */
+export function useFormWriter(formId: string) {
+  const { mutate } = useSWRConfig();
+  const update = useCallback(
+    async (token: string, patch: FormPatch): Promise<WriteOutcome<FormRecord>> => {
+      const value = await updateSobaForm(token, formId, patch);
+      await Promise.all([
+        mutate(['design-form', formId]),
+        mutate((key) => Array.isArray(key) && key[0] === 'forms'),
+      ]);
+      return { status: 'applied', value };
+    },
+    [mutate, formId],
+  );
+  return { update };
 }

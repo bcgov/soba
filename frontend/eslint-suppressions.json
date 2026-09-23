@@ -14,16 +14,6 @@
       "count": 1
     }
   },
-  "src/features/form-settings/form/FormSettingsDrawer.tsx": {
-    "no-restricted-imports": {
-      "count": 1
-    }
-  },
-  "src/features/form-settings/profile/FormProfileDrawer.tsx": {
-    "no-restricted-imports": {
-      "count": 1
-    }
-  },
   "src/features/formio-v5/ui/FormioV5SubmissionFillClient.tsx": {
     "no-restricted-imports": {
       "count": 1

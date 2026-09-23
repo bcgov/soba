@@ -6,14 +6,14 @@ import { Select } from '@bcgov/design-system-react-components';
 import FormSettingsDrawers from '@/src/features/form-settings/ui/FormSettingsDrawers';
 import type { FormSettingsSectionProps } from '@/src/features/form-settings/types';
 import { codeItems } from '@/src/shared/util/codeList';
-import { updateSobaForm } from '@/src/shared/api/sobaApiDesign';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import { useForm } from '@/src/features/designer/data/useForm';
+import { useForm, useFormWriter } from '@/src/features/designer/data/useForm';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
 export default function FormProfileDrawer({ dict, drawerName, formId }: FormSettingsSectionProps) {
   const { token } = useKeycloak();
-  const { form, refreshForm } = useForm(formId);
+  const { form } = useForm(formId);
+  const formWriter = useFormWriter(formId);
   const { addNotification } = useNotificationStore();
 
   // Edits layered over the loaded values. Null means no edit, so a refresh from anywhere shows
@@ -29,11 +29,10 @@ export default function FormProfileDrawer({ dict, drawerName, formId }: FormSett
     if (token !== undefined) {
       setSaving(true);
       try {
-        await updateSobaForm(token, formId, {
+        await formWriter.update(token, {
           org: ministryOrg,
           useCase: useCase,
         });
-        await refreshForm();
         addNotification({
           type: 'success',
           text:
