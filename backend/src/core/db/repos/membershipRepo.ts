@@ -1,6 +1,6 @@
 import { and, count, eq, exists, ilike, isNotNull, isNull, or, sql, inArray } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
-import { WORKSPACE_SORT_FIELDS, type SortToken } from '@soba/lib';
+import { WORKSPACE_SORT_FIELDS, type SortLocale, type SortToken } from '@soba/lib';
 import { db } from '../client';
 import {
   appUsers,
@@ -196,7 +196,7 @@ export type WorkspaceListSortField = (typeof WORKSPACE_SORT_FIELDS)[number];
 export type WorkspaceListSort = SortToken<WorkspaceListSortField>;
 
 const WORKSPACE_SORT_COLUMNS: SortColumns<WorkspaceListSortField> = {
-  name: { column: workspaces.name, caseInsensitive: true },
+  name: { column: workspaces.name, linguistic: true },
   kind: { column: workspaces.kind },
   status: { column: workspaces.status },
   updatedAt: { column: workspaces.updatedAt },
@@ -216,6 +216,7 @@ export interface ListWorkspacesForUserInput extends WorkspaceMembershipFilter {
   offset: number;
   limit: number;
   sort: WorkspaceListSort;
+  locale: SortLocale;
 }
 
 export interface WorkspaceListRow {
@@ -289,7 +290,7 @@ export interface WorkspaceLookupRow {
 
 /** Workspaces for a select, in name order. */
 export const lookupWorkspacesForUser = (
-  input: WorkspaceMembershipFilter & { limit: number },
+  input: WorkspaceMembershipFilter & { limit: number; locale: SortLocale },
 ): Promise<WorkspaceLookupRow[]> =>
   db
     .select({
@@ -306,7 +307,7 @@ export const lookupWorkspacesForUser = (
       eq(workspaceDisclaimerAcceptances.workspaceId, workspaces.id),
     )
     .where(workspaceMembershipWhere(input))
-    .orderBy(...orderByForSort(WORKSPACE_SORT_COLUMNS, 'name:asc', workspaces.id))
+    .orderBy(...orderByForSort(WORKSPACE_SORT_COLUMNS, 'name:asc', workspaces.id, input.locale))
     .limit(input.limit);
 
 export const hasActiveMembership = async (userId: string): Promise<boolean> => {
@@ -365,7 +366,7 @@ export const listWorkspacesForUser = async (
         eq(workspaceDisclaimerAcceptances.workspaceId, workspaces.id),
       )
       .where(where)
-      .orderBy(...orderByForSort(WORKSPACE_SORT_COLUMNS, input.sort, workspaces.id))
+      .orderBy(...orderByForSort(WORKSPACE_SORT_COLUMNS, input.sort, workspaces.id, input.locale))
       .limit(input.limit)
       .offset(input.offset);
 
@@ -400,7 +401,7 @@ export type MemberListSort = SortToken<MemberListSortField>;
 
 const MEMBER_SORT_COLUMNS: SortColumns<MemberListSortField> = {
   // A user who has never signed in has no label yet.
-  displayLabel: { column: appUsers.displayLabel, nullable: true, caseInsensitive: true },
+  displayLabel: { column: appUsers.displayLabel, nullable: true, linguistic: true },
   role: { column: workspaceMemberships.role },
   status: { column: workspaceMemberships.status },
 };
@@ -410,6 +411,7 @@ export interface ListMembersForWorkspaceInput {
   offset: number;
   limit: number;
   sort: MemberListSort;
+  locale: SortLocale;
   role?: string;
   status?: string;
   q?: string;
@@ -444,7 +446,9 @@ export const listMembersForWorkspace = async (
       .from(workspaceMemberships)
       .innerJoin(appUsers, eq(appUsers.id, workspaceMemberships.userId))
       .where(where)
-      .orderBy(...orderByForSort(MEMBER_SORT_COLUMNS, input.sort, workspaceMemberships.id))
+      .orderBy(
+        ...orderByForSort(MEMBER_SORT_COLUMNS, input.sort, workspaceMemberships.id, input.locale),
+      )
       .limit(input.limit)
       .offset(input.offset);
     const totals = await tx

@@ -18,6 +18,7 @@ import {
 import { formsApiService } from './service';
 import { formSubmitterAudienceService } from './submitterAudience';
 import { asyncHandler } from '../shared/asyncHandler';
+import { withSortLocale } from '../../middleware/sortLocale';
 import { NotFoundError } from '../../errors';
 import type { Request } from 'express';
 
@@ -76,7 +77,7 @@ export const getForm = asyncHandler(async (req: Request<FormIdParams>, res: Resp
 
 export const getFormSubmitterAudience = asyncHandler(
   async (req: Request<FormIdParams>, res: Response) => {
-    const result = await formSubmitterAudienceService.get(req.coreContext!, req.params.id);
+    const result = await formSubmitterAudienceService.get(withSortLocale(req), req.params.id);
     res.json(result);
   },
 );
@@ -84,7 +85,7 @@ export const getFormSubmitterAudience = asyncHandler(
 export const setFormSubmitterAudience = asyncHandler(
   async (req: Request<FormIdParams, unknown, SetFormSubmitterAudienceBody>, res: Response) => {
     const result = await formSubmitterAudienceService.set(
-      req.coreContext!,
+      withSortLocale(req),
       req.params.id,
       req.body,
     );
@@ -96,7 +97,7 @@ export const listForms = asyncHandler(async (req: Request, res: Response) => {
   const scope = req.listScope!;
   const result = await formsApiService.list(
     { workspaceIds: scope.workspaceIds, actorId: scope.actorId },
-    req.query as unknown as ListFormsQuery,
+    { ...(req.query as unknown as ListFormsQuery), locale: req.sortLocale! },
   );
   res.json(result);
 });

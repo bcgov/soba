@@ -1,6 +1,7 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import { GROUP_NAME_TAKEN } from '../../messages';
+import { SortLocaleQuerySchema } from '../shared/offsetPagination';
 import {
   SetSubmitterAudienceBodySchema as LibSetSubmitterAudienceBodySchema,
   SubmitterAudienceSchema as LibSubmitterAudienceSchema,
@@ -135,7 +136,7 @@ export const registerGroupsOpenApi = (registry: OpenAPIRegistry) => {
     path: GROUPS_PATH,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
-    request: { params: WorkspaceGroupParamsSchema },
+    request: { query: SortLocaleQuerySchema, params: WorkspaceGroupParamsSchema },
     responses: {
       200: jsonResponse('Workspace groups with roles and members', ListGroupsResponseSchema),
       403: { description: 'Actor is not a member of the workspace' },
@@ -149,6 +150,7 @@ export const registerGroupsOpenApi = (registry: OpenAPIRegistry) => {
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
+      query: SortLocaleQuerySchema,
       params: WorkspaceGroupParamsSchema,
       body: jsonBody(CreateGroupBodySchema),
     },
@@ -167,6 +169,7 @@ export const registerGroupsOpenApi = (registry: OpenAPIRegistry) => {
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
+      query: SortLocaleQuerySchema,
       params: GroupIdParamsSchema,
       body: jsonBody(UpdateGroupBodySchema),
     },
@@ -184,7 +187,7 @@ export const registerGroupsOpenApi = (registry: OpenAPIRegistry) => {
     path: GROUP_PATH,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
-    request: { params: GroupIdParamsSchema },
+    request: { query: SortLocaleQuerySchema, params: GroupIdParamsSchema },
     responses: {
       204: { description: 'Group soft-deleted' },
       403: { description: ERR_MANAGE },
@@ -198,6 +201,7 @@ export const registerGroupsOpenApi = (registry: OpenAPIRegistry) => {
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
+      query: SortLocaleQuerySchema,
       params: GroupIdParamsSchema,
       body: jsonBody(SetGroupRolesBodySchema),
     },
@@ -215,6 +219,7 @@ export const registerGroupsOpenApi = (registry: OpenAPIRegistry) => {
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
+      query: SortLocaleQuerySchema,
       params: GroupIdParamsSchema,
       body: jsonBody(AddGroupMemberBodySchema),
     },
@@ -232,7 +237,7 @@ export const registerGroupsOpenApi = (registry: OpenAPIRegistry) => {
     path: GROUP_MEMBER_PATH,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
-    request: { params: GroupMemberParamsSchema },
+    request: { query: SortLocaleQuerySchema, params: GroupMemberParamsSchema },
     responses: {
       200: jsonResponse(OK_UPDATED_GROUP, GroupSchema),
       403: { description: ERR_MANAGE },
@@ -245,7 +250,7 @@ export const registerGroupsOpenApi = (registry: OpenAPIRegistry) => {
     path: SUBMITTER_AUDIENCE_PATH,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
-    request: { params: WorkspaceGroupParamsSchema },
+    request: { query: SortLocaleQuerySchema, params: WorkspaceGroupParamsSchema },
     responses: {
       200: jsonResponse(
         'The workspace submit audience (public / protected)',
@@ -262,6 +267,7 @@ export const registerGroupsOpenApi = (registry: OpenAPIRegistry) => {
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
+      query: SortLocaleQuerySchema,
       params: WorkspaceGroupParamsSchema,
       body: jsonBody(SetSubmitterAudienceBodySchema),
     },

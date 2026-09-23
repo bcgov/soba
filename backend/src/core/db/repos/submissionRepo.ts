@@ -1,6 +1,6 @@
 import { and, count, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
-import { SUBMISSION_SORT_FIELDS, type SubmissionListSort } from '@soba/lib';
+import { SUBMISSION_SORT_FIELDS, type SortLocale, type SubmissionListSort } from '@soba/lib';
 import { db } from '../client';
 import { submissionRevisions, submissions, forms, formVersions } from '../schema';
 import { likePattern, orderByForSort, type SortColumns } from '../listSort';
@@ -101,7 +101,7 @@ export type AppendSubmissionRevisionResult =
 export type SubmissionListSortField = (typeof SUBMISSION_SORT_FIELDS)[number];
 
 const SUBMISSION_SORT_COLUMNS: SortColumns<SubmissionListSortField> = {
-  formName: { column: forms.name, caseInsensitive: true },
+  formName: { column: forms.name, linguistic: true },
   // Only a submitted submission has one, so an unsubmitted row never leads either direction.
   submittedAt: { column: submissions.submittedAt, nullable: true },
   createdAt: { column: submissions.createdAt },
@@ -120,6 +120,7 @@ export interface ListSubmissionsInput {
   createdBy?: string;
   q?: string;
   sort: SubmissionListSort;
+  locale: SortLocale;
 }
 
 /**
@@ -377,7 +378,7 @@ export const listSubmissionsForWorkspace = async (
       .innerJoin(forms, eq(submissions.formId, forms.id))
       .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
       .where(where)
-      .orderBy(...orderByForSort(SUBMISSION_SORT_COLUMNS, input.sort, submissions.id))
+      .orderBy(...orderByForSort(SUBMISSION_SORT_COLUMNS, input.sort, submissions.id, input.locale))
       .limit(input.limit)
       .offset(input.offset);
 

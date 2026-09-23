@@ -1,4 +1,4 @@
-import type { OffsetPage } from '@soba/lib';
+import type { OffsetPage, SortLocale } from '@soba/lib';
 
 export type { OffsetPage } from '@soba/lib';
 
@@ -8,6 +8,8 @@ export type ListQueryArgs = {
   limit: number;
   sort: string;
   q?: string;
+  /** Language to sort text in, for lists with a text sort field. */
+  locale?: SortLocale;
 };
 
 export const EMPTY_LIST_PAGE: OffsetPage = { offset: 0, limit: 0, total: 0 };
@@ -18,4 +20,5 @@ export const toListRequestQuery = (args: ListQueryArgs): Record<string, string |
   limit: args.limit,
   sort: args.sort,
   ...(args.q ? { q: args.q } : {}),
+  ...(args.locale ? { locale: args.locale } : {}),
 });

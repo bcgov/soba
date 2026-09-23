@@ -1,4 +1,4 @@
-import type { SubmissionListSort } from '@soba/lib';
+import type { SortLocale, SubmissionListSort } from '@soba/lib';
 import { v7 as uuidv7 } from 'uuid';
 import {
   appendSubmissionRevision,
@@ -82,6 +82,7 @@ interface ListInput {
   createdBy?: string;
   q?: string;
   sort: SubmissionListSort;
+  locale: SortLocale;
 }
 
 export class SubmissionService {

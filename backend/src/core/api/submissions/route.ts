@@ -1,5 +1,6 @@
 import express from 'express';
 import { validateRequest } from '../shared/validation';
+import { sortLocale } from '../../middleware/sortLocale';
 import { workspaceListScope, workspaceFromResource } from '../../middleware/workspaceContext';
 import { requireFormPermissions } from '../../middleware/requireFormPermissions';
 import { Permissions } from '../../db/codes';
@@ -17,6 +18,7 @@ const ID_PATH = '/:id';
 router.get(
   '/',
   validateRequest({ query: ListSubmissionsQuerySchema }),
+  sortLocale,
   workspaceListScope({
     anchorOrder: ['submissionId', 'formVersionId', 'formId', 'workspaceId'],
   }),

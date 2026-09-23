@@ -1,33 +1,66 @@
-import { compareTextForSort, matchesSearchTerm, type TextSortRules } from '../src/sort';
+import {
+  compareTextForSort,
+  matchesSearchTerm,
+  resolveSortLocale,
+  sortCollators,
+  type SortLocale,
+  type TextSortRules,
+} from '../src/sort';
 
 const order = (list: (string | null | undefined)[], dir: 'asc' | 'desc', rules: TextSortRules) =>
-  [...list].sort((a, b) => compareTextForSort(a, b, dir, rules));
+  [...list].sort((a, b) => compareTextForSort(a, b, dir, 'en', rules));
 
 describe('compareTextForSort', () => {
-  // Expected order captured from the en_US.utf8 database with `ORDER BY lower(x)`: accents sort by
-  // code point (cafz before cafe-acute, a-ring after z), which is what the code-unit compare must
-  // reproduce so a client list matches the server. A locale comparator would interleave the accents.
+  // Expected order captured from Postgres with `ORDER BY x COLLATE "und-x-icu"`, identical on the
+  // musl dev image and the glibc cluster image.
   const dbOrder = [
+    'a b',
+    'A_b',
+    'a-b',
+    'a1',
+    'a10',
+    'a2',
+    'ab',
     'Andrew',
+    'Ångström',
     'apple',
     'Banana',
+    'ça',
     'cafe',
-    'cafz',
     'café',
+    'Café',
+    'cafz',
+    'cote',
+    'coté',
+    'côte',
+    'côté',
+    'cz',
+    'ecole',
+    'École',
+    'elan',
+    'Élan',
+    'Émile',
+    'Eva',
+    'Intake 2',
+    'Intake_3',
+    'Intake-1',
+    'intake1',
     'naive',
     'naïve',
+    'oeuvre',
+    'œuvre',
     'Zebra',
+    'zèbre',
     'Zulu',
-    'Ångström',
   ];
-  const ci = { caseInsensitive: true };
+  const linguistic = { linguistic: true };
 
-  it('reproduces the database order for accented, mixed-case text', () => {
-    expect(order([...dbOrder].reverse(), 'asc', ci)).toEqual(dbOrder);
+  it('reproduces the database order for accented, mixed-case, punctuated text', () => {
+    expect(order([...dbOrder].reverse(), 'asc', linguistic)).toEqual(dbOrder);
   });
 
   it('reverses that order descending', () => {
-    expect(order(dbOrder, 'desc', ci)).toEqual([...dbOrder].reverse());
+    expect(order(dbOrder, 'desc', linguistic)).toEqual([...dbOrder].reverse());
   });
 
   it('sorts missing values last in both directions', () => {
@@ -40,9 +73,51 @@ describe('compareTextForSort', () => {
     expect(desc.slice(2).every((v) => v == null)).toBe(true);
   });
 
-  it('compares as-is without folding when not case insensitive', () => {
-    // Matches an ASCII enum column's default sort: uppercase sorts before lowercase by code point.
-    expect(compareTextForSort('Beta', 'alpha', 'asc')).toBeLessThan(0);
+  it('resolves each collator to its own locale, not the runtime default', () => {
+    expect(sortCollators.en.resolvedOptions().locale).toBe('en');
+    expect(sortCollators.fr.resolvedOptions().locale).toBe('fr-CA');
+  });
+
+  it('orders accent-only differences from the end of the word in fr', () => {
+    // Captured from Postgres with `COLLATE "fr-CA-x-icu"` and `COLLATE "und-x-icu"`.
+    const words = ['côté', 'coté', 'côte', 'cote'];
+    const sortIn = (locale: SortLocale) =>
+      [...words].sort((a, b) => compareTextForSort(a, b, 'asc', locale, linguistic));
+    expect(sortIn('fr')).toEqual(['cote', 'côte', 'coté', 'côté']);
+    expect(sortIn('en')).toEqual(['cote', 'coté', 'côte', 'côté']);
+  });
+
+  it('sorts an unknown locale in the en collator', () => {
+    const words = ['côté', 'coté', 'côte', 'cote'];
+    const sorted = [...words].sort((a, b) =>
+      compareTextForSort(a, b, 'asc', 'de' as SortLocale, linguistic),
+    );
+    expect(sorted).toEqual(['cote', 'coté', 'côte', 'côté']);
+  });
+
+  it('compares by code unit when not linguistic', () => {
+    expect(compareTextForSort('Beta', 'alpha', 'asc', 'en')).toBeLessThan(0);
+  });
+});
+
+describe('resolveSortLocale', () => {
+  const cases: [string | null | undefined, SortLocale][] = [
+    ['fr', 'fr'],
+    ['fr-CA', 'fr'],
+    ['FR-ca', 'fr'],
+    ['fr-CA,fr;q=0.9,en;q=0.8', 'fr'],
+    ['en-CA', 'en'],
+    ['en,fr;q=0.9', 'en'],
+    ['de-DE', 'en'],
+    ['french', 'en'],
+    ['*', 'en'],
+    ['', 'en'],
+    [undefined, 'en'],
+    [null, 'en'],
+  ];
+
+  it.each(cases)('%p sorts as %p', (tag, expected) => {
+    expect(resolveSortLocale(tag)).toBe(expected);
   });
 });
 
