@@ -1,19 +1,4 @@
 {
-  "src/features/admin/ui/FeatureScopeListPanel.tsx": {
-    "no-restricted-imports": {
-      "count": 1
-    }
-  },
-  "src/features/admin/ui/FeatureScopePanel.tsx": {
-    "no-restricted-imports": {
-      "count": 1
-    }
-  },
-  "src/features/admin/ui/SobaAdminsPanel.tsx": {
-    "no-restricted-imports": {
-      "count": 1
-    }
-  },
   "src/features/designer/ui/FormCreateContent.tsx": {
     "no-restricted-imports": {
       "count": 1

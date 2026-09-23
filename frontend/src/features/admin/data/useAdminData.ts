@@ -2,21 +2,26 @@
 
 import { useCallback, useEffect, useMemo } from 'react';
 import {
+  addSobaAdmin,
   fetchDocumentGenerationAudits,
   fetchFeatureScope,
   fetchFeatureScopes,
   fetchSobaAdmins,
+  removeFeatureScope,
+  removeSobaAdmin,
+  upsertFeatureScope,
 } from '@/src/shared/api/sobaApiAdmin';
 import { unstable_serialize, useSWRConfig } from 'swr';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { listReadConfig } from '@/src/shared/api/swrConfig';
 import { classifyDataError } from '@/src/shared/api/dataError';
-import type { ListResult } from '@/src/shared/api/dataContracts';
+import type { ListResult, WriteOutcome } from '@/src/shared/api/dataContracts';
 import type { ListQueryArgs } from '@/src/types/list';
 import type {
   DocumentGenerationAuditItem,
   FeatureScopeItem,
   SobaAdminItem,
+  UpsertFeatureScopeBody,
 } from '@/src/types/admin';
 
 const scopeKey = (featureScopeId: string) => ['feature-scope', featureScopeId];
@@ -150,4 +155,56 @@ export function useFeatureScope(
   }, [featureScopeId, cache]);
 
   return { featureScope: data ?? null, isLoading, error: error ? classifyDataError(error) : null };
+}
+
+/** Add or remove a platform administrator, refreshing the admin list after each write. */
+export function useSobaAdminWriter() {
+  const { mutate } = useSWRConfig();
+  const refresh = useCallback(
+    () => mutate((key) => Array.isArray(key) && key[0] === 'soba-admins'),
+    [mutate],
+  );
+  const add = useCallback(
+    async (token: string, userId: string): Promise<WriteOutcome<void>> => {
+      await addSobaAdmin(token, userId);
+      await refresh();
+      return { status: 'applied', value: undefined };
+    },
+    [refresh],
+  );
+  const remove = useCallback(
+    async (token: string, userId: string): Promise<WriteOutcome<void>> => {
+      await removeSobaAdmin(token, userId);
+      await refresh();
+      return { status: 'applied', value: undefined };
+    },
+    [refresh],
+  );
+  return { add, remove };
+}
+
+/** Create, update or remove a feature scope, refreshing the scope list after each write. */
+export function useFeatureScopeWriter() {
+  const { mutate } = useSWRConfig();
+  const refresh = useCallback(
+    () => mutate((key) => Array.isArray(key) && key[0] === 'feature-scopes'),
+    [mutate],
+  );
+  const upsert = useCallback(
+    async (token: string, body: UpsertFeatureScopeBody): Promise<WriteOutcome<void>> => {
+      await upsertFeatureScope(token, body);
+      await refresh();
+      return { status: 'applied', value: undefined };
+    },
+    [refresh],
+  );
+  const remove = useCallback(
+    async (token: string, id: string): Promise<WriteOutcome<void>> => {
+      await removeFeatureScope(token, id);
+      await refresh();
+      return { status: 'applied', value: undefined };
+    },
+    [refresh],
+  );
+  return { upsert, remove };
 }

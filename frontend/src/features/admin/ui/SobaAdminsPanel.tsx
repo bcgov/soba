@@ -11,9 +11,8 @@ import { SecondaryText } from '@/src/components/SecondaryText';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { addSobaAdmin, removeSobaAdmin } from '@/src/shared/api/sobaApiAdmin';
 import { useCurrentUser, useRefreshCurrentUser } from '@/src/shared/api/useCurrentUser';
-import { useSobaAdmins } from '../data/useAdminData';
+import { useSobaAdmins, useSobaAdminWriter } from '../data/useAdminData';
 import { SOBA_ADMINS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { useListQuery } from '@/src/shared/list/useListQuery';
 import { useDataTable } from '@/src/shared/list/useDataTable';
@@ -42,16 +41,16 @@ export function SobaAdminsPanel() {
     sort: query.sort,
     q: query.q,
   });
-  const { table, refresh: reload } = useDataTable(query, admins, dictAdmin.admins.loadError);
+  const { table } = useDataTable(query, admins, dictAdmin.admins.loadError);
+  const adminWriter = useSobaAdminWriter();
 
   const handleAdd = useCallback(async () => {
     const trimmed = userId.trim();
     if (!token || !trimmed) return;
     setSaving(true);
     try {
-      await addSobaAdmin(token, trimmed);
+      await adminWriter.add(token, trimmed);
       setUserId('');
-      void reload();
       addNotification({ text: dictAdmin.admins.addSuccess, type: 'success' });
     } catch (cause) {
       addNotification({ text: dictAdmin.admins.addError, type: 'error', consoleError: cause });
@@ -61,7 +60,7 @@ export function SobaAdminsPanel() {
   }, [
     token,
     userId,
-    reload,
+    adminWriter,
     addNotification,
     dictAdmin.admins.addSuccess,
     dictAdmin.admins.addError,
@@ -71,9 +70,9 @@ export function SobaAdminsPanel() {
     const admin = confirmRemove;
     if (!token || !admin) return;
     setSaving(true);
-    removeSobaAdmin(token, admin.userId)
+    adminWriter
+      .remove(token, admin.userId)
       .then(() => {
-        void reload();
         // Removing your own grant ends your access to this console. `/me` is read once per page
         // load, so without this the console stays on screen while every control in it is refused.
         if (admin.userId === currentUser?.actor?.id) void refreshCurrentUser();
@@ -93,7 +92,7 @@ export function SobaAdminsPanel() {
   }, [
     token,
     confirmRemove,
-    reload,
+    adminWriter,
     currentUser,
     refreshCurrentUser,
     addNotification,
