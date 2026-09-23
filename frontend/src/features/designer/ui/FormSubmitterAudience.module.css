@@ -3,6 +3,7 @@
   flex-direction: column;
   gap: var(--layout-margin-xsmall);
   margin-bottom: var(--layout-margin-medium);
+  position: relative;
 }
 
 .label {
@@ -23,6 +24,7 @@
   min-width: 20rem;
   max-width: 24rem;
   z-index: 10000;
+  position: fixed;
 }
 
 .dialog {

@@ -1,6 +1,5 @@
 'use client';
-import { useId, useMemo, useRef, useState } from 'react';
-import { Popover, Dialog } from 'react-aria-components';
+import { useId, useMemo, useRef, useState, useEffect, useLayoutEffect } from 'react';
 import {
   Button,
   RadioGroup,
@@ -68,6 +67,8 @@ export function FormSubmitterAudience({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const triggerRef = useRef<HTMLSpanElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
   const summaryId = useId();
   const isForm = !!formId || !!createForm;
 
@@ -124,7 +125,6 @@ export function FormSubmitterAudience({
       setIdps(idps);
     } else {
       setMode(initialMode(effectiveAudience));
-      // A saved provider that is no longer offered has no checkbox to untick, so it is left out.
       const offered = new Set(effectiveAudience.available.map((p) => p.code));
       setIdps(
         effectiveAudience.mode === 'protected'
@@ -135,6 +135,48 @@ export function FormSubmitterAudience({
     setSaveError(null);
     setOpen(true);
   };
+
+  const closePanel = () => {
+    setOpen(false);
+  };
+
+  
+
+  useLayoutEffect(() => {
+    if (open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPosition({ top: rect.bottom + 8, left: rect.left });
+    }
+  }, [open]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      
+      // If the clicked node is no longer in the document, it was probably a temporary
+      // element removed immediately upon click (like a ripple span).
+      if (!document.contains(target)) {
+        return;
+      }
+
+      if (
+        open &&
+        triggerRef.current &&
+        !triggerRef.current.contains(target) &&
+        popoverRef.current &&
+        !popoverRef.current.contains(target)
+      ) {
+        // setOpen(false); // TEMPORARILY DISABLED
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [open]);
+
 
   const summary = useMemo(() => {
     if (!effectiveAudience) return '…';
@@ -160,7 +202,7 @@ export function FormSubmitterAudience({
   const onSave = async () => {
     if (onChange) {
       onChange(saveBody(mode, idps));
-      setOpen(false);
+      closePanel();
       return;
     }
     if (!token) return;
@@ -168,7 +210,7 @@ export function FormSubmitterAudience({
     setSaveError(null);
     try {
       await save(token, saveBody(mode, idps));
-      setOpen(false);
+      closePanel();
     } catch {
       setSaveError(t.submitterAudienceSaveError);
     } finally {
@@ -189,81 +231,87 @@ export function FormSubmitterAudience({
             type="button"
             variant="secondary"
             isDisabled={!canManage || !effectiveAudience}
-            onPress={openPanel}
+            onPress={() => (open ? closePanel() : openPanel())}
             data-testid="submitter-audience-trigger"
           >
             {summary}
           </Button>
         </span>
       )}
-      <Popover triggerRef={triggerRef} isOpen={open} isNonModal={true} className={styles.panel}>
-        <Dialog aria-label={t.submitterAudienceLabel} className={styles.dialog}>
-          <div className={styles.sections}>
-            {saveError && <InlineAlert variant="danger" title={saveError} />}
-            <RadioGroup
-              value={mode}
-              onChange={setMode}
-              isDisabled={saving}
-              label={t.submitterAudienceLabel}
-            >
-              {isForm && (
-                <Radio
-                  value="inherit"
-                  data-testid="audience-mode-inherit"
-                  aria-describedby={mode === 'inherit' && workspaceSummary ? summaryId : undefined}
-                >
-                  {t.submitterAudienceInherit}
+      {open && (
+        <div 
+          ref={popoverRef} 
+          className={styles.panel}
+          style={{ top: position.top, left: position.left }}
+        >
+          <div className={styles.dialog}>
+            <div className={styles.sections}>
+              {saveError && <InlineAlert variant="danger" title={saveError} />}
+              <RadioGroup
+                value={mode}
+                onChange={setMode}
+                isDisabled={saving}
+                label={t.submitterAudienceLabel}
+              >
+                {isForm && (
+                  <Radio
+                    value="inherit"
+                    data-testid="audience-mode-inherit"
+                    aria-describedby={mode === 'inherit' && workspaceSummary ? summaryId : undefined}
+                  >
+                    {t.submitterAudienceInherit}
+                  </Radio>
+                )}
+                <Radio value="public" data-testid="audience-mode-public">
+                  {t.submitterAudiencePublic}
                 </Radio>
+                <Radio value="protected" data-testid="audience-mode-protected">
+                  {t.submitterAudienceProtected}
+                </Radio>
+              </RadioGroup>
+              {mode === 'inherit' && workspaceSummary && (
+                <span id={summaryId} data-testid="audience-workspace-summary">
+                  {workspaceSummary}
+                </span>
               )}
-              <Radio value="public" data-testid="audience-mode-public">
-                {t.submitterAudiencePublic}
-              </Radio>
-              <Radio value="protected" data-testid="audience-mode-protected">
-                {t.submitterAudienceProtected}
-              </Radio>
-            </RadioGroup>
-            {mode === 'inherit' && workspaceSummary && (
-              <span id={summaryId} data-testid="audience-workspace-summary">
-                {workspaceSummary}
-              </span>
-            )}
-            {overridesPeople && (
-              <InlineAlert
-                variant="info"
-                data-testid="audience-people-note"
-                title={t.submitterAudienceUsersNotApplied}
-              />
-            )}
-            {mode === 'protected' && (
-              <CheckboxGroup
-                value={idps}
-                onChange={setIdps}
-                isDisabled={saving}
-                label={t.submitterAudienceProviders}
-              >
-                {(effectiveAudience?.available ?? []).map((p) => (
-                  <Checkbox key={p.code} value={p.code} data-testid={`audience-idp-${p.code}`}>
-                    {p.name}
-                  </Checkbox>
-                ))}
-              </CheckboxGroup>
-            )}
-            <div className={styles.actions}>
-              <Button
-                variant="tertiary"
-                onPress={() => setOpen(false)}
-                isDisabled={saving}
-                data-testid="audience-cancel"
-              >
-                {t.submitterAudienceCancel}
-              </Button>
-              <Button onPress={onSave} isDisabled={saveDisabled} data-testid="audience-save">
-                {t.submitterAudienceSave}
-              </Button>
+              {overridesPeople && (
+                <InlineAlert
+                  variant="info"
+                  data-testid="audience-people-note"
+                  title={t.submitterAudienceUsersNotApplied}
+                />
+              )}
+              {mode === 'protected' && (
+                <CheckboxGroup
+                  value={idps}
+                  onChange={setIdps}
+                  isDisabled={saving}
+                  label={t.submitterAudienceProviders}
+                >
+                  {(effectiveAudience?.available ?? []).map((p) => (
+                    <Checkbox key={p.code} value={p.code} data-testid={`audience-idp-${p.code}`}>
+                      {p.name}
+                    </Checkbox>
+                  ))}
+                </CheckboxGroup>
+              )}
+              <div className={styles.actions}>
+                <Button
+                  variant="tertiary"
+                  onPress={closePanel}
+                  isDisabled={saving}
+                  data-testid="audience-cancel"
+                >
+                  {t.submitterAudienceCancel}
+                </Button>
+                <Button onPress={onSave} isDisabled={saveDisabled} data-testid="audience-save">
+                  {t.submitterAudienceSave}
+                </Button>
+              </div>
             </div>
           </div>
-        </Dialog>
-      </Popover>
+        </div>
+      )}
     </div>
   );
 }
