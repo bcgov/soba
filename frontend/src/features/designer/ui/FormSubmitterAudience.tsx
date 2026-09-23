@@ -140,8 +140,6 @@ export function FormSubmitterAudience({
     setOpen(false);
   };
 
-  
-
   useLayoutEffect(() => {
     if (open && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
@@ -152,7 +150,7 @@ export function FormSubmitterAudience({
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       const target = e.target as Node;
-      
+
       // If the clicked node is no longer in the document, it was probably a temporary
       // element removed immediately upon click (like a ripple span).
       if (!document.contains(target)) {
@@ -166,7 +164,6 @@ export function FormSubmitterAudience({
       document.removeEventListener('touchstart', handleClickOutside);
     };
   }, [open]);
-
 
   const summary = useMemo(() => {
     if (!effectiveAudience) return '…';
@@ -229,8 +226,8 @@ export function FormSubmitterAudience({
         </span>
       )}
       {open && (
-        <div 
-          ref={popoverRef} 
+        <div
+          ref={popoverRef}
           className={styles.panel}
           style={{ top: position.top, left: position.left }}
         >
@@ -247,7 +244,9 @@ export function FormSubmitterAudience({
                   <Radio
                     value="inherit"
                     data-testid="audience-mode-inherit"
-                    aria-describedby={mode === 'inherit' && workspaceSummary ? summaryId : undefined}
+                    aria-describedby={
+                      mode === 'inherit' && workspaceSummary ? summaryId : undefined
+                    }
                   >
                     {t.submitterAudienceInherit}
                   </Radio>
