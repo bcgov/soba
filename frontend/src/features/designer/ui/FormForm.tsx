@@ -21,15 +21,9 @@ import FormSubmissionTab from './FormSubmissionTab';
 import FormShareTab from './FormShareTab';
 import { useWorkspace } from '@/src/shared/api/useWorkspaces';
 import { lookupTruncatedNote, withSelectedOption } from '@/src/shared/list/lookupOptions';
-import { useForm } from '@/src/features/designer/data/useForm';
+import { useForm, useFormWriter } from '@/src/features/designer/data/useForm';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
-import {
-  createFormVersion,
-  saveFormVersionSchema,
-  publishSobaFormVersion,
-  getFormVersionSchema,
-} from '@/src/shared/api/sobaApi';
 import type { FormVersionSummary, SobaFormVersionListItem } from '@/src/types/forms';
 import { messageForDataError } from '@/src/shared/api/dataError';
 import { isConflict } from '@/src/shared/api/sobaHelpers';
@@ -130,11 +124,10 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     error: loadError,
     setSchema,
     discardEdits,
-    commitSchema,
     selectVersion,
-    refreshForm,
     refreshVersions,
   } = useForm(formId);
+  const formWriter = useFormWriter(formId);
 
   // A draft that failed to load leaves nothing to edit, save or publish. Distinct from `loading`,
   // which these reads leave behind for good once a read has failed.
@@ -179,29 +172,26 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     await refreshVersions().catch(() => undefined);
   };
 
-  /** True once the new version exists and is selected. Callers navigate only on true. */
-  const createNewVersion = async (sourceSchema?: FormType): Promise<boolean> => {
+  /**
+   * Run a new-version write, then select the new draft in-page (it has the highest versionNo, so it
+   * is the form's current version once the form is read again) and report. Navigate only on true.
+   */
+  const applyNewVersion = async (
+    run: () => ReturnType<typeof formWriter.createVersion>,
+  ): Promise<boolean> => {
     if (isSaving || draftUnavailable || !token) return false;
     setIsSaving(true);
-
     try {
-      // The engine strips engine-managed fields on save, so the raw schema can be submitted as-is.
-      const newVersion = await createFormVersion(token as string, formId);
-      const newSchema = (sourceSchema ?? formSchema ?? {}) as FormType;
-      await saveFormVersionSchema(token as string, newVersion.id, newSchema);
-      await commitSchema(newVersion.id, newSchema);
-
-      // Select the new draft in-page. It has the highest versionNo, so it is the form's current
-      // version once the form has been read again.
-      await refreshVersions();
+      const outcome = await run();
       selectVersion('current');
-
-      addNotification({
-        text: (
-          dict.form.versionDraftCreated || 'Version {version} draft created successfully!'
-        ).replace('{version}', String(newVersion.versionNo)),
-        type: 'success',
-      });
+      if (outcome.status === 'applied') {
+        addNotification({
+          text: (
+            dict.form.versionDraftCreated || 'Version {version} draft created successfully!'
+          ).replace('{version}', String(outcome.value.versionNo)),
+          type: 'success',
+        });
+      }
       return true;
     } catch (e: unknown) {
       await reportWriteFailure(e, dict.form.createVersionError || 'Failed to create new version.');
@@ -211,21 +201,13 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     }
   };
 
-  const restoreVersionAsNew = async (version: SobaFormVersionListItem): Promise<boolean> => {
-    if (!token) return false;
-    let schema: FormType | null;
-    try {
-      schema = (await getFormVersionSchema(token, version.id)) as FormType | null;
-    } catch (e: unknown) {
-      addNotification({
-        text: dict.form.createVersionError || 'Failed to create new version.',
-        type: 'error',
-        consoleError: e,
-      });
-      return false;
-    }
-    return createNewVersion(schema ?? undefined);
-  };
+  const createNewVersion = (sourceSchema?: FormType): Promise<boolean> =>
+    applyNewVersion(() =>
+      formWriter.createVersion(token as string, (sourceSchema ?? formSchema ?? {}) as FormType),
+    );
+
+  const restoreVersionAsNew = (version: SobaFormVersionListItem): Promise<boolean> =>
+    applyNewVersion(() => formWriter.restoreVersion(token as string, version.id));
 
   const saveFormPublish = async () => {
     await saveForm(true);
@@ -237,26 +219,16 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
 
   const saveForm = async (publish: boolean = false) => {
     if (isSaving || draftUnavailable) return;
+    // An existing form with no current version. Saving here would file the edits under a second form.
+    if (!currentVersion?.id) return;
     setIsSaving(true);
-    const schema = (formSchema ?? {}) as FormType;
-
     try {
-      if (currentVersion?.id) {
-        await saveFormVersionSchema(token as string, currentVersion.id, schema);
-        if (publish) {
-          await publishSobaFormVersion(token as string, currentVersion.id);
-          // Publishing changes the version's state, which gates Save and the read-only notice.
-          await refreshVersions();
-        }
-        await commitSchema(currentVersion.id, schema);
-      } else {
-        // An existing form with no current version. Creating here would file the edits under a
-        // second form.
-        return;
-      }
-
-      // A save moves the form on: the heading and the current version come from this read.
-      await refreshForm();
+      await formWriter.saveSchema(
+        token as string,
+        currentVersion.id,
+        (formSchema ?? {}) as FormType,
+        publish,
+      );
       addNotification({
         text: publish ? dict.form.published || 'Form published successfully!' : dict.form.saved,
         type: 'success',

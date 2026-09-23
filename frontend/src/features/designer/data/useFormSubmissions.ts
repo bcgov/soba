@@ -54,7 +54,7 @@ export function useFormSubmissions(
   };
 }
 
-/** Delete a submission, refreshing the submissions list it was shown in. */
+/** Delete a submission. */
 export function useSubmissionDeleter() {
   const { mutate } = useSWRConfig();
   const remove = useCallback(

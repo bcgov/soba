@@ -157,7 +157,7 @@ export function useFeatureScope(
   return { featureScope: data ?? null, isLoading, error: error ? classifyDataError(error) : null };
 }
 
-/** Add or remove a platform administrator, refreshing the admin list after each write. */
+/** Add or remove a platform administrator. */
 export function useSobaAdminWriter() {
   const { mutate } = useSWRConfig();
   const refresh = useCallback(
@@ -183,7 +183,7 @@ export function useSobaAdminWriter() {
   return { add, remove };
 }
 
-/** Create, update or remove a feature scope, refreshing the scope list after each write. */
+/** Create, update or remove a feature scope. */
 export function useFeatureScopeWriter() {
   const { mutate } = useSWRConfig();
   const refresh = useCallback(

@@ -1,14 +1,4 @@
 {
-  "src/features/designer/ui/FormCreateContent.tsx": {
-    "no-restricted-imports": {
-      "count": 1
-    }
-  },
-  "src/features/designer/ui/FormForm.tsx": {
-    "no-restricted-imports": {
-      "count": 1
-    }
-  },
   "src/features/formio-v5/ui/FormioV5SubmissionFillClient.tsx": {
     "no-restricted-imports": {
       "count": 1
