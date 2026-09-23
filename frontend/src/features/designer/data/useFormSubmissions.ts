@@ -1,11 +1,12 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { getSobaSubmissions } from '@/src/shared/api/sobaApi';
+import { useSWRConfig } from 'swr';
+import { deleteSobaSubmission, getSobaSubmissions } from '@/src/shared/api/sobaApi';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { listReadConfig } from '@/src/shared/api/swrConfig';
 import { classifyDataError } from '@/src/shared/api/dataError';
-import type { ListResult } from '@/src/shared/api/dataContracts';
+import type { ListResult, WriteOutcome } from '@/src/shared/api/dataContracts';
 import type { ListQueryArgs } from '@/src/types/list';
 import type { SubmissionListItem } from '@/src/types/submissions';
 
@@ -51,4 +52,18 @@ export function useFormSubmissions(
     error: error ? classifyDataError(error) : null,
     refresh,
   };
+}
+
+/** Delete a submission, refreshing the submissions list it was shown in. */
+export function useSubmissionDeleter() {
+  const { mutate } = useSWRConfig();
+  const remove = useCallback(
+    async (token: string, submissionId: string): Promise<WriteOutcome<void>> => {
+      await deleteSobaSubmission(token, submissionId);
+      await mutate((key) => Array.isArray(key) && key[0] === 'form-submissions');
+      return { status: 'applied', value: undefined };
+    },
+    [mutate],
+  );
+  return { remove };
 }

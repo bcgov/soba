@@ -9,17 +9,7 @@
       "count": 1
     }
   },
-  "src/features/designer/ui/FormSubmissionTab.tsx": {
-    "no-restricted-imports": {
-      "count": 1
-    }
-  },
   "src/features/formio-v5/ui/FormioV5SubmissionFillClient.tsx": {
-    "no-restricted-imports": {
-      "count": 1
-    }
-  },
-  "src/features/submit-mode/ui/StartSubmission.tsx": {
     "no-restricted-imports": {
       "count": 1
     }
