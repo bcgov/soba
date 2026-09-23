@@ -3,18 +3,14 @@
 import { useCallback, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import type { FormType } from '@formio/react';
-import {
-  getFormVersionSchema,
-  getSobaForm,
-  getSobaFormVersion,
-  lookupFormVersions,
-} from '@/src/shared/api/sobaApi';
+import { getSobaForm, getSobaFormVersion, lookupFormVersions } from '@/src/shared/api/sobaApi';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { sessionReadConfig } from '@/src/shared/api/swrConfig';
+import { classifyDataError } from '@/src/shared/api/dataError';
+import type { DataError } from '@/src/shared/api/dataContracts';
 import type { FormVersionSummary } from '@/src/types/forms';
 import { versionsKey } from './useFormVersions';
-
-const schemaKey = (versionId: string) => ['form-version-schema', versionId];
+import { formVersionSchemaKey, useFormVersionSchema } from './useFormVersionSchema';
 
 const EMPTY_VERSIONS: FormVersionSummary[] = [];
 
@@ -61,11 +57,7 @@ export function useForm(formId?: string) {
     data: loadedSchema,
     isLoading: schemaLoading,
     error: schemaError,
-  } = useAuthedSWR(
-    activeVersion?.id ? schemaKey(activeVersion.id) : null,
-    (token) => getFormVersionSchema(token, activeVersion?.id as string),
-    sessionReadConfig,
-  );
+  } = useFormVersionSchema(activeVersion?.id);
 
   const { mutate: globalMutate } = useSWRConfig();
 
@@ -76,7 +68,7 @@ export function useForm(formId?: string) {
    */
   const commitSchema = useCallback(
     (versionId: string, next: FormType) =>
-      globalMutate(schemaKey(versionId), next, { revalidate: false }),
+      globalMutate(formVersionSchemaKey(versionId), next, { revalidate: false }),
     [globalMutate],
   );
 
@@ -93,7 +85,9 @@ export function useForm(formId?: string) {
     ]);
   }, [globalMutate, formId, refreshForm]);
 
-  const loadError = formError ?? versionsError ?? selectedVersionError ?? schemaError ?? null;
+  // schemaError arrives already classified from useFormVersionSchema; the rest are raw.
+  const rawError = formError ?? versionsError ?? selectedVersionError ?? null;
+  const loadError: DataError | null = rawError ? classifyDataError(rawError) : schemaError;
 
   const [editedSchema, setEditedSchema] = useState<FormType | null>(null);
   const [editedName, setEditedName] = useState<string | null>(null);
@@ -146,7 +140,7 @@ export function useForm(formId?: string) {
     selectedVersionId,
     isHistoryView,
     historicalVersionNo: isHistoryView ? (activeVersion?.versionNo ?? null) : null,
-    schema: editedSchema ?? (loadedSchema as FormType | undefined) ?? null,
+    schema: editedSchema ?? loadedSchema ?? null,
     name: editedName ?? form?.name ?? '',
     description: form?.description ?? '',
     isDirty: editedSchema !== null || editedName !== null,

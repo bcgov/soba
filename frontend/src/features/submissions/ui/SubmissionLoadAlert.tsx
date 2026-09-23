@@ -2,34 +2,16 @@
 
 import { useDictionary } from '@/app/[lang]/Providers';
 import type { DataError } from '@/src/shared/api/dataContracts';
-import { classifyDataError } from '@/src/shared/api/dataError';
 import { useAuthErrorDefaults } from '@/src/shared/api/useDataErrorNotice';
 import { LoadErrorAlert } from '@/src/shared/ui/LoadErrorAlert';
 
-export type SubmissionLoadFailure = 'sessionExpired' | 'noAccess' | 'notFound' | 'loadFailed';
-
-const FAILURE_KIND: Record<SubmissionLoadFailure, DataError['kind']> = {
-  sessionExpired: 'sessionExpired',
-  noAccess: 'forbidden',
-  notFound: 'notFound',
-  loadFailed: 'failed',
-};
-
-/** Only a 404 means the submission is missing; any other failure is a failed load. */
-export function submissionLoadFailure(error: unknown): SubmissionLoadFailure {
-  const { kind } = classifyDataError(error);
-  if (kind === 'sessionExpired') return 'sessionExpired';
-  if (kind === 'forbidden') return 'noAccess';
-  if (kind === 'notFound') return 'notFound';
-  return 'loadFailed';
-}
-
-export function SubmissionLoadAlert({ failure }: Readonly<{ failure: SubmissionLoadFailure }>) {
+/** A submission read failure, with the submission-specific copy and test ids. */
+export function SubmissionLoadAlert({ error }: Readonly<{ error: DataError }>) {
   const dict = useDictionary();
   const authDefaults = useAuthErrorDefaults();
   return (
     <LoadErrorAlert
-      error={{ kind: FAILURE_KIND[failure], cause: null }}
+      error={error}
       messages={{
         ...authDefaults,
         notFound: dict.submission.notFound,

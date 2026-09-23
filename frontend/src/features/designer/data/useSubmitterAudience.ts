@@ -7,6 +7,7 @@ import {
   setSubmitterAudience,
 } from '@/src/shared/api/sobaApiGroups';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
+import { classifyDataError } from '@/src/shared/api/dataError';
 import type {
   AudienceMode,
   FormSubmitterAudience,
@@ -86,5 +87,6 @@ export function useSubmitterAudience(workspaceId: string | null, formId?: string
     });
   };
 
-  return { view, error: formId ? formRead.error : workspaceRead.error, save };
+  const rawError = formId ? formRead.error : workspaceRead.error;
+  return { view, error: rawError ? classifyDataError(rawError) : null, save };
 }

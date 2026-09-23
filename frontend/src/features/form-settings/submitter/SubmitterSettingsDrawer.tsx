@@ -14,7 +14,7 @@ import {
 import { useSubmitterAudience } from '@/src/features/designer/data/useSubmitterAudience';
 import { FormSubmitterAudience } from '@/src/features/designer/ui/FormSubmitterAudience';
 import { useForm } from '@/src/features/designer/data/useForm';
-import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';
+import { messageForDataError } from '@/src/shared/api/dataError';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
@@ -49,9 +49,9 @@ export default function SubmitterSettingsDrawer({
   const readErrorMessage = useMemo(
     () =>
       readError
-        ? loadErrorMessage(readError, {
+        ? messageForDataError(readError, {
             sessionExpired: dict.general.sessionExpired,
-            noAccess: dict.general.noAccess,
+            forbidden: dict.general.noAccess,
             failed: t.submitterSettingsLoadError,
           })
         : null,
