@@ -39,6 +39,7 @@ import type {
   StorageEngineReadinessResult,
   StoragePluginDefinition,
 } from '../storage-engine/StorageEngineAdapter';
+import { TenantEnginePluginDefinition } from '../tenant/TenantEnginePluginDefinition';
 
 // --- Definition schemas -----------------------------------------------------
 
@@ -86,6 +87,7 @@ interface CachedPlugin {
   virusScanDefinition?: VirusScanPluginDefinition;
   storageDefinition?: StoragePluginDefinition;
   idpDefinition?: IdpPluginDefinition;
+  tenantEngineDefinition?: TenantEnginePluginDefinition;
 }
 
 // Each CachedPlugin definition field, the module export it comes from, and the schema that
@@ -137,6 +139,11 @@ const DEFINITION_KINDS: ReadonlyArray<{
     schema: AdapterPluginDefinitionSchema,
   },
   { field: 'idpDefinition', exportKey: 'idpPluginDefinition', schema: IdpPluginDefinitionSchema },
+  {
+    field: 'tenantEngineDefinition',
+    exportKey: 'tenantEngineDefinition',
+    schema: MetadataPluginDefinitionSchema,
+  },
 ];
 
 let cache: CachedPlugin[] | null = null;
@@ -278,6 +285,7 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
       p.virusScanDefinition?.code ??
       p.storageDefinition?.code ??
       p.idpDefinition?.code ??
+      p.tenantEngineDefinition?.code ??
       p.dir;
     return {
       code,
@@ -503,4 +511,22 @@ export async function checkStorageReadiness(): Promise<
     }
   }
   return results;
+}
+
+export interface TenantEnginePluginCatalogEntry {
+  code: string;
+  name: string;
+  version?: string;
+}
+
+export function getTenantEnginePluginCatalog(): TenantEnginePluginCatalogEntry[] {
+  return getTenantEnginePluginDefinitions().map((d) => ({
+    code: d.code,
+    name: d.metadata.name,
+    version: d.metadata.version,
+  }));
+}
+
+export function getTenantEnginePluginDefinitions(): TenantEnginePluginDefinition[] {
+  return definitionsOf('tenantEngineDefinition');
 }

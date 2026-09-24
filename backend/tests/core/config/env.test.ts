@@ -232,4 +232,14 @@ describe('env', () => {
     const reader = createEnvReader({ NODE_ENV: 'development' });
     expect(reader.getTrustProxySetting()).toBe(false);
   });
+
+  it('createEnvReader getTenantEngineDefaultCode returns value when set', () => {
+    const reader = createEnvReader({ TENANT_ENGINE_DEFUALT_CODE: 'test-code' });
+    expect(reader.getTenantEngineDefaultCode()).toBe('test-code');
+  });
+
+  it('createEnvReader getTenantEngineDefaultCode returns undefined when unset', () => {
+    const reader = createEnvReader({});
+    expect(reader.getTenantEngineDefaultCode()).toBeUndefined();
+  });
 });

@@ -19,4 +19,5 @@ export {
   logMessageBusSelfTest,
   logEventStreamSelfTest,
   logDocumentGenerationReadiness,
+  logTenantServiceReadiness,
 } from './startupHealth';

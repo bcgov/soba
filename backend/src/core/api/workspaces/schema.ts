@@ -21,6 +21,8 @@ import {
 import { LOOKUP_NOTE } from '../shared/lookup';
 import { WORKSPACE_NAME_TAKEN } from '../../messages';
 
+const WORKSPACE_NOT_FOUND = 'Workspace not found';
+
 extendZodWithOpenApi(z);
 
 // @soba/lib builds its schemas before zod is extended, so they only get `.openapi()` once cloned.
@@ -170,7 +172,7 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       403: { description: 'Actor is not a member of the workspace' },
-      404: { description: 'Workspace not found' },
+      404: { description: WORKSPACE_NOT_FOUND },
     },
   });
 
@@ -227,8 +229,48 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       403: { description: 'Only workspace owners can rename this workspace' },
-      404: { description: 'Workspace not found' },
+      404: { description: WORKSPACE_NOT_FOUND },
       409: { description: WORKSPACE_NAME_TAKEN },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: `${WORKSPACE_PATH}/engine/health`,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: WorkspaceIdParamsSchema,
+    },
+    responses: {
+      200: {
+        description: 'Get workspace (tenant) engine health for default code',
+        content: {
+          'application/json': {
+            schema: CurrentWorkspaceResponseSchema,
+          },
+        },
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: `${WORKSPACE_PATH}/engine/health/{engineCode}`,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: WorkspaceIdParamsSchema,
+    },
+    responses: {
+      200: {
+        description: 'Get workspace (tenant) engine health for specified code',
+        content: {
+          'application/json': {
+            schema: CurrentWorkspaceResponseSchema,
+          },
+        },
+      },
     },
   });
 };

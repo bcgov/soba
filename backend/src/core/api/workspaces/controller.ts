@@ -12,6 +12,11 @@ import {
   WorkspaceIdParamsSchema,
   WorkspaceLookupQuerySchema,
 } from './schema';
+import {
+  TenantService,
+  type HealthInput,
+  type ListInput as TenantListInput,
+} from '../../services/tenantService';
 
 type ListWorkspacesQuery = z.infer<typeof ListWorkspacesQuerySchema>;
 type WorkspaceLookupQuery = z.infer<typeof WorkspaceLookupQuerySchema>;
@@ -86,3 +91,31 @@ export const updateWorkspace = asyncHandler(
     res.json(result);
   },
 );
+
+export const getEngineTenants = asyncHandler(async (req: Request, res: Response) => {
+  const tenantService = new TenantService();
+  const userId: string = (req.user?.idpAttributes?.idir_user_guid ??
+    req.user?.idpAttributes?.bceid_user_guid) as string;
+  if (!userId) {
+    throw new ValidationError("Couldn't determine user id");
+  }
+  const params: TenantListInput = {
+    userId,
+    token: req.headers['authorization'],
+  };
+  if (req.params.engineCode) {
+    params.tenantEngineCode = req.params.engineCode;
+  }
+
+  const result = await tenantService.list(params);
+  res.json(result);
+});
+
+export const getEngineHealth = asyncHandler(async (req: Request, res: Response) => {
+  const tenantService = new TenantService();
+  const params: HealthInput = {};
+  if (req.params.engineCode) {
+    params.tenantEngineCode = req.params.engineCode;
+  }
+  res.json(await tenantService.health(params));
+});
