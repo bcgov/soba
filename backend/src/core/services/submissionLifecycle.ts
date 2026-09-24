@@ -1,7 +1,7 @@
 import {
   SubmissionEventType,
   SubmissionWorkflowState,
-  type SubmissionEventTypeCode,
+  type SubmissionWriteEventCode,
   type SubmissionWorkflowStateCode,
 } from '../db/codes';
 import { ConflictError } from '../errors';
@@ -16,7 +16,8 @@ import { ConflictError } from '../errors';
  * writes state itself.
  *
  * Flow: opened --saved--> draft --saved--> draft --submitted--> submitted.
- * Terminal states (submitted, deleted) accept no further edits or submits.
+ * Terminal states (submitted, deleted) accept no further edits or submits. Deleting is a staff action
+ * from any live state and does not pass through resolveSubmissionTransition.
  */
 
 const TERMINAL_STATES: ReadonlySet<string> = new Set([
@@ -28,8 +29,7 @@ const TERMINAL_STATES: ReadonlySet<string> = new Set([
 export const isTerminalSubmissionState = (state: string): boolean => TERMINAL_STATES.has(state);
 
 /** The state each recordable event drives a non-terminal submission into. */
-const TARGET_STATE: Record<SubmissionEventTypeCode, SubmissionWorkflowStateCode> = {
-  [SubmissionEventType.opened]: SubmissionWorkflowState.opened,
+const TARGET_STATE: Record<SubmissionWriteEventCode, SubmissionWorkflowStateCode> = {
   [SubmissionEventType.saved]: SubmissionWorkflowState.draft,
   [SubmissionEventType.submitted]: SubmissionWorkflowState.submitted,
 };
@@ -41,7 +41,7 @@ const TARGET_STATE: Record<SubmissionEventTypeCode, SubmissionWorkflowStateCode>
  */
 export const resolveSubmissionTransition = (
   current: string,
-  event: SubmissionEventTypeCode,
+  event: SubmissionWriteEventCode,
 ): SubmissionWorkflowStateCode => {
   if (TERMINAL_STATES.has(current)) {
     throw new ConflictError(`Submission is ${current} and can no longer be changed`);

@@ -4,6 +4,9 @@ jest.mock('../../../src/core/db/repos/submissionRepo', () => ({
   getSubmissionListContext: jest.fn(),
   getSubmissionRecordById: jest.fn(),
 }));
+jest.mock('../../../src/core/db/repos/submissionParticipantRepo', () => ({
+  isActiveParticipant: jest.fn(),
+}));
 jest.mock('../../../src/core/db/repos/formSubmitAccessRepo', () => ({
   hasFormSubmitAccess: jest.fn(),
 }));
@@ -30,6 +33,7 @@ jest.mock('../../../src/core/db/repos/documentGenerationAuditRepo', () => ({
 
 import { documentGenerationService } from '../../../src/features/document-generation/service';
 import * as submissionRepo from '../../../src/core/db/repos/submissionRepo';
+import * as participantRepo from '../../../src/core/db/repos/submissionParticipantRepo';
 import * as accessRepo from '../../../src/core/db/repos/formSubmitAccessRepo';
 import * as pluginRegistry from '../../../src/core/integrations/plugins/PluginRegistry';
 import * as docgenRegistry from '../../../src/core/integrations/document-generation/DocumentGenerationRegistry';
@@ -40,6 +44,7 @@ import { ServiceUnavailableError } from '../../../src/core/errors';
 
 const getSubmissionListContext = submissionRepo.getSubmissionListContext as unknown as jest.Mock;
 const getSubmissionRecordById = submissionRepo.getSubmissionRecordById as unknown as jest.Mock;
+const isActiveParticipant = participantRepo.isActiveParticipant as unknown as jest.Mock;
 const hasFormSubmitAccess = accessRepo.hasFormSubmitAccess as unknown as jest.Mock;
 const getDefs = pluginRegistry.getDocumentGenerationPluginDefinitions as unknown as jest.Mock;
 const resolveDefault = docgenRegistry.resolveDefaultDocumentGenerationCode as unknown as jest.Mock;
@@ -56,7 +61,8 @@ const template = { content: 'base64', fileType: 'docx' };
 beforeEach(() => {
   jest.clearAllMocks();
   getSubmissionListContext.mockResolvedValue(scope);
-  getSubmissionRecordById.mockResolvedValue({ submittedBy: caller.actorId });
+  getSubmissionRecordById.mockResolvedValue({ id: 's1' });
+  hasFormSubmitAccess.mockResolvedValue(false);
   getDefs.mockReturnValue([
     { code: 'cdogs-v2', featureCode: 'document-generation-v2' },
     { code: 'cdogs-v3', featureCode: 'document-generation-v3' },
@@ -91,8 +97,9 @@ describe('documentGenerationService.preview', () => {
     expect(outcome.status).toBe('notfound');
   });
 
-  it('is denied without submission_create', async () => {
-    hasFormSubmitAccess.mockResolvedValue(false);
+  it('is denied to a caller who is not a participant, whatever their form permissions', async () => {
+    isActiveParticipant.mockResolvedValue(false);
+    hasFormSubmitAccess.mockResolvedValue(true);
     const outcome = await documentGenerationService.preview(caller, {
       submissionId: 's1',
       template,
@@ -102,7 +109,7 @@ describe('documentGenerationService.preview', () => {
   });
 
   it('renders the caller live data via the default backend', async () => {
-    hasFormSubmitAccess.mockResolvedValue(true);
+    isActiveParticipant.mockResolvedValue(true);
     const outcome = await documentGenerationService.preview(caller, {
       submissionId: 's1',
       template,
@@ -110,11 +117,7 @@ describe('documentGenerationService.preview', () => {
       data: { field: 'live' },
     });
     expect(outcome).toMatchObject({ status: 'ok', code: 'cdogs-v2' });
-    expect(hasFormSubmitAccess).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: 'ws-1', formId: 'form-1' }),
-      caller,
-      'submission_create',
-    );
+    expect(isActiveParticipant).toHaveBeenCalledWith('s1', caller.actorId);
     expect(createAdapter).toHaveBeenCalledWith('cdogs-v2');
     // Service passes the payload through untouched; CDOGS-specific shaping is in the plugin.
     expect(renderMock).toHaveBeenCalledWith({
@@ -125,7 +128,7 @@ describe('documentGenerationService.preview', () => {
   });
 
   it('uses the granted scoped v3 backend over the default', async () => {
-    hasFormSubmitAccess.mockResolvedValue(true);
+    isActiveParticipant.mockResolvedValue(true);
     isFeatureAvailable.mockResolvedValue(true); // v3 now granted for this scope
     const outcome = await documentGenerationService.preview(caller, {
       submissionId: 's1',
@@ -137,7 +140,7 @@ describe('documentGenerationService.preview', () => {
   });
 
   it('is unavailable when no backend is available for the scope', async () => {
-    hasFormSubmitAccess.mockResolvedValue(true);
+    isActiveParticipant.mockResolvedValue(true);
     isFeatureAvailable.mockResolvedValue(false); // neither v3 nor v2 available
     const outcome = await documentGenerationService.preview(caller, {
       submissionId: 's1',
@@ -148,7 +151,7 @@ describe('documentGenerationService.preview', () => {
   });
 
   it('does not let an available fixed non-default backend override the default', async () => {
-    hasFormSubmitAccess.mockResolvedValue(true);
+    isActiveParticipant.mockResolvedValue(true);
     getDefs.mockReturnValue([
       { code: 'cdogs-v2', featureCode: 'document-generation-v2' },
       { code: 'other-fixed', featureCode: 'other-fixed' },
@@ -168,7 +171,7 @@ describe('documentGenerationService.preview', () => {
   });
 
   it('is unavailable when the configured default backend is not installed', async () => {
-    hasFormSubmitAccess.mockResolvedValue(true);
+    isActiveParticipant.mockResolvedValue(true);
     resolveDefault.mockReturnValue('cdogs-v99'); // no such plugin installed
     isFeatureAvailable.mockResolvedValue(false); // and no scoped grant
     const outcome = await documentGenerationService.preview(caller, {
@@ -181,38 +184,22 @@ describe('documentGenerationService.preview', () => {
 });
 
 describe('documentGenerationService.print', () => {
-  it('lets staff with submission_read print any submission', async () => {
-    getSubmissionRecordById.mockResolvedValue({ submittedBy: 'someone-else' });
-    hasFormSubmitAccess.mockImplementation((_w, _c, p) => Promise.resolve(p === 'submission_read'));
+  it('lets a participant print the persisted submission', async () => {
+    isActiveParticipant.mockResolvedValue(true);
 
     const outcome = await documentGenerationService.print(caller, { submissionId: 's1', template });
 
     expect(outcome).toMatchObject({ status: 'ok' });
-    expect(hasFormSubmitAccess).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: 'ws-1', formId: 'form-1' }),
-      caller,
-      'submission_read',
-    );
+    expect(isActiveParticipant).toHaveBeenCalledWith('s1', caller.actorId);
     // Service passes the raw persisted doc through; the plugin flattens it for the template.
     expect(renderMock).toHaveBeenCalledWith(
       expect.objectContaining({ data: { data: { field: 'saved' } } }),
     );
   });
 
-  it('lets a submitter print their own submission (no submission_read)', async () => {
-    getSubmissionRecordById.mockResolvedValue({ submittedBy: caller.actorId });
-    hasFormSubmitAccess.mockImplementation((_w, _c, p) =>
-      Promise.resolve(p === 'submission_create'),
-    );
-
-    const outcome = await documentGenerationService.print(caller, { submissionId: 's1', template });
-
-    expect(outcome.status).toBe('ok');
-  });
-
-  it('denies a non-owner without submission_read', async () => {
-    getSubmissionRecordById.mockResolvedValue({ submittedBy: 'someone-else' });
-    hasFormSubmitAccess.mockResolvedValue(false);
+  it('denies a caller who is not a participant, whatever their form permissions', async () => {
+    isActiveParticipant.mockResolvedValue(false);
+    hasFormSubmitAccess.mockResolvedValue(true);
 
     const outcome = await documentGenerationService.print(caller, { submissionId: 's1', template });
 
@@ -220,7 +207,7 @@ describe('documentGenerationService.print', () => {
   });
 
   it('is no-content when the submission has no persisted data', async () => {
-    hasFormSubmitAccess.mockResolvedValue(true);
+    isActiveParticipant.mockResolvedValue(true);
     getContentMock.mockResolvedValue(null);
 
     const outcome = await documentGenerationService.print(caller, { submissionId: 's1', template });
@@ -231,7 +218,7 @@ describe('documentGenerationService.print', () => {
 
 describe('documentGenerationService audit', () => {
   it('records a success audit for the backend call', async () => {
-    hasFormSubmitAccess.mockResolvedValue(true);
+    isActiveParticipant.mockResolvedValue(true);
 
     await documentGenerationService.preview(caller, { submissionId: 's1', template, data: {} });
 
@@ -249,7 +236,7 @@ describe('documentGenerationService audit', () => {
   });
 
   it('records an error audit and returns error when the backend throws', async () => {
-    hasFormSubmitAccess.mockResolvedValue(true);
+    isActiveParticipant.mockResolvedValue(true);
     renderMock.mockRejectedValue(new ServiceUnavailableError('CDOGS error 500: boom'));
 
     const outcome = await documentGenerationService.preview(caller, {
@@ -271,7 +258,7 @@ describe('documentGenerationService audit', () => {
   });
 
   it('audits and returns a 503 when the backend fails to construct (misconfigured)', async () => {
-    hasFormSubmitAccess.mockResolvedValue(true);
+    isActiveParticipant.mockResolvedValue(true);
     // A granted-but-unconfigured backend throws a plain Error during construction.
     createAdapter.mockImplementation(() => {
       throw new Error('PLUGIN_CDOGS_V3_ENDPOINT is required');
@@ -295,7 +282,7 @@ describe('documentGenerationService audit', () => {
   });
 
   it('does not fail the render when the audit write fails', async () => {
-    hasFormSubmitAccess.mockResolvedValue(true);
+    isActiveParticipant.mockResolvedValue(true);
     createAudit.mockRejectedValue(new Error('audit db down'));
 
     const outcome = await documentGenerationService.preview(caller, {
@@ -309,11 +296,11 @@ describe('documentGenerationService audit', () => {
 
   it('does not audit when no backend call is made', async () => {
     // denied: never reaches the backend
-    hasFormSubmitAccess.mockResolvedValue(false);
+    isActiveParticipant.mockResolvedValue(false);
     await documentGenerationService.preview(caller, { submissionId: 's1', template, data: {} });
 
     // unavailable: no backend resolved
-    hasFormSubmitAccess.mockResolvedValue(true);
+    isActiveParticipant.mockResolvedValue(true);
     isFeatureAvailable.mockResolvedValue(false);
     await documentGenerationService.preview(caller, { submissionId: 's1', template, data: {} });
 

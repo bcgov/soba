@@ -13,5 +13,7 @@ export const SubmitFillBundleSchema = z.object({
   headRevisionId: z.string().nullable(),
   schema: z.record(z.string(), z.unknown()),
   content: SubmissionDataDocumentSchema.nullable(),
+  // Whether the caller may save or submit; a participant outside the audience only views.
+  canWrite: z.boolean(),
 });
 export type SubmitFillBundle = z.infer<typeof SubmitFillBundleSchema>;

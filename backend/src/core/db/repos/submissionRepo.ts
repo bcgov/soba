@@ -1,18 +1,26 @@
 import { and, count, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { SUBMISSION_SORT_FIELDS, type SortLocale, type SubmissionListSort } from '@soba/lib';
-import { db } from '../client';
-import { submissionRevisions, submissions, forms, formVersions } from '../schema';
+import { db, type Tx } from '../client';
+import {
+  submissionParticipants,
+  submissionRevisions,
+  submissions,
+  forms,
+  formVersions,
+} from '../schema';
 import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 import {
   RevisionReason,
   RevisionStatus,
   SubmissionEventType,
+  SubmissionParticipantRole,
+  SubmissionParticipantStatus,
   SubmissionWorkflowState,
   type RevisionReasonCode,
   type RevisionStatusCode,
-  type SubmissionEventTypeCode,
+  type SubmissionWriteEventCode,
   type SubmissionWorkflowStateCode,
 } from '../codes';
 
@@ -49,9 +57,10 @@ interface CreateSubmissionInput {
 }
 
 /**
- * created  — the id was free; a new opened submission (+ revision 0) was written.
- * existing — the id is already bound to this actor + form; the retry returns that row (idempotent).
- * conflict — the id is bound to a different actor or form (caller maps to 409).
+ * created  - the id was free; a new opened submission, its revision 0 and the opener's owner grant
+ *            were written.
+ * existing - the id is already bound to this actor + form; the retry returns that row (idempotent).
+ * conflict - the id is bound to a different actor or form (caller maps to 409).
  */
 export type OpenSubmissionResult =
   | { outcome: 'created'; record: SubmissionRecord }
@@ -67,7 +76,7 @@ interface SaveSubmissionInput {
   parentRevisionId: string | null;
   actorId: string;
   actorDisplayLabel: string | null;
-  eventType: SubmissionEventTypeCode;
+  eventType: SubmissionWriteEventCode;
   /**
    * The gate's intent. 'current' applies the revision as the new head; 'pending' holds it for review.
    * An intended-'current' write whose head moved since the gate read is downgraded to pending here.
@@ -124,10 +133,10 @@ export interface ListSubmissionsInput {
 }
 
 /**
- * Open a submission against a client-minted id: insert the row in the `opened` state and its
- * revision-0 `opened` event in one transaction, so every submission has a full history from the
- * moment a fill begins. `submittedBy` captures the actor who started it (the seeded public user for
- * anonymous fills).
+ * Open a submission against a client-minted id: insert the row in the `opened` state, its
+ * revision-0 `opened` event and the opener's owner grant in one transaction, so every submission has
+ * a full history and an owner from the moment a fill begins. `submittedBy` captures the actor who
+ * started it (the seeded public user for anonymous fills, who then owns it).
  *
  * Idempotent on the id. `ON CONFLICT DO NOTHING` is the atomic gate: the row is only written when the
  * id is free, so concurrent double-opens are race-safe — the loser inserts nothing, falls through to
@@ -168,6 +177,16 @@ export const openSubmission = async (
         beforeEngineSubmissionRef: null,
         afterEngineSubmissionRef: null,
         changedBy: input.actorId,
+      });
+      await tx.insert(submissionParticipants).values({
+        workspaceId: input.workspaceId,
+        submissionId: created.id,
+        userId: input.actorId,
+        role: SubmissionParticipantRole.owner,
+        status: SubmissionParticipantStatus.active,
+        grantedBy: input.actorId,
+        createdBy: input.actorDisplayLabel,
+        updatedBy: input.actorDisplayLabel,
       });
       const [record] = await tx
         .update(submissions)
@@ -293,21 +312,19 @@ export const getSubmissionListContext = async (
   return row[0] ?? null;
 };
 
-/** Resolve a submission's workspace, form, workflow state + owner by id alone (for the write gates). */
+/** Resolve a submission's workspace, form and workflow state by id alone (for the write gates). */
 export const getSubmissionWorkspaceAndState = async (
   submissionId: string,
 ): Promise<{
   workspaceId: string;
   formId: string;
   workflowState: string;
-  submittedBy: string | null;
 } | null> => {
   const rows = await db
     .select({
       workspaceId: submissions.workspaceId,
       formId: submissions.formId,
       workflowState: submissions.workflowState,
-      submittedBy: submissions.submittedBy,
     })
     .from(submissions)
     .where(and(eq(submissions.id, submissionId), isNull(submissions.deletedAt)))
@@ -503,6 +520,68 @@ const resolveRevisionStanding = (
 };
 
 /**
+ * Lock a live submission row until commit. Save, submit and delete all take this lock first, so a head
+ * check and a head move cannot interleave with another writer on the same submission.
+ */
+const lockLiveSubmission = async (
+  tx: Tx,
+  workspaceId: string,
+  submissionId: string,
+): Promise<SubmissionRecord | null> => {
+  const [submission] = await tx
+    .select()
+    .from(submissions)
+    .where(
+      and(
+        eq(submissions.id, submissionId),
+        eq(submissions.workspaceId, workspaceId),
+        isNull(submissions.deletedAt),
+      ),
+    )
+    .limit(1)
+    .for('no key update');
+  return submission ?? null;
+};
+
+/** Append order over all revisions; the current version's number lives in current_revision_no. */
+const nextRevisionNo = async (
+  tx: Tx,
+  workspaceId: string,
+  submissionId: string,
+): Promise<number> => {
+  const [{ next }] = await tx
+    .select({
+      next: sql<number>`coalesce(max(${submissionRevisions.revisionNo}), -1) + 1`,
+    })
+    .from(submissionRevisions)
+    .where(
+      and(
+        eq(submissionRevisions.submissionId, submissionId),
+        eq(submissionRevisions.workspaceId, workspaceId),
+      ),
+    );
+  return Number(next);
+};
+
+/** The outgoing head is the single current revision; demote it before the new head commits. */
+const demoteHead = async (
+  tx: Tx,
+  workspaceId: string,
+  headRevisionId: string | null,
+): Promise<void> => {
+  if (!headRevisionId) return;
+  await tx
+    .update(submissionRevisions)
+    .set({ status: RevisionStatus.superseded, reason: RevisionReason.replaced })
+    .where(
+      and(
+        eq(submissionRevisions.id, headRevisionId),
+        eq(submissionRevisions.workspaceId, workspaceId),
+      ),
+    );
+};
+
+/**
  * Record a submission revision in one transaction. `revisionNo` is the next append-order number over
  * every revision (current and pending), so it is not the current version's number. A 'current' write
  * whose head still matches its base demotes the outgoing head to `superseded`, inserts the new head as
@@ -519,21 +598,7 @@ export const appendSubmissionRevision = async (
   input: SaveSubmissionInput,
 ): Promise<AppendSubmissionRevisionResult> => {
   return db.transaction(async (tx) => {
-    // The row lock holds other writers on this submission until commit, so the head check and the
-    // head move cannot interleave with a concurrent save, submit or delete.
-    const [submission] = await tx
-      .select()
-      .from(submissions)
-      .where(
-        and(
-          eq(submissions.id, input.submissionId),
-          eq(submissions.workspaceId, input.workspaceId),
-          isNull(submissions.deletedAt),
-        ),
-      )
-      .limit(1)
-      .for('no key update');
-
+    const submission = await lockLiveSubmission(tx, input.workspaceId, input.submissionId);
     if (!submission) return { outcome: 'not_found' };
 
     // A concurrent duplicate of this write committed first.
@@ -575,19 +640,7 @@ export const appendSubmissionRevision = async (
       );
     }
 
-    // Append order over all revisions; the current version's number lives in current_revision_no.
-    const [{ next }] = await tx
-      .select({
-        next: sql<number>`coalesce(max(${submissionRevisions.revisionNo}), -1) + 1`,
-      })
-      .from(submissionRevisions)
-      .where(
-        and(
-          eq(submissionRevisions.submissionId, input.submissionId),
-          eq(submissionRevisions.workspaceId, input.workspaceId),
-        ),
-      );
-    const nextRevision = Number(next);
+    const nextRevision = await nextRevisionNo(tx, input.workspaceId, input.submissionId);
 
     const headMoved = submission.headRevisionId !== input.parentRevisionId;
     const { applyAsCurrent, status, reason } = resolveRevisionStanding(
@@ -632,18 +685,7 @@ export const appendSubmissionRevision = async (
       return toAppendResult('pending', record, input.revisionId, nextRevision, status, reason);
     }
 
-    // The outgoing head is the single current revision; demote it before the new head commits.
-    if (submission.headRevisionId) {
-      await tx
-        .update(submissionRevisions)
-        .set({ status: RevisionStatus.superseded, reason: RevisionReason.replaced })
-        .where(
-          and(
-            eq(submissionRevisions.id, submission.headRevisionId),
-            eq(submissionRevisions.workspaceId, input.workspaceId),
-          ),
-        );
-    }
+    await demoteHead(tx, input.workspaceId, submission.headRevisionId);
 
     const updates: Partial<typeof submissions.$inferInsert> = {
       currentRevisionNo: nextRevision,
@@ -674,28 +716,55 @@ export const appendSubmissionRevision = async (
   });
 };
 
-export const markSubmissionDeleted = async (
-  workspaceId: string,
-  submissionId: string,
-  actorDisplayLabel: string | null,
-) => {
-  const updated = await db
-    .update(submissions)
-    .set({
-      workflowState: SubmissionWorkflowState.deleted,
-      deletedAt: new Date(),
-      deletedBy: actorDisplayLabel,
-      updatedBy: actorDisplayLabel,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(submissions.id, submissionId),
-        eq(submissions.workspaceId, workspaceId),
-        isNull(submissions.deletedAt),
-      ),
-    )
-    .returning();
+/**
+ * Soft-delete a submission from any live state and record it as a `deleted` revision by the actor,
+ * which becomes the current revision. The engine document is unchanged, so the revision's before and
+ * after refs are both the current ref. Returns null when the submission is missing or already deleted.
+ */
+export const markSubmissionDeleted = async (input: {
+  workspaceId: string;
+  submissionId: string;
+  actorId: string;
+  actorDisplayLabel: string | null;
+}): Promise<SubmissionRecord | null> => {
+  return db.transaction(async (tx) => {
+    const submission = await lockLiveSubmission(tx, input.workspaceId, input.submissionId);
+    if (!submission) return null;
 
-  return updated[0] ?? null;
+    const revisionNo = await nextRevisionNo(tx, input.workspaceId, input.submissionId);
+    const revisionId = uuidv7();
+    await demoteHead(tx, input.workspaceId, submission.headRevisionId);
+    await tx.insert(submissionRevisions).values({
+      id: revisionId,
+      workspaceId: input.workspaceId,
+      submissionId: input.submissionId,
+      revisionNo,
+      parentRevisionId: submission.headRevisionId,
+      eventType: SubmissionEventType.deleted,
+      status: RevisionStatus.current,
+      reason: RevisionReason.accepted,
+      beforeEngineSubmissionRef: submission.engineSubmissionRef,
+      afterEngineSubmissionRef: submission.engineSubmissionRef,
+      changedBy: input.actorId,
+    });
+
+    const now = new Date();
+    const [updated] = await tx
+      .update(submissions)
+      .set({
+        workflowState: SubmissionWorkflowState.deleted,
+        currentRevisionNo: revisionNo,
+        headRevisionId: revisionId,
+        deletedAt: now,
+        deletedBy: input.actorDisplayLabel,
+        updatedBy: input.actorDisplayLabel,
+        updatedAt: now,
+      })
+      .where(
+        and(eq(submissions.id, input.submissionId), eq(submissions.workspaceId, input.workspaceId)),
+      )
+      .returning();
+    if (!updated) throw new Error(`Submission ${input.submissionId} missing after head move`);
+    return updated;
+  });
 };

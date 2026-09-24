@@ -111,9 +111,12 @@ export const SubmissionEventType = {
   opened: 'opened',
   saved: 'saved',
   submitted: 'submitted',
+  deleted: 'deleted',
 } as const;
 export type SubmissionEventTypeCode =
   (typeof SubmissionEventType)[keyof typeof SubmissionEventType];
+/** The events a submitter's save or submit records. Open and delete have their own paths. */
+export type SubmissionWriteEventCode = Extract<SubmissionEventTypeCode, 'saved' | 'submitted'>;
 
 /**
  * Standing of a revision within its submission (submission_revision.status).
@@ -287,6 +290,25 @@ export const FormGroupOverrideStatus = {
 } as const;
 export type FormGroupOverrideStatusCode =
   (typeof FormGroupOverrideStatus)[keyof typeof FormGroupOverrideStatus];
+
+/**
+ * A user's standing on one submission (submission_participant.role). Owners and collaborators have
+ * the same access.
+ */
+export const SubmissionParticipantRole = {
+  owner: 'owner',
+  collaborator: 'collaborator',
+} as const;
+export type SubmissionParticipantRoleCode =
+  (typeof SubmissionParticipantRole)[keyof typeof SubmissionParticipantRole];
+
+/** Status of a submission_participant row. */
+export const SubmissionParticipantStatus = {
+  active: 'active',
+  inactive: 'inactive',
+} as const;
+export type SubmissionParticipantStatusCode =
+  (typeof SubmissionParticipantStatus)[keyof typeof SubmissionParticipantStatus];
 
 /** Status of a role assigned to a workspace group (workspace_group_role.status). */
 export const WorkspaceGroupRoleStatus = {

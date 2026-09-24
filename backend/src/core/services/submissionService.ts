@@ -23,7 +23,7 @@ import {
   SubmissionEventType,
   type RevisionReasonCode,
   type RevisionStatusCode,
-  type SubmissionEventTypeCode,
+  type SubmissionWriteEventCode,
   type SubmissionWorkflowStateCode,
 } from '../db/codes';
 import { log } from '../logging';
@@ -124,7 +124,7 @@ export class SubmissionService {
    */
   private async record(
     input: SaveInput,
-    eventType: SubmissionEventTypeCode,
+    eventType: SubmissionWriteEventCode,
   ): Promise<SubmissionWriteOutcome> {
     const submission = await getSubmissionRecordById(input.workspaceId, input.submissionId);
     if (!submission) throw new NotFoundError('Submission not found');
@@ -203,7 +203,7 @@ export class SubmissionService {
   private async writeRevision(
     input: SaveInput,
     submission: SubmissionRecord,
-    eventType: SubmissionEventTypeCode,
+    eventType: SubmissionWriteEventCode,
     decision: Exclude<SubmissionWriteDecision, { kind: 'replay' }>,
   ): Promise<SubmissionWriteOutcome> {
     if (!input.revisionId) {
@@ -282,7 +282,7 @@ export class SubmissionService {
   }
 
   async delete(input: DeleteInput) {
-    return markSubmissionDeleted(input.workspaceId, input.submissionId, input.actorDisplayLabel);
+    return markSubmissionDeleted(input);
   }
 
   async get(workspaceId: string, submissionId: string) {
