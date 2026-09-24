@@ -7,8 +7,28 @@ jest.mock('../../../src/core/config/env');
 jest.mock('../../../src/core/integrations/tenant/TenantEngineRegistry');
 
 describe('TenantService', () => {
+  let mockAdapter: unknown;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAdapter = {
+      getTenants: jest.fn().mockResolvedValue({ tenants: [] }),
+      readinessCheck: jest.fn().mockResolvedValue({ ok: true }),
+    };
+    jest
+      .mocked(tenantEngineRegistry.getTenantEnginePlugins)
+      .mockReturnValue([{ code: 'test-engine', name: 'Test' }]);
+    jest
+      .mocked(tenantEngineRegistry.resolveTenantEnginePlugin)
+      .mockReturnValue(
+        {} as unknown as import('../../../src/core/integrations/tenant/TenantEnginePluginDefinition').TenantEnginePluginDefinition,
+      );
+    jest
+      .mocked(tenantEngineRegistry.createTenantEngineAdapter)
+      .mockReturnValue(
+        mockAdapter as import('../../../src/core/integrations/tenant/TenantEngineAdapter').TenantEngineAdapter,
+      );
+    jest.mocked(env.getTenantEngineDefaultCode).mockReturnValue('test-engine');
   });
   it('getTenantEngineCode throws when no plugins installed', () => {
     jest.mocked(tenantEngineRegistry.getTenantEnginePlugins).mockReturnValue([]);
@@ -50,28 +70,6 @@ describe('TenantService', () => {
       .mocked(tenantEngineRegistry.getTenantEnginePlugins)
       .mockReturnValue([{ code: 'first-engine', name: 'First' }]);
     expect(getTenantEngineCode({})).toBe('first-engine');
-  });
-  let mockAdapter: unknown;
-
-  beforeEach(() => {
-    mockAdapter = {
-      getTenants: jest.fn().mockResolvedValue({ tenants: [] }),
-      readinessCheck: jest.fn().mockResolvedValue({ ok: true }),
-    };
-    jest
-      .mocked(tenantEngineRegistry.getTenantEnginePlugins)
-      .mockReturnValue([{ code: 'test-engine', name: 'Test' }]);
-    jest
-      .mocked(tenantEngineRegistry.resolveTenantEnginePlugin)
-      .mockReturnValue(
-        {} as unknown as import('../../../src/core/integrations/tenant/TenantEnginePluginDefinition').TenantEnginePluginDefinition,
-      );
-    jest
-      .mocked(tenantEngineRegistry.createTenantEngineAdapter)
-      .mockReturnValue(
-        mockAdapter as import('../../../src/core/integrations/tenant/TenantEngineAdapter').TenantEngineAdapter,
-      );
-    jest.mocked(env.getTenantEngineDefaultCode).mockReturnValue('test-engine');
   });
 
   it('list delegates to adapter.getTenants', async () => {
