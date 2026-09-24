@@ -8,6 +8,7 @@ import {
   ListWorkspacesResponseSchema as SobaListWorkspacesResponseSchema,
   WorkspaceLookupItemSchema as SobaWorkspaceLookupItemSchema,
   WorkspaceLookupResponseSchema as SobaWorkspaceLookupResponseSchema,
+  ListTenantsResponseSchema as SobaListTenantsResponseSchema,
 } from '@soba/lib';
 
 import {
@@ -35,6 +36,20 @@ export const WorkspaceSortSchema = SobaWorkspaceSortSchema.clone().openapi(
   'Workspaces_WorkspaceSort',
   { description: 'Valid workspace sort tokens: `field:asc` or `field:desc`.' },
 );
+
+export const ListTenantsResponseSchema = SobaListTenantsResponseSchema.clone().openapi(
+  'Workspaces_ListTenantsResponse',
+);
+
+export const TenantEngineHealthResponseSchema = z
+  .record(
+    z.string(),
+    z.object({
+      ok: z.boolean(),
+      message: z.string().optional(),
+    }),
+  )
+  .openapi('Workspaces_TenantEngineHealthResponse');
 
 export const ListWorkspacesQuerySchema = z
   .object({
@@ -98,6 +113,12 @@ export const WorkspaceIdParamsSchema = z
     id: z.string().min(1),
   })
   .openapi('Workspaces_WorkspaceIdParams');
+
+export const EngineCodeParamsSchema = z
+  .object({
+    engineCode: z.string().min(1),
+  })
+  .openapi('Workspaces_EngineCodeParams');
 
 export const CreateWorkspaceBodySchema = SobaCreateWorkspaceBodySchema.clone().openapi(
   'Workspaces_CreateWorkspaceBody',
@@ -236,18 +257,15 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'get',
-    path: `${WORKSPACE_PATH}/engine/health`,
+    path: `${WORKSPACES_PATH}/engine/health`,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
-    request: {
-      params: WorkspaceIdParamsSchema,
-    },
     responses: {
       200: {
         description: 'Get workspace (tenant) engine health for default code',
         content: {
           'application/json': {
-            schema: CurrentWorkspaceResponseSchema,
+            schema: TenantEngineHealthResponseSchema,
           },
         },
       },
@@ -256,18 +274,55 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
 
   registry.registerPath({
     method: 'get',
-    path: `${WORKSPACE_PATH}/engine/health/{engineCode}`,
+    path: `${WORKSPACES_PATH}/engine/health/{engineCode}`,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
-      params: WorkspaceIdParamsSchema,
+      params: EngineCodeParamsSchema,
     },
     responses: {
       200: {
         description: 'Get workspace (tenant) engine health for specified code',
         content: {
           'application/json': {
-            schema: CurrentWorkspaceResponseSchema,
+            schema: TenantEngineHealthResponseSchema,
+          },
+        },
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: `${WORKSPACES_PATH}/engine`,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: {
+        description: 'Get workspace tenants for default engine',
+        content: {
+          'application/json': {
+            schema: ListTenantsResponseSchema,
+          },
+        },
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: `${WORKSPACES_PATH}/engine/{engineCode}`,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: EngineCodeParamsSchema,
+    },
+    responses: {
+      200: {
+        description: 'Get workspace tenants for specified engine',
+        content: {
+          'application/json': {
+            schema: ListTenantsResponseSchema,
           },
         },
       },
