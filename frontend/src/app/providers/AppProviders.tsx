@@ -3,9 +3,11 @@
 import React, { useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
 import { I18nProvider } from 'react-aria-components';
+import { SWRConfig } from 'swr';
 import makeStore from '@/lib/store';
-import { setActiveWorkspaceId } from '@/lib/slices/workspaceSlice';
-import { setWorkspaceResolvedListener } from '@/src/shared/workspace/workspaceSync';
+import { swrConfig } from '@/src/shared/api/swrConfig';
+import { refreshAccessToken } from '@/lib/slices/keycloakSlice';
+import { setTokenRefresher } from '@/src/shared/auth/tokenRefresh';
 import { getDictionary } from '@/app/[lang]/dictionaries';
 import { NotificationToast } from '@/app/ui/base/NotificationToast';
 
@@ -24,13 +26,11 @@ export default function AppProviders({
 }) {
   const store = useMemo(() => makeStore(), []);
 
-  // sobaFetch can't import the store (would create an import cycle), so it notifies
-  // through a registry. Mirror the backend-resolved workspace into Redux here.
+  // sobaFetch can't import the slice (that would close an import cycle), so it reaches Keycloak
+  // through a registry. Refresh here, where the store is, so the new token reaches Redux.
   useEffect(() => {
-    setWorkspaceResolvedListener((workspaceId) => {
-      store.dispatch(setActiveWorkspaceId(workspaceId));
-    });
-    return () => setWorkspaceResolvedListener(null);
+    setTokenRefresher((force) => store.dispatch(refreshAccessToken(force)));
+    return () => setTokenRefresher(null);
   }, [store]);
 
   // The root layout renders a static `<html lang="en">` (it sits above the
@@ -46,8 +46,10 @@ export default function AppProviders({
     <I18nProvider locale={locale}>
       <DictionaryContext.Provider value={dictionary}>
         <Provider store={store}>
-          {children}
-          <NotificationToast />
+          <SWRConfig value={swrConfig}>
+            {children}
+            <NotificationToast />
+          </SWRConfig>
         </Provider>
       </DictionaryContext.Provider>
     </I18nProvider>

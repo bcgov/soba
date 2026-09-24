@@ -1,8 +1,8 @@
 import { SubmissionService } from '../../services/submissionService';
-import { decodeCursorAndMode, buildNextCursor, type CursorSort } from '../shared/pagination';
 import type {
   SubmissionRecord,
   SubmissionListRow,
+  SubmissionListSort,
   SubmissionDetailRow,
 } from '../../db/repos/submissionRepo';
 
@@ -23,11 +23,12 @@ interface ListSubmissionsQueryInput {
   formId?: string;
   formVersionId?: string;
   submissionId?: string;
+  offset: number;
   limit: number;
-  cursor?: string;
   workflowState?: string;
   createdBy?: string;
-  sort?: CursorSort;
+  q?: string;
+  sort: SubmissionListSort;
 }
 
 const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
@@ -44,6 +45,8 @@ const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
     submittedAt: item.submittedAt?.toISOString() ?? null,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
+    createdBy: detail.createdBy ?? null,
+    submittedBy: detail.submittedBy ?? null,
   };
 };
 
@@ -58,6 +61,8 @@ const toSubmissionListItemDto = (item: SubmissionListRow) => ({
   submittedAt: item.submittedAt?.toISOString() ?? null,
   createdAt: item.createdAt.toISOString(),
   updatedAt: item.updatedAt.toISOString(),
+  createdBy: item.createdBy,
+  submittedBy: item.submittedBy,
 });
 
 export function createSubmissionsApiService(submissionService: SubmissionService) {
@@ -71,35 +76,26 @@ export function createSubmissionsApiService(submissionService: SubmissionService
       submissionService.getContent({ workspaceId: ctx.workspaceId, submissionId }),
 
     list: async (scope: SubmissionsListScopeInput, query: ListSubmissionsQueryInput) => {
-      const { cursorMode, sort, afterId, afterUpdatedAt } = decodeCursorAndMode({
-        cursor: query.cursor,
-        sort: query.sort,
-      });
       const result = await submissionService.list({
         workspaceIds: scope.workspaceIds,
         actorId: scope.actorId,
+        offset: query.offset,
         limit: query.limit,
         formId: query.formId,
         formVersionId: query.formVersionId,
         submissionId: query.submissionId,
         workflowState: query.workflowState,
         createdBy: query.createdBy,
-        sort,
-        cursorMode,
-        afterId,
-        afterUpdatedAt,
+        q: query.q,
+        sort: query.sort,
       });
-
-      const lastItem = result.items[result.items.length - 1];
-      const nextCursor = buildNextCursor(lastItem, result.hasMore, cursorMode);
 
       return {
         items: result.items.map((item) => toSubmissionListItemDto(item)),
         page: {
+          offset: query.offset,
           limit: query.limit,
-          hasMore: result.hasMore,
-          nextCursor,
-          cursorMode,
+          total: result.total,
         },
         filters: {
           workspaceId: query.workspaceId,
@@ -108,8 +104,9 @@ export function createSubmissionsApiService(submissionService: SubmissionService
           submissionId: query.submissionId,
           workflowState: query.workflowState,
           createdBy: query.createdBy,
+          q: query.q,
         },
-        sort,
+        sort: query.sort,
       };
     },
 

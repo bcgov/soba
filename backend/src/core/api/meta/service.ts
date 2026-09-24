@@ -24,6 +24,17 @@ function parseKeycloakIssuer(issuer: string): { url: string; realm: string } {
   return { url, realm };
 }
 
+// Deployments set APP_VERSION; package.json is the fallback for local runs. Release tags are
+// conventionally `vX.Y.Z`, so drop the prefix rather than reporting "v2.1.0" as the version.
+function resolveAppVersion(): string {
+  const configured = env.getOptionalEnv('APP_VERSION');
+  return configured ? configured.replace(/^v(?=\d)/, '') : packageJson.version;
+}
+
+function resolveGitSha(): string {
+  return env.getOptionalEnv('GIT_SHA') ?? 'unknown';
+}
+
 export class MetaApiService {
   async getPlugins() {
     const plugins = getPluginCatalog();
@@ -82,9 +93,9 @@ export class MetaApiService {
   getBuild() {
     return {
       name: packageJson.name,
-      version: packageJson.version,
+      version: resolveAppVersion(),
       nodeVersion: process.version,
-      gitSha: env.getOptionalEnv('GIT_SHA') ?? 'unknown',
+      gitSha: resolveGitSha(),
       gitTag: env.getOptionalEnv('GIT_TAG') ?? 'unknown',
       imageTag: env.getOptionalEnv('IMAGE_TAG') ?? 'unknown',
     };
@@ -108,9 +119,16 @@ export class MetaApiService {
       api: {
         baseUrl: env.getOptionalEnv('SOBA_API_BASE_URL') ?? 'http://localhost:4000/api/v1',
       },
+      // Reported only when configured. A guessed URL would be served to every client and silently
+      // produce links to the wrong host.
+      app: {
+        designerUrl: env.getDesignerAppUrl(),
+        formsUrl: env.getFormsAppUrl(),
+      },
       build: {
         name: packageJson.name,
-        version: packageJson.version,
+        version: resolveAppVersion(),
+        gitSha: resolveGitSha(),
       },
     };
   }

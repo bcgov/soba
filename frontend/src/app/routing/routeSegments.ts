@@ -16,6 +16,10 @@ const PUBLIC: RouteKind = 'public';
  */
 export const ROUTE_KIND_BY_SEGMENT: Readonly<Record<string, RouteKind>> = {
   onboarding: 'onboarding', // app/[lang]/onboarding
+  // Platform administration: signed-in but not workspace-scoped, so it is treated like the
+  // workspace chooser (session required, no active workspace needed). The page itself and the
+  // backend `/admin/*` routes gate on the `soba_admin` role.
+  admin: WORKSPACES, // app/[lang]/admin
   forms: WORKSPACE_APP, // app/[lang]/forms
   designer: WORKSPACE_APP, // app/[lang]/designer
   // Public fill/submit route: reachable without signing in; the backend authorizes against the
@@ -29,4 +33,6 @@ export const ROUTE_KIND_BY_SEGMENT: Readonly<Record<string, RouteKind>> = {
   submission: PUBLIC, // app/[lang]/submission/[submissionId]
   workspaces: WORKSPACES, // app/[lang]/workspaces
   workspace: WORKSPACES, // app/[lang]/workspace
+  // Diagnostic feature-support page; public (renders without auth, gated on the `meta` feature).
+  meta: PUBLIC, // app/[lang]/meta
 };

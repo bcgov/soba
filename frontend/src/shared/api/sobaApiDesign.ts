@@ -10,6 +10,7 @@ import type {
   SobaFormVersionType,
 } from '../../types/forms';
 import type { ListSubmissionsResponse, SubmissionListItem } from '@/src/types/submissions';
+import { toListRequestQuery, type ListPage, type ListQueryArgs } from '@/src/types/list';
 
 export async function createSobaFormioForm(
   token: string,
@@ -18,11 +19,27 @@ export async function createSobaFormioForm(
 ): Promise<CreateSobaFormioFormResponse> {
   data.formEngineCode = 'formio-v5';
 
+  if (workspaceId) {
+    data.workspaceId = workspaceId;
+  }
+
   const response = await sobaFetch('/design/forms', {
     token,
     method: 'POST',
     json: data,
-    workspaceId,
+  });
+  return parseJson(response);
+}
+
+export async function updateSobaForm(
+  token: string,
+  id: string,
+  data: Partial<SobaFormType>,
+): Promise<SobaResponseFormType> {
+  const response = await sobaFetch(`/design/forms/${id}`, {
+    token,
+    method: 'PATCH',
+    json: data,
   });
   return parseJson(response);
 }
@@ -60,6 +77,7 @@ export async function getSobaForm(token: string, id: string): Promise<SobaRespon
 /** Compact form row for the designer/submit list. */
 export type SobaFormSummary = {
   id: string;
+  workspaceId: string;
   name: string;
   status: string;
   createdAt: string;
@@ -67,34 +85,36 @@ export type SobaFormSummary = {
   createdBy: string | null;
 };
 
-/** List forms (PG-backed) with each form's representative version, for the designer/submit list. */
+export type ListFormsResponse = {
+  items: SobaFormSummary[];
+  page: ListPage;
+};
+
+/** One page of forms. Search, sort and paging are resolved by the server. */
 export async function getSobaForms(
   token: string,
-  workspaceId?: string,
-): Promise<{ items: SobaFormSummary[] }> {
+  args: ListQueryArgs & { workspaceId?: string },
+): Promise<ListFormsResponse> {
   const response = await sobaFetch('/design/forms', {
     token,
-    workspaceId,
-    query: { limit: 100 },
+    query: { ...toListRequestQuery(args), workspaceId: args.workspaceId },
   });
   return parseJson(response);
 }
 
+/** One page of submissions. Search, sort and paging are resolved by the server. */
 export async function getSobaSubmissions(
   token: string,
-  params?: Record<string, string | number | boolean>,
-  workspaceId?: string,
+  args: ListQueryArgs & { formId?: string; workspaceId?: string; workflowState?: string },
 ): Promise<ListSubmissionsResponse> {
-  const query: Record<string, string> = {};
-  if (params) {
-    for (const [key, value] of Object.entries(params)) {
-      query[key] = String(value);
-    }
-  }
   const response = await sobaFetch('/design/submissions', {
     token,
-    workspaceId,
-    query,
+    query: {
+      ...toListRequestQuery(args),
+      formId: args.formId,
+      workspaceId: args.workspaceId,
+      workflowState: args.workflowState,
+    },
   });
   return parseJson(response);
 }
@@ -115,13 +135,43 @@ export async function getSobaSubmissionData(
   return parseJson(response);
 }
 
+/**
+ * Every version of one form, newest first. A version picker, not a paged list: it asks for the
+ * endpoint's maximum in one request, and `page.total` is how a caller sees that a form has more
+ * versions than the picker is showing.
+ */
+export const FORM_VERSION_PICKER_LIMIT = 100;
+
+const FORM_VERSIONS_PATH = '/design/form-versions';
+
 export async function getSobaFormVersions(
   token: string,
   formId: string,
-): Promise<{ items: SobaFormVersionType[] }> {
-  const response = await sobaFetch('/design/form-versions', {
+): Promise<{ items: SobaFormVersionType[]; page: ListPage }> {
+  const response = await sobaFetch(FORM_VERSIONS_PATH, {
     token,
-    query: { formId, limit: 100 },
+    query: { formId, limit: FORM_VERSION_PICKER_LIMIT, sort: 'versionNo:desc' },
+  });
+  return parseJson(response);
+}
+
+/** One version, by id. */
+export async function getSobaFormVersion(
+  token: string,
+  id: string,
+): Promise<SobaFormVersionType> {
+  const response = await sobaFetch(`${FORM_VERSIONS_PATH}/${id}`, { token });
+  return parseJson(response);
+}
+
+/** One page of a form's versions, for the history table. */
+export async function getSobaFormVersionPage(
+  token: string,
+  args: ListQueryArgs & { formId: string },
+): Promise<{ items: SobaFormVersionType[]; page: ListPage }> {
+  const response = await sobaFetch(FORM_VERSIONS_PATH, {
+    token,
+    query: { formId: args.formId, ...toListRequestQuery(args) },
   });
   return parseJson(response);
 }
@@ -131,7 +181,7 @@ export async function createFormVersion(
   token: string,
   formId: string,
 ): Promise<SobaFormVersionType> {
-  const response = await sobaFetch('/design/form-versions', {
+  const response = await sobaFetch(FORM_VERSIONS_PATH, {
     token,
     method: 'POST',
     json: { formId },
@@ -158,4 +208,13 @@ export async function getFormVersionSchema(token: string, id: string): Promise<F
   const response = await sobaFetch(`/design/form-versions/${id}/schema`, { token });
   if (response.status === 404) return null;
   return parseJson(response);
+}
+
+/**
+ * A 404 means the submission was already gone, which is the outcome the caller asked for. Reporting
+ * it as a failure would contradict the refreshed list.
+ */
+export async function deleteSobaSubmission(token: string, id: string): Promise<void> {
+  const response = await sobaFetch(`/design/submissions/${id}`, { token, method: 'DELETE' });
+  if (!response.ok && response.status !== 404) await parseJson(response);
 }

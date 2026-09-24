@@ -25,7 +25,7 @@ test.describe.serial("Landing page tests", () => {
   });
 
   test("Validate form designing page", async ({ title }) => {
-    await sharedPage.goto("/");
+    await sharedPage.goto("");
     await expect(
       sharedPage.locator('[data-testid="login-button"]'),
     ).toBeVisible();
@@ -92,7 +92,6 @@ test.describe.serial("Landing page tests", () => {
       await formsNav.click();
       await sharedPage.click('[data-testid="create-form-button"]');
       const workspaceSelect = sharedPage.getByTestId("#workspace-select");
-      await expect(workspaceSelect).toBeVisible();
       await workspaceSelect.click();
       await sharedPage.waitForTimeout(1000);
       const workspaceOption = sharedPage.getByRole("option", {
@@ -130,22 +129,26 @@ test.describe.serial("Landing page tests", () => {
       // Continue with normal flow
       //Form creation
       await sharedPage.click('[data-testid="create-form-button"]');
-      if (depEnv === "dev" || /^\d+$/.test(depEnv ?? "")) {
-        const selectItem = sharedPage.getByText("Select an item", {
+      const formNameInput = sharedPage
+        .locator("label", { hasText: "Form Name" })
+        .locator("xpath=following-sibling::div//input");
+      await formNameInput.fill(title);
+      form_name = title;
+      await sharedPage.getByRole("button", { name: "Select an item" }).click();
+      if (depEnv === "test") {
+        const workspaceOption = sharedPage.getByRole("option", {
+          name: "Test Workspace (team)",
           exact: true,
         });
-        await selectItem.click();
+        await workspaceOption.click();
+      } else {
+        await sharedPage.waitForTimeout(1000);
         const workspaceOption = sharedPage.getByRole("option", {
           name: "Test (team)",
           exact: true,
         });
         await workspaceOption.click();
       }
-      const formNameInput = sharedPage
-        .locator("label", { hasText: "Form Name" })
-        .locator("xpath=following-sibling::div//input");
-      await formNameInput.fill(title);
-      form_name = title;
       await sharedPage.getByTestId("submitter-audience-trigger").click();
       await expect(
         sharedPage.getByTestId("audience-mode-public"),
@@ -175,10 +178,6 @@ test.describe.serial("Landing page tests", () => {
     }
   });
   test("Checks form creation with basic components", async ({ title }) => {
-    const saveButton = sharedPage.getByRole("button", {
-      name: "Save",
-      exact: true,
-    });
     await expect(
       sharedPage
         .locator(".drag-and-drop-alert")
@@ -247,33 +246,88 @@ test.describe.serial("Landing page tests", () => {
     await formNameInput.click();
     await formNameInput.fill(title);
     form_name = title;
-    await saveButton.click();
+    const saveButton = sharedPage.getByRole("button", {
+      name: "Save",
+      exact: true,
+    });
+    await saveButton.click({ force: true });
+    await expect(
+      sharedPage.getByText("Form saved successfully.", { exact: true }),
+    ).toBeVisible();
     await sharedPage.waitForTimeout(1000);
+    const formsNav = sharedPage.getByTestId("home-nav");
+    await expect(sharedPage.getByTestId("home-nav")).toBeVisible({
+      timeout: 30000,
+    });
+    await formsNav.click();
   });
   //form validation by searching the form
   test("search form", async () => {
-    if (depEnv === "test" || /^\d+$/.test(depEnv ?? "")) {
-      const formsNav = sharedPage.getByTestId("home-nav");
-      await expect(formsNav).toBeVisible();
-      await formsNav.click();
-      const searchForms = sharedPage.locator(
-        '[data-testid="search-forms-text"]',
-      );
-      await expect(searchForms).toBeVisible({ timeout: 10000 });
-      await expect(searchForms).toBeEnabled();
-      await searchForms.click();
-      const searchInput = sharedPage
-        .getByTestId("search-forms-text")
-        .getByRole("textbox", { name: "Search" });
-      await searchInput.fill(form_name);
-      await sharedPage.waitForTimeout(1000); // waits 1 second
-      await sharedPage.getByText(form_name).click();
-      console.log("Form name is: " + form_name);
-      await sharedPage.waitForTimeout(2000);
-      //Validate form is created by checking form name
-      await expect(sharedPage.getByLabel("Form Name")).toHaveValue(form_name);
-    } else {
-      console.log("Skipping form search test in dev environment");
-    }
+    const formsNav = sharedPage.getByTestId("home-nav");
+    await formsNav.click();
+    const searchForms = sharedPage.locator('[data-testid="search-forms-text"]');
+    await expect(searchForms).toBeVisible({ timeout: 10000 });
+    await expect(searchForms).toBeEnabled();
+    await searchForms.click();
+    const searchInput = sharedPage
+      .getByTestId("search-forms-text")
+      .getByRole("textbox", { name: "Search" });
+    await searchInput.fill(form_name);
+    await sharedPage.waitForTimeout(1000); // waits 1 second
+    await sharedPage.getByText(form_name).click();
+    console.log("Form name is: " + form_name);
+    await sharedPage.waitForTimeout(2000);
+    //Validate form is created by checking form name
+    await expect(sharedPage.getByLabel("Form Name")).toHaveValue(form_name);
+    //validate workspace name is displayed correctly
+    await expect(sharedPage.getByText("Workspace: Test Workspace")).toHaveText(
+      "Workspace: Test Workspace",
+    );
+  });
+  test("Validate Preview button functionality", async () => {
+    await expect(
+      sharedPage.getByRole("button", { name: "Preview" }),
+    ).toBeVisible();
+    await sharedPage
+      .getByRole("button", { name: "Preview", exact: true })
+      .click();
+    await expect(
+      sharedPage.getByRole("heading", { name: /Form Preview chefs2-/ }),
+    ).toBeVisible();
+    await expect(
+      sharedPage.locator('input[name="data[textField]"]'),
+    ).toBeVisible();
+    await expect(
+      sharedPage.locator('input[name="data[number]"]'),
+    ).toBeVisible();
+    await expect(
+      sharedPage.locator('input[name="data[checkbox]"]'),
+    ).toBeVisible();
+    await sharedPage
+      .getByRole("button", { name: "Close Preview", exact: true })
+      .click();
+  });
+  test("Validate Publish button functionality", async () => {
+    await expect(
+      sharedPage.getByRole("button", { name: "Publish", exact: true }),
+    ).toBeVisible();
+    await sharedPage
+      .getByRole("button", { name: "Publish", exact: true })
+      .click();
+    await expect(
+      sharedPage.getByText("Form published successfully!", { exact: true }),
+    ).toBeVisible();
+    const publishedNotice = sharedPage.getByTestId(
+      "page-notice-published-version",
+    );
+    await expect(publishedNotice).toBeVisible();
+    await expect(publishedNotice).toContainText("Published Version:");
+    await expect(publishedNotice).toContainText(
+      "This version is published and cannot be modified directly.",
+    );
+    //Verify version is disabled for modification
+    await expect(sharedPage.locator('input[data-disabled="true"]')).toHaveValue(
+      /^chefs2-\d+$/,
+    );
   });
 });

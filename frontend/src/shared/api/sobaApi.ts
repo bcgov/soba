@@ -1,14 +1,18 @@
 import type { FeaturesMetaPayload } from '@/src/shared/config/featuresMeta';
 import { isFeaturesMetaPayload } from '@/src/shared/config/featuresMeta';
 import { getSobaApiBaseUrl } from '../config/runtimeConfig';
-import { setWorkspaceId } from '../workspace/workspaceStore';
-import { notifyWorkspaceResolved } from '../workspace/workspaceSync';
 import { parseJson } from './sobaHelpers';
 import { sobaFetch } from './sobaFetch';
 
 import type { SobaFormType } from '../../types/forms';
-import type { WorkspaceItem, WorkspacesResponse, CreateWorkspaceBody, UpdateWorkspaceBody } from '../../types/workspaces';
-import type { CurrentUserResponse, PatchCurrentUserBody } from '../../types/user';
+import type {
+  WorkspaceItem,
+  WorkspacesResponse,
+  CreateWorkspaceBody,
+  UpdateWorkspaceBody,
+} from '../../types/workspaces';
+import type { CurrentUserResponse } from '../../types/user';
+import type { ListQueryArgs } from '../../types/list';
 
 export type { SobaFormType, WorkspaceItem, WorkspacesResponse, CurrentUserResponse };
 // Design-mode (staff, /design/*)
@@ -22,9 +26,13 @@ export {
   getSobaSubmission,
   getSobaSubmissionData,
   getSobaFormVersions,
+  getSobaFormVersion,
+  getSobaFormVersionPage,
   createFormVersion,
   saveFormVersionSchema,
   getFormVersionSchema,
+  updateSobaForm,
+  deleteSobaSubmission,
 } from './sobaApiDesign';
 // Submit-mode (public-capable, /submit/*)
 export {
@@ -36,6 +44,17 @@ export {
   getSubmitSubmission,
   getSubmitSubmissionData,
 } from './sobaApiSubmit';
+// Platform administration (soba_admin only, /admin/*)
+export {
+  fetchSobaAdmins,
+  addSobaAdmin,
+  fetchFeatureScope,
+  fetchFeatureScopes,
+  removeFeatureScope,
+  removeSobaAdmin,
+  upsertFeatureScope,
+  fetchDocumentGenerationAudits,
+} from './sobaApiAdmin';
 
 export type BuildMeta = {
   name: string;
@@ -135,36 +154,31 @@ export async function fetchRolesMeta(onlyEnabledFeatures = true): Promise<unknow
   return parseJson(response);
 }
 
-export async function fetchWorkspaces(token: string): Promise<WorkspacesResponse> {
-  const response = await sobaFetch('/workspaces', { token });
+export async function fetchWorkspaces(
+  token: string,
+  options: Partial<ListQueryArgs> & { requiredPermission?: string } = {},
+): Promise<WorkspacesResponse> {
+  const response = await sobaFetch('/workspaces', {
+    token,
+    query: {
+      offset: options.offset,
+      limit: options.limit,
+      sort: options.sort,
+      q: options.q || undefined,
+      requiredPermission: options.requiredPermission,
+    },
+  });
   return parseJson(response);
 }
 
-/**
- * Read a specific workspace by id. Used by the workspace chooser/listing to establish the
- * tab's workspace: the backend verifies membership and echoes x-soba-workspace-id, which
- * sobaFetch captures to set the per-tab workspace and Redux mirror.
- */
 export async function selectWorkspace(token: string, id: string): Promise<WorkspaceItem> {
   const response = await sobaFetch(`/workspaces/${id}`, { token });
   const workspace = await parseJson<WorkspaceItem>(response);
-  // Persist from the verified response body. Header capture in sobaFetch is best-effort
-  // (cross-origin responses may omit readable custom headers); the JSON body is always available.
-  setWorkspaceId(workspace.id);
-  notifyWorkspaceResolved(workspace.id);
   return workspace;
 }
 
 export async function fetchCurrentUser(token: string): Promise<CurrentUserResponse> {
   const response = await sobaFetch('/me', { token });
-  return parseJson(response);
-}
-
-export async function patchCurrentUser(
-  token: string,
-  body: PatchCurrentUserBody,
-): Promise<CurrentUserResponse> {
-  const response = await sobaFetch('/me', { token, method: 'PATCH', json: body });
   return parseJson(response);
 }
 

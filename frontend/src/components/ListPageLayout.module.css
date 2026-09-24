@@ -1,33 +1,24 @@
-.container {
-  width: 100%;
-  padding: 1.5rem 1rem;
-}
-
-@media (min-width: 992px) {
-  .container {
-    padding-left: 3rem;
-    padding-right: 3rem;
-  }
-}
-
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: var(--layout-margin-medium);
+  margin-bottom: var(--layout-margin-medium);
 }
 
 .toolbarEnd {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: var(--layout-margin-medium);
+  margin-bottom: var(--layout-margin-medium);
 }
 
+/* Padding tokens stop at 2rem, so the vertical inset comes off the margin scale. */
 .authGate {
-  padding: 3rem 1rem;
+  padding: var(--layout-margin-xxxlarge) var(--layout-padding-medium);
   text-align: center;
   color: var(--app-text);
 }

@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { getBootstrapApiBaseUrl } from '@/src/shared/config/runtimeConfig';
 
 export type MetaFeatureRow = {
@@ -43,23 +44,74 @@ function assertFeaturesMetaShape(value: unknown): asserts value is FeaturesMetaP
   }
 }
 
+/** Attempts and backoff are deliberately small: this runs during SSR and holds up the render. */
+const FETCH_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 150;
+
+/** A 4xx is an answer, not a blip. Only transport failures and 5xx are worth trying again. */
+class RetryableFeaturesMetaError extends Error {}
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchFeaturesMetaOnce(): Promise<FeaturesMetaPayload> {
+  let response: Response;
+  try {
+    response = await fetch(`${getBootstrapApiBaseUrl()}/meta/features`, {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+  } catch (error) {
+    // Transport failure: DNS not resolving yet, a pod rolling, a connection reset.
+    throw new RetryableFeaturesMetaError(
+      `Failed to reach features meta: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (!response.ok) {
+    const message = `Failed to load features meta: ${response.status}`;
+    throw response.status >= 500
+      ? new RetryableFeaturesMetaError(message)
+      : new Error(message);
+  }
+  const payload = (await response.json()) as unknown;
+  assertFeaturesMetaShape(payload);
+  return payload;
+}
+
+/**
+ * Every layout and page gates on this, so a failure takes the whole render down. Backend
+ * unreachability is usually momentary, so retry briefly before surfacing it. A persistent outage
+ * still throws and is caught by the root error boundary rather than degrading to "no features",
+ * which would render as a misconfigured app instead of an unavailable one.
+ */
+async function fetchFeaturesMeta(): Promise<FeaturesMetaPayload> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await fetchFeaturesMetaOnce();
+    } catch (error) {
+      if (!(error instanceof RetryableFeaturesMetaError) || attempt >= FETCH_ATTEMPTS) {
+        throw error;
+      }
+      await delay(RETRY_DELAY_MS * attempt);
+    }
+  }
+}
+
+// Server: memoised per render, so nested layouts and pages share one fetch and the next request
+// sees current flags. A module-level cache here would last the pod's lifetime.
+const loadFeaturesMetaForRequest = cache(fetchFeaturesMeta);
+
 export async function loadFeaturesMeta(): Promise<FeaturesMetaPayload> {
+  if (typeof window === 'undefined') return loadFeaturesMetaForRequest();
+
+  // Browser: the module cache is page-scoped, so a reload picks up changes.
   if (cachedFeaturesMeta) return cachedFeaturesMeta;
   if (featuresMetaPromise) return featuresMetaPromise;
 
-  featuresMetaPromise = fetch(`${getBootstrapApiBaseUrl()}/meta/features`, {
-    method: 'GET',
-    cache: 'no-store',
-    headers: {
-      Accept: 'application/json',
-    },
-  })
-    .then(async (response) => {
-      if (!response.ok) {
-        throw new Error(`Failed to load features meta: ${response.status}`);
-      }
-      const payload = (await response.json()) as unknown;
-      assertFeaturesMetaShape(payload);
+  featuresMetaPromise = fetchFeaturesMeta()
+    .then((payload) => {
       cachedFeaturesMeta = payload;
       return payload;
     })

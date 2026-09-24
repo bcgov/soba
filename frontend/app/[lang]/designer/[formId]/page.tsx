@@ -1,6 +1,6 @@
 import { getDictionary, hasLocale, Locale } from '../../dictionaries';
 import FormDesignerLoader from '@/src/features/designer/ui/FormDesignerLoader';
-import { DsPageHeading } from '@/app/ui/DsPageHeading';
+import { PageLayout } from '@/src/components/PageLayout';
 import { notFound } from 'next/navigation';
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
@@ -32,11 +32,10 @@ export default async function Page({ params }: PageProps) {
   const dict = await getDictionary((hasLocale(lang) ? lang : 'en') as Locale);
 
   return (
-    <section className="p-4" aria-labelledby="designer-heading">
-      <DsPageHeading id="designer-heading" className="visually-hidden">
-        {dict.general.formDesigner}
-      </DsPageHeading>
-      <FormDesignerLoader formId={formId} />
-    </section>
+    <PageLayout headingId="designer-heading" heading={dict.general.formDesigner} width="wide">
+      {/* Keyed so navigating between two forms remounts rather than carrying the previous form's
+          selected version and unsaved edits across. */}
+      <FormDesignerLoader key={formId} formId={formId} />
+    </PageLayout>
   );
 }

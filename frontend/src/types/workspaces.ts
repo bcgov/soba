@@ -1,3 +1,5 @@
+import type { ListPage } from './list';
+
 export type WorkspaceItem = {
   id: string;
   name: string;
@@ -11,15 +13,11 @@ export type WorkspaceItem = {
 
 export type WorkspacesResponse = {
   items: WorkspaceItem[];
-  page: {
-    limit: number;
-    hasMore: boolean;
-    nextCursor: string | null;
-    cursorMode: 'id' | 'ts_id';
-  };
+  page: ListPage;
   filters: {
     kind?: string;
     status?: string;
+    q?: string;
   };
   sort: string;
 };
@@ -31,9 +29,10 @@ export type CreateWorkspaceBody = {
   org: string;
 };
 
+/** A patch: every field is optional, and the backend requires at least one. */
 export type UpdateWorkspaceBody = {
   name?: string;
   disclaimerAccepted?: boolean;
-  useCase: string;
-  org: string;
+  useCase?: string;
+  org?: string;
 };

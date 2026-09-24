@@ -1,3 +1,5 @@
+import type { ListPage } from './list';
+
 export interface SubmissionListItem {
   id: string;
   formId: string;
@@ -9,21 +11,19 @@ export interface SubmissionListItem {
   submittedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  createdBy?: string | null;
+  submittedBy?: string | null;
 }
 
 export interface ListSubmissionsResponse {
   items: SubmissionListItem[];
-  page: {
-    limit: number;
-    hasMore: boolean;
-    nextCursor: string | null;
-    cursorMode: 'id' | 'ts_id';
-  };
+  page: ListPage;
   filters: {
     formId?: string;
     formVersionId?: string;
     workflowState?: string;
     createdBy?: string;
+    q?: string;
   };
   sort: string;
 }
@@ -38,4 +38,6 @@ export interface SubmissionResponse {
   submittedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  createdBy?: string | null;
+  submittedBy?: string | null;
 }

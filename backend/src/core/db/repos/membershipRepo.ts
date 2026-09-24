@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
+import { and, count, eq, exists, ilike, or, sql, inArray } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { db } from '../client';
 import {
@@ -7,6 +7,9 @@ import {
   userIdentities,
   workspaceDisclaimerAcceptances,
   workspaceMemberships,
+  workspaceGroupMemberships,
+  workspaceGroupRoles,
+  rolePermissions,
   workspaces,
 } from '../schema';
 import { getCacheAdapter } from '../../integrations/plugins/PluginRegistry';
@@ -14,7 +17,15 @@ import { membershipKey } from '../../integrations/cache/cacheKeys';
 import { profileHelpers } from '../../auth/jwtClaims';
 import { ForbiddenError } from '../../errors';
 import type { NormalizedProfile, IdpAttributes } from '../../auth/jwtClaims';
-import { WorkspaceMembershipRole } from '../codes';
+import {
+  GroupMemberKind,
+  Permissions,
+  WorkspaceGroupMembershipStatus,
+  WorkspaceGroupRoleStatus,
+  WorkspaceMembershipRole,
+} from '../codes';
+import { likePattern, orderByForSort, type SortColumns, type SortToken } from '../listSort';
+import { readListPage } from '../listRead';
 
 /** Second int for `pg_advisory_xact_lock`; must not collide with workspaceRepo / sobaAdminRepo lock ids. */
 const ADV_LOCK_FIND_OR_CREATE_IDENTITY = 2_147_483_622;
@@ -180,18 +191,26 @@ export const invalidateMembershipCache = (workspaceId: string, userId: string): 
   }
 };
 
-export type WorkspaceListSort = 'id:desc' | 'updatedAt:desc';
-export type WorkspaceListCursorMode = 'id' | 'ts_id';
+export const WORKSPACE_SORT_FIELDS = ['name', 'kind', 'status', 'updatedAt'] as const;
+export type WorkspaceListSortField = (typeof WORKSPACE_SORT_FIELDS)[number];
+export type WorkspaceListSort = SortToken<WorkspaceListSortField>;
+
+const WORKSPACE_SORT_COLUMNS: SortColumns<WorkspaceListSortField> = {
+  name: { column: workspaces.name, caseInsensitive: true },
+  kind: { column: workspaces.kind },
+  status: { column: workspaces.status },
+  updatedAt: { column: workspaces.updatedAt },
+};
 
 export interface ListWorkspacesForUserInput {
   userId: string;
+  offset: number;
   limit: number;
   sort: WorkspaceListSort;
-  cursorMode: WorkspaceListCursorMode;
-  afterId?: string;
-  afterUpdatedAt?: Date;
   kind?: string;
   status?: string;
+  q?: string;
+  requiredPermission?: string;
 }
 
 export interface WorkspaceListRow {
@@ -208,7 +227,7 @@ export interface WorkspaceListRow {
 
 export const listWorkspacesForUser = async (
   input: ListWorkspacesForUserInput,
-): Promise<{ items: WorkspaceListRow[]; hasMore: boolean }> => {
+): Promise<{ items: WorkspaceListRow[]; total: number }> => {
   const whereClauses = [
     eq(workspaceMemberships.userId, input.userId),
     eq(workspaceMemberships.status, 'active'),
@@ -219,49 +238,76 @@ export const listWorkspacesForUser = async (
   if (input.status) {
     whereClauses.push(eq(workspaces.status, input.status));
   }
-  if (input.cursorMode === 'id' && input.afterId) {
-    whereClauses.push(lt(workspaces.id, input.afterId));
+  if (input.q) {
+    const pattern = likePattern(input.q);
+    whereClauses.push(or(ilike(workspaces.name, pattern), ilike(workspaces.org, pattern)));
   }
-  if (input.cursorMode === 'ts_id' && input.afterId && input.afterUpdatedAt) {
+  if (input.requiredPermission) {
+    // Correlated to the actor's own membership row above, not just any member of the workspace.
     whereClauses.push(
-      or(
-        lt(workspaces.updatedAt, input.afterUpdatedAt),
-        and(eq(workspaces.updatedAt, input.afterUpdatedAt), lt(workspaces.id, input.afterId)),
+      exists(
+        db
+          .select({ permissionCode: rolePermissions.permissionCode })
+          .from(workspaceGroupMemberships)
+          .innerJoin(
+            workspaceGroupRoles,
+            eq(workspaceGroupRoles.groupId, workspaceGroupMemberships.groupId),
+          )
+          .innerJoin(rolePermissions, eq(rolePermissions.roleCode, workspaceGroupRoles.roleCode))
+          .where(
+            and(
+              eq(workspaceGroupMemberships.workspaceMembershipId, workspaceMemberships.id),
+              eq(workspaceGroupMemberships.workspaceId, workspaceMemberships.workspaceId),
+              eq(workspaceGroupMemberships.memberKind, GroupMemberKind.user),
+              eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
+              eq(workspaceGroupRoles.status, WorkspaceGroupRoleStatus.active),
+              inArray(rolePermissions.permissionCode, [input.requiredPermission, Permissions.all]),
+            ),
+          ),
       ),
     );
   }
 
-  const rows = await db
-    .select({
-      id: workspaces.id,
-      name: workspaces.name,
-      kind: workspaces.kind,
-      role: workspaceMemberships.role,
-      status: workspaces.status,
-      org: workspaces.org,
-      useCase: workspaces.useCase,
-      disclaimerAcceptedAt: workspaceDisclaimerAcceptances.acceptedAt,
-      updatedAt: workspaces.updatedAt,
-    })
-    .from(workspaceMemberships)
-    .innerJoin(workspaces, eq(workspaces.id, workspaceMemberships.workspaceId))
-    .leftJoin(
-      workspaceDisclaimerAcceptances,
-      eq(workspaceDisclaimerAcceptances.workspaceId, workspaces.id),
-    )
-    .where(and(...whereClauses))
-    .orderBy(
-      input.cursorMode === 'ts_id' || input.sort === 'updatedAt:desc'
-        ? desc(workspaces.updatedAt)
-        : desc(workspaces.id),
-      desc(workspaces.id),
-    )
-    .limit(input.limit + 1);
+  const where = and(...whereClauses);
 
-  return {
-    items: rows.slice(0, input.limit),
-    hasMore: rows.length > input.limit,
-  };
+  return readListPage(async (tx) => {
+    const items = await tx
+      .select({
+        id: workspaces.id,
+        name: workspaces.name,
+        kind: workspaces.kind,
+        role: workspaceMemberships.role,
+        status: workspaces.status,
+        org: workspaces.org,
+        useCase: workspaces.useCase,
+        disclaimerAcceptedAt: workspaceDisclaimerAcceptances.acceptedAt,
+        updatedAt: workspaces.updatedAt,
+      })
+      .from(workspaceMemberships)
+      .innerJoin(workspaces, eq(workspaces.id, workspaceMemberships.workspaceId))
+      .leftJoin(
+        workspaceDisclaimerAcceptances,
+        eq(workspaceDisclaimerAcceptances.workspaceId, workspaces.id),
+      )
+      .where(where)
+      .orderBy(...orderByForSort(WORKSPACE_SORT_COLUMNS, input.sort, workspaces.id))
+      .limit(input.limit)
+      .offset(input.offset);
+
+    // Mirrors the page query's joins. The acceptance join is 1:0-or-1 only because workspace_id is
+    // that table's primary key; per-user acceptance would multiply page rows and not the count.
+    const totals = await tx
+      .select({ total: count() })
+      .from(workspaceMemberships)
+      .innerJoin(workspaces, eq(workspaces.id, workspaceMemberships.workspaceId))
+      .leftJoin(
+        workspaceDisclaimerAcceptances,
+        eq(workspaceDisclaimerAcceptances.workspaceId, workspaces.id),
+      )
+      .where(where);
+
+    return { items, total: totals[0]?.total ?? 0 };
+  });
 };
 
 export interface WorkspaceMemberRow {
@@ -273,23 +319,30 @@ export interface WorkspaceMemberRow {
   updatedAt: Date;
 }
 
-export type MemberListSort = 'id:desc' | 'updatedAt:desc';
-export type MemberListCursorMode = 'id' | 'ts_id';
+export const MEMBER_SORT_FIELDS = ['displayLabel', 'role', 'status'] as const;
+export type MemberListSortField = (typeof MEMBER_SORT_FIELDS)[number];
+export type MemberListSort = SortToken<MemberListSortField>;
+
+const MEMBER_SORT_COLUMNS: SortColumns<MemberListSortField> = {
+  // A user who has never signed in has no label yet.
+  displayLabel: { column: appUsers.displayLabel, nullable: true, caseInsensitive: true },
+  role: { column: workspaceMemberships.role },
+  status: { column: workspaceMemberships.status },
+};
 
 export interface ListMembersForWorkspaceInput {
   workspaceId: string;
+  offset: number;
   limit: number;
   sort: MemberListSort;
-  cursorMode: MemberListCursorMode;
-  afterId?: string;
-  afterUpdatedAt?: Date;
   role?: string;
   status?: string;
+  q?: string;
 }
 
 export const listMembersForWorkspace = async (
   input: ListMembersForWorkspaceInput,
-): Promise<{ items: WorkspaceMemberRow[]; hasMore: boolean }> => {
+): Promise<{ items: WorkspaceMemberRow[]; total: number }> => {
   const whereClauses = [eq(workspaceMemberships.workspaceId, input.workspaceId)];
   if (input.role) {
     whereClauses.push(eq(workspaceMemberships.role, input.role));
@@ -297,43 +350,33 @@ export const listMembersForWorkspace = async (
   if (input.status) {
     whereClauses.push(eq(workspaceMemberships.status, input.status));
   }
-  if (input.cursorMode === 'id' && input.afterId) {
-    whereClauses.push(lt(workspaceMemberships.id, input.afterId));
-  }
-  if (input.cursorMode === 'ts_id' && input.afterId && input.afterUpdatedAt) {
-    whereClauses.push(
-      or(
-        lt(workspaceMemberships.updatedAt, input.afterUpdatedAt),
-        and(
-          eq(workspaceMemberships.updatedAt, input.afterUpdatedAt),
-          lt(workspaceMemberships.id, input.afterId),
-        ),
-      ),
-    );
+  if (input.q) {
+    whereClauses.push(ilike(appUsers.displayLabel, likePattern(input.q)));
   }
 
-  const rows = await db
-    .select({
-      id: workspaceMemberships.id,
-      userId: workspaceMemberships.userId,
-      displayLabel: appUsers.displayLabel,
-      role: workspaceMemberships.role,
-      status: workspaceMemberships.status,
-      updatedAt: workspaceMemberships.updatedAt,
-    })
-    .from(workspaceMemberships)
-    .innerJoin(appUsers, eq(appUsers.id, workspaceMemberships.userId))
-    .where(and(...whereClauses))
-    .orderBy(
-      input.cursorMode === 'ts_id' || input.sort === 'updatedAt:desc'
-        ? desc(workspaceMemberships.updatedAt)
-        : desc(workspaceMemberships.id),
-      desc(workspaceMemberships.id),
-    )
-    .limit(input.limit + 1);
+  const where = and(...whereClauses);
 
-  return {
-    items: rows.slice(0, input.limit),
-    hasMore: rows.length > input.limit,
-  };
+  return readListPage(async (tx) => {
+    const items = await tx
+      .select({
+        id: workspaceMemberships.id,
+        userId: workspaceMemberships.userId,
+        displayLabel: appUsers.displayLabel,
+        role: workspaceMemberships.role,
+        status: workspaceMemberships.status,
+        updatedAt: workspaceMemberships.updatedAt,
+      })
+      .from(workspaceMemberships)
+      .innerJoin(appUsers, eq(appUsers.id, workspaceMemberships.userId))
+      .where(where)
+      .orderBy(...orderByForSort(MEMBER_SORT_COLUMNS, input.sort, workspaceMemberships.id))
+      .limit(input.limit)
+      .offset(input.offset);
+    const totals = await tx
+      .select({ total: count() })
+      .from(workspaceMemberships)
+      .innerJoin(appUsers, eq(appUsers.id, workspaceMemberships.userId))
+      .where(where);
+    return { items, total: totals[0]?.total ?? 0 };
+  });
 };

@@ -10,15 +10,10 @@ export type CurrentUserResponse = {
     preferredUsername: string | null;
   };
   preferences: {
-    defaultWorkspaceId: string | null;
+    [key: string]: unknown;
   };
   capabilities: {
     canCreateWorkspace: boolean;
-  };
-};
-
-export type PatchCurrentUserBody = {
-  preferences: {
-    defaultWorkspaceId?: string | null;
+    isSobaAdmin: boolean;
   };
 };

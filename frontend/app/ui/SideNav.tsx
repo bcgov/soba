@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { Button } from '@bcgov/design-system-react-components';
+import { usePathname } from 'next/navigation';
 import { useDictionary } from '../[lang]/Providers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
+import { navLink } from '@/src/shared/list/listQueryMemory';
 import {
   FaRegMessage,
   FaRegCircleQuestion,
@@ -13,16 +14,20 @@ import {
   FaList,
   FaChevronRight,
   FaChevronLeft,
+  FaUserShield,
 } from 'react-icons/fa6';
+import { useIsSobaAdmin } from '@/src/features/admin/useIsSobaAdmin';
 import styles from './SideNav.module.css';
 
 interface SideNavProps {
   showAppLinks: boolean;
   showHome: boolean;
+  showWorkspaces: boolean;
 }
 
-export function SideNav({ showAppLinks, showHome }: SideNavProps) {
+export function SideNav({ showAppLinks, showHome, showWorkspaces }: Readonly<SideNavProps>) {
   const { authenticated } = useKeycloak();
+  const { isSobaAdmin } = useIsSobaAdmin();
   const dict = useDictionary();
   const pathname = usePathname();
   const locale = dict.locale === 'en' || dict.locale === 'fr' ? dict.locale : 'en';
@@ -31,7 +36,7 @@ export function SideNav({ showAppLinks, showHome }: SideNavProps) {
   const navItems = [];
   if (showHome) {
     navItems.push({
-      href: authenticated ? `/${locale}/forms` : `/`,
+      href: authenticated ? navLink(`/${locale}/forms`) : `/`,
       title: authenticated ? dict.general.forms : dict.general.home,
       testId: 'home-nav',
       icon: <FaHouse className={styles.iconOutlineBootstrap} size={20} />,
@@ -41,9 +46,9 @@ export function SideNav({ showAppLinks, showHome }: SideNavProps) {
     });
   }
 
-  if (showAppLinks && authenticated) {
+  if (showWorkspaces && authenticated) {
     navItems.push({
-      href: `/${locale}/workspaces`,
+      href: navLink(`/${locale}/workspaces`),
       title: dict.header.workspaces,
       testId: 'workspaces-nav',
       icon: <FaList size={20} />,
@@ -51,6 +56,16 @@ export function SideNav({ showAppLinks, showHome }: SideNavProps) {
         pathname.startsWith(`/${locale}/workspaces`) ||
         pathname === `/${locale}/workspace` ||
         pathname.startsWith(`/${locale}/workspace/`),
+    });
+  }
+
+  if (authenticated && isSobaAdmin) {
+    navItems.push({
+      href: `/${locale}/admin`,
+      title: dict.admin.heading,
+      testId: 'admin-nav',
+      icon: <FaUserShield size={20} />,
+      isActive: pathname.startsWith(`/${locale}/admin`),
     });
   }
 
@@ -74,8 +89,8 @@ export function SideNav({ showAppLinks, showHome }: SideNavProps) {
   }
 
   return (
-    <nav className={`d-flex flex-column py-3 px-2 ${styles.sideNav} position-relative`}>
-      <ul className="nav flex-column gap-2">
+    <nav className={`d-flex flex-column py-3 px-2 ${styles.sideNav}`}>
+      <ul id="sidenav-items" className="nav flex-column gap-2">
         {navItems.map((item) => (
           <li className="nav-item" key={item.href}>
             <Link
@@ -93,22 +108,25 @@ export function SideNav({ showAppLinks, showHome }: SideNavProps) {
         ))}
       </ul>
 
-      <Button
-        id="sidebar-toggle-button"
-        className={`position-relative top-25gt start-100 translate-middle-y bg-white border border-start-0 rounded-end d-flex align-items-center justify-content-center shadow-sm p-0 ${styles.sidebarToggle}`}
-        aria-label={dict.sideNav.toggleSidebar}
-        variant="secondary"
-        data-testid="sidebar-toggle"
-        onClick={() => {
-          setIsCollapsed(!isCollapsed);
-        }}
-      >
-        {isCollapsed ? (
-          <FaChevronRight size={14} className="text-secondary" />
-        ) : (
-          <FaChevronLeft size={14} className="text-secondary" />
-        )}
-      </Button>
+      {/* The wrapper carries the position. A className on the Button replaces the design system's
+          own classes rather than adding to them, so its styling is overridden from the wrapper. */}
+      <span className={styles.toggleSlot}>
+        <Button
+          id="sidebar-toggle-button"
+          variant="secondary"
+          size="small"
+          isIconButton
+          aria-label={dict.sideNav.toggleSidebar}
+          aria-expanded={!isCollapsed}
+          aria-controls="sidenav-items"
+          data-testid="sidebar-toggle"
+          onPress={() => {
+            setIsCollapsed(!isCollapsed);
+          }}
+        >
+          {isCollapsed ? <FaChevronRight size={14} /> : <FaChevronLeft size={14} />}
+        </Button>
+      </span>
     </nav>
   );
 }

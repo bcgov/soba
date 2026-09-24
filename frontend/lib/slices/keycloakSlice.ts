@@ -2,19 +2,27 @@ import Keycloak from 'keycloak-js';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { AppDispatch } from '../store';
-import { clearWorkspaceState } from './workspaceSlice';
 import { loadFrontendRuntimeConfig } from '@/src/shared/config/runtimeConfig';
 import { disableFormioBrowserAuth } from '@/src/features/formio-v5/disableFormioBrowserAuth';
+import type { RefreshOutcome } from '@/src/shared/auth/tokenRefresh';
 
 // Keep the Keycloak instance out of Redux state (non-serializable).
 // Store it in a module-level variable instead.
 let kcInstance: Keycloak.KeycloakInstance | null = null;
+// Distinguishes "the session ended" from "not booted yet": both leave kcInstance null, but only the
+// first means a caller's token is dead and must not be sent.
+let sessionEnded = false;
 
 export type KeycloakState = {
   token?: string;
   idTokenParsed?: Keycloak.KeycloakTokenParsed;
   authenticated: boolean;
   initializing: boolean;
+  /**
+   * Init has been dispatched. Before that, `authenticated: false` only means Keycloak has not run
+   * yet, which is not the same answer as "anonymous" and must not be routed on.
+   */
+  initStarted: boolean;
   error?: string;
 };
 
@@ -23,6 +31,7 @@ const initialState: KeycloakState = {
   idTokenParsed: undefined,
   authenticated: false,
   initializing: false,
+  initStarted: false,
   error: undefined,
 };
 
@@ -66,6 +75,7 @@ export const initKeycloak = createAsyncThunk<InitResult, void, { rejectValue: st
 
       // store instance in module-level variable (not in Redux state)
       kcInstance = kc;
+      sessionEnded = false;
 
       if (kc.idTokenParsed) {
         await kc.updateToken(30);
@@ -99,6 +109,7 @@ const slice = createSlice({
     clear(state) {
       // also clear module-level instance
       kcInstance = null;
+      sessionEnded = true;
       state.token = undefined;
       state.idTokenParsed = undefined;
       state.authenticated = false;
@@ -110,6 +121,7 @@ const slice = createSlice({
     builder
       .addCase(initKeycloak.pending, (state) => {
         state.initializing = true;
+        state.initStarted = true;
         state.error = undefined;
       })
       .addCase(initKeycloak.fulfilled, (state, action) => {
@@ -141,6 +153,7 @@ export const login = () => async (dispatch: AppDispatch) => {
         clientId: runtimeConfig.auth.keycloak.clientId,
       });
       kcInstance = kc;
+      sessionEnded = false;
     }
     // prefer a forced login flow
     await kc.init({ onLoad: 'login-required', checkLoginIframe: false, pkceMethod: 'S256' });
@@ -167,24 +180,57 @@ export const logout = () => (dispatch: AppDispatch) => {
   }
   kcInstance = null;
   disableFormioBrowserAuth();
-  dispatch(clearWorkspaceState());
   dispatch(clear());
 };
 
-export const refreshToken = () => async (dispatch: AppDispatch) => {
-  const kc: Keycloak.KeycloakInstance | null = kcInstance;
-  if (!kc) return;
-  try {
-    const refreshed = await kc.updateToken(0);
-    if (refreshed) {
-      dispatch(setToken(kc.token ?? undefined));
-      dispatch(setIdTokenParsed(kc.idTokenParsed as Keycloak.KeycloakTokenParsed | undefined));
-      dispatch(setAuthenticated(!!kc.authenticated));
+// keycloak-js: -1 forces a refresh, a positive value only refreshes within that many seconds of expiry.
+const FORCE_REFRESH = -1;
+const REFRESH_WITHIN_SECONDS = 30;
+
+const UNAVAILABLE: RefreshOutcome = { status: 'unavailable' };
+const NO_SESSION: RefreshOutcome = { status: 'no-session' };
+const held = (kc: Keycloak.KeycloakInstance): RefreshOutcome =>
+  kc.token ? { status: 'token', token: kc.token } : UNAVAILABLE;
+
+/** Refresh if needed and mirror into the store. `force` is the 401 path. */
+export const refreshAccessToken =
+  (force: boolean) =>
+  async (dispatch: AppDispatch): Promise<RefreshOutcome> => {
+    const kc: Keycloak.KeycloakInstance | null = kcInstance;
+    if (!kc) return sessionEnded ? NO_SESSION : UNAVAILABLE;
+    // An anonymous check-sso instance has no refresh token and updateToken would throw. Nothing to
+    // refresh and nothing to clear — a public visitor's upload must not tear down the instance.
+    if (!kc.refreshToken) return held(kc);
+    try {
+      const refreshed = await kc.updateToken(force ? FORCE_REFRESH : REFRESH_WITHIN_SECONDS);
+      // A logout or a failed refresh may have replaced the instance while we awaited; mirroring a
+      // token from the old one would leave the store authenticated with no instance behind it.
+      if (kcInstance !== kc) return UNAVAILABLE;
+      // idTokenParsed is a new object every call, so dispatch only on a real refresh.
+      if (refreshed) {
+        dispatch(setToken(kc.token ?? undefined));
+        dispatch(setIdTokenParsed(kc.idTokenParsed as Keycloak.KeycloakTokenParsed | undefined));
+        dispatch(setAuthenticated(!!kc.authenticated));
+      }
+      return kc.token ? { status: 'token', token: kc.token } : NO_SESSION;
+    } catch {
+      if (kcInstance !== kc) return UNAVAILABLE;
+      // keycloak-js drops its own token only when the refresh token is rejected, so that is the
+      // verdict to read. Anything else is a blip: the instance keeps its token and so do we.
+      if (!kc.token || !kc.authenticated) {
+        dispatch(clear());
+        return NO_SESSION;
+      }
+      return { status: 'token', token: kc.token };
     }
-  } catch {
-    // token refresh failed
-    dispatch(clear());
-  }
+  };
+
+/**
+ * Refresh entry point for the UI (the header's poll, the session-error retry). Delegates so there
+ * is one refresh policy: this used to clear auth on any failure, logging people out on a blip.
+ */
+export const refreshToken = () => async (dispatch: AppDispatch) => {
+  await dispatch(refreshAccessToken(false));
 };
 
 // Accessor to the module-level Keycloak instance (not stored in Redux state)
