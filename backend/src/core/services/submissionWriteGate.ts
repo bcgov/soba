@@ -1,7 +1,7 @@
 import {
   RevisionReason,
   type RevisionReasonCode,
-  type SubmissionEventTypeCode,
+  type SubmissionWriteEventCode,
   type SubmissionWorkflowStateCode,
 } from '../db/codes';
 import { ConflictError } from '../errors';
@@ -9,7 +9,7 @@ import { isTerminalSubmissionState, resolveSubmissionTransition } from './submis
 
 export interface SubmissionWriteRequest {
   submission: { id: string; workflowState: string; headRevisionId: string | null };
-  eventType: SubmissionEventTypeCode;
+  eventType: SubmissionWriteEventCode;
   /** Head the client loaded; the current head is assumed when absent. */
   baseRevisionId?: string;
   /** The revision already recorded under the request's revision id, if any. */

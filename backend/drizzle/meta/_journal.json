@@ -253,6 +253,13 @@
       "when": 1772618009000,
       "tag": "0035_submission_revision_status",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1772618010000,
+      "tag": "0036_submission_participant",
+      "breakpoints": true
     }
   ]
 }

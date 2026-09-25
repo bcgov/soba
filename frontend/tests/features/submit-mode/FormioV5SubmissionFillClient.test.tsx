@@ -10,11 +10,13 @@ const h = vi.hoisted(() => ({
   onSubmit: undefined as
     | undefined
     | ((submission: { data: Record<string, unknown> }) => Promise<void>),
+  options: undefined as undefined | { readOnly?: boolean },
 }));
 
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
-    general: { sessionExpired: 'Your session has ended.' },
+    general: { sessionExpired: 'Your session has ended.', noAccess: 'You do not have access.' },
+    submission: { notFound: 'Submission not found.', loadError: 'Could not load this submission.' },
     form: { loading: 'Loading...' },
     formioV5: {
       formRender: {
@@ -23,6 +25,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
         submitSuccess: 'Submitted.',
         submitPending: 'Saved for review.',
         missingId: 'Missing submission id.',
+        readOnly: 'You can view this submission only.',
       },
     },
   }),
@@ -44,13 +47,15 @@ vi.mock('@/src/features/formio-v5/useBcgovFileOption', () => ({
 }));
 
 vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => ({
-  DynamicForm: (props: { onSubmit: typeof h.onSubmit }) => {
+  DynamicForm: (props: { onSubmit: typeof h.onSubmit; options: typeof h.options }) => {
     h.onSubmit = props.onSubmit;
+    h.options = props.options;
     return <div data-testid="fill-form">rendered</div>;
   },
 }));
 
 import makeStore from '@/lib/store';
+import { ApiError } from '@/src/shared/api/sobaHelpers';
 import FormioV5SubmissionFillClient from '@/src/features/formio-v5/ui/FormioV5SubmissionFillClient';
 import { answerInit, renderInStore } from './keycloakInit';
 
@@ -66,6 +71,7 @@ describe('FormioV5SubmissionFillClient', () => {
       headRevisionId: 'rev-0',
       schema: { components: [] },
       content: null,
+      canWrite: true,
     });
   });
 
@@ -91,6 +97,63 @@ describe('FormioV5SubmissionFillClient', () => {
     await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
     expect(h.getSubmitFillBundle).toHaveBeenCalledTimes(1);
     expect(h.getSubmitFillBundle).toHaveBeenCalledWith('token', 'sub-1');
+  });
+
+  const renderSignedOut = async () => {
+    await renderInStore(store, <FormioV5SubmissionFillClient />);
+    await answerInit(store, { authenticated: false });
+  };
+
+  it('renders an editable form when the caller may write', async () => {
+    await renderSignedOut();
+    await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+    expect(h.options?.readOnly).toBe(false);
+    expect(screen.queryByTestId('submission-fill-readonly')).not.toBeInTheDocument();
+  });
+
+  it('renders the form read-only, with a notice, when the caller may only read', async () => {
+    h.getSubmitFillBundle.mockResolvedValue({
+      workflowState: 'draft',
+      formVersionId: 'ver-1',
+      headRevisionId: 'rev-1',
+      schema: { components: [] },
+      content: null,
+      canWrite: false,
+    });
+    await renderSignedOut();
+    await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+    expect(h.options?.readOnly).toBe(true);
+    expect(screen.getByTestId('submission-fill-readonly')).toHaveTextContent(
+      'You can view this submission only.',
+    );
+  });
+
+  // An older backend sends no canWrite at all.
+  it('renders an editable form when the bundle does not say whether the caller may write', async () => {
+    h.getSubmitFillBundle.mockResolvedValue({
+      workflowState: 'draft',
+      formVersionId: 'ver-1',
+      headRevisionId: 'rev-1',
+      schema: { components: [] },
+      content: null,
+    });
+    await renderSignedOut();
+    await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+    expect(h.options?.readOnly).toBe(false);
+    expect(screen.queryByTestId('submission-fill-readonly')).not.toBeInTheDocument();
+  });
+
+  it('shows the translated no-access message when the read is refused', async () => {
+    h.getSubmitFillBundle.mockRejectedValue(
+      new ApiError('Not authorized to access this submission', 403),
+    );
+    await renderSignedOut();
+    await waitFor(() =>
+      expect(screen.getByTestId('submission-view-noaccess')).toHaveTextContent(
+        'You do not have access.',
+      ),
+    );
+    expect(screen.queryByText('Not authorized to access this submission')).not.toBeInTheDocument();
   });
 
   describe('submit', () => {

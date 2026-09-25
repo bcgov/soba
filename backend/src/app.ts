@@ -104,8 +104,8 @@ app.use(apiPath('/api/v1/health'), publicRateLimit, healthRouter);
 // default: it is public and body-less.
 const jsonBodyLimit = env.getJsonBodyLimit();
 
-// Submit feature (public-capable): anonymous resolves to the public user; the Form submitters audience
-// decides access. 404s when submit-mode is disabled.
+// Submit feature (public-capable): anonymous resolves to the public user; each submit route authorizes
+// itself. 404s when submit-mode is disabled.
 app.use(
   apiPath('/api/v1/submit'),
   apiRateLimit,
