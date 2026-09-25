@@ -26,9 +26,7 @@ export function StatusTag({
   variant = 'neutral',
   'data-testid': testId,
 }: Readonly<StatusTagProps>) {
-  return (
-    <Tag text={label} color={VARIANT_COLORS[variant]} shape="circular" data-testid={testId} />
-  );
+  return <Tag text={label} color={VARIANT_COLORS[variant]} shape="circular" data-testid={testId} />;
 }
 
 export function workspaceRoleToVariant(role?: string): StatusTagVariant {

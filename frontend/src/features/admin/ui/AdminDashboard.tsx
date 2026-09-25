@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Tab, Tabs } from 'react-bootstrap';
-import { Heading } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { ListPageAuthGate } from '@/src/components/ListPageLayout';
 import { useDictionary } from '@/app/[lang]/Providers';
@@ -44,31 +43,26 @@ export function AdminDashboard({
   }
 
   return (
-    <div>
-      <Heading level={1} id="admin-heading">
-        {dictAdmin.heading}
-      </Heading>
-      <Tabs
-        activeKey={activeTab}
-        onSelect={(key) => setActiveTab(key ?? 'admins')}
-        id="admin-tabs"
-        data-testid="admin-tabs"
-      >
-        <Tab eventKey="admins" title={dictAdmin.admins.heading}>
-          {activeTab === 'admins' ? <SobaAdminsPanel /> : null}
-        </Tab>
-        <Tab eventKey="featureScopes" title={dictAdmin.featureScopes.heading}>
-          {activeTab === 'featureScopes' ? (
-            <FeatureScopeListPanel scopedFeatureCodes={scopedFeatureCodes} />
-          ) : null}
-        </Tab>
-        {documentGenerationEnabled ? (
-          <Tab eventKey="audits" title={dictAdmin.audits.heading}>
-            {activeTab === 'audits' ? <DocumentGenerationAuditsPanel /> : null}
-          </Tab>
+    <Tabs
+      activeKey={activeTab}
+      onSelect={(key) => setActiveTab(key ?? 'admins')}
+      id="admin-tabs"
+      data-testid="admin-tabs"
+    >
+      <Tab eventKey="admins" title={dictAdmin.admins.heading}>
+        {activeTab === 'admins' ? <SobaAdminsPanel /> : null}
+      </Tab>
+      <Tab eventKey="featureScopes" title={dictAdmin.featureScopes.heading}>
+        {activeTab === 'featureScopes' ? (
+          <FeatureScopeListPanel scopedFeatureCodes={scopedFeatureCodes} />
         ) : null}
-      </Tabs>
-    </div>
+      </Tab>
+      {documentGenerationEnabled ? (
+        <Tab eventKey="audits" title={dictAdmin.audits.heading}>
+          {activeTab === 'audits' ? <DocumentGenerationAuditsPanel /> : null}
+        </Tab>
+      ) : null}
+    </Tabs>
   );
 }
 

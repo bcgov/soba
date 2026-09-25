@@ -5,27 +5,30 @@ import {
   SubmissionDataBodySchema,
   SubmissionIdParamsSchema,
   SubmissionResponseSchema,
+  SubmissionWriteResponseSchema,
+  SubmitSubmissionBodySchema,
 } from '../submissions/schema';
+import { SubmitFillBundleSchema as LibSubmitFillBundleSchema } from '@soba/lib';
 
 extendZodWithOpenApi(z);
 
-export const SubmitFillBundleSchema = z
-  .object({
-    workflowState: z.string(),
-    schema: z.record(z.string(), z.unknown()),
-    // The submission's answer document; null for a just-opened submission (no engine document yet).
-    content: z.record(z.string(), z.unknown()).nullable(),
-  })
-  .openapi('Submit_FillBundle');
+export const SubmitFillBundleSchema =
+  LibSubmitFillBundleSchema.clone().openapi('Submit_FillBundle');
 
 const TAG = 'core.submit';
 const SUBMISSION_PATH = '/submit/submissions/{id}';
 const SUBMISSION_NOT_FOUND = 'Submission not found';
 const AUTHZ = 'Not in the form submitters audience';
 const AUTH_REQUIRED = 'Authentication required (form is not public)';
-const TERMINAL_CONFLICT = 'Submission is already submitted or deleted';
-// Optional auth: anonymous is allowed (public audience), or a bearer token for an authenticated
-// audience member. `{}` marks the no-auth case explicit rather than leaving security unset.
+const NOT_PARTICIPANT = 'Not a participant on this submission';
+const WRITE_AUTHZ = 'Not a participant on this submission, or not in the form submitters audience';
+const SUBMISSION_AUTH_REQUIRED =
+  'Authentication required (anonymous caller has no access to this submission)';
+const INVALID_WRITE_BODY =
+  'Invalid body (save requires revisionId and baseRevisionId; submit takes both or neither)';
+const WRITE_CONFLICT = 'The revision id is already used by another write';
+// Optional auth: anonymous (the public user) or a bearer token. `{}` marks the no-auth case
+// explicit rather than leaving security unset.
 const PUBLIC_SECURITY = [{}, { bearerAuth: [] }];
 
 export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
@@ -41,7 +44,8 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
           "The submission's own form-version schema, for the read-only confirmation view",
         content: { 'application/json': { schema: z.record(z.string(), z.unknown()) } },
       },
-      403: { description: AUTHZ },
+      401: { description: SUBMISSION_AUTH_REQUIRED },
+      403: { description: NOT_PARTICIPANT },
       404: { description: 'Submission or schema not found' },
     },
   });
@@ -54,11 +58,12 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
     request: { params: SubmissionIdParamsSchema },
     responses: {
       200: {
-        description: 'Workflow state + schema + saved answers for the fill page (resume)',
+        description:
+          'Workflow state + schema + saved answers + write access for the fill page (resume)',
         content: { 'application/json': { schema: SubmitFillBundleSchema } },
       },
-      401: { description: AUTH_REQUIRED },
-      403: { description: AUTHZ },
+      401: { description: SUBMISSION_AUTH_REQUIRED },
+      403: { description: NOT_PARTICIPANT },
       404: { description: 'Submission or schema not found' },
     },
   });
@@ -85,7 +90,10 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
       },
       401: { description: AUTH_REQUIRED },
       403: { description: AUTHZ },
-      409: { description: 'Submission id already in use by a different owner' },
+      409: {
+        description:
+          'Submission id already in use by a different owner, or formVersionId is not the published version',
+      },
     },
   });
 
@@ -103,13 +111,15 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
     },
     responses: {
       200: {
-        description: 'Saved draft submission',
-        content: { 'application/json': { schema: SubmissionResponseSchema } },
+        description:
+          'The submission plus the revision this save produced. `revision.status` is `current` when it became the draft, or `pending` when it was held for review (a conflict or a save against a submitted record).',
+        content: { 'application/json': { schema: SubmissionWriteResponseSchema } },
       },
-      401: { description: AUTH_REQUIRED },
-      403: { description: AUTHZ },
+      401: { description: SUBMISSION_AUTH_REQUIRED },
+      403: { description: WRITE_AUTHZ },
       404: { description: SUBMISSION_NOT_FOUND },
-      409: { description: TERMINAL_CONFLICT },
+      400: { description: INVALID_WRITE_BODY },
+      409: { description: WRITE_CONFLICT },
     },
   });
 
@@ -122,18 +132,20 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
       params: SubmissionIdParamsSchema,
       body: {
         required: true,
-        content: { 'application/json': { schema: SubmissionDataBodySchema } },
+        content: { 'application/json': { schema: SubmitSubmissionBodySchema } },
       },
     },
     responses: {
       200: {
-        description: 'Submitted submission',
-        content: { 'application/json': { schema: SubmissionResponseSchema } },
+        description:
+          'The submission plus the revision this submit produced. `revision.status` is `current` when it submitted the record, or `pending` when it was held for review (a conflict or a submit against an already-submitted record).',
+        content: { 'application/json': { schema: SubmissionWriteResponseSchema } },
       },
-      401: { description: AUTH_REQUIRED },
-      403: { description: AUTHZ },
+      401: { description: SUBMISSION_AUTH_REQUIRED },
+      403: { description: WRITE_AUTHZ },
       404: { description: SUBMISSION_NOT_FOUND },
-      409: { description: TERMINAL_CONFLICT },
+      400: { description: INVALID_WRITE_BODY },
+      409: { description: WRITE_CONFLICT },
     },
   });
 
@@ -145,10 +157,11 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
     request: { params: SubmissionIdParamsSchema },
     responses: {
       200: {
-        description: 'Submission confirmation (audience-readable)',
+        description: 'Submission confirmation',
         content: { 'application/json': { schema: SubmissionResponseSchema } },
       },
-      403: { description: AUTHZ },
+      401: { description: SUBMISSION_AUTH_REQUIRED },
+      403: { description: NOT_PARTICIPANT },
       404: { description: SUBMISSION_NOT_FOUND },
     },
   });
@@ -164,7 +177,8 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
         description: 'Submission answer document',
         content: { 'application/json': { schema: z.record(z.string(), z.unknown()) } },
       },
-      403: { description: AUTHZ },
+      401: { description: SUBMISSION_AUTH_REQUIRED },
+      403: { description: NOT_PARTICIPANT },
       404: { description: 'Submission or its content not found' },
     },
   });

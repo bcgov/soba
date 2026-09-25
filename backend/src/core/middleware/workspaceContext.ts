@@ -4,7 +4,7 @@
  * - `workspaceListScope`: resolve workspace from a scope anchor (workspace or resource hierarchy id).
  * - `workspaceFromResource`: derive the workspace from the target resource.
  * The `open*` variants build a membership-optional context for the public-capable submit surface,
- * leaving authorization to a downstream guard (requireFormAccess).
+ * leaving authorization to a downstream guard.
  *
  */
 import type { NextFunction, Request, Response } from 'express';
@@ -19,15 +19,12 @@ import { ForbiddenError, NotFoundError, ValidationError } from '../errors';
 import { WorkspaceMembershipRole } from '../db/codes';
 import { getActorId } from './actor';
 import { getFormListContext, getWorkspaceIdForForm } from '../db/repos/formRepo';
-import {
-  getFormVersionListContext,
-  getWorkspaceIdForFormVersion,
-} from '../db/repos/formVersionRepo';
-import { getSubmissionListContext, getWorkspaceIdForSubmission } from '../db/repos/submissionRepo';
+import { getFormVersionListContext } from '../db/repos/formVersionRepo';
+import { getSubmissionListContext } from '../db/repos/submissionRepo';
 import type { CoreRequestContext } from './requestContext';
 
 const RESOURCE_NOT_FOUND = 'Resource not found';
-const MISSING_ACTOR_IDENTITY = 'Missing actor identity (actorId or x-soba-user-id)';
+const MISSING_ACTOR_IDENTITY = 'Missing actor identity';
 
 export type ListAnchorKind = 'workspaceId' | 'formId' | 'formVersionId' | 'submissionId';
 
@@ -168,18 +165,20 @@ export const buildCoreContext = async (
 
 /**
  * Build a context for the submit surface WITHOUT requiring membership: the workspace is resolved so the
- * route's own authorization (the Form submitters audience) decides access. Members get their real role;
- * non-members (incl. the public user) get a non-manage role so they can never reach workspace-admin
- * routes. Shares the cached membership lookup with buildCoreContext.
+ * route's own guard decides access. Members get their real role; non-members (incl. the public user)
+ * get a non-manage role so they can never reach workspace-admin routes. Shares the cached membership
+ * lookup with buildCoreContext.
  */
 const buildSubmitContext = async (
   actorId: string,
-  workspaceId: string,
+  scope: ResourceScope,
   source: string,
 ): Promise<CoreRequestContext> => {
+  const { workspaceId, formId } = scope;
   const membership = await loadMembership(workspaceId, actorId);
   return {
     workspaceId,
+    ...(formId ? { formId } : {}),
     actorId,
     actorDisplayLabel: await loadActorDisplayLabel(actorId),
     workspaceSource: source,
@@ -190,7 +189,7 @@ const buildSubmitContext = async (
 /**
  * Resource (deep-link) read routes reachable by non-members/anonymous: derive the workspace from the
  * target resource (404 if missing) and build a membership-optional context. Authorization is left to a
- * downstream guard (requireFormAccess) rather than to membership.
+ * downstream guard rather than to membership.
  */
 export const openWorkspaceFromResource = (config: {
   kind: WorkspaceResourceKind;
@@ -206,11 +205,11 @@ export const openWorkspaceFromResource = (config: {
       if (!resourceId) {
         throw new ValidationError('Missing resource identifier for workspace resolution');
       }
-      const workspaceId = await lookupWorkspaceId(config.kind, resourceId);
-      if (!workspaceId) {
+      const scope = await lookupResourceScope(config.kind, resourceId);
+      if (!scope) {
         throw new NotFoundError(RESOURCE_NOT_FOUND);
       }
-      req.coreContext = await buildSubmitContext(actorId, workspaceId, `submit:${config.kind}`);
+      req.coreContext = await buildSubmitContext(actorId, scope, `submit:${config.kind}`);
       next();
     } catch (error) {
       next(error);
@@ -320,23 +319,28 @@ export const workspaceListScope = (config: {
 export type WorkspaceResourceKind = 'form' | 'formVersion' | 'submission' | 'workspace';
 export type ResourceIdSource = 'paramsId' | 'queryFormId' | 'bodyFormId';
 
-const lookupWorkspaceId = async (
+/** The workspace a resource belongs to and, for a form or anything under one, the form. */
+type ResourceScope = { workspaceId: string; formId?: string };
+
+const lookupResourceScope = async (
   kind: WorkspaceResourceKind,
   resourceId: string,
-): Promise<string | null> => {
+): Promise<ResourceScope | null> => {
   switch (kind) {
-    case 'form':
-      return getWorkspaceIdForForm(resourceId);
+    case 'form': {
+      const workspaceId = await getWorkspaceIdForForm(resourceId);
+      return workspaceId ? { workspaceId, formId: resourceId } : null;
+    }
     case 'formVersion':
-      return getWorkspaceIdForFormVersion(resourceId);
+      return getFormVersionListContext(resourceId);
     case 'submission':
-      return getWorkspaceIdForSubmission(resourceId);
+      return getSubmissionListContext(resourceId);
     case 'workspace': {
       // The resource is the workspace itself. Confirm it exists so a missing workspace
       // yields 404 (matching workspaces/schema.ts); membership is then verified by
       // buildCoreContext, which yields 403 for an existing workspace the actor can't access.
       const workspace = await getWorkspaceById(resourceId);
-      return workspace ? resourceId : null;
+      return workspace ? { workspaceId: resourceId } : null;
     }
   }
 };
@@ -370,11 +374,12 @@ export const workspaceFromResource = (config: {
       if (!resourceId) {
         throw new ValidationError('Missing resource identifier for workspace resolution');
       }
-      const workspaceId = await lookupWorkspaceId(config.kind, resourceId);
-      if (!workspaceId) {
+      const scope = await lookupResourceScope(config.kind, resourceId);
+      if (!scope) {
         throw new NotFoundError(RESOURCE_NOT_FOUND);
       }
-      req.coreContext = await buildCoreContext(actorId, workspaceId, `resource:${config.kind}`);
+      const context = await buildCoreContext(actorId, scope.workspaceId, `resource:${config.kind}`);
+      req.coreContext = scope.formId ? { ...context, formId: scope.formId } : context;
 
       next();
     } catch (error) {

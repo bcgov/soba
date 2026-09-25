@@ -1,8 +1,14 @@
 import { z } from 'zod';
+import type { FormCreateCapability, MeResponse } from '@soba/lib';
 import { findAppUserById, updateAppUserProfile } from '../../db/repos/appUserRepo';
 import { toAppUserView } from '../../db/appUserView';
 import { canCreateWorkspaceByIdp } from '../../db/repos/idpGroupRepo';
-import { actorBelongsToWorkspace } from '../../db/repos/membershipRepo';
+import {
+  actorBelongsToWorkspace,
+  findPermittedWorkspace,
+  hasActiveMembership,
+} from '../../db/repos/membershipRepo';
+import { FormCreatePermissions } from '../../db/codes';
 import { profileHelpers, type StoredProfile } from '../../auth/jwtClaims';
 import { ForbiddenError } from '../../errors';
 import { PatchMeBodySchema } from './schema';
@@ -20,17 +26,26 @@ export class MeApiService {
     return belongs ? stored : null;
   }
 
+  /** Same filters as the create-form workspace picker. */
+  private async resolveFormCreate(actorId: string): Promise<FormCreateCapability> {
+    const workspace = await findPermittedWorkspace(actorId, FormCreatePermissions);
+    if (!workspace) return 'none';
+    return workspace.disclaimerAccepted ? 'allowed' : 'disclaimer_required';
+  }
+
   private async toResponse(
     user: NonNullable<Awaited<ReturnType<typeof findAppUserById>>>,
     idpCode: string | null,
     isSobaAdmin: boolean,
-  ) {
+  ): Promise<MeResponse> {
     const view = toAppUserView(user);
-    // Independent lookups — run concurrently so /me (a bootstrap hot path) pays
-    // one DB round-trip of latency, not two.
-    const [defaultWorkspaceId, canCreateWorkspace] = await Promise.all([
+    // Independent lookups, run concurrently so /me (a bootstrap hot path) pays
+    // one DB round-trip of latency, not one per lookup.
+    const [defaultWorkspaceId, canCreateWorkspace, hasWorkspaces, formCreate] = await Promise.all([
       this.resolveDefaultWorkspaceId(view.id, user.profile as StoredProfile),
       canCreateWorkspaceByIdp(idpCode),
+      hasActiveMembership(view.id),
+      this.resolveFormCreate(view.id),
     ]);
     return {
       actor: {
@@ -48,6 +63,8 @@ export class MeApiService {
       },
       capabilities: {
         canCreateWorkspace,
+        hasWorkspaces,
+        formCreate,
         isSobaAdmin,
       },
     };

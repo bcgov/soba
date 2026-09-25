@@ -4,7 +4,7 @@ import { FaRegTrashCan, FaFile } from 'react-icons/fa6';
 import { Link, Button } from '@bcgov/design-system-react-components';
 import { useRouter, usePathname } from 'next/navigation';
 
-import type { Dictionary } from '@/src/types/plugins';
+import type { Dictionary } from '@/src/types/dictionary';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { Modal } from '@/src/components/Modal';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
@@ -12,11 +12,13 @@ import type { SubmissionListItem } from '@/src/types/submissions';
 import { Tag } from '@/src/components/Tag';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { deleteSobaSubmission } from '@/src/shared/api/sobaApi';
-import { useFormSubmissions } from '@/src/features/designer/useFormSubmissions';
+import {
+  useFormSubmissions,
+  useSubmissionDeleter,
+} from '@/src/features/designer/data/useFormSubmissions';
 import { FORM_SUBMISSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
-import { PAGE_SIZE_OPTIONS, useListQuery } from '@/src/shared/list/useListQuery';
-import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';
+import { useListQuery } from '@/src/shared/list/useListQuery';
+import { useDataTable } from '@/src/shared/list/useDataTable';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import {
   capitalizeFirstLetter,
@@ -35,13 +37,15 @@ export default function FormSubmissionTab({
   formId,
   opened,
 }: Readonly<FormSubmissionTabProps>) {
-  const listQuery = useListQuery(FORM_SUBMISSIONS_LIST_QUERY);
-  const { submissions, total, isLoading, error, refresh } = useFormSubmissions(formId, opened, {
-    offset: listQuery.offset,
-    limit: listQuery.pageSize,
-    sort: listQuery.sort,
-    q: listQuery.q,
+  const query = useListQuery(FORM_SUBMISSIONS_LIST_QUERY);
+  const submissionsResult = useFormSubmissions(formId, opened, {
+    offset: query.offset,
+    limit: query.pageSize,
+    sort: query.sort,
+    q: query.q,
   });
+  const { table } = useDataTable(query, submissionsResult, dict.submission.error);
+  const submissionDeleter = useSubmissionDeleter();
   const formatLongDate = useFormatLongDate();
   const { token } = useKeycloak();
   const pathname = usePathname();
@@ -59,8 +63,7 @@ export default function FormSubmissionTab({
   const confirmDelete = useCallback(async () => {
     setShowDeleteConfirm(false);
     try {
-      await deleteSobaSubmission(token as string, deleteId);
-      await refresh();
+      await submissionDeleter.remove(token as string, deleteId);
       addNotification({
         text: dict.submission.deleteSuccess || 'Submission deleted successfully',
         type: 'success',
@@ -72,7 +75,7 @@ export default function FormSubmissionTab({
         consoleError: e,
       });
     }
-  }, [token, deleteId, refresh, addNotification, dict]);
+  }, [token, deleteId, submissionDeleter, addNotification, dict]);
 
   const columns: Column<SubmissionListItem>[] = useMemo(
     () => [
@@ -125,7 +128,7 @@ export default function FormSubmissionTab({
               className="bcds-react-aria-Link medium false me-2"
               aria-label={dict.submission.view}
               data-testid={`${sub.id}-view-link`}
-              onPress={() => router.push(`/${locale}/submission/${sub.id}`)}
+              onPress={() => router.push(`/${locale}/build/${sub.formId}/submissions/${sub.id}`)}
             >
               <FaFile />
             </Link>
@@ -146,37 +149,15 @@ export default function FormSubmissionTab({
     [dict, formatLongDate, deletePress, locale, router],
   );
 
-  const loadError = useMemo(
-    () =>
-      error
-        ? loadErrorMessage(error, {
-            sessionExpired: dict.general.sessionExpired,
-            noAccess: dict.general.noAccess,
-            failed: dict.submission.error,
-          })
-        : null,
-    [error, dict.general.sessionExpired, dict.general.noAccess, dict.submission.error],
-  );
-
   return (
     <>
       <DataTable<SubmissionListItem>
-        data={submissions}
+        {...table}
         columns={columns}
-        loading={isLoading}
-        error={loadError}
         emptyMessage={dict.submission.emptyList}
         loadingMessage={dict.general.loading}
         itemName="submissions"
         caption={dict.submission?.submissions || 'Submissions'}
-        pageSize={listQuery.pageSize}
-        currentPage={listQuery.page}
-        totalItems={total}
-        onPageChange={listQuery.setPage}
-        onPageSizeChange={listQuery.setPageSize}
-        pageSizeOptions={PAGE_SIZE_OPTIONS}
-        sort={listQuery.sort}
-        onSortChange={listQuery.setSort}
         keyExtractor={(sub) => sub.id}
       />
       <Modal

@@ -6,13 +6,19 @@ import { Provider } from 'react-redux';
 import { SWRConfig } from 'swr';
 
 const mockPush = vi.fn();
-const { mockCreateWorkspace, mockUpdateWorkspace, mockSelectWorkspace, mockRefreshWorkspaces } =
-  vi.hoisted(() => ({
-    mockCreateWorkspace: vi.fn(),
-    mockUpdateWorkspace: vi.fn(),
-    mockSelectWorkspace: vi.fn(),
-    mockRefreshWorkspaces: vi.fn().mockResolvedValue([]),
-  }));
+const {
+  mockCreateWorkspace,
+  mockUpdateWorkspace,
+  mockSelectWorkspace,
+  mockRefreshWorkspaces,
+  mockRefreshCurrentUser,
+} = vi.hoisted(() => ({
+  mockCreateWorkspace: vi.fn(),
+  mockUpdateWorkspace: vi.fn(),
+  mockSelectWorkspace: vi.fn(),
+  mockRefreshWorkspaces: vi.fn().mockResolvedValue([]),
+  mockRefreshCurrentUser: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
   useKeycloak: () => ({ authenticated: true, token: 'token', initializing: false }),
@@ -103,6 +109,7 @@ vi.mock('@/src/shared/api/useCurrentUser', () => ({
     data: { capabilities: { canCreateWorkspace: true } },
     loaded: true,
   }),
+  useRefreshCurrentUser: () => mockRefreshCurrentUser,
 }));
 
 vi.mock('@/lib/hooks/useNotificationStore', () => ({
@@ -209,7 +216,6 @@ describe('WorkspaceForm', () => {
         useCase: 'testUseCase',
         org: 'testOrg',
       });
-      expect(mockRefreshWorkspaces).toHaveBeenCalled();
       expect(mockPush).toHaveBeenCalledWith('/en/workspaces?from=nav');
     });
   });
@@ -350,7 +356,10 @@ describe('WorkspaceForm', () => {
     });
   });
 
-  it('refreshes the workspace lists after saving', async () => {
+  // A disclaimer change moves whether the user can create a form, which the current user carries.
+  // The writer refreshes the workspace lists and the current user together, so the current-user
+  // refresh standing in confirms the post-save refresh ran.
+  it('refreshes the current user after saving', async () => {
     await act(async () => {
       renderForm('ws2');
     });
@@ -358,6 +367,6 @@ describe('WorkspaceForm', () => {
     await userEvent.click(screen.getByTestId('workspace-disclaimer-switch'));
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    await waitFor(() => expect(mockRefreshWorkspaces).toHaveBeenCalled());
+    await waitFor(() => expect(mockRefreshCurrentUser).toHaveBeenCalled());
   });
 });

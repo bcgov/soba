@@ -7,7 +7,7 @@ import {
 import { PluginConfigReader } from '../../core/config/pluginConfig';
 import { ValidationError } from '../../core/errors';
 import { getAuthenticatedFormioClient } from './formioV5Client';
-import { normalizeSchema as normalizeFormioSchema } from './normalizeSchema';
+import { normalizeSchema as normalizeFormioSchema } from '@soba/lib';
 
 export interface FormioV5Config {
   apiBaseUrl: string;
@@ -119,18 +119,14 @@ export function buildSchemaBody(input: UpsertSchemaInput): Record<string, unknow
 }
 
 /**
- * Form.io strips submission `data` keys that aren't form components, so the correlation key lives in
- * submission `metadata` (preserved intact) as a single STRING field — Form.io can filter metadata by
- * string but not by number, so the deterministic key is a string, not the numeric `soba_revision_no`.
+ * Form.io strips submission `data` keys that aren't form components, so SOBA correlation fields live
+ * in submission `metadata` (preserved intact). The revision id is a string Form.io can filter on, so
+ * it is also the idempotency key.
  */
-const SOBA_REVISION_KEY_FIELD = 'soba_revision_key';
-
-/** Deterministic per-revision idempotency key for a submission save. */
-const sobaSubmissionRevisionKey = (submissionId: string, revisionNo: number): string =>
-  `soba-${submissionId}-r${revisionNo}`;
+const SOBA_REVISION_ID_FIELD = 'soba_revision_id';
 
 /** Build the Form.io submission document for a create: the answer data plus SOBA correlation/tenancy
- *  metadata (the per-revision key in metadata, queryable for idempotency). */
+ *  metadata. */
 export function buildSubmissionBody(input: CreateSubmissionInput): Record<string, unknown> {
   const answers =
     typeof input.data === 'object' && input.data !== null && !Array.isArray(input.data)
@@ -141,8 +137,7 @@ export function buildSubmissionBody(input: CreateSubmissionInput): Record<string
     metadata: {
       soba_workspace_id: input.workspaceId,
       soba_submission_id: input.submissionId,
-      soba_revision_no: input.revisionNo,
-      [SOBA_REVISION_KEY_FIELD]: sobaSubmissionRevisionKey(input.submissionId, input.revisionNo),
+      [SOBA_REVISION_ID_FIELD]: input.revisionId,
     },
   };
 }
@@ -231,8 +226,8 @@ export class FormioEngineAdapter implements FormEngineAdapter {
 
   /**
    * Create a new Form.io submission document under the form `engineFormRef`. Idempotent per
-   * `(submissionId, revisionNo)`: a retried save with the same target revision finds the existing
-   * document (via the planted correlation key) instead of creating a duplicate.
+   * revision id: a retried write for the same revision finds the existing document rather than
+   * creating a duplicate.
    */
   async createSubmission(input: CreateSubmissionInput): Promise<{ engineRef: string }> {
     const client = await getAuthenticatedFormioClient(this.pluginConfig);
@@ -240,11 +235,8 @@ export class FormioEngineAdapter implements FormEngineAdapter {
       throw new Error('Form.io admin client unavailable; cannot create submission');
     }
 
-    const key = sobaSubmissionRevisionKey(input.submissionId, input.revisionNo);
-
-    // Idempotency: a retried save (same submission + revision) must converge on one document.
     const existing = (await client.loadSubmissions(input.engineFormRef, {
-      params: { [`metadata.${SOBA_REVISION_KEY_FIELD}`]: key },
+      params: { [`metadata.${SOBA_REVISION_ID_FIELD}`]: input.revisionId },
     })) as Array<Record<string, unknown>>;
     if (existing.length > 0 && existing[0]?._id != null && existing[0]._id !== '') {
       return { engineRef: String(existing[0]._id) };

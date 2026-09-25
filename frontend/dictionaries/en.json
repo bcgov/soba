@@ -11,6 +11,8 @@
     "unknown": "Unknown",
     "home": "Home",
     "forms": "Forms",
+    "myForms": "My Forms",
+    "mySubmissions": "My Submissions",
     "formDesigner": "Form Designer",
     "feedback": "Feedback",
     "help": "Help",
@@ -32,7 +34,11 @@
     "create": "Create",
     "version": "Version",
     "clearFilters": "Reset Filters",
-    "noAccess": "You do not have access to this."
+    "noAccess": "You do not have access to this.",
+    "sortBy": "Sort by",
+    "lookupTruncated": "Showing the first {limit}.",
+    "next": "Next",
+    "fieldRequired": "This field is required."
   },
   "dataTable": {
     "emptyMessage": "No items found.",
@@ -187,12 +193,9 @@
   "header": {
     "workspaces": "Workspaces",
     "design": "Design",
-    "submit": "Submit",
     "skipToMain": "Skip to main content",
-    "designer": "Designer",
     "selectLanguage": "Select Language",
     "bcgovTitle": "Government of British Columbia",
-    "primaryNavAria": "Primary",
     "languages": {
       "en": "EN",
       "fr": "FR"
@@ -213,15 +216,16 @@
       "pageTitle": "Form",
       "backToList": "Back to form list",
       "missingId": "No form was selected.",
-      "unavailable": "This form is not currently available for submission.",
       "loadError": "The form could not be loaded. Check the browser network tab and API logs.",
       "rendererError": "The form renderer stopped unexpectedly. Try again or return to the list.",
       "segmentError": {
         "title": "Something went wrong loading this form page.",
         "tryAgain": "Try again",
-        "backToList": "Back to form list"
+        "backToHome": "Back to home"
       },
       "submitSuccess": "Form submitted successfully.",
+      "submitPending": "This form changed since you opened it, so your answers were saved for review instead of submitted.",
+      "readOnly": "You can view this submission, but you can no longer change or submit it.",
       "starting": "Starting your submission…",
       "startError": "The submission could not be started. Please try again."
     }
@@ -229,6 +233,9 @@
   "form": {
     "saved": "Form saved successfully.",
     "saveError": "Error saving form.",
+    "versionConflict": "This form changed since you opened it. Save your edits as a new version, or discard them.",
+    "staleEdits": "Your unsaved edits were made on an older version of this form. Save them as a new version, or discard them.",
+    "discardEdits": "Discard edits",
     "noActiveWorkspace": "Select a workspace before creating a form.",
     "noActiveWorkspaceError": "Select a workspace before saving this form.",
     "published": "Form published successfully!",
@@ -251,11 +258,15 @@
     "submitterAudienceCancel": "Cancel",
     "submitterAudienceLoadError": "Could not load submit access",
     "submitterAudienceSaveError": "Could not save submit access",
+    "submitterAudienceInherit": "Inherit from workspace",
+    "submitterAudienceInheritedSummary": "Inherited: {summary}",
+    "submitterAudienceUsersNotApplied": "People named in the workspace audience cannot submit this form unless another group gives them access.",
     "disclaimerLabel": "I agree to the disclaimer and statement of responsibility",
     "disclaimerRequired": "Accept the workspace disclaimer in workspace Settings before creating a form.",
     "exportJson": "Export JSON",
     "importJson": "Import JSON",
     "designerTab": "Form",
+    "designerTabs": "Form Designer tabs",
     "teamTab": "Access",
     "settingsTab": "Settings",
     "historyTab": "Version History",
@@ -292,22 +303,37 @@
     "copiedNotification": "Copied to clipboard",
     "newVersionFrom": "New Version From",
     "emptyHistory": "No Previous Versions",
-    "loadVersionsError": "Failed to load version history."
+    "loadVersionsError": "Failed to load version history.",
+    "settings": {
+      "formSettingsDrawerLabel": "Form Settings",
+      "formSettingsDrawerSaveSuccessMessage": "Changes updated successfully.",
+      "formSettingsDrawerSaveErrorMessage": "Failed to save changes.",
+      "submitterSettingsDrawerLabel": "Submitter Settings",
+      "allowSubmitterDraftsLabel": "Allow Submitters to Save and Edit Drafts",
+      "allowSubmitterDraftsPublicNote": "Drafts are not available for Public forms.",
+      "submitterSettingsLoadError": "Could not load submitter settings.",
+      "profileDrawerInfo": "The CHEFS team is collecting and organizing information to serve as crucial input for crafting comprehensive business cases. These cases will play a pivotal role in guiding the strategic operation and ongoing improvement of CHEFS in the coming years. This initiative to gather data is essential for informing critical decisions and molding the trajectory of CHEFS, ensuring its adaptability and effectiveness in addressing evolving needs and challenges.",
+      "profileDrawerLabel": "Form Profile"
+    },
+    "descriptionLabel": "Description",
+    "submit": "Submit",
+    "noFormName": "Form name is required"
   },
   "submission": {
     "submissions": "Submissions",
     "anon": "Anonymous",
     "pageTitle": "Submission",
     "loading": "Loading submissions…",
-    "empty": "No submissions in this workspace yet.",
     "error": "Could not load submissions.",
     "submittedOn": "Submitted",
     "noContent": "No submitted answers to display.",
     "notFound": "Submission not found.",
+    "loadError": "Could not load this submission.",
     "workflow": "Workflow",
     "confirmationId": "Confirmation ID",
     "submittedAt": "Submission Date",
     "submitter": "Submitter",
+    "backToSubmissions": "Back to submissions",
     "deleteConfirm": "Confirm Delete",
     "deleteConfirmText": "Do you really want to delete submission",
     "confirm": "Confirm",
@@ -317,14 +343,6 @@
     "emptyList": "No submissions",
     "deleteSuccess": "Submission deleted successfully",
     "deleteFailure": "Failed to delete submission",
-    "columns": {
-      "id": "Submission ID",
-      "formName": "Form Name",
-      "formId": "Form ID",
-      "version": "Version",
-      "status": "Status",
-      "user": "User"
-    },
     "formList": {
       "columns": {
         "name": "Form Name",

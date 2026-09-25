@@ -7,7 +7,10 @@ jest.mock('../../../../src/core/db/client', () => ({
 }));
 
 import { listFormsForWorkspace } from '../../../../src/core/db/repos/formRepo';
-import { listFormVersionsForWorkspace } from '../../../../src/core/db/repos/formVersionRepo';
+import {
+  listFormVersionsForWorkspace,
+  lookupFormVersions,
+} from '../../../../src/core/db/repos/formVersionRepo';
 import { listSubmissionsForWorkspace } from '../../../../src/core/db/repos/submissionRepo';
 
 // Empty scope means no access; without the guard the workspace filter is dropped and every row leaks.
@@ -23,6 +26,7 @@ describe('list repos reject an empty workspace scope', () => {
         offset: 0,
         limit: 20,
         sort: 'createdAt:desc',
+        locale: 'en',
       }),
     ).resolves.toEqual({ items: [], total: 0 });
     expect(selectMock).not.toHaveBeenCalled();
@@ -40,6 +44,13 @@ describe('list repos reject an empty workspace scope', () => {
     expect(selectMock).not.toHaveBeenCalled();
   });
 
+  it('lookupFormVersions returns nothing without querying', async () => {
+    await expect(
+      lookupFormVersions({ workspaceIds: [], formId: 'form1', limit: 501 }),
+    ).resolves.toEqual([]);
+    expect(selectMock).not.toHaveBeenCalled();
+  });
+
   it('listSubmissionsForWorkspace returns nothing without querying', async () => {
     await expect(
       listSubmissionsForWorkspace({
@@ -47,6 +58,7 @@ describe('list repos reject an empty workspace scope', () => {
         offset: 0,
         limit: 20,
         sort: 'updatedAt:desc',
+        locale: 'en',
       }),
     ).resolves.toEqual({ items: [], total: 0 });
     expect(selectMock).not.toHaveBeenCalled();

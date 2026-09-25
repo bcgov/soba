@@ -19,14 +19,10 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { codeItems } from '@/src/shared/util/codeList';
-import {
-  useWorkspace,
-  useRefreshWorkspace,
-  useRefreshWorkspaces,
-} from '@/src/shared/api/useWorkspaces';
+import { useSortLocale } from '@/src/shared/list/useSortLocale';
+import { useWorkspace, useWorkspaceWriter } from '@/src/shared/api/useWorkspaces';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { createWorkspace, updateWorkspace } from '@/src/shared/api/sobaApi';
 import { isWorkspaceManageRole } from '../workspaceRoles';
 import type { UpdateWorkspaceBody, WorkspaceItem } from '@/src/types/workspaces';
 import styles from './WorkspaceForm.module.css';
@@ -55,13 +51,13 @@ type WorkspaceSettingsProps = {
 function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps>) {
   const isCreate = workspace === null;
   const dict = useDictionary();
+  const sortLocale = useSortLocale();
   const dictWorkspaces = dict.workspaces;
   const router = useRouter();
   const pathname = usePathname();
   const locale = getLocaleFromPath(pathname);
   const { token } = useKeycloak();
-  const refreshWorkspaces = useRefreshWorkspaces();
-  const refreshWorkspace = useRefreshWorkspace();
+  const workspaceWriter = useWorkspaceWriter();
   const { addNotification } = useNotificationStore();
 
   // What the fields were seeded from. The `workspace` prop moves with a revalidation while the
@@ -96,7 +92,7 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
     setSaving(true);
     try {
       if (!seed) {
-        await createWorkspace(token, {
+        await workspaceWriter.create(token, {
           name: trimmedName,
           disclaimerAccepted,
           useCase,
@@ -111,11 +107,9 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
           router.push(navLink(`/${locale}/workspaces`));
           return;
         }
-        await updateWorkspace(token, seed.id, patch);
-        await refreshWorkspace(seed.id);
+        await workspaceWriter.update(token, seed.id, patch);
       }
 
-      await refreshWorkspaces();
       router.push(navLink(`/${locale}/workspaces`));
     } catch (error) {
       addNotification({
@@ -133,8 +127,7 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
     token,
     seed,
     disclaimerAccepted,
-    refreshWorkspace,
-    refreshWorkspaces,
+    workspaceWriter,
     router,
     locale,
     addNotification,
@@ -161,7 +154,7 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
         data-testid="workspace-name"
       />
       <Select
-        items={codeItems(dict.ministries, seed?.org)}
+        items={codeItems(dict.ministries, seed?.org, sortLocale)}
         label={dictWorkspaces.yourOrgReq}
         selectionMode="single"
         size="medium"
@@ -172,7 +165,7 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
         onChange={handleOrgChange}
       />
       <Select
-        items={codeItems(dict.useCases, seed?.useCase)}
+        items={codeItems(dict.useCases, seed?.useCase, sortLocale)}
         label={dictWorkspaces.useCase}
         selectionMode="single"
         size="medium"

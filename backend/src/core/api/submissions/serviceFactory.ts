@@ -1,10 +1,16 @@
-import { SubmissionService } from '../../services/submissionService';
+import { SubmissionService, type SubmissionWriteOutcome } from '../../services/submissionService';
 import type {
   SubmissionRecord,
   SubmissionListRow,
-  SubmissionListSort,
   SubmissionDetailRow,
 } from '../../db/repos/submissionRepo';
+import type {
+  OpenSubmissionBody,
+  SubmissionDataBody,
+  SortLocale,
+  SubmissionListSort,
+  SubmitSubmissionBody,
+} from '@soba/lib';
 
 export interface SubmissionsContextInput {
   workspaceId: string;
@@ -18,7 +24,7 @@ export interface SubmissionsListScopeInput {
   actorId: string;
 }
 
-interface ListSubmissionsQueryInput {
+export interface ListSubmissionsQueryInput {
   workspaceId?: string;
   formId?: string;
   formVersionId?: string;
@@ -29,6 +35,7 @@ interface ListSubmissionsQueryInput {
   createdBy?: string;
   q?: string;
   sort: SubmissionListSort;
+  locale: SortLocale;
 }
 
 const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
@@ -42,6 +49,7 @@ const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
     workflowState: item.workflowState,
     engineSyncStatus: item.engineSyncStatus,
     currentRevisionNo: item.currentRevisionNo,
+    headRevisionId: item.headRevisionId,
     submittedAt: item.submittedAt?.toISOString() ?? null,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
@@ -49,6 +57,11 @@ const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
     submittedBy: detail.submittedBy ?? null,
   };
 };
+
+const toSubmissionWriteDto = (outcome: SubmissionWriteOutcome) => ({
+  ...toSubmissionDto(outcome.record),
+  revision: outcome.revision,
+});
 
 const toSubmissionListItemDto = (item: SubmissionListRow) => ({
   id: item.id,
@@ -88,6 +101,7 @@ export function createSubmissionsApiService(submissionService: SubmissionService
         createdBy: query.createdBy,
         q: query.q,
         sort: query.sort,
+        locale: query.locale,
       });
 
       return {
@@ -110,16 +124,20 @@ export function createSubmissionsApiService(submissionService: SubmissionService
       };
     },
 
-    open: async (ctx: SubmissionsContextInput, formId: string, id: string) => {
-      const { created, record } = await submissionService.open({ ...ctx, formId, id });
+    open: async (ctx: SubmissionsContextInput, body: OpenSubmissionBody) => {
+      const { created, record } = await submissionService.open({ ...ctx, ...body });
       return { created, submission: toSubmissionDto(record) };
     },
 
-    save: (ctx: SubmissionsContextInput, submissionId: string, data: Record<string, unknown>) =>
-      submissionService.save({ ...ctx, submissionId, data }).then((row) => toSubmissionDto(row)),
+    save: (ctx: SubmissionsContextInput, submissionId: string, body: SubmissionDataBody) =>
+      submissionService
+        .save({ ...ctx, submissionId, ...body })
+        .then((outcome) => toSubmissionWriteDto(outcome)),
 
-    submit: (ctx: SubmissionsContextInput, submissionId: string, data: Record<string, unknown>) =>
-      submissionService.submit({ ...ctx, submissionId, data }).then((row) => toSubmissionDto(row)),
+    submit: (ctx: SubmissionsContextInput, submissionId: string, body: SubmitSubmissionBody) =>
+      submissionService
+        .submit({ ...ctx, submissionId, ...body })
+        .then((outcome) => toSubmissionWriteDto(outcome)),
 
     delete: (ctx: SubmissionsContextInput, submissionId: string) =>
       submissionService.delete({ ...ctx, submissionId }),

@@ -1,4 +1,12 @@
-import { index, text, timestamp, uniqueIndex, uuid, integer } from 'drizzle-orm/pg-core';
+import {
+  index,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  integer,
+  type AnyPgColumn,
+} from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { auditColumns, idColumn, softDeleteColumns } from './audit';
 import { appUsers, sobaSchema, workspaces } from './core';
@@ -13,6 +21,8 @@ export const forms = sobaSchema.table(
     formEngineCode: text('form_engine_code').notNull(),
     name: text('name').notNull(),
     description: text('description'),
+    org: text('org').notNull(),
+    useCase: text('use_case').notNull(),
     status: text('status').notNull(),
     ...auditColumns(),
     ...softDeleteColumns(),
@@ -107,6 +117,7 @@ export const submissions = sobaSchema.table(
     engineSyncStatus: text('engine_sync_status').notNull(),
     engineSyncError: text('engine_sync_error'),
     currentRevisionNo: integer('current_revision_no').notNull().default(0),
+    headRevisionId: uuid('head_revision_id').references((): AnyPgColumn => submissionRevisions.id),
     submittedAt: timestamp('submitted_at', { withTimezone: true }),
     ...auditColumns(),
     ...softDeleteColumns(),
@@ -124,6 +135,7 @@ export const submissions = sobaSchema.table(
     workspaceUpdatedIdx: index('submission_workspace_updated_idx')
       .on(table.workspaceId, table.updatedAt.desc(), table.id.desc())
       .where(sql`${table.deletedAt} is null`),
+    headRevisionIdx: index('submission_head_revision_idx').on(table.headRevisionId),
   }),
 );
 
@@ -138,7 +150,12 @@ export const submissionRevisions = sobaSchema.table(
       .notNull()
       .references(() => submissions.id),
     revisionNo: integer('revision_no').notNull(),
+    parentRevisionId: uuid('parent_revision_id').references(
+      (): AnyPgColumn => submissionRevisions.id,
+    ),
     eventType: text('event_type').notNull(),
+    status: text('status').notNull(),
+    reason: text('reason').notNull(),
     beforeEngineSubmissionRef: text('before_engine_submission_ref'),
     afterEngineSubmissionRef: text('after_engine_submission_ref'),
     changedBy: uuid('changed_by')
@@ -154,5 +171,6 @@ export const submissionRevisions = sobaSchema.table(
       table.revisionNo,
     ),
     workspaceIdx: index('submission_revision_workspace_idx').on(table.workspaceId),
+    parentRevisionIdx: index('submission_revision_parent_idx').on(table.parentRevisionId),
   }),
 );

@@ -1,9 +1,13 @@
+import type { SortLocale, SubmissionListSort } from '@soba/lib';
+import { v7 as uuidv7 } from 'uuid';
 import {
-  SubmissionListSort,
   appendSubmissionRevision,
+  clearSubmissionProvisioning,
+  failSubmissionProvisioning,
   openSubmission,
   getSubmissionById,
   getSubmissionRecordById,
+  getSubmissionRevisionById,
   listSubmissionsForWorkspace,
   markSubmissionDeleted,
   updateSubmissionDraft,
@@ -13,8 +17,28 @@ import { getFormVersionById, getPublishedVersionForForm } from '../db/repos/form
 import { getFormEngineCodeForForm } from '../db/repos/formRepo';
 import { createFormEngineAdapter } from '../integrations/form-engine/FormEngineRegistry';
 import { ConflictError, NotFoundError, ValidationError } from '../errors';
-import { SubmissionEventType, type SubmissionEventTypeCode } from '../db/codes';
-import { resolveSubmissionTransition } from './submissionLifecycle';
+import {
+  RevisionReason,
+  RevisionStatus,
+  SubmissionEventType,
+  type RevisionReasonCode,
+  type RevisionStatusCode,
+  type SubmissionWriteEventCode,
+  type SubmissionWorkflowStateCode,
+} from '../db/codes';
+import { log } from '../logging';
+import { decideSubmissionWrite, type SubmissionWriteDecision } from './submissionWriteGate';
+
+export interface SubmissionWriteOutcome {
+  record: SubmissionRecord;
+  /** Where this write landed: `current` applied it, `pending` held it for review. */
+  revision: {
+    id: string;
+    revisionNo: number;
+    status: RevisionStatusCode;
+    reason: RevisionReasonCode;
+  };
+}
 
 interface CreateInput {
   /** Client-minted uuidv7 that becomes the submission id. */
@@ -23,6 +47,8 @@ interface CreateInput {
   actorId: string;
   actorDisplayLabel: string | null;
   formId: string;
+  /** Must be the form's published version when given. */
+  formVersionId?: string;
 }
 
 interface SaveInput {
@@ -31,6 +57,10 @@ interface SaveInput {
   actorDisplayLabel: string | null;
   submissionId: string;
   data: Record<string, unknown>;
+  /** Client-minted id for this write; the server mints one when absent. */
+  revisionId?: string;
+  /** Head the client loaded; the current head is assumed when absent. */
+  baseRevisionId?: string;
 }
 
 interface DeleteInput {
@@ -52,17 +82,22 @@ interface ListInput {
   createdBy?: string;
   q?: string;
   sort: SubmissionListSort;
+  locale: SortLocale;
 }
 
 export class SubmissionService {
   /**
    * Open a new submission against the form's currently published version (the only submittable one),
    * under the client-supplied id. Idempotent: a retry of the same id by the same actor+form returns
-   * the existing record ({ created: false }); a collision with a different owner is a 409.
+   * the existing record ({ created: false }); a collision with a different owner is a 409. A
+   * formVersionId that is not the published version is a 409.
    */
   async open(input: CreateInput) {
     const version = await getPublishedVersionForForm(input.workspaceId, input.formId);
     if (!version) throw new NotFoundError('Form has no published version');
+    if (input.formVersionId && input.formVersionId !== version.id) {
+      throw new ConflictError('Form version is not the published version');
+    }
 
     const result = await openSubmission({ ...input, formVersionId: version.id });
     if (result.outcome === 'conflict') {
@@ -82,24 +117,74 @@ export class SubmissionService {
   }
 
   /**
-   * Record a save/submit: gate the transition (lifecycle policy) up front, create a new (immutable)
-   * submission document in the form engine, then advance the PG submission + append a revision
-   * capturing the before→after engine refs. Mirrors the forms provisioning flow — status
-   * 'provisioning' → 'ready' (in appendSubmissionRevision) or 'error'.
+   * Record a save/submit: decide it up front (replay, current or pending), then write it. A `current`
+   * write appends on top of the head; a `pending` write - a conflict or a write against a submitted
+   * record - is kept off the current chain for staff to resolve, leaving the current version and
+   * workflow state untouched. The returned revision says where the write landed.
    */
-  private async record(input: SaveInput, eventType: SubmissionEventTypeCode) {
+  private async record(
+    input: SaveInput,
+    eventType: SubmissionWriteEventCode,
+  ): Promise<SubmissionWriteOutcome> {
     const submission = await getSubmissionRecordById(input.workspaceId, input.submissionId);
     if (!submission) throw new NotFoundError('Submission not found');
 
-    // Decide the resulting state first, so a terminal submission is rejected (409) before any write.
-    const workflowState = resolveSubmissionTransition(submission.workflowState, eventType);
+    const recorded = input.revisionId ? await getSubmissionRevisionById(input.revisionId) : null;
+    const decision = decideSubmissionWrite({
+      submission,
+      eventType,
+      baseRevisionId: input.baseRevisionId,
+      recorded,
+    });
+    if (decision.kind === 'replay') {
+      // The gate returns replay only when a matching revision was recorded. Report the write's landing
+      // disposition, not the revision's current standing: a revision that landed as current and was
+      // later superseded still replays as `current`, never `superseded`.
+      const revision = recorded!;
+      const landedPending = revision.status === RevisionStatus.pending;
+      return {
+        record: submission,
+        revision: {
+          id: input.revisionId!,
+          revisionNo: revision.revisionNo,
+          status: landedPending ? RevisionStatus.pending : RevisionStatus.current,
+          reason: landedPending ? (revision.reason as RevisionReasonCode) : RevisionReason.accepted,
+        },
+      };
+    }
 
-    const version = await getFormVersionById(input.workspaceId, submission.formVersionId);
+    // The base must be a revision of this submission. A foreign or unknown base is a malformed write,
+    // rejected before any engine document is created, so it cannot orphan one or branch across
+    // submissions. A base equal to the head is trivially valid.
+    if (input.baseRevisionId && input.baseRevisionId !== submission.headRevisionId) {
+      const base = await getSubmissionRevisionById(input.baseRevisionId);
+      if (base?.submissionId !== input.submissionId) {
+        throw new ValidationError('baseRevisionId is not a revision of this submission');
+      }
+    }
+
+    return this.writeRevision(input, submission, eventType, decision);
+  }
+
+  /**
+   * Create a new (immutable) submission document in the form engine, then record the revision. A
+   * `current` write advertises 'provisioning' on the submission, then 'ready' or (on engine failure)
+   * 'error'; a deleted submission is a 404 that resets 'provisioning'. A `pending` write never touches
+   * the submission's sync status - it is a side branch, so an engine failure on it leaves the live
+   * version untouched.
+   */
+  /**
+   * Resolve the submission's own form version and its engine adapter for a write, or throw a
+   * ValidationError when the version is unprovisioned, the form has no engine, or the engine does not
+   * support submissions.
+   */
+  private async resolveSubmissionEngine(submission: SubmissionRecord) {
+    const version = await getFormVersionById(submission.workspaceId, submission.formVersionId);
     if (!version || !version.engineSchemaRef) {
       throw new ValidationError('Form version is not provisioned in the engine');
     }
 
-    const engineCode = await getFormEngineCodeForForm(input.workspaceId, submission.formId);
+    const engineCode = await getFormEngineCodeForForm(submission.workspaceId, submission.formId);
     if (!engineCode) {
       throw new ValidationError('Form has no form engine configured');
     }
@@ -109,44 +194,95 @@ export class SubmissionService {
       throw new ValidationError(`Form engine '${engineCode}' does not support submissions`);
     }
 
-    await updateSubmissionDraft(input.workspaceId, input.submissionId, input.actorDisplayLabel, {
-      engineSyncStatus: 'provisioning',
-      engineSyncError: null,
-    });
+    return {
+      engineSchemaRef: version.engineSchemaRef,
+      createSubmission: adapter.createSubmission.bind(adapter),
+    };
+  }
+
+  private async writeRevision(
+    input: SaveInput,
+    submission: SubmissionRecord,
+    eventType: SubmissionWriteEventCode,
+    decision: Exclude<SubmissionWriteDecision, { kind: 'replay' }>,
+  ): Promise<SubmissionWriteOutcome> {
+    if (!input.revisionId) {
+      log.info(
+        { submissionId: input.submissionId, eventType },
+        'Submission write without revision ids',
+      );
+    }
+
+    const { engineSchemaRef, createSubmission } = await this.resolveSubmissionEngine(submission);
+    const pending = decision.kind === 'pending';
+
+    // Only a current write advertises in-flight status on the live submission; a pending write is a
+    // side branch and must leave the row alone.
+    if (!pending) {
+      await updateSubmissionDraft(input.workspaceId, input.submissionId, input.actorDisplayLabel, {
+        engineSyncStatus: 'provisioning',
+        engineSyncError: null,
+      });
+    }
+
+    const revisionId = input.revisionId ?? uuidv7();
 
     try {
-      const { engineRef } = await adapter.createSubmission({
-        engineFormRef: version.engineSchemaRef,
+      const { engineRef } = await createSubmission({
+        engineFormRef: engineSchemaRef,
         submissionId: input.submissionId,
-        revisionNo: submission.currentRevisionNo + 1,
+        revisionId,
         workspaceId: input.workspaceId,
         data: input.data,
       });
 
-      const updated = await appendSubmissionRevision({
+      const result = await appendSubmissionRevision({
         workspaceId: input.workspaceId,
         submissionId: input.submissionId,
+        revisionId,
+        parentRevisionId: decision.parentRevisionId,
         actorId: input.actorId,
         actorDisplayLabel: input.actorDisplayLabel,
         eventType,
-        workflowState,
+        status: pending ? RevisionStatus.pending : RevisionStatus.current,
+        reason: pending ? decision.reason : RevisionReason.accepted,
+        workflowState: pending
+          ? (submission.workflowState as SubmissionWorkflowStateCode)
+          : decision.workflowState,
         afterEngineSubmissionRef: engineRef,
       });
 
-      if (!updated) throw new NotFoundError('Submission not found');
+      if (result.outcome === 'not_found') throw new NotFoundError('Submission not found');
 
-      return updated;
+      return {
+        record: result.record,
+        revision: {
+          id: result.revisionId,
+          revisionNo: result.revisionNo,
+          status: result.status,
+          reason: result.reason,
+        },
+      };
     } catch (err) {
-      await updateSubmissionDraft(input.workspaceId, input.submissionId, input.actorDisplayLabel, {
-        engineSyncStatus: 'error',
-        engineSyncError: err instanceof Error ? err.message : String(err),
-      });
+      // A pending write never set a provisioning flag, so there is nothing to reset for it.
+      if (pending) throw err;
+      // A deleted submission is not an engine failure.
+      if (err instanceof NotFoundError) {
+        await clearSubmissionProvisioning(input.workspaceId, input.submissionId);
+        throw err;
+      }
+      await failSubmissionProvisioning(
+        input.workspaceId,
+        input.submissionId,
+        input.actorDisplayLabel,
+        err instanceof Error ? err.message : String(err),
+      );
       throw err;
     }
   }
 
   async delete(input: DeleteInput) {
-    return markSubmissionDeleted(input.workspaceId, input.submissionId, input.actorDisplayLabel);
+    return markSubmissionDeleted(input);
   }
 
   async get(workspaceId: string, submissionId: string) {
