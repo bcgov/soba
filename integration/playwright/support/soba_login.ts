@@ -15,7 +15,6 @@ export function formsettings() {
 
 export async function login(page: Page) {
   const { username, password, mfaCode } = formsettings();
-  await page.goto("./");
   await page.click('[data-testid="login-button"]');
   //Verify login option
   await expect(page.locator("#social-azureidir")).toBeVisible();
