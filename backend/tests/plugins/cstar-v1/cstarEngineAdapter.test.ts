@@ -1,5 +1,3 @@
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { tenantEnginePluginDefinition } from '../../../src/plugins/cstar-v1';
 import {
   CstarEngineAdapter,
@@ -12,6 +10,7 @@ import {
 import { createEnvReader } from '../../../src/core/config/env';
 import { ServiceUnavailableError } from '../../../src/core/errors';
 import { log } from '../../../src/core/logging';
+import { json, startCstar, type CstarHandler, type FakeCstar } from './fakeCstar';
 
 const USER_ID = 'F45AFBBD68C44D6F956BA3A1D9181399';
 const IDIR_CLAIMS = { identity_provider: 'idir', idir_user_guid: USER_ID };
@@ -38,40 +37,8 @@ function makeConfig(values: Record<string, string>): PluginConfigReader {
   );
 }
 
-interface FakeCstar {
-  baseUrl: string;
-  requests: { url?: string; authorization?: string }[];
-  close: () => Promise<void>;
-}
-
-// Stands in for CSTAR under /api/v1 and records what each request carried.
-async function startCstar(
-  handler: (req: IncomingMessage, res: ServerResponse) => void,
-): Promise<FakeCstar> {
-  const requests: FakeCstar['requests'] = [];
-  const server = createServer((req, res) => {
-    requests.push({ url: req.url, authorization: req.headers.authorization });
-    handler(req, res);
-  });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const { port } = server.address() as AddressInfo;
-  return {
-    baseUrl: `http://127.0.0.1:${port}/api/v1`,
-    requests,
-    close: async () => {
-      server.closeAllConnections();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-    },
-  };
-}
-
-const json = (status: number, body: unknown) => (_req: IncomingMessage, res: ServerResponse) => {
-  res.writeHead(status, { 'content-type': 'application/json' });
-  res.end(JSON.stringify(body));
-};
-
 // What a base URL missing /api reaches: the CSTAR frontend, which answers every path with 200 HTML.
-const frontendPage = (_req: IncomingMessage, res: ServerResponse) => {
+const frontendPage: CstarHandler = (_req, res) => {
   res.writeHead(200, { 'content-type': 'text/html' });
   res.end('<!doctype html><p>CSTAR</p>');
 };

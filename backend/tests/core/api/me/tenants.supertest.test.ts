@@ -1,9 +1,13 @@
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import express from 'express';
 import request from 'supertest';
 import { meRouter } from '../../../../src/core/api/me';
 import { coreErrorHandler } from '../../../../src/core/middleware/errorHandler';
+import {
+  json,
+  startCstar,
+  type CstarHandler,
+  type FakeCstar,
+} from '../../../plugins/cstar-v1/fakeCstar';
 
 const USER_ID = 'F45AFBBD68C44D6F956BA3A1D9181399';
 
@@ -33,40 +37,16 @@ function buildApp(claims: Record<string, unknown>) {
 
 const idirApp = () => buildApp({ identity_provider: 'idir', idir_user_guid: USER_ID });
 
-// Stands in for CSTAR under /api/v1 and records what each request carried.
-async function startCstar(handler: (req: IncomingMessage, res: ServerResponse) => void) {
-  const requests: { url?: string; authorization?: string }[] = [];
-  const server = createServer((req, res) => {
-    requests.push({ url: req.url, authorization: req.headers.authorization });
-    handler(req, res);
-  });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const { port } = server.address() as AddressInfo;
-  return {
-    baseUrl: `http://127.0.0.1:${port}/api/v1`,
-    requests,
-    close: async () => {
-      server.closeAllConnections();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-    },
-  };
-}
-
-const json = (status: number, body: unknown) => (_req: IncomingMessage, res: ServerResponse) => {
-  res.writeHead(status, { 'content-type': 'application/json' });
-  res.end(JSON.stringify(body));
-};
-
 describe('GET /me/tenants', () => {
   const saved = { ...process.env };
-  let cstar: Awaited<ReturnType<typeof startCstar>> | undefined;
+  let cstar: FakeCstar | undefined;
   afterEach(async () => {
     process.env = { ...saved };
     await cstar?.close();
     cstar = undefined;
   });
 
-  async function useCstar(handler: (req: IncomingMessage, res: ServerResponse) => void) {
+  async function useCstar(handler: CstarHandler) {
     cstar = await startCstar(handler);
     process.env.TENANT_ENGINE_DEFAULT_CODE = 'cstar-v1';
     process.env.PLUGIN_CSTAR_V1_API_BASE_URL = cstar.baseUrl;
