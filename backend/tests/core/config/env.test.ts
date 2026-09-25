@@ -234,7 +234,7 @@ describe('env', () => {
   });
 
   it('createEnvReader getTenantEngineDefaultCode returns value when set', () => {
-    const reader = createEnvReader({ TENANT_ENGINE_DEFUALT_CODE: 'test-code' });
+    const reader = createEnvReader({ TENANT_ENGINE_DEFAULT_CODE: 'test-code' });
     expect(reader.getTenantEngineDefaultCode()).toBe('test-code');
   });
 
