@@ -9,7 +9,7 @@ import type { CallerIdentity } from '../db/repos/formSubmitAccessRepo';
 import { findOrCreateUserByIdentity } from '../db/repos/membershipRepo';
 import { isSobaAdmin, upsertSobaAdminFromIdp } from '../db/repos/sobaAdminRepo';
 import { ValidationError } from '../errors';
-import { profileHelpers } from '../auth/jwtClaims';
+import { profileHelpers, type IdpAttributes } from '../auth/jwtClaims';
 import { getPublicUser } from '../services/publicUser';
 import { PUBLIC_PROVIDER_CODE } from '../db/codes';
 
@@ -31,6 +31,9 @@ export const resolveCaller = (req: Request): CallerIdentity => ({
   actorId: req.actorId ?? null,
   idpCode: getActorIdpCode(req) ?? req.idpType?.toLowerCase() ?? null,
 });
+
+/** The caller's IdP claims for the current session (from the verified JWT); empty when anonymous. */
+export const getActorIdpAttributes = (req: Request): IdpAttributes => req.user?.idpAttributes ?? {};
 
 export function resolveActor(req: Request, res: Response, next: NextFunction): void {
   const pluginCode = (req as Request & { idpPluginCode?: string }).idpPluginCode;

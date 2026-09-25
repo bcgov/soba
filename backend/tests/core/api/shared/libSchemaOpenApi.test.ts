@@ -63,6 +63,7 @@ describe('OpenAPI components for lib-backed schemas', () => {
     ['Meta_FeaturesResponse', 'features', 'Meta_Feature'],
     ['Meta_FormEnginesResponse', 'items', 'Meta_FormEngine'],
     ['Meta_RolesResponse', 'roles', 'Meta_RoleWithSource'],
+    ['Me_TenantsResponse', 'tenants', 'Me_Tenant'],
   ])('%s references its %s item component', (response, property, item) => {
     expect(at(schemas, response, 'properties', property, 'items')).toEqual(ref(item));
   });

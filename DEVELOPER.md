@@ -243,19 +243,24 @@ Key form-version routes: `POST /:id/publish`, `POST /:id/unpublish`, `POST /:id/
 
 ### Plugin implementations
 
-The backend uses a **plugin architecture** so that form engines, auth (IdP), cache, message bus, and optional feature APIs can be swapped or extended without changing core. Plugins are discovered from `backend/src/plugins/` (each directory is a plugin module). Configuration is via env (e.g. which plugins are enabled, plugin-specific keys). For auth, Passport is now the protected-route entry point, but IdP plugins still provide provider-specific token verification and claim mapping. See [In Detail — Configuration of plugins and features](#configuration-of-plugins-and-features).
+The backend uses a **plugin architecture** so that external services and infrastructure can be swapped without changing core. Plugins are discovered from `backend/src/plugins/` (each directory is a plugin module; `shared/` holds code shared between plugins). Most kinds select one plugin by a default code; IdP uses an ordered list and storage uses profiles. Each plugin reads its own `PLUGIN_<CODE>_*` keys (storage reads `STORAGE_PROFILE_<PROFILE>_*`). For auth, Passport is the protected-route entry point, but IdP plugins still provide provider-specific token verification and claim mapping. See [In Detail - Configuration of plugins and features](#configuration-of-plugins-and-features). To add a plugin or a new kind, follow [How to add a plugin](docs/how-to-add-a-plugin.md).
 
-**Plugin types and current implementations:**
+**Plugin kinds and current implementations:**
 
-| Type            | Purpose                            | Implementations                                                                   |
-| --------------- | ---------------------------------- | --------------------------------------------------------------------------------- |
-| **Form engine** | Render/store forms and submissions | `formio-v5` (Form.io v5)                                                          |
-| **IdP (auth)**  | JWT validation, claim mapping      | `idp-bcgov-sso` (BC Gov Keycloak), `idp-github`                                   |
-| **Cache**       | Key-value cache                    | `cache-memory`; future: Redis                                                     |
-| **Message bus** | Async messaging                    | `messagebus-memory`; future: Redis, NATS                                          |
-| **Feature API** | Optional REST API per plugin       | none; `pluginApiDefinition` extension point stays for plugins with REST endpoints |
+| Kind                    | Purpose                                  | Implementations                                  | Selected by (default)                                                                |
+| ----------------------- | ---------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| **Form engine**         | Render/store forms and submissions       | `formio-v5` (Form.io v5)                         | `FORM_ENGINE_DEFAULT_CODE` (`formio-v5`)                                             |
+| **IdP (auth)**          | JWT validation, claim mapping            | `idp-bcgov-sso` (code `bcgov-sso`), `idp-github` | `IDP_PLUGINS`, tried in order (`bcgov-sso`)                                          |
+| **Cache**               | Key-value cache                          | `cache-memory`, `cache-redis`                    | `CACHE_DEFAULT_CODE` (`cache-memory`)                                                |
+| **Message bus**         | Cross-replica pub/sub                    | `messagebus-memory`, `messagebus-redis`          | `MESSAGEBUS_DEFAULT_CODE` (`messagebus-memory`)                                      |
+| **Event stream**        | Durable at-least-once streams            | `eventstream-memory`, `eventstream-redis`        | `EVENTSTREAM_DEFAULT_CODE` (`eventstream-memory`)                                    |
+| **Temp storage**        | Temporary files                          | `tempstorage-os`, `tempstorage-mount`            | `TEMPSTORAGE_DEFAULT_CODE` (`tempstorage-os`)                                        |
+| **Virus scan**          | Scan uploaded files                      | `virusscan-noop`, `virusscan-clamav`             | `VIRUSSCAN_DEFAULT_CODE` (`virusscan-noop`; Helm sets `virusscan-clamav`)            |
+| **Storage**             | File storage, one backend per profile    | `storage-memory`, `storage-local`, `storage-s3`  | `STORAGE_PROFILES` (one `storage-memory` profile in development; required elsewhere) |
+| **Document generation** | Render documents                         | `docgen-noop`, `cdogs-v2`, `cdogs-v3`            | `DOCUMENT_GENERATION_DEFAULT_CODE` (`docgen-noop`); cdogs is feature-gated           |
+| **Tenant engine**       | The caller's tenants (`GET /me/tenants`) | `tenant-noop`, `cstar-v1` (CSTAR)                | `TENANT_ENGINE_DEFAULT_CODE` (`tenant-noop`)                                         |
 
-IdP plugins are ordered via env (`IDP_PLUGINS`); the first successful IdP wins. Passport orchestrates the ordered plugin attempts and the winning plugin supplies the mapped identity used by core. IdP env prefixes follow plugin codes (e.g. `bcgov-sso` → `PLUGIN_BCGOV_SSO_*`, `idp-github` → `PLUGIN_IDP_GITHUB_*`).
+IdP plugins are ordered via env (`IDP_PLUGINS`); the first successful IdP wins. Passport orchestrates the ordered plugin attempts and the winning plugin supplies the mapped identity used by core. IdP env prefixes follow plugin codes (e.g. `bcgov-sso` reads `PLUGIN_BCGOV_SSO_*`, `idp-github` reads `PLUGIN_IDP_GITHUB_*`).
 
 ### Features
 
@@ -448,9 +453,9 @@ The Form.io admin client (`backend/src/plugins/formio-v5/formioV5Client.ts`) aut
 
 ### Configuration of plugins and features
 
-- **Plugin discovery:** Plugins live under `backend/src/plugins/<pluginDir>/`. Each plugin module can export one or more of: `workspacePluginDefinition`, `formEnginePluginDefinition`, `pluginApiDefinition`, `idpPluginDefinition`, `cachePluginDefinition`, `messagebusPluginDefinition`. The registry validates with Zod and builds caches at startup.
-- **Which plugins run:** Workspace resolvers: `WORKSPACE_PLUGINS_ALLOWED` (comma-separated codes). IdP: `IDP_PLUGINS` (comma-separated; default from `IDP_PLUGIN_DEFAULT_CODE`). Cache / message bus: `CACHE_DEFAULT_CODE`, `MESSAGEBUS_DEFAULT_CODE`. Form engine: `FORM_ENGINE_DEFAULT_CODE`. Only plugins that are both discovered and listed in the relevant env are used. For auth, Passport uses the ordered IdP plugin list as its provider chain and stops at the first successful plugin. `WORKSPACE_PLUGINS_STRICT_MODE=true` fails startup if any enabled workspace plugin is missing.
-- **Plugin config:** Each plugin gets a `PluginConfigReader` built from env with a prefix. Prefix is `PLUGIN_<NORMALIZED_CODE>_` (e.g. `PLUGIN_FORMIO_V5_API_BASE_URL`). The reader exposes `getRequired`, `getOptional`, `getBoolean`, `getNumber`, `getCsv`. Use `.env.example` and `.env.local` for secrets; document keys in examples only.
+- **Plugin discovery:** Plugins live under `backend/src/plugins/<pluginDir>/`; `shared/` is skipped. `PluginRegistry` loads each module once and validates the exports named in its `DEFINITION_KINDS` with Zod: `formEnginePluginDefinition`, `documentGenerationPluginDefinition`, `tenantEnginePluginDefinition`, `idpPluginDefinition`, `cachePluginDefinition`, `messagebusPluginDefinition`, `eventStreamPluginDefinition`, `tempStoragePluginDefinition`, `virusScanPluginDefinition`, `storagePluginDefinition` and `pluginApiDefinition`. A module that fails to load, or a definition that fails validation, is logged and skipped. `pluginApiDefinition` is validated but its router is not mounted.
+- **Which plugins run:** Each kind's default code selects its plugin, falling back to the default in the [kinds table](#plugin-implementations). IdP: `IDP_PLUGINS` (comma-separated; default from `IDP_PLUGIN_DEFAULT_CODE`); Passport uses the ordered list as its provider chain and stops at the first successful plugin. Storage: one backend per profile in `STORAGE_PROFILES`. A document generation plugin that declares a `featureCode` is used only where that feature is available for the workspace or form, and a scoped one overrides the default. `/api/v1/meta/plugins` marks the active selectable, storage, form engine and tenant engine plugins, and feature-gated plugins whose feature is platform-enabled; it does not mark IdP plugins or the document generation default.
+- **Plugin config:** Each plugin gets a `PluginConfigReader` built from env with a prefix. Prefix is `PLUGIN_<NORMALIZED_CODE>_` (e.g. `PLUGIN_FORMIO_V5_API_BASE_URL`). The reader exposes `getRequired`, `getOptional`, `getBoolean`, `getNumber`, `getOptionalNumber`, `getCsv`. Storage profiles read `STORAGE_PROFILE_<PROFILE>_*` instead. Use `.env.example` and `.env.local` for secrets; document keys in examples only.
 - **Features (DB):** The `soba.feature` and `soba.feature_status` tables are seeded via `pnpm db:seed`. Feature status (e.g. `enabled`/`disabled`) drives feature-flag behaviour. Roles and code tables support `source` and (for roles) `feature_code` so features can add codes and roles; see [Enable/Disable features, add codes + roles](#enabledisable-features-add-codes--roles-for-feature).
 
 ### Admins: table and IdP role mapping

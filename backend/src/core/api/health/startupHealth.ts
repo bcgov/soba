@@ -26,6 +26,7 @@ import {
   type EventStreamSelfTestResult,
 } from '../../integrations/eventstream/eventStreamSelfTest';
 import { checkDocumentGenerationReadiness } from '../../integrations/document-generation/DocumentGenerationRegistry';
+import { checkTenantEngineReadiness } from '../../integrations/tenant/TenantEngineRegistry';
 
 /** Run a check; swallow sync throws and rejections. */
 async function probe(check: () => Promise<boolean>): Promise<boolean> {
@@ -231,5 +232,29 @@ export async function logDocumentGenerationReadiness(): Promise<void> {
     );
   } else {
     log.info({ documentGeneration: results }, 'Document generation readiness: all backends ready');
+  }
+}
+
+/** Log per-engine tenant engine readiness (CSTAR reachability / config) at startup. Never throws. */
+export async function logTenantEngineReadiness(): Promise<void> {
+  let results: Record<string, { ok: boolean; message?: string }>;
+  try {
+    results = await checkTenantEngineReadiness();
+  } catch (err) {
+    log.warn({ err }, 'Tenant engine readiness could not run');
+    return;
+  }
+
+  const notReady = Object.entries(results)
+    .filter(([, r]) => !r.ok)
+    .map(([code]) => code);
+
+  if (notReady.length > 0) {
+    log.warn(
+      { tenantEngines: results },
+      `Tenant engine readiness: not ready: ${notReady.join(', ')}`,
+    );
+  } else {
+    log.info({ tenantEngines: results }, 'Tenant engine readiness: all engines ready');
   }
 }
