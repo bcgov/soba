@@ -8,7 +8,6 @@ import {
   ListWorkspacesResponseSchema as SobaListWorkspacesResponseSchema,
   WorkspaceLookupItemSchema as SobaWorkspaceLookupItemSchema,
   WorkspaceLookupResponseSchema as SobaWorkspaceLookupResponseSchema,
-  ListTenantsResponseSchema as SobaListTenantsResponseSchema,
 } from '@soba/lib';
 
 import {
@@ -22,8 +21,6 @@ import {
 import { LOOKUP_NOTE } from '../shared/lookup';
 import { WORKSPACE_NAME_TAKEN } from '../../messages';
 
-const WORKSPACE_NOT_FOUND = 'Workspace not found';
-
 extendZodWithOpenApi(z);
 
 // @soba/lib builds its schemas before zod is extended, so they only get `.openapi()` once cloned.
@@ -36,20 +33,6 @@ export const WorkspaceSortSchema = SobaWorkspaceSortSchema.clone().openapi(
   'Workspaces_WorkspaceSort',
   { description: 'Valid workspace sort tokens: `field:asc` or `field:desc`.' },
 );
-
-export const ListTenantsResponseSchema = SobaListTenantsResponseSchema.clone().openapi(
-  'Workspaces_ListTenantsResponse',
-);
-
-export const TenantEngineHealthResponseSchema = z
-  .record(
-    z.string(),
-    z.object({
-      ok: z.boolean(),
-      message: z.string().optional(),
-    }),
-  )
-  .openapi('Workspaces_TenantEngineHealthResponse');
 
 export const ListWorkspacesQuerySchema = z
   .object({
@@ -113,12 +96,6 @@ export const WorkspaceIdParamsSchema = z
     id: z.string().min(1),
   })
   .openapi('Workspaces_WorkspaceIdParams');
-
-export const EngineCodeParamsSchema = z
-  .object({
-    engineCode: z.string().min(1),
-  })
-  .openapi('Workspaces_EngineCodeParams');
 
 export const CreateWorkspaceBodySchema = SobaCreateWorkspaceBodySchema.clone().openapi(
   'Workspaces_CreateWorkspaceBody',
@@ -193,7 +170,7 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       403: { description: 'Actor is not a member of the workspace' },
-      404: { description: WORKSPACE_NOT_FOUND },
+      404: { description: 'Workspace not found' },
     },
   });
 
@@ -250,82 +227,8 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       403: { description: 'Only workspace owners can rename this workspace' },
-      404: { description: WORKSPACE_NOT_FOUND },
+      404: { description: 'Workspace not found' },
       409: { description: WORKSPACE_NAME_TAKEN },
-    },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: `${WORKSPACES_PATH}/engine/health`,
-    tags: [TAG],
-    security: [{ bearerAuth: [] }],
-    responses: {
-      200: {
-        description: 'Get workspace (tenant) engine health for default code',
-        content: {
-          'application/json': {
-            schema: TenantEngineHealthResponseSchema,
-          },
-        },
-      },
-    },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: `${WORKSPACES_PATH}/engine/health/{engineCode}`,
-    tags: [TAG],
-    security: [{ bearerAuth: [] }],
-    request: {
-      params: EngineCodeParamsSchema,
-    },
-    responses: {
-      200: {
-        description: 'Get workspace (tenant) engine health for specified code',
-        content: {
-          'application/json': {
-            schema: TenantEngineHealthResponseSchema,
-          },
-        },
-      },
-    },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: `${WORKSPACES_PATH}/engine`,
-    tags: [TAG],
-    security: [{ bearerAuth: [] }],
-    responses: {
-      200: {
-        description: 'Get workspace tenants for default engine',
-        content: {
-          'application/json': {
-            schema: ListTenantsResponseSchema,
-          },
-        },
-      },
-    },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: `${WORKSPACES_PATH}/engine/{engineCode}`,
-    tags: [TAG],
-    security: [{ bearerAuth: [] }],
-    request: {
-      params: EngineCodeParamsSchema,
-    },
-    responses: {
-      200: {
-        description: 'Get workspace tenants for specified engine',
-        content: {
-          'application/json': {
-            schema: ListTenantsResponseSchema,
-          },
-        },
-      },
     },
   });
 };

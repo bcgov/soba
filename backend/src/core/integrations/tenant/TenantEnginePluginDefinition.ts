@@ -1,5 +1,5 @@
-import { PluginConfigReader } from '../../config/pluginConfig';
-import { TenantEngineAdapter } from './TenantEngineAdapter';
+import type { PluginConfigReader } from '../../config/pluginConfig';
+import type { TenantEngineAdapter } from './TenantEngineAdapter';
 
 export interface TenantEngineMetadata {
   code: string;

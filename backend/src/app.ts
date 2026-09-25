@@ -16,7 +16,7 @@ import {
   logMessageBusSelfTest,
   logEventStreamSelfTest,
   logDocumentGenerationReadiness,
-  logTenantServiceReadiness,
+  logTenantEngineReadiness,
 } from './core/api/health';
 import { metaRouter } from './core/api/meta';
 import { buildOpenApiSpec } from './core/api/shared/openapi';
@@ -158,6 +158,6 @@ app.listen(port, () => {
     .then(logMessageBusSelfTest)
     .then(logEventStreamSelfTest)
     .then(logDocumentGenerationReadiness)
-    .then(logTenantServiceReadiness)
+    .then(logTenantEngineReadiness)
     .catch((err) => log.warn({ err }, 'Startup diagnostics failed'));
 });

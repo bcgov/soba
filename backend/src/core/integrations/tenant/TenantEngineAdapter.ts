@@ -1,24 +1,21 @@
-import type { TenantSchema } from '@soba/lib';
+import type { Tenant } from '@soba/lib';
+import type { IdpAttributes } from '../../auth/jwtClaims';
 
-/** Result of a form engine readiness check; no config or credentials are exposed. */
+/** Result of a tenant engine readiness check; no config or credentials are exposed. */
 export interface TenantEngineReadinessResult {
   ok: boolean;
   message?: string;
 }
 
-export interface TenantsResult {
-  ok?: boolean;
-  tenants?: Array<typeof TenantSchema>;
-  message?: string;
-}
-
 export interface GetTenantsInput {
+  /** The caller's bearer token, without the scheme. */
   token: string;
-  userId: string;
+  claims: IdpAttributes;
 }
 
 export interface TenantEngineAdapter {
   /** Optional: report whether the engine is reachable (readiness). No config in result. */
   readinessCheck?(): Promise<TenantEngineReadinessResult>;
-  getTenants(input: GetTenantsInput): Promise<TenantsResult>;
+  /** The caller's tenants. Throws an AppError when the engine cannot answer. */
+  getTenants(input: GetTenantsInput): Promise<Tenant[]>;
 }

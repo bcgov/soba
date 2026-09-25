@@ -235,12 +235,13 @@ export async function logDocumentGenerationReadiness(): Promise<void> {
   }
 }
 
-export async function logTenantServiceReadiness(): Promise<void> {
+/** Log per-engine tenant engine readiness (CSTAR reachability / config) at startup. Never throws. */
+export async function logTenantEngineReadiness(): Promise<void> {
   let results: Record<string, { ok: boolean; message?: string }>;
   try {
     results = await checkTenantEngineReadiness();
   } catch (err) {
-    log.warn({ err }, 'Tenant readiness could not run');
+    log.warn({ err }, 'Tenant engine readiness could not run');
     return;
   }
 
@@ -249,8 +250,11 @@ export async function logTenantServiceReadiness(): Promise<void> {
     .map(([code]) => code);
 
   if (notReady.length > 0) {
-    log.warn({ tenant: results }, `Tenant readiness: not ready: ${notReady.join(', ')}`);
+    log.warn(
+      { tenantEngines: results },
+      `Tenant engine readiness: not ready: ${notReady.join(', ')}`,
+    );
   } else {
-    log.info({ tenant: results }, 'Tenant readiness: all backends ready');
+    log.info({ tenantEngines: results }, 'Tenant engine readiness: all engines ready');
   }
 }

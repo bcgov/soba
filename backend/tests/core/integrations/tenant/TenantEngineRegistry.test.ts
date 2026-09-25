@@ -1,105 +1,59 @@
-import { getTenantEnginePlugins } from '../../../../src/core/integrations/tenant/TenantEngineRegistry';
-import * as pluginRegistry from '../../../../src/core/integrations/plugins/PluginRegistry';
-
-jest.mock('../../../../src/core/integrations/plugins/PluginRegistry');
-jest.mock('../../../../src/core/config/pluginConfig');
+import {
+  checkTenantEngineReadiness,
+  createDefaultTenantEngineAdapter,
+  createTenantEngineAdapter,
+  getTenantEnginePlugins,
+  resolveDefaultTenantEngineCode,
+  resolveTenantEnginePlugin,
+} from '../../../../src/core/integrations/tenant/TenantEngineRegistry';
+import { CstarEngineAdapter } from '../../../../src/plugins/cstar-v1/cstarEngineAdapter';
 
 describe('TenantEngineRegistry', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+  const saved = { ...process.env };
+  afterEach(() => {
+    process.env = { ...saved };
   });
 
-  it('getTenantEnginePlugins calls catalog', () => {
-    jest
-      .mocked(pluginRegistry.getTenantEnginePluginCatalog)
-      .mockReturnValue([{ code: 'test', name: 'Test' }]);
-    expect(getTenantEnginePlugins()).toEqual([{ code: 'test', name: 'Test' }]);
+  it('discovers the cstar and noop engines in its catalog', () => {
+    const codes = getTenantEnginePlugins().map((p) => p.code);
+    expect(codes).toEqual(expect.arrayContaining(['cstar-v1', 'tenant-noop']));
   });
 
-  it('resolveTenantEnginePlugin throws if code not found', async () => {
-    await jest.isolateModulesAsync(async () => {
-      const { resolveTenantEnginePlugin } =
-        await import('../../../../src/core/integrations/tenant/TenantEngineRegistry');
-      const pr = await import('../../../../src/core/integrations/plugins/PluginRegistry');
-      jest.spyOn(pr, 'getTenantEnginePluginDefinitions').mockReturnValue([]);
-
-      expect(() => resolveTenantEnginePlugin('missing')).toThrow(
-        "No tenant engine plugin is installed for code 'missing'",
-      );
-    });
+  it('resolves an engine by code and rejects unknown codes', () => {
+    expect(resolveTenantEnginePlugin('cstar-v1').metadata.version).toBe('v1');
+    expect(() => resolveTenantEnginePlugin('nope')).toThrow(/No tenant engine plugin/);
   });
 
-  it('resolveTenantEnginePlugin returns definition', async () => {
-    await jest.isolateModulesAsync(async () => {
-      const { resolveTenantEnginePlugin } =
-        await import('../../../../src/core/integrations/tenant/TenantEngineRegistry');
-      const pr = await import('../../../../src/core/integrations/plugins/PluginRegistry');
-      jest.spyOn(pr, 'getTenantEnginePluginDefinitions').mockReturnValue([
-        {
-          code: 'test',
-        } as unknown as import('../../../../src/core/integrations/tenant/TenantEnginePluginDefinition').TenantEnginePluginDefinition,
-      ]);
-
-      expect(resolveTenantEnginePlugin('test')).toEqual({ code: 'test' });
-    });
+  it('creates an adapter for a configured engine', () => {
+    process.env.PLUGIN_CSTAR_V1_API_BASE_URL = 'http://cstar.test/api/v1';
+    expect(createTenantEngineAdapter('cstar-v1')).toBeInstanceOf(CstarEngineAdapter);
   });
 
-  it('createTenantEngineAdapter creates adapter via definition', async () => {
-    await jest.isolateModulesAsync(async () => {
-      const { createTenantEngineAdapter } =
-        await import('../../../../src/core/integrations/tenant/TenantEngineRegistry');
-      const pr = await import('../../../../src/core/integrations/plugins/PluginRegistry');
-      const pc = await import('../../../../src/core/config/pluginConfig');
+  it('defaults the engine to tenant-noop, honouring the env override', () => {
+    delete process.env.TENANT_ENGINE_DEFAULT_CODE;
+    expect(resolveDefaultTenantEngineCode()).toBe('tenant-noop');
 
-      const mockCreateAdapter = jest.fn().mockReturnValue('adapter');
-      jest.spyOn(pr, 'getTenantEnginePluginDefinitions').mockReturnValue([
-        {
-          code: 'test',
-          createAdapter: mockCreateAdapter,
-        } as unknown as import('../../../../src/core/integrations/tenant/TenantEnginePluginDefinition').TenantEnginePluginDefinition,
-      ]);
-      jest
-        .spyOn(pc, 'createPluginConfigReader')
-        .mockReturnValue(
-          'config-reader' as unknown as import('../../../../src/core/config/pluginConfig').PluginConfigReader,
-        );
-
-      const adapter = createTenantEngineAdapter('test');
-      expect(adapter).toBe('adapter');
-      expect(mockCreateAdapter).toHaveBeenCalledWith('config-reader');
-    });
+    process.env.TENANT_ENGINE_DEFAULT_CODE = 'cstar-v1';
+    expect(resolveDefaultTenantEngineCode()).toBe('cstar-v1');
   });
 
-  it('checkTenantEngineReadiness returns results for all plugins', async () => {
-    await jest.isolateModulesAsync(async () => {
-      const { checkTenantEngineReadiness } =
-        await import('../../../../src/core/integrations/tenant/TenantEngineRegistry');
-      const pr = await import('../../../../src/core/integrations/plugins/PluginRegistry');
+  it('creates the default adapter without external config (noop)', async () => {
+    delete process.env.TENANT_ENGINE_DEFAULT_CODE;
+    const adapter = createDefaultTenantEngineAdapter();
+    await expect(
+      adapter.getTenants({ token: 'tok', claims: { identity_provider: 'idir' } }),
+    ).resolves.toEqual([]);
+  });
 
-      jest.spyOn(pr, 'getTenantEnginePluginCatalog').mockReturnValue([
-        { code: 'plugin1', name: 'Plugin 1' },
-        { code: 'plugin2', name: 'Plugin 2' },
-        { code: 'plugin3', name: 'Plugin 3' },
-      ]);
-      jest.spyOn(pr, 'getTenantEnginePluginDefinitions').mockReturnValue([
-        { code: 'plugin1', createAdapter: () => ({ readinessCheck: async () => ({ ok: true }) }) },
-        { code: 'plugin2', createAdapter: () => ({}) }, // No readinessCheck
-        {
-          code: 'plugin3',
-          createAdapter: () => ({
-            readinessCheck: async () => {
-              throw new Error('fail');
-            },
-          }),
-        },
-      ] as unknown as import('../../../../src/core/integrations/tenant/TenantEnginePluginDefinition').TenantEnginePluginDefinition[]);
+  it('reports readiness per engine, failing those missing config', async () => {
+    delete process.env.PLUGIN_CSTAR_V1_API_BASE_URL;
 
-      const results = await checkTenantEngineReadiness();
-      expect(results).toEqual({
-        plugin1: { ok: true },
-        plugin2: { ok: true },
-        plugin3: { ok: false, message: 'fail' },
-      });
+    const readiness = await checkTenantEngineReadiness();
+
+    expect(readiness['tenant-noop']).toEqual({ ok: true });
+    expect(readiness['cstar-v1']).toEqual({
+      ok: false,
+      message: 'PLUGIN_CSTAR_V1_API_BASE_URL is required',
     });
   });
 });

@@ -33,6 +33,35 @@ describe('Tenant Schemas TenantSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts the null columns CSTAR returns', () => {
+    const data = {
+      id: '123',
+      name: 'Test Tenant',
+      ministryName: 'Ministry of Test',
+      description: null,
+      createdDateTime: null,
+      updatedDateTime: null,
+      createdBy: null,
+      updatedBy: null,
+    };
+
+    const result = TenantSchema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('strips fields outside the schema', () => {
+    const result = TenantSchema.parse({
+      id: '123',
+      name: 'Test Tenant',
+      ministryName: 'Ministry of Test',
+      createdDateTime: '2021-01-01',
+      updatedDateTime: '2021-01-01',
+      createdBy: 'user1',
+      users: [{ id: 'u1' }],
+    });
+    expect(result).not.toHaveProperty('users');
+  });
+
   it('fails if required fields are missing', () => {
     const data = {
       id: '123',

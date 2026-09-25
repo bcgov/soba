@@ -8,8 +8,6 @@ import {
   createWorkspace,
   getWorkspaceById,
   updateWorkspace,
-  getEngineHealth,
-  getEngineTenants,
 } from './controller';
 import {
   ListWorkspacesQuerySchema,
@@ -20,11 +18,6 @@ import {
 } from './schema';
 
 const router = express.Router();
-
-router.get('/workspaces/engine/health', getEngineHealth);
-router.get('/workspaces/engine/health/:engineCode', getEngineHealth);
-router.get('/workspaces/engine', getEngineTenants);
-router.get('/workspaces/engine/:engineCode', getEngineTenants);
 
 // Actor-only: lists the workspaces the caller belongs to (no workspace context required).
 router.get(

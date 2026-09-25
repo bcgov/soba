@@ -39,7 +39,7 @@ import type {
   StorageEngineReadinessResult,
   StoragePluginDefinition,
 } from '../storage-engine/StorageEngineAdapter';
-import { TenantEnginePluginDefinition } from '../tenant/TenantEnginePluginDefinition';
+import type { TenantEnginePluginDefinition } from '../tenant/TenantEnginePluginDefinition';
 
 // --- Definition schemas -----------------------------------------------------
 
@@ -49,7 +49,7 @@ const AdapterPluginDefinitionSchema = z.object({
   createAdapter: z.any(),
 });
 
-// form-engine and document-generation share this { code, metadata, createAdapter } shape.
+// form-engine, document-generation and tenant-engine share this { code, metadata, createAdapter } shape.
 const MetadataPluginDefinitionSchema = z.object({
   code: z.string().min(1),
   metadata: z.object({
@@ -141,7 +141,7 @@ const DEFINITION_KINDS: ReadonlyArray<{
   { field: 'idpDefinition', exportKey: 'idpPluginDefinition', schema: IdpPluginDefinitionSchema },
   {
     field: 'tenantEngineDefinition',
-    exportKey: 'tenantEngineDefinition',
+    exportKey: 'tenantEnginePluginDefinition',
     schema: MetadataPluginDefinitionSchema,
   },
 ];
@@ -335,6 +335,24 @@ export function getDocumentGenerationPluginDefinitions(): DocumentGenerationPlug
   return definitionsOf('documentGenerationDefinition');
 }
 
+export interface TenantEnginePluginCatalogEntry {
+  code: string;
+  name: string;
+  version?: string;
+}
+
+export function getTenantEnginePluginCatalog(): TenantEnginePluginCatalogEntry[] {
+  return getTenantEnginePluginDefinitions().map((d) => ({
+    code: d.code,
+    name: d.metadata.name,
+    version: d.metadata.version,
+  }));
+}
+
+export function getTenantEnginePluginDefinitions(): TenantEnginePluginDefinition[] {
+  return definitionsOf('tenantEngineDefinition');
+}
+
 export function getCachePluginDefinitions(): CachePluginDefinition[] {
   return definitionsOf('cacheDefinition');
 }
@@ -511,22 +529,4 @@ export async function checkStorageReadiness(): Promise<
     }
   }
   return results;
-}
-
-export interface TenantEnginePluginCatalogEntry {
-  code: string;
-  name: string;
-  version?: string;
-}
-
-export function getTenantEnginePluginCatalog(): TenantEnginePluginCatalogEntry[] {
-  return getTenantEnginePluginDefinitions().map((d) => ({
-    code: d.code,
-    name: d.metadata.name,
-    version: d.metadata.version,
-  }));
-}
-
-export function getTenantEnginePluginDefinitions(): TenantEnginePluginDefinition[] {
-  return definitionsOf('tenantEngineDefinition');
 }

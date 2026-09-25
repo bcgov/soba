@@ -179,6 +179,17 @@ and Vault/Kubernetes Secret (secret) values.
 | `PLUGIN_CDOGS_V2_CLIENT_ID`     | `PLUGIN_CDOGS_V2_CLIENT_ID`     |
 | `PLUGIN_CDOGS_V2_CLIENT_SECRET` | `PLUGIN_CDOGS_V2_CLIENT_SECRET` |
 
+## Tenant Engine Configuration
+
+The tenant engine serves `GET /me/tenants`. It has no secrets: `cstar-v1` calls CSTAR with the
+signed-in user's own token. ConfigMap `<fullname>-backend-tenant-engine`:
+
+| Helm value                                | Env var                        | Used by                 |
+| ----------------------------------------- | ------------------------------ | ----------------------- |
+| `backend.config.tenantEngineDefaultCode`  | `TENANT_ENGINE_DEFAULT_CODE`   | default engine resolver |
+| `backend.tenantEngine.cstarV1.apiBaseUrl` | `PLUGIN_CSTAR_V1_API_BASE_URL` | cstar-v1 adapter        |
+| `backend.tenantEngine.cstarV1.timeoutMs`  | `PLUGIN_CSTAR_V1_TIMEOUT_MS`   | cstar-v1 adapter        |
+
 ## Database Migration
 
 On every `helm install` and `helm upgrade`, a Kubernetes Job runs **before** the
