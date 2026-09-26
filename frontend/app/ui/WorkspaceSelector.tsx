@@ -13,6 +13,7 @@ export function WorkspaceSelector({
   allLabel,
   description,
   className = '',
+  isRequired = false,
 }: Readonly<{
   workspaces: WorkspaceSelectorItem[];
   className?: string;
@@ -22,6 +23,7 @@ export function WorkspaceSelector({
   /** When set, prepends an option covering every workspace, which selects null. */
   allLabel?: string;
   description?: string;
+  isRequired?: boolean;
   onChange: (key: string | number | null) => void;
 }>) {
   return (
@@ -32,6 +34,7 @@ export function WorkspaceSelector({
       label={label}
       description={description}
       className={`mr-2 ${className}`}
+      isRequired={isRequired}
       selectedKey={selectedWorkspaceId || (allLabel ? 'all' : null)}
       onSelectionChange={(key) => onChange(key === 'all' ? null : key)}
       items={[

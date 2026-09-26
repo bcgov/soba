@@ -1,18 +1,12 @@
 'use client';
-import { useId, useMemo, useRef, useState, useEffect, useLayoutEffect } from 'react';
-import {
-  Button,
-  RadioGroup,
-  Radio,
-  CheckboxGroup,
-  Checkbox,
-  InlineAlert,
-} from '@bcgov/design-system-react-components';
+import { useMemo, useRef, useState, useEffect, useLayoutEffect } from 'react';
+import { Button, InlineAlert } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { messageForDataError } from '@/src/shared/api/dataError';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import type { SetFormSubmitterAudienceBody } from '@/src/types/groups';
 import { useSubmitterAudience, type AudienceView } from '../data/useSubmitterAudience';
+import { SubmitterAudienceControls, describeAudience } from './SubmitterAudienceControls';
 import styles from './FormSubmitterAudience.module.css';
 
 type Props = Readonly<{
@@ -20,25 +14,7 @@ type Props = Readonly<{
   /** Shows and edits this form's audience, which can inherit the workspace's. */
   formId?: string;
   canManage: boolean;
-  createForm?: boolean;
-  value?: SetFormSubmitterAudienceBody;
-  onChange?: (value: SetFormSubmitterAudienceBody) => void;
 }>;
-
-type FormDict = ReturnType<typeof useDictionary>['form'];
-
-function describeAudience(
-  audience: Pick<AudienceView, 'mode' | 'idps' | 'users'>,
-  available: AudienceView['available'],
-  t: FormDict,
-): string {
-  if (audience.mode === 'public') return t.submitterAudiencePublic;
-  if (audience.mode === 'none') return t.submitterAudienceNotSet;
-  const names = audience.idps.map((c) => available.find((p) => p.code === c)?.name ?? c);
-  if (audience.users.length) names.push(`${audience.users.length} ${t.submitterAudiencePeople}`);
-  return `${t.submitterAudienceProtected} (${names.join(', ')})`;
-}
-
 function initialMode(audience: AudienceView): string {
   if (audience.inherit) return 'inherit';
   return audience.mode === 'none' ? '' : audience.mode;
@@ -50,14 +26,7 @@ function saveBody(mode: string, idps: string[]): SetFormSubmitterAudienceBody {
   return { mode: 'protected', idps };
 }
 
-export function FormSubmitterAudience({
-  workspaceId,
-  formId,
-  canManage,
-  createForm,
-  value,
-  onChange,
-}: Props) {
+export function FormSubmitterAudience({ workspaceId, formId, canManage }: Props) {
   const dict = useDictionary();
   const t = dict.form;
   const { token } = useKeycloak();
@@ -69,8 +38,7 @@ export function FormSubmitterAudience({
   const triggerRef = useRef<HTMLSpanElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
-  const summaryId = useId();
-  const isForm = !!formId || !!createForm;
+  const isForm = !!formId;
 
   const { view: audience, error: loadError, save } = useSubmitterAudience(workspaceId, formId);
 
@@ -95,43 +63,20 @@ export function FormSubmitterAudience({
       idps: audience.idps,
       users: audience.users,
     };
-    if (value) {
-      const alternateIdps = value.mode === 'inherit' ? ws.idps : [];
-      const idps = value.mode === 'protected' ? value.idps : alternateIdps;
-      return {
-        ...audience,
-        inherit: value.mode === 'inherit',
-        mode: value.mode === 'inherit' ? ws.mode : value.mode,
-        idps: idps,
-        users: value.mode === 'inherit' ? ws.users : [],
-        workspace: ws,
-      };
-    }
     return { ...audience, workspace: ws };
-  }, [audience, value]);
+  }, [audience]);
 
   // Seed the editable state from the saved audience whenever the panel opens. An inherited
   // protected audience seeds its providers, so an override starts from the workspace's.
   const openPanel = () => {
     if (!effectiveAudience) return;
-    if (value) {
-      setMode(value.mode);
-      const offered = new Set(effectiveAudience.available.map((p) => p.code));
-      const alternateIdps =
-        effectiveAudience.mode === 'protected'
-          ? effectiveAudience.idps.filter((c) => offered.has(c))
-          : [];
-      const idps = value.mode === 'protected' ? value.idps : alternateIdps;
-      setIdps(idps);
-    } else {
-      setMode(initialMode(effectiveAudience));
-      const offered = new Set(effectiveAudience.available.map((p) => p.code));
-      setIdps(
-        effectiveAudience.mode === 'protected'
-          ? effectiveAudience.idps.filter((c) => offered.has(c))
-          : [],
-      );
-    }
+    setMode(initialMode(effectiveAudience));
+    const offered = new Set(effectiveAudience.available.map((p) => p.code));
+    setIdps(
+      effectiveAudience.mode === 'protected'
+        ? effectiveAudience.idps.filter((c) => offered.has(c))
+        : [],
+    );
     setSaveError(null);
     setOpen(true);
   };
@@ -173,25 +118,11 @@ export function FormSubmitterAudience({
       : text;
   }, [effectiveAudience, t]);
 
-  const workspaceSummary =
-    effectiveAudience?.workspace &&
-    describeAudience(effectiveAudience.workspace, effectiveAudience.available, t);
-
-  // Protected needs a principal. A workspace's existing direct user counts; a form override holds
-  // providers only.
   const directUsers = isForm ? 0 : (effectiveAudience?.users.length ?? 0);
   const noPrincipal = mode === 'protected' && idps.length === 0 && directUsers === 0;
   const saveDisabled = saving || mode === '' || noPrincipal;
-  const overridesPeople =
-    (mode === 'public' || mode === 'protected') &&
-    (effectiveAudience?.workspace?.users.length ?? 0) > 0;
 
   const onSave = async () => {
-    if (onChange) {
-      onChange(saveBody(mode, idps));
-      closePanel();
-      return;
-    }
     if (!token) return;
     setSaving(true);
     setSaveError(null);
@@ -234,56 +165,15 @@ export function FormSubmitterAudience({
           <div className={styles.dialog}>
             <div className={styles.sections}>
               {saveError && <InlineAlert variant="danger" title={saveError} />}
-              <RadioGroup
-                value={mode}
-                onChange={setMode}
-                isDisabled={saving}
-                label={t.submitterAudienceLabel}
-              >
-                {isForm && (
-                  <Radio
-                    value="inherit"
-                    data-testid="audience-mode-inherit"
-                    aria-describedby={
-                      mode === 'inherit' && workspaceSummary ? summaryId : undefined
-                    }
-                  >
-                    {t.submitterAudienceInherit}
-                  </Radio>
-                )}
-                <Radio value="public" data-testid="audience-mode-public">
-                  {t.submitterAudiencePublic}
-                </Radio>
-                <Radio value="protected" data-testid="audience-mode-protected">
-                  {t.submitterAudienceProtected}
-                </Radio>
-              </RadioGroup>
-              {mode === 'inherit' && workspaceSummary && (
-                <span id={summaryId} data-testid="audience-workspace-summary">
-                  {workspaceSummary}
-                </span>
-              )}
-              {overridesPeople && (
-                <InlineAlert
-                  variant="info"
-                  data-testid="audience-people-note"
-                  title={t.submitterAudienceUsersNotApplied}
-                />
-              )}
-              {mode === 'protected' && (
-                <CheckboxGroup
-                  value={idps}
-                  onChange={setIdps}
-                  isDisabled={saving}
-                  label={t.submitterAudienceProviders}
-                >
-                  {(effectiveAudience?.available ?? []).map((p) => (
-                    <Checkbox key={p.code} value={p.code} data-testid={`audience-idp-${p.code}`}>
-                      {p.name}
-                    </Checkbox>
-                  ))}
-                </CheckboxGroup>
-              )}
+              <SubmitterAudienceControls
+                mode={mode}
+                setMode={setMode}
+                idps={idps}
+                setIdps={setIdps}
+                saving={saving}
+                isForm={isForm}
+                effectiveAudience={effectiveAudience}
+              />
               <div className={styles.actions}>
                 <Button
                   variant="tertiary"

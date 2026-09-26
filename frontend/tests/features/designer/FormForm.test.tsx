@@ -48,6 +48,12 @@ vi.mock('@/app/[lang]/Providers', () => ({
       report: 'Reporting usually on a repeating schedule or event driven like follow-ups',
       registration: 'Registrations or Sign up - no evaluation',
     },
+    submission: {
+      error: 'Error',
+    },
+    dataTable: {
+      emptyMessage: 'Empty',
+    },
   }),
 }));
 
@@ -523,9 +529,126 @@ describe('FormForm', () => {
       await renderForm({ formId: 'f1' });
     });
 
-    expect(await screen.findByTestId('designer-load-error')).toHaveTextContent(
+    expect(await screen.findByTestId('page-notice-load-error')).toHaveTextContent(
       'Failed to load form.',
     );
     expect(screen.queryByText('Loading')).not.toBeInTheDocument();
+  });
+
+  describe('Tab Permissions', () => {
+    it('shows only the Designer and History tabs when user only has design_update', async () => {
+      api.getSobaForm.mockImplementation(() =>
+        Promise.resolve({
+          id: 'f1',
+          name: 'Test',
+          description: '',
+          permissions: ['design_update'],
+          currentVersion: newestFirst(mockWorkspaceState.versions)[0] ?? null,
+        }),
+      );
+      await act(async () => {
+        await renderForm({ formId: 'f1' });
+      });
+
+      expect(screen.getByTestId('designer-tab')).toBeInTheDocument();
+      expect(screen.getByTestId('version-tab')).toBeInTheDocument();
+      // "Share" tab has no permission requirement, it's always shown
+      expect(screen.getByTestId('share-tab')).toBeInTheDocument();
+
+      expect(screen.queryByTestId('settings-tab')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('team-tab')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('submission-tab')).not.toBeInTheDocument();
+    });
+
+    it('shows only the Settings tab when user only has form_update', async () => {
+      api.getSobaForm.mockImplementation(() =>
+        Promise.resolve({
+          id: 'f1',
+          name: 'Test',
+          description: '',
+          permissions: ['form_update'],
+          currentVersion: newestFirst(mockWorkspaceState.versions)[0] ?? null,
+        }),
+      );
+      await act(async () => {
+        await renderForm({ formId: 'f1' });
+      });
+
+      expect(screen.getByTestId('settings-tab')).toBeInTheDocument();
+      expect(screen.getByTestId('share-tab')).toBeInTheDocument();
+
+      expect(screen.queryByTestId('designer-tab')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('version-tab')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('team-tab')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('submission-tab')).not.toBeInTheDocument();
+    });
+
+    it('shows only the Team tab when user only has team_update', async () => {
+      api.getSobaForm.mockImplementation(() =>
+        Promise.resolve({
+          id: 'f1',
+          name: 'Test',
+          description: '',
+          permissions: ['team_update'],
+          currentVersion: newestFirst(mockWorkspaceState.versions)[0] ?? null,
+        }),
+      );
+      await act(async () => {
+        await renderForm({ formId: 'f1' });
+      });
+
+      expect(screen.getByTestId('team-tab')).toBeInTheDocument();
+      expect(screen.getByTestId('share-tab')).toBeInTheDocument();
+
+      expect(screen.queryByTestId('designer-tab')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('version-tab')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('settings-tab')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('submission-tab')).not.toBeInTheDocument();
+    });
+
+    it('shows only the Submissions tab when user only has submission_read', async () => {
+      api.getSobaForm.mockImplementation(() =>
+        Promise.resolve({
+          id: 'f1',
+          name: 'Test',
+          description: '',
+          permissions: ['submission_read'],
+          currentVersion: newestFirst(mockWorkspaceState.versions)[0] ?? null,
+        }),
+      );
+      await act(async () => {
+        await renderForm({ formId: 'f1' });
+      });
+
+      expect(screen.getByTestId('submission-tab')).toBeInTheDocument();
+      expect(screen.getByTestId('share-tab')).toBeInTheDocument();
+
+      expect(screen.queryByTestId('designer-tab')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('version-tab')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('settings-tab')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('team-tab')).not.toBeInTheDocument();
+    });
+
+    it('shows all tabs when user has * permission', async () => {
+      api.getSobaForm.mockImplementation(() =>
+        Promise.resolve({
+          id: 'f1',
+          name: 'Test',
+          description: '',
+          permissions: ['*'],
+          currentVersion: newestFirst(mockWorkspaceState.versions)[0] ?? null,
+        }),
+      );
+      await act(async () => {
+        await renderForm({ formId: 'f1' });
+      });
+
+      expect(screen.getByTestId('designer-tab')).toBeInTheDocument();
+      expect(screen.getByTestId('settings-tab')).toBeInTheDocument();
+      expect(screen.getByTestId('team-tab')).toBeInTheDocument();
+      expect(screen.getByTestId('version-tab')).toBeInTheDocument();
+      expect(screen.getByTestId('submission-tab')).toBeInTheDocument();
+      expect(screen.getByTestId('share-tab')).toBeInTheDocument();
+    });
   });
 });

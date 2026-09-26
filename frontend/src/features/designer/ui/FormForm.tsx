@@ -103,7 +103,8 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   const SHARE_TAB = 'share';
 
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || '');
+  const requestedTab = searchParams.get('tab') ?? '';
+  const [activeTab, setActiveTab] = useState('');
   // A tab's read starts when it is first opened and stays cached after: leaving is not a reason to
   // drop what it loaded, and the reads behind these tabs are gated on permissions a user may lack.
   const [openedTabs, setOpenedTabs] = useState<string[]>(() => [activeTab]);
@@ -176,11 +177,11 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   }, [form?.permissions]);
 
   const canSeeDesignTab = useMemo(() => {
-    return hasPermission(permissions, Permissions.design_create);
+    return hasPermission(permissions, Permissions.design_update);
   }, [permissions]);
 
   const canSeeSettingsTab = useMemo(() => {
-    return hasPermission(permissions, Permissions.all);
+    return hasPermission(permissions, Permissions.form_update);
   }, [permissions]);
 
   const canSeeAccessTab = useMemo(() => {
@@ -204,31 +205,38 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
       canSeeHistoryTab !== undefined &&
       canSeeSubmissionsTab !== undefined
     ) {
-      const setT = async (tab: string) => {
-        setActiveTab(tab);
-      };
+      const validTabs = [];
       if (canSeeDesignTab) {
-        setT(DESIGNER_TAB);
+        validTabs.push(DESIGNER_TAB);
       } else if (canSeeSettingsTab) {
-        setT(SETTINGS_TAB);
+        validTabs.push(SETTINGS_TAB);
       } else if (canSeeAccessTab) {
-        setT(ACCESS_TAB);
+        validTabs.push(ACCESS_TAB);
       } else if (canSeeHistoryTab) {
-        setT(HISTORY_TAB);
+        validTabs.push(HISTORY_TAB);
       } else if (canSeeSubmissionsTab) {
-        setT(SUBMISSIONS_TAB);
+        validTabs.push(SUBMISSIONS_TAB);
       } else {
-        setT(SHARE_TAB);
+        validTabs.push(SHARE_TAB);
+      }
+      const setT = async (tab: string) => {
+        openTab(tab);
+      };
+      if (validTabs.includes(requestedTab)) {
+        setT(requestedTab);
+      } else {
+        setT(validTabs[0]);
       }
     }
   }, [
     activeTab,
-    setActiveTab,
     canSeeDesignTab,
     canSeeSettingsTab,
     canSeeAccessTab,
     canSeeHistoryTab,
     canSeeSubmissionsTab,
+    openTab,
+    requestedTab,
   ]);
 
   const reportWriteFailure = async (e: unknown, failedText: string) => {
@@ -310,7 +318,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     }
   };
 
-  if (initializing) {
+  if (initializing || !activeTab) {
     return <CenteredProgress label={dict.form.loading} />;
   }
 
@@ -455,7 +463,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
         id="form-designer-tabs"
         aria-label={dict.form.designerTabs || 'Form Designer tabs'}
         activeKey={activeTab}
-        onSelect={(k) => openTab(k || 'designer')}
+        onSelect={(k) => openTab(k || DESIGNER_TAB)}
         className="mb-3"
         // A tab's data is read when it is opened, not before: the reads behind these tabs are
         // gated on permissions a given user may not hold.
@@ -502,7 +510,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
               formId={formId}
               onSelectVersion={selectVersion}
               onRestoreVersion={restoreVersionAsNew}
-              onNavigateToDesigner={() => openTab('designer')}
+              onNavigateToDesigner={() => openTab(DESIGNER_TAB)}
             />
           </Tab>
         )}
@@ -516,7 +524,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
             <FormSubmissionTab
               dict={dict}
               formId={formId}
-              opened={openedTabs.includes('submissions')}
+              opened={openedTabs.includes(SUBMISSIONS_TAB)}
             />
           </Tab>
         )}

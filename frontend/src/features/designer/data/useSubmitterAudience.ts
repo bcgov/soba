@@ -90,16 +90,3 @@ export function useSubmitterAudience(workspaceId: string | null, formId?: string
   const rawError = formId ? formRead.error : workspaceRead.error;
   return { view, error: rawError ? classifyDataError(rawError) : null, save };
 }
-
-/** A hook to update a form's submitter audience without a pre-existing formId. */
-export function useFormAudienceWriter() {
-  const saveFormAudience = async (
-    token: string,
-    formId: string,
-    body: SetFormSubmitterAudienceBody,
-  ): Promise<void> => {
-    await setFormSubmitterAudience(token, formId, body);
-  };
-
-  return { saveFormAudience };
-}
