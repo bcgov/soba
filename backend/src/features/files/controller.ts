@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { filesService } from './service';
+import { streamFile } from './streamFile';
 import { isBlockedExtension } from './config';
 import { resolveCaller } from '../../core/middleware/actor';
 import { accessDenial } from '../../core/middleware/formSubmitAccess';
@@ -80,16 +81,19 @@ export async function downloadFileHandler(req: Request, res: Response): Promise<
     throw accessDenial(req, 'Not authorized to access this file');
   }
   const { record, file } = result;
-  res.setHeader(
-    'Content-Type',
-    record.contentType ?? file.contentType ?? 'application/octet-stream',
-  );
-  const size = record.size ?? file.size;
-  if (size != null) res.setHeader('Content-Length', String(size));
-  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(record.filename)}"`);
-
   if (file.downloadStream) {
-    file.downloadStream.pipe(res);
+    res.setHeader(
+      'Content-Type',
+      record.contentType ?? file.contentType ?? 'application/octet-stream',
+    );
+    // The stored bytes set the length; a stale record size would misframe the response.
+    const size = file.size ?? record.size;
+    if (size != null) res.setHeader('Content-Length', String(size));
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${encodeURIComponent(record.filename)}"`,
+    );
+    await streamFile(file.downloadStream, res, record.id);
     return;
   }
   if (file.publicUrl) {

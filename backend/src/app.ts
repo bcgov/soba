@@ -24,6 +24,7 @@ import { httpLogger, log } from './core/logging';
 import { resolveActor, resolveActorOrPublic } from './core/middleware/actor';
 import { requireFeature } from './core/middleware/requireFeature';
 import { requireSobaAdmin } from './core/middleware/requireSobaAdmin';
+import { coreErrorHandler, notFoundHandler } from './core/middleware/errorHandler';
 import { adminRouter } from './core/api/admin';
 import { globalRateLimit, apiRateLimit, publicRateLimit } from './core/middleware/rateLimit';
 import { initializePassport } from './core/auth/passport';
@@ -158,6 +159,11 @@ app.use(
   resolveActor,
   coreRouter,
 );
+
+// Paths outside every surface, and errors raised by the surface middleware above (auth, feature
+// gates, body parsing), which run before a surface router's own error handler.
+app.use(notFoundHandler);
+app.use(coreErrorHandler);
 
 app.listen(port, () => {
   log.info({ port }, 'Express is listening');
