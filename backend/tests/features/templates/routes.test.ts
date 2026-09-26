@@ -32,6 +32,10 @@ jest.mock('../../../src/core/middleware/workspaceContext', () => ({
       next();
     },
 }));
+const mockLiveVersion = jest.fn();
+jest.mock('../../../src/core/db/repos/formVersionRepo', () => ({
+  isLiveFormVersion: (...args: unknown[]) => mockLiveVersion(...args),
+}));
 jest.mock('../../../src/features/templates/service', () => ({
   templatesService: {
     list: jest.fn(),
@@ -78,6 +82,7 @@ describe('templates routes', () => {
     mockAsked.length = 0;
     mockGranted.clear();
     jest.clearAllMocks();
+    mockLiveVersion.mockResolvedValue(true);
   });
 
   it.each([
@@ -119,5 +124,39 @@ describe('templates routes', () => {
     const res = await request(app).get(url);
     expect(res.status).toBe(400);
     expect(mockAsked).toEqual([]);
+  });
+
+  it.each([
+    ['GET', `/templates?formVersionId=${VERSION}`],
+    ['POST', `/templates?formVersionId=${VERSION}`],
+  ])(
+    'returns 404 on %s for a version whose form is deleted, before any upload',
+    async (method, url) => {
+      Object.values(Permissions).forEach((p) => mockGranted.add(p));
+      mockLiveVersion.mockResolvedValue(false);
+      const res = await send(method, url);
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ error: 'Form version not found' });
+      expect(templatesService.list).not.toHaveBeenCalled();
+      expect(templatesService.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('answers a caller without permission 403, whether or not the form is deleted', async () => {
+    mockLiveVersion.mockResolvedValue(false);
+    const res = await send('GET', `/templates?formVersionId=${VERSION}`);
+    expect(res.status).toBe(403);
+    expect(mockLiveVersion).not.toHaveBeenCalled();
+  });
+
+  it('refuses a template file name over 255 bytes with 400', async () => {
+    Object.values(Permissions).forEach((p) => mockGranted.add(p));
+    const res = await request(app)
+      .post(`/templates?formVersionId=${VERSION}`)
+      .attach('file', Buffer.from('x'), `${'a'.repeat(252)}.docx`)
+      .field('name', 'Receipt');
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'File name is longer than 255 bytes' });
+    expect(templatesService.create).not.toHaveBeenCalled();
   });
 });

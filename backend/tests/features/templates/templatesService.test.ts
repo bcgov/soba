@@ -33,6 +33,11 @@ jest.mock('../../../src/core/db/repos/fileRepo', () => {
       await unlink(mockTx, record);
       mockFiles.delete(record.id);
     }),
+    releaseFileRow: jest.fn(async (_tx: unknown, record: any, isLinked: any) => {
+      if (await isLinked(mockTx, record)) return false;
+      mockFiles.delete(record.id);
+      return true;
+    }),
     releaseFileRecord: jest.fn(async (record: any, unlink: any, isLinked: any) => {
       await unlink(mockTx, record);
       if (await isLinked(mockTx, record)) return false;

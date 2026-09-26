@@ -51,6 +51,8 @@ import * as templateRepo from '../../../src/core/db/repos/documentTemplateRepo';
 import { fileStore } from '../../../src/core/services/fileStore';
 import { Readable } from 'node:stream';
 import { ServiceUnavailableError } from '../../../src/core/errors';
+import { HttpClientError } from '../../../src/core/http/httpClient';
+import { httpErrorToAppError } from '../../../src/core/http/httpErrorMapper';
 
 const getSubmissionListContext = submissionRepo.getSubmissionListContext as unknown as jest.Mock;
 const getSubmissionRecordById = submissionRepo.getSubmissionRecordById as unknown as jest.Mock;
@@ -266,7 +268,9 @@ describe('documentGenerationService audit', () => {
 
   it('records an error audit and returns error when the backend throws', async () => {
     isActiveParticipant.mockResolvedValue(true);
-    renderMock.mockRejectedValue(new ServiceUnavailableError('CDOGS error 500: boom'));
+    renderMock.mockRejectedValue(
+      httpErrorToAppError(new HttpClientError(500, 'Error', 'boom', 'http://cdogs.test'), 'CDOGS'),
+    );
 
     const outcome = await documentGenerationService.preview(caller, {
       submissionId: 's1',
@@ -280,8 +284,8 @@ describe('documentGenerationService audit', () => {
         backendCode: 'cdogs-v2',
         outcome: 'error',
         httpStatus: 503,
-        // PI-safe: the error class, not the upstream body (which was 'CDOGS error 500: boom').
-        errorDetail: 'ServiceUnavailableError',
+        // PI-safe: the error class and upstream status, not the upstream body ('boom').
+        errorDetail: 'ServiceUnavailableError upstream 500',
       }),
     );
   });

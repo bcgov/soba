@@ -6,8 +6,8 @@ export const TEMPLATE_NOT_RENDERED = 'Template could not be rendered';
 const GENERATION_UNAVAILABLE = 'Document generation is unavailable';
 
 /**
- * The error a render failure returns to the caller: a backend refusal (4xx) is a generic 422, any
- * other failure a generic 503.
+ * The error a render failure returns to the caller. A request the backend refused (400, 415 or 422,
+ * or an upstream 413) is a generic 422; any other failure is a generic 503.
  */
 export function toRenderError(
   err: unknown,
@@ -28,7 +28,8 @@ export function toRenderError(
     upstreamStatus: upstreamStatusOf(err),
     error: err.name,
   };
-  if (err.statusCode >= 500) {
+  // A backend that refuses the request as too large is refusing this template, not failing.
+  if (err.statusCode >= 500 && failure.upstreamStatus !== 413) {
     log.warn(failure, 'document generation backend failed');
     return new ServiceUnavailableError(GENERATION_UNAVAILABLE);
   }

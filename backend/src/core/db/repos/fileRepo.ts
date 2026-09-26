@@ -54,6 +54,22 @@ export const deleteFileRecord = async (
 };
 
 /**
+ * Delete the file row when none of the owner's links remain, in the caller's transaction. True when
+ * this call deletes the row.
+ */
+export const releaseFileRow = async (
+  tx: Tx,
+  record: FileRecord,
+  isLinked: FileLinkCheck,
+): Promise<boolean> => {
+  // The file lock makes concurrent releases of one file count its links one at a time.
+  await tx.select({ id: files.id }).from(files).where(eq(files.id, record.id)).for('update');
+  if (await isLinked(tx, record)) return false;
+  const deleted = await tx.delete(files).where(eq(files.id, record.id)).returning({ id: files.id });
+  return deleted.length > 0;
+};
+
+/**
  * Delete the owner's link, then the file row when no link remains, in one transaction. True when
  * this call deletes the file row.
  */
@@ -63,14 +79,7 @@ export const releaseFileRecord = async (
   isLinked: FileLinkCheck,
 ): Promise<boolean> =>
   db.transaction(async (tx) => {
+    // Link row, then file row: the lock order every path takes.
     await unlink(tx, record);
-    // Link row, then file row: the lock order every path takes. The file lock makes concurrent
-    // releases of one file count its links one at a time.
-    await tx.select({ id: files.id }).from(files).where(eq(files.id, record.id)).for('update');
-    if (await isLinked(tx, record)) return false;
-    const deleted = await tx
-      .delete(files)
-      .where(eq(files.id, record.id))
-      .returning({ id: files.id });
-    return deleted.length > 0;
+    return releaseFileRow(tx, record, isLinked);
   });

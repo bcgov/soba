@@ -153,8 +153,9 @@ export type FeatureStatusCode = (typeof FeatureStatus)[keyof typeof FeatureStatu
 
 /**
  * Feature codes backed by the soba.feature table. Most gate a mounted API surface via
- * requireFeature and mirror the frontend FEATURE_CODES; antivirus is backend-only and gates
- * the upload scan in the core file store rather than a surface of its own.
+ * requireFeature and mirror the frontend FEATURE_CODES. Templates, dev-data, antivirus and the
+ * per-backend document generation codes have no frontend code; antivirus gates the upload scan in
+ * the core file store rather than a surface of its own.
  */
 export const Features = {
   design_mode: 'design-mode',

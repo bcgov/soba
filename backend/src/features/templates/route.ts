@@ -7,6 +7,8 @@ import { parseUpload } from '../../core/middleware/parseUpload';
 import { requireFeature } from '../../core/middleware/requireFeature';
 import { requireFormPermissions } from '../../core/middleware/requireFormPermissions';
 import { workspaceFromResource } from '../../core/middleware/workspaceContext';
+import { isLiveFormVersion } from '../../core/db/repos/formVersionRepo';
+import { NotFoundError } from '../../core/errors';
 import { TemplateIdParamsSchema, TemplateNameBodySchema, TemplatesQuerySchema } from './schema';
 import {
   createTemplateHandler,
@@ -21,6 +23,15 @@ import {
 const router = express.Router();
 
 const upload = parseUpload(env.getTemplatesMaxFileSizeMb() * 1024 * 1024);
+
+// A deleted form keeps its versions, so the version alone does not say whether its form is live.
+const liveFormVersion = asyncHandler(async (req, _res, next) => {
+  if (!(await isLiveFormVersion(req.query.formVersionId as string))) {
+    throw new NotFoundError('Form version not found');
+  }
+  next();
+});
+
 const onFormVersion = [
   validateRequest({ query: TemplatesQuerySchema }),
   workspaceFromResource({ kind: 'formVersion', idFrom: 'queryFormVersionId' }),
@@ -35,12 +46,15 @@ const canDelete = requireFormPermissions([Permissions.document_template_delete])
 
 router.use(requireFeature(Features.templates), requireFeature(Features.design_mode));
 
-router.get('/', ...onFormVersion, canRead, asyncHandler(listTemplatesHandler));
+// liveFormVersion follows the permission check, so only a caller who may see the form learns its
+// state.
+router.get('/', ...onFormVersion, canRead, liveFormVersion, asyncHandler(listTemplatesHandler));
 // Uploads are authorized before the body is parsed, so an unauthorized caller never buffers a file.
 router.post(
   '/',
   ...onFormVersion,
   canWrite,
+  liveFormVersion,
   upload,
   validateRequest({ body: TemplateNameBodySchema }),
   asyncHandler(createTemplateHandler),

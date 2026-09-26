@@ -133,18 +133,18 @@ subjects, so they cannot sign in. They exist to fill member lists, groups, and r
 
 ## Layout
 
-| File                                     | Role                                                     |
-| ---------------------------------------- | -------------------------------------------------------- |
-| [`plan.ts`](./plan.ts)                   | What gets created, as data. No DB, no engine, no clock   |
-| [`generate.ts`](./generate.ts)           | Runs the plan through the services, returns a manifest   |
-| [`purge.ts`](./purge.ts)                 | Removes it all, engine documents included                |
-| [`fixtures/`](./fixtures)                | Form definitions and answers matching their components   |
-| [`ownerFile.ts`](./ownerFile.ts)         | Reads and writes `.devdata-owner`, creates the owner     |
-| [`resolveUser.ts`](./resolveUser.ts)     | Looks the owner up by username                           |
-| [`preconditions.ts`](./preconditions.ts) | Checks the database is migrated and seeded               |
-| [`guard.ts`](./guard.ts)                 | Refuses to run unless the dev-data feature is on         |
-| [`runs.ts`](./runs.ts)                   | Records each run's ids in `soba.dev_data_run` as it goes |
-| [`cli.ts`](./cli.ts)                     | Argument parsing, output, exit codes                     |
+| File                                     | Role                                                       |
+| ---------------------------------------- | ---------------------------------------------------------- |
+| [`plan.ts`](./plan.ts)                   | What gets created, as data. No DB, no engine, no clock     |
+| [`generate.ts`](./generate.ts)           | Runs the plan through the services, returns a manifest     |
+| [`purge.ts`](./purge.ts)                 | Removes it all, engine documents and stored bytes included |
+| [`fixtures/`](./fixtures)                | Form definitions and answers matching their components     |
+| [`ownerFile.ts`](./ownerFile.ts)         | Reads and writes `.devdata-owner`, creates the owner       |
+| [`resolveUser.ts`](./resolveUser.ts)     | Looks the owner up by username                             |
+| [`preconditions.ts`](./preconditions.ts) | Checks the database is migrated and seeded                 |
+| [`guard.ts`](./guard.ts)                 | Refuses to run unless the dev-data feature is on           |
+| [`runs.ts`](./runs.ts)                   | Records each run's ids in `soba.dev_data_run` as it goes   |
+| [`cli.ts`](./cli.ts)                     | Argument parsing, output, exit codes                       |
 
 `generate()` and `purge()` take options and return results, with no argv, console, or process exit,
 so an admin API route can drive them unchanged.
@@ -158,8 +158,10 @@ so an admin API route can drive them unchanged.
   Postgres row without its engine document is broken. Workspaces, groups, audience, and users are
   direct repo calls, bypassing checks the API applies (workspace creation would reject the BCeID
   dev users). The generated set is therefore not guaranteed to be reproducible through the API.
-- Purge order: read engine refs, purge Postgres in one transaction, then delete engine documents
-  best-effort. The reverse leaves live rows pointing at documents that are gone.
+- Purge order: read engine refs and stored files, purge Postgres in one transaction, then delete
+  engine documents and stored bytes best-effort. The reverse leaves live rows pointing at documents
+  and bytes that are gone. Run purge where the backend runs (in its pod when deployed), so it uses
+  the same storage profiles.
 - Every save and submit creates a new engine document, so purge collects refs from
   `submission_revision` as well as from the submission row.
 - A new table carrying `workspace_id` must be added to `WORKSPACE_SCOPED_TABLES` and to

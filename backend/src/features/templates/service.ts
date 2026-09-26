@@ -10,12 +10,11 @@ import {
   setDocumentTemplateFile,
   type DocumentTemplateWithFile,
 } from '../../core/db/repos/documentTemplateRepo';
-import type { FileRecord } from '../../core/db/repos/fileRepo';
+import { releaseFileRow, type FileRecord } from '../../core/db/repos/fileRepo';
 import type { Tx } from '../../core/db/client';
 import { fileStore, storedOrThrow } from '../../core/services/fileStore';
 import type { GetFileResult } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 import { ConflictError } from '../../core/errors';
-import { log } from '../../core/logging';
 
 /** Who is acting, and in which workspace. */
 export interface TemplateActor {
@@ -79,29 +78,27 @@ export const templatesService = {
     return getDocumentTemplate(id);
   },
 
-  /** Store the new file under the same template id, then release the file it replaced. */
+  /**
+   * Store the new file under the same template id and release the file it replaced, in one
+   * transaction; the replaced bytes go after commit.
+   */
   async replaceFile(
     existing: DocumentTemplateWithFile,
     actor: TemplateActor,
     file: TemplateFile,
   ): Promise<DocumentTemplateWithFile | null> {
     const { id } = existing.template;
+    let released = false;
     storedOrThrow(
       await fileStore.put(toStoreInput(actor, file), async (tx, record) => {
         if (!(await setDocumentTemplateFile(tx, id, existing.file.id, record.id, actor.actorId))) {
           throw new ConflictError(TEMPLATE_CHANGED);
         }
+        // Template row, then file row: the lock order every path takes.
+        released = await releaseFileRow(tx, existing.file, usedByTemplates);
       }),
     );
-    // The template points at the new file, so the old one has no link to remove.
-    await fileStore
-      .release(existing.file, async () => undefined, usedByTemplates)
-      .catch((err: unknown) => {
-        log.warn(
-          { err, templateId: id, fileId: existing.file.id },
-          'Replaced template file not released',
-        );
-      });
+    if (released) await fileStore.deleteBytes(existing.file);
     return getDocumentTemplate(id);
   },
 

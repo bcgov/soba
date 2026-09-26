@@ -11,6 +11,7 @@ import type { GetFileResult } from '../integrations/storage-engine/StorageEngine
 import { isStoragePrefix } from '../integrations/storage-engine/storageKey';
 import { scanUpload, type ScanOutcome } from './scanUpload';
 import { ServiceUnavailableError, UnprocessableEntityError } from '../errors';
+import { log } from '../logging';
 
 export interface StoreFileInput {
   workspaceId: string;
@@ -86,10 +87,13 @@ export const fileStore = {
     return getStorageAdapter(record.profile).getFile(record.backendRef);
   },
 
-  /** Rows first, then bytes: a failed byte delete leaves a reclaimable orphan. */
+  /**
+   * Rows first, then bytes: a failed byte delete leaves unreferenced bytes, never a row without
+   * bytes.
+   */
   async remove(record: FileRecord, unlink: FileLinkWrite): Promise<void> {
     await deleteFileRecord(record, unlink);
-    await getStorageAdapter(record.profile).deleteFile(record.backendRef);
+    await fileStore.deleteBytes(record);
   },
 
   /**
@@ -98,7 +102,16 @@ export const fileStore = {
    */
   async release(record: FileRecord, unlink: FileLinkWrite, isLinked: FileLinkCheck): Promise<void> {
     if (await releaseFileRecord(record, unlink, isLinked)) {
+      await fileStore.deleteBytes(record);
+    }
+  },
+
+  /** Delete a file's stored bytes once its row is gone. Never throws: a failure is logged. */
+  async deleteBytes(record: FileRecord): Promise<void> {
+    try {
       await getStorageAdapter(record.profile).deleteFile(record.backendRef);
+    } catch (err) {
+      log.warn({ err, fileId: record.id, profile: record.profile }, 'Stored bytes not deleted');
     }
   },
 };

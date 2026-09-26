@@ -9,6 +9,7 @@ const TEMPLATE_PATH = `${TEMPLATES_PATH}/{id}`;
 const SECURITY = [{ bearerAuth: [] }];
 const NOT_FOUND = { description: 'Not found' };
 const FORBIDDEN = { description: 'Insufficient form permissions' };
+const INVALID_ID = { description: 'Invalid template id' };
 
 export const TemplateIdParamsSchema = z.object({ id: z.uuid() }).openapi('Templates_IdParams');
 
@@ -104,7 +105,12 @@ export function registerTemplatesOpenApi(registry: OpenAPIRegistry) {
     tags,
     security: SECURITY,
     request: { params: TemplateIdParamsSchema },
-    responses: { 200: templateResponse('Template'), 403: FORBIDDEN, 404: NOT_FOUND },
+    responses: {
+      200: templateResponse('Template'),
+      400: INVALID_ID,
+      403: FORBIDDEN,
+      404: NOT_FOUND,
+    },
   });
 
   registry.registerPath({
@@ -115,6 +121,7 @@ export function registerTemplatesOpenApi(registry: OpenAPIRegistry) {
     request: { params: TemplateIdParamsSchema },
     responses: {
       200: { description: 'Template file (attachment)', content: {} },
+      400: INVALID_ID,
       403: FORBIDDEN,
       404: NOT_FOUND,
       503: { description: 'Template content unavailable' },
@@ -147,7 +154,7 @@ export function registerTemplatesOpenApi(registry: OpenAPIRegistry) {
     },
     responses: {
       200: templateResponse('Renamed template'),
-      400: { description: 'Invalid name' },
+      400: { description: 'Invalid template id or name' },
       403: FORBIDDEN,
       404: NOT_FOUND,
       409: { description: 'A template with this name already exists on the form version' },
@@ -162,6 +169,7 @@ export function registerTemplatesOpenApi(registry: OpenAPIRegistry) {
     request: { params: TemplateIdParamsSchema },
     responses: {
       204: { description: 'Deleted' },
+      400: INVALID_ID,
       403: FORBIDDEN,
       404: NOT_FOUND,
       409: { description: 'Template changed while the request ran' },

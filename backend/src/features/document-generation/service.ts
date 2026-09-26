@@ -25,6 +25,7 @@ import {
 import { SubmissionService } from '../../core/services/submissionService';
 import type { DocumentRenderRequest } from '../../core/integrations/document-generation/DocumentGenerationAdapter';
 import { templateFileType } from '../../core/integrations/document-generation/templateFileType';
+import { upstreamStatusOf } from '../../core/http/httpErrorMapper';
 import { env } from '../../core/config/env';
 import { AppError, UnprocessableEntityError } from '../../core/errors';
 import { log, getCorrelationId } from '../../core/logging';
@@ -80,9 +81,14 @@ interface AuditContext {
 const submissionReader = new SubmissionService();
 const maxConcurrentRenders = env.getDocumentGenerationMaxConcurrent();
 
-// PI-safe: record the error class only (e.g. ServiceUnavailableError), never the upstream error
-// body, which can echo submitted answer data. The mapped HTTP status is captured separately.
-const errorLabel = (err: unknown): string => (err instanceof Error ? err.name : 'Error');
+// PI-safe: record the error class and the upstream status (e.g. `ServiceUnavailableError
+// upstream 429`), never the upstream error body, which can echo submitted answer data. The mapped
+// HTTP status is captured separately.
+const errorLabel = (err: unknown): string => {
+  const label = err instanceof Error ? err.name : 'Error';
+  const upstream = upstreamStatusOf(err);
+  return upstream === undefined ? label : `${label} upstream ${upstream}`;
+};
 
 /**
  * Record one document-generation backend call (success or error). Non-blocking: a failed audit write

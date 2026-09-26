@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { templatesService, type TemplateActor, type TemplateFile } from './service';
 import { isTemplateFile, TEMPLATE_TYPES } from './config';
-import { getUploadedFile } from '../../core/middleware/parseUpload';
+import { checkedFileName, getUploadedFile } from '../../core/middleware/parseUpload';
 import { sendStoredFile } from '../../core/api/shared/sendStoredFile';
 import type { DocumentTemplateWithFile } from '../../core/db/repos/documentTemplateRepo';
 import {
@@ -39,7 +39,7 @@ function templateFile(req: Request): TemplateFile {
     throw new UnsupportedMediaTypeError(`Template must be one of: ${TEMPLATE_TYPES}`);
   }
   return {
-    filename: upload.originalname,
+    filename: checkedFileName(upload.originalname),
     contentType: upload.mimetype,
     size: upload.size,
     buffer: upload.buffer,

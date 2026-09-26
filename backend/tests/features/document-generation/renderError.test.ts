@@ -34,6 +34,13 @@ describe('toRenderError', () => {
     expect(mapped.message).toBe('Document generation is unavailable');
   });
 
+  it('returns a generic 422 when the backend refuses the request as too large', () => {
+    const tooLarge = new HttpClientError(413, 'Payload Too Large', 'too big', 'http://cdogs.test');
+    const mapped = toRenderError(httpErrorToAppError(tooLarge, 'CDOGS'), context);
+    expect(mapped).toBeInstanceOf(UnprocessableEntityError);
+    expect(mapped.message).toBe(TEMPLATE_NOT_RENDERED);
+  });
+
   it('logs the statuses and error class, never the backend body', () => {
     const warn = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
     try {
