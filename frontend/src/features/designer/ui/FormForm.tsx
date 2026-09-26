@@ -116,6 +116,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     historicalVersionNo,
     selectedVersionId,
     schema: formSchema,
+    schemaVersionId,
     name: formName,
     description: formDesc,
     isDirty,
@@ -206,7 +207,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
       formWriter.createVersion(
         token as string,
         (sourceSchema ?? formSchema ?? {}) as FormType,
-        activeVersion?.id,
+        schemaVersionId ?? undefined,
       ),
     );
 

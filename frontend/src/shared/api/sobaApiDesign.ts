@@ -140,8 +140,8 @@ export async function getSobaFormVersionPage(
 }
 
 /**
- * Create a new (empty) form version draft for a form. With `fromFormVersionId`, the draft gets that
- * version's document templates.
+ * Create a new form version draft for a form. `fromFormVersionId`: the version whose document
+ * templates the draft gets.
  */
 export async function createFormVersion(
   token: string,

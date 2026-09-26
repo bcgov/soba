@@ -155,6 +155,8 @@ export function useForm(formId?: string) {
     isHistoryView,
     historicalVersionNo: isHistoryView ? (activeVersion?.versionNo ?? null) : null,
     schema: editedSchema ?? loadedSchema ?? null,
+    // The version the schema came from: the one the edits were made on, else the active version.
+    schemaVersionId: (editedSchema === null ? null : editsBaseVersionId) ?? activeVersionId,
     name: editedName ?? form?.name ?? '',
     description: form?.description ?? '',
     isDirty: editedSchema !== null || editedName !== null,

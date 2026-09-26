@@ -68,7 +68,7 @@ interface CreateDraftInput {
   actorId: string;
   actorDisplayLabel: string | null;
   formId: string;
-  /** The version the draft starts from; the draft gets its document templates. */
+  /** The version whose document templates the draft gets. */
   fromFormVersionId?: string;
 }
 

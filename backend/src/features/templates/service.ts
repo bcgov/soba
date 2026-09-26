@@ -32,7 +32,6 @@ export interface TemplateFile {
 
 const TEMPLATE_CHANGED = 'Template changed while this request ran; reload it and retry';
 
-// Templates carried to a new version share a file, so it stays while any template points at it.
 const usedByTemplates = (tx: Tx, record: FileRecord) => hasDocumentTemplateForFile(tx, record.id);
 
 const toStoreInput = (actor: TemplateActor, file: TemplateFile) => ({

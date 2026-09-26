@@ -70,8 +70,7 @@ export const CreateFormVersionBodySchema = z
   .object({
     formId: z.string().min(1),
     fromFormVersionId: z.uuid().optional().openapi({
-      description:
-        'The version of this form the draft starts from. The draft gets its document templates.',
+      description: 'The version whose document templates the draft gets.',
     }),
   })
   .openapi('Forms_CreateFormVersionBody');
