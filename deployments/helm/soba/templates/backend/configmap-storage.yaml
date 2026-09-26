@@ -1,3 +1,4 @@
+{{- include "soba.validateStorage" . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -6,9 +7,9 @@ metadata:
     {{- include "soba.labels" (dict "root" . "component" "backend") | nindent 4 }}
 data:
   # Files and templates features + storage profiles. The default profile uses 'storage-memory'
-  # (in-process, ephemeral, no volume or external service). Switch defaultBackend to 'storage-s3' and
-  # set the endpoint, bucket and prefix below (credentials come from a Secret) for durable,
-  # multi-replica storage.
+  # (in-process, ephemeral, no volume or external service, single replica only). 'storage-local'
+  # keeps files on the file store PVC; 'storage-s3' uses the endpoint, bucket and prefix below
+  # (credentials come from a Secret).
   STORAGE_PROFILES: {{ .Values.backend.storage.profiles | quote }}
   STORAGE_PROFILE_DEFAULT_BACKEND: {{ .Values.backend.storage.defaultBackend | quote }}
   FILES_STORAGE_PROFILE: {{ .Values.backend.storage.filesStorageProfile | quote }}

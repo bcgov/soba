@@ -143,7 +143,8 @@ backend:
     # Active storage profiles (comma-separated). Each needs a *Backend below.
     profiles: "default"
     # Backend for the 'default' profile. 'storage-memory' is in-process and ephemeral — no PVC,
-    # no external service, lost on restart, per-replica. Fine for ephemeral (PR/dev) namespaces.
+    # no external service, lost on restart, per-replica. Fine for ephemeral (PR) namespaces, and
+    # refused with more than one replica or with autoscaling.
     # 'storage-local' keeps files on the RWX PVC below (localVolume, defaultBasePath).
     # For durable, multi-replica environments override to 'storage-s3' and set the endpoint, bucket
     # and prefix below (credentials come from a Secret).

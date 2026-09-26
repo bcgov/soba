@@ -176,6 +176,32 @@ cannot drift apart.
 {{- end }}
 
 {{/*
+Fails the render on storage values the backend would refuse, or that would lose files:
+storage-memory keeps files in one process, so it cannot back more than one replica; key prefixes
+are lowercase words joined by dashes, in slash-separated segments; the storage-local base path is
+absolute.
+*/}}
+{{- define "soba.validateStorage" -}}
+{{- $storage := .Values.backend.storage -}}
+{{- $prefix := "^[a-z0-9]+(-[a-z0-9]+)*(/[a-z0-9]+(-[a-z0-9]+)*)*$" -}}
+{{- if and (eq $storage.defaultBackend "storage-memory") (or (gt (int .Values.backend.replicas) 1) .Values.backend.autoscaling.enabled) -}}
+{{- fail "backend.storage.defaultBackend storage-memory keeps files in one process; use storage-local or storage-s3 with more than one replica or with autoscaling" -}}
+{{- end -}}
+{{- if and (eq $storage.defaultBackend "storage-local") $storage.defaultBasePath (not (hasPrefix "/" $storage.defaultBasePath)) -}}
+{{- fail "backend.storage.defaultBasePath must be an absolute path" -}}
+{{- end -}}
+{{- if and (eq $storage.defaultBackend "storage-s3") $storage.defaultPrefix (not (regexMatch $prefix (toString $storage.defaultPrefix))) -}}
+{{- fail "backend.storage.defaultPrefix must be lowercase words joined by dashes, in slash-separated segments" -}}
+{{- end -}}
+{{- range $key := list "filesStoragePrefix" "templatesStoragePrefix" -}}
+{{- $value := index $storage $key -}}
+{{- if and $value (not (regexMatch $prefix (toString $value))) -}}
+{{- fail (printf "backend.storage.%s must be lowercase words joined by dashes, in slash-separated segments" $key) -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Truthy ("true") only when the backend scans with clamav. Gates the clamav alias
 Service and the PLUGIN_VIRUSSCAN_CLAMAV_* env together so they cannot drift apart.
 Any other code (e.g. virusscan-noop) needs no clamav wiring.
