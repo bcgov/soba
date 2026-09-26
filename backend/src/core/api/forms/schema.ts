@@ -69,6 +69,10 @@ export const FormVersionListItemSchema = SobaFormVersionListItemSchema.clone().o
 export const CreateFormVersionBodySchema = z
   .object({
     formId: z.string().min(1),
+    fromFormVersionId: z.uuid().optional().openapi({
+      description:
+        'The version of this form the draft starts from. The draft gets its document templates.',
+    }),
   })
   .openapi('Forms_CreateFormVersionBody');
 

@@ -30,11 +30,13 @@ describe('storage-local adapter', () => {
   it('uploads, gets and deletes a file', async () => {
     const result = await (adapter as any).uploadFile({
       workspaceId: 'w1',
+      prefix: 'attachments',
       filename: 'hello.txt',
       buffer: Buffer.from('hello world'),
       contentType: 'text/plain',
     });
     expect(result).toHaveProperty('engineFileRef');
+    expect(fs.readdirSync(path.join(tmp, 'attachments', 'w1'))).toHaveLength(1);
     const meta = await (adapter as any).getFile(result.engineFileRef);
     expect(meta).not.toBeNull();
     expect(meta.filename).toBeDefined();

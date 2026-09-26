@@ -260,6 +260,27 @@
       "when": 1772618010000,
       "tag": "0036_submission_participant",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1772618011000,
+      "tag": "0037_submission_file",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1772618012000,
+      "tag": "0038_document_template",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1772618013000,
+      "tag": "0039_document_template_shared_file",
+      "breakpoints": true
     }
   ]
 }

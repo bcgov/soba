@@ -1,7 +1,7 @@
-import { getVirusScanAdapter } from '../../core/integrations/plugins/PluginRegistry';
-import { isFeatureEnabledCached } from '../../core/db/repos/featureRepo';
-import { Features } from '../../core/db/codes';
-import { log } from '../../core/logging';
+import { getVirusScanAdapter } from '../integrations/plugins/PluginRegistry';
+import { isFeatureEnabledCached } from '../db/repos/featureRepo';
+import { Features } from '../db/codes';
+import { log } from '../logging';
 
 /** 'clean' proceeds to storage; 'infected'/'scan-unavailable' reject the upload. */
 export type ScanOutcome = 'clean' | 'infected' | 'scan-unavailable';

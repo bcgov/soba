@@ -14,6 +14,7 @@ import {
   type LookupFormVersionsInput,
 } from '../db/repos/formVersionRepo';
 import { getFormById, getFormEngineCodeForForm } from '../db/repos/formRepo';
+import { copyDocumentTemplates } from '../db/repos/documentTemplateRepo';
 import { createFormEngineAdapter } from '../integrations/form-engine/FormEngineRegistry';
 import { db, type DbOrTx } from '../db/client';
 import { ConflictError, NotFoundError, ValidationError } from '../errors';
@@ -67,6 +68,8 @@ interface CreateDraftInput {
   actorId: string;
   actorDisplayLabel: string | null;
   formId: string;
+  /** The version the draft starts from; the draft gets its document templates. */
+  fromFormVersionId?: string;
 }
 
 interface SaveInput {
@@ -148,7 +151,17 @@ function stateStamps(
 
 export class FormVersionService {
   async createDraft(input: CreateDraftInput) {
-    return createEmptyFormVersionDraft(input);
+    const { fromFormVersionId } = input;
+    if (!fromFormVersionId) return createEmptyFormVersionDraft(input);
+    const source = await getFormVersionById(input.workspaceId, fromFormVersionId);
+    if (source?.formId !== input.formId) {
+      throw new ValidationError('fromFormVersionId is not a version of this form');
+    }
+    return db.transaction(async (tx) => {
+      const draft = await createEmptyFormVersionDraft(input, tx);
+      await copyDocumentTemplates(tx, fromFormVersionId, draft.id, input.actorId);
+      return draft;
+    });
   }
 
   async save(input: SaveInput) {

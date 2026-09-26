@@ -301,4 +301,12 @@ export const env = {
   getFilesMaxFileSizeMb: () => getNumberEnv('FILES_MAX_FILE_SIZE_MB') || 10,
   // Storage profile the files feature reads/writes. Defaults to 'default'.
   getFilesStorageProfile: () => getOptionalEnv('FILES_STORAGE_PROFILE') ?? 'default',
+  // Key prefix the files feature stores under within its profile. Defaults to 'attachments'.
+  getFilesStoragePrefix: () => getOptionalEnv('FILES_STORAGE_PREFIX') ?? 'attachments',
+  // Max upload size accepted by the templates API. Feature-level (not per storage backend).
+  getTemplatesMaxFileSizeMb: () => getNumberEnv('TEMPLATES_MAX_FILE_SIZE_MB') || 10,
+  // Storage profile the templates feature reads/writes. Defaults to 'default'.
+  getTemplatesStorageProfile: () => getOptionalEnv('TEMPLATES_STORAGE_PROFILE') ?? 'default',
+  // Key prefix the templates feature stores under within its profile. Defaults to 'templates'.
+  getTemplatesStoragePrefix: () => getOptionalEnv('TEMPLATES_STORAGE_PREFIX') ?? 'templates',
 };

@@ -1,5 +1,5 @@
 import express from 'express';
-import { coreErrorHandler } from '../middleware/errorHandler';
+import { coreErrorHandler, notFoundHandler } from '../middleware/errorHandler';
 import { registerAdminOpenApi } from './admin';
 import { registerHealthOpenApi } from './health';
 import { designFormsRouter, registerFormsOpenApi } from './forms';
@@ -8,6 +8,7 @@ import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
 import { groupsDomain } from './groups';
 import { filesDomain } from '../../features/files';
 import { documentGenerationDomain } from '../../features/document-generation';
+import { templatesDomain } from '../../features/templates';
 import { formSettingsRouter, registerFormSettingsOpenApi } from '../../features/form-settings';
 import { meDomain } from './me';
 import { membersDomain } from './members';
@@ -16,9 +17,10 @@ import { metaDomain } from './meta';
 import { registerOpenApiPaths } from './shared/openapi';
 
 // API surfaces, each mounted under its own base path with its own auth (see app.ts):
-//  - designRouter  (/api/v1/design): staff form authoring + submission management.
-//  - submitRouter  (/api/v1/submit): public-capable submissions, file attachments, preview/print.
-//  - coreRouter    (/api/v1):        workspace/account management (not a toggled feature).
+//  - designRouter   (/api/v1/design): staff form authoring + submission management.
+//  - submitRouter   (/api/v1/submit): public-capable submissions, file attachments, preview/print.
+//  - filesApiRouter (/api/v1/files):  public-capable submission file attachments.
+//  - coreRouter     (/api/v1):        workspace/account management, and staff document templates.
 registerOpenApiPaths((registry) => {
   registerFormsOpenApi(registry);
   registerFormSettingsOpenApi(registry);
@@ -30,6 +32,7 @@ registerOpenApiPaths((registry) => {
   workspacesDomain.registerOpenApi(registry);
   filesDomain.registerOpenApi(registry);
   documentGenerationDomain.registerOpenApi(registry);
+  templatesDomain.registerOpenApi(registry);
   metaDomain.registerOpenApi(registry);
   registerAdminOpenApi(registry);
   registerHealthOpenApi(registry);
@@ -41,25 +44,34 @@ const designRouter = express.Router();
 designRouter.use('/forms/:id/settings', formSettingsRouter);
 designRouter.use('/', designFormsRouter);
 designRouter.use('/submissions', designSubmissionsRouter);
+designRouter.use(notFoundHandler);
 designRouter.use(coreErrorHandler);
 
 // Submit feature: submission open/save/submit + reads of an existing submission, plus file
 // attachments at /files (upload/download/delete) and document preview/print, each authorized through
 // isSubmitterAllowed (services/submitterAccess). The files feature flag is enforced inside
-// filesDomain.router.
+// filesDomain.router. Same routes as /files, mounted under submit for the Form.io file component.
 const submitRouter = express.Router();
 submitRouter.use('/', submitRoutes);
 submitRouter.use('/files', filesDomain.router);
 // Mounted after submitRoutes so only the fall-through actions (preview/print) reach it; the
 // document-generation feature gate lives inside the router.
 submitRouter.use('/submissions', documentGenerationDomain.router);
+submitRouter.use(notFoundHandler);
 submitRouter.use(coreErrorHandler);
 
-// Core: workspace/account management.
+// Files feature: submission attachments, authorized through the submission each file belongs to.
+const filesApiRouter = express.Router();
+filesApiRouter.use('/', filesDomain.router);
+filesApiRouter.use(notFoundHandler);
+filesApiRouter.use(coreErrorHandler);
+
+// Core: workspace/account management, and staff document templates.
 const coreRouter = express.Router();
-for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain]) {
+for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain, templatesDomain]) {
   coreRouter.use(domain.path, domain.router);
 }
+coreRouter.use(notFoundHandler);
 coreRouter.use(coreErrorHandler);
 
-export { designRouter, submitRouter, coreRouter };
+export { designRouter, submitRouter, filesApiRouter, coreRouter };

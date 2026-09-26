@@ -3,36 +3,20 @@ import { filesService } from './service';
 import { isBlockedExtension } from './config';
 import { resolveCaller } from '../../core/middleware/actor';
 import { accessDenial } from '../../core/middleware/formSubmitAccess';
-import {
-  InternalError,
-  NotFoundError,
-  ServiceUnavailableError,
-  UnprocessableEntityError,
-  UnsupportedMediaTypeError,
-  ValidationError,
-} from '../../core/errors';
-
-/** Minimal shape of a multer memory-storage file (this project has no @types/multer). */
-interface UploadedFile {
-  originalname: string;
-  mimetype: string;
-  size: number;
-  buffer: Buffer;
-}
+import { getUploadedFile } from '../../core/middleware/parseUpload';
+import { storedOrThrow } from '../../core/services/fileStore';
+import { sendStoredFile } from '../../core/api/shared/sendStoredFile';
+import { NotFoundError, UnsupportedMediaTypeError } from '../../core/errors';
 
 export async function uploadFileHandler(req: Request, res: Response): Promise<void> {
-  // requireUploadAccess has resolved + authorized the submission's workspace into coreContext.
+  // requireUploadAccess has checked submissionId, then resolved + authorized its workspace into
+  // coreContext.
   const ctx = req.coreContext!;
 
-  const files = (req as Request & { files?: UploadedFile[] }).files;
-  const uploaded = Array.isArray(files) ? files[0] : undefined;
-  if (!uploaded) {
-    throw new ValidationError('no file');
-  }
-
+  const uploaded = getUploadedFile(req);
   const filename =
     (req.body?.fileName as string) || (req.body?.name as string) || uploaded.originalname;
-  const submissionId = (req.body?.submissionId as string) || null;
+  const submissionId = req.body.submissionId as string;
 
   // Always reject blocked extensions, regardless of the form's designer-configured fileTypes.
   // Check both the stored name and the real uploaded name (they can differ via fileNameTemplate).
@@ -40,27 +24,17 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
     throw new UnsupportedMediaTypeError('File type not allowed');
   }
 
-  const profile = req.header('storageProfile') || undefined;
-
-  const record = await filesService.upload({
-    workspaceId: ctx.workspaceId,
-    actorId: ctx.actorId,
-    filename,
-    contentType: uploaded.mimetype,
-    size: uploaded.size,
-    buffer: uploaded.buffer,
-    submissionId,
-    useProfile: profile,
-  });
-
-  // Virus scan rejections (antivirus feature on): infected is a client-side content problem;
-  // scan-unavailable is fail-closed — the scanner couldn't clear the file, so we don't store it.
-  if (record === 'infected') {
-    throw new UnprocessableEntityError('File failed virus scan');
-  }
-  if (record === 'scan-unavailable') {
-    throw new ServiceUnavailableError('Virus scanning unavailable');
-  }
+  const record = storedOrThrow(
+    await filesService.upload({
+      workspaceId: ctx.workspaceId,
+      actorId: ctx.actorId,
+      filename,
+      contentType: uploaded.mimetype,
+      size: uploaded.size,
+      buffer: uploaded.buffer,
+      submissionId,
+    }),
+  );
 
   // The chefs provider builds each file's URL as `${filesUrl}/${id}`, so it only needs the id
   // (name/size/type are used for the Form.io file value).
@@ -81,24 +55,7 @@ export async function downloadFileHandler(req: Request, res: Response): Promise<
   if (result === 'denied') {
     throw accessDenial(req, 'Not authorized to access this file');
   }
-  const { record, file } = result;
-  res.setHeader(
-    'Content-Type',
-    record.contentType ?? file.contentType ?? 'application/octet-stream',
-  );
-  const size = record.size ?? file.size;
-  if (size != null) res.setHeader('Content-Length', String(size));
-  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(record.filename)}"`);
-
-  if (file.downloadStream) {
-    file.downloadStream.pipe(res);
-    return;
-  }
-  if (file.publicUrl) {
-    res.redirect(file.publicUrl);
-    return;
-  }
-  throw new InternalError('no download available');
+  await sendStoredFile(res, result.record, result.file, 'inline');
 }
 
 export async function deleteFileHandler(req: Request, res: Response): Promise<void> {

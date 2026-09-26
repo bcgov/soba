@@ -219,8 +219,12 @@ export function useFormWriter(formId: string) {
   );
 
   const createVersion = useCallback(
-    async (token: string, sourceSchema: FormType): Promise<WriteOutcome<NewVersion>> => {
-      const value = await createFormVersion(token, formId);
+    async (
+      token: string,
+      sourceSchema: FormType,
+      fromVersionId?: string,
+    ): Promise<WriteOutcome<NewVersion>> => {
+      const value = await createFormVersion(token, formId, fromVersionId);
       await saveFormVersionSchema(token, value.id, sourceSchema);
       await commitSchema(value.id, sourceSchema);
       await refreshVersions();
@@ -232,7 +236,7 @@ export function useFormWriter(formId: string) {
   const restoreVersion = useCallback(
     async (token: string, fromVersionId: string): Promise<WriteOutcome<NewVersion>> => {
       const sourceSchema = ((await getFormVersionSchema(token, fromVersionId)) ?? {}) as FormType;
-      return createVersion(token, sourceSchema);
+      return createVersion(token, sourceSchema, fromVersionId);
     },
     [createVersion],
   );

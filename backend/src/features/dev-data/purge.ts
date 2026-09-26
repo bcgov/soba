@@ -11,6 +11,7 @@ import { db, type DbOrTx } from '../../core/db/client';
 import {
   appUsers,
   documentGenerationAudits,
+  documentTemplates,
   enterpriseGroupBindings,
   enterpriseMembershipBindings,
   enterpriseSyncCursors,
@@ -24,6 +25,7 @@ import {
   formVersions,
   forms,
   sobaAdmins,
+  submissionFiles,
   submissionParticipants,
   submissionRevisions,
   submissions,
@@ -233,7 +235,9 @@ export const WORKSPACE_SCOPED_TABLES: readonly string[] = [
   'document_generation_audit',
   'submission_revision',
   'submission_participant',
+  'submission_file',
   'submission',
+  'document_template',
   'file',
   'form_version_revision',
   'form_version',
@@ -308,7 +312,15 @@ async function purgeWorkspaceScoped(
     'submission_participant',
     tx.delete(submissionParticipants).where(inArray(submissionParticipants.workspaceId, ids)),
   );
+  await record(
+    'submission_file',
+    tx.delete(submissionFiles).where(inArray(submissionFiles.workspaceId, ids)),
+  );
   await record('submission', tx.delete(submissions).where(inArray(submissions.workspaceId, ids)));
+  await record(
+    'document_template',
+    tx.delete(documentTemplates).where(inArray(documentTemplates.workspaceId, ids)),
+  );
   await record('file', tx.delete(files).where(inArray(files.workspaceId, ids)));
   await record(
     'form_version_revision',

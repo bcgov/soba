@@ -21,6 +21,7 @@ import { getActorId } from './actor';
 import { getFormListContext, getWorkspaceIdForForm } from '../db/repos/formRepo';
 import { getFormVersionListContext } from '../db/repos/formVersionRepo';
 import { getSubmissionListContext } from '../db/repos/submissionRepo';
+import { getDocumentTemplateScope } from '../db/repos/documentTemplateRepo';
 import type { CoreRequestContext } from './requestContext';
 
 const RESOURCE_NOT_FOUND = 'Resource not found';
@@ -316,8 +317,13 @@ export const workspaceListScope = (config: {
   };
 };
 
-export type WorkspaceResourceKind = 'form' | 'formVersion' | 'submission' | 'workspace';
-export type ResourceIdSource = 'paramsId' | 'queryFormId' | 'bodyFormId';
+export type WorkspaceResourceKind =
+  | 'form'
+  | 'formVersion'
+  | 'submission'
+  | 'template'
+  | 'workspace';
+export type ResourceIdSource = 'paramsId' | 'queryFormId' | 'queryFormVersionId' | 'bodyFormId';
 
 /** The workspace a resource belongs to and, for a form or anything under one, the form. */
 type ResourceScope = { workspaceId: string; formId?: string };
@@ -335,6 +341,8 @@ const lookupResourceScope = async (
       return getFormVersionListContext(resourceId);
     case 'submission':
       return getSubmissionListContext(resourceId);
+    case 'template':
+      return getDocumentTemplateScope(resourceId);
     case 'workspace': {
       // The resource is the workspace itself. Confirm it exists so a missing workspace
       // yields 404 (matching workspaces/schema.ts); membership is then verified by
@@ -345,15 +353,20 @@ const lookupResourceScope = async (
   }
 };
 
+const nonEmptyString = (value: unknown): string | null =>
+  typeof value === 'string' && value ? value : null;
+
 const readResourceId = (req: Request, idFrom: ResourceIdSource): string | null => {
-  if (idFrom === 'paramsId') {
-    return typeof req.params.id === 'string' && req.params.id ? req.params.id : null;
+  switch (idFrom) {
+    case 'paramsId':
+      return nonEmptyString(req.params.id);
+    case 'queryFormId':
+      return nonEmptyString(req.query.formId);
+    case 'queryFormVersionId':
+      return nonEmptyString(req.query.formVersionId);
+    case 'bodyFormId':
+      return nonEmptyString((req.body as { formId?: unknown } | undefined)?.formId);
   }
-  if (idFrom === 'queryFormId') {
-    return typeof req.query.formId === 'string' && req.query.formId ? req.query.formId : null;
-  }
-  const formId = (req.body as { formId?: unknown } | undefined)?.formId;
-  return typeof formId === 'string' && formId ? formId : null;
 };
 
 /**
