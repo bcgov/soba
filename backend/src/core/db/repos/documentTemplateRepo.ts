@@ -70,6 +70,46 @@ export const deleteDocumentTemplate = async (
   return rows.length > 0;
 };
 
+/**
+ * Give `toFormVersionId` a template for each template on `fromFormVersionId`, with the same name
+ * and pointing at the same file.
+ */
+export const copyDocumentTemplates = async (
+  tx: Tx,
+  fromFormVersionId: string,
+  toFormVersionId: string,
+  createdBy: string,
+): Promise<void> => {
+  // Locked so a concurrent replace or delete of a source template either waits for the copy or is
+  // seen by it.
+  const sources = await tx
+    .select()
+    .from(documentTemplates)
+    .where(eq(documentTemplates.formVersionId, fromFormVersionId))
+    .for('share');
+  if (sources.length === 0) return;
+  await tx.insert(documentTemplates).values(
+    sources.map((source) => ({
+      workspaceId: source.workspaceId,
+      formId: source.formId,
+      formVersionId: toFormVersionId,
+      fileId: source.fileId,
+      name: source.name,
+      createdBy,
+    })),
+  );
+};
+
+/** Whether any template points at the file. */
+export const hasDocumentTemplateForFile = async (tx: Tx, fileId: string): Promise<boolean> => {
+  const rows = await tx
+    .select({ id: documentTemplates.id })
+    .from(documentTemplates)
+    .where(eq(documentTemplates.fileId, fileId))
+    .limit(1);
+  return rows.length > 0;
+};
+
 const selectWithFile = () =>
   db
     .select({ template: documentTemplates, file: files })

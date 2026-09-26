@@ -134,7 +134,11 @@ export const lookupFormVersions = asyncHandler(async (req: Request, res: Respons
 export const createFormVersion = asyncHandler(
   async (req: Request<unknown, unknown, CreateFormVersionBody>, res: Response) => {
     const ctx = req.coreContext!;
-    const result = await formsApiService.createDraft(ctx, req.body.formId);
+    const result = await formsApiService.createDraft(
+      ctx,
+      req.body.formId,
+      req.body.fromFormVersionId,
+    );
     res.status(201).json(result);
   },
 );

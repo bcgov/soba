@@ -3,12 +3,15 @@ import { env } from '../../core/config/env';
 import {
   deleteDocumentTemplate,
   getDocumentTemplate,
+  hasDocumentTemplateForFile,
   insertDocumentTemplate,
   listDocumentTemplates,
   renameDocumentTemplate,
   setDocumentTemplateFile,
   type DocumentTemplateWithFile,
 } from '../../core/db/repos/documentTemplateRepo';
+import type { FileRecord } from '../../core/db/repos/fileRepo';
+import type { Tx } from '../../core/db/client';
 import { fileStore, storedOrThrow } from '../../core/services/fileStore';
 import type { GetFileResult } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 import { ConflictError } from '../../core/errors';
@@ -28,6 +31,9 @@ export interface TemplateFile {
 }
 
 const TEMPLATE_CHANGED = 'Template changed while this request ran; reload it and retry';
+
+// Templates carried to a new version share a file, so it stays while any template points at it.
+const usedByTemplates = (tx: Tx, record: FileRecord) => hasDocumentTemplateForFile(tx, record.id);
 
 const toStoreInput = (actor: TemplateActor, file: TemplateFile) => ({
   workspaceId: actor.workspaceId,
@@ -74,7 +80,7 @@ export const templatesService = {
     return getDocumentTemplate(id);
   },
 
-  /** Store the new file under the same template id, then remove the file it replaced. */
+  /** Store the new file under the same template id, then release the file it replaced. */
   async replaceFile(
     existing: DocumentTemplateWithFile,
     actor: TemplateActor,
@@ -90,11 +96,11 @@ export const templatesService = {
     );
     // The template points at the new file, so the old one has no link to remove.
     await fileStore
-      .remove(existing.file, async () => undefined)
+      .release(existing.file, async () => undefined, usedByTemplates)
       .catch((err: unknown) => {
         log.warn(
           { err, templateId: id, fileId: existing.file.id },
-          'Replaced template file not removed',
+          'Replaced template file not released',
         );
       });
     return getDocumentTemplate(id);
@@ -110,10 +116,14 @@ export const templatesService = {
   },
 
   remove(existing: DocumentTemplateWithFile): Promise<void> {
-    return fileStore.remove(existing.file, async (tx, record) => {
-      if (!(await deleteDocumentTemplate(tx, existing.template.id, record.id))) {
-        throw new ConflictError(TEMPLATE_CHANGED);
-      }
-    });
+    return fileStore.release(
+      existing.file,
+      async (tx, record) => {
+        if (!(await deleteDocumentTemplate(tx, existing.template.id, record.id))) {
+          throw new ConflictError(TEMPLATE_CHANGED);
+        }
+      },
+      usedByTemplates,
+    );
   },
 };

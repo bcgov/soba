@@ -2,6 +2,8 @@ import { getStorageAdapter } from '../integrations/plugins/PluginRegistry';
 import {
   createFileRecord,
   deleteFileRecord,
+  releaseFileRecord,
+  type FileLinkCheck,
   type FileLinkWrite,
   type FileRecord,
 } from '../db/repos/fileRepo';
@@ -88,5 +90,15 @@ export const fileStore = {
   async remove(record: FileRecord, unlink: FileLinkWrite): Promise<void> {
     await deleteFileRecord(record, unlink);
     await getStorageAdapter(record.profile).deleteFile(record.backendRef);
+  },
+
+  /**
+   * Remove one link to a shared file, and the file itself once no link remains. Rows first, then
+   * bytes.
+   */
+  async release(record: FileRecord, unlink: FileLinkWrite, isLinked: FileLinkCheck): Promise<void> {
+    if (await releaseFileRecord(record, unlink, isLinked)) {
+      await getStorageAdapter(record.profile).deleteFile(record.backendRef);
+    }
   },
 };

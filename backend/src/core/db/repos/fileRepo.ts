@@ -39,6 +39,9 @@ export const createFileRecord = async (
     return row;
   });
 
+/** Whether any of the owning feature's links still point at the file. */
+export type FileLinkCheck = (tx: Tx, record: FileRecord) => Promise<boolean>;
+
 /** Delete the owner's link, then the file row, in one transaction. */
 export const deleteFileRecord = async (
   record: FileRecord,
@@ -49,3 +52,21 @@ export const deleteFileRecord = async (
     await tx.delete(files).where(eq(files.id, record.id));
   });
 };
+
+/**
+ * Delete the owner's link, then the file row when no link remains, in one transaction. True when
+ * the file row is deleted.
+ */
+export const releaseFileRecord = async (
+  record: FileRecord,
+  unlink: FileLinkWrite,
+  isLinked: FileLinkCheck,
+): Promise<boolean> =>
+  db.transaction(async (tx) => {
+    await unlink(tx, record);
+    // Locked after the unlink, so concurrent releases of one file count its links one at a time.
+    await tx.select({ id: files.id }).from(files).where(eq(files.id, record.id)).for('update');
+    if (await isLinked(tx, record)) return false;
+    await tx.delete(files).where(eq(files.id, record.id));
+    return true;
+  });

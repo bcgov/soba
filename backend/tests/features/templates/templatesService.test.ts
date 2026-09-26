@@ -33,6 +33,12 @@ jest.mock('../../../src/core/db/repos/fileRepo', () => {
       await unlink(mockTx, record);
       mockFiles.delete(record.id);
     }),
+    releaseFileRecord: jest.fn(async (record: any, unlink: any, isLinked: any) => {
+      await unlink(mockTx, record);
+      if (await isLinked(mockTx, record)) return false;
+      mockFiles.delete(record.id);
+      return true;
+    }),
   };
 });
 jest.mock('../../../src/core/db/repos/documentTemplateRepo', () => {
@@ -70,6 +76,9 @@ jest.mock('../../../src/core/db/repos/documentTemplateRepo', () => {
       mockTemplates.delete(id);
       return true;
     }),
+    hasDocumentTemplateForFile: jest.fn(async (_tx: unknown, fileId: string) =>
+      [...mockTemplates.values()].some((t) => t.fileId === fileId),
+    ),
     getDocumentTemplate: jest.fn(async (id: string) => withFile(mockTemplates.get(id))),
     listDocumentTemplates: jest.fn(async (formVersionId: string) =>
       [...mockTemplates.values()].filter((t) => t.formVersionId === formVersionId).map(withFile),
@@ -127,6 +136,19 @@ function listBlobs(dir: string): string[] {
     else out.push(full);
   }
   return out.sort();
+}
+
+/** The template a new draft of `toVersionId` gets: same name, same file. */
+async function carryForward(source: { template: { id: string } }, toVersionId: string) {
+  const id = `${source.template.id}-${toVersionId}`;
+  mockTemplates.set(id, {
+    ...mockTemplates.get(source.template.id),
+    id,
+    formVersionId: toVersionId,
+  });
+  const carried = await templatesService.get(id);
+  if (!carried) throw new Error('expected the carried template');
+  return carried;
 }
 
 async function contentOf(templateId: string): Promise<string> {
@@ -202,6 +224,32 @@ describe('templatesService', () => {
     const renamed = await templatesService.rename(created.template.id, 'Summary', 'actor2');
     expect(renamed?.template.name).toBe('Summary');
     expect(await templatesService.rename('missing', 'Summary', 'actor2')).toBeNull();
+  });
+
+  it('keeps a file another version still uses when a template is deleted, until the last goes', async () => {
+    const created = await createTemplate('v1', 'Receipt', 'r.docx', 'one');
+    const carried = await carryForward(created, 'v2');
+    const blobs = listBlobs(tmp);
+
+    await templatesService.remove(created);
+    expect(mockFiles.has(created.file.id)).toBe(true);
+    expect(listBlobs(tmp)).toEqual(blobs);
+    expect(await contentOf(carried.template.id)).toBe('one');
+
+    await templatesService.remove(carried);
+    expect(mockFiles.has(created.file.id)).toBe(false);
+    expect(listBlobs(tmp)).toHaveLength(blobs.length - 1);
+  });
+
+  it('gives a replaced template its own file, leaving the shared one with the other version', async () => {
+    const created = await createTemplate('v1', 'Receipt', 'a.docx', 'one');
+    const carried = await carryForward(created, 'v2');
+
+    await templatesService.replaceFile(carried, actor, upload('b.docx', 'new'));
+
+    expect(await contentOf(carried.template.id)).toBe('new');
+    expect(await contentOf(created.template.id)).toBe('one');
+    expect(mockFiles.has(created.file.id)).toBe(true);
   });
 
   it('removes the template, its file row and the stored file', async () => {

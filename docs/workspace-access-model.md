@@ -24,7 +24,8 @@ adds a third control per submission, who takes part in it; see
 > (`features/templates/route.ts`) are gated by `requireFormPermissions`: `document_template_read` to
 > list and download, `document_template_create` to upload, replace and rename,
 > `document_template_delete` to delete. Only `form_admin` (via `*`) holds the create and delete codes;
-> `form_submitter` holds read. Group and member management is gated by workspace role
+> `form_submitter` holds read. A draft created from an existing version gets that version's
+> templates under `design_create` alone. Group and member management is gated by workspace role
 > (`requireWorkspaceManage`), not by RBAC.
 
 ```

@@ -274,6 +274,13 @@
       "when": 1772618012000,
       "tag": "0038_document_template",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1772618013000,
+      "tag": "0039_document_template_shared_file",
+      "breakpoints": true
     }
   ]
 }
