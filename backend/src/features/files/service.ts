@@ -20,7 +20,6 @@ export interface UploadFileParams {
   contentType?: string;
   size?: number;
   buffer: Buffer;
-  useProfile?: string;
 }
 
 /** The attachment and its still-present submission; null when either is missing. */
@@ -41,7 +40,7 @@ export const filesService = {
       {
         workspaceId: params.workspaceId,
         actorId: params.actorId,
-        profile: params.useProfile ?? env.getFilesStorageProfile(),
+        profile: env.getFilesStorageProfile(),
         filename: params.filename,
         contentType: params.contentType,
         size: params.size,

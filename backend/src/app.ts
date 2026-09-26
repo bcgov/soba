@@ -6,7 +6,7 @@ import rTracer from 'cls-rtracer';
 import cors from 'cors';
 import passport from 'passport';
 import { checkJwt } from './core/middleware/auth';
-import { designRouter, submitRouter, coreRouter } from './core/api';
+import { designRouter, submitRouter, filesApiRouter, coreRouter } from './core/api';
 import {
   healthRouter,
   logStartupHealth,
@@ -114,6 +114,17 @@ app.use(
   resolveActorOrPublic,
   requireFeature(Features.submit_mode),
   submitRouter,
+);
+
+// Files feature (public-capable): submission attachments, same auth as submit. Multipart and
+// body-less only, so no JSON parser. 404s when submit-mode is disabled.
+app.use(
+  apiPath('/api/v1/files'),
+  apiRateLimit,
+  checkJwt({ allowPublic: true }),
+  resolveActorOrPublic,
+  requireFeature(Features.submit_mode),
+  filesApiRouter,
 );
 
 // Design feature (staff): mandatory auth. 404s when design-mode is disabled.

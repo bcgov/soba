@@ -16,9 +16,10 @@ import { metaDomain } from './meta';
 import { registerOpenApiPaths } from './shared/openapi';
 
 // API surfaces, each mounted under its own base path with its own auth (see app.ts):
-//  - designRouter  (/api/v1/design): staff form authoring + submission management.
-//  - submitRouter  (/api/v1/submit): public-capable submissions, file attachments, preview/print.
-//  - coreRouter    (/api/v1):        workspace/account management (not a toggled feature).
+//  - designRouter   (/api/v1/design): staff form authoring + submission management.
+//  - submitRouter   (/api/v1/submit): public-capable submissions, file attachments, preview/print.
+//  - filesApiRouter (/api/v1/files):  public-capable submission file attachments.
+//  - coreRouter     (/api/v1):        workspace/account management (not a toggled feature).
 registerOpenApiPaths((registry) => {
   registerFormsOpenApi(registry);
   registerFormSettingsOpenApi(registry);
@@ -46,7 +47,7 @@ designRouter.use(coreErrorHandler);
 // Submit feature: submission open/save/submit + reads of an existing submission, plus file
 // attachments at /files (upload/download/delete) and document preview/print, each authorized through
 // isSubmitterAllowed (services/submitterAccess). The files feature flag is enforced inside
-// filesDomain.router.
+// filesDomain.router. Same routes as /files, mounted under submit for the Form.io file component.
 const submitRouter = express.Router();
 submitRouter.use('/', submitRoutes);
 submitRouter.use('/files', filesDomain.router);
@@ -55,6 +56,11 @@ submitRouter.use('/files', filesDomain.router);
 submitRouter.use('/submissions', documentGenerationDomain.router);
 submitRouter.use(coreErrorHandler);
 
+// Files feature: submission attachments, authorized through the submission each file belongs to.
+const filesApiRouter = express.Router();
+filesApiRouter.use('/', filesDomain.router);
+filesApiRouter.use(coreErrorHandler);
+
 // Core: workspace/account management.
 const coreRouter = express.Router();
 for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain]) {
@@ -62,4 +68,4 @@ for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain]) 
 }
 coreRouter.use(coreErrorHandler);
 
-export { designRouter, submitRouter, coreRouter };
+export { designRouter, submitRouter, filesApiRouter, coreRouter };

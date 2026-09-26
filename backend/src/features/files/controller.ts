@@ -41,8 +41,6 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
     throw new UnsupportedMediaTypeError('File type not allowed');
   }
 
-  const profile = req.header('storageProfile') || undefined;
-
   const record = await filesService.upload({
     workspaceId: ctx.workspaceId,
     actorId: ctx.actorId,
@@ -51,7 +49,6 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
     size: uploaded.size,
     buffer: uploaded.buffer,
     submissionId,
-    useProfile: profile,
   });
 
   // Virus scan rejections (antivirus feature on): infected is a client-side content problem;

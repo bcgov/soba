@@ -9,7 +9,9 @@ const SUBMISSION_AUTH_REQUIRED =
 // Optional auth: anonymous (the public user) or a bearer token. `{}` marks the no-auth case
 // explicit rather than leaving security unset.
 const PUBLIC_SECURITY = [{}, { bearerAuth: [] }];
-const FILES_PATH = '/submit/files';
+const FILES_PATH = '/files';
+// Same routes as /files, mounted under submit for the Form.io file component.
+const SUBMIT_FILES_PATH = '/submit/files';
 
 export const FileUploadResponseSchema = z
   .object({
@@ -21,13 +23,20 @@ export const FileUploadResponseSchema = z
   })
   .openapi('Files_UploadResponse');
 
-export function registerFilesOpenApi(registry: OpenAPIRegistry) {
+const FileGetParamsSchema = z.object({ id: z.string().min(1) }).openapi('Files_GetParams');
+const FileDeleteParamsSchema = z.object({ id: z.string().min(1) }).openapi('Files_DeleteParams');
+
+function registerFilesPaths(
+  registry: OpenAPIRegistry,
+  { basePath, deprecated }: { basePath: string; deprecated: boolean },
+) {
   const tag = 'feature.files';
 
   registry.registerPath({
     method: 'post',
-    path: FILES_PATH,
+    path: basePath,
     tags: [tag],
+    deprecated,
     security: PUBLIC_SECURITY,
     request: {
       body: {
@@ -63,10 +72,11 @@ export function registerFilesOpenApi(registry: OpenAPIRegistry) {
 
   registry.registerPath({
     method: 'get',
-    path: `${FILES_PATH}/{id}`,
+    path: `${basePath}/{id}`,
     tags: [tag],
+    deprecated,
     security: PUBLIC_SECURITY,
-    request: { params: z.object({ id: z.string().min(1) }).openapi('Files_GetParams') },
+    request: { params: FileGetParamsSchema },
     responses: {
       200: { description: 'File contents (stream or redirect)', content: {} },
       401: { description: SUBMISSION_AUTH_REQUIRED },
@@ -77,10 +87,11 @@ export function registerFilesOpenApi(registry: OpenAPIRegistry) {
 
   registry.registerPath({
     method: 'delete',
-    path: `${FILES_PATH}/{id}`,
+    path: `${basePath}/{id}`,
     tags: [tag],
+    deprecated,
     security: PUBLIC_SECURITY,
-    request: { params: z.object({ id: z.string().min(1) }).openapi('Files_DeleteParams') },
+    request: { params: FileDeleteParamsSchema },
     responses: {
       204: { description: 'Deleted' },
       401: { description: SUBMISSION_AUTH_REQUIRED },
@@ -88,4 +99,9 @@ export function registerFilesOpenApi(registry: OpenAPIRegistry) {
       404: { description: NOT_FOUND_DESC },
     },
   });
+}
+
+export function registerFilesOpenApi(registry: OpenAPIRegistry) {
+  registerFilesPaths(registry, { basePath: FILES_PATH, deprecated: false });
+  registerFilesPaths(registry, { basePath: SUBMIT_FILES_PATH, deprecated: true });
 }

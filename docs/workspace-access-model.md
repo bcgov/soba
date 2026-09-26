@@ -242,7 +242,8 @@ the id has access to those.
 
 Owners and collaborators have the same access. Design routes do not use these rules; staff read and
 delete submissions through form permissions. Files, print and preview have no design route, so staff
-download files, print and preview only through the submit routes, which need a grant.
+download files through `/files` or `/submit/files`, and print and preview through the submit routes,
+all of which need a grant.
 
 ## What a new workspace looks like
 

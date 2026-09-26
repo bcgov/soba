@@ -53,6 +53,11 @@ backend:
         annotations:
           # Upload is silent through the clamd scan (clamav.timeoutMs, 60s).
           haproxy.router.openshift.io/timeout: "300s"
+      - name: files-api
+        path: /api/v1/files
+        annotations:
+          # Upload is silent through the clamd scan (clamav.timeoutMs, 60s).
+          haproxy.router.openshift.io/timeout: "300s"
   ingress:
     enabled: false
     ingressClassName: ""
