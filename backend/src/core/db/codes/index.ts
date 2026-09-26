@@ -2,6 +2,8 @@
  * Single source of truth for all seeded code values. Seed and application code
  * import from here; no string literals for codes in logic. Compile-time safety.
  */
+import { Permissions } from '@soba/lib';
+export { Permissions, PermissionCode } from '@soba/lib';
 
 export const Roles = {
   // Form roles. form_admin holds the `*` wildcard permission.
@@ -13,30 +15,6 @@ export const Roles = {
   team_manager: 'team_manager',
 } as const;
 export type RoleCode = (typeof Roles)[keyof typeof Roles];
-
-/** Form permissions. `all` is the `*` wildcard, held only by form_admin. */
-export const Permissions = {
-  all: '*',
-  form_create: 'form_create',
-  form_read: 'form_read',
-  form_update: 'form_update',
-  form_delete: 'form_delete',
-  design_create: 'design_create',
-  design_read: 'design_read',
-  design_update: 'design_update',
-  design_delete: 'design_delete',
-  submission_create: 'submission_create',
-  submission_read: 'submission_read',
-  submission_update: 'submission_update',
-  submission_delete: 'submission_delete',
-  submission_review: 'submission_review',
-  team_read: 'team_read',
-  team_update: 'team_update',
-  document_template_create: 'document_template_create',
-  document_template_read: 'document_template_read',
-  document_template_delete: 'document_template_delete',
-} as const;
-export type PermissionCode = (typeof Permissions)[keyof typeof Permissions];
 
 /**
  * POST /forms writes the form and its first design. `form_create` is not seeded onto any role;

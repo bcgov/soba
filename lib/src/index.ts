@@ -10,3 +10,4 @@ export * from './schemas/me';
 export * from './schemas/groups';
 export * from './schemas/submit';
 export * from './schemas/meta';
+export * from './permissions';

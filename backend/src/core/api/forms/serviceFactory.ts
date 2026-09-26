@@ -5,6 +5,8 @@ import type { FormListSort } from '../../db/repos/formRepo';
 import type { FormVersionListSort } from '../../db/repos/formVersionRepo';
 import type { FormListItem, FormVersionListItem, SortLocale } from '@soba/lib';
 import { LOOKUP_FETCH_LIMIT, toLookupResponse } from '../shared/lookup';
+import { formSubmitterAudienceService } from './submitterAudience';
+import type { SetFormSubmitterAudienceBody } from '@soba/lib';
 
 export interface FormsContextInput {
   workspaceId: string;
@@ -43,6 +45,7 @@ interface CreateFormInput {
   name: string;
   description?: string;
   formEngineCode?: string;
+  submitterAudience?: SetFormSubmitterAudienceBody;
 }
 
 interface UpdateFormInput {
@@ -171,6 +174,9 @@ export function createFormsApiService(
         description: input.description,
         formEngineCode: input.formEngineCode,
       });
+      if (input.submitterAudience) {
+        await formSubmitterAudienceService.set(ctx, form.id, input.submitterAudience);
+      }
       return { ...toFormDto(form), formVersion: toFormVersionDto(version) };
     },
 

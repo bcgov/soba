@@ -60,6 +60,10 @@ vi.mock('@/src/shared/api/useWorkspaces', () => ({
   useFormCreateWorkspaceOptions: vi.fn(),
 }));
 
+vi.mock('@/src/features/designer/data/useSubmitterAudience', () => ({
+  useSubmitterAudience: vi.fn(),
+}));
+
 vi.mock('@/src/features/designer/ui/FormSubmitterAudience', () => ({
   FormSubmitterAudience: () => <div data-testid="form-submitter-audience" />,
 }));
@@ -97,6 +101,7 @@ vi.mock('@/app/ui/WorkspaceSelector', () => ({
 import type { Mock } from 'vitest';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useFormCreateWorkspaceOptions } from '@/src/shared/api/useWorkspaces';
+import { useSubmitterAudience } from '@/src/features/designer/data/useSubmitterAudience';
 
 describe('FormCreateContent', () => {
   beforeEach(() => {
@@ -117,6 +122,15 @@ describe('FormCreateContent', () => {
       formVersion: { id: 'v-1', versionNo: 1, state: 'draft' },
     });
     mockSaveFormVersionSchema.mockResolvedValue({});
+    (useSubmitterAudience as Mock).mockReturnValue({
+      view: {
+        mode: 'none',
+        idps: [],
+        users: [],
+        available: [{ code: 'azureidir', name: 'IDIR - MFA' }],
+      },
+      error: null,
+    });
   });
 
   const renderComponent = () => render(<FormCreateContent onCancelPress={vi.fn()} />);
@@ -264,5 +278,65 @@ describe('FormCreateContent', () => {
     });
     renderComponent();
     expect(screen.getByTestId('designer-select-workspace')).toBeInTheDocument();
+  });
+
+  describe('submitter audience', () => {
+    it('creates a form with a public audience', async () => {
+      renderComponent();
+
+      await userEvent.type(nameInput(), 'My New Form');
+      await userEvent.selectOptions(screen.getByTestId('workspace-selector'), 'ws-1');
+
+      // Click "Public" radio
+      await userEvent.click(screen.getByTestId('audience-mode-public'));
+
+      await userEvent.click(screen.getByTestId('save-create-form'));
+
+      expect(mockCreateSobaFormioForm).toHaveBeenCalledWith(
+        'mock-token',
+        { name: 'My New Form', submitterAudience: { mode: 'public' } },
+        'ws-1',
+      );
+    });
+
+    it('creates a form with a protected audience and IDPs', async () => {
+      renderComponent();
+
+      await userEvent.type(nameInput(), 'My New Form');
+      await userEvent.selectOptions(screen.getByTestId('workspace-selector'), 'ws-1');
+
+      // Click "Protected" radio
+      await userEvent.click(screen.getByTestId('audience-mode-protected'));
+
+      // Click an IDP
+      await userEvent.click(screen.getByTestId('audience-idp-azureidir'));
+
+      await userEvent.click(screen.getByTestId('save-create-form'));
+
+      expect(mockCreateSobaFormioForm).toHaveBeenCalledWith(
+        'mock-token',
+        { name: 'My New Form', submitterAudience: { mode: 'protected', idps: ['azureidir'] } },
+        'ws-1',
+      );
+    });
+
+    it('disables the save button if protected mode is selected but no IDPs are chosen', async () => {
+      renderComponent();
+
+      await userEvent.type(nameInput(), 'My New Form');
+      await userEvent.selectOptions(screen.getByTestId('workspace-selector'), 'ws-1');
+
+      const saveButton = screen.getByTestId('save-create-form');
+      expect(saveButton).toBeEnabled();
+
+      // Click "Protected" radio but no IDPs
+      await userEvent.click(screen.getByTestId('audience-mode-protected'));
+
+      expect(saveButton).toBeDisabled();
+
+      // Click an IDP, it should re-enable
+      await userEvent.click(screen.getByTestId('audience-idp-azureidir'));
+      expect(saveButton).toBeEnabled();
+    });
   });
 });
