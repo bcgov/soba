@@ -21,7 +21,8 @@ interface UploadedFile {
 }
 
 export async function uploadFileHandler(req: Request, res: Response): Promise<void> {
-  // requireUploadAccess has resolved + authorized the submission's workspace into coreContext.
+  // requireUploadAccess has checked submissionId, then resolved + authorized its workspace into
+  // coreContext.
   const ctx = req.coreContext!;
 
   const files = (req as Request & { files?: UploadedFile[] }).files;
@@ -32,7 +33,7 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
 
   const filename =
     (req.body?.fileName as string) || (req.body?.name as string) || uploaded.originalname;
-  const submissionId = (req.body?.submissionId as string) || null;
+  const submissionId = req.body.submissionId as string;
 
   // Always reject blocked extensions, regardless of the form's designer-configured fileTypes.
   // Check both the stored name and the real uploaded name (they can differ via fileNameTemplate).

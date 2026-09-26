@@ -3,53 +3,51 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-// In-memory fileRepo so the service can be exercised without a database.
+// In-memory file and submission_file rows so the service can be exercised without a database.
+const mockFiles = new Map<string, any>();
+const mockLinks = new Map<string, string>();
+const mockTx = {};
+
 jest.mock('../../../src/core/db/repos/fileRepo', () => {
-  const store = new Map<string, any>();
   let seq = 0;
   return {
-    createFileRecord: jest.fn(async (input: any) => {
-      const id = `file-${++seq}`;
+    createFileRecord: jest.fn(async (input: any, link: any) => {
       const record = {
-        id,
+        id: `file-${++seq}`,
         workspaceId: input.workspaceId,
         profile: input.profile,
         backendRef: input.backendRef,
         filename: input.filename,
         contentType: input.contentType ?? null,
         size: input.size ?? null,
-        submissionId: input.submissionId ?? null,
         createdBy: input.createdBy ?? null,
         updatedBy: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      store.set(id, record);
+      await link(mockTx, record);
+      mockFiles.set(record.id, record);
       return record;
     }),
-    getFileRecordById: jest.fn(async (id: string) => store.get(id) ?? null),
-    deleteFileRecordById: jest.fn(async (id: string) => {
-      store.delete(id);
+    deleteFileRecord: jest.fn(async (record: any, unlink: any) => {
+      await unlink(mockTx, record);
+      mockFiles.delete(record.id);
     }),
-    associateFilesWithSubmission: jest.fn(
-      async (fileIds: string[], submissionId: string, workspaceId: string) => {
-        let count = 0;
-        for (const id of fileIds) {
-          const rec = store.get(id);
-          if (
-            rec &&
-            rec.workspaceId === workspaceId &&
-            (rec.submissionId == null || rec.submissionId === submissionId)
-          ) {
-            rec.submissionId = submissionId;
-            count += 1;
-          }
-        }
-        return count;
-      },
-    ),
   };
 });
+jest.mock('../../../src/core/db/repos/submissionFileRepo', () => ({
+  linkFileToSubmission: jest.fn(async (_tx: unknown, link: any) => {
+    mockLinks.set(link.fileId, link.submissionId);
+  }),
+  unlinkSubmissionFile: jest.fn(async (_tx: unknown, fileId: string) => {
+    mockLinks.delete(fileId);
+  }),
+  getSubmissionFileByFileId: jest.fn(async (fileId: string) => {
+    const file = mockFiles.get(fileId);
+    const submissionId = mockLinks.get(fileId);
+    return file && submissionId ? { file, submissionId } : null;
+  }),
+}));
 
 // Authorization lookups are mocked; the storage + service logic is exercised for real.
 jest.mock('../../../src/core/db/repos/formSubmitAccessRepo', () => ({
@@ -67,7 +65,8 @@ jest.mock('../../../src/core/db/repos/featureRepo', () => ({
 }));
 
 import { filesService } from '../../../src/features/files/service';
-import { createFileRecord, deleteFileRecordById } from '../../../src/core/db/repos/fileRepo';
+import { createFileRecord, deleteFileRecord } from '../../../src/core/db/repos/fileRepo';
+import { linkFileToSubmission } from '../../../src/core/db/repos/submissionFileRepo';
 import { hasFormSubmitAccess } from '../../../src/core/db/repos/formSubmitAccessRepo';
 import { getSubmissionRecordById } from '../../../src/core/db/repos/submissionRepo';
 import { isActiveParticipant } from '../../../src/core/db/repos/submissionParticipantRepo';
@@ -97,7 +96,7 @@ async function uploadRecord(params: Parameters<typeof filesService.upload>[0]) {
   return result;
 }
 
-const uploadFor = (submissionId: string | null, filename = 'a.txt') =>
+const uploadFor = (submissionId: string, filename = 'a.txt') =>
   uploadRecord({
     workspaceId: 'ws1',
     actorId: 'actor1',
@@ -147,9 +146,12 @@ describe('filesService', () => {
     }
     expect(got.record.filename).toBe('a.txt');
     expect(await readAll(got.file.downloadStream)).toBe('abc');
+    // The link's submission is read within the file's own workspace.
+    expect(submissionMock).toHaveBeenCalledWith('ws1', 'sub1');
 
     // Un-submitted: a participant who is still in the submit audience may delete.
     expect(await filesService.deleteForCaller(record.id, owner)).toBe('deleted');
+    expect(mockLinks.has(record.id)).toBe(false);
 
     expect(participantMock).toHaveBeenCalledWith('sub1', owner.actorId);
     // The audience is checked against the submission's form, whose audience may override the
@@ -160,38 +162,6 @@ describe('filesService', () => {
       owner,
       'submission_create',
     );
-  });
-
-  it('associates only same-workspace files referenced in submission data', async () => {
-    const f1 = await uploadRecord({
-      workspaceId: 'ws1',
-      actorId: 'a',
-      filename: 'f1.pdf',
-      buffer: Buffer.from('1'),
-    });
-    const f2 = await uploadRecord({
-      workspaceId: 'ws1',
-      actorId: 'a',
-      filename: 'f2.pdf',
-      buffer: Buffer.from('2'),
-    });
-    const other = await uploadRecord({
-      workspaceId: 'ws2',
-      actorId: 'a',
-      filename: 'x.pdf',
-      buffer: Buffer.from('3'),
-    });
-
-    const data = {
-      files: [
-        { storage: 'chefs', id: f1.id },
-        { storage: 'chefs', id: f2.id },
-        { storage: 'chefs', id: other.id }, // different workspace — must not be claimed
-        { storage: 'url', id: 'ignored' },
-      ],
-    };
-    // ws1 files get tagged; the ws2 file is left alone (tenancy boundary).
-    expect(await filesService.associateWithSubmission('sub1', 'ws1', data)).toBe(2);
   });
 
   it('denies download to a caller who is not a participant, even one in the audience', async () => {
@@ -208,8 +178,9 @@ describe('filesService', () => {
     expect(await filesService.getForCaller(record.id, owner)).toBe('notfound');
   });
 
-  it('treats a file with no owning submission as notfound (submission-scoped)', async () => {
-    const record = await uploadFor(null, 'c.txt');
+  it('treats a file with no submission link as notfound (submission-scoped)', async () => {
+    const record = await uploadFor('sub1', 'c.txt');
+    mockLinks.delete(record.id);
     audienceMock.mockResolvedValue(true);
     expect(await filesService.getForCaller(record.id, owner)).toBe('notfound');
   });
@@ -247,23 +218,23 @@ describe('filesService', () => {
     expect(await filesService.deleteForCaller(record.id, owner)).toBe('denied');
   });
 
-  it('delete of a file with no owning submission is notfound', async () => {
-    const record = await uploadFor(null, 'g.txt');
+  it('delete of a file with no submission link is notfound', async () => {
+    const record = await uploadFor('sub1', 'g.txt');
+    mockLinks.delete(record.id);
     expect(await filesService.deleteForCaller(record.id, owner)).toBe('notfound');
   });
 
   it('removes the stored blob when the file-record insert fails (no orphan)', async () => {
     const before = listBlobs(tmp);
     (createFileRecord as jest.Mock).mockRejectedValueOnce(new Error('insert failed'));
-    await expect(
-      filesService.upload({
-        workspaceId: 'ws1',
-        actorId: 'actor1',
-        filename: 'orphan.txt',
-        buffer: Buffer.from('zz'),
-        submissionId: 'sub1',
-      }),
-    ).rejects.toThrow('insert failed');
+    await expect(uploadFor('sub1', 'orphan.txt')).rejects.toThrow('insert failed');
+    expect(listBlobs(tmp)).toEqual(before);
+  });
+
+  it('removes the stored blob when the submission link insert fails (no orphan)', async () => {
+    const before = listBlobs(tmp);
+    (linkFileToSubmission as jest.Mock).mockRejectedValueOnce(new Error('link failed'));
+    await expect(uploadFor('sub1', 'unlinked.txt')).rejects.toThrow('link failed');
     expect(listBlobs(tmp)).toEqual(before);
   });
 
@@ -272,7 +243,7 @@ describe('filesService', () => {
     submissionMock.mockResolvedValue({ id: 'sub1', workflowState: 'draft', formId: 'form1' });
     audienceMock.mockResolvedValue(true);
     const blobs = listBlobs(tmp);
-    (deleteFileRecordById as jest.Mock).mockRejectedValueOnce(new Error('row delete failed'));
+    (deleteFileRecord as jest.Mock).mockRejectedValueOnce(new Error('row delete failed'));
     await expect(filesService.deleteForCaller(record.id, owner)).rejects.toThrow(
       'row delete failed',
     );

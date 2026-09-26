@@ -1,4 +1,4 @@
-import { scanUpload } from '../../../src/features/files/scanUpload';
+import { scanUpload } from '../../../src/core/services/scanUpload';
 import { isFeatureEnabledCached } from '../../../src/core/db/repos/featureRepo';
 import { getVirusScanAdapter } from '../../../src/core/integrations/plugins/PluginRegistry';
 import { virusScanPluginDefinition } from '../../../src/plugins/virusscan-noop';

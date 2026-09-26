@@ -9,6 +9,7 @@ export * from './formGroupOverride';
 export * from './formSubmitterSetting';
 export * from './submissionParticipant';
 export * from './file';
+export * from './submissionFile';
 export * from './documentGenerationAudit';
 export * from './devData';
 export * from './plugins.enterprise';
