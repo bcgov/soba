@@ -81,7 +81,8 @@ templates/
 │   ├── configmap-document-generation.yaml # Document generation plugin config
 │   ├── configmap-sso.yaml       # SSO / JWT config
 │   ├── configmap-ratelimit.yaml # Rate limiting config
-│   └── configmap-storage.yaml   # Files and templates features + storage profiles config
+│   ├── configmap-storage.yaml   # Files and templates features + storage profiles config
+│   └── pvc-filestore.yaml       # File store PVC when the default storage profile is storage-local
 ├── frontend/
 │   ├── deployment.yaml
 │   ├── service.yaml

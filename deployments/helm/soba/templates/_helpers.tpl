@@ -167,6 +167,15 @@ cannot drift apart. Any other code (e.g. tempstorage-os) needs no PVC.
 {{- end }}
 
 {{/*
+Truthy ("true") only when the default storage profile is storage-local. Gates the
+file store PVC, its mount, and STORAGE_PROFILE_DEFAULT_BASE_PATH off one value so they
+cannot drift apart.
+*/}}
+{{- define "soba.storageUsesLocal" -}}
+{{- if eq .Values.backend.storage.defaultBackend "storage-local" -}}true{{- end -}}
+{{- end }}
+
+{{/*
 Truthy ("true") only when the backend scans with clamav. Gates the clamav alias
 Service and the PLUGIN_VIRUSSCAN_CLAMAV_* env together so they cannot drift apart.
 Any other code (e.g. virusscan-noop) needs no clamav wiring.

@@ -21,9 +21,9 @@ data:
   {{- with .Values.backend.storage.templatesStoragePrefix }}
   TEMPLATES_STORAGE_PREFIX: {{ . | quote }}
   {{- end }}
-  {{- with .Values.backend.storage.defaultBasePath }}
-  # storage-local only: filesystem path the default profile writes to (needs a writable volume).
-  STORAGE_PROFILE_DEFAULT_BASE_PATH: {{ . | quote }}
+  {{- if include "soba.storageUsesLocal" . }}
+  # storage-local only: where the file store PVC is mounted and the default profile writes.
+  STORAGE_PROFILE_DEFAULT_BASE_PATH: {{ required "backend.storage.defaultBasePath is required for storage-local" .Values.backend.storage.defaultBasePath | quote }}
   {{- end }}
   {{- with .Values.backend.storage.defaultEndpoint }}
   # storage-s3 only (non-credential keys; ACCESS_KEY/SECRET_KEY come from a Secret).

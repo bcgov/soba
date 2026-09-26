@@ -15,6 +15,12 @@ backend:
     limits:
       cpu: 500m
       memory: 512Mi
+  # Files and templates on the file store PVC (storage-local).
+  storage:
+    defaultBackend: storage-local
+    defaultBasePath: /app/files
+    localVolume:
+      storageClassName: netapp-file-standard
   config:
     nodeEnv: production
     documentGenerationDefaultCode: cdogs-v2

@@ -115,14 +115,27 @@ spec:
             timeoutSeconds: {{ .Values.backend.readinessProbe.timeoutSeconds }}
           resources:
             {{- toYaml .Values.backend.resources | nindent 12 }}
-          {{- if include "soba.tempStorageUsesMount" . }}
+          {{- if or (include "soba.tempStorageUsesMount" .) (include "soba.storageUsesLocal" .) }}
           volumeMounts:
+            {{- if include "soba.tempStorageUsesMount" . }}
             - name: app-tmp
               mountPath: {{ .Values.backend.tempStorage.mountPath }}
+            {{- end }}
+            {{- if include "soba.storageUsesLocal" . }}
+            - name: app-filestore
+              mountPath: {{ .Values.backend.storage.defaultBasePath }}
+            {{- end }}
           {{- end }}
-      {{- if include "soba.tempStorageUsesMount" . }}
+      {{- if or (include "soba.tempStorageUsesMount" .) (include "soba.storageUsesLocal" .) }}
       volumes:
+        {{- if include "soba.tempStorageUsesMount" . }}
         - name: app-tmp
           persistentVolumeClaim:
             claimName: {{ include "soba.fullname" . }}-backend-tmp
+        {{- end }}
+        {{- if include "soba.storageUsesLocal" . }}
+        - name: app-filestore
+          persistentVolumeClaim:
+            claimName: {{ include "soba.fullname" . }}-backend-filestore
+        {{- end }}
       {{- end }}
