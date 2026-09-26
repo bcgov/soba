@@ -1,3 +1,4 @@
+import type { Readable } from 'node:stream';
 import type { PluginConfigReader } from '../../config/pluginConfig';
 
 /**
@@ -65,7 +66,7 @@ export interface UploadFileResult {
 
 export interface GetFileResult extends StorageFileMeta {
   /** When available, a stream to read the file contents server-side (may be omitted). */
-  downloadStream?: NodeJS.ReadableStream;
+  downloadStream?: Readable;
 }
 
 /**

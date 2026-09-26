@@ -31,9 +31,10 @@ beforeEach(() => {
   mockFormPermission.mockReset();
 });
 
-const { open, read, write, deleteSubmittedFile } = SubmitterOperation;
+const { open, read, write, deleteSubmittedFile, render } = SubmitterOperation;
 const create = Permissions.submission_create;
 const update = Permissions.submission_update;
+const templateRead = Permissions.document_template_read;
 
 // [operation, participant, form permissions held, allowed]
 const matrix: [SubmitterOperationCode, boolean, PermissionCode[], boolean][] = [
@@ -46,6 +47,9 @@ const matrix: [SubmitterOperationCode, boolean, PermissionCode[], boolean][] = [
   [write, false, [create], false],
   [deleteSubmittedFile, false, [update], true],
   [deleteSubmittedFile, true, [create], false],
+  [render, true, [templateRead], true],
+  [render, true, [create, Permissions.submission_read], false],
+  [render, false, [templateRead], false],
 ];
 
 it.each(matrix)(

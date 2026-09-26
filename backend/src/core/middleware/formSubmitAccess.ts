@@ -22,6 +22,7 @@ const DENIAL_MESSAGES: Record<SubmitterOperationCode, string> = {
   read: 'Not authorized to access this submission',
   write: 'Not authorized to change this submission',
   deleteSubmittedFile: 'Not authorized to change this submission',
+  render: 'Not authorized to generate this document',
 };
 
 /**

@@ -165,12 +165,13 @@ and Vault/Kubernetes Secret (secret) values.
 
 ### Non-secret values (ConfigMap `<fullname>-backend-document-generation`)
 
-| Helm value                                     | Env var                            | Used by                  |
-| ---------------------------------------------- | ---------------------------------- | ------------------------ |
-| `backend.config.documentGenerationDefaultCode` | `DOCUMENT_GENERATION_DEFAULT_CODE` | default backend resolver |
-| `backend.documentGeneration.cdogsV2.endpoint`  | `PLUGIN_CDOGS_V2_ENDPOINT`         | cdogs-v2 adapter         |
-| `backend.documentGeneration.cdogsV2.tokenUrl`  | `PLUGIN_CDOGS_V2_TOKEN_URL`        | cdogs-v2 adapter         |
-| `backend.documentGeneration.cdogsV3.endpoint`  | `PLUGIN_CDOGS_V3_ENDPOINT`         | cdogs-v3 adapter         |
+| Helm value                                     | Env var                              | Used by                  |
+| ---------------------------------------------- | ------------------------------------ | ------------------------ |
+| `backend.config.documentGenerationDefaultCode` | `DOCUMENT_GENERATION_DEFAULT_CODE`   | default backend resolver |
+| `backend.documentGeneration.maxConcurrent`     | `DOCUMENT_GENERATION_MAX_CONCURRENT` | render concurrency cap   |
+| `backend.documentGeneration.cdogsV2.endpoint`  | `PLUGIN_CDOGS_V2_ENDPOINT`           | cdogs-v2 adapter         |
+| `backend.documentGeneration.cdogsV2.tokenUrl`  | `PLUGIN_CDOGS_V2_TOKEN_URL`          | cdogs-v2 adapter         |
+| `backend.documentGeneration.cdogsV3.endpoint`  | `PLUGIN_CDOGS_V3_ENDPOINT`           | cdogs-v3 adapter         |
 
 ### Secret values (Vault template in backend Deployment)
 

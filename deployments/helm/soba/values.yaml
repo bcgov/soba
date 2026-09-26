@@ -180,6 +180,8 @@ backend:
 
   # -- configmap-document-generation: PLUGIN_CDOGS_* + default backend code
   documentGeneration:
+    # -- renders one pod runs at once; empty uses the backend default (2)
+    maxConcurrent: ""
     cdogsV2:
       endpoint: ""
       tokenUrl: ""
@@ -206,6 +208,8 @@ backend:
     apiMax: "60"
     publicWindowMs: "60000"
     publicMax: "200"
+    renderWindowMs: "60000"
+    renderMax: "30"
 
 # -- Frontend (Next.js) ---------------------------------------------------
 frontend:

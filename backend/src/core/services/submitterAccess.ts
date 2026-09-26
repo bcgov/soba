@@ -10,12 +10,14 @@ import { isActiveParticipant } from '../db/repos/submissionParticipantRepo';
 export const SubmitterOperation = {
   /** Open a new submission on a form. */
   open: 'open',
-  /** Read an existing submission: confirmation, data, schema, fill bundle, files, print, preview. */
+  /** Read an existing submission: confirmation, data, schema, fill bundle, files. */
   read: 'read',
   /** Save, submit, file upload, and delete of a file on an un-submitted submission. */
   write: 'write',
   /** Delete a file on an already-submitted submission. */
   deleteSubmittedFile: 'deleteSubmittedFile',
+  /** Render a document from a submission with a stored template: print, preview, template list. */
+  render: 'render',
 } as const;
 export type SubmitterOperationCode = (typeof SubmitterOperation)[keyof typeof SubmitterOperation];
 
@@ -43,6 +45,7 @@ const RULES: Record<SubmitterOperationCode, readonly AccessCheck[]> = {
   read: [isParticipant],
   write: [isParticipant, hasFormPermission(Permissions.submission_create)],
   deleteSubmittedFile: [hasFormPermission(Permissions.submission_update)],
+  render: [isParticipant, hasFormPermission(Permissions.document_template_read)],
 };
 
 /** Whether the caller may perform a submit-mode operation on the target. */

@@ -4,7 +4,12 @@ import { isTemplateFile, TEMPLATE_TYPES } from './config';
 import { getUploadedFile } from '../../core/middleware/parseUpload';
 import { sendStoredFile } from '../../core/api/shared/sendStoredFile';
 import type { DocumentTemplateWithFile } from '../../core/db/repos/documentTemplateRepo';
-import { NotFoundError, UnsupportedMediaTypeError } from '../../core/errors';
+import {
+  NotFoundError,
+  ServiceUnavailableError,
+  UnsupportedMediaTypeError,
+} from '../../core/errors';
+import { log } from '../../core/logging';
 
 const TEMPLATE_NOT_FOUND = 'Template not found';
 
@@ -73,7 +78,11 @@ export async function getTemplateHandler(req: Request, res: Response): Promise<v
 export async function downloadTemplateHandler(req: Request, res: Response): Promise<void> {
   const template = await findTemplate(req);
   const file = await templatesService.open(template);
-  if (!file) throw new NotFoundError(TEMPLATE_NOT_FOUND);
+  if (!file) {
+    const { id: fileId, profile } = template.file;
+    log.warn({ templateId: template.template.id, fileId, profile }, 'Template content unavailable');
+    throw new ServiceUnavailableError('Template content unavailable');
+  }
   await sendStoredFile(res, template.file, file, 'attachment');
 }
 

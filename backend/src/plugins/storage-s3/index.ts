@@ -122,7 +122,7 @@ function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
           contentType: stat.metaData?.['content-type'] as string | undefined,
           size: stat.size,
           createdAt: stat.lastModified?.toISOString(),
-          downloadStream: stream as unknown as NodeJS.ReadableStream,
+          downloadStream: stream,
         };
       } catch {
         return null;

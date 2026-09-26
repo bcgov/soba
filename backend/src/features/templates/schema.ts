@@ -117,6 +117,7 @@ export function registerTemplatesOpenApi(registry: OpenAPIRegistry) {
       200: { description: 'Template file (attachment)', content: {} },
       403: FORBIDDEN,
       404: NOT_FOUND,
+      503: { description: 'Template content unavailable' },
     },
   });
 

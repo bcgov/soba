@@ -10,10 +10,12 @@ import {
 } from '../../core/errors';
 
 interface RenderBody {
-  template: Record<string, unknown>;
+  templateId: string;
   options?: Record<string, unknown>;
   data?: Record<string, unknown>;
 }
+
+const NOT_AUTHORIZED = 'Not authorized to generate this document';
 
 /** Filename from the CDOGS options: `${reportName}.${convertTo}`, falling back to `document`. */
 function buildFilename(options: Record<string, unknown> | undefined): string {
@@ -44,10 +46,16 @@ function respond(
   switch (outcome.status) {
     case 'notfound':
       throw new NotFoundError('Submission not found');
+    case 'template-notfound':
+      throw new NotFoundError('Template not found');
+    case 'template-unavailable':
+      throw new ServiceUnavailableError('Template content unavailable');
     case 'denied':
-      throw accessDenial(req, 'Not authorized to generate this document');
+      throw accessDenial(req, NOT_AUTHORIZED);
     case 'unavailable':
       throw new ServiceUnavailableError('Document generation is not available for this submission');
+    case 'busy':
+      throw new ServiceUnavailableError('Document generation is busy; try again shortly');
     case 'no-content':
       throw new UnprocessableEntityError('Submission has no saved data to print');
     case 'error':
@@ -66,11 +74,18 @@ function respond(
   }
 }
 
+export async function listTemplatesHandler(req: Request, res: Response): Promise<void> {
+  const outcome = await documentGenerationService.listTemplates(resolveCaller(req), req.params.id);
+  if (outcome.status === 'notfound') throw new NotFoundError('Submission not found');
+  if (outcome.status === 'denied') throw accessDenial(req, NOT_AUTHORIZED);
+  res.json({ items: outcome.templates });
+}
+
 export async function previewDocumentHandler(req: Request, res: Response): Promise<void> {
   const body = req.body as RenderBody;
   const outcome = await documentGenerationService.preview(resolveCaller(req), {
     submissionId: req.params.id,
-    template: body.template,
+    templateId: body.templateId,
     options: body.options,
     data: body.data ?? {},
   });
@@ -81,7 +96,7 @@ export async function printDocumentHandler(req: Request, res: Response): Promise
   const body = req.body as RenderBody;
   const outcome = await documentGenerationService.print(resolveCaller(req), {
     submissionId: req.params.id,
-    template: body.template,
+    templateId: body.templateId,
     options: body.options,
   });
   respond(req, res, outcome, buildFilename(body.options));

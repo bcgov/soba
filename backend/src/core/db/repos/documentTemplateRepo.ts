@@ -128,6 +128,38 @@ export const listDocumentTemplates = async (
     .where(eq(documentTemplates.formVersionId, formVersionId))
     .orderBy(asc(documentTemplates.name));
 
+const selectWithVersionAndForm = () =>
+  selectWithFile()
+    .innerJoin(formVersions, eq(formVersions.id, documentTemplates.formVersionId))
+    .innerJoin(forms, eq(forms.id, documentTemplates.formId));
+
+/** On the form version, when neither the version nor its form is deleted. */
+const onLiveVersion = (formVersionId: string) =>
+  and(
+    eq(documentTemplates.formVersionId, formVersionId),
+    isNull(formVersions.deletedAt),
+    isNull(forms.deletedAt),
+  );
+
+/** The template when it is on the form version and neither is deleted; null otherwise. */
+export const getLiveDocumentTemplate = async (
+  id: string,
+  formVersionId: string,
+): Promise<DocumentTemplateWithFile | null> => {
+  const rows = await selectWithVersionAndForm()
+    .where(and(eq(documentTemplates.id, id), onLiveVersion(formVersionId)))
+    .limit(1);
+  return rows[0] ?? null;
+};
+
+/** The form version's templates by name, when neither the version nor its form is deleted. */
+export const listLiveDocumentTemplates = async (
+  formVersionId: string,
+): Promise<DocumentTemplateWithFile[]> =>
+  selectWithVersionAndForm()
+    .where(onLiveVersion(formVersionId))
+    .orderBy(asc(documentTemplates.name));
+
 /**
  * The workspace and form a template belongs to; null when there is no such template, or its form
  * or form version is deleted.

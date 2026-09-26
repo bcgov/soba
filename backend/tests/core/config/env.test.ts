@@ -70,6 +70,20 @@ describe('env', () => {
     expect(() => reader.getRequiredEnv('MISSING')).toThrow('MISSING is required');
   });
 
+  it.each([
+    [undefined, 2],
+    ['3', 3],
+    ['0', 2],
+    ['-1', 2],
+    ['1.5', 2],
+    ['Infinity', 2],
+  ])('createEnvReader getDocumentGenerationMaxConcurrent reads %j as %d', (value, expected) => {
+    const reader = createEnvReader(
+      value === undefined ? {} : { DOCUMENT_GENERATION_MAX_CONCURRENT: value },
+    );
+    expect(reader.getDocumentGenerationMaxConcurrent()).toBe(expected);
+  });
+
   it('createEnvReader getRequiredEnv throws when key is empty string', () => {
     const reader = createEnvReader({ EMPTY: '' });
     expect(() => reader.getRequiredEnv('EMPTY')).toThrow('EMPTY is required');

@@ -100,8 +100,7 @@ app.use(
 app.use(apiPath('/api/v1/meta'), publicRateLimit, express.json(), metaRouter);
 app.use(apiPath('/api/v1/health'), publicRateLimit, healthRouter);
 
-// Body limit for the body-carrying surfaces — larger than express's 100kb default so document
-// generation can carry a base64 template inline (see env.getJsonBodyLimit). meta stays at the
+// Body limit for the body-carrying surfaces (see env.getJsonBodyLimit). meta stays at express's
 // default: it is public and body-less.
 const jsonBodyLimit = env.getJsonBodyLimit();
 
