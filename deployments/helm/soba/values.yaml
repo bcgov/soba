@@ -58,6 +58,11 @@ backend:
         annotations:
           # Upload is silent through the clamd scan (clamav.timeoutMs, 60s).
           haproxy.router.openshift.io/timeout: "300s"
+      - name: templates
+        path: /api/v1/templates
+        annotations:
+          # Upload is silent through the clamd scan (clamav.timeoutMs, 60s).
+          haproxy.router.openshift.io/timeout: "300s"
   ingress:
     enabled: false
     ingressClassName: ""
@@ -132,7 +137,8 @@ backend:
     size: 1Gi
     storageClassName: ""
 
-  # -- configmap-storage: files feature + storage profiles (STORAGE_* + FILES_*)
+  # -- configmap-storage: files and templates features + storage profiles (STORAGE_* + FILES_* +
+  # TEMPLATES_*)
   storage:
     # Active storage profiles (comma-separated). Each needs a *Backend below.
     profiles: "default"
@@ -144,6 +150,9 @@ backend:
     # Profile the /files API reads/writes, and the max upload size it accepts (MB).
     filesStorageProfile: "default"
     filesMaxFileSizeMb: "10"
+    # Profile the /templates API reads/writes, and the max upload size it accepts (MB).
+    templatesStorageProfile: "default"
+    templatesMaxFileSizeMb: "10"
 
     # storage-local only: writable filesystem path for the default profile. Rendered only when set.
     defaultBasePath: ""

@@ -7,6 +7,7 @@ import {
 } from '../db/repos/fileRepo';
 import type { GetFileResult } from '../integrations/storage-engine/StorageEngineAdapter';
 import { scanUpload, type ScanOutcome } from './scanUpload';
+import { ServiceUnavailableError, UnprocessableEntityError } from '../errors';
 
 export interface StoreFileInput {
   workspaceId: string;
@@ -21,6 +22,16 @@ export interface StoreFileInput {
 
 /** The stored file, or the scan outcome that refused it. */
 export type StoreFileOutcome = FileRecord | Exclude<ScanOutcome, 'clean'>;
+
+/** The stored file, or the API error for a scan that refused it. */
+export function storedOrThrow(outcome: StoreFileOutcome): FileRecord {
+  // Infected is a problem with the content; scan-unavailable fails closed, so nothing is stored.
+  if (outcome === 'infected') throw new UnprocessableEntityError('File failed virus scan');
+  if (outcome === 'scan-unavailable') {
+    throw new ServiceUnavailableError('Virus scanning unavailable');
+  }
+  return outcome;
+}
 
 /** Stored files for every feature. */
 export const fileStore = {

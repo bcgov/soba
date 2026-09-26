@@ -81,7 +81,7 @@ templates/
 │   ├── configmap-document-generation.yaml # Document generation plugin config
 │   ├── configmap-sso.yaml       # SSO / JWT config
 │   ├── configmap-ratelimit.yaml # Rate limiting config
-│   └── configmap-storage.yaml   # Files feature + storage profiles config
+│   └── configmap-storage.yaml   # Files and templates features + storage profiles config
 ├── frontend/
 │   ├── deployment.yaml
 │   ├── service.yaml
@@ -318,9 +318,13 @@ backend:
         path: /api/v1/files
         annotations:
           haproxy.router.openshift.io/timeout: "300s"
+      - name: templates
+        path: /api/v1/templates
+        annotations:
+          haproxy.router.openshift.io/timeout: "300s"
 ```
 
-That is what the chart ships: uploads at 300s on both file paths, everything else at 60s. An upload writes nothing back until clamd finishes scanning (`clamav.timeoutMs`, 60s), so the router's 30s default would 504 a clean upload.
+That is what the chart ships: uploads at 300s on the file and template paths, everything else at 60s. An upload writes nothing back until clamd finishes scanning (`clamav.timeoutMs`, 60s), so the router's 30s default would 504 a clean upload.
 
 Matching is by whole segment and prefix only — `/api/v1/submit/files` does not capture
 `/api/v1/submit/filestore`, and there is no suffix match. Document generation cannot be scoped this way: it sits at `/api/v1/submit/submissions/:id/{preview,print}`,and the only prefix reaching it would swallow ordinary submission reads and writes. It is a synchronous call to CDOGS, so the base timeout has to cover it.

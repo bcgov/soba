@@ -301,4 +301,8 @@ export const env = {
   getFilesMaxFileSizeMb: () => getNumberEnv('FILES_MAX_FILE_SIZE_MB') || 10,
   // Storage profile the files feature reads/writes. Defaults to 'default'.
   getFilesStorageProfile: () => getOptionalEnv('FILES_STORAGE_PROFILE') ?? 'default',
+  // Max upload size accepted by the templates API. Feature-level (not per storage backend).
+  getTemplatesMaxFileSizeMb: () => getNumberEnv('TEMPLATES_MAX_FILE_SIZE_MB') || 10,
+  // Storage profile the templates feature reads/writes. Defaults to 'default'.
+  getTemplatesStorageProfile: () => getOptionalEnv('TEMPLATES_STORAGE_PROFILE') ?? 'default',
 };

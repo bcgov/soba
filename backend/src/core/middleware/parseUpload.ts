@@ -1,7 +1,22 @@
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler } from 'express';
 import multer, { MulterError } from 'multer';
-import { AppError, PayloadTooLargeError, ValidationError } from '../../core/errors';
-import { log } from '../../core/logging';
+import { AppError, PayloadTooLargeError, ValidationError } from '../errors';
+import { log } from '../logging';
+
+/** Minimal shape of a multer memory-storage file (this project has no @types/multer). */
+export interface UploadedFile {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+}
+
+/** The file parseUpload read from the request. */
+export function getUploadedFile(req: Request): UploadedFile {
+  const uploaded = (req as Request & { files?: UploadedFile[] }).files?.[0];
+  if (!uploaded) throw new ValidationError('no file');
+  return uploaded;
+}
 
 function toUploadError(err: unknown): AppError {
   if (err instanceof MulterError) {
@@ -15,14 +30,13 @@ function toUploadError(err: unknown): AppError {
   return new ValidationError('Malformed multipart body');
 }
 
-/**
- * Parse a multipart upload of one file into memory. Accepts any file field name (Form.io's fileKey
- * is configurable; the component uploads one at a time).
- */
+/** Parse a multipart upload of one file into memory, under any file field name. */
 export const parseUpload = (maxFileBytes: number): RequestHandler => {
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: maxFileBytes, files: 1 },
+    // Browsers send UTF-8 filenames; multer decodes them as latin1 unless told otherwise.
+    defParamCharset: 'utf8',
   }).any();
   return (req, res, next) => {
     let settled = false;

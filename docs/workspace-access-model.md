@@ -20,8 +20,12 @@ adds a third control per submission, who takes part in it; see
 > workspace). Creating a form requires `form_create` and `design_create` — only `form_admin` satisfies
 > that, via `*`. Creating a design on an existing form requires `design_create` (`form_designer`). The
 > submit routes, file uploads and document generation are gated by `isSubmitterAllowed` (see
-> [Submission participants](#submission-participants)). Group and member management is gated by
-> workspace role (`requireWorkspaceManage`), not by RBAC.
+> [Submission participants](#submission-participants)). The template routes
+> (`features/templates/route.ts`) are gated by `requireFormPermissions`: `document_template_read` to
+> list and download, `document_template_create` to upload, replace and rename,
+> `document_template_delete` to delete. Only `form_admin` (via `*`) holds the create and delete codes;
+> `form_submitter` holds read. Group and member management is gated by workspace role
+> (`requireWorkspaceManage`), not by RBAC.
 
 ```
                         User in a workspace

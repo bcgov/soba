@@ -2,10 +2,13 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { Readable } from 'node:stream';
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { asyncHandler } from '../../../src/core/api/shared/asyncHandler';
-import { coreErrorHandler } from '../../../src/core/middleware/errorHandler';
-import { log } from '../../../src/core/logging';
-import { streamFile } from '../../../src/features/files/streamFile';
+import supertest from 'supertest';
+import { asyncHandler } from '../../../../src/core/api/shared/asyncHandler';
+import { coreErrorHandler } from '../../../../src/core/middleware/errorHandler';
+import { log } from '../../../../src/core/logging';
+import { sendStoredFile, streamFile } from '../../../../src/core/api/shared/sendStoredFile';
+import type { FileRecord } from '../../../../src/core/db/repos/fileRepo';
+import type { GetFileResult } from '../../../../src/core/integrations/storage-engine/StorageEngineAdapter';
 
 interface Served {
   port: number;
@@ -14,7 +17,7 @@ interface Served {
   close: () => Promise<void>;
 }
 
-/** Mounted like the files route: an async handler, then the core error handler. */
+/** Mounted like a download route: an async handler, then the core error handler. */
 async function serve(source: Readable): Promise<Served> {
   const seen: unknown[] = [];
   const app = express();
@@ -139,5 +142,56 @@ describe('streamFile', () => {
       'File download closed by the client',
     );
     expect(served.seen).toEqual([]);
+  });
+});
+
+const storedRecord = {
+  id: 'file-1',
+  filename: 'r\u00e9sum\u00e9.txt',
+  contentType: 'text/plain',
+  size: 99,
+} as FileRecord;
+
+function downloadApp(file: GetFileResult): express.Express {
+  const app = express();
+  app.get(
+    '/file',
+    asyncHandler(async (_req, res) => {
+      await sendStoredFile(res, storedRecord, file, 'attachment');
+    }),
+  );
+  app.use(coreErrorHandler);
+  return app;
+}
+
+describe('sendStoredFile', () => {
+  it('sends the bytes with the stored type, the backend length and the disposition', async () => {
+    const file = {
+      engineFileRef: 'ref',
+      filename: 'ignored',
+      size: 3,
+      downloadStream: Readable.from(['abc']),
+    };
+    const res = await supertest(downloadApp(file)).get('/file');
+    expect(res.status).toBe(200);
+    expect(res.text).toBe('abc');
+    expect(res.headers['content-type']).toMatch(/^text\/plain/);
+    expect(res.headers['content-length']).toBe('3');
+    expect(res.headers['content-disposition']).toBe(
+      `attachment; filename="${encodeURIComponent('r\u00e9sum\u00e9.txt')}"`,
+    );
+  });
+
+  it('redirects to the public URL when the backend has one', async () => {
+    const file = { engineFileRef: 'ref', filename: 'x', publicUrl: 'https://store.example/x' };
+    const res = await supertest(downloadApp(file)).get('/file');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('https://store.example/x');
+  });
+
+  it('returns 500 when the backend offers neither a stream nor a URL', async () => {
+    const res = await supertest(downloadApp({ engineFileRef: 'ref', filename: 'x' })).get('/file');
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'no download available' });
   });
 });

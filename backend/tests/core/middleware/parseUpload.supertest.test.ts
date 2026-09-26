@@ -1,6 +1,6 @@
 import express from 'express';
 import request from 'supertest';
-import { parseUpload } from '../../../src/features/files/parseUpload';
+import { parseUpload } from '../../../src/core/middleware/parseUpload';
 import { coreErrorHandler } from '../../../src/core/middleware/errorHandler';
 
 function uploadApp(): express.Express {
@@ -25,6 +25,14 @@ describe('parseUpload', () => {
       .attach('anyKey', Buffer.from('abc'), 'a.txt');
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ files: ['a.txt'], submissionId: 'sub1' });
+  });
+
+  it('keeps a UTF-8 filename intact', async () => {
+    const res = await request(app)
+      .post('/upload')
+      .attach('file', Buffer.from('ab'), 'r\u00e9sum\u00e9.txt');
+    expect(res.status).toBe(200);
+    expect(res.body.files).toEqual(['r\u00e9sum\u00e9.txt']);
   });
 
   it('passes a request that is not multipart through unparsed', async () => {

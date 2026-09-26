@@ -8,6 +8,7 @@ import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
 import { groupsDomain } from './groups';
 import { filesDomain } from '../../features/files';
 import { documentGenerationDomain } from '../../features/document-generation';
+import { templatesDomain } from '../../features/templates';
 import { formSettingsRouter, registerFormSettingsOpenApi } from '../../features/form-settings';
 import { meDomain } from './me';
 import { membersDomain } from './members';
@@ -19,7 +20,7 @@ import { registerOpenApiPaths } from './shared/openapi';
 //  - designRouter   (/api/v1/design): staff form authoring + submission management.
 //  - submitRouter   (/api/v1/submit): public-capable submissions, file attachments, preview/print.
 //  - filesApiRouter (/api/v1/files):  public-capable submission file attachments.
-//  - coreRouter     (/api/v1):        workspace/account management (not a toggled feature).
+//  - coreRouter     (/api/v1):        workspace/account management, and staff document templates.
 registerOpenApiPaths((registry) => {
   registerFormsOpenApi(registry);
   registerFormSettingsOpenApi(registry);
@@ -31,6 +32,7 @@ registerOpenApiPaths((registry) => {
   workspacesDomain.registerOpenApi(registry);
   filesDomain.registerOpenApi(registry);
   documentGenerationDomain.registerOpenApi(registry);
+  templatesDomain.registerOpenApi(registry);
   metaDomain.registerOpenApi(registry);
   registerAdminOpenApi(registry);
   registerHealthOpenApi(registry);
@@ -64,9 +66,9 @@ filesApiRouter.use('/', filesDomain.router);
 filesApiRouter.use(notFoundHandler);
 filesApiRouter.use(coreErrorHandler);
 
-// Core: workspace/account management.
+// Core: workspace/account management, and staff document templates.
 const coreRouter = express.Router();
-for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain]) {
+for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain, templatesDomain]) {
   coreRouter.use(domain.path, domain.router);
 }
 coreRouter.use(notFoundHandler);

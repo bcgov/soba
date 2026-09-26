@@ -150,7 +150,8 @@ app.use(
   adminRouter,
 );
 
-// Core: workspace/account management (mandatory auth). Mounted last so the more specific paths win.
+// Core: workspace/account management and staff document templates (mandatory auth). Mounted last
+// so the more specific paths win.
 app.use(
   apiPath('/api/v1'),
   apiRateLimit,
