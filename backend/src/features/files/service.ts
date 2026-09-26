@@ -41,6 +41,7 @@ export const filesService = {
         workspaceId: params.workspaceId,
         actorId: params.actorId,
         profile: env.getFilesStorageProfile(),
+        prefix: env.getFilesStoragePrefix(),
         filename: params.filename,
         contentType: params.contentType,
         size: params.size,

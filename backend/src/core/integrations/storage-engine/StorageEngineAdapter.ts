@@ -37,6 +37,8 @@ export type StorageFileMeta = {
 export interface UploadFileInput {
   /** SOBA workspace id — used for tenancy and scoping in the storage backend. */
   workspaceId: string;
+  /** Key prefix of the feature that owns the file; the backend stores the object under it. */
+  prefix: string;
   /** Original filename provided by the client. */
   filename: string;
   /** Content type hint. */

@@ -224,6 +224,37 @@ describe('filesService', () => {
     expect(await filesService.deleteForCaller(record.id, owner)).toBe('notfound');
   });
 
+  it('stores attachments under the files prefix, or FILES_STORAGE_PREFIX when set', async () => {
+    const before = new Set(listBlobs(tmp));
+    await uploadFor('sub1', 'default-prefix.txt');
+    process.env.FILES_STORAGE_PREFIX = 'other-prefix';
+    try {
+      await uploadFor('sub1', 'override-prefix.txt');
+    } finally {
+      delete process.env.FILES_STORAGE_PREFIX;
+    }
+    const folders = listBlobs(tmp)
+      .filter((blob) => !before.has(blob))
+      .map((blob) => path.relative(tmp, path.dirname(blob)));
+    expect(folders.sort()).toEqual([
+      path.join('attachments', 'ws1'),
+      path.join('other-prefix', 'ws1'),
+    ]);
+  });
+
+  it('refuses a storage prefix outside the allowed pattern before storing anything', async () => {
+    const before = listBlobs(tmp);
+    process.env.FILES_STORAGE_PREFIX = '../escape';
+    try {
+      await expect(uploadFor('sub1', 'escape.txt')).rejects.toThrow(
+        "Invalid storage prefix '../escape'",
+      );
+    } finally {
+      delete process.env.FILES_STORAGE_PREFIX;
+    }
+    expect(listBlobs(tmp)).toEqual(before);
+  });
+
   it('removes the stored blob when the file-record insert fails (no orphan)', async () => {
     const before = listBlobs(tmp);
     (createFileRecord as jest.Mock).mockRejectedValueOnce(new Error('insert failed'));

@@ -8,6 +8,11 @@ import type {
   GetFileResult,
 } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 import type { PluginConfigReader } from '../../core/config/pluginConfig';
+import { isStoragePrefix } from '../../core/integrations/storage-engine/storageKey';
+import { log } from '../../core/logging';
+import { objectKey, ownedKey } from './objectKey';
+
+const CODE = 'storage-s3';
 
 /**
  * S3-compatible (MinIO) storage plugin adapter.
@@ -20,13 +25,10 @@ import type { PluginConfigReader } from '../../core/config/pluginConfig';
  * - ACCESS_KEY
  * - SECRET_KEY
  * - BUCKET_NAME or BUCKET
+ * - PREFIX (optional): root every object is stored under, e.g. `dev`
+ *
+ * Reads and deletes act only on refs in the profile's bucket and under its root.
  */
-function parseEngineRef(ref: string) {
-  if (!ref.startsWith('s3:')) return null;
-  const parts = ref.split(':');
-  return { bucket: parts[1], key: parts.slice(2).join(':') };
-}
-
 function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
   const endpointRaw = config.getRequired('ENDPOINT');
   let endPointHost: string;
@@ -49,6 +51,10 @@ function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
     config.getOptional('BUCKET') ??
     config.getOptional('BUCKET_NAME') ??
     config.getRequired('BUCKET_NAME');
+  const root = config.getOptional('PREFIX');
+  if (root !== undefined && !isStoragePrefix(root)) {
+    throw new Error(`Invalid storage profile PREFIX '${root}'`);
+  }
 
   const client = new Minio.Client({
     endPoint: endPointHost,
@@ -62,6 +68,14 @@ function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
     return `s3:${bucket}:${key}`;
   }
 
+  function keyFor(engineFileRef: string): string | null {
+    const key = ownedKey(engineFileRef, bucket, root);
+    if (key === null) {
+      log.warn({ plugin: CODE }, 'Stored ref is outside the profile bucket and root; ignored');
+    }
+    return key;
+  }
+
   return {
     async readinessCheck() {
       try {
@@ -73,7 +87,7 @@ function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
     },
 
     async uploadFile(input: UploadFileInput): Promise<UploadFileResult> {
-      const key = `${input.workspaceId ?? 'default'}/${Date.now()}-${input.workspaceId}-${input.filename}`;
+      const key = objectKey(root, input);
       if (input.buffer) {
         const stream = Readable.from(input.buffer);
         await client.putObject(bucket, key, stream, input.buffer.length, {
@@ -97,14 +111,14 @@ function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
     },
 
     async getFile(engineFileRef: string): Promise<GetFileResult | null> {
-      const parsed = parseEngineRef(engineFileRef);
-      if (!parsed) return null;
+      const key = keyFor(engineFileRef);
+      if (key === null) return null;
       try {
-        const stat = await client.statObject(parsed.bucket, parsed.key);
-        const stream = await client.getObject(parsed.bucket, parsed.key);
+        const stat = await client.statObject(bucket, key);
+        const stream = await client.getObject(bucket, key);
         return {
           engineFileRef,
-          filename: parsed.key.split('/').pop() ?? parsed.key,
+          filename: key.split('/').pop() ?? key,
           contentType: stat.metaData?.['content-type'] as string | undefined,
           size: stat.size,
           createdAt: stat.lastModified?.toISOString(),
@@ -116,10 +130,10 @@ function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
     },
 
     async deleteFile(engineFileRef: string): Promise<void> {
-      const parsed = parseEngineRef(engineFileRef);
-      if (!parsed) return;
+      const key = keyFor(engineFileRef);
+      if (key === null) return;
       try {
-        await client.removeObject(parsed.bucket, parsed.key);
+        await client.removeObject(bucket, key);
       } catch {
         // ignore
       }
@@ -128,6 +142,6 @@ function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
 }
 
 export const storagePluginDefinition: StoragePluginDefinition = {
-  code: 'storage-s3',
+  code: CODE,
   createAdapter: createMinioAdapter,
 };

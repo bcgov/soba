@@ -9,6 +9,7 @@ import type {
   GetFileResult,
 } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 import type { PluginConfigReader } from '../../core/config/pluginConfig';
+import { storedFileName } from '../../core/integrations/storage-engine/storageKey';
 
 function engineRefFor(relPath: string) {
   return `local:${relPath}`;
@@ -47,12 +48,9 @@ function createLocalStorageAdapter(config: PluginConfigReader): StorageEngineAda
 
     async uploadFile(input: UploadFileInput): Promise<UploadFileResult> {
       await ensureBase();
-      const subdir = input.workspaceId ? path.join(basePath, input.workspaceId) : basePath;
+      const subdir = path.join(basePath, input.prefix, input.workspaceId);
       await fs.promises.mkdir(subdir, { recursive: true });
-      const filename = `${Date.now()}-${input.workspaceId}-${path.basename(
-        input.filename || 'file',
-      )}`;
-      const dest = path.join(subdir, filename);
+      const dest = path.join(subdir, storedFileName(input.filename));
 
       if (input.buffer) {
         await fs.promises.writeFile(dest, input.buffer);

@@ -6,6 +6,7 @@ import {
   type FileRecord,
 } from '../db/repos/fileRepo';
 import type { GetFileResult } from '../integrations/storage-engine/StorageEngineAdapter';
+import { isStoragePrefix } from '../integrations/storage-engine/storageKey';
 import { scanUpload, type ScanOutcome } from './scanUpload';
 import { ServiceUnavailableError, UnprocessableEntityError } from '../errors';
 
@@ -14,6 +15,8 @@ export interface StoreFileInput {
   actorId: string;
   /** Storage profile of the owning feature. */
   profile: string;
+  /** Key prefix of the owning feature. */
+  prefix: string;
   filename: string;
   contentType?: string;
   size?: number;
@@ -40,12 +43,16 @@ export const fileStore = {
    * reaches storage or the database.
    */
   async put(input: StoreFileInput, link: FileLinkWrite): Promise<StoreFileOutcome> {
+    if (!isStoragePrefix(input.prefix)) {
+      throw new Error(`Invalid storage prefix '${input.prefix}'`);
+    }
     const scan = await scanUpload(input.buffer, input.filename);
     if (scan !== 'clean') return scan;
 
     const adapter = getStorageAdapter(input.profile);
     const result = await adapter.uploadFile({
       workspaceId: input.workspaceId,
+      prefix: input.prefix,
       filename: input.filename,
       contentType: input.contentType,
       size: input.size,

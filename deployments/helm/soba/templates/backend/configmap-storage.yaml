@@ -6,8 +6,8 @@ metadata:
     {{- include "soba.labels" (dict "root" . "component" "backend") | nindent 4 }}
 data:
   # Files and templates features + storage profiles. The default profile uses 'storage-memory'
-  # (in-process, ephemeral — no volume or external service). Switch storageProfileDefaultBackend to
-  # 'storage-s3' and set the endpoint/bucket below (credentials come from a Secret) for durable,
+  # (in-process, ephemeral, no volume or external service). Switch defaultBackend to 'storage-s3' and
+  # set the endpoint, bucket and prefix below (credentials come from a Secret) for durable,
   # multi-replica storage.
   STORAGE_PROFILES: {{ .Values.backend.storage.profiles | quote }}
   STORAGE_PROFILE_DEFAULT_BACKEND: {{ .Values.backend.storage.defaultBackend | quote }}
@@ -15,6 +15,12 @@ data:
   FILES_MAX_FILE_SIZE_MB: {{ .Values.backend.storage.filesMaxFileSizeMb | quote }}
   TEMPLATES_STORAGE_PROFILE: {{ .Values.backend.storage.templatesStorageProfile | quote }}
   TEMPLATES_MAX_FILE_SIZE_MB: {{ .Values.backend.storage.templatesMaxFileSizeMb | quote }}
+  {{- with .Values.backend.storage.filesStoragePrefix }}
+  FILES_STORAGE_PREFIX: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.backend.storage.templatesStoragePrefix }}
+  TEMPLATES_STORAGE_PREFIX: {{ . | quote }}
+  {{- end }}
   {{- with .Values.backend.storage.defaultBasePath }}
   # storage-local only: filesystem path the default profile writes to (needs a writable volume).
   STORAGE_PROFILE_DEFAULT_BASE_PATH: {{ . | quote }}
@@ -32,4 +38,8 @@ data:
   {{- end }}
   {{- with .Values.backend.storage.defaultUseSsl }}
   STORAGE_PROFILE_DEFAULT_USE_SSL: {{ . | quote }}
+  {{- end }}
+  {{- if eq .Values.backend.storage.defaultBackend "storage-s3" }}
+  # storage-s3 only: root every object in the default profile is stored under.
+  STORAGE_PROFILE_DEFAULT_PREFIX: {{ required "backend.storage.defaultPrefix is required for storage-s3" .Values.backend.storage.defaultPrefix | quote }}
   {{- end }}

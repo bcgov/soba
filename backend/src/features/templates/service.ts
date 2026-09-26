@@ -33,6 +33,7 @@ const toStoreInput = (actor: TemplateActor, file: TemplateFile) => ({
   workspaceId: actor.workspaceId,
   actorId: actor.actorId,
   profile: env.getTemplatesStorageProfile(),
+  prefix: env.getTemplatesStoragePrefix(),
   ...file,
 });
 

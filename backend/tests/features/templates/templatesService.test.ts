@@ -149,6 +149,8 @@ describe('templatesService', () => {
     expect(created.file.filename).toBe('r.docx');
     expect(await contentOf(created.template.id)).toBe('one');
 
+    expect(created.file.backendRef).toMatch(/^local:templates\/ws1\//);
+
     await createTemplate('v2', 'Receipt', 'r.docx', 'other version');
     const onV1 = await templatesService.list('v1');
     expect(onV1.map((t) => t.template.name)).toEqual(['Receipt']);
