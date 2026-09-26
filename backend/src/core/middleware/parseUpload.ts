@@ -11,6 +11,20 @@ export interface UploadedFile {
   buffer: Buffer;
 }
 
+/**
+ * Longest file name, in UTF-8 bytes, an upload may give. It is stored and sent back in a download
+ * header.
+ */
+export const MAX_FILE_NAME_BYTES = 255;
+
+/** The file name, or a 400 when it is longer than MAX_FILE_NAME_BYTES. */
+export const checkedFileName = (name: string): string => {
+  if (Buffer.byteLength(name, 'utf8') > MAX_FILE_NAME_BYTES) {
+    throw new ValidationError(`File name is longer than ${MAX_FILE_NAME_BYTES} bytes`);
+  }
+  return name;
+};
+
 /** The file parseUpload read from the request. */
 export function getUploadedFile(req: Request): UploadedFile {
   const uploaded = (req as Request & { files?: UploadedFile[] }).files?.[0];
@@ -34,7 +48,8 @@ function toUploadError(err: unknown): AppError {
 export const parseUpload = (maxFileBytes: number): RequestHandler => {
   const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: maxFileBytes, files: 1 },
+    // Text fields are held in memory, and /files reads them before it authorizes: few and small.
+    limits: { fileSize: maxFileBytes, files: 1, fields: 20, fieldSize: 64 * 1024, parts: 21 },
     // Browsers send UTF-8 filenames; multer decodes them as latin1 unless told otherwise.
     defParamCharset: 'utf8',
   }).any();

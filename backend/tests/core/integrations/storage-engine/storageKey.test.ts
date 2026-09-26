@@ -1,6 +1,6 @@
 import {
   isStoragePrefix,
-  storedFileName,
+  storedObjectName,
 } from '../../../../src/core/integrations/storage-engine/storageKey';
 
 describe('isStoragePrefix', () => {
@@ -26,23 +26,11 @@ describe('isStoragePrefix', () => {
   });
 });
 
-describe('storedFileName', () => {
-  const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}';
-
-  it('puts a uuid v7 before the name', () => {
-    expect(storedFileName('receipt.docx')).toMatch(new RegExp(`^${UUID}-receipt\\.docx$`));
-  });
-
-  it('gives the same name a different stored name each time', () => {
-    expect(storedFileName('receipt.docx')).not.toBe(storedFileName('receipt.docx'));
-  });
-
-  it('keeps only the last segment of a name with slashes', () => {
-    expect(storedFileName('nested/dir/name.txt')).toMatch(new RegExp(`^${UUID}-name\\.txt$`));
-    expect(storedFileName('../../escape.txt')).toMatch(new RegExp(`^${UUID}-escape\\.txt$`));
-  });
-
-  it('names an unnamed file "file"', () => {
-    expect(storedFileName('')).toMatch(new RegExp(`^${UUID}-file$`));
+describe('storedObjectName', () => {
+  it('is a uuid v7, different on every call', () => {
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+    const first = storedObjectName();
+    expect(first).toMatch(uuid);
+    expect(storedObjectName()).not.toBe(first);
   });
 });

@@ -1,6 +1,6 @@
 import express from 'express';
 import request from 'supertest';
-import { parseUpload } from '../../../src/core/middleware/parseUpload';
+import { checkedFileName, parseUpload } from '../../../src/core/middleware/parseUpload';
 import { coreErrorHandler } from '../../../src/core/middleware/errorHandler';
 
 function uploadApp(): express.Express {
@@ -14,6 +14,19 @@ function uploadApp(): express.Express {
 }
 
 const MALFORMED = { error: 'Malformed multipart body' };
+
+describe('checkedFileName', () => {
+  it('passes a name of up to 255 bytes', () => {
+    const name = `${'\u00e9'.repeat(125)}.pdf`; // 250 + 4 bytes
+    expect(checkedFileName(name)).toBe(name);
+  });
+
+  it('refuses a longer name with 400', () => {
+    expect(() => checkedFileName(`${'a'.repeat(252)}.pdf`)).toThrow(
+      'File name is longer than 255 bytes',
+    );
+  });
+});
 
 describe('parseUpload', () => {
   const app = uploadApp();
@@ -56,6 +69,21 @@ describe('parseUpload', () => {
       .attach('second', Buffer.from('b'), 'b.txt');
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ error: 'Too many files' });
+  });
+
+  it('returns 400 for more text fields than the parser allows', async () => {
+    let req = request(app).post('/upload');
+    for (let i = 0; i < 21; i++) req = req.field(`f${i}`, 'x');
+    const res = await req.attach('file', Buffer.from('a'), 'a.txt');
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for a text field over the size limit', async () => {
+    const res = await request(app)
+      .post('/upload')
+      .field('submissionId', 'x'.repeat(64 * 1024 + 1))
+      .attach('file', Buffer.from('a'), 'a.txt');
+    expect(res.status).toBe(400);
   });
 
   it('returns 400 for a multipart body with no boundary', async () => {

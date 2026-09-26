@@ -1,17 +1,15 @@
 import type { UploadFileInput } from '../../core/integrations/storage-engine/StorageEngineAdapter';
-import { storedFileName } from '../../core/integrations/storage-engine/storageKey';
+import { storedObjectName } from '../../core/integrations/storage-engine/storageKey';
 
 /**
  * The object key: the profile's root (when set), the owning feature's prefix, the workspace, then
- * the stored file name.
+ * the stored object name.
  */
 export function objectKey(
   root: string | undefined,
-  input: Pick<UploadFileInput, 'prefix' | 'workspaceId' | 'filename'>,
+  input: Pick<UploadFileInput, 'prefix' | 'workspaceId'>,
 ): string {
-  return [root, input.prefix, input.workspaceId, storedFileName(input.filename)]
-    .filter(Boolean)
-    .join('/');
+  return [root, input.prefix, input.workspaceId, storedObjectName()].filter(Boolean).join('/');
 }
 
 /**

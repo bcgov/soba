@@ -4,6 +4,21 @@ import { coreErrorHandler, errorToHttpResponse } from '../../../src/core/middlew
 import { HttpClientError } from '../../../src/core/http/httpClient';
 import { FormioApiError } from '../../../src/plugins/formio-v5/formioV5Client';
 import { AppError, NotFoundError, ValidationError } from '../../../src/core/errors';
+import { log } from '../../../src/core/logging';
+
+/** A Drizzle-style query error wrapping a pg DatabaseError, with the submitted value in params. */
+const queryError = (code: string, extra: Record<string, string> = {}) =>
+  Object.assign(new Error('Failed query: insert ... params: jane.doe@example.com'), {
+    name: 'DrizzleQueryError',
+    params: ['jane.doe@example.com'],
+    cause: Object.assign(new Error('pg says no'), { code, severity: 'ERROR', ...extra }),
+  });
+
+const respond = () => {
+  const res = { headersSent: false, status: jest.fn(), json: jest.fn() };
+  res.status.mockReturnValue(res);
+  return res as unknown as Response;
+};
 
 describe('errorHandler', () => {
   it('errorToHttpResponse returns statusCode and body for AppError', () => {
@@ -103,6 +118,41 @@ describe('errorHandler', () => {
     const result = errorToHttpResponse(err);
     expect(result.statusCode).toBe(418);
     expect(result.body.error).toBe('Custom');
+  });
+
+  it('coreErrorHandler logs a database 500 by its fields, never its message or parameters', () => {
+    const error = jest.spyOn(log, 'error').mockImplementation(() => undefined);
+    try {
+      const err = queryError('23502', { table: 'file', column: 'filename' });
+      coreErrorHandler(err, {} as Request, respond(), jest.fn());
+      expect(error).toHaveBeenCalledWith(
+        {
+          name: 'DrizzleQueryError',
+          code: '23502',
+          table: 'file',
+          column: 'filename',
+          constraint: undefined,
+        },
+        'Unhandled error',
+      );
+      expect(JSON.stringify(error.mock.calls)).not.toContain('jane.doe');
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  it('coreErrorHandler logs rejected database input by its fields, never its parameters', () => {
+    const warn = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+    try {
+      coreErrorHandler(queryError('22P02'), {} as Request, respond(), jest.fn());
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'DrizzleQueryError', code: '22P02' }),
+        'Database rejected request input',
+      );
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('jane.doe');
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('coreErrorHandler hands the error on once the response has started streaming', () => {

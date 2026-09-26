@@ -3,6 +3,7 @@ import { isFeatureEnabledCached } from '../../../src/core/db/repos/featureRepo';
 import { getVirusScanAdapter } from '../../../src/core/integrations/plugins/PluginRegistry';
 import { virusScanPluginDefinition } from '../../../src/plugins/virusscan-noop';
 import { createPluginConfigReader } from '../../../src/core/config/pluginConfig';
+import { log } from '../../../src/core/logging';
 import type {
   ScanResult,
   VirusScanAdapter,
@@ -49,13 +50,22 @@ describe('scanUpload', () => {
     await expect(scanUpload(Buffer.from('x'), 'f.txt')).resolves.toBe('clean');
   });
 
-  it('rejects an infected file', async () => {
+  it('rejects an infected file, logging its extension and never its name', async () => {
     featureEnabled.mockResolvedValue(true);
     scannerGetter.mockReturnValue(
       adapterReturning({ verdict: 'infected', viruses: ['Eicar-Test'], scannerCode: 'fake' }),
     );
-
-    await expect(scanUpload(Buffer.from('x'), 'f.txt')).resolves.toBe('infected');
+    const warn = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+    try {
+      await expect(scanUpload(Buffer.from('x'), 'Jane Doe SIN.PDF')).resolves.toBe('infected');
+      expect(warn).toHaveBeenCalledWith(
+        { extension: '.pdf', viruses: ['Eicar-Test'], scannerCode: 'fake' },
+        'Upload rejected: virus detected',
+      );
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('Jane');
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('fails closed when the scan verdict is error', async () => {

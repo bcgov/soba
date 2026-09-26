@@ -10,6 +10,7 @@ import type { CallerIdentity } from '../../core/db/repos/formSubmitAccessRepo';
 import { isSubmitterAllowed, SubmitterOperation } from '../../core/services/submitterAccess';
 import { fileStore, type StoreFileOutcome } from '../../core/services/fileStore';
 import { SubmissionWorkflowState } from '../../core/db/codes';
+import { log } from '../../core/logging';
 import type { GetFileResult } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 
 export interface UploadFileParams {
@@ -60,12 +61,12 @@ export const filesService = {
   /**
    * Fetch a file for a caller, scoped to its owning submission: the file must belong to a still-present
    * submission, and the caller must be allowed to read it. 'notfound' when missing / no live owning
-   * submission; 'denied' when unauthorized.
+   * submission; 'denied' when unauthorized; 'unavailable' when storage does not have the bytes.
    */
   async getForCaller(
     id: string,
     caller: CallerIdentity,
-  ): Promise<{ record: FileRecord; file: GetFileResult } | 'notfound' | 'denied'> {
+  ): Promise<{ record: FileRecord; file: GetFileResult } | 'notfound' | 'denied' | 'unavailable'> {
     const attachment = await findAttachment(id);
     if (!attachment) return 'notfound';
     const { record, submission } = attachment;
@@ -76,7 +77,10 @@ export const filesService = {
     };
     if (!(await isSubmitterAllowed(SubmitterOperation.read, target, caller))) return 'denied';
     const file = await fileStore.open(record);
-    if (!file) return 'notfound';
+    if (!file) {
+      log.warn({ fileId: record.id, profile: record.profile }, 'File content unavailable');
+      return 'unavailable';
+    }
     return { record, file };
   },
 

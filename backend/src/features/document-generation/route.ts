@@ -4,7 +4,11 @@ import { renderRateLimit } from '../../core/middleware/rateLimit';
 import { Features } from '../../core/db/codes';
 import { asyncHandler } from '../../core/api/shared/asyncHandler';
 import { validateRequest } from '../../core/api/shared/validation';
-import { listTemplatesHandler, previewDocumentHandler, printDocumentHandler } from './controller';
+import {
+  listSubmissionTemplatesHandler,
+  previewDocumentHandler,
+  printDocumentHandler,
+} from './controller';
 import { PreviewBodySchema, PrintBodySchema, SubmissionIdParamSchema } from './schema';
 
 const router = express.Router();
@@ -18,7 +22,7 @@ router.use(requireFeature(Features.document_generation), requireFeature(Features
 router.get(
   '/:id/templates',
   validateRequest({ params: SubmissionIdParamSchema }),
-  asyncHandler(listTemplatesHandler),
+  asyncHandler(listSubmissionTemplatesHandler),
 );
 
 // preview: render the caller's live on-screen data (submission is the authorization anchor).

@@ -1,25 +1,15 @@
 import { objectKey, ownedKey } from '../../../src/plugins/storage-s3/objectKey';
 
-const input = { prefix: 'templates', workspaceId: 'ws1', filename: 'receipt.docx' };
+const input = { prefix: 'templates', workspaceId: 'ws1' };
 const UUID = '[0-9a-f-]{36}';
 
 describe('objectKey', () => {
-  it('puts the feature prefix before the workspace', () => {
-    expect(objectKey(undefined, input)).toMatch(
-      new RegExp(`^templates/ws1/${UUID}-receipt\\.docx$`),
-    );
+  it('puts the feature prefix before the workspace, and ends in the stored object name', () => {
+    expect(objectKey(undefined, input)).toMatch(new RegExp(`^templates/ws1/${UUID}$`));
   });
 
   it("puts the profile's root before the feature prefix", () => {
-    expect(objectKey('soba/dev', input)).toMatch(
-      new RegExp(`^soba/dev/templates/ws1/${UUID}-receipt\\.docx$`),
-    );
-  });
-
-  it('keeps a name with slashes in the workspace folder', () => {
-    expect(objectKey('soba/dev', { ...input, filename: 'nested/dir/name.txt' })).toMatch(
-      new RegExp(`^soba/dev/templates/ws1/${UUID}-name\\.txt$`),
-    );
+    expect(objectKey('soba/dev', input)).toMatch(new RegExp(`^soba/dev/templates/ws1/${UUID}$`));
   });
 });
 

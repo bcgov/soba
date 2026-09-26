@@ -1,4 +1,3 @@
-import path from 'node:path';
 import { v7 as uuidv7 } from 'uuid';
 
 const SEGMENT = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -10,6 +9,8 @@ const SEGMENT = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const isStoragePrefix = (value: string): boolean =>
   value.split('/').every((segment) => SEGMENT.test(segment));
 
-/** The name a file is stored under: a unique time-ordered id, then the last segment of its name. */
-export const storedFileName = (filename: string): string =>
-  `${uuidv7()}-${path.posix.basename(filename || 'file')}`;
+/**
+ * The name a file's bytes are stored under: a unique time-ordered id. The file's own name stays in
+ * the database, so it never reaches a storage key or path.
+ */
+export const storedObjectName = (): string => uuidv7();

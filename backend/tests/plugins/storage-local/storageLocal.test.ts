@@ -36,7 +36,10 @@ describe('storage-local adapter', () => {
       contentType: 'text/plain',
     });
     expect(result).toHaveProperty('engineFileRef');
-    expect(fs.readdirSync(path.join(tmp, 'attachments', 'w1'))).toHaveLength(1);
+    // Stored under an id alone: the file's name never reaches the path.
+    expect(fs.readdirSync(path.join(tmp, 'attachments', 'w1'))).toEqual([
+      expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/),
+    ]);
     const meta = await (adapter as any).getFile(result.engineFileRef);
     expect(meta).not.toBeNull();
     expect(meta.filename).toBeDefined();

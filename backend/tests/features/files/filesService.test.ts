@@ -70,6 +70,7 @@ import { linkFileToSubmission } from '../../../src/core/db/repos/submissionFileR
 import { hasFormSubmitAccess } from '../../../src/core/db/repos/formSubmitAccessRepo';
 import { getSubmissionRecordById } from '../../../src/core/db/repos/submissionRepo';
 import { isActiveParticipant } from '../../../src/core/db/repos/submissionParticipantRepo';
+import { getStorageAdapter } from '../../../src/core/integrations/plugins/PluginRegistry';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'files-svc-'));
 process.env.STORAGE_PROFILES = 'default';
@@ -141,7 +142,7 @@ describe('filesService', () => {
     audienceMock.mockResolvedValue(true);
     submissionMock.mockResolvedValue({ id: 'sub1', workflowState: 'draft', formId: 'form1' });
     const got = await filesService.getForCaller(record.id, owner);
-    if (got === 'notfound' || got === 'denied' || !got.file.downloadStream) {
+    if (typeof got === 'string' || !got.file.downloadStream) {
       throw new Error('expected a file with a download stream');
     }
     expect(got.record.filename).toBe('a.txt');
@@ -176,6 +177,14 @@ describe('filesService', () => {
     submissionMock.mockResolvedValue(null); // submission soft-deleted / gone
     audienceMock.mockResolvedValue(true);
     expect(await filesService.getForCaller(record.id, owner)).toBe('notfound');
+  });
+
+  it('reports a file whose stored bytes are gone as unavailable', async () => {
+    const record = await uploadFor('sub1', 'gone.txt');
+    await getStorageAdapter(record.profile).deleteFile(record.backendRef);
+    audienceMock.mockResolvedValue(true);
+    submissionMock.mockResolvedValue({ id: 'sub1', workflowState: 'draft', formId: 'form1' });
+    expect(await filesService.getForCaller(record.id, owner)).toBe('unavailable');
   });
 
   it('treats a file with no submission link as notfound (submission-scoped)', async () => {

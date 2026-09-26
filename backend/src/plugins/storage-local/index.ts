@@ -9,7 +9,8 @@ import type {
   GetFileResult,
 } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 import type { PluginConfigReader } from '../../core/config/pluginConfig';
-import { storedFileName } from '../../core/integrations/storage-engine/storageKey';
+import { storedObjectName } from '../../core/integrations/storage-engine/storageKey';
+import { log } from '../../core/logging';
 
 function engineRefFor(relPath: string) {
   return `local:${relPath}`;
@@ -50,7 +51,7 @@ function createLocalStorageAdapter(config: PluginConfigReader): StorageEngineAda
       await ensureBase();
       const subdir = path.join(basePath, input.prefix, input.workspaceId);
       await fs.promises.mkdir(subdir, { recursive: true });
-      const dest = path.join(subdir, storedFileName(input.filename));
+      const dest = path.join(subdir, storedObjectName());
 
       if (input.buffer) {
         await fs.promises.writeFile(dest, input.buffer);
@@ -102,8 +103,11 @@ function createLocalStorageAdapter(config: PluginConfigReader): StorageEngineAda
       if (!full) return;
       try {
         await fs.promises.unlink(full);
-      } catch {
-        // ignore
+      } catch (err) {
+        // Already gone is the outcome a delete wants. The error code only: the path holds the name.
+        const code = (err as { code?: unknown }).code;
+        if (code !== 'ENOENT')
+          log.warn({ plugin: 'storage-local', code }, 'Stored file not deleted');
       }
     },
   };

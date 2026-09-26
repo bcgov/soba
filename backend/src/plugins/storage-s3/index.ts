@@ -134,8 +134,10 @@ function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
       if (key === null) return;
       try {
         await client.removeObject(bucket, key);
-      } catch {
-        // ignore
+      } catch (err) {
+        // The error code only: the key holds the name.
+        const code = (err as { code?: unknown }).code;
+        log.warn({ plugin: CODE, code }, 'Stored file not deleted');
       }
     },
   };

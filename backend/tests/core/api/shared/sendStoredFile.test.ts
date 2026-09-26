@@ -152,35 +152,85 @@ const storedRecord = {
   size: 99,
 } as FileRecord;
 
-function downloadApp(file: GetFileResult): express.Express {
+function downloadApp(
+  file: GetFileResult,
+  record: FileRecord = storedRecord,
+  disposition: 'inline' | 'attachment' = 'attachment',
+): express.Express {
   const app = express();
   app.get(
     '/file',
     asyncHandler(async (_req, res) => {
-      await sendStoredFile(res, storedRecord, file, 'attachment');
+      await sendStoredFile(res, record, file, disposition);
     }),
   );
   app.use(coreErrorHandler);
   return app;
 }
 
+const streamOf = (body: string): GetFileResult => ({
+  engineFileRef: 'ref',
+  filename: 'ignored',
+  size: body.length,
+  downloadStream: Readable.from([body]),
+});
+
 describe('sendStoredFile', () => {
-  it('sends the bytes with the stored type, the backend length and the disposition', async () => {
-    const file = {
-      engineFileRef: 'ref',
-      filename: 'ignored',
-      size: 3,
-      downloadStream: Readable.from(['abc']),
-    };
-    const res = await supertest(downloadApp(file)).get('/file');
+  it('sends the bytes as an attachment with the backend length and both filename forms', async () => {
+    const res = await supertest(downloadApp(streamOf('abc'))).get('/file');
     expect(res.status).toBe(200);
     expect(res.text).toBe('abc');
     expect(res.headers['content-type']).toMatch(/^text\/plain/);
     expect(res.headers['content-length']).toBe('3');
     expect(res.headers['content-disposition']).toBe(
-      `attachment; filename="${encodeURIComponent('r\u00e9sum\u00e9.txt')}"`,
+      `attachment; filename="r_sum_.txt"; filename*=UTF-8''${encodeURIComponent('r\u00e9sum\u00e9.txt')}`,
+    );
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+    expect(res.headers['content-security-policy']).toBe("sandbox; default-src 'none'");
+  });
+
+  it('keeps an Office type on a download', async () => {
+    const docx = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const record = { ...storedRecord, filename: 'report.docx', contentType: docx };
+    const res = await supertest(downloadApp(streamOf('docx'), record, 'inline')).get('/file');
+    expect(res.headers['content-type']).toBe(docx);
+    expect(res.headers['content-disposition']).toMatch(/^attachment; /);
+  });
+
+  it('downloads an inline type as an attachment when asked to', async () => {
+    const png = { ...storedRecord, filename: 'scan.png', contentType: 'image/png' };
+    const res = await supertest(downloadApp(streamOf('png'), png, 'attachment')).get('/file');
+    expect(res.headers['content-type']).toBe('image/png');
+    expect(res.headers['content-disposition']).toMatch(/^attachment; /);
+  });
+
+  it("percent-encodes ' ( ) * in the UTF-8 filename", async () => {
+    const record = { ...storedRecord, filename: "d'\u00e9t\u00e9 (1)*.txt" };
+    const res = await supertest(downloadApp(streamOf('x'), record)).get('/file');
+    expect(res.headers['content-disposition']).toBe(
+      `attachment; filename="d'_t_ (1)*.txt"; filename*=UTF-8''d%27%C3%A9t%C3%A9%20%281%29%2A.txt`,
     );
   });
+
+  it('shows an allowed type inline with that type', async () => {
+    const png = { ...storedRecord, filename: 'scan.png', contentType: 'IMAGE/PNG; charset=x' };
+    const res = await supertest(downloadApp(streamOf('png'), png, 'inline')).get('/file');
+    expect(res.headers['content-type']).toBe('image/png');
+    expect(res.headers['content-disposition']).toMatch(/^inline; /);
+  });
+
+  it.each(['text/html', 'image/svg+xml', 'application/javascript'])(
+    'downloads a file declared as %s as opaque bytes, even when asked to show it inline',
+    async (declared) => {
+      const record = { ...storedRecord, filename: 'photo.png', contentType: declared };
+      const res = await supertest(downloadApp(streamOf('<script>'), record, 'inline'))
+        .get('/file')
+        .buffer(true);
+      expect(res.headers['content-type']).toBe('application/octet-stream');
+      expect(res.headers['content-disposition']).toMatch(/^attachment; /);
+      expect(res.headers['x-content-type-options']).toBe('nosniff');
+    },
+  );
 
   it('redirects to the public URL when the backend has one', async () => {
     const file = { engineFileRef: 'ref', filename: 'x', publicUrl: 'https://store.example/x' };

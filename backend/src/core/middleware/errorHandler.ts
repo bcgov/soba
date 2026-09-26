@@ -23,6 +23,39 @@ function hasPgCode(err: unknown, codes: readonly string[]): boolean {
   return false;
 }
 
+type PgErrorFields = {
+  name?: string;
+  code: string;
+  table?: string;
+  column?: string;
+  constraint?: string;
+};
+
+const text = (value: unknown): string | undefined =>
+  typeof value === 'string' ? value : undefined;
+
+/**
+ * The fields of a Postgres error on the cause chain (pg's DatabaseError carries `severity`); null
+ * when there is none. Never the message or query parameters, which carry submitted values.
+ */
+function pgErrorFields(err: unknown): PgErrorFields | null {
+  for (let e: unknown = err, depth = 0; e != null && depth < 5; depth++) {
+    const fields = e as { code?: unknown; severity?: unknown };
+    if (typeof fields.code === 'string' && typeof fields.severity === 'string') {
+      const { table, column, constraint } = e as Record<string, unknown>;
+      return {
+        name: err instanceof Error ? err.name : undefined,
+        code: fields.code,
+        table: text(table),
+        column: text(column),
+        constraint: text(constraint),
+      };
+    }
+    e = (e as { cause?: unknown }).cause;
+  }
+  return null;
+}
+
 /**
  * The 4xx status of a request rejected before app code runs: http-errors (body-parser) marks it
  * `expose`, express-jwt raises UnauthorizedError, and Express flags an undecodable path param with a
@@ -69,10 +102,10 @@ export const coreErrorHandler = (
   }
   const { statusCode, body } = errorToHttpResponse(err);
   if (statusCode === 500) {
-    log.error({ err }, 'Unhandled error');
+    log.error(pgErrorFields(err) ?? { err }, 'Unhandled error');
   } else if (hasPgCode(err, PG_INVALID_INPUT)) {
     // A server-side value can cause this too, and a 400 alone leaves no trace.
-    log.warn({ err }, 'Database rejected request input');
+    log.warn(pgErrorFields(err) ?? {}, 'Database rejected request input');
   }
   res.status(statusCode).json(body);
 };

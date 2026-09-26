@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { getVirusScanAdapter } from '../integrations/plugins/PluginRegistry';
 import { isFeatureEnabledCached } from '../db/repos/featureRepo';
 import { Features } from '../db/codes';
@@ -15,25 +16,27 @@ export async function scanUpload(buffer: Buffer, filename: string): Promise<Scan
   const enabled = await isFeatureEnabledCached(Features.antivirus, Date.now());
   if (!enabled) return 'clean';
 
+  // Logs carry the extension only: an uploaded file's name can identify a person.
+  const extension = path.extname(filename).toLowerCase();
   try {
     const result = await getVirusScanAdapter().scanBuffer(buffer, { filename });
     if (result.verdict === 'infected') {
       log.warn(
-        { filename, viruses: result.viruses, scannerCode: result.scannerCode },
+        { extension, viruses: result.viruses, scannerCode: result.scannerCode },
         'Upload rejected: virus detected',
       );
       return 'infected';
     }
     if (result.verdict === 'error') {
       log.error(
-        { filename, scannerCode: result.scannerCode, message: result.message },
+        { extension, scannerCode: result.scannerCode, message: result.message },
         'Upload rejected: virus scan could not complete (fail-closed)',
       );
       return 'scan-unavailable';
     }
     return 'clean';
   } catch (err) {
-    log.error({ err, filename }, 'Upload rejected: virus scanner unavailable (fail-closed)');
+    log.error({ err, extension }, 'Upload rejected: virus scanner unavailable (fail-closed)');
     return 'scan-unavailable';
   }
 }

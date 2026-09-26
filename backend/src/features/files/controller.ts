@@ -3,10 +3,14 @@ import { filesService } from './service';
 import { isBlockedExtension } from './config';
 import { resolveCaller } from '../../core/middleware/actor';
 import { accessDenial } from '../../core/middleware/formSubmitAccess';
-import { getUploadedFile } from '../../core/middleware/parseUpload';
+import { checkedFileName, getUploadedFile } from '../../core/middleware/parseUpload';
 import { storedOrThrow } from '../../core/services/fileStore';
 import { sendStoredFile } from '../../core/api/shared/sendStoredFile';
-import { NotFoundError, UnsupportedMediaTypeError } from '../../core/errors';
+import {
+  NotFoundError,
+  ServiceUnavailableError,
+  UnsupportedMediaTypeError,
+} from '../../core/errors';
 
 export async function uploadFileHandler(req: Request, res: Response): Promise<void> {
   // requireUploadAccess has checked submissionId, then resolved + authorized its workspace into
@@ -14,8 +18,9 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
   const ctx = req.coreContext!;
 
   const uploaded = getUploadedFile(req);
-  const filename =
-    (req.body?.fileName as string) || (req.body?.name as string) || uploaded.originalname;
+  const filename = checkedFileName(
+    (req.body?.fileName as string) || (req.body?.name as string) || uploaded.originalname,
+  );
   const submissionId = req.body.submissionId as string;
 
   // Always reject blocked extensions, regardless of the form's designer-configured fileTypes.
@@ -54,6 +59,9 @@ export async function downloadFileHandler(req: Request, res: Response): Promise<
   }
   if (result === 'denied') {
     throw accessDenial(req, 'Not authorized to access this file');
+  }
+  if (result === 'unavailable') {
+    throw new ServiceUnavailableError('File content unavailable');
   }
   await sendStoredFile(res, result.record, result.file, 'inline');
 }
