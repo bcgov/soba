@@ -8,7 +8,7 @@ export function contentDisposition(type: 'inline' | 'attachment', filename: stri
   // encodeURIComponent leaves ' ( ) * alone; RFC 5987 needs them encoded.
   const encoded = encodeURIComponent(filename).replace(
     /['()*]/g,
-    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+    (c) => `%${(c.codePointAt(0) ?? 0).toString(16).toUpperCase()}`,
   );
   return `${type}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
 }
