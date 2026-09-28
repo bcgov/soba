@@ -185,22 +185,22 @@ asks the server about this form; anything that fails to answer hides the section
 
 ## 8. Verify
 
-Run everything in the devcontainer:
+From a terminal in the devcontainer, at the repo root (`/workspaces/soba`):
 
 ```bash
-docker exec soba-devcontainer-app-1 bash -lc 'cd /workspaces/soba/backend && pnpm db:migrate'
+pnpm db:migrate
 ```
 
 ```bash
-docker exec soba-devcontainer-app-1 bash -lc 'cd /workspaces/soba/lib && pnpm build && npx jest'
+pnpm build:lib && pnpm test:lib
 ```
 
 ```bash
-docker exec soba-devcontainer-app-1 bash -lc 'cd /workspaces/soba/backend && npx tsc --noEmit && npx eslint src tests && npx jest'
+pnpm check:backend && pnpm test:backend
 ```
 
 ```bash
-docker exec soba-devcontainer-app-1 bash -lc 'cd /workspaces/soba/frontend && npx tsc --noEmit && npx eslint src tests && npx vitest run'
+pnpm check:frontend && pnpm test:frontend
 ```
 
 Then a throwaway script against the local database for: the backfill, a read, a save, a form with no

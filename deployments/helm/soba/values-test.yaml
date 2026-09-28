@@ -18,12 +18,16 @@ backend:
   config:
     nodeEnv: production
     documentGenerationDefaultCode: cdogs-v2
+    tenantEngineDefaultCode: cstar-v1
   documentGeneration:
     cdogsV2:
       endpoint: https://cdogs-test.api.gov.bc.ca/api
       tokenUrl: https://test.loginproxy.gov.bc.ca/auth/realms/comsvcauth/protocol/openid-connect/token
     cdogsV3:
       endpoint: http://common-document-generation-service-master.a12c97-prod:3000
+  tenantEngine:
+    cstarV1:
+      apiBaseUrl: https://test.connect.digital.gov.bc.ca/api/v1
 
 frontend:
   replicas: 2

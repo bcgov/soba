@@ -7,6 +7,8 @@ import {
   MeCapabilitiesSchema as LibMeCapabilitiesSchema,
   MeResponseSchema as LibMeResponseSchema,
   PatchMeBodySchema as LibPatchMeBodySchema,
+  TenantSchema as LibTenantSchema,
+  ListTenantsResponseSchema as LibListTenantsResponseSchema,
 } from '@soba/lib';
 
 extendZodWithOpenApi(z);
@@ -26,6 +28,12 @@ export const MeResponseSchema = LibMeResponseSchema.extend({
 export const PatchMeBodySchema = LibPatchMeBodySchema.extend({
   preferences: MePreferencesSchema,
 }).openapi('Me_PatchBody');
+
+export const MeTenantSchema = LibTenantSchema.clone().openapi('Me_Tenant');
+
+export const MeTenantsResponseSchema = LibListTenantsResponseSchema.extend({
+  tenants: z.array(MeTenantSchema),
+}).openapi('Me_TenantsResponse');
 
 export const registerMeOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
@@ -79,6 +87,30 @@ export const registerMeOpenApi = (registry: OpenAPIRegistry) => {
       },
       404: {
         description: 'Current actor not found',
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/me/tenants',
+    tags: ['core.me'],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: {
+        description:
+          "The caller's tenants from the default tenant engine; empty when the engine does not serve the caller's identity provider",
+        content: {
+          'application/json': {
+            schema: MeTenantsResponseSchema,
+          },
+        },
+      },
+      400: {
+        description: 'Missing actor identity or bearer token',
+      },
+      503: {
+        description: 'The tenant engine is unavailable',
       },
     },
   });

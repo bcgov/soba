@@ -116,6 +116,8 @@ backend:
     # Virus scan plugin. Deployments scan for real against the shared clamav
     # (see the clamav block below); local dev overrides to virusscan-noop via .env.
     virusScanDefaultCode: virusscan-clamav
+    # Tenant engine behind GET /me/tenants. tenant-noop returns no tenants and calls nothing.
+    tenantEngineDefaultCode: tenant-noop
     sobaSystemSubject: soba-system
 
   # -- Shared temp storage PVC (RWX so it survives horizontal scaling).
@@ -168,6 +170,13 @@ backend:
       endpoint: ""
       # -- outbound deadline in ms; empty uses the backend default (30000)
       timeoutMs: ""
+
+  # -- configmap-tenant-engine: PLUGIN_CSTAR_V1_* + default engine code
+  tenantEngine:
+    cstarV1:
+      apiBaseUrl: ""
+      # -- outbound deadline in ms; empty uses the backend default (30000)
+      timeoutMs: "5000"
 
   # -- configmap-sso: IDP / SSO config
   sso:
