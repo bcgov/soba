@@ -8,11 +8,9 @@ import { LOOKUP_FETCH_LIMIT, toLookupResponse } from '../shared/lookup';
 import { formSubmitterAudienceService } from './submitterAudience';
 import type { SetFormSubmitterAudienceBody } from '@soba/lib';
 
-export interface FormsContextInput {
-  workspaceId: string;
-  actorId: string;
-  actorDisplayLabel: string | null;
-}
+import type { CoreRequestContext } from '../../middleware/requestContext';
+
+export type FormsContextInput = CoreRequestContext;
 
 /** Scope for list/search: single workspace resolved from a scope anchor. */
 export interface FormsListScopeInput {
