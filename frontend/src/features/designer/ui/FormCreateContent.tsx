@@ -40,7 +40,7 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
   const [idps, setIdps] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
-  const { view: effectiveAudience } = useSubmitterAudience(selectedWorkspaceId, undefined);
+  const { view: effectiveAudience } = useSubmitterAudience(selectedWorkspaceId);
 
   const creatableWorkspaces = useFormCreateWorkspaceOptions(true);
 

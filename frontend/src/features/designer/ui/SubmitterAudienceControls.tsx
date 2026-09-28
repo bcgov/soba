@@ -41,7 +41,7 @@ export function SubmitterAudienceControls({
   isForm = false,
   effectiveAudience,
   isDisabled = false,
-}: SubmitterAudienceControlsProps) {
+}: Readonly<SubmitterAudienceControlsProps>) {
   const dict = useDictionary();
   const t = dict.form;
   const summaryId = useId();

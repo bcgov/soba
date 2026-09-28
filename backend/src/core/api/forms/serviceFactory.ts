@@ -3,10 +3,9 @@ import { FormVersionService } from '../../services/formVersionService';
 import { resolveFormPermissions } from '../../db/repos/formAccessRepo';
 import type { FormListSort } from '../../db/repos/formRepo';
 import type { FormVersionListSort } from '../../db/repos/formVersionRepo';
-import type { FormListItem, FormVersionListItem } from '@soba/lib';
+import type { FormListItem, FormVersionListItem, SetFormSubmitterAudienceBody } from '@soba/lib';
 import { LOOKUP_FETCH_LIMIT, toLookupResponse } from '../shared/lookup';
 import { formSubmitterAudienceService } from './submitterAudience';
-import type { SetFormSubmitterAudienceBody } from '@soba/lib';
 
 import type { CoreRequestContext } from '../../middleware/requestContext';
 
@@ -172,7 +171,13 @@ export function createFormsApiService(
         formEngineCode: input.formEngineCode,
       });
       if (input.submitterAudience) {
-        await formSubmitterAudienceService.set(ctx, form.id, input.submitterAudience);
+        await formSubmitterAudienceService.set(
+          { ...ctx, locale: 'en' as const } as unknown as Parameters<
+            typeof formSubmitterAudienceService.set
+          >[0],
+          form.id,
+          input.submitterAudience,
+        );
       }
       return { ...toFormDto(form), formVersion: toFormVersionDto(version) };
     },
