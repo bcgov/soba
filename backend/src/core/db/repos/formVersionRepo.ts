@@ -1,5 +1,5 @@
 import { and, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
-import { FORM_VERSION_SORT_FIELDS, type SortToken } from '@soba/lib';
+import { DEFAULT_SORT_LOCALE, FORM_VERSION_SORT_FIELDS, type SortToken } from '@soba/lib';
 import { db, type DbOrTx } from '../client';
 import { formVersionRevisions, formVersions } from '../schema';
 import { orderByForSort, prefixPattern, type SortColumns } from '../listSort';
@@ -165,7 +165,14 @@ export const listFormVersionsForWorkspace = async (
       })
       .from(formVersions)
       .where(where)
-      .orderBy(...orderByForSort(FORM_VERSION_SORT_COLUMNS, input.sort, formVersions.id))
+      .orderBy(
+        ...orderByForSort(
+          FORM_VERSION_SORT_COLUMNS,
+          input.sort,
+          formVersions.id,
+          DEFAULT_SORT_LOCALE,
+        ),
+      )
       .limit(input.limit)
       .offset(input.offset);
     const totals = await tx.select({ total: count() }).from(formVersions).where(where);

@@ -18,6 +18,7 @@ import {
 } from '@/src/features/formio-v5/activeSubmission';
 import { useSubmitFill } from '@/src/features/formio-v5/data/useSubmitFill';
 import { useSubmissionWriter } from '@/src/features/formio-v5/data/useSubmissionWriter';
+import { SubmissionLoadAlert } from '@/src/features/submissions/ui/SubmissionLoadAlert';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
@@ -28,6 +29,7 @@ type FillLabels = {
   submitSuccess: string;
   submitPending: string;
   sessionExpired: string;
+  readOnly: string;
 };
 
 /**
@@ -42,7 +44,7 @@ function SubmissionFillBody({
   submissionId: string;
   labels: FillLabels;
 }>) {
-  // Token is optional: a public-audience submission is fillable without signing in.
+  // Token is optional: a submission opened anonymously is fillable without signing in.
   const { token } = useKeycloak();
   const { addNotification } = useNotificationStore();
   const router = useRouter();
@@ -66,6 +68,9 @@ function SubmissionFillBody({
   // An already-submitted submission isn't fillable; only a fillable one drives the form.
   const fillableBundle = bundle && bundle.workflowState !== 'submitted' ? bundle : null;
   const schema = (fillableBundle?.schema ?? null) as FormType | null;
+  // A participant who may no longer write (e.g. removed from the audience) gets a read-only form. The
+  // backend enforces writes, so a bundle without the flag stays editable.
+  const canWrite = fillableBundle?.canWrite !== false;
 
   useEffect(() => {
     if (!bundle) return;
@@ -93,7 +98,10 @@ function SubmissionFillBody({
   );
   // We own all submit messaging (success toast + redirect, inline error), so suppress Form.io's
   // built-in green "Submission Complete" alert.
-  const formOptions = useMemo(() => ({ noAlerts: true, ...bcgovFileOption }), [bcgovFileOption]);
+  const formOptions = useMemo(
+    () => ({ noAlerts: true, readOnly: !canWrite, ...bcgovFileOption }),
+    [bcgovFileOption, canWrite],
+  );
 
   const submitForm = async (submission: Submission) => {
     try {
@@ -126,11 +134,7 @@ function SubmissionFillBody({
   };
 
   if (fill.error) {
-    return (
-      <InlineAlert variant="danger" role="alert" data-testid="submission-fill-error">
-        {normalizeFormioRenderError(fill.error.cause, labels.loadError, labels.sessionExpired)}
-      </InlineAlert>
-    );
+    return <SubmissionLoadAlert error={fill.error} />;
   }
 
   if (!schema) {
@@ -144,6 +148,11 @@ function SubmissionFillBody({
           {renderError}
         </InlineAlert>
       ) : null}
+      {canWrite ? null : (
+        <InlineAlert variant="info" data-testid="submission-fill-readonly">
+          {labels.readOnly}
+        </InlineAlert>
+      )}
       <FormioV5FormRenderErrorBoundary
         fallback={
           <InlineAlert variant="danger" role="alert">
@@ -201,6 +210,7 @@ export default function FormioV5SubmissionFillClient() {
           submitSuccess: labels.submitSuccess,
           submitPending: labels.submitPending,
           sessionExpired: dict.general.sessionExpired,
+          readOnly: labels.readOnly,
         }}
       />
     </div>

@@ -1,4 +1,9 @@
-import type { SetSubmitterAudienceBody, SubmitterAudience } from '@soba/lib';
+import {
+  DEFAULT_SORT_LOCALE,
+  type SetSubmitterAudienceBody,
+  type SortLocale,
+  type SubmitterAudience,
+} from '@soba/lib';
 import { NotFoundError, ValidationError } from '../../errors';
 import { PUBLIC_PROVIDER_CODE, SystemGroup } from '../../db/codes';
 import { listLoginIdentityProviders } from '../../db/repos/identityProviderRepo';
@@ -20,8 +25,9 @@ export async function requireSubmittersGroupId(workspaceId: string): Promise<str
 export async function readAudience(
   workspaceId: string,
   groupId: string,
+  locale: SortLocale,
 ): Promise<SubmitterAudience> {
-  const group = await getWorkspaceGroup(workspaceId, groupId);
+  const group = await getWorkspaceGroup(workspaceId, groupId, locale);
   const members = group?.members ?? [];
   const idps: string[] = [];
   const users: SubmitterAudience['users'] = [];
@@ -38,12 +44,12 @@ export async function readAudience(
   let mode: SubmitterAudience['mode'] = 'none';
   if (isPublic) mode = 'public';
   else if (idps.length || users.length) mode = 'protected';
-  return { mode, idps, users, available: await listLoginIdentityProviders() };
+  return { mode, idps, users, available: await listLoginIdentityProviders(locale) };
 }
 
 /** Rejects codes that aren't active login providers (also excludes `public`/`system`). */
 export async function assertLoginProviders(codes: string[]): Promise<void> {
-  const valid = new Set((await listLoginIdentityProviders()).map((p) => p.code));
+  const valid = new Set((await listLoginIdentityProviders(DEFAULT_SORT_LOCALE)).map((p) => p.code));
   const bad = [...new Set(codes)].filter((c) => !valid.has(c));
   if (bad.length) {
     throw new ValidationError(`Not assignable login providers: ${bad.join(', ')}`);
@@ -53,7 +59,7 @@ export async function assertLoginProviders(codes: string[]): Promise<void> {
 export const submitterAudienceService = {
   async get(ctx: GroupsContextInput): Promise<SubmitterAudience> {
     const groupId = await requireSubmittersGroupId(ctx.workspaceId);
-    return readAudience(ctx.workspaceId, groupId);
+    return readAudience(ctx.workspaceId, groupId, ctx.locale);
   },
 
   async set(ctx: GroupsContextInput, input: SetSubmitterAudienceBody): Promise<SubmitterAudience> {
@@ -66,12 +72,12 @@ export const submitterAudienceService = {
         idps: [],
         displayLabel: ctx.actorDisplayLabel,
       });
-      return readAudience(ctx.workspaceId, groupId);
+      return readAudience(ctx.workspaceId, groupId, ctx.locale);
     }
 
     const idps = [...new Set(input.idps)];
     await assertLoginProviders(idps);
-    const group = await getWorkspaceGroup(ctx.workspaceId, groupId);
+    const group = await getWorkspaceGroup(ctx.workspaceId, groupId, ctx.locale);
     const userCount = group?.members.filter((m) => m.kind === 'user').length ?? 0;
     // protected = at least one principal: a login provider or an existing direct user.
     if (idps.length + userCount === 0) {
@@ -84,6 +90,6 @@ export const submitterAudienceService = {
       idps,
       displayLabel: ctx.actorDisplayLabel,
     });
-    return readAudience(ctx.workspaceId, groupId);
+    return readAudience(ctx.workspaceId, groupId, ctx.locale);
   },
 };

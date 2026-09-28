@@ -4,7 +4,7 @@
  * - `workspaceListScope`: resolve workspace from a scope anchor (workspace or resource hierarchy id).
  * - `workspaceFromResource`: derive the workspace from the target resource.
  * The `open*` variants build a membership-optional context for the public-capable submit surface,
- * leaving authorization to a downstream guard (requireFormAccess).
+ * leaving authorization to a downstream guard.
  *
  */
 import type { NextFunction, Request, Response } from 'express';
@@ -165,9 +165,9 @@ export const buildCoreContext = async (
 
 /**
  * Build a context for the submit surface WITHOUT requiring membership: the workspace is resolved so the
- * route's own authorization (the Form submitters audience) decides access. Members get their real role;
- * non-members (incl. the public user) get a non-manage role so they can never reach workspace-admin
- * routes. Shares the cached membership lookup with buildCoreContext.
+ * route's own guard decides access. Members get their real role; non-members (incl. the public user)
+ * get a non-manage role so they can never reach workspace-admin routes. Shares the cached membership
+ * lookup with buildCoreContext.
  */
 const buildSubmitContext = async (
   actorId: string,
@@ -189,7 +189,7 @@ const buildSubmitContext = async (
 /**
  * Resource (deep-link) read routes reachable by non-members/anonymous: derive the workspace from the
  * target resource (404 if missing) and build a membership-optional context. Authorization is left to a
- * downstream guard (requireFormAccess) rather than to membership.
+ * downstream guard rather than to membership.
  */
 export const openWorkspaceFromResource = (config: {
   kind: WorkspaceResourceKind;

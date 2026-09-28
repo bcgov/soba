@@ -7,6 +7,7 @@ import type {
 import type {
   OpenSubmissionBody,
   SubmissionDataBody,
+  SortLocale,
   SubmissionListSort,
   SubmitSubmissionBody,
 } from '@soba/lib';
@@ -34,6 +35,7 @@ export interface ListSubmissionsQueryInput {
   createdBy?: string;
   q?: string;
   sort: SubmissionListSort;
+  locale: SortLocale;
 }
 
 const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
@@ -99,6 +101,7 @@ export function createSubmissionsApiService(submissionService: SubmissionService
         createdBy: query.createdBy,
         q: query.q,
         sort: query.sort,
+        locale: query.locale,
       });
 
       return {

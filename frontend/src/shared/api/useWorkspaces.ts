@@ -24,6 +24,8 @@ import type {
   WorkspaceLookupItem,
   WorkspaceLookupResponse,
 } from '@/src/types/workspaces';
+import { useSortLocale } from '@/src/shared/list/useSortLocale';
+import type { SortLocale } from '@soba/lib/sort';
 
 /** Same pair as FormCreatePermissions: form + first design. Only form_admin matches form_create. */
 const FORM_CREATE_PERMISSIONS = ['form_create', 'design_create'] as const;
@@ -40,9 +42,13 @@ const toItems = (items: unknown): WorkspaceItem[] => (Array.isArray(items) ? ite
 
 function useWorkspaceLookup(
   key: readonly string[] | null,
-  fetcher: (token: string) => Promise<WorkspaceLookupResponse>,
+  fetcher: (token: string, locale: SortLocale) => Promise<WorkspaceLookupResponse>,
 ) {
-  const { data, isLoading, error } = useAuthedSWR<WorkspaceLookupResponse>(key, fetcher);
+  const locale = useSortLocale();
+  const { data, isLoading, error } = useAuthedSWR<WorkspaceLookupResponse>(
+    key ? [...key, locale] : null,
+    (token) => fetcher(token, locale),
+  );
   return {
     workspaces: Array.isArray(data?.items) ? data.items : EMPTY_OPTIONS,
     truncated: data?.truncated === true,
@@ -58,15 +64,16 @@ function useWorkspaceLookup(
  * whether the user belongs to a given workspace: read that workspace instead.
  */
 export function useWorkspaceOptions() {
-  return useWorkspaceLookup(OPTIONS_KEY, (token) => lookupWorkspaces(token));
+  return useWorkspaceLookup(OPTIONS_KEY, (token, locale) => lookupWorkspaces(token, { locale }));
 }
 
 /** Options for the new-form picker: workspaces the user can create a form in, disclaimer accepted. */
 export function useFormCreateWorkspaceOptions(enabled = true) {
-  return useWorkspaceLookup(enabled ? FORM_CREATE_OPTIONS_KEY : null, (token) =>
+  return useWorkspaceLookup(enabled ? FORM_CREATE_OPTIONS_KEY : null, (token, locale) =>
     lookupWorkspaces(token, {
       requiredPermissions: FORM_CREATE_PERMISSIONS,
       disclaimerAccepted: true,
+      locale,
     }),
   );
 }
@@ -92,13 +99,14 @@ export function useWorkspace(workspaceId: string | undefined) {
  * workspace created or renamed on another screen shows up on the way back.
  */
 export function useWorkspaceList(query: ListQueryArgs): ListResult<WorkspaceItem> {
+  const locale = useSortLocale();
   const { data, isLoading, isValidating, error, mutate } = useAuthedSWR<{
     items: WorkspaceItem[];
     page: OffsetPage;
   }>(
-    ['workspaces', 'list', query.offset, query.limit, query.sort, query.q ?? ''],
+    ['workspaces', 'list', query.offset, query.limit, query.sort, query.q ?? '', locale],
     async (token) => {
-      const response = await fetchWorkspaces(token, query);
+      const response = await fetchWorkspaces(token, { ...query, locale });
       return { items: toItems(response.items), page: response.page ?? EMPTY_LIST_PAGE };
     },
     listReadConfig,

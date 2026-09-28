@@ -1,6 +1,7 @@
-// Submit-mode API service: public form read + submission create/save + confirmation read. All calls
-// hit /submit/* and take an optional token — anonymous callers on a public-audience form are attributed
-// to the seeded public user by the backend. Access is decided by the workspace Form submitters audience.
+// Submit-mode API service: submission open/save/submit + reads of an existing submission. All calls
+// hit /submit/* and take an optional token; the backend attributes anonymous callers to the seeded
+// public user. Opening needs the form's Form submitters audience; reading an existing submission needs
+// participation in it, and writing it needs both.
 import { sobaFetch } from './sobaFetch';
 import { parseJson } from './sobaHelpers';
 import { FormType } from '@formio/react';
@@ -14,8 +15,8 @@ import type {
 } from '@/src/types/submissions';
 
 /**
- * The one payload the fill page needs: workflow state, form version, head revision, schema and any
- * saved answers (resume).
+ * The one payload the fill page needs: workflow state, form version, head revision, schema, any
+ * saved answers (resume) and whether the caller may write.
  */
 export async function getSubmitFillBundle(
   token: string | undefined,
@@ -93,7 +94,7 @@ export async function submitSobaFormSubmission(
   return parseJson<SubmissionWriteResponse>(response);
 }
 
-/** Read a submission's metadata for the confirmation view (audience-readable). */
+/** Read a submission's metadata for the confirmation view. */
 export async function getSubmitSubmission(
   token: string | undefined,
   id: string,

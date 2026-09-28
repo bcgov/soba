@@ -19,6 +19,7 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { codeItems } from '@/src/shared/util/codeList';
+import { useSortLocale } from '@/src/shared/list/useSortLocale';
 import { useWorkspace, useWorkspaceWriter } from '@/src/shared/api/useWorkspaces';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
@@ -50,6 +51,7 @@ type WorkspaceSettingsProps = {
 function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps>) {
   const isCreate = workspace === null;
   const dict = useDictionary();
+  const sortLocale = useSortLocale();
   const dictWorkspaces = dict.workspaces;
   const router = useRouter();
   const pathname = usePathname();
@@ -152,7 +154,7 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
         data-testid="workspace-name"
       />
       <Select
-        items={codeItems(dict.ministries, seed?.org)}
+        items={codeItems(dict.ministries, seed?.org, sortLocale)}
         label={dictWorkspaces.yourOrgReq}
         selectionMode="single"
         size="medium"
@@ -163,7 +165,7 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
         onChange={handleOrgChange}
       />
       <Select
-        items={codeItems(dict.useCases, seed?.useCase)}
+        items={codeItems(dict.useCases, seed?.useCase, sortLocale)}
         label={dictWorkspaces.useCase}
         selectionMode="single"
         size="medium"

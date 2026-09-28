@@ -5,12 +5,12 @@ import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 import { NotFoundError } from '../../errors';
 
-import { FORM_SORT_FIELDS, type SortToken } from '@soba/lib';
+import { FORM_SORT_FIELDS, type SortLocale, type SortToken } from '@soba/lib';
 export type FormListSortField = (typeof FORM_SORT_FIELDS)[number];
 export type FormListSort = SortToken<FormListSortField>;
 
 const FORM_SORT_COLUMNS: SortColumns<FormListSortField> = {
-  name: { column: forms.name, caseInsensitive: true },
+  name: { column: forms.name, linguistic: true },
   status: { column: forms.status },
   createdAt: { column: forms.createdAt },
   updatedAt: { column: forms.updatedAt },
@@ -25,6 +25,7 @@ export interface ListFormsForWorkspaceInput {
   q?: string;
   status?: string;
   sort: FormListSort;
+  locale: SortLocale;
 }
 
 export interface FormListRow {
@@ -120,7 +121,7 @@ export const listFormsForWorkspace = async (
       .from(forms)
       .innerJoin(workspaces, eq(workspaces.id, forms.workspaceId))
       .where(where)
-      .orderBy(...orderByForSort(FORM_SORT_COLUMNS, input.sort, forms.id))
+      .orderBy(...orderByForSort(FORM_SORT_COLUMNS, input.sort, forms.id, input.locale))
       .limit(input.limit)
       .offset(input.offset);
     const totals = await tx.select({ total: count() }).from(forms).where(where);

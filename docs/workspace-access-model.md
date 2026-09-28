@@ -11,14 +11,17 @@ Two separate things control access:
 - **Form access (RBAC)** — what can you do with the forms in the workspace? This comes from group
   membership → roles → permissions.
 
-They don't overlap: being a workspace admin grants no form permissions, and vice versa.
+They don't overlap: being a workspace admin grants no form permissions, and vice versa. Submit mode
+adds a third control per submission, who takes part in it; see
+[Submission participants](#submission-participants).
 
 > **Current status.** The design form routes (`api/forms/route.ts`) and the staff submission routes
 > (`api/submissions/route.ts`) are gated by `requireFormPermissions`, except schema normalize (no
 > workspace). Creating a form requires `form_create` and `design_create` — only `form_admin` satisfies
 > that, via `*`. Creating a design on an existing form requires `design_create` (`form_designer`). The
-> submit routes, file uploads and document generation are gated by `hasFormSubmitAccess`. Group and
-> member management is gated by workspace role (`requireWorkspaceManage`), not by RBAC.
+> submit routes, file uploads and document generation are gated by `isSubmitterAllowed` (see
+> [Submission participants](#submission-participants)). Group and member management is gated by
+> workspace role (`requireWorkspaceManage`), not by RBAC.
 
 ```
                         User in a workspace
@@ -177,8 +180,9 @@ members where the form has an active override, otherwise the workspace group's m
 
 The submit surface reads overrides: `hasFormSubmitAccess({workspaceId, formId}, ...)` checks the
 form's effective `idp` members, and resolves roles with `resolveFormPermissionsForForm`, which follows
-the form's effective `user` members. That covers open, save, submit, the confirmation reads, uploads,
-file download/delete and document generation. Design routes and lists still use
+the form's effective `user` members. Submit mode uses it to open a submission, alongside participation
+to save, submit, upload and delete a file on an in-progress submission, and on its own
+(`submission_update`) to delete a file on a submitted submission. Design routes and lists still use
 `resolveFormPermissions`, which reads workspace group membership, so they are not form-aware yet.
 
 | method | path | effect |
@@ -217,6 +221,28 @@ the check and treats `*` as a match for anything.
 `GET /forms/:id` returns the caller's resolved codes as `permissions` (a sorted array, `['*']` for
 admins) so the UI can gate actions. This reads the same resolver, so it upgrades automatically when
 per-form resolution lands.
+
+## Submission participants
+
+Once a submission exists, reading it in submit mode needs an active grant on it, and changing it
+needs a form permission. `submission_participant` holds one row per grant: `user_id`, `role` (`owner`
+or `collaborator`), `status` (`active` or `inactive`), `granted_by`, and `revoked_by`/`revoked_at`. A
+grant is revoked, never deleted, so the rows are the access history. Opening a submission makes the
+opener its owner. The shared public user owns anonymous submissions, so any anonymous caller holding
+the id has access to those.
+
+`isSubmitterAllowed` in `services/submitterAccess.ts` holds the rules:
+
+| operation | needs |
+|-----------|-------|
+| `open` | `submission_create` on the form (`hasFormSubmitAccess`) |
+| `read`: confirmation, data, schema, fill, file download, print, preview | an active grant |
+| `write`: save, submit, upload, delete a file on an in-progress submission | an active grant and `submission_create` on the form |
+| `deleteSubmittedFile` | `submission_update` on the form |
+
+Owners and collaborators have the same access. Design routes do not use these rules; staff read and
+delete submissions through form permissions. Files, print and preview have no design route, so staff
+download files, print and preview only through the submit routes, which need a grant.
 
 ## What a new workspace looks like
 

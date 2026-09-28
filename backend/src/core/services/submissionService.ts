@@ -1,4 +1,4 @@
-import type { SubmissionListSort } from '@soba/lib';
+import type { SortLocale, SubmissionListSort } from '@soba/lib';
 import { v7 as uuidv7 } from 'uuid';
 import {
   appendSubmissionRevision,
@@ -23,7 +23,7 @@ import {
   SubmissionEventType,
   type RevisionReasonCode,
   type RevisionStatusCode,
-  type SubmissionEventTypeCode,
+  type SubmissionWriteEventCode,
   type SubmissionWorkflowStateCode,
 } from '../db/codes';
 import { log } from '../logging';
@@ -82,6 +82,7 @@ interface ListInput {
   createdBy?: string;
   q?: string;
   sort: SubmissionListSort;
+  locale: SortLocale;
 }
 
 export class SubmissionService {
@@ -123,7 +124,7 @@ export class SubmissionService {
    */
   private async record(
     input: SaveInput,
-    eventType: SubmissionEventTypeCode,
+    eventType: SubmissionWriteEventCode,
   ): Promise<SubmissionWriteOutcome> {
     const submission = await getSubmissionRecordById(input.workspaceId, input.submissionId);
     if (!submission) throw new NotFoundError('Submission not found');
@@ -202,7 +203,7 @@ export class SubmissionService {
   private async writeRevision(
     input: SaveInput,
     submission: SubmissionRecord,
-    eventType: SubmissionEventTypeCode,
+    eventType: SubmissionWriteEventCode,
     decision: Exclude<SubmissionWriteDecision, { kind: 'replay' }>,
   ): Promise<SubmissionWriteOutcome> {
     if (!input.revisionId) {
@@ -281,7 +282,7 @@ export class SubmissionService {
   }
 
   async delete(input: DeleteInput) {
-    return markSubmissionDeleted(input.workspaceId, input.submissionId, input.actorDisplayLabel);
+    return markSubmissionDeleted(input);
   }
 
   async get(workspaceId: string, submissionId: string) {

@@ -157,7 +157,7 @@ describe('FormSubmitterAudience for a form', () => {
     expect(await screen.findByTestId('submitter-audience-trigger')).toHaveTextContent(
       'Inherited: Protected (IDIR - MFA)',
     );
-    expect(mockFormGet).toHaveBeenCalledWith('token', 'f1');
+    expect(mockFormGet).toHaveBeenCalledWith('token', 'f1', 'en');
     expect(mockGet).not.toHaveBeenCalled();
   });
 
@@ -183,7 +183,7 @@ describe('FormSubmitterAudience for a form', () => {
     );
     await user.click(screen.getByTestId('audience-save'));
     await waitFor(() =>
-      expect(mockFormSet).toHaveBeenCalledWith('token', 'f1', { mode: 'inherit' }),
+      expect(mockFormSet).toHaveBeenCalledWith('token', 'f1', { mode: 'inherit' }, 'en'),
     );
     expect(mockSet).not.toHaveBeenCalled();
     // The saved audience is what the control shows once the panel closes.
@@ -209,10 +209,12 @@ describe('FormSubmitterAudience for a form', () => {
     expect(screen.getByTestId('audience-save')).toBeEnabled();
     await user.click(screen.getByTestId('audience-save'));
     await waitFor(() =>
-      expect(mockFormSet).toHaveBeenCalledWith('token', 'f1', {
-        mode: 'protected',
-        idps: ['azureidir'],
-      }),
+      expect(mockFormSet).toHaveBeenCalledWith(
+        'token',
+        'f1',
+        { mode: 'protected', idps: ['azureidir'] },
+        'en',
+      ),
     );
   });
 
@@ -228,10 +230,12 @@ describe('FormSubmitterAudience for a form', () => {
     await user.click(trigger);
     await user.click(await screen.findByTestId('audience-save'));
     await waitFor(() =>
-      expect(mockFormSet).toHaveBeenCalledWith('token', 'f1', {
-        mode: 'protected',
-        idps: ['azureidir'],
-      }),
+      expect(mockFormSet).toHaveBeenCalledWith(
+        'token',
+        'f1',
+        { mode: 'protected', idps: ['azureidir'] },
+        'en',
+      ),
     );
   });
 

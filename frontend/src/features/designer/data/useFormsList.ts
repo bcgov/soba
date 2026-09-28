@@ -8,6 +8,7 @@ import { classifyDataError } from '@/src/shared/api/dataError';
 import type { ListResult } from '@/src/shared/api/dataContracts';
 import type { ListQueryArgs } from '@/src/types/list';
 import type { SobaFormSummary } from '@/src/types/forms';
+import { useSortLocale } from '@/src/shared/list/useSortLocale';
 
 const EMPTY: SobaFormSummary[] = [];
 
@@ -20,16 +21,18 @@ export function useFormsList(
   workspaceId: string | undefined,
   holdRequest: boolean,
 ): ListResult<SobaFormSummary> {
+  const locale = useSortLocale();
   const { data, isLoading, isValidating, error, mutate } = useAuthedSWR(
     holdRequest
       ? null
-      : ['forms', workspaceId ?? null, query.offset, query.limit, query.sort, query.q],
+      : ['forms', workspaceId ?? null, query.offset, query.limit, query.sort, query.q, locale],
     (token) =>
       getSobaForms(token, {
         offset: query.offset,
         limit: query.limit,
         sort: query.sort,
         q: query.q,
+        locale,
         workspaceId,
       }),
     listReadConfig,

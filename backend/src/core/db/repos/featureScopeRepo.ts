@@ -1,5 +1,5 @@
 import { and, count, eq, inArray, or, sql, type SQL } from 'drizzle-orm';
-import { FEATURE_SCOPE_SORT_FIELDS, type SortToken } from '@soba/lib';
+import { DEFAULT_SORT_LOCALE, FEATURE_SCOPE_SORT_FIELDS, type SortToken } from '@soba/lib';
 import { db } from '../client';
 import { featureScopes } from '../schema';
 import { orderByForSort, type SortColumns } from '../listSort';
@@ -111,7 +111,14 @@ export const listFeatureScopes = async (
       .select()
       .from(featureScopes)
       .where(where)
-      .orderBy(...orderByForSort(FEATURE_SCOPE_SORT_COLUMNS, input.sort, featureScopes.id))
+      .orderBy(
+        ...orderByForSort(
+          FEATURE_SCOPE_SORT_COLUMNS,
+          input.sort,
+          featureScopes.id,
+          DEFAULT_SORT_LOCALE,
+        ),
+      )
       .limit(input.limit)
       .offset(input.offset);
     const totals = await tx.select({ total: count() }).from(featureScopes).where(where);

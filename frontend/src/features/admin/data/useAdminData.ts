@@ -23,6 +23,7 @@ import type {
   SobaAdminItem,
   UpsertFeatureScopeBody,
 } from '@/src/types/admin';
+import { useSortLocale } from '@/src/shared/list/useSortLocale';
 
 const scopeKey = (featureScopeId: string) => ['feature-scope', featureScopeId];
 
@@ -37,9 +38,10 @@ const reportOnce = (onError: (cause: unknown) => void) => ({
 });
 
 export function useSobaAdmins(query: ListQueryArgs): ListResult<SobaAdminItem> {
+  const locale = useSortLocale();
   const { data, isLoading, isValidating, error, mutate } = useAuthedSWR(
-    ['soba-admins', query.offset, query.limit, query.sort, query.q ?? ''],
-    (token) => fetchSobaAdmins(token, query),
+    ['soba-admins', query.offset, query.limit, query.sort, query.q ?? '', locale],
+    (token) => fetchSobaAdmins(token, { ...query, locale }),
     { ...listReadConfig, shouldRetryOnError: false },
   );
 

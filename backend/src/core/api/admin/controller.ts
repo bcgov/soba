@@ -83,6 +83,7 @@ export const listSobaAdminsHandler = asyncHandler(async (req: Request, res: Resp
     offset: query.offset,
     limit: query.limit,
     sort: query.sort,
+    locale: req.sortLocale!,
     source: query.source,
     q: query.q,
   });

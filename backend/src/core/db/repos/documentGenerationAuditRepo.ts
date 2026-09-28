@@ -1,5 +1,5 @@
 import { and, count, eq, type SQL } from 'drizzle-orm';
-import { DOCGEN_AUDIT_SORT_FIELDS, type SortToken } from '@soba/lib';
+import { DEFAULT_SORT_LOCALE, DOCGEN_AUDIT_SORT_FIELDS, type SortToken } from '@soba/lib';
 import { db } from '../client';
 import { documentGenerationAudits } from '../schema';
 import { orderByForSort, type SortColumns } from '../listSort';
@@ -75,7 +75,12 @@ export const listDocumentGenerationAudits = async (
       .from(documentGenerationAudits)
       .where(where)
       .orderBy(
-        ...orderByForSort(DOCGEN_AUDIT_SORT_COLUMNS, filters.sort, documentGenerationAudits.id),
+        ...orderByForSort(
+          DOCGEN_AUDIT_SORT_COLUMNS,
+          filters.sort,
+          documentGenerationAudits.id,
+          DEFAULT_SORT_LOCALE,
+        ),
       )
       .limit(filters.limit)
       .offset(filters.offset);

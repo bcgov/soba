@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   fetchFeatureScope,
   fetchFeatureScopes,
+  fetchSobaAdmins,
   removeFeatureScope,
   removeSobaAdmin,
   upsertFeatureScope,
@@ -108,5 +109,33 @@ describe('sobaApiAdmin feature-scope helpers', () => {
       scopeId: '11111111-1111-4111-8111-111111111111',
       status: 'inactive',
     });
+  });
+});
+
+describe('sobaApiAdmin list requests', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('sends the sort locale as both the locale param and Accept-Language', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ items: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchSobaAdmins('tok', { offset: 0, limit: 10, sort: 'displayLabel:asc', locale: 'fr' });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain('locale=fr');
+    expect(init.headers['Accept-Language']).toBe('fr');
+  });
+
+  it('leaves the browser default when no sort locale is given', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ items: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchSobaAdmins('tok', { offset: 0, limit: 10, sort: 'displayLabel:asc' });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).not.toContain('locale=');
+    expect(init.headers['Accept-Language']).toBeUndefined();
   });
 });

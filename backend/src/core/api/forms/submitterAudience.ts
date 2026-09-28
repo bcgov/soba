@@ -1,7 +1,9 @@
-import type {
-  FormSubmitterAudience,
-  SetFormSubmitterAudienceBody,
-  SubmitterAudience,
+import {
+  compareTextForSort,
+  type FormSubmitterAudience,
+  type SetFormSubmitterAudienceBody,
+  type SortLocale,
+  type SubmitterAudience,
 } from '@soba/lib';
 import { GroupMemberKind, PUBLIC_PROVIDER_CODE } from '../../db/codes';
 import {
@@ -18,15 +20,18 @@ import {
 } from '../groups/submitterAudience';
 import type { CoreRequestContext } from '../../middleware/requestContext';
 
-type FormAudienceContext = Pick<CoreRequestContext, 'workspaceId' | 'actorDisplayLabel'>;
+type FormAudienceContext = Pick<CoreRequestContext, 'workspaceId' | 'actorDisplayLabel'> & {
+  locale: SortLocale;
+};
 
 async function readFormAudience(
   workspaceId: string,
   formId: string,
   groupId: string,
+  locale: SortLocale,
 ): Promise<FormSubmitterAudience> {
   const [{ available, ...workspace }, overridden] = await Promise.all([
-    readAudience(workspaceId, groupId),
+    readAudience(workspaceId, groupId, locale),
     hasActiveOverride(formId, groupId),
   ]);
   if (!overridden) {
@@ -44,7 +49,7 @@ async function readFormAudience(
   const nameOf = (code: string) => available.find((p) => p.code === code)?.name ?? code;
   const idps = codes
     .filter((c) => c !== PUBLIC_PROVIDER_CODE)
-    .sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+    .sort((a, b) => compareTextForSort(nameOf(a), nameOf(b), 'asc', locale, { linguistic: true }));
   let mode: SubmitterAudience['mode'] = 'none';
   if (codes.includes(PUBLIC_PROVIDER_CODE)) mode = 'public';
   else if (idps.length) mode = 'protected';
@@ -58,7 +63,7 @@ const idpMembers = (codes: string[]): OverrideMemberInput[] =>
 export const formSubmitterAudienceService = {
   async get(ctx: FormAudienceContext, formId: string): Promise<FormSubmitterAudience> {
     const groupId = await requireSubmittersGroupId(ctx.workspaceId);
-    return readFormAudience(ctx.workspaceId, formId, groupId);
+    return readFormAudience(ctx.workspaceId, formId, groupId, ctx.locale);
   },
 
   async set(
@@ -79,6 +84,6 @@ export const formSubmitterAudienceService = {
         displayLabel: ctx.actorDisplayLabel,
       });
     }
-    return readFormAudience(ctx.workspaceId, formId, groupId);
+    return readFormAudience(ctx.workspaceId, formId, groupId, ctx.locale);
   },
 };

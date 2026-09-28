@@ -9,6 +9,7 @@ import { classifyDataError } from '@/src/shared/api/dataError';
 import type { ListResult, WriteOutcome } from '@/src/shared/api/dataContracts';
 import type { ListQueryArgs } from '@/src/types/list';
 import type { SubmissionListItem } from '@/src/types/submissions';
+import { useSortLocale } from '@/src/shared/list/useSortLocale';
 
 const EMPTY: SubmissionListItem[] = [];
 
@@ -21,9 +22,10 @@ export function useFormSubmissions(
   opened: boolean,
   query: ListQueryArgs,
 ): ListResult<SubmissionListItem> {
+  const locale = useSortLocale();
   const { data, isLoading, isValidating, error, mutate } = useAuthedSWR(
     formId && opened
-      ? ['form-submissions', formId, query.offset, query.limit, query.sort, query.q ?? '']
+      ? ['form-submissions', formId, query.offset, query.limit, query.sort, query.q ?? '', locale]
       : null,
     (token) =>
       getSobaSubmissions(token, {
@@ -31,6 +33,7 @@ export function useFormSubmissions(
         limit: query.limit,
         sort: query.sort,
         q: query.q,
+        locale,
         formId: formId as string,
       }),
     listReadConfig,

@@ -24,6 +24,7 @@ import {
   formVersions,
   forms,
   sobaAdmins,
+  submissionParticipants,
   submissionRevisions,
   submissions,
   userIdentities,
@@ -231,6 +232,7 @@ async function purgeUserScoped(tx: DbOrTx, userIds: string[], record: RecordFn):
 export const WORKSPACE_SCOPED_TABLES: readonly string[] = [
   'document_generation_audit',
   'submission_revision',
+  'submission_participant',
   'submission',
   'file',
   'form_version_revision',
@@ -301,6 +303,10 @@ async function purgeWorkspaceScoped(
   await record(
     'submission_revision',
     tx.delete(submissionRevisions).where(inArray(submissionRevisions.workspaceId, ids)),
+  );
+  await record(
+    'submission_participant',
+    tx.delete(submissionParticipants).where(inArray(submissionParticipants.workspaceId, ids)),
   );
   await record('submission', tx.delete(submissions).where(inArray(submissions.workspaceId, ids)));
   await record('file', tx.delete(files).where(inArray(files.workspaceId, ids)));

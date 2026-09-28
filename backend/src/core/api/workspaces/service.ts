@@ -1,3 +1,4 @@
+import type { SortLocale } from '@soba/lib';
 import {
   getWorkspaceForUser,
   listWorkspacesForUser,
@@ -20,6 +21,7 @@ export class WorkspacesApiService {
       q?: string;
       requiredPermission?: string;
       sort: WorkspaceListSort;
+      locale: SortLocale;
     },
   ) {
     const { items, total } = await listWorkspacesForUser({
@@ -27,6 +29,7 @@ export class WorkspacesApiService {
       offset: query.offset,
       limit: query.limit,
       sort: query.sort,
+      locale: query.locale,
       kind: query.kind,
       status: query.status,
       q: query.q,
@@ -60,7 +63,12 @@ export class WorkspacesApiService {
 
   async lookup(
     actorId: string,
-    query: { q?: string; requiredPermissions?: string; disclaimerAccepted?: 'true' | 'false' },
+    query: {
+      q?: string;
+      requiredPermissions?: string;
+      disclaimerAccepted?: 'true' | 'false';
+      locale: SortLocale;
+    },
   ) {
     const rows = await lookupWorkspacesForUser({
       userId: actorId,
@@ -69,6 +77,7 @@ export class WorkspacesApiService {
       disclaimerAccepted:
         query.disclaimerAccepted === undefined ? undefined : query.disclaimerAccepted === 'true',
       limit: LOOKUP_FETCH_LIMIT,
+      locale: query.locale,
     });
     return toLookupResponse(
       rows.map((r) => ({

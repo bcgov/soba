@@ -1,5 +1,5 @@
 import { asc, desc, sql, type Column, type SQL } from 'drizzle-orm';
-import type { SortToken } from '@soba/lib';
+import { DEFAULT_SORT_LOCALE, type SortLocale, type SortToken } from '@soba/lib';
 import { ValidationError } from '../errors';
 
 interface SortableColumn {
@@ -7,13 +7,24 @@ interface SortableColumn {
   /** Rows with no value sort last in both directions. */
   nullable?: boolean;
   /**
-   * Order by the folded value, so "Budget" and "budget" sort together as the `ilike` search returns
-   * them. An index for such a sort has to be on `lower(column)`.
+   * Order by the sort locale's ICU collation, the same order `compareTextForSort` gives in the
+   * browser. An index for such a sort has to be built with the same collation.
    */
-  caseInsensitive?: boolean;
+  linguistic?: boolean;
 }
 
 export type SortColumns<TField extends string> = Record<TField, SortableColumn>;
+
+// ICU collations, so the order is the same on every image and in the browser. Each must order as
+// `sortCollators` in lib.
+const SORT_COLLATIONS: Record<SortLocale, SQL> = {
+  en: sql.raw('"und-x-icu"'),
+  fr: sql.raw('"fr-CA-x-icu"'),
+};
+
+/** `column` in the sort locale's ICU collation, for an `orderBy` that does not take a sort token. */
+export const collated = (column: Column, locale: SortLocale): SQL =>
+  sql`${column} collate ${SORT_COLLATIONS[locale] ?? SORT_COLLATIONS[DEFAULT_SORT_LOCALE]}`;
 
 /**
  * Order for one sort token, with `tiebreak` appended so a query returns rows in the same order on
@@ -24,6 +35,7 @@ export function orderByForSort<TField extends string>(
   columns: SortColumns<TField>,
   token: SortToken<TField>,
   tiebreak: Column,
+  locale: SortLocale,
 ): SQL[] {
   const separator = token.lastIndexOf(':');
   const field = token.slice(0, separator) as TField;
@@ -36,13 +48,13 @@ export function orderByForSort<TField extends string>(
     throw new ValidationError(`Unsupported sort: ${token}`);
   }
 
-  const { column, nullable, caseInsensitive } = sortable;
+  const { column, nullable, linguistic } = sortable;
 
-  if (!nullable && !caseInsensitive) {
+  if (!nullable && !linguistic) {
     return [direction === 'asc' ? asc(column) : desc(column), desc(tiebreak)];
   }
 
-  const target = caseInsensitive ? sql`lower(${column})` : sql`${column}`;
+  const target = linguistic ? collated(column, locale) : sql`${column}`;
   if (direction === 'asc') {
     return [nullable ? sql`${target} asc nulls last` : sql`${target} asc`, desc(tiebreak)];
   }

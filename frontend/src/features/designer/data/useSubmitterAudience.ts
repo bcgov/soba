@@ -8,6 +8,7 @@ import {
 } from '@/src/shared/api/sobaApiGroups';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { classifyDataError } from '@/src/shared/api/dataError';
+import { useSortLocale } from '@/src/shared/list/useSortLocale';
 import type {
   AudienceMode,
   FormSubmitterAudience,
@@ -52,13 +53,14 @@ const fromForm = (audience: FormSubmitterAudience): AudienceView => ({
 /** The submitter audience of a form when `formId` is given, otherwise of the workspace. */
 export function useSubmitterAudience(workspaceId: string | null, formId?: string) {
   const { mutate: globalMutate } = useSWRConfig();
+  const locale = useSortLocale();
   const workspaceRead = useAuthedSWR<SubmitterAudience>(
-    !formId && workspaceId ? [WORKSPACE_AUDIENCE_KEY, workspaceId] : null,
-    (token) => getSubmitterAudience(token, workspaceId as string),
+    !formId && workspaceId ? [WORKSPACE_AUDIENCE_KEY, workspaceId, locale] : null,
+    (token) => getSubmitterAudience(token, workspaceId as string, locale),
   );
   const formRead = useAuthedSWR<FormSubmitterAudience>(
-    formId ? [FORM_AUDIENCE_KEY, formId] : null,
-    (token) => getFormSubmitterAudience(token, formId as string),
+    formId ? [FORM_AUDIENCE_KEY, formId, locale] : null,
+    (token) => getFormSubmitterAudience(token, formId as string, locale),
   );
 
   const formData = formRead.data;
@@ -70,13 +72,15 @@ export function useSubmitterAudience(workspaceId: string | null, formId?: string
 
   const save = async (token: string, body: SetFormSubmitterAudienceBody): Promise<void> => {
     if (formId) {
-      await formRead.mutate(setFormSubmitterAudience(token, formId, body), { revalidate: false });
+      await formRead.mutate(setFormSubmitterAudience(token, formId, body, locale), {
+        revalidate: false,
+      });
       return;
     }
     if (!workspaceId || body.mode === 'inherit') {
       throw new Error('A workspace audience has nothing to inherit from');
     }
-    await workspaceRead.mutate(setSubmitterAudience(token, workspaceId, body), {
+    await workspaceRead.mutate(setSubmitterAudience(token, workspaceId, body, locale), {
       revalidate: false,
     });
     // Forms that inherit carry a copy of the workspace audience. Dropping the cached copies, not only

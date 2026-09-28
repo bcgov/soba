@@ -9,18 +9,13 @@ import {
   DocumentGenerationMode,
   DocumentGenerationOutcome,
   FeatureAvailability,
-  Permissions,
 } from '../../core/db/codes';
 import {
   getSubmissionListContext,
   getSubmissionRecordById,
-  type SubmissionRecord,
 } from '../../core/db/repos/submissionRepo';
-import {
-  hasFormSubmitAccess,
-  type CallerIdentity,
-  type FormAccessTarget,
-} from '../../core/db/repos/formSubmitAccessRepo';
+import type { CallerIdentity } from '../../core/db/repos/formSubmitAccessRepo';
+import { isSubmitterAllowed, SubmitterOperation } from '../../core/services/submitterAccess';
 import { createDocumentGenerationAudit } from '../../core/db/repos/documentGenerationAuditRepo';
 import { SubmissionService } from '../../core/services/submissionService';
 import { AppError, ServiceUnavailableError } from '../../core/errors';
@@ -191,32 +186,15 @@ async function renderWith(
   }
 }
 
-/**
- * Print access: `submission_read` (staff, or a public/idp audience where submissions are public data),
- * or the submitter printing their own submission. The owner branch is load-bearing for a user-member
- * submitter, who holds `submission_create` but not `submission_read`; requiring `submission_create`
- * there bounds the shared public-user id to forms the caller can submit to.
- */
-async function canPrint(
-  target: FormAccessTarget,
-  caller: CallerIdentity,
-  record: SubmissionRecord,
-): Promise<boolean> {
-  if (await hasFormSubmitAccess(target, caller, Permissions.submission_read)) return true;
-  return (
-    !!caller.actorId &&
-    record.submittedBy === caller.actorId &&
-    (await hasFormSubmitAccess(target, caller, Permissions.submission_create))
-  );
-}
-
 export const documentGenerationService = {
   /** Render from the caller's live (on-screen) data. The submission is only the authorization anchor. */
   async preview(caller: CallerIdentity, input: PreviewInput): Promise<DocumentRenderOutcome> {
     const scope = await getSubmissionListContext(input.submissionId);
     if (!scope) return { status: 'notfound' };
-    const allowed = await hasFormSubmitAccess(scope, caller, Permissions.submission_create);
-    if (!allowed) return { status: 'denied' };
+    const target = { ...scope, submissionId: input.submissionId };
+    if (!(await isSubmitterAllowed(SubmitterOperation.read, target, caller))) {
+      return { status: 'denied' };
+    }
     return renderWith(
       scope,
       { template: input.template, options: input.options, data: input.data },
@@ -230,7 +208,10 @@ export const documentGenerationService = {
     if (!scope) return { status: 'notfound' };
     const record = await getSubmissionRecordById(scope.workspaceId, input.submissionId);
     if (!record) return { status: 'notfound' };
-    if (!(await canPrint(scope, caller, record))) return { status: 'denied' };
+    const target = { ...scope, submissionId: input.submissionId };
+    if (!(await isSubmitterAllowed(SubmitterOperation.read, target, caller))) {
+      return { status: 'denied' };
+    }
 
     // Persisted answer document from the engine (the plugin shapes it for the template). Pass the
     // record we already loaded so getContent doesn't re-read it.

@@ -11,7 +11,8 @@ import type { Resource } from '@/src/shared/api/dataContracts';
 type FillBundle = Awaited<ReturnType<typeof getSubmitFillBundle>>;
 
 /**
- * The bundle for filling one submission: workflow state, its version schema, and any saved answers.
+ * The bundle for filling one submission: workflow state, its version schema, any saved answers, and
+ * whether the caller may write.
  * Works signed in or anonymously; a session read, so it does not revalidate on its own.
  */
 export function useSubmitFill(submissionId: string): Resource<FillBundle> {

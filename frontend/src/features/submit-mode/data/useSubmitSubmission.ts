@@ -14,7 +14,7 @@ import type { Resource } from '@/src/shared/api/dataContracts';
 type SubmitSubmission = Awaited<ReturnType<typeof loadSubmitSubmission>>;
 
 async function loadSubmitSubmission(token: string | undefined, submissionId: string) {
-  // Submit-mode: read through the submit APIs regardless of sign-in so audience members who are not
+  // Submit-mode: read through the submit APIs regardless of sign-in so participants who are not
   // workspace members can still view.
   const submission = await getSubmitSubmission(token, submissionId);
   const [schema, content] = await Promise.all([
@@ -24,7 +24,7 @@ async function loadSubmitSubmission(token: string | undefined, submissionId: str
   return { submission, schema, content };
 }
 
-/** The confirmation read: works signed in or anonymously against the form's audience. */
+/** The confirmation read: works signed in or anonymously for a participant on the submission. */
 export function useSubmitSubmission(submissionId: string): Resource<SubmitSubmission> {
   const { token, initializing, initStarted } = useKeycloak();
   // Wait for Keycloak to answer before reading. Before init, "no token" is the default rather than

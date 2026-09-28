@@ -23,7 +23,10 @@ export const getActorId = (req: Request): string | null => req.actorId ?? null;
 export const getActorIdpCode = (req: Request): string | null =>
   req.user?.providerCode?.toLowerCase() ?? null;
 
-/** The caller's identity for audience checks: resolved actor id and provider code (`public` if anon). */
+/**
+ * The caller's identity for submit-mode access checks: resolved actor id and provider code (`public`
+ * if anon).
+ */
 export const resolveCaller = (req: Request): CallerIdentity => ({
   actorId: req.actorId ?? null,
   idpCode: getActorIdpCode(req) ?? req.idpType?.toLowerCase() ?? null,

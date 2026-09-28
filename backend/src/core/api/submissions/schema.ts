@@ -17,6 +17,7 @@ import {
   searchQueryField,
   OffsetPageSchema,
   OFFSET_DRIFT_NOTE,
+  sortLocaleQueryField,
 } from '../shared/offsetPagination';
 import {
   workspaceIdQueryField,
@@ -75,6 +76,7 @@ export const ListSubmissionsQuerySchema = requireAtLeastOneQueryField(
       description: 'Matches anywhere in the form name or the submission id.',
     }),
     sort: SubmissionSortSchema.default('updatedAt:desc'),
+    locale: sortLocaleQueryField,
   }),
   ['workspaceId', 'formId', 'formVersionId', 'submissionId'],
   'At least one of workspaceId, formId, formVersionId, or submissionId is required',

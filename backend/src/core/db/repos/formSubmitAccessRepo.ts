@@ -5,9 +5,9 @@ import { hasAllPermissions, resolveFormPermissionsForForm } from './formAccessRe
 import { effectiveGroupMembers } from './formGroupOverrideRepo';
 
 /**
- * Permissions the Form submitters audience conveys to non-staff (idp/public) members: read the form,
- * submit to it, read a submission (on a public form submissions are public data), and read the form's
- * document templates. Anything else (mutations, submission list) stays staff-only.
+ * Permissions the Form submitters audience conveys to non-staff (idp/public) members. Anything else
+ * (mutations, submission list) stays staff-only. Submit mode never reads a submission through this
+ * set; reads go by participation (services/submitterAccess).
  */
 const AUDIENCE_PERMISSIONS = new Set<PermissionCode>([
   Permissions.form_read,
