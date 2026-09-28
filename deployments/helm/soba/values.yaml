@@ -6,6 +6,13 @@ global:
   # PR number a deployment belongs to, for provenance when several PR releases share a namespace.
   prNumber: ""
 
+# Opt-in access from APS to backend pods only. Silver: 264e6f; Gold: b8840c.
+# environment selects the APS data plane, not the SOBA environment.
+gatewayNetworkPolicy:
+  enabled: false
+  namespaceName: ""
+  environment: ""
+
 # -- Backend (Express API) ------------------------------------------------
 backend:
   image:
