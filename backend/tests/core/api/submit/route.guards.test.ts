@@ -47,3 +47,14 @@ it.each(routes.map((r) => [`${r.method.toUpperCase()} ${r.path}`, r.handlers] as
     expect(handlers.indexOf(guards[0])).toBeLessThan(handlers.length - 1);
   },
 );
+
+it('POST /submissions/:id/save checks drafts after write access, before its handler', () => {
+  const handlers = handlersFor('post', '/submissions/:id/save');
+  const draftGuard = handlers.indexOf('requireDraftSave');
+  expect(draftGuard).toBeGreaterThan(handlers.indexOf('requireFormSubmitAccess'));
+  expect(draftGuard).toBeLessThan(handlers.length - 1);
+});
+
+it.each(['/submissions', '/submissions/:id/submit'])('POST %s does not check drafts', (path) => {
+  expect(handlersFor('post', path)).not.toContain('requireDraftSave');
+});

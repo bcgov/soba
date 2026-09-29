@@ -3,6 +3,7 @@ import { validateRequest } from '../shared/validation';
 import { openWorkspaceFromResource } from '../../middleware/workspaceContext';
 import { requireFormSubmitAccess, requireSubmissionRead } from '../../middleware/formSubmitAccess';
 import { getSubmitSubmissionSchema, getSubmitFillBundle } from './controller';
+import { requireDraftSave } from './draftSave';
 import {
   openSubmission,
   getSubmission,
@@ -36,6 +37,7 @@ router.post(
   '/submissions/:id/save',
   validateRequest({ params: SubmissionIdParamsSchema, body: SubmissionDataBodySchema }),
   requireFormSubmitAccess,
+  requireDraftSave,
   saveSubmission,
 );
 router.post(
@@ -70,7 +72,7 @@ router.get(
 );
 
 // The one bundle the fill page needs: workflow state + schema + any saved answers (resume) + whether
-// the caller may write.
+// the caller may write and save a draft.
 router.get(
   '/submissions/:id/fill',
   validateRequest({ params: SubmissionIdParamsSchema }),

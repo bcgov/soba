@@ -15,7 +15,7 @@ the reference for what the pieces are.
 | `schema.ts`   | `registerSettingsPaths`: the standard OpenAPI entries for a group                                                                                          |
 | `router.ts`   | mounts every module at `/design/forms/:id/settings/<key>`, after resolving the form and checking the module's feature for that form (404 when unavailable) |
 | `registry.ts` | the list of modules, lowest `weight` first                                                                                                                 |
-| `<group>/`    | `repo.ts`, `service.ts`, `openapi.ts`, `index.ts` (the module descriptor)                                                                                  |
+| `<group>/`    | `repo.ts`, `service.ts`, `openapi.ts`, `index.ts` (the module descriptor), plus any helper other features read the group through                           |
 
 Rows: each group's migration backfills a row for every live form. A read or save goes straight to
 the row; a form without one gets it on that access, filled from the column defaults and stamped

@@ -151,8 +151,8 @@ The role lives on the group (`workspace_group_role`). `member_kind` selects the 
 | `idp_group`   | `idp_group_code`           | anyone whose provider is in that IdP group (e.g. `bcgov` = `idir` + `azureidir`) |
 
 `user` members are resolved for form permissions by `resolveFormPermissions`. `idp` members are
-resolved only for the Form submitters audience, by `hasFormSubmitAccess` in `formSubmitAccessRepo.ts`,
-against the form's effective members (see [Form-level overrides](#form-level-overrides)).
+resolved only for the Form submitters audience, by `hasFormSubmitAccess` and `isPublicSubmitterAudience`
+in `formSubmitAccessRepo.ts`, against the form's effective members (see [Form-level overrides](#form-level-overrides)).
 `idp_group` members are not resolved. `public` is a pseudo identity provider (`identity_provider.is_login_provider = false`) used as a
 match-all selector.
 

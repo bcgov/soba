@@ -31,20 +31,13 @@ export interface FormAccessTarget {
 }
 
 /**
- * True when the form's effective Form submitters members (the form's override, else the workspace
- * group) admit the caller via a `public` idp member (matches everyone, including anonymous) or an `idp`
- * member matching the caller's provider. User members are not checked here; they are resolved through
- * the staff permission path. idp_group is not resolved yet.
+ * Provider codes of the form's effective Form submitters `idp` members (the form's override, else the
+ * workspace group). `public` among them matches everyone, including anonymous. User members are not
+ * included; they are resolved through the staff permission path. idp_group is not resolved yet.
  */
-const isSubmitterAudienceMember = async (
-  target: FormAccessTarget,
-  caller: CallerIdentity,
-): Promise<boolean> => {
+const submitterAudienceCodes = async (target: FormAccessTarget): Promise<Set<string>> => {
   const groupId = await getSystemGroupId(target.workspaceId, SystemGroup.form_submitters);
-  if (!groupId) return false;
-
-  const codes = new Set<string>([PUBLIC_PROVIDER_CODE]);
-  if (caller.idpCode) codes.add(caller.idpCode);
+  if (!groupId) return new Set();
 
   const members = await effectiveGroupMembers({
     workspaceId: target.workspaceId,
@@ -52,8 +45,23 @@ const isSubmitterAudienceMember = async (
     groupId,
     memberKind: GroupMemberKind.idp,
   });
-  return members.some((m) => m.identityProviderCode != null && codes.has(m.identityProviderCode));
+  return new Set(
+    members.map((m) => m.identityProviderCode).filter((code): code is string => code != null),
+  );
 };
+
+/** True when the form's audience admits the caller: public, or the caller's provider. */
+const isSubmitterAudienceMember = async (
+  target: FormAccessTarget,
+  caller: CallerIdentity,
+): Promise<boolean> => {
+  const codes = await submitterAudienceCodes(target);
+  return codes.has(PUBLIC_PROVIDER_CODE) || (!!caller.idpCode && codes.has(caller.idpCode));
+};
+
+/** True when the form's effective Form submitters audience is public. */
+export const isPublicSubmitterAudience = async (target: FormAccessTarget): Promise<boolean> =>
+  (await submitterAudienceCodes(target)).has(PUBLIC_PROVIDER_CODE);
 
 /**
  * Authorizes a caller for `required` on a form. Grants when the roles of the groups the caller is an

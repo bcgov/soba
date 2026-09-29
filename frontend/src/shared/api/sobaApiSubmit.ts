@@ -16,7 +16,7 @@ import type {
 
 /**
  * The one payload the fill page needs: workflow state, form version, head revision, schema, any
- * saved answers (resume) and whether the caller may write.
+ * saved answers (resume) and whether the caller may write and save a draft.
  */
 export async function getSubmitFillBundle(
   token: string | undefined,

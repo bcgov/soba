@@ -59,7 +59,7 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
     responses: {
       200: {
         description:
-          'Workflow state + schema + saved answers + write access for the fill page (resume)',
+          'Workflow state + schema + saved answers + write and draft access for the fill page (resume)',
         content: { 'application/json': { schema: SubmitFillBundleSchema } },
       },
       401: { description: SUBMISSION_AUTH_REQUIRED },
@@ -116,7 +116,9 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
         content: { 'application/json': { schema: SubmissionWriteResponseSchema } },
       },
       401: { description: SUBMISSION_AUTH_REQUIRED },
-      403: { description: WRITE_AUTHZ },
+      403: {
+        description: `${WRITE_AUTHZ}, or the form does not accept drafts (not enabled, or a public audience)`,
+      },
       404: { description: SUBMISSION_NOT_FOUND },
       400: { description: INVALID_WRITE_BODY },
       409: { description: WRITE_CONFLICT },
