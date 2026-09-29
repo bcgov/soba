@@ -139,15 +139,19 @@ export async function getSobaFormVersionPage(
   return parseJson(response);
 }
 
-/** Create a new (empty) form version draft for a form. */
+/**
+ * Create a new form version draft for a form. `fromFormVersionId`: the version whose document
+ * templates the draft gets.
+ */
 export async function createFormVersion(
   token: string,
   formId: string,
+  fromFormVersionId?: string,
 ): Promise<SobaFormVersionType> {
   const response = await sobaFetch(FORM_VERSIONS_PATH, {
     token,
     method: 'POST',
-    json: { formId },
+    json: { formId, fromFormVersionId },
   });
   return parseJson(response);
 }

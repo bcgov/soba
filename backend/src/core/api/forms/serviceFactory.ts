@@ -281,13 +281,14 @@ export function createFormsApiService(
         }),
       ),
 
-    createDraft: async (ctx: FormsContextInput, formId: string) =>
+    createDraft: async (ctx: FormsContextInput, formId: string, fromFormVersionId?: string) =>
       toFormVersionDto(
         await formVersionService.createDraft({
           workspaceId: ctx.workspaceId,
           actorId: ctx.actorId,
           actorDisplayLabel: ctx.actorDisplayLabel,
           formId,
+          fromFormVersionId,
         }),
       ),
 

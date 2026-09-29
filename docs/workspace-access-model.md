@@ -20,8 +20,13 @@ adds a third control per submission, who takes part in it; see
 > workspace). Creating a form requires `form_create` and `design_create` — only `form_admin` satisfies
 > that, via `*`. Creating a design on an existing form requires `design_create` (`form_designer`). The
 > submit routes, file uploads and document generation are gated by `isSubmitterAllowed` (see
-> [Submission participants](#submission-participants)). Group and member management is gated by
-> workspace role (`requireWorkspaceManage`), not by RBAC.
+> [Submission participants](#submission-participants)); rendering a document also needs
+> `document_template_read`. The template routes (`features/templates/route.ts`) are gated by
+> `requireFormPermissions`: `document_template_read` to list and download, `document_template_create`
+> to upload, replace and rename, `document_template_delete` to delete. Only `form_admin` (via `*`)
+> holds the create and delete codes; `form_submitter` holds read. A draft created from an existing
+> version gets that version's templates under `design_create` alone. Group and member management is
+> gated by workspace role (`requireWorkspaceManage`), not by RBAC.
 
 ```
                         User in a workspace
@@ -236,13 +241,15 @@ the id has access to those.
 | operation | needs |
 |-----------|-------|
 | `open` | `submission_create` on the form (`hasFormSubmitAccess`) |
-| `read`: confirmation, data, schema, fill, file download, print, preview | an active grant |
+| `read`: confirmation, data, schema, fill, file download | an active grant |
 | `write`: save, submit, upload, delete a file on an in-progress submission | an active grant and `submission_create` on the form |
 | `deleteSubmittedFile` | `submission_update` on the form |
+| `render`: print, preview, template list | an active grant and `document_template_read` on the form |
 
 Owners and collaborators have the same access. Design routes do not use these rules; staff read and
 delete submissions through form permissions. Files, print and preview have no design route, so staff
-download files, print and preview only through the submit routes, which need a grant.
+download files through `/files` or `/submit/files`, and print and preview through the submit routes,
+all of which need a grant.
 
 ## What a new workspace looks like
 

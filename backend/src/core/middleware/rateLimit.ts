@@ -28,6 +28,16 @@ export const apiRateLimit = rateLimit({
 });
 
 /**
+ * Limiter for document rendering (print, preview).
+ * Env: RATE_LIMIT_RENDER_WINDOW_MS (default 60 000), RATE_LIMIT_RENDER_MAX (default 30).
+ */
+export const renderRateLimit = rateLimit({
+  ...defaults,
+  windowMs: env.getRateLimitRenderWindowMs() ?? 60_000,
+  max: env.getRateLimitRenderMax() ?? 30,
+});
+
+/**
  * Lenient limiter for public endpoints (health, meta, docs).
  * Env: RATE_LIMIT_PUBLIC_WINDOW_MS (default 60 000), RATE_LIMIT_PUBLIC_MAX (default 200).
  */

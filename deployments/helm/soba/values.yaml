@@ -53,6 +53,16 @@ backend:
         annotations:
           # Upload is silent through the clamd scan (clamav.timeoutMs, 60s).
           haproxy.router.openshift.io/timeout: "300s"
+      - name: files-api
+        path: /api/v1/files
+        annotations:
+          # Upload is silent through the clamd scan (clamav.timeoutMs, 60s).
+          haproxy.router.openshift.io/timeout: "300s"
+      - name: templates
+        path: /api/v1/templates
+        annotations:
+          # Upload is silent through the clamd scan (clamav.timeoutMs, 60s).
+          haproxy.router.openshift.io/timeout: "300s"
   ingress:
     enabled: false
     ingressClassName: ""
@@ -129,21 +139,38 @@ backend:
     size: 1Gi
     storageClassName: ""
 
-  # -- configmap-storage: files feature + storage profiles (STORAGE_* + FILES_*)
+  # -- configmap-storage: files and templates features + storage profiles (STORAGE_* + FILES_* +
+  # TEMPLATES_*)
   storage:
     # Active storage profiles (comma-separated). Each needs a *Backend below.
     profiles: "default"
     # Backend for the 'default' profile. 'storage-memory' is in-process and ephemeral — no PVC,
-    # no external service, lost on restart, per-replica. Fine for ephemeral (PR/dev) namespaces.
-    # For durable, multi-replica environments override to 'storage-s3' and set the endpoint/
-    # bucket below (credentials come from a Secret).
+    # no external service, lost on restart, per-replica. Fine for ephemeral (PR) namespaces, and
+    # refused with more than one replica or with autoscaling.
+    # 'storage-local' keeps files on the RWX PVC below (localVolume, defaultBasePath).
+    # For durable, multi-replica environments override to 'storage-s3' and set the endpoint, bucket
+    # and prefix below (credentials come from a Secret).
     defaultBackend: storage-memory
     # Profile the /files API reads/writes, and the max upload size it accepts (MB).
     filesStorageProfile: "default"
     filesMaxFileSizeMb: "10"
+    # Profile the /templates API reads/writes, and the max upload size it accepts (MB).
+    templatesStorageProfile: "default"
+    templatesMaxFileSizeMb: "10"
+    # Key prefixes the features store under within their profiles. Empty uses the defaults in code
+    # (attachments, templates).
+    filesStoragePrefix: ""
+    templatesStoragePrefix: ""
 
-    # storage-local only: writable filesystem path for the default profile. Rendered only when set.
+    # storage-local only: where the file store PVC is mounted and the default profile writes.
+    # Required for storage-local.
     defaultBasePath: ""
+    # storage-local only: the file store PVC, created only when defaultBackend is storage-local.
+    # ReadWriteMany, shared by every replica.
+    localVolume:
+      accessMode: ReadWriteMany
+      size: 1Gi
+      storageClassName: ""
 
     # storage-s3 only — non-credential keys, rendered only when set. ACCESS_KEY/SECRET_KEY are
     # NOT here; supply them via a Secret. A full URL endpoint (https://host:port) also carries the
@@ -152,6 +179,9 @@ backend:
     defaultBucketName: ""
     defaultPort: ""
     defaultUseSsl: ""
+    # Root every object in the default profile is stored under. Required for storage-s3. Unique per
+    # environment, not inside another environment's root, and fixed once files are stored.
+    defaultPrefix: ""
 
   # -- configmap-formio: PLUGIN_FORMIO_V5_* (non-secret values)
   formio:
@@ -161,6 +191,8 @@ backend:
 
   # -- configmap-document-generation: PLUGIN_CDOGS_* + default backend code
   documentGeneration:
+    # -- renders one pod runs at once; empty uses the backend default (2)
+    maxConcurrent: ""
     cdogsV2:
       endpoint: ""
       tokenUrl: ""
@@ -194,6 +226,8 @@ backend:
     apiMax: "60"
     publicWindowMs: "60000"
     publicMax: "200"
+    renderWindowMs: "60000"
+    renderMax: "30"
 
 # -- Frontend (Next.js) ---------------------------------------------------
 frontend:
@@ -252,7 +286,7 @@ frontend:
   apps:
     designer:
       enabled: true
-      featuresAllowed: "design-mode,meta,marketing"
+      featuresAllowed: "design-mode,files,meta,marketing"
       routePath: /designer
     forms:
       enabled: true

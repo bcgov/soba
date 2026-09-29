@@ -138,6 +138,10 @@ export function resolveApiBasePath(source: EnvSource): string {
   return withLeadingSlash.endsWith('/') ? withLeadingSlash.slice(0, -1) : withLeadingSlash;
 }
 
+/** The value when it is a whole number of at least 1; undefined otherwise. */
+const positiveInteger = (value: number | undefined): number | undefined =>
+  value !== undefined && Number.isInteger(value) && value >= 1 ? value : undefined;
+
 /** Build an env reader that reads from the given source. Use in tests with a simulated .env object. */
 export function createEnvReader(source: EnvSource) {
   return {
@@ -148,10 +152,7 @@ export function createEnvReader(source: EnvSource) {
     getNumberEnv: (key: string) => getNumberEnvFrom(source, key),
     getCsvEnv: (key: string) => getCsvEnvFrom(source, key),
     getDatabaseUrl: () => resolveDatabaseUrl(source),
-    /**
-     * express.json body limit for the API surfaces. Larger than the 100kb default so document
-     * generation can carry a base64 template inline (reducible once templates are stored server-side).
-     */
+    /** express.json body limit for the API surfaces. */
     getJsonBodyLimit: () => getOptionalEnvFrom(source, 'HTTP_JSON_BODY_LIMIT') ?? '10mb',
     getDbAdminDatabase: () => getOptionalEnvFrom(source, 'DB_ADMIN_DATABASE'),
     // Pipeline performance fix: Revert if needed.
@@ -178,6 +179,9 @@ export function createEnvReader(source: EnvSource) {
     getTenantEngineDefaultCode: () => getOptionalEnvFrom(source, 'TENANT_ENGINE_DEFAULT_CODE'),
     getDocumentGenerationDefaultCode: () =>
       getOptionalEnvFrom(source, 'DOCUMENT_GENERATION_DEFAULT_CODE'),
+    /** Renders one process runs at once. Unset, or not a whole number of at least 1, is 2. */
+    getDocumentGenerationMaxConcurrent: () =>
+      positiveInteger(getNumberEnvFrom(source, 'DOCUMENT_GENERATION_MAX_CONCURRENT')) ?? 2,
     /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
     getDefaultSubmitterProvider: () =>
       getOptionalEnvFrom(source, 'DEFAULT_SUBMITTER_PROVIDER') ?? 'azureidir',
@@ -201,6 +205,8 @@ export function createEnvReader(source: EnvSource) {
     getRateLimitApiMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_API_MAX'),
     getRateLimitPublicWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_PUBLIC_WINDOW_MS'),
     getRateLimitPublicMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_PUBLIC_MAX'),
+    getRateLimitRenderWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_RENDER_WINDOW_MS'),
+    getRateLimitRenderMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_RENDER_MAX'),
     /** URL path the API is served under, e.g. `/chefs`. Empty serves at the host root. */
     getApiBasePath: () => resolveApiBasePath(source),
     getTrustProxySetting: () => resolveTrustProxySetting(source),
@@ -233,10 +239,7 @@ export const env = {
   getNumberEnv,
   getCsvEnv,
   getDatabaseUrl: () => resolveDatabaseUrl(process.env),
-  /**
-   * express.json body limit for the API surfaces. Larger than the 100kb default so document
-   * generation can carry a base64 template inline (reducible once templates are stored server-side).
-   */
+  /** express.json body limit for the API surfaces. */
   getJsonBodyLimit: () => getOptionalEnv('HTTP_JSON_BODY_LIMIT') ?? '10mb',
   getDbAdminDatabase: () => getOptionalEnv('DB_ADMIN_DATABASE'),
   // Pipeline performance fix: Revert if needed.
@@ -261,6 +264,9 @@ export const env = {
   getTenantEngineDefaultCode: () => getOptionalEnv('TENANT_ENGINE_DEFAULT_CODE'),
   /** Document generation backend the consumer defaults to (a discovered plugin code). */
   getDocumentGenerationDefaultCode: () => getOptionalEnv('DOCUMENT_GENERATION_DEFAULT_CODE'),
+  /** Renders one process runs at once. Unset, or not a whole number of at least 1, is 2. */
+  getDocumentGenerationMaxConcurrent: () =>
+    positiveInteger(getNumberEnv('DOCUMENT_GENERATION_MAX_CONCURRENT')) ?? 2,
   /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
   getDefaultSubmitterProvider: () => getOptionalEnv('DEFAULT_SUBMITTER_PROVIDER') ?? 'azureidir',
   getStorageProfiles: () => {
@@ -283,6 +289,8 @@ export const env = {
   getRateLimitApiMax: () => getNumberEnv('RATE_LIMIT_API_MAX'),
   getRateLimitPublicWindowMs: () => getNumberEnv('RATE_LIMIT_PUBLIC_WINDOW_MS'),
   getRateLimitPublicMax: () => getNumberEnv('RATE_LIMIT_PUBLIC_MAX'),
+  getRateLimitRenderWindowMs: () => getNumberEnv('RATE_LIMIT_RENDER_WINDOW_MS'),
+  getRateLimitRenderMax: () => getNumberEnv('RATE_LIMIT_RENDER_MAX'),
   /** URL path the API is served under, e.g. `/chefs`. Empty serves at the host root. */
   getApiBasePath: () => resolveApiBasePath(process.env),
   getTrustProxySetting: () => resolveTrustProxySetting(process.env),
@@ -303,4 +311,12 @@ export const env = {
   getFilesMaxFileSizeMb: () => getNumberEnv('FILES_MAX_FILE_SIZE_MB') || 10,
   // Storage profile the files feature reads/writes. Defaults to 'default'.
   getFilesStorageProfile: () => getOptionalEnv('FILES_STORAGE_PROFILE') ?? 'default',
+  // Key prefix the files feature stores under within its profile. Defaults to 'attachments'.
+  getFilesStoragePrefix: () => getOptionalEnv('FILES_STORAGE_PREFIX') ?? 'attachments',
+  // Max upload size accepted by the templates API. Feature-level (not per storage backend).
+  getTemplatesMaxFileSizeMb: () => getNumberEnv('TEMPLATES_MAX_FILE_SIZE_MB') || 10,
+  // Storage profile the templates feature reads/writes. Defaults to 'default'.
+  getTemplatesStorageProfile: () => getOptionalEnv('TEMPLATES_STORAGE_PROFILE') ?? 'default',
+  // Key prefix the templates feature stores under within its profile. Defaults to 'templates'.
+  getTemplatesStoragePrefix: () => getOptionalEnv('TEMPLATES_STORAGE_PREFIX') ?? 'templates',
 };
