@@ -50,6 +50,7 @@ jobs:
               - 'backend/**'
               - 'frontend/**'
               - '.github/workflows/pr_open.yaml'
+              - '.github/workflows/gateway-proxy-check.yaml'
               - '.github/workflows/build-images.yaml'
               - '.github/workflows/qa.yaml'
               - '.gitignore'
@@ -348,6 +349,19 @@ jobs:
             - Designer (design-mode): <${{ needs.set-vars.outputs.URL }}>
             - Forms (submit-mode): <${{ needs.set-vars.outputs.URL_FORMS }}>
           number: ${{ needs.set-vars.outputs.PR_NUM }}
+
+  gateway:
+    name: Verify PR through APS gateway
+    needs: [deploy, set-vars]
+    # Repository variable: opt in while establishing the first gateway proof.
+    if: ${{ vars.APS_PR_ENABLED == 'true' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/gateway-proxy-check.yaml
+    with:
+      environment: pr
+      release: soba-${{ needs.set-vars.outputs.JOB_NAME }}
+    secrets: inherit
 
   Tests:
     name: Integration Tests

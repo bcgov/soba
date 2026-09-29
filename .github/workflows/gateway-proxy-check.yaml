@@ -1,0 +1,178 @@
+name: Gateway proxy check
+run-name: Gateway health check for ${{ inputs.release }}
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      release:
+        required: true
+        type: string
+      gateway_hostname:
+        description: Optional explicit hostname; otherwise derive from APS_PR_HOST_SUFFIX
+        default: ""
+        type: string
+      aps_data_plane:
+        default: ""
+        type: string
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub environment holding OpenShift and APS credentials
+        type: choice
+        options: [dev, pr, test]
+        default: dev
+      release:
+        description: Existing Helm release (e.g. soba-dev or soba-pr-156)
+        required: true
+        type: string
+      gateway_hostname:
+        description: Dedicated APS hostname for this proof (no scheme/path)
+        required: true
+        type: string
+      aps_data_plane:
+        description: APS Silver data plane allowed to reach the backend
+        type: choice
+        options: [test, prod]
+        default: test
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gateway-proxy-check
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: ${{ inputs.environment }}
+    env:
+      RELEASE: ${{ inputs.release }}
+      OPENSHIFT_NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+      APS_HOST: ${{ vars.APS_HOST }}
+      GATEWAY_ID: ${{ vars.APS_GATEWAY_ID }}
+      GATEWAY_HOSTNAME: ${{ inputs.gateway_hostname }}
+      GATEWAY_QUALIFIER: proxy-proof-${{ inputs.release }}
+      APS_DATA_PLANE: ${{ inputs.aps_data_plane || vars.APS_DATA_PLANE }}
+      APS_PR_HOST_SUFFIX: ${{ vars.APS_PR_HOST_SUFFIX }}
+      GWA_SHA256: ${{ vars.GWA_LINUX_AMD64_SHA256 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate settings and render gateway
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE" =~ ^soba-[a-z0-9-]+$ && ${#RELEASE} -le 53 ]]
+          [[ "$OPENSHIFT_NAMESPACE" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]
+          [[ "$APS_HOST" =~ ^[a-z0-9.-]+$ ]]
+          [[ "$GWA_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]
+          [[ "$APS_DATA_PLANE" == test || "$APS_DATA_PLANE" == prod ]]
+          if [[ -z "$GATEWAY_HOSTNAME" ]]; then
+            : "${APS_PR_HOST_SUFFIX:?Set APS_PR_HOST_SUFFIX in the pr GitHub environment}"
+            export GATEWAY_HOSTNAME="${RELEASE}.${APS_PR_HOST_SUFFIX}"
+          fi
+          export GATEWAY_SERVICE_NAME="soba-${GATEWAY_QUALIFIER}"
+          export BACKEND_HOST="${RELEASE}-backend.${OPENSHIFT_NAMESPACE}.svc"
+          node deployments/gateway/scripts/generate-gateway-config.mjs \
+            --format kong --output "$RUNNER_TEMP/gateway-kong.yaml"
+          cat "$RUNNER_TEMP/gateway-kong.yaml"
+          # The generator validates the hostname before it is persisted for later steps.
+          echo "GATEWAY_HOSTNAME=$GATEWAY_HOSTNAME" >> "$GITHUB_ENV"
+
+      - name: Install OpenShift CLI
+        uses: redhat-actions/openshift-tools-installer@e3b32c2ab7b064b2ce189121c4a49f509a99a7b4 # v3.0
+        with:
+          oc: "4.14"
+
+      - name: Login to OpenShift
+        uses: redhat-actions/oc-login@2a1614bc977c054c8786c8e35fc9534bd0ddc156 # v2.0.1
+        with:
+          openshift_server_url: ${{ vars.OC_SERVER }}
+          openshift_token: ${{ secrets.OC_TOKEN }}
+          namespace: ${{ secrets.OC_NAMESPACE }}
+
+      - name: Check existing backend and permit APS ingress
+        shell: bash
+        run: |
+          set -euo pipefail
+          oc rollout status "deployment/${RELEASE}-backend" \
+            -n "$OPENSHIFT_NAMESPACE" --timeout=120s
+          oc get service "${RELEASE}-backend" -n "$OPENSHIFT_NAMESPACE" -o json \
+            | jq -e '.spec.ports | any(.port == 4000)'
+          oc get endpoints "${RELEASE}-backend" -n "$OPENSHIFT_NAMESPACE" -o json \
+            | jq -e '[.subsets[]?.addresses[]?] | length > 0'
+          oc get configmap "${RELEASE}-backend-app" -n "$OPENSHIFT_NAMESPACE" -o json \
+            | jq -e '.data.API_BASE_PATH == "/chefs"'
+          # Reuse deployed chart values so selectors match this release.
+          helm get values "$RELEASE" -n "$OPENSHIFT_NAMESPACE" -o yaml \
+            > "$RUNNER_TEMP/deployed-values.yaml"
+          helm template "$RELEASE" deployments/helm/soba \
+            --namespace "$OPENSHIFT_NAMESPACE" \
+            -f "$RUNNER_TEMP/deployed-values.yaml" \
+            --set gatewayNetworkPolicy.enabled=true \
+            --set-string gatewayNetworkPolicy.namespaceName=264e6f \
+            --set-string "gatewayNetworkPolicy.environment=${APS_DATA_PLANE}" \
+            --show-only templates/backend/networkpolicy-aps.yaml \
+            > "$RUNNER_TEMP/aps-networkpolicy.yaml"
+          oc apply -n "$OPENSHIFT_NAMESPACE" -f "$RUNNER_TEMP/aps-networkpolicy.yaml"
+
+      - name: Install pinned GWA
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/gwa-bin"
+          curl --fail --silent --show-error --location \
+            https://github.com/bcgov/gwa-cli/releases/download/v3.2.0/gwa_Linux_x86_64.tgz \
+            -o "$RUNNER_TEMP/gwa.tgz"
+          printf '%s  %s\n' "$GWA_SHA256" "$RUNNER_TEMP/gwa.tgz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/gwa.tgz" -C "$RUNNER_TEMP/gwa-bin"
+          echo "$RUNNER_TEMP/gwa-bin" >> "$GITHUB_PATH"
+
+      - name: Publish isolated reverse proxy
+        shell: bash
+        env:
+          APS_CLIENT_ID: ${{ secrets.APS_CLIENT_ID }}
+          APS_CLIENT_SECRET: ${{ secrets.APS_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          : "${APS_CLIENT_ID:?Missing APS_CLIENT_ID}"
+          : "${APS_CLIENT_SECRET:?Missing APS_CLIENT_SECRET}"
+          gwa config set host "$APS_HOST"
+          gwa config set gateway "$GATEWAY_ID"
+          gwa login --client-id "$APS_CLIENT_ID" --client-secret "$APS_CLIENT_SECRET"
+          gwa publish-gateway "$RUNNER_TEMP/gateway-kong.yaml" \
+            --qualifier "$GATEWAY_QUALIFIER" --dry-run
+          gwa publish-gateway "$RUNNER_TEMP/gateway-kong.yaml" \
+            --qualifier "$GATEWAY_QUALIFIER"
+
+      - name: Verify APS upstream and public health response
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            if gwa status --json > "$RUNNER_TEMP/gateway-status.json" \
+              && jq -e --arg name "soba-${GATEWAY_QUALIFIER}" 'any(.[]; .name == $name and .status == "UP")' \
+                "$RUNNER_TEMP/gateway-status.json" \
+              && node deployments/gateway/scripts/verify-health.mjs; then
+              printf 'Gateway health URL: https://%s/health\n' "$GATEWAY_HOSTNAME" >> "$GITHUB_STEP_SUMMARY"
+              printf 'Verified gateway /health → %s-backend.%s.svc:4000/chefs/api/v1/health\n' \
+                "$RELEASE" "$OPENSHIFT_NAMESPACE" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Gateway health verification failed; inspect status and NetworkPolicy.' >&2
+          cat "$RUNNER_TEMP/gateway-status.json"
+          exit 1
+
+      - name: Remove local credential and deployment files
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$HOME/.gwa-config.yaml" "$RUNNER_TEMP/deployed-values.yaml"
