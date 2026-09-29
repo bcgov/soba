@@ -6,6 +6,7 @@ import { registerSubmitterSettingsOpenApi, SetSubmitterSettingsBodySchema } from
 import { submitterSettingsService } from './service';
 
 export { submitterSettingsService } from './service';
+export { DraftSaveStatus, getDraftSaveStatus, type DraftSaveStatusCode } from './drafts';
 
 export const submitterSettingsModule: FormSettingsModule = {
   key: SUBMITTER_SETTINGS_KEY,

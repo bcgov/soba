@@ -12,18 +12,25 @@ jest.mock('../../../../src/core/db/repos/submissionParticipantRepo', () => ({
 jest.mock('../../../../src/core/db/repos/formSubmitAccessRepo', () => ({
   hasFormSubmitAccess: jest.fn(),
 }));
+jest.mock('../../../../src/features/form-settings/submitter/drafts', () => ({
+  ...jest.requireActual('../../../../src/features/form-settings/submitter/drafts'),
+  getDraftSaveStatus: jest.fn(),
+}));
 
 import { getSubmitFillBundle } from '../../../../src/core/api/submit/controller';
 import { coreErrorHandler } from '../../../../src/core/middleware/errorHandler';
 import { formVersionService, submissionsApiService } from '../../../../src/core/container';
 import { isActiveParticipant } from '../../../../src/core/db/repos/submissionParticipantRepo';
 import { hasFormSubmitAccess } from '../../../../src/core/db/repos/formSubmitAccessRepo';
+import { getDraftSaveStatus } from '../../../../src/features/form-settings/submitter/drafts';
+import { log } from '../../../../src/core/logging';
 
 const getSubmission = submissionsApiService.get as jest.Mock;
 const getData = submissionsApiService.getData as jest.Mock;
 const getSchema = formVersionService.getSchema as jest.Mock;
 const participantMock = jest.mocked(isActiveParticipant);
 const formPermissionMock = jest.mocked(hasFormSubmitAccess);
+const draftsMock = jest.mocked(getDraftSaveStatus);
 
 function createApp() {
   const app = express();
@@ -49,6 +56,7 @@ beforeEach(() => {
   getSchema.mockResolvedValue({ components: [] });
   getData.mockResolvedValue({ data: { a: 1 } });
   participantMock.mockResolvedValue(true);
+  draftsMock.mockResolvedValue('disabled');
 });
 
 describe('getSubmitFillBundle', () => {
@@ -71,5 +79,47 @@ describe('getSubmitFillBundle', () => {
     const res = await request(createApp()).get('/s1');
     expect(res.status).toBe(200);
     expect(res.body.canWrite).toBe(false);
+  });
+
+  it('offers a draft save when the caller may write and the form accepts drafts', async () => {
+    formPermissionMock.mockResolvedValue(true);
+    draftsMock.mockResolvedValue('allowed');
+    const res = await request(createApp()).get('/s1');
+    expect(res.body.canSaveDraft).toBe(true);
+    expect(draftsMock).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: 'ws1' }), 'f1');
+  });
+
+  it.each(['disabled', 'public'] as const)(
+    'withholds a draft save when the form is %s for drafts',
+    async (status) => {
+      formPermissionMock.mockResolvedValue(true);
+      draftsMock.mockResolvedValue(status);
+      const res = await request(createApp()).get('/s1');
+      expect(res.body.canWrite).toBe(true);
+      expect(res.body.canSaveDraft).toBe(false);
+    },
+  );
+
+  it('still opens the form to submit when the draft lookup fails', async () => {
+    formPermissionMock.mockResolvedValue(true);
+    draftsMock.mockRejectedValue(new Error('settings read failed'));
+    const error = jest.spyOn(log, 'error').mockImplementation(() => undefined);
+    const res = await request(createApp()).get('/s1');
+    expect(res.status).toBe(200);
+    expect(res.body.canWrite).toBe(true);
+    expect(res.body.canSaveDraft).toBe(false);
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({ formId: 'f1' }),
+      'Draft save status lookup failed',
+    );
+    error.mockRestore();
+  });
+
+  it('withholds a draft save from a caller who may not write', async () => {
+    formPermissionMock.mockResolvedValue(false);
+    draftsMock.mockResolvedValue('allowed');
+    const res = await request(createApp()).get('/s1');
+    expect(res.body.canSaveDraft).toBe(false);
+    expect(draftsMock).not.toHaveBeenCalled();
   });
 });
