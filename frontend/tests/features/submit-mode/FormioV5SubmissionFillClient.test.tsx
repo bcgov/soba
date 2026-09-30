@@ -231,18 +231,19 @@ describe('FormioV5SubmissionFillClient', () => {
       expect(sentBody(1).baseRevisionId).toBe('rev-0');
     });
 
-    it('navigates to the confirmation when the submit becomes current', async () => {
+    it('replaces the fill page with the confirmation when the submit becomes current', async () => {
       h.submitSobaFormSubmission.mockResolvedValue(writeResponse('current'));
       await renderReady();
       await submit({ a: 1 });
-      expect(h.push).toHaveBeenCalledWith('/en/submission/sub-1');
+      expect(h.replace).toHaveBeenCalledWith('/en/submission/sub-1/success');
+      expect(h.push).not.toHaveBeenCalled();
     });
 
     it('stays on the form with the held notice when the submit conflicts', async () => {
       h.submitSobaFormSubmission.mockResolvedValue(writeResponse('pending', 'conflict'));
       await renderReady();
       await submit({ a: 1 });
-      expect(h.push).not.toHaveBeenCalled();
+      expect(h.replace).not.toHaveBeenCalled();
       expect(screen.getByTestId('fill-form')).toBeInTheDocument();
       expect(screen.getByTestId('submission-fill-held')).toHaveTextContent(
         'Changed elsewhere; not submitted.',
@@ -285,12 +286,12 @@ describe('FormioV5SubmissionFillClient', () => {
       expect(sentBody(1).revisionId).not.toBe(sentBody(0).revisionId);
     });
 
-    it('redirects to the confirmation when the record was already submitted', async () => {
+    it('redirects to the submission view when the record was already submitted', async () => {
       h.submitSobaFormSubmission.mockResolvedValue(writeResponse('pending', 'closed'));
       await renderReady();
       await submit({ a: 1 });
       expect(h.replace).toHaveBeenCalledWith('/en/submission/sub-1');
-      expect(h.push).not.toHaveBeenCalled();
+      expect(h.replace).not.toHaveBeenCalledWith('/en/submission/sub-1/success');
     });
   });
 

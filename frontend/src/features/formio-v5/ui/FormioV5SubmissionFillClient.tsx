@@ -193,9 +193,10 @@ function SubmissionFillBody({
         return;
       }
       addNotification({ text: labels.submitSuccess, type: 'success' });
-      // Straight to the read-only confirmation; navigating away unmounts the form, so there's no
-      // need to emit `submitDone` and no flash of Form.io's own success screen.
-      router.push(submissionPath);
+      // Straight to the confirmation; navigating away unmounts the form, so there's no need to emit
+      // `submitDone` and no flash of Form.io's own success screen. replace, so Back does not return
+      // to the fill page of a submitted record.
+      router.replace(`${submissionPath}/success`);
     } catch (err) {
       writeError(err);
       formInstanceRef.current?.emit('submitError', labels.rendererError);
