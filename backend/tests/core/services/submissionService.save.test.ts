@@ -91,6 +91,7 @@ describe('SubmissionService save (versioned engine write)', () => {
       revisionId: expect.any(String),
       workspaceId: 'ws1',
       data: { firstName: 'Ada' },
+      validate: true,
     });
     expect(updateDraft).toHaveBeenCalledWith(
       'ws1',
@@ -115,6 +116,15 @@ describe('SubmissionService save (versioned engine write)', () => {
       record: { id: 's1', currentRevisionNo: 3 },
       revision: { id: 'rev-3', revisionNo: 3, status: 'current', reason: 'accepted' },
     });
+  });
+
+  it('writes a draft save without engine validation', async () => {
+    const createSubmission = jest.fn().mockResolvedValue({ engineRef: 'eng-new' });
+    createAdapter.mockReturnValue({ createSubmission });
+
+    await svc.save(input);
+
+    expect(createSubmission).toHaveBeenCalledWith(expect.objectContaining({ validate: false }));
   });
 
   it('mints a distinct revision id for each write', async () => {

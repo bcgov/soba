@@ -209,11 +209,20 @@ export class FormioCommunityEditionAPIv5Client {
     );
   }
 
-  async saveSubmission(formId: string, data: FormioSubmission): Promise<FormioSubmission> {
+  async saveSubmission(
+    formId: string,
+    data: FormioSubmission,
+    query?: FormioQuery,
+  ): Promise<FormioSubmission> {
+    const qs = buildQueryString(query);
     if (data._id) {
-      return this.request<FormioSubmission>(`/form/${formId}/submission/${data._id}`, 'PUT', data);
+      return this.request<FormioSubmission>(
+        `/form/${formId}/submission/${data._id}${qs}`,
+        'PUT',
+        data,
+      );
     }
-    return this.request<FormioSubmission>(`/form/${formId}/submission`, 'POST', data);
+    return this.request<FormioSubmission>(`/form/${formId}/submission${qs}`, 'POST', data);
   }
 
   async deleteSubmission(formId: string, submissionId: string): Promise<void> {

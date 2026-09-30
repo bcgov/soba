@@ -234,6 +234,7 @@ export class SubmissionService {
         revisionId,
         workspaceId: input.workspaceId,
         data: input.data,
+        validate: eventType === SubmissionEventType.submitted,
       });
 
       const result = await appendSubmissionRevision({

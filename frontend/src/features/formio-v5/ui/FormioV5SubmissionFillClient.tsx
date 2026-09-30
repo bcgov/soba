@@ -1,10 +1,10 @@
 'use client';
 
 import { useParams, useRouter, usePathname } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Submission } from '@formio/react';
 import type { FormType } from '@formio/react';
-import { InlineAlert } from '@bcgov/design-system-react-components';
+import { Button, InlineAlert } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
@@ -27,15 +27,34 @@ type FillLabels = {
   loadError: string;
   rendererError: string;
   submitSuccess: string;
-  submitPending: string;
   sessionExpired: string;
   readOnly: string;
+  saveDraft: string;
+  savingDraft: string;
+  draftSaved: string;
+  heldSave: string;
+  heldSubmit: string;
+  reloadLatest: string;
+  saveMine: string;
+  submitMine: string;
+  alreadySubmitted: string;
+};
+
+type WriteKind = 'save' | 'submit';
+// `resolve`: reloading or writing over after a held write.
+type Busy = WriteKind | 'resolve';
+
+type FormInstance = {
+  emit: (event: string, ...args: unknown[]) => void;
+  submit: () => Promise<unknown>;
+  submission?: { data?: Record<string, unknown> };
 };
 
 /**
  * Renders an already-opened submission for filling, keyed on its id. The submission record exists
- * before this mounts (opened in the start step), so this component only renders + submits — it never
- * creates. Loads the submission's own version schema and any saved answers, so a refresh resumes.
+ * before this mounts (opened in the start step), so this component renders, saves drafts and submits;
+ * it never creates. Loads the submission's own version schema and any saved answers, so a refresh
+ * resumes.
  */
 function SubmissionFillBody({
   submissionId,
@@ -56,13 +75,22 @@ function SubmissionFillBody({
   // Host file constraints (blocked extensions + max size) for the BCGovFile component; {} when files off.
   const bcgovFileOption = useBcgovFileOption();
   const [renderError, setRenderError] = useState<string | null>(null);
-  // The head revision loaded with the bundle; each submit is based on it.
+  // The head revision each write is based on: the loaded head, then each applied save.
   const baseRevisionIdRef = useRef<string | null>(null);
-  // The Form.io webform instance; in JSON mode (no `src`) we must signal it on a failed submit,
-  // or its submit button spins forever. On success we navigate away instead.
-  const formInstanceRef = useRef<{
-    emit: (event: string, ...args: unknown[]) => void;
-  } | null>(null);
+  // The live Form.io webform: a save reads its answers, "Submit my version" submits it, and a failed
+  // submit must emit on it or its button spins forever.
+  const formInstanceRef = useRef<FormInstance | null>(null);
+  // A submit waits for an in-flight save, so it is based on the revision that save produces.
+  const saveInFlightRef = useRef<Promise<void> | null>(null);
+  const [writing, setWriting] = useState<Busy | null>(null);
+  // The write held because the record changed elsewhere. Until the filler reloads or writes over it,
+  // saves and submits are refused. The ref gives a submit that waited on a save the current value.
+  const [held, setHeld] = useState<WriteKind | null>(null);
+  const heldRef = useRef<WriteKind | null>(null);
+  const markHeld = (kind: WriteKind | null) => {
+    heldRef.current = kind;
+    setHeld(kind);
+  };
 
   const bundle = fill.data;
   // An already-submitted submission isn't fillable; only a fillable one drives the form.
@@ -71,16 +99,18 @@ function SubmissionFillBody({
   // A participant who may no longer write (e.g. removed from the audience) gets a read-only form. The
   // backend enforces writes, so a bundle without the flag stays editable.
   const canWrite = fillableBundle?.canWrite !== false;
+  const submissionPath = `/${locale}/submission/${submissionId}`;
 
   useEffect(() => {
-    if (!bundle) return;
-    if (bundle.workflowState === 'submitted') {
-      router.replace(`/${locale}/submission/${submissionId}`);
-      return;
+    if (bundle?.workflowState === 'submitted') {
+      router.replace(submissionPath);
     }
-    // Each submit is based on the head revision loaded with the bundle.
-    baseRevisionIdRef.current = bundle.headRevisionId;
-  }, [bundle, submissionId, locale, router]);
+  }, [bundle, submissionPath, router]);
+
+  // Only a newly loaded bundle resets the base; a re-render must not undo a save's revision.
+  useEffect(() => {
+    if (bundle) baseRevisionIdRef.current = bundle.headRevisionId;
+  }, [bundle]);
 
   // Expose the submission being filled to the CHEFS upload provider; clear it when leaving so a stale
   // id can't tag an unrelated upload (e.g. a designer preview).
@@ -103,33 +133,110 @@ function SubmissionFillBody({
     [bcgovFileOption, canWrite],
   );
 
+  const onFormReady = useCallback((instance: FormInstance) => {
+    formInstanceRef.current = instance;
+  }, []);
+
+  // `closed`: submitted elsewhere, so there is nothing left to fill.
+  const onHeld = (kind: WriteKind, reason: string) => {
+    if (reason === 'closed') {
+      addNotification({ text: labels.alreadySubmitted, type: 'warning' });
+      router.replace(submissionPath);
+      return;
+    }
+    markHeld(kind);
+  };
+
+  const writeError = (err: unknown) =>
+    setRenderError(normalizeFormioRenderError(err, labels.rendererError, labels.sessionExpired));
+
+  const runSave = async () => {
+    const base = baseRevisionIdRef.current;
+    if (!base) return;
+    setRenderError(null);
+    const data = formInstanceRef.current?.submission?.data ?? {};
+    const outcome = await writer.save(token ?? undefined, data, base);
+    if (outcome.status === 'applied') {
+      baseRevisionIdRef.current = outcome.value.revision.id;
+      markHeld(null);
+      addNotification({ text: labels.draftSaved, type: 'success' });
+    } else if (outcome.status === 'held') {
+      onHeld('save', outcome.reason);
+    }
+  };
+
+  // Saves the answers as they are, without Form.io's validation.
+  const saveDraft = async () => {
+    setWriting('save');
+    const run = runSave().catch(writeError);
+    saveInFlightRef.current = run;
+    await run;
+    saveInFlightRef.current = null;
+    setWriting(null);
+  };
+
   const submitForm = async (submission: Submission) => {
+    await saveInFlightRef.current;
+    if (heldRef.current) {
+      formInstanceRef.current?.emit('submitError', '');
+      return;
+    }
+    setWriting('submit');
     try {
       const data = (submission?.data ?? {}) as Record<string, unknown>;
       const outcome = await writer.submit(token ?? undefined, data, baseRevisionIdRef.current);
-      // A pending revision means the record changed under the filler (a conflict, or it was already
-      // submitted); the work is kept for review but this submit did not go through. Keep them on the
-      // form with a notice, resync the base so a retry is not permanently stale, and release the
-      // submit button. The typed answers stay in the live form (initialData is not reset).
       if (outcome.status === 'held') {
-        addNotification({ text: labels.submitPending, type: 'warning' });
         setRenderError(null);
-        const head = await writer.reloadHead(token ?? undefined);
-        if (head?.workflowState === 'submitted') {
-          router.replace(`/${locale}/submission/${submissionId}`);
-          return;
-        }
-        if (head) baseRevisionIdRef.current = head.headRevisionId;
-        formInstanceRef.current?.emit('submitDone');
+        onHeld('submit', outcome.reason);
+        // Releases the submit button without Form.io's success state.
+        formInstanceRef.current?.emit('submitError', '');
         return;
       }
       addNotification({ text: labels.submitSuccess, type: 'success' });
       // Straight to the read-only confirmation; navigating away unmounts the form, so there's no
       // need to emit `submitDone` and no flash of Form.io's own success screen.
-      router.push(`/${locale}/submission/${submissionId}`);
+      router.push(submissionPath);
     } catch (err) {
-      setRenderError(normalizeFormioRenderError(err, labels.rendererError, labels.sessionExpired));
+      writeError(err);
       formInstanceRef.current?.emit('submitError', labels.rendererError);
+    } finally {
+      setWriting(null);
+    }
+  };
+
+  // Discards the typed answers: a fresh bundle is a new submission prop, which resets the form.
+  const reloadLatest = async () => {
+    setWriting('resolve');
+    try {
+      markHeld(null);
+      await fill.refresh();
+    } finally {
+      setWriting(null);
+    }
+  };
+
+  // Writes the typed answers over the current head. A submit goes through Form.io again, so an
+  // invalid form shows its field errors and never reaches submitForm.
+  const writeMine = async () => {
+    const kind = held;
+    if (!kind) return;
+    setWriting('resolve');
+    const head = await writer.reloadHead(token ?? undefined);
+    if (head?.workflowState === 'submitted') {
+      onHeld(kind, 'closed');
+      return;
+    }
+    setWriting(null);
+    if (!head) {
+      setRenderError(labels.loadError);
+      return;
+    }
+    baseRevisionIdRef.current = head.headRevisionId;
+    markHeld(null);
+    if (kind === 'save') {
+      await saveDraft();
+    } else {
+      await formInstanceRef.current?.submit().catch(() => undefined);
     }
   };
 
@@ -153,6 +260,57 @@ function SubmissionFillBody({
           {labels.readOnly}
         </InlineAlert>
       )}
+      {held ? (
+        <div className="mb-3">
+          <InlineAlert
+            variant="warning"
+            // BCDS names the alert from `title`; without it the notice has no accessible name.
+            title={held === 'save' ? labels.heldSave : labels.heldSubmit}
+            role="status"
+            data-testid="submission-fill-held"
+            buttons={
+              <>
+                <Button
+                  size="small"
+                  variant="secondary"
+                  onPress={() => {
+                    reloadLatest().catch(writeError);
+                  }}
+                  isDisabled={writing !== null}
+                  data-testid="submission-fill-reload-latest"
+                >
+                  {labels.reloadLatest}
+                </Button>
+                <Button
+                  size="small"
+                  variant="primary"
+                  onPress={() => {
+                    writeMine().catch(writeError);
+                  }}
+                  isDisabled={writing !== null}
+                  data-testid="submission-fill-write-mine"
+                >
+                  {held === 'save' ? labels.saveMine : labels.submitMine}
+                </Button>
+              </>
+            }
+          />
+        </div>
+      ) : null}
+      {fillableBundle?.canSaveDraft ? (
+        <div className="mb-3 d-flex gap-2" data-testid="submission-fill-actions">
+          <Button
+            variant="secondary"
+            onPress={() => {
+              saveDraft().catch(writeError);
+            }}
+            isDisabled={writing !== null || held !== null}
+            data-testid="submission-fill-save-draft"
+          >
+            {writing === 'save' ? labels.savingDraft : labels.saveDraft}
+          </Button>
+        </div>
+      ) : null}
       <FormioV5FormRenderErrorBoundary
         fallback={
           <InlineAlert variant="danger" role="alert">
@@ -167,9 +325,7 @@ function SubmissionFillBody({
             form={schema}
             submission={submissionProp}
             options={formOptions}
-            onFormReady={(instance) => {
-              formInstanceRef.current = instance;
-            }}
+            onFormReady={onFormReady}
             onError={(err) => {
               setRenderError(
                 normalizeFormioRenderError(err, labels.loadError, labels.sessionExpired),
@@ -208,9 +364,17 @@ export default function FormioV5SubmissionFillClient() {
           loadError: labels.loadError,
           rendererError: labels.rendererError,
           submitSuccess: labels.submitSuccess,
-          submitPending: labels.submitPending,
           sessionExpired: dict.general.sessionExpired,
           readOnly: labels.readOnly,
+          saveDraft: labels.saveDraft,
+          savingDraft: labels.savingDraft,
+          draftSaved: labels.draftSaved,
+          heldSave: labels.heldSave,
+          heldSubmit: labels.heldSubmit,
+          reloadLatest: labels.reloadLatest,
+          saveMine: labels.saveMine,
+          submitMine: labels.submitMine,
+          alreadySubmitted: labels.alreadySubmitted,
         }}
       />
     </div>

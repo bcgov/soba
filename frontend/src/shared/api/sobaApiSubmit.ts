@@ -58,10 +58,9 @@ export async function openSobaFormSubmission(
 }
 
 /**
- * Save a submission's answer data as a draft; the server writes a new engine document + revision.
- * Reserved for the (deferred) draft-save UI — the fill flow is resume-only for now, so nothing calls
- * this yet. Kept as the client half of POST /submit/submissions/:id/save. `revision.status` reports
- * whether the save became current or was held as pending.
+ * Save a submission's answer data as a draft, without engine validation; the server writes a new
+ * engine document + revision. `revision.status` reports whether the save became current or was held
+ * as pending.
  */
 export async function saveSobaFormSubmission(
   token: string | undefined,
