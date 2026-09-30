@@ -100,6 +100,9 @@ submission (see [Submission participants](workspace-access-model.md#submission-p
 the form to delete from a submitted one. A file whose submission is deleted returns 404 and keeps
 its rows and bytes.
 
+Removing a file from the form deletes it at once, not when the answers are next saved, so a draft
+saved earlier can still reference it.
+
 Extensions in `BLOCKED_FILE_EXTENSIONS` (`backend/src/features/files/config.ts`) are refused with
 415 whatever the form allows. `GET /api/v1/meta/files-config` returns them and the upload limit.
 

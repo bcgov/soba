@@ -225,7 +225,15 @@
         "backToHome": "Retour à l'accueil"
       },
       "submitSuccess": "Formulaire soumis avec succès.",
-      "submitPending": "Ce formulaire a changé depuis son ouverture; vos réponses ont été enregistrées pour examen au lieu d'être soumises.",
+      "saveDraft": "Enregistrer le brouillon",
+      "savingDraft": "Enregistrement du brouillon…",
+      "draftSaved": "Brouillon enregistré.",
+      "heldSave": "Cette soumission a été modifiée ailleurs depuis que vous l’avez ouverte; votre brouillon n’a donc pas été enregistré. Rechargez la dernière version pour abandonner vos modifications, ou remplacez-la par votre version.",
+      "heldSubmit": "Cette soumission a été modifiée ailleurs depuis que vous l’avez ouverte; vos réponses n’ont donc pas été soumises. Rechargez la dernière version pour abandonner vos modifications, ou soumettez votre version à sa place.",
+      "reloadLatest": "Recharger la dernière version",
+      "saveMine": "Enregistrer ma version",
+      "submitMine": "Soumettre ma version",
+      "alreadySubmitted": "Ce formulaire a déjà été soumis.",
       "readOnly": "Vous pouvez consulter cette soumission, mais vous ne pouvez plus la modifier ni la soumettre.",
       "starting": "Démarrage de votre soumission…",
       "startError": "La soumission n’a pas pu être démarrée. Veuillez réessayer."

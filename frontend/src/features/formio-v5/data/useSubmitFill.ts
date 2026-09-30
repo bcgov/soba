@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
+import { unstable_serialize, useSWRConfig } from 'swr';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { getSubmitFillBundle } from '@/src/shared/api/sobaApi';
 import { useMaybeAuthedSWR } from '@/src/shared/api/useAuthedSWR';
@@ -22,11 +23,21 @@ export function useSubmitFill(submissionId: string): Resource<FillBundle> {
   // anonymous copy.
   const ready = initStarted && !initializing && !!submissionId;
 
+  const identity = token ? 'user' : 'anonymous';
   const { data, error, isLoading, mutate } = useMaybeAuthedSWR<FillBundle>(
-    ready ? ['submit-fill', submissionId, token ? 'user' : 'anonymous'] : null,
+    ready ? ['submit-fill', submissionId, identity] : null,
     (authToken) => getSubmitFillBundle(authToken, submissionId),
     sessionReadConfig,
   );
+
+  // One read per visit: the cached copy predates any save made on the page, so leaving drops it. A
+  // plain delete, not mutate: a mutate marks the key changed and SWR discards a fetch still in flight.
+  const { cache } = useSWRConfig();
+  useEffect(() => {
+    if (!ready) return undefined;
+    const cacheKey = unstable_serialize(['submit-fill', submissionId, identity]);
+    return () => cache.delete(cacheKey);
+  }, [ready, submissionId, identity, cache]);
 
   const refresh = useCallback(async () => {
     await mutate();
