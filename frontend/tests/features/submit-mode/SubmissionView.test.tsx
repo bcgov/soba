@@ -100,6 +100,7 @@ describe('SubmissionView', () => {
       versionNo: 3,
       workflowState: 'submitted',
       submittedAt: new Date('2026-01-02T03:04:05Z').toISOString(),
+      confirmationCode: 'K7M2Q9XA',
     });
     getSubmitSubmissionSchema.mockResolvedValue({ components: [] });
     getSubmitSubmissionData.mockResolvedValue({ data: { field: 'value' } });
@@ -113,8 +114,23 @@ describe('SubmissionView', () => {
     await waitFor(() => expect(screen.getByTestId('submission-view-form')).toBeInTheDocument());
     expect(getSubmitSubmission).toHaveBeenCalledWith(undefined, 'sub-1');
     expect(screen.getByTestId('submission-view-version')).toHaveTextContent('v3');
-    expect(screen.getByTestId('submission-view-header')).toHaveTextContent('Confirmation ID: sub');
+    expect(screen.getByTestId('submission-view-confirmation')).toHaveTextContent(
+      'Confirmation ID: K7M2Q9XA',
+    );
     expect(screen.queryByTestId('submission-view-submitter')).not.toBeInTheDocument();
+  });
+
+  it('shows no confirmation line for a submission without a code', async () => {
+    initAnswered();
+    getSubmitSubmission.mockResolvedValue({
+      id: 'sub-1',
+      formId: 'f1',
+      workflowState: 'draft',
+      confirmationCode: null,
+    });
+    await renderView();
+    await waitFor(() => expect(screen.getByTestId('submission-view-form')).toBeInTheDocument());
+    expect(screen.queryByTestId('submission-view-confirmation')).not.toBeInTheDocument();
   });
 
   it('renders the completed submission below the success confirmation', async () => {
@@ -131,7 +147,7 @@ describe('SubmissionView', () => {
     const form = await screen.findByTestId('submission-view-form');
     const confirmation = screen.getByText('Keep this ID.');
     expect(screen.getByTestId('submission-success')).toHaveTextContent('Submitted successfully.');
-    expect(screen.getByText('sub').tagName).toBe('STRONG');
+    expect(screen.getByText('K7M2Q9XA').tagName).toBe('STRONG');
     expect(confirmation.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );

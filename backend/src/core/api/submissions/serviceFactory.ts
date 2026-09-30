@@ -1,4 +1,5 @@
 import { SubmissionService, type SubmissionWriteOutcome } from '../../services/submissionService';
+import { SubmissionWorkflowState } from '../../db/codes';
 import type {
   SubmissionRecord,
   SubmissionListRow,
@@ -38,6 +39,10 @@ export interface ListSubmissionsQueryInput {
   locale: SortLocale;
 }
 
+// The code exists from open but is shown only once the submission is submitted.
+const confirmationCodeOf = (item: { workflowState: string; confirmationCode: string }) =>
+  item.workflowState === SubmissionWorkflowState.submitted ? item.confirmationCode : null;
+
 const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
   const detail = item as Partial<SubmissionDetailRow>;
   return {
@@ -55,6 +60,7 @@ const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
     updatedAt: item.updatedAt.toISOString(),
     createdBy: detail.createdBy ?? null,
     submittedBy: detail.submittedBy ?? null,
+    confirmationCode: confirmationCodeOf(item),
   };
 };
 
@@ -76,6 +82,7 @@ const toSubmissionListItemDto = (item: SubmissionListRow) => ({
   updatedAt: item.updatedAt.toISOString(),
   createdBy: item.createdBy,
   submittedBy: item.submittedBy,
+  confirmationCode: confirmationCodeOf(item),
 });
 
 export function createSubmissionsApiService(submissionService: SubmissionService) {

@@ -1,60 +1,17 @@
 import { NextFunction, Request, RequestHandler, Response } from 'express';
 import { AppError, NotFoundError } from '../errors';
 import { log } from '../logging';
+import { hasPgCode, PG_UNIQUE_VIOLATION, pgErrorFields } from '../db/pgError';
 
 export interface ErrorHttpResponse {
   statusCode: number;
   body: { error: string };
 }
 
-const PG_UNIQUE_VIOLATION = '23505';
 // Text the column type can't hold: invalid text representation (a non-uuid id), and a character the
 // database encoding rejects (a NUL in text).
 const PG_INVALID_INPUT = ['22P02', '22021', '22P05'];
 const INTERNAL_ERROR = 'Internal server error';
-
-// Drizzle wraps the driver error, so the pg code can sit on the cause chain, not the top level.
-function hasPgCode(err: unknown, codes: readonly string[]): boolean {
-  for (let e: unknown = err, depth = 0; e != null && depth < 5; depth++) {
-    const code = (e as { code?: unknown }).code;
-    if (typeof code === 'string' && codes.includes(code)) return true;
-    e = (e as { cause?: unknown }).cause;
-  }
-  return false;
-}
-
-type PgErrorFields = {
-  name?: string;
-  code: string;
-  table?: string;
-  column?: string;
-  constraint?: string;
-};
-
-const text = (value: unknown): string | undefined =>
-  typeof value === 'string' ? value : undefined;
-
-/**
- * The fields of a Postgres error on the cause chain (pg's DatabaseError carries `severity`); null
- * when there is none. Never the message or query parameters, which carry submitted values.
- */
-function pgErrorFields(err: unknown): PgErrorFields | null {
-  for (let e: unknown = err, depth = 0; e != null && depth < 5; depth++) {
-    const fields = e as { code?: unknown; severity?: unknown };
-    if (typeof fields.code === 'string' && typeof fields.severity === 'string') {
-      const { table, column, constraint } = e as Record<string, unknown>;
-      return {
-        name: err instanceof Error ? err.name : undefined,
-        code: fields.code,
-        table: text(table),
-        column: text(column),
-        constraint: text(constraint),
-      };
-    }
-    e = (e as { cause?: unknown }).cause;
-  }
-  return null;
-}
 
 /**
  * The 4xx status of a request rejected before app code runs: http-errors (body-parser) marks it

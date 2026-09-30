@@ -39,6 +39,8 @@ export const SubmissionListItemSchema = z.object({
   updatedAt: z.string(),
   createdBy: z.string().nullable().optional(),
   submittedBy: z.string().nullable().optional(),
+  // Null until the submission is submitted.
+  confirmationCode: z.string().nullable(),
 });
 
 export const SubmissionResponseSchema = z.object({
@@ -54,6 +56,8 @@ export const SubmissionResponseSchema = z.object({
   updatedAt: z.string(),
   createdBy: z.string().nullable().optional(),
   submittedBy: z.string().nullable().optional(),
+  // Null until the submission is submitted.
+  confirmationCode: z.string().nullable(),
 });
 
 /** Where a save/submit landed: `current` applied it as the live version, `pending` held it for review. */
