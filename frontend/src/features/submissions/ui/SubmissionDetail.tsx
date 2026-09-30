@@ -36,7 +36,8 @@ export function SubmissionDetail({
       <div className="mb-3" data-testid="submission-view-header">
         <h2 className="h5 mb-1">{submission.formName || dict.form.nameLabel}</h2>
         <div>
-          {dictSub.confirmationId}: {convertSubmissionIdToConfirmationId(submission.id)}
+          {dictSub.confirmationId}:{' '}
+          <strong>{convertSubmissionIdToConfirmationId(submission.id)}</strong>
         </div>
         {showSubmitter ? (
           <div data-testid="submission-view-submitter">

@@ -1,4 +1,5 @@
 export * from './schemas/forms';
+export * from './schemas/formSettings';
 export * from './schemas/submissions';
 export * from './schemas/pagination';
 export * from './sort';
@@ -9,3 +10,4 @@ export * from './schemas/me';
 export * from './schemas/groups';
 export * from './schemas/submit';
 export * from './schemas/meta';
+export * from './schemas/tenants';

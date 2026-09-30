@@ -8,16 +8,20 @@ const getSobaForm = vi.fn();
 const lookupFormVersions = vi.fn();
 const getSobaFormVersion = vi.fn();
 const getFormVersionSchema = vi.fn();
+const createFormVersion = vi.fn();
+const saveFormVersionSchema = vi.fn();
 vi.mock('@/src/shared/api/sobaApi', () => ({
   getSobaForm: (...args: unknown[]) => getSobaForm(...args),
   lookupFormVersions: (...args: unknown[]) => lookupFormVersions(...args),
   getSobaFormVersion: (...args: unknown[]) => getSobaFormVersion(...args),
   getFormVersionSchema: (...args: unknown[]) => getFormVersionSchema(...args),
+  createFormVersion: (...args: unknown[]) => createFormVersion(...args),
+  saveFormVersionSchema: (...args: unknown[]) => saveFormVersionSchema(...args),
 }));
 
 import makeStore from '@/lib/store';
 import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
-import { useForm } from '@/src/features/designer/useForm';
+import { useForm, useFormWriter } from '@/src/features/designer/data/useForm';
 
 const V1 = { id: 'v1', versionNo: 1, state: 'published' };
 const V2 = { id: 'v2', versionNo: 2, state: 'draft' };
@@ -81,6 +85,38 @@ describe('useForm', () => {
 
     act(() => result.current.discardEdits());
     expect(result.current.editsStale).toBe(false);
+  });
+
+  // A new version takes the templates of the version its schema came from.
+  it('names the version the unsaved schema edits were made on as their source', async () => {
+    const { result } = renderHook(() => useForm('f1'), { wrapper });
+    await waitFor(() => expect(result.current.currentVersion?.id).toBe('v2'));
+    expect(result.current.schemaVersionId).toBe('v2');
+
+    act(() => result.current.setSchema({ components: [{ key: 'edited' }] } as never));
+    getSobaForm.mockResolvedValue({ id: 'f1', name: 'Form', description: '', currentVersion: V3 });
+    await act(async () => {
+      await result.current.refreshForm();
+    });
+
+    await waitFor(() => expect(result.current.currentVersion?.id).toBe('v3'));
+    expect(result.current.schemaVersionId).toBe('v2');
+
+    act(() => result.current.discardEdits());
+    expect(result.current.schemaVersionId).toBe('v3');
+  });
+
+  it('restores a version as a new draft from that version', async () => {
+    createFormVersion.mockResolvedValue({ id: 'v3', versionNo: 3, state: 'draft' });
+    saveFormVersionSchema.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useFormWriter('f1'), { wrapper });
+
+    await act(async () => {
+      await result.current.restoreVersion('token', 'v1');
+    });
+
+    expect(getFormVersionSchema).toHaveBeenCalledWith('token', 'v1');
+    expect(createFormVersion).toHaveBeenCalledWith('token', 'f1', 'v1');
   });
 
   it('opens an older version as history, read by id', async () => {

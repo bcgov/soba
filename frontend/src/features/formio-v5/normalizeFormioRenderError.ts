@@ -1,4 +1,4 @@
-import { isSessionExpired } from '@/src/shared/api/sobaFetch';
+import { isSessionExpired } from '@/src/shared/api/dataError';
 
 /**
  * Turn Form.io `@formio/react` <Form /> `onError` payloads into a single user-facing string.

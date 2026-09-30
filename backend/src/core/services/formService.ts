@@ -1,3 +1,4 @@
+import type { SortLocale } from '@soba/lib';
 import {
   createForm,
   FormRecord,
@@ -37,6 +38,7 @@ interface ListInput {
   q?: string;
   status?: string;
   sort: FormListSort;
+  locale: SortLocale;
 }
 
 interface CreateInput {

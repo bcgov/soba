@@ -1,5 +1,5 @@
 // Design-mode API service: form authoring + submission management. All calls hit /design/* and
-// require a staff token. Public form read/submit lives in sobaApiSubmit.
+// require a staff token. Submit-mode calls live in sobaApiSubmit.
 import { sobaFetch } from './sobaFetch';
 import { parseJson } from './sobaHelpers';
 import { FormType } from '@formio/react';
@@ -16,6 +16,7 @@ import type {
 } from '../../types/forms';
 import type { ListSubmissionsResponse, SubmissionListItem } from '@/src/types/submissions';
 import { toListRequestQuery, type ListQueryArgs } from '@/src/types/list';
+import { sortLocaleHeaders } from './sortLocaleRequest';
 
 export async function createSobaFormioForm(
   token: string,
@@ -70,6 +71,7 @@ export async function getSobaForms(
   const response = await sobaFetch('/design/forms', {
     token,
     query: { ...toListRequestQuery(args), workspaceId: args.workspaceId },
+    headers: sortLocaleHeaders(args.locale),
   });
   return parseJson(response);
 }
@@ -87,6 +89,7 @@ export async function getSobaSubmissions(
       workspaceId: args.workspaceId,
       workflowState: args.workflowState,
     },
+    headers: sortLocaleHeaders(args.locale),
   });
   return parseJson(response);
 }
@@ -136,15 +139,19 @@ export async function getSobaFormVersionPage(
   return parseJson(response);
 }
 
-/** Create a new (empty) form version draft for a form. */
+/**
+ * Create a new form version draft for a form. `fromFormVersionId`: the version whose document
+ * templates the draft gets.
+ */
 export async function createFormVersion(
   token: string,
   formId: string,
+  fromFormVersionId?: string,
 ): Promise<SobaFormVersionType> {
   const response = await sobaFetch(FORM_VERSIONS_PATH, {
     token,
     method: 'POST',
-    json: { formId },
+    json: { formId, fromFormVersionId },
   });
   return parseJson(response);
 }

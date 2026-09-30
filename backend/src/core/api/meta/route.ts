@@ -1,6 +1,7 @@
 import express from 'express';
 import { validateRequest } from '../shared/validation';
 import { requireFeature } from '../../middleware/requireFeature';
+import { coreErrorHandler, notFoundHandler } from '../../middleware/errorHandler';
 import { Features } from '../../db/codes';
 import {
   getBuildMeta,
@@ -35,5 +36,7 @@ router.get('/frontend-config', getFrontendConfigMeta);
 router.get('/files-config', requireFeature(Features.files), getFilesConfigMeta);
 router.get('/codes', validateRequest({ query: ListCodesQuerySchema }), getCodesMeta);
 router.get('/roles', validateRequest({ query: ListRolesQuerySchema }), getRolesMeta);
+router.use(notFoundHandler);
+router.use(coreErrorHandler);
 
 export { router as metaRouter };

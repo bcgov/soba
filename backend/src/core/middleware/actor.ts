@@ -9,7 +9,7 @@ import type { CallerIdentity } from '../db/repos/formSubmitAccessRepo';
 import { findOrCreateUserByIdentity } from '../db/repos/membershipRepo';
 import { isSobaAdmin, upsertSobaAdminFromIdp } from '../db/repos/sobaAdminRepo';
 import { ValidationError } from '../errors';
-import { profileHelpers } from '../auth/jwtClaims';
+import { profileHelpers, type IdpAttributes } from '../auth/jwtClaims';
 import { getPublicUser } from '../services/publicUser';
 import { PUBLIC_PROVIDER_CODE } from '../db/codes';
 
@@ -23,11 +23,17 @@ export const getActorId = (req: Request): string | null => req.actorId ?? null;
 export const getActorIdpCode = (req: Request): string | null =>
   req.user?.providerCode?.toLowerCase() ?? null;
 
-/** The caller's identity for audience checks: resolved actor id and provider code (`public` if anon). */
+/**
+ * The caller's identity for submit-mode access checks: resolved actor id and provider code (`public`
+ * if anon).
+ */
 export const resolveCaller = (req: Request): CallerIdentity => ({
   actorId: req.actorId ?? null,
   idpCode: getActorIdpCode(req) ?? req.idpType?.toLowerCase() ?? null,
 });
+
+/** The caller's IdP claims for the current session (from the verified JWT); empty when anonymous. */
+export const getActorIdpAttributes = (req: Request): IdpAttributes => req.user?.idpAttributes ?? {};
 
 export function resolveActor(req: Request, res: Response, next: NextFunction): void {
   const pluginCode = (req as Request & { idpPluginCode?: string }).idpPluginCode;

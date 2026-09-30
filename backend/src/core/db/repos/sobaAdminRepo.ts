@@ -1,5 +1,5 @@
 import { and, count, eq, ilike, sql } from 'drizzle-orm';
-import { SOBA_ADMIN_SORT_FIELDS, type SortToken } from '@soba/lib';
+import { SOBA_ADMIN_SORT_FIELDS, type SortLocale, type SortToken } from '@soba/lib';
 import { db } from '../client';
 import { appUsers, sobaAdmins } from '../schema';
 import { likePattern, orderByForSort, type SortColumns } from '../listSort';
@@ -24,7 +24,7 @@ export type SobaAdminListSort = SortToken<SobaAdminListSortField>;
 
 const SOBA_ADMIN_SORT_COLUMNS: SortColumns<SobaAdminListSortField> = {
   // A user who has never signed in has no label yet.
-  displayLabel: { column: appUsers.displayLabel, nullable: true, caseInsensitive: true },
+  displayLabel: { column: appUsers.displayLabel, nullable: true, linguistic: true },
   source: { column: sobaAdmins.source },
   // Only an IdP-sourced grant is synced; a direct grant has no timestamp.
   syncedAt: { column: sobaAdmins.syncedAt, nullable: true },
@@ -34,6 +34,7 @@ export interface ListSobaAdminsInput {
   offset: number;
   limit: number;
   sort: SobaAdminListSort;
+  locale: SortLocale;
   source?: string;
   q?: string;
 }
@@ -63,7 +64,9 @@ export async function listSobaAdmins(
       .from(sobaAdmins)
       .innerJoin(appUsers, eq(appUsers.id, sobaAdmins.userId))
       .where(where)
-      .orderBy(...orderByForSort(SOBA_ADMIN_SORT_COLUMNS, input.sort, sobaAdmins.userId))
+      .orderBy(
+        ...orderByForSort(SOBA_ADMIN_SORT_COLUMNS, input.sort, sobaAdmins.userId, input.locale),
+      )
       .limit(input.limit)
       .offset(input.offset);
     const totals = await tx

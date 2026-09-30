@@ -26,10 +26,10 @@ export const listWorkspaces = asyncHandler(async (req: Request, res: Response) =
   if (!actorId) {
     throw new ValidationError(MISSING_ACTOR_IDENTITY);
   }
-  const result = await workspacesApiService.list(
-    actorId,
-    req.query as unknown as ListWorkspacesQuery,
-  );
+  const result = await workspacesApiService.list(actorId, {
+    ...(req.query as unknown as ListWorkspacesQuery),
+    locale: req.sortLocale!,
+  });
   res.json(result);
 });
 
@@ -38,10 +38,10 @@ export const lookupWorkspaces = asyncHandler(async (req: Request, res: Response)
   if (!actorId) {
     throw new ValidationError(MISSING_ACTOR_IDENTITY);
   }
-  const result = await workspacesApiService.lookup(
-    actorId,
-    req.query as unknown as WorkspaceLookupQuery,
-  );
+  const result = await workspacesApiService.lookup(actorId, {
+    ...(req.query as unknown as WorkspaceLookupQuery),
+    locale: req.sortLocale!,
+  });
   res.json(result);
 });
 

@@ -1,6 +1,5 @@
 'use client';
 import { useCallback, useEffect, useRef } from 'react';
-import { useSWRConfig } from 'swr';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Dropdown } from 'react-bootstrap';
@@ -12,7 +11,7 @@ import { useDictionary } from '../[lang]/Providers';
 import { LoginButton } from './LoginButton';
 import { LanguageSelector, type LanguageOption } from './LanguageSelector';
 import { WorkspaceModal, WORKSPACE_MODAL_DISMISSED_KEY } from '@/src/components/WorkspaceModal';
-import { forgetListQueries } from '@/src/shared/list/listQueryMemory';
+import { useClearSessionData } from '@/src/shared/api/useClearSessionData';
 import { removeSessionValues } from '@/src/shared/storage/sessionStore';
 import { isIdentityEnded } from '@/src/shared/auth/sessionIdentity';
 
@@ -34,7 +33,7 @@ function Header({ designMode }: Readonly<HeaderProps>) {
   const { authenticated, idTokenParsed, token, logout, init, refresh, initStarted, initializing } =
     useKeycloak();
   const currentUser = useCurrentUser();
-  const { mutate } = useSWRConfig();
+  const clearSessionData = useClearSessionData();
 
   const headerChromeRef = useRef<HTMLDivElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -61,15 +60,13 @@ function Header({ designMode }: Readonly<HeaderProps>) {
     return () => observer.disconnect();
   }, []);
 
-  // The cache and this tab's view state outlive the session. The next person signing in here would
-  // otherwise be served the previous user's workspaces and their list filters. Revalidating rather
-  // than only emptying: a key still on screen would otherwise hold `undefined` for the life of the
-  // page, because a mounted hook only refetches when its key changes.
+  // The cache and this tab's view state outlive the session, so the next person signing in here
+  // must not be served the previous user's data. The dismissed-modal flag is this feature's, so it
+  // is cleared here rather than in the shared session-data hook.
   const clearSessionState = useCallback(() => {
-    void mutate(() => true, undefined, { revalidate: true });
+    clearSessionData();
     removeSessionValues((key) => key === WORKSPACE_MODAL_DISMISSED_KEY);
-    forgetListQueries();
-  }, [mutate]);
+  }, [clearSessionData]);
 
   useEffect(() => {
     const currentSubject =

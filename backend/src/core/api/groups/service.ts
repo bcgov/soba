@@ -1,3 +1,4 @@
+import type { SortLocale } from '@soba/lib';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { GroupMemberKind, PUBLIC_PROVIDER_CODE, SystemGroup } from '../../db/codes';
 import { GROUP_NAME_TAKEN } from '../../messages';
@@ -27,6 +28,7 @@ import {
 export interface GroupsContextInput {
   workspaceId: string;
   actorDisplayLabel: string | null;
+  locale: SortLocale;
 }
 
 export type AddMemberInput = { kind: 'user'; membershipId: string } | { kind: 'idp'; code: string };
@@ -66,8 +68,8 @@ async function assertNameFree(
   }
 }
 
-async function loadGroup(workspaceId: string, groupId: string): Promise<WorkspaceGroupRow> {
-  const group = await getWorkspaceGroup(workspaceId, groupId);
+async function loadGroup(ctx: GroupsContextInput, groupId: string): Promise<WorkspaceGroupRow> {
+  const group = await getWorkspaceGroup(ctx.workspaceId, groupId, ctx.locale);
   if (!group) {
     throw new NotFoundError(GROUP_NOT_FOUND);
   }
@@ -75,8 +77,8 @@ async function loadGroup(workspaceId: string, groupId: string): Promise<Workspac
 }
 
 export class GroupsApiService {
-  async list(workspaceId: string) {
-    const items = await listWorkspaceGroups(workspaceId);
+  async list(ctx: GroupsContextInput) {
+    const items = await listWorkspaceGroups(ctx.workspaceId, ctx.locale);
     return { items };
   }
 
@@ -93,7 +95,7 @@ export class GroupsApiService {
       roleCodes: input.roleCodes,
       displayLabel: ctx.actorDisplayLabel,
     });
-    return loadGroup(ctx.workspaceId, groupId);
+    return loadGroup(ctx, groupId);
   }
 
   async rename(
@@ -111,7 +113,7 @@ export class GroupsApiService {
       description: input.description,
       displayLabel: ctx.actorDisplayLabel,
     });
-    return loadGroup(ctx.workspaceId, groupId);
+    return loadGroup(ctx, groupId);
   }
 
   async remove(ctx: GroupsContextInput, groupId: string) {
@@ -134,7 +136,7 @@ export class GroupsApiService {
       roleCodes,
       displayLabel: ctx.actorDisplayLabel,
     });
-    return loadGroup(ctx.workspaceId, groupId);
+    return loadGroup(ctx, groupId);
   }
 
   async addMember(ctx: GroupsContextInput, groupId: string, input: AddMemberInput) {
@@ -144,7 +146,7 @@ export class GroupsApiService {
     } else {
       await addUserMember(ctx, groupId, systemCode, input.membershipId);
     }
-    return loadGroup(ctx.workspaceId, groupId);
+    return loadGroup(ctx, groupId);
   }
 
   async removeMember(ctx: GroupsContextInput, groupId: string, memberId: string) {
@@ -161,7 +163,7 @@ export class GroupsApiService {
     if (!removed) {
       throw new NotFoundError('Group member not found');
     }
-    return loadGroup(ctx.workspaceId, groupId);
+    return loadGroup(ctx, groupId);
   }
 }
 

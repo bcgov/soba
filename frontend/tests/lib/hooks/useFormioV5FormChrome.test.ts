@@ -12,12 +12,13 @@ describe('useFormioV5FormChrome', () => {
     vi.unstubAllEnvs();
   });
 
-  it('loads the Form.io stylesheet from under the base path', () => {
+  it('loads the Form.io stylesheets from under the base path', () => {
     vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/designer');
     const { unmount } = renderHook(() => useFormioV5FormChrome('build'));
 
     expect(document.getElementById('soba-formio-styles')?.textContent).toBe(
-      '@import url("/designer/formio-v5/formio.full.min.css") layer(formio);',
+      '@import url("/designer/formio-v5/formio.full.min.css") layer(formio);\n' +
+        '@import url("/designer/formio-v5/bcgov-file.css") layer(formio);',
     );
     unmount();
   });

@@ -16,6 +16,7 @@ import {
   searchQueryField,
   OffsetPageSchema,
   OFFSET_DRIFT_NOTE,
+  sortLocaleQueryField,
 } from '../shared/offsetPagination';
 import { LOOKUP_NOTE } from '../shared/lookup';
 import { WORKSPACE_NAME_TAKEN } from '../../messages';
@@ -44,6 +45,7 @@ export const ListWorkspacesQuerySchema = z
     }),
     requiredPermission: z.string().trim().min(1).optional(),
     sort: WorkspaceSortSchema.default('name:asc'),
+    locale: sortLocaleQueryField,
   })
   .openapi('Workspaces_ListWorkspacesQuery');
 
@@ -60,6 +62,7 @@ export const WorkspaceLookupQuerySchema = z
     q: searchQueryField.openapi({
       description: 'Matches anywhere in the workspace name or organization.',
     }),
+    locale: sortLocaleQueryField,
     requiredPermissions: z
       .string()
       .trim()

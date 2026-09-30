@@ -1,5 +1,7 @@
 import express from 'express';
 import { validateRequest } from '../shared/validation';
+import { SortLocaleQuerySchema } from '../shared/offsetPagination';
+import { sortLocale } from '../../middleware/sortLocale';
 import {
   workspaceFromBody,
   workspaceListScope,
@@ -63,6 +65,7 @@ const formFromBodyResource = workspaceFromResource({ kind: 'form', idFrom: 'body
 router.get(
   FORMS_PATH,
   validateRequest({ query: ListFormsQuerySchema }),
+  sortLocale,
   workspaceListScope({ anchorOrder: ['formId', 'workspaceId'], allowEmpty: true }),
   requireFormPermissions([Permissions.form_read]),
   listForms,
@@ -97,14 +100,20 @@ router.patch(
 );
 router.get(
   FORM_SUBMITTER_AUDIENCE_PATH,
-  validateRequest({ params: FormIdParamsSchema }),
+  validateRequest({ query: SortLocaleQuerySchema, params: FormIdParamsSchema }),
+  sortLocale,
   formResource,
   requireFormPermissions([Permissions.form_read]),
   getFormSubmitterAudience,
 );
 router.put(
   FORM_SUBMITTER_AUDIENCE_PATH,
-  validateRequest({ params: FormIdParamsSchema, body: SetFormSubmitterAudienceBodySchema }),
+  validateRequest({
+    query: SortLocaleQuerySchema,
+    params: FormIdParamsSchema,
+    body: SetFormSubmitterAudienceBodySchema,
+  }),
+  sortLocale,
   formResource,
   requireFormPermissions([Permissions.form_update]),
   setFormSubmitterAudience,

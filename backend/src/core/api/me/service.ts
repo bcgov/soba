@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { FormCreateCapability, MeResponse } from '@soba/lib';
+import type { FormCreateCapability, ListTenantsResponse, MeResponse } from '@soba/lib';
 import { findAppUserById, updateAppUserProfile } from '../../db/repos/appUserRepo';
 import { toAppUserView } from '../../db/appUserView';
 import { canCreateWorkspaceByIdp } from '../../db/repos/idpGroupRepo';
@@ -9,8 +9,14 @@ import {
   hasActiveMembership,
 } from '../../db/repos/membershipRepo';
 import { FormCreatePermissions } from '../../db/codes';
-import { profileHelpers, type StoredProfile } from '../../auth/jwtClaims';
-import { ForbiddenError } from '../../errors';
+import { profileHelpers, type IdpAttributes, type StoredProfile } from '../../auth/jwtClaims';
+import {
+  createDefaultTenantEngineAdapter,
+  resolveDefaultTenantEngineCode,
+} from '../../integrations/tenant/TenantEngineRegistry';
+import type { TenantEngineAdapter } from '../../integrations/tenant/TenantEngineAdapter';
+import { ForbiddenError, ServiceUnavailableError } from '../../errors';
+import { log } from '../../logging';
 import { PatchMeBodySchema } from './schema';
 
 type PatchMeBody = z.infer<typeof PatchMeBodySchema>;
@@ -109,6 +115,23 @@ export class MeApiService {
     const updated = await updateAppUserProfile(actorId, nextProfile, updatedBy);
     if (!updated) return null;
     return this.toResponse(updated, idpCode, isSobaAdmin);
+  }
+
+  /** The caller's tenants from the default tenant engine, fetched with the caller's own token. */
+  async listTenants(token: string, claims: IdpAttributes): Promise<ListTenantsResponse> {
+    let adapter: TenantEngineAdapter;
+    try {
+      adapter = createDefaultTenantEngineAdapter();
+    } catch (err) {
+      // Missing config or an uninstalled default code; the detail names env vars, so it stays in the log.
+      log.error(
+        { err, engine: resolveDefaultTenantEngineCode() },
+        'Tenant engine could not be created',
+      );
+      throw new ServiceUnavailableError('Tenant engine is unavailable');
+    }
+    const tenants = await adapter.getTenants({ token, claims });
+    return { tenants };
   }
 }
 

@@ -32,6 +32,10 @@ jest.mock('../../../src/core/db/repos/workspaceRepo', () => ({
   getWorkspaceById: jest.fn(),
 }));
 
+jest.mock('../../../src/core/db/repos/documentTemplateRepo', () => ({
+  getDocumentTemplateScope: jest.fn(),
+}));
+
 import type { NextFunction, Request, Response } from 'express';
 import {
   openWorkspaceFromResource,
@@ -45,6 +49,7 @@ import { getFormListContext } from '../../../src/core/db/repos/formRepo';
 import { getFormVersionListContext } from '../../../src/core/db/repos/formVersionRepo';
 import { getSubmissionListContext } from '../../../src/core/db/repos/submissionRepo';
 import { getWorkspaceById } from '../../../src/core/db/repos/workspaceRepo';
+import { getDocumentTemplateScope } from '../../../src/core/db/repos/documentTemplateRepo';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../src/core/errors';
 
 function selectChain(result: unknown) {
@@ -97,6 +102,7 @@ beforeEach(() => {
   jest.mocked(getFormListContext).mockReset();
   jest.mocked(getFormVersionListContext).mockReset();
   jest.mocked(getSubmissionListContext).mockReset();
+  jest.mocked(getDocumentTemplateScope).mockReset();
   // Default: actor display label lookup.
   selectMock.mockReturnValue(selectChain([{ displayLabel: 'Actor One' }]));
 });
@@ -375,6 +381,61 @@ describe('workspaceFromResource (resources under a form)', () => {
       formId: 'form1',
       workspaceSource: 'resource:submission',
     });
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('carries the form of a template', async () => {
+    jest
+      .mocked(getDocumentTemplateScope)
+      .mockResolvedValue({ workspaceId: 'ws9', formId: 'form1' });
+    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws9'));
+    const req = makeReq({ params: { id: 't1' } as Request['params'] });
+    const next = jest.fn() as unknown as NextFunction;
+
+    await workspaceFromResource({ kind: 'template', idFrom: 'paramsId' })(
+      req,
+      makeRes() as Response,
+      next,
+    );
+
+    expect(getDocumentTemplateScope).toHaveBeenCalledWith('t1');
+    expect(req.coreContext).toMatchObject({
+      workspaceId: 'ws9',
+      formId: 'form1',
+      workspaceSource: 'resource:template',
+    });
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('returns 404 for a template that is missing or on a deleted form version', async () => {
+    jest.mocked(getDocumentTemplateScope).mockResolvedValue(null);
+    const next = jest.fn() as unknown as NextFunction;
+
+    await workspaceFromResource({ kind: 'template', idFrom: 'paramsId' })(
+      makeReq({ params: { id: 't1' } as Request['params'] }),
+      makeRes() as Response,
+      next,
+    );
+
+    expect(next).toHaveBeenCalledWith(expect.any(NotFoundError));
+  });
+
+  it('reads a form version id from the query', async () => {
+    jest
+      .mocked(getFormVersionListContext)
+      .mockResolvedValue({ workspaceId: 'ws9', formId: 'form1' });
+    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws9'));
+    const req = makeReq({ query: { formVersionId: 'fv1' } as Request['query'] });
+    const next = jest.fn() as unknown as NextFunction;
+
+    await workspaceFromResource({ kind: 'formVersion', idFrom: 'queryFormVersionId' })(
+      req,
+      makeRes() as Response,
+      next,
+    );
+
+    expect(getFormVersionListContext).toHaveBeenCalledWith('fv1');
+    expect(req.coreContext).toMatchObject({ workspaceId: 'ws9', formId: 'form1' });
     expect(next).toHaveBeenCalledWith();
   });
 });

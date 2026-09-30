@@ -13,7 +13,9 @@ import type {
   UpdateWorkspaceBody,
 } from '../../types/workspaces';
 import type { CurrentUserResponse } from '../../types/user';
+import type { SortLocale } from '@soba/lib/sort';
 import type { ListQueryArgs } from '../../types/list';
+import { sortLocaleHeaders } from './sortLocaleRequest';
 
 export type { SobaFormType, WorkspaceItem, WorkspacesResponse, CurrentUserResponse };
 // Design-mode (staff, /design/*)
@@ -165,7 +167,9 @@ export async function fetchWorkspaces(
       limit: options.limit,
       sort: options.sort,
       q: options.q || undefined,
+      locale: options.locale,
     },
+    headers: sortLocaleHeaders(options.locale),
   });
   return parseJson(response);
 }
@@ -173,14 +177,20 @@ export async function fetchWorkspaces(
 /** Workspaces for a select. The caller must hold every one of `requiredPermissions`. */
 export async function lookupWorkspaces(
   token: string,
-  options: { requiredPermissions?: readonly string[]; disclaimerAccepted?: boolean } = {},
+  options: {
+    requiredPermissions?: readonly string[];
+    disclaimerAccepted?: boolean;
+    locale?: SortLocale;
+  } = {},
 ): Promise<WorkspaceLookupResponse> {
   const response = await sobaFetch('/workspaces/lookup', {
     token,
     query: {
       requiredPermissions: options.requiredPermissions?.join(','),
       disclaimerAccepted: options.disclaimerAccepted,
+      locale: options.locale,
     },
+    headers: sortLocaleHeaders(options.locale),
   });
   return parseJson(response);
 }

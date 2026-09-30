@@ -3,8 +3,10 @@ import { z } from 'zod';
 import {
   SubmissionListItemSchema as SobaSubmissionListItemSchema,
   SubmissionDataBodySchema as SobaSubmissionDataBodySchema,
+  SubmitSubmissionBodySchema as SobaSubmitSubmissionBodySchema,
   OpenSubmissionBodySchema as SobaOpenSubmissionBodySchema,
   SubmissionResponseSchema as SobaSubmissionResponseSchema,
+  SubmissionRevisionInfoSchema as SobaSubmissionRevisionInfoSchema,
   ListSubmissionsResponseSchema as SobaListSubmissionsResponseSchema,
   SubmissionSortSchema as SobaSubmissionSortSchema,
 } from '@soba/lib';
@@ -15,6 +17,7 @@ import {
   searchQueryField,
   OffsetPageSchema,
   OFFSET_DRIFT_NOTE,
+  sortLocaleQueryField,
 } from '../shared/offsetPagination';
 import {
   workspaceIdQueryField,
@@ -43,9 +46,14 @@ export const SubmissionIdParamsSchema = z
   })
   .openapi('Submissions_SubmissionIdParams');
 
-// The answer-data body, shared by save (draft) and submit.
+// The save body.
 export const SubmissionDataBodySchema = SobaSubmissionDataBodySchema.clone().openapi(
   'Submissions_SubmissionDataBody',
+);
+
+// The submit body.
+export const SubmitSubmissionBodySchema = SobaSubmitSubmissionBodySchema.clone().openapi(
+  'Submissions_SubmitSubmissionBody',
 );
 
 export const SubmissionSortSchema = SobaSubmissionSortSchema.clone().openapi(
@@ -68,6 +76,7 @@ export const ListSubmissionsQuerySchema = requireAtLeastOneQueryField(
       description: 'Matches anywhere in the form name or the submission id.',
     }),
     sort: SubmissionSortSchema.default('updatedAt:desc'),
+    locale: sortLocaleQueryField,
   }),
   ['workspaceId', 'formId', 'formVersionId', 'submissionId'],
   'At least one of workspaceId, formId, formVersionId, or submissionId is required',
@@ -80,6 +89,15 @@ export const SubmissionListItemSchema = SobaSubmissionListItemSchema.clone().ope
 export const SubmissionResponseSchema = SobaSubmissionResponseSchema.clone().openapi(
   'Submissions_SubmissionResponse',
 );
+
+export const SubmissionRevisionInfoSchema = SobaSubmissionRevisionInfoSchema.clone().openapi(
+  'Submissions_SubmissionRevisionInfo',
+);
+
+// Save/submit response: the submission plus the revision this write produced (current or pending).
+export const SubmissionWriteResponseSchema = SobaSubmissionResponseSchema.extend({
+  revision: SubmissionRevisionInfoSchema,
+}).openapi('Submissions_SubmissionWriteResponse');
 
 export const ListSubmissionsResponseSchema = SobaListSubmissionsResponseSchema.extend({
   items: z.array(SubmissionListItemSchema),

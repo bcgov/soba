@@ -1,4 +1,5 @@
 import type { NormalizedProfile, IdpAttributes } from '../core/auth/jwtClaims';
+import type { SortLocale } from '@soba/lib';
 import type { CoreRequestContext, CoreListScope } from '../core/middleware/requestContext';
 
 declare global {
@@ -21,6 +22,7 @@ declare global {
       idpPluginCode?: string;
       coreContext?: CoreRequestContext;
       listScope?: CoreListScope;
+      sortLocale?: SortLocale;
       actorId?: string;
       isSobaAdmin?: boolean;
     }

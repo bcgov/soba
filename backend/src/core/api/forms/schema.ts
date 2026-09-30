@@ -25,6 +25,8 @@ import {
   searchQueryField,
   OffsetPageSchema,
   OFFSET_DRIFT_NOTE,
+  sortLocaleQueryField,
+  SortLocaleQuerySchema,
 } from '../shared/offsetPagination';
 import { FORM_NAME_TAKEN } from '../../messages';
 import {
@@ -67,6 +69,9 @@ export const FormVersionListItemSchema = SobaFormVersionListItemSchema.clone().o
 export const CreateFormVersionBodySchema = z
   .object({
     formId: z.string().min(1),
+    fromFormVersionId: z.uuid().optional().openapi({
+      description: 'The version whose document templates the draft gets.',
+    }),
   })
   .openapi('Forms_CreateFormVersionBody');
 
@@ -132,6 +137,7 @@ export const ListFormsQuerySchema = z
     q: searchQueryField.openapi({ description: 'Matches anywhere in the form name.' }),
     status: z.string().trim().min(1).optional(),
     sort: FormSortSchema.default('createdAt:desc'),
+    locale: sortLocaleQueryField,
   })
   .openapi('Forms_ListFormsQuery');
 
@@ -341,7 +347,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
     path: `${FORM_PATH}/submitter-audience`,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
-    request: { params: FormIdParamsSchema },
+    request: { query: SortLocaleQuerySchema, params: FormIdParamsSchema },
     responses: {
       200: {
         description: "The form's submit audience: inherited from the workspace or overridden",
@@ -358,6 +364,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
     tags: [TAG],
     security: [{ bearerAuth: [] }],
     request: {
+      query: SortLocaleQuerySchema,
       params: FormIdParamsSchema,
       body: { content: { 'application/json': { schema: SetFormSubmitterAudienceBodySchema } } },
     },

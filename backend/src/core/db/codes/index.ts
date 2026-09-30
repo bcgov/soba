@@ -111,9 +111,37 @@ export const SubmissionEventType = {
   opened: 'opened',
   saved: 'saved',
   submitted: 'submitted',
+  deleted: 'deleted',
 } as const;
 export type SubmissionEventTypeCode =
   (typeof SubmissionEventType)[keyof typeof SubmissionEventType];
+/** The events a submitter's save or submit records. Open and delete have their own paths. */
+export type SubmissionWriteEventCode = Extract<SubmissionEventTypeCode, 'saved' | 'submitted'>;
+
+/**
+ * Standing of a revision within its submission (submission_revision.status).
+ * current — the submission's live version. superseded — a former current, replaced by a later one.
+ * pending — a conflicting or post-submit write held for staff to resolve; not on the current chain.
+ */
+export const RevisionStatus = {
+  current: 'current',
+  superseded: 'superseded',
+  pending: 'pending',
+} as const;
+export type RevisionStatusCode = (typeof RevisionStatus)[keyof typeof RevisionStatus];
+
+/**
+ * Why a revision holds its status (submission_revision.reason).
+ * accepted — applied as the current version. replaced — superseded by a later current version.
+ * conflict — its base was no longer the head. closed — the submission was already submitted.
+ */
+export const RevisionReason = {
+  accepted: 'accepted',
+  replaced: 'replaced',
+  conflict: 'conflict',
+  closed: 'closed',
+} as const;
+export type RevisionReasonCode = (typeof RevisionReason)[keyof typeof RevisionReason];
 
 export const FeatureStatus = {
   enabled: 'enabled',
@@ -125,13 +153,16 @@ export type FeatureStatusCode = (typeof FeatureStatus)[keyof typeof FeatureStatu
 
 /**
  * Feature codes backed by the soba.feature table. Most gate a mounted API surface via
- * requireFeature and mirror the frontend FEATURE_CODES; antivirus is backend-only and gates
- * scan-on-upload behaviour inside the files surface rather than a surface of its own.
+ * requireFeature and mirror the frontend FEATURE_CODES. Templates, dev-data, antivirus and the
+ * per-backend document generation codes have no frontend code; antivirus gates the upload scan in
+ * the core file store rather than a surface of its own.
  */
 export const Features = {
   design_mode: 'design-mode',
   submit_mode: 'submit-mode',
   files: 'files',
+  /** Document templates stored per form version, managed by staff. */
+  templates: 'templates',
   antivirus: 'antivirus',
   /** Umbrella: gates the document-generation surface within submit. */
   document_generation: 'document-generation',
@@ -262,6 +293,25 @@ export const FormGroupOverrideStatus = {
 } as const;
 export type FormGroupOverrideStatusCode =
   (typeof FormGroupOverrideStatus)[keyof typeof FormGroupOverrideStatus];
+
+/**
+ * A user's standing on one submission (submission_participant.role). Owners and collaborators have
+ * the same access.
+ */
+export const SubmissionParticipantRole = {
+  owner: 'owner',
+  collaborator: 'collaborator',
+} as const;
+export type SubmissionParticipantRoleCode =
+  (typeof SubmissionParticipantRole)[keyof typeof SubmissionParticipantRole];
+
+/** Status of a submission_participant row. */
+export const SubmissionParticipantStatus = {
+  active: 'active',
+  inactive: 'inactive',
+} as const;
+export type SubmissionParticipantStatusCode =
+  (typeof SubmissionParticipantStatus)[keyof typeof SubmissionParticipantStatus];
 
 /** Status of a role assigned to a workspace group (workspace_group_role.status). */
 export const WorkspaceGroupRoleStatus = {

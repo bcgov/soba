@@ -8,8 +8,9 @@ import { Tag, TagColor } from '@/src/components/Tag';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import { FORM_VERSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
-import { PAGE_SIZE_OPTIONS, useListQuery } from '@/src/shared/list/useListQuery';
-import { useFormVersionPage } from '../useFormVersions';
+import { useListQuery } from '@/src/shared/list/useListQuery';
+import { useDataTable } from '@/src/shared/list/useDataTable';
+import { useFormVersionPage } from '../data/useFormVersions';
 import type { SobaFormVersionListItem } from '@/src/types/forms';
 import { capitalizeFirstLetter } from '@/src/shared/util/stringUtils';
 
@@ -33,12 +34,13 @@ export default function FormHistoryTab({
   onRestoreVersion,
   onNavigateToDesigner,
 }: Readonly<FormHistoryTabProps>) {
-  const listQuery = useListQuery(FORM_VERSIONS_LIST_QUERY);
-  const { versions, total, isLoading, error } = useFormVersionPage(formId, {
-    offset: listQuery.offset,
-    limit: listQuery.pageSize,
-    sort: listQuery.sort,
+  const query = useListQuery(FORM_VERSIONS_LIST_QUERY);
+  const versionsResult = useFormVersionPage(formId, {
+    offset: query.offset,
+    limit: query.pageSize,
+    sort: query.sort,
   });
+  const { table } = useDataTable(query, versionsResult, dict.form.loadVersionsError);
   const formatLongDate = useFormatLongDate();
 
   const openInDesigner = useCallback(
@@ -126,22 +128,12 @@ export default function FormHistoryTab({
 
   return (
     <DataTable<SobaFormVersionListItem>
-      data={versions}
+      {...table}
       columns={columns}
-      loading={isLoading}
-      error={error ? dict.form.loadVersionsError : null}
       emptyMessage={dict.form.emptyHistory}
       loadingMessage={dict.general.loading}
       itemName="items"
       caption={dict.form.historyTab}
-      pageSize={listQuery.pageSize}
-      currentPage={listQuery.page}
-      totalItems={total}
-      onPageChange={listQuery.setPage}
-      onPageSizeChange={listQuery.setPageSize}
-      pageSizeOptions={PAGE_SIZE_OPTIONS}
-      sort={listQuery.sort}
-      onSortChange={listQuery.setSort}
       keyExtractor={(version) => version.id}
     />
   );

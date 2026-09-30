@@ -19,6 +19,7 @@ import {
   searchQueryField,
   OffsetPageSchema,
   OFFSET_DRIFT_NOTE,
+  sortLocaleQueryField,
 } from '../shared/offsetPagination';
 
 extendZodWithOpenApi(z);
@@ -34,6 +35,7 @@ export const ListSobaAdminsQuerySchema = z
     source: z.string().trim().min(1).optional(),
     q: searchQueryField.openapi({ description: 'Matches anywhere in the admin display label.' }),
     sort: SobaAdminSortSchema.default('displayLabel:asc'),
+    locale: sortLocaleQueryField,
   })
   .openapi('Admin_ListSobaAdminsQuery');
 

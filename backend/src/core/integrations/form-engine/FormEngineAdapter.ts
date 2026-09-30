@@ -28,6 +28,8 @@ export interface CreateSubmissionInput {
   workspaceId: string;
   /** The submission answer data to store. */
   data: Record<string, unknown>;
+  /** False stores the answers without the engine's validation, for a draft that may be incomplete. */
+  validate: boolean;
 }
 
 export interface FormEngineAdapter {

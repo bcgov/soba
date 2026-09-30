@@ -3,7 +3,7 @@ import { FormVersionService } from '../../services/formVersionService';
 import { resolveFormPermissions } from '../../db/repos/formAccessRepo';
 import type { FormListSort } from '../../db/repos/formRepo';
 import type { FormVersionListSort } from '../../db/repos/formVersionRepo';
-import type { FormListItem, FormVersionListItem } from '@soba/lib';
+import type { FormListItem, FormVersionListItem, SortLocale } from '@soba/lib';
 import { LOOKUP_FETCH_LIMIT, toLookupResponse } from '../shared/lookup';
 
 export interface FormsContextInput {
@@ -26,6 +26,7 @@ interface ListFormsQueryInput {
   q?: string;
   status?: string;
   sort: FormListSort;
+  locale: SortLocale;
 }
 
 interface ListFormVersionsQueryInput {
@@ -216,6 +217,7 @@ export function createFormsApiService(
         q: query.q,
         status: query.status,
         sort: query.sort,
+        locale: query.locale,
       });
 
       return {
@@ -279,13 +281,14 @@ export function createFormsApiService(
         }),
       ),
 
-    createDraft: async (ctx: FormsContextInput, formId: string) =>
+    createDraft: async (ctx: FormsContextInput, formId: string, fromFormVersionId?: string) =>
       toFormVersionDto(
         await formVersionService.createDraft({
           workspaceId: ctx.workspaceId,
           actorId: ctx.actorId,
           actorDisplayLabel: ctx.actorDisplayLabel,
           formId,
+          fromFormVersionId,
         }),
       ),
 

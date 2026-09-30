@@ -1,7 +1,7 @@
 import { and, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
-import { FORM_VERSION_SORT_FIELDS, type SortToken } from '@soba/lib';
+import { DEFAULT_SORT_LOCALE, FORM_VERSION_SORT_FIELDS, type SortToken } from '@soba/lib';
 import { db, type DbOrTx } from '../client';
-import { formVersionRevisions, formVersions } from '../schema';
+import { formVersionRevisions, formVersions, forms } from '../schema';
 import { orderByForSort, prefixPattern, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 
@@ -55,6 +55,23 @@ export interface FormVersionListRow {
   createdBy: string | null;
   updatedBy: string | null;
 }
+
+/** Whether the form version exists and neither it nor its form is deleted. */
+export const isLiveFormVersion = async (formVersionId: string): Promise<boolean> => {
+  const rows = await db
+    .select({ id: formVersions.id })
+    .from(formVersions)
+    .innerJoin(forms, eq(forms.id, formVersions.formId))
+    .where(
+      and(
+        eq(formVersions.id, formVersionId),
+        isNull(formVersions.deletedAt),
+        isNull(forms.deletedAt),
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
+};
 
 /**
  * Resolve list-scope context for a form version by id alone. Returns null for missing/deleted versions.
@@ -165,7 +182,14 @@ export const listFormVersionsForWorkspace = async (
       })
       .from(formVersions)
       .where(where)
-      .orderBy(...orderByForSort(FORM_VERSION_SORT_COLUMNS, input.sort, formVersions.id))
+      .orderBy(
+        ...orderByForSort(
+          FORM_VERSION_SORT_COLUMNS,
+          input.sort,
+          formVersions.id,
+          DEFAULT_SORT_LOCALE,
+        ),
+      )
       .limit(input.limit)
       .offset(input.offset);
     const totals = await tx.select({ total: count() }).from(formVersions).where(where);

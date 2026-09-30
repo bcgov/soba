@@ -5,16 +5,8 @@ import { Link } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { SubmissionDetail } from '@/src/features/submissions/ui/SubmissionDetail';
-import {
-  SubmissionLoadAlert,
-  submissionLoadFailure,
-} from '@/src/features/submissions/ui/SubmissionLoadAlert';
-import {
-  getFormVersionSchema,
-  getSobaSubmission,
-  getSobaSubmissionData,
-} from '@/src/shared/api/sobaApi';
-import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
+import { SubmissionLoadAlert } from '@/src/features/submissions/ui/SubmissionLoadAlert';
+import { useDesignSubmission } from '@/src/features/designer/data/useDesignSubmission';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 
 type DesignSubmissionViewProps = {
@@ -31,20 +23,11 @@ export function DesignSubmissionView({
   const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
 
-  const { data, error } = useAuthedSWR(['design-submission', submissionId], async (token) => {
-    const submission = await getSobaSubmission(token, submissionId);
-    const [schema, content] = await Promise.all([
-      getFormVersionSchema(token, submission.formVersionId),
-      getSobaSubmissionData(token, submissionId),
-    ]);
-    return { submission, schema, content };
-  });
+  const { data, error } = useDesignSubmission(submissionId, formId);
 
   const renderContent = () => {
     // A failed background revalidation keeps the submission already on screen.
     if (data) {
-      // The URL names the form; a submission from another form is not found under it.
-      if (data.submission.formId !== formId) return <SubmissionLoadAlert failure="notFound" />;
       return (
         <SubmissionDetail
           submission={data.submission}
@@ -54,7 +37,7 @@ export function DesignSubmissionView({
         />
       );
     }
-    if (error) return <SubmissionLoadAlert failure={submissionLoadFailure(error)} />;
+    if (error) return <SubmissionLoadAlert error={error} />;
     return <CenteredProgress label={dict.general.loading} />;
   };
 

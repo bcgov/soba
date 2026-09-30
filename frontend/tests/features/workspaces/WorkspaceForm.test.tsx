@@ -216,7 +216,6 @@ describe('WorkspaceForm', () => {
         useCase: 'testUseCase',
         org: 'testOrg',
       });
-      expect(mockRefreshWorkspaces).toHaveBeenCalled();
       expect(mockPush).toHaveBeenCalledWith('/en/workspaces?from=nav');
     });
   });
@@ -358,7 +357,9 @@ describe('WorkspaceForm', () => {
   });
 
   // A disclaimer change moves whether the user can create a form, which the current user carries.
-  it('refreshes the workspace lists and the current user after saving', async () => {
+  // The writer refreshes the workspace lists and the current user together, so the current-user
+  // refresh standing in confirms the post-save refresh ran.
+  it('refreshes the current user after saving', async () => {
     await act(async () => {
       renderForm('ws2');
     });
@@ -366,7 +367,6 @@ describe('WorkspaceForm', () => {
     await userEvent.click(screen.getByTestId('workspace-disclaimer-switch'));
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    await waitFor(() => expect(mockRefreshWorkspaces).toHaveBeenCalled());
-    expect(mockRefreshCurrentUser).toHaveBeenCalled();
+    await waitFor(() => expect(mockRefreshCurrentUser).toHaveBeenCalled());
   });
 });

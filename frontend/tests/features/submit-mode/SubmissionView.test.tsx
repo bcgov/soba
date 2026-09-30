@@ -18,10 +18,8 @@ vi.mock('@/app/[lang]/Providers', () => ({
       success: {
         message: 'Submitted successfully.',
         keepConfirmation: 'Keep this ID.',
-        viewSubmission: 'View your submission',
         notSubmitted: 'Not submitted yet.',
       },
-      loading: 'Loading submission...',
       confirmationId: 'Confirmation ID',
       notFound: 'Submission not found.',
       loadError: 'Could not load this submission.',
@@ -33,7 +31,6 @@ vi.mock('@/app/[lang]/Providers', () => ({
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ submissionId: 'sub-1' }),
-  usePathname: () => '/en/submission/sub-1/success',
 }));
 
 vi.mock('@/src/features/formio-v5/ui/ReadOnlyFormView', () => ({
@@ -134,6 +131,7 @@ describe('SubmissionView', () => {
     const form = await screen.findByTestId('submission-view-form');
     const confirmation = screen.getByText('Keep this ID.');
     expect(screen.getByTestId('submission-success')).toHaveTextContent('Submitted successfully.');
+    expect(screen.getByText('sub').tagName).toBe('STRONG');
     expect(confirmation.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );

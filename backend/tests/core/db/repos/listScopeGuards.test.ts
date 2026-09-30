@@ -26,6 +26,7 @@ describe('list repos reject an empty workspace scope', () => {
         offset: 0,
         limit: 20,
         sort: 'createdAt:desc',
+        locale: 'en',
       }),
     ).resolves.toEqual({ items: [], total: 0 });
     expect(selectMock).not.toHaveBeenCalled();
@@ -57,6 +58,7 @@ describe('list repos reject an empty workspace scope', () => {
         offset: 0,
         limit: 20,
         sort: 'updatedAt:desc',
+        locale: 'en',
       }),
     ).resolves.toEqual({ items: [], total: 0 });
     expect(selectMock).not.toHaveBeenCalled();

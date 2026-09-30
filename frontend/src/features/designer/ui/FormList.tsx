@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useCallback, useEffect } from 'react';
+import { useMemo, useCallback, useEffect, useState } from 'react';
 import { Button as DSButton } from '@bcgov/design-system-react-components';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { Tag } from '@/src/components/Tag';
@@ -11,23 +11,24 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useRouter, usePathname } from 'next/navigation';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
-import { getSobaForms } from '@/src/shared/api/sobaApi';
 import type { SobaFormSummary } from '@/src/types/forms';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import { usePageNotices } from '@/src/components/PageHeader';
-import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { useWorkspace, useWorkspaceOptions } from '@/src/shared/api/useWorkspaces';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
+import { classifyDataError, messageForDataError } from '@/src/shared/api/dataError';
+import { useAuthErrorDefaults } from '@/src/shared/api/useDataErrorNotice';
 import { lookupTruncatedNote, withSelectedOption } from '@/src/shared/list/lookupOptions';
 import { FORMS_LIST_QUERY, rememberListQuery } from '@/src/shared/list/listQueryMemory';
-import { PAGE_SIZE_OPTIONS, useListQuery } from '@/src/shared/list/useListQuery';
-import { listReadConfig } from '@/src/shared/api/swrConfig';
+import { useListQuery } from '@/src/shared/list/useListQuery';
+import { useDataTable } from '@/src/shared/list/useDataTable';
+import { useFormsList } from '@/src/features/designer/data/useFormsList';
 import { WorkspaceSelector } from '@/app/ui/WorkspaceSelector';
 import { FaDatabase, FaLink } from 'react-icons/fa6';
 import styles from './FormList.module.css';
-import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';
-import { isForbidden, isNotFound } from '@/src/shared/api/sobaHelpers';
 import type { WorkspaceLookupItem } from '@/src/types/workspaces';
+import { Modal } from '@/src/components/Modal';
+import { FormCreateContent } from './FormCreateContent';
 
 const WORKSPACE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -49,7 +50,7 @@ function useWorkspaceFilter(
   );
   const workspace: WorkspaceLookupItem | null = listed ?? read;
   // Only a refusal says the workspace is not this user's. Any other failure is a failed load.
-  const refused = isForbidden(error) || isNotFound(error);
+  const refused = error?.kind === 'forbidden' || error?.kind === 'notFound';
   return {
     workspace,
     rejected: !!workspaceParam && !workspace && (!paramIsId || refused),
@@ -121,59 +122,36 @@ function FormList() {
   const workspaceRejected = workspaceFilter.rejected;
   const holdFormsRequest = workspaceFilter.holdRequest;
 
-  const {
-    data,
-    isLoading,
-    error: loadError,
-  } = useAuthedSWR(
-    // Wait for the filter to resolve before reading, or the first arrival scopes to no workspace. A
-    // refused or malformed id reads unscoped on purpose: the picker reads "all workspaces" and the
-    // notice says the filter was not applied.
-    holdFormsRequest
-      ? null
-      : [
-          'forms',
-          selectedWorkspaceId ?? null,
-          listQuery.offset,
-          listQuery.pageSize,
-          listQuery.sort,
-          listQuery.q,
-        ],
-    (token) =>
-      getSobaForms(token, {
-        offset: listQuery.offset,
-        limit: listQuery.pageSize,
-        sort: listQuery.sort,
-        q: listQuery.q,
-        workspaceId: selectedWorkspaceId,
-      }),
-    listReadConfig,
-  );
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const forms: SobaFormSummary[] = useMemo(
-    () => (Array.isArray(data?.items) ? data.items : []),
-    [data],
+  // Wait for the filter to resolve before reading, or the first arrival scopes to no workspace. A
+  // refused or malformed id reads unscoped on purpose: the picker reads "all workspaces" and the
+  // notice says the filter was not applied.
+  const formsList = useFormsList(
+    {
+      offset: listQuery.offset,
+      limit: listQuery.pageSize,
+      sort: listQuery.sort,
+      q: listQuery.q,
+    },
+    selectedWorkspaceId,
+    holdFormsRequest,
   );
+  const { table } = useDataTable(listQuery, formsList, dict.form.loadFormsError);
 
-  const workspaceOptionsError = workspaceOptions.error;
+  const authDefaults = useAuthErrorDefaults();
+  const optionsError = workspaceOptions.error;
   const filterLoadError = workspaceFilter.loadError;
   const error = useMemo(() => {
-    const failure = loadError ?? workspaceOptionsError ?? filterLoadError;
+    const failure =
+      formsList.error ??
+      (optionsError ? classifyDataError(optionsError) : null) ??
+      filterLoadError ??
+      null;
     return failure
-      ? loadErrorMessage(failure, {
-          sessionExpired: dict.general.sessionExpired,
-          noAccess: dict.general.noAccess,
-          failed: dict.form.loadFormsError,
-        })
+      ? messageForDataError(failure, { ...authDefaults, failed: dict.form.loadFormsError })
       : null;
-  }, [
-    loadError,
-    workspaceOptionsError,
-    filterLoadError,
-    dict.general.sessionExpired,
-    dict.general.noAccess,
-    dict.form.loadFormsError,
-  ]);
+  }, [formsList.error, optionsError, filterLoadError, authDefaults, dict.form.loadFormsError]);
 
   // A filter this user cannot resolve is not a view worth restoring. Without this it stays in the
   // memory and every later arrival from the nav replays it and raises the same notice again.
@@ -304,6 +282,10 @@ function FormList() {
     ],
   );
 
+  const hideModal = () => {
+    setShowCreateModal(false);
+  };
+
   // Auth gate only — loading (including Keycloak init) is shown inside the table
   // body so the page heading stays visible throughout.
   if (!authenticated && !initializing) {
@@ -312,6 +294,9 @@ function FormList() {
 
   return (
     <>
+      <Modal show={showCreateModal} onClose={hideModal} title={dict.form.createForm}>
+        <FormCreateContent onCancelPress={hideModal} />
+      </Modal>
       <ListPageToolbar>
         <ListPageSearchField
           value={listQuery.searchInput}
@@ -323,7 +308,7 @@ function FormList() {
           variant="primary"
           data-testid="create-form-button"
           isDisabled={!canCreate}
-          onPress={() => router.push(`/${locale}/build`)}
+          onPress={() => setShowCreateModal(true)}
         >
           {dict.general.create}
         </DSButton>
@@ -345,22 +330,14 @@ function FormList() {
       </div>
 
       <DataTable<SobaFormSummary>
-        data={forms}
-        columns={columns}
-        loading={isLoading || initializing || workspaceFilter.pending}
+        {...table}
+        loading={table.loading || initializing || workspaceFilter.pending}
         error={error}
+        columns={columns}
         emptyMessage="No forms found matching your criteria."
         loadingMessage={dict.general.loading}
         itemName="items"
         caption={dict.general.forms}
-        pageSize={listQuery.pageSize}
-        currentPage={listQuery.page}
-        totalItems={data?.page?.total}
-        onPageChange={listQuery.setPage}
-        onPageSizeChange={listQuery.setPageSize}
-        pageSizeOptions={PAGE_SIZE_OPTIONS}
-        sort={listQuery.sort}
-        onSortChange={listQuery.setSort}
         keyExtractor={(form) => form.id}
       />
     </>

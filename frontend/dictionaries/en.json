@@ -36,7 +36,9 @@
     "clearFilters": "Reset Filters",
     "noAccess": "You do not have access to this.",
     "sortBy": "Sort by",
-    "lookupTruncated": "Showing the first {limit}."
+    "lookupTruncated": "Showing the first {limit}.",
+    "next": "Next",
+    "fieldRequired": "This field is required."
   },
   "dataTable": {
     "emptyMessage": "No items found.",
@@ -222,6 +224,16 @@
         "backToHome": "Back to home"
       },
       "submitSuccess": "Form submitted successfully.",
+      "saveDraft": "Save draft",
+      "savingDraft": "Saving draft…",
+      "draftSaved": "Draft saved.",
+      "heldSave": "This submission was changed elsewhere after you opened it, so your draft was not saved. Reload the latest version to discard your changes here, or save your version over it.",
+      "heldSubmit": "This submission was changed elsewhere after you opened it, so your answers were not submitted. Reload the latest version to discard your changes here, or submit your version over it.",
+      "reloadLatest": "Reload latest version",
+      "saveMine": "Save my version",
+      "submitMine": "Submit my version",
+      "alreadySubmitted": "This form has already been submitted.",
+      "readOnly": "You can view this submission, but you can no longer change or submit it.",
       "starting": "Starting your submission…",
       "startError": "The submission could not be started. Please try again."
     }
@@ -304,18 +316,22 @@
       "formSettingsDrawerLabel": "Form Settings",
       "formSettingsDrawerSaveSuccessMessage": "Changes updated successfully.",
       "formSettingsDrawerSaveErrorMessage": "Failed to save changes.",
+      "submitterSettingsDrawerLabel": "Submitter Settings",
+      "allowSubmitterDraftsLabel": "Allow Submitters to Save and Edit Drafts",
+      "allowSubmitterDraftsPublicNote": "Drafts are not available for Public forms.",
+      "submitterSettingsLoadError": "Could not load submitter settings.",
       "profileDrawerInfo": "The CHEFS team is collecting and organizing information to serve as crucial input for crafting comprehensive business cases. These cases will play a pivotal role in guiding the strategic operation and ongoing improvement of CHEFS in the coming years. This initiative to gather data is essential for informing critical decisions and molding the trajectory of CHEFS, ensuring its adaptability and effectiveness in addressing evolving needs and challenges.",
       "profileDrawerLabel": "Form Profile"
     },
     "descriptionLabel": "Description",
-    "submit": "Submit"
+    "submit": "Submit",
+    "noFormName": "Form name is required"
   },
   "submission": {
     "success": {
       "pageTitle": "Submission Confirmation",
       "message": "Your form has been submitted successfully.",
       "keepConfirmation": "Keep this confirmation ID for your records.",
-      "viewSubmission": "View your submission",
       "notSubmitted": "This form has not been submitted yet."
     },
     "submissions": "Submissions",

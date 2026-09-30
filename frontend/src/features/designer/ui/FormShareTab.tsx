@@ -4,7 +4,7 @@ import { Heading, Button, Link } from '@bcgov/design-system-react-components';
 import { useRouter, usePathname } from 'next/navigation';
 
 import type { Dictionary } from '@/src/types/dictionary';
-import { useForm } from '@/src/features/designer/useForm';
+import { useForm } from '@/src/features/designer/data/useForm';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { getFormsAppBaseUrl } from '@/src/shared/config/runtimeConfig';

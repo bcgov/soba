@@ -42,6 +42,7 @@ const createInput = {
   revisionId: 'rev-3',
   workspaceId: 'ws1',
   data: { firstName: 'Ada' },
+  validate: true,
 };
 
 describe('FormioEngineAdapter submission methods', () => {
@@ -80,6 +81,18 @@ describe('FormioEngineAdapter submission methods', () => {
     });
     const body = client.saveSubmission.mock.calls[0][1] as Record<string, unknown>;
     expect(body._id).toBeUndefined(); // POST (new doc), not PUT
+  });
+
+  it.each([
+    [true, undefined],
+    [false, { params: { noValidate: true } }],
+  ])('with validate %s saves with query %j', async (validate, query) => {
+    const client = makeClient();
+    mockedGetClient.mockResolvedValue(client);
+
+    await new FormioEngineAdapter(makeConfig()).createSubmission({ ...createInput, validate });
+
+    expect(client.saveSubmission).toHaveBeenCalledWith('form-ref-1', expect.any(Object), query);
   });
 
   it('is idempotent: a retry for the same revision returns the existing doc without re-saving', async () => {

@@ -39,6 +39,7 @@ import type {
   StorageEngineReadinessResult,
   StoragePluginDefinition,
 } from '../storage-engine/StorageEngineAdapter';
+import type { TenantEnginePluginDefinition } from '../tenant/TenantEnginePluginDefinition';
 
 // --- Definition schemas -----------------------------------------------------
 
@@ -48,7 +49,7 @@ const AdapterPluginDefinitionSchema = z.object({
   createAdapter: z.any(),
 });
 
-// form-engine and document-generation share this { code, metadata, createAdapter } shape.
+// form-engine, document-generation and tenant-engine share this { code, metadata, createAdapter } shape.
 const MetadataPluginDefinitionSchema = z.object({
   code: z.string().min(1),
   metadata: z.object({
@@ -86,6 +87,7 @@ interface CachedPlugin {
   virusScanDefinition?: VirusScanPluginDefinition;
   storageDefinition?: StoragePluginDefinition;
   idpDefinition?: IdpPluginDefinition;
+  tenantEngineDefinition?: TenantEnginePluginDefinition;
 }
 
 // Each CachedPlugin definition field, the module export it comes from, and the schema that
@@ -137,6 +139,11 @@ const DEFINITION_KINDS: ReadonlyArray<{
     schema: AdapterPluginDefinitionSchema,
   },
   { field: 'idpDefinition', exportKey: 'idpPluginDefinition', schema: IdpPluginDefinitionSchema },
+  {
+    field: 'tenantEngineDefinition',
+    exportKey: 'tenantEnginePluginDefinition',
+    schema: MetadataPluginDefinitionSchema,
+  },
 ];
 
 let cache: CachedPlugin[] | null = null;
@@ -278,6 +285,7 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
       p.virusScanDefinition?.code ??
       p.storageDefinition?.code ??
       p.idpDefinition?.code ??
+      p.tenantEngineDefinition?.code ??
       p.dir;
     return {
       code,
@@ -325,6 +333,24 @@ export function getDocumentGenerationPluginCatalog(): DocumentGenerationPluginCa
 
 export function getDocumentGenerationPluginDefinitions(): DocumentGenerationPluginDefinition[] {
   return definitionsOf('documentGenerationDefinition');
+}
+
+export interface TenantEnginePluginCatalogEntry {
+  code: string;
+  name: string;
+  version?: string;
+}
+
+export function getTenantEnginePluginCatalog(): TenantEnginePluginCatalogEntry[] {
+  return getTenantEnginePluginDefinitions().map((d) => ({
+    code: d.code,
+    name: d.metadata.name,
+    version: d.metadata.version,
+  }));
+}
+
+export function getTenantEnginePluginDefinitions(): TenantEnginePluginDefinition[] {
+  return definitionsOf('tenantEngineDefinition');
 }
 
 export function getCachePluginDefinitions(): CachePluginDefinition[] {

@@ -154,6 +154,8 @@ export const submissionRevisions = sobaSchema.table(
       (): AnyPgColumn => submissionRevisions.id,
     ),
     eventType: text('event_type').notNull(),
+    status: text('status').notNull(),
+    reason: text('reason').notNull(),
     beforeEngineSubmissionRef: text('before_engine_submission_ref'),
     afterEngineSubmissionRef: text('after_engine_submission_ref'),
     changedBy: uuid('changed_by')
