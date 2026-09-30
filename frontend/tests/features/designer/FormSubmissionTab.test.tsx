@@ -75,13 +75,27 @@ describe('FormSubmissionTab', () => {
           createdAt: '2026-01-02T03:04:05.000Z',
           updatedAt: '2026-01-02T03:04:05.000Z',
           createdBy: 'Ada Lovelace',
+          confirmationCode: 'K7M2Q9XA',
+        },
+        {
+          id: 'sub-2',
+          formId: 'f1',
+          formVersionId: 'v1',
+          versionNo: 1,
+          workflowState: 'draft',
+          engineSyncStatus: 'ready',
+          submittedAt: null,
+          createdAt: '2026-01-02T03:04:05.000Z',
+          updatedAt: '2026-01-02T03:04:05.000Z',
+          createdBy: 'Ada Lovelace',
+          confirmationCode: null,
         },
       ],
-      page: { offset: 0, limit: 10, total: 1 },
+      page: { offset: 0, limit: 10, total: 2 },
     });
   });
 
-  it('opens a submission on the staff submission page', async () => {
+  async function renderTab() {
     const store = makeStore();
     store.dispatch(setToken('token'));
     store.dispatch(setAuthenticated(true));
@@ -97,6 +111,17 @@ describe('FormSubmissionTab', () => {
         </Provider>,
       );
     });
+  }
+
+  it('shows the confirmation code of a submitted row and N/A for a draft', async () => {
+    await renderTab();
+    await waitFor(() => expect(screen.getByTestId('sub-1-confirmation-id')).toBeInTheDocument());
+    expect(screen.getByTestId('sub-1-confirmation-id')).toHaveTextContent('K7M2Q9XA');
+    expect(screen.getByTestId('sub-2-confirmation-id')).toHaveTextContent('N/A');
+  });
+
+  it('opens a submission on the staff submission page', async () => {
+    await renderTab();
 
     const view = await waitFor(() => screen.getByTestId('sub-1-view-link'));
     await act(async () => {

@@ -73,7 +73,8 @@ export const ListSubmissionsQuerySchema = requireAtLeastOneQueryField(
     workflowState: z.string().trim().min(1).optional(),
     createdBy: z.string().trim().min(1).optional(),
     q: searchQueryField.openapi({
-      description: 'Matches anywhere in the form name or the submission id.',
+      description:
+        'Matches anywhere in the form name, the submission id, or a submitted confirmation code.',
     }),
     sort: SubmissionSortSchema.default('updatedAt:desc'),
     locale: sortLocaleQueryField,

@@ -20,10 +20,7 @@ import { FORM_SUBMISSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { useListQuery } from '@/src/shared/list/useListQuery';
 import { useDataTable } from '@/src/shared/list/useDataTable';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
-import {
-  capitalizeFirstLetter,
-  convertSubmissionIdToConfirmationId,
-} from '@/src/shared/util/stringUtils';
+import { capitalizeFirstLetter } from '@/src/shared/util/stringUtils';
 
 interface FormSubmissionTabProps {
   dict: Dictionary;
@@ -80,12 +77,10 @@ export default function FormSubmissionTab({
   const columns: Column<SubmissionListItem>[] = useMemo(
     () => [
       {
-        key: 'id',
+        key: 'confirmationCode',
         label: dict.submission?.confirmationId || 'Confirmation Id',
         render: (sub) => (
-          <span data-testid={`${sub.id}-confirmation-id`}>
-            {convertSubmissionIdToConfirmationId(sub.id)}
-          </span>
+          <span data-testid={`${sub.id}-confirmation-id`}>{sub.confirmationCode ?? 'N/A'}</span>
         ),
       },
       {

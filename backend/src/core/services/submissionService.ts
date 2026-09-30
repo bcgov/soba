@@ -28,6 +28,7 @@ import {
 } from '../db/codes';
 import { log } from '../logging';
 import { decideSubmissionWrite, type SubmissionWriteDecision } from './submissionWriteGate';
+import { withNewConfirmationCode } from './confirmationCode';
 
 export interface SubmissionWriteOutcome {
   record: SubmissionRecord;
@@ -99,7 +100,9 @@ export class SubmissionService {
       throw new ConflictError('Form version is not the published version');
     }
 
-    const result = await openSubmission({ ...input, formVersionId: version.id });
+    const result = await withNewConfirmationCode((confirmationCode) =>
+      openSubmission({ ...input, formVersionId: version.id, confirmationCode }),
+    );
     if (result.outcome === 'conflict') {
       throw new ConflictError('Submission id already in use');
     }

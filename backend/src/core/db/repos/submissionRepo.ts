@@ -39,6 +39,7 @@ export interface SubmissionListRow {
   updatedAt: Date;
   createdBy: string | null;
   submittedBy: string | null;
+  confirmationCode: string;
 }
 
 export interface SubmissionDetailRow extends SubmissionListRow {
@@ -54,6 +55,7 @@ interface CreateSubmissionInput {
   formVersionId: string;
   actorId: string;
   actorDisplayLabel: string | null;
+  confirmationCode: string;
 }
 
 /**
@@ -158,10 +160,12 @@ export const openSubmission = async (
         submittedBy: input.actorId,
         engineSyncStatus: 'pending',
         currentRevisionNo: 0,
+        confirmationCode: input.confirmationCode,
         createdBy: input.actorDisplayLabel,
         updatedBy: input.actorDisplayLabel,
       })
-      .onConflictDoNothing()
+      // A taken confirmation code throws so the caller retries with a new one.
+      .onConflictDoNothing({ target: submissions.id })
       .returning();
 
     if (created) {
@@ -277,6 +281,7 @@ export const getSubmissionById = async (
       updatedAt: submissions.updatedAt,
       createdBy: submissions.createdBy,
       submittedBy: submissions.submittedBy,
+      confirmationCode: submissions.confirmationCode,
     })
     .from(submissions)
     .leftJoin(forms, eq(submissions.formId, forms.id))
@@ -369,7 +374,15 @@ export const listSubmissionsForWorkspace = async (
   if (input.q) {
     const pattern = likePattern(input.q);
     whereClauses.push(
-      or(ilike(forms.name, pattern), sql`${submissions.id}::text ilike ${pattern}`),
+      or(
+        ilike(forms.name, pattern),
+        sql`${submissions.id}::text ilike ${pattern}`,
+        // Codes are hidden until submitted.
+        and(
+          eq(submissions.workflowState, SubmissionWorkflowState.submitted),
+          ilike(submissions.confirmationCode, pattern),
+        ),
+      ),
     );
   }
 
@@ -390,6 +403,7 @@ export const listSubmissionsForWorkspace = async (
         updatedAt: submissions.updatedAt,
         createdBy: submissions.createdBy,
         submittedBy: submissions.submittedBy,
+        confirmationCode: submissions.confirmationCode,
       })
       .from(submissions)
       .innerJoin(forms, eq(submissions.formId, forms.id))

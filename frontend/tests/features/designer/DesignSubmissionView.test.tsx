@@ -86,6 +86,7 @@ describe('DesignSubmissionView', () => {
       workflowState: 'submitted',
       submittedAt: new Date('2026-01-02T03:04:05Z').toISOString(),
       createdBy: 'Ada Lovelace',
+      confirmationCode: 'K7M2Q9XA',
     });
     getFormVersionSchema.mockResolvedValue({ components: [] });
     getSobaSubmissionData.mockResolvedValue({ data: { field: 'value' } });
@@ -99,8 +100,8 @@ describe('DesignSubmissionView', () => {
     expect(getSobaSubmission).toHaveBeenCalledWith('token', 'sub-1');
     expect(getFormVersionSchema).toHaveBeenCalledWith('token', 'v3');
     expect(getSobaSubmissionData).toHaveBeenCalledWith('token', 'sub-1');
-    expect(screen.getByTestId('submission-view-header')).toHaveTextContent(
-      'Confirmation ID: 01a0a276',
+    expect(screen.getByTestId('submission-view-confirmation')).toHaveTextContent(
+      'Confirmation ID: K7M2Q9XA',
     );
     expect(screen.getByTestId('submission-view-submitter')).toHaveTextContent('Ada Lovelace');
   });
