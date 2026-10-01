@@ -234,6 +234,7 @@
       "saveMine": "Enregistrer ma version",
       "submitMine": "Soumettre ma version",
       "alreadySubmitted": "Ce formulaire a déjà été soumis.",
+      "submitPending": "Ce formulaire a changé depuis son ouverture; vos réponses ont été enregistrées pour examen au lieu d'être soumises.",
       "readOnly": "Vous pouvez consulter cette soumission, mais vous ne pouvez plus la modifier ni la soumettre.",
       "starting": "Démarrage de votre soumission…",
       "startError": "La soumission n’a pas pu être démarrée. Veuillez réessayer."
@@ -326,6 +327,8 @@
     },
     "templates": {
       "drawerLabel": "Modèles de documents",
+      "versionColumn": "Version du formulaire",
+      "versionUnavailable": "Indisponible",
       "nameLabel": "Nom du modèle",
       "fileLabel": "Fichier du modèle",
       "acceptedTypes": "Types de fichiers acceptés : {types}.",

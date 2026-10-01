@@ -5,6 +5,8 @@ export type FormSettingsSectionProps = Readonly<{
   dict: Dictionary;
   drawerName: string;
   formId: string;
+  formVersionId?: string | null;
+  formVersionNo?: number | null;
 }>;
 
 /** One section of a form's Settings tab. */

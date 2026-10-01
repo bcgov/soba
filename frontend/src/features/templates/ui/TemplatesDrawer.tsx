@@ -12,7 +12,6 @@ import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { classifyDataError, messageForDataError } from '@/src/shared/api/dataError';
-import { useForm } from '@/src/features/designer/data/useForm';
 import type { FormSettingsSectionProps } from '@/src/features/form-settings/types';
 import { useTemplates } from '../data/useTemplates';
 
@@ -31,16 +30,21 @@ const nameFromFile = (filename: string): string => filename.replace(/\.[^.]+$/, 
 export default function TemplatesDrawer({
   dict,
   drawerName,
-  formId,
+  formVersionId,
+  formVersionNo,
 }: Readonly<FormSettingsSectionProps>) {
   const text = dict.form.templates;
   const { token } = useKeycloak();
   const { addNotification } = useNotificationStore();
   const formatLongDate = useFormatLongDate();
   // Templates are held per version; the settings tab edits the form's current one.
-  const { currentVersion } = useForm(formId);
-  const formVersionId = currentVersion?.id ?? null;
-  const { templates, loading, error, upload, remove, download } = useTemplates(formVersionId);
+  const versionLabel =
+    formVersionNo === null || formVersionNo === undefined
+      ? text.versionUnavailable
+      : `v${formVersionNo}`;
+  const { templates, loading, error, upload, remove, download } = useTemplates(
+    formVersionId ?? null,
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -127,6 +131,13 @@ export default function TemplatesDrawer({
           </RowActionButton>
         ),
       },
+      {
+        key: 'formVersionId',
+        label: text.versionColumn,
+        render: (template) => (
+          <span data-testid={`template-${template.id}-version`}>{versionLabel}</span>
+        ),
+      },
       { key: 'filename', label: text.fileColumn },
       {
         key: 'size',
@@ -155,7 +166,7 @@ export default function TemplatesDrawer({
         ),
       },
     ],
-    [text, formatLongDate, startDownload],
+    [text, formatLongDate, startDownload, versionLabel],
   );
 
   return (

@@ -412,7 +412,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
           disabled={isSaving || draftUnavailable}
           title={dict.form.settingsTab || 'Settings'}
         >
-          <FormSettingsTab dict={dict} formId={formId} />
+          <FormSettingsTab dict={dict} formId={formId} selectedVersion={activeVersion} />
         </Tab>
         <Tab
           eventKey="team"

@@ -233,6 +233,7 @@
       "saveMine": "Save my version",
       "submitMine": "Submit my version",
       "alreadySubmitted": "This form has already been submitted.",
+      "submitPending": "This form changed since you opened it, so your answers were saved for review instead of submitted.",
       "readOnly": "You can view this submission, but you can no longer change or submit it.",
       "starting": "Starting your submission…",
       "startError": "The submission could not be started. Please try again."
@@ -325,6 +326,8 @@
     },
     "templates": {
       "drawerLabel": "Document Templates",
+      "versionColumn": "Form Version",
+      "versionUnavailable": "Unavailable",
       "nameLabel": "Template Name",
       "fileLabel": "Template File",
       "acceptedTypes": "Accepted file types: {types}.",
