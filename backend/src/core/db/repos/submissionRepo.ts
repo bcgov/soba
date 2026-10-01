@@ -1,6 +1,12 @@
 import { and, count, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
-import { SUBMISSION_SORT_FIELDS, type SortLocale, type SubmissionListSort } from '@soba/lib';
+import {
+  MY_SUBMISSION_STATES,
+  SUBMISSION_SORT_FIELDS,
+  type MySubmissionState,
+  type SortLocale,
+  type SubmissionListSort,
+} from '@soba/lib';
 import { db, type Tx } from '../client';
 import {
   submissionParticipants,
@@ -118,6 +124,29 @@ const SUBMISSION_SORT_COLUMNS: SortColumns<SubmissionListSortField> = {
   createdAt: { column: submissions.createdAt },
   updatedAt: { column: submissions.updatedAt },
 };
+
+export interface ParticipantSubmissionListRow {
+  id: string;
+  formId: string;
+  formName: string;
+  workflowState: string;
+  /** The user's own grant on the submission. */
+  role: string;
+  submittedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  confirmationCode: string;
+}
+
+export interface ListParticipantSubmissionsInput {
+  userId: string;
+  offset: number;
+  limit: number;
+  workflowState?: MySubmissionState;
+  q?: string;
+  sort: SubmissionListSort;
+  locale: SortLocale;
+}
 
 export interface ListSubmissionsInput {
   /** Workspace resolved from the list scope anchor. */
@@ -337,6 +366,13 @@ export const getSubmissionWorkspaceAndState = async (
   return rows[0] ?? null;
 };
 
+// Codes are hidden until submitted, so only a submitted row matches on its code.
+const submittedCodeMatches = (pattern: string) =>
+  and(
+    eq(submissions.workflowState, SubmissionWorkflowState.submitted),
+    ilike(submissions.confirmationCode, pattern),
+  );
+
 export const listSubmissionsForWorkspace = async (
   input: ListSubmissionsInput,
 ): Promise<{ items: SubmissionListRow[]; total: number }> => {
@@ -347,7 +383,6 @@ export const listSubmissionsForWorkspace = async (
     inArray(submissions.workspaceId, input.workspaceIds),
     isNull(submissions.deletedAt),
     // Workspace/staff list shows only real submissions; a just-`opened` shell isn't one yet.
-    // (A future user-scoped list would surface the caller's own opened submissions.)
     ne(submissions.workflowState, SubmissionWorkflowState.opened),
   ];
 
@@ -377,11 +412,7 @@ export const listSubmissionsForWorkspace = async (
       or(
         ilike(forms.name, pattern),
         sql`${submissions.id}::text ilike ${pattern}`,
-        // Codes are hidden until submitted.
-        and(
-          eq(submissions.workflowState, SubmissionWorkflowState.submitted),
-          ilike(submissions.confirmationCode, pattern),
-        ),
+        submittedCodeMatches(pattern),
       ),
     );
   }
@@ -419,6 +450,67 @@ export const listSubmissionsForWorkspace = async (
     const totals = await (input.q
       ? countQuery.innerJoin(forms, eq(submissions.formId, forms.id)).where(where)
       : countQuery.where(where));
+
+    return { items, total: totals[0]?.total ?? 0 };
+  });
+};
+
+/**
+ * The draft and submitted submissions the user holds an active grant on, across every workspace.
+ * An opened submission holds no answers yet, and a submission on a deleted form or form version
+ * can no longer be opened, so none of these is listed.
+ */
+export const listSubmissionsForParticipant = async (
+  input: ListParticipantSubmissionsInput,
+): Promise<{ items: ParticipantSubmissionListRow[]; total: number }> => {
+  const whereClauses = [
+    eq(submissionParticipants.userId, input.userId),
+    eq(submissionParticipants.status, SubmissionParticipantStatus.active),
+    isNull(submissions.deletedAt),
+    input.workflowState
+      ? eq(submissions.workflowState, input.workflowState)
+      : inArray(submissions.workflowState, [...MY_SUBMISSION_STATES]),
+    isNull(forms.deletedAt),
+    isNull(formVersions.deletedAt),
+  ];
+
+  if (input.q) {
+    const pattern = likePattern(input.q);
+    whereClauses.push(or(ilike(forms.name, pattern), submittedCodeMatches(pattern)));
+  }
+
+  const where = and(...whereClauses);
+
+  return readListPage(async (tx) => {
+    const items = await tx
+      .select({
+        id: submissions.id,
+        formId: submissions.formId,
+        formName: forms.name,
+        workflowState: submissions.workflowState,
+        role: submissionParticipants.role,
+        submittedAt: submissions.submittedAt,
+        createdAt: submissions.createdAt,
+        updatedAt: submissions.updatedAt,
+        confirmationCode: submissions.confirmationCode,
+      })
+      .from(submissionParticipants)
+      .innerJoin(submissions, eq(submissionParticipants.submissionId, submissions.id))
+      .innerJoin(forms, eq(submissions.formId, forms.id))
+      .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
+      .where(where)
+      .orderBy(...orderByForSort(SUBMISSION_SORT_COLUMNS, input.sort, submissions.id, input.locale))
+      .limit(input.limit)
+      .offset(input.offset);
+
+    // One active grant per user and submission, so the joins never repeat a submission.
+    const totals = await tx
+      .select({ total: count() })
+      .from(submissionParticipants)
+      .innerJoin(submissions, eq(submissionParticipants.submissionId, submissions.id))
+      .innerJoin(forms, eq(submissions.formId, forms.id))
+      .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
+      .where(where);
 
     return { items, total: totals[0]?.total ?? 0 };
   });
@@ -731,19 +823,34 @@ export const appendSubmissionRevision = async (
 };
 
 /**
- * Soft-delete a submission from any live state and record it as a `deleted` revision by the actor,
- * which becomes the current revision. The engine document is unchanged, so the revision's before and
- * after refs are both the current ref. Returns null when the submission is missing or already deleted.
+ * deleted       - the submission is now soft-deleted.
+ * not_found     - the submission is missing or already deleted.
+ * not_deletable - its workflow state is not one of the deletable states asked for.
+ */
+export type DeleteSubmissionResult =
+  | { outcome: 'deleted'; record: SubmissionRecord }
+  | { outcome: 'not_found' }
+  | { outcome: 'not_deletable'; workflowState: string };
+
+/**
+ * Soft-delete a submission and record it as a `deleted` revision by the actor, which becomes the
+ * current revision. The engine document is unchanged, so the revision's before and after refs are both
+ * the current ref. Any live state is deletable unless `deletableStates` narrows it; the state is read
+ * under the row lock, so a concurrent submit cannot slip past the check.
  */
 export const markSubmissionDeleted = async (input: {
   workspaceId: string;
   submissionId: string;
   actorId: string;
   actorDisplayLabel: string | null;
-}): Promise<SubmissionRecord | null> => {
+  deletableStates?: readonly string[];
+}): Promise<DeleteSubmissionResult> => {
   return db.transaction(async (tx) => {
     const submission = await lockLiveSubmission(tx, input.workspaceId, input.submissionId);
-    if (!submission) return null;
+    if (!submission) return { outcome: 'not_found' };
+    if (input.deletableStates && !input.deletableStates.includes(submission.workflowState)) {
+      return { outcome: 'not_deletable', workflowState: submission.workflowState };
+    }
 
     const revisionNo = await nextRevisionNo(tx, input.workspaceId, input.submissionId);
     const revisionId = uuidv7();
@@ -779,6 +886,6 @@ export const markSubmissionDeleted = async (input: {
       )
       .returning();
     if (!updated) throw new Error(`Submission ${input.submissionId} missing after head move`);
-    return updated;
+    return { outcome: 'deleted', record: updated };
   });
 };

@@ -4,7 +4,7 @@ interface RouteLayer {
   route?: { path: string; methods: Record<string, boolean>; stack: { handle: { name: string } }[] };
 }
 
-const GUARDS = ['requireSubmissionRead', 'requireFormSubmitAccess'];
+const GUARDS = ['requireSubmissionRead', 'requireFormSubmitAccess', 'requireSubmissionDelete'];
 
 const routes = (submitRouter as unknown as { stack: RouteLayer[] }).stack.flatMap((l) =>
   l.route
@@ -38,6 +38,10 @@ it.each(['/submissions', '/submissions/:id/save', '/submissions/:id/submit'])(
     expect(handlersFor('post', path)).toContain('requireFormSubmitAccess');
   },
 );
+
+it('DELETE /submissions/:id goes through requireSubmissionDelete', () => {
+  expect(handlersFor('delete', '/submissions/:id')).toContain('requireSubmissionDelete');
+});
 
 it.each(routes.map((r) => [`${r.method.toUpperCase()} ${r.path}`, r.handlers] as const))(
   '%s runs exactly one submit-mode guard, before its handler',

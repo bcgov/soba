@@ -1,10 +1,10 @@
-import { Permissions, type PermissionCode } from '../db/codes';
+import { Permissions, PUBLIC_PROVIDER_CODE, type PermissionCode } from '../db/codes';
 import {
   hasFormSubmitAccess,
   type CallerIdentity,
   type FormAccessTarget,
 } from '../db/repos/formSubmitAccessRepo';
-import { isActiveParticipant } from '../db/repos/submissionParticipantRepo';
+import { isActiveOwner, isActiveParticipant } from '../db/repos/submissionParticipantRepo';
 
 /** What a caller does through submit mode. Design-mode routes do not use this policy. */
 export const SubmitterOperation = {
@@ -18,6 +18,8 @@ export const SubmitterOperation = {
   deleteSubmittedFile: 'deleteSubmittedFile',
   /** Render a document from a submission with a stored template: print, preview, template list. */
   render: 'render',
+  /** Delete the caller's own submission; the lifecycle limits it to one not yet submitted. */
+  delete: 'delete',
 } as const;
 export type SubmitterOperationCode = (typeof SubmitterOperation)[keyof typeof SubmitterOperation];
 
@@ -33,6 +35,13 @@ const isParticipant: AccessCheck = async (target, caller) =>
   !!caller.actorId &&
   isActiveParticipant(target.submissionId, caller.actorId);
 
+const isOwner: AccessCheck = async (target, caller) =>
+  !!target.submissionId && !!caller.actorId && isActiveOwner(target.submissionId, caller.actorId);
+
+// The shared public user owns every anonymous submission, so its ownership grants nothing.
+const isIdentified: AccessCheck = async (_target, caller) =>
+  !!caller.idpCode && caller.idpCode !== PUBLIC_PROVIDER_CODE;
+
 const hasFormPermission =
   (permission: PermissionCode): AccessCheck =>
   (target, caller) =>
@@ -46,6 +55,7 @@ const RULES: Record<SubmitterOperationCode, readonly AccessCheck[]> = {
   write: [isParticipant, hasFormPermission(Permissions.submission_create)],
   deleteSubmittedFile: [hasFormPermission(Permissions.submission_update)],
   render: [isParticipant, hasFormPermission(Permissions.document_template_read)],
+  delete: [isIdentified, isOwner],
 };
 
 /** Whether the caller may perform a submit-mode operation on the target. */

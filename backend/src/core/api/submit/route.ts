@@ -1,7 +1,11 @@
 import express from 'express';
 import { validateRequest } from '../shared/validation';
 import { openWorkspaceFromResource } from '../../middleware/workspaceContext';
-import { requireFormSubmitAccess, requireSubmissionRead } from '../../middleware/formSubmitAccess';
+import {
+  requireFormSubmitAccess,
+  requireSubmissionDelete,
+  requireSubmissionRead,
+} from '../../middleware/formSubmitAccess';
 import { getSubmitSubmissionSchema, getSubmitFillBundle } from './controller';
 import { requireDraftSave } from './draftSave';
 import {
@@ -10,6 +14,7 @@ import {
   getSubmissionData,
   saveSubmission,
   submitSubmission,
+  deleteUnsubmittedSubmission,
 } from '../submissions/controller';
 import {
   OpenSubmissionBodySchema,
@@ -79,6 +84,15 @@ router.get(
   openSubmissionResource,
   requireSubmissionRead,
   getSubmitFillBundle,
+);
+
+// The owner deletes their own submission before it is submitted.
+router.delete(
+  '/submissions/:id',
+  validateRequest({ params: SubmissionIdParamsSchema }),
+  openSubmissionResource,
+  requireSubmissionDelete,
+  deleteUnsubmittedSubmission,
 );
 
 export { router as submitRouter };

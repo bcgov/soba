@@ -101,3 +101,39 @@ export const ListSubmissionsResponseSchema = z.object({
 });
 
 export type ListSubmissionsResponse = z.infer<typeof ListSubmissionsResponseSchema>;
+
+/** The states the caller's own list shows; an opened submission holds no answers yet. */
+export const MY_SUBMISSION_STATES = ['draft', 'submitted'] as const;
+export const MySubmissionStateSchema = z.enum(MY_SUBMISSION_STATES);
+export type MySubmissionState = z.infer<typeof MySubmissionStateSchema>;
+
+/** The caller's grant on a submission; only an owner deletes. */
+export const MySubmissionRoleSchema = z.enum(['owner', 'collaborator']);
+export type MySubmissionRole = z.infer<typeof MySubmissionRoleSchema>;
+
+/** A row of the caller's own submissions. */
+export const MySubmissionListItemSchema = z.object({
+  id: z.string(),
+  formId: z.string(),
+  formName: z.string(),
+  workflowState: MySubmissionStateSchema,
+  role: MySubmissionRoleSchema,
+  submittedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  // Null until the submission is submitted.
+  confirmationCode: z.string().nullable(),
+});
+
+export const ListMySubmissionsResponseSchema = z.object({
+  items: z.array(MySubmissionListItemSchema),
+  page: OffsetPageSchema,
+  filters: z.object({
+    workflowState: MySubmissionStateSchema.optional(),
+    q: z.string().optional(),
+  }),
+  sort: SubmissionSortSchema,
+});
+
+export type MySubmissionListItem = z.infer<typeof MySubmissionListItemSchema>;
+export type ListMySubmissionsResponse = z.infer<typeof ListMySubmissionsResponseSchema>;

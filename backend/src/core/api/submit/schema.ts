@@ -184,4 +184,21 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
       404: { description: 'Submission or its content not found' },
     },
   });
+
+  registry.registerPath({
+    method: 'delete',
+    path: SUBMISSION_PATH,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    description:
+      "Deletes the caller's own submission before it is submitted. Anonymous callers cannot delete.",
+    request: { params: SubmissionIdParamsSchema },
+    responses: {
+      204: { description: 'Submission deleted' },
+      401: { description: 'Authentication required' },
+      403: { description: 'Not the owner of this submission' },
+      404: { description: SUBMISSION_NOT_FOUND },
+      409: { description: 'The submission is submitted and can no longer be deleted' },
+    },
+  });
 };

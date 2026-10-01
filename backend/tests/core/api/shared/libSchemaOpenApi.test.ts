@@ -45,6 +45,7 @@ describe('OpenAPI components for lib-backed schemas', () => {
       'Submissions_SubmissionSort',
     ],
     ['Workspaces_ListWorkspacesResponse', 'Workspaces_WorkspaceItem', 'Workspaces_WorkspaceSort'],
+    ['Me_ListSubmissionsResponse', 'Me_SubmissionListItem', 'Submissions_SubmissionSort'],
     ['Admin_ListSobaAdminsResponse', 'Admin_SobaAdminItem', 'Admin_SobaAdminSort'],
     ['Admin_ListFeatureScopesResponse', 'Admin_FeatureScopeItem', 'Admin_FeatureScopeSort'],
     [

@@ -93,6 +93,15 @@ export async function submitSobaFormSubmission(
   return parseJson<SubmissionWriteResponse>(response);
 }
 
+/** Delete the caller's own unsubmitted submission. A 404 counts as deleted. */
+export async function deleteSubmitSubmission(token: string, submissionId: string): Promise<void> {
+  const response = await sobaFetch(`/submit/submissions/${submissionId}`, {
+    token,
+    method: 'DELETE',
+  });
+  if (!response.ok && response.status !== 404) await parseJson(response);
+}
+
 /** Read a submission's metadata for the confirmation view. */
 export async function getSubmitSubmission(
   token: string | undefined,

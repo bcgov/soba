@@ -370,6 +370,38 @@
       }
     }
   },
+  "mySubmissions": {
+    "columns": {
+      "form": "Formulaire",
+      "status": "Statut",
+      "confirmationId": "ID de confirmation",
+      "updatedAt": "Dernière mise à jour",
+      "actions": "Actions"
+    },
+    "states": {
+      "draft": "Brouillon",
+      "submitted": "Soumise"
+    },
+    "statusFilter": "Statut",
+    "allStates": "Tous",
+    "continue": "Continuer",
+    "view": "Voir",
+    "delete": "Supprimer",
+    "continueLabel": "Continuer {form}, dernière mise à jour le {updated}",
+    "viewLabel": "Voir {form}, dernière mise à jour le {updated}",
+    "deleteLabel": "Supprimer le brouillon de {form}, dernière mise à jour le {updated}",
+    "empty": "Vous n’avez encore aucune soumission.",
+    "noMatches": "Aucune soumission ne correspond à votre recherche ou à votre filtre.",
+    "loadError": "Impossible de charger vos soumissions.",
+    "itemName": "soumissions",
+    "deleteTitle": "Supprimer le brouillon",
+    "deleteMessage": "Votre brouillon de {form}, mis à jour le {updated}, sera supprimé. Cette action est irréversible.",
+    "deleteSuccess": "Brouillon supprimé.",
+    "deleteError": "Impossible de supprimer ce brouillon.",
+    "deleteSubmitted": "Ce brouillon a été soumis et ne peut plus être supprimé.",
+    "viewAll": "Voir mes soumissions",
+    "noCode": "Aucun ID de confirmation pour l’instant"
+  },
   "Basic": "Basique",
   "Text Field": "Champ de Texte",
   "Text Area": "Zone de Texte",

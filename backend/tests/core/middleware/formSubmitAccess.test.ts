@@ -12,6 +12,7 @@ jest.mock('../../../src/core/db/repos/formRepo', () => ({
 import type { NextFunction, Request, Response } from 'express';
 import {
   requireFormSubmitAccess,
+  requireSubmissionDelete,
   requireSubmissionRead,
 } from '../../../src/core/middleware/formSubmitAccess';
 import { isSubmitterAllowed } from '../../../src/core/services/submitterAccess';
@@ -155,5 +156,30 @@ describe('requireSubmissionRead', () => {
     expect(error).toBeInstanceOf(Error);
     expect(error).not.toBeInstanceOf(AppError);
     expect(mockAllowed).not.toHaveBeenCalled();
+  });
+});
+
+describe('requireSubmissionDelete', () => {
+  const context = { workspaceId: 'ws1', formId: 'f1' };
+
+  it('authorizes a delete of the routed submission', async () => {
+    mockAllowed.mockResolvedValue(true);
+    const next = await run(requireSubmissionDelete, makeReq({ authed: true, id: 's1', context }));
+    expect(mockAllowed).toHaveBeenCalledWith(
+      'delete',
+      { workspaceId: 'ws1', formId: 'f1', submissionId: 's1' },
+      expect.objectContaining({ actorId: 'u1' }),
+    );
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('refuses a caller who may not delete, 403 signed in and 401 anonymous', async () => {
+    mockAllowed.mockResolvedValue(false);
+    expect(
+      await run(requireSubmissionDelete, makeReq({ authed: true, id: 's1', context })),
+    ).toHaveBeenCalledWith(expect.any(ForbiddenError));
+    expect(await run(requireSubmissionDelete, makeReq({ id: 's1', context }))).toHaveBeenCalledWith(
+      expect.any(UnauthorizedError),
+    );
   });
 });

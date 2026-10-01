@@ -1,12 +1,16 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '../client';
 import { submissionParticipants } from '../schema';
-import { SubmissionParticipantStatus } from '../codes';
+import {
+  SubmissionParticipantRole,
+  SubmissionParticipantStatus,
+  type SubmissionParticipantRoleCode,
+} from '../codes';
 
-/** Whether the user holds an active grant (any role) on the submission. */
-export const isActiveParticipant = async (
+const hasActiveGrant = async (
   submissionId: string,
   userId: string,
+  role?: SubmissionParticipantRoleCode,
 ): Promise<boolean> => {
   const rows = await db
     .select({ id: submissionParticipants.id })
@@ -16,8 +20,17 @@ export const isActiveParticipant = async (
         eq(submissionParticipants.submissionId, submissionId),
         eq(submissionParticipants.userId, userId),
         eq(submissionParticipants.status, SubmissionParticipantStatus.active),
+        role ? eq(submissionParticipants.role, role) : undefined,
       ),
     )
     .limit(1);
   return rows.length > 0;
 };
+
+/** Whether the user holds an active grant (any role) on the submission. */
+export const isActiveParticipant = (submissionId: string, userId: string): Promise<boolean> =>
+  hasActiveGrant(submissionId, userId);
+
+/** Whether the user holds an active owner grant on the submission. */
+export const isActiveOwner = (submissionId: string, userId: string): Promise<boolean> =>
+  hasActiveGrant(submissionId, userId, SubmissionParticipantRole.owner);

@@ -245,11 +245,18 @@ the id has access to those.
 | `write`: save, submit, upload, delete a file on an in-progress submission | an active grant and `submission_create` on the form |
 | `deleteSubmittedFile` | `submission_update` on the form |
 | `render`: print, preview, template list | an active grant and `document_template_read` on the form |
+| `delete`: the caller's own submission | a signed-in caller with an active owner grant |
 
-Owners and collaborators have the same access. Design routes do not use these rules; staff read and
-delete submissions through form permissions. Files, print and preview have no design route, so staff
-download files through `/files` or `/submit/files`, and print and preview through the submit routes,
-all of which need a grant.
+Owners and collaborators have the same access, except that only an owner deletes. A submitter
+deletes only an opened or draft submission; a submitted one is a 409. The public user's ownership
+grants no delete, because every anonymous caller shares it. Design routes do not use these rules;
+staff read and delete submissions through form permissions. Files, print and preview have no design
+route, so staff download files through `/files` or `/submit/files`, and print and preview through
+the submit routes, all of which need a grant.
+
+`GET /me/submissions` lists the draft and submitted submissions the caller holds an active grant
+on, across every workspace, with the caller's role on each. Submissions on a deleted form or form
+version are left out.
 
 ## What a new workspace looks like
 
