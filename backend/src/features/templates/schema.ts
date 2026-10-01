@@ -1,5 +1,12 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
+import {
+  TemplateIdParamsSchema as LibTemplateIdParamsSchema,
+  TemplateListResponseSchema as LibTemplateListSchema,
+  TemplateNameBodySchema as LibTemplateNameBodySchema,
+  TemplateResponseSchema as LibTemplateSchema,
+  TemplatesQuerySchema as LibTemplatesQuerySchema,
+} from '@soba/lib';
 import { TEMPLATE_TYPES } from './config';
 
 extendZodWithOpenApi(z);
@@ -11,35 +18,19 @@ const NOT_FOUND = { description: 'Not found' };
 const FORBIDDEN = { description: 'Insufficient form permissions' };
 const INVALID_ID = { description: 'Invalid template id' };
 
-export const TemplateIdParamsSchema = z.object({ id: z.uuid() }).openapi('Templates_IdParams');
+export const TemplateIdParamsSchema =
+  LibTemplateIdParamsSchema.clone().openapi('Templates_IdParams');
 
-export const TemplatesQuerySchema = z
-  .object({ formVersionId: z.uuid() })
-  .openapi('Templates_FormVersionQuery');
+export const TemplatesQuerySchema = LibTemplatesQuerySchema.clone().openapi(
+  'Templates_FormVersionQuery',
+);
 
-export const TemplateNameBodySchema = z
-  .object({ name: z.string().trim().min(1).max(100) })
-  .openapi('Templates_NameBody');
+export const TemplateNameBodySchema =
+  LibTemplateNameBodySchema.clone().openapi('Templates_NameBody');
 
-const TemplateSchema = z
-  .object({
-    id: z.uuid(),
-    formId: z.uuid(),
-    formVersionId: z.uuid(),
-    name: z.string(),
-    filename: z.string(),
-    contentType: z.string().nullable(),
-    size: z.number().int().nullable(),
-    createdBy: z.string().nullable(),
-    createdAt: z.iso.datetime(),
-    updatedBy: z.string().nullable(),
-    updatedAt: z.iso.datetime(),
-  })
-  .openapi('Templates_Template');
+const TemplateSchema = LibTemplateSchema.clone().openapi('Templates_Template');
 
-const TemplateListSchema = z
-  .object({ items: z.array(TemplateSchema) })
-  .openapi('Templates_TemplateList');
+const TemplateListSchema = LibTemplateListSchema.clone().openapi('Templates_TemplateList');
 
 const templateResponse = (description: string) => ({
   description,

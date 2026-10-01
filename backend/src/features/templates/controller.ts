@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import type { TemplateResponse } from '@soba/lib';
 import { templatesService, type TemplateActor, type TemplateFile } from './service';
 import { isTemplateFile, TEMPLATE_TYPES } from './config';
 import { checkedFileName, getUploadedFile } from '../../core/middleware/parseUpload';
@@ -13,7 +14,7 @@ import { log } from '../../core/logging';
 
 const TEMPLATE_NOT_FOUND = 'Template not found';
 
-const toTemplateResponse = ({ template, file }: DocumentTemplateWithFile) => ({
+const toTemplateResponse = ({ template, file }: DocumentTemplateWithFile): TemplateResponse => ({
   id: template.id,
   formId: template.formId,
   formVersionId: template.formVersionId,

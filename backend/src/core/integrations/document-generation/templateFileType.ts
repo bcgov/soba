@@ -1,12 +1,8 @@
 import path from 'node:path';
+import { isTemplateFileType, TEMPLATE_FILE_TYPES, type TemplateFileType } from '@soba/lib';
 
-/** Template file types the document generation backends render. */
-export const TEMPLATE_FILE_TYPES = ['docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp'] as const;
-
-export type TemplateFileType = (typeof TEMPLATE_FILE_TYPES)[number];
-
-const isTemplateFileType = (value: string): value is TemplateFileType =>
-  (TEMPLATE_FILE_TYPES as readonly string[]).includes(value);
+export { TEMPLATE_FILE_TYPES };
+export type { TemplateFileType };
 
 /** The template type of a file name, from its extension; null when it is not a template type. */
 export const templateFileType = (filename: string): TemplateFileType | null => {
