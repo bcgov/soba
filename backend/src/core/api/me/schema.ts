@@ -9,20 +9,7 @@ import {
   PatchMeBodySchema as LibPatchMeBodySchema,
   TenantSchema as LibTenantSchema,
   ListTenantsResponseSchema as LibListTenantsResponseSchema,
-  MySubmissionStateSchema as LibMySubmissionStateSchema,
-  MySubmissionRoleSchema as LibMySubmissionRoleSchema,
-  MySubmissionListItemSchema as LibMySubmissionListItemSchema,
-  ListMySubmissionsResponseSchema as LibListMySubmissionsResponseSchema,
 } from '@soba/lib';
-import {
-  offsetQueryFields,
-  rejectedCursorField,
-  searchQueryField,
-  sortLocaleQueryField,
-  OffsetPageSchema,
-  OFFSET_DRIFT_NOTE,
-} from '../shared/offsetPagination';
-import { SubmissionSortSchema } from '../submissions/schema';
 
 extendZodWithOpenApi(z);
 
@@ -47,40 +34,6 @@ export const MeTenantSchema = LibTenantSchema.clone().openapi('Me_Tenant');
 export const MeTenantsResponseSchema = LibListTenantsResponseSchema.extend({
   tenants: z.array(MeTenantSchema),
 }).openapi('Me_TenantsResponse');
-
-export const MySubmissionStateSchema =
-  LibMySubmissionStateSchema.clone().openapi('Me_SubmissionState');
-
-export const ListMySubmissionsQuerySchema = z
-  .object({
-    ...offsetQueryFields,
-    cursor: rejectedCursorField,
-    workflowState: MySubmissionStateSchema.optional(),
-    q: searchQueryField.openapi({
-      description: 'Matches anywhere in the form name, or a submitted confirmation code.',
-    }),
-    sort: SubmissionSortSchema.default('updatedAt:desc'),
-    locale: sortLocaleQueryField,
-  })
-  .openapi('Me_ListSubmissionsQuery');
-
-export const MySubmissionRoleSchema =
-  LibMySubmissionRoleSchema.clone().openapi('Me_SubmissionRole');
-
-export const MySubmissionListItemSchema = LibMySubmissionListItemSchema.extend({
-  workflowState: MySubmissionStateSchema,
-  role: MySubmissionRoleSchema,
-}).openapi('Me_SubmissionListItem');
-
-export const ListMySubmissionsResponseSchema = LibListMySubmissionsResponseSchema.extend({
-  items: z.array(MySubmissionListItemSchema),
-  page: OffsetPageSchema,
-  filters: z.object({
-    workflowState: MySubmissionStateSchema.optional(),
-    q: z.string().optional(),
-  }),
-  sort: SubmissionSortSchema,
-}).openapi('Me_ListSubmissionsResponse');
 
 export const registerMeOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
@@ -158,31 +111,6 @@ export const registerMeOpenApi = (registry: OpenAPIRegistry) => {
       },
       503: {
         description: 'The tenant engine is unavailable',
-      },
-    },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: '/me/submissions',
-    tags: ['core.me'],
-    security: [{ bearerAuth: [] }],
-    description: `The caller's draft and submitted submissions, across every workspace. ${OFFSET_DRIFT_NOTE}`,
-    request: { query: ListMySubmissionsQuerySchema },
-    responses: {
-      200: {
-        description: "A page of the caller's submissions",
-        content: {
-          'application/json': {
-            schema: ListMySubmissionsResponseSchema,
-          },
-        },
-      },
-      400: {
-        description: 'Invalid query',
-      },
-      404: {
-        description: 'Submit mode is not enabled',
       },
     },
   });

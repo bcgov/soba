@@ -14,8 +14,7 @@ import type {
 } from '../../types/workspaces';
 import type { CurrentUserResponse } from '../../types/user';
 import type { SortLocale } from '@soba/lib/sort';
-import { toListRequestQuery, type ListQueryArgs } from '../../types/list';
-import type { ListMySubmissionsResponse, MySubmissionState } from '../../types/submissions';
+import type { ListQueryArgs } from '../../types/list';
 import { sortLocaleHeaders } from './sortLocaleRequest';
 
 export type { SobaFormType, WorkspaceItem, WorkspacesResponse, CurrentUserResponse };
@@ -45,6 +44,7 @@ export {
   saveSobaFormSubmission,
   submitSobaFormSubmission,
   deleteSubmitSubmission,
+  getMySubmissions,
   getSubmitSubmission,
   getSubmitSubmissionData,
 } from './sobaApiSubmit';
@@ -205,19 +205,6 @@ export async function selectWorkspace(token: string, id: string): Promise<Worksp
 
 export async function fetchCurrentUser(token: string): Promise<CurrentUserResponse> {
   const response = await sobaFetch('/me', { token });
-  return parseJson(response);
-}
-
-/** One page of the caller's own draft and submitted submissions. */
-export async function getMySubmissions(
-  token: string,
-  args: ListQueryArgs & { workflowState?: MySubmissionState },
-): Promise<ListMySubmissionsResponse> {
-  const response = await sobaFetch('/me/submissions', {
-    token,
-    query: { ...toListRequestQuery(args), workflowState: args.workflowState },
-    headers: sortLocaleHeaders(args.locale),
-  });
   return parseJson(response);
 }
 

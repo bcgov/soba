@@ -1,32 +1,35 @@
-jest.mock('../../../../src/core/api/submissions/service', () => ({
+jest.mock('../../../../src/core/container', () => ({
   submissionsApiService: { listMine: jest.fn() },
-}));
-jest.mock('../../../../src/core/db/repos/featureRepo', () => ({
-  isFeatureEnabledCached: jest.fn(),
+  formVersionService: {},
 }));
 
 import express from 'express';
 import request from 'supertest';
-import { meRouter } from '../../../../src/core/api/me';
-import { submissionsApiService } from '../../../../src/core/api/submissions/service';
-import { isFeatureEnabledCached } from '../../../../src/core/db/repos/featureRepo';
+import { submitRouter } from '../../../../src/core/api/submit';
+import { submissionsApiService } from '../../../../src/core/container';
 import { coreErrorHandler } from '../../../../src/core/middleware/errorHandler';
 
 const listMine = jest.mocked(submissionsApiService.listMine);
-const featureEnabled = jest.mocked(isFeatureEnabledCached);
 
-// Stands in for checkJwt + resolveActor, which need a signed token; everything after is real.
-function buildApp() {
+// Stands in for checkJwt + resolveActorOrPublic, which need a signed token; everything after is real.
+function buildApp(caller: 'signedIn' | 'anonymous') {
   const app = express();
   app.use((req, _res, next) => {
-    req.user = { idpAttributes: {} } as Express.User;
-    req.actorId = 'actor-1';
+    if (caller === 'signedIn') {
+      req.user = { providerCode: 'idir', idpAttributes: {} } as unknown as Express.User;
+      req.actorId = 'actor-1';
+    } else {
+      req.actorId = 'public-user';
+      req.idpType = 'public';
+    }
     next();
   });
-  app.use('/api/v1', meRouter);
+  app.use('/api/v1/submit', submitRouter);
   app.use(coreErrorHandler);
   return app;
 }
+
+const MINE = '/api/v1/submit/submissions/mine';
 
 const PAGE = {
   items: [],
@@ -37,13 +40,12 @@ const PAGE = {
 
 beforeEach(() => {
   listMine.mockReset().mockResolvedValue(PAGE);
-  featureEnabled.mockReset().mockResolvedValue(true);
 });
 
-describe('GET /me/submissions', () => {
+describe('GET /submit/submissions/mine', () => {
   it("lists the caller's own submissions, never a user named in the query", async () => {
-    const res = await request(buildApp())
-      .get('/api/v1/me/submissions')
+    const res = await request(buildApp('signedIn'))
+      .get(MINE)
       .query({ workflowState: 'draft', q: 'tax', userId: 'someone-else' });
 
     expect(res.status).toBe(200);
@@ -59,8 +61,8 @@ describe('GET /me/submissions', () => {
   });
 
   it('sorts in the language the caller asks for', async () => {
-    await request(buildApp())
-      .get('/api/v1/me/submissions')
+    await request(buildApp('signedIn'))
+      .get(MINE)
       .set('Accept-Language', 'fr-CA')
       .query({ sort: 'formName:asc' });
 
@@ -70,24 +72,23 @@ describe('GET /me/submissions', () => {
     );
   });
 
+  // Anonymous callers resolve to the shared public user, which owns every anonymous submission.
+  it('refuses an anonymous caller', async () => {
+    const res = await request(buildApp('anonymous')).get(MINE);
+
+    expect(res.status).toBe(401);
+    expect(listMine).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['an opened state', { workflowState: 'opened' }],
     ['a deleted state', { workflowState: 'deleted' }],
     ['a cursor', { cursor: 'abc' }],
     ['an unknown sort', { sort: 'confirmationCode:asc' }],
   ])('refuses %s', async (_label, params) => {
-    const res = await request(buildApp()).get('/api/v1/me/submissions').query(params);
+    const res = await request(buildApp('signedIn')).get(MINE).query(params);
 
     expect(res.status).toBe(400);
-    expect(listMine).not.toHaveBeenCalled();
-  });
-
-  it('is not found while submit mode is off', async () => {
-    featureEnabled.mockResolvedValue(false);
-
-    const res = await request(buildApp()).get('/api/v1/me/submissions');
-
-    expect(res.status).toBe(404);
     expect(listMine).not.toHaveBeenCalled();
   });
 });

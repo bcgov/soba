@@ -5,12 +5,10 @@ import type { Request } from 'express';
 import { NotFoundError, ValidationError } from '../../errors';
 import { getActorId, getActorIdpAttributes, getActorIdpCode } from '../../middleware/actor';
 import { getToken } from '../../auth/IdpPlugin';
-import { submissionsApiService } from '../submissions/service';
 import { meApiService } from './service';
-import { ListMySubmissionsQuerySchema, PatchMeBodySchema } from './schema';
+import { PatchMeBodySchema } from './schema';
 
 type PatchMeBody = z.infer<typeof PatchMeBodySchema>;
-type ListMySubmissionsQuery = z.infer<typeof ListMySubmissionsQuerySchema>;
 
 const MISSING_ACTOR_IDENTITY = 'Missing actor identity';
 
@@ -41,24 +39,6 @@ export const patchCurrentActor = asyncHandler(async (req: Request, res: Response
     throw new NotFoundError('Current actor not found');
   }
   res.json(result);
-});
-
-export const listMySubmissions = asyncHandler(async (req: Request, res: Response) => {
-  const actorId = getActorId(req);
-  if (!actorId) {
-    throw new ValidationError(MISSING_ACTOR_IDENTITY);
-  }
-  const query = req.query as unknown as ListMySubmissionsQuery;
-  res.json(
-    await submissionsApiService.listMine(actorId, {
-      offset: query.offset,
-      limit: query.limit,
-      workflowState: query.workflowState,
-      q: query.q,
-      sort: query.sort,
-      locale: req.sortLocale!,
-    }),
-  );
 });
 
 export const getCurrentActorTenants = asyncHandler(async (req: Request, res: Response) => {

@@ -7,13 +7,63 @@ import {
   SubmissionResponseSchema,
   SubmissionWriteResponseSchema,
   SubmitSubmissionBodySchema,
+  SubmissionSortSchema,
 } from '../submissions/schema';
-import { SubmitFillBundleSchema as LibSubmitFillBundleSchema } from '@soba/lib';
+import {
+  offsetQueryFields,
+  rejectedCursorField,
+  searchQueryField,
+  sortLocaleQueryField,
+  OffsetPageSchema,
+  OFFSET_DRIFT_NOTE,
+} from '../shared/offsetPagination';
+import {
+  SubmitFillBundleSchema as LibSubmitFillBundleSchema,
+  MySubmissionStateSchema as LibMySubmissionStateSchema,
+  MySubmissionRoleSchema as LibMySubmissionRoleSchema,
+  MySubmissionListItemSchema as LibMySubmissionListItemSchema,
+  ListMySubmissionsResponseSchema as LibListMySubmissionsResponseSchema,
+} from '@soba/lib';
 
 extendZodWithOpenApi(z);
 
 export const SubmitFillBundleSchema =
   LibSubmitFillBundleSchema.clone().openapi('Submit_FillBundle');
+
+export const MySubmissionStateSchema = LibMySubmissionStateSchema.clone().openapi(
+  'Submit_MySubmissionState',
+);
+
+export const ListMySubmissionsQuerySchema = z
+  .object({
+    ...offsetQueryFields,
+    cursor: rejectedCursorField,
+    workflowState: MySubmissionStateSchema.optional(),
+    q: searchQueryField.openapi({
+      description: 'Matches anywhere in the form name, or a submitted confirmation code.',
+    }),
+    sort: SubmissionSortSchema.default('updatedAt:desc'),
+    locale: sortLocaleQueryField,
+  })
+  .openapi('Submit_ListMySubmissionsQuery');
+
+export const MySubmissionRoleSchema =
+  LibMySubmissionRoleSchema.clone().openapi('Submit_MySubmissionRole');
+
+export const MySubmissionListItemSchema = LibMySubmissionListItemSchema.extend({
+  workflowState: MySubmissionStateSchema,
+  role: MySubmissionRoleSchema,
+}).openapi('Submit_MySubmissionListItem');
+
+export const ListMySubmissionsResponseSchema = LibListMySubmissionsResponseSchema.extend({
+  items: z.array(MySubmissionListItemSchema),
+  page: OffsetPageSchema,
+  filters: z.object({
+    workflowState: MySubmissionStateSchema.optional(),
+    q: z.string().optional(),
+  }),
+  sort: SubmissionSortSchema,
+}).openapi('Submit_ListMySubmissionsResponse');
 
 const TAG = 'core.submit';
 const SUBMISSION_PATH = '/submit/submissions/{id}';
@@ -182,6 +232,23 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
       401: { description: SUBMISSION_AUTH_REQUIRED },
       403: { description: NOT_PARTICIPANT },
       404: { description: 'Submission or its content not found' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/submit/submissions/mine',
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    description: `The caller's draft and submitted submissions, across every workspace. Anonymous callers have none. ${OFFSET_DRIFT_NOTE}`,
+    request: { query: ListMySubmissionsQuerySchema },
+    responses: {
+      200: {
+        description: "A page of the caller's submissions",
+        content: { 'application/json': { schema: ListMySubmissionsResponseSchema } },
+      },
+      400: { description: 'Invalid query' },
+      401: { description: 'Authentication required' },
     },
   });
 

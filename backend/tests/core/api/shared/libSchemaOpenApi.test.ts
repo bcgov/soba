@@ -5,6 +5,7 @@ import { registerWorkspacesOpenApi } from '../../../../src/core/api/workspaces/s
 import { registerAdminOpenApi } from '../../../../src/core/api/admin/schema';
 import { registerMetaOpenApi } from '../../../../src/core/api/meta/schema';
 import { registerMeOpenApi } from '../../../../src/core/api/me/schema';
+import { registerSubmitOpenApi } from '../../../../src/core/api/submit/schema';
 import { registerFormSettingsOpenApi } from '../../../../src/features/form-settings';
 
 function componentSchemas(): unknown {
@@ -16,6 +17,7 @@ function componentSchemas(): unknown {
   registerAdminOpenApi(registry);
   registerMetaOpenApi(registry);
   registerMeOpenApi(registry);
+  registerSubmitOpenApi(registry);
   const doc = new OpenApiGeneratorV3(registry.definitions).generateDocument({
     openapi: '3.0.3',
     info: { title: 'test', version: '1' },
@@ -45,7 +47,11 @@ describe('OpenAPI components for lib-backed schemas', () => {
       'Submissions_SubmissionSort',
     ],
     ['Workspaces_ListWorkspacesResponse', 'Workspaces_WorkspaceItem', 'Workspaces_WorkspaceSort'],
-    ['Me_ListSubmissionsResponse', 'Me_SubmissionListItem', 'Submissions_SubmissionSort'],
+    [
+      'Submit_ListMySubmissionsResponse',
+      'Submit_MySubmissionListItem',
+      'Submissions_SubmissionSort',
+    ],
     ['Admin_ListSobaAdminsResponse', 'Admin_SobaAdminItem', 'Admin_SobaAdminSort'],
     ['Admin_ListFeatureScopesResponse', 'Admin_FeatureScopeItem', 'Admin_FeatureScopeSort'],
     [

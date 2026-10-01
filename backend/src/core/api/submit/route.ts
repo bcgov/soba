@@ -1,12 +1,14 @@
 import express from 'express';
 import { validateRequest } from '../shared/validation';
 import { openWorkspaceFromResource } from '../../middleware/workspaceContext';
+import { sortLocale } from '../../middleware/sortLocale';
 import {
   requireFormSubmitAccess,
+  requireSignedInSubmitter,
   requireSubmissionDelete,
   requireSubmissionRead,
 } from '../../middleware/formSubmitAccess';
-import { getSubmitSubmissionSchema, getSubmitFillBundle } from './controller';
+import { getSubmitSubmissionSchema, getSubmitFillBundle, listMySubmissions } from './controller';
 import { requireDraftSave } from './draftSave';
 import {
   openSubmission,
@@ -22,6 +24,7 @@ import {
   SubmissionIdParamsSchema,
   SubmitSubmissionBodySchema,
 } from '../submissions/schema';
+import { ListMySubmissionsQuerySchema } from './schema';
 
 // Submit-mode: mounted under /api/v1/submit with optional auth (anonymous resolves to the public user).
 // Each route authorizes through isSubmitterAllowed (services/submitterAccess).
@@ -50,6 +53,15 @@ router.post(
   validateRequest({ params: SubmissionIdParamsSchema, body: SubmitSubmissionBodySchema }),
   requireFormSubmitAccess,
   submitSubmission,
+);
+
+// Registered before /submissions/:id, which would otherwise take `mine` as an id.
+router.get(
+  '/submissions/mine',
+  validateRequest({ query: ListMySubmissionsQuerySchema }),
+  sortLocale,
+  requireSignedInSubmitter,
+  listMySubmissions,
 );
 
 router.get(

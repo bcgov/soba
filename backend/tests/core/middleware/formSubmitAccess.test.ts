@@ -12,6 +12,7 @@ jest.mock('../../../src/core/db/repos/formRepo', () => ({
 import type { NextFunction, Request, Response } from 'express';
 import {
   requireFormSubmitAccess,
+  requireSignedInSubmitter,
   requireSubmissionDelete,
   requireSubmissionRead,
 } from '../../../src/core/middleware/formSubmitAccess';
@@ -181,5 +182,22 @@ describe('requireSubmissionDelete', () => {
     expect(await run(requireSubmissionDelete, makeReq({ id: 's1', context }))).toHaveBeenCalledWith(
       expect.any(UnauthorizedError),
     );
+  });
+});
+
+describe('requireSignedInSubmitter', () => {
+  const call = (req: Request) => {
+    const next = jest.fn() as jest.MockedFunction<NextFunction>;
+    requireSignedInSubmitter(req, res, next);
+    return next;
+  };
+
+  it('lets a signed-in caller through', () => {
+    expect(call(makeReq({ authed: true }))).toHaveBeenCalledWith();
+  });
+
+  it('refuses the public caller with a 401, without consulting the access policy', () => {
+    expect(call(makeReq({}))).toHaveBeenCalledWith(expect.any(UnauthorizedError));
+    expect(mockAllowed).not.toHaveBeenCalled();
   });
 });

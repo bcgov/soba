@@ -3,6 +3,7 @@ import { getSubmissionWorkspaceAndState } from '../db/repos/submissionRepo';
 import { getWorkspaceIdForForm } from '../db/repos/formRepo';
 import { PUBLIC_SUBMITTER_LABEL, WorkspaceMembershipRole, type PermissionCode } from '../db/codes';
 import {
+  isIdentifiedCaller,
   isSubmitterAllowed,
   SubmitterOperation,
   type SubmitterAccessTarget,
@@ -193,4 +194,17 @@ export const requireSubmissionDelete = async (
   } catch (error) {
     next(error);
   }
+};
+
+/** Authorizes a list of the caller's own submissions: signed-in callers only, otherwise 401. */
+export const requireSignedInSubmitter = (
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): void => {
+  if (isIdentifiedCaller(resolveCaller(req))) {
+    next();
+    return;
+  }
+  next(accessDenial(req, 'Sign in to list your submissions'));
 };

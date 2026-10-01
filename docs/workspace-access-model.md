@@ -254,9 +254,9 @@ staff read and delete submissions through form permissions. Files, print and pre
 route, so staff download files through `/files` or `/submit/files`, and print and preview through
 the submit routes, all of which need a grant.
 
-`GET /me/submissions` lists the draft and submitted submissions the caller holds an active grant
-on, across every workspace, with the caller's role on each. Submissions on a deleted form or form
-version are left out.
+`GET /submit/submissions/mine` lists the draft and submitted submissions the caller holds an active
+grant on, across every workspace, with the caller's role on each. Submissions on a deleted form or
+form version are left out. Anonymous callers get a 401, since the public user's grants are shared.
 
 ## What a new workspace looks like
 

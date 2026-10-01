@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { z } from 'zod';
 import type { SubmitFillBundle } from '@soba/lib';
 import { asyncHandler } from '../shared/asyncHandler';
 import { NotFoundError } from '../../errors';
@@ -8,8 +9,10 @@ import { isSubmitterAllowed, SubmitterOperation } from '../../services/submitter
 import { log } from '../../logging';
 import { DraftSaveStatus, getDraftSaveStatus } from '../../../features/form-settings/submitter';
 import type { Request } from 'express';
+import { ListMySubmissionsQuerySchema } from './schema';
 
 type SubmitContext = NonNullable<Request['coreContext']>;
+type ListMySubmissionsQuery = z.infer<typeof ListMySubmissionsQuerySchema>;
 
 /** Load a submission and its form-version schema by id (both required), or throw 404. */
 const loadSubmissionSchema = async (ctx: SubmitContext, submissionId: string) => {
@@ -80,3 +83,18 @@ export const getSubmitFillBundle = asyncHandler(
     res.json(bundle);
   },
 );
+
+/** The caller's own draft and submitted submissions. Runs after requireSignedInSubmitter. */
+export const listMySubmissions = asyncHandler(async (req: Request, res: Response) => {
+  const query = req.query as unknown as ListMySubmissionsQuery;
+  res.json(
+    await submissionsApiService.listMine(req.actorId!, {
+      offset: query.offset,
+      limit: query.limit,
+      workflowState: query.workflowState,
+      q: query.q,
+      sort: query.sort,
+      locale: req.sortLocale!,
+    }),
+  );
+});
