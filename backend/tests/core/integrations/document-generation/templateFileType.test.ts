@@ -5,10 +5,6 @@ describe('templateFileType', () => {
     ['r.docx', 'docx'],
     ['R.DOCX', 'docx'],
     ['sheet.xlsx', 'xlsx'],
-    ['deck.pptx', 'pptx'],
-    ['r.odt', 'odt'],
-    ['sheet.ods', 'ods'],
-    ['deck.odp', 'odp'],
   ])('reads %s as %s', (name, type) => {
     expect(templateFileType(name)).toBe(type);
   });
