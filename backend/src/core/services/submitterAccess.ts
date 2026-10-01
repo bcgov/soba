@@ -39,8 +39,8 @@ const isOwner: AccessCheck = async (target, caller) =>
   !!target.submissionId && !!caller.actorId && isActiveOwner(target.submissionId, caller.actorId);
 
 // The shared public user owns every anonymous submission, so its ownership grants nothing.
-const isIdentified: AccessCheck = async (_target, caller) =>
-  !!caller.idpCode && caller.idpCode !== PUBLIC_PROVIDER_CODE;
+const isIdentified: AccessCheck = (_target, caller) =>
+  Promise.resolve(!!caller.idpCode && caller.idpCode !== PUBLIC_PROVIDER_CODE);
 
 const hasFormPermission =
   (permission: PermissionCode): AccessCheck =>

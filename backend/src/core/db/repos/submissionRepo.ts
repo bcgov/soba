@@ -838,7 +838,7 @@ export type DeleteSubmissionResult =
  * the current ref. Any live state is deletable unless `deletableStates` narrows it; the state is read
  * under the row lock, so a concurrent submit cannot slip past the check.
  */
-export const markSubmissionDeleted = async (input: {
+export const markSubmissionDeleted = (input: {
   workspaceId: string;
   submissionId: string;
   actorId: string;
