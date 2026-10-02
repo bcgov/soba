@@ -4,7 +4,12 @@ interface RouteLayer {
   route?: { path: string; methods: Record<string, boolean>; stack: { handle: { name: string } }[] };
 }
 
-const GUARDS = ['requireSubmissionRead', 'requireFormSubmitAccess'];
+const GUARDS = [
+  'requireSubmissionRead',
+  'requireFormSubmitAccess',
+  'requireSubmissionDelete',
+  'requireSignedInSubmitter',
+];
 
 const routes = (submitRouter as unknown as { stack: RouteLayer[] }).stack.flatMap((l) =>
   l.route
@@ -38,6 +43,19 @@ it.each(['/submissions', '/submissions/:id/save', '/submissions/:id/submit'])(
     expect(handlersFor('post', path)).toContain('requireFormSubmitAccess');
   },
 );
+
+it('GET /submissions/mine goes through requireSignedInSubmitter', () => {
+  expect(handlersFor('get', '/submissions/mine')).toContain('requireSignedInSubmitter');
+});
+
+it('registers GET /submissions/mine before GET /submissions/:id, which would take it as an id', () => {
+  const order = routes.filter((r) => r.method === 'get').map((r) => r.path);
+  expect(order.indexOf('/submissions/mine')).toBeLessThan(order.indexOf('/submissions/:id'));
+});
+
+it('DELETE /submissions/:id goes through requireSubmissionDelete', () => {
+  expect(handlersFor('delete', '/submissions/:id')).toContain('requireSubmissionDelete');
+});
 
 it.each(routes.map((r) => [`${r.method.toUpperCase()} ${r.path}`, r.handlers] as const))(
   '%s runs exactly one submit-mode guard, before its handler',

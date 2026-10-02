@@ -1,9 +1,12 @@
-// Submit-mode API service: submission open/save/submit + reads of an existing submission. All calls
-// hit /submit/* and take an optional token; the backend attributes anonymous callers to the seeded
-// public user. Opening needs the form's Form submitters audience; reading an existing submission needs
-// participation in it, and writing it needs both.
+// Submit-mode API service: submission open/save/submit, reads of an existing submission, and the
+// caller's own list and delete. All calls hit /submit/*. The token is optional except on the list and
+// delete; the backend attributes anonymous callers to the seeded public user. Opening needs the form's
+// Form submitters audience; reading an existing submission needs participation in it, and writing it
+// needs both.
 import { sobaFetch } from './sobaFetch';
 import { parseJson } from './sobaHelpers';
+import { sortLocaleHeaders } from './sortLocaleRequest';
+import { toListRequestQuery, type ListQueryArgs } from '@/src/types/list';
 import { FormType } from '@formio/react';
 import type { SubmitFillBundle, SubmissionDataDocument } from '../../types/forms';
 import type {
@@ -12,6 +15,8 @@ import type {
   SubmissionWriteResponse,
   SubmissionListItem,
   SubmitSubmissionBody,
+  ListMySubmissionsResponse,
+  MySubmissionState,
 } from '@/src/types/submissions';
 
 /**
@@ -91,6 +96,28 @@ export async function submitSobaFormSubmission(
     json: body,
   });
   return parseJson<SubmissionWriteResponse>(response);
+}
+
+/** One page of the caller's own draft and submitted submissions; signed-in callers only. */
+export async function getMySubmissions(
+  token: string,
+  args: ListQueryArgs & { workflowState?: MySubmissionState },
+): Promise<ListMySubmissionsResponse> {
+  const response = await sobaFetch('/submit/submissions/mine', {
+    token,
+    query: { ...toListRequestQuery(args), workflowState: args.workflowState },
+    headers: sortLocaleHeaders(args.locale),
+  });
+  return parseJson(response);
+}
+
+/** Delete the caller's own unsubmitted submission. A 404 counts as deleted. */
+export async function deleteSubmitSubmission(token: string, submissionId: string): Promise<void> {
+  const response = await sobaFetch(`/submit/submissions/${submissionId}`, {
+    token,
+    method: 'DELETE',
+  });
+  if (!response.ok && response.status !== 404) await parseJson(response);
 }
 
 /** Read a submission's metadata for the confirmation view. */

@@ -305,7 +305,7 @@ export type FormGroupOverrideStatusCode =
 
 /**
  * A user's standing on one submission (submission_participant.role). Owners and collaborators have
- * the same access.
+ * the same access, except that only an owner deletes the submission.
  */
 export const SubmissionParticipantRole = {
   owner: 'owner',

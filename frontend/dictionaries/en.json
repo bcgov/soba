@@ -411,6 +411,38 @@
       }
     }
   },
+  "mySubmissions": {
+    "columns": {
+      "form": "Form",
+      "status": "Status",
+      "confirmationId": "Confirmation ID",
+      "updatedAt": "Last updated",
+      "actions": "Actions"
+    },
+    "states": {
+      "draft": "Draft",
+      "submitted": "Submitted"
+    },
+    "statusFilter": "Status",
+    "allStates": "All",
+    "continue": "Continue",
+    "view": "View",
+    "delete": "Delete",
+    "continueLabel": "Continue {form}, last updated {updated}",
+    "viewLabel": "View {form}, last updated {updated}",
+    "deleteLabel": "Delete draft of {form}, last updated {updated}",
+    "empty": "You have no submissions yet.",
+    "noMatches": "No submissions match your search or filter.",
+    "loadError": "Could not load your submissions.",
+    "itemName": "submissions",
+    "deleteTitle": "Delete draft",
+    "deleteMessage": "Your draft of {form}, last updated {updated}, will be deleted. This cannot be undone.",
+    "deleteSuccess": "Draft deleted.",
+    "deleteError": "Could not delete this draft.",
+    "deleteSubmitted": "This draft has been submitted and can no longer be deleted.",
+    "viewAll": "View my submissions",
+    "noCode": "No confirmation ID yet"
+  },
   "Basic": "Basic",
   "Text Field": "Text Field",
   "Text Area": "Text Area",

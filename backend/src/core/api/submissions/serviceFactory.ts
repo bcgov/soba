@@ -1,11 +1,15 @@
 import { SubmissionService, type SubmissionWriteOutcome } from '../../services/submissionService';
 import { SubmissionWorkflowState } from '../../db/codes';
 import type {
+  ParticipantSubmissionListRow,
   SubmissionRecord,
   SubmissionListRow,
   SubmissionDetailRow,
 } from '../../db/repos/submissionRepo';
 import type {
+  ListMySubmissionsResponse,
+  MySubmissionRole,
+  MySubmissionState,
   OpenSubmissionBody,
   SubmissionDataBody,
   SortLocale,
@@ -34,6 +38,15 @@ export interface ListSubmissionsQueryInput {
   limit: number;
   workflowState?: string;
   createdBy?: string;
+  q?: string;
+  sort: SubmissionListSort;
+  locale: SortLocale;
+}
+
+export interface ListMySubmissionsQueryInput {
+  offset: number;
+  limit: number;
+  workflowState?: MySubmissionState;
   q?: string;
   sort: SubmissionListSort;
   locale: SortLocale;
@@ -85,6 +98,18 @@ const toSubmissionListItemDto = (item: SubmissionListRow) => ({
   confirmationCode: confirmationCodeOf(item),
 });
 
+const toMySubmissionListItemDto = (item: ParticipantSubmissionListRow) => ({
+  id: item.id,
+  formId: item.formId,
+  formName: item.formName,
+  workflowState: item.workflowState as MySubmissionState,
+  role: item.role as MySubmissionRole,
+  submittedAt: item.submittedAt?.toISOString() ?? null,
+  createdAt: item.createdAt.toISOString(),
+  updatedAt: item.updatedAt.toISOString(),
+  confirmationCode: confirmationCodeOf(item),
+});
+
 export function createSubmissionsApiService(submissionService: SubmissionService) {
   return {
     get: async (ctx: SubmissionsContextInput, submissionId: string) => {
@@ -131,6 +156,27 @@ export function createSubmissionsApiService(submissionService: SubmissionService
       };
     },
 
+    listMine: async (
+      userId: string,
+      query: ListMySubmissionsQueryInput,
+    ): Promise<ListMySubmissionsResponse> => {
+      const result = await submissionService.listForParticipant({
+        userId,
+        offset: query.offset,
+        limit: query.limit,
+        workflowState: query.workflowState,
+        q: query.q,
+        sort: query.sort,
+        locale: query.locale,
+      });
+      return {
+        items: result.items.map((item) => toMySubmissionListItemDto(item)),
+        page: { offset: query.offset, limit: query.limit, total: result.total },
+        filters: { workflowState: query.workflowState, q: query.q },
+        sort: query.sort,
+      };
+    },
+
     open: async (ctx: SubmissionsContextInput, body: OpenSubmissionBody) => {
       const { created, record } = await submissionService.open({ ...ctx, ...body });
       return { created, submission: toSubmissionDto(record) };
@@ -148,6 +194,9 @@ export function createSubmissionsApiService(submissionService: SubmissionService
 
     delete: (ctx: SubmissionsContextInput, submissionId: string) =>
       submissionService.delete({ ...ctx, submissionId }),
+
+    deleteUnsubmitted: (ctx: SubmissionsContextInput, submissionId: string) =>
+      submissionService.deleteUnsubmitted({ ...ctx, submissionId }),
   };
 }
 

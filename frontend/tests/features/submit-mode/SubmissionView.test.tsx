@@ -26,11 +26,15 @@ vi.mock('@/app/[lang]/Providers', () => ({
       noContent: 'No submitted answers to display.',
       submittedOn: 'Submitted',
     },
+    mySubmissions: { viewAll: 'View my submissions' },
   }),
 }));
 
+const push = vi.fn();
 vi.mock('next/navigation', () => ({
   useParams: () => ({ submissionId: 'sub-1' }),
+  usePathname: () => '/en/submission/sub-1/success',
+  useRouter: () => ({ push }),
 }));
 
 vi.mock('@/src/features/formio-v5/ui/ReadOnlyFormView', () => ({
@@ -156,6 +160,25 @@ describe('SubmissionView', () => {
     );
     expect(getSubmitSubmissionSchema).toHaveBeenCalledWith(undefined, 'sub-1');
     expect(getSubmitSubmissionData).toHaveBeenCalledWith(undefined, 'sub-1');
+  });
+
+  it('links a signed-in submitter to their submissions', async () => {
+    initAnswered();
+    store.dispatch(setToken('token'));
+    store.dispatch(setAuthenticated(true));
+    await renderView(true);
+
+    const link = await screen.findByTestId('submission-success-my-submissions');
+    await act(async () => link.click());
+
+    expect(push).toHaveBeenCalledWith('/en/my-submissions');
+  });
+
+  it('offers no submissions link to an anonymous submitter', async () => {
+    initAnswered();
+    await renderView(true);
+    await screen.findByTestId('submission-success');
+    expect(screen.queryByTestId('submission-success-my-submissions')).not.toBeInTheDocument();
   });
 
   it('does not claim success for an unsubmitted form', async () => {

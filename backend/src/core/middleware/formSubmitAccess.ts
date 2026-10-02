@@ -3,6 +3,7 @@ import { getSubmissionWorkspaceAndState } from '../db/repos/submissionRepo';
 import { getWorkspaceIdForForm } from '../db/repos/formRepo';
 import { PUBLIC_SUBMITTER_LABEL, WorkspaceMembershipRole, type PermissionCode } from '../db/codes';
 import {
+  isIdentifiedCaller,
   isSubmitterAllowed,
   SubmitterOperation,
   type SubmitterAccessTarget,
@@ -23,6 +24,7 @@ const DENIAL_MESSAGES: Record<SubmitterOperationCode, string> = {
   write: 'Not authorized to change this submission',
   deleteSubmittedFile: 'Not authorized to change this submission',
   render: 'Not authorized to generate this document',
+  delete: 'Not authorized to delete this submission',
 };
 
 /**
@@ -144,6 +146,22 @@ export const requireFormSubmitAccess = async (
   }
 };
 
+/** Authorizes an operation on the submission openWorkspaceFromResource already resolved. */
+const authorizeResolvedSubmission = async (
+  req: Request,
+  operation: SubmitterOperationCode,
+): Promise<void> => {
+  const context = req.coreContext;
+  if (!context?.formId || !req.params.id) {
+    throw new Error(`The ${operation} guard must run after submission resource resolution`);
+  }
+  await assertSubmitterAllowed(req, operation, {
+    workspaceId: context.workspaceId,
+    formId: context.formId,
+    submissionId: req.params.id,
+  });
+};
+
 /**
  * Authorizes a submit-mode read of an existing submission. Runs after openWorkspaceFromResource, which
  * 404s a missing submission and resolves its form.
@@ -154,17 +172,39 @@ export const requireSubmissionRead = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const context = req.coreContext;
-    if (!context?.formId || !req.params.id) {
-      throw new Error('requireSubmissionRead must run after submission resource resolution');
-    }
-    await assertSubmitterAllowed(req, SubmitterOperation.read, {
-      workspaceId: context.workspaceId,
-      formId: context.formId,
-      submissionId: req.params.id,
-    });
+    await authorizeResolvedSubmission(req, SubmitterOperation.read);
     next();
   } catch (error) {
     next(error);
   }
+};
+
+/**
+ * Authorizes a submitter's delete of an existing submission. Runs after openWorkspaceFromResource,
+ * which 404s a missing submission and resolves its form.
+ */
+export const requireSubmissionDelete = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    await authorizeResolvedSubmission(req, SubmitterOperation.delete);
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** Authorizes a list of the caller's own submissions: signed-in callers only, otherwise 401. */
+export const requireSignedInSubmitter = (
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): void => {
+  if (isIdentifiedCaller(resolveCaller(req))) {
+    next();
+    return;
+  }
+  next(accessDenial(req, 'Sign in to list your submissions'));
 };

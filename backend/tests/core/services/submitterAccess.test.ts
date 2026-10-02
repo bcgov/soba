@@ -3,10 +3,14 @@ jest.mock('../../../src/core/db/repos/formSubmitAccessRepo', () => ({
 }));
 jest.mock('../../../src/core/db/repos/submissionParticipantRepo', () => ({
   isActiveParticipant: jest.fn(),
+  isActiveOwner: jest.fn(),
 }));
 
 import { hasFormSubmitAccess } from '../../../src/core/db/repos/formSubmitAccessRepo';
-import { isActiveParticipant } from '../../../src/core/db/repos/submissionParticipantRepo';
+import {
+  isActiveOwner,
+  isActiveParticipant,
+} from '../../../src/core/db/repos/submissionParticipantRepo';
 import {
   isSubmitterAllowed,
   SubmitterOperation,
@@ -15,6 +19,7 @@ import {
 import { Permissions, type PermissionCode } from '../../../src/core/db/codes';
 
 const mockParticipant = jest.mocked(isActiveParticipant);
+const mockOwner = jest.mocked(isActiveOwner);
 const mockFormPermission = jest.mocked(hasFormSubmitAccess);
 
 const caller = { actorId: 'u1', idpCode: 'idir' };
@@ -28,6 +33,7 @@ const grant = (participant: boolean, permissions: PermissionCode[]) => {
 
 beforeEach(() => {
   mockParticipant.mockReset();
+  mockOwner.mockReset();
   mockFormPermission.mockReset();
 });
 
@@ -77,6 +83,41 @@ it('never consults participation to open', async () => {
   grant(false, [create]);
   await isSubmitterAllowed(open, { workspaceId: 'ws1', formId: 'f1' }, caller);
   expect(mockParticipant).not.toHaveBeenCalled();
+});
+
+describe('delete', () => {
+  const publicCaller = { actorId: 'public-user', idpCode: 'public' };
+
+  it('allows an identified owner, without consulting the form audience', async () => {
+    mockOwner.mockResolvedValue(true);
+    await expect(isSubmitterAllowed(SubmitterOperation.delete, target, caller)).resolves.toBe(true);
+    expect(mockOwner).toHaveBeenCalledWith('s1', 'u1');
+    expect(mockFormPermission).not.toHaveBeenCalled();
+  });
+
+  it('refuses a participant who is not the owner', async () => {
+    mockOwner.mockResolvedValue(false);
+    grant(true, [create]);
+    await expect(isSubmitterAllowed(SubmitterOperation.delete, target, caller)).resolves.toBe(
+      false,
+    );
+  });
+
+  it.each([
+    ['the public caller', publicCaller],
+    ['a caller with no provider', { actorId: 'u1' }],
+  ])('refuses %s even when it owns the submission, without a lookup', async (_label, who) => {
+    mockOwner.mockResolvedValue(true);
+    await expect(isSubmitterAllowed(SubmitterOperation.delete, target, who)).resolves.toBe(false);
+    expect(mockOwner).not.toHaveBeenCalled();
+  });
+
+  it('refuses without a submission', async () => {
+    mockOwner.mockResolvedValue(true);
+    await expect(
+      isSubmitterAllowed(SubmitterOperation.delete, { workspaceId: 'ws1', formId: 'f1' }, caller),
+    ).resolves.toBe(false);
+  });
 });
 
 it('refuses a read without an actor or a submission, without a lookup', async () => {

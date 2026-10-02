@@ -1,17 +1,22 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { InlineAlert } from '@bcgov/design-system-react-components';
+import { useParams, usePathname, useRouter } from 'next/navigation';
+import { InlineAlert, Link } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useDictionary } from '@/app/[lang]/Providers';
+import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { SubmissionDetail } from '@/src/features/submissions/ui/SubmissionDetail';
 import { SubmissionLoadAlert } from '@/src/features/submissions/ui/SubmissionLoadAlert';
 import { useSubmitSubmission } from '@/src/features/submit-mode/data/useSubmitSubmission';
+import { getLocaleFromPath } from '@/src/shared/util/locale';
 
 /** A submitter's view of one submission; `success` is the confirmation shown right after submit. */
 export function SubmissionView({ success = false }: Readonly<{ success?: boolean }>) {
   const params = useParams();
   const dict = useDictionary();
+  const router = useRouter();
+  const locale = getLocaleFromPath(usePathname());
+  const { authenticated } = useKeycloak();
 
   const submissionIdRaw = params?.submissionId;
   const submissionId =
@@ -50,6 +55,17 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
               description={dict.submission.success.keepConfirmation}
             />
           </div>
+          {/* Signed in only; the bare URL opens the list unfiltered. */}
+          {authenticated ? (
+            <div className="mb-3">
+              <Link
+                data-testid="submission-success-my-submissions"
+                onPress={() => router.push(`/${locale}/my-submissions`)}
+              >
+                {dict.mySubmissions.viewAll}
+              </Link>
+            </div>
+          ) : null}
           {detail}
         </div>
       );

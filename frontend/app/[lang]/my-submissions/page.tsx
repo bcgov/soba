@@ -1,6 +1,6 @@
 import { getDictionary, resolveLocale } from '../dictionaries';
 import { PageLayout } from '@/src/components/PageLayout';
-import { SecondaryText } from '@/src/components/SecondaryText';
+import { MySubmissionsList } from '@/src/features/submit-mode/ui/MySubmissionsList';
 import { pageMetadata } from '@/src/shared/config/pageMetadata';
 
 type PageProps = {
@@ -18,9 +18,7 @@ export default async function Page({ params }: Readonly<PageProps>) {
 
   return (
     <PageLayout headingId="my-submissions-heading" heading={dict.general.mySubmissions}>
-      <SecondaryText elementType="p" size="medium" data-testid="my-submissions-coming-soon">
-        {dict.general.comingSoon}
-      </SecondaryText>
+      <MySubmissionsList />
     </PageLayout>
   );
 }

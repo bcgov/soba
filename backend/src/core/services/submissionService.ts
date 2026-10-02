@@ -8,9 +8,11 @@ import {
   getSubmissionById,
   getSubmissionRecordById,
   getSubmissionRevisionById,
+  listSubmissionsForParticipant,
   listSubmissionsForWorkspace,
   markSubmissionDeleted,
   updateSubmissionDraft,
+  type ListParticipantSubmissionsInput,
   type SubmissionRecord,
 } from '../db/repos/submissionRepo';
 import { getFormVersionById, getPublishedVersionForForm } from '../db/repos/formVersionRepo';
@@ -28,6 +30,7 @@ import {
 } from '../db/codes';
 import { log } from '../logging';
 import { decideSubmissionWrite, type SubmissionWriteDecision } from './submissionWriteGate';
+import { SUBMITTER_DELETABLE_STATES } from './submissionLifecycle';
 import { withNewConfirmationCode } from './confirmationCode';
 
 export interface SubmissionWriteOutcome {
@@ -285,8 +288,25 @@ export class SubmissionService {
     }
   }
 
+  /** Staff delete, from any live state. Null when the submission is missing or already deleted. */
   async delete(input: DeleteInput) {
-    return markSubmissionDeleted(input);
+    const result = await markSubmissionDeleted(input);
+    return result.outcome === 'deleted' ? result.record : null;
+  }
+
+  /**
+   * A submitter's delete, only before the submission is submitted; a submitted one is a 409. Null
+   * when the submission is missing or already deleted.
+   */
+  async deleteUnsubmitted(input: DeleteInput) {
+    const result = await markSubmissionDeleted({
+      ...input,
+      deletableStates: SUBMITTER_DELETABLE_STATES,
+    });
+    if (result.outcome === 'not_deletable') {
+      throw new ConflictError(`Submission is ${result.workflowState} and can no longer be deleted`);
+    }
+    return result.outcome === 'deleted' ? result.record : null;
   }
 
   async get(workspaceId: string, submissionId: string) {
@@ -322,5 +342,10 @@ export class SubmissionService {
     return listSubmissionsForWorkspace({
       ...input,
     });
+  }
+
+  /** The draft and submitted submissions the user takes part in, across every workspace. */
+  async listForParticipant(input: ListParticipantSubmissionsInput) {
+    return listSubmissionsForParticipant(input);
   }
 }

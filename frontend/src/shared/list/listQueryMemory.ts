@@ -69,6 +69,14 @@ export const FORM_SUBMISSIONS_LIST_QUERY: ListQuerySpec = {
   defaultSort: 'submittedAt:desc',
 };
 
+/** The caller's own submissions in submit mode. */
+export const MY_SUBMISSIONS_LIST_QUERY: ListQuerySpec = {
+  resource: 'mySubmissions',
+  filters: ['state'],
+  sortOptions: sortTokensFor(SUBMISSION_SORT_FIELDS),
+  defaultSort: UPDATED_DESC,
+};
+
 /** The version history tab inside the designer. */
 export const FORM_VERSIONS_LIST_QUERY: ListQuerySpec = {
   resource: 'formVersions',

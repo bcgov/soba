@@ -85,3 +85,14 @@ export const deleteSubmission = asyncHandler(
     res.status(204).send();
   },
 );
+
+export const deleteUnsubmittedSubmission = asyncHandler(
+  async (req: Request<SubmissionIdParams>, res: Response) => {
+    const ctx = req.coreContext!;
+    const result = await submissionsApiService.deleteUnsubmitted(ctx, req.params.id);
+    if (!result) {
+      throw new NotFoundError(SUBMISSION_NOT_FOUND);
+    }
+    res.status(204).send();
+  },
+);
