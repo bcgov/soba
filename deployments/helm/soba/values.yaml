@@ -6,6 +6,13 @@ global:
   # PR number a deployment belongs to, for provenance when several PR releases share a namespace.
   prNumber: ""
 
+# Opt-in access from APS to backend pods only. namespaceName is the APS namespace label (Silver:
+# 264e6f, Gold: b8840c); environment is test or prod, matching the APS instance publishing the route.
+gatewayNetworkPolicy:
+  enabled: false
+  namespaceName: ""
+  environment: ""
+
 # -- Backend (Express API) ------------------------------------------------
 backend:
   image:

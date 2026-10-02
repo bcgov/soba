@@ -46,6 +46,11 @@ backend:
   autoscaling:
     enabled: false
 
+# PR routes publish to the APS test instance on Silver. The PR deploy sets enabled from APS_PR_ENABLED.
+gatewayNetworkPolicy:
+  namespaceName: "264e6f"
+  environment: test
+
 frontend:
   replicas: 1
   readinessProbe:
