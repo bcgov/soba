@@ -4,10 +4,12 @@ import { sobaSchema, workspaces } from './core';
 import { files } from './file';
 import { formVersions, forms } from './forms';
 
+export const DOCUMENT_TEMPLATE_VERSION_TYPE_UNIQUE = 'document_template_version_type_uq';
+
 /**
- * A document template on one form version: a stored file under a name unique within the version.
- * The id stays the same when the file is replaced. Templates carried to a new version share the
- * file until one of them replaces it.
+ * A document template on one form version: a stored file of a type, at most one of each type per
+ * version. The id stays the same when the file is replaced. Templates carried to a new version
+ * share the file until one of them replaces it.
  */
 export const documentTemplates = sobaSchema.table(
   'document_template',
@@ -25,14 +27,15 @@ export const documentTemplates = sobaSchema.table(
     fileId: uuid('file_id')
       .notNull()
       .references(() => files.id),
+    type: text('type').notNull().default('cdogs'),
     name: text('name').notNull(),
     ...auditColumns(),
   },
   (table) => ({
     fileIdx: index('document_template_file_idx').on(table.fileId),
-    versionNameUnique: uniqueIndex('document_template_version_name_uq').on(
+    versionTypeUnique: uniqueIndex(DOCUMENT_TEMPLATE_VERSION_TYPE_UNIQUE).on(
       table.formVersionId,
-      table.name,
+      table.type,
     ),
     workspaceIdx: index('document_template_workspace_idx').on(table.workspaceId),
   }),

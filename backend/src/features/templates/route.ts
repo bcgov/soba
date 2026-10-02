@@ -9,7 +9,13 @@ import { requireFormPermissions } from '../../core/middleware/requireFormPermiss
 import { workspaceFromResource } from '../../core/middleware/workspaceContext';
 import { isLiveFormVersion } from '../../core/db/repos/formVersionRepo';
 import { NotFoundError } from '../../core/errors';
-import { TemplateIdParamsSchema, TemplateNameBodySchema, TemplatesQuerySchema } from './schema';
+import {
+  TemplateIdParamsSchema,
+  TemplateNameBodySchema,
+  TemplateUploadBodySchema,
+  TemplatesFormQuerySchema,
+  TemplateVersionQuerySchema,
+} from './schema';
 import {
   createTemplateHandler,
   deleteTemplateHandler,
@@ -32,8 +38,12 @@ const liveFormVersion = asyncHandler(async (req, _res, next) => {
   next();
 });
 
+const onForm = [
+  validateRequest({ query: TemplatesFormQuerySchema }),
+  workspaceFromResource({ kind: 'form', idFrom: 'queryFormId' }),
+];
 const onFormVersion = [
-  validateRequest({ query: TemplatesQuerySchema }),
+  validateRequest({ query: TemplateVersionQuerySchema }),
   workspaceFromResource({ kind: 'formVersion', idFrom: 'queryFormVersionId' }),
 ];
 const onTemplate = [
@@ -46,17 +56,17 @@ const canDelete = requireFormPermissions([Permissions.document_template_delete])
 
 router.use(requireFeature(Features.templates), requireFeature(Features.design_mode));
 
+router.get('/', ...onForm, canRead, asyncHandler(listTemplatesHandler));
+// Uploads are authorized before the body is parsed, so an unauthorized caller never buffers a file.
 // liveFormVersion follows the permission check, so only a caller who may see the form learns its
 // state.
-router.get('/', ...onFormVersion, canRead, liveFormVersion, asyncHandler(listTemplatesHandler));
-// Uploads are authorized before the body is parsed, so an unauthorized caller never buffers a file.
 router.post(
   '/',
   ...onFormVersion,
   canWrite,
   liveFormVersion,
   upload,
-  validateRequest({ body: TemplateNameBodySchema }),
+  validateRequest({ body: TemplateUploadBodySchema }),
   asyncHandler(createTemplateHandler),
 );
 router.get('/:id', ...onTemplate, canRead, asyncHandler(getTemplateHandler));

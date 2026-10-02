@@ -1,11 +1,8 @@
-import path from 'node:path';
-import { isTemplateFileType, type TemplateFileType } from '@soba/lib';
+import { templateFileTypeFor, type TemplateFileType as LibTemplateFileType } from '@soba/lib';
 
-export { TEMPLATE_FILE_TYPES } from '@soba/lib';
-export type { TemplateFileType } from '@soba/lib';
+/** The file types the document generation backends render: those a CDOGS template accepts. */
+export type TemplateFileType = LibTemplateFileType<'cdogs'>;
 
-/** The template type of a file name, from its extension; null when it is not a template type. */
-export const templateFileType = (filename: string): TemplateFileType | null => {
-  const extension = path.extname(filename).slice(1).toLowerCase();
-  return isTemplateFileType(extension) ? extension : null;
-};
+/** The render file type of a file name, from its extension; null when a CDOGS template does not accept it. */
+export const templateFileType = (filename: string): TemplateFileType | null =>
+  templateFileTypeFor('cdogs', filename);

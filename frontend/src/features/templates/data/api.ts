@@ -1,33 +1,48 @@
 import { sobaFetch } from '@/src/shared/api/sobaFetch';
 import { ApiError, parseJson } from '@/src/shared/api/sobaHelpers';
-import type { TemplateListResponse, TemplateResponse } from '@/src/types/templates';
+import type { TemplateListResponse, TemplateResponse, TemplateType } from '@/src/types/templates';
 
 const TEMPLATES_PATH = '/templates';
 const templatePath = (templateId: string) => `${TEMPLATES_PATH}/${templateId}`;
 
-/** The templates on a form version, by name. */
-export async function listTemplates(
-  token: string,
-  formVersionId: string,
-): Promise<TemplateListResponse> {
-  const response = await sobaFetch(TEMPLATES_PATH, { token, query: { formVersionId } });
+const fileForm = (file: File, fields: Record<string, string> = {}): FormData => {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(fields)) form.set(key, value);
+  form.set('file', file);
+  return form;
+};
+
+/** The templates on the form's versions, newest version first. */
+export async function listTemplates(token: string, formId: string): Promise<TemplateListResponse> {
+  const response = await sobaFetch(TEMPLATES_PATH, { token, query: { formId } });
   return parseJson(response);
 }
 
 export async function uploadTemplate(
   token: string,
   formVersionId: string,
+  type: TemplateType,
   name: string,
   file: File,
 ): Promise<TemplateResponse> {
-  const form = new FormData();
-  form.set('name', name);
-  form.set('file', file);
   const response = await sobaFetch(TEMPLATES_PATH, {
     token,
     method: 'POST',
     query: { formVersionId },
-    form,
+    form: fileForm(file, name ? { type, name } : { type }),
+  });
+  return parseJson(response);
+}
+
+export async function replaceTemplateFile(
+  token: string,
+  templateId: string,
+  file: File,
+): Promise<TemplateResponse> {
+  const response = await sobaFetch(`${templatePath(templateId)}/content`, {
+    token,
+    method: 'PUT',
+    form: fileForm(file),
   });
   return parseJson(response);
 }

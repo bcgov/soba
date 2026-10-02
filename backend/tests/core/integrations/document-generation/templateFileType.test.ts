@@ -5,11 +5,15 @@ describe('templateFileType', () => {
     ['r.docx', 'docx'],
     ['R.DOCX', 'docx'],
     ['sheet.xlsx', 'xlsx'],
+    ['page.html', 'html'],
   ])('reads %s as %s', (name, type) => {
     expect(templateFileType(name)).toBe(type);
   });
 
-  it.each(['r.doc', 'r.pdf', 'r.docx.exe', 'docx', 'r.txt', ''])('refuses %j', (name) => {
-    expect(templateFileType(name)).toBeNull();
-  });
+  it.each(['deck.pptx', 'r.odt', 'r.doc', 'r.pdf', 'r.docx.exe', 'docx', 'r.txt', ''])(
+    'refuses %j',
+    (name) => {
+      expect(templateFileType(name)).toBeNull();
+    },
+  );
 });

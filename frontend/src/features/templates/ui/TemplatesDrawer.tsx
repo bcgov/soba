@@ -1,10 +1,9 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { Accordion, Button, TextField } from '@bcgov/design-system-react-components';
+import { useCallback, useMemo, useState } from 'react';
+import { Accordion, InlineAlert } from '@bcgov/design-system-react-components';
 
 import type { TemplateResponse } from '@/src/types/templates';
-import { TEMPLATE_FILE_ACCEPT, TEMPLATE_TYPES } from '@/src/types/templates';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { ConfirmModal } from '@/src/components/ConfirmModal';
 import { RowActionButton } from '@/src/components/RowActionButton';
@@ -12,10 +11,15 @@ import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { classifyDataError, messageForDataError } from '@/src/shared/api/dataError';
+import { useForm } from '@/src/features/designer/data/useForm';
 import type { FormSettingsSectionProps } from '@/src/features/form-settings/types';
 import { useTemplates } from '../data/useTemplates';
+import { useTemplateTypes } from '../data/useTemplateTypes';
+import { TemplateUploadForm } from './TemplateUploadForm';
 
 const KB = 1024;
+
+const versionLabel = (template: TemplateResponse) => `v${template.formVersionNo}`;
 
 function formatSize(bytes: number | null): string {
   if (bytes === null) return '';
@@ -24,32 +28,23 @@ function formatSize(bytes: number | null): string {
   return kb < KB ? `${Math.round(kb)} KB` : `${(kb / KB).toFixed(1)} MB`;
 }
 
-/** The uploaded file's name without its extension, as the default template name. */
-const nameFromFile = (filename: string): string => filename.replace(/\.[^.]+$/, '');
-
 export default function TemplatesDrawer({
   dict,
   drawerName,
-  formVersionId,
-  formVersionNo,
+  formId,
 }: Readonly<FormSettingsSectionProps>) {
   const text = dict.form.templates;
   const { token } = useKeycloak();
   const { addNotification } = useNotificationStore();
   const formatLongDate = useFormatLongDate();
-  // Templates are held per version; the settings tab edits the form's current one.
-  const versionLabel =
-    formVersionNo === null || formVersionNo === undefined
-      ? text.versionUnavailable
-      : `v${formVersionNo}`;
-  const { templates, loading, error, upload, remove, download } = useTemplates(
-    formVersionId ?? null,
+  const { form, currentVersion, versions, versionsTruncated, versionsLimit } = useForm(formId);
+  const types = useTemplateTypes(formId, form?.workspaceId ?? null);
+  const { templates, isLoading, error, upload, replace, remove, download } = useTemplates(
+    formId,
+    currentVersion?.id ?? null,
   );
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [name, setName] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<TemplateResponse | null>(null);
 
   const report = useCallback(
@@ -67,35 +62,9 @@ export default function TemplatesDrawer({
     [addNotification, dict],
   );
 
-  const clearUpload = useCallback(() => {
-    setFile(null);
-    setName('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  }, []);
-
-  const pickFile = (chosen: File | null) => {
-    setFile(chosen);
-    // Only fills a name the user has not written; they stay free to rename it.
-    if (chosen && name.trim() === '') setName(nameFromFile(chosen.name));
-  };
-
-  const submitUpload = async () => {
-    if (!token || !file || name.trim() === '' || busy) return;
-    setBusy(true);
-    try {
-      await upload(token, name.trim(), file);
-      clearUpload();
-      addNotification({ text: text.uploadSuccess, type: 'success' });
-    } catch (e: unknown) {
-      report(e, text.uploadError);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const confirmDelete = async () => {
-    if (!token || !pendingDelete || busy) return;
-    setBusy(true);
+    if (!token || !pendingDelete || deleting) return;
+    setDeleting(true);
     try {
       await remove(token, pendingDelete.id);
       addNotification({ text: text.deleteSuccess, type: 'success' });
@@ -103,7 +72,7 @@ export default function TemplatesDrawer({
     } catch (e: unknown) {
       report(e, text.deleteError);
     } finally {
-      setBusy(false);
+      setDeleting(false);
     }
   };
 
@@ -124,7 +93,7 @@ export default function TemplatesDrawer({
           <RowActionButton
             main
             data-testid={`template-${template.id}-download`}
-            aria-label={`${text.download} ${template.name}`}
+            aria-label={`${text.download} ${template.name} ${versionLabel(template)}`}
             onPress={() => startDownload(template)}
           >
             {template.name}
@@ -132,10 +101,17 @@ export default function TemplatesDrawer({
         ),
       },
       {
-        key: 'formVersionId',
+        key: 'type',
+        label: text.typeColumn,
+        render: (template) => (
+          <span data-testid={`template-${template.id}-type`}>{text.types[template.type]}</span>
+        ),
+      },
+      {
+        key: 'formVersionNo',
         label: text.versionColumn,
         render: (template) => (
-          <span data-testid={`template-${template.id}-version`}>{versionLabel}</span>
+          <span data-testid={`template-${template.id}-version`}>{versionLabel(template)}</span>
         ),
       },
       { key: 'filename', label: text.fileColumn },
@@ -154,11 +130,10 @@ export default function TemplatesDrawer({
         key: 'actions',
         label: text.actionsColumn,
         align: 'end',
-        width: '10%',
         render: (template) => (
           <RowActionButton
             data-testid={`template-${template.id}-delete`}
-            aria-label={`${text.delete} ${template.name}`}
+            aria-label={`${text.delete} ${template.name} ${versionLabel(template)}`}
             onPress={() => setPendingDelete(template)}
           >
             {text.delete}
@@ -166,52 +141,42 @@ export default function TemplatesDrawer({
         ),
       },
     ],
-    [text, formatLongDate, startDownload, versionLabel],
+    [text, formatLongDate, startDownload],
   );
+
+  const loadError = error
+    ? messageForDataError(error, {
+        sessionExpired: dict.general.sessionExpired,
+        forbidden: dict.general.noAccess,
+        failed: text.loadError,
+      })
+    : null;
 
   return (
     <Accordion id={drawerName} data-testid={`accordion-${drawerName}`} label={text.drawerLabel}>
       <div className="d-block w-100">
-        <div className="d-md-flex align-items-end gap-2 mb-3 w-100">
-          <TextField
-            label={text.nameLabel}
-            value={name}
-            isDisabled={busy || !formVersionId}
-            data-testid="template-name-field"
-            onChange={setName}
+        {types?.length === 0 && (
+          <InlineAlert variant="info" title={text.noTypes} data-testid="template-no-types" />
+        )}
+        {types && types.length > 0 && (
+          <TemplateUploadForm
+            dict={dict}
+            types={types}
+            templates={templates}
+            currentVersion={currentVersion}
+            versions={versions}
+            versionsTruncated={versionsTruncated}
+            versionsLimit={versionsLimit}
+            upload={upload}
+            replace={replace}
           />
-          <div className="d-flex flex-column">
-            <label className="form-label mb-1" htmlFor="template-file-input">
-              {text.fileLabel}
-            </label>
-            <input
-              id="template-file-input"
-              ref={fileInputRef}
-              type="file"
-              className="form-control"
-              accept={TEMPLATE_FILE_ACCEPT}
-              data-testid="template-file-input"
-              disabled={busy || !formVersionId}
-              onChange={(event) => pickFile(event.target.files?.[0] ?? null)}
-            />
-          </div>
-          <Button
-            data-testid="template-upload-button"
-            isDisabled={busy || !file || name.trim() === '' || !formVersionId}
-            onPress={submitUpload}
-          >
-            {busy ? text.uploading : text.upload}
-          </Button>
-        </div>
-        <p className="text-muted small" data-testid="template-accepted-types">
-          {text.acceptedTypes.replace('{types}', TEMPLATE_TYPES)}
-        </p>
+        )}
 
         <DataTable<TemplateResponse>
           data={templates}
           columns={columns}
-          loading={loading}
-          error={error ? text.loadError : null}
+          loading={isLoading}
+          error={loadError}
           emptyMessage={text.empty}
           caption={text.drawerLabel}
           keyExtractor={(template) => template.id}
@@ -221,9 +186,11 @@ export default function TemplatesDrawer({
       <ConfirmModal
         show={pendingDelete !== null}
         title={text.deleteTitle}
-        message={text.deleteMessage.replace('{name}', pendingDelete?.name ?? '')}
+        message={text.deleteMessage
+          .replace('{name}', pendingDelete?.name ?? '')
+          .replace('{version}', pendingDelete ? versionLabel(pendingDelete) : '')}
         confirmLabel={text.delete}
-        pending={busy}
+        pending={deleting}
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete(null)}
       />

@@ -2,9 +2,17 @@
 
 import { useCallback } from 'react';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
-import { sessionReadConfig } from '@/src/shared/api/swrConfig';
-import type { TemplateResponse } from '@/src/types/templates';
-import { deleteTemplate, downloadTemplate, listTemplates, uploadTemplate } from './api';
+import { listReadConfig, sessionReadConfig } from '@/src/shared/api/swrConfig';
+import { classifyDataError } from '@/src/shared/api/dataError';
+import type { TemplateResponse, TemplateType } from '@/src/types/templates';
+import { rereadAfter } from '../templateUpload';
+import {
+  deleteTemplate,
+  downloadTemplate,
+  listTemplates,
+  replaceTemplateFile,
+  uploadTemplate,
+} from './api';
 
 const EMPTY_TEMPLATES: TemplateResponse[] = [];
 
@@ -18,33 +26,33 @@ function saveBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-/**
- * The document templates on one form version, and the writes that change them. Each write
- * re-reads the list, so a caller never refreshes by hand.
- */
-export function useTemplates(formVersionId: string | null) {
-  const key = formVersionId ? (['form-version-templates', formVersionId] as const) : null;
+/** A form's document templates and the writes that change them. Each write re-reads the list. */
+export function useTemplates(formId: string, currentVersionId: string | null) {
+  // A new version is given the templates of the one it came from, so a new current version
+  // means a new list. The rows on screen stay until it arrives.
   const { data, error, isLoading, mutate } = useAuthedSWR(
-    key,
-    (token) => listTemplates(token, formVersionId as string),
-    sessionReadConfig,
+    ['form-templates', formId, currentVersionId],
+    (token) => listTemplates(token, formId),
+    { ...sessionReadConfig, ...listReadConfig },
   );
 
+  const reread = useCallback(() => mutate(), [mutate]);
+
   const upload = useCallback(
-    async (token: string, name: string, file: File): Promise<void> => {
-      if (!formVersionId) return;
-      await uploadTemplate(token, formVersionId, name, file);
-      await mutate();
-    },
-    [formVersionId, mutate],
+    (token: string, formVersionId: string, type: TemplateType, name: string, file: File) =>
+      rereadAfter(uploadTemplate(token, formVersionId, type, name, file), reread),
+    [reread],
+  );
+
+  const replace = useCallback(
+    (token: string, templateId: string, file: File) =>
+      rereadAfter(replaceTemplateFile(token, templateId, file), reread),
+    [reread],
   );
 
   const remove = useCallback(
-    async (token: string, templateId: string): Promise<void> => {
-      await deleteTemplate(token, templateId);
-      await mutate();
-    },
-    [mutate],
+    (token: string, templateId: string) => rereadAfter(deleteTemplate(token, templateId), reread),
+    [reread],
   );
 
   const download = useCallback(async (token: string, template: TemplateResponse): Promise<void> => {
@@ -53,9 +61,10 @@ export function useTemplates(formVersionId: string | null) {
 
   return {
     templates: data?.items ?? EMPTY_TEMPLATES,
-    loading: !!key && isLoading,
-    error: (error ?? null) as unknown,
+    isLoading,
+    error: error ? classifyDataError(error) : null,
     upload,
+    replace,
     remove,
     download,
   };

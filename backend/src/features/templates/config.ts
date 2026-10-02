@@ -1,6 +1,6 @@
-import { templateFileType } from '../../core/integrations/document-generation/templateFileType';
+import type { TemplateType } from '@soba/lib';
 
-/** The accepted types for messages: "docx, xlsx, html". */
-export { TEMPLATE_TYPES } from '@soba/lib';
-
-export const isTemplateFile = (filename: string): boolean => templateFileType(filename) !== null;
+/** The name a template takes when it is uploaded without one. */
+export const DEFAULT_TEMPLATE_NAMES: Record<TemplateType, string> = {
+  cdogs: 'CDOGS',
+};

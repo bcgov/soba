@@ -5,13 +5,17 @@ import {
   getDocumentTemplate,
   hasDocumentTemplateForFile,
   insertDocumentTemplate,
-  listDocumentTemplates,
+  listFormDocumentTemplates,
   renameDocumentTemplate,
   setDocumentTemplateFile,
   type DocumentTemplateWithFile,
+  type DocumentTemplateWithVersion,
 } from '../../core/db/repos/documentTemplateRepo';
 import { releaseFileRow, type FileRecord } from '../../core/db/repos/fileRepo';
 import type { Tx } from '../../core/db/client';
+import type { DocumentTemplateTypeCode } from '../../core/db/codes';
+import { isUniqueViolationOn } from '../../core/db/pgError';
+import { DOCUMENT_TEMPLATE_VERSION_TYPE_UNIQUE } from '../../core/db/schema';
 import { fileStore, storedOrThrow } from '../../core/services/fileStore';
 import type { GetFileResult } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 import { ConflictError } from '../../core/errors';
@@ -30,6 +34,7 @@ export interface TemplateFile {
 }
 
 const TEMPLATE_CHANGED = 'Template changed while this request ran; reload it and retry';
+const TYPE_TAKEN = 'The form version already has a template of this type';
 
 const usedByTemplates = (tx: Tx, record: FileRecord) => hasDocumentTemplateForFile(tx, record.id);
 
@@ -42,11 +47,11 @@ const toStoreInput = (actor: TemplateActor, file: TemplateFile) => ({
 });
 
 export const templatesService = {
-  list(formVersionId: string): Promise<DocumentTemplateWithFile[]> {
-    return listDocumentTemplates(formVersionId);
+  list(formId: string): Promise<DocumentTemplateWithVersion[]> {
+    return listFormDocumentTemplates(formId);
   },
 
-  get(id: string): Promise<DocumentTemplateWithFile | null> {
+  get(id: string): Promise<DocumentTemplateWithVersion | null> {
     return getDocumentTemplate(id);
   },
 
@@ -55,26 +60,35 @@ export const templatesService = {
     return fileStore.open(template.file);
   },
 
+  /** Refused with a conflict when the form version already has a template of the type. */
   async create(
     actor: TemplateActor,
     formVersion: { id: string; formId: string },
-    name: string,
+    template: { type: DocumentTemplateTypeCode; name: string },
     file: TemplateFile,
-  ): Promise<DocumentTemplateWithFile | null> {
+  ): Promise<DocumentTemplateWithVersion | null> {
     const id = uuidv7();
-    storedOrThrow(
-      await fileStore.put(toStoreInput(actor, file), (tx, record) =>
-        insertDocumentTemplate(tx, {
-          id,
-          workspaceId: actor.workspaceId,
-          formId: formVersion.formId,
-          formVersionId: formVersion.id,
-          fileId: record.id,
-          name,
-          createdBy: actor.actorId,
-        }),
-      ),
-    );
+    try {
+      storedOrThrow(
+        await fileStore.put(toStoreInput(actor, file), (tx, record) =>
+          insertDocumentTemplate(tx, {
+            id,
+            workspaceId: actor.workspaceId,
+            formId: formVersion.formId,
+            formVersionId: formVersion.id,
+            fileId: record.id,
+            type: template.type,
+            name: template.name,
+            createdBy: actor.actorId,
+          }),
+        ),
+      );
+    } catch (err) {
+      if (isUniqueViolationOn(err, DOCUMENT_TEMPLATE_VERSION_TYPE_UNIQUE)) {
+        throw new ConflictError(TYPE_TAKEN);
+      }
+      throw err;
+    }
     return getDocumentTemplate(id);
   },
 
@@ -86,7 +100,7 @@ export const templatesService = {
     existing: DocumentTemplateWithFile,
     actor: TemplateActor,
     file: TemplateFile,
-  ): Promise<DocumentTemplateWithFile | null> {
+  ): Promise<DocumentTemplateWithVersion | null> {
     const { id } = existing.template;
     let released = false;
     storedOrThrow(
@@ -106,7 +120,7 @@ export const templatesService = {
     id: string,
     name: string,
     actorId: string,
-  ): Promise<DocumentTemplateWithFile | null> {
+  ): Promise<DocumentTemplateWithVersion | null> {
     const renamed = await renameDocumentTemplate(id, name, actorId);
     return renamed ? getDocumentTemplate(id) : null;
   },

@@ -56,6 +56,27 @@ describe('sobaFetch', () => {
     expect(init.body).toBe(JSON.stringify({ a: 1 }));
   });
 
+  it('sends a multipart body as is and leaves its Content-Type to the browser', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(mockResponse(401))
+      .mockResolvedValueOnce(mockResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    setTokenRefresher(
+      vi.fn().mockResolvedValueOnce(token('first')).mockResolvedValueOnce(token('second')),
+    );
+    const form = new FormData();
+    form.set('type', 'cdogs');
+
+    await sobaFetch('/templates', { token: 'tok', method: 'POST', form });
+
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(init.body).toBe(form);
+      expect(init.headers['Content-Type']).toBeUndefined();
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('sends the refreshed token, not the one the caller passed', async () => {
     const fetchMock = vi.fn().mockResolvedValue(mockResponse());
     vi.stubGlobal('fetch', fetchMock);

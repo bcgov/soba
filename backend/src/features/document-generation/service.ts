@@ -8,6 +8,7 @@ import { isFeatureAvailable } from '../../core/services/featureAvailabilityServi
 import {
   DocumentGenerationMode,
   DocumentGenerationOutcome,
+  DocumentTemplateType,
   FeatureAvailability,
 } from '../../core/db/codes';
 import {
@@ -250,11 +251,14 @@ async function renderWith(
 }
 
 export const documentGenerationService = {
-  /** The templates the caller may render from the submission: those on its form version. */
+  /** The templates the caller may render from the submission: the CDOGS ones on its form version. */
   async listTemplates(caller: CallerIdentity, submissionId: string): Promise<TemplateListOutcome> {
     const scope = await renderScope(caller, submissionId);
     if (scope === 'notfound' || scope === 'denied') return { status: scope };
-    const templates = await listLiveDocumentTemplates(scope.formVersionId);
+    const templates = await listLiveDocumentTemplates(
+      scope.formVersionId,
+      DocumentTemplateType.cdogs,
+    );
     return {
       status: 'ok',
       templates: templates.map(({ template }) => ({ id: template.id, name: template.name })),
@@ -265,7 +269,11 @@ export const documentGenerationService = {
   async preview(caller: CallerIdentity, input: PreviewInput): Promise<DocumentRenderOutcome> {
     const scope = await renderScope(caller, input.submissionId);
     if (scope === 'notfound' || scope === 'denied') return { status: scope };
-    const stored = await getLiveDocumentTemplate(input.templateId, scope.formVersionId);
+    const stored = await getLiveDocumentTemplate(
+      input.templateId,
+      scope.formVersionId,
+      DocumentTemplateType.cdogs,
+    );
     if (!stored) return { status: 'template-notfound' };
     return renderWith(
       scope,
@@ -281,7 +289,11 @@ export const documentGenerationService = {
     if (scope === 'notfound' || scope === 'denied') return { status: scope };
     const record = await getSubmissionRecordById(scope.workspaceId, input.submissionId);
     if (!record) return { status: 'notfound' };
-    const stored = await getLiveDocumentTemplate(input.templateId, scope.formVersionId);
+    const stored = await getLiveDocumentTemplate(
+      input.templateId,
+      scope.formVersionId,
+      DocumentTemplateType.cdogs,
+    );
     if (!stored) return { status: 'template-notfound' };
 
     // Persisted answer document from the engine (the plugin shapes it for the template). Pass the

@@ -5,9 +5,10 @@ import {
   TemplateListResponseSchema as LibTemplateListSchema,
   TemplateNameBodySchema as LibTemplateNameBodySchema,
   TemplateResponseSchema as LibTemplateSchema,
-  TemplatesQuerySchema as LibTemplatesQuerySchema,
+  TemplateUploadBodySchema as LibTemplateUploadBodySchema,
+  TemplatesFormQuerySchema as LibTemplatesFormQuerySchema,
+  TemplateVersionQuerySchema as LibTemplateVersionQuerySchema,
 } from '@soba/lib';
-import { TEMPLATE_TYPES } from './config';
 
 extendZodWithOpenApi(z);
 
@@ -21,12 +22,18 @@ const INVALID_ID = { description: 'Invalid template id' };
 export const TemplateIdParamsSchema =
   LibTemplateIdParamsSchema.clone().openapi('Templates_IdParams');
 
-export const TemplatesQuerySchema = LibTemplatesQuerySchema.clone().openapi(
+export const TemplatesFormQuerySchema =
+  LibTemplatesFormQuerySchema.clone().openapi('Templates_FormQuery');
+
+export const TemplateVersionQuerySchema = LibTemplateVersionQuerySchema.clone().openapi(
   'Templates_FormVersionQuery',
 );
 
 export const TemplateNameBodySchema =
   LibTemplateNameBodySchema.clone().openapi('Templates_NameBody');
+
+export const TemplateUploadBodySchema =
+  LibTemplateUploadBodySchema.clone().openapi('Templates_UploadBody');
 
 const TemplateSchema = LibTemplateSchema.clone().openapi('Templates_Template');
 
@@ -49,9 +56,12 @@ const multipartFile = (fields: z.ZodRawShape) => ({
 export function registerTemplatesOpenApi(registry: OpenAPIRegistry) {
   const tags = ['feature.templates'];
   const uploadErrors = {
-    400: { description: 'Missing file or name, or a malformed upload' },
+    400: {
+      description:
+        'Missing file or type, invalid name, a malformed upload, or a template type not available for the form',
+    },
     413: { description: 'File too large' },
-    415: { description: `Not a template file type (${TEMPLATE_TYPES})` },
+    415: { description: 'Not a file type the template type accepts' },
     422: { description: 'File failed virus scan' },
     503: { description: 'Virus scanning unavailable' },
   };
@@ -61,10 +71,10 @@ export function registerTemplatesOpenApi(registry: OpenAPIRegistry) {
     path: TEMPLATES_PATH,
     tags,
     security: SECURITY,
-    request: { query: TemplatesQuerySchema },
+    request: { query: TemplatesFormQuerySchema },
     responses: {
       200: {
-        description: "The form version's templates, by name",
+        description: "The templates on the form's versions, newest version first, then by type",
         content: { 'application/json': { schema: TemplateListSchema } },
       },
       403: FORBIDDEN,
@@ -78,15 +88,15 @@ export function registerTemplatesOpenApi(registry: OpenAPIRegistry) {
     tags,
     security: SECURITY,
     request: {
-      query: TemplatesQuerySchema,
-      body: multipartFile({ name: z.string() }),
+      query: TemplateVersionQuerySchema,
+      body: multipartFile(TemplateUploadBodySchema.shape),
     },
     responses: {
       201: templateResponse('Created template'),
       ...uploadErrors,
       403: FORBIDDEN,
       404: NOT_FOUND,
-      409: { description: 'A template with this name already exists on the form version' },
+      409: { description: 'The form version already has a template of this type' },
     },
   });
 
@@ -148,7 +158,6 @@ export function registerTemplatesOpenApi(registry: OpenAPIRegistry) {
       400: { description: 'Invalid template id or name' },
       403: FORBIDDEN,
       404: NOT_FOUND,
-      409: { description: 'A template with this name already exists on the form version' },
     },
   });
 

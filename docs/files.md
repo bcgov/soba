@@ -108,19 +108,25 @@ Extensions in `BLOCKED_FILE_EXTENSIONS` (`backend/src/features/files/config.ts`)
 
 ## Templates
 
-Feature `templates`. A template is a named file bound to one form version through
-`document_template`. Names are unique per version. Accepted types, by extension: docx, xlsx, pptx,
-odt, ods, odp.
+Feature `templates`. A template is a named file of a type, bound to one form version through
+`document_template`. A version holds at most one template of each type. The types and the
+extensions each accepts are `TEMPLATE_TYPES` and `TEMPLATE_TYPE_EXTENSIONS` in
+`lib/src/schemas/templates.ts`: `cdogs` takes docx, xlsx and html. A template uploaded without a
+name takes its type's name.
 
-| route                                   | body                     | permission                 |
-| --------------------------------------- | ------------------------ | -------------------------- |
-| `GET /api/v1/templates?formVersionId=`  |                          | `document_template_read`   |
-| `POST /api/v1/templates?formVersionId=` | multipart `file`, `name` | `document_template_create` |
-| `GET /api/v1/templates/:id`             |                          | `document_template_read`   |
-| `GET /api/v1/templates/:id/content`     |                          | `document_template_read`   |
-| `PUT /api/v1/templates/:id/content`     | multipart `file`         | `document_template_create` |
-| `PATCH /api/v1/templates/:id`           | `name`                   | `document_template_create` |
-| `DELETE /api/v1/templates/:id`          |                          | `document_template_delete` |
+Each type needs a feature, `TEMPLATE_TYPE_FEATURES`: `cdogs` needs `document-generation`. Uploading
+or replacing a file of a type whose feature is not available to the form returns 400. Listing,
+downloading, renaming and deleting do not check it.
+
+| route                                   | body                              | permission                 |
+| --------------------------------------- | --------------------------------- | -------------------------- |
+| `GET /api/v1/templates?formId=`         |                                   | `document_template_read`   |
+| `POST /api/v1/templates?formVersionId=` | multipart `file`, `type`, `name`? | `document_template_create` |
+| `GET /api/v1/templates/:id`             |                                   | `document_template_read`   |
+| `GET /api/v1/templates/:id/content`     |                                   | `document_template_read`   |
+| `PUT /api/v1/templates/:id/content`     | multipart `file`                  | `document_template_create` |
+| `PATCH /api/v1/templates/:id`           | `name`                            | `document_template_create` |
+| `DELETE /api/v1/templates/:id`          |                                   | `document_template_delete` |
 
 The routes need sign-in and `design-mode`. Templates can be changed on any version, published ones
 included. Templates of a deleted form or form version return 404.
@@ -131,17 +137,18 @@ file for that template only.
 
 Rendering needs the `document-generation` and `templates` features:
 
-| route                                          | does                                                 |
-| ---------------------------------------------- | ---------------------------------------------------- |
-| `GET /api/v1/submit/submissions/:id/templates` | lists the templates of the submission's form version |
-| `POST /api/v1/submit/submissions/:id/preview`  | renders `templateId` with the `data` in the body     |
-| `POST /api/v1/submit/submissions/:id/print`    | renders `templateId` with the saved submission       |
+| route                                          | does                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------ |
+| `GET /api/v1/submit/submissions/:id/templates` | lists the `cdogs` templates of the submission's form version |
+| `POST /api/v1/submit/submissions/:id/preview`  | renders `templateId` with the `data` in the body             |
+| `POST /api/v1/submit/submissions/:id/print`    | renders `templateId` with the saved submission               |
 
-These need access to the submission and `document_template_read`. `options` passes through to the
-backend (CDOGS `convertTo`, `reportName`). Preview and print are rate limited by
-`RATE_LIMIT_RENDER_*`. Each pod renders at most `DOCUMENT_GENERATION_MAX_CONCURRENT` (2) at a time
-and returns 503 beyond that. A template that cannot be rendered, or a print with no saved data,
-returns 422. An unavailable backend or missing template bytes return 503.
+These need access to the submission and `document_template_read`, and render only `cdogs`
+templates. `options` passes through to the backend (CDOGS `convertTo`, `reportName`). Preview and
+print are rate limited by `RATE_LIMIT_RENDER_*`. Each pod renders at most
+`DOCUMENT_GENERATION_MAX_CONCURRENT` (2) at a time and returns 503 beyond that. A template that
+cannot be rendered, or a print with no saved data, returns 422. An unavailable backend or missing
+template bytes return 503.
 
 ## Submit files (deprecated)
 
