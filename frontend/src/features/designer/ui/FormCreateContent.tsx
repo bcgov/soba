@@ -68,8 +68,6 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
         selectedWorkspaceId || undefined,
       );
 
-      // The version the form is created with holds no schema, and a read of one that has none is a
-      // 404. Writing the empty schema here leaves the designer a draft it can open and publish.
       addNotification({
         text: dict.form.saved,
         type: 'success',

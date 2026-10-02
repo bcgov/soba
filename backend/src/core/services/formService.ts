@@ -41,6 +41,8 @@ interface ListInput {
   locale: SortLocale;
 }
 
+import type { DbOrTx } from '../db/client';
+
 interface CreateInput {
   workspaceId: string;
   actorId: string;
@@ -48,6 +50,7 @@ interface CreateInput {
   name: string;
   description?: string;
   formEngineCode?: string;
+  executor?: DbOrTx;
 }
 
 interface UpdateInput {
@@ -93,8 +96,9 @@ export class FormService {
       throw new ConflictError(FORM_NAME_TAKEN);
     }
 
+    const executor = input.executor ?? db;
     // One-call create: form + an empty v1 draft in a single transaction.
-    return db.transaction(async (tx) => {
+    return executor.transaction(async (tx) => {
       const form = await createForm(
         {
           workspaceId: input.workspaceId,
