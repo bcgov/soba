@@ -28,7 +28,8 @@ export const documentGenerationAudits = sobaSchema.table(
     // unavailable); null on success. The raw upstream status is carried in error_detail.
     httpStatus: integer('http_status'),
     durationMs: integer('duration_ms').notNull(),
-    // Error class only (e.g. ServiceUnavailableError) — never the upstream body, to avoid storing PI.
+    // Error class and upstream status (e.g. `ServiceUnavailableError upstream 429`), never the
+    // upstream body, to avoid storing PI.
     errorDetail: text('error_detail'),
     // Correlation id (X-Request-Id) to pivot an audit row back to the request's app logs.
     requestId: text('request_id'),

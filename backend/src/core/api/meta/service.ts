@@ -10,6 +10,7 @@ import packageJson from '../../../../package.json';
 import { env } from '../../config/env';
 import { authEnv } from '../../config/authEnv';
 import { getFormEnginePlugins } from '../../integrations/form-engine/FormEngineRegistry';
+import { resolveDefaultTenantEngineCode } from '../../integrations/tenant/TenantEngineRegistry';
 import {
   getActivePluginCodes,
   getActiveStorageBackendCodes,
@@ -46,11 +47,12 @@ function resolveGitSha(): string {
 export class MetaApiService {
   async getPlugins(): Promise<PluginsMetaResponse> {
     const plugins = getPluginCatalog();
-    // Selectable adapter codes come from the registry; form engine has its own registry.
+    // Selectable adapter codes come from the registry; form and tenant engines have their own.
     const activeFormEngineCode =
       env.getFormEngineDefaultCode() ?? getFormEnginePlugins()[0]?.code ?? 'formio-v5';
     const activeCodes = new Set([
       activeFormEngineCode,
+      resolveDefaultTenantEngineCode(),
       ...getActivePluginCodes(),
       ...getActiveStorageBackendCodes(),
     ]);

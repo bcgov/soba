@@ -1,10 +1,15 @@
 import { SubmissionService, type SubmissionWriteOutcome } from '../../services/submissionService';
+import { SubmissionWorkflowState } from '../../db/codes';
 import type {
+  ParticipantSubmissionListRow,
   SubmissionRecord,
   SubmissionListRow,
   SubmissionDetailRow,
 } from '../../db/repos/submissionRepo';
 import type {
+  ListMySubmissionsResponse,
+  MySubmissionRole,
+  MySubmissionState,
   OpenSubmissionBody,
   SubmissionDataBody,
   SortLocale,
@@ -38,6 +43,19 @@ export interface ListSubmissionsQueryInput {
   locale: SortLocale;
 }
 
+export interface ListMySubmissionsQueryInput {
+  offset: number;
+  limit: number;
+  workflowState?: MySubmissionState;
+  q?: string;
+  sort: SubmissionListSort;
+  locale: SortLocale;
+}
+
+// The code exists from open but is shown only once the submission is submitted.
+const confirmationCodeOf = (item: { workflowState: string; confirmationCode: string }) =>
+  item.workflowState === SubmissionWorkflowState.submitted ? item.confirmationCode : null;
+
 const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
   const detail = item as Partial<SubmissionDetailRow>;
   return {
@@ -55,6 +73,7 @@ const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
     updatedAt: item.updatedAt.toISOString(),
     createdBy: detail.createdBy ?? null,
     submittedBy: detail.submittedBy ?? null,
+    confirmationCode: confirmationCodeOf(item),
   };
 };
 
@@ -76,6 +95,19 @@ const toSubmissionListItemDto = (item: SubmissionListRow) => ({
   updatedAt: item.updatedAt.toISOString(),
   createdBy: item.createdBy,
   submittedBy: item.submittedBy,
+  confirmationCode: confirmationCodeOf(item),
+});
+
+const toMySubmissionListItemDto = (item: ParticipantSubmissionListRow) => ({
+  id: item.id,
+  formId: item.formId,
+  formName: item.formName,
+  workflowState: item.workflowState as MySubmissionState,
+  role: item.role as MySubmissionRole,
+  submittedAt: item.submittedAt?.toISOString() ?? null,
+  createdAt: item.createdAt.toISOString(),
+  updatedAt: item.updatedAt.toISOString(),
+  confirmationCode: confirmationCodeOf(item),
 });
 
 export function createSubmissionsApiService(submissionService: SubmissionService) {
@@ -124,6 +156,27 @@ export function createSubmissionsApiService(submissionService: SubmissionService
       };
     },
 
+    listMine: async (
+      userId: string,
+      query: ListMySubmissionsQueryInput,
+    ): Promise<ListMySubmissionsResponse> => {
+      const result = await submissionService.listForParticipant({
+        userId,
+        offset: query.offset,
+        limit: query.limit,
+        workflowState: query.workflowState,
+        q: query.q,
+        sort: query.sort,
+        locale: query.locale,
+      });
+      return {
+        items: result.items.map((item) => toMySubmissionListItemDto(item)),
+        page: { offset: query.offset, limit: query.limit, total: result.total },
+        filters: { workflowState: query.workflowState, q: query.q },
+        sort: query.sort,
+      };
+    },
+
     open: async (ctx: SubmissionsContextInput, body: OpenSubmissionBody) => {
       const { created, record } = await submissionService.open({ ...ctx, ...body });
       return { created, submission: toSubmissionDto(record) };
@@ -141,6 +194,9 @@ export function createSubmissionsApiService(submissionService: SubmissionService
 
     delete: (ctx: SubmissionsContextInput, submissionId: string) =>
       submissionService.delete({ ...ctx, submissionId }),
+
+    deleteUnsubmitted: (ctx: SubmissionsContextInput, submissionId: string) =>
+      submissionService.deleteUnsubmitted({ ...ctx, submissionId }),
   };
 }
 

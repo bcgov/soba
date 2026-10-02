@@ -69,7 +69,7 @@ export function SideNav({ designMode, submitMode }: Readonly<SideNavProps>) {
         isActive: pathname.startsWith(`/${locale}/my-forms`),
       },
       {
-        href: `/${locale}/my-submissions`,
+        href: navLink(`/${locale}/my-submissions`),
         title: dict.general.mySubmissions,
         testId: 'my-submissions-nav',
         icon: <FaInbox size={20} />,

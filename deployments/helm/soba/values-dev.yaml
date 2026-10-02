@@ -11,6 +11,12 @@ backend:
     limits:
       cpu: 250m
       memory: 512Mi
+  # Files and templates on the file store PVC (storage-local).
+  storage:
+    defaultBackend: storage-local
+    defaultBasePath: /app/files
+    localVolume:
+      storageClassName: netapp-file-standard
   config:
     logLevel: debug
     nodeEnv: development
@@ -18,12 +24,16 @@ backend:
     messagebusDefaultCode: messagebus-redis
     eventStreamDefaultCode: eventstream-redis
     documentGenerationDefaultCode: cdogs-v2
+    tenantEngineDefaultCode: cstar-v1
   documentGeneration:
     cdogsV2:
       endpoint: https://cdogs-dev.api.gov.bc.ca/api
       tokenUrl: https://dev.loginproxy.gov.bc.ca/auth/realms/comsvcauth/protocol/openid-connect/token
     cdogsV3:
       endpoint: http://common-document-generation-service-master.a12c97-prod:3000
+  tenantEngine:
+    cstarV1:
+      apiBaseUrl: https://dev.connect.digital.gov.bc.ca/api/v1
 
 frontend:
   replicas: 1

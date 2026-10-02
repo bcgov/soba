@@ -15,6 +15,12 @@ backend:
     minReplicas: 3
     maxReplicas: 6
     targetCPUUtilizationPercentage: 75
+  # Files and templates on the file store PVC (storage-local).
+  storage:
+    defaultBackend: storage-local
+    defaultBasePath: /app/files
+    localVolume:
+      storageClassName: netapp-file-standard
   config:
     nodeEnv: production
     logLevel: warn

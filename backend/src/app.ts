@@ -6,7 +6,7 @@ import rTracer from 'cls-rtracer';
 import cors from 'cors';
 import passport from 'passport';
 import { checkJwt } from './core/middleware/auth';
-import { designRouter, submitRouter, coreRouter } from './core/api';
+import { designRouter, submitRouter, filesApiRouter, coreRouter } from './core/api';
 import {
   healthRouter,
   logStartupHealth,
@@ -16,6 +16,7 @@ import {
   logMessageBusSelfTest,
   logEventStreamSelfTest,
   logDocumentGenerationReadiness,
+  logTenantEngineReadiness,
 } from './core/api/health';
 import { metaRouter } from './core/api/meta';
 import { buildOpenApiSpec } from './core/api/shared/openapi';
@@ -24,6 +25,7 @@ import { httpLogger, log } from './core/logging';
 import { resolveActor, resolveActorOrPublic } from './core/middleware/actor';
 import { requireFeature } from './core/middleware/requireFeature';
 import { requireSobaAdmin } from './core/middleware/requireSobaAdmin';
+import { coreErrorHandler, notFoundHandler } from './core/middleware/errorHandler';
 import { adminRouter } from './core/api/admin';
 import { globalRateLimit, apiRateLimit, publicRateLimit } from './core/middleware/rateLimit';
 import { initializePassport } from './core/auth/passport';
@@ -99,8 +101,7 @@ app.use(
 app.use(apiPath('/api/v1/meta'), publicRateLimit, express.json(), metaRouter);
 app.use(apiPath('/api/v1/health'), publicRateLimit, healthRouter);
 
-// Body limit for the body-carrying surfaces — larger than express's 100kb default so document
-// generation can carry a base64 template inline (see env.getJsonBodyLimit). meta stays at the
+// Body limit for the body-carrying surfaces (see env.getJsonBodyLimit). meta stays at express's
 // default: it is public and body-less.
 const jsonBodyLimit = env.getJsonBodyLimit();
 
@@ -114,6 +115,17 @@ app.use(
   resolveActorOrPublic,
   requireFeature(Features.submit_mode),
   submitRouter,
+);
+
+// Files feature (public-capable): submission attachments, same auth as submit. Multipart and
+// body-less only, so no JSON parser. 404s when submit-mode is disabled.
+app.use(
+  apiPath('/api/v1/files'),
+  apiRateLimit,
+  checkJwt({ allowPublic: true }),
+  resolveActorOrPublic,
+  requireFeature(Features.submit_mode),
+  filesApiRouter,
 );
 
 // Design feature (staff): mandatory auth. 404s when design-mode is disabled.
@@ -138,7 +150,8 @@ app.use(
   adminRouter,
 );
 
-// Core: workspace/account management (mandatory auth). Mounted last so the more specific paths win.
+// Core: workspace/account management and staff document templates (mandatory auth). Mounted last
+// so the more specific paths win.
 app.use(
   apiPath('/api/v1'),
   apiRateLimit,
@@ -147,6 +160,11 @@ app.use(
   resolveActor,
   coreRouter,
 );
+
+// Paths outside every surface, and errors raised by the surface middleware above (auth, feature
+// gates, body parsing), which run before a surface router's own error handler.
+app.use(notFoundHandler);
+app.use(coreErrorHandler);
 
 app.listen(port, () => {
   log.info({ port }, 'Express is listening');
@@ -157,5 +175,6 @@ app.listen(port, () => {
     .then(logMessageBusSelfTest)
     .then(logEventStreamSelfTest)
     .then(logDocumentGenerationReadiness)
+    .then(logTenantEngineReadiness)
     .catch((err) => log.warn({ err }, 'Startup diagnostics failed'));
 });

@@ -12,6 +12,8 @@ export const FEATURE_CODES = {
   DOCUMENT_GENERATION: 'document-generation',
   /** BC File Upload component + CHEFS storage provider (backend `soba.feature` code `files`). */
   FILES: 'files',
+  /** Document templates stored per form version, managed by staff. */
+  TEMPLATES: 'templates',
 } as const;
 
 export type FeatureCode = (typeof FEATURE_CODES)[keyof typeof FEATURE_CODES];

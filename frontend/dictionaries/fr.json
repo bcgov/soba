@@ -225,7 +225,15 @@
         "backToHome": "Retour à l'accueil"
       },
       "submitSuccess": "Formulaire soumis avec succès.",
-      "submitPending": "Ce formulaire a changé depuis son ouverture; vos réponses ont été enregistrées pour examen au lieu d'être soumises.",
+      "saveDraft": "Enregistrer le brouillon",
+      "savingDraft": "Enregistrement du brouillon…",
+      "draftSaved": "Brouillon enregistré.",
+      "heldSave": "Cette soumission a été modifiée ailleurs depuis que vous l’avez ouverte; votre brouillon n’a donc pas été enregistré. Rechargez la dernière version pour abandonner vos modifications, ou remplacez-la par votre version.",
+      "heldSubmit": "Cette soumission a été modifiée ailleurs depuis que vous l’avez ouverte; vos réponses n’ont donc pas été soumises. Rechargez la dernière version pour abandonner vos modifications, ou soumettez votre version à sa place.",
+      "reloadLatest": "Recharger la dernière version",
+      "saveMine": "Enregistrer ma version",
+      "submitMine": "Soumettre ma version",
+      "alreadySubmitted": "Ce formulaire a déjà été soumis.",
       "readOnly": "Vous pouvez consulter cette soumission, mais vous ne pouvez plus la modifier ni la soumettre.",
       "starting": "Démarrage de votre soumission…",
       "startError": "La soumission n’a pas pu être démarrée. Veuillez réessayer."
@@ -316,11 +324,59 @@
       "profileDrawerInfo": "L'équipe CHEFS recueille et organise des informations pour servir d'entrée cruciale à l'élaboration de dossiers d'affaires complets. Ces dossiers joueront un rôle central dans l'orientation de l'exploitation stratégique et de l'amélioration continue de CHEFS dans les années à venir. Cette initiative de collecte de données est essentielle pour éclairer les décisions critiques et façonner la trajectoire de CHEFS, garantissant son adaptabilité et son efficacité face aux besoins et défis évolutifs.",
       "profileDrawerLabel": "Profil du Formulaire"
     },
+    "templates": {
+      "drawerLabel": "Modèles de documents",
+      "noTypes": "Aucun type de modèle n'est disponible pour ce formulaire.",
+      "typeLabel": "Type de modèle",
+      "versionLabel": "Version du formulaire",
+      "fileLabel": "Fichier du modèle",
+      "nameLabel": "Nom du modèle",
+      "nameDescription": "Facultatif. Un modèle sans nom prend le nom de son type.",
+      "replaceNameDescription": "Le remplacement du fichier conserve le nom du modèle.",
+      "acceptedTypes": "Types de fichiers acceptés : {types}.",
+      "upload": "Téléverser",
+      "uploading": "Téléversement…",
+      "replace": "Remplacer",
+      "replacing": "Remplacement…",
+      "uploadSuccess": "Modèle téléversé.",
+      "replaceSuccess": "Fichier du modèle remplacé.",
+      "uploadError": "Échec du téléversement du modèle.",
+      "uploadTypeTaken": "Cette version du formulaire a déjà un modèle de ce type.",
+      "replaceConflict": "Le modèle a changé pendant son remplacement. Vérifiez la liste et réessayez.",
+      "uploadTooLarge": "Le fichier est trop volumineux.",
+      "uploadWrongType": "Le type de modèle n'accepte pas ce type de fichier.",
+      "uploadScanFailed": "Le fichier n'a pas réussi l'analyse antivirus.",
+      "download": "Télécharger",
+      "downloadError": "Échec du téléchargement du modèle.",
+      "delete": "Supprimer",
+      "deleteTitle": "Supprimer le modèle",
+      "deleteMessage": "Supprimer « {name} » de {version} ? Cette action est irréversible.",
+      "deleteSuccess": "Modèle supprimé.",
+      "deleteError": "Échec de la suppression du modèle.",
+      "loadError": "Échec du chargement des modèles.",
+      "empty": "Aucun modèle sur ce formulaire.",
+      "nameColumn": "Nom",
+      "typeColumn": "Type",
+      "versionColumn": "Version du formulaire",
+      "fileColumn": "Fichier",
+      "sizeColumn": "Taille",
+      "updatedColumn": "Dernière mise à jour",
+      "actionsColumn": "Actions",
+      "types": {
+        "cdogs": "CDOGS"
+      }
+    },
     "descriptionLabel": "Description du Formulaire",
     "submit": "Soumettre",
     "noFormName": "Nom de formulaire est requise"
   },
   "submission": {
+    "success": {
+      "pageTitle": "Confirmation de soumission",
+      "message": "Votre formulaire a été soumis avec succès.",
+      "keepConfirmation": "Conservez cet ID de confirmation dans vos dossiers.",
+      "notSubmitted": "Ce formulaire n’a pas encore été soumis."
+    },
     "submissions": "Soumissions",
     "anon": "Anonyme",
     "pageTitle": "Soumission",
@@ -355,6 +411,38 @@
         "quickLinks": "Liens rapides"
       }
     }
+  },
+  "mySubmissions": {
+    "columns": {
+      "form": "Formulaire",
+      "status": "Statut",
+      "confirmationId": "ID de confirmation",
+      "updatedAt": "Dernière mise à jour",
+      "actions": "Actions"
+    },
+    "states": {
+      "draft": "Brouillon",
+      "submitted": "Soumise"
+    },
+    "statusFilter": "Statut",
+    "allStates": "Tous",
+    "continue": "Continuer",
+    "view": "Voir",
+    "delete": "Supprimer",
+    "continueLabel": "Continuer {form}, dernière mise à jour le {updated}",
+    "viewLabel": "Voir {form}, dernière mise à jour le {updated}",
+    "deleteLabel": "Supprimer le brouillon de {form}, dernière mise à jour le {updated}",
+    "empty": "Vous n’avez encore aucune soumission.",
+    "noMatches": "Aucune soumission ne correspond à votre recherche ou à votre filtre.",
+    "loadError": "Impossible de charger vos soumissions.",
+    "itemName": "soumissions",
+    "deleteTitle": "Supprimer le brouillon",
+    "deleteMessage": "Votre brouillon de {form}, mis à jour le {updated}, sera supprimé. Cette action est irréversible.",
+    "deleteSuccess": "Brouillon supprimé.",
+    "deleteError": "Impossible de supprimer ce brouillon.",
+    "deleteSubmitted": "Ce brouillon a été soumis et ne peut plus être supprimé.",
+    "viewAll": "Voir mes soumissions",
+    "noCode": "Aucun ID de confirmation pour l’instant"
   },
   "Basic": "Basique",
   "Text Field": "Champ de Texte",

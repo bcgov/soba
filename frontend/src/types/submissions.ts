@@ -6,4 +6,8 @@ export type {
   ListSubmissionsResponse,
   SubmissionDataBody,
   SubmitSubmissionBody,
+  MySubmissionListItem,
+  MySubmissionState,
+  ListMySubmissionsResponse,
 } from '@soba/lib';
+export { MY_SUBMISSION_STATES } from '@soba/lib';

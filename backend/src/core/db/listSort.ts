@@ -37,6 +37,10 @@ export function orderByForSort<TField extends string>(
   tiebreak: Column,
   locale: SortLocale,
 ): SQL[] {
+  // A repeated query param arrives as an array.
+  if (typeof token !== 'string') {
+    throw new ValidationError('Unsupported sort');
+  }
   const separator = token.lastIndexOf(':');
   const field = token.slice(0, separator) as TField;
   const direction = token.slice(separator + 1);

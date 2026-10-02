@@ -98,6 +98,8 @@ export const formVersionRevisions = sobaSchema.table(
   }),
 );
 
+export const SUBMISSION_CONFIRMATION_CODE_UNIQUE = 'submission_confirmation_code_uq';
+
 export const submissions = sobaSchema.table(
   'submission',
   {
@@ -119,10 +121,15 @@ export const submissions = sobaSchema.table(
     currentRevisionNo: integer('current_revision_no').notNull().default(0),
     headRevisionId: uuid('head_revision_id').references((): AnyPgColumn => submissionRevisions.id),
     submittedAt: timestamp('submitted_at', { withTimezone: true }),
+    // 8 characters of Crockford base32, assigned at open; returned only once submitted.
+    confirmationCode: text('confirmation_code').notNull(),
     ...auditColumns(),
     ...softDeleteColumns(),
   },
   (table) => ({
+    confirmationCodeUnique: uniqueIndex(SUBMISSION_CONFIRMATION_CODE_UNIQUE).on(
+      table.confirmationCode,
+    ),
     workspaceWorkflowIdx: index('submission_workspace_workflow_idx').on(
       table.workspaceId,
       table.workflowState,

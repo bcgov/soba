@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { pool } from '../../db/client';
 import { checkFormEngineReadiness } from '../../integrations/form-engine/FormEngineRegistry';
 import { checkDocumentGenerationReadiness } from '../../integrations/document-generation/DocumentGenerationRegistry';
+import { checkTenantEngineReadiness } from '../../integrations/tenant/TenantEngineRegistry';
 import {
   checkStorageReadiness,
   getCacheAdapter,
@@ -41,10 +42,12 @@ export async function readinessHandler(_req: Request, res: Response): Promise<vo
   const allEnginesOk = Object.values(formEngines).every((r) => r.ok);
 
   // Everything below is reported but non-gating — an outage degrades a feature (uploads, rendering,
-  // caching, cross-pod fan-out), it doesn't pull the pod from rotation the way DB or a form engine
-  // does. Adapters without a readinessCheck (e.g. cache-memory, messagebus-memory) report reachable.
+  // caching, cross-pod fan-out, tenant lookup), it doesn't pull the pod from rotation the way DB or a
+  // form engine does. Adapters without a readinessCheck (e.g. cache-memory, messagebus-memory) report
+  // reachable.
   const storage = await checkStorageReadiness();
   const documentGeneration = await checkDocumentGenerationReadiness();
+  const tenantEngines = await checkTenantEngineReadiness();
   const tempStorage = await reportReadiness(async () => ({
     ok: await getTempStorageAdapter().ping(),
   }));
@@ -63,6 +66,7 @@ export async function readinessHandler(_req: Request, res: Response): Promise<vo
     tempStorage,
     virusScanner,
     documentGeneration,
+    tenantEngines,
     cache,
     messageBus,
     eventStream,

@@ -1,5 +1,5 @@
 import express from 'express';
-import { coreErrorHandler } from '../../middleware/errorHandler';
+import { coreErrorHandler, notFoundHandler } from '../../middleware/errorHandler';
 import { validateRequest } from '../shared/validation';
 import { sortLocale } from '../../middleware/sortLocale';
 import { requireFeature } from '../../middleware/requireFeature';
@@ -65,6 +65,7 @@ router.get(
   listDocumentGenerationAuditsHandler,
 );
 
+router.use(notFoundHandler);
 router.use(coreErrorHandler);
 
 export { router as adminRouter };

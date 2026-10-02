@@ -155,6 +155,8 @@ export function useForm(formId?: string) {
     isHistoryView,
     historicalVersionNo: isHistoryView ? (activeVersion?.versionNo ?? null) : null,
     schema: editedSchema ?? loadedSchema ?? null,
+    // The version the schema came from: the one the edits were made on, else the active version.
+    schemaVersionId: (editedSchema === null ? null : editsBaseVersionId) ?? activeVersionId,
     name: editedName ?? form?.name ?? '',
     description: form?.description ?? '',
     isDirty: editedSchema !== null || editedName !== null,
@@ -219,8 +221,12 @@ export function useFormWriter(formId: string) {
   );
 
   const createVersion = useCallback(
-    async (token: string, sourceSchema: FormType): Promise<WriteOutcome<NewVersion>> => {
-      const value = await createFormVersion(token, formId);
+    async (
+      token: string,
+      sourceSchema: FormType,
+      fromVersionId?: string,
+    ): Promise<WriteOutcome<NewVersion>> => {
+      const value = await createFormVersion(token, formId, fromVersionId);
       await saveFormVersionSchema(token, value.id, sourceSchema);
       await commitSchema(value.id, sourceSchema);
       await refreshVersions();
@@ -232,7 +238,7 @@ export function useFormWriter(formId: string) {
   const restoreVersion = useCallback(
     async (token: string, fromVersionId: string): Promise<WriteOutcome<NewVersion>> => {
       const sourceSchema = ((await getFormVersionSchema(token, fromVersionId)) ?? {}) as FormType;
-      return createVersion(token, sourceSchema);
+      return createVersion(token, sourceSchema, fromVersionId);
     },
     [createVersion],
   );

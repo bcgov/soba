@@ -43,6 +43,8 @@ export {
   openSobaFormSubmission,
   saveSobaFormSubmission,
   submitSobaFormSubmission,
+  deleteSubmitSubmission,
+  getMySubmissions,
   getSubmitSubmission,
   getSubmitSubmissionData,
 } from './sobaApiSubmit';

@@ -30,6 +30,13 @@ jest.mock('../../../src/core/services/submissionService', () => ({
 jest.mock('../../../src/core/db/repos/documentGenerationAuditRepo', () => ({
   createDocumentGenerationAudit: jest.fn(),
 }));
+jest.mock('../../../src/core/db/repos/documentTemplateRepo', () => ({
+  getLiveDocumentTemplate: jest.fn(),
+  listLiveDocumentTemplates: jest.fn(),
+}));
+jest.mock('../../../src/core/services/fileStore', () => ({
+  fileStore: { open: jest.fn() },
+}));
 
 import { documentGenerationService } from '../../../src/features/document-generation/service';
 import * as submissionRepo from '../../../src/core/db/repos/submissionRepo';
@@ -40,7 +47,12 @@ import * as docgenRegistry from '../../../src/core/integrations/document-generat
 import * as featureRepo from '../../../src/core/db/repos/featureRepo';
 import * as availability from '../../../src/core/services/featureAvailabilityService';
 import * as auditRepo from '../../../src/core/db/repos/documentGenerationAuditRepo';
+import * as templateRepo from '../../../src/core/db/repos/documentTemplateRepo';
+import { fileStore } from '../../../src/core/services/fileStore';
+import { Readable } from 'node:stream';
 import { ServiceUnavailableError } from '../../../src/core/errors';
+import { HttpClientError } from '../../../src/core/http/httpClient';
+import { httpErrorToAppError } from '../../../src/core/http/httpErrorMapper';
 
 const getSubmissionListContext = submissionRepo.getSubmissionListContext as unknown as jest.Mock;
 const getSubmissionRecordById = submissionRepo.getSubmissionRecordById as unknown as jest.Mock;
@@ -52,17 +64,27 @@ const createAdapter = docgenRegistry.createDocumentGenerationAdapter as unknown 
 const getFeatureGateCached = featureRepo.getFeatureGateCached as unknown as jest.Mock;
 const isFeatureAvailable = availability.isFeatureAvailable as unknown as jest.Mock;
 const createAudit = auditRepo.createDocumentGenerationAudit as unknown as jest.Mock;
+const getLiveTemplate = templateRepo.getLiveDocumentTemplate as unknown as jest.Mock;
+const openFile = fileStore.open as unknown as jest.Mock;
 
 const caller = { actorId: 'user-1', idpCode: 'idir' };
 const scope = { workspaceId: 'ws-1', formId: 'form-1', formVersionId: 'fv-1' };
 const renderMock = jest.fn();
-const template = { content: 'base64', fileType: 'docx' };
+const templateId = 'tpl-1';
+const storedTemplate = {
+  template: { id: templateId, formVersionId: 'fv-1', name: 'Receipt' },
+  file: { id: 'file-1', profile: 'default', filename: 'receipt.docx', size: 9 },
+};
 
 beforeEach(() => {
   jest.clearAllMocks();
   getSubmissionListContext.mockResolvedValue(scope);
   getSubmissionRecordById.mockResolvedValue({ id: 's1' });
-  hasFormSubmitAccess.mockResolvedValue(false);
+  hasFormSubmitAccess.mockResolvedValue(true);
+  getLiveTemplate.mockResolvedValue(storedTemplate);
+  openFile.mockImplementation(async () => ({
+    downloadStream: Readable.from(Buffer.from('tpl bytes')),
+  }));
   getDefs.mockReturnValue([
     { code: 'cdogs-v2', featureCode: 'document-generation-v2' },
     { code: 'cdogs-v3', featureCode: 'document-generation-v3' },
@@ -91,7 +113,7 @@ describe('documentGenerationService.preview', () => {
     getSubmissionListContext.mockResolvedValue(null);
     const outcome = await documentGenerationService.preview(caller, {
       submissionId: 's1',
-      template,
+      templateId,
       data: { field: 'live' },
     });
     expect(outcome.status).toBe('notfound');
@@ -102,7 +124,7 @@ describe('documentGenerationService.preview', () => {
     hasFormSubmitAccess.mockResolvedValue(true);
     const outcome = await documentGenerationService.preview(caller, {
       submissionId: 's1',
-      template,
+      templateId,
       data: { field: 'live' },
     });
     expect(outcome.status).toBe('denied');
@@ -112,16 +134,17 @@ describe('documentGenerationService.preview', () => {
     isActiveParticipant.mockResolvedValue(true);
     const outcome = await documentGenerationService.preview(caller, {
       submissionId: 's1',
-      template,
+      templateId,
       options: { reportName: 'r' },
       data: { field: 'live' },
     });
     expect(outcome).toMatchObject({ status: 'ok', code: 'cdogs-v2' });
     expect(isActiveParticipant).toHaveBeenCalledWith('s1', caller.actorId);
+    expect(getLiveTemplate).toHaveBeenCalledWith(templateId, expect.any(String), 'cdogs');
     expect(createAdapter).toHaveBeenCalledWith('cdogs-v2');
-    // Service passes the payload through untouched; CDOGS-specific shaping is in the plugin.
+    // Service passes the stored template's bytes and type; CDOGS-specific shaping is in the plugin.
     expect(renderMock).toHaveBeenCalledWith({
-      template,
+      template: { content: Buffer.from('tpl bytes'), fileType: 'docx' },
       options: { reportName: 'r' },
       data: { field: 'live' },
     });
@@ -132,7 +155,7 @@ describe('documentGenerationService.preview', () => {
     isFeatureAvailable.mockResolvedValue(true); // v3 now granted for this scope
     const outcome = await documentGenerationService.preview(caller, {
       submissionId: 's1',
-      template,
+      templateId,
       data: {},
     });
     expect(outcome).toMatchObject({ status: 'ok', code: 'cdogs-v3' });
@@ -144,7 +167,7 @@ describe('documentGenerationService.preview', () => {
     isFeatureAvailable.mockResolvedValue(false); // neither v3 nor v2 available
     const outcome = await documentGenerationService.preview(caller, {
       submissionId: 's1',
-      template,
+      templateId,
       data: {},
     });
     expect(outcome.status).toBe('unavailable');
@@ -164,7 +187,7 @@ describe('documentGenerationService.preview', () => {
     );
     const outcome = await documentGenerationService.preview(caller, {
       submissionId: 's1',
-      template,
+      templateId,
       data: {},
     });
     expect(outcome).toMatchObject({ status: 'ok', code: 'cdogs-v2' });
@@ -176,7 +199,7 @@ describe('documentGenerationService.preview', () => {
     isFeatureAvailable.mockResolvedValue(false); // and no scoped grant
     const outcome = await documentGenerationService.preview(caller, {
       submissionId: 's1',
-      template,
+      templateId,
       data: {},
     });
     expect(outcome.status).toBe('unavailable');
@@ -187,10 +210,14 @@ describe('documentGenerationService.print', () => {
   it('lets a participant print the persisted submission', async () => {
     isActiveParticipant.mockResolvedValue(true);
 
-    const outcome = await documentGenerationService.print(caller, { submissionId: 's1', template });
+    const outcome = await documentGenerationService.print(caller, {
+      submissionId: 's1',
+      templateId,
+    });
 
     expect(outcome).toMatchObject({ status: 'ok' });
     expect(isActiveParticipant).toHaveBeenCalledWith('s1', caller.actorId);
+    expect(getLiveTemplate).toHaveBeenCalledWith(templateId, expect.any(String), 'cdogs');
     // Service passes the raw persisted doc through; the plugin flattens it for the template.
     expect(renderMock).toHaveBeenCalledWith(
       expect.objectContaining({ data: { data: { field: 'saved' } } }),
@@ -201,7 +228,10 @@ describe('documentGenerationService.print', () => {
     isActiveParticipant.mockResolvedValue(false);
     hasFormSubmitAccess.mockResolvedValue(true);
 
-    const outcome = await documentGenerationService.print(caller, { submissionId: 's1', template });
+    const outcome = await documentGenerationService.print(caller, {
+      submissionId: 's1',
+      templateId,
+    });
 
     expect(outcome.status).toBe('denied');
   });
@@ -210,7 +240,10 @@ describe('documentGenerationService.print', () => {
     isActiveParticipant.mockResolvedValue(true);
     getContentMock.mockResolvedValue(null);
 
-    const outcome = await documentGenerationService.print(caller, { submissionId: 's1', template });
+    const outcome = await documentGenerationService.print(caller, {
+      submissionId: 's1',
+      templateId,
+    });
 
     expect(outcome.status).toBe('no-content');
   });
@@ -220,7 +253,7 @@ describe('documentGenerationService audit', () => {
   it('records a success audit for the backend call', async () => {
     isActiveParticipant.mockResolvedValue(true);
 
-    await documentGenerationService.preview(caller, { submissionId: 's1', template, data: {} });
+    await documentGenerationService.preview(caller, { submissionId: 's1', templateId, data: {} });
 
     expect(createAudit).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -237,11 +270,13 @@ describe('documentGenerationService audit', () => {
 
   it('records an error audit and returns error when the backend throws', async () => {
     isActiveParticipant.mockResolvedValue(true);
-    renderMock.mockRejectedValue(new ServiceUnavailableError('CDOGS error 500: boom'));
+    renderMock.mockRejectedValue(
+      httpErrorToAppError(new HttpClientError(500, 'Error', 'boom', 'http://cdogs.test'), 'CDOGS'),
+    );
 
     const outcome = await documentGenerationService.preview(caller, {
       submissionId: 's1',
-      template,
+      templateId,
       data: {},
     });
 
@@ -251,8 +286,8 @@ describe('documentGenerationService audit', () => {
         backendCode: 'cdogs-v2',
         outcome: 'error',
         httpStatus: 503,
-        // PI-safe: the error class, not the upstream body (which was 'CDOGS error 500: boom').
-        errorDetail: 'ServiceUnavailableError',
+        // PI-safe: the error class and upstream status, not the upstream body ('boom').
+        errorDetail: 'ServiceUnavailableError upstream 500',
       }),
     );
   });
@@ -266,7 +301,7 @@ describe('documentGenerationService audit', () => {
 
     const outcome = await documentGenerationService.preview(caller, {
       submissionId: 's1',
-      template,
+      templateId,
       data: {},
     });
 
@@ -287,7 +322,7 @@ describe('documentGenerationService audit', () => {
 
     const outcome = await documentGenerationService.preview(caller, {
       submissionId: 's1',
-      template,
+      templateId,
       data: {},
     });
 
@@ -297,19 +332,19 @@ describe('documentGenerationService audit', () => {
   it('does not audit when no backend call is made', async () => {
     // denied: never reaches the backend
     isActiveParticipant.mockResolvedValue(false);
-    await documentGenerationService.preview(caller, { submissionId: 's1', template, data: {} });
+    await documentGenerationService.preview(caller, { submissionId: 's1', templateId, data: {} });
 
     // unavailable: no backend resolved
     isActiveParticipant.mockResolvedValue(true);
     isFeatureAvailable.mockResolvedValue(false);
-    await documentGenerationService.preview(caller, { submissionId: 's1', template, data: {} });
+    await documentGenerationService.preview(caller, { submissionId: 's1', templateId, data: {} });
 
     // print no-content: no persisted data, so no backend call
     isFeatureAvailable.mockImplementation((code: string) =>
       Promise.resolve(code === 'document-generation-v2'),
     );
     getContentMock.mockResolvedValue(null);
-    await documentGenerationService.print(caller, { submissionId: 's1', template });
+    await documentGenerationService.print(caller, { submissionId: 's1', templateId });
 
     expect(createAudit).not.toHaveBeenCalled();
   });

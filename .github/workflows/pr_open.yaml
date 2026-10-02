@@ -50,6 +50,7 @@ jobs:
               - 'backend/**'
               - 'frontend/**'
               - '.github/workflows/pr_open.yaml'
+              - '.github/workflows/gateway-proxy-check.yaml'
               - '.github/workflows/build-images.yaml'
               - '.github/workflows/qa.yaml'
               - '.gitignore'
@@ -251,6 +252,7 @@ jobs:
           DOMAIN: ${{ vars.OC_DOMAIN }}
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
           FRONTEND_HOST: ${{ needs.set-vars.outputs.FRONTEND_HOST }}
+          APS_PR_ENABLED: ${{ vars.APS_PR_ENABLED == 'true' }}
         run: |
           # Pipeline performance fix: Revert if needed.
           set -euo pipefail
@@ -312,6 +314,8 @@ jobs:
             # PR-unique Redis namespace (by PR number, not the reused slot) so a recycled slot never
             # inherits a previous PR's cached rows, bus channels or streams on the shared Valkey.
             prefix: "soba-pr-${PR_NUM}:"
+          gatewayNetworkPolicy:
+            enabled: ${APS_PR_ENABLED}
 
           OVERRIDE
 
@@ -348,6 +352,20 @@ jobs:
             - Designer (design-mode): <${{ needs.set-vars.outputs.URL }}>
             - Forms (submit-mode): <${{ needs.set-vars.outputs.URL_FORMS }}>
           number: ${{ needs.set-vars.outputs.PR_NUM }}
+
+  gateway:
+    name: Verify PR through APS gateway
+    needs: [deploy, set-vars]
+    # Repository variable: opt in while establishing the first gateway proof.
+    if: ${{ vars.APS_PR_ENABLED == 'true' }}
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/gateway-proxy-check.yaml
+    with:
+      environment: pr
+      release: soba-${{ needs.set-vars.outputs.JOB_NAME }}
+    secrets: inherit
 
   Tests:
     name: Integration Tests

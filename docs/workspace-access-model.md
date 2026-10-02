@@ -20,8 +20,13 @@ adds a third control per submission, who takes part in it; see
 > workspace). Creating a form requires `form_create` and `design_create` — only `form_admin` satisfies
 > that, via `*`. Creating a design on an existing form requires `design_create` (`form_designer`). The
 > submit routes, file uploads and document generation are gated by `isSubmitterAllowed` (see
-> [Submission participants](#submission-participants)). Group and member management is gated by
-> workspace role (`requireWorkspaceManage`), not by RBAC.
+> [Submission participants](#submission-participants)); rendering a document also needs
+> `document_template_read`. The template routes (`features/templates/route.ts`) are gated by
+> `requireFormPermissions`: `document_template_read` to list and download, `document_template_create`
+> to upload, replace and rename, `document_template_delete` to delete. Only `form_admin` (via `*`)
+> holds the create and delete codes; `form_submitter` holds read. A draft created from an existing
+> version gets that version's templates under `design_create` alone. Group and member management is
+> gated by workspace role (`requireWorkspaceManage`), not by RBAC.
 
 ```
                         User in a workspace
@@ -146,8 +151,8 @@ The role lives on the group (`workspace_group_role`). `member_kind` selects the 
 | `idp_group`   | `idp_group_code`           | anyone whose provider is in that IdP group (e.g. `bcgov` = `idir` + `azureidir`) |
 
 `user` members are resolved for form permissions by `resolveFormPermissions`. `idp` members are
-resolved only for the Form submitters audience, by `hasFormSubmitAccess` in `formSubmitAccessRepo.ts`,
-against the form's effective members (see [Form-level overrides](#form-level-overrides)).
+resolved only for the Form submitters audience, by `hasFormSubmitAccess` and `isPublicSubmitterAudience`
+in `formSubmitAccessRepo.ts`, against the form's effective members (see [Form-level overrides](#form-level-overrides)).
 `idp_group` members are not resolved. `public` is a pseudo identity provider (`identity_provider.is_login_provider = false`) used as a
 match-all selector.
 
@@ -236,13 +241,22 @@ the id has access to those.
 | operation | needs |
 |-----------|-------|
 | `open` | `submission_create` on the form (`hasFormSubmitAccess`) |
-| `read`: confirmation, data, schema, fill, file download, print, preview | an active grant |
+| `read`: confirmation, data, schema, fill, file download | an active grant |
 | `write`: save, submit, upload, delete a file on an in-progress submission | an active grant and `submission_create` on the form |
 | `deleteSubmittedFile` | `submission_update` on the form |
+| `render`: print, preview, template list | an active grant and `document_template_read` on the form |
+| `delete`: the caller's own submission | a signed-in caller with an active owner grant |
 
-Owners and collaborators have the same access. Design routes do not use these rules; staff read and
-delete submissions through form permissions. Files, print and preview have no design route, so staff
-download files, print and preview only through the submit routes, which need a grant.
+Owners and collaborators have the same access, except that only an owner deletes. A submitter
+deletes only an opened or draft submission; a submitted one is a 409. The public user's ownership
+grants no delete, because every anonymous caller shares it. Design routes do not use these rules;
+staff read and delete submissions through form permissions. Files, print and preview have no design
+route, so staff download files through `/files` or `/submit/files`, and print and preview through
+the submit routes, all of which need a grant.
+
+`GET /submit/submissions/mine` lists the draft and submitted submissions the caller holds an active
+grant on, across every workspace, with the caller's role on each. Submissions on a deleted form or
+form version are left out. Anonymous callers get a 401, since the public user's grants are shared.
 
 ## What a new workspace looks like
 

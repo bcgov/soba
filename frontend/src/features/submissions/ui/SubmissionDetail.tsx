@@ -5,7 +5,6 @@ import { InlineAlert } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { ReadOnlyFormView } from '@/src/features/formio-v5/ui/ReadOnlyFormView';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
-import { convertSubmissionIdToConfirmationId } from '@/src/shared/util/stringUtils';
 import type { SubmissionDataDocument } from '@/src/types/forms';
 import type { SubmissionListItem } from '@/src/types/submissions';
 import { WorkflowStateBadge } from './WorkflowStateBadge';
@@ -35,9 +34,11 @@ export function SubmissionDetail({
     <>
       <div className="mb-3" data-testid="submission-view-header">
         <h2 className="h5 mb-1">{submission.formName || dict.form.nameLabel}</h2>
-        <div>
-          {dictSub.confirmationId}: {convertSubmissionIdToConfirmationId(submission.id)}
-        </div>
+        {submission.confirmationCode ? (
+          <div data-testid="submission-view-confirmation">
+            {dictSub.confirmationId}: <strong>{submission.confirmationCode}</strong>
+          </div>
+        ) : null}
         {showSubmitter ? (
           <div data-testid="submission-view-submitter">
             {dictSub.submitter}: {submission.createdBy || dictSub.anon}

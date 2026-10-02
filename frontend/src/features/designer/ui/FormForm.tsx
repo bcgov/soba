@@ -164,6 +164,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     historicalVersionNo,
     selectedVersionId,
     schema: formSchema,
+    schemaVersionId,
     name: formName,
     description: formDesc,
     isDirty,
@@ -283,7 +284,11 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
 
   const createNewVersion = (sourceSchema?: FormType): Promise<boolean> =>
     applyNewVersion(() =>
-      formWriter.createVersion(token as string, (sourceSchema ?? formSchema ?? {}) as FormType),
+      formWriter.createVersion(
+        token as string,
+        (sourceSchema ?? formSchema ?? {}) as FormType,
+        schemaVersionId ?? undefined,
+      ),
     );
 
   const restoreVersionAsNew = (version: SobaFormVersionListItem): Promise<boolean> =>

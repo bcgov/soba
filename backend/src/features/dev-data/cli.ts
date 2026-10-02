@@ -153,6 +153,12 @@ function reportPurge(result: PurgeResult): void {
   if (result.engineSkipped > 0) {
     console.log(`  ${result.engineSkipped} engine document(s) skipped, no plugin to delete them`);
   }
+  console.log(`  stored files${''.padEnd(20)} ${result.storedFilesDeleted}`);
+  if (result.storedFilesSkipped > 0) {
+    console.log(
+      `  ${result.storedFilesSkipped} stored file(s) skipped, no storage profile for them`,
+    );
+  }
 }
 
 async function reportDryRun(): Promise<void> {
@@ -163,6 +169,7 @@ async function reportDryRun(): Promise<void> {
   console.log(`  users${''.padEnd(27)} ${targets.userIds.length}`);
   console.log(`  engine form documents${''.padEnd(11)} ${targets.schemaRefs.length}`);
   console.log(`  engine submission documents${''.padEnd(5)} ${targets.submissionRefs.length}`);
+  console.log(`  stored files${''.padEnd(20)} ${targets.storedFiles.length}`);
 }
 
 function reportManifest(manifest: DevDataManifest): void {
@@ -248,6 +255,12 @@ async function run(options: CliOptions): Promise<void> {
     if (result.engineFailures + result.engineSkipped > 0) {
       throw new AppError(
         `Postgres is clean but ${result.engineFailures + result.engineSkipped} form engine document(s) were left behind`,
+        1,
+      );
+    }
+    if (result.storedFilesSkipped > 0) {
+      throw new AppError(
+        `Postgres is clean but ${result.storedFilesSkipped} stored file(s) were left behind`,
         1,
       );
     }

@@ -463,6 +463,7 @@ describe('FormForm', () => {
       .querySelector('select') as HTMLSelectElement;
     await userEvent.selectOptions(picker, 'create');
     await waitFor(() => expect(api.createFormVersion).toHaveBeenCalled());
+    expect(api.createFormVersion).toHaveBeenCalledWith(expect.any(String), 'f1', 'v1');
     const newVersionCall = api.saveFormVersionSchema.mock.calls.find((c) => c[1] === 'v-new');
     expect(newVersionCall?.[2]).toEqual({ components: [{ key: 'edited' }] });
   });

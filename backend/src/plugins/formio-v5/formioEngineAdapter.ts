@@ -243,8 +243,10 @@ export class FormioEngineAdapter implements FormEngineAdapter {
     }
 
     const body = buildSubmissionBody(input);
+    // Form.io validates every submission, drafts included; only an admin's noValidate skips it.
+    const query = input.validate ? undefined : { params: { noValidate: true } };
     const saved = (await client
-      .saveSubmission(input.engineFormRef, body)
+      .saveSubmission(input.engineFormRef, body, query)
       .catch(rethrowEngineRejection)) as Record<string, unknown> | null;
     const engineRef = saved?._id;
     if (engineRef == null || engineRef === '') {

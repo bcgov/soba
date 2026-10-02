@@ -7,13 +7,63 @@ import {
   SubmissionResponseSchema,
   SubmissionWriteResponseSchema,
   SubmitSubmissionBodySchema,
+  SubmissionSortSchema,
 } from '../submissions/schema';
-import { SubmitFillBundleSchema as LibSubmitFillBundleSchema } from '@soba/lib';
+import {
+  offsetQueryFields,
+  rejectedCursorField,
+  searchQueryField,
+  sortLocaleQueryField,
+  OffsetPageSchema,
+  OFFSET_DRIFT_NOTE,
+} from '../shared/offsetPagination';
+import {
+  SubmitFillBundleSchema as LibSubmitFillBundleSchema,
+  MySubmissionStateSchema as LibMySubmissionStateSchema,
+  MySubmissionRoleSchema as LibMySubmissionRoleSchema,
+  MySubmissionListItemSchema as LibMySubmissionListItemSchema,
+  ListMySubmissionsResponseSchema as LibListMySubmissionsResponseSchema,
+} from '@soba/lib';
 
 extendZodWithOpenApi(z);
 
 export const SubmitFillBundleSchema =
   LibSubmitFillBundleSchema.clone().openapi('Submit_FillBundle');
+
+export const MySubmissionStateSchema = LibMySubmissionStateSchema.clone().openapi(
+  'Submit_MySubmissionState',
+);
+
+export const ListMySubmissionsQuerySchema = z
+  .object({
+    ...offsetQueryFields,
+    cursor: rejectedCursorField,
+    workflowState: MySubmissionStateSchema.optional(),
+    q: searchQueryField.openapi({
+      description: 'Matches anywhere in the form name, or a submitted confirmation code.',
+    }),
+    sort: SubmissionSortSchema.default('updatedAt:desc'),
+    locale: sortLocaleQueryField,
+  })
+  .openapi('Submit_ListMySubmissionsQuery');
+
+export const MySubmissionRoleSchema =
+  LibMySubmissionRoleSchema.clone().openapi('Submit_MySubmissionRole');
+
+export const MySubmissionListItemSchema = LibMySubmissionListItemSchema.extend({
+  workflowState: MySubmissionStateSchema,
+  role: MySubmissionRoleSchema,
+}).openapi('Submit_MySubmissionListItem');
+
+export const ListMySubmissionsResponseSchema = LibListMySubmissionsResponseSchema.extend({
+  items: z.array(MySubmissionListItemSchema),
+  page: OffsetPageSchema,
+  filters: z.object({
+    workflowState: MySubmissionStateSchema.optional(),
+    q: z.string().optional(),
+  }),
+  sort: SubmissionSortSchema,
+}).openapi('Submit_ListMySubmissionsResponse');
 
 const TAG = 'core.submit';
 const SUBMISSION_PATH = '/submit/submissions/{id}';
@@ -59,7 +109,7 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
     responses: {
       200: {
         description:
-          'Workflow state + schema + saved answers + write access for the fill page (resume)',
+          'Workflow state + schema + saved answers + write and draft access for the fill page (resume)',
         content: { 'application/json': { schema: SubmitFillBundleSchema } },
       },
       401: { description: SUBMISSION_AUTH_REQUIRED },
@@ -116,7 +166,9 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
         content: { 'application/json': { schema: SubmissionWriteResponseSchema } },
       },
       401: { description: SUBMISSION_AUTH_REQUIRED },
-      403: { description: WRITE_AUTHZ },
+      403: {
+        description: `${WRITE_AUTHZ}, or the form does not accept drafts (not enabled, or a public audience)`,
+      },
       404: { description: SUBMISSION_NOT_FOUND },
       400: { description: INVALID_WRITE_BODY },
       409: { description: WRITE_CONFLICT },
@@ -180,6 +232,40 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
       401: { description: SUBMISSION_AUTH_REQUIRED },
       403: { description: NOT_PARTICIPANT },
       404: { description: 'Submission or its content not found' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/submit/submissions/mine',
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    description: `The caller's draft and submitted submissions, across every workspace. Anonymous callers have none. ${OFFSET_DRIFT_NOTE}`,
+    request: { query: ListMySubmissionsQuerySchema },
+    responses: {
+      200: {
+        description: "A page of the caller's submissions",
+        content: { 'application/json': { schema: ListMySubmissionsResponseSchema } },
+      },
+      400: { description: 'Invalid query' },
+      401: { description: 'Authentication required' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: SUBMISSION_PATH,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    description:
+      "Deletes the caller's own submission before it is submitted. Anonymous callers cannot delete.",
+    request: { params: SubmissionIdParamsSchema },
+    responses: {
+      204: { description: 'Submission deleted' },
+      401: { description: 'Authentication required' },
+      403: { description: 'Not the owner of this submission' },
+      404: { description: SUBMISSION_NOT_FOUND },
+      409: { description: 'The submission is submitted and can no longer be deleted' },
     },
   });
 };
