@@ -12,7 +12,7 @@ import {
 } from '../db/repos/formRepo';
 import { createEmptyFormVersionDraft } from '../db/repos/formVersionRepo';
 import { isWorkspaceDisclaimerAccepted } from '../db/repos/workspaceRepo';
-import { db } from '../db/client';
+import { db, type DbOrTx } from '../db/client';
 import { env } from '../config/env';
 import {
   createFormEngineAdapter,
@@ -48,6 +48,7 @@ interface CreateInput {
   name: string;
   description?: string;
   formEngineCode?: string;
+  executor?: DbOrTx;
 }
 
 interface UpdateInput {
@@ -93,8 +94,9 @@ export class FormService {
       throw new ConflictError(FORM_NAME_TAKEN);
     }
 
+    const executor = input.executor ?? db;
     // One-call create: form + an empty v1 draft in a single transaction.
-    return db.transaction(async (tx) => {
+    return executor.transaction(async (tx) => {
       const form = await createForm(
         {
           workspaceId: input.workspaceId,

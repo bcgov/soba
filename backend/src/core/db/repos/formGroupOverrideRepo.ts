@@ -122,8 +122,13 @@ export const effectiveGroupMembers = (args: {
 };
 
 /** True when the form has an active override for the group. */
-export const hasActiveOverride = async (formId: string, groupId: string): Promise<boolean> => {
-  const rows = await db
+export const hasActiveOverride = async (
+  formId: string,
+  groupId: string,
+  executor?: DbOrTx,
+): Promise<boolean> => {
+  const ex = executor ?? db;
+  const rows = await ex
     .select({ id: formGroupOverrides.id })
     .from(formGroupOverrides)
     .where(
@@ -160,8 +165,10 @@ export const replaceOverrideMembers = async (args: {
   groupId: string;
   members: OverrideMemberInput[];
   displayLabel: string | null;
+  executor?: DbOrTx;
 }): Promise<void> => {
-  await db.transaction(async (tx) => {
+  const executor = args.executor ?? db;
+  await executor.transaction(async (tx) => {
     const [override] = await tx
       .insert(formGroupOverrides)
       .values({
@@ -205,8 +212,10 @@ export const clearOverride = async (args: {
   formId: string;
   groupId: string;
   displayLabel: string | null;
+  executor?: DbOrTx;
 }): Promise<void> => {
-  await db.transaction(async (tx) => {
+  const executor = args.executor ?? db;
+  await executor.transaction(async (tx) => {
     const [override] = await tx
       .select({ id: formGroupOverrides.id })
       .from(formGroupOverrides)

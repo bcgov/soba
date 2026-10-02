@@ -2,11 +2,14 @@ import { z } from 'zod';
 import { LookupMetaSchema, OffsetPageSchema, makeSortEnum } from './pagination';
 import { FORM_SORT_FIELDS, FORM_VERSION_SORT_FIELDS } from '../sort';
 
+import { SetFormSubmitterAudienceBodySchema } from './groups';
+
 export const CreateFormBodySchema = z.object({
   workspaceId: z.string().min(1),
   name: z.string().trim().min(1),
   description: z.string().optional(),
   formEngineCode: z.string().trim().min(1).optional(),
+  submitterAudience: SetFormSubmitterAudienceBodySchema.optional(),
 });
 
 export const UpdateFormBodySchema = z.object({

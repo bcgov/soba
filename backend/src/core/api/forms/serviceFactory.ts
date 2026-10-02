@@ -3,14 +3,20 @@ import { FormVersionService } from '../../services/formVersionService';
 import { resolveFormPermissions } from '../../db/repos/formAccessRepo';
 import type { FormListSort } from '../../db/repos/formRepo';
 import type { FormVersionListSort } from '../../db/repos/formVersionRepo';
-import type { FormListItem, FormVersionListItem, SortLocale } from '@soba/lib';
+import {
+  type FormListItem,
+  type FormVersionListItem,
+  type SortLocale,
+  type SetFormSubmitterAudienceBody,
+  DEFAULT_SORT_LOCALE,
+} from '@soba/lib';
 import { LOOKUP_FETCH_LIMIT, toLookupResponse } from '../shared/lookup';
+import { formSubmitterAudienceService } from './submitterAudience';
+import { db } from '../../db/client';
 
-export interface FormsContextInput {
-  workspaceId: string;
-  actorId: string;
-  actorDisplayLabel: string | null;
-}
+import type { CoreRequestContext } from '../../middleware/requestContext';
+
+export type FormsContextInput = CoreRequestContext;
 
 /** Scope for list/search: single workspace resolved from a scope anchor. */
 export interface FormsListScopeInput {
@@ -43,6 +49,7 @@ interface CreateFormInput {
   name: string;
   description?: string;
   formEngineCode?: string;
+  submitterAudience?: SetFormSubmitterAudienceBody;
 }
 
 interface UpdateFormInput {
@@ -163,15 +170,26 @@ export function createFormsApiService(
 ) {
   return {
     createForm: async (ctx: FormsContextInput, input: CreateFormInput) => {
-      const { form, version } = await formService.create({
-        workspaceId: ctx.workspaceId,
-        actorId: ctx.actorId,
-        actorDisplayLabel: ctx.actorDisplayLabel,
-        name: input.name,
-        description: input.description,
-        formEngineCode: input.formEngineCode,
+      return db.transaction(async (tx) => {
+        const { form, version } = await formService.create({
+          workspaceId: ctx.workspaceId,
+          actorId: ctx.actorId,
+          actorDisplayLabel: ctx.actorDisplayLabel,
+          name: input.name,
+          description: input.description,
+          formEngineCode: input.formEngineCode,
+          executor: tx,
+        });
+        if (input.submitterAudience) {
+          await formSubmitterAudienceService.set(
+            { ...ctx, locale: DEFAULT_SORT_LOCALE },
+            form.id,
+            input.submitterAudience,
+            tx,
+          );
+        }
+        return { ...toFormDto(form), formVersion: toFormVersionDto(version) };
       });
-      return { ...toFormDto(form), formVersion: toFormVersionDto(version) };
     },
 
     normalizeSchema: (_ctx: FormsContextInput, schema: Record<string, unknown>) =>

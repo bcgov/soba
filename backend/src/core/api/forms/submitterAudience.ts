@@ -19,6 +19,7 @@ import {
   requireSubmittersGroupId,
 } from '../groups/submitterAudience';
 import type { CoreRequestContext } from '../../middleware/requestContext';
+import type { DbOrTx } from '../../db/client';
 
 type FormAudienceContext = Pick<CoreRequestContext, 'workspaceId' | 'actorDisplayLabel'> & {
   locale: SortLocale;
@@ -29,10 +30,11 @@ async function readFormAudience(
   formId: string,
   groupId: string,
   locale: SortLocale,
+  executor?: DbOrTx,
 ): Promise<FormSubmitterAudience> {
   const [{ available, ...workspace }, overridden] = await Promise.all([
     readAudience(workspaceId, groupId, locale),
-    hasActiveOverride(formId, groupId),
+    hasActiveOverride(formId, groupId, executor),
   ]);
   if (!overridden) {
     return { inherit: true, mode: workspace.mode, idps: workspace.idps, available, workspace };
@@ -43,6 +45,7 @@ async function readFormAudience(
     formId,
     groupId,
     memberKind: GroupMemberKind.idp,
+    executor,
   });
   const codes = members.map((m) => m.identityProviderCode).filter((c): c is string => c != null);
   // Ordered by provider name, as the workspace audience lists them.
@@ -70,11 +73,12 @@ export const formSubmitterAudienceService = {
     ctx: FormAudienceContext,
     formId: string,
     input: SetFormSubmitterAudienceBody,
+    executor?: DbOrTx,
   ): Promise<FormSubmitterAudience> {
     const groupId = await requireSubmittersGroupId(ctx.workspaceId);
     const target = { workspaceId: ctx.workspaceId, formId, groupId };
     if (input.mode === 'inherit') {
-      await clearOverride({ formId, groupId, displayLabel: ctx.actorDisplayLabel });
+      await clearOverride({ formId, groupId, displayLabel: ctx.actorDisplayLabel, executor });
     } else {
       const codes = input.mode === 'public' ? [PUBLIC_PROVIDER_CODE] : [...new Set(input.idps)];
       if (input.mode === 'protected') await assertLoginProviders(codes);
@@ -82,8 +86,9 @@ export const formSubmitterAudienceService = {
         ...target,
         members: idpMembers(codes),
         displayLabel: ctx.actorDisplayLabel,
+        executor,
       });
     }
-    return readFormAudience(ctx.workspaceId, formId, groupId, ctx.locale);
+    return readFormAudience(ctx.workspaceId, formId, groupId, ctx.locale, executor);
   },
 };
