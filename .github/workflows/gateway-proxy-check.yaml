@@ -76,7 +76,14 @@ jobs:
               exit 1
               ;;
           esac
-          [[ "$GWA_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]
+          if [[ ! "$GWA_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]; then
+            echo '::error::Set Actions variable GWA_LINUX_AMD64_SHA256 to the reviewed 64-character SHA256 of the pinned GWA release archive'
+            exit 1
+          fi
+          if [[ ! "$GATEWAY_ID" =~ ^gw-[a-z0-9-]+$ ]]; then
+            echo '::error::Set Actions variable APS_GATEWAY_ID to the gateway ID for the selected APS instance (gw-...)'
+            exit 1
+          fi
           if [[ -z "$GATEWAY_HOSTNAME" ]]; then
             if [[ "$APP_ENVIRONMENT" == prod ]]; then
               echo '::error::Production requires an explicit gateway_hostname'
@@ -177,9 +184,11 @@ jobs:
           gwa config set host "$APS_HOST"
           gwa config set gateway "$GATEWAY_ID"
           gwa login --client-id "$GWA_CLIENT_ID" --client-secret "$GWA_CLIENT_SECRET"
-          gwa publish-gateway "$RUNNER_TEMP/gateway-kong.yaml" \
+          # GWA resolves config paths relative to the current working directory.
+          cd "$RUNNER_TEMP"
+          gwa publish-gateway gateway-kong.yaml \
             --qualifier "$GATEWAY_QUALIFIER" --dry-run
-          gwa publish-gateway "$RUNNER_TEMP/gateway-kong.yaml" \
+          gwa publish-gateway gateway-kong.yaml \
             --qualifier "$GATEWAY_QUALIFIER"
 
       - name: Verify APS upstream and public health response
