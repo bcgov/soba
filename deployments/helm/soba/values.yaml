@@ -7,7 +7,7 @@ global:
   prNumber: ""
 
 # Opt-in access from APS to backend pods only. Silver: 264e6f; Gold: b8840c.
-# environment selects the APS data plane, not the SOBA environment.
+# environment selects the APS namespace label; the workflow derives it from the application environment.
 gatewayNetworkPolicy:
   enabled: false
   namespaceName: ""

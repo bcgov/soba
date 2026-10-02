@@ -357,6 +357,7 @@ jobs:
     if: ${{ vars.APS_PR_ENABLED == 'true' }}
     permissions:
       contents: read
+      pull-requests: read
     uses: ./.github/workflows/gateway-proxy-check.yaml
     with:
       environment: pr

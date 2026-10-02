@@ -11,10 +11,7 @@ on:
         required: true
         type: string
       gateway_hostname:
-        description: Optional explicit hostname; otherwise derive from APS_PR_HOST_SUFFIX
-        default: ""
-        type: string
-      aps_data_plane:
+        description: Optional explicit hostname; otherwise derive the APS test hostname from the release
         default: ""
         type: string
   workflow_dispatch:
@@ -32,17 +29,13 @@ on:
         description: Dedicated APS hostname for this proof (no scheme/path)
         required: true
         type: string
-      aps_data_plane:
-        description: APS Silver data plane allowed to reach the backend
-        type: choice
-        options: [test, prod]
-        default: test
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
-  group: gateway-proxy-check
+  group: aps-gateway-${{ inputs.release }}
   cancel-in-progress: false
 
 jobs:
@@ -53,12 +46,11 @@ jobs:
     env:
       RELEASE: ${{ inputs.release }}
       OPENSHIFT_NAMESPACE: ${{ secrets.OC_NAMESPACE }}
-      APS_HOST: ${{ vars.APS_HOST }}
+      # PR, dev, and test applications use the APS test administration endpoint.
+      APP_ENVIRONMENT: ${{ inputs.environment }}
       GATEWAY_ID: ${{ vars.APS_GATEWAY_ID }}
       GATEWAY_HOSTNAME: ${{ inputs.gateway_hostname }}
       GATEWAY_QUALIFIER: proxy-proof-${{ inputs.release }}
-      APS_DATA_PLANE: ${{ inputs.aps_data_plane || vars.APS_DATA_PLANE }}
-      APS_PR_HOST_SUFFIX: ${{ vars.APS_PR_HOST_SUFFIX }}
       GWA_SHA256: ${{ vars.GWA_LINUX_AMD64_SHA256 }}
     steps:
       - name: Checkout
@@ -70,12 +62,27 @@ jobs:
           set -euo pipefail
           [[ "$RELEASE" =~ ^soba-[a-z0-9-]+$ && ${#RELEASE} -le 53 ]]
           [[ "$OPENSHIFT_NAMESPACE" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]
-          [[ "$APS_HOST" =~ ^[a-z0-9.-]+$ ]]
+          case "$APP_ENVIRONMENT" in
+            pr|dev|test)
+              echo 'APS_HOST=api-gov-bc-ca.test.api.gov.bc.ca' >> "$GITHUB_ENV"
+              echo 'GATEWAY_NETWORK_ENVIRONMENT=test' >> "$GITHUB_ENV"
+              ;;
+            prod)
+              echo 'APS_HOST=api.gov.bc.ca' >> "$GITHUB_ENV"
+              echo 'GATEWAY_NETWORK_ENVIRONMENT=prod' >> "$GITHUB_ENV"
+              ;;
+            *)
+              echo "::error::Unsupported application environment: $APP_ENVIRONMENT"
+              exit 1
+              ;;
+          esac
           [[ "$GWA_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]
-          [[ "$APS_DATA_PLANE" == test || "$APS_DATA_PLANE" == prod ]]
           if [[ -z "$GATEWAY_HOSTNAME" ]]; then
-            : "${APS_PR_HOST_SUFFIX:?Set APS_PR_HOST_SUFFIX in the pr GitHub environment}"
-            export GATEWAY_HOSTNAME="${RELEASE}.${APS_PR_HOST_SUFFIX}"
+            if [[ "$APP_ENVIRONMENT" == prod ]]; then
+              echo '::error::Production requires an explicit gateway_hostname'
+              exit 1
+            fi
+            export GATEWAY_HOSTNAME="${RELEASE}-api-gov-bc-ca.test.api.gov.bc.ca"
           fi
           export GATEWAY_SERVICE_NAME="soba-${GATEWAY_QUALIFIER}"
           export BACKEND_HOST="${RELEASE}-backend.${OPENSHIFT_NAMESPACE}.svc"
@@ -117,7 +124,7 @@ jobs:
             -f "$RUNNER_TEMP/deployed-values.yaml" \
             --set gatewayNetworkPolicy.enabled=true \
             --set-string gatewayNetworkPolicy.namespaceName=264e6f \
-            --set-string "gatewayNetworkPolicy.environment=${APS_DATA_PLANE}" \
+            --set-string "gatewayNetworkPolicy.environment=${GATEWAY_NETWORK_ENVIRONMENT}" \
             --show-only templates/backend/networkpolicy-aps.yaml \
             > "$RUNNER_TEMP/aps-networkpolicy.yaml"
           oc apply -n "$OPENSHIFT_NAMESPACE" -f "$RUNNER_TEMP/aps-networkpolicy.yaml"
@@ -134,18 +141,34 @@ jobs:
           tar -xzf "$RUNNER_TEMP/gwa.tgz" -C "$RUNNER_TEMP/gwa-bin"
           echo "$RUNNER_TEMP/gwa-bin" >> "$GITHUB_PATH"
 
+      - name: Ensure PR is still open before publishing
+        if: ${{ inputs.environment == 'pr' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE" =~ ^soba-pr-([1-9][0-9]*)$ ]]
+          PR_NUMBER="${BASH_REMATCH[1]}"
+          STATE=$(gh api "repos/${GH_REPO}/pulls/${PR_NUMBER}" --jq '.state')
+          if [[ "$STATE" != open ]]; then
+            echo '::error::PR is no longer open; refusing to recreate its gateway configuration'
+            exit 1
+          fi
+
       - name: Publish isolated reverse proxy
         shell: bash
         env:
-          APS_CLIENT_ID: ${{ secrets.APS_CLIENT_ID }}
-          APS_CLIENT_SECRET: ${{ secrets.APS_CLIENT_SECRET }}
+          GWA_CLIENT_ID: ${{ secrets[format('GWA_CLIENT_ID_{0}', fromJSON('{"pr":"PR","dev":"DEV","test":"TEST","prod":"PROD"}')[inputs.environment])] }}
+          GWA_CLIENT_SECRET: ${{ secrets[format('GWA_CLIENT_SECRET_{0}', fromJSON('{"pr":"PR","dev":"DEV","test":"TEST","prod":"PROD"}')[inputs.environment])] }}
         run: |
           set -euo pipefail
-          : "${APS_CLIENT_ID:?Missing APS_CLIENT_ID}"
-          : "${APS_CLIENT_SECRET:?Missing APS_CLIENT_SECRET}"
+          : "${GWA_CLIENT_ID:?Missing GWA_CLIENT_ID_<ENV> for the selected environment}"
+          : "${GWA_CLIENT_SECRET:?Missing GWA_CLIENT_SECRET_<ENV> for the selected environment}"
           gwa config set host "$APS_HOST"
           gwa config set gateway "$GATEWAY_ID"
-          gwa login --client-id "$APS_CLIENT_ID" --client-secret "$APS_CLIENT_SECRET"
+          gwa login --client-id "$GWA_CLIENT_ID" --client-secret "$GWA_CLIENT_SECRET"
           gwa publish-gateway "$RUNNER_TEMP/gateway-kong.yaml" \
             --qualifier "$GATEWAY_QUALIFIER" --dry-run
           gwa publish-gateway "$RUNNER_TEMP/gateway-kong.yaml" \
@@ -157,10 +180,13 @@ jobs:
           set -euo pipefail
           for attempt in {1..12}; do
             if gwa status --json > "$RUNNER_TEMP/gateway-status.json" \
-              && jq -e --arg name "soba-${GATEWAY_QUALIFIER}" 'any(.[]; .name == $name and .status == "UP")' \
-                "$RUNNER_TEMP/gateway-status.json" \
-              && node deployments/gateway/scripts/verify-health.mjs; then
-              printf 'Gateway health URL: https://%s/health\n' "$GATEWAY_HOSTNAME" >> "$GITHUB_STEP_SUMMARY"
+              && PUBLIC_GATEWAY_HOST=$(jq -er --arg name "soba-${GATEWAY_QUALIFIER}" '
+                [.[] | select(.name == $name and .status == "UP") | .env_host
+                  | select(type == "string" and length > 0)] | unique
+                | if length == 1 then .[0] else error("Expected one public hostname for the deployed service") end
+              ' "$RUNNER_TEMP/gateway-status.json") \
+              && GATEWAY_HOSTNAME="$PUBLIC_GATEWAY_HOST" node deployments/gateway/scripts/verify-health.mjs; then
+              printf 'Gateway health URL: https://%s/health\n' "$PUBLIC_GATEWAY_HOST" >> "$GITHUB_STEP_SUMMARY"
               printf 'Verified gateway /health → %s-backend.%s.svc:4000/chefs/api/v1/health\n' \
                 "$RELEASE" "$OPENSHIFT_NAMESPACE" >> "$GITHUB_STEP_SUMMARY"
               exit 0
