@@ -139,9 +139,7 @@ export const getDocumentTemplate = async (
 };
 
 /** The templates on the form's versions that are not deleted: newest version first, then by type. */
-export const listFormDocumentTemplates = async (
-  formId: string,
-): Promise<DocumentTemplateWithVersion[]> =>
+export const listFormDocumentTemplates = (formId: string): Promise<DocumentTemplateWithVersion[]> =>
   selectWithVersion()
     .where(and(eq(documentTemplates.formId, formId), isNull(formVersions.deletedAt)))
     .orderBy(desc(formVersions.versionNo), asc(documentTemplates.type));
@@ -173,7 +171,7 @@ export const getLiveDocumentTemplate = async (
 };
 
 /** The form version's templates of the type by name, when neither the version nor its form is deleted. */
-export const listLiveDocumentTemplates = async (
+export const listLiveDocumentTemplates = (
   formVersionId: string,
   type: DocumentTemplateTypeCode,
 ): Promise<DocumentTemplateWithFile[]> =>
