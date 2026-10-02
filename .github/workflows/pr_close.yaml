@@ -8,6 +8,19 @@ on:
     types: [closed]
     branches:
       - develop
+    # Same set as the PR Open deploy filter.
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/pr_open.yaml"
+      - ".github/workflows/gateway-proxy-check.yaml"
+      - ".github/workflows/build-images.yaml"
+      - ".github/workflows/qa.yaml"
+      - ".gitignore"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "deployments/**"
   workflow_dispatch:
     inputs:
       pr_number:
@@ -87,11 +100,13 @@ jobs:
           gwa login --client-id "$GWA_CLIENT_ID" --client-secret "$GWA_CLIENT_SECRET"
           QUALIFIER="proxy-proof-${RELEASE}"
           SERVICE="soba-${QUALIFIER}"
+          # GWA resolves config paths relative to the current working directory.
+          cd "$RUNNER_TEMP"
           # Never publish an empty configuration without the exact PR qualifier.
-          printf 'services: []\n' > "$RUNNER_TEMP/empty-gateway.yaml"
-          gwa publish-gateway "$RUNNER_TEMP/empty-gateway.yaml" \
+          printf 'services: []\n' > empty-gateway.yaml
+          gwa publish-gateway empty-gateway.yaml \
             --qualifier "$QUALIFIER" --dry-run
-          gwa publish-gateway "$RUNNER_TEMP/empty-gateway.yaml" \
+          gwa publish-gateway empty-gateway.yaml \
             --qualifier "$QUALIFIER"
           for attempt in {1..12}; do
             if gwa status --json > "$RUNNER_TEMP/gateway-status.json" \

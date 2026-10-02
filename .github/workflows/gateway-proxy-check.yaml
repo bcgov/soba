@@ -11,7 +11,7 @@ on:
         required: true
         type: string
       gateway_hostname:
-        description: Optional explicit hostname; otherwise derive the APS test hostname from the release
+        description: Optional route hostname; defaults to <release>.api.gov.bc.ca outside prod
         default: ""
         type: string
   workflow_dispatch:
@@ -26,7 +26,7 @@ on:
         required: true
         type: string
       gateway_hostname:
-        description: Dedicated APS hostname for this proof (no scheme/path)
+        description: Route hostname in the <name>.api.gov.bc.ca form (no scheme/path)
         required: true
         type: string
 
@@ -60,16 +60,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$RELEASE" =~ ^soba-[a-z0-9-]+$ && ${#RELEASE} -le 53 ]]
+          # 49 leaves room for the -api-gov-bc-ca suffix in a 63-character DNS label.
+          [[ "$RELEASE" =~ ^soba-[a-z0-9-]+$ && ${#RELEASE} -le 49 ]]
           [[ "$OPENSHIFT_NAMESPACE" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]
           case "$APP_ENVIRONMENT" in
             pr|dev|test)
               echo 'APS_HOST=api-gov-bc-ca.test.api.gov.bc.ca' >> "$GITHUB_ENV"
-              echo 'GATEWAY_NETWORK_ENVIRONMENT=test' >> "$GITHUB_ENV"
               ;;
             prod)
               echo 'APS_HOST=api.gov.bc.ca' >> "$GITHUB_ENV"
-              echo 'GATEWAY_NETWORK_ENVIRONMENT=prod' >> "$GITHUB_ENV"
               ;;
             *)
               echo "::error::Unsupported application environment: $APP_ENVIRONMENT"
@@ -89,15 +88,14 @@ jobs:
               echo '::error::Production requires an explicit gateway_hostname'
               exit 1
             fi
-            export GATEWAY_HOSTNAME="${RELEASE}-api-gov-bc-ca.test.api.gov.bc.ca"
+            # The test instance publishes this as <release>-api-gov-bc-ca.test.api.gov.bc.ca.
+            export GATEWAY_HOSTNAME="${RELEASE}.api.gov.bc.ca"
           fi
           export GATEWAY_SERVICE_NAME="soba-${GATEWAY_QUALIFIER}"
           export BACKEND_HOST="${RELEASE}-backend.${OPENSHIFT_NAMESPACE}.svc"
           node deployments/gateway/scripts/generate-gateway-config.mjs \
-            --format kong --output "$RUNNER_TEMP/gateway-kong.yaml"
+            --output "$RUNNER_TEMP/gateway-kong.yaml"
           cat "$RUNNER_TEMP/gateway-kong.yaml"
-          # The generator validates the hostname before it is persisted for later steps.
-          echo "GATEWAY_HOSTNAME=$GATEWAY_HOSTNAME" >> "$GITHUB_ENV"
 
       - name: Install OpenShift CLI
         uses: redhat-actions/openshift-tools-installer@e3b32c2ab7b064b2ce189121c4a49f509a99a7b4 # v3.0
@@ -111,7 +109,7 @@ jobs:
           openshift_token: ${{ secrets.OC_TOKEN }}
           namespace: ${{ secrets.OC_NAMESPACE }}
 
-      - name: Check existing backend and permit APS ingress
+      - name: Check existing backend and APS NetworkPolicy
         shell: bash
         run: |
           set -euo pipefail
@@ -123,18 +121,10 @@ jobs:
             | jq -e '[.subsets[]?.addresses[]?] | length > 0'
           oc get configmap "${RELEASE}-backend-app" -n "$OPENSHIFT_NAMESPACE" -o json \
             | jq -e '.data.API_BASE_PATH == "/chefs"'
-          # Reuse deployed chart values so selectors match this release.
-          helm get values "$RELEASE" -n "$OPENSHIFT_NAMESPACE" -o yaml \
-            > "$RUNNER_TEMP/deployed-values.yaml"
-          helm template "$RELEASE" deployments/helm/soba \
-            --namespace "$OPENSHIFT_NAMESPACE" \
-            -f "$RUNNER_TEMP/deployed-values.yaml" \
-            --set gatewayNetworkPolicy.enabled=true \
-            --set-string gatewayNetworkPolicy.namespaceName=264e6f \
-            --set-string "gatewayNetworkPolicy.environment=${GATEWAY_NETWORK_ENVIRONMENT}" \
-            --show-only templates/backend/networkpolicy-aps.yaml \
-            > "$RUNNER_TEMP/aps-networkpolicy.yaml"
-          oc apply -n "$OPENSHIFT_NAMESPACE" -f "$RUNNER_TEMP/aps-networkpolicy.yaml"
+          if ! oc get networkpolicy "${RELEASE}-aps" -n "$OPENSHIFT_NAMESPACE" > /dev/null; then
+            echo "::error::NetworkPolicy ${RELEASE}-aps not found; enable gatewayNetworkPolicy in the release values"
+            exit 1
+          fi
 
       - name: Install pinned GWA
         shell: bash
@@ -204,7 +194,7 @@ jobs:
               ' "$RUNNER_TEMP/gateway-status.json") \
               && GATEWAY_HOSTNAME="$PUBLIC_GATEWAY_HOST" node deployments/gateway/scripts/verify-health.mjs; then
               printf 'Gateway health URL: https://%s/health\n' "$PUBLIC_GATEWAY_HOST" >> "$GITHUB_STEP_SUMMARY"
-              printf 'Verified gateway /health → %s-backend.%s.svc:4000/chefs/api/v1/health\n' \
+              printf 'Verified gateway /health -> %s-backend.%s.svc:4000/chefs/api/v1/health\n' \
                 "$RELEASE" "$OPENSHIFT_NAMESPACE" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
@@ -214,8 +204,7 @@ jobs:
           cat "$RUNNER_TEMP/gateway-status.json"
           exit 1
 
-      - name: Remove local credential and deployment files
+      - name: Remove local GWA credentials
         if: always()
         shell: bash
-        run: |
-          rm -f "$HOME/.gwa-config.yaml" "$RUNNER_TEMP/deployed-values.yaml"
+        run: rm -f "$HOME/.gwa-config.yaml"
