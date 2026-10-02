@@ -105,7 +105,7 @@ function useActiveTab(
     canSeeAccessTab?: boolean;
     canSeeHistoryTab?: boolean;
     canSeeSubmissionsTab?: boolean;
-  }
+  },
 ) {
   const searchParams = useSearchParams();
   const requestedTab = searchParams.get('tab') ?? '';
