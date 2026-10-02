@@ -97,16 +97,13 @@ const HISTORY_TAB = 'version';
 const SUBMISSIONS_TAB = 'submissions';
 const SHARE_TAB = 'share';
 
-function useActiveTab(
-  loadError: boolean,
-  permissions: {
-    canSeeDesignTab?: boolean;
-    canSeeSettingsTab?: boolean;
-    canSeeAccessTab?: boolean;
-    canSeeHistoryTab?: boolean;
-    canSeeSubmissionsTab?: boolean;
-  },
-) {
+function useActiveTab(permissions: {
+  canSeeDesignTab?: boolean;
+  canSeeSettingsTab?: boolean;
+  canSeeAccessTab?: boolean;
+  canSeeHistoryTab?: boolean;
+  canSeeSubmissionsTab?: boolean;
+}) {
   const searchParams = useSearchParams();
   const requestedTab = searchParams.get('tab') ?? '';
   const [selectedTab, setSelectedTab] = useState('');
@@ -125,7 +122,7 @@ function useActiveTab(
     permissions.canSeeSubmissionsTab !== undefined;
 
   let activeTab = selectedTab;
-  if (!selectedTab && (loadError || permsLoaded)) {
+  if (!selectedTab && permsLoaded) {
     const validTabs = [
       permissions.canSeeDesignTab && DESIGNER_TAB,
       permissions.canSeeSettingsTab && SETTINGS_TAB,
@@ -235,7 +232,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     return hasPermission(permissions, Permissions.submission_read);
   }, [permissions]);
 
-  const { activeTab, openedTabs, openTab } = useActiveTab(!!loadError, {
+  const { activeTab, openedTabs, openTab } = useActiveTab({
     canSeeDesignTab,
     canSeeSettingsTab,
     canSeeAccessTab,
@@ -326,7 +323,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     }
   };
 
-  if (initializing || !activeTab) {
+  if (initializing) {
     return <CenteredProgress label={dict.form.loading} />;
   }
 
@@ -334,7 +331,23 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     return <div className="p-5 text-center">{dict.general.notAuthenticated}</div>;
   }
 
+  // The page notice reports the error. With no form there are no permissions to pick a tab from.
+  if (loadError && !form) {
+    return null;
+  }
+
+  if (!activeTab) {
+    return <CenteredProgress label={dict.form.loading} />;
+  }
+
   const renderFormBuilder = () => {
+    if (loadError) {
+      return (
+        <div className="my-4" data-testid="designer-load-error">
+          {noticeForLoadError(dict, loadError)}
+        </div>
+      );
+    }
     if (loading) {
       return <CenteredProgress label={dict.form.loading} />;
     }
@@ -462,16 +475,13 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
 
   return (
     <>
-      {loadError && (
-        <div className="my-4" data-testid="designer-load-error">
-          {noticeForLoadError(dict, loadError)}
-        </div>
-      )}
       <Tabs
         id="form-designer-tabs"
         aria-label={dict.form.designerTabs || 'Form Designer tabs'}
         activeKey={activeTab}
-        onSelect={(k) => openTab(k || DESIGNER_TAB)}
+        onSelect={(k) => {
+          if (k) openTab(k);
+        }}
         className="mb-3"
         // A tab's data is read when it is opened, not before: the reads behind these tabs are
         // gated on permissions a given user may not hold.

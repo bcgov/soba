@@ -3,7 +3,7 @@
  * import from here; no string literals for codes in logic. Compile-time safety.
  */
 import { Permissions } from '@soba/lib';
-export { Permissions, PermissionCode } from '@soba/lib';
+export { Permissions, type PermissionCode } from '@soba/lib';
 
 import type { TemplateType } from '@soba/lib';
 

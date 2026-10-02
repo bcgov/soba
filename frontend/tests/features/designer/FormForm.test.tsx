@@ -3,8 +3,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+// Set per test: whether the user is signed in, and the query string the page was opened with.
+const session = vi.hoisted(() => ({ authenticated: true, search: '' }));
+
 vi.mock('@/lib/hooks/useKeycloak', () => ({
-  useKeycloak: () => ({ authenticated: true, token: 'token', initializing: false }),
+  useKeycloak: () => ({
+    authenticated: session.authenticated,
+    token: session.authenticated ? 'token' : null,
+    initializing: false,
+  }),
 }));
 
 vi.mock('@/app/[lang]/Providers', () => ({
@@ -195,7 +202,7 @@ vi.mock('@/src/features/designer/ui/FormDesigner', () => {
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {} }),
   useParams: () => ({ lang: 'en' }),
-  useSearchParams: () => new URLSearchParams(''),
+  useSearchParams: () => new URLSearchParams(session.search),
   usePathname: () => '',
 }));
 
@@ -233,6 +240,8 @@ describe('FormForm', () => {
     store = makeStore();
     store.dispatch(setToken('token'));
     store.dispatch(setAuthenticated(true));
+    session.authenticated = true;
+    session.search = '';
     mockWorkspaceState.creatable = [{ id: 'ws1', disclaimerAccepted: true }];
     mockWorkspaceState.formCreate = 'allowed';
     mockWorkspaceState.versions = [];
@@ -533,7 +542,34 @@ describe('FormForm', () => {
     expect(await screen.findByTestId('page-notice-load-error')).toHaveTextContent(
       'Failed to load form.',
     );
-    expect(screen.queryByText('Loading')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('loading-indicator')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+  });
+
+  // The form loaded but its draft did not. An empty builder there reads as an empty form.
+  it('shows the load error in place of the builder when the schema read fails', async () => {
+    mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
+    api.getFormVersionSchema.mockRejectedValue(new Error('boom'));
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+
+    expect(await screen.findByTestId('designer-load-error')).toHaveTextContent(
+      'Failed to load form.',
+    );
+    expect(screen.queryByTestId('form-designer')).not.toBeInTheDocument();
+  });
+
+  // Nothing is read without a token, so no tab can be picked from the form's permissions.
+  it('tells a signed-out user so instead of spinning', async () => {
+    session.authenticated = false;
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+
+    expect(await screen.findByText('Not authed')).toBeInTheDocument();
+    expect(screen.queryByTestId('loading-indicator')).not.toBeInTheDocument();
+    expect(api.getSobaForm).not.toHaveBeenCalled();
   });
 
   describe('Tab Permissions', () => {
@@ -546,6 +582,38 @@ describe('FormForm', () => {
       'share-tab',
     ];
 
+    const withPermissions = (permissions: string[]) =>
+      api.getSobaForm.mockImplementation(() =>
+        Promise.resolve({
+          id: 'f1',
+          name: 'Test',
+          description: '',
+          permissions,
+          currentVersion: newestFirst(mockWorkspaceState.versions)[0] ?? null,
+        }),
+      );
+
+    // The forms list and the submission view link to a tab by name.
+    it('opens the tab named in the URL', async () => {
+      session.search = 'tab=submissions';
+      await act(async () => {
+        await renderForm({ formId: 'f1' });
+      });
+
+      expect(await screen.findByTestId('submission-tab')).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('opens the first visible tab when the URL names one the user cannot see', async () => {
+      session.search = 'tab=submissions';
+      withPermissions(['design_update']);
+      await act(async () => {
+        await renderForm({ formId: 'f1' });
+      });
+
+      expect(await screen.findByTestId('designer-tab')).toHaveAttribute('aria-selected', 'true');
+      expect(screen.queryByTestId('submission-tab')).not.toBeInTheDocument();
+    });
+
     it.each([
       ['design_update', ['designer-tab', 'version-tab', 'share-tab']],
       ['form_update', ['settings-tab', 'share-tab']],
@@ -553,15 +621,7 @@ describe('FormForm', () => {
       ['submission_read', ['submission-tab', 'share-tab']],
       ['*', allTabs],
     ])('shows expected tabs when user has %s permission', async (permission, expectedTabs) => {
-      api.getSobaForm.mockImplementation(() =>
-        Promise.resolve({
-          id: 'f1',
-          name: 'Test',
-          description: '',
-          permissions: [permission],
-          currentVersion: newestFirst(mockWorkspaceState.versions)[0] ?? null,
-        }),
-      );
+      withPermissions([permission]);
       await act(async () => {
         await renderForm({ formId: 'f1' });
       });
