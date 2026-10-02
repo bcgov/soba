@@ -37,8 +37,8 @@ const eslintConfig = defineConfig([
     // Generated ESLint bulk-suppressions baseline; not hand-edited, so don't lint it.
     'eslint-suppressions.json',
   ]),
-  // Disallow console in app code. Error logging goes through the notification
-  // store's `consoleError` option (the single sanctioned logging sink).
+  // Disallow console in app code. Error logging goes through useNotificationStore's
+  // `consoleError` option (the single sanctioned logging sink).
   {
     plugins: { sonarjs },
     rules: {
