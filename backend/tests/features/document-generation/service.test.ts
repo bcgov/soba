@@ -140,6 +140,7 @@ describe('documentGenerationService.preview', () => {
     });
     expect(outcome).toMatchObject({ status: 'ok', code: 'cdogs-v2' });
     expect(isActiveParticipant).toHaveBeenCalledWith('s1', caller.actorId);
+    expect(getLiveTemplate).toHaveBeenCalledWith(templateId, expect.any(String), 'cdogs');
     expect(createAdapter).toHaveBeenCalledWith('cdogs-v2');
     // Service passes the stored template's bytes and type; CDOGS-specific shaping is in the plugin.
     expect(renderMock).toHaveBeenCalledWith({
@@ -216,6 +217,7 @@ describe('documentGenerationService.print', () => {
 
     expect(outcome).toMatchObject({ status: 'ok' });
     expect(isActiveParticipant).toHaveBeenCalledWith('s1', caller.actorId);
+    expect(getLiveTemplate).toHaveBeenCalledWith(templateId, expect.any(String), 'cdogs');
     // Service passes the raw persisted doc through; the plugin flattens it for the template.
     expect(renderMock).toHaveBeenCalledWith(
       expect.objectContaining({ data: { data: { field: 'saved' } } }),

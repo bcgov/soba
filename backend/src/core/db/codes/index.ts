@@ -3,6 +3,8 @@
  * import from here; no string literals for codes in logic. Compile-time safety.
  */
 
+import type { TemplateType } from '@soba/lib';
+
 export const Roles = {
   // Form roles. form_admin holds the `*` wildcard permission.
   form_admin: 'form_admin',
@@ -224,6 +226,13 @@ export const DocumentGenerationOutcome = {
 } as const;
 export type DocumentGenerationOutcomeCode =
   (typeof DocumentGenerationOutcome)[keyof typeof DocumentGenerationOutcome];
+
+/** What a document template is for (document_template.type). The list lives in @soba/lib. */
+export const DocumentTemplateType = {
+  cdogs: 'cdogs',
+} as const satisfies Record<TemplateType, TemplateType>;
+export type DocumentTemplateTypeCode =
+  (typeof DocumentTemplateType)[keyof typeof DocumentTemplateType];
 
 /** Display name for the group that grants form admin on all forms in a workspace. */
 export const FORM_ADMINS_GROUP_NAME = 'Form administrators';

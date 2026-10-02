@@ -48,15 +48,22 @@ jest.mock('../../../src/core/db/repos/fileRepo', () => {
 });
 jest.mock('../../../src/core/db/repos/documentTemplateRepo', () => {
   const withFile = (template: any) =>
-    template ? { template, file: mockFiles.get(template.fileId) } : null;
+    template ? { template, file: mockFiles.get(template.fileId), formVersionNo: 1 } : null;
   // Mirrors the conditional writes: only while the template still holds the expected file.
   const holds = (id: string, fileId: string) => mockTemplates.get(id)?.fileId === fileId;
   return {
     insertDocumentTemplate: jest.fn(async (_tx: unknown, input: any) => {
       const clash = [...mockTemplates.values()].some(
-        (t) => t.formVersionId === input.formVersionId && t.name === input.name,
+        (t) => t.formVersionId === input.formVersionId && t.type === input.type,
       );
-      if (clash) throw Object.assign(new Error('duplicate'), { code: '23505' });
+      // The shape pg reports a unique violation in.
+      if (clash) {
+        throw Object.assign(new Error('duplicate'), {
+          code: '23505',
+          severity: 'ERROR',
+          constraint: 'document_template_version_type_uq',
+        });
+      }
       mockTemplates.set(input.id, {
         ...input,
         updatedBy: null,
@@ -85,8 +92,8 @@ jest.mock('../../../src/core/db/repos/documentTemplateRepo', () => {
       [...mockTemplates.values()].some((t) => t.fileId === fileId),
     ),
     getDocumentTemplate: jest.fn(async (id: string) => withFile(mockTemplates.get(id))),
-    listDocumentTemplates: jest.fn(async (formVersionId: string) =>
-      [...mockTemplates.values()].filter((t) => t.formVersionId === formVersionId).map(withFile),
+    listFormDocumentTemplates: jest.fn(async (formId: string) =>
+      [...mockTemplates.values()].filter((t) => t.formId === formId).map(withFile),
     ),
   };
 });
@@ -106,6 +113,7 @@ process.env.STORAGE_PROFILE_DEFAULT_BASE_PATH = tmp;
 
 const actor = { workspaceId: 'ws1', actorId: 'actor1' };
 const version = (id: string) => ({ id, formId: 'form1' });
+const cdogs = (name: string) => ({ type: 'cdogs' as const, name });
 
 const upload = (filename: string, body: string) => ({
   filename,
@@ -119,7 +127,7 @@ async function createTemplate(versionId: string, name: string, filename: string,
   const created = await templatesService.create(
     actor,
     version(versionId),
-    name,
+    cdogs(name),
     upload(filename, body),
   );
   if (!created) throw new Error('expected the template to be created');
@@ -168,10 +176,15 @@ describe('templatesService', () => {
     mockTemplates.clear();
   });
 
-  it('stores a template on its form version and lists it by version', async () => {
+  it('stores a template on its form version and lists it with the form', async () => {
     const created = await createTemplate('v1', 'Receipt', 'r.docx', 'one');
     expect(created.template).toEqual(
-      expect.objectContaining({ formId: 'form1', formVersionId: 'v1', name: 'Receipt' }),
+      expect.objectContaining({
+        formId: 'form1',
+        formVersionId: 'v1',
+        type: 'cdogs',
+        name: 'Receipt',
+      }),
     );
     expect(created.file.filename).toBe('r.docx');
     expect(await contentOf(created.template.id)).toBe('one');
@@ -179,16 +192,16 @@ describe('templatesService', () => {
     expect(created.file.backendRef).toMatch(/^local:templates\/ws1\//);
 
     await createTemplate('v2', 'Receipt', 'r.docx', 'other version');
-    const onV1 = await templatesService.list('v1');
-    expect(onV1.map((t) => t.template.name)).toEqual(['Receipt']);
+    const onForm = await templatesService.list('form1');
+    expect(onForm.map((t) => t.template.formVersionId).sort()).toEqual(['v1', 'v2']);
   });
 
-  it('refuses a second template with the same name on a version, leaving no stored file', async () => {
+  it('refuses a second template of a type on a version, leaving no stored file', async () => {
     await createTemplate('v1', 'Receipt', 'r.docx', 'one');
     const before = listBlobs(tmp);
     await expect(
-      templatesService.create(actor, version('v1'), 'Receipt', upload('r2.docx', 'two')),
-    ).rejects.toThrow('duplicate');
+      templatesService.create(actor, version('v1'), cdogs('Other'), upload('r2.docx', 'two')),
+    ).rejects.toThrow(new ConflictError('The form version already has a template of this type'));
     expect(listBlobs(tmp)).toEqual(before);
   });
 

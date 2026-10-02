@@ -40,6 +40,7 @@ describe('form settings sections', () => {
       'form-settings',
       'form-profile',
       'submitter-settings',
+      'document-templates',
     ]);
   });
 

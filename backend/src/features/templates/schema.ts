@@ -1,6 +1,14 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
-import { TEMPLATE_TYPES } from './config';
+import {
+  TemplateIdParamsSchema as LibTemplateIdParamsSchema,
+  TemplateListResponseSchema as LibTemplateListSchema,
+  TemplateNameBodySchema as LibTemplateNameBodySchema,
+  TemplateResponseSchema as LibTemplateSchema,
+  TemplateUploadBodySchema as LibTemplateUploadBodySchema,
+  TemplatesFormQuerySchema as LibTemplatesFormQuerySchema,
+  TemplateVersionQuerySchema as LibTemplateVersionQuerySchema,
+} from '@soba/lib';
 
 extendZodWithOpenApi(z);
 
@@ -11,35 +19,25 @@ const NOT_FOUND = { description: 'Not found' };
 const FORBIDDEN = { description: 'Insufficient form permissions' };
 const INVALID_ID = { description: 'Invalid template id' };
 
-export const TemplateIdParamsSchema = z.object({ id: z.uuid() }).openapi('Templates_IdParams');
+export const TemplateIdParamsSchema =
+  LibTemplateIdParamsSchema.clone().openapi('Templates_IdParams');
 
-export const TemplatesQuerySchema = z
-  .object({ formVersionId: z.uuid() })
-  .openapi('Templates_FormVersionQuery');
+export const TemplatesFormQuerySchema =
+  LibTemplatesFormQuerySchema.clone().openapi('Templates_FormQuery');
 
-export const TemplateNameBodySchema = z
-  .object({ name: z.string().trim().min(1).max(100) })
-  .openapi('Templates_NameBody');
+export const TemplateVersionQuerySchema = LibTemplateVersionQuerySchema.clone().openapi(
+  'Templates_FormVersionQuery',
+);
 
-const TemplateSchema = z
-  .object({
-    id: z.uuid(),
-    formId: z.uuid(),
-    formVersionId: z.uuid(),
-    name: z.string(),
-    filename: z.string(),
-    contentType: z.string().nullable(),
-    size: z.number().int().nullable(),
-    createdBy: z.string().nullable(),
-    createdAt: z.iso.datetime(),
-    updatedBy: z.string().nullable(),
-    updatedAt: z.iso.datetime(),
-  })
-  .openapi('Templates_Template');
+export const TemplateNameBodySchema =
+  LibTemplateNameBodySchema.clone().openapi('Templates_NameBody');
 
-const TemplateListSchema = z
-  .object({ items: z.array(TemplateSchema) })
-  .openapi('Templates_TemplateList');
+export const TemplateUploadBodySchema =
+  LibTemplateUploadBodySchema.clone().openapi('Templates_UploadBody');
+
+const TemplateSchema = LibTemplateSchema.clone().openapi('Templates_Template');
+
+const TemplateListSchema = LibTemplateListSchema.clone().openapi('Templates_TemplateList');
 
 const templateResponse = (description: string) => ({
   description,
@@ -58,9 +56,12 @@ const multipartFile = (fields: z.ZodRawShape) => ({
 export function registerTemplatesOpenApi(registry: OpenAPIRegistry) {
   const tags = ['feature.templates'];
   const uploadErrors = {
-    400: { description: 'Missing file or name, or a malformed upload' },
+    400: {
+      description:
+        'Missing file or type, invalid name, a malformed upload, or a template type not available for the form',
+    },
     413: { description: 'File too large' },
-    415: { description: `Not a template file type (${TEMPLATE_TYPES})` },
+    415: { description: 'Not a file type the template type accepts' },
     422: { description: 'File failed virus scan' },
     503: { description: 'Virus scanning unavailable' },
   };
@@ -70,10 +71,10 @@ export function registerTemplatesOpenApi(registry: OpenAPIRegistry) {
     path: TEMPLATES_PATH,
     tags,
     security: SECURITY,
-    request: { query: TemplatesQuerySchema },
+    request: { query: TemplatesFormQuerySchema },
     responses: {
       200: {
-        description: "The form version's templates, by name",
+        description: "The templates on the form's versions, newest version first, then by type",
         content: { 'application/json': { schema: TemplateListSchema } },
       },
       403: FORBIDDEN,
@@ -87,15 +88,15 @@ export function registerTemplatesOpenApi(registry: OpenAPIRegistry) {
     tags,
     security: SECURITY,
     request: {
-      query: TemplatesQuerySchema,
-      body: multipartFile({ name: z.string() }),
+      query: TemplateVersionQuerySchema,
+      body: multipartFile(TemplateUploadBodySchema.shape),
     },
     responses: {
       201: templateResponse('Created template'),
       ...uploadErrors,
       403: FORBIDDEN,
       404: NOT_FOUND,
-      409: { description: 'A template with this name already exists on the form version' },
+      409: { description: 'The form version already has a template of this type' },
     },
   });
 
@@ -157,7 +158,6 @@ export function registerTemplatesOpenApi(registry: OpenAPIRegistry) {
       400: { description: 'Invalid template id or name' },
       403: FORBIDDEN,
       404: NOT_FOUND,
-      409: { description: 'A template with this name already exists on the form version' },
     },
   });
 
