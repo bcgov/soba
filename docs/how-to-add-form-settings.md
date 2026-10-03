@@ -42,7 +42,7 @@ Add the journal entry in `backend/drizzle/meta/_journal.json` with a `when` high
 migration already merged. The migrator applies an entry only when its `when` is newer than the last
 applied one, so a migration that reaches an environment out of order is skipped silently.
 
-The backfill covers live forms; forms created later get their row on first access (step 4).
+The backfill covers live forms; forms created later get their row when they are created (step 4).
 
 ## 2. Drizzle table
 
@@ -82,13 +82,12 @@ flag.
 
 `backend/src/features/form-settings/<group>/`, four files:
 
-- **`repo.ts`**: `ensure<Group>Settings`, `find<Group>Settings`, `update<Group>Settings`. `ensure`
-  checks the form is live and in the workspace, then inserts with `onConflictDoNothing` on `formId`,
-  so the row's values come from the column defaults.
+- **`repo.ts`**: `create<Group>Settings`, `find<Group>Settings`, `update<Group>Settings`. `create`
+  takes the transaction that creates the form and inserts the row, so its values come from the
+  column defaults.
 - **`service.ts`**: implements `FormSettingsService<TSettings, TBody>` from `../routes`. `get` finds
-  the row and `set` updates it; only a miss calls `ensure` and retries, so the usual request is one
-  statement. Both throw `NotFoundError` when the row is still missing. Other features read the group
-  through this service, never through its table.
+  the row and `set` updates it, one statement each. Both throw `NotFoundError` when the row is
+  missing. Other features read the group through this service, never through its table.
 - **`openapi.ts`**: the OpenAPI clones, with the key from the lib schema:
 
 ```ts
@@ -114,11 +113,13 @@ export const <group>SettingsModule: FormSettingsModule = {
   router: () => settingsRoutes(<group>SettingsService, Set<Group>SettingsBodySchema),
   registerOpenApi: register<Group>SettingsOpenApi,
   tables: [form<Group>Settings],
+  createForForm: create<Group>Settings,
 };
 ```
 
 Add it to `backend/src/features/form-settings/registry.ts`. That is the only file outside the module
-that changes: the mounting router, OpenAPI registration and dev-data purge all read the registry.
+that changes: the mounting router, OpenAPI registration, form creation and dev-data purge all read
+the registry.
 
 `settingsRoutes` gives the group `GET` (needs `form_read`) and `PUT` (needs `form_update`, body
 validated against the schema). Write your own router only if the group needs more than those two.
@@ -203,8 +204,8 @@ pnpm check:backend && pnpm test:backend
 pnpm check:frontend && pnpm test:frontend
 ```
 
-Then a throwaway script against the local database for: the backfill, a read, a save, a form with no
-row (reads the defaults, creates one row), and an unknown form (404). Finish in the browser: the
+Then a throwaway script against the local database for: the backfill, a new form getting its row
+with the defaults, a read, a save, and an unknown form (404). Finish in the browser: the
 section appears in the right place, saves, and survives a reload.
 
 ## Adding a flag to an existing group
@@ -223,11 +224,12 @@ The endpoint, the registry and the section descriptor stay as they are.
 
 ## Gotchas
 
-- **Defaults live in the database only.** No server code supplies a fallback; `ensure` exists so
-  reads and saves always have a row. A section may still show a placeholder while the value loads.
+- **Defaults live in the database only.** No server code supplies a fallback; the row created with
+  the form carries them. A section may still show a placeholder while the value loads.
 - **`PUT` replaces the whole group.** The body carries every flag, so the section sends the values it
   loaded plus the change.
-- **Form creation knows nothing about settings.** Do not add a group's insert to `FormService.create`.
+- **Every creation path gets the rows.** `FormService.create` creates them, so do not insert a form
+  any other way.
 - **The group name is load-bearing.** It appears in the URL, the SWR key and the OpenAPI component
   names; changing it later is a breaking API change.
 - **Migration order.** Merge the group's PR after any PR carrying a lower-numbered migration, and

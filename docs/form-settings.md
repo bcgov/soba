@@ -8,19 +8,32 @@ the reference for what the pieces are.
 
 ## Backend: `backend/src/features/form-settings/`
 
-| file          | role                                                                                                                                                       |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `types.ts`    | `FormSettingsModule`: `key`, `weight`, optional `featureCode`, `router()`, `registerOpenApi`, `tables`                                                     |
-| `routes.ts`   | `settingsRoutes(service, bodySchema)`: GET (`form_read`) and PUT (`form_update`, body validated)                                                           |
-| `schema.ts`   | `registerSettingsPaths`: the standard OpenAPI entries for a group                                                                                          |
-| `router.ts`   | mounts every module at `/design/forms/:id/settings/<key>`, after resolving the form and checking the module's feature for that form (404 when unavailable) |
-| `registry.ts` | the list of modules, lowest `weight` first                                                                                                                 |
-| `<group>/`    | `repo.ts`, `service.ts`, `openapi.ts`, `index.ts` (the module descriptor), plus any helper other features read the group through                           |
+| file             | role                                                                                                                                                                                                                               |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| file             | role                                                                                                                                                                                                                               |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------                                        |
+| `types.ts`       | `FormSettingsModule`: `key`, `weight`, optional `featureCode`, `router()`, `registerOpenApi`, `tables`, `createForForm`, and optional `workspace` (`router()`, `createForWorkspace`)                                               |
+| `routes.ts`      | `settingsRoutes(service, bodySchema, scope)`: GET and PUT. A form group needs `form_read` and `form_update`; a workspace level is readable by members and writable by owners and admins. The permission is checked before the body |
+| `schema.ts`      | `registerSettingsPaths`: the standard OpenAPI entries for a group at one scope                                                                                                                                                     |
+| `router.ts`      | mounts every module at `/design/forms/:id/settings/<key>` and every workspace level at `/workspaces/:id/settings/<key>`, after resolving the form or workspace and checking the module's feature (404 when unavailable)            |
+| `create.ts`      | `createFormSettings` and `createWorkspaceSettings`: every group's row for a new form or workspace                                                                                                                                  |
+| `inheritable.ts` | `toInheritableSettings`: a form's view of a shared group, from its row and the workspace's values                                                                                                                                  |
+| `registry.ts`    | the list of modules, lowest `weight` first                                                                                                                                                                                         |
+| `<group>/`       | `repo.ts`, `service.ts`, `openapi.ts`, `index.ts` (the module descriptor), plus any helper other features read the group through                                                                                                   |
 
-Rows: each group's migration backfills a row for every live form. A read or save goes straight to
-the row; a form without one gets it on that access, filled from the column defaults and stamped
-`SOBA System (auto)`, so defaults exist only in the database and form creation does not know about
-settings. Other features read a group through its service.
+Rows: every form has a row in every group. `FormService.create` calls each module's
+`createForForm` in the transaction that creates the form, and each group's migration backfills a
+row for every live form. The row takes its values from the column defaults, so defaults exist only
+in the database. A read or save of a missing row is a 404. Other features read a group through its
+service.
+
+Shared groups: a group whose values a workspace shares with its forms also declares `workspace`.
+The workspace has its own row, created with the workspace by `createTeamWorkspace`. Each form's row
+says whether the form inherits the workspace's values or keeps its own. A form that inherits uses
+the workspace's values, read when asked, so a workspace change reaches it with nothing copied; going
+back to inherit drops the form's own values. The lib helper `inheritableSettingsSchemas` builds a
+shared group's schemas: the workspace values, the form's view (`inherit`, `own`, `workspace`,
+`effective`) and the form's save body (`{ inherit: true }` or `{ inherit: false, values }`).
 
 A module's `router` is a factory, so importing the registry builds nothing.
 

@@ -28,6 +28,7 @@ import {
 } from './membershipRepo';
 import { addIdpToGroup, addUserToGroup, createGroupWithRole } from './workspaceGroupRepo';
 import { getIdentityProvider } from './identityProviderRepo';
+import { createWorkspaceSettings } from '../../../features/form-settings/create';
 
 /** True if a workspace of this kind already uses this name (optionally excluding one workspace). */
 const workspaceNameExistsForKind = async (
@@ -113,8 +114,9 @@ const bootstrapWorkspaceOwner = async (
 };
 
 /**
- * Creates a user-owned team workspace: owner membership plus the form-admin and form-submitter groups,
- * optionally recording the creator's disclaimer acceptance in the same transaction.
+ * Creates a user-owned team workspace: owner membership, the form-admin and form-submitter groups,
+ * and every shared settings group's row, optionally recording the creator's disclaimer acceptance in
+ * the same transaction.
  */
 export const createTeamWorkspace = async (
   userId: string,
@@ -154,6 +156,8 @@ export const createTeamWorkspace = async (
       displayLabel,
       WorkspaceMembershipSource.user_created,
     );
+
+    await createWorkspaceSettings({ workspaceId, actorDisplayLabel: displayLabel }, d);
 
     if (disclaimerAccepted) {
       await d.insert(workspaceDisclaimerAcceptances).values({
