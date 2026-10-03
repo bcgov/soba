@@ -10,8 +10,6 @@ the reference for what the pieces are.
 
 | file             | role                                                                                                                                                                                                                               |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| file             | role                                                                                                                                                                                                                               |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------                                        |
 | `types.ts`       | `FormSettingsModule`: `key`, `weight`, optional `featureCode`, `router()`, `registerOpenApi`, `tables`, `createForForm`, and optional `workspace` (`router()`, `createForWorkspace`)                                               |
 | `routes.ts`      | `settingsRoutes(service, bodySchema, scope)`: GET and PUT. A form group needs `form_read` and `form_update`; a workspace level is readable by members and writable by owners and admins. The permission is checked before the body |
 | `schema.ts`      | `registerSettingsPaths`: the standard OpenAPI entries for a group at one scope                                                                                                                                                     |
@@ -24,7 +22,9 @@ the reference for what the pieces are.
 Rows: every form has a row in every group. `FormService.create` calls each module's
 `createForForm` in the transaction that creates the form, and each group's migration backfills a
 row for every live form. The row takes its values from the column defaults, so defaults exist only
-in the database. A read or save of a missing row is a 404. Other features read a group through its
+in the database. The one exception is a new workspace's audience: protected by the
+`DEFAULT_SUBMITTER_PROVIDER` login provider, or members only when that provider is not an active
+login provider. A read or save of a missing row is a 404. Other features read a group through its
 service.
 
 Shared groups: a group whose values a workspace shares with its forms also declares `workspace`.

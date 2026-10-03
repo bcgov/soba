@@ -15,7 +15,7 @@ export type SetInheritableSettingsBody<T> = { inherit: true } | { inherit: false
  * The schemas of a settings group whose values a workspace shares with its forms. A body that mixes
  * the two choices, such as inherit with values, is refused rather than half applied.
  */
-export const inheritableSettingsSchemas = <T extends z.ZodObject>(values: T) => ({
+export const inheritableSettingsSchemas = <T extends z.ZodType>(values: T) => ({
   /** A workspace's values, as read and as saved. */
   workspace: values,
   form: z.object({

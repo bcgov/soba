@@ -1,0 +1,78 @@
+import {
+  DEFAULT_SORT_LOCALE,
+  type Audience,
+  type FormAudienceSettings,
+  type SetFormAudienceSettingsBody,
+} from '@soba/lib';
+import { NotFoundError, ValidationError } from '../../../core/errors';
+import { listLoginIdentityProviders } from '../../../core/db/repos/identityProviderRepo';
+import {
+  findFormAudience,
+  findWorkspaceAudience,
+  updateFormAudience,
+  updateWorkspaceAudience,
+} from '../../../core/db/repos/audienceSettingRepo';
+import { toInheritableSettings } from '../inheritable';
+import type { FormSettingsContext, FormSettingsService } from '../routes';
+
+const FORM_NOT_FOUND = 'Form audience settings not found';
+const WORKSPACE_NOT_FOUND = 'Workspace audience settings not found';
+
+/**
+ * The audience as stored: providers deduplicated and sorted. Refuses codes that aren't active login
+ * providers, which also keeps out `public` and `system`.
+ */
+const toStored = async (audience: Audience): Promise<Audience> => {
+  if (audience.mode !== 'protected') return audience;
+  const idps = [...new Set(audience.idps)].sort();
+  const valid = new Set((await listLoginIdentityProviders(DEFAULT_SORT_LOCALE)).map((p) => p.code));
+  const bad = idps.filter((code) => !valid.has(code));
+  if (bad.length) {
+    throw new ValidationError(`Not assignable login providers: ${bad.join(', ')}`);
+  }
+  return { mode: 'protected', idps };
+};
+
+const readForm = async (ctx: FormSettingsContext, formId: string) => {
+  const row = await findFormAudience(ctx.workspaceId, formId);
+  if (!row) throw new NotFoundError(FORM_NOT_FOUND);
+  return toInheritableSettings(row, row.workspace);
+};
+
+/** A form's audience: inherited from its workspace, or its own. */
+export const formAudienceService: FormSettingsService<
+  FormAudienceSettings,
+  SetFormAudienceSettingsBody
+> = {
+  get: readForm,
+
+  async set(ctx, formId, body) {
+    const found = await updateFormAudience({
+      workspaceId: ctx.workspaceId,
+      formId,
+      audience: body.inherit === false ? await toStored(body.values) : null,
+      actorDisplayLabel: ctx.actorDisplayLabel,
+    });
+    if (!found) throw new NotFoundError(FORM_NOT_FOUND);
+    return readForm(ctx, formId);
+  },
+};
+
+/** A workspace's audience, which its forms inherit unless they set their own. */
+export const workspaceAudienceService: FormSettingsService<Audience, Audience> = {
+  async get(ctx) {
+    const audience = await findWorkspaceAudience(ctx.workspaceId);
+    if (!audience) throw new NotFoundError(WORKSPACE_NOT_FOUND);
+    return audience;
+  },
+
+  async set(ctx, _workspaceId, body) {
+    const audience = await updateWorkspaceAudience({
+      workspaceId: ctx.workspaceId,
+      audience: await toStored(body),
+      actorDisplayLabel: ctx.actorDisplayLabel,
+    });
+    if (!audience) throw new NotFoundError(WORKSPACE_NOT_FOUND);
+    return audience;
+  },
+};
