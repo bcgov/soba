@@ -12,7 +12,7 @@ the reference for what the pieces are.
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `types.ts`       | `FormSettingsModule`: `key`, `weight`, optional `featureCode`, `router()`, `registerOpenApi`, `tables`, `createForForm`, and optional `workspace` (`router()`, `createForWorkspace`)                                               |
 | `routes.ts`      | `settingsRoutes(service, bodySchema, scope)`: GET and PUT. A form group needs `form_read` and `form_update`; a workspace level is readable by members and writable by owners and admins. The permission is checked before the body |
-| `schema.ts`      | `registerSettingsPaths`: the standard OpenAPI entries for a group at one scope                                                                                                                                                     |
+| `schema.ts`      | `registerSettingsPaths`: the standard OpenAPI entries for a group at one scope; `inheritableOpenApiSchemas` and `registerInheritableSettingsPaths` for a shared group at both                                                      |
 | `router.ts`      | mounts every module at `/design/forms/:id/settings/<key>` and every workspace level at `/workspaces/:id/settings/<key>`, after resolving the form or workspace and checking the module's feature (404 when unavailable)            |
 | `create.ts`      | `createFormSettings` and `createWorkspaceSettings`: every group's row for a new form or workspace                                                                                                                                  |
 | `inheritable.ts` | `toInheritableSettings`: a form's view of a shared group, from its row and the workspace's values                                                                                                                                  |
@@ -41,17 +41,20 @@ Dev-data purge clears every module's `tables` before deleting forms.
 
 ## Frontend: `frontend/src/features/form-settings/`
 
-| file                           | role                                                                              |
-| ------------------------------ | --------------------------------------------------------------------------------- |
-| `types.ts`                     | `FormSettingsSection`: `id`, `weight`, optional `featureCode`, `scoped`, `Drawer` |
-| `api.ts`, `useFormSettings.ts` | generic read and save of a group by key                                           |
-| `sections.ts`                  | the tab's sections for a form, without those whose feature is off                 |
-| `registry.ts`                  | the list of sections, lowest `weight` first                                       |
-| `ui/FormSettingsDrawers.tsx`   | the accordion section with Save and Cancel                                        |
-| `<group>/`                     | the section component and `index.ts` (the section descriptor)                     |
+| file                                                 | role                                                                                           |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `types.ts`                                           | `FormSettingsSection`: `id`, `weight`, optional `featureCode`, `scoped`, `Drawer`              |
+| `data/api.ts`, `data/useFormSettings.ts`             | generic read and save of a form's group by key                                                 |
+| `data/useWorkspaceSettings.ts`                       | the same for a workspace's group; a save re-reads that group for loaded forms                  |
+| `data/sections.ts`                                   | the tab's sections for a form, without those whose feature is off                              |
+| `registry.ts`                                        | the list of sections, lowest `weight` first                                                    |
+| `ui/FormSettingsDrawers.tsx`                         | the accordion section with Save and Cancel                                                     |
+| `ui/InheritCheckbox.tsx`, `ui/useInheritableEdit.ts` | a shared group's "Use the workspace setting" choice, and the edit layered over its loaded view |
+| `<group>/`                                           | the section component and `index.ts` (the section descriptor)                                  |
 
-Form Settings (10) and Form Profile (20) save through the form update; Submitter Settings (30) uses
-its group endpoint.
+Form Settings (10) and Form Profile (20) save through the form update; Form Audience (25) and
+Submitter Settings (30) use their group endpoints. The audience's login providers come from
+`GET /meta/login-providers` through `useLoginProviders`.
 
 A section's `weight` orders the Settings tab. A module's `weight` orders mounting. The two are
 unrelated, and one group's numbers need not match.

@@ -39,6 +39,7 @@ describe('form settings sections', () => {
     expect(formSettingsSections.map((s) => s.id)).toEqual([
       'form-settings',
       'form-profile',
+      'form-audience',
       'submitter-settings',
       'document-templates',
     ]);

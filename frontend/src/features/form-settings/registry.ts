@@ -1,3 +1,4 @@
+import { audienceSection } from './audience';
 import { formSection } from './form';
 import { profileSection } from './profile';
 import { submitterSection } from './submitter';
@@ -8,6 +9,7 @@ import type { FormSettingsSection } from './types';
 export const formSettingsSections: FormSettingsSection[] = [
   formSection,
   profileSection,
+  audienceSection,
   submitterSection,
   templatesSection,
 ].sort((a, b) => a.weight - b.weight);

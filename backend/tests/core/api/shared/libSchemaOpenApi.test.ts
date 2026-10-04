@@ -69,6 +69,7 @@ describe('OpenAPI components for lib-backed schemas', () => {
     ['Meta_PluginsResponse', 'plugins', 'Meta_PluginCatalogEntry'],
     ['Meta_FeaturesResponse', 'features', 'Meta_Feature'],
     ['Meta_FormEnginesResponse', 'items', 'Meta_FormEngine'],
+    ['Meta_LoginProvidersResponse', 'items', 'Meta_LoginProvider'],
     ['Meta_RolesResponse', 'roles', 'Meta_RoleWithSource'],
     ['Me_TenantsResponse', 'tenants', 'Me_Tenant'],
   ])('%s references its %s item component', (response, property, item) => {

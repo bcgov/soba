@@ -4,6 +4,8 @@ import { useId, useMemo, useRef, useState } from 'react';
 import { Checkbox, InlineAlert } from '@bcgov/design-system-react-components';
 
 import FormSettingsDrawers from '@/src/features/form-settings/ui/FormSettingsDrawers';
+import InheritCheckbox from '@/src/features/form-settings/ui/InheritCheckbox';
+import { useInheritableEdit } from '@/src/features/form-settings/ui/useInheritableEdit';
 import type { FormSettingsSectionProps } from '@/src/features/form-settings/types';
 import { useFormSettings } from '@/src/features/form-settings/data/useFormSettings';
 import {
@@ -12,6 +14,7 @@ import {
   type FormAudienceSettings,
   type FormSubmitterSettings,
   type SetFormSubmitterSettingsBody,
+  type SubmitterSettings,
 } from '@/src/types/formSettings';
 import { messageForDataError } from '@/src/shared/api/dataError';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
@@ -42,9 +45,7 @@ export default function SubmitterSettingsDrawer({
     formId,
   );
 
-  // An edit layered over the loaded value. Null means no edit, so a refresh shows through until the
-  // user changes it.
-  const [editedAllowDrafts, setEditedAllowDrafts] = useState<boolean | null>(null);
+  const edit = useInheritableEdit<SubmitterSettings>(settings);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
 
@@ -61,22 +62,24 @@ export default function SubmitterSettingsDrawer({
     [readError, dict.general.sessionExpired, dict.general.noAccess, t.submitterSettingsLoadError],
   );
 
-  // The setting changes only once the stored value and the audience are both known. On a Public
-  // audience the stored value stands, including over an edit made before the audience changed.
+  // The settings change only once they and the audience are both known. On a Public audience the
+  // stored settings stand, including over an edit made before the audience changed.
   const isPublic = audience?.effective.mode === 'public';
   const canEdit = !!settings && !!audience && !isPublic;
-  const storedAllowDrafts = settings?.effective.allowSubmitterDrafts ?? false;
-  const allowSubmitterDrafts = canEdit
-    ? (editedAllowDrafts ?? storedAllowDrafts)
-    : storedAllowDrafts;
+  const shown = canEdit ? edit : null;
+  const inherit = shown ? shown.inherit : (settings?.inherit ?? true);
+  const allowSubmitterDrafts = shown
+    ? (shown.values?.allowSubmitterDrafts ?? false)
+    : (settings?.effective.allowSubmitterDrafts ?? false);
 
   const saveChanges = async () => {
-    if (!token || !canEdit || savingRef.current) return;
+    const body = edit.body();
+    if (!token || !canEdit || !body || savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
     try {
-      await save(token, { inherit: false, values: { allowSubmitterDrafts } });
-      setEditedAllowDrafts(null);
+      await save(token, body);
+      edit.reset();
       addNotification({ type: 'success', text: t.formSettingsDrawerSaveSuccessMessage });
     } catch {
       addNotification({ type: 'error', text: t.formSettingsDrawerSaveErrorMessage });
@@ -92,7 +95,7 @@ export default function SubmitterSettingsDrawer({
       id={drawerName}
       label={t.submitterSettingsDrawerLabel}
       onSave={saveChanges}
-      onCancel={() => setEditedAllowDrafts(null)}
+      onCancel={edit.reset}
     >
       {readErrorMessage && (
         <InlineAlert
@@ -101,10 +104,17 @@ export default function SubmitterSettingsDrawer({
           data-testid="form-settings-submitter-settings-error"
         />
       )}
+      <InheritCheckbox
+        label={t.inheritWorkspaceLabel}
+        isSelected={inherit}
+        onChange={edit.setInherit}
+        isDisabled={saving || !canEdit}
+        testId="form-settings-submitter-inherit"
+      />
       <Checkbox
         isSelected={allowSubmitterDrafts}
-        onChange={setEditedAllowDrafts}
-        isDisabled={saving || !canEdit}
+        onChange={(allow) => edit.setValues({ allowSubmitterDrafts: allow })}
+        isDisabled={saving || !canEdit || inherit}
         aria-describedby={isPublic ? noteId : undefined}
         data-testid="form-settings-allow-drafts"
       >

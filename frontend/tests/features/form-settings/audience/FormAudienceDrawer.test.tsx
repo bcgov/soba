@@ -1,0 +1,258 @@
+import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Provider } from 'react-redux';
+import { SWRConfig } from 'swr';
+import type { Dictionary } from '@/src/types/dictionary';
+import type { Audience, FormAudienceSettings } from '@/src/types/formSettings';
+import { ApiError } from '@/src/shared/api/sobaHelpers';
+
+const { mockGetSettings, mockSetSettings, mockGetProviders, mockAddNotification } = vi.hoisted(
+  () => ({
+    mockGetSettings: vi.fn(),
+    mockSetSettings: vi.fn(),
+    mockGetProviders: vi.fn(),
+    mockAddNotification: vi.fn(),
+  }),
+);
+
+vi.mock('@/src/features/form-settings/data/api', () => ({
+  getFormSettings: mockGetSettings,
+  setFormSettings: mockSetSettings,
+}));
+
+vi.mock('@/src/shared/api/sobaApi', () => ({
+  fetchLoginProviders: mockGetProviders,
+}));
+
+vi.mock('@/lib/hooks/useNotificationStore', () => ({
+  useNotificationStore: () => ({ addNotification: mockAddNotification }),
+}));
+
+import makeStore from '@/lib/store';
+import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
+import FormAudienceDrawer from '@/src/features/form-settings/audience/FormAudienceDrawer';
+
+const INHERIT = 'Use the workspace setting';
+const REQUIRED = 'Select at least one login.';
+
+const mockDict = {
+  form: {
+    save: 'Save',
+    settings: {
+      audienceDrawerLabel: 'Form Audience',
+      audienceLabel: 'Who can submit',
+      audiencePublic: 'Public',
+      audienceProtected: 'Protected',
+      audienceMembers: 'Members only',
+      audienceProviders: 'Allowed logins',
+      audienceProvidersRequired: REQUIRED,
+      audienceLoadError: 'Could not load the form audience.',
+      inheritWorkspaceLabel: INHERIT,
+      formSettingsDrawerSaveSuccessMessage: 'Changes saved.',
+      formSettingsDrawerSaveErrorMessage: 'Save failed.',
+    },
+  },
+  general: {
+    cancel: 'Cancel',
+    noAccess: 'You do not have access to this.',
+    sessionExpired: 'Your session has ended.',
+  },
+} as unknown as Dictionary;
+
+const PROVIDERS = [
+  { code: 'azureidir', name: 'IDIR - MFA' },
+  { code: 'bceidbusiness', name: 'BCeID Business' },
+];
+const IDIR: Audience = { mode: 'protected', idps: ['azureidir'] };
+
+const inherited = (workspace: Audience): FormAudienceSettings => ({
+  inherit: true,
+  own: null,
+  workspace,
+  effective: workspace,
+});
+const own = (values: Audience, workspace: Audience = IDIR): FormAudienceSettings => ({
+  inherit: false,
+  own: values,
+  workspace,
+  effective: values,
+});
+
+let store: ReturnType<typeof makeStore>;
+
+function renderDrawer() {
+  return render(
+    <Provider store={store}>
+      <SWRConfig
+        value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}
+      >
+        <FormAudienceDrawer dict={mockDict} drawerName="form-audience" formId="f1" />
+      </SWRConfig>
+    </Provider>,
+  );
+}
+
+const input = (testId: string) =>
+  screen.getByTestId(testId).querySelector('input') as HTMLInputElement;
+const inheritBox = () => input('form-settings-audience-inherit');
+const radio = (mode: string) => input(`audience-mode-${mode}`);
+const login = (code: string) => input(`audience-idp-${code}`);
+const saveButton = () => screen.getByTestId('form-settings-form-audience-save');
+
+describe('FormAudienceDrawer', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store = makeStore();
+    store.dispatch(setToken('token'));
+    store.dispatch(setAuthenticated(true));
+    mockGetProviders.mockResolvedValue({ items: PROVIDERS });
+  });
+
+  it('shows the workspace audience read-only while the form inherits', async () => {
+    mockGetSettings.mockResolvedValue(inherited(IDIR));
+    renderDrawer();
+    await waitFor(() => expect(inheritBox()).toBeEnabled());
+
+    expect(inheritBox()).toBeChecked();
+    expect(radio('protected')).toBeChecked();
+    expect(radio('protected')).toBeDisabled();
+    expect(login('azureidir')).toBeChecked();
+    expect(login('azureidir')).toBeDisabled();
+    expect(mockGetSettings).toHaveBeenCalledWith('token', 'f1', 'audience');
+  });
+
+  it("starts from the workspace audience once inherit is off and saves the form's own", async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(inherited(IDIR));
+    mockSetSettings.mockResolvedValue(own({ mode: 'members', idps: [] }));
+    renderDrawer();
+    await waitFor(() => expect(inheritBox()).toBeEnabled());
+
+    await user.click(screen.getByText(INHERIT));
+    expect(radio('protected')).toBeEnabled();
+    expect(radio('protected')).toBeChecked();
+    await user.click(screen.getByText('Members only'));
+    await user.click(saveButton());
+
+    await waitFor(() =>
+      expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', {
+        inherit: false,
+        values: { mode: 'members', idps: [] },
+      }),
+    );
+    expect(mockAddNotification).toHaveBeenCalledWith({ type: 'success', text: 'Changes saved.' });
+  });
+
+  it('needs a login before a protected audience saves', async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(own({ mode: 'public', idps: [] }));
+    mockSetSettings.mockResolvedValue(own({ mode: 'protected', idps: ['bceidbusiness'] }));
+    renderDrawer();
+    await waitFor(() => expect(radio('public')).toBeEnabled());
+
+    await user.click(screen.getByText('Protected'));
+    expect(screen.getByText(REQUIRED)).toBeInTheDocument();
+    expect(saveButton()).toBeDisabled();
+
+    await user.click(screen.getByText('BCeID Business'));
+    expect(screen.queryByText(REQUIRED)).not.toBeInTheDocument();
+    await user.click(saveButton());
+
+    await waitFor(() =>
+      expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', {
+        inherit: false,
+        values: { mode: 'protected', idps: ['bceidbusiness'] },
+      }),
+    );
+  });
+
+  // The server refuses a provider that is no longer a login provider, and it has no checkbox here.
+  it('leaves out a saved login that is no longer offered', async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(own({ mode: 'protected', idps: ['retired', 'azureidir'] }));
+    mockSetSettings.mockResolvedValue(own(IDIR));
+    renderDrawer();
+    await waitFor(() => expect(radio('protected')).toBeEnabled());
+
+    await user.click(saveButton());
+
+    await waitFor(() =>
+      expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', {
+        inherit: false,
+        values: IDIR,
+      }),
+    );
+  });
+
+  it('goes back to the workspace audience and saves inherit only', async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(own({ mode: 'members', idps: [] }));
+    mockSetSettings.mockResolvedValue(inherited(IDIR));
+    renderDrawer();
+    await waitFor(() => expect(inheritBox()).toBeEnabled());
+
+    await user.click(screen.getByText(INHERIT));
+    expect(radio('protected')).toBeChecked();
+    expect(radio('protected')).toBeDisabled();
+    await user.click(saveButton());
+
+    await waitFor(() =>
+      expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', { inherit: true }),
+    );
+  });
+
+  it('keeps the edit and reports a failed save', async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(own({ mode: 'public', idps: [] }));
+    mockSetSettings.mockRejectedValue(new Error('boom'));
+    renderDrawer();
+    await waitFor(() => expect(radio('public')).toBeEnabled());
+
+    await user.click(screen.getByText('Members only'));
+    await user.click(saveButton());
+
+    await waitFor(() =>
+      expect(mockAddNotification).toHaveBeenCalledWith({ type: 'error', text: 'Save failed.' }),
+    );
+    expect(radio('members')).toBeChecked();
+  });
+
+  it('cancels an unsaved change', async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(own({ mode: 'public', idps: [] }));
+    renderDrawer();
+    await waitFor(() => expect(radio('public')).toBeEnabled());
+
+    await user.click(screen.getByText('Members only'));
+    await user.click(screen.getByTestId('form-settings-form-audience-cancel'));
+
+    expect(radio('public')).toBeChecked();
+    expect(mockSetSettings).not.toHaveBeenCalled();
+  });
+
+  it('says when the audience cannot be read and saves nothing', async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockRejectedValue(new ApiError('Boom', 500));
+    renderDrawer();
+
+    expect(await screen.findByTestId('form-settings-audience-error')).toHaveTextContent(
+      'Could not load the form audience.',
+    );
+    expect(inheritBox()).toBeDisabled();
+    await user.click(saveButton());
+    expect(mockSetSettings).not.toHaveBeenCalled();
+  });
+
+  // A protected audience cannot be shown or checked without the logins, so the drawer stays locked.
+  it('says when the logins cannot be read and stays locked', async () => {
+    mockGetSettings.mockResolvedValue(own({ mode: 'public', idps: [] }));
+    mockGetProviders.mockRejectedValue(new ApiError('Boom', 500));
+    renderDrawer();
+
+    expect(await screen.findByTestId('form-settings-audience-error')).toBeInTheDocument();
+    expect(radio('public')).toBeDisabled();
+    expect(saveButton()).toBeDisabled();
+  });
+});

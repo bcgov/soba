@@ -27,3 +27,31 @@ export async function setFormSettings<TBody, TSettings>(
   });
   return parseJson(response);
 }
+
+const workspaceSettingsPath = (workspaceId: string, key: string) =>
+  `/workspaces/${workspaceId}/settings/${key}`;
+
+/** A settings group of a workspace, shared by its forms. */
+export async function getWorkspaceSettings<TSettings>(
+  token: string,
+  workspaceId: string,
+  key: string,
+): Promise<TSettings> {
+  const response = await sobaFetch(workspaceSettingsPath(workspaceId, key), { token });
+  return parseJson(response);
+}
+
+/** Saves a settings group of a workspace; resolves to the saved settings. */
+export async function setWorkspaceSettings<TSettings>(
+  token: string,
+  workspaceId: string,
+  key: string,
+  body: TSettings,
+): Promise<TSettings> {
+  const response = await sobaFetch(workspaceSettingsPath(workspaceId, key), {
+    token,
+    method: 'PUT',
+    json: body,
+  });
+  return parseJson(response);
+}

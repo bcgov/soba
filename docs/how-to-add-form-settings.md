@@ -230,6 +230,9 @@ values. On top of the steps above:
   `registerInheritableSettingsPaths` name the values component once and register both scopes.
 - **Descriptor:** add `workspace: { router, createForWorkspace }`, the router from
   `settingsRoutes(workspaceService, valuesSchema, 'workspace')`, and list both tables in `tables`.
+- **Section:** `useInheritableEdit(settings)` holds the edit; `InheritCheckbox` shows the inherit
+  choice, and the group's controls show the workspace's values, disabled, while it is ticked. Save
+  `edit.body()`. See `SubmitterSettingsDrawer.tsx`.
 
 The workspace routes are `/workspaces/:id/settings/<group>`: any member reads, owners and admins
 write.
