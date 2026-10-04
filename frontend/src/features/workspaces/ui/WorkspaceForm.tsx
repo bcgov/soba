@@ -23,6 +23,7 @@ import { useWorkspace, useWorkspaceWriter } from '@/src/shared/api/useWorkspaces
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { isWorkspaceManageRole } from '../workspaceRoles';
+import WorkspaceFormSettings from '@/src/features/form-settings/ui/WorkspaceFormSettings';
 import type { UpdateWorkspaceBody, WorkspaceItem } from '@/src/types/workspaces';
 import styles from './WorkspaceForm.module.css';
 
@@ -309,6 +310,15 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
       <Tab eventKey="settings" title={dictWorkspaces.settingsTab}>
         <div className={styles.tabContent}>
           <WorkspaceSettings key={workspace.id} workspace={workspace} first={first} />
+        </div>
+      </Tab>
+      <Tab
+        eventKey="form-settings"
+        title={dictWorkspaces.formSettingsTab}
+        tabAttrs={{ 'data-testid': 'workspace-form-settings-tab' }}
+      >
+        <div className={styles.tabContent}>
+          <WorkspaceFormSettings key={workspace.id} dict={dict} workspaceId={workspace.id} />
         </div>
       </Tab>
     </Tabs>

@@ -70,6 +70,8 @@
     "manageHeading": "Gérer l'espace de travail",
     "createHeading": "Créer un espace de travail",
     "settingsTab": "Paramètres",
+    "formSettingsTab": "Paramètres des formulaires",
+    "formSettingsIntro": "Ces paramètres sont partagés par tous les formulaires de cet espace de travail. Un formulaire les utilise à moins de définir les siens; une modification ici s'applique donc à tous les formulaires qui utilisent encore le paramètre de l'espace de travail.",
     "nameLabel": "Nom",
     "save": "Enregistrer",
     "create": "Créer",

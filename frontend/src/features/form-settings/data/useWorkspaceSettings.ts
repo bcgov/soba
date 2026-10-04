@@ -6,7 +6,8 @@ import { getWorkspaceSettings, setWorkspaceSettings } from './api';
 
 /**
  * A settings group of a workspace, and a save that puts the saved settings in the cache. A save also
- * re-reads the group for any form already loaded, since a form that inherits shows the new values.
+ * drops the group's cached form views, since a form that inherits shows the new values: a mounted
+ * view reads again now, an unmounted one when it next mounts.
  */
 export function useWorkspaceSettings<TSettings>(key: string, workspaceId: string | null) {
   const { mutate: mutateAll } = useSWRConfig();
@@ -21,9 +22,12 @@ export function useWorkspaceSettings<TSettings>(key: string, workspaceId: string
     await mutate(setWorkspaceSettings<TSettings>(token, workspaceId, key, body), {
       revalidate: false,
     });
+    // Without data, mutate re-reads mounted keys only; undefined clears the rest as well.
     await mutateAll(
       (cacheKey) =>
         Array.isArray(cacheKey) && cacheKey[0] === 'form-settings' && cacheKey[1] === key,
+      undefined,
+      { revalidate: true },
     );
   };
 

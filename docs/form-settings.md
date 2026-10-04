@@ -41,20 +41,24 @@ Dev-data purge clears every module's `tables` before deleting forms.
 
 ## Frontend: `frontend/src/features/form-settings/`
 
-| file                                                 | role                                                                                           |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `types.ts`                                           | `FormSettingsSection`: `id`, `weight`, optional `featureCode`, `scoped`, `Drawer`              |
-| `data/api.ts`, `data/useFormSettings.ts`             | generic read and save of a form's group by key                                                 |
-| `data/useWorkspaceSettings.ts`                       | the same for a workspace's group; a save re-reads that group for loaded forms                  |
-| `data/sections.ts`                                   | the tab's sections for a form, without those whose feature is off                              |
-| `registry.ts`                                        | the list of sections, lowest `weight` first                                                    |
-| `ui/FormSettingsDrawers.tsx`                         | the accordion section with Save and Cancel                                                     |
-| `ui/InheritCheckbox.tsx`, `ui/useInheritableEdit.ts` | a shared group's "Use the workspace setting" choice, and the edit layered over its loaded view |
-| `<group>/`                                           | the section component and `index.ts` (the section descriptor)                                  |
+| file                                                 | role                                                                                                                       |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `types.ts`                                           | `FormSettingsSection`: `id`, `weight`, optional `featureCode`, `scoped`, `Drawer`                                          |
+| `data/api.ts`, `data/useFormSettings.ts`             | generic read and save of a form's group by key                                                                             |
+| `data/useWorkspaceSettings.ts`                       | the same for a workspace's group; a save re-reads that group for loaded forms                                              |
+| `data/sections.ts`                                   | the tab's sections for a form, without those whose feature is off                                                          |
+| `registry.ts`                                        | the sections of a form's Settings tab and of a workspace's Form Settings tab, lowest `weight` first                        |
+| `ui/FormSettingsDrawers.tsx`                         | the accordion section with Save and Cancel                                                                                 |
+| `ui/WorkspaceFormSettings.tsx`                       | a workspace's Form Settings tab: an intro, then a drawer for each workspace section                                        |
+| `ui/InheritCheckbox.tsx`, `ui/useInheritableEdit.ts` | a shared group's "Use the workspace setting" choice, and the edit layered over its loaded view                             |
+| `<group>/`                                           | the section components and `index.ts` (the section descriptors; a shared group has a form section and a workspace section) |
 
 Form Settings (10) and Form Profile (20) save through the form update; Form Audience (25) and
 Submitter Settings (30) use their group endpoints. The audience's login providers come from
 `GET /meta/login-providers` through `useLoginProviders`.
+
+A workspace's Form Settings tab holds one section per shared group: Form Audience (10) and Submitter
+Settings (20). Only workspace owners and admins reach the page, so the sections are editable there.
 
 A section's `weight` orders the Settings tab. A module's `weight` orders mounting. The two are
 unrelated, and one group's numbers need not match.
