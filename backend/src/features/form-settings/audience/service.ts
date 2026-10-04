@@ -75,6 +75,7 @@ export const formAudienceService: FormSettingsService<
       audience: body.inherit === false ? await toStored(body.values) : null,
       version: body.version,
       actorDisplayLabel: ctx.actorDisplayLabel,
+      audit: { actorId: ctx.actorId ?? null },
     });
     assertSaved(status, FORM_NOT_FOUND);
     return readForm(ctx, formId);
@@ -100,6 +101,7 @@ export const workspaceAudienceService: FormSettingsService<
       audience: await toStored(body.values),
       version: body.version,
       actorDisplayLabel: ctx.actorDisplayLabel,
+      audit: { actorId: ctx.actorId ?? null },
     });
     assertSaved(status, WORKSPACE_NOT_FOUND);
     return readWorkspace(ctx);

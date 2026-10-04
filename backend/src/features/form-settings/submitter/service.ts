@@ -37,6 +37,7 @@ export const formSubmitterSettingsService: FormSettingsService<
       settings: body.inherit === false ? body.values : null,
       version: body.version,
       actorDisplayLabel: ctx.actorDisplayLabel,
+      audit: { actorId: ctx.actorId ?? null },
     });
     assertSaved(status, FORM_NOT_FOUND);
     return readForm(ctx, formId);
@@ -62,6 +63,7 @@ export const workspaceSubmitterSettingsService: FormSettingsService<
       settings: body.values,
       version: body.version,
       actorDisplayLabel: ctx.actorDisplayLabel,
+      audit: { actorId: ctx.actorId ?? null },
     });
     assertSaved(status, WORKSPACE_NOT_FOUND);
     return readWorkspace(ctx);

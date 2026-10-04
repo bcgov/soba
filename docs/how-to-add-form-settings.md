@@ -90,8 +90,9 @@ flag.
   column defaults.
 - **`service.ts`**: implements `FormSettingsService<TSettings, TBody>` from `../routes`. `get` finds
   the row and returns its `version`; `set` writes it through `saveSettingsRow`
-  (`core/db/repos/settingsRow.ts`) with the version the body names, and `assertSaved` turns a
-  missed save into a 404 (no row) or a 409 (the row moved on). Other features read the group
+  (`core/db/repos/settingsRow.ts`) with the version the body names and the audit entry (group key,
+  workspace, form, actor), and `assertSaved` turns a missed save into a 404 (no row) or a 409 (the
+  row moved on). Other features read the group
   through this service, never through its table.
 - **`openapi.ts`**: the OpenAPI clones, with the key from the lib schema:
 

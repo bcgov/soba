@@ -7,8 +7,13 @@ import { requireWorkspaceManage } from '../../core/middleware/requireWorkspaceMa
 import { Permissions } from '../../core/db/codes';
 import type { CoreRequestContext } from '../../core/middleware/requestContext';
 
-/** What a settings service reads from the request: the workspace and the actor's label. */
-export type FormSettingsContext = Pick<CoreRequestContext, 'workspaceId' | 'actorDisplayLabel'>;
+/**
+ * What a settings service reads from the request: the workspace and the actor. Callers outside the
+ * settings routes, such as the drafts check, read without an actor id.
+ */
+export type FormSettingsContext = Pick<CoreRequestContext, 'workspaceId' | 'actorDisplayLabel'> & {
+  actorId?: string;
+};
 
 /** Reads and writes one settings group of a form, or of a workspace at its workspace level. */
 export interface FormSettingsService<TSettings, TBody> {

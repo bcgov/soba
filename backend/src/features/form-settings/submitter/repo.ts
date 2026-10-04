@@ -1,10 +1,14 @@
 import { and, eq, type SQL } from 'drizzle-orm';
-import type { SubmitterSettings, WorkspaceSettings } from '@soba/lib';
+import { SUBMITTER_SETTINGS_KEY, type SubmitterSettings, type WorkspaceSettings } from '@soba/lib';
 import { db, type DbOrTx } from '../../../core/db/client';
 import { formSubmitterSettings, workspaceSubmitterSettings } from '../../../core/db/schema';
 import type { InheritableRow } from '../inheritable';
 import type { FormSettingsRowInput } from '../types';
-import { saveSettingsRow, type SettingsSaveStatus } from '../../../core/db/repos/settingsRow';
+import {
+  saveSettingsRow,
+  type SettingsSaveActor,
+  type SettingsSaveStatus,
+} from '../../../core/db/repos/settingsRow';
 
 /** A form's submitter settings row read with its workspace's. */
 export interface FormSubmitterSettingsRow extends InheritableRow<SubmitterSettings> {
@@ -60,6 +64,7 @@ export const updateWorkspaceSubmitterSettings = (input: {
   settings: SubmitterSettings;
   version?: number;
   actorDisplayLabel: string | null;
+  audit?: SettingsSaveActor;
 }): Promise<SettingsSaveStatus> =>
   saveSettingsRow(
     workspaceSubmitterSettings,
@@ -70,6 +75,13 @@ export const updateWorkspaceSubmitterSettings = (input: {
       updatedAt: new Date(),
     },
     input.version,
+    input.audit && {
+      workspaceId: input.workspaceId,
+      formId: null,
+      groupKey: SUBMITTER_SETTINGS_KEY,
+      actorId: input.audit.actorId,
+      actorDisplayLabel: input.actorDisplayLabel,
+    },
   );
 
 /** A form's submitter settings with its workspace's, or null when either row is missing. */
@@ -119,6 +131,7 @@ export const updateSubmitterSettings = (input: {
   settings: SubmitterSettings | null;
   version?: number;
   actorDisplayLabel: string | null;
+  audit?: SettingsSaveActor;
 }): Promise<SettingsSaveStatus> =>
   saveSettingsRow(
     formSubmitterSettings,
@@ -133,4 +146,11 @@ export const updateSubmitterSettings = (input: {
       updatedAt: new Date(),
     },
     input.version,
+    input.audit && {
+      workspaceId: input.workspaceId,
+      formId: input.formId,
+      groupKey: SUBMITTER_SETTINGS_KEY,
+      actorId: input.audit.actorId,
+      actorDisplayLabel: input.actorDisplayLabel,
+    },
   );

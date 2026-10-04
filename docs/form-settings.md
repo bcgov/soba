@@ -33,6 +33,11 @@ the same settings cannot overwrite each other unseen. On a 409 the section reads
 drops the edit and says so. Workspace reads and saves are `{ values, version }`; a new form's
 `settings` in the create body carries no version.
 
+Audit: every save the API takes adds a `settings_audit` row in the same transaction: the workspace,
+the form (none for a workspace-level save), the group key, the version after the save, the actor's
+id and label, and the fields the save wrote, before and after. Rows are never changed; only dev-data
+purge removes them. Internal writes such as dev-data seeding are not audited.
+
 Shared groups: a group whose values a workspace shares with its forms also declares `workspace`.
 The workspace has its own row, created with the workspace by `createTeamWorkspace`. Each form's row
 says whether the form inherits the workspace's values or keeps its own. A form that inherits uses

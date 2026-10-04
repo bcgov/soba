@@ -1,10 +1,10 @@
 import { and, count, eq, isNull, type SQL } from 'drizzle-orm';
-import type { Audience, WorkspaceSettings } from '@soba/lib';
+import { AUDIENCE_SETTINGS_KEY, type Audience, type WorkspaceSettings } from '@soba/lib';
 import { env } from '../../config/env';
 import { db, type DbOrTx } from '../client';
 import { formAudienceSettings, forms, workspaceAudienceSettings } from '../schema';
 import { getIdentityProvider } from './identityProviderRepo';
-import { saveSettingsRow, type SettingsSaveStatus } from './settingsRow';
+import { saveSettingsRow, type SettingsSaveActor, type SettingsSaveStatus } from './settingsRow';
 
 /** A form's audience row read with its workspace's. `own` is null while the form inherits. */
 export interface FormAudienceRow {
@@ -82,12 +82,13 @@ export const findWorkspaceAudience = async (
   return row ? { values: toAudience(row.mode, row.idps), version: row.version } : null;
 };
 
-/** Writes a workspace's audience if its row is still at `version`. */
+/** Writes a workspace's audience if its row is still at `version`, audited when `audit` is given. */
 export const updateWorkspaceAudience = (input: {
   workspaceId: string;
   audience: Audience;
   version?: number;
   actorDisplayLabel: string | null;
+  audit?: SettingsSaveActor;
 }): Promise<SettingsSaveStatus> =>
   saveSettingsRow(
     workspaceAudienceSettings,
@@ -99,6 +100,13 @@ export const updateWorkspaceAudience = (input: {
       updatedAt: new Date(),
     },
     input.version,
+    input.audit && {
+      workspaceId: input.workspaceId,
+      formId: null,
+      groupKey: AUDIENCE_SETTINGS_KEY,
+      actorId: input.audit.actorId,
+      actorDisplayLabel: input.actorDisplayLabel,
+    },
   );
 
 /** A form's audience row with its workspace's, or null when either row is missing. */
@@ -163,8 +171,8 @@ export const findEffectiveAudience = async (target: {
 };
 
 /**
- * Writes a form's audience if its row is still at `version`. A null audience inherits the
- * workspace's and clears the form's own.
+ * Writes a form's audience if its row is still at `version`, audited when `audit` is given. A null
+ * audience inherits the workspace's and clears the form's own.
  */
 export const updateFormAudience = (input: {
   workspaceId: string;
@@ -172,6 +180,7 @@ export const updateFormAudience = (input: {
   audience: Audience | null;
   version?: number;
   actorDisplayLabel: string | null;
+  audit?: SettingsSaveActor;
 }): Promise<SettingsSaveStatus> =>
   saveSettingsRow(
     formAudienceSettings,
@@ -187,4 +196,11 @@ export const updateFormAudience = (input: {
       updatedAt: new Date(),
     },
     input.version,
+    input.audit && {
+      workspaceId: input.workspaceId,
+      formId: input.formId,
+      groupKey: AUDIENCE_SETTINGS_KEY,
+      actorId: input.audit.actorId,
+      actorDisplayLabel: input.actorDisplayLabel,
+    },
   );
