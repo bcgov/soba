@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { SWRConfig, useSWRConfig } from 'swr';
 import type { Dictionary } from '@/src/types/dictionary';
-import type { FormAudienceSettings } from '@/src/types/formSettings';
+import type { FormAudienceSettings, FormSubmitterSettings } from '@/src/types/formSettings';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 
 const { mockGetSettings, mockSetSettings, mockGetAudience, mockAddNotification } = vi.hoisted(
@@ -67,6 +67,14 @@ const audience = (mode: keyof typeof AUDIENCES): FormAudienceSettings => ({
   effective: AUDIENCES[mode],
 });
 
+// The form's submitter settings while it inherits the workspace's drafts flag.
+const inheritedDrafts = (allowSubmitterDrafts: boolean): FormSubmitterSettings => ({
+  inherit: true,
+  own: null,
+  workspace: { allowSubmitterDrafts },
+  effective: { allowSubmitterDrafts },
+});
+
 let store: ReturnType<typeof makeStore>;
 
 // Stands in for a later read that finds the audience has become Public.
@@ -112,7 +120,7 @@ describe('SubmitterSettingsDrawer', () => {
   });
 
   it('shows the saved setting', async () => {
-    mockGetSettings.mockResolvedValue({ allowSubmitterDrafts: true });
+    mockGetSettings.mockResolvedValue(inheritedDrafts(true));
     renderDrawer();
     await waitFor(() => expect(checkbox()).toBeEnabled());
     expect(checkbox()).toBeChecked();
@@ -121,8 +129,13 @@ describe('SubmitterSettingsDrawer', () => {
 
   it('saves the changed setting', async () => {
     const user = userEvent.setup();
-    mockGetSettings.mockResolvedValue({ allowSubmitterDrafts: false });
-    mockSetSettings.mockResolvedValue({ allowSubmitterDrafts: true });
+    mockGetSettings.mockResolvedValue(inheritedDrafts(false));
+    mockSetSettings.mockResolvedValue({
+      inherit: false,
+      own: { allowSubmitterDrafts: true },
+      workspace: { allowSubmitterDrafts: false },
+      effective: { allowSubmitterDrafts: true },
+    });
     renderDrawer();
     await waitFor(() => expect(checkbox()).toBeEnabled());
 
@@ -133,14 +146,15 @@ describe('SubmitterSettingsDrawer', () => {
       expect(mockAddNotification).toHaveBeenCalledWith({ type: 'success', text: 'Changes saved.' }),
     );
     expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'submitter', {
-      allowSubmitterDrafts: true,
+      inherit: false,
+      values: { allowSubmitterDrafts: true },
     });
     expect(checkbox()).toBeChecked();
   });
 
   it('keeps the edit and reports a failed save', async () => {
     const user = userEvent.setup();
-    mockGetSettings.mockResolvedValue({ allowSubmitterDrafts: false });
+    mockGetSettings.mockResolvedValue(inheritedDrafts(false));
     mockSetSettings.mockRejectedValue(new Error('boom'));
     renderDrawer();
     await waitFor(() => expect(checkbox()).toBeEnabled());
@@ -156,7 +170,7 @@ describe('SubmitterSettingsDrawer', () => {
 
   it('sends one save when Save is pressed twice', async () => {
     const user = userEvent.setup();
-    mockGetSettings.mockResolvedValue({ allowSubmitterDrafts: false });
+    mockGetSettings.mockResolvedValue(inheritedDrafts(false));
     mockSetSettings.mockImplementation(() => new Promise(() => {}));
     renderDrawer();
     await waitFor(() => expect(checkbox()).toBeEnabled());
@@ -170,7 +184,7 @@ describe('SubmitterSettingsDrawer', () => {
 
   it('cancels an unsaved change', async () => {
     const user = userEvent.setup();
-    mockGetSettings.mockResolvedValue({ allowSubmitterDrafts: false });
+    mockGetSettings.mockResolvedValue(inheritedDrafts(false));
     renderDrawer();
     await waitFor(() => expect(checkbox()).toBeEnabled());
 
@@ -184,7 +198,7 @@ describe('SubmitterSettingsDrawer', () => {
 
   // Whether the audience is Public decides if the setting may change, so it stays locked until known.
   it('keeps the setting locked until the audience is known', async () => {
-    mockGetSettings.mockResolvedValue({ allowSubmitterDrafts: true });
+    mockGetSettings.mockResolvedValue(inheritedDrafts(true));
     mockGetAudience.mockImplementation(() => new Promise(() => {}));
     renderDrawer();
 
@@ -194,7 +208,7 @@ describe('SubmitterSettingsDrawer', () => {
 
   it('disables the setting with a linked note on a Public audience', async () => {
     const user = userEvent.setup();
-    mockGetSettings.mockResolvedValue({ allowSubmitterDrafts: true });
+    mockGetSettings.mockResolvedValue(inheritedDrafts(true));
     mockGetAudience.mockResolvedValue(audience('public'));
     renderDrawer();
 
@@ -216,7 +230,7 @@ describe('SubmitterSettingsDrawer', () => {
 
   it('drops an edit when the audience turns out to be Public', async () => {
     const user = userEvent.setup();
-    mockGetSettings.mockResolvedValue({ allowSubmitterDrafts: false });
+    mockGetSettings.mockResolvedValue(inheritedDrafts(false));
     renderDrawer();
     await waitFor(() => expect(checkbox()).toBeEnabled());
 
@@ -246,7 +260,7 @@ describe('SubmitterSettingsDrawer', () => {
 
   // Without the audience the Public lock cannot be judged, so a refused read keeps the setting locked.
   it('says when the audience cannot be read and stays locked', async () => {
-    mockGetSettings.mockResolvedValue({ allowSubmitterDrafts: false });
+    mockGetSettings.mockResolvedValue(inheritedDrafts(false));
     mockGetAudience.mockRejectedValue(new ApiError('Forbidden', 403));
     renderDrawer();
 

@@ -101,14 +101,27 @@ describe('OpenAPI components for lib-backed schemas', () => {
     );
   });
 
-  it('names the submitter settings response and body', () => {
+  it('names the submitter settings values', () => {
     expect(
       at(schemas, 'FormSettings_Submitter', 'properties', 'allowSubmitterDrafts', 'type'),
     ).toBe('boolean');
-    expect(at(schemas, 'FormSettings_SetSubmitterBody', 'required')).toEqual([
-      'allowSubmitterDrafts',
-    ]);
   });
+
+  it.each(['Audience', 'Submitter'])(
+    'builds the %s form view and save body on its values component',
+    (name) => {
+      const values = `FormSettings_${name}`;
+      const view = `FormSettings_Form${name}`;
+      expect(at(schemas, view, 'properties', 'workspace')).toEqual(ref(values));
+      expect(at(schemas, view, 'properties', 'effective')).toEqual(ref(values));
+      expect(at(schemas, view, 'properties', 'own', 'allOf', 0)).toEqual(ref(values));
+      expect(
+        at(schemas, `FormSettings_SetForm${name}Body`, 'oneOf', 1, 'properties', 'values'),
+      ).toEqual(ref(values));
+      // The form's own values may be null; the workspace's never are.
+      expect(JSON.stringify(at(schemas, values))).not.toContain('nullable');
+    },
+  );
 
   it('builds the form-with-version response on the named form response', () => {
     expect(at(schemas, 'Forms_FormWithVersionResponse', 'allOf', 0)).toEqual(

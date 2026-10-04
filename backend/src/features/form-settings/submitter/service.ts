@@ -1,40 +1,64 @@
-import type { SetSubmitterSettingsBody, SubmitterSettings } from '@soba/lib';
+import type {
+  FormSubmitterSettings,
+  SetFormSubmitterSettingsBody,
+  SubmitterSettings,
+} from '@soba/lib';
 import { NotFoundError } from '../../../core/errors';
+import { toInheritableSettings } from '../inheritable';
 import type { FormSettingsContext, FormSettingsService } from '../routes';
 import {
   findSubmitterSettings,
+  findWorkspaceSubmitterSettings,
   updateSubmitterSettings,
-  type SubmitterSettingsRecord,
+  updateWorkspaceSubmitterSettings,
 } from './repo';
 
-const SETTINGS_NOT_FOUND = 'Form submitter settings not found';
+const FORM_NOT_FOUND = 'Form submitter settings not found';
+const WORKSPACE_NOT_FOUND = 'Workspace submitter settings not found';
 
-const toDto = (row: SubmitterSettingsRecord): SubmitterSettings => ({
-  allowSubmitterDrafts: row.allowSubmitterDrafts,
-});
+const readForm = async (ctx: FormSettingsContext, formId: string) => {
+  const row = await findSubmitterSettings(ctx.workspaceId, formId);
+  if (!row) throw new NotFoundError(FORM_NOT_FOUND);
+  return toInheritableSettings(row, row.workspace);
+};
 
-const writeRow = (ctx: FormSettingsContext, formId: string, body: SetSubmitterSettingsBody) =>
-  updateSubmitterSettings({
-    workspaceId: ctx.workspaceId,
-    formId,
-    allowSubmitterDrafts: body.allowSubmitterDrafts,
-    actorDisplayLabel: ctx.actorDisplayLabel,
-  });
-
-/** A form's submitter settings. Other features read them through `get`. */
-export const submitterSettingsService: FormSettingsService<
-  SubmitterSettings,
-  SetSubmitterSettingsBody
+/** A form's submitter settings: inherited from its workspace, or its own. */
+export const formSubmitterSettingsService: FormSettingsService<
+  FormSubmitterSettings,
+  SetFormSubmitterSettingsBody
 > = {
-  async get(ctx, formId) {
-    const row = await findSubmitterSettings(ctx.workspaceId, formId);
-    if (!row) throw new NotFoundError(SETTINGS_NOT_FOUND);
-    return toDto(row);
-  },
+  get: readForm,
 
   async set(ctx, formId, body) {
-    const row = await writeRow(ctx, formId, body);
-    if (!row) throw new NotFoundError(SETTINGS_NOT_FOUND);
-    return toDto(row);
+    const found = await updateSubmitterSettings({
+      workspaceId: ctx.workspaceId,
+      formId,
+      settings: body.inherit === false ? body.values : null,
+      actorDisplayLabel: ctx.actorDisplayLabel,
+    });
+    if (!found) throw new NotFoundError(FORM_NOT_FOUND);
+    return readForm(ctx, formId);
+  },
+};
+
+/** A workspace's submitter settings, which its forms inherit unless they set their own. */
+export const workspaceSubmitterSettingsService: FormSettingsService<
+  SubmitterSettings,
+  SubmitterSettings
+> = {
+  async get(ctx) {
+    const settings = await findWorkspaceSubmitterSettings(ctx.workspaceId);
+    if (!settings) throw new NotFoundError(WORKSPACE_NOT_FOUND);
+    return settings;
+  },
+
+  async set(ctx, _workspaceId, body) {
+    const settings = await updateWorkspaceSubmitterSettings({
+      workspaceId: ctx.workspaceId,
+      settings: body,
+      actorDisplayLabel: ctx.actorDisplayLabel,
+    });
+    if (!settings) throw new NotFoundError(WORKSPACE_NOT_FOUND);
+    return settings;
   },
 };

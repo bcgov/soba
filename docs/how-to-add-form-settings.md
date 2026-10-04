@@ -1,7 +1,9 @@
 # How to add a form settings group
 
-A worked guide modelled on `submitter`, the group that ships today. Replace `<group>` with your
-group's name throughout; the submitter files are the reference copy for every step.
+A worked guide for a group a form owns alone, then the extra pieces for a group a workspace shares
+with its forms ([Shared groups](#shared-groups)). Replace `<group>` with your group's name
+throughout. Both groups that ship today, `audience` and `submitter`, are shared; the submitter files
+are the reference copy.
 
 For what the pieces are and how they fit, see [Form settings](form-settings.md).
 
@@ -208,6 +210,30 @@ Then a throwaway script against the local database for: the backfill, a new form
 with the defaults, a read, a save, and an unknown form (404). Finish in the browser: the
 section appears in the right place, saves, and survives a reload.
 
+## Shared groups
+
+A shared group has a workspace row as well, and each form either inherits it or keeps its own
+values. On top of the steps above:
+
+- **Migration:** a `workspace_<group>_setting` table (unique `workspace_id`, flag columns with
+  `NOT NULL DEFAULT`) backfilled for every workspace. The form table adds
+  `inherit boolean DEFAULT true NOT NULL`, its flag columns are nullable with no default, and a
+  `CHECK` keeps them null exactly while `inherit` is true. See `0045_submitter_settings_shared.sql`.
+- **Lib:** `inheritableSettingsSchemas(<Group>SettingsSchema)` gives the workspace values, the form's
+  view (`inherit`, `own`, `workspace`, `effective`) and the form's save body (`{ inherit: true }` or
+  `{ inherit: false, values }`).
+- **Repo:** read the form row joined to its workspace's in one query; a save with `inherit` clears the
+  form's own values. The workspace row has its own create, find and update.
+- **Service:** the form service returns `toInheritableSettings(row, row.workspace)`; a workspace
+  service serves the workspace values. Other features read `effective`.
+- **OpenAPI:** `inheritableOpenApiSchemas(<Group>SettingsSchema, '<Group>')` and
+  `registerInheritableSettingsPaths` name the values component once and register both scopes.
+- **Descriptor:** add `workspace: { router, createForWorkspace }`, the router from
+  `settingsRoutes(workspaceService, valuesSchema, 'workspace')`, and list both tables in `tables`.
+
+The workspace routes are `/workspaces/:id/settings/<group>`: any member reads, owners and admins
+write.
+
 ## Adding a flag to an existing group
 
 1. A migration adding the column, whose default fills every existing row:
@@ -219,6 +245,9 @@ section appears in the right place, saves, and survives a reload.
 2. The column in the Drizzle table.
 3. The field in the lib schema, and the mapping in the module's `service.ts` and `repo.ts`.
 4. The control in the section, with its dictionary text and tests.
+
+In a shared group the workspace column takes the `NOT NULL DEFAULT`, the form column is nullable,
+and the form table's `CHECK` covers the new column too.
 
 The endpoint, the registry and the section descriptor stay as they are.
 

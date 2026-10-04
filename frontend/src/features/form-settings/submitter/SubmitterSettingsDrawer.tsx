@@ -10,8 +10,8 @@ import {
   AUDIENCE_SETTINGS_KEY,
   SUBMITTER_SETTINGS_KEY,
   type FormAudienceSettings,
-  type SetSubmitterSettingsBody,
-  type SubmitterSettings,
+  type FormSubmitterSettings,
+  type SetFormSubmitterSettingsBody,
 } from '@/src/types/formSettings';
 import { messageForDataError } from '@/src/shared/api/dataError';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
@@ -28,7 +28,10 @@ export default function SubmitterSettingsDrawer({
     settings,
     error: settingsError,
     save,
-  } = useFormSettings<SubmitterSettings, SetSubmitterSettingsBody>(SUBMITTER_SETTINGS_KEY, formId);
+  } = useFormSettings<FormSubmitterSettings, SetFormSubmitterSettingsBody>(
+    SUBMITTER_SETTINGS_KEY,
+    formId,
+  );
   const { addNotification } = useNotificationStore();
   const noteId = useId();
 
@@ -62,7 +65,7 @@ export default function SubmitterSettingsDrawer({
   // audience the stored value stands, including over an edit made before the audience changed.
   const isPublic = audience?.effective.mode === 'public';
   const canEdit = !!settings && !!audience && !isPublic;
-  const storedAllowDrafts = settings?.allowSubmitterDrafts ?? false;
+  const storedAllowDrafts = settings?.effective.allowSubmitterDrafts ?? false;
   const allowSubmitterDrafts = canEdit
     ? (editedAllowDrafts ?? storedAllowDrafts)
     : storedAllowDrafts;
@@ -72,7 +75,7 @@ export default function SubmitterSettingsDrawer({
     savingRef.current = true;
     setSaving(true);
     try {
-      await save(token, { allowSubmitterDrafts });
+      await save(token, { inherit: false, values: { allowSubmitterDrafts } });
       setEditedAllowDrafts(null);
       addNotification({ type: 'success', text: t.formSettingsDrawerSaveSuccessMessage });
     } catch {

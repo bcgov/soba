@@ -1,8 +1,11 @@
-import { SetSubmitterSettingsBodySchema } from '../../../src/schemas/formSettings';
+import {
+  SetFormSubmitterSettingsBodySchema,
+  WorkspaceSubmitterSettingsSchema,
+} from '../../../src/schemas/formSettings';
 
-describe('SetSubmitterSettingsBodySchema', () => {
+describe('submitter settings', () => {
   it('accepts the full settings object', () => {
-    expect(SetSubmitterSettingsBodySchema.safeParse({ allowSubmitterDrafts: true }).success).toBe(
+    expect(WorkspaceSubmitterSettingsSchema.safeParse({ allowSubmitterDrafts: true }).success).toBe(
       true,
     );
   });
@@ -12,6 +15,19 @@ describe('SetSubmitterSettingsBodySchema', () => {
     ['a missing flag', {}],
     ['a non-boolean flag', { allowSubmitterDrafts: 'yes' }],
   ])('rejects %s', (_label, body) => {
-    expect(SetSubmitterSettingsBodySchema.safeParse(body).success).toBe(false);
+    expect(WorkspaceSubmitterSettingsSchema.safeParse(body).success).toBe(false);
+    expect(
+      SetFormSubmitterSettingsBodySchema.safeParse({ inherit: false, values: body }).success,
+    ).toBe(false);
+  });
+
+  it('saves a form as inheriting or with its own settings', () => {
+    expect(SetFormSubmitterSettingsBodySchema.safeParse({ inherit: true }).success).toBe(true);
+    expect(
+      SetFormSubmitterSettingsBodySchema.safeParse({
+        inherit: false,
+        values: { allowSubmitterDrafts: true },
+      }).success,
+    ).toBe(true);
   });
 });

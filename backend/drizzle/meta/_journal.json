@@ -316,6 +316,13 @@
       "when": 1772618018000,
       "tag": "0044_groups_people_only",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1772618019000,
+      "tag": "0045_submitter_settings_shared",
+      "breakpoints": true
     }
   ]
 }

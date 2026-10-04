@@ -1,5 +1,6 @@
 import { extendZodWithOpenApi, type OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z, type ZodTypeAny } from 'zod';
+import { inheritableSettingsSchemas } from '@soba/lib';
 import type { SettingsScope } from './routes';
 
 extendZodWithOpenApi(z);
@@ -95,5 +96,42 @@ export const registerSettingsPaths = (
       403: { description: docs.write403 },
       404: { description: docs.notFound },
     },
+  });
+};
+
+/**
+ * The OpenAPI schemas of a shared group, built on its named values component so the form's view and
+ * save body reference that component rather than repeat it.
+ */
+export const inheritableOpenApiSchemas = <T extends z.ZodType>(values: T, name: string) => {
+  const named = values.clone().openapi(`FormSettings_${name}`);
+  const schemas = inheritableSettingsSchemas(named);
+  // The generator cannot mark a ref to a named union nullable, so the description carries it.
+  const own = named.nullable().openapi({ description: 'Null while the form inherits.' });
+  return {
+    workspace: named,
+    form: schemas.form.extend({ own }).openapi(`FormSettings_Form${name}`),
+    formBody: schemas.formBody.openapi(`FormSettings_SetForm${name}Body`),
+  };
+};
+
+/** OpenAPI for a shared group's GET and PUT at both scopes. */
+export const registerInheritableSettingsPaths = (
+  registry: OpenAPIRegistry,
+  input: { key: string; label: string; schemas: ReturnType<typeof inheritableOpenApiSchemas> },
+): void => {
+  const { key, label, schemas } = input;
+  registerSettingsPaths(registry, {
+    key,
+    label,
+    settingsSchema: schemas.form,
+    bodySchema: schemas.formBody,
+  });
+  registerSettingsPaths(registry, {
+    key,
+    label,
+    settingsSchema: schemas.workspace,
+    bodySchema: schemas.workspace,
+    scope: 'workspace',
   });
 };

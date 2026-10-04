@@ -18,10 +18,12 @@ export type SetInheritableSettingsBody<T> = { inherit: true } | { inherit: false
 export const inheritableSettingsSchemas = <T extends z.ZodType>(values: T) => ({
   /** A workspace's values, as read and as saved. */
   workspace: values,
+  // workspace precedes own: the OpenAPI generator marks a named values component itself nullable
+  // when it first meets it through own.
   form: z.object({
     inherit: z.boolean(),
-    own: values.nullable(),
     workspace: values,
+    own: values.nullable(),
     effective: values,
   }),
   formBody: z.discriminatedUnion('inherit', [
