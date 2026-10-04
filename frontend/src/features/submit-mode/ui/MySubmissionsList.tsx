@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button as DSButton, Select } from '@bcgov/design-system-react-components';
 import { usePathname, useRouter } from 'next/navigation';
 import { DataTable, type Column } from '@/src/components/DataTable';
-import { ListPageAuthGate, ListPageToolbar } from '@/src/components/ListPageLayout';
+import {
+  ListPageAuthGate,
+  ListPageFilters,
+  ListPageToolbar,
+} from '@/src/components/ListPageLayout';
 import { ListPageSearchField } from '@/src/components/ListPageSearchField';
 import { RowActionButton } from '@/src/components/RowActionButton';
 import { ConfirmModal } from '@/src/components/ConfirmModal';
@@ -238,7 +242,7 @@ export function MySubmissionsList() {
           testIdPrefix="my-submissions"
         />
       </ListPageToolbar>
-      <div className="d-flex align-items-end gap-2">
+      <ListPageFilters>
         <Select
           size="medium"
           id="my-submissions-state"
@@ -256,7 +260,7 @@ export function MySubmissionsList() {
         >
           {dict.general.clearFilters}
         </DSButton>
-      </div>
+      </ListPageFilters>
 
       <DataTable<MySubmissionListItem>
         {...table}
