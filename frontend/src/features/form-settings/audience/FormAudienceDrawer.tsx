@@ -17,6 +17,7 @@ import { useLoginProviders } from '@/src/shared/api/useLoginProviders';
 import { messageForDataError } from '@/src/shared/api/dataError';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
+import { ConfirmModal } from '@/src/components/ConfirmModal';
 import AudienceField, { isValidAudience, toAudience, type AudienceValue } from './AudienceField';
 
 export default function FormAudienceDrawer({ dict, drawerName, formId }: FormSettingsSectionProps) {
@@ -35,6 +36,7 @@ export default function FormAudienceDrawer({ dict, drawerName, formId }: FormSet
   const edit = useInheritableEdit<AudienceValue>(settings);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  const [confirmingPublic, setConfirmingPublic] = useState(false);
 
   const readError = settingsError ?? providersError;
   const readErrorMessage = useMemo(
@@ -56,6 +58,14 @@ export default function FormAudienceDrawer({ dict, drawerName, formId }: FormSet
   const canSave =
     loaded && !saving && !!body && (body.inherit === true || isValidAudience(body.values, offered));
 
+  // A save that opens the form to everyone is confirmed first, whether it sets Public or inherits a
+  // Public workspace.
+  let nextAudience = null;
+  if (body) {
+    nextAudience = body.inherit === true ? settings?.workspace : toAudience(body.values, offered);
+  }
+  const widensToPublic = nextAudience?.mode === 'public' && settings?.effective.mode !== 'public';
+
   const saveChanges = async () => {
     if (!token || !canSave || !body || savingRef.current) return;
     savingRef.current = true;
@@ -72,7 +82,13 @@ export default function FormAudienceDrawer({ dict, drawerName, formId }: FormSet
     } finally {
       savingRef.current = false;
       setSaving(false);
+      setConfirmingPublic(false);
     }
+  };
+
+  const requestSave = () => {
+    if (widensToPublic) setConfirmingPublic(true);
+    else void saveChanges();
   };
 
   return (
@@ -80,7 +96,7 @@ export default function FormAudienceDrawer({ dict, drawerName, formId }: FormSet
       dict={dict}
       id={drawerName}
       label={t.audienceDrawerLabel}
-      onSave={saveChanges}
+      onSave={requestSave}
       onCancel={edit.reset}
       canSave={canSave}
     >
@@ -107,6 +123,15 @@ export default function FormAudienceDrawer({ dict, drawerName, formId }: FormSet
           isDisabled={!loaded || saving || edit.inherit}
         />
       )}
+      <ConfirmModal
+        show={confirmingPublic}
+        title={t.audienceFormPublicConfirmTitle}
+        message={t.audienceFormPublicConfirmMessage}
+        confirmLabel={t.audiencePublicConfirmLabel}
+        onConfirm={() => void saveChanges()}
+        onCancel={() => setConfirmingPublic(false)}
+        pending={saving}
+      />
     </FormSettingsDrawers>
   );
 }

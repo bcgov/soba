@@ -26,6 +26,11 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
   fetchLoginProviders: mockGetProviders,
 }));
 
+// The confirmation dialog reads the dictionary from context.
+vi.mock('@/app/[lang]/Providers', () => ({
+  useDictionary: () => mockDict,
+}));
+
 vi.mock('@/lib/hooks/useNotificationStore', () => ({
   useNotificationStore: () => ({ addNotification: mockAddNotification }),
 }));
@@ -50,10 +55,14 @@ const mockDict = {
       audienceProvidersRequired: REQUIRED,
       audienceLoadError: 'Could not load the form audience.',
       inheritWorkspaceLabel: INHERIT,
+      audienceFormPublicConfirmTitle: 'Make this form public?',
+      audienceFormPublicConfirmMessage: 'Anyone will be able to submit this form.',
+      audiencePublicConfirmLabel: 'Make public',
       formSettingsDrawerSaveSuccessMessage: 'Changes saved.',
       formSettingsDrawerSaveErrorMessage: 'Save failed.',
     },
   },
+  modal: { dialogActions: 'Dialog actions' },
   general: {
     cancel: 'Cancel',
     noAccess: 'You do not have access to this.',
@@ -201,6 +210,71 @@ describe('FormAudienceDrawer', () => {
     await waitFor(() =>
       expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', { inherit: true }),
     );
+  });
+
+  it('asks before making the form public and saves nothing on cancel', async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(own(IDIR));
+    mockSetSettings.mockResolvedValue(own({ mode: 'public', idps: [] }));
+    renderDrawer();
+    await waitFor(() => expect(radio('protected')).toBeEnabled());
+
+    await user.click(screen.getByText('Public'));
+    await user.click(saveButton());
+    expect(await screen.findByTestId('confirm-modal-message')).toHaveTextContent(
+      'Anyone will be able to submit this form.',
+    );
+    await user.click(screen.getByTestId('confirm-modal-cancel'));
+    await waitFor(() => expect(screen.queryByTestId('confirm-modal-message')).toBeNull());
+    expect(mockSetSettings).not.toHaveBeenCalled();
+    expect(radio('public')).toBeChecked();
+
+    await user.click(saveButton());
+    await user.click(await screen.findByTestId('confirm-modal-confirm'));
+    await waitFor(() =>
+      expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', {
+        inherit: false,
+        values: { mode: 'public', idps: [] },
+      }),
+    );
+  });
+
+  // Inheriting a Public workspace opens the form just as setting Public does.
+  it('asks before the form inherits a Public workspace', async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(
+      own({ mode: 'members', idps: [] }, { mode: 'public', idps: [] }),
+    );
+    mockSetSettings.mockResolvedValue(inherited({ mode: 'public', idps: [] }));
+    renderDrawer();
+    await waitFor(() => expect(inheritBox()).toBeEnabled());
+
+    await user.click(screen.getByText(INHERIT));
+    await user.click(saveButton());
+    await user.click(await screen.findByTestId('confirm-modal-confirm'));
+
+    await waitFor(() =>
+      expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', { inherit: true }),
+    );
+  });
+
+  it('saves without asking when the form is already public', async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(inherited({ mode: 'public', idps: [] }));
+    mockSetSettings.mockResolvedValue(own({ mode: 'public', idps: [] }));
+    renderDrawer();
+    await waitFor(() => expect(inheritBox()).toBeEnabled());
+
+    await user.click(screen.getByText(INHERIT));
+    await user.click(saveButton());
+
+    await waitFor(() =>
+      expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', {
+        inherit: false,
+        values: { mode: 'public', idps: [] },
+      }),
+    );
+    expect(screen.queryByTestId('confirm-modal-message')).toBeNull();
   });
 
   it('keeps the edit and reports a failed save', async () => {
