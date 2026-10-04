@@ -119,6 +119,9 @@ describe('OpenAPI components for lib-backed schemas', () => {
       expect(
         at(schemas, `FormSettings_SetForm${name}Body`, 'oneOf', 1, 'properties', 'values'),
       ).toEqual(ref(values));
+      expect(at(schemas, `FormSettings_Workspace${name}`, 'properties', 'values')).toEqual(
+        ref(values),
+      );
       // The form's own values may be null; the workspace's never are.
       expect(JSON.stringify(at(schemas, values))).not.toContain('nullable');
     },

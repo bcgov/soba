@@ -40,17 +40,21 @@ describe('AudienceSchema', () => {
 
 describe('form audience settings', () => {
   it('saves either inherit or the form audience', () => {
-    expect(SetFormAudienceSettingsBodySchema.safeParse({ inherit: true }).success).toBe(true);
+    expect(SetFormAudienceSettingsBodySchema.safeParse({ inherit: true, version: 1 }).success).toBe(
+      true,
+    );
     expect(
       SetFormAudienceSettingsBodySchema.safeParse({
         inherit: false,
         values: { mode: 'members', idps: [] },
+        version: 1,
       }).success,
     ).toBe(true);
     expect(
       SetFormAudienceSettingsBodySchema.safeParse({
         inherit: false,
         values: { mode: 'protected', idps: [] },
+        version: 1,
       }).success,
     ).toBe(false);
   });
@@ -61,6 +65,7 @@ describe('form audience settings', () => {
       own: null,
       workspace: { mode: 'protected', idps: ['azureidir'] },
       effective: { mode: 'protected', idps: ['azureidir'] },
+      version: 1,
     };
     expect(FormAudienceSettingsSchema.parse(read)).toEqual(read);
   });

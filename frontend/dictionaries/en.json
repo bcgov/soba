@@ -304,6 +304,7 @@
       "formSettingsDrawerLabel": "Form Settings",
       "formSettingsDrawerSaveSuccessMessage": "Changes updated successfully.",
       "formSettingsDrawerSaveErrorMessage": "Failed to save changes.",
+      "settingsConflictMessage": "Someone else changed these settings. They have been reloaded; make your change again.",
       "submitterSettingsDrawerLabel": "Submitter Settings",
       "allowSubmitterDraftsLabel": "Allow Submitters to Save and Edit Drafts",
       "allowSubmitterDraftsPublicNote": "Drafts are not available for Public forms.",

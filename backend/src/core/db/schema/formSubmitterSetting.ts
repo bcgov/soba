@@ -1,4 +1,4 @@
-import { boolean, index, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { auditColumns, idColumn } from './audit';
 import { sobaSchema, workspaces } from './core';
 import { forms } from './forms';
@@ -16,6 +16,8 @@ export const workspaceSubmitterSettings = sobaSchema.table(
       .notNull()
       .references(() => workspaces.id),
     allowSubmitterDrafts: boolean('allow_submitter_drafts').notNull().default(false),
+    /** Moves on with every save; a save names the version it started from. */
+    version: integer('version').notNull().default(1),
     ...auditColumns(),
   },
   (table) => ({
@@ -39,6 +41,8 @@ export const formSubmitterSettings = sobaSchema.table(
       .references(() => forms.id),
     inherit: boolean('inherit').notNull().default(true),
     allowSubmitterDrafts: boolean('allow_submitter_drafts'),
+    /** Moves on with every save; a save names the version it started from. */
+    version: integer('version').notNull().default(1),
     ...auditColumns(),
   },
   (table) => ({

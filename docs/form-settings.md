@@ -27,6 +27,12 @@ in the database. The one exception is a new workspace's audience: protected by t
 login provider. A read or save of a missing row is a 404. Other features read a group through its
 service.
 
+Versions: every settings row has a `version` that moves on with each save. A read returns it and a
+save names it; a save from an older version gets a 409 and changes nothing, so two people editing
+the same settings cannot overwrite each other unseen. On a 409 the section reads the settings again,
+drops the edit and says so. Workspace reads and saves are `{ values, version }`; a new form's
+`settings` in the create body carries no version.
+
 Shared groups: a group whose values a workspace shares with its forms also declares `workspace`.
 The workspace has its own row, created with the workspace by `createTeamWorkspace`. Each form's row
 says whether the form inherits the workspace's values or keeps its own. A form that inherits uses

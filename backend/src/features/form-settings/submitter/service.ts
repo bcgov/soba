@@ -1,10 +1,11 @@
 import type {
   FormSubmitterSettings,
   SetFormSubmitterSettingsBody,
-  SubmitterSettings,
+  WorkspaceSubmitterSettings,
 } from '@soba/lib';
 import { NotFoundError } from '../../../core/errors';
 import { toInheritableSettings } from '../inheritable';
+import { assertSaved } from '../saved';
 import type { FormSettingsContext, FormSettingsService } from '../routes';
 import {
   findSubmitterSettings,
@@ -30,35 +31,39 @@ export const formSubmitterSettingsService: FormSettingsService<
   get: readForm,
 
   async set(ctx, formId, body) {
-    const found = await updateSubmitterSettings({
+    const status = await updateSubmitterSettings({
       workspaceId: ctx.workspaceId,
       formId,
       settings: body.inherit === false ? body.values : null,
+      version: body.version,
       actorDisplayLabel: ctx.actorDisplayLabel,
     });
-    if (!found) throw new NotFoundError(FORM_NOT_FOUND);
+    assertSaved(status, FORM_NOT_FOUND);
     return readForm(ctx, formId);
   },
 };
 
+const readWorkspace = async (ctx: FormSettingsContext) => {
+  const settings = await findWorkspaceSubmitterSettings(ctx.workspaceId);
+  if (!settings) throw new NotFoundError(WORKSPACE_NOT_FOUND);
+  return settings;
+};
+
 /** A workspace's submitter settings, which its forms inherit unless they set their own. */
 export const workspaceSubmitterSettingsService: FormSettingsService<
-  SubmitterSettings,
-  SubmitterSettings
+  WorkspaceSubmitterSettings,
+  WorkspaceSubmitterSettings
 > = {
-  async get(ctx) {
-    const settings = await findWorkspaceSubmitterSettings(ctx.workspaceId);
-    if (!settings) throw new NotFoundError(WORKSPACE_NOT_FOUND);
-    return settings;
-  },
+  get: readWorkspace,
 
   async set(ctx, _workspaceId, body) {
-    const settings = await updateWorkspaceSubmitterSettings({
+    const status = await updateWorkspaceSubmitterSettings({
       workspaceId: ctx.workspaceId,
-      settings: body,
+      settings: body.values,
+      version: body.version,
       actorDisplayLabel: ctx.actorDisplayLabel,
     });
-    if (!settings) throw new NotFoundError(WORKSPACE_NOT_FOUND);
-    return settings;
+    assertSaved(status, WORKSPACE_NOT_FOUND);
+    return readWorkspace(ctx);
   },
 };

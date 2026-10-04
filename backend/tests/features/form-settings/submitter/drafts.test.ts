@@ -22,6 +22,7 @@ const inherited = (allowSubmitterDrafts: boolean) => ({
   own: null,
   workspace: { allowSubmitterDrafts },
   effective: { allowSubmitterDrafts },
+  version: 1,
 });
 
 describe('getDraftSaveStatus', () => {

@@ -3,6 +3,7 @@ import {
   inheritableSettingsSchemas,
   type InheritableSettings,
   type SetInheritableSettingsBody,
+  type WorkspaceSettings,
 } from './inheritable';
 
 /** URL segment of the group, shared by the routes, the SWR keys and the OpenAPI component names. */
@@ -21,5 +22,6 @@ export const WorkspaceSubmitterSettingsSchema = schemas.workspace;
 export const FormSubmitterSettingsSchema = schemas.form;
 export const SetFormSubmitterSettingsBodySchema = schemas.formBody;
 
+export type WorkspaceSubmitterSettings = WorkspaceSettings<SubmitterSettings>;
 export type FormSubmitterSettings = InheritableSettings<SubmitterSettings>;
 export type SetFormSubmitterSettingsBody = SetInheritableSettingsBody<SubmitterSettings>;

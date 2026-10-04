@@ -1,15 +1,17 @@
-import { and, count, eq, isNull } from 'drizzle-orm';
-import type { Audience } from '@soba/lib';
+import { and, count, eq, isNull, type SQL } from 'drizzle-orm';
+import type { Audience, WorkspaceSettings } from '@soba/lib';
 import { env } from '../../config/env';
 import { db, type DbOrTx } from '../client';
 import { formAudienceSettings, forms, workspaceAudienceSettings } from '../schema';
 import { getIdentityProvider } from './identityProviderRepo';
+import { saveSettingsRow, type SettingsSaveStatus } from './settingsRow';
 
 /** A form's audience row read with its workspace's. `own` is null while the form inherits. */
 export interface FormAudienceRow {
   inherit: boolean;
   own: Audience | null;
   workspace: Audience;
+  version: number;
 }
 
 // The table CHECKs keep mode within the known set and idps empty unless protected.
@@ -63,36 +65,41 @@ export const createFormAudienceSetting = async (
   });
 };
 
-/** A workspace's audience, or null when the workspace has no row. */
-export const findWorkspaceAudience = async (workspaceId: string): Promise<Audience | null> => {
+/** A workspace's audience and its version, or null when the workspace has no row. */
+export const findWorkspaceAudience = async (
+  workspaceId: string,
+): Promise<WorkspaceSettings<Audience> | null> => {
   const rows = await db
-    .select({ mode: workspaceAudienceSettings.mode, idps: workspaceAudienceSettings.idps })
+    .select({
+      mode: workspaceAudienceSettings.mode,
+      idps: workspaceAudienceSettings.idps,
+      version: workspaceAudienceSettings.version,
+    })
     .from(workspaceAudienceSettings)
     .where(eq(workspaceAudienceSettings.workspaceId, workspaceId))
     .limit(1);
   const row = rows[0];
-  return row ? toAudience(row.mode, row.idps) : null;
+  return row ? { values: toAudience(row.mode, row.idps), version: row.version } : null;
 };
 
-/** Writes a workspace's audience; null when the workspace has no row. */
-export const updateWorkspaceAudience = async (input: {
+/** Writes a workspace's audience if its row is still at `version`. */
+export const updateWorkspaceAudience = (input: {
   workspaceId: string;
   audience: Audience;
+  version?: number;
   actorDisplayLabel: string | null;
-}): Promise<Audience | null> => {
-  const rows = await db
-    .update(workspaceAudienceSettings)
-    .set({
+}): Promise<SettingsSaveStatus> =>
+  saveSettingsRow(
+    workspaceAudienceSettings,
+    eq(workspaceAudienceSettings.workspaceId, input.workspaceId),
+    {
       mode: input.audience.mode,
       idps: input.audience.idps,
       updatedBy: input.actorDisplayLabel,
       updatedAt: new Date(),
-    })
-    .where(eq(workspaceAudienceSettings.workspaceId, input.workspaceId))
-    .returning({ mode: workspaceAudienceSettings.mode, idps: workspaceAudienceSettings.idps });
-  const row = rows[0];
-  return row ? toAudience(row.mode, row.idps) : null;
-};
+    },
+    input.version,
+  );
 
 /** A form's audience row with its workspace's, or null when either row is missing. */
 export const findFormAudience = async (
@@ -104,6 +111,7 @@ export const findFormAudience = async (
       inherit: formAudienceSettings.inherit,
       mode: formAudienceSettings.mode,
       idps: formAudienceSettings.idps,
+      version: formAudienceSettings.version,
       workspaceMode: workspaceAudienceSettings.mode,
       workspaceIdps: workspaceAudienceSettings.idps,
     })
@@ -125,6 +133,7 @@ export const findFormAudience = async (
     inherit: row.inherit,
     own: row.inherit || row.mode == null ? null : toAudience(row.mode, row.idps ?? []),
     workspace: toAudience(row.workspaceMode, row.workspaceIdps),
+    version: row.version,
   };
 };
 
@@ -154,30 +163,28 @@ export const findEffectiveAudience = async (target: {
 };
 
 /**
- * Writes a form's audience. A null audience inherits the workspace's and clears the form's own.
- * Returns false when the form has no row in this workspace.
+ * Writes a form's audience if its row is still at `version`. A null audience inherits the
+ * workspace's and clears the form's own.
  */
-export const updateFormAudience = async (input: {
+export const updateFormAudience = (input: {
   workspaceId: string;
   formId: string;
   audience: Audience | null;
+  version?: number;
   actorDisplayLabel: string | null;
-}): Promise<boolean> => {
-  const rows = await db
-    .update(formAudienceSettings)
-    .set({
+}): Promise<SettingsSaveStatus> =>
+  saveSettingsRow(
+    formAudienceSettings,
+    and(
+      eq(formAudienceSettings.workspaceId, input.workspaceId),
+      eq(formAudienceSettings.formId, input.formId),
+    ) as SQL,
+    {
       inherit: input.audience == null,
       mode: input.audience?.mode ?? null,
       idps: input.audience?.idps ?? null,
       updatedBy: input.actorDisplayLabel,
       updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(formAudienceSettings.workspaceId, input.workspaceId),
-        eq(formAudienceSettings.formId, input.formId),
-      ),
-    )
-    .returning({ id: formAudienceSettings.id });
-  return rows.length > 0;
-};
+    },
+    input.version,
+  );

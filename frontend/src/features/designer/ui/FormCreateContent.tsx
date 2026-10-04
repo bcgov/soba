@@ -56,7 +56,13 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
   const audienceView = useMemo(
     () =>
       workspaceAudience
-        ? { inherit: true, own: null, workspace: workspaceAudience, effective: workspaceAudience }
+        ? {
+            inherit: true,
+            own: null,
+            workspace: workspaceAudience.values,
+            effective: workspaceAudience.values,
+            version: workspaceAudience.version,
+          }
         : undefined,
     [workspaceAudience],
   );

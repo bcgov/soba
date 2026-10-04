@@ -10,4 +10,5 @@ export type {
   SetFormSubmitterSettingsBody,
   SetInheritableSettingsBody,
   SubmitterSettings,
+  WorkspaceSettings,
 } from '@soba/lib';

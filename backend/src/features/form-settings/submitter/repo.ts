@@ -1,9 +1,10 @@
-import { and, eq } from 'drizzle-orm';
-import type { SubmitterSettings } from '@soba/lib';
+import { and, eq, type SQL } from 'drizzle-orm';
+import type { SubmitterSettings, WorkspaceSettings } from '@soba/lib';
 import { db, type DbOrTx } from '../../../core/db/client';
 import { formSubmitterSettings, workspaceSubmitterSettings } from '../../../core/db/schema';
 import type { InheritableRow } from '../inheritable';
 import type { FormSettingsRowInput } from '../types';
+import { saveSettingsRow, type SettingsSaveStatus } from '../../../core/db/repos/settingsRow';
 
 /** A form's submitter settings row read with its workspace's. */
 export interface FormSubmitterSettingsRow extends InheritableRow<SubmitterSettings> {
@@ -35,35 +36,41 @@ export const createSubmitterSettings = async (
   });
 };
 
-/** A workspace's submitter settings, or null when the workspace has no row. */
+/** A workspace's submitter settings and their version, or null when the workspace has no row. */
 export const findWorkspaceSubmitterSettings = async (
   workspaceId: string,
-): Promise<SubmitterSettings | null> => {
+): Promise<WorkspaceSettings<SubmitterSettings> | null> => {
   const rows = await db
-    .select({ allowSubmitterDrafts: workspaceSubmitterSettings.allowSubmitterDrafts })
+    .select({
+      allowSubmitterDrafts: workspaceSubmitterSettings.allowSubmitterDrafts,
+      version: workspaceSubmitterSettings.version,
+    })
     .from(workspaceSubmitterSettings)
     .where(eq(workspaceSubmitterSettings.workspaceId, workspaceId))
     .limit(1);
-  return rows[0] ?? null;
+  const row = rows[0];
+  return row
+    ? { values: { allowSubmitterDrafts: row.allowSubmitterDrafts }, version: row.version }
+    : null;
 };
 
-/** Writes a workspace's submitter settings; null when the workspace has no row. */
-export const updateWorkspaceSubmitterSettings = async (input: {
+/** Writes a workspace's submitter settings if its row is still at `version`. */
+export const updateWorkspaceSubmitterSettings = (input: {
   workspaceId: string;
   settings: SubmitterSettings;
+  version?: number;
   actorDisplayLabel: string | null;
-}): Promise<SubmitterSettings | null> => {
-  const rows = await db
-    .update(workspaceSubmitterSettings)
-    .set({
+}): Promise<SettingsSaveStatus> =>
+  saveSettingsRow(
+    workspaceSubmitterSettings,
+    eq(workspaceSubmitterSettings.workspaceId, input.workspaceId),
+    {
       allowSubmitterDrafts: input.settings.allowSubmitterDrafts,
       updatedBy: input.actorDisplayLabel,
       updatedAt: new Date(),
-    })
-    .where(eq(workspaceSubmitterSettings.workspaceId, input.workspaceId))
-    .returning({ allowSubmitterDrafts: workspaceSubmitterSettings.allowSubmitterDrafts });
-  return rows[0] ?? null;
-};
+    },
+    input.version,
+  );
 
 /** A form's submitter settings with its workspace's, or null when either row is missing. */
 export const findSubmitterSettings = async (
@@ -74,6 +81,7 @@ export const findSubmitterSettings = async (
     .select({
       inherit: formSubmitterSettings.inherit,
       allowSubmitterDrafts: formSubmitterSettings.allowSubmitterDrafts,
+      version: formSubmitterSettings.version,
       workspaceAllowSubmitterDrafts: workspaceSubmitterSettings.allowSubmitterDrafts,
     })
     .from(formSubmitterSettings)
@@ -97,33 +105,32 @@ export const findSubmitterSettings = async (
         ? null
         : { allowSubmitterDrafts: row.allowSubmitterDrafts },
     workspace: { allowSubmitterDrafts: row.workspaceAllowSubmitterDrafts },
+    version: row.version,
   };
 };
 
 /**
- * Writes a form's submitter settings. Null settings inherit the workspace's and clear the form's
- * own. Returns false when the form has no row in this workspace.
+ * Writes a form's submitter settings if its row is still at `version`. Null settings inherit the
+ * workspace's and clear the form's own.
  */
-export const updateSubmitterSettings = async (input: {
+export const updateSubmitterSettings = (input: {
   workspaceId: string;
   formId: string;
   settings: SubmitterSettings | null;
+  version?: number;
   actorDisplayLabel: string | null;
-}): Promise<boolean> => {
-  const rows = await db
-    .update(formSubmitterSettings)
-    .set({
+}): Promise<SettingsSaveStatus> =>
+  saveSettingsRow(
+    formSubmitterSettings,
+    and(
+      eq(formSubmitterSettings.workspaceId, input.workspaceId),
+      eq(formSubmitterSettings.formId, input.formId),
+    ) as SQL,
+    {
       inherit: input.settings == null,
       allowSubmitterDrafts: input.settings?.allowSubmitterDrafts ?? null,
       updatedBy: input.actorDisplayLabel,
       updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(formSubmitterSettings.workspaceId, input.workspaceId),
-        eq(formSubmitterSettings.formId, input.formId),
-      ),
-    )
-    .returning({ id: formSubmitterSettings.id });
-  return rows.length > 0;
-};
+    },
+    input.version,
+  );

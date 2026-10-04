@@ -4,6 +4,7 @@ import type { InheritableSettings } from '@soba/lib';
 export interface InheritableRow<T> {
   inherit: boolean;
   own: T | null;
+  version: number;
 }
 
 /**
@@ -16,5 +17,11 @@ export const toInheritableSettings = <T>(
   workspace: T,
 ): InheritableSettings<T> => {
   const own = row.inherit ? null : row.own;
-  return { inherit: row.inherit, own, workspace, effective: own ?? workspace };
+  return {
+    inherit: row.inherit,
+    own,
+    workspace,
+    effective: own ?? workspace,
+    version: row.version,
+  };
 };

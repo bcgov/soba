@@ -3,6 +3,7 @@ import {
   type Audience,
   type FormAudienceSettings,
   type SetFormAudienceSettingsBody,
+  type WorkspaceAudienceSettings,
 } from '@soba/lib';
 import { NotFoundError, ValidationError } from '../../../core/errors';
 import { listLoginIdentityProviders } from '../../../core/db/repos/identityProviderRepo';
@@ -14,6 +15,7 @@ import {
   updateWorkspaceAudience,
 } from '../../../core/db/repos/audienceSettingRepo';
 import { toInheritableSettings } from '../inheritable';
+import { assertSaved } from '../saved';
 import type { FormSettingsContext, FormSettingsService } from '../routes';
 import type { DbOrTx } from '../../../core/db/client';
 import type { FormSettingsRowInput } from '../types';
@@ -67,32 +69,39 @@ export const formAudienceService: FormSettingsService<
   get: readForm,
 
   async set(ctx, formId, body) {
-    const found = await updateFormAudience({
+    const status = await updateFormAudience({
       workspaceId: ctx.workspaceId,
       formId,
       audience: body.inherit === false ? await toStored(body.values) : null,
+      version: body.version,
       actorDisplayLabel: ctx.actorDisplayLabel,
     });
-    if (!found) throw new NotFoundError(FORM_NOT_FOUND);
+    assertSaved(status, FORM_NOT_FOUND);
     return readForm(ctx, formId);
   },
 };
 
+const readWorkspace = async (ctx: FormSettingsContext) => {
+  const settings = await findWorkspaceAudience(ctx.workspaceId);
+  if (!settings) throw new NotFoundError(WORKSPACE_NOT_FOUND);
+  return settings;
+};
+
 /** A workspace's audience, which its forms inherit unless they set their own. */
-export const workspaceAudienceService: FormSettingsService<Audience, Audience> = {
-  async get(ctx) {
-    const audience = await findWorkspaceAudience(ctx.workspaceId);
-    if (!audience) throw new NotFoundError(WORKSPACE_NOT_FOUND);
-    return audience;
-  },
+export const workspaceAudienceService: FormSettingsService<
+  WorkspaceAudienceSettings,
+  WorkspaceAudienceSettings
+> = {
+  get: readWorkspace,
 
   async set(ctx, _workspaceId, body) {
-    const audience = await updateWorkspaceAudience({
+    const status = await updateWorkspaceAudience({
       workspaceId: ctx.workspaceId,
-      audience: await toStored(body),
+      audience: await toStored(body.values),
+      version: body.version,
       actorDisplayLabel: ctx.actorDisplayLabel,
     });
-    if (!audience) throw new NotFoundError(WORKSPACE_NOT_FOUND);
-    return audience;
+    assertSaved(status, WORKSPACE_NOT_FOUND);
+    return readWorkspace(ctx);
   },
 };

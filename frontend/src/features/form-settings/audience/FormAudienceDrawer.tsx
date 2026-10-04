@@ -15,6 +15,7 @@ import {
 } from '@/src/types/formSettings';
 import { useLoginProviders } from '@/src/shared/api/useLoginProviders';
 import { messageForDataError } from '@/src/shared/api/dataError';
+import { isConflict } from '@/src/shared/api/sobaHelpers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { ConfirmModal } from '@/src/components/ConfirmModal';
@@ -73,12 +74,19 @@ export default function FormAudienceDrawer({ dict, drawerName, formId }: FormSet
     try {
       await save(
         token,
-        body.inherit === true ? body : { inherit: false, values: toAudience(body.values, offered) },
+        body.inherit === true
+          ? body
+          : { inherit: false, values: toAudience(body.values, offered), version: body.version },
       );
       edit.reset();
       addNotification({ type: 'success', text: t.formSettingsDrawerSaveSuccessMessage });
-    } catch {
-      addNotification({ type: 'error', text: t.formSettingsDrawerSaveErrorMessage });
+    } catch (err) {
+      // Someone else saved first: the hook has read their change, so the stale edit goes.
+      if (isConflict(err)) edit.reset();
+      addNotification({
+        type: 'error',
+        text: isConflict(err) ? t.settingsConflictMessage : t.formSettingsDrawerSaveErrorMessage,
+      });
     } finally {
       savingRef.current = false;
       setSaving(false);

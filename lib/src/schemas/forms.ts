@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import { LookupMetaSchema, OffsetPageSchema, makeSortEnum } from './pagination';
 import { FORM_SORT_FIELDS, FORM_VERSION_SORT_FIELDS } from '../sort';
-import { SetFormAudienceSettingsBodySchema } from './formSettings/audience';
+import { FormAudienceChoiceSchema } from './formSettings/audience';
 
 /** Settings a new form starts with instead of inheriting its workspace's. A group left out inherits. */
 export const CreateFormSettingsSchema = z.strictObject({
-  audience: SetFormAudienceSettingsBodySchema.optional(),
+  audience: FormAudienceChoiceSchema.optional(),
 });
 export type CreateFormSettings = z.infer<typeof CreateFormSettingsSchema>;
 

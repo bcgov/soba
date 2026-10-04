@@ -11,6 +11,7 @@ import { ConfirmModal } from '@/src/components/ConfirmModal';
 import { AUDIENCE_SETTINGS_KEY, type Audience } from '@/src/types/formSettings';
 import { useLoginProviders } from '@/src/shared/api/useLoginProviders';
 import { messageForDataError } from '@/src/shared/api/dataError';
+import { isConflict } from '@/src/shared/api/sobaHelpers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import AudienceField, { isValidAudience, toAudience, type AudienceValue } from './AudienceField';
@@ -60,20 +61,25 @@ export default function WorkspaceAudienceDrawer({
   // Providers are needed to show and check a protected audience, so nothing changes until both load.
   const offered = providers ?? [];
   const loaded = !!settings && !!providers;
-  const value = edited ?? settings ?? null;
+  const value = edited ?? settings?.values ?? null;
   const canSave = loaded && !saving && !!value && isValidAudience(value, offered);
-  const widensToPublic = value?.mode === 'public' && settings?.mode !== 'public';
+  const widensToPublic = value?.mode === 'public' && settings?.values.mode !== 'public';
 
   const saveChanges = async () => {
-    if (!token || !canSave || !value || savingRef.current) return;
+    if (!token || !canSave || !value || !settings || savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
     try {
-      await save(token, toAudience(value, offered));
+      await save(token, { values: toAudience(value, offered), version: settings.version });
       setEdited(null);
       addNotification({ type: 'success', text: t.formSettingsDrawerSaveSuccessMessage });
-    } catch {
-      addNotification({ type: 'error', text: t.formSettingsDrawerSaveErrorMessage });
+    } catch (err) {
+      // Someone else saved first: the hook has read their change, so the stale edit goes.
+      if (isConflict(err)) setEdited(null);
+      addNotification({
+        type: 'error',
+        text: isConflict(err) ? t.settingsConflictMessage : t.formSettingsDrawerSaveErrorMessage,
+      });
     } finally {
       savingRef.current = false;
       setSaving(false);

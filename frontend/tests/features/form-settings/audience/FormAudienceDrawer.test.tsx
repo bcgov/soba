@@ -41,6 +41,7 @@ import FormAudienceDrawer from '@/src/features/form-settings/audience/FormAudien
 
 const INHERIT = 'Use the workspace setting';
 const REQUIRED = 'Select at least one login.';
+const CONFLICT = 'Someone else changed these settings.';
 
 const mockDict = {
   form: {
@@ -60,6 +61,7 @@ const mockDict = {
       audiencePublicConfirmLabel: 'Make public',
       formSettingsDrawerSaveSuccessMessage: 'Changes saved.',
       formSettingsDrawerSaveErrorMessage: 'Save failed.',
+      settingsConflictMessage: CONFLICT,
     },
   },
   modal: { dialogActions: 'Dialog actions' },
@@ -81,12 +83,14 @@ const inherited = (workspace: Audience): FormAudienceSettings => ({
   own: null,
   workspace,
   effective: workspace,
+  version: 1,
 });
 const own = (values: Audience, workspace: Audience = IDIR): FormAudienceSettings => ({
   inherit: false,
   own: values,
   workspace,
   effective: values,
+  version: 1,
 });
 
 let store: ReturnType<typeof makeStore>;
@@ -149,6 +153,7 @@ describe('FormAudienceDrawer', () => {
       expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', {
         inherit: false,
         values: { mode: 'members', idps: [] },
+        version: 1,
       }),
     );
     expect(mockAddNotification).toHaveBeenCalledWith({ type: 'success', text: 'Changes saved.' });
@@ -173,6 +178,7 @@ describe('FormAudienceDrawer', () => {
       expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', {
         inherit: false,
         values: { mode: 'protected', idps: ['bceidbusiness'] },
+        version: 1,
       }),
     );
   });
@@ -191,6 +197,7 @@ describe('FormAudienceDrawer', () => {
       expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', {
         inherit: false,
         values: IDIR,
+        version: 1,
       }),
     );
   });
@@ -208,7 +215,10 @@ describe('FormAudienceDrawer', () => {
     await user.click(saveButton());
 
     await waitFor(() =>
-      expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', { inherit: true }),
+      expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', {
+        inherit: true,
+        version: 1,
+      }),
     );
   });
 
@@ -235,6 +245,7 @@ describe('FormAudienceDrawer', () => {
       expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', {
         inherit: false,
         values: { mode: 'public', idps: [] },
+        version: 1,
       }),
     );
   });
@@ -254,7 +265,10 @@ describe('FormAudienceDrawer', () => {
     await user.click(await screen.findByTestId('confirm-modal-confirm'));
 
     await waitFor(() =>
-      expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', { inherit: true }),
+      expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', {
+        inherit: true,
+        version: 1,
+      }),
     );
   });
 
@@ -272,9 +286,32 @@ describe('FormAudienceDrawer', () => {
       expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', {
         inherit: false,
         values: { mode: 'public', idps: [] },
+        version: 1,
       }),
     );
     expect(screen.queryByTestId('confirm-modal-message')).toBeNull();
+  });
+
+  // Someone else saved first: their change is read back and the stale edit is dropped.
+  it('reloads and says so when someone else saved first', async () => {
+    const user = userEvent.setup();
+    mockGetSettings
+      .mockResolvedValueOnce(own({ mode: 'members', idps: [] }))
+      .mockResolvedValue({ ...own(IDIR), version: 2 });
+    mockSetSettings.mockRejectedValue(new ApiError('changed', 409));
+    renderDrawer();
+    await waitFor(() => expect(radio('members')).toBeEnabled());
+
+    await user.click(screen.getByText('Protected'));
+    await user.click(screen.getByText('BCeID Business'));
+    await user.click(saveButton());
+
+    await waitFor(() =>
+      expect(mockAddNotification).toHaveBeenCalledWith({ type: 'error', text: CONFLICT }),
+    );
+    await waitFor(() => expect(login('azureidir')).toBeChecked());
+    expect(login('bceidbusiness')).not.toBeChecked();
+    expect(mockGetSettings).toHaveBeenCalledTimes(2);
   });
 
   it('keeps the edit and reports a failed save', async () => {

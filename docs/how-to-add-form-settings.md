@@ -26,6 +26,7 @@ CREATE TABLE "soba"."form_<group>_setting" (
 	"workspace_id" uuid NOT NULL,
 	"form_id" uuid NOT NULL,
 	"<flag>" boolean DEFAULT false NOT NULL,
+	"version" integer DEFAULT 1 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"created_by" text,
@@ -88,8 +89,10 @@ flag.
   takes the transaction that creates the form and inserts the row, so its values come from the
   column defaults.
 - **`service.ts`**: implements `FormSettingsService<TSettings, TBody>` from `../routes`. `get` finds
-  the row and `set` updates it, one statement each. Both throw `NotFoundError` when the row is
-  missing. Other features read the group through this service, never through its table.
+  the row and returns its `version`; `set` writes it through `saveSettingsRow`
+  (`core/db/repos/settingsRow.ts`) with the version the body names, and `assertSaved` turns a
+  missed save into a 404 (no row) or a 409 (the row moved on). Other features read the group
+  through this service, never through its table.
 - **`openapi.ts`**: the OpenAPI clones, with the key from the lib schema:
 
 ```ts
@@ -263,6 +266,8 @@ The endpoint, the registry and the section descriptor stay as they are.
   the form carries them. A section may still show a placeholder while the value loads.
 - **`PUT` replaces the whole group.** The body carries every flag, so the section sends the values it
   loaded plus the change.
+- **Saves name a version.** The body carries the version the section read. Let the 409 through to
+  the section, which reads again and asks for the change again; never retry it with a fresh version.
 - **Every creation path gets the rows.** `FormService.create` creates them, so do not insert a form
   any other way.
 - **The group name is load-bearing.** It appears in the URL, the SWR key and the OpenAPI component

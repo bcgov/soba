@@ -1,4 +1,4 @@
-import { boolean, index, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { auditColumns, idColumn } from './audit';
 import { sobaSchema, workspaces } from './core';
@@ -20,6 +20,8 @@ export const workspaceAudienceSettings = sobaSchema.table(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
+    /** Moves on with every save; a save names the version it started from. */
+    version: integer('version').notNull().default(1),
     ...auditColumns(),
   },
   (table) => ({
@@ -44,6 +46,8 @@ export const formAudienceSettings = sobaSchema.table(
     inherit: boolean('inherit').notNull().default(true),
     mode: text('mode'),
     idps: text('idps').array(),
+    /** Moves on with every save; a save names the version it started from. */
+    version: integer('version').notNull().default(1),
     ...auditColumns(),
   },
   (table) => ({

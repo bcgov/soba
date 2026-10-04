@@ -13,6 +13,7 @@ import {
   type SubmitterSettings,
 } from '@/src/types/formSettings';
 import { messageForDataError } from '@/src/shared/api/dataError';
+import { isConflict } from '@/src/shared/api/sobaHelpers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
@@ -58,19 +59,24 @@ export default function WorkspaceSubmitterDrawer({
     ],
   );
 
-  const isPublic = audience?.mode === 'public';
-  const allowSubmitterDrafts = editedAllowDrafts ?? settings?.allowSubmitterDrafts ?? false;
+  const isPublic = audience?.values.mode === 'public';
+  const allowSubmitterDrafts = editedAllowDrafts ?? settings?.values.allowSubmitterDrafts ?? false;
 
   const saveChanges = async () => {
     if (!token || !settings || savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
     try {
-      await save(token, { allowSubmitterDrafts });
+      await save(token, { values: { allowSubmitterDrafts }, version: settings.version });
       setEditedAllowDrafts(null);
       addNotification({ type: 'success', text: t.formSettingsDrawerSaveSuccessMessage });
-    } catch {
-      addNotification({ type: 'error', text: t.formSettingsDrawerSaveErrorMessage });
+    } catch (err) {
+      // Someone else saved first: the hook has read their change, so the stale edit goes.
+      if (isConflict(err)) setEditedAllowDrafts(null);
+      addNotification({
+        type: 'error',
+        text: isConflict(err) ? t.settingsConflictMessage : t.formSettingsDrawerSaveErrorMessage,
+      });
     } finally {
       savingRef.current = false;
       setSaving(false);

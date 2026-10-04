@@ -143,7 +143,7 @@ describe('FormCreateContent', () => {
     mockSaveFormVersionSchema.mockResolvedValue({});
     (useWorkspaceSettings as Mock).mockImplementation(
       (_key: string, workspaceId: string | null) => ({
-        settings: workspaceId ? workspaceAudiences[workspaceId] : undefined,
+        settings: workspaceId ? { values: workspaceAudiences[workspaceId], version: 1 } : undefined,
         error: null,
         save: vi.fn(),
       }),

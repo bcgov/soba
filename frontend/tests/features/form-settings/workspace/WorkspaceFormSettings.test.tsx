@@ -52,6 +52,7 @@ import { useFormSettings } from '@/src/features/form-settings/data/useFormSettin
 const DRAFTS = 'Allow Submitters to Save and Edit Drafts';
 const PUBLIC_NOTE = 'Drafts are not available for Public forms.';
 const REQUIRED = 'Select at least one login.';
+const CONFLICT = 'Someone else changed these settings.';
 
 const mockDict = {
   form: {
@@ -75,6 +76,7 @@ const mockDict = {
       submitterSettingsLoadError: 'Could not load submitter settings.',
       formSettingsDrawerSaveSuccessMessage: 'Changes saved.',
       formSettingsDrawerSaveErrorMessage: 'Save failed.',
+      settingsConflictMessage: CONFLICT,
     },
   },
   workspaces: { formSettingsIntro: 'These settings are shared by every form in this workspace.' },
@@ -145,7 +147,7 @@ describe('WorkspaceFormSettings', () => {
     mockGetProviders.mockResolvedValue({ items: PROVIDERS });
     mockGetInheriting.mockResolvedValue({ count: 3 });
     mockGetSettings.mockImplementation((_token: string, _ws: string, key: string) =>
-      Promise.resolve(key === 'audience' ? audience : submitter),
+      Promise.resolve({ values: key === 'audience' ? audience : submitter, version: 1 }),
     );
     mockSetSettings.mockImplementation((_token: string, _ws: string, _key: string, body: unknown) =>
       Promise.resolve(body),
@@ -176,8 +178,8 @@ describe('WorkspaceFormSettings', () => {
 
     await waitFor(() =>
       expect(mockSetSettings).toHaveBeenCalledWith('token', 'ws1', 'audience', {
-        mode: 'public',
-        idps: [],
+        values: { mode: 'public', idps: [] },
+        version: 1,
       }),
     );
     expect(
@@ -233,8 +235,8 @@ describe('WorkspaceFormSettings', () => {
     await user.click(audienceSave());
     await waitFor(() =>
       expect(mockSetSettings).toHaveBeenCalledWith('token', 'ws1', 'audience', {
-        mode: 'protected',
-        idps: ['bceidbusiness'],
+        values: { mode: 'protected', idps: ['bceidbusiness'] },
+        version: 1,
       }),
     );
   });
@@ -249,11 +251,29 @@ describe('WorkspaceFormSettings', () => {
 
     await waitFor(() =>
       expect(mockSetSettings).toHaveBeenCalledWith('token', 'ws1', 'submitter', {
-        allowSubmitterDrafts: true,
+        values: { allowSubmitterDrafts: true },
+        version: 1,
       }),
     );
     expect(drafts()).toBeChecked();
     expect(mockAddNotification).toHaveBeenCalledWith({ type: 'success', text: 'Changes saved.' });
+  });
+
+  it('reloads the workspace settings and says so when someone else saved first', async () => {
+    const user = userEvent.setup();
+    mockSetSettings.mockRejectedValue(new ApiError('changed', 409));
+    renderTab();
+    await waitFor(() => expect(drafts()).toBeEnabled());
+    submitter = { allowSubmitterDrafts: false };
+
+    await user.click(screen.getByText(DRAFTS));
+    await user.click(submitterSave());
+
+    await waitFor(() =>
+      expect(mockAddNotification).toHaveBeenCalledWith({ type: 'error', text: CONFLICT }),
+    );
+    expect(drafts()).not.toBeChecked();
+    expect(mockGetSettings.mock.calls.filter((call) => call[2] === 'submitter')).toHaveLength(2);
   });
 
   it('keeps the edit and reports a failed save', async () => {
@@ -274,7 +294,9 @@ describe('WorkspaceFormSettings', () => {
   it('says when a group cannot be read and saves nothing', async () => {
     const user = userEvent.setup();
     mockGetSettings.mockImplementation((_token: string, _ws: string, key: string) =>
-      key === 'audience' ? Promise.reject(new ApiError('Boom', 500)) : Promise.resolve(submitter),
+      key === 'audience'
+        ? Promise.reject(new ApiError('Boom', 500))
+        : Promise.resolve({ values: submitter, version: 1 }),
     );
     renderTab();
 

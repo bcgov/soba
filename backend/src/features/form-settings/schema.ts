@@ -95,6 +95,7 @@ export const registerSettingsPaths = (
       400: { description: 'Validation or business rule error' },
       403: { description: docs.write403 },
       404: { description: docs.notFound },
+      409: { description: 'The settings changed after the version this save names' },
     },
   });
 };
@@ -109,7 +110,7 @@ export const inheritableOpenApiSchemas = <T extends z.ZodType>(values: T, name: 
   // The generator cannot mark a ref to a named union nullable, so the description carries it.
   const own = named.nullable().openapi({ description: 'Null while the form inherits.' });
   return {
-    workspace: named,
+    workspace: schemas.workspace.openapi(`FormSettings_Workspace${name}`),
     form: schemas.form.extend({ own }).openapi(`FormSettings_Form${name}`),
     formBody: schemas.formBody.openapi(`FormSettings_SetForm${name}Body`),
   };

@@ -17,6 +17,7 @@ import {
   type SubmitterSettings,
 } from '@/src/types/formSettings';
 import { messageForDataError } from '@/src/shared/api/dataError';
+import { isConflict } from '@/src/shared/api/sobaHelpers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
@@ -81,8 +82,13 @@ export default function SubmitterSettingsDrawer({
       await save(token, body);
       edit.reset();
       addNotification({ type: 'success', text: t.formSettingsDrawerSaveSuccessMessage });
-    } catch {
-      addNotification({ type: 'error', text: t.formSettingsDrawerSaveErrorMessage });
+    } catch (err) {
+      // Someone else saved first: the hook has read their change, so the stale edit goes.
+      if (isConflict(err)) edit.reset();
+      addNotification({
+        type: 'error',
+        text: isConflict(err) ? t.settingsConflictMessage : t.formSettingsDrawerSaveErrorMessage,
+      });
     } finally {
       savingRef.current = false;
       setSaving(false);

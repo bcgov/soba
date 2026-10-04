@@ -22,10 +22,13 @@ export function useInheritableEdit<T>(settings: InheritableSettings<T> | undefin
     values,
     setInherit: (next: boolean) => setEdit({ inherit: next, values: ownValues }),
     setValues: (next: T) => setEdit({ inherit: false, values: next }),
-    /** The save body, or null until the settings are loaded. */
+    /** The save body, from the version loaded, or null until the settings are loaded. */
     body: (): SetInheritableSettingsBody<T> | null => {
-      if (inherit) return { inherit: true };
-      return ownValues === null ? null : { inherit: false, values: ownValues };
+      if (!settings) return null;
+      if (inherit) return { inherit: true, version: settings.version };
+      return ownValues === null
+        ? null
+        : { inherit: false, values: ownValues, version: settings.version };
     },
     reset: () => setEdit(null),
   };

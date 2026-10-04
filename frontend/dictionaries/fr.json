@@ -305,6 +305,7 @@
       "formSettingsDrawerLabel": "Paramètres du Formulaire",
       "formSettingsDrawerSaveSuccessMessage": "Modifications mises à jour avec succès.",
       "formSettingsDrawerSaveErrorMessage": "Échec de l'enregistrement des modifications.",
+      "settingsConflictMessage": "Quelqu'un d'autre a modifié ces paramètres. Ils ont été rechargés; refaites votre modification.",
       "submitterSettingsDrawerLabel": "Paramètres des Soumissionnaires",
       "allowSubmitterDraftsLabel": "Permettre aux soumissionnaires d'enregistrer et de modifier des brouillons",
       "allowSubmitterDraftsPublicNote": "Les brouillons ne sont pas disponibles pour les formulaires publics.",

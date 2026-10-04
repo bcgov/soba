@@ -67,6 +67,7 @@ const audience = (mode: keyof typeof AUDIENCES): FormAudienceSettings => ({
   own: null,
   workspace: AUDIENCES[mode],
   effective: AUDIENCES[mode],
+  version: 1,
 });
 
 // The form's submitter settings while it inherits the workspace's drafts flag.
@@ -75,6 +76,7 @@ const inheritedDrafts = (allowSubmitterDrafts: boolean): FormSubmitterSettings =
   own: null,
   workspace: { allowSubmitterDrafts },
   effective: { allowSubmitterDrafts },
+  version: 1,
 });
 
 // The form's own drafts flag, under a workspace that keeps drafts off.
@@ -83,6 +85,7 @@ const ownDrafts = (allowSubmitterDrafts: boolean): FormSubmitterSettings => ({
   own: { allowSubmitterDrafts },
   workspace: { allowSubmitterDrafts: false },
   effective: { allowSubmitterDrafts },
+  version: 1,
 });
 
 let store: ReturnType<typeof makeStore>;
@@ -157,6 +160,7 @@ describe('SubmitterSettingsDrawer', () => {
       expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'submitter', {
         inherit: false,
         values: { allowSubmitterDrafts: false },
+        version: 1,
       }),
     );
   });
@@ -175,7 +179,10 @@ describe('SubmitterSettingsDrawer', () => {
     await user.click(saveButton());
 
     await waitFor(() =>
-      expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'submitter', { inherit: true }),
+      expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'submitter', {
+        inherit: true,
+        version: 1,
+      }),
     );
   });
 
@@ -195,6 +202,7 @@ describe('SubmitterSettingsDrawer', () => {
       own: { allowSubmitterDrafts: true },
       workspace: { allowSubmitterDrafts: false },
       effective: { allowSubmitterDrafts: true },
+      version: 2,
     });
     renderDrawer();
     await waitFor(() => expect(checkbox()).toBeEnabled());
@@ -208,6 +216,7 @@ describe('SubmitterSettingsDrawer', () => {
     expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'submitter', {
       inherit: false,
       values: { allowSubmitterDrafts: true },
+      version: 1,
     });
     expect(checkbox()).toBeChecked();
   });
