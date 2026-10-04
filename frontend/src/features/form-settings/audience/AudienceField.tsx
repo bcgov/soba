@@ -3,6 +3,7 @@
 import { RadioGroup, Radio, CheckboxGroup, Checkbox } from '@bcgov/design-system-react-components';
 import type { Dictionary } from '@/src/types/dictionary';
 import type { Audience, AudienceMode, LoginProviderMeta } from '@/src/types/formSettings';
+import styles from './AudienceField.module.css';
 
 /** An audience being edited: protected may have no provider until one is picked. */
 export interface AudienceValue {
@@ -45,7 +46,7 @@ export default function AudienceField({
   const selected = offeredIdps(value, providers);
 
   return (
-    <>
+    <div className={styles.field}>
       <RadioGroup
         label={t.audienceLabel}
         value={value.mode}
@@ -82,6 +83,6 @@ export default function AudienceField({
           ))}
         </CheckboxGroup>
       )}
-    </>
+    </div>
   );
 }
