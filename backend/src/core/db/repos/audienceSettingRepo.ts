@@ -42,14 +42,22 @@ export const createWorkspaceAudienceSetting = async (
   });
 };
 
-/** Creates a new form's audience row, inheriting its workspace's. */
+/** Creates a new form's audience row: its own audience when given, otherwise inheriting. */
 export const createFormAudienceSetting = async (
-  input: { workspaceId: string; formId: string; actorDisplayLabel: string | null },
+  input: {
+    workspaceId: string;
+    formId: string;
+    audience?: Audience | null;
+    actorDisplayLabel: string | null;
+  },
   executor: DbOrTx,
 ): Promise<void> => {
   await executor.insert(formAudienceSettings).values({
     workspaceId: input.workspaceId,
     formId: input.formId,
+    inherit: !input.audience,
+    mode: input.audience?.mode ?? null,
+    idps: input.audience?.idps ?? null,
     createdBy: input.actorDisplayLabel,
     updatedBy: input.actorDisplayLabel,
   });

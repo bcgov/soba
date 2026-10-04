@@ -7,6 +7,7 @@ import {
 import { NotFoundError, ValidationError } from '../../../core/errors';
 import { listLoginIdentityProviders } from '../../../core/db/repos/identityProviderRepo';
 import {
+  createFormAudienceSetting,
   findFormAudience,
   findWorkspaceAudience,
   updateFormAudience,
@@ -14,6 +15,8 @@ import {
 } from '../../../core/db/repos/audienceSettingRepo';
 import { toInheritableSettings } from '../inheritable';
 import type { FormSettingsContext, FormSettingsService } from '../routes';
+import type { DbOrTx } from '../../../core/db/client';
+import type { FormSettingsRowInput } from '../types';
 
 const FORM_NOT_FOUND = 'Form audience settings not found';
 const WORKSPACE_NOT_FOUND = 'Workspace audience settings not found';
@@ -37,6 +40,23 @@ const readForm = async (ctx: FormSettingsContext, formId: string) => {
   const row = await findFormAudience(ctx.workspaceId, formId);
   if (!row) throw new NotFoundError(FORM_NOT_FOUND);
   return toInheritableSettings(row, row.workspace);
+};
+
+/** Creates a new form's audience row: inheriting, or the audience sent with the new form. */
+export const createFormAudience = async (
+  input: FormSettingsRowInput,
+  executor: DbOrTx,
+): Promise<void> => {
+  const body = input.settings?.audience;
+  await createFormAudienceSetting(
+    {
+      workspaceId: input.workspaceId,
+      formId: input.formId,
+      audience: body?.inherit === false ? await toStored(body.values) : null,
+      actorDisplayLabel: input.actorDisplayLabel,
+    },
+    executor,
+  );
 };
 
 /** A form's audience: inherited from its workspace, or its own. */

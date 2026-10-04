@@ -90,6 +90,21 @@ describe('FormService.create', () => {
     });
   });
 
+  it('passes the settings sent with the form to its settings rows', async () => {
+    createForm.mockResolvedValue({ id: 'f1', name: 'My Form' });
+    createDraft.mockResolvedValue({ id: 'v1', formId: 'f1', versionNo: 1, state: 'draft' });
+    const settings = {
+      audience: { inherit: false as const, values: { mode: 'members' as const, idps: [] } },
+    };
+
+    await new FormService().create({ ...baseCreate, settings });
+
+    expect(createSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ formId: 'f1', settings }),
+      createForm.mock.calls[0][1],
+    );
+  });
+
   it('throws when no form engine plugins are installed', async () => {
     getPlugins.mockReturnValue([]);
     const svc = new FormService();

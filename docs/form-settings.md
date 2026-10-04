@@ -31,7 +31,9 @@ Shared groups: a group whose values a workspace shares with its forms also decla
 The workspace has its own row, created with the workspace by `createTeamWorkspace`. Each form's row
 says whether the form inherits the workspace's values or keeps its own. A form that inherits uses
 the workspace's values, read when asked, so a workspace change reaches it with nothing copied; going
-back to inherit drops the form's own values. The lib helper `inheritableSettingsSchemas` builds a
+back to inherit drops the form's own values. A create request may carry `settings`, such as
+`{ audience: { inherit: false, values } }`, and the named groups then start with the form's own
+values; the rest inherit. The lib helper `inheritableSettingsSchemas` builds a
 shared group's schemas: the workspace values, the form's view (`inherit`, `own`, `workspace`,
 `effective`) and the form's save body (`{ inherit: true }` or `{ inherit: false, values }`).
 

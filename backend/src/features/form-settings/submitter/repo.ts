@@ -3,6 +3,7 @@ import type { SubmitterSettings } from '@soba/lib';
 import { db, type DbOrTx } from '../../../core/db/client';
 import { formSubmitterSettings, workspaceSubmitterSettings } from '../../../core/db/schema';
 import type { InheritableRow } from '../inheritable';
+import type { FormSettingsRowInput } from '../types';
 
 /** A form's submitter settings row read with its workspace's. */
 export interface FormSubmitterSettingsRow extends InheritableRow<SubmitterSettings> {
@@ -23,7 +24,7 @@ export const createWorkspaceSubmitterSettings = async (
 
 /** Creates a new form's submitter settings, inheriting its workspace's. */
 export const createSubmitterSettings = async (
-  input: { workspaceId: string; formId: string; actorDisplayLabel: string | null },
+  input: FormSettingsRowInput,
   executor: DbOrTx,
 ): Promise<void> => {
   await executor.insert(formSubmitterSettings).values({

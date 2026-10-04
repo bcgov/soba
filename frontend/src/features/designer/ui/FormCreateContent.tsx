@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 import { Form, TextField, Button, InlineAlert } from '@bcgov/design-system-react-components';
@@ -14,6 +14,16 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { isConflict } from '@/src/shared/api/sobaHelpers';
 import type { SobaFormType } from '@/src/types/forms';
+import { AUDIENCE_SETTINGS_KEY, type Audience } from '@/src/types/formSettings';
+import { useWorkspaceSettings } from '@/src/features/form-settings/data/useWorkspaceSettings';
+import { useLoginProviders } from '@/src/shared/api/useLoginProviders';
+import { useInheritableEdit } from '@/src/features/form-settings/ui/useInheritableEdit';
+import InheritCheckbox from '@/src/features/form-settings/ui/InheritCheckbox';
+import AudienceField, {
+  isValidAudience,
+  toAudience,
+  type AudienceValue,
+} from '@/src/features/form-settings/audience/AudienceField';
 
 interface FormCreateContentProps {
   onCancelPress: () => void;
@@ -37,6 +47,25 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
 
   const creatableWorkspaces = useFormCreateWorkspaceOptions(true);
 
+  // The new form inherits the selected workspace's audience unless the creator sets its own.
+  const { settings: workspaceAudience } = useWorkspaceSettings<Audience>(
+    AUDIENCE_SETTINGS_KEY,
+    selectedWorkspaceId,
+  );
+  const { data: providers } = useLoginProviders();
+  const audienceView = useMemo(
+    () =>
+      workspaceAudience
+        ? { inherit: true, own: null, workspace: workspaceAudience, effective: workspaceAudience }
+        : undefined,
+    [workspaceAudience],
+  );
+  const audienceEdit = useInheritableEdit<AudienceValue>(audienceView);
+  const offered = providers ?? [];
+  const audienceBody = audienceEdit.body();
+  const ownAudience = audienceBody?.inherit === false ? audienceBody.values : null;
+  const audienceValid = !ownAudience || isValidAudience(ownAudience, offered);
+
   const saveForm = async () => {
     if (isSaving) return;
     // Creating a form is workspace-scoped: without a selected workspace the backend
@@ -49,6 +78,11 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
 
     try {
       const data: SobaFormType = { name: formName.trim() };
+      if (ownAudience) {
+        data.settings = {
+          audience: { inherit: false, values: toAudience(ownAudience, offered) },
+        };
+      }
       const outcome = await formCreator.create(
         token as string,
         data,
@@ -126,10 +160,34 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
           workspaces={creatableWorkspaces.workspaces}
           selectedWorkspaceId={selectedWorkspaceId}
           isRequired={true}
-          onChange={(id) => setSelectedWorkspaceId(id as string)}
+          onChange={(id) => {
+            setSelectedWorkspaceId(id as string);
+            audienceEdit.reset();
+          }}
           description={lookupTruncatedNote(dict.general.lookupTruncated, creatableWorkspaces)}
           size="medium"
         />
+      )}
+
+      {selectedWorkspaceId && (
+        <div className="p-3 border rounded-3 bg-light" data-testid="create-form-audience">
+          <InheritCheckbox
+            label={dict.form.settings.inheritWorkspaceLabel}
+            isSelected={audienceEdit.inherit}
+            onChange={audienceEdit.setInherit}
+            isDisabled={isSaving || !audienceView || !providers}
+            testId="create-form-audience-inherit"
+          />
+          {audienceEdit.values && providers && (
+            <AudienceField
+              dict={dict}
+              value={audienceEdit.values}
+              onChange={audienceEdit.setValues}
+              providers={offered}
+              isDisabled={isSaving || audienceEdit.inherit}
+            />
+          )}
+        </div>
       )}
 
       <div className="d-flex justify-content-end gap-2">
@@ -142,7 +200,11 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
         >
           {dict.general.cancel}
         </Button>
-        <Button type="submit" isDisabled={isSaving} data-testid="save-create-form">
+        <Button
+          type="submit"
+          isDisabled={isSaving || !audienceValid}
+          data-testid="save-create-form"
+        >
           {dict.general.next}
         </Button>
       </div>

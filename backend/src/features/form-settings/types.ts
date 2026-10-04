@@ -1,4 +1,5 @@
 import type { Router } from 'express';
+import type { CreateFormSettings } from '@soba/lib';
 import type { AnyPgColumn, PgTable } from 'drizzle-orm/pg-core';
 import type { FeatureCode } from '../../core/db/codes';
 import type { DbOrTx } from '../../core/db/client';
@@ -11,6 +12,12 @@ export type WorkspaceScopedTable = PgTable & { workspaceId: AnyPgColumn };
 export interface SettingsRowInput {
   workspaceId: string;
   actorDisplayLabel: string | null;
+}
+
+/** A new form's row: a group whose key is in `settings` starts with those values. */
+export interface FormSettingsRowInput extends SettingsRowInput {
+  formId: string;
+  settings?: CreateFormSettings;
 }
 
 /**
@@ -42,7 +49,7 @@ export interface FormSettingsModule {
   /** Cleared by dev-data purge before forms are deleted, in this order. */
   tables: WorkspaceScopedTable[];
   /** Creates the form's row, in the transaction that creates the form. */
-  createForForm: (input: SettingsRowInput & { formId: string }, executor: DbOrTx) => Promise<void>;
+  createForForm: (input: FormSettingsRowInput, executor: DbOrTx) => Promise<void>;
   /** Set when the group's values are shared by the workspace's forms. */
   workspace?: WorkspaceSettingsScope;
 }

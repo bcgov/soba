@@ -1,4 +1,4 @@
-import type { SortLocale } from '@soba/lib';
+import type { CreateFormSettings, SortLocale } from '@soba/lib';
 import {
   createForm,
   FormRecord,
@@ -49,6 +49,8 @@ interface CreateInput {
   name: string;
   description?: string;
   formEngineCode?: string;
+  /** Settings the form starts with instead of inheriting its workspace's. */
+  settings?: CreateFormSettings;
   executor?: DbOrTx;
 }
 
@@ -123,6 +125,7 @@ export class FormService {
           workspaceId: input.workspaceId,
           formId: form.id,
           actorDisplayLabel: input.actorDisplayLabel,
+          settings: input.settings,
         },
         tx,
       );

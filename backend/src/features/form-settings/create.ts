@@ -1,10 +1,13 @@
 import type { DbOrTx } from '../../core/db/client';
 import { formSettingsModules } from './registry';
-import type { SettingsRowInput } from './types';
+import type { FormSettingsRowInput, SettingsRowInput } from './types';
 
-/** Creates every group's row for a new form, in the transaction that creates the form. */
+/**
+ * Creates every group's row for a new form, in the transaction that creates the form. A group named
+ * in `settings` starts with those values; the rest inherit.
+ */
 export const createFormSettings = async (
-  input: SettingsRowInput & { formId: string },
+  input: FormSettingsRowInput,
   executor: DbOrTx,
 ): Promise<void> => {
   for (const module of formSettingsModules) {

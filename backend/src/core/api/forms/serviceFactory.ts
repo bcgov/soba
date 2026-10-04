@@ -3,7 +3,12 @@ import { FormVersionService } from '../../services/formVersionService';
 import { resolveFormPermissions } from '../../db/repos/formAccessRepo';
 import type { FormListSort } from '../../db/repos/formRepo';
 import type { FormVersionListSort } from '../../db/repos/formVersionRepo';
-import { type FormListItem, type FormVersionListItem, type SortLocale } from '@soba/lib';
+import {
+  type CreateFormSettings,
+  type FormListItem,
+  type FormVersionListItem,
+  type SortLocale,
+} from '@soba/lib';
 import { LOOKUP_FETCH_LIMIT, toLookupResponse } from '../shared/lookup';
 
 import type { CoreRequestContext } from '../../middleware/requestContext';
@@ -41,6 +46,7 @@ interface CreateFormInput {
   name: string;
   description?: string;
   formEngineCode?: string;
+  settings?: CreateFormSettings;
 }
 
 interface UpdateFormInput {
@@ -168,6 +174,7 @@ export function createFormsApiService(
         name: input.name,
         description: input.description,
         formEngineCode: input.formEngineCode,
+        settings: input.settings,
       });
       return { ...toFormDto(form), formVersion: toFormVersionDto(version) };
     },

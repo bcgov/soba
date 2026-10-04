@@ -26,6 +26,15 @@ vi.mock('@/app/[lang]/Providers', () => ({
       versionConflict: 'Version conflict.',
       disclaimerRequired: 'Accept the workspace disclaimer before creating a form.',
       noActiveWorkspace: 'No active workspace.',
+      settings: {
+        inheritWorkspaceLabel: 'Use the workspace setting',
+        audienceLabel: 'Who can submit',
+        audiencePublic: 'Public',
+        audienceProtected: 'Protected',
+        audienceMembers: 'Members only',
+        audienceProviders: 'Allowed logins',
+        audienceProvidersRequired: 'Select at least one login.',
+      },
     },
     general: {
       cancel: 'Cancel',
@@ -58,6 +67,14 @@ vi.mock('@/src/shared/api/useCurrentUser', () => ({
 
 vi.mock('@/src/shared/api/useWorkspaces', () => ({
   useFormCreateWorkspaceOptions: vi.fn(),
+}));
+
+vi.mock('@/src/features/form-settings/data/useWorkspaceSettings', () => ({
+  useWorkspaceSettings: vi.fn(),
+}));
+
+vi.mock('@/src/shared/api/useLoginProviders', () => ({
+  useLoginProviders: vi.fn(),
 }));
 
 vi.mock('@/app/ui/WorkspaceSelector', () => ({
@@ -93,6 +110,17 @@ vi.mock('@/app/ui/WorkspaceSelector', () => ({
 import type { Mock } from 'vitest';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useFormCreateWorkspaceOptions } from '@/src/shared/api/useWorkspaces';
+import { useWorkspaceSettings } from '@/src/features/form-settings/data/useWorkspaceSettings';
+import { useLoginProviders } from '@/src/shared/api/useLoginProviders';
+
+const PROVIDERS = [
+  { code: 'azureidir', name: 'IDIR - MFA' },
+  { code: 'bceidbusiness', name: 'BCeID Business' },
+];
+const workspaceAudiences: Record<string, unknown> = {
+  'ws-1': { mode: 'protected', idps: ['azureidir'] },
+  'ws-2': { mode: 'members', idps: [] },
+};
 
 describe('FormCreateContent', () => {
   beforeEach(() => {
@@ -113,6 +141,19 @@ describe('FormCreateContent', () => {
       formVersion: { id: 'v-1', versionNo: 1, state: 'draft' },
     });
     mockSaveFormVersionSchema.mockResolvedValue({});
+    (useWorkspaceSettings as Mock).mockImplementation(
+      (_key: string, workspaceId: string | null) => ({
+        settings: workspaceId ? workspaceAudiences[workspaceId] : undefined,
+        error: null,
+        save: vi.fn(),
+      }),
+    );
+    (useLoginProviders as Mock).mockReturnValue({
+      data: PROVIDERS,
+      isLoading: false,
+      error: null,
+      refresh: vi.fn(),
+    });
   });
 
   const renderComponent = () => render(<FormCreateContent onCancelPress={vi.fn()} />);
@@ -260,5 +301,78 @@ describe('FormCreateContent', () => {
     });
     renderComponent();
     expect(screen.getByTestId('designer-select-workspace')).toBeInTheDocument();
+  });
+
+  describe('who can submit', () => {
+    const input = (testId: string) =>
+      screen.getByTestId(testId).querySelector('input') as HTMLInputElement;
+
+    const chooseWorkspace = async (id = 'ws-1') => {
+      await userEvent.type(nameInput(), 'My New Form');
+      await userEvent.selectOptions(screen.getByTestId('workspace-selector'), id);
+    };
+
+    it('asks nothing until a workspace is chosen', () => {
+      renderComponent();
+      expect(screen.queryByTestId('create-form-audience')).not.toBeInTheDocument();
+    });
+
+    it("inherits the workspace's audience by default and sends no settings", async () => {
+      renderComponent();
+      await chooseWorkspace();
+
+      expect(input('create-form-audience-inherit')).toBeChecked();
+      expect(input('audience-mode-protected')).toBeChecked();
+      expect(input('audience-mode-protected')).toBeDisabled();
+      await userEvent.click(screen.getByTestId('save-create-form'));
+
+      expect(mockCreateSobaFormioForm).toHaveBeenCalledWith(
+        'mock-token',
+        { name: 'My New Form' },
+        'ws-1',
+      );
+    });
+
+    it('creates the form with its own audience', async () => {
+      renderComponent();
+      await chooseWorkspace();
+
+      await userEvent.click(screen.getByText('Use the workspace setting'));
+      await userEvent.click(screen.getByText('Members only'));
+      await userEvent.click(screen.getByTestId('save-create-form'));
+
+      expect(mockCreateSobaFormioForm).toHaveBeenCalledWith(
+        'mock-token',
+        {
+          name: 'My New Form',
+          settings: { audience: { inherit: false, values: { mode: 'members', idps: [] } } },
+        },
+        'ws-1',
+      );
+    });
+
+    it('needs a login before a protected audience is created', async () => {
+      renderComponent();
+      await chooseWorkspace('ws-2');
+
+      await userEvent.click(screen.getByText('Use the workspace setting'));
+      await userEvent.click(screen.getByText('Protected'));
+      expect(screen.getByTestId('save-create-form')).toBeDisabled();
+
+      await userEvent.click(screen.getByText('BCeID Business'));
+      expect(screen.getByTestId('save-create-form')).toBeEnabled();
+    });
+
+    it('starts from the new workspace when the workspace changes', async () => {
+      renderComponent();
+      await chooseWorkspace();
+      await userEvent.click(screen.getByText('Use the workspace setting'));
+      await userEvent.click(screen.getByText('Public'));
+
+      await userEvent.selectOptions(screen.getByTestId('workspace-selector'), 'ws-2');
+
+      expect(input('create-form-audience-inherit')).toBeChecked();
+      expect(input('audience-mode-members')).toBeChecked();
+    });
   });
 });
