@@ -56,15 +56,15 @@ That role is the only source of workspace-management authority. It's never read 
 Groups, their roles, and their members are managed through the group APIs, gated by
 `requireWorkspaceManage` (owner/admin only, via `req.coreContext.role`):
 
-| method | path | effect |
-|--------|------|--------|
-| `GET`    | `/workspaces/:id/groups` | list active groups with their roles and `user` members (any member) |
-| `POST`   | `/workspaces/:id/groups` | create a group carrying `roleCodes` |
-| `PATCH`  | `/workspaces/:id/groups/:groupId` | rename / re-describe a group |
-| `DELETE` | `/workspaces/:id/groups/:groupId` | soft-delete a group |
-| `PUT`    | `/workspaces/:id/groups/:groupId/roles` | replace a group's role set |
-| `POST`   | `/workspaces/:id/groups/:groupId/members` | add a workspace member (by `membershipId`) |
-| `DELETE` | `/workspaces/:id/groups/:groupId/members/:membershipId` | remove a member |
+| method   | path                                                | effect                                                              |
+| -------- | --------------------------------------------------- | ------------------------------------------------------------------- |
+| `GET`    | `/workspaces/:id/groups`                            | list active groups with their roles and `user` members (any member) |
+| `POST`   | `/workspaces/:id/groups`                            | create a group carrying `roleCodes`                                 |
+| `PATCH`  | `/workspaces/:id/groups/:groupId`                   | rename / re-describe a group                                        |
+| `DELETE` | `/workspaces/:id/groups/:groupId`                   | soft-delete a group                                                 |
+| `PUT`    | `/workspaces/:id/groups/:groupId/roles`             | replace a group's role set                                          |
+| `POST`   | `/workspaces/:id/groups/:groupId/members`           | add a workspace member (by `membershipId`)                          |
+| `DELETE` | `/workspaces/:id/groups/:groupId/members/:memberId` | remove a member by its row id                                       |
 
 Group names are unique among **active** groups in a workspace. Delete is a soft-delete: the group and
 its roles and memberships are set to `inactive` in one transaction, so the resolver (which only reads
@@ -76,17 +76,13 @@ workspace bootstrap.
 
 **Protected groups.** The two bootstrap groups carry a hidden `workspace_group.system_code`
 (`form_admins`/`form_submitters`) so protections don't depend on the renameable name. Both can be
-renamed but not deleted, and their roles can't be changed; *Form administrators* must always keep at
+renamed but not deleted, and their roles can't be changed; _Form administrators_ must always keep at
 least one active user member (the last member can't be removed). Attempts return 409. The group DTO
 exposes a `system` boolean so the UI can hide those actions.
 
-**Members are typed.** Each member is `{id, kind:'user', …}` or `{id, kind:'idp', code, label}`, added
-via `POST …/members` with `{kind:'user', membershipId}` or `{kind:'idp', code}` and removed by row id.
-Only *Form submitters* accepts `idp` members (all other groups are user-only); an `idp` must be an active
-login provider or `public`, never `system`. `public` is exclusive — it can only be the group's sole
-member (blocks all other adds, and can't be added to a non-empty group). This is the workspace-level
-submit audience. `GET /workspaces/:id/submitter-audience` (any member) reads it and `PUT` (owner/admin)
-sets it: `{mode:'public'}` or `{mode:'protected', idps}`.
+**Members are people.** Each member is `{id, kind:'user', membershipId, userId, displayLabel}`, added
+via `POST …/members` with `{kind:'user', membershipId}` and removed by row id. Who outside the
+workspace may submit is not group membership; it is the [Form Audience](#form-audience) setting.
 
 ## Form access (RBAC)
 
@@ -107,8 +103,6 @@ each role grants permissions. Users are members of groups.
                      +-- contains --> workspace_group_membership
                                           |
                                           +  member_kind = user      --> workspace_membership
-                                          +  member_kind = idp        --> identity_provider
-                                          +  member_kind = idp_group   --> idp_group
 ```
 
 - `workspace_group` — a named group in a workspace.
@@ -121,14 +115,14 @@ each role grants permissions. Users are members of groups.
 
 Six form roles are seeded (`role` + `role_permission`):
 
-| role                  | permissions |
-|-----------------------|-------------|
-| `form_admin`          | `*` (everything) |
-| `form_designer`       | `form_read`, `design_create`, `design_read`, `design_update`, `design_delete` |
-| `form_submitter`      | `form_read`, `submission_create`, `document_template_read` |
+| role                  | permissions                                                                                                |
+| --------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `form_admin`          | `*` (everything)                                                                                           |
+| `form_designer`       | `form_read`, `design_create`, `design_read`, `design_update`, `design_delete`                              |
+| `form_submitter`      | `form_read`, `submission_create`, `document_template_read`                                                 |
 | `submission_reviewer` | `form_read`, `submission_read`, `submission_update`, `submission_delete`, `submission_review`, `team_read` |
-| `submission_approver` | `form_read`, `submission_read`, `submission_review`, `team_read` |
-| `team_manager`        | `form_read`, `team_read`, `team_update` |
+| `submission_approver` | `form_read`, `submission_read`, `submission_review`, `team_read`                                           |
+| `team_manager`        | `form_read`, `team_read`, `team_update`                                                                    |
 
 `*` is a wildcard: a role holding it satisfies any permission check. Only `form_admin` has it, so adding
 new permissions later needs no change to that role.
@@ -141,33 +135,24 @@ The permission codes are: `form_create/read/update/delete`, `design_create/read/
 
 ### Group membership is "who", not "what"
 
-A `workspace_group_membership` row records *which* users/identities are in a group — never their role.
-The role lives on the group (`workspace_group_role`). `member_kind` selects the reference:
+A `workspace_group_membership` row records _which_ people are in a group, never their role. The role
+lives on the group (`workspace_group_role`). A member is `member_kind = user`, referencing a
+`workspace_membership_id`. The table also allows `idp` and `idp_group` kinds, which nothing writes or
+reads.
 
-| `member_kind` | reference | means |
-|---------------|-----------|-------|
-| `user`        | `workspace_membership_id`  | a specific workspace member |
-| `idp`         | `identity_provider_code`   | anyone signing in through that provider (e.g. `azureidir`) |
-| `idp_group`   | `idp_group_code`           | anyone whose provider is in that IdP group (e.g. `bcgov` = `idir` + `azureidir`) |
-
-`user` members are resolved for form permissions by `resolveFormPermissions`. `idp` members are
-resolved only for the Form submitters audience, by `hasFormSubmitAccess` and `isPublicSubmitterAudience`
-in `formSubmitAccessRepo.ts`, against the form's effective members (see [Form-level overrides](#form-level-overrides)).
-`idp_group` members are not resolved. `public` is a pseudo identity provider (`identity_provider.is_login_provider = false`) used as a
-match-all selector.
+`user` members are resolved for form permissions by `resolveFormPermissions`.
 
 ### The special groups
 
 Creating a workspace bootstraps two form groups (`bootstrapWorkspaceOwner` in `workspaceRepo.ts`):
 
-| group                | role             | members on create |
-|----------------------|------------------|-------------------|
-| Form administrators  | `form_admin`     | the workspace creator |
-| Form submitters      | `form_submitter` | an `idp` member for the default submitter provider |
+| group               | role             | members on create     |
+| ------------------- | ---------------- | --------------------- |
+| Form administrators | `form_admin`     | the workspace creator |
+| Form submitters     | `form_submitter` | none                  |
 
-So the creator can do everything with the workspace's forms. The default submitter provider is
-`DEFAULT_SUBMITTER_PROVIDER` (`azureidir` when unset); it is seeded only when it is an active login
-provider, otherwise the Form submitters group starts empty.
+So the creator can do everything with the workspace's forms. Form submitters holds the people given
+the submit role.
 
 ### Form-level overrides
 
@@ -183,20 +168,43 @@ Returning to inherit sets the override `inactive` and deletes its members.
 `effectiveGroupMembers` in `formGroupOverrideRepo.ts` returns, for a form, each active group's override
 members where the form has an active override, otherwise the workspace group's members.
 
-The submit surface reads overrides: `hasFormSubmitAccess({workspaceId, formId}, ...)` checks the
-form's effective `idp` members, and resolves roles with `resolveFormPermissionsForForm`, which follows
-the form's effective `user` members. Submit mode uses it to open a submission, alongside participation
-to save, submit, upload and delete a file on an in-progress submission, and on its own
+No API writes overrides yet.
+
+The submit surface reads overrides: `hasFormSubmitAccess({workspaceId, formId}, ...)` resolves roles
+with `resolveFormPermissionsForForm`, which follows the form's effective `user` members, and then checks
+the form's [audience](#form-audience). Submit mode uses it to open a submission, alongside
+participation to save, submit, upload and delete a file on an in-progress submission, and on its own
 (`submission_update`) to delete a file on a submitted submission. Design routes and lists still use
 `resolveFormPermissions`, which reads workspace group membership, so they are not form-aware yet.
 
-| method | path | effect |
-|--------|------|--------|
-| `GET` | `/design/forms/:id/submitter-audience` | `inherit`, the effective `mode` and `idps`, and the workspace audience (`form_read`) |
-| `PUT` | `/design/forms/:id/submitter-audience` | `{mode:'inherit'}`, `{mode:'public'}` or `{mode:'protected', idps}` with at least one provider (`form_update`) |
+### Form Audience
 
-A form override holds `public` or login providers only. Named people in the workspace audience cannot
-submit a form that overrides it unless another group gives them access.
+Who outside the workspace may submit is a shared settings group (see [Form settings](form-settings.md)):
+
+- `workspace_audience_setting` - one row per workspace, created with it: `mode` and `idps`.
+- `form_audience_setting` - one row per form, created with it: `inherit`, and the form's own `mode`
+  and `idps` while it does not inherit.
+
+| mode        | admits                                                                    |
+| ----------- | ------------------------------------------------------------------------- |
+| `public`    | everyone, including anonymous callers                                     |
+| `protected` | callers signed in through one of `idps`, which are active login providers |
+| `members`   | no one beyond role holders                                                |
+
+A form that inherits uses its workspace's audience, read when asked, so a workspace change reaches it
+with nothing copied. A form may be more open than its workspace. Anyone a group gives
+`submission_create` can submit whatever the audience. A new workspace is `protected` by
+`DEFAULT_SUBMITTER_PROVIDER` (`azureidir` when unset) when that is an active login provider, otherwise
+`members`. Anonymous callers carry the `public` pseudo provider (`is_login_provider = false`), which
+no audience lists.
+
+| method        | path                                  | effect                                                                                                                            |
+| ------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `GET` / `PUT` | `/workspaces/:id/settings/audience`   | the workspace's `{mode, idps}`; any member reads, owner/admin writes                                                              |
+| `GET` / `PUT` | `/design/forms/:id/settings/audience` | reads `{inherit, own, workspace, effective}`; saves `{inherit: true}` or `{inherit: false, values}` (`form_read` / `form_update`) |
+
+`hasFormSubmitAccess` and `isPublicAudience` in `formSubmitAccessRepo.ts` read the form's effective
+audience through `findEffectiveAudience`. Drafts are not offered on a public audience.
 
 ### Resolving a user's permissions
 
@@ -238,14 +246,14 @@ the id has access to those.
 
 `isSubmitterAllowed` in `services/submitterAccess.ts` holds the rules:
 
-| operation | needs |
-|-----------|-------|
-| `open` | `submission_create` on the form (`hasFormSubmitAccess`) |
-| `read`: confirmation, data, schema, fill, file download | an active grant |
-| `write`: save, submit, upload, delete a file on an in-progress submission | an active grant and `submission_create` on the form |
-| `deleteSubmittedFile` | `submission_update` on the form |
-| `render`: print, preview, template list | an active grant and `document_template_read` on the form |
-| `delete`: the caller's own submission | a signed-in caller with an active owner grant |
+| operation                                                                 | needs                                                    |
+| ------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `open`                                                                    | `submission_create` on the form (`hasFormSubmitAccess`)  |
+| `read`: confirmation, data, schema, fill, file download                   | an active grant                                          |
+| `write`: save, submit, upload, delete a file on an in-progress submission | an active grant and `submission_create` on the form      |
+| `deleteSubmittedFile`                                                     | `submission_update` on the form                          |
+| `render`: print, preview, template list                                   | an active grant and `document_template_read` on the form |
+| `delete`: the caller's own submission                                     | a signed-in caller with an active owner grant            |
 
 Owners and collaborators have the same access, except that only an owner deletes. A submitter
 deletes only an opened or draft submission; a submitted one is a 409. The public user's ownership
@@ -266,8 +274,8 @@ Creating a workspace writes, in one transaction:
 - 1 `workspace_membership` for the creator (`role = 'owner'`)
 - 2 `workspace_group` — "Form administrators", "Form submitters"
 - 2 `workspace_group_role` — those groups' `form_admin` / `form_submitter` roles
-- 1 or 2 `workspace_group_membership` - the creator in "Form administrators", and the default submitter
-  provider in "Form submitters" when it is an active login provider
+- 1 `workspace_group_membership` - the creator in "Form administrators"
+- 1 row per shared settings group, such as `workspace_audience_setting`
 
 ## CSTAR tenants
 

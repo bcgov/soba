@@ -137,7 +137,7 @@ describe('dev data plan', () => {
 
     it('covers every audience mode and every submission end state', () => {
       expect(new Set(plan.workspaces.map((w) => w.audience))).toEqual(
-        new Set(['public', 'protected', 'none']),
+        new Set(['public', 'protected', 'members']),
       );
       expect(new Set(allSubmissions.map((s) => plannedSubmissionState(s.submission)))).toEqual(
         new Set(['opened', 'draft', 'submitted']),

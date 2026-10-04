@@ -11,7 +11,6 @@ import {
   WorkspaceMembershipStatus,
   WorkspaceStatus,
 } from '../codes';
-import { env } from '../../config/env';
 import { db, type DbOrTx } from '../client';
 import {
   appUsers,
@@ -26,8 +25,7 @@ import {
   invalidateMembershipCache,
   isWorkspaceManageRole,
 } from './membershipRepo';
-import { addIdpToGroup, addUserToGroup, createGroupWithRole } from './workspaceGroupRepo';
-import { getIdentityProvider } from './identityProviderRepo';
+import { addUserToGroup, createGroupWithRole } from './workspaceGroupRepo';
 import { createWorkspaceSettings } from '../../../features/form-settings/create';
 
 /** True if a workspace of this kind already uses this name (optionally excluding one workspace). */
@@ -89,26 +87,14 @@ const bootstrapWorkspaceOwner = async (
   });
   await addUserToGroup(tx, { workspaceId, groupId: formAdminsGroupId, membershipId, displayLabel });
 
-  // Submitters default to protected by the standard login provider; the audience is editable later.
-  const formSubmittersGroupId = await createGroupWithRole(tx, {
+  // People given the submit role. Who else may submit is the workspace's audience setting.
+  await createGroupWithRole(tx, {
     workspaceId,
     name: FORM_SUBMITTERS_GROUP_NAME,
     roleCodes: [Roles.form_submitter],
     systemCode: SystemGroup.form_submitters,
     displayLabel,
   });
-  // Only seed the default audience when the provider is a usable login provider; a missing/disabled
-  // one just leaves the audience unset rather than failing workspace creation.
-  const submitterProvider = env.getDefaultSubmitterProvider();
-  const defaultProvider = await getIdentityProvider(submitterProvider);
-  if (defaultProvider?.isActive && defaultProvider.isLoginProvider) {
-    await addIdpToGroup(tx, {
-      workspaceId,
-      groupId: formSubmittersGroupId,
-      code: submitterProvider,
-      displayLabel,
-    });
-  }
 
   invalidateMembershipCache(workspaceId, userId);
 };

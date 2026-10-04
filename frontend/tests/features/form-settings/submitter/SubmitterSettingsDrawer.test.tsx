@@ -5,46 +5,27 @@ import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { SWRConfig, useSWRConfig } from 'swr';
 import type { Dictionary } from '@/src/types/dictionary';
-import type { FormSubmitterAudience } from '@/src/types/groups';
+import type { FormAudienceSettings } from '@/src/types/formSettings';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 
-const { mockGetSettings, mockSetSettings, mockGetAudience, mockAddNotification, mockGetForm } =
-  vi.hoisted(() => ({
+const { mockGetSettings, mockSetSettings, mockGetAudience, mockAddNotification } = vi.hoisted(
+  () => ({
     mockGetSettings: vi.fn(),
     mockSetSettings: vi.fn(),
     mockGetAudience: vi.fn(),
     mockAddNotification: vi.fn(),
-    mockGetForm: vi.fn(),
-  }));
+  }),
+);
 
-vi.mock('@/src/shared/api/sobaApi', () => ({
-  getSobaForm: mockGetForm,
-  getSobaFormVersion: vi.fn(),
-  lookupFormVersions: vi.fn().mockResolvedValue({ items: [] }),
-  getFormVersionSchema: vi.fn(),
-}));
-
+// The drawer reads two settings groups through one API: its own and the form audience.
 vi.mock('@/src/features/form-settings/data/api', () => ({
-  getFormSettings: mockGetSettings,
+  getFormSettings: (token: string, formId: string, key: string) =>
+    key === 'audience' ? mockGetAudience(token, formId) : mockGetSettings(token, formId, key),
   setFormSettings: mockSetSettings,
-}));
-
-vi.mock('@/src/shared/api/sobaApiGroups', () => ({
-  getFormSubmitterAudience: mockGetAudience,
-  setFormSubmitterAudience: vi.fn(),
-  getSubmitterAudience: vi.fn(),
-  setSubmitterAudience: vi.fn(),
 }));
 
 vi.mock('@/lib/hooks/useNotificationStore', () => ({
   useNotificationStore: () => ({ addNotification: mockAddNotification }),
-}));
-
-// The audience control reads the dictionary from context and has its own suite.
-vi.mock('@/src/features/designer/ui/FormSubmitterAudience', () => ({
-  FormSubmitterAudience: ({ canManage }: { canManage: boolean }) => (
-    <div data-testid="submitter-audience" data-can-manage={String(canManage)} />
-  ),
 }));
 
 import makeStore from '@/lib/store';
@@ -73,13 +54,17 @@ const mockDict = {
   },
 } as unknown as Dictionary;
 
-// The form's effective audience, as the form endpoint returns it while the form inherits.
-const audience = (mode: FormSubmitterAudience['mode']): FormSubmitterAudience => ({
+const AUDIENCES: Record<'public' | 'protected', FormAudienceSettings['effective']> = {
+  public: { mode: 'public', idps: [] },
+  protected: { mode: 'protected', idps: ['azureidir'] },
+};
+
+// The form's audience settings, as the endpoint returns them while the form inherits.
+const audience = (mode: keyof typeof AUDIENCES): FormAudienceSettings => ({
   inherit: true,
-  mode,
-  idps: [],
-  available: [],
-  workspace: { mode, idps: [], users: [] },
+  own: null,
+  workspace: AUDIENCES[mode],
+  effective: AUDIENCES[mode],
 });
 
 let store: ReturnType<typeof makeStore>;
@@ -92,7 +77,7 @@ function MakeAudiencePublic() {
       type="button"
       data-testid="make-audience-public"
       onClick={() =>
-        mutate(['form-submitter-audience', 'f1', 'en'], audience('public'), { revalidate: false })
+        mutate(['form-settings', 'audience', 'f1'], audience('public'), { revalidate: false })
       }
     >
       make public
@@ -124,24 +109,6 @@ describe('SubmitterSettingsDrawer', () => {
     store.dispatch(setToken('token'));
     store.dispatch(setAuthenticated(true));
     mockGetAudience.mockResolvedValue(audience('protected'));
-    mockGetForm.mockResolvedValue({ id: 'f1', workspaceId: 'ws1', permissions: ['form_update'] });
-  });
-
-  // The audience is the form's, so editing it follows form_update rather than a workspace role.
-  it.each([
-    [['form_update'], 'true'],
-    [['*'], 'true'],
-    [['form_read'], 'false'],
-  ])('gates the audience control on %s', async (permissions, canManage) => {
-    mockGetSettings.mockResolvedValue({ allowSubmitterDrafts: false });
-    mockGetForm.mockResolvedValue({ id: 'f1', workspaceId: 'ws1', permissions });
-    renderDrawer();
-    await waitFor(() =>
-      expect(screen.getByTestId('submitter-audience')).toHaveAttribute(
-        'data-can-manage',
-        canManage,
-      ),
-    );
   });
 
   it('shows the saved setting', async () => {
@@ -244,7 +211,7 @@ describe('SubmitterSettingsDrawer', () => {
 
     await user.click(saveButton());
     expect(mockSetSettings).not.toHaveBeenCalled();
-    expect(mockGetAudience).toHaveBeenCalledWith('token', 'f1', 'en');
+    expect(mockGetAudience).toHaveBeenCalledWith('token', 'f1');
   });
 
   it('drops an edit when the audience turns out to be Public', async () => {

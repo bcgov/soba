@@ -67,7 +67,7 @@ function registerFilesPaths(
       },
       401: { description: SUBMISSION_AUTH_REQUIRED },
       403: {
-        description: 'Not a participant on this submission, or not in the form submitters audience',
+        description: "Not a participant on this submission, or not in the form's audience",
       },
       404: { description: 'Submission not found' },
       409: { description: 'Submission is not accepting file uploads' },

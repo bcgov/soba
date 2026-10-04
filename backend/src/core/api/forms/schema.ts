@@ -14,8 +14,6 @@ import {
   ListFormVersionsResponseSchema as SobaListFormVersionsResponseSchema,
   FormVersionSummarySchema as SobaFormVersionSummarySchema,
   FormVersionLookupResponseSchema as SobaFormVersionLookupResponseSchema,
-  FormSubmitterAudienceSchema as SobaFormSubmitterAudienceSchema,
-  SetFormSubmitterAudienceBodySchema as SobaSetFormSubmitterAudienceBodySchema,
 } from '@soba/lib';
 import { LOOKUP_NOTE } from '../shared/lookup';
 
@@ -26,7 +24,6 @@ import {
   OffsetPageSchema,
   OFFSET_DRIFT_NOTE,
   sortLocaleQueryField,
-  SortLocaleQuerySchema,
 } from '../shared/offsetPagination';
 import { FORM_NAME_TAKEN } from '../../messages';
 import {
@@ -80,12 +77,6 @@ export const FormIdParamsSchema = z
     id: z.string().min(1),
   })
   .openapi('Forms_FormIdParams');
-
-export const SetFormSubmitterAudienceBodySchema =
-  SobaSetFormSubmitterAudienceBodySchema.clone().openapi('Forms_SetFormSubmitterAudienceBody');
-export const FormSubmitterAudienceSchema = SobaFormSubmitterAudienceSchema.clone().openapi(
-  'Forms_FormSubmitterAudience',
-);
 
 export const FormVersionIdParamsSchema = z
   .object({
@@ -188,7 +179,6 @@ const FORM_VERSIONS_PATH = '/design/form-versions';
 const FORM_VERSION_PATH = `${FORM_VERSIONS_PATH}/{id}`;
 const FORM_NOT_FOUND = 'Form not found';
 const FORM_VERSION_NOT_FOUND = 'Form version not found';
-const AUDIENCE_NOT_FOUND = `${FORM_NOT_FOUND}, or the workspace has no Form submitters group`;
 const VALIDATION_ERROR = 'Validation or business rule error';
 const VERSION_CONFLICT = "Not the form's current version";
 const SCHEMA_WRITE_CONFLICT = `${VERSION_CONFLICT}, not a draft, or its schema is being saved`;
@@ -339,43 +329,6 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
       409: {
         description: FORM_NAME_TAKEN,
       },
-    },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: `${FORM_PATH}/submitter-audience`,
-    tags: [TAG],
-    security: [{ bearerAuth: [] }],
-    request: { query: SortLocaleQuerySchema, params: FormIdParamsSchema },
-    responses: {
-      200: {
-        description: "The form's submit audience: inherited from the workspace or overridden",
-        content: { 'application/json': { schema: FormSubmitterAudienceSchema } },
-      },
-      403: { description: 'Requires form_read' },
-      404: { description: AUDIENCE_NOT_FOUND },
-    },
-  });
-
-  registry.registerPath({
-    method: 'put',
-    path: `${FORM_PATH}/submitter-audience`,
-    tags: [TAG],
-    security: [{ bearerAuth: [] }],
-    request: {
-      query: SortLocaleQuerySchema,
-      params: FormIdParamsSchema,
-      body: { content: { 'application/json': { schema: SetFormSubmitterAudienceBodySchema } } },
-    },
-    responses: {
-      200: {
-        description: 'Updated form submit audience',
-        content: { 'application/json': { schema: FormSubmitterAudienceSchema } },
-      },
-      400: { description: 'Protected needs a provider, or an invalid provider was given' },
-      403: { description: 'Requires form_update' },
-      404: { description: AUDIENCE_NOT_FOUND },
     },
   });
 

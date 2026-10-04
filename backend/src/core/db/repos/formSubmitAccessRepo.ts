@@ -1,13 +1,12 @@
-import { GroupMemberKind, PUBLIC_PROVIDER_CODE, Permissions, SystemGroup } from '../codes';
+import { PUBLIC_PROVIDER_CODE, Permissions } from '../codes';
 import type { PermissionCode } from '../codes';
-import { getSystemGroupId } from './workspaceGroupRepo';
 import { hasAllPermissions, resolveFormPermissionsForForm } from './formAccessRepo';
-import { effectiveGroupMembers } from './formGroupOverrideRepo';
+import { findEffectiveAudience } from './audienceSettingRepo';
 
 /**
- * Permissions the Form submitters audience conveys to non-staff (idp/public) members. Anything else
- * (mutations, submission list) stays staff-only. Submit mode never reads a submission through this
- * set; reads go by participation (services/submitterAccess).
+ * Permissions a form's audience conveys to people outside the workspace. Anything else (mutations,
+ * submission list) stays staff-only. Submit mode never reads a submission through this set; reads
+ * go by participation (services/submitterAccess).
  */
 const AUDIENCE_PERMISSIONS = new Set<PermissionCode>([
   Permissions.form_read,
@@ -31,44 +30,29 @@ export interface FormAccessTarget {
 }
 
 /**
- * Provider codes of the form's effective Form submitters `idp` members (the form's override, else the
- * workspace group). `public` among them matches everyone, including anonymous. User members are not
- * included; they are resolved through the staff permission path. idp_group is not resolved yet.
+ * True when the form's audience admits the caller: public admits everyone, including anonymous;
+ * protected admits callers signed in through one of its providers; members admits no one.
  */
-const submitterAudienceCodes = async (target: FormAccessTarget): Promise<Set<string>> => {
-  const groupId = await getSystemGroupId(target.workspaceId, SystemGroup.form_submitters);
-  if (!groupId) return new Set();
-
-  const members = await effectiveGroupMembers({
-    workspaceId: target.workspaceId,
-    formId: target.formId,
-    groupId,
-    memberKind: GroupMemberKind.idp,
-  });
-  return new Set(
-    members.map((m) => m.identityProviderCode).filter((code): code is string => code != null),
-  );
-};
-
-/** True when the form's audience admits the caller: public, or the caller's provider. */
-const isSubmitterAudienceMember = async (
+const isAudienceMember = async (
   target: FormAccessTarget,
   caller: CallerIdentity,
 ): Promise<boolean> => {
-  const codes = await submitterAudienceCodes(target);
-  return codes.has(PUBLIC_PROVIDER_CODE) || (!!caller.idpCode && codes.has(caller.idpCode));
+  const audience = await findEffectiveAudience(target);
+  if (audience?.mode === 'public') return true;
+  return (
+    audience?.mode === 'protected' && !!caller.idpCode && audience.idps.includes(caller.idpCode)
+  );
 };
 
-/** True when the form's effective Form submitters audience is public. */
-export const isPublicSubmitterAudience = async (target: FormAccessTarget): Promise<boolean> =>
-  (await submitterAudienceCodes(target)).has(PUBLIC_PROVIDER_CODE);
+/** True when the form's audience is public. */
+export const isPublicAudience = async (target: FormAccessTarget): Promise<boolean> =>
+  (await findEffectiveAudience(target))?.mode === 'public';
 
 /**
  * Authorizes a caller for `required` on a form. Grants when the roles of the groups the caller is an
- * effective member of for this form satisfy `required` (staff, incl. user members of the Form
- * submitters group, where a form's override of a group replaces its members), or, for a code in
- * AUDIENCE_PERMISSIONS, when the caller is in the form's Form submitters audience via a `public`/`idp`
- * member.
+ * effective member of for this form satisfy `required` (staff and anyone given a submit role, where
+ * a form's override of a group replaces its members), or, for a code in AUDIENCE_PERMISSIONS, when
+ * the form's audience admits the caller.
  */
 export const hasFormSubmitAccess = async (
   target: FormAccessTarget,
@@ -81,5 +65,5 @@ export const hasFormSubmitAccess = async (
     const perms = await resolveFormPermissionsForForm(caller.actorId, target);
     if (hasAllPermissions(perms, [required])) return true;
   }
-  return AUDIENCE_PERMISSIONS.has(required) && (await isSubmitterAudienceMember(target, caller));
+  return AUDIENCE_PERMISSIONS.has(required) && (await isAudienceMember(target, caller));
 };

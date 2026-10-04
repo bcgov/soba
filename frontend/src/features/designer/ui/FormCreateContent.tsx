@@ -5,18 +5,15 @@ import { useParams, useRouter } from 'next/navigation';
 
 import { Form, TextField, Button, InlineAlert } from '@bcgov/design-system-react-components';
 import { WorkspaceSelector } from '@/app/ui/WorkspaceSelector';
-import { SubmitterAudienceControls } from './SubmitterAudienceControls';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useFormCreateWorkspaceOptions } from '@/src/shared/api/useWorkspaces';
 import { lookupTruncatedNote } from '@/src/shared/list/lookupOptions';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { useFormCreator } from '@/src/features/designer/data/useForm';
-import { useSubmitterAudience } from '@/src/features/designer/data/useSubmitterAudience';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { isConflict } from '@/src/shared/api/sobaHelpers';
 import type { SobaFormType } from '@/src/types/forms';
-import type { SetFormSubmitterAudienceBody } from '@/src/types/groups';
 
 interface FormCreateContentProps {
   onCancelPress: () => void;
@@ -36,11 +33,7 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
 
   const [formName, setFormName] = useState('');
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
-  const [mode, setMode] = useState<string>('inherit');
-  const [idps, setIdps] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-
-  const { view: effectiveAudience } = useSubmitterAudience(selectedWorkspaceId);
 
   const creatableWorkspaces = useFormCreateWorkspaceOptions(true);
 
@@ -55,13 +48,7 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
     setIsSaving(true);
 
     try {
-      const data: SobaFormType & { submitterAudience?: SetFormSubmitterAudienceBody } = {
-        name: formName.trim(),
-      };
-      if (mode !== 'inherit') {
-        data.submitterAudience =
-          mode === 'public' ? { mode: 'public' } : { mode: 'protected', idps };
-      }
+      const data: SobaFormType = { name: formName.trim() };
       const outcome = await formCreator.create(
         token as string,
         data,
@@ -139,28 +126,11 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
           workspaces={creatableWorkspaces.workspaces}
           selectedWorkspaceId={selectedWorkspaceId}
           isRequired={true}
-          onChange={(id) => {
-            setSelectedWorkspaceId(id as string);
-            setMode('inherit');
-            setIdps([]);
-          }}
+          onChange={(id) => setSelectedWorkspaceId(id as string)}
           description={lookupTruncatedNote(dict.general.lookupTruncated, creatableWorkspaces)}
           size="medium"
         />
       )}
-
-      <div className="p-3 border rounded-3 bg-light">
-        <SubmitterAudienceControls
-          mode={mode}
-          setMode={setMode}
-          idps={idps}
-          setIdps={setIdps}
-          saving={isSaving}
-          isForm={true}
-          effectiveAudience={effectiveAudience ?? null}
-          isDisabled={!selectedWorkspaceId}
-        />
-      </div>
 
       <div className="d-flex justify-content-end gap-2">
         <Button
@@ -172,11 +142,7 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
         >
           {dict.general.cancel}
         </Button>
-        <Button
-          type="submit"
-          isDisabled={isSaving || (mode === 'protected' && idps.length === 0)}
-          data-testid="save-create-form"
-        >
+        <Button type="submit" isDisabled={isSaving} data-testid="save-create-form">
           {dict.general.next}
         </Button>
       </div>

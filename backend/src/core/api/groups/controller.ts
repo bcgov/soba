@@ -10,12 +10,8 @@ import {
   GroupIdParamsSchema,
   GroupMemberParamsSchema,
   SetGroupRolesBodySchema,
-  SetSubmitterAudienceBodySchema,
   UpdateGroupBodySchema,
 } from './schema';
-import { submitterAudienceService } from './submitterAudience';
-
-type SetSubmitterAudienceBody = z.infer<typeof SetSubmitterAudienceBodySchema>;
 
 type CreateGroupBody = z.infer<typeof CreateGroupBodySchema>;
 type UpdateGroupBody = z.infer<typeof UpdateGroupBodySchema>;
@@ -75,18 +71,6 @@ export const removeGroupMember = asyncHandler(
       req.params.groupId,
       req.params.memberId,
     );
-    res.json(result);
-  },
-);
-
-export const getSubmitterAudience = asyncHandler(async (req: Request, res: Response) => {
-  const result = await submitterAudienceService.get(withSortLocale(req));
-  res.json(result);
-});
-
-export const setSubmitterAudience = asyncHandler(
-  async (req: Request<unknown, unknown, SetSubmitterAudienceBody>, res: Response) => {
-    const result = await submitterAudienceService.set(withSortLocale(req), req.body);
     res.json(result);
   },
 );

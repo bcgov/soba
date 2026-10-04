@@ -309,6 +309,13 @@
       "when": 1772618017000,
       "tag": "0043_audience_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1772618018000,
+      "tag": "0044_groups_people_only",
+      "breakpoints": true
     }
   ]
 }

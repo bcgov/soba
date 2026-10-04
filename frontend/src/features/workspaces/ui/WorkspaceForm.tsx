@@ -12,7 +12,6 @@ import {
   Select,
   InlineAlert,
 } from '@bcgov/design-system-react-components';
-import { FormSubmitterAudience } from '@/src/features/designer/ui/FormSubmitterAudience';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { usePageHeading } from '@/src/components/PageHeader';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
@@ -310,11 +309,6 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
       <Tab eventKey="settings" title={dictWorkspaces.settingsTab}>
         <div className={styles.tabContent}>
           <WorkspaceSettings key={workspace.id} workspace={workspace} first={first} />
-        </div>
-      </Tab>
-      <Tab eventKey="team" title={dictWorkspaces.teamTab}>
-        <div className={styles.tabContent}>
-          <FormSubmitterAudience key={workspace.id} workspaceId={workspace.id} canManage />
         </div>
       </Tab>
     </Tabs>

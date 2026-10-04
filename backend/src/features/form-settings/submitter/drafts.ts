@@ -1,4 +1,4 @@
-import { isPublicSubmitterAudience } from '../../../core/db/repos/formSubmitAccessRepo';
+import { isPublicAudience } from '../../../core/db/repos/formSubmitAccessRepo';
 import type { FormSettingsContext } from '../routes';
 import { submitterSettingsService } from './service';
 
@@ -18,6 +18,6 @@ export const getDraftSaveStatus = async (
 ): Promise<DraftSaveStatusCode> => {
   const { allowSubmitterDrafts } = await submitterSettingsService.get(ctx, formId);
   if (!allowSubmitterDrafts) return DraftSaveStatus.disabled;
-  const isPublic = await isPublicSubmitterAudience({ workspaceId: ctx.workspaceId, formId });
+  const isPublic = await isPublicAudience({ workspaceId: ctx.workspaceId, formId });
   return isPublic ? DraftSaveStatus.public : DraftSaveStatus.allowed;
 };

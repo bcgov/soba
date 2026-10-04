@@ -62,8 +62,8 @@ function sizingFor(size: SizeName): Sizing {
   };
 }
 
-/** Form submitters group setup. 'protected' is the bootstrap default. */
-export type PlannedAudience = 'public' | 'protected' | 'none';
+/** The workspace's audience. 'protected' is a new workspace's default. */
+export type PlannedAudience = 'public' | 'protected' | 'members';
 
 export type PlannedSubmitter =
   | { kind: 'target' }
@@ -204,10 +204,10 @@ function disclaimerAcceptedFor(sizing: Sizing, index: number): boolean {
 const publicIndexes = (sizing: Sizing): Set<number> =>
   new Set([1, Math.floor(sizing.memberWorkspaces / 2)]);
 
-const noAudienceIndex = (sizing: Sizing): number => sizing.memberWorkspaces - 1;
+const membersOnlyIndex = (sizing: Sizing): number => sizing.memberWorkspaces - 1;
 
 function audienceFor(sizing: Sizing, index: number): PlannedAudience {
-  if (index === noAudienceIndex(sizing)) return 'none';
+  if (index === membersOnlyIndex(sizing)) return 'members';
   return publicIndexes(sizing).has(index) ? 'public' : 'protected';
 }
 

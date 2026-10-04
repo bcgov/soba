@@ -120,6 +120,15 @@ export const findFormAudience = async (
   };
 };
 
+/** The audience that applies to a form: its own, or its workspace's while it inherits. */
+export const findEffectiveAudience = async (target: {
+  workspaceId: string;
+  formId: string;
+}): Promise<Audience | null> => {
+  const row = await findFormAudience(target.workspaceId, target.formId);
+  return row ? (row.own ?? row.workspace) : null;
+};
+
 /**
  * Writes a form's audience. A null audience inherits the workspace's and clears the form's own.
  * Returns false when the form has no row in this workspace.

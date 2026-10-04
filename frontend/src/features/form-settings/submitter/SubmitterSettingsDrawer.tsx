@@ -7,18 +7,15 @@ import FormSettingsDrawers from '@/src/features/form-settings/ui/FormSettingsDra
 import type { FormSettingsSectionProps } from '@/src/features/form-settings/types';
 import { useFormSettings } from '@/src/features/form-settings/data/useFormSettings';
 import {
+  AUDIENCE_SETTINGS_KEY,
   SUBMITTER_SETTINGS_KEY,
+  type FormAudienceSettings,
   type SetSubmitterSettingsBody,
   type SubmitterSettings,
 } from '@/src/types/formSettings';
-import { useSubmitterAudience } from '@/src/features/designer/data/useSubmitterAudience';
-import { FormSubmitterAudience } from '@/src/features/designer/ui/FormSubmitterAudience';
-import { useForm } from '@/src/features/designer/data/useForm';
 import { messageForDataError } from '@/src/shared/api/dataError';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { Permissions } from '@/src/types/permissions';
-import { hasPermission } from '@/src/shared/util/permissions';
 
 export default function SubmitterSettingsDrawer({
   dict,
@@ -34,12 +31,13 @@ export default function SubmitterSettingsDrawer({
   } = useFormSettings<SubmitterSettings, SetSubmitterSettingsBody>(SUBMITTER_SETTINGS_KEY, formId);
   const { addNotification } = useNotificationStore();
   const noteId = useId();
-  const { form } = useForm(formId);
-  const canUpdateForm = hasPermission(form?.permissions, Permissions.form_update);
 
-  // Drafts are not offered to a Public audience. This is the form's effective audience: its own
-  // override when it has one, otherwise the workspace audience it inherits.
-  const { view: audience, error: audienceError } = useSubmitterAudience(null, formId);
+  // Drafts are not offered to a Public audience: the form's own, or its workspace's while it
+  // inherits.
+  const { settings: audience, error: audienceError } = useFormSettings<FormAudienceSettings>(
+    AUDIENCE_SETTINGS_KEY,
+    formId,
+  );
 
   // An edit layered over the loaded value. Null means no edit, so a refresh shows through until the
   // user changes it.
@@ -62,7 +60,7 @@ export default function SubmitterSettingsDrawer({
 
   // The setting changes only once the stored value and the audience are both known. On a Public
   // audience the stored value stands, including over an edit made before the audience changed.
-  const isPublic = audience?.mode === 'public';
+  const isPublic = audience?.effective.mode === 'public';
   const canEdit = !!settings && !!audience && !isPublic;
   const storedAllowDrafts = settings?.allowSubmitterDrafts ?? false;
   const allowSubmitterDrafts = canEdit
@@ -100,7 +98,6 @@ export default function SubmitterSettingsDrawer({
           data-testid="form-settings-submitter-settings-error"
         />
       )}
-      <FormSubmitterAudience workspaceId={null} formId={formId} canManage={!!canUpdateForm} />
       <Checkbox
         isSelected={allowSubmitterDrafts}
         onChange={setEditedAllowDrafts}

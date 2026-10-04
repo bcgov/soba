@@ -2,7 +2,7 @@ jest.mock('../../../../src/features/form-settings/submitter/service', () => ({
   submitterSettingsService: { get: jest.fn() },
 }));
 jest.mock('../../../../src/core/db/repos/formSubmitAccessRepo', () => ({
-  isPublicSubmitterAudience: jest.fn(),
+  isPublicAudience: jest.fn(),
 }));
 
 import {
@@ -10,10 +10,10 @@ import {
   getDraftSaveStatus,
 } from '../../../../src/features/form-settings/submitter/drafts';
 import { submitterSettingsService } from '../../../../src/features/form-settings/submitter/service';
-import { isPublicSubmitterAudience } from '../../../../src/core/db/repos/formSubmitAccessRepo';
+import { isPublicAudience } from '../../../../src/core/db/repos/formSubmitAccessRepo';
 
 const mockSettings = jest.mocked(submitterSettingsService.get);
-const mockPublic = jest.mocked(isPublicSubmitterAudience);
+const mockPublic = jest.mocked(isPublicAudience);
 const ctx = { workspaceId: 'ws1', actorDisplayLabel: null };
 
 describe('getDraftSaveStatus', () => {
