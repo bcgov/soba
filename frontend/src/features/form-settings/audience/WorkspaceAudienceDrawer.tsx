@@ -6,6 +6,8 @@ import { InlineAlert } from '@bcgov/design-system-react-components';
 import FormSettingsDrawers from '@/src/features/form-settings/ui/FormSettingsDrawers';
 import type { WorkspaceSettingsSectionProps } from '@/src/features/form-settings/types';
 import { useWorkspaceSettings } from '@/src/features/form-settings/data/useWorkspaceSettings';
+import { useInheritingFormCount } from '@/src/features/form-settings/data/useInheritingFormCount';
+import { ConfirmModal } from '@/src/components/ConfirmModal';
 import { AUDIENCE_SETTINGS_KEY, type Audience } from '@/src/types/formSettings';
 import { useLoginProviders } from '@/src/shared/api/useLoginProviders';
 import { messageForDataError } from '@/src/shared/api/dataError';
@@ -34,6 +36,13 @@ export default function WorkspaceAudienceDrawer({
   const [edited, setEdited] = useState<AudienceValue | null>(null);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  // Widening to Public reaches every form that uses the workspace setting, so it is confirmed first.
+  const [confirmingPublic, setConfirmingPublic] = useState(false);
+  const inheritingForms = useInheritingFormCount(
+    AUDIENCE_SETTINGS_KEY,
+    workspaceId,
+    confirmingPublic,
+  );
 
   const readError = settingsError ?? providersError;
   const readErrorMessage = useMemo(
@@ -53,6 +62,7 @@ export default function WorkspaceAudienceDrawer({
   const loaded = !!settings && !!providers;
   const value = edited ?? settings ?? null;
   const canSave = loaded && !saving && !!value && isValidAudience(value, offered);
+  const widensToPublic = value?.mode === 'public' && settings?.mode !== 'public';
 
   const saveChanges = async () => {
     if (!token || !canSave || !value || savingRef.current) return;
@@ -67,15 +77,26 @@ export default function WorkspaceAudienceDrawer({
     } finally {
       savingRef.current = false;
       setSaving(false);
+      setConfirmingPublic(false);
     }
   };
+
+  const requestSave = () => {
+    if (widensToPublic) setConfirmingPublic(true);
+    else void saveChanges();
+  };
+
+  const confirmMessage =
+    inheritingForms === null
+      ? t.audiencePublicConfirmMessage
+      : `${t.audiencePublicConfirmMessage} ${t.audienceInheritingForms.replace('{count}', String(inheritingForms))}`;
 
   return (
     <FormSettingsDrawers
       dict={dict}
       id={drawerName}
       label={t.audienceDrawerLabel}
-      onSave={saveChanges}
+      onSave={requestSave}
       onCancel={() => setEdited(null)}
       canSave={canSave}
     >
@@ -95,6 +116,15 @@ export default function WorkspaceAudienceDrawer({
           isDisabled={!loaded || saving}
         />
       )}
+      <ConfirmModal
+        show={confirmingPublic}
+        title={t.audiencePublicConfirmTitle}
+        message={confirmMessage}
+        confirmLabel={t.audiencePublicConfirmLabel}
+        onConfirm={() => void saveChanges()}
+        onCancel={() => setConfirmingPublic(false)}
+        pending={saving}
+      />
     </FormSettingsDrawers>
   );
 }

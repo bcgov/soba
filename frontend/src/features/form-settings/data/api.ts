@@ -55,3 +55,15 @@ export async function setWorkspaceSettings<TSettings>(
   });
   return parseJson(response);
 }
+
+/** How many live forms in a workspace use a group's workspace values rather than their own. */
+export async function getWorkspaceInheritingForms(
+  token: string,
+  workspaceId: string,
+  key: string,
+): Promise<{ count: number }> {
+  const response = await sobaFetch(`${workspaceSettingsPath(workspaceId, key)}/inheriting-forms`, {
+    token,
+  });
+  return parseJson(response);
+}

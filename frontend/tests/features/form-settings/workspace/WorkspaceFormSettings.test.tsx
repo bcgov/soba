@@ -8,23 +8,36 @@ import type { Dictionary } from '@/src/types/dictionary';
 import type { Audience, SubmitterSettings } from '@/src/types/formSettings';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 
-const { mockGetForm, mockGetSettings, mockSetSettings, mockGetProviders, mockAddNotification } =
-  vi.hoisted(() => ({
-    mockGetForm: vi.fn(),
-    mockGetSettings: vi.fn(),
-    mockSetSettings: vi.fn(),
-    mockGetProviders: vi.fn(),
-    mockAddNotification: vi.fn(),
-  }));
+const {
+  mockGetForm,
+  mockGetSettings,
+  mockSetSettings,
+  mockGetInheriting,
+  mockGetProviders,
+  mockAddNotification,
+} = vi.hoisted(() => ({
+  mockGetForm: vi.fn(),
+  mockGetInheriting: vi.fn(),
+  mockGetSettings: vi.fn(),
+  mockSetSettings: vi.fn(),
+  mockGetProviders: vi.fn(),
+  mockAddNotification: vi.fn(),
+}));
 
 vi.mock('@/src/features/form-settings/data/api', () => ({
   getFormSettings: mockGetForm,
   getWorkspaceSettings: mockGetSettings,
   setWorkspaceSettings: mockSetSettings,
+  getWorkspaceInheritingForms: mockGetInheriting,
 }));
 
 vi.mock('@/src/shared/api/sobaApi', () => ({
   fetchLoginProviders: mockGetProviders,
+}));
+
+// The confirmation dialog reads the dictionary from context.
+vi.mock('@/app/[lang]/Providers', () => ({
+  useDictionary: () => mockDict,
 }));
 
 vi.mock('@/lib/hooks/useNotificationStore', () => ({
@@ -52,6 +65,10 @@ const mockDict = {
       audienceProviders: 'Allowed logins',
       audienceProvidersRequired: REQUIRED,
       audienceLoadError: 'Could not load the form audience.',
+      audiencePublicConfirmTitle: "Make this workspace's forms public?",
+      audiencePublicConfirmMessage: 'Anyone can submit every form that uses the workspace setting.',
+      audienceInheritingForms: 'Forms using the workspace setting: {count}.',
+      audiencePublicConfirmLabel: 'Make public',
       submitterSettingsDrawerLabel: 'Submitter Settings',
       allowSubmitterDraftsLabel: DRAFTS,
       allowSubmitterDraftsPublicNote: PUBLIC_NOTE,
@@ -61,6 +78,7 @@ const mockDict = {
     },
   },
   workspaces: { formSettingsIntro: 'These settings are shared by every form in this workspace.' },
+  modal: { dialogActions: 'Dialog actions' },
   general: {
     cancel: 'Cancel',
     noAccess: 'You do not have access to this.',
@@ -125,6 +143,7 @@ describe('WorkspaceFormSettings', () => {
     audience = IDIR;
     submitter = { allowSubmitterDrafts: false };
     mockGetProviders.mockResolvedValue({ items: PROVIDERS });
+    mockGetInheriting.mockResolvedValue({ count: 3 });
     mockGetSettings.mockImplementation((_token: string, _ws: string, key: string) =>
       Promise.resolve(key === 'audience' ? audience : submitter),
     );
@@ -153,6 +172,7 @@ describe('WorkspaceFormSettings', () => {
 
     await user.click(screen.getByText('Public'));
     await user.click(audienceSave());
+    await user.click(await screen.findByTestId('confirm-modal-confirm'));
 
     await waitFor(() =>
       expect(mockSetSettings).toHaveBeenCalledWith('token', 'ws1', 'audience', {
@@ -164,6 +184,39 @@ describe('WorkspaceFormSettings', () => {
       await screen.findByTestId('workspace-settings-allow-drafts-public-note'),
     ).toHaveTextContent(PUBLIC_NOTE);
     expect(drafts()).toBeEnabled();
+  });
+
+  it('asks before making the workspace public, says how many forms it reaches, and saves nothing on cancel', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await waitFor(() => expect(radio('protected')).toBeEnabled());
+
+    await user.click(screen.getByText('Public'));
+    await user.click(audienceSave());
+
+    expect(await screen.findByTestId('confirm-modal-message')).toHaveTextContent(
+      'Forms using the workspace setting: 3.',
+    );
+    expect(mockGetInheriting).toHaveBeenCalledWith('token', 'ws1', 'audience');
+    await user.click(screen.getByTestId('confirm-modal-cancel'));
+
+    await waitFor(() => expect(screen.queryByTestId('confirm-modal-message')).toBeNull());
+    expect(mockSetSettings).not.toHaveBeenCalled();
+    expect(radio('public')).toBeChecked();
+  });
+
+  // Only widening to Public reaches forms in a way worth stopping for.
+  it('saves without asking when the workspace is already public', async () => {
+    const user = userEvent.setup();
+    audience = { mode: 'public', idps: [] };
+    renderTab();
+    await waitFor(() => expect(radio('public')).toBeEnabled());
+
+    await user.click(audienceSave());
+
+    await waitFor(() => expect(mockSetSettings).toHaveBeenCalled());
+    expect(screen.queryByTestId('confirm-modal-message')).toBeNull();
+    expect(mockGetInheriting).not.toHaveBeenCalled();
   });
 
   it('needs a login before a protected audience saves', async () => {
@@ -254,6 +307,7 @@ describe('WorkspaceFormSettings', () => {
 
     await user.click(screen.getByText('Public'));
     await user.click(audienceSave());
+    await user.click(await screen.findByTestId('confirm-modal-confirm'));
     await waitFor(() => expect(mockSetSettings).toHaveBeenCalled());
     await user.click(screen.getByText('toggle form'));
 

@@ -1,8 +1,8 @@
-import { and, eq } from 'drizzle-orm';
+import { and, count, eq, isNull } from 'drizzle-orm';
 import type { Audience } from '@soba/lib';
 import { env } from '../../config/env';
 import { db, type DbOrTx } from '../client';
-import { formAudienceSettings, workspaceAudienceSettings } from '../schema';
+import { formAudienceSettings, forms, workspaceAudienceSettings } from '../schema';
 import { getIdentityProvider } from './identityProviderRepo';
 
 /** A form's audience row read with its workspace's. `own` is null while the form inherits. */
@@ -126,6 +126,22 @@ export const findFormAudience = async (
     own: row.inherit || row.mode == null ? null : toAudience(row.mode, row.idps ?? []),
     workspace: toAudience(row.workspaceMode, row.workspaceIdps),
   };
+};
+
+/** How many live forms in the workspace use its audience rather than their own. */
+export const countFormsInheritingAudience = async (workspaceId: string): Promise<number> => {
+  const rows = await db
+    .select({ count: count() })
+    .from(formAudienceSettings)
+    .innerJoin(forms, eq(forms.id, formAudienceSettings.formId))
+    .where(
+      and(
+        eq(formAudienceSettings.workspaceId, workspaceId),
+        eq(formAudienceSettings.inherit, true),
+        isNull(forms.deletedAt),
+      ),
+    );
+  return rows[0]?.count ?? 0;
 };
 
 /** The audience that applies to a form: its own, or its workspace's while it inherits. */

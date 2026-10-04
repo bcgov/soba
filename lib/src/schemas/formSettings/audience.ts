@@ -35,4 +35,8 @@ export const FormAudienceSettingsSchema = schemas.form;
 export const SetFormAudienceSettingsBodySchema = schemas.formBody;
 
 export type FormAudienceSettings = InheritableSettings<Audience>;
+
+/** How many live forms in a workspace use its audience rather than their own. */
+export const InheritingFormsSchema = z.object({ count: z.number().int().nonnegative() });
+export type InheritingForms = z.infer<typeof InheritingFormsSchema>;
 export type SetFormAudienceSettingsBody = SetInheritableSettingsBody<Audience>;

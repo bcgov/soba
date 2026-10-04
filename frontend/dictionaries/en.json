@@ -316,6 +316,10 @@
       "audienceProviders": "Allowed logins",
       "audienceProvidersRequired": "Select at least one login.",
       "audienceLoadError": "Could not load the form audience.",
+      "audiencePublicConfirmTitle": "Make this workspace's forms public?",
+      "audiencePublicConfirmMessage": "Anyone, including people who are not signed in, will be able to submit every form that uses the workspace setting. Drafts are not available on Public forms.",
+      "audienceInheritingForms": "Forms using the workspace setting: {count}.",
+      "audiencePublicConfirmLabel": "Make public",
       "inheritWorkspaceLabel": "Use the workspace setting",
       "profileDrawerInfo": "The CHEFS team is collecting and organizing information to serve as crucial input for crafting comprehensive business cases. These cases will play a pivotal role in guiding the strategic operation and ongoing improvement of CHEFS in the coming years. This initiative to gather data is essential for informing critical decisions and molding the trajectory of CHEFS, ensuring its adaptability and effectiveness in addressing evolving needs and challenges.",
       "profileDrawerLabel": "Form Profile"

@@ -3,12 +3,9 @@ import { createWorkspaceAudienceSetting } from '../../../core/db/repos/audienceS
 import { formAudienceSettings, workspaceAudienceSettings } from '../../../core/db/schema';
 import { settingsRoutes } from '../routes';
 import type { FormSettingsModule } from '../types';
-import {
-  registerAudienceSettingsOpenApi,
-  SetFormAudienceSettingsBodySchema,
-  WorkspaceAudienceSettingsSchema,
-} from './openapi';
-import { createFormAudience, formAudienceService, workspaceAudienceService } from './service';
+import { registerAudienceSettingsOpenApi, SetFormAudienceSettingsBodySchema } from './openapi';
+import { createFormAudience, formAudienceService } from './service';
+import { workspaceAudienceRoutes } from './routes';
 
 export { formAudienceService, workspaceAudienceService } from './service';
 
@@ -20,8 +17,7 @@ export const audienceSettingsModule: FormSettingsModule = {
   tables: [formAudienceSettings, workspaceAudienceSettings],
   createForForm: createFormAudience,
   workspace: {
-    router: () =>
-      settingsRoutes(workspaceAudienceService, WorkspaceAudienceSettingsSchema, 'workspace'),
+    router: workspaceAudienceRoutes,
     createForWorkspace: createWorkspaceAudienceSetting,
   },
 };

@@ -317,6 +317,10 @@
       "audienceProviders": "Connexions autorisées",
       "audienceProvidersRequired": "Sélectionnez au moins une connexion.",
       "audienceLoadError": "Impossible de charger le public du formulaire.",
+      "audiencePublicConfirmTitle": "Rendre publics les formulaires de cet espace de travail?",
+      "audiencePublicConfirmMessage": "Toute personne, y compris une personne non connectée, pourra soumettre chaque formulaire qui utilise le paramètre de l'espace de travail. Les brouillons ne sont pas offerts pour les formulaires publics.",
+      "audienceInheritingForms": "Formulaires qui utilisent le paramètre de l'espace de travail : {count}.",
+      "audiencePublicConfirmLabel": "Rendre public",
       "inheritWorkspaceLabel": "Utiliser le paramètre de l'espace de travail",
       "profileDrawerInfo": "L'équipe CHEFS recueille et organise des informations pour servir d'entrée cruciale à l'élaboration de dossiers d'affaires complets. Ces dossiers joueront un rôle central dans l'orientation de l'exploitation stratégique et de l'amélioration continue de CHEFS dans les années à venir. Cette initiative de collecte de données est essentielle pour éclairer les décisions critiques et façonner la trajectoire de CHEFS, garantissant son adaptabilité et son efficacité face aux besoins et défis évolutifs.",
       "profileDrawerLabel": "Profil du Formulaire"
