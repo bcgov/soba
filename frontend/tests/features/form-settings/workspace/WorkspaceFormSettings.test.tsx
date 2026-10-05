@@ -112,7 +112,8 @@ function renderWithCache(ui: React.ReactNode) {
   );
 }
 
-const renderTab = () => renderWithCache(<WorkspaceFormSettings dict={mockDict} workspaceId="ws1" />);
+const renderTab = () =>
+  renderWithCache(<WorkspaceFormSettings dict={mockDict} workspaceId="ws1" />);
 
 const input = (testId: string) =>
   screen.getByTestId(testId).querySelector('input') as HTMLInputElement;

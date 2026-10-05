@@ -30,7 +30,8 @@ const WORKSPACE_NOT_FOUND = 'Workspace audience settings not found';
  */
 const toStored = async (audience: Audience, executor?: DbOrTx): Promise<Audience> => {
   if (audience.mode !== 'protected') return audience;
-  const idps = [...new Set(audience.idps)].sort();
+  // Code unit order, as stored. The codes are unique after the Set, so none compare equal.
+  const idps = [...new Set(audience.idps)].sort((a, b) => (a < b ? -1 : 1));
   const providers = await listLoginIdentityProviders(DEFAULT_SORT_LOCALE, executor);
   const valid = new Set(providers.map((p) => p.code));
   const bad = idps.filter((code) => !valid.has(code));
