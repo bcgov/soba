@@ -144,7 +144,7 @@ test.describe.serial("Landing page tests", () => {
       } else {
         await sharedPage.waitForTimeout(1000);
         const workspaceOption = sharedPage.getByRole("option", {
-          name: "Test (team)",
+          name: "Test Workspace (team)",
           exact: true,
         });
         await workspaceOption.click();

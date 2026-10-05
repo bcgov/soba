@@ -11,14 +11,13 @@ function getExpectedURL(depEnv: string): string {
   // PR environments: DEP_ENV is a PR number
   if (/^\d+$/.test(depEnv)) {
     const prNumber = Number(depEnv);
-    const slot = prNumber % 20;
-
-    return `https://soba-${slot}-designer.apps.silver.devops.gov.bc.ca`;
+    //const slot = prNumber % 20;
+    return `https://soba-dev.apps.silver.devops.gov.bc.ca/designer-${prNumber}/en`;
   }
 
   switch (depEnv.toLowerCase()) {
     case "dev":
-      return "https://soba-dev.apps.silver.devops.gov.bc.ca/designer/en/forms";
+      return "https://soba-dev.apps.silver.devops.gov.bc.ca/designer/en";
 
     case "test":
       return "https://soba-test-designer.apps.silver.devops.gov.bc.ca/en";
