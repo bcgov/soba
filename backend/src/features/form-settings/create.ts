@@ -22,7 +22,8 @@ export const createWorkspaceSettings = async (
   input: SettingsRowInput,
   executor: DbOrTx,
 ): Promise<void> => {
-  await Promise.all(
-    formSettingsModules.map((module) => module.workspace?.createForWorkspace(input, executor)),
+  const shared = formSettingsModules.flatMap((module) =>
+    module.workspace ? [module.workspace] : [],
   );
+  await Promise.all(shared.map((workspace) => workspace.createForWorkspace(input, executor)));
 };
