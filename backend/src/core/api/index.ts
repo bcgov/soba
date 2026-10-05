@@ -9,7 +9,11 @@ import { groupsDomain } from './groups';
 import { filesDomain } from '../../features/files';
 import { documentGenerationDomain } from '../../features/document-generation';
 import { templatesDomain } from '../../features/templates';
-import { formSettingsRouter, registerFormSettingsOpenApi } from '../../features/form-settings';
+import {
+  formSettingsRouter,
+  registerFormSettingsOpenApi,
+  workspaceSettingsRouter,
+} from '../../features/form-settings';
 import { meDomain } from './me';
 import { membersDomain } from './members';
 import { workspacesDomain } from './workspaces';
@@ -69,6 +73,8 @@ filesApiRouter.use(coreErrorHandler);
 
 // Core: workspace/account management, and staff document templates.
 const coreRouter = express.Router();
+// The workspace level of settings groups whose values a workspace shares with its forms.
+coreRouter.use('/workspaces/:id/settings', workspaceSettingsRouter);
 for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain, templatesDomain]) {
   coreRouter.use(domain.path, domain.router);
 }

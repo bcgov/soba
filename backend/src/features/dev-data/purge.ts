@@ -25,6 +25,7 @@ import {
   formVersionRevisions,
   formVersions,
   forms,
+  settingsAudit,
   sobaAdmins,
   submissionFiles,
   submissionParticipants,
@@ -268,6 +269,7 @@ export const WORKSPACE_SCOPED_TABLES: readonly string[] = [
   'form_version',
   'form_group_override_member',
   'form_group_override',
+  'settings_audit',
   ...FORM_SETTINGS_TABLES.map((table) => getTableConfig(table).name),
   'form',
   'workspace_group_role',
@@ -362,6 +364,10 @@ async function purgeWorkspaceScoped(
   await record(
     'form_group_override',
     tx.delete(formGroupOverrides).where(inArray(formGroupOverrides.workspaceId, ids)),
+  );
+  await record(
+    'settings_audit',
+    tx.delete(settingsAudit).where(inArray(settingsAudit.workspaceId, ids)),
   );
   for (const table of FORM_SETTINGS_TABLES) {
     await record(

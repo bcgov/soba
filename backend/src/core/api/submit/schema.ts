@@ -68,10 +68,10 @@ export const ListMySubmissionsResponseSchema = LibListMySubmissionsResponseSchem
 const TAG = 'core.submit';
 const SUBMISSION_PATH = '/submit/submissions/{id}';
 const SUBMISSION_NOT_FOUND = 'Submission not found';
-const AUTHZ = 'Not in the form submitters audience';
+const AUTHZ = "Not in the form's audience";
 const AUTH_REQUIRED = 'Authentication required (form is not public)';
 const NOT_PARTICIPANT = 'Not a participant on this submission';
-const WRITE_AUTHZ = 'Not a participant on this submission, or not in the form submitters audience';
+const WRITE_AUTHZ = "Not a participant on this submission, or not in the form's audience";
 const SUBMISSION_AUTH_REQUIRED =
   'Authentication required (anonymous caller has no access to this submission)';
 const INVALID_WRITE_BODY =

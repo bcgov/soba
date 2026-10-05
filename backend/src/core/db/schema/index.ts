@@ -7,6 +7,8 @@ export * from './codes';
 export * from './forms';
 export * from './formGroupOverride';
 export * from './formSubmitterSetting';
+export * from './audienceSetting';
+export * from './settingsAudit';
 export * from './submissionParticipant';
 export * from './file';
 export * from './submissionFile';

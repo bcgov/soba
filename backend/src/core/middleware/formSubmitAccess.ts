@@ -100,9 +100,9 @@ const resolveSubmitTarget = async (req: Request): Promise<SubmitterAccessTarget>
 
 /**
  * Authorizes a read of a form resource whose workspace and form were already resolved into
- * req.coreContext (see openWorkspaceFromResource). Grants staff with `required`, or the form's Form
- * submitters audience when `required` is in AUDIENCE_PERMISSIONS. On denial, 401 for anonymous / 403
- * for an authenticated non-member.
+ * req.coreContext (see openWorkspaceFromResource). Grants role holders with `required`, or a caller the
+ * form's audience admits when `required` is in AUDIENCE_PERMISSIONS. On denial, 401 for anonymous /
+ * 403 for an authenticated non-member.
  */
 export const requireFormAccess = (required: PermissionCode) => {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {

@@ -5,6 +5,7 @@ import { parseJson } from './sobaHelpers';
 import { FormType } from '@formio/react';
 import type {
   SobaFormType,
+  CreateFormFields,
   CreateSobaFormioFormResponse,
   SobaResponseFormType,
   SobaFormDetail,
@@ -20,19 +21,13 @@ import { sortLocaleHeaders } from './sortLocaleRequest';
 
 export async function createSobaFormioForm(
   token: string,
-  data: SobaFormType,
+  data: CreateFormFields,
   workspaceId?: string,
 ): Promise<CreateSobaFormioFormResponse> {
-  data.formEngineCode = 'formio-v5';
-
-  if (workspaceId) {
-    data.workspaceId = workspaceId;
-  }
-
   const response = await sobaFetch('/design/forms', {
     token,
     method: 'POST',
-    json: data,
+    json: { ...data, formEngineCode: 'formio-v5', workspaceId },
   });
   return parseJson(response);
 }

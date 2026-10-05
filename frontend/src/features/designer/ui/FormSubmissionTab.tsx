@@ -1,12 +1,12 @@
 'use client';
 import { useMemo, useState, useCallback } from 'react';
 import { FaRegTrashCan, FaFile } from 'react-icons/fa6';
-import { Link, Button } from '@bcgov/design-system-react-components';
+import { Link } from '@bcgov/design-system-react-components';
 import { useRouter, usePathname } from 'next/navigation';
 
 import type { Dictionary } from '@/src/types/dictionary';
 import { DataTable, type Column } from '@/src/components/DataTable';
-import { Modal } from '@/src/components/Modal';
+import { ConfirmModal } from '@/src/components/ConfirmModal';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import type { SubmissionListItem } from '@/src/types/submissions';
 import { Tag } from '@/src/components/Tag';
@@ -48,31 +48,35 @@ export default function FormSubmissionTab({
   const pathname = usePathname();
   const locale = getLocaleFromPath(pathname);
   const router = useRouter();
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
-  const [deleteId, setDeleteId] = useState<string>('');
+  const [pendingDelete, setPendingDelete] = useState<SubmissionListItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { addNotification } = useNotificationStore();
 
-  const deletePress = useCallback((submissionId: string) => {
-    setShowDeleteConfirm(true);
-    setDeleteId(submissionId);
-  }, []);
-
   const confirmDelete = useCallback(async () => {
-    setShowDeleteConfirm(false);
+    if (!token || !pendingDelete) return;
+    setDeleting(true);
     try {
-      await submissionDeleter.remove(token as string, deleteId);
-      addNotification({
-        text: dict.submission.deleteSuccess || 'Submission deleted successfully',
-        type: 'success',
-      });
+      await submissionDeleter.remove(token, pendingDelete.id);
+      addNotification({ text: dict.submission.deleteSuccess, type: 'success' });
     } catch (e: unknown) {
       addNotification({
         text: e instanceof Error && e.message ? e.message : dict.submission.deleteFailure,
         type: 'error',
         consoleError: e,
       });
+    } finally {
+      setDeleting(false);
+      setPendingDelete(null);
     }
-  }, [token, deleteId, submissionDeleter, addNotification, dict]);
+  }, [token, pendingDelete, submissionDeleter, addNotification, dict]);
+
+  // Names the submission by its confirmation code, or by when it was last changed until it has one.
+  const deleteMessageFor = (sub: SubmissionListItem): string => {
+    const message = sub.confirmationCode
+      ? dict.submission.deleteMessage.replace('{confirmation}', sub.confirmationCode)
+      : dict.submission.deleteDraftMessage.replace('{updated}', formatLongDate(sub.updatedAt));
+    return message.replace('{submitter}', sub.createdBy || dict.submission.anon);
+  };
 
   const columns: Column<SubmissionListItem>[] = useMemo(
     () => [
@@ -131,9 +135,7 @@ export default function FormSubmissionTab({
               className="bcds-react-aria-Link medium false danger"
               data-testid={`${sub.id}-delete-link`}
               aria-label={dict.submission.delete}
-              onPress={() => {
-                deletePress(sub.id);
-              }}
+              onPress={() => setPendingDelete(sub)}
             >
               <FaRegTrashCan />
             </Link>
@@ -141,7 +143,7 @@ export default function FormSubmissionTab({
         ),
       },
     ],
-    [dict, formatLongDate, deletePress, locale, router],
+    [dict, formatLongDate, locale, router],
   );
 
   return (
@@ -155,42 +157,15 @@ export default function FormSubmissionTab({
         caption={dict.submission?.submissions || 'Submissions'}
         keyExtractor={(sub) => sub.id}
       />
-      <Modal
-        show={showDeleteConfirm}
-        title={`${dict.submission.deleteConfirm || 'Confirm Delete'}`}
-        onClose={() => setShowDeleteConfirm(false)}
-        size="sm"
-      >
-        <p className="text-center px-2 py-3 text-muted">
-          {dict.submission.deleteConfirmText}: {deleteId}
-        </p>
-        <div>
-          <Button
-            variant="secondary"
-            data-testid="cancel-delete-button"
-            className="bcds-react-aria-Button medium secondary me-2"
-            aria-label={dict.workspaces.cancel}
-            isIconButton
-            onPress={() => {
-              setShowDeleteConfirm(false);
-            }}
-          >
-            {dict.workspaces.cancel}
-          </Button>
-          <Button
-            variant="secondary"
-            data-testid="confirm-delete-button"
-            aria-label={dict.submission.confirm}
-            isIconButton
-            danger
-            onPress={() => {
-              confirmDelete();
-            }}
-          >
-            {dict.submission.confirm}
-          </Button>
-        </div>
-      </Modal>
+      <ConfirmModal
+        show={pendingDelete !== null}
+        title={dict.submission.deleteTitle}
+        message={pendingDelete ? deleteMessageFor(pendingDelete) : ''}
+        confirmLabel={dict.submission.delete}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setPendingDelete(null)}
+        pending={deleting}
+      />
     </>
   );
 }

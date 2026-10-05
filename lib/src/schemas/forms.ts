@@ -1,15 +1,21 @@
 import { z } from 'zod';
 import { LookupMetaSchema, OffsetPageSchema, makeSortEnum } from './pagination';
 import { FORM_SORT_FIELDS, FORM_VERSION_SORT_FIELDS } from '../sort';
+import { FormAudienceChoiceSchema } from './formSettings/audience';
 
-import { SetFormSubmitterAudienceBodySchema } from './groups';
+/** Settings a new form starts with instead of inheriting its workspace's. A group left out inherits. */
+export const CreateFormSettingsSchema = z.strictObject({
+  audience: FormAudienceChoiceSchema.optional(),
+});
+export type CreateFormSettings = z.infer<typeof CreateFormSettingsSchema>;
 
-export const CreateFormBodySchema = z.object({
+/** Refuses keys it does not know, so a choice the create would not apply is never dropped silently. */
+export const CreateFormBodySchema = z.strictObject({
   workspaceId: z.string().min(1),
   name: z.string().trim().min(1),
   description: z.string().optional(),
   formEngineCode: z.string().trim().min(1).optional(),
-  submitterAudience: SetFormSubmitterAudienceBodySchema.optional(),
+  settings: CreateFormSettingsSchema.optional(),
 });
 
 export const UpdateFormBodySchema = z.object({

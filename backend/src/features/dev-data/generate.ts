@@ -7,7 +7,6 @@ import { v7 as uuidv7 } from 'uuid';
 import { db } from '../../core/db/client';
 import { workspaceMemberships } from '../../core/db/schema';
 import {
-  SystemGroup,
   WorkspaceMembershipSource,
   WorkspaceMembershipStatus,
   type WorkspaceMembershipRoleCode,
@@ -18,12 +17,8 @@ import {
   findOrCreateUserByIdentity,
   invalidateMembershipCache,
 } from '../../core/db/repos/membershipRepo';
-import {
-  addUserToGroup,
-  createGroupWithRole,
-  getSystemGroupId,
-  setSubmitterAudience,
-} from '../../core/db/repos/workspaceGroupRepo';
+import { addUserToGroup, createGroupWithRole } from '../../core/db/repos/workspaceGroupRepo';
+import { updateWorkspaceAudience } from '../../core/db/repos/audienceSettingRepo';
 import { FormService } from '../../core/services/formService';
 import { FormVersionService } from '../../core/services/formVersionService';
 import { SubmissionService } from '../../core/services/submissionService';
@@ -191,21 +186,17 @@ async function addMembers(
   return { dev, target };
 }
 
-/** Bootstrap already produces 'protected', so only the other modes need work. */
+/** A new workspace is already 'protected', so only the other modes need work. */
 async function applyAudience(
   workspaceId: string,
   planned: PlannedWorkspace,
   owner: ResolvedUser,
 ): Promise<void> {
   if (planned.audience === 'protected') return;
-  const groupId = await getSystemGroupId(workspaceId, SystemGroup.form_submitters);
-  if (!groupId) return;
-  await setSubmitterAudience({
+  await updateWorkspaceAudience({
     workspaceId,
-    groupId,
-    public: planned.audience === 'public',
-    idps: [],
-    displayLabel: owner.displayLabel,
+    audience: { mode: planned.audience, idps: [] },
+    actorDisplayLabel: owner.displayLabel,
   });
 }
 

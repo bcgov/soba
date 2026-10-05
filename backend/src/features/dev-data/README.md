@@ -126,7 +126,7 @@ Everything else is smaller than the anchors and spread so each distinct state ex
 - forms cover published, draft with a schema, and draft never provisioned
 - submissions cover `opened`, `draft`, and `submitted`, attributed to the owner, to dev users, and
   anonymously to the public user
-- submitter audiences cover `protected` (the bootstrap default), `public`, and `none`
+- workspace audiences cover `protected` (a new workspace's default), `public`, and `members`
 
 Generated users sit on active login providers (`azureidir`, `bceidbusiness`) with fabricated
 subjects, so they cannot sign in. They exist to fill member lists, groups, and role assignments.

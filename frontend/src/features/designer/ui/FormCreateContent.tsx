@@ -1,22 +1,30 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 import { Form, TextField, Button, InlineAlert } from '@bcgov/design-system-react-components';
 import { WorkspaceSelector } from '@/app/ui/WorkspaceSelector';
-import { SubmitterAudienceControls } from './SubmitterAudienceControls';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useFormCreateWorkspaceOptions } from '@/src/shared/api/useWorkspaces';
 import { lookupTruncatedNote } from '@/src/shared/list/lookupOptions';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { useFormCreator } from '@/src/features/designer/data/useForm';
-import { useSubmitterAudience } from '@/src/features/designer/data/useSubmitterAudience';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { isConflict } from '@/src/shared/api/sobaHelpers';
-import type { SobaFormType } from '@/src/types/forms';
-import type { SetFormSubmitterAudienceBody } from '@/src/types/groups';
+import { messageForDataError } from '@/src/shared/api/dataError';
+import type { CreateFormFields } from '@/src/types/forms';
+import { AUDIENCE_SETTINGS_KEY, type Audience } from '@/src/types/formSettings';
+import { useFreshWorkspaceSettings } from '@/src/features/form-settings/data/useWorkspaceSettings';
+import { useLoginProviders } from '@/src/shared/api/useLoginProviders';
+import { useInheritableEdit } from '@/src/features/form-settings/ui/useInheritableEdit';
+import InheritCheckbox from '@/src/features/form-settings/ui/InheritCheckbox';
+import AudienceField, {
+  isValidAudience,
+  toAudience,
+  type AudienceValue,
+} from '@/src/features/form-settings/audience/AudienceField';
 
 interface FormCreateContentProps {
   onCancelPress: () => void;
@@ -36,13 +44,43 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
 
   const [formName, setFormName] = useState('');
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
-  const [mode, setMode] = useState<string>('inherit');
-  const [idps, setIdps] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
-  const { view: effectiveAudience } = useSubmitterAudience(selectedWorkspaceId);
-
   const creatableWorkspaces = useFormCreateWorkspaceOptions(true);
+
+  // The new form inherits the selected workspace's audience unless the creator sets its own. Own
+  // values start as a copy of the workspace's, so the read is a fresh one.
+  const { settings: workspaceAudience, error: workspaceAudienceError } =
+    useFreshWorkspaceSettings<Audience>(AUDIENCE_SETTINGS_KEY, selectedWorkspaceId);
+  const { data: providers, error: providersError } = useLoginProviders();
+  const audienceReadError = workspaceAudienceError ?? providersError;
+  const audienceReadErrorMessage = audienceReadError
+    ? messageForDataError(audienceReadError, {
+        sessionExpired: dict.general.sessionExpired,
+        forbidden: dict.general.noAccess,
+        failed: dict.form.settings.audienceLoadError,
+      })
+    : null;
+  const audienceView = useMemo(
+    () =>
+      workspaceAudience
+        ? {
+            inherit: true,
+            own: null,
+            workspace: workspaceAudience.values,
+            effective: workspaceAudience.values,
+            version: workspaceAudience.version,
+          }
+        : undefined,
+    [workspaceAudience],
+  );
+  const audienceEdit = useInheritableEdit<AudienceValue>(audienceView);
+  const offered = providers ?? [];
+  const audienceBody = audienceEdit.body();
+  const ownAudience = audienceBody?.inherit === false ? audienceBody.values : null;
+  const audienceValid = !ownAudience || isValidAudience(ownAudience, offered);
+  // A form is not created against an audience the creator has not been shown.
+  const audienceShown = !selectedWorkspaceId || (!!audienceView && !!providers);
 
   const saveForm = async () => {
     if (isSaving) return;
@@ -55,12 +93,11 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
     setIsSaving(true);
 
     try {
-      const data: SobaFormType & { submitterAudience?: SetFormSubmitterAudienceBody } = {
-        name: formName.trim(),
-      };
-      if (mode !== 'inherit') {
-        data.submitterAudience =
-          mode === 'public' ? { mode: 'public' } : { mode: 'protected', idps };
+      const data: CreateFormFields = { name: formName.trim() };
+      if (ownAudience) {
+        data.settings = {
+          audience: { inherit: false, values: toAudience(ownAudience, offered) },
+        };
       }
       const outcome = await formCreator.create(
         token as string,
@@ -141,26 +178,42 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
           isRequired={true}
           onChange={(id) => {
             setSelectedWorkspaceId(id as string);
-            setMode('inherit');
-            setIdps([]);
+            audienceEdit.reset();
           }}
           description={lookupTruncatedNote(dict.general.lookupTruncated, creatableWorkspaces)}
           size="medium"
         />
       )}
 
-      <div className="p-3 border rounded-3 bg-light">
-        <SubmitterAudienceControls
-          mode={mode}
-          setMode={setMode}
-          idps={idps}
-          setIdps={setIdps}
-          saving={isSaving}
-          isForm={true}
-          effectiveAudience={effectiveAudience ?? null}
-          isDisabled={!selectedWorkspaceId}
-        />
-      </div>
+      {selectedWorkspaceId && (
+        <div className="p-3 border rounded-3 bg-light" data-testid="create-form-audience">
+          {audienceReadErrorMessage && (
+            <div className="mb-3">
+              <InlineAlert
+                variant="warning"
+                title={audienceReadErrorMessage}
+                data-testid="create-form-audience-error"
+              />
+            </div>
+          )}
+          <InheritCheckbox
+            label={dict.form.settings.inheritWorkspaceLabel}
+            isSelected={audienceEdit.inherit}
+            onChange={audienceEdit.setInherit}
+            isDisabled={isSaving || !audienceShown}
+            testId="create-form-audience-inherit"
+          />
+          {audienceEdit.values && providers && (
+            <AudienceField
+              dict={dict}
+              value={audienceEdit.values}
+              onChange={audienceEdit.setValues}
+              providers={offered}
+              isDisabled={isSaving || audienceEdit.inherit}
+            />
+          )}
+        </div>
+      )}
 
       <div className="d-flex justify-content-end gap-2">
         <Button
@@ -174,7 +227,7 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
         </Button>
         <Button
           type="submit"
-          isDisabled={isSaving || (mode === 'protected' && idps.length === 0)}
+          isDisabled={isSaving || !audienceValid || !audienceShown}
           data-testid="save-create-form"
         >
           {dict.general.next}

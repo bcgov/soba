@@ -4,15 +4,12 @@ import { resolveFormPermissions } from '../../db/repos/formAccessRepo';
 import type { FormListSort } from '../../db/repos/formRepo';
 import type { FormVersionListSort } from '../../db/repos/formVersionRepo';
 import {
+  type CreateFormSettings,
   type FormListItem,
   type FormVersionListItem,
   type SortLocale,
-  type SetFormSubmitterAudienceBody,
-  DEFAULT_SORT_LOCALE,
 } from '@soba/lib';
 import { LOOKUP_FETCH_LIMIT, toLookupResponse } from '../shared/lookup';
-import { formSubmitterAudienceService } from './submitterAudience';
-import { db } from '../../db/client';
 
 import type { CoreRequestContext } from '../../middleware/requestContext';
 
@@ -49,7 +46,7 @@ interface CreateFormInput {
   name: string;
   description?: string;
   formEngineCode?: string;
-  submitterAudience?: SetFormSubmitterAudienceBody;
+  settings?: CreateFormSettings;
 }
 
 interface UpdateFormInput {
@@ -170,26 +167,16 @@ export function createFormsApiService(
 ) {
   return {
     createForm: async (ctx: FormsContextInput, input: CreateFormInput) => {
-      return db.transaction(async (tx) => {
-        const { form, version } = await formService.create({
-          workspaceId: ctx.workspaceId,
-          actorId: ctx.actorId,
-          actorDisplayLabel: ctx.actorDisplayLabel,
-          name: input.name,
-          description: input.description,
-          formEngineCode: input.formEngineCode,
-          executor: tx,
-        });
-        if (input.submitterAudience) {
-          await formSubmitterAudienceService.set(
-            { ...ctx, locale: DEFAULT_SORT_LOCALE },
-            form.id,
-            input.submitterAudience,
-            tx,
-          );
-        }
-        return { ...toFormDto(form), formVersion: toFormVersionDto(version) };
+      const { form, version } = await formService.create({
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
+        name: input.name,
+        description: input.description,
+        formEngineCode: input.formEngineCode,
+        settings: input.settings,
       });
+      return { ...toFormDto(form), formVersion: toFormVersionDto(version) };
     },
 
     normalizeSchema: (_ctx: FormsContextInput, schema: Record<string, unknown>) =>

@@ -14,6 +14,7 @@ import type {
 } from '../../types/workspaces';
 import type { CurrentUserResponse } from '../../types/user';
 import type { SortLocale } from '@soba/lib/sort';
+import type { LoginProvidersMetaResponse } from '@soba/lib';
 import type { ListQueryArgs } from '../../types/list';
 import { sortLocaleHeaders } from './sortLocaleRequest';
 
@@ -125,6 +126,19 @@ export async function fetchFormEnginesMeta(): Promise<unknown> {
     method: 'GET',
     cache: 'no-store',
     headers: { Accept: 'application/json' },
+  });
+  return parseJson(response);
+}
+
+/** The providers people sign in through, by name in the sort locale. */
+export async function fetchLoginProviders(
+  locale?: SortLocale,
+): Promise<LoginProvidersMetaResponse> {
+  const q = locale ? `?locale=${locale}` : '';
+  const response = await fetch(`${getSobaApiBaseUrl()}/meta/login-providers${q}`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: { Accept: 'application/json', ...sortLocaleHeaders(locale) },
   });
   return parseJson(response);
 }

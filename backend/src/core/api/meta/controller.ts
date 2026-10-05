@@ -4,6 +4,7 @@ import { metaApiService } from './service';
 import { asyncHandler } from '../shared/asyncHandler';
 import { codeService } from '../../services/codeService';
 import { getFilesConfig } from '../../../features/files/config';
+import { listLoginIdentityProviders } from '../../db/repos/identityProviderRepo';
 
 export const getPluginsMeta = asyncHandler(async (_req: Request, res: Response) => {
   res.json(await metaApiService.getPlugins());
@@ -24,6 +25,10 @@ export const getFeatureAvailabilityMeta = asyncHandler(async (req: Request, res:
 
 export const getFormEnginesMeta = asyncHandler(async (_req: Request, res: Response) => {
   res.json(await metaApiService.getFormEngines());
+});
+
+export const getLoginProvidersMeta = asyncHandler(async (req: Request, res: Response) => {
+  res.json({ items: await listLoginIdentityProviders(req.sortLocale!) });
 });
 
 export const getBuildMeta = (_req: Request, res: Response) => {

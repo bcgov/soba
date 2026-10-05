@@ -1,8 +1,7 @@
 // Submit-mode API service: submission open/save/submit, reads of an existing submission, and the
 // caller's own list and delete. All calls hit /submit/*. The token is optional except on the list and
 // delete; the backend attributes anonymous callers to the seeded public user. Opening needs the form's
-// Form submitters audience; reading an existing submission needs participation in it, and writing it
-// needs both.
+// audience; reading an existing submission needs participation in it, and writing it needs both.
 import { sobaFetch } from './sobaFetch';
 import { parseJson } from './sobaHelpers';
 import { sortLocaleHeaders } from './sortLocaleRequest';

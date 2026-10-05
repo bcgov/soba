@@ -2,10 +2,6 @@ import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-op
 import { z } from 'zod';
 import { GROUP_NAME_TAKEN } from '../../messages';
 import { SortLocaleQuerySchema } from '../shared/offsetPagination';
-import {
-  SetSubmitterAudienceBodySchema as LibSetSubmitterAudienceBodySchema,
-  SubmitterAudienceSchema as LibSubmitterAudienceSchema,
-} from '@soba/lib';
 
 extendZodWithOpenApi(z);
 
@@ -57,28 +53,17 @@ export const SetGroupRolesBodySchema = z
   .openapi('Groups_SetGroupRolesBody');
 
 export const AddGroupMemberBodySchema = z
-  .discriminatedUnion('kind', [
-    z.object({ kind: z.literal('user'), membershipId: z.string().min(1) }),
-    z.object({ kind: z.literal('idp'), code: z.string().trim().min(1) }),
-  ])
+  .object({ kind: z.literal('user'), membershipId: z.string().min(1) })
   .openapi('Groups_AddGroupMemberBody');
 
 export const GroupMemberSchema = z
-  .discriminatedUnion('kind', [
-    z.object({
-      id: z.string(),
-      kind: z.literal('user'),
-      membershipId: z.string(),
-      userId: z.string(),
-      displayLabel: z.string().nullable(),
-    }),
-    z.object({
-      id: z.string(),
-      kind: z.literal('idp'),
-      code: z.string(),
-      label: z.string(),
-    }),
-  ])
+  .object({
+    id: z.string(),
+    kind: z.literal('user'),
+    membershipId: z.string(),
+    userId: z.string(),
+    displayLabel: z.string().nullable(),
+  })
   .openapi('Groups_GroupMember');
 
 export const GroupSchema = z
@@ -100,21 +85,12 @@ export const ListGroupsResponseSchema = z
   })
   .openapi('Groups_ListGroupsResponse');
 
-export const SetSubmitterAudienceBodySchema = LibSetSubmitterAudienceBodySchema.clone().openapi(
-  'Groups_SetSubmitterAudienceBody',
-);
-
-export const SubmitterAudienceSchema = LibSubmitterAudienceSchema.clone().openapi(
-  'Groups_SubmitterAudience',
-);
-
 const TAG = 'core.groups';
 const GROUPS_PATH = '/workspaces/{id}/groups';
 const GROUP_PATH = '/workspaces/{id}/groups/{groupId}';
 const GROUP_ROLES_PATH = '/workspaces/{id}/groups/{groupId}/roles';
 const GROUP_MEMBERS_PATH = '/workspaces/{id}/groups/{groupId}/members';
 const GROUP_MEMBER_PATH = '/workspaces/{id}/groups/{groupId}/members/{memberId}';
-const SUBMITTER_AUDIENCE_PATH = '/workspaces/{id}/submitter-audience';
 
 const ERR_MANAGE = 'Workspace management requires an owner or admin role';
 const ERR_WORKSPACE_NOT_FOUND = 'Workspace not found';
@@ -225,10 +201,10 @@ export const registerGroupsOpenApi = (registry: OpenAPIRegistry) => {
     },
     responses: {
       200: jsonResponse(OK_UPDATED_GROUP, GroupSchema),
-      400: { description: 'Invalid member (bad membership, provider, or provider not assignable)' },
+      400: { description: 'Membership is not an active member of the workspace' },
       403: { description: ERR_MANAGE },
       404: { description: ERR_WORKSPACE_OR_GROUP_NOT_FOUND },
-      409: { description: 'Member already present, or conflicts with public-access exclusivity' },
+      409: { description: 'Member already in group' },
     },
   });
 
@@ -242,40 +218,6 @@ export const registerGroupsOpenApi = (registry: OpenAPIRegistry) => {
       200: jsonResponse(OK_UPDATED_GROUP, GroupSchema),
       403: { description: ERR_MANAGE },
       404: { description: 'Workspace, group, or member not found' },
-    },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: SUBMITTER_AUDIENCE_PATH,
-    tags: [TAG],
-    security: [{ bearerAuth: [] }],
-    request: { query: SortLocaleQuerySchema, params: WorkspaceGroupParamsSchema },
-    responses: {
-      200: jsonResponse(
-        'The workspace submit audience (public / protected)',
-        SubmitterAudienceSchema,
-      ),
-      403: { description: 'Actor is not a member of the workspace' },
-      404: { description: ERR_WORKSPACE_NOT_FOUND },
-    },
-  });
-
-  registry.registerPath({
-    method: 'put',
-    path: SUBMITTER_AUDIENCE_PATH,
-    tags: [TAG],
-    security: [{ bearerAuth: [] }],
-    request: {
-      query: SortLocaleQuerySchema,
-      params: WorkspaceGroupParamsSchema,
-      body: jsonBody(SetSubmitterAudienceBodySchema),
-    },
-    responses: {
-      200: jsonResponse('Updated submit audience', SubmitterAudienceSchema),
-      400: { description: 'Protected needs a principal, or an invalid provider was given' },
-      403: { description: ERR_MANAGE },
-      404: { description: ERR_WORKSPACE_NOT_FOUND },
     },
   });
 };

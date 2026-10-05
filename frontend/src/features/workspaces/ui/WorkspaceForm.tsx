@@ -12,7 +12,6 @@ import {
   Select,
   InlineAlert,
 } from '@bcgov/design-system-react-components';
-import { FormSubmitterAudience } from '@/src/features/designer/ui/FormSubmitterAudience';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { usePageHeading } from '@/src/components/PageHeader';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
@@ -24,6 +23,7 @@ import { useWorkspace, useWorkspaceWriter } from '@/src/shared/api/useWorkspaces
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { isWorkspaceManageRole } from '../workspaceRoles';
+import WorkspaceFormSettings from '@/src/features/form-settings/ui/WorkspaceFormSettings';
 import type { UpdateWorkspaceBody, WorkspaceItem } from '@/src/types/workspaces';
 import styles from './WorkspaceForm.module.css';
 
@@ -312,9 +312,13 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
           <WorkspaceSettings key={workspace.id} workspace={workspace} first={first} />
         </div>
       </Tab>
-      <Tab eventKey="team" title={dictWorkspaces.teamTab}>
+      <Tab
+        eventKey="form-settings"
+        title={dictWorkspaces.formSettingsTab}
+        tabAttrs={{ 'data-testid': 'workspace-form-settings-tab' }}
+      >
         <div className={styles.tabContent}>
-          <FormSubmitterAudience key={workspace.id} workspaceId={workspace.id} canManage />
+          <WorkspaceFormSettings key={workspace.id} dict={dict} workspaceId={workspace.id} />
         </div>
       </Tab>
     </Tabs>

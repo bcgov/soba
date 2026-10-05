@@ -16,6 +16,15 @@
   margin-bottom: var(--layout-margin-medium);
 }
 
+/* A list's filters, between its toolbar and its table. */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--layout-margin-small);
+  margin-bottom: var(--layout-margin-medium);
+}
+
 /* Padding tokens stop at 2rem, so the vertical inset comes off the margin scale. */
 .authGate {
   padding: var(--layout-margin-xxxlarge) var(--layout-padding-medium);

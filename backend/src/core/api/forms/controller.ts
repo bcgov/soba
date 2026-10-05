@@ -12,13 +12,10 @@ import {
   ProvisionSchemaBodySchema,
   SaveFormVersionBodySchema,
   SaveFormVersionParamsSchema,
-  SetFormSubmitterAudienceBodySchema,
   UpdateFormBodySchema,
 } from './schema';
 import { formsApiService } from './service';
-import { formSubmitterAudienceService } from './submitterAudience';
 import { asyncHandler } from '../shared/asyncHandler';
-import { withSortLocale } from '../../middleware/sortLocale';
 import { NotFoundError } from '../../errors';
 import type { Request } from 'express';
 
@@ -34,7 +31,6 @@ type ListFormsQuery = z.infer<typeof ListFormsQuerySchema>;
 type ListFormVersionsQuery = z.infer<typeof ListFormVersionsQuerySchema>;
 type FormVersionLookupQuery = z.infer<typeof FormVersionLookupQuerySchema>;
 type NormalizeSchemaBody = z.infer<typeof NormalizeSchemaBodySchema>;
-type SetFormSubmitterAudienceBody = z.infer<typeof SetFormSubmitterAudienceBodySchema>;
 
 const FORM_NOT_FOUND = 'Form not found';
 const FORM_VERSION_NOT_FOUND = 'Form version not found';
@@ -74,24 +70,6 @@ export const getForm = asyncHandler(async (req: Request<FormIdParams>, res: Resp
   }
   res.json(result);
 });
-
-export const getFormSubmitterAudience = asyncHandler(
-  async (req: Request<FormIdParams>, res: Response) => {
-    const result = await formSubmitterAudienceService.get(withSortLocale(req), req.params.id);
-    res.json(result);
-  },
-);
-
-export const setFormSubmitterAudience = asyncHandler(
-  async (req: Request<FormIdParams, unknown, SetFormSubmitterAudienceBody>, res: Response) => {
-    const result = await formSubmitterAudienceService.set(
-      withSortLocale(req),
-      req.params.id,
-      req.body,
-    );
-    res.json(result);
-  },
-);
 
 export const listForms = asyncHandler(async (req: Request, res: Response) => {
   const scope = req.listScope!;

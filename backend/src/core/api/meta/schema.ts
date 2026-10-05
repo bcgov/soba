@@ -11,10 +11,13 @@ import {
   CodeRowWithSourceMetaSchema as LibCodeRowWithSourceMetaSchema,
   FormEngineMetaSchema as LibFormEngineMetaSchema,
   FormEnginesMetaResponseSchema as LibFormEnginesMetaResponseSchema,
+  LoginProviderMetaSchema as LibLoginProviderMetaSchema,
+  LoginProvidersMetaResponseSchema as LibLoginProvidersMetaResponseSchema,
   RoleWithSourceMetaSchema as LibRoleWithSourceMetaSchema,
   RolesMetaResponseSchema as LibRolesMetaResponseSchema,
   FilesConfigMetaResponseSchema as LibFilesConfigMetaResponseSchema,
 } from '@soba/lib';
+import { SortLocaleQuerySchema } from '../shared/offsetPagination';
 
 extendZodWithOpenApi(z);
 
@@ -74,6 +77,13 @@ export const FormEngineMetaSchema = LibFormEngineMetaSchema.clone().openapi('Met
 export const FormEnginesMetaResponseSchema = LibFormEnginesMetaResponseSchema.extend({
   items: z.array(FormEngineMetaSchema),
 }).openapi('Meta_FormEnginesResponse');
+
+export const LoginProviderMetaSchema =
+  LibLoginProviderMetaSchema.clone().openapi('Meta_LoginProvider');
+
+export const LoginProvidersMetaResponseSchema = LibLoginProvidersMetaResponseSchema.extend({
+  items: z.array(LoginProviderMetaSchema),
+}).openapi('Meta_LoginProvidersResponse');
 
 export const RoleWithSourceMetaSchema =
   LibRoleWithSourceMetaSchema.clone().openapi('Meta_RoleWithSource');
@@ -139,6 +149,19 @@ export const registerMetaOpenApi = (registry: OpenAPIRegistry) => {
         description:
           'Whether a feature is available for the given workspace/form scope (fixed → platform-enabled; scoped → an active grant).',
         content: { 'application/json': { schema: FeatureAvailabilityResponseSchema } },
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/meta/login-providers',
+    tags: ['core.meta'],
+    request: { query: SortLocaleQuerySchema },
+    responses: {
+      200: {
+        description: 'Active login providers, by name: the providers an audience can name',
+        content: { 'application/json': { schema: LoginProvidersMetaResponseSchema } },
       },
     },
   });

@@ -31,6 +31,9 @@ export type {
 
 export type SobaFormType = Partial<CreateFormBody> & Partial<UpdateFormBody>;
 
+/** A new form as the dialog fills it in; the API call adds the workspace and the form engine. */
+export type CreateFormFields = Omit<CreateFormBody, 'workspaceId' | 'formEngineCode'>;
+
 export type CreateSobaFormioFormResponse = FormWithVersionResponse;
 
 export type SobaResponseFormType = FormResponse;

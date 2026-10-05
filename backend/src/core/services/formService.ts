@@ -1,4 +1,4 @@
-import type { SortLocale } from '@soba/lib';
+import type { CreateFormSettings, SortLocale } from '@soba/lib';
 import {
   createForm,
   FormRecord,
@@ -21,6 +21,7 @@ import {
 } from '../integrations/form-engine/FormEngineRegistry';
 import { ConflictError, ValidationError } from '../errors';
 import { FORM_NAME_TAKEN } from '../messages';
+import { createFormSettings } from '../../features/form-settings/create';
 
 interface DeleteInput {
   workspaceId: string;
@@ -48,6 +49,8 @@ interface CreateInput {
   name: string;
   description?: string;
   formEngineCode?: string;
+  /** Settings the form starts with instead of inheriting its workspace's. */
+  settings?: CreateFormSettings;
   executor?: DbOrTx;
 }
 
@@ -95,7 +98,7 @@ export class FormService {
     }
 
     const executor = input.executor ?? db;
-    // One-call create: form + an empty v1 draft in a single transaction.
+    // One-call create: form, an empty v1 draft and every settings group's row, in one transaction.
     return executor.transaction(async (tx) => {
       const form = await createForm(
         {
@@ -114,6 +117,16 @@ export class FormService {
           formId: form.id,
           actorId: input.actorId,
           actorDisplayLabel: input.actorDisplayLabel,
+        },
+        tx,
+      );
+      await createFormSettings(
+        {
+          workspaceId: input.workspaceId,
+          formId: form.id,
+          actorId: input.actorId,
+          actorDisplayLabel: input.actorDisplayLabel,
+          settings: input.settings,
         },
         tx,
       );

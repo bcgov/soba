@@ -4,7 +4,11 @@ import { useMemo, useCallback, useEffect, useState } from 'react';
 import { Button as DSButton } from '@bcgov/design-system-react-components';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { Tag } from '@/src/components/Tag';
-import { ListPageToolbar, ListPageAuthGate } from '@/src/components/ListPageLayout';
+import {
+  ListPageAuthGate,
+  ListPageFilters,
+  ListPageToolbar,
+} from '@/src/components/ListPageLayout';
 import { ListPageSearchField } from '@/src/components/ListPageSearchField';
 import { RowActionButton } from '@/src/components/RowActionButton';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
@@ -313,7 +317,7 @@ function FormList() {
           {dict.general.create}
         </DSButton>
       </ListPageToolbar>
-      <div className={`d-flex align-items-end gap-2`}>
+      <ListPageFilters>
         <WorkspaceSelector
           className={`${styles.workspaceField}`}
           workspaces={pickerWorkspaces}
@@ -327,7 +331,7 @@ function FormList() {
         <DSButton variant="secondary" data-testid="clear-filters-button" onPress={listQuery.clear}>
           {dict.general.clearFilters || 'Clear'}
         </DSButton>
-      </div>
+      </ListPageFilters>
 
       <DataTable<SobaFormSummary>
         {...table}
