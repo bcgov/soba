@@ -199,6 +199,14 @@ jobs:
           oc -n "$NAMESPACE" get secret "$MONGODB_AUTH_SECRET_NAME" -o json |
             jq -e '.data["mongodb-passwords"] != null' >/dev/null
 
+      - name: Recover pending Helm release
+        # Checkouts that predate the action skip recovery.
+        if: hashFiles('.github/actions/recover-helm-release/action.yaml') != ''
+        uses: ./.github/actions/recover-helm-release
+        with:
+          release: ${{ env.ACRONYM }}-uat
+          namespace: ${{ env.NAMESPACE }}
+
       - name: Deploy application
         shell: bash
         run: |
@@ -233,15 +241,6 @@ jobs:
             --set-string "vault.role=$VAULT_ROLE" \
             --set-string "vault.secretPath=$VAULT_SECRET_PATH" \
             --set-string "vault.serviceAccountName=$VAULT_SERVICE_ACCOUNT_NAME"
-
-      - name: Wait for application rollouts
-        shell: bash
-        run: |
-          set -euo pipefail
-          oc -n "$NAMESPACE" rollout status deployment/$ACRONYM-uat-backend --timeout=5m
-          oc -n "$NAMESPACE" rollout status deployment/$ACRONYM-uat-frontend-designer --timeout=5m
-          oc -n "$NAMESPACE" rollout status deployment/$ACRONYM-uat-frontend-forms --timeout=5m
-          oc -n "$NAMESPACE" rollout status deployment/$ACRONYM-uat-formio --timeout=5m
 
       - name: Write deployment summary
         shell: bash
