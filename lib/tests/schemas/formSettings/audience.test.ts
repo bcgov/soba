@@ -20,7 +20,7 @@ describe('AudienceSchema', () => {
     ['a blank provider', { mode: 'protected', idps: [' '] }],
     ['public with providers', { mode: 'public', idps: ['azureidir'] }],
     ['members with providers', { mode: 'members', idps: ['azureidir'] }],
-    ['the retired none mode', { mode: 'none', idps: [] }],
+    ['an unknown mode', { mode: 'none', idps: [] }],
     ['no providers list', { mode: 'public' }],
   ])('rejects %s', (_label, audience) => {
     expect(AudienceSchema.safeParse(audience).success).toBe(false);

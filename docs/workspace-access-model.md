@@ -81,8 +81,9 @@ least one active user member (the last member can't be removed). Attempts return
 exposes a `system` boolean so the UI can hide those actions.
 
 **Members are people.** Each member is `{id, kind:'user', membershipId, userId, displayLabel}`, added
-via `POST …/members` with `{kind:'user', membershipId}` and removed by row id. Who outside the
-workspace may submit is not group membership; it is the [Form Audience](#form-audience) setting.
+via `POST /workspaces/:id/groups/:groupId/members` with `{kind:'user', membershipId}` and removed by
+row id. Who outside the workspace may submit is not group membership; it is the
+[Form Audience](#form-audience) setting.
 
 ## Form access (RBAC)
 
@@ -198,10 +199,14 @@ with nothing copied. A form may be more open than its workspace. Anyone a group 
 `members`. Anonymous callers carry the `public` pseudo provider (`is_login_provider = false`), which
 no audience lists.
 
-| method        | path                                  | effect                                                                                                                            |
-| ------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `GET` / `PUT` | `/workspaces/:id/settings/audience`   | the workspace's `{mode, idps}`; any member reads, owner/admin writes                                                              |
-| `GET` / `PUT` | `/design/forms/:id/settings/audience` | reads `{inherit, own, workspace, effective}`; saves `{inherit: true}` or `{inherit: false, values}` (`form_read` / `form_update`) |
+| method        | path                                                 | effect                                                                                                                                                       |
+| ------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET` / `PUT` | `/workspaces/:id/settings/audience`                  | reads and saves `{values: {mode, idps}, version}`; any member reads, owner/admin writes                                                                      |
+| `GET`         | `/workspaces/:id/settings/audience/inheriting-forms` | `{count}` of live forms that use the workspace's audience; any member                                                                                        |
+| `GET` / `PUT` | `/design/forms/:id/settings/audience`                | reads `{inherit, own, workspace, effective, version}`; saves `{inherit: true, version}` or `{inherit: false, values, version}` (`form_read` / `form_update`) |
+
+A save names the `version` it read; a save from an older one gets a 409 and changes nothing. A new
+form can start with its own audience from `settings.audience` in the create body.
 
 `hasFormSubmitAccess` and `isPublicAudience` in `formSubmitAccessRepo.ts` read the form's effective
 audience through `findEffectiveAudience`. Drafts are not offered on a public audience.
