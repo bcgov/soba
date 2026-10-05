@@ -159,6 +159,14 @@ jobs:
           label: test database
       # Pipeline performance fix: Revert if needed.
 
+      - name: Recover pending Helm release
+        # Checkouts that predate the action skip recovery.
+        if: hashFiles('.github/actions/recover-helm-release/action.yaml') != ''
+        uses: ./.github/actions/recover-helm-release
+        with:
+          release: soba-test
+          namespace: ${{ secrets.OC_NAMESPACE }}
+
       - name: Generate values override and deploy
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -208,25 +216,6 @@ jobs:
             -f /tmp/values-override.yaml
           # Pipeline performance fix: Revert if needed.
 
-          REVISION=$(helm status "soba-test" -n "${NAMESPACE}" -o json | jq -r '.version')
-          oc get jobs -n "${NAMESPACE}" -o name \
-            | grep "soba-test-migrate-" \
-            | grep -v -- "-migrate-${REVISION}$" \
-            | xargs -r oc delete -n "${NAMESPACE}" 2>/dev/null || true
-
-          echo "Waiting for backend rollout..."
-          oc rollout status deployment/soba-test-backend -n "${NAMESPACE}" --timeout=300s
-
-          echo "Waiting for frontend rollouts (designer + forms)..."
-          oc rollout status deployment/soba-test-frontend-designer -n "${NAMESPACE}" --timeout=300s
-          oc rollout status deployment/soba-test-frontend-forms -n "${NAMESPACE}" --timeout=300s
-
-          echo "Waiting for formio rollout..."
-          oc rollout status deployment/soba-test-formio -n "${NAMESPACE}" --timeout=300s
-
-          echo "Waiting for mongodb rollout..."
-          oc rollout status statefulset/soba-test-mongodb -n "${NAMESPACE}" --timeout=300s
-
       # Pipeline performance fix: Revert if needed.
       # Temporarily disabled openshift diagnostics; uncomment to restore.
       # - name: Deployment diagnostics
@@ -246,6 +235,6 @@ jobs:
       DEP_ENV: test
       pr_branch: ${{ needs.set-vars.outputs.ref }}
     secrets:
-      Username: ${{ secrets.keycloakUsername }}
-      Password: ${{ secrets.keycloakPassword }}
+      keycloakUsername: ${{ secrets.keycloakUsername }}
+      keycloakPassword: ${{ secrets.keycloakPassword }}
       MFA_CODE: ${{ secrets.MFA_CODE }}
