@@ -11,6 +11,7 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
+      - "lib/**"
       - ".github/workflows/on-merge.yaml"
       - ".github/workflows/build-images.yaml"
       - ".github/actions/**"

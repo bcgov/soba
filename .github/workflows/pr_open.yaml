@@ -49,6 +49,7 @@ jobs:
             deploy:
               - 'backend/**'
               - 'frontend/**'
+              - 'lib/**'
               - '.github/workflows/pr_open.yaml'
               - '.github/workflows/gateway-proxy-check.yaml'
               - '.github/workflows/build-images.yaml'
