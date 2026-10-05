@@ -186,6 +186,8 @@ jobs:
           gwa login --client-id "$GWA_CLIENT_ID" --client-secret "$GWA_CLIENT_SECRET"
           # GWA resolves config paths relative to the current working directory.
           cd "$RUNNER_TEMP"
+          printf 'Publishing gateway-kong.yaml from %s\n' "$PWD"
+          test -s gateway-kong.yaml
           gwa publish-gateway gateway-kong.yaml \
             --qualifier "$GATEWAY_QUALIFIER" --dry-run
           gwa publish-gateway gateway-kong.yaml \

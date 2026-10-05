@@ -35,15 +35,13 @@ Configure the following under **Settings → Environments → pr** for automatic
 checks, or the selected environment for manual checks. Existing accessible
 repository secrets and variables can be reused; environment settings override them.
 
-
-
 | Kind | Name | Value |
 | --- | --- | --- |
 | Secret | `OC_NAMESPACE` | Namespace containing the existing backend release |
 | Secret | `OC_TOKEN` | Account able to inspect deployments/services/configmaps/Helm values and apply NetworkPolicies |
 | Secret | `GWA_CLIENT_ID_<ENV>`, `GWA_CLIENT_SECRET_<ENV>` | Gateway publishing account with `GatewayConfig.Publish`; use the names below |
 | Variable | `OC_SERVER` | OpenShift API URL |
-| Variable | `APS_GATEWAY_ID` | Gateway ID on the selected APS instance, e.g. `gw-ca88c` |
+| Variable | `APS_GATEWAY_ID` | Gateway ID for this GitHub environment; use the gateway table below |
 | Variable | `GWA_LINUX_AMD64_SHA256` | Reviewed SHA256 of the v3.2.0 `gwa_Linux_x86_64.tgz` release asset |
 
 Gateway service-account secret names use an uppercase environment suffix:
@@ -54,6 +52,15 @@ Gateway service-account secret names use an uppercase environment suffix:
 | `dev` | `GWA_CLIENT_ID_DEV` | `GWA_CLIENT_SECRET_DEV` | `chefs-dev` (`gw-e86a9`) |
 | `test` | `GWA_CLIENT_ID_TEST` | `GWA_CLIENT_SECRET_TEST` | `chefs-test` (`gw-68f56`) |
 | `prod` | `GWA_CLIENT_ID_PROD` | `GWA_CLIENT_SECRET_PROD` | Production gateway, when configured |
+
+Set `APS_GATEWAY_ID` separately in each GitHub environment: `gw-e1890` for
+`pr`, `gw-e86a9` for `dev`, and `gw-68f56` for `test`. The local config files and
+`.env.*.example` files do not set GitHub Actions variables.
+
+The supplied APS details show publishing enabled for `chefs-pr` and disabled for
+`chefs-dev`. Enable publishing for `chefs-dev` in APS before running a dev publish.
+Confirm the test gateway's publishing setting as well; it was not included in the
+supplied details. Each publishing account also needs `GatewayConfig.Publish`.
 
 The workflow selects the credential pair from its application environment. Store
 these as repository secrets or in the corresponding GitHub environment. PR Open
@@ -97,7 +104,7 @@ For a manual check:
 1. Make `.github/workflows/gateway-proxy-check.yaml` available on the repository's
    default branch, then open **Actions → Gateway proxy check → Run workflow**.
 2. Select the reviewed workflow ref and GitHub environment.
-3. Supply an existing release, such as `soba-pr-156`.
+3. Supply an existing release: `soba-dev`, `soba-test`, or `soba-pr-<number>`.
 4. Supply a dedicated APS-provisioned hostname without a scheme or path.
 
 Manual checks do not require `APS_PR_ENABLED`. They use the
@@ -128,14 +135,80 @@ https://<gateway-host>/health
 Do not include `/chefs/api/v1` in the gateway request. Existing application
 routing and authorization still apply to other paths behind this broad route.
 
+## Publish the dev or test config locally
+
+The configs in this directory use the same service names and qualifiers as the
+workflow. Commands below start at the repository root and then change into
+`deployments/gateway`, because GWA resolves input files from the working directory.
+
+| Environment | Config | Gateway | Qualifier | Backend upstream |
+| --- | --- | --- | --- | --- |
+| dev | [gw-config-dev.yaml](gw-config-dev.yaml) | `gw-e86a9` | `proxy-proof-soba-dev` | `soba-dev-backend.acf456-dev.svc:4000` |
+| test | [gw-config-test.yaml](gw-config-test.yaml) | `gw-68f56` | `proxy-proof-soba-test` | `soba-test-backend.acf456-test.svc:4000` |
+
+Confirm the namespaces and dedicated APS hostnames in these files against the
+actual deployments. The namespaces are assumed values. APS must provision the
+hostnames, and its gateway pods must be allowed to reach the backend on port 4000.
+Local publishing does not apply the NetworkPolicy or check OpenShift readiness;
+use the manual workflow above to perform those steps automatically.
+
+Install the same checksum-verified GWA v3.2.0 used by the workflow. Export
+`GWA_CLIENT_ID_DEV` and `GWA_CLIENT_SECRET_DEV` with the dev gateway credentials,
+then run:
+
+```bash
+cd deployments/gateway
+gwa config set host api-gov-bc-ca.test.api.gov.bc.ca
+gwa config set gateway gw-e86a9
+gwa login --client-id "$GWA_CLIENT_ID_DEV" --client-secret "$GWA_CLIENT_SECRET_DEV"
+gwa publish-gateway gw-config-dev.yaml --qualifier proxy-proof-soba-dev --dry-run
+```
+
+Review the dry-run output, then publish with the same qualifier:
+
+```bash
+gwa publish-gateway gw-config-dev.yaml --qualifier proxy-proof-soba-dev
+gwa status --json
+```
+
+For test, from the same directory, use the test credentials and config:
+
+```bash
+gwa config set host api-gov-bc-ca.test.api.gov.bc.ca
+gwa config set gateway gw-68f56
+gwa login --client-id "$GWA_CLIENT_ID_TEST" --client-secret "$GWA_CLIENT_SECRET_TEST"
+gwa publish-gateway gw-config-test.yaml --qualifier proxy-proof-soba-test --dry-run
+# After reviewing the dry run:
+gwa publish-gateway gw-config-test.yaml --qualifier proxy-proof-soba-test
+gwa status --json
+```
+
+Wait for `soba-proxy-proof-soba-dev` or `soba-proxy-proof-soba-test` to be `UP`.
+Use the service's public `env_host` from `gwa status --json` for the health check
+(the workflow also uses this returned hostname):
+
+```bash
+# From deployments/gateway; replace the placeholder with the returned env_host.
+GATEWAY_HOSTNAME='<env_host>' node scripts/verify-health.mjs
+```
+
+The expected URLs from the configs are
+`https://soba-dev-api-gov-bc-ca.test.api.gov.bc.ca/health` and
+`https://soba-test-api-gov-bc-ca.test.api.gov.bc.ca/health`.
+The verifier requires HTTP 200, JSON `status: OK`, and a valid timestamp.
+
+Always keep the matching qualifier on both dry-run and publish commands. A local
+publish and a workflow run for the same environment update the same proof resources.
+
 ## Local rendering
 
-Node.js 20+ is sufficient; no packages or credentials are needed to render.
+Run the rendering commands from the repository root. Node.js 20+ is sufficient;
+no packages or credentials are needed to render.
 The `environments/.env.*.example` files contain routing settings only. Source only
 trusted shell files. The generator reads exported variables and does not load .env itself.
 
 ```bash
-export GATEWAY_ID=gw-example
+export GATEWAY_ID=gw-e86a9
 export GATEWAY_QUALIFIER=proxy-proof-soba-dev
 export GATEWAY_HOSTNAME=soba-dev-api-gov-bc-ca.test.api.gov.bc.ca
 export GATEWAY_SERVICE_NAME=soba-proxy-proof-soba-dev
@@ -143,6 +216,14 @@ export BACKEND_HOST=soba-dev-backend.your-namespace.svc
 node deployments/gateway/scripts/generate-gateway-config.mjs \
   --format kong --output /tmp/gateway-kong.yaml
 ```
+
+The environment examples already contain the dev, test, and PR gateway IDs.
+Fill in their empty routing values and export them when sourcing (for example,
+`set -a; source deployments/gateway/environments/.env.dev.example; set +a`).
+Their default service names and qualifiers (`soba-dev` / `dev`, `soba-test` / `test`)
+create a different scope from the configs above. Use the explicit
+`proxy-proof-soba-<environment>` qualifier and `soba-proxy-proof-soba-<environment>`
+service name to reproduce the workflow.
 
 The generator only renders configuration; it does not log in or publish. The
 workflow sets explicit names as shown above. When using the generator's optional

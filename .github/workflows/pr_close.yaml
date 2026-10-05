@@ -89,9 +89,12 @@ jobs:
           SERVICE="soba-${QUALIFIER}"
           # Never publish an empty configuration without the exact PR qualifier.
           printf 'services: []\n' > "$RUNNER_TEMP/empty-gateway.yaml"
-          gwa publish-gateway "$RUNNER_TEMP/empty-gateway.yaml" \
+          # GWA expects config paths relative to the current working directory.
+          cd "$RUNNER_TEMP"
+          test -s empty-gateway.yaml
+          gwa publish-gateway empty-gateway.yaml \
             --qualifier "$QUALIFIER" --dry-run
-          gwa publish-gateway "$RUNNER_TEMP/empty-gateway.yaml" \
+          gwa publish-gateway empty-gateway.yaml \
             --qualifier "$QUALIFIER"
           for attempt in {1..12}; do
             if gwa status --json > "$RUNNER_TEMP/gateway-status.json" \

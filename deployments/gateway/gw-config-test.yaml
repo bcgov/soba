@@ -1,0 +1,23 @@
+# Gateway: chefs-test (gw-68f56); APS administration host: api-gov-bc-ca.test.api.gov.bc.ca
+# Confirm backend namespace acf456-test and gateway hostname before publishing.
+# Configure GWA host/gateway and log in with this gateway's credentials first.
+# Dry run: gwa publish-gateway gw-config-test.yaml --qualifier proxy-proof-soba-test --dry-run
+# Publish: gwa publish-gateway gw-config-test.yaml --qualifier proxy-proof-soba-test
+# Health: https://soba-test-api-gov-bc-ca.test.api.gov.bc.ca/health
+services:
+  - name: "soba-proxy-proof-soba-test"
+    tags: ["ns.gw-68f56.proxy-proof-soba-test"]
+    host: "soba-test-backend.acf456-test.svc"
+    port: 4000
+    protocol: http
+    path: /chefs/api/v1
+    routes:
+      - name: "soba-proxy-proof-soba-test"
+        tags: ["ns.gw-68f56.proxy-proof-soba-test"]
+        hosts:
+          - "soba-test-api-gov-bc-ca.test.api.gov.bc.ca"
+        protocols: [https]
+        paths: [/]
+        preserve_host: false
+        strip_path: false
+        path_handling: v0
