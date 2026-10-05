@@ -24,7 +24,9 @@ runs:
         SELECTOR="owner=helm,name=${RELEASE},status in (pending-install,pending-upgrade,pending-rollback)"
         ERR=$(mktemp)
         for attempt in 1 2 3; do
-          if DELETED=$(oc delete secret -n "${NAMESPACE}" -l "${SELECTOR}" -o name 2>"${ERR}"); then
+          if OUT=$(oc delete secret -n "${NAMESPACE}" -l "${SELECTOR}" -o name 2>"${ERR}"); then
+            # oc prints "No resources found" to stdout when nothing matches.
+            DELETED=$(grep '^secret/' <<< "${OUT}" || true)
             if [ -n "${DELETED}" ]; then
               echo "::warning::Deleted pending Helm records left by an interrupted deploy: ${DELETED//$'\n'/ }"
             fi
