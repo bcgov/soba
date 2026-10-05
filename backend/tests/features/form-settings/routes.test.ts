@@ -31,6 +31,7 @@ jest.mock('../../../src/core/middleware/requireWorkspaceManage', () => {
 import { coreErrorHandler } from '../../../src/core/middleware/errorHandler';
 import { NotFoundError } from '../../../src/core/errors';
 import { Permissions } from '../../../src/core/db/codes';
+import { assertSaved, SETTINGS_CHANGED } from '../../../src/features/form-settings/saved';
 import {
   settingsRoutes,
   type FormSettingsService,
@@ -139,5 +140,20 @@ describe('settingsRoutes', () => {
 
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: 'Form settings not found' });
+  });
+
+  it.each([
+    ['notFound', 404, 'Form settings not found'],
+    ['conflict', 409, SETTINGS_CHANGED],
+  ] as const)('reports a save that ended %s as %i', async (status, code, error) => {
+    service.set.mockImplementation(async () => {
+      assertSaved(status, 'Form settings not found');
+      return { allowThing: true };
+    });
+
+    const res = await request(app).put('/forms/f1/settings/group').send({ allowThing: true });
+
+    expect(res.status).toBe(code);
+    expect(res.body).toEqual({ error });
   });
 });

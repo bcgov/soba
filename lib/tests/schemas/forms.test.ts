@@ -23,4 +23,9 @@ describe('CreateFormBodySchema settings', () => {
   ])('rejects %s', (_label, settings) => {
     expect(CreateFormBodySchema.safeParse({ ...base, settings }).success).toBe(false);
   });
+
+  it('rejects a key outside settings that it does not know', () => {
+    const submitterAudience = { mode: 'protected', idps: ['bceidbasic'] };
+    expect(CreateFormBodySchema.safeParse({ ...base, submitterAudience }).success).toBe(false);
+  });
 });

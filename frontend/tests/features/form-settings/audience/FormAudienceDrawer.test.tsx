@@ -191,15 +191,30 @@ describe('FormAudienceDrawer', () => {
     renderDrawer();
     await waitFor(() => expect(radio('protected')).toBeEnabled());
 
+    await user.click(screen.getByText('BCeID Business'));
     await user.click(saveButton());
 
     await waitFor(() =>
       expect(mockSetSettings).toHaveBeenCalledWith('token', 'f1', 'audience', {
         inherit: false,
-        values: IDIR,
+        values: { mode: 'protected', idps: ['azureidir', 'bceidbusiness'] },
         version: 1,
       }),
     );
+  });
+
+  // A save with nothing changed would still move the version on and stale someone else's edit.
+  it('keeps Save off until something changes', async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(own({ mode: 'members', idps: [] }));
+    renderDrawer();
+    await waitFor(() => expect(radio('members')).toBeEnabled());
+
+    expect(saveButton()).toBeDisabled();
+    await user.click(screen.getByText('Public'));
+    expect(saveButton()).toBeEnabled();
+    await user.click(screen.getByTestId('form-settings-form-audience-cancel'));
+    expect(saveButton()).toBeDisabled();
   });
 
   it('goes back to the workspace audience and saves inherit only', async () => {

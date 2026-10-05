@@ -17,6 +17,8 @@ export interface SettingsRowInput {
 /** A new form's row: a group whose key is in `settings` starts with those values. */
 export interface FormSettingsRowInput extends SettingsRowInput {
   formId: string;
+  /** Who creates the form, for a group that audits the values it starts with. */
+  actorId: string;
   settings?: CreateFormSettings;
 }
 

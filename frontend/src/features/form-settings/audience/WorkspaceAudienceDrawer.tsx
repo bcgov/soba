@@ -37,12 +37,14 @@ export default function WorkspaceAudienceDrawer({
   const [edited, setEdited] = useState<AudienceValue | null>(null);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
-  // Widening to Public reaches every form that uses the workspace setting, so it is confirmed first.
+  // Widening to Public reaches every form that uses the workspace setting, so it is confirmed first,
+  // with the count of those forms read for each confirmation.
   const [confirmingPublic, setConfirmingPublic] = useState(false);
+  const [confirmations, setConfirmations] = useState(0);
   const inheritingForms = useInheritingFormCount(
     AUDIENCE_SETTINGS_KEY,
     workspaceId,
-    confirmingPublic,
+    confirmingPublic ? confirmations : null,
   );
 
   const readError = settingsError ?? providersError;
@@ -62,7 +64,8 @@ export default function WorkspaceAudienceDrawer({
   const offered = providers ?? [];
   const loaded = !!settings && !!providers;
   const value = edited ?? settings?.values ?? null;
-  const canSave = loaded && !saving && !!value && isValidAudience(value, offered);
+  const canSave =
+    loaded && !saving && edited !== null && !!value && isValidAudience(value, offered);
   const widensToPublic = value?.mode === 'public' && settings?.values.mode !== 'public';
 
   const saveChanges = async () => {
@@ -88,14 +91,20 @@ export default function WorkspaceAudienceDrawer({
   };
 
   const requestSave = () => {
-    if (widensToPublic) setConfirmingPublic(true);
-    else void saveChanges();
+    if (!widensToPublic) {
+      void saveChanges();
+      return;
+    }
+    setConfirmations((count) => count + 1);
+    setConfirmingPublic(true);
   };
 
-  const confirmMessage =
-    inheritingForms === null
-      ? t.audiencePublicConfirmMessage
-      : `${t.audiencePublicConfirmMessage} ${t.audienceInheritingForms.replace('{count}', String(inheritingForms))}`;
+  let confirmMessage = t.audiencePublicConfirmMessage;
+  if (inheritingForms.count !== null) {
+    confirmMessage += ` ${t.audienceInheritingForms.replace('{count}', String(inheritingForms.count))}`;
+  } else if (inheritingForms.failed) {
+    confirmMessage += ` ${t.audienceInheritingFormsUnknown}`;
+  }
 
   return (
     <FormSettingsDrawers
@@ -130,6 +139,7 @@ export default function WorkspaceAudienceDrawer({
         onConfirm={() => void saveChanges()}
         onCancel={() => setConfirmingPublic(false)}
         pending={saving}
+        confirmDisabled={inheritingForms.loading}
       />
     </FormSettingsDrawers>
   );

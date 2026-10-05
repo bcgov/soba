@@ -57,7 +57,11 @@ export default function FormAudienceDrawer({ dict, drawerName, formId }: FormSet
   const loaded = !!settings && !!providers;
   const body = edit.body();
   const canSave =
-    loaded && !saving && !!body && (body.inherit === true || isValidAudience(body.values, offered));
+    loaded &&
+    !saving &&
+    edit.changed &&
+    !!body &&
+    (body.inherit === true || isValidAudience(body.values, offered));
 
   // A save that opens the form to everyone is confirmed first, whether it sets Public or inherits a
   // Public workspace.

@@ -102,6 +102,7 @@ export default function SubmitterSettingsDrawer({
       label={t.submitterSettingsDrawerLabel}
       onSave={saveChanges}
       onCancel={edit.reset}
+      canSave={canEdit && edit.changed && !saving}
     >
       {readErrorMessage && (
         <InlineAlert

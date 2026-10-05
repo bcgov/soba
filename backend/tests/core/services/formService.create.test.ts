@@ -81,7 +81,7 @@ describe('FormService.create', () => {
     );
     const tx = createForm.mock.calls[0][1];
     expect(createSettings).toHaveBeenCalledWith(
-      { workspaceId: 'ws1', formId: 'f1', actorDisplayLabel: 'A' },
+      { workspaceId: 'ws1', formId: 'f1', actorId: 'a1', actorDisplayLabel: 'A' },
       tx,
     );
     expect(res).toEqual({

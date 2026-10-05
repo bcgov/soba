@@ -69,6 +69,7 @@ const mockDict = {
       audiencePublicConfirmTitle: "Make this workspace's forms public?",
       audiencePublicConfirmMessage: 'Anyone can submit every form that uses the workspace setting.',
       audienceInheritingForms: 'Forms using the workspace setting: {count}.',
+      audienceInheritingFormsUnknown: 'The number of forms could not be loaded.',
       audiencePublicConfirmLabel: 'Make public',
       submitterSettingsDrawerLabel: 'Submitter Settings',
       allowSubmitterDraftsLabel: DRAFTS,
@@ -98,17 +99,20 @@ let audience: Audience;
 let submitter: SubmitterSettings;
 let store: ReturnType<typeof makeStore>;
 
-function renderTab() {
+// One cache for everything rendered, as the app has.
+function renderWithCache(ui: React.ReactNode) {
   return render(
     <Provider store={store}>
       <SWRConfig
         value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}
       >
-        <WorkspaceFormSettings dict={mockDict} workspaceId="ws1" />
+        {ui}
       </SWRConfig>
     </Provider>,
   );
 }
+
+const renderTab = () => renderWithCache(<WorkspaceFormSettings dict={mockDict} workspaceId="ws1" />);
 
 const input = (testId: string) =>
   screen.getByTestId(testId).querySelector('input') as HTMLInputElement;
@@ -134,6 +138,27 @@ function WithFormProbe() {
       <WorkspaceFormSettings dict={mockDict} workspaceId="ws1" />
     </>
   );
+}
+
+// The tab remounts when the workspace changes, while the app's cache stays.
+function Remountable() {
+  const [mount, setMount] = React.useState(0);
+  return (
+    <>
+      <button type="button" onClick={() => setMount((count) => count + 1)}>
+        remount
+      </button>
+      <WorkspaceFormSettings key={mount} dict={mockDict} workspaceId="ws1" />
+    </>
+  );
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
 }
 
 describe('WorkspaceFormSettings', () => {
@@ -207,6 +232,112 @@ describe('WorkspaceFormSettings', () => {
     expect(radio('public')).toBeChecked();
   });
 
+  // Forms change between confirmations, so a count from an earlier one is never shown.
+  it('holds the confirm until the count is read, and reads it again each time', async () => {
+    const user = userEvent.setup();
+    const first = deferred<{ count: number }>();
+    const second = deferred<{ count: number }>();
+    mockGetInheriting.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    renderTab();
+    await waitFor(() => expect(radio('protected')).toBeEnabled());
+
+    await user.click(screen.getByText('Public'));
+    await user.click(audienceSave());
+    expect(await screen.findByTestId('confirm-modal-confirm')).toBeDisabled();
+    first.resolve({ count: 3 });
+    await waitFor(() => expect(screen.getByTestId('confirm-modal-confirm')).toBeEnabled());
+    expect(screen.getByTestId('confirm-modal-message')).toHaveTextContent(
+      'Forms using the workspace setting: 3.',
+    );
+    await user.click(screen.getByTestId('confirm-modal-cancel'));
+    await waitFor(() => expect(screen.queryByTestId('confirm-modal-message')).toBeNull());
+
+    await user.click(audienceSave());
+    expect(await screen.findByTestId('confirm-modal-confirm')).toBeDisabled();
+    expect(screen.getByTestId('confirm-modal-message')).not.toHaveTextContent(
+      'Forms using the workspace setting',
+    );
+    second.resolve({ count: 5 });
+    await waitFor(() =>
+      expect(screen.getByTestId('confirm-modal-message')).toHaveTextContent(
+        'Forms using the workspace setting: 5.',
+      ),
+    );
+    expect(mockGetInheriting).toHaveBeenCalledTimes(2);
+  });
+
+  it('reads the count again after the tab remounts', async () => {
+    const user = userEvent.setup();
+    const second = deferred<{ count: number }>();
+    mockGetInheriting.mockResolvedValueOnce({ count: 3 }).mockReturnValueOnce(second.promise);
+    renderWithCache(<Remountable />);
+    await waitFor(() => expect(radio('protected')).toBeEnabled());
+
+    await user.click(screen.getByText('Public'));
+    await user.click(audienceSave());
+    await waitFor(() =>
+      expect(screen.getByTestId('confirm-modal-message')).toHaveTextContent(
+        'Forms using the workspace setting: 3.',
+      ),
+    );
+    await user.click(screen.getByTestId('confirm-modal-cancel'));
+    await waitFor(() => expect(screen.queryByTestId('confirm-modal-message')).toBeNull());
+
+    await user.click(screen.getByText('remount'));
+    await waitFor(() => expect(radio('protected')).toBeEnabled());
+    await user.click(screen.getByText('Public'));
+    await user.click(audienceSave());
+    expect(await screen.findByTestId('confirm-modal-confirm')).toBeDisabled();
+    expect(screen.getByTestId('confirm-modal-message')).not.toHaveTextContent(
+      'Forms using the workspace setting',
+    );
+    second.resolve({ count: 5 });
+    await waitFor(() =>
+      expect(screen.getByTestId('confirm-modal-message')).toHaveTextContent(
+        'Forms using the workspace setting: 5.',
+      ),
+    );
+  });
+
+  it('says when the count cannot be read and still lets the change through', async () => {
+    const user = userEvent.setup();
+    mockGetInheriting.mockRejectedValue(new ApiError('Boom', 500));
+    renderTab();
+    await waitFor(() => expect(radio('protected')).toBeEnabled());
+
+    await user.click(screen.getByText('Public'));
+    await user.click(audienceSave());
+    await waitFor(() =>
+      expect(screen.getByTestId('confirm-modal-message')).toHaveTextContent(
+        'The number of forms could not be loaded.',
+      ),
+    );
+    await user.click(screen.getByTestId('confirm-modal-confirm'));
+
+    await waitFor(() =>
+      expect(mockSetSettings).toHaveBeenCalledWith('token', 'ws1', 'audience', {
+        values: { mode: 'public', idps: [] },
+        version: 1,
+      }),
+    );
+  });
+
+  // A save with nothing changed would still move the version on and stale someone else's edit.
+  it('keeps each Save off until its group changes', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await waitFor(() => expect(radio('protected')).toBeEnabled());
+    await waitFor(() => expect(drafts()).toBeEnabled());
+
+    expect(audienceSave()).toBeDisabled();
+    expect(submitterSave()).toBeDisabled();
+    await user.click(screen.getByText('Members only'));
+    expect(audienceSave()).toBeEnabled();
+    expect(submitterSave()).toBeDisabled();
+    await user.click(screen.getByText(DRAFTS));
+    expect(submitterSave()).toBeEnabled();
+  });
+
   // Only widening to Public reaches forms in a way worth stopping for.
   it('saves without asking when the workspace is already public', async () => {
     const user = userEvent.setup();
@@ -214,6 +345,8 @@ describe('WorkspaceFormSettings', () => {
     renderTab();
     await waitFor(() => expect(radio('public')).toBeEnabled());
 
+    await user.click(screen.getByText('Members only'));
+    await user.click(screen.getByText('Public'));
     await user.click(audienceSave());
 
     await waitFor(() => expect(mockSetSettings).toHaveBeenCalled());
@@ -314,15 +447,7 @@ describe('WorkspaceFormSettings', () => {
     mockGetForm
       .mockResolvedValueOnce({ effective: IDIR })
       .mockResolvedValue({ effective: { mode: 'public', idps: [] } });
-    render(
-      <Provider store={store}>
-        <SWRConfig
-          value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}
-        >
-          <WithFormProbe />
-        </SWRConfig>
-      </Provider>,
-    );
+    renderWithCache(<WithFormProbe />);
     expect(await screen.findByText('protected')).toBeInTheDocument();
     await user.click(screen.getByText('toggle form'));
     await waitFor(() => expect(radio('protected')).toBeEnabled());
@@ -334,6 +459,29 @@ describe('WorkspaceFormSettings', () => {
     await user.click(screen.getByText('toggle form'));
 
     expect(await screen.findByText('public')).toBeInTheDocument();
+    expect(mockGetForm).toHaveBeenCalledTimes(2);
+  });
+
+  // A 409 means another save of the workspace landed, which the form's cached view predates.
+  it('makes a form that inherits read its audience again when a workspace save conflicts', async () => {
+    const user = userEvent.setup();
+    mockGetForm
+      .mockResolvedValueOnce({ effective: IDIR })
+      .mockResolvedValue({ effective: { mode: 'members', idps: [] } });
+    mockSetSettings.mockRejectedValue(new ApiError('changed', 409));
+    renderWithCache(<WithFormProbe />);
+    expect(await screen.findByText('protected')).toBeInTheDocument();
+    await user.click(screen.getByText('toggle form'));
+    await waitFor(() => expect(radio('protected')).toBeEnabled());
+
+    await user.click(screen.getByText('Members only'));
+    await user.click(audienceSave());
+    await waitFor(() =>
+      expect(mockAddNotification).toHaveBeenCalledWith({ type: 'error', text: CONFLICT }),
+    );
+    await user.click(screen.getByText('toggle form'));
+
+    expect(await screen.findByText('members')).toBeInTheDocument();
     expect(mockGetForm).toHaveBeenCalledTimes(2);
   });
 });

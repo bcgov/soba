@@ -9,7 +9,8 @@ export const CreateFormSettingsSchema = z.strictObject({
 });
 export type CreateFormSettings = z.infer<typeof CreateFormSettingsSchema>;
 
-export const CreateFormBodySchema = z.object({
+/** Refuses keys it does not know, so a choice the create would not apply is never dropped silently. */
+export const CreateFormBodySchema = z.strictObject({
   workspaceId: z.string().min(1),
   name: z.string().trim().min(1),
   description: z.string().optional(),

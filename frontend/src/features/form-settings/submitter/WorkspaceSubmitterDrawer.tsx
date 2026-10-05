@@ -90,7 +90,7 @@ export default function WorkspaceSubmitterDrawer({
       label={t.submitterSettingsDrawerLabel}
       onSave={saveChanges}
       onCancel={() => setEditedAllowDrafts(null)}
-      canSave={!!settings && !saving}
+      canSave={!!settings && !saving && editedAllowDrafts !== null}
     >
       {readErrorMessage && (
         <InlineAlert

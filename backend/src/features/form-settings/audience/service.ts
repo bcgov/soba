@@ -25,12 +25,14 @@ const WORKSPACE_NOT_FOUND = 'Workspace audience settings not found';
 
 /**
  * The audience as stored: providers deduplicated and sorted. Refuses codes that aren't active login
- * providers, which also keeps out `public` and `system`.
+ * providers, which also keeps out `public` and `system`. Inside a transaction, pass the transaction,
+ * so the check does not wait on a second connection.
  */
-const toStored = async (audience: Audience): Promise<Audience> => {
+const toStored = async (audience: Audience, executor?: DbOrTx): Promise<Audience> => {
   if (audience.mode !== 'protected') return audience;
   const idps = [...new Set(audience.idps)].sort();
-  const valid = new Set((await listLoginIdentityProviders(DEFAULT_SORT_LOCALE)).map((p) => p.code));
+  const providers = await listLoginIdentityProviders(DEFAULT_SORT_LOCALE, executor);
+  const valid = new Set(providers.map((p) => p.code));
   const bad = idps.filter((code) => !valid.has(code));
   if (bad.length) {
     throw new ValidationError(`Not assignable login providers: ${bad.join(', ')}`);
@@ -44,18 +46,20 @@ const readForm = async (ctx: FormSettingsContext, formId: string) => {
   return toInheritableSettings(row, row.workspace);
 };
 
-/** Creates a new form's audience row: inheriting, or the audience sent with the new form. */
+/** Creates a new form's audience row: inheriting, or the audience sent with the new form, audited. */
 export const createFormAudience = async (
   input: FormSettingsRowInput,
   executor: DbOrTx,
 ): Promise<void> => {
   const body = input.settings?.audience;
+  const own = body?.inherit === false ? await toStored(body.values, executor) : null;
   await createFormAudienceSetting(
     {
       workspaceId: input.workspaceId,
       formId: input.formId,
-      audience: body?.inherit === false ? await toStored(body.values) : null,
+      audience: own,
       actorDisplayLabel: input.actorDisplayLabel,
+      audit: own ? { actorId: input.actorId } : undefined,
     },
     executor,
   );

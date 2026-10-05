@@ -124,6 +124,7 @@ export class FormService {
         {
           workspaceId: input.workspaceId,
           formId: form.id,
+          actorId: input.actorId,
           actorDisplayLabel: input.actorDisplayLabel,
           settings: input.settings,
         },

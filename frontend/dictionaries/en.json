@@ -320,6 +320,7 @@
       "audiencePublicConfirmTitle": "Make this workspace's forms public?",
       "audiencePublicConfirmMessage": "Anyone, including people who are not signed in, will be able to submit every form that uses the workspace setting. Drafts are not available on Public forms.",
       "audienceInheritingForms": "Forms using the workspace setting: {count}.",
+      "audienceInheritingFormsUnknown": "The number of forms using the workspace setting could not be loaded.",
       "audiencePublicConfirmLabel": "Make public",
       "audienceFormPublicConfirmTitle": "Make this form public?",
       "audienceFormPublicConfirmMessage": "Anyone, including people who are not signed in, will be able to submit this form. Drafts are not available on Public forms.",

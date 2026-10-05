@@ -194,6 +194,18 @@ describe('SubmitterSettingsDrawer', () => {
     expect(mockGetSettings).toHaveBeenCalledWith('token', 'f1', 'submitter');
   });
 
+  // A save with nothing changed would still move the version on and stale someone else's edit.
+  it('keeps Save off until something changes', async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(ownDrafts(false));
+    renderDrawer();
+    await waitFor(() => expect(checkbox()).toBeEnabled());
+
+    expect(saveButton()).toBeDisabled();
+    await user.click(screen.getByText(LABEL));
+    expect(saveButton()).toBeEnabled();
+  });
+
   it('saves the changed setting', async () => {
     const user = userEvent.setup();
     mockGetSettings.mockResolvedValue(ownDrafts(false));

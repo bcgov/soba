@@ -4,7 +4,12 @@ import { env } from '../../config/env';
 import { db, type DbOrTx } from '../client';
 import { formAudienceSettings, forms, workspaceAudienceSettings } from '../schema';
 import { getIdentityProvider } from './identityProviderRepo';
-import { saveSettingsRow, type SettingsSaveActor, type SettingsSaveStatus } from './settingsRow';
+import {
+  recordSettingsAudit,
+  saveSettingsRow,
+  type SettingsSaveActor,
+  type SettingsSaveStatus,
+} from './settingsRow';
 
 /** A form's audience row read with its workspace's. `own` is null while the form inherits. */
 export interface FormAudienceRow {
@@ -21,9 +26,9 @@ const toAudience = (mode: string, idps: string[]): Audience => ({ mode, idps }) 
  * The audience a new workspace starts with: protected by the configured provider when it is an
  * active login provider, otherwise members only.
  */
-const defaultWorkspaceAudience = async (): Promise<Audience> => {
+const defaultWorkspaceAudience = async (executor: DbOrTx): Promise<Audience> => {
   const code = env.getDefaultSubmitterProvider();
-  const provider = await getIdentityProvider(code);
+  const provider = await getIdentityProvider(code, executor);
   return provider?.isActive && provider.isLoginProvider
     ? { mode: 'protected', idps: [code] }
     : { mode: 'members', idps: [] };
@@ -34,7 +39,7 @@ export const createWorkspaceAudienceSetting = async (
   input: { workspaceId: string; actorDisplayLabel: string | null },
   executor: DbOrTx,
 ): Promise<void> => {
-  const audience = await defaultWorkspaceAudience();
+  const audience = await defaultWorkspaceAudience(executor);
   await executor.insert(workspaceAudienceSettings).values({
     workspaceId: input.workspaceId,
     mode: audience.mode,
@@ -44,25 +49,47 @@ export const createWorkspaceAudienceSetting = async (
   });
 };
 
-/** Creates a new form's audience row: its own audience when given, otherwise inheriting. */
+/**
+ * Creates a new form's audience row: its own audience when given, otherwise inheriting. With `audit`,
+ * the audit records the row as created, with nothing before it.
+ */
 export const createFormAudienceSetting = async (
   input: {
     workspaceId: string;
     formId: string;
     audience?: Audience | null;
     actorDisplayLabel: string | null;
+    audit?: SettingsSaveActor;
   },
   executor: DbOrTx,
 ): Promise<void> => {
-  await executor.insert(formAudienceSettings).values({
-    workspaceId: input.workspaceId,
-    formId: input.formId,
+  const values = {
     inherit: !input.audience,
     mode: input.audience?.mode ?? null,
     idps: input.audience?.idps ?? null,
-    createdBy: input.actorDisplayLabel,
-    updatedBy: input.actorDisplayLabel,
-  });
+  };
+  const [created] = await executor
+    .insert(formAudienceSettings)
+    .values({
+      workspaceId: input.workspaceId,
+      formId: input.formId,
+      ...values,
+      createdBy: input.actorDisplayLabel,
+      updatedBy: input.actorDisplayLabel,
+    })
+    .returning({ version: formAudienceSettings.version });
+  if (input.audit) {
+    await recordSettingsAudit(executor, {
+      workspaceId: input.workspaceId,
+      formId: input.formId,
+      groupKey: AUDIENCE_SETTINGS_KEY,
+      actorId: input.audit.actorId,
+      actorDisplayLabel: input.actorDisplayLabel,
+      version: created.version,
+      before: {},
+      after: values,
+    });
+  }
 };
 
 /** A workspace's audience and its version, or null when the workspace has no row. */

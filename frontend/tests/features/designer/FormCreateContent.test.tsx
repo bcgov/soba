@@ -34,12 +34,15 @@ vi.mock('@/app/[lang]/Providers', () => ({
         audienceMembers: 'Members only',
         audienceProviders: 'Allowed logins',
         audienceProvidersRequired: 'Select at least one login.',
+        audienceLoadError: 'Could not load the form audience.',
       },
     },
     general: {
       cancel: 'Cancel',
       next: 'Next',
       lookupTruncated: 'Showing truncated.',
+      noAccess: 'You do not have access to this.',
+      sessionExpired: 'Your session has ended.',
     },
     workspaces: {
       workspace: 'Workspace',
@@ -70,7 +73,7 @@ vi.mock('@/src/shared/api/useWorkspaces', () => ({
 }));
 
 vi.mock('@/src/features/form-settings/data/useWorkspaceSettings', () => ({
-  useWorkspaceSettings: vi.fn(),
+  useFreshWorkspaceSettings: vi.fn(),
 }));
 
 vi.mock('@/src/shared/api/useLoginProviders', () => ({
@@ -110,8 +113,9 @@ vi.mock('@/app/ui/WorkspaceSelector', () => ({
 import type { Mock } from 'vitest';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useFormCreateWorkspaceOptions } from '@/src/shared/api/useWorkspaces';
-import { useWorkspaceSettings } from '@/src/features/form-settings/data/useWorkspaceSettings';
+import { useFreshWorkspaceSettings } from '@/src/features/form-settings/data/useWorkspaceSettings';
 import { useLoginProviders } from '@/src/shared/api/useLoginProviders';
+import { classifyDataError } from '@/src/shared/api/dataError';
 
 const PROVIDERS = [
   { code: 'azureidir', name: 'IDIR - MFA' },
@@ -141,11 +145,10 @@ describe('FormCreateContent', () => {
       formVersion: { id: 'v-1', versionNo: 1, state: 'draft' },
     });
     mockSaveFormVersionSchema.mockResolvedValue({});
-    (useWorkspaceSettings as Mock).mockImplementation(
+    (useFreshWorkspaceSettings as Mock).mockImplementation(
       (_key: string, workspaceId: string | null) => ({
         settings: workspaceId ? { values: workspaceAudiences[workspaceId], version: 1 } : undefined,
         error: null,
-        save: vi.fn(),
       }),
     );
     (useLoginProviders as Mock).mockReturnValue({
@@ -361,6 +364,35 @@ describe('FormCreateContent', () => {
 
       await userEvent.click(screen.getByText('BCeID Business'));
       expect(screen.getByTestId('save-create-form')).toBeEnabled();
+    });
+
+    // The form would inherit an audience the creator was never shown.
+    it('keeps Next off while the workspace audience loads', async () => {
+      (useFreshWorkspaceSettings as Mock).mockReturnValue({ settings: undefined, error: null });
+      renderComponent();
+      await chooseWorkspace();
+
+      expect(screen.getByTestId('save-create-form')).toBeDisabled();
+      expect(screen.queryByTestId('create-form-audience-error')).not.toBeInTheDocument();
+    });
+
+    it.each([
+      ['the workspace audience', 'settings'],
+      ['the logins', 'providers'],
+    ])('says when %s cannot be read and keeps Next off', async (_label, failing) => {
+      const failed = classifyDataError(new ApiError('Boom', 500));
+      if (failing === 'settings') {
+        (useFreshWorkspaceSettings as Mock).mockReturnValue({ settings: undefined, error: failed });
+      } else {
+        (useLoginProviders as Mock).mockReturnValue({ data: undefined, error: failed });
+      }
+      renderComponent();
+      await chooseWorkspace();
+
+      expect(screen.getByTestId('create-form-audience-error')).toHaveTextContent(
+        'Could not load the form audience.',
+      );
+      expect(screen.getByTestId('save-create-form')).toBeDisabled();
     });
 
     it('starts from the new workspace when the workspace changes', async () => {

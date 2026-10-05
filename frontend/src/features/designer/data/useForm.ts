@@ -19,9 +19,9 @@ import { sessionReadConfig } from '@/src/shared/api/swrConfig';
 import { classifyDataError } from '@/src/shared/api/dataError';
 import type { DataError, WriteOutcome } from '@/src/shared/api/dataContracts';
 import type {
+  CreateFormFields,
   CreateSobaFormioFormResponse,
   FormVersionSummary,
-  SobaFormType,
 } from '@/src/types/forms';
 import { versionsKey } from './useFormVersions';
 import { formVersionSchemaKey, useFormVersionSchema } from './useFormVersionSchema';
@@ -270,7 +270,7 @@ export function useFormCreator() {
   const create = useCallback(
     async (
       token: string,
-      data: SobaFormType,
+      data: CreateFormFields,
       workspaceId?: string,
     ): Promise<WriteOutcome<CreateSobaFormioFormResponse>> => {
       const value = await createSobaFormioForm(token, data, workspaceId);

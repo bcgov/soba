@@ -20,6 +20,8 @@ export function useInheritableEdit<T>(settings: InheritableSettings<T> | undefin
     inherit,
     /** The values shown: the workspace's while inheriting, otherwise the form's. */
     values,
+    /** True once the user has changed something. */
+    changed: edit !== null,
     setInherit: (next: boolean) => setEdit({ inherit: next, values: ownValues }),
     setValues: (next: T) => setEdit({ inherit: false, values: next }),
     /** The save body, from the version loaded, or null until the settings are loaded. */
