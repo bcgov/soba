@@ -13,7 +13,6 @@ import {
   WorkspaceGroupRoleStatus,
   WorkspaceMembershipStatus,
 } from '../codes';
-import { effectiveGroupMembers } from './formGroupOverrideRepo';
 
 /**
  * Permission codes the user holds across a workspace's forms, from the roles of the workspace groups
@@ -48,56 +47,6 @@ export const resolveFormPermissions = async (
     );
 
   return new Set(rows.map((row) => row.permissionCode));
-};
-
-/**
- * Permission codes the user holds on one form, from the roles of the groups they are an effective
- * member of for that form: a form's override of a group replaces that group's members, and roles stay
- * on the workspace group. Resolves 'user' group members only.
- */
-export const resolveFormPermissionsForForm = async (
-  actorId: string,
-  target: { workspaceId: string; formId: string },
-): Promise<Set<string>> => {
-  const [membership] = await db
-    .select({ id: workspaceMemberships.id })
-    .from(workspaceMemberships)
-    .where(
-      and(
-        eq(workspaceMemberships.workspaceId, target.workspaceId),
-        eq(workspaceMemberships.userId, actorId),
-        eq(workspaceMemberships.status, WorkspaceMembershipStatus.active),
-      ),
-    )
-    .limit(1);
-  if (!membership) return new Set();
-
-  const members = await effectiveGroupMembers({
-    workspaceId: target.workspaceId,
-    formId: target.formId,
-    memberKind: GroupMemberKind.user,
-    workspaceMembershipId: membership.id,
-  });
-  const groupIds = [...new Set(members.map((m) => m.groupId))];
-  if (!groupIds.length) return new Set();
-
-  const rows = await db
-    .selectDistinct({ permissionCode: rolePermissions.permissionCode })
-    .from(workspaceGroupRoles)
-    .innerJoin(rolePermissions, eq(rolePermissions.roleCode, workspaceGroupRoles.roleCode))
-    .where(
-      and(
-        inArray(workspaceGroupRoles.groupId, groupIds),
-        eq(workspaceGroupRoles.status, WorkspaceGroupRoleStatus.active),
-      ),
-    );
-  return new Set(rows.map((row) => row.permissionCode));
-};
-
-/** True if `perms` satisfies every required code, honoring the `*` wildcard. */
-export const hasAllPermissions = (perms: Set<string>, required: readonly string[]): boolean => {
-  if (perms.has(Permissions.all)) return true;
-  return required.every((code) => perms.has(code));
 };
 
 /** Fetch all active workspaces for the actor where they hold the required permissions. */

@@ -11,7 +11,7 @@ import { formSubmitterSettingsService, workspaceSubmitterSettingsService } from 
 import { createSubmitterSettings, createWorkspaceSubmitterSettings } from './repo';
 
 export { formSubmitterSettingsService, workspaceSubmitterSettingsService } from './service';
-export { DraftSaveStatus, getDraftSaveStatus, type DraftSaveStatusCode } from './drafts';
+export { getDraftSaveStatus, offersDraftSave } from './drafts';
 
 export const submitterSettingsModule: FormSettingsModule = {
   key: SUBMITTER_SETTINGS_KEY,

@@ -1,9 +1,9 @@
+import { isIdentifiedCaller } from '@soba/lib';
 import { hasFormSubmitAccess, type FormAccessTarget } from '../db/repos/formSubmitAccessRepo';
 import { getSubmissionWorkspaceAndState } from '../db/repos/submissionRepo';
 import { getWorkspaceIdForForm } from '../db/repos/formRepo';
 import { PUBLIC_SUBMITTER_LABEL, WorkspaceMembershipRole, type PermissionCode } from '../db/codes';
 import {
-  isIdentifiedCaller,
   isSubmitterAllowed,
   SubmitterOperation,
   type SubmitterAccessTarget,
@@ -101,8 +101,8 @@ const resolveSubmitTarget = async (req: Request): Promise<SubmitterAccessTarget>
 /**
  * Authorizes a read of a form resource whose workspace and form were already resolved into
  * req.coreContext (see openWorkspaceFromResource). Grants role holders with `required`, or a caller the
- * form's audience admits when `required` is in AUDIENCE_PERMISSIONS. On denial, 401 for anonymous /
- * 403 for an authenticated non-member.
+ * form's audience admits when `required` is an audience permission (isAudiencePermission). On
+ * denial, 401 for anonymous / 403 for an authenticated non-member.
  */
 export const requireFormAccess = (required: PermissionCode) => {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
@@ -196,7 +196,7 @@ export const requireSubmissionDelete = async (
   }
 };
 
-/** Authorizes a list of the caller's own submissions: signed-in callers only, otherwise 401. */
+/** Authorizes a list of the caller's own forms or submissions: signed-in only, otherwise 401. */
 export const requireSignedInSubmitter = (
   req: Request,
   _res: Response,
@@ -206,5 +206,5 @@ export const requireSignedInSubmitter = (
     next();
     return;
   }
-  next(accessDenial(req, 'Sign in to list your submissions'));
+  next(accessDenial(req, 'Sign in to list your own forms and submissions'));
 };

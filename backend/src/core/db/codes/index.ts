@@ -233,8 +233,7 @@ export const IdentityProviders = {
 } as const;
 export type IdentityProviderCode = (typeof IdentityProviders)[keyof typeof IdentityProviders];
 
-/** Pseudo identity provider that grants public (unauthenticated) submit access. */
-export const PUBLIC_PROVIDER_CODE = 'public';
+export { PUBLIC_PROVIDER_CODE } from '@soba/lib';
 
 /** Identity subject of the seeded public user (provider=public). */
 export const PUBLIC_SUBJECT = 'soba-public';
