@@ -45,7 +45,9 @@ export {
   saveSobaFormSubmission,
   submitSobaFormSubmission,
   deleteSubmitSubmission,
+  getMyForms,
   getMySubmissions,
+  getMyWorkspaces,
   getSubmitSubmission,
   getSubmitSubmissionData,
 } from './sobaApiSubmit';

@@ -5,4 +5,6 @@ export type {
   CreateWorkspaceBody,
   UpdateWorkspaceBody,
   ListWorkspacesResponse as WorkspacesResponse,
+  MyWorkspaceLookupResponse,
+  MyWorkspaceLookupItem,
 } from '@soba/lib';

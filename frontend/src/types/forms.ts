@@ -15,6 +15,8 @@ export type {
   FormWithPermissionsResponse,
   ListFormsResponse,
   ListFormVersionsResponse,
+  ListMyFormsResponse,
+  MyFormListItem,
   SubmitFillBundle,
   SubmissionDataDocument,
 } from '@soba/lib';
