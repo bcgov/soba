@@ -63,6 +63,7 @@ export class MeApiService {
         displayName: view.displayName,
         email: view.email,
         preferredUsername: view.preferredUsername,
+        idpCode,
       },
       preferences: {
         defaultWorkspaceId,

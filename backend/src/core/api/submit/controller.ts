@@ -3,16 +3,17 @@ import { z } from 'zod';
 import type { SubmitFillBundle } from '@soba/lib';
 import { asyncHandler } from '../shared/asyncHandler';
 import { NotFoundError } from '../../errors';
-import { formVersionService, submissionsApiService } from '../../container';
+import { formsApiService, formVersionService, submissionsApiService } from '../../container';
 import { resolveCaller } from '../../middleware/actor';
 import { isSubmitterAllowed, SubmitterOperation } from '../../services/submitterAccess';
-import { log } from '../../logging';
-import { DraftSaveStatus, getDraftSaveStatus } from '../../../features/form-settings/submitter';
+import { offersDraftSave } from '../../../features/form-settings/submitter';
+import { workspacesApiService } from '../workspaces/service';
 import type { Request } from 'express';
-import { ListMySubmissionsQuerySchema } from './schema';
+import { ListMyFormsQuerySchema, ListMySubmissionsQuerySchema } from './schema';
 
 type SubmitContext = NonNullable<Request['coreContext']>;
 type ListMySubmissionsQuery = z.infer<typeof ListMySubmissionsQuerySchema>;
+type ListMyFormsQuery = z.infer<typeof ListMyFormsQuerySchema>;
 
 /** Load a submission and its form-version schema by id (both required), or throw 404. */
 const loadSubmissionSchema = async (ctx: SubmitContext, submissionId: string) => {
@@ -28,16 +29,6 @@ const loadSubmissionSchema = async (ctx: SubmitContext, submissionId: string) =>
     throw new NotFoundError('Form version schema not found');
   }
   return { submission, schema };
-};
-
-/** Whether the fill page offers a draft save; a failed lookup offers none, so the form still opens. */
-const offersDraftSave = async (ctx: SubmitContext, formId: string): Promise<boolean> => {
-  try {
-    return (await getDraftSaveStatus(ctx, formId)) === DraftSaveStatus.allowed;
-  } catch (err) {
-    log.error({ err, formId }, 'Draft save status lookup failed');
-    return false;
-  }
 };
 
 /**
@@ -97,4 +88,24 @@ export const listMySubmissions = asyncHandler(async (req: Request, res: Response
       locale: req.sortLocale!,
     }),
   );
+});
+
+/** The caller's forms. Runs after requireSignedInSubmitter. */
+export const listMyForms = asyncHandler(async (req: Request, res: Response) => {
+  const query = req.query as unknown as ListMyFormsQuery;
+  res.json(
+    await formsApiService.listMine(req.actorId!, {
+      offset: query.offset,
+      limit: query.limit,
+      workspaceId: query.workspaceId,
+      q: query.q,
+      sort: query.sort,
+      locale: req.sortLocale!,
+    }),
+  );
+});
+
+/** The workspaces the caller's forms belong to. Runs after requireSignedInSubmitter. */
+export const listMyWorkspaces = asyncHandler(async (req: Request, res: Response) => {
+  res.json(await workspacesApiService.listMine(req.actorId!, req.sortLocale!));
 });

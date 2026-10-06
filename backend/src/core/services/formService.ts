@@ -10,6 +10,7 @@ import {
   updateForm,
   getFormByEngineSchemaRef,
 } from '../db/repos/formRepo';
+import { listFormsForSubmitter, type ListSubmitterFormsInput } from '../db/repos/submitterFormRepo';
 import { createEmptyFormVersionDraft } from '../db/repos/formVersionRepo';
 import { isWorkspaceDisclaimerAccepted } from '../db/repos/workspaceRepo';
 import { db, type DbOrTx } from '../db/client';
@@ -176,6 +177,11 @@ export class FormService {
 
   async list(input: ListInput) {
     return listFormsForWorkspace(input);
+  }
+
+  /** The forms the user holds the submitter role on or has submitted to, in every workspace. */
+  async listForSubmitter(input: ListSubmitterFormsInput) {
+    return listFormsForSubmitter(input);
   }
 
   async delete(input: DeleteInput) {

@@ -44,9 +44,12 @@ it.each(['/submissions', '/submissions/:id/save', '/submissions/:id/submit'])(
   },
 );
 
-it('GET /submissions/mine goes through requireSignedInSubmitter', () => {
-  expect(handlersFor('get', '/submissions/mine')).toContain('requireSignedInSubmitter');
-});
+it.each(['/submissions/mine', '/forms/mine', '/workspaces/mine'])(
+  'GET %s goes through requireSignedInSubmitter',
+  (path) => {
+    expect(handlersFor('get', path)).toContain('requireSignedInSubmitter');
+  },
+);
 
 it('registers GET /submissions/mine before GET /submissions/:id, which would take it as an id', () => {
   const order = routes.filter((r) => r.method === 'get').map((r) => r.path);
