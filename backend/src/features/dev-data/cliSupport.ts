@@ -31,7 +31,8 @@ function exitCodeFor(error: unknown, usage: string): number {
 
 /** Runs a command to completion, then sets the exit code and closes the pool. */
 export function runCli(main: () => Promise<void>, usage: string): void {
-  main()
+  // Ends the chain: every failure is turned into an exit code, and the pool close catches its own.
+  void main()
     .then(() => 0)
     .catch((error: unknown) => exitCodeFor(error, usage))
     .then(async (code) => {

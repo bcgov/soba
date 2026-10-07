@@ -41,6 +41,7 @@ import {
   updateWorkspaceSubmitterSettings,
 } from '../../form-settings/submitter/repo';
 import { getFixture } from '../fixtures';
+import { inSequence } from '../inSequence';
 import { addMember } from '../members';
 import type { ResolvedUser } from '../resolveUser';
 import { recordIds } from '../runs';
@@ -133,24 +134,25 @@ async function createPersonas(
   owner: ResolvedUser,
   publicUser: ResolvedUser,
 ): Promise<Map<PersonaKey, Persona>> {
-  const personas = new Map<PersonaKey, Persona>([
-    [OWNER, { ...owner, identityProviderCode: await providerOf(owner.id) }],
-    [ANONYMOUS, { ...publicUser, identityProviderCode: PUBLIC_PROVIDER_CODE }],
-  ]);
-  for (const planned of buildCoveragePlan().personas) {
+  const generated = await inSequence(buildCoveragePlan().personas, async (planned) => {
     const id = await findOrCreateUserByIdentity(
       planned.identityProviderCode,
       planned.subject,
       planned.profile,
     );
     await recordIds(runId, { userIds: [id] });
-    personas.set(planned.key, {
+    const created: Persona = {
       id,
       displayLabel: planned.displayLabel,
       identityProviderCode: planned.identityProviderCode,
-    });
-  }
-  return personas;
+    };
+    return [planned.key, created] as const;
+  });
+  return new Map<PersonaKey, Persona>([
+    [OWNER, { ...owner, identityProviderCode: await providerOf(owner.id) }],
+    [ANONYMOUS, { ...publicUser, identityProviderCode: PUBLIC_PROVIDER_CODE }],
+    ...generated,
+  ]);
 }
 
 async function groupFor(
@@ -186,26 +188,35 @@ async function addSeat(
     status: seat.membershipStatus ? WorkspaceMembershipStatus[seat.membershipStatus] : undefined,
   });
   const groupId = await groupFor(workspaceId, seat, admin);
-  if (!groupId) return membershipId;
+  if (groupId) await joinGroup({ workspaceId, groupId, membershipId, seat, admin });
+  return membershipId;
+}
 
+/** Adds the membership to the group with the seat's group membership status. */
+async function joinGroup(args: {
+  workspaceId: string;
+  groupId: string;
+  membershipId: string;
+  seat: PlannedSeat;
+  admin: ResolvedUser;
+}): Promise<void> {
+  const { workspaceId, groupId, membershipId, seat } = args;
   await addUserToGroup(db, {
     workspaceId,
     groupId,
     membershipId,
-    displayLabel: admin.displayLabel,
+    displayLabel: args.admin.displayLabel,
   });
-  if (seat.groupMembershipStatus) {
-    await db
-      .update(workspaceGroupMemberships)
-      .set({ status: WorkspaceGroupMembershipStatus[seat.groupMembershipStatus] })
-      .where(
-        and(
-          eq(workspaceGroupMemberships.groupId, groupId),
-          eq(workspaceGroupMemberships.workspaceMembershipId, membershipId),
-        ),
-      );
-  }
-  return membershipId;
+  if (!seat.groupMembershipStatus) return;
+  await db
+    .update(workspaceGroupMemberships)
+    .set({ status: WorkspaceGroupMembershipStatus[seat.groupMembershipStatus] })
+    .where(
+      and(
+        eq(workspaceGroupMemberships.groupId, groupId),
+        eq(workspaceGroupMemberships.workspaceMembershipId, membershipId),
+      ),
+    );
 }
 
 async function createForm(
@@ -309,15 +320,13 @@ async function createWorkspace(
     'workspace drafts setting',
   );
 
-  const memberships = new Map<PersonaKey, string>();
-  for (const seat of planned.seats) {
-    memberships.set(seat.persona, await addSeat(ctx, workspaceId, seat));
-  }
-  ctx.memberships.set(planned.key, memberships);
+  const seats = await inSequence(
+    planned.seats,
+    async (seat) => [seat.persona, await addSeat(ctx, workspaceId, seat)] as const,
+  );
+  ctx.memberships.set(planned.key, new Map<PersonaKey, string>(seats));
 
-  for (const form of planned.forms) {
-    await createForm(ctx, planned, workspaceId, form);
-  }
+  await inSequence(planned.forms, (form) => createForm(ctx, planned, workspaceId, form));
   return { id: workspaceId, name: planned.name };
 }
 
@@ -334,26 +343,36 @@ async function createSubmission(
   const submissionId = uuidv7();
 
   await submissionService.open({ id: submissionId, workspaceId, formId, ...actor });
-  const data = getFixture(COVERAGE_FIXTURE_CODE).answers(index);
-  for (const event of planned.events) {
-    const input = { workspaceId, submissionId, data, ...actor };
-    await (event === 'saved' ? submissionService.save(input) : submissionService.submit(input));
-  }
+  const input = {
+    workspaceId,
+    submissionId,
+    data: getFixture(COVERAGE_FIXTURE_CODE).answers(index),
+  };
+  await inSequence(planned.events, (event) =>
+    event === 'saved'
+      ? submissionService.save({ ...input, ...actor })
+      : submissionService.submit({ ...input, ...actor }),
+  );
 
-  for (const grant of planned.collaborators ?? []) {
-    const inactive = grant.status === 'inactive';
-    await db.insert(submissionParticipants).values({
-      workspaceId,
-      submissionId,
-      userId: persona(ctx, grant.persona).id,
-      role: SubmissionParticipantRole.collaborator,
-      status: SubmissionParticipantStatus[grant.status],
-      grantedBy: by.id,
-      revokedBy: inactive ? by.id : null,
-      revokedAt: inactive ? new Date() : null,
-      createdBy: by.displayLabel,
-      updatedBy: by.displayLabel,
-    });
+  const grants = planned.collaborators ?? [];
+  if (grants.length > 0) {
+    await db.insert(submissionParticipants).values(
+      grants.map((grant) => {
+        const inactive = grant.status === 'inactive';
+        return {
+          workspaceId,
+          submissionId,
+          userId: persona(ctx, grant.persona).id,
+          role: SubmissionParticipantRole.collaborator,
+          status: SubmissionParticipantStatus[grant.status],
+          grantedBy: by.id,
+          revokedBy: inactive ? by.id : null,
+          revokedAt: inactive ? new Date() : null,
+          createdBy: by.displayLabel,
+          updatedBy: by.displayLabel,
+        };
+      }),
+    );
   }
 
   if (planned.deleted) {
@@ -383,19 +402,19 @@ async function applyDeletes(
   plannedForms: PlannedCoverageForm[],
 ): Promise<void> {
   const actor = actorOf(persona(ctx, ADMIN));
-  for (const planned of plannedForms) {
-    const form = ctx.forms.get(planned.key);
-    if (!form || !planned.then) continue;
-    if (planned.then === 'deleteForm') {
-      await formService.delete({ workspaceId: form.workspaceId, formId: form.formId, ...actor });
-    } else {
-      await formVersionService.delete({
-        workspaceId: form.workspaceId,
-        formVersionId: form.versionId,
-        ...actor,
-      });
-    }
-  }
+  await inSequence(
+    plannedForms.filter((planned) => planned.afterSubmissions),
+    async (planned) => {
+      const form = ctx.forms.get(planned.key);
+      if (!form) throw new Error(`Coverage form ${planned.key} was not created`);
+      const { workspaceId } = form;
+      if (planned.afterSubmissions === 'deleteForm') {
+        await formService.delete({ workspaceId, formId: form.formId, ...actor });
+      } else {
+        await formVersionService.delete({ workspaceId, formVersionId: form.versionId, ...actor });
+      }
+    },
+  );
 }
 
 /**
@@ -415,15 +434,14 @@ export async function generateCoverage(args: {
     forms: new Map(),
   };
 
-  const workspaces = new Map<CoverageWorkspaceKey, { id: string; name: string }>();
-  for (const planned of plan.workspaces) {
-    workspaces.set(planned.key, await createWorkspace(ctx, planned));
-  }
-
-  const submissions = new Map<CoverageSubmissionKey, CoverageSubmissionRef>();
-  for (const [index, planned] of plan.submissions.entries()) {
-    submissions.set(planned.key, await createSubmission(ctx, planned, index));
-  }
+  const workspaces = await inSequence(
+    plan.workspaces,
+    async (planned) => [planned.key, await createWorkspace(ctx, planned)] as const,
+  );
+  const submissions = await inSequence(
+    plan.submissions,
+    async (planned, index) => [planned.key, await createSubmission(ctx, planned, index)] as const,
+  );
   await applyDeletes(
     ctx,
     plan.workspaces.flatMap((w) => w.forms),
@@ -434,12 +452,12 @@ export async function generateCoverage(args: {
       id,
       identityProviderCode,
     })),
-    workspaces: recordOf(COVERAGE_WORKSPACE_KEYS, workspaces, (ref) => ref),
+    workspaces: recordOf(COVERAGE_WORKSPACE_KEYS, new Map(workspaces), (ref) => ref),
     forms: recordOf(COVERAGE_FORM_KEYS, ctx.forms, ({ workspaceId, formId, name }) => ({
       workspaceId,
       formId,
       name,
     })),
-    submissions: recordOf(COVERAGE_SUBMISSION_KEYS, submissions, (ref) => ref),
+    submissions: recordOf(COVERAGE_SUBMISSION_KEYS, new Map(submissions), (ref) => ref),
   };
 }

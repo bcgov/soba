@@ -181,6 +181,7 @@ them.
 | [`purge.ts`](./purge.ts)                 | Removes it all, engine documents and stored bytes included |
 | [`fixtures/`](./fixtures)                | Form definitions and answers matching their components     |
 | [`members.ts`](./members.ts)             | Writes workspace memberships directly                      |
+| [`inSequence.ts`](./inSequence.ts)       | Runs async steps one at a time, in order                   |
 | [`access/`](./access)                    | The access coverage set, its expectations, and its checks  |
 | [`ownerFile.ts`](./ownerFile.ts)         | Reads and writes `.devdata-owner`, creates the owner       |
 | [`resolveUser.ts`](./resolveUser.ts)     | Looks the owner up by username                             |

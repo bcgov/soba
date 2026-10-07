@@ -38,6 +38,7 @@ import { SUBMITTER_DELETABLE_STATES } from '../../../core/services/submissionLif
 import { isSubmitterAllowed, SubmitterOperation } from '../../../core/services/submitterAccess';
 import { ValidationError } from '../../../core/errors';
 import { getDraftSaveStatus } from '../../form-settings/submitter/drafts';
+import { inSequence } from '../inSequence';
 import { findActiveManifest } from '../runs';
 import {
   expectedOf,
@@ -59,6 +60,7 @@ import {
   PERSONA_KEYS,
   type CoverageFormKey,
   type CoverageSubmissionKey,
+  type CoverageWorkspaceKey,
   type PersonaKey,
 } from './plan';
 
@@ -71,6 +73,12 @@ export interface CoverageReport {
   submissions: CaseResult<CoverageSubmissionKey, SubmissionCheck>[];
   /** Disagreements between two code paths that should give the same answer. */
   inconsistencies: string[];
+}
+
+/** Results for a group of cases, and where two code paths disagreed on them. */
+interface CaseCheck<TCase extends string, TCheck extends string> {
+  results: CaseResult<TCase, TCheck>[];
+  issues: string[];
 }
 
 interface Caller {
@@ -214,78 +222,108 @@ function rowInconsistencies(
   return issues;
 }
 
+/** Answers for one persona and one form, read alongside the My Forms rows of its workspace. */
+async function checkForm(
+  manifest: CoverageManifest,
+  caller: Caller,
+  formKey: CoverageFormKey,
+  rows: Map<string, SubmitterFormListRow>,
+): Promise<{ result: CaseResult<CoverageFormKey, FormCheck>; issues: string[] }> {
+  const form = manifest.forms[formKey];
+  const row = rows.get(form.formId);
+  const answers = await formAnswers(caller, form);
+  return {
+    result: {
+      persona: caller.persona,
+      caseKey: formKey,
+      actual: { listed: !!row, ...answers },
+      expected: expectedOf(FORM_CHECKS, FORM_EXPECTATIONS[formKey], caller.persona),
+    },
+    issues: row ? rowInconsistencies(caller, formKey, row, answers) : [],
+  };
+}
+
+async function checkWorkspaceForms(
+  manifest: CoverageManifest,
+  caller: Caller,
+  workspaceKey: CoverageWorkspaceKey,
+  filter: Set<string>,
+): Promise<CaseCheck<CoverageFormKey, FormCheck>> {
+  const workspaceId = manifest.workspaces[workspaceKey].id;
+  const rows = await myFormRows(caller, workspaceId);
+  const formKeys = COVERAGE_FORM_KEYS.filter(
+    (key) => manifest.forms[key].workspaceId === workspaceId,
+  );
+  const checked = await Promise.all(
+    formKeys.map((formKey) => checkForm(manifest, caller, formKey, rows)),
+  );
+  const listedHere = rows.size > 0;
+  const filterIssue =
+    listedHere === filter.has(workspaceId)
+      ? []
+      : [`${caller.persona} x ${workspaceKey}: My Forms filter disagrees with the listed forms`];
+  return {
+    results: checked.map((c) => c.result),
+    issues: [...checked.flatMap((c) => c.issues), ...filterIssue],
+  };
+}
+
 async function checkForms(
   manifest: CoverageManifest,
   caller: Caller,
-  report: CoverageReport,
-): Promise<void> {
+): Promise<CaseCheck<CoverageFormKey, FormCheck>> {
   const filter = await myWorkspaceIds(caller);
-  for (const workspaceKey of COVERAGE_WORKSPACE_KEYS) {
-    const workspaceId = manifest.workspaces[workspaceKey].id;
-    const rows = await myFormRows(caller, workspaceId);
-    const formKeys = COVERAGE_FORM_KEYS.filter(
-      (key) => manifest.forms[key].workspaceId === workspaceId,
-    );
-    for (const formKey of formKeys) {
-      const form = manifest.forms[formKey];
-      const row = rows.get(form.formId);
-      const answers = await formAnswers(caller, form);
-      if (row) report.inconsistencies.push(...rowInconsistencies(caller, formKey, row, answers));
-      report.forms.push({
-        persona: caller.persona,
-        caseKey: formKey,
-        actual: { listed: !!row, ...answers },
-        expected: expectedOf(FORM_CHECKS, FORM_EXPECTATIONS[formKey], caller.persona),
-      });
-    }
-    const listedHere = rows.size > 0;
-    if (listedHere !== filter.has(workspaceId)) {
-      report.inconsistencies.push(
-        `${caller.persona} x ${workspaceKey}: My Forms filter disagrees with the listed forms`,
-      );
-    }
-  }
+  const workspaces = await Promise.all(
+    COVERAGE_WORKSPACE_KEYS.map((key) => checkWorkspaceForms(manifest, caller, key, filter)),
+  );
+  return {
+    results: workspaces.flatMap((w) => w.results),
+    issues: workspaces.flatMap((w) => w.issues),
+  };
 }
 
 async function checkSubmissions(
   manifest: CoverageManifest,
   caller: Caller,
-  report: CoverageReport,
-): Promise<void> {
+): Promise<CaseResult<CoverageSubmissionKey, SubmissionCheck>[]> {
   const mine = await mySubmissionIds(caller);
-  for (const key of COVERAGE_SUBMISSION_KEYS) {
-    report.submissions.push({
+  return Promise.all(
+    COVERAGE_SUBMISSION_KEYS.map(async (key) => ({
       persona: caller.persona,
       caseKey: key,
       actual: await submissionAnswers(caller, manifest.submissions[key], mine),
       expected: expectedOf(SUBMISSION_CHECKS, SUBMISSION_EXPECTATIONS[key], caller.persona),
-    });
-  }
+    })),
+  );
 }
 
-/** Every persona against every form and submission in the coverage set. */
+const skipsOwner = (manifest: CoverageManifest): boolean =>
+  manifest.personas[OWNER].identityProviderCode !== OWNER_PROVIDER;
+
+/**
+ * Every persona against every form and submission in the coverage set. Personas run in turn and
+ * each persona's cases together, which bounds how many queries wait for a pooled connection.
+ */
 export async function checkCoverage(manifest: CoverageManifest): Promise<CoverageReport> {
-  const report: CoverageReport = {
-    personas: [],
-    skipped: [],
-    forms: [],
-    submissions: [],
-    inconsistencies: [],
-  };
-  for (const persona of PERSONA_KEYS) {
-    const provider = manifest.personas[persona].identityProviderCode;
-    if (persona === OWNER && provider !== OWNER_PROVIDER) {
-      report.skipped.push(
-        `${OWNER}: signs in through ${provider}, the table assumes ${OWNER_PROVIDER}`,
-      );
-      continue;
-    }
+  const ownerProvider = manifest.personas[OWNER].identityProviderCode;
+  const personas = PERSONA_KEYS.filter((persona) => persona !== OWNER || !skipsOwner(manifest));
+  const checked = await inSequence(personas, async (persona) => {
     const caller = callerOf(manifest, persona);
-    report.personas.push(persona);
-    await checkForms(manifest, caller, report);
-    await checkSubmissions(manifest, caller, report);
-  }
-  return report;
+    const [forms, submissions] = await Promise.all([
+      checkForms(manifest, caller),
+      checkSubmissions(manifest, caller),
+    ]);
+    return { forms, submissions };
+  });
+  return {
+    personas,
+    skipped: skipsOwner(manifest)
+      ? [`${OWNER}: signs in through ${ownerProvider}, the table assumes ${OWNER_PROVIDER}`]
+      : [],
+    forms: checked.flatMap((c) => c.forms.results),
+    submissions: checked.flatMap((c) => c.submissions),
+    inconsistencies: checked.flatMap((c) => c.forms.issues),
+  };
 }
 
 const formNameOf = (manifest: CoverageManifest, formId: string): string =>

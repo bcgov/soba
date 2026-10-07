@@ -101,7 +101,7 @@ export interface PlannedCoverageForm {
   /** Replaces the form submitters group's members on this form; cleared leaves it inactive. */
   submitterOverride?: { members: PersonaKey[]; cleared?: boolean };
   /** Applied once the form's submissions exist. */
-  then?: 'deleteForm' | 'deleteVersion';
+  afterSubmissions?: 'deleteForm' | 'deleteVersion';
 }
 
 export interface PlannedCoverageWorkspace {
@@ -254,13 +254,13 @@ const ROLES_WORKSPACE: PlannedCoverageWorkspace = {
     ),
     form('rolesUnpublished', 'Roles unpublished', 'Never published.', { published: false }),
     form('rolesFormDeleted', 'Roles form deleted', 'Deleted after a draft was saved.', {
-      then: 'deleteForm',
+      afterSubmissions: 'deleteForm',
     }),
     form(
       'rolesVersionDeleted',
       'Roles version deleted',
       'Its published version was deleted after a submission.',
-      { then: 'deleteVersion' },
+      { afterSubmissions: 'deleteVersion' },
     ),
     form('rolesDraftsOff', 'Roles drafts off', 'Turns drafts off for itself.', {
       allowSubmitterDrafts: false,
