@@ -226,8 +226,8 @@ describe('FormCreateContent', () => {
     expect(mockRouterPush).toHaveBeenCalledWith('/en/build/form-123');
   });
 
-  // A version with no schema answers a read with 404, which leaves the designer nothing to open.
-  it('writes the empty schema to the version the form is created with', async () => {
+  // A version with no schema answers a read with 404, and the builder adds no Submit of its own.
+  it('writes a Submit button to the version the form is created with', async () => {
     renderComponent();
 
     await userEvent.type(nameInput(), 'My New Form');
@@ -235,7 +235,7 @@ describe('FormCreateContent', () => {
     await userEvent.click(screen.getByTestId('save-create-form'));
 
     expect(mockSaveFormVersionSchema).toHaveBeenCalledWith('mock-token', 'v-1', {
-      components: [],
+      components: [expect.objectContaining({ type: 'button', key: 'submit', action: 'submit' })],
     });
     expect(mockRouterPush).toHaveBeenCalledWith('/en/build/form-123');
   });
