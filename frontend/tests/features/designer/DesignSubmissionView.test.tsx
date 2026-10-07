@@ -1,7 +1,8 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { act } from 'react';
+import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { SWRConfig } from 'swr';
 
@@ -28,6 +29,7 @@ const deleteSobaSubmission = vi.fn();
 const getSobaSubmissionReview = vi.fn();
 const addSobaSubmissionNote = vi.fn();
 const recordSobaSubmissionEdit = vi.fn();
+const updateSobaSubmissionStatus = vi.fn();
 
 const SUBMISSION_ID = '01a0a276-8dee-71e4-8951-5effdc491be0';
 const REVIEW = {
@@ -48,7 +50,7 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
   getSobaSubmissionReview: (...args: unknown[]) => getSobaSubmissionReview(...args),
   addSobaSubmissionNote: (...args: unknown[]) => addSobaSubmissionNote(...args),
   recordSobaSubmissionEdit: (...args: unknown[]) => recordSobaSubmissionEdit(...args),
-  updateSobaSubmissionStatus: vi.fn(),
+  updateSobaSubmissionStatus: (...args: unknown[]) => updateSobaSubmissionStatus(...args),
   fetchCurrentUser: async () => ({ actor: { displayLabel: 'Rev Iewer' } }),
   deleteSobaSubmission: (...args: unknown[]) => deleteSobaSubmission(...args),
   getSobaSubmission: (...args: unknown[]) => getSobaSubmission(...args),
@@ -297,5 +299,116 @@ describe('DesignSubmissionView', () => {
 
     await waitFor(() => expect(deleteSobaSubmission).toHaveBeenCalledWith('token', SUBMISSION_ID));
     expect(mockPush).toHaveBeenCalledWith('/en/build/f1?tab=submissions');
+  });
+
+  const notifications = () =>
+    store.getState().notification.notifications.map((notification) => notification.text);
+
+  it('saves a status change and shows it as the current status', async () => {
+    signIn();
+    updateSobaSubmissionStatus.mockResolvedValue({
+      ...REVIEW,
+      statusHistory: [
+        { ...REVIEW.statusHistory[0], id: 's2', status: 'COMPLETED' },
+        ...REVIEW.statusHistory,
+      ],
+    });
+    const user = userEvent.setup();
+    await renderView();
+    await waitFor(() => expect(screen.getByTestId('submission-status-select')).toBeInTheDocument());
+
+    await user.click(within(screen.getByTestId('submission-status-select')).getByRole('button'));
+    await user.click(await screen.findByRole('option', { name: 'Completed' }));
+    await user.click(screen.getByTestId('submission-status-update'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('submission-status-current')).toHaveTextContent(
+        'Current Status: Completed',
+      ),
+    );
+    expect(updateSobaSubmissionStatus).toHaveBeenCalledWith('token', SUBMISSION_ID, {
+      status: 'COMPLETED',
+      assignee: null,
+      emailComment: false,
+    });
+    expect(notifications()).toContain('Status updated');
+  });
+
+  it('says a note could not be saved and leaves the list as it was', async () => {
+    signIn();
+    addSobaSubmissionNote.mockRejectedValue(new ApiError('Request failed (500)', 500));
+    await renderView();
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Note' })).toBeInTheDocument());
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Note' }), {
+      target: { value: 'Will not save' },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('submission-note-add'));
+    });
+
+    await waitFor(() => expect(notifications()).toContain('Could not save your change.'));
+    expect(screen.getByTestId('submission-notes-empty')).toBeInTheDocument();
+  });
+
+  it('keeps Add Note off for a note that is only spaces', async () => {
+    signIn();
+    await renderView();
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Note' })).toBeInTheDocument());
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Note' }), { target: { value: '   ' } });
+
+    expect(screen.getByTestId('submission-note-add')).toBeDisabled();
+  });
+
+  it('records no edit when the change is cancelled', async () => {
+    signIn();
+    await renderView();
+    await waitFor(() => expect(screen.getByTestId('submission-data-update')).toBeInTheDocument());
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('submission-data-update'));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('confirm-modal-cancel'));
+    });
+
+    expect(recordSobaSubmissionEdit).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('confirm-modal-confirm')).not.toBeInTheDocument();
+  });
+
+  it('lists the edits in the submitted data history', async () => {
+    signIn();
+    getSobaSubmissionReview.mockResolvedValue({
+      ...REVIEW,
+      editHistory: [{ id: 'e1', editedAt: '2026-01-03T03:04:05Z', editedBy: 'Grace Hopper' }],
+    });
+    await renderView();
+    await waitFor(() => expect(screen.getByTestId('submission-data-history')).toBeInTheDocument());
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('submission-data-history'));
+    });
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByTestId('submission-history-intro')).toHaveTextContent('audit log');
+    expect(within(dialog).getByText('Grace Hopper')).toBeInTheDocument();
+  });
+
+  it('stays on the page and says so when the delete fails', async () => {
+    signIn();
+    deleteSobaSubmission.mockRejectedValue(new ApiError('Request failed (500)', 500));
+    await renderView();
+    await waitFor(() => expect(screen.getByTestId('submission-review-delete')).toBeInTheDocument());
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('submission-review-delete'));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('confirm-modal-confirm'));
+    });
+
+    await waitFor(() => expect(notifications()).toContain('Failed to delete submission'));
+    expect(mockPush).not.toHaveBeenCalled();
   });
 });
