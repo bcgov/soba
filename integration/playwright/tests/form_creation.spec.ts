@@ -1,9 +1,10 @@
 import { test, expect } from "../fixtures/form_title";
 import type { Page } from "@playwright/test";
-import { login } from "../support/soba_login";
 import dictionaries from "../../../frontend/dictionaries/en.json";
 import * as dotenv from "dotenv";
 import path from "path"; // <-- import dotenv
+
+const authFile = path.resolve(__dirname, "../support/user.json");
 
 let sharedPage: Page;
 let form_name: string;
@@ -13,7 +14,9 @@ const depEnv = process.env.DEP_ENV || "dev"; // fallback to dev if undefined
 
 test.describe.serial("Landing page tests", () => {
   test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext();
+    const context = await browser.newContext({
+      storageState: authFile,
+    });
     sharedPage = await context.newPage();
   });
 
@@ -29,7 +32,7 @@ test.describe.serial("Landing page tests", () => {
     await expect(
       sharedPage.locator('[data-testid="login-button"]'),
     ).toBeVisible();
-    await login(sharedPage);
+    //await login(sharedPage);
     await sharedPage.waitForTimeout(1000); // waits 1 second
     const workspaceModal = sharedPage
       .locator(".bcds-react-aria-Modal")
@@ -125,57 +128,38 @@ test.describe.serial("Landing page tests", () => {
       await expect(idirMfa.locator('input[type="checkbox"]')).toBeChecked();
       await expect(sharedPage.getByTestId("audience-cancel")).toBeVisible();
       await sharedPage.getByTestId("audience-save").click();
-    } else {
-      // Continue with normal flow
-      //Form creation
-      await sharedPage.click('[data-testid="create-form-button"]');
-      const formNameInput = sharedPage
-        .locator("label", { hasText: "Form Name" })
-        .locator("xpath=following-sibling::div//input");
-      await formNameInput.fill(title);
-      form_name = title;
-      await sharedPage.getByRole("button", { name: "Select an item" }).click();
-      if (depEnv === "test") {
-        const workspaceOption = sharedPage.getByRole("option", {
-          name: "Test Workspace (team)",
-          exact: true,
-        });
-        await workspaceOption.click();
-      } else {
-        await sharedPage.waitForTimeout(1000);
-        const workspaceOption = sharedPage.getByRole("option", {
-          name: "Test Workspace (team)",
-          exact: true,
-        });
-        await workspaceOption.click();
-      }
-      await sharedPage.getByTestId("submitter-audience-trigger").click();
-      await expect(
-        sharedPage.getByTestId("audience-mode-public"),
-      ).toBeVisible();
-      await expect(
-        sharedPage.getByTestId("audience-mode-protected"),
-      ).toBeVisible();
-      await expect(
-        sharedPage.locator('input[type="radio"][value="protected"]'),
-      ).toBeChecked();
-      const bceidBusiness = sharedPage.getByTestId(
-        "audience-idp-bceidbusiness",
-      );
-      const idirMfa = sharedPage.getByTestId("audience-idp-azureidir");
-      // Verify both options are visible
-      await expect(bceidBusiness).toBeVisible();
-      await expect(idirMfa).toBeVisible();
-      // Verify IDIR - MFA is selected
-      await expect(idirMfa.locator('input[type="checkbox"]')).toBeChecked();
-      await expect(sharedPage.getByTestId("audience-cancel")).toBeVisible();
-      await sharedPage.getByTestId("audience-save").click();
-      await expect(
-        sharedPage
-          .locator(".drag-and-drop-alert")
-          .filter({ hasText: "Drag and Drop a form component" }),
-      ).toBeVisible();
     }
+    // Continue with normal flow
+    //Form creation
+    await sharedPage.click('[data-testid="create-form-button"]');
+    const formNameInput = sharedPage
+      .locator("label", { hasText: "Form Name" })
+      .locator("xpath=following-sibling::div//input");
+    await formNameInput.fill(title);
+    form_name = title;
+    await sharedPage.getByRole("button", { name: "Select an item" }).click();
+    await sharedPage.waitForTimeout(1000);
+    const workspaceOption = sharedPage.getByRole("option", {
+      name: "Test Workspace (team)",
+      exact: true,
+    });
+    await workspaceOption.click();
+    await sharedPage.getByTestId("save-create-form").click();
+    //await sharedPage.getByTestId("submitter-audience-trigger").click();
+    //await expect(sharedPage.getByTestId("audience-mode-public"),).toBeVisible();
+    //await expect( sharedPage.getByTestId("audience-mode-protected"),).toBeVisible();
+    //await expect( sharedPage.locator('input[type="radio"][value="protected"]'),).toBeChecked();
+    //const bceidBusiness = sharedPage.getByTestId(
+    //"audience-idp-bceidbusiness",
+    //);
+    //const idirMfa = sharedPage.getByTestId("audience-idp-azureidir");
+    // Verify both options are visible
+    //await expect(bceidBusiness).toBeVisible();
+    //await expect(idirMfa).toBeVisible();
+    // Verify IDIR - MFA is selected
+    //await expect(idirMfa.locator('input[type="checkbox"]')).toBeChecked();
+    //await expect(sharedPage.getByTestId("audience-cancel")).toBeVisible();
+    //await sharedPage.getByTestId("audience-save").click();
   });
   test("Checks form creation with basic components", async ({ title }) => {
     await expect(

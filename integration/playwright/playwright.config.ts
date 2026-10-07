@@ -1,4 +1,4 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 import * as dotenv from "dotenv";
 import path from "path";
 
@@ -6,6 +6,7 @@ import path from "path";
 dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 const depEnv = process.env.DEP_ENV || "dev";
+const authFile = path.resolve(__dirname, "support", "user.json");
 
 function getExpectedURL(depEnv: string): string {
   // PR environments: DEP_ENV is a PR number
@@ -20,17 +21,18 @@ function getExpectedURL(depEnv: string): string {
       return "https://soba-dev.apps.silver.devops.gov.bc.ca/designer/en";
 
     case "test":
-      return "https://soba-test-designer.apps.silver.devops.gov.bc.ca/en";
+      return "https://soba-test.apps.silver.devops.gov.bc.ca/designer/en";
 
     default:
       throw new Error(`Invalid DEP_ENV: ${depEnv}`);
   }
 }
 
-const baseURL = getExpectedURL(depEnv);
+const resolvedBaseURL = process.env.BASE_URL || getExpectedURL(depEnv);
+const BASE_URL = resolvedBaseURL;
 
 console.log(`DEP_ENV: ${depEnv}`);
-console.log(`Playwright Base URL: ${baseURL}`);
+console.log(`Playwright Base URL: ${BASE_URL}`);
 
 export default defineConfig({
   testDir: "./tests",
@@ -39,7 +41,7 @@ export default defineConfig({
   workers: 1,
 
   use: {
-    baseURL,
+    baseURL: BASE_URL,
 
     headless: true,
 
@@ -56,10 +58,29 @@ export default defineConfig({
 
   projects: [
     {
+      name: "setup",
+      testMatch: /.*\.setup\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        baseURL: BASE_URL,
+        headless: true,
+      },
+    },
+
+    // All E2E tests use the authenticated session
+    {
       name: "chromium",
       use: {
-        browserName: "chromium",
+        ...devices["Desktop Chrome"],
+        baseURL: BASE_URL,
+        headless: true,
+        storageState: authFile,
+        video: "retain-on-failure",
+        screenshot: "only-on-failure",
+        trace: "on-first-retry",
+        ignoreHTTPSErrors: true,
       },
+      dependencies: ["setup"],
     },
   ],
 });
