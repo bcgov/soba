@@ -7,7 +7,7 @@ import {
 import reviewData from './reviewData.json';
 import type { SubmissionsContextInput } from './serviceFactory';
 
-// TODO:  Implement real service methods
+// TODO:  Implement real service methods // NOSONAR
 // These are Placeholder  methods. Data comes from static reviewData.json
 // changes stay in memory until restart.
 const sampleReview = SubmissionReviewSchema.parse(reviewData);
@@ -17,21 +17,25 @@ const read = (submissionId: string): SubmissionReview => reviews.get(submissionI
 
 const actorOf = (ctx: SubmissionsContextInput): string => ctx.actorDisplayLabel ?? ctx.actorId;
 
-function write(submissionId: string, change: Partial<SubmissionReview>): SubmissionReview {
+// Answers with a promise, as the real storage will.
+function writeAsync(
+  submissionId: string,
+  change: Partial<SubmissionReview>,
+): Promise<SubmissionReview> {
   const next = { ...read(submissionId), ...change };
   reviews.set(submissionId, next);
-  return next;
+  return Promise.resolve(next);
 }
 
 export const submissionReviewService = {
-  get: async (_ctx: SubmissionsContextInput, submissionId: string) => read(submissionId),
+  get: (_ctx: SubmissionsContextInput, submissionId: string) => Promise.resolve(read(submissionId)),
 
-  updateStatus: async (
+  updateStatus: (
     ctx: SubmissionsContextInput,
     submissionId: string,
     body: UpdateSubmissionStatusBody,
   ) =>
-    write(submissionId, {
+    writeAsync(submissionId, {
       statusHistory: [
         {
           id: randomUUID(),
@@ -44,8 +48,8 @@ export const submissionReviewService = {
       ],
     }),
 
-  addNote: async (ctx: SubmissionsContextInput, submissionId: string, text: string) =>
-    write(submissionId, {
+  addNote: (ctx: SubmissionsContextInput, submissionId: string, text: string) =>
+    writeAsync(submissionId, {
       notes: [
         { id: randomUUID(), text, createdAt: new Date().toISOString(), createdBy: actorOf(ctx) },
         ...read(submissionId).notes,
@@ -53,8 +57,8 @@ export const submissionReviewService = {
     }),
 
   /** Records that the answers were changed. The answers themselves are not written here. */
-  recordEdit: async (ctx: SubmissionsContextInput, submissionId: string) =>
-    write(submissionId, {
+  recordEdit: (ctx: SubmissionsContextInput, submissionId: string) =>
+    writeAsync(submissionId, {
       editHistory: [
         { id: randomUUID(), editedAt: new Date().toISOString(), editedBy: actorOf(ctx) },
         ...read(submissionId).editHistory,
