@@ -7,27 +7,10 @@ import { SWRConfig } from 'swr';
 
 const { mockPush } = vi.hoisted(() => ({ mockPush: vi.fn() }));
 
-vi.mock('@/app/[lang]/Providers', () => ({
-  useDictionary: () => ({
-    locale: 'en',
-    general: {
-      loading: 'Loading...',
-      sessionExpired: 'Your session has ended.',
-      noAccess: 'You do not have access to this.',
-    },
-    form: { nameLabel: 'Form' },
-    submission: {
-      notFound: 'Submission not found.',
-      loadError: 'Could not load this submission.',
-      noContent: 'No submitted answers to display.',
-      submittedOn: 'Submitted',
-      confirmationId: 'Confirmation ID',
-      submitter: 'Submitter',
-      anon: 'Anonymous',
-      backToSubmissions: 'Back to submissions',
-    },
-  }),
-}));
+vi.mock('@/app/[lang]/Providers', async () => {
+  const dict = { ...(await import('@/dictionaries/en.json')).default, locale: 'en' };
+  return { useDictionary: () => dict };
+});
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/en/build/f1/submissions/sub-1',
@@ -41,7 +24,33 @@ vi.mock('@/src/features/formio-v5/ui/ReadOnlyFormView', () => ({
 const getSobaSubmission = vi.fn();
 const getSobaSubmissionData = vi.fn();
 const getFormVersionSchema = vi.fn();
+const deleteSobaSubmission = vi.fn();
+const getSobaSubmissionReview = vi.fn();
+const addSobaSubmissionNote = vi.fn();
+const recordSobaSubmissionEdit = vi.fn();
+
+const SUBMISSION_ID = '01a0a276-8dee-71e4-8951-5effdc491be0';
+const REVIEW = {
+  assignees: ['Grace Hopper'],
+  statusHistory: [
+    {
+      id: 's1',
+      status: 'SUBMITTED',
+      assignee: null,
+      changedAt: '2026-01-02T03:04:05Z',
+      updatedBy: 'Ada Lovelace',
+    },
+  ],
+  notes: [],
+  editHistory: [],
+};
 vi.mock('@/src/shared/api/sobaApi', () => ({
+  getSobaSubmissionReview: (...args: unknown[]) => getSobaSubmissionReview(...args),
+  addSobaSubmissionNote: (...args: unknown[]) => addSobaSubmissionNote(...args),
+  recordSobaSubmissionEdit: (...args: unknown[]) => recordSobaSubmissionEdit(...args),
+  updateSobaSubmissionStatus: vi.fn(),
+  fetchCurrentUser: async () => ({ actor: { displayLabel: 'Rev Iewer' } }),
+  deleteSobaSubmission: (...args: unknown[]) => deleteSobaSubmission(...args),
   getSobaSubmission: (...args: unknown[]) => getSobaSubmission(...args),
   getSobaSubmissionData: (...args: unknown[]) => getSobaSubmissionData(...args),
   getFormVersionSchema: (...args: unknown[]) => getFormVersionSchema(...args),
@@ -90,6 +99,7 @@ describe('DesignSubmissionView', () => {
     });
     getFormVersionSchema.mockResolvedValue({ components: [] });
     getSobaSubmissionData.mockResolvedValue({ data: { field: 'value' } });
+    getSobaSubmissionReview.mockResolvedValue(REVIEW);
   });
 
   it('reads the submission, its version schema and its answers through the design API', async () => {
@@ -201,5 +211,91 @@ describe('DesignSubmissionView', () => {
     await waitFor(() =>
       expect(screen.getByTestId('submission-view-session-expired')).toBeInTheDocument(),
     );
+  });
+
+  it('adds a note and lists it under the reviewer', async () => {
+    signIn();
+    addSobaSubmissionNote.mockResolvedValue({
+      ...REVIEW,
+      notes: [
+        {
+          id: 'n1',
+          text: 'Needs a second look',
+          createdAt: '2026-01-03T03:04:05Z',
+          createdBy: 'Rev Iewer',
+        },
+      ],
+    });
+    await renderView();
+    // The test id lands on the design-system wrapper, so the field is found by its label.
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Note' })).toBeInTheDocument());
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Note' }), {
+      target: { value: 'Needs a second look' },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('submission-note-add'));
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('submission-notes-list')).toHaveTextContent('Needs a second look'),
+    );
+    expect(addSobaSubmissionNote).toHaveBeenCalledWith(
+      'token',
+      SUBMISSION_ID,
+      'Needs a second look',
+    );
+    expect(screen.getByTestId('submission-notes-list')).toHaveTextContent('Rev Iewer');
+  });
+
+  it('starts a submission as submitted and unassigned', async () => {
+    signIn();
+    await renderView();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('submission-status-current')).toHaveTextContent(
+        'Current Status: Submitted',
+      ),
+    );
+    expect(screen.getByTestId('submission-status-assignee')).toHaveTextContent('Unassigned');
+    expect(screen.getByTestId('submission-status-update')).toBeDisabled();
+  });
+
+  it('records an edit of the answers once the change is confirmed', async () => {
+    signIn();
+    recordSobaSubmissionEdit.mockResolvedValue({
+      ...REVIEW,
+      editHistory: [{ id: 'e1', editedAt: '2026-01-03T03:04:05Z', editedBy: 'Rev Iewer' }],
+    });
+    await renderView();
+    await waitFor(() => expect(screen.getByTestId('submission-data-update')).toBeInTheDocument());
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('submission-data-update'));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('confirm-modal-confirm'));
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('submission-view-modified-by')).toHaveTextContent('Rev Iewer'),
+    );
+  });
+
+  it('deletes the submission and returns to the submissions tab', async () => {
+    signIn();
+    deleteSobaSubmission.mockResolvedValue(undefined);
+    await renderView();
+    await waitFor(() => expect(screen.getByTestId('submission-review-delete')).toBeInTheDocument());
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('submission-review-delete'));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('confirm-modal-confirm'));
+    });
+
+    await waitFor(() => expect(deleteSobaSubmission).toHaveBeenCalledWith('token', SUBMISSION_ID));
+    expect(mockPush).toHaveBeenCalledWith('/en/build/f1?tab=submissions');
   });
 });

@@ -16,6 +16,7 @@ import type {
   SubmissionDataDocument,
 } from '../../types/forms';
 import type { ListSubmissionsResponse, SubmissionListItem } from '@/src/types/submissions';
+import type { SubmissionReview, UpdateSubmissionStatusBody } from '@/src/types/submissionReview';
 import { toListRequestQuery, type ListQueryArgs } from '@/src/types/list';
 import { sortLocaleHeaders } from './sortLocaleRequest';
 
@@ -103,6 +104,55 @@ export async function getSobaSubmissionData(
   const response = await sobaFetch(`/design/submissions/${submissionId}/data`, { token });
   if (response.status === 404) return null;
   return parseJson<SubmissionDataDocument>(response);
+}
+
+const reviewPath = (submissionId: string) => `/design/submissions/${submissionId}/review`;
+
+/** Status history, notes and edit history of a submission. The backend serves sample data for now. */
+export async function getSobaSubmissionReview(
+  token: string,
+  submissionId: string,
+): Promise<SubmissionReview> {
+  const response = await sobaFetch(reviewPath(submissionId), { token });
+  return parseJson(response);
+}
+
+export async function updateSobaSubmissionStatus(
+  token: string,
+  submissionId: string,
+  body: UpdateSubmissionStatusBody,
+): Promise<SubmissionReview> {
+  const response = await sobaFetch(`${reviewPath(submissionId)}/status`, {
+    token,
+    method: 'POST',
+    json: body,
+  });
+  return parseJson(response);
+}
+
+export async function addSobaSubmissionNote(
+  token: string,
+  submissionId: string,
+  text: string,
+): Promise<SubmissionReview> {
+  const response = await sobaFetch(`${reviewPath(submissionId)}/notes`, {
+    token,
+    method: 'POST',
+    json: { text },
+  });
+  return parseJson(response);
+}
+
+/** Records that staff changed the answers. The answers themselves are not written yet. */
+export async function recordSobaSubmissionEdit(
+  token: string,
+  submissionId: string,
+): Promise<SubmissionReview> {
+  const response = await sobaFetch(`${reviewPath(submissionId)}/edits`, {
+    token,
+    method: 'POST',
+  });
+  return parseJson(response);
 }
 
 const FORM_VERSIONS_PATH = '/design/form-versions';
