@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
+import { hasAllPermissions } from '@soba/lib';
 import { ForbiddenError } from '../errors';
 import {
-  hasAllPermissions,
   resolveFormPermissions,
   getWorkspaceIdsWithAllPermissions,
 } from '../db/repos/formAccessRepo';

@@ -18,6 +18,8 @@ import { copyDocumentTemplates } from '../db/repos/documentTemplateRepo';
 import { createFormEngineAdapter } from '../integrations/form-engine/FormEngineRegistry';
 import { db, type DbOrTx } from '../db/client';
 import { ConflictError, NotFoundError, ValidationError } from '../errors';
+import { isUniqueViolationOn } from '../db/pgError';
+import { FORM_VERSION_ONE_PUBLISHED_UNIQUE } from '../db/schema';
 
 const FORM_VERSION_NOT_FOUND = 'Form version not found';
 
@@ -232,13 +234,21 @@ export class FormVersionService {
           tx,
         );
       }
-      return updateFormVersionDraft(
-        input.workspaceId,
-        input.formVersionId,
-        input.actorDisplayLabel,
-        stateStamps('published', input),
-        tx,
-      );
+      try {
+        return await updateFormVersionDraft(
+          input.workspaceId,
+          input.formVersionId,
+          input.actorDisplayLabel,
+          stateStamps('published', input),
+          tx,
+        );
+      } catch (err) {
+        // Another version of the form was published concurrently.
+        if (isUniqueViolationOn(err, FORM_VERSION_ONE_PUBLISHED_UNIQUE)) {
+          throw new ConflictError('Another version of this form was published at the same time');
+        }
+        throw err;
+      }
     });
   }
 

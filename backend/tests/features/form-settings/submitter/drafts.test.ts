@@ -1,50 +1,66 @@
-jest.mock('../../../../src/features/form-settings/submitter/service', () => ({
-  formSubmitterSettingsService: { get: jest.fn() },
-}));
-jest.mock('../../../../src/core/db/repos/formSubmitAccessRepo', () => ({
-  isPublicAudience: jest.fn(),
+jest.mock('../../../../src/core/db/repos/submitterFormRepo', () => ({
+  findSubmitterFormFacts: jest.fn(),
 }));
 
+import { DraftSaveStatus } from '@soba/lib';
 import {
-  DraftSaveStatus,
   getDraftSaveStatus,
+  offersDraftSave,
 } from '../../../../src/features/form-settings/submitter/drafts';
-import { formSubmitterSettingsService } from '../../../../src/features/form-settings/submitter/service';
-import { isPublicAudience } from '../../../../src/core/db/repos/formSubmitAccessRepo';
+import { findSubmitterFormFacts } from '../../../../src/core/db/repos/submitterFormRepo';
+import { NotFoundError } from '../../../../src/core/errors';
+import { log } from '../../../../src/core/logging';
 
-const mockSettings = jest.mocked(formSubmitterSettingsService.get);
-const mockPublic = jest.mocked(isPublicAudience);
+const mockFacts = jest.mocked(findSubmitterFormFacts);
 const ctx = { workspaceId: 'ws1', actorDisplayLabel: null };
 
-// The drafts flag the form inherits from its workspace; only the effective value matters here.
-const inherited = (allowSubmitterDrafts: boolean) => ({
-  inherit: true,
-  own: null,
-  workspace: { allowSubmitterDrafts },
-  effective: { allowSubmitterDrafts },
-  version: 1,
+const facts = (allowSubmitterDrafts: boolean, audienceMode: 'public' | 'protected') => ({
+  publishedVersionId: 'v1',
+  permissions: [],
+  audienceMode,
+  audienceIdps: [],
+  allowSubmitterDrafts,
 });
 
+beforeEach(() => jest.resetAllMocks());
+
 describe('getDraftSaveStatus', () => {
-  beforeEach(() => jest.resetAllMocks());
-
-  it('is disabled when allowSubmitterDrafts is off, without reading the audience', async () => {
-    mockSettings.mockResolvedValue(inherited(false));
-    expect(await getDraftSaveStatus(ctx, 'f1')).toBe(DraftSaveStatus.disabled);
-    expect(mockSettings).toHaveBeenCalledWith(ctx, 'f1');
-    expect(mockPublic).not.toHaveBeenCalled();
-  });
-
-  it('is public when drafts are on and the audience is public', async () => {
-    mockSettings.mockResolvedValue(inherited(true));
-    mockPublic.mockResolvedValue(true);
-    expect(await getDraftSaveStatus(ctx, 'f1')).toBe(DraftSaveStatus.public);
-    expect(mockPublic).toHaveBeenCalledWith({ workspaceId: 'ws1', formId: 'f1' });
-  });
-
-  it('is allowed when drafts are on and the audience is not public', async () => {
-    mockSettings.mockResolvedValue(inherited(true));
-    mockPublic.mockResolvedValue(false);
+  it("reads the form's facts without a caller", async () => {
+    mockFacts.mockResolvedValue(facts(true, 'protected'));
     expect(await getDraftSaveStatus(ctx, 'f1')).toBe(DraftSaveStatus.allowed);
+    expect(mockFacts).toHaveBeenCalledWith({ userId: null, workspaceId: 'ws1', formId: 'f1' });
+  });
+
+  it.each([
+    [false, 'protected', DraftSaveStatus.disabled],
+    [true, 'public', DraftSaveStatus.public],
+  ] as const)('drafts %s with a %s audience is %s', async (allow, audience, expected) => {
+    mockFacts.mockResolvedValue(facts(allow, audience));
+    expect(await getDraftSaveStatus(ctx, 'f1')).toBe(expected);
+  });
+
+  it('is not found for a form outside the workspace', async () => {
+    mockFacts.mockResolvedValue(null);
+    await expect(getDraftSaveStatus(ctx, 'f1')).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('offersDraftSave', () => {
+  it('offers a draft save only when drafts are allowed', async () => {
+    mockFacts.mockResolvedValue(facts(true, 'protected'));
+    expect(await offersDraftSave(ctx, 'f1')).toBe(true);
+    mockFacts.mockResolvedValue(facts(true, 'public'));
+    expect(await offersDraftSave(ctx, 'f1')).toBe(false);
+  });
+
+  it('offers none, and logs, when the lookup fails', async () => {
+    mockFacts.mockRejectedValue(new Error('read failed'));
+    const error = jest.spyOn(log, 'error').mockImplementation(() => undefined);
+    expect(await offersDraftSave(ctx, 'f1')).toBe(false);
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({ formId: 'f1' }),
+      'Draft save status lookup failed',
+    );
+    error.mockRestore();
   });
 });

@@ -59,6 +59,7 @@ describe('MeApiService', () => {
     expect(result?.preferences.defaultWorkspaceId).toBe(workspaceId);
     expect(result?.capabilities.canCreateWorkspace).toBe(true);
     expect(idpGroupRepo.canCreateWorkspaceByIdp).toHaveBeenCalledWith('idir');
+    expect(result?.profile.idpCode).toBe('idir');
   });
 
   it('get returns null defaultWorkspaceId when stored workspace is invalid', async () => {

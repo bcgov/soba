@@ -47,6 +47,7 @@ describe('OpenAPI components for lib-backed schemas', () => {
       'Submissions_SubmissionSort',
     ],
     ['Workspaces_ListWorkspacesResponse', 'Workspaces_WorkspaceItem', 'Workspaces_WorkspaceSort'],
+    ['Submit_ListMyFormsResponse', 'Submit_MyFormListItem', 'Submit_MyFormSort'],
     [
       'Submit_ListMySubmissionsResponse',
       'Submit_MySubmissionListItem',
@@ -89,6 +90,7 @@ describe('OpenAPI components for lib-backed schemas', () => {
   it.each([
     ['Workspaces_WorkspaceLookupResponse', 'Workspaces_WorkspaceLookupItem'],
     ['Forms_FormVersionLookupResponse', 'Forms_FormVersionSummary'],
+    ['Submit_MyWorkspaceLookupResponse', 'Submit_MyWorkspaceLookupItem'],
   ])('%s references its item component', (response, item) => {
     expect(at(schemas, response, 'properties', 'items', 'items')).toEqual(ref(item));
     expect(at(schemas, response, 'required')).toEqual(

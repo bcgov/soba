@@ -8,7 +8,13 @@ import {
   requireSubmissionDelete,
   requireSubmissionRead,
 } from '../../middleware/formSubmitAccess';
-import { getSubmitSubmissionSchema, getSubmitFillBundle, listMySubmissions } from './controller';
+import {
+  getSubmitSubmissionSchema,
+  getSubmitFillBundle,
+  listMyForms,
+  listMySubmissions,
+  listMyWorkspaces,
+} from './controller';
 import { requireDraftSave } from './draftSave';
 import {
   openSubmission,
@@ -24,10 +30,15 @@ import {
   SubmissionIdParamsSchema,
   SubmitSubmissionBodySchema,
 } from '../submissions/schema';
-import { ListMySubmissionsQuerySchema } from './schema';
+import {
+  ListMyFormsQuerySchema,
+  ListMySubmissionsQuerySchema,
+  MyWorkspaceLookupQuerySchema,
+} from './schema';
 
 // Submit-mode: mounted under /api/v1/submit with optional auth (anonymous resolves to the public user).
-// Each route authorizes through isSubmitterAllowed (services/submitterAccess).
+// Each route authorizes through isSubmitterAllowed (services/submitterAccess), except the caller's
+// own lists, which need a signed-in caller (requireSignedInSubmitter).
 const router = express.Router();
 
 const openSubmissionResource = openWorkspaceFromResource({
@@ -53,6 +64,22 @@ router.post(
   validateRequest({ params: SubmissionIdParamsSchema, body: SubmitSubmissionBodySchema }),
   requireFormSubmitAccess,
   submitSubmission,
+);
+
+router.get(
+  '/forms/mine',
+  validateRequest({ query: ListMyFormsQuerySchema }),
+  sortLocale,
+  requireSignedInSubmitter,
+  listMyForms,
+);
+
+router.get(
+  '/workspaces/mine',
+  validateRequest({ query: MyWorkspaceLookupQuerySchema }),
+  sortLocale,
+  requireSignedInSubmitter,
+  listMyWorkspaces,
 );
 
 // Registered before /submissions/:id, which would otherwise take `mine` as an id.

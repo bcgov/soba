@@ -166,17 +166,20 @@ inherits every group, so a change to a workspace group reaches every form that h
 
 An override replaces the group's whole membership for that form; roles stay on the workspace group.
 Returning to inherit sets the override `inactive` and deletes its members.
-`effectiveGroupMembers` in `formGroupOverrideRepo.ts` returns, for a form, each active group's override
-members where the form has an active override, otherwise the workspace group's members.
+`effectiveGroups` in `submitterFormRepo.ts` resolves, per form, the groups a user is an effective
+member of: each active group's override members where the form has an active override, otherwise the
+workspace group's members.
 
 No API writes overrides yet.
 
-The submit surface reads overrides: `hasFormSubmitAccess({workspaceId, formId}, ...)` resolves roles
-with `resolveFormPermissionsForForm`, which follows the form's effective `user` members, and then checks
-the form's [audience](#form-audience). Submit mode uses it to open a submission, alongside
-participation to save, submit, upload and delete a file on an in-progress submission, and on its own
-(`submission_update`) to delete a file on a submitted submission. Design routes and lists still use
-`resolveFormPermissions`, which reads workspace group membership, so they are not form-aware yet.
+The submit surface reads overrides: `hasFormSubmitAccess({workspaceId, formId}, ...)` reads the
+form's facts with `findSubmitterFormFacts` in `submitterFormRepo.ts`, whose permissions follow the
+caller's effective `user` memberships by the same rule, and decides with `formAccessAllows` from
+`@soba/lib`, which also checks the form's [audience](#form-audience). Submit mode uses it to open a
+submission, alongside participation to save, submit, upload and delete a file on an in-progress
+submission, and on its own (`submission_update`) to delete a file on a submitted submission. Design
+routes and lists still use `resolveFormPermissions`, which reads workspace group membership, so they
+are not form-aware yet.
 
 ### Form Audience
 
@@ -208,8 +211,9 @@ no audience lists.
 A save names the `version` it read; a save from an older one gets a 409 and changes nothing. A new
 form can start with its own audience from `settings.audience` in the create body.
 
-`hasFormSubmitAccess` and `isPublicAudience` in `formSubmitAccessRepo.ts` read the form's effective
-audience through `findEffectiveAudience`. Drafts are not offered on a public audience.
+The submit-side facts query (`findSubmitterFormFacts` in `submitterFormRepo.ts`) reads the form's
+effective audience and drafts setting the same way.
+Drafts are not offered on a public audience.
 
 ### Resolving a user's permissions
 
@@ -233,8 +237,8 @@ codes a user holds:
 ```
 
 It's workspace-scoped: a user's form permissions are the same for every form in the workspace, because
-it reads workspace group membership and not form overrides. `hasAllPermissions(perms, required)` does
-the check and treats `*` as a match for anything.
+it reads workspace group membership and not form overrides. `hasAllPermissions(perms, required)`
+from `@soba/lib` does the check and treats `*` as a match for anything.
 
 `GET /forms/:id` returns the caller's resolved codes as `permissions` (a sorted array, `['*']` for
 admins) so the UI can gate actions. This reads the same resolver, so it upgrades automatically when
@@ -270,6 +274,19 @@ the submit routes, all of which need a grant.
 `GET /submit/submissions/mine` lists the draft and submitted submissions the caller holds an active
 grant on, across every workspace, with the caller's role on each. Submissions on a deleted form or
 form version are left out. Anonymous callers get a 401, since the public user's grants are shared.
+
+`GET /submit/forms/mine` lists the forms the caller holds the `form_submitter` role on, plus the forms
+of the submissions `GET /submit/submissions/mine` returns, across every workspace. The role resolves
+like any form permission, so a form's active override of a group replaces that group's workspace
+members. Only that role lists a form, not every role granting `submission_create`: form
+administrators find their forms in design mode. A role form needs a published version; a form
+reached through a submission is listed without one. Each row carries the facts the access rules
+read: the caller's permission codes on the form, its effective audience, its effective drafts
+setting and its published version. The rules are pure functions in `@soba/lib`
+(`formAccessAllows`, `canStartSubmission`, `canSaveSubmissionDraft`, `draftSaveStatusOf`). The
+browser works out Start from a row, and `hasFormSubmitAccess` and `getDraftSaveStatus` decide from
+the same facts, read for one form by `findSubmitterFormFacts`. `GET /submit/workspaces/mine` lists
+those forms' workspaces, for a filter. Both need a signed-in caller.
 
 ## What a new workspace looks like
 

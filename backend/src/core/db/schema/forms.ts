@@ -36,6 +36,8 @@ export const forms = sobaSchema.table(
   }),
 );
 
+export const FORM_VERSION_ONE_PUBLISHED_UNIQUE = 'form_version_one_published_uq';
+
 export const formVersions = sobaSchema.table(
   'form_version',
   {
@@ -65,6 +67,10 @@ export const formVersions = sobaSchema.table(
     ),
     workspaceIdx: index('form_version_workspace_idx').on(table.workspaceId),
     formIdx: index('form_version_form_idx').on(table.formId),
+    // Publishing archives the previous version first, so a form has at most one published version.
+    onePublished: uniqueIndex(FORM_VERSION_ONE_PUBLISHED_UNIQUE)
+      .on(table.formId)
+      .where(sql`${table.state} = 'published' and ${table.deletedAt} is null`),
   }),
 );
 

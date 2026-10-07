@@ -199,4 +199,37 @@ describe('FormVersionService state transitions', () => {
     expect(getPublished).not.toHaveBeenCalled();
     expect(updateDraft).not.toHaveBeenCalled();
   });
+
+  // Another version of the form published between this one's read and its write.
+  it.each([
+    [
+      'answers a clash on the one-published-version index with a conflict',
+      'form_version_one_published_uq',
+      409,
+    ],
+    [
+      'passes any other unique violation through',
+      'form_version_workspace_form_version_uq',
+      undefined,
+    ],
+  ])('publish: %s', async (_label, constraint, statusCode) => {
+    getById.mockResolvedValue({
+      id: 'v1',
+      formId: 'f1',
+      state: 'draft',
+      engineSyncStatus: 'ready',
+    });
+    getPublished.mockResolvedValue(null);
+    const violation = Object.assign(new Error('duplicate key'), {
+      code: '23505',
+      severity: 'ERROR',
+      constraint,
+    });
+    updateDraft.mockRejectedValue(violation);
+
+    const outcome = svc.publish(actor);
+
+    if (statusCode) await expect(outcome).rejects.toMatchObject({ statusCode });
+    else await expect(outcome).rejects.toBe(violation);
+  });
 });

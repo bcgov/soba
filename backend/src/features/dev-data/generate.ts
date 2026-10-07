@@ -5,25 +5,19 @@
 import { v7 as uuidv7 } from 'uuid';
 
 import { db } from '../../core/db/client';
-import { workspaceMemberships } from '../../core/db/schema';
-import {
-  WorkspaceMembershipSource,
-  WorkspaceMembershipStatus,
-  type WorkspaceMembershipRoleCode,
-} from '../../core/db/codes';
+import type { WorkspaceMembershipRoleCode } from '../../core/db/codes';
 import { ConflictError } from '../../core/errors';
 import { createTeamWorkspace } from '../../core/db/repos/workspaceRepo';
-import {
-  findOrCreateUserByIdentity,
-  invalidateMembershipCache,
-} from '../../core/db/repos/membershipRepo';
+import { findOrCreateUserByIdentity } from '../../core/db/repos/membershipRepo';
 import { addUserToGroup, createGroupWithRole } from '../../core/db/repos/workspaceGroupRepo';
 import { updateWorkspaceAudience } from '../../core/db/repos/audienceSettingRepo';
 import { FormService } from '../../core/services/formService';
 import { FormVersionService } from '../../core/services/formVersionService';
 import { SubmissionService } from '../../core/services/submissionService';
 
+import { generateCoverage, type CoverageManifest } from './access/generate';
 import { getFixture, type DevFormFixture } from './fixtures';
+import { addMember } from './members';
 import {
   buildPlan,
   DEFAULT_SIZE,
@@ -83,6 +77,7 @@ export interface DevDataManifest {
   users: Array<{ id: string; displayLabel: string; identityProviderCode: string }>;
   workspaces: ManifestWorkspace[];
   counts: Record<string, number>;
+  coverage: CoverageManifest;
 }
 
 interface GenerateContext {
@@ -127,33 +122,6 @@ function requireUser(ctx: GenerateContext, index: number): ResolvedUser {
 
 const ownerOf = (ctx: GenerateContext, planned: PlannedWorkspace): ResolvedUser =>
   planned.ownerUserIndex == null ? ctx.target : requireUser(ctx, planned.ownerUserIndex);
-
-/** Written directly: the members API is read-only and the owner bootstrap is private. */
-async function addMember(args: {
-  workspaceId: string;
-  user: ResolvedUser;
-  role: WorkspaceMembershipRoleCode;
-  invitedBy: ResolvedUser;
-}): Promise<string> {
-  const membershipId = uuidv7();
-  const now = new Date();
-  await db.insert(workspaceMemberships).values({
-    id: membershipId,
-    workspaceId: args.workspaceId,
-    userId: args.user.id,
-    role: args.role,
-    status: WorkspaceMembershipStatus.active,
-    source: WorkspaceMembershipSource.user_created,
-    invitedByUserId: args.invitedBy.id,
-    invitedAt: now,
-    acceptedAt: now,
-    createdBy: args.invitedBy.displayLabel,
-    updatedBy: args.invitedBy.displayLabel,
-  });
-  // The cache is process-local, so a long-lived API process would otherwise miss this row.
-  invalidateMembershipCache(args.workspaceId, args.user.id);
-  return membershipId;
-}
 
 /** Memberships for the target user when they are not the owner, plus every planned dev member. */
 async function addMembers(
@@ -399,6 +367,9 @@ export async function generate(options: GenerateOptions): Promise<DevDataManifes
   // Recorded before anything is written, so a run that dies part-way is still visible.
   const runId = await startRun({ size, ownerUserId: target.id, stampedBy: target.displayLabel });
 
+  // First, so its rows take the lowest ids and trail the default id:desc lists.
+  const coverage = await generateCoverage({ runId, owner: target, publicUser });
+
   const ctx: GenerateContext = {
     runId,
     target,
@@ -427,6 +398,7 @@ export async function generate(options: GenerateOptions): Promise<DevDataManifes
     })),
     workspaces: created,
     counts: countRows(created, ctx.users.size),
+    coverage,
   };
 
   await finishRun(runId, manifest, target.displayLabel);
