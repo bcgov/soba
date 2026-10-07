@@ -13,7 +13,7 @@ import type { FormType, FormBuilderProps } from '@formio/react';
 import './FormDesigner.module.css';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { normalizeSchema } from '@soba/lib';
+import { newFormSchema, normalizeSchema } from '@soba/lib';
 import { buildExportFilename } from '@/src/features/designer/exportFilename';
 
 // Import Types
@@ -64,7 +64,7 @@ const FormDesigner: React.FC<DesignerProps> = ({
    * stable reference (satisfies ESLint's `react-hooks/refs` rule). We assume a
    * valid Form.io v5 schema from the engine, so no client-side fix-ups.
    */
-  const [stableForm] = useState<FormType>(() => initialModel ?? { components: [] });
+  const [stableForm] = useState<FormType>(() => initialModel ?? (newFormSchema() as FormType));
 
   // Whether any bcgov component is enabled (today just BC File Upload, gated on `files`).
   // Controls whether the 'BC Gov' builder group shows.
@@ -85,6 +85,8 @@ const FormDesigner: React.FC<DesignerProps> = ({
       i18n: { [dict.locale]: dict },
       useWorker: false,
       display: 'form' as const,
+      // The builder's default Submit is drawn but never saved; show only buttons the schema holds.
+      noDefaultSubmitButton: true,
       builder: {
         basic: {
           title: 'Basic',

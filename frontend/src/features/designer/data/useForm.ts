@@ -14,6 +14,7 @@ import {
   saveFormVersionSchema,
 } from '@/src/shared/api/sobaApi';
 import { updateSobaForm } from '@/src/shared/api/sobaApiDesign';
+import { newFormSchema } from '@soba/lib';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { sessionReadConfig } from '@/src/shared/api/swrConfig';
 import { classifyDataError } from '@/src/shared/api/dataError';
@@ -274,9 +275,9 @@ export function useFormCreator() {
       workspaceId?: string,
     ): Promise<WriteOutcome<CreateSobaFormioFormResponse>> => {
       const value = await createSobaFormioForm(token, data, workspaceId);
-      // A version with no schema 404s when read; the empty schema leaves an openable draft.
+      // A version with no schema 404s when read, so the first one is saved here.
       if (value.formVersion?.id) {
-        await saveFormVersionSchema(token, value.formVersion.id, { components: [] } as FormType);
+        await saveFormVersionSchema(token, value.formVersion.id, newFormSchema() as FormType);
       }
       return { status: 'applied', value };
     },

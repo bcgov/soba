@@ -8,6 +8,7 @@ import { Modal as CommonModal } from '@/src/components/Modal';
 import styles from './FormForm.module.css';
 
 import type { FormType } from '@formio/react';
+import { newFormSchema } from '@soba/lib';
 
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
@@ -204,7 +205,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
 
   useEffect(() => {
     if (!loading && form && !formSchema) {
-      setSchema({ components: [] });
+      setSchema(newFormSchema() as FormType);
     }
   }, [loading, form, formSchema, setSchema]);
 

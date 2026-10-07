@@ -6,6 +6,7 @@ export * from './sort';
 export * from './schemas/admin';
 export * from './schemas/workspaces';
 export * from './formio/normalizeSchema';
+export * from './formio/newFormSchema';
 export * from './schemas/me';
 export * from './schemas/submit';
 export * from './schemas/meta';
