@@ -19,17 +19,28 @@ import type { ListSubmissionsResponse, SubmissionListItem } from '@/src/types/su
 import { toListRequestQuery, type ListQueryArgs } from '@/src/types/list';
 import { sortLocaleHeaders } from './sortLocaleRequest';
 
+/** What a create returned; `created` is false when a retry got back what an earlier attempt made. */
+export interface CreateResult<T> {
+  value: T;
+  created: boolean;
+}
+
+const createResult = async <T>(response: Response): Promise<CreateResult<T>> => ({
+  value: await parseJson<T>(response),
+  created: response.status === 201,
+});
+
 export async function createSobaFormioForm(
   token: string,
   data: CreateFormFields,
   workspaceId?: string,
-): Promise<CreateSobaFormioFormResponse> {
+): Promise<CreateResult<CreateSobaFormioFormResponse>> {
   const response = await sobaFetch('/design/forms', {
     token,
     method: 'POST',
     json: { ...data, formEngineCode: 'formio-v5', workspaceId },
   });
-  return parseJson(response);
+  return createResult(response);
 }
 
 export async function updateSobaForm(
@@ -135,20 +146,16 @@ export async function getSobaFormVersionPage(
 }
 
 /**
- * Create a new form version draft for a form. `fromFormVersionId`: the version whose document
- * templates the draft gets.
+ * Create a form version draft with its schema in one request. `fromFormVersionId`: the version whose
+ * document templates the draft gets, and whose schema it starts from when none is sent. A retry with
+ * the same `id` returns the draft the first request made.
  */
 export async function createFormVersion(
   token: string,
-  formId: string,
-  fromFormVersionId?: string,
-): Promise<SobaFormVersionType> {
-  const response = await sobaFetch(FORM_VERSIONS_PATH, {
-    token,
-    method: 'POST',
-    json: { formId, fromFormVersionId },
-  });
-  return parseJson(response);
+  draft: { id: string; formId: string; fromFormVersionId?: string; schema?: FormType },
+): Promise<CreateResult<SobaFormVersionType>> {
+  const response = await sobaFetch(FORM_VERSIONS_PATH, { token, method: 'POST', json: draft });
+  return createResult(response);
 }
 
 /** Save a form version's schema; the server provisions it in the engine (Form.io). */

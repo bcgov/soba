@@ -181,18 +181,23 @@ export class FormioEngineAdapter implements FormEngineAdapter {
     const name = sobaEngineName(input.formVersionId);
 
     // Find an existing document by the deterministic name so a retry updates instead of duplicating.
-    const existing = (await client.loadForms({ params: { name } })) as Array<
-      Record<string, unknown>
-    >;
-    const existingId = existing.length > 0 ? existing[0]._id : undefined;
+    const findId = async (): Promise<unknown> => {
+      const found = (await client.loadForms({ params: { name } })) as Array<
+        Record<string, unknown>
+      >;
+      return found.length > 0 ? found[0]._id : undefined;
+    };
+    const existingId = await findId();
     if (existingId) {
       body._id = existingId;
     }
 
-    const saved = (await client.saveForm(body).catch(rethrowEngineRejection)) as Record<
-      string,
-      unknown
-    > | null;
+    const saved = (await client.saveForm(body).catch(async (err: unknown) => {
+      // A concurrent write for the same version created the document first: update that one.
+      const createdId = existingId ? undefined : await findId();
+      if (!createdId) return rethrowEngineRejection(err);
+      return client.saveForm({ ...body, _id: createdId }).catch(rethrowEngineRejection);
+    })) as Record<string, unknown> | null;
     const engineRef = saved?._id;
     if (engineRef == null || engineRef === '') {
       throw new Error('Form.io saveForm did not return an _id');

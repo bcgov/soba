@@ -119,7 +119,8 @@ router.post(
   FORM_VERSIONS_PATH,
   validateRequest({ body: CreateFormVersionBodySchema }),
   formFromBodyResource,
-  requireFormPermissions([Permissions.design_create]),
+  // Creating a draft writes its schema, so it needs design_update too.
+  requireFormPermissions([Permissions.design_create, Permissions.design_update]),
   createFormVersion,
 );
 router.post(

@@ -58,10 +58,8 @@ vi.mock('@/lib/hooks/useNotificationStore', () => ({
 }));
 
 const mockCreateSobaFormioForm = vi.fn();
-const mockSaveFormVersionSchema = vi.fn();
 vi.mock('@/src/shared/api/sobaApi', () => ({
   createSobaFormioForm: (...args: unknown[]) => mockCreateSobaFormioForm(...args),
-  saveFormVersionSchema: (...args: unknown[]) => mockSaveFormVersionSchema(...args),
 }));
 
 vi.mock('@/src/shared/api/useCurrentUser', () => ({
@@ -121,6 +119,10 @@ const PROVIDERS = [
   { code: 'azureidir', name: 'IDIR - MFA' },
   { code: 'bceidbusiness', name: 'BCeID Business' },
 ];
+const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+// The form and its first version, as ids the browser mints.
+const minted = { id: expect.stringMatching(UUID_V7), versionId: expect.stringMatching(UUID_V7) };
+
 const workspaceAudiences: Record<string, unknown> = {
   'ws-1': { mode: 'protected', idps: ['azureidir'] },
   'ws-2': { mode: 'members', idps: [] },
@@ -141,10 +143,9 @@ describe('FormCreateContent', () => {
       truncated: false,
     });
     mockCreateSobaFormioForm.mockResolvedValue({
-      id: 'form-123',
-      formVersion: { id: 'v-1', versionNo: 1, state: 'draft' },
+      value: { id: 'form-123', formVersion: { id: 'v-1', versionNo: 1, state: 'draft' } },
+      created: true,
     });
-    mockSaveFormVersionSchema.mockResolvedValue({});
     (useFreshWorkspaceSettings as Mock).mockImplementation(
       (_key: string, workspaceId: string | null) => ({
         settings: workspaceId ? { values: workspaceAudiences[workspaceId], version: 1 } : undefined,
@@ -217,7 +218,7 @@ describe('FormCreateContent', () => {
 
     expect(mockCreateSobaFormioForm).toHaveBeenCalledWith(
       'mock-token',
-      { name: 'My New Form' },
+      { name: 'My New Form', ...minted },
       'ws-1',
     );
     expect(mockAddNotification).toHaveBeenCalledWith(
@@ -226,18 +227,38 @@ describe('FormCreateContent', () => {
     expect(mockRouterPush).toHaveBeenCalledWith('/en/build/form-123');
   });
 
-  // A version with no schema answers a read with 404, and the builder adds no Submit of its own.
-  it('writes a Submit button to the version the form is created with', async () => {
+  // A retry with the same ids returns the form the first attempt made, rather than a second one, even
+  // after the name was edited.
+  it('sends the same ids when a failed create is tried again after an edit', async () => {
+    mockCreateSobaFormioForm.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     renderComponent();
 
     await userEvent.type(nameInput(), 'My New Form');
     await userEvent.selectOptions(screen.getByTestId('workspace-selector'), 'ws-1');
     await userEvent.click(screen.getByTestId('save-create-form'));
+    await userEvent.type(nameInput(), ' 2');
+    await userEvent.click(screen.getByTestId('save-create-form'));
 
-    expect(mockSaveFormVersionSchema).toHaveBeenCalledWith('mock-token', 'v-1', {
-      components: [expect.objectContaining({ type: 'button', key: 'submit', action: 'submit' })],
-    });
+    expect(mockCreateSobaFormioForm).toHaveBeenCalledTimes(2);
+    const [first, second] = mockCreateSobaFormioForm.mock.calls.map((call) => call[1]);
+    expect(second).toEqual({ ...first, name: 'My New Form 2' });
     expect(mockRouterPush).toHaveBeenCalledWith('/en/build/form-123');
+  });
+
+  // Another workspace is another form, so a retry there is not matched to the first attempt.
+  it('mints new ids when a failed create is tried again in another workspace', async () => {
+    mockCreateSobaFormioForm.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    renderComponent();
+
+    await userEvent.type(nameInput(), 'My New Form');
+    await userEvent.selectOptions(screen.getByTestId('workspace-selector'), 'ws-1');
+    await userEvent.click(screen.getByTestId('save-create-form'));
+    await userEvent.selectOptions(screen.getByTestId('workspace-selector'), 'ws-2');
+    await userEvent.click(screen.getByTestId('save-create-form'));
+
+    const [first, second] = mockCreateSobaFormioForm.mock.calls.map((call) => call[1]);
+    expect(second.id).not.toBe(first.id);
+    expect(second.versionId).not.toBe(first.versionId);
   });
 
   it('sends the name without surrounding whitespace', async () => {
@@ -249,7 +270,7 @@ describe('FormCreateContent', () => {
 
     expect(mockCreateSobaFormioForm).toHaveBeenCalledWith(
       'mock-token',
-      { name: 'My New Form' },
+      { name: 'My New Form', ...minted },
       'ws-1',
     );
   });
@@ -331,7 +352,7 @@ describe('FormCreateContent', () => {
 
       expect(mockCreateSobaFormioForm).toHaveBeenCalledWith(
         'mock-token',
-        { name: 'My New Form' },
+        { name: 'My New Form', ...minted },
         'ws-1',
       );
     });
@@ -348,6 +369,7 @@ describe('FormCreateContent', () => {
         'mock-token',
         {
           name: 'My New Form',
+          ...minted,
           settings: { audience: { inherit: false, values: { mode: 'members', idps: [] } } },
         },
         'ws-1',

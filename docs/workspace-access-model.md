@@ -18,14 +18,16 @@ adds a third control per submission, who takes part in it; see
 > **Current status.** The design form routes (`api/forms/route.ts`) and the staff submission routes
 > (`api/submissions/route.ts`) are gated by `requireFormPermissions`, except schema normalize (no
 > workspace). Creating a form requires `form_create` and `design_create` — only `form_admin` satisfies
-> that, via `*`. Creating a design on an existing form requires `design_create` (`form_designer`). The
+> that, via `*`. Creating a design on an existing form requires `design_create` and `design_update`
+> (`form_designer`), since the create writes the design's schema. The
 > submit routes, file uploads and document generation are gated by `isSubmitterAllowed` (see
 > [Submission participants](#submission-participants)); rendering a document also needs
 > `document_template_read`. The template routes (`features/templates/route.ts`) are gated by
 > `requireFormPermissions`: `document_template_read` to list and download, `document_template_create`
 > to upload, replace and rename, `document_template_delete` to delete. Only `form_admin` (via `*`)
 > holds the create and delete codes; `form_submitter` holds read. A draft created from an existing
-> version gets that version's templates under `design_create` alone. Group and member management is
+> version gets that version's templates under the draft's own permissions, without
+> `document_template_create`. Group and member management is
 > gated by workspace role (`requireWorkspaceManage`), not by RBAC.
 
 ```
@@ -129,7 +131,8 @@ Six form roles are seeded (`role` + `role_permission`):
 new permissions later needs no change to that role.
 
 `form_create` is catalogued but not assigned to any seeded role. Only `form_admin` can create a form
-(via `*`). `form_designer` can create a new design on an existing form (`design_create`).
+(via `*`). `form_designer` can create a new design on an existing form (`design_create` and
+`design_update`).
 
 The permission codes are: `form_create/read/update/delete`, `design_create/read/update/delete`,
 `submission_create/read/update/delete/review`, `team_read/update`, `document_template_create/read/delete`.

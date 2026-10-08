@@ -256,17 +256,10 @@ async function createForm(
     workspaceId,
     name: planned.name,
     description: planned.description,
+    schema: fixture.schema,
     ...actor,
   });
 
-  if (planned.provisioned) {
-    await formVersionService.provision({
-      workspaceId,
-      formVersionId: version.id,
-      schema: fixture.schema,
-      ...actor,
-    });
-  }
   if (planned.published) {
     await formVersionService.publish({ workspaceId, formVersionId: version.id, ...actor });
   }

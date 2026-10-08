@@ -120,13 +120,6 @@ describe('dev data plan', () => {
       expect(allForms.some((f) => !f.published)).toBe(true);
     });
 
-    it('only leaves unpublished forms unprovisioned, and does leave some', () => {
-      for (const form of allForms) {
-        if (form.published) expect(form.provisioned).toBe(true);
-      }
-      expect(allForms.some((f) => !f.provisioned)).toBe(true);
-    });
-
     it('plans anonymous submissions only where the audience is public', () => {
       const anonymous = allSubmissions.filter((s) => s.submission.submitter.kind === 'anonymous');
       expect(anonymous.length).toBeGreaterThan(0);

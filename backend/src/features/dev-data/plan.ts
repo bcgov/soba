@@ -82,8 +82,6 @@ export interface PlannedForm {
   name: string;
   description: string;
   fixtureCode: string;
-  /** False leaves the version at engineSyncStatus 'pending' with no schema ref. */
-  provisioned: boolean;
   published: boolean;
   submissions: PlannedSubmission[];
 }
@@ -223,10 +221,6 @@ function formCountFor(sizing: Sizing, index: number, anchor: PlannedAnchor | nul
 /** Two in three get published. Only a published version can take submissions. */
 const publishedFor = (formIndex: number): boolean => formIndex % 3 !== 2;
 
-/** Publishing needs a ready version, so only unpublished forms stay unprovisioned. */
-const provisionedFor = (formIndex: number): boolean =>
-  publishedFor(formIndex) || formIndex % 6 !== 5;
-
 function submissionCountFor(args: {
   sizing: Sizing;
   workspaceIndex: number;
@@ -320,7 +314,6 @@ function buildForms(args: {
       name: formName(args.workspaceIndex, formIndex, args.anchor),
       description: `Generated ${fixtureCodeFor(formIndex, args.anchor)} form for development.`,
       fixtureCode: fixtureCodeFor(formIndex, args.anchor),
-      provisioned: provisionedFor(formIndex),
       published,
       submissions: buildSubmissions({ ...args, formIndex, published }),
     };

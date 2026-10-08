@@ -1,4 +1,4 @@
-import { and, count, eq, ilike, inArray, isNull, ne } from 'drizzle-orm';
+import { and, count, eq, ilike, inArray, isNull, ne, type InferSelectModel } from 'drizzle-orm';
 import { db, type DbOrTx } from '../client';
 import { forms, formVersions, workspaces } from '../schema';
 import { likePattern, orderByForSort, type SortColumns } from '../listSort';
@@ -42,24 +42,11 @@ export interface FormListRow {
   updatedBy: string | null;
 }
 
-export interface FormRecord {
-  id: string;
-  workspaceId: string;
-  formEngineCode: string;
-  name: string;
-  description: string | null;
-  org: string;
-  useCase: string;
-  status: string;
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string | null;
-  updatedBy: string | null;
-  deletedAt: Date | null;
-  deletedBy: string | null;
-}
+export type FormRecord = InferSelectModel<typeof forms>;
 
 interface CreateFormInput {
+  /** Minted by the caller; a new UUIDv7 when absent. */
+  id?: string;
   workspaceId: string;
   actorId: string;
   actorDisplayLabel: string | null;
@@ -196,6 +183,7 @@ export const createForm = async (input: CreateFormInput, tx?: DbOrTx): Promise<F
   const created = await d
     .insert(forms)
     .values({
+      id: input.id,
       workspaceId: input.workspaceId,
       formEngineCode: input.formEngineCode,
       name: input.name,
@@ -209,6 +197,18 @@ export const createForm = async (input: CreateFormInput, tx?: DbOrTx): Promise<F
     .returning();
 
   return created[0] as FormRecord;
+};
+
+/** A form by id in any workspace, deleted included, for checking an id a caller minted. */
+export const findFormAnywhere = async (
+  formId: string,
+): Promise<{ workspaceId: string; deletedAt: Date | null } | null> => {
+  const rows = await db
+    .select({ workspaceId: forms.workspaceId, deletedAt: forms.deletedAt })
+    .from(forms)
+    .where(eq(forms.id, formId))
+    .limit(1);
+  return rows[0] ?? null;
 };
 
 /** True if a non-deleted form with this name exists in the workspace (optionally excluding one form). */

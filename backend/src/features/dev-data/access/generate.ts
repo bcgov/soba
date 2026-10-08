@@ -231,11 +231,6 @@ async function createForm(
     workspaceId,
     name: planned.name,
     description: planned.description,
-    ...actor,
-  });
-  await formVersionService.provision({
-    workspaceId,
-    formVersionId: version.id,
     schema: getFixture(COVERAGE_FIXTURE_CODE).schema,
     ...actor,
   });

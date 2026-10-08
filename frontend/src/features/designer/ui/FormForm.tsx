@@ -273,6 +273,12 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
       }
       return true;
     } catch (e: unknown) {
+      // A new version's 409 carries the backend's own reason (the version to copy has no schema),
+      // not a form that changed since it was opened.
+      if (isConflict(e) && e instanceof Error && e.message) {
+        addNotification({ text: e.message, type: 'error', consoleError: e });
+        return false;
+      }
       await reportWriteFailure(e, dict.form.createVersionError || 'Failed to create new version.');
       return false;
     } finally {
@@ -284,7 +290,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     applyNewVersion(() =>
       formWriter.createVersion(
         token as string,
-        (sourceSchema ?? formSchema ?? {}) as FormType,
+        sourceSchema ?? formSchema,
         schemaVersionId ?? undefined,
       ),
     );
