@@ -28,7 +28,7 @@ export const CreateFormBodySchema = z
     settings: CreateFormSettingsSchema.optional(),
   })
   // A retry is matched on both, so they are minted and sent together.
-  .refine((body) => !body.id === !body.versionId, {
+  .refine((body) => (body.id === undefined) === (body.versionId === undefined), {
     message: 'id and versionId are sent together',
     path: ['versionId'],
   });

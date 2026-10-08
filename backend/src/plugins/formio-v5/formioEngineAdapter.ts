@@ -192,12 +192,17 @@ export class FormioEngineAdapter implements FormEngineAdapter {
       body._id = existingId;
     }
 
-    const saved = (await client.saveForm(body).catch(async (err: unknown) => {
+    let saved: Record<string, unknown> | null;
+    try {
+      saved = (await client.saveForm(body)) as Record<string, unknown> | null;
+    } catch (err) {
       // A concurrent write for the same version created the document first: update that one.
       const createdId = existingId ? undefined : await findId();
-      if (!createdId) return rethrowEngineRejection(err);
-      return client.saveForm({ ...body, _id: createdId }).catch(rethrowEngineRejection);
-    })) as Record<string, unknown> | null;
+      if (!createdId) rethrowEngineRejection(err);
+      saved = (await client
+        .saveForm({ ...body, _id: createdId })
+        .catch(rethrowEngineRejection)) as Record<string, unknown> | null;
+    }
     const engineRef = saved?._id;
     if (engineRef == null || engineRef === '') {
       throw new Error('Form.io saveForm did not return an _id');
