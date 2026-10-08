@@ -1,7 +1,6 @@
 import 'server-only';
 import { getDictionary, resolveLocale } from '@/app/[lang]/dictionaries';
-
-type Dictionary = Awaited<ReturnType<typeof getDictionary>>;
+import type { Dictionary } from '@/src/types/dictionary';
 
 /**
  * Metadata for a localized route. `title` receives the loaded dictionary, since some titles come
