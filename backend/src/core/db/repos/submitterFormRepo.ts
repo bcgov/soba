@@ -6,7 +6,6 @@ import {
   ilike,
   inArray,
   isNull,
-  notExists,
   sql,
   type SQL,
   type SQLWrapper,
@@ -25,35 +24,19 @@ import {
 import { db } from '../client';
 import {
   formAudienceSettings,
-  formGroupOverrideMembers,
-  formGroupOverrides,
   forms,
   formSubmitterSettings,
   formVersions,
-  rolePermissions,
   submissionParticipants,
   submissions,
   workspaceAudienceSettings,
-  workspaceGroupMemberships,
-  workspaceGroupRoles,
-  workspaceGroups,
-  workspaceMemberships,
   workspaceSubmitterSettings,
   workspaces,
 } from '../schema';
-import {
-  FormGroupOverrideStatus,
-  FormVersionState,
-  GroupMemberKind,
-  Roles,
-  SubmissionParticipantStatus,
-  WorkspaceGroupMembershipStatus,
-  WorkspaceGroupRoleStatus,
-  WorkspaceGroupStatus,
-  WorkspaceMembershipStatus,
-} from '../codes';
+import { FormVersionState, Roles, SubmissionParticipantStatus } from '../codes';
 import { collated, likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
+import { effectiveGroups, permissionsByForm } from './formAccessRepo';
 
 type SubmitterFormSortField = (typeof MY_FORM_SORT_FIELDS)[number];
 
@@ -81,17 +64,6 @@ export interface ListSubmitterFormsInput {
   locale: SortLocale;
 }
 
-/** Narrows the groups a caller is an effective member of. */
-interface GroupScope {
-  workspaceId?: string;
-  /** Only these forms: ids, or a subquery returning them. */
-  formIds?: string[] | SQLWrapper;
-  /** Only groups carrying this role, active. */
-  roleCode?: string;
-  /** Leave out deleted forms. */
-  liveFormsOnly?: boolean;
-}
-
 const isPublished = and(
   eq(formVersions.state, FormVersionState.published),
   isNull(formVersions.deletedAt),
@@ -111,143 +83,6 @@ const publishedVersionIdOf = (formId: SQLWrapper) =>
     .from(formVersions)
     .where(and(eq(formVersions.formId, formId), isPublished))
     .limit(1)})`;
-
-/**
- * The groups the user is an effective member of, per form: a form's active override of a group
- * replaces that group's workspace members with its own. User members only.
- */
-const effectiveGroups = (userId: string, scope: GroupScope) => {
-  const activeMembership = and(
-    eq(workspaceMemberships.userId, userId),
-    eq(workspaceMemberships.status, WorkspaceMembershipStatus.active),
-    scope.workspaceId ? eq(workspaceMemberships.workspaceId, scope.workspaceId) : undefined,
-  );
-  const inScope = (formId: SQLWrapper) =>
-    scope.formIds ? inArray(formId, scope.formIds) : undefined;
-  // Checked on the group before its forms are joined, so other groups never reach the forms.
-  const carriesRole = scope.roleCode
-    ? exists(
-        db
-          .select({ id: workspaceGroupRoles.id })
-          .from(workspaceGroupRoles)
-          .where(
-            and(
-              eq(workspaceGroupRoles.groupId, workspaceGroups.id),
-              eq(workspaceGroupRoles.status, WorkspaceGroupRoleStatus.active),
-              eq(workspaceGroupRoles.roleCode, scope.roleCode),
-            ),
-          ),
-      )
-    : undefined;
-  const live = scope.liveFormsOnly ? isNull(forms.deletedAt) : undefined;
-  // Drizzle does not qualify a subquery's aliased columns, so the names must not match a table's.
-  const formId = sql<string>`${forms.id}`.as('effective_form_id');
-  const groupId = sql<string>`${workspaceGroups.id}`.as('effective_group_id');
-
-  const inherited = db
-    .select({ formId, groupId })
-    .from(workspaceMemberships)
-    .innerJoin(
-      workspaceGroupMemberships,
-      and(
-        eq(workspaceGroupMemberships.workspaceMembershipId, workspaceMemberships.id),
-        eq(workspaceGroupMemberships.workspaceId, workspaceMemberships.workspaceId),
-        eq(workspaceGroupMemberships.memberKind, GroupMemberKind.user),
-        eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
-      ),
-    )
-    .innerJoin(
-      workspaceGroups,
-      and(
-        eq(workspaceGroups.id, workspaceGroupMemberships.groupId),
-        eq(workspaceGroups.status, WorkspaceGroupStatus.active),
-        carriesRole,
-      ),
-    )
-    .innerJoin(
-      forms,
-      and(eq(forms.workspaceId, workspaceMemberships.workspaceId), inScope(forms.id), live),
-    )
-    .where(
-      and(
-        activeMembership,
-        notExists(
-          db
-            .select({ id: formGroupOverrides.id })
-            .from(formGroupOverrides)
-            .where(
-              and(
-                eq(formGroupOverrides.formId, forms.id),
-                eq(formGroupOverrides.groupId, workspaceGroups.id),
-                eq(formGroupOverrides.status, FormGroupOverrideStatus.active),
-              ),
-            ),
-        ),
-      ),
-    );
-
-  const overridden = db
-    .select({ formId, groupId })
-    .from(workspaceMemberships)
-    .innerJoin(
-      formGroupOverrideMembers,
-      and(
-        eq(formGroupOverrideMembers.workspaceMembershipId, workspaceMemberships.id),
-        eq(formGroupOverrideMembers.memberKind, GroupMemberKind.user),
-        eq(formGroupOverrideMembers.status, WorkspaceGroupMembershipStatus.active),
-      ),
-    )
-    .innerJoin(
-      formGroupOverrides,
-      and(
-        eq(formGroupOverrides.id, formGroupOverrideMembers.overrideId),
-        eq(formGroupOverrides.workspaceId, workspaceMemberships.workspaceId),
-        eq(formGroupOverrides.status, FormGroupOverrideStatus.active),
-        inScope(formGroupOverrides.formId),
-      ),
-    )
-    .innerJoin(
-      workspaceGroups,
-      and(
-        eq(workspaceGroups.id, formGroupOverrides.groupId),
-        eq(workspaceGroups.status, WorkspaceGroupStatus.active),
-        carriesRole,
-      ),
-    )
-    .innerJoin(
-      forms,
-      and(
-        eq(forms.id, formGroupOverrides.formId),
-        eq(forms.workspaceId, workspaceMemberships.workspaceId),
-        live,
-      ),
-    )
-    .where(activeMembership);
-
-  return unionAll(inherited, overridden);
-};
-
-/** Per form, the user's permission codes from the active roles of their effective groups. */
-const permissionsByForm = (userId: string, scope: GroupScope) => {
-  const groups = effectiveGroups(userId, scope).as('effective_group');
-  return db
-    .select({
-      formId: groups.formId,
-      permissions: sql<string[]>`array_agg(distinct ${rolePermissions.permissionCode})`.as(
-        'access_permissions',
-      ),
-    })
-    .from(groups)
-    .innerJoin(
-      workspaceGroupRoles,
-      and(
-        eq(workspaceGroupRoles.groupId, groups.groupId),
-        eq(workspaceGroupRoles.status, WorkspaceGroupRoleStatus.active),
-      ),
-    )
-    .innerJoin(rolePermissions, eq(rolePermissions.roleCode, workspaceGroupRoles.roleCode))
-    .groupBy(groups.formId);
-};
 
 /**
  * Ids of the forms the user holds the form_submitter role on, plus the forms of their draft and

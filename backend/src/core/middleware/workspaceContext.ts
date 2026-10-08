@@ -34,6 +34,8 @@ type ListScopeQuery = Partial<Record<ListAnchorKind, string>>;
 export type ResolvedListScope = {
   workspaceId: string;
   anchorKind: ListAnchorKind;
+  /** The form a form, version or submission anchor belongs to. */
+  formId?: string;
 };
 
 const readQueryString = (query: ListScopeQuery, key: ListAnchorKind): string | undefined => {
@@ -85,7 +87,7 @@ export const resolveListWorkspaceScope = async (
       assertHierarchyMatch('formVersionId', context.formVersionId, qFormVersionId);
       assertHierarchyMatch('formId', context.formId, qFormId);
       assertHierarchyMatch('workspaceId', context.workspaceId, qWorkspaceId);
-      return { workspaceId: context.workspaceId, anchorKind };
+      return { workspaceId: context.workspaceId, anchorKind, formId: context.formId };
     }
     case 'formVersionId': {
       const formVersionId = readQueryString(query, 'formVersionId')!;
@@ -95,7 +97,7 @@ export const resolveListWorkspaceScope = async (
       }
       assertHierarchyMatch('formId', context.formId, qFormId);
       assertHierarchyMatch('workspaceId', context.workspaceId, qWorkspaceId);
-      return { workspaceId: context.workspaceId, anchorKind };
+      return { workspaceId: context.workspaceId, anchorKind, formId: context.formId };
     }
     case 'formId': {
       const formId = readQueryString(query, 'formId')!;
@@ -104,7 +106,7 @@ export const resolveListWorkspaceScope = async (
         throw new NotFoundError(RESOURCE_NOT_FOUND);
       }
       assertHierarchyMatch('workspaceId', context.workspaceId, qWorkspaceId);
-      return { workspaceId: context.workspaceId, anchorKind };
+      return { workspaceId: context.workspaceId, anchorKind, formId };
     }
     case 'workspaceId': {
       return { workspaceId: readQueryString(query, 'workspaceId')!, anchorKind };
@@ -266,7 +268,8 @@ export const workspaceFromBody = async (
 
 /**
  * List/search routes: resolve workspace from the most specific scope anchor in the query,
- * verify hierarchy consistency, membership, and restrict results to that single workspace.
+ * verify hierarchy consistency, membership, and restrict results to that workspace. A form,
+ * version or submission anchor also puts its form in context.
  */
 export const workspaceListScope = (config: {
   anchorOrder: ListAnchorKind[];
@@ -304,7 +307,7 @@ export const workspaceListScope = (config: {
         resolved.workspaceId,
         `list:${resolved.anchorKind}`,
       );
-      req.coreContext = context;
+      req.coreContext = resolved.formId ? { ...context, formId: resolved.formId } : context;
       req.listScope = {
         actorId,
         workspaceIds: [resolved.workspaceId],

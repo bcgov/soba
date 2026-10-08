@@ -29,6 +29,7 @@ import {
   type SubmissionWriteEventCode,
   type SubmissionWorkflowStateCode,
 } from '../codes';
+import { permittedFormsWhere, type FormAccessFilter } from './formAccessRepo';
 
 export type SubmissionRecord = typeof submissions.$inferSelect;
 
@@ -149,8 +150,9 @@ export interface ListParticipantSubmissionsInput {
 }
 
 export interface ListSubmissionsInput {
-  /** Workspace resolved from the list scope anchor. */
+  /** The anchored workspace, or every workspace the actor is an active member of. */
   workspaceIds: string[];
+  formAccess: FormAccessFilter;
   offset: number;
   limit: number;
   formId?: string;
@@ -376,12 +378,17 @@ const submittedCodeMatches = (pattern: string) =>
 export const listSubmissionsForWorkspace = async (
   input: ListSubmissionsInput,
 ): Promise<{ items: SubmissionListRow[]; total: number }> => {
-  if (input.workspaceIds.length === 0) {
+  // No workspace or no access filter means no access, never every row.
+  if (input.workspaceIds.length === 0 || !input.formAccess) {
     return { items: [], total: 0 };
   }
   const whereClauses = [
     inArray(submissions.workspaceId, input.workspaceIds),
     isNull(submissions.deletedAt),
+    permittedFormsWhere(input.formAccess, input.workspaceIds, {
+      workspaceId: submissions.workspaceId,
+      formId: submissions.formId,
+    }),
     // Workspace/staff list shows only real submissions; a just-`opened` shell isn't one yet.
     ne(submissions.workflowState, SubmissionWorkflowState.opened),
   ];

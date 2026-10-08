@@ -148,6 +148,16 @@ async function verify(): Promise<void> {
     results: report.forms,
   });
   printGrid({
+    title: 'Design',
+    letters: { designListed: 'L', designRead: 'R', designUpdate: 'U', submissionsRead: 'S' },
+    caseKeys: COVERAGE_FORM_KEYS,
+    caseLabels: Object.fromEntries(
+      COVERAGE_FORM_KEYS.map((key) => [key, manifest.forms[key].name]),
+    ) as Record<CoverageFormKey, string>,
+    personas: report.personas,
+    results: report.design,
+  });
+  printGrid({
     title: 'Submissions',
     letters: { mine: 'M', read: 'R', write: 'W', delete: 'X' },
     caseKeys: COVERAGE_SUBMISSION_KEYS,
@@ -163,6 +173,7 @@ async function verify(): Promise<void> {
 
   const failures =
     mismatchesOf(report.forms).length +
+    mismatchesOf(report.design).length +
     mismatchesOf(report.submissions).length +
     report.inconsistencies.length;
   if (failures > 0) {

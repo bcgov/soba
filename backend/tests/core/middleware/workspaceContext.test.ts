@@ -158,7 +158,7 @@ describe('resolveListWorkspaceScope', () => {
         'formId',
         'workspaceId',
       ]),
-    ).resolves.toEqual({ workspaceId: 'ws-form', anchorKind: 'formId' });
+    ).resolves.toEqual({ workspaceId: 'ws-form', anchorKind: 'formId', formId: 'form1' });
   });
 
   it('rejects inconsistent workspaceId for formId anchor', async () => {
@@ -189,7 +189,7 @@ describe('resolveListWorkspaceScope', () => {
         'formId',
         'workspaceId',
       ]),
-    ).resolves.toEqual({ workspaceId: 'ws-fv', anchorKind: 'formVersionId' });
+    ).resolves.toEqual({ workspaceId: 'ws-fv', anchorKind: 'formVersionId', formId: 'form1' });
   });
 
   it('rejects inconsistent formId for formVersionId anchor', async () => {
@@ -217,7 +217,7 @@ describe('resolveListWorkspaceScope', () => {
         { submissionId: 'sub1', formVersionId: 'fv1', formId: 'form1', workspaceId: 'ws-sub' },
         ['submissionId', 'formVersionId', 'formId', 'workspaceId'],
       ),
-    ).resolves.toEqual({ workspaceId: 'ws-sub', anchorKind: 'submissionId' });
+    ).resolves.toEqual({ workspaceId: 'ws-sub', anchorKind: 'submissionId', formId: 'form1' });
   });
 });
 
@@ -238,6 +238,7 @@ describe('workspaceListScope', () => {
       selectedWorkspaceId: 'ws1',
     });
     expect(req.coreContext?.workspaceSource).toBe('list:workspaceId');
+    expect(req.coreContext?.formId).toBeUndefined();
     expect(next).toHaveBeenCalledWith();
   });
 
@@ -257,6 +258,7 @@ describe('workspaceListScope', () => {
       selectedWorkspaceId: 'ws-form',
     });
     expect(req.coreContext?.workspaceSource).toBe('list:formId');
+    expect(req.coreContext?.formId).toBe('form1');
     expect(next).toHaveBeenCalledWith();
   });
 

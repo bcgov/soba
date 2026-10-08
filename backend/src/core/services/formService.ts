@@ -12,6 +12,7 @@ import {
 } from '../db/repos/formRepo';
 import { listFormsForSubmitter, type ListSubmitterFormsInput } from '../db/repos/submitterFormRepo';
 import { createEmptyFormVersionDraft } from '../db/repos/formVersionRepo';
+import type { FormAccessFilter } from '../db/repos/formAccessRepo';
 import { isWorkspaceDisclaimerAccepted } from '../db/repos/workspaceRepo';
 import { db, type DbOrTx } from '../db/client';
 import { env } from '../config/env';
@@ -34,6 +35,7 @@ interface DeleteInput {
 interface ListInput {
   workspaceIds: string[];
   actorId: string;
+  formAccess: FormAccessFilter;
   offset: number;
   limit: number;
   formId?: string;

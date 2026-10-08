@@ -37,6 +37,9 @@ export const formGroupOverrides = sobaSchema.table(
       .on(table.formId, table.groupId)
       .where(sql`${table.status} = 'active'`),
     workspaceIdx: index('form_group_override_workspace_idx').on(table.workspaceId),
+    activeWorkspaceIdx: index('form_group_override_active_workspace_idx')
+      .on(table.workspaceId, table.formId)
+      .where(sql`${table.status} = 'active'`),
     formIdx: index('form_group_override_form_idx').on(table.formId),
     groupIdx: index('form_group_override_group_idx').on(table.groupId),
   }),

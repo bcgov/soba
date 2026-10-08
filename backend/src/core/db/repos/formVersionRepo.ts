@@ -4,6 +4,7 @@ import { db, type DbOrTx } from '../client';
 import { formVersionRevisions, formVersions, forms } from '../schema';
 import { orderByForSort, prefixPattern, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
+import { permittedFormsWhere, type FormAccessFilter } from './formAccessRepo';
 
 interface CreateDraftInput {
   workspaceId: string;
@@ -33,8 +34,9 @@ const FORM_VERSION_SORT_COLUMNS: SortColumns<FormVersionListSortField> = {
 };
 
 export interface ListFormVersionsInput {
-  /** Workspace resolved from the list scope anchor. */
+  /** The anchored workspace, or every workspace the actor is an active member of. */
   workspaceIds: string[];
+  formAccess: FormAccessFilter;
   offset: number;
   limit: number;
   formId?: string;
@@ -143,13 +145,17 @@ export const getFormVersionById = async (workspaceId: string, formVersionId: str
 export const listFormVersionsForWorkspace = async (
   input: ListFormVersionsInput,
 ): Promise<{ items: FormVersionListRow[]; total: number }> => {
-  // An empty scope means the actor holds the permission in no workspace, never "all workspaces".
-  if (input.workspaceIds.length === 0) {
+  // No workspace or no access filter means no access, never every row.
+  if (input.workspaceIds.length === 0 || !input.formAccess) {
     return { items: [], total: 0 };
   }
   const whereClauses = [
     inArray(formVersions.workspaceId, input.workspaceIds),
     isNull(formVersions.deletedAt),
+    permittedFormsWhere(input.formAccess, input.workspaceIds, {
+      workspaceId: formVersions.workspaceId,
+      formId: formVersions.formId,
+    }),
   ];
 
   if (input.formId) {
@@ -221,7 +227,7 @@ export interface LookupFormVersionsInput {
 export const lookupFormVersions = async (
   input: LookupFormVersionsInput,
 ): Promise<FormVersionSummaryRow[]> => {
-  // An empty scope means the actor holds the permission in no workspace, never "all workspaces".
+  // No workspace means no access, never every row.
   if (input.workspaceIds.length === 0) {
     return [];
   }

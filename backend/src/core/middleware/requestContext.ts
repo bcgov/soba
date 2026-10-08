@@ -1,3 +1,5 @@
+import type { FormAccessFilter } from '../db/repos/formAccessRepo';
+
 /**
  * Core per-request workspace context, populated by the per-route workspace middleware in
  * `workspaceContext.ts` (`workspaceFromQuery` / `workspaceFromResource`). Actor-only routes
@@ -16,16 +18,20 @@ export interface CoreRequestContext {
    * invalidateMembershipCache(workspaceId, userId) or a demoted admin keeps authority until the TTL.
    */
   role: string;
+  /** The actor's permission codes on `formId`, or on the workspace without one. */
+  permissions?: ReadonlySet<string>;
 }
 
 /**
- * Scope for workspace-scoped *list/search* routes, populated by `workspaceListScope`. Workspace
- * is always resolved to a single id (from a scope anchor); membership is verified before listing.
+ * Scope for *list/search* routes, populated by `workspaceListScope` and `requireFormPermissions`.
+ * Membership in an anchored workspace is verified before listing.
  */
 export interface CoreListScope {
   actorId: string;
-  /** Workspaces the list is restricted to (always a single resolved workspace). */
+  /** The anchored workspace, or every workspace the actor is an active member of. */
   workspaceIds: string[];
   /** The workspace resolved from the scope anchor. */
   selectedWorkspaceId?: string;
+  /** Set when the list names no form: only rows whose form allows the actor are kept. */
+  formAccess?: FormAccessFilter;
 }

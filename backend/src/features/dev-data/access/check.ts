@@ -14,11 +14,14 @@ import {
   isIdentifiedCaller,
   Permissions,
   PUBLIC_PROVIDER_CODE,
+  type PermissionCode,
 } from '@soba/lib';
 
 import { db } from '../../../core/db/client';
 import { submissionParticipants } from '../../../core/db/schema';
-import { getWorkspaceIdForForm } from '../../../core/db/repos/formRepo';
+import { resolveFormPermissions } from '../../../core/db/repos/formAccessRepo';
+import { getWorkspaceIdForForm, listFormsForWorkspace } from '../../../core/db/repos/formRepo';
+import { getActiveWorkspaceIdsForUser } from '../../../core/db/repos/membershipRepo';
 import {
   hasFormSubmitAccess,
   type CallerIdentity,
@@ -41,12 +44,15 @@ import { getDraftSaveStatus } from '../../form-settings/submitter/drafts';
 import { inSequence } from '../inSequence';
 import { findActiveManifest } from '../runs';
 import {
+  DESIGN_CHECKS,
+  DESIGN_EXPECTATIONS,
   expectedOf,
   FORM_CHECKS,
   FORM_EXPECTATIONS,
   SUBMISSION_CHECKS,
   SUBMISSION_EXPECTATIONS,
   type CaseResult,
+  type DesignCheck,
   type FormCheck,
   type SubmissionCheck,
 } from './expectations';
@@ -70,6 +76,7 @@ export interface CoverageReport {
   /** Why a persona was left out. */
   skipped: string[];
   forms: CaseResult<CoverageFormKey, FormCheck>[];
+  design: CaseResult<CoverageFormKey, DesignCheck>[];
   submissions: CaseResult<CoverageSubmissionKey, SubmissionCheck>[];
   /** Disagreements between two code paths that should give the same answer. */
   inconsistencies: string[];
@@ -243,6 +250,60 @@ async function checkForm(
   };
 }
 
+/** Codes the design lists filter on. */
+const DESIGN_LIST_CODES: readonly (readonly PermissionCode[])[] = [
+  [Permissions.form_read],
+  [Permissions.submission_read],
+  [Permissions.design_update],
+  [Permissions.form_read, Permissions.document_template_read],
+];
+
+/** Whether the form's own check grants every code. A deleted form grants nothing. */
+async function formGrants(
+  actorId: string,
+  form: CoverageFormRef,
+  required: readonly PermissionCode[],
+): Promise<boolean> {
+  if ((await getWorkspaceIdForForm(form.formId)) === null) return false;
+  const permissions = await resolveFormPermissions(actorId, form.workspaceId, form.formId);
+  return hasAllPermissions(permissions, required);
+}
+
+/** The design forms list must hold exactly the forms whose own check grants the codes. */
+async function designListInconsistencies(
+  manifest: CoverageManifest,
+  caller: Caller,
+  workspaceKey: CoverageWorkspaceKey,
+): Promise<string[]> {
+  const actorId = caller.identity.actorId;
+  if (!caller.signedIn || !actorId) return [];
+  const workspaceId = manifest.workspaces[workspaceKey].id;
+  const formKeys = COVERAGE_FORM_KEYS.filter(
+    (key) => manifest.forms[key].workspaceId === workspaceId,
+  );
+  const issues: string[] = [];
+  for (const required of DESIGN_LIST_CODES) {
+    const { items } = await listFormsForWorkspace({
+      workspaceIds: [workspaceId],
+      formAccess: { actorId, required },
+      offset: 0,
+      limit: MAX_ROWS,
+      sort: 'name:asc',
+      locale: DEFAULT_SORT_LOCALE,
+    });
+    const listed = new Set(items.map((item) => item.id));
+    for (const key of formKeys) {
+      const form = manifest.forms[key];
+      if ((await formGrants(actorId, form, required)) !== listed.has(form.formId)) {
+        issues.push(
+          `${caller.persona} x ${key}: design list for ${required.join('+')} differs from the form check`,
+        );
+      }
+    }
+  }
+  return issues;
+}
+
 async function checkWorkspaceForms(
   manifest: CoverageManifest,
   caller: Caller,
@@ -264,7 +325,11 @@ async function checkWorkspaceForms(
       : [`${caller.persona} x ${workspaceKey}: My Forms filter disagrees with the listed forms`];
   return {
     results: checked.map((c) => c.result),
-    issues: [...checked.flatMap((c) => c.issues), ...filterIssue],
+    issues: [
+      ...checked.flatMap((c) => c.issues),
+      ...filterIssue,
+      ...(await designListInconsistencies(manifest, caller, workspaceKey)),
+    ],
   };
 }
 
@@ -280,6 +345,63 @@ async function checkForms(
     results: workspaces.flatMap((w) => w.results),
     issues: workspaces.flatMap((w) => w.issues),
   };
+}
+
+/** The designer's forms list, across the coverage workspaces the persona is an active member of. */
+async function designListedIds(manifest: CoverageManifest, caller: Caller): Promise<Set<string>> {
+  const actorId = caller.identity.actorId;
+  if (!caller.signedIn || !actorId) return new Set();
+  const coverage = new Set(COVERAGE_WORKSPACE_KEYS.map((key) => manifest.workspaces[key].id));
+  const memberships = await getActiveWorkspaceIdsForUser(actorId);
+  const { items } = await listFormsForWorkspace({
+    workspaceIds: memberships.filter((id) => coverage.has(id)),
+    formAccess: { actorId, required: [Permissions.form_read] },
+    offset: 0,
+    limit: MAX_ROWS,
+    sort: 'name:asc',
+    locale: DEFAULT_SORT_LOCALE,
+  });
+  return new Set(items.map((item) => item.id));
+}
+
+const NO_DESIGN_ACCESS: Record<DesignCheck, boolean> = {
+  designListed: false,
+  designRead: false,
+  designUpdate: false,
+  submissionsRead: false,
+};
+
+/** The design routes need a signed-in caller, so the public user never reaches them. */
+async function designAnswers(
+  caller: Caller,
+  form: CoverageFormRef,
+  listed: Set<string>,
+): Promise<Record<DesignCheck, boolean>> {
+  const actorId = caller.identity.actorId;
+  if (!caller.signedIn || !actorId) return NO_DESIGN_ACCESS;
+  const permissions = await resolveFormPermissions(actorId, form.workspaceId, form.formId);
+  const grants = (code: PermissionCode) => hasAllPermissions(permissions, [code]);
+  return {
+    designListed: listed.has(form.formId),
+    designRead: grants(Permissions.form_read),
+    designUpdate: grants(Permissions.design_update),
+    submissionsRead: grants(Permissions.submission_read),
+  };
+}
+
+async function checkDesign(
+  manifest: CoverageManifest,
+  caller: Caller,
+): Promise<CaseResult<CoverageFormKey, DesignCheck>[]> {
+  const listed = await designListedIds(manifest, caller);
+  return Promise.all(
+    COVERAGE_FORM_KEYS.map(async (key) => ({
+      persona: caller.persona,
+      caseKey: key,
+      actual: await designAnswers(caller, manifest.forms[key], listed),
+      expected: expectedOf(DESIGN_CHECKS, DESIGN_EXPECTATIONS[key], caller.persona),
+    })),
+  );
 }
 
 async function checkSubmissions(
@@ -309,11 +431,12 @@ export async function checkCoverage(manifest: CoverageManifest): Promise<Coverag
   const personas = PERSONA_KEYS.filter((persona) => persona !== OWNER || !skipsOwner(manifest));
   const checked = await inSequence(personas, async (persona) => {
     const caller = callerOf(manifest, persona);
-    const [forms, submissions] = await Promise.all([
+    const [forms, design, submissions] = await Promise.all([
       checkForms(manifest, caller),
+      checkDesign(manifest, caller),
       checkSubmissions(manifest, caller),
     ]);
-    return { forms, submissions };
+    return { forms, design, submissions };
   });
   return {
     personas,
@@ -321,6 +444,7 @@ export async function checkCoverage(manifest: CoverageManifest): Promise<Coverag
       ? [`${OWNER}: signs in through ${ownerProvider}, the table assumes ${OWNER_PROVIDER}`]
       : [],
     forms: checked.flatMap((c) => c.forms.results),
+    design: checked.flatMap((c) => c.design),
     submissions: checked.flatMap((c) => c.submissions),
     inconsistencies: checked.flatMap((c) => c.forms.issues),
   };
@@ -360,6 +484,7 @@ export async function explainForm(
   const published = await getPublishedVersionForForm(form.workspaceId, form.formId);
   const rows = await myFormRows(caller, form.workspaceId);
   const answers = { listed: rows.has(form.formId), ...(await formAnswers(caller, form)) };
+  const design = await designAnswers(caller, form, await designListedIds(manifest, caller));
   const idp = { idpCode: caller.identity.idpCode };
 
   return [
@@ -379,6 +504,7 @@ export async function explainForm(
     ],
     ['audience admits', yesNo(!!facts && audienceAdmits(facts, idp))],
     ...answerLines(answers, expectedOf(FORM_CHECKS, FORM_EXPECTATIONS[formKey], persona)),
+    ...answerLines(design, expectedOf(DESIGN_CHECKS, DESIGN_EXPECTATIONS[formKey], persona)),
   ];
 }
 

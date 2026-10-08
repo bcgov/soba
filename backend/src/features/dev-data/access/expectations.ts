@@ -22,6 +22,18 @@ export interface FormExpectation {
   update: PersonaKey[];
 }
 
+/** Design-mode access, as the design routes answer it. */
+export interface DesignExpectation {
+  /** In the designer's forms list. */
+  designListed: PersonaKey[];
+  /** form_read on the form: the form, its versions and settings. */
+  designRead: PersonaKey[];
+  /** design_update on the form. */
+  designUpdate: PersonaKey[];
+  /** submission_read on the form: its submissions in the designer. */
+  submissionsRead: PersonaKey[];
+}
+
 export interface SubmissionExpectation {
   /** In My Submissions. */
   mine: PersonaKey[];
@@ -33,9 +45,16 @@ export interface SubmissionExpectation {
 }
 
 export const FORM_CHECKS = ['listed', 'start', 'draft', 'templates', 'update'] as const;
+export const DESIGN_CHECKS = [
+  'designListed',
+  'designRead',
+  'designUpdate',
+  'submissionsRead',
+] as const;
 export const SUBMISSION_CHECKS = ['mine', 'read', 'write', 'delete'] as const;
 
 export type FormCheck = (typeof FORM_CHECKS)[number];
+export type DesignCheck = (typeof DESIGN_CHECKS)[number];
 export type SubmissionCheck = (typeof SUBMISSION_CHECKS)[number];
 
 /** One persona's answers on one case. */
@@ -109,6 +128,7 @@ export const FORM_EXPECTATIONS: Record<CoverageFormKey, FormExpectation> = {
     update: ROLES_STAFF_UPDATE,
   },
   rolesOverrideCleared: rolesInherited(),
+  rolesDesignersOverride: rolesInherited(),
   rolesUnpublished: rolesUnlisted(),
   rolesFormDeleted: rolesUnlisted(),
   rolesVersionDeleted: rolesUnlisted(),
@@ -161,6 +181,66 @@ export const FORM_EXPECTATIONS: Record<CoverageFormKey, FormExpectation> = {
     templates: IDIR,
     update: ['admin'],
   },
+};
+
+/** form_read in the roles workspace without an override: the staff groups and form submitters. */
+const ROLES_READERS: PersonaKey[] = ['admin', 'designer', 'reviewer', 'viewer', ...ROLE_SUBMITTERS];
+
+const rolesDesign = (changes: Partial<DesignExpectation> = {}): DesignExpectation => ({
+  designListed: ROLES_READERS,
+  designRead: ROLES_READERS,
+  designUpdate: ['admin', 'designer'],
+  submissionsRead: ['admin', 'reviewer', 'viewer'],
+  ...changes,
+});
+
+const everyCheck = (personas: PersonaKey[]): DesignExpectation => ({
+  designListed: personas,
+  designRead: personas,
+  designUpdate: personas,
+  submissionsRead: personas,
+});
+
+const ROLES_OVERRIDE_READERS: PersonaKey[] = [
+  'admin',
+  'designer',
+  'reviewer',
+  'viewer',
+  'submitter',
+  'overrideAdded',
+];
+
+const DESIGNERS_OVERRIDE_READERS: PersonaKey[] = [
+  'admin',
+  'reviewer',
+  'viewer',
+  ...ROLE_SUBMITTERS,
+  'overrideAdded',
+];
+
+/** Only the list leaves out a deleted form; the checks read roles. */
+export const DESIGN_EXPECTATIONS: Record<CoverageFormKey, DesignExpectation> = {
+  rolesInherit: rolesDesign(),
+  rolesOverride: rolesDesign({
+    designListed: ROLES_OVERRIDE_READERS,
+    designRead: ROLES_OVERRIDE_READERS,
+  }),
+  rolesOverrideCleared: rolesDesign(),
+  rolesDesignersOverride: rolesDesign({
+    designListed: DESIGNERS_OVERRIDE_READERS,
+    designRead: DESIGNERS_OVERRIDE_READERS,
+    designUpdate: ['admin', 'overrideAdded'],
+  }),
+  rolesUnpublished: rolesDesign(),
+  rolesFormDeleted: rolesDesign({ designListed: [] }),
+  rolesVersionDeleted: rolesDesign(),
+  rolesDraftsOff: rolesDesign(),
+  protectedInherit: everyCheck(['admin', 'owner']),
+  publicOwn: everyCheck(['admin', 'owner']),
+  bceidOwn: everyCheck(['admin', 'owner']),
+  membersOwn: everyCheck(['admin', 'owner']),
+  publicInherit: everyCheck(['admin']),
+  protectedOwn: everyCheck(['admin']),
 };
 
 const NONE: SubmissionExpectation = { mine: [], read: [], write: [], delete: [] };

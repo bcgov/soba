@@ -8,6 +8,8 @@ import {
   COVERAGE_SUBMISSION_KEYS,
 } from '../../../src/features/dev-data/access/plan';
 import {
+  DESIGN_CHECKS,
+  DESIGN_EXPECTATIONS,
   expectedOf,
   FORM_EXPECTATIONS,
   mismatchesOf,
@@ -35,9 +37,21 @@ describe('dev data access coverage plan', () => {
     for (const workspace of plan.workspaces) {
       const seated = new Set<string>(workspace.seats.map((s) => s.persona));
       for (const form of workspace.forms) {
-        for (const persona of form.submitterOverride?.members ?? []) {
+        for (const persona of form.groupOverride?.members ?? []) {
           expect(seated.has(persona)).toBe(true);
         }
+      }
+    }
+  });
+
+  it('only overrides a named group a seat in the same workspace creates', () => {
+    for (const workspace of plan.workspaces) {
+      const named = new Set(
+        workspace.seats.flatMap((s) => (s.group && 'name' in s.group ? [s.group.name] : [])),
+      );
+      for (const form of workspace.forms) {
+        const group = form.groupOverride?.group;
+        if (group && 'name' in group) expect(named.has(group.name)).toBe(true);
       }
     }
   });
@@ -75,6 +89,19 @@ describe('dev data access coverage expectations', () => {
   it.each(COVERAGE_SUBMISSION_KEYS)('%s: every listing, write or delete is by a reader', (key) => {
     const { mine, read, write, delete: remove } = SUBMISSION_EXPECTATIONS[key];
     expect([...mine, ...write, ...remove].filter((persona) => !read.includes(persona))).toEqual([]);
+  });
+
+  it.each(COVERAGE_FORM_KEYS)('%s: the designer lists only forms the persona can read', (key) => {
+    const { designListed, designRead } = DESIGN_EXPECTATIONS[key];
+    expect(designListed.filter((persona) => !designRead.includes(persona))).toEqual([]);
+  });
+
+  it('gives the anonymous caller no design access', () => {
+    for (const key of COVERAGE_FORM_KEYS) {
+      for (const check of DESIGN_CHECKS) {
+        expect(DESIGN_EXPECTATIONS[key][check]).not.toContain(ANONYMOUS);
+      }
+    }
   });
 
   it('never lists anything for, or lets delete, the anonymous caller', () => {

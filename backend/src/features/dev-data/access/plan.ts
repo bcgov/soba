@@ -26,6 +26,7 @@ export const PERSONA_KEYS = [
   'submitter',
   'designer',
   'reviewer',
+  'viewer',
   'overrideRemoved',
   'overrideAdded',
   'inactiveMember',
@@ -64,6 +65,7 @@ export interface PlannedPersona {
 export interface PlannedSeat {
   persona: Exclude<PersonaKey, typeof ADMIN>;
   role: WorkspaceMembershipRoleCode;
+  /** A named group is created by the first seat that names it. */
   group: { system: SystemGroupCode } | { name: string; roleCodes: RoleCode[] } | null;
   membershipStatus?: 'inactive';
   groupMembershipStatus?: 'inactive';
@@ -76,6 +78,7 @@ export const COVERAGE_FORM_KEYS = [
   'rolesInherit',
   'rolesOverride',
   'rolesOverrideCleared',
+  'rolesDesignersOverride',
   'rolesUnpublished',
   'rolesFormDeleted',
   'rolesVersionDeleted',
@@ -98,8 +101,12 @@ export interface PlannedCoverageForm {
   audience?: Audience;
   /** The form's own drafts setting; absent inherits the workspace's. */
   allowSubmitterDrafts?: boolean;
-  /** Replaces the form submitters group's members on this form; cleared leaves it inactive. */
-  submitterOverride?: { members: PersonaKey[]; cleared?: boolean };
+  /** Replaces the group's members on this form; cleared leaves the override inactive. */
+  groupOverride?: {
+    group: { system: SystemGroupCode } | { name: string };
+    members: PersonaKey[];
+    cleared?: boolean;
+  };
   /** Applied once the form's submissions exist. */
   afterSubmissions?: 'deleteForm' | 'deleteVersion';
 }
@@ -154,6 +161,7 @@ const PERSONA_PROVIDERS: Record<GeneratedPersonaKey, string> = {
   submitter: 'azureidir',
   designer: 'azureidir',
   reviewer: 'azureidir',
+  viewer: 'azureidir',
   overrideRemoved: 'azureidir',
   overrideAdded: 'azureidir',
   inactiveMember: 'azureidir',
@@ -190,6 +198,8 @@ function buildPersona(key: GeneratedPersonaKey): PlannedPersona {
   };
 }
 
+const DESIGNERS_GROUP = `${COVERAGE_PREFIX}Designers`;
+
 const submitters = (persona: PlannedSeat['persona']): PlannedSeat => ({
   persona,
   role: WorkspaceMembershipRole.member,
@@ -224,12 +234,17 @@ const ROLES_WORKSPACE: PlannedCoverageWorkspace = {
     {
       persona: 'designer',
       role: WorkspaceMembershipRole.member,
-      group: { name: `${COVERAGE_PREFIX}Designers`, roleCodes: [Roles.form_designer] },
+      group: { name: DESIGNERS_GROUP, roleCodes: [Roles.form_designer] },
     },
     {
       persona: 'reviewer',
       role: WorkspaceMembershipRole.member,
       group: { name: `${COVERAGE_PREFIX}Reviewers`, roleCodes: [Roles.submission_reviewer] },
+    },
+    {
+      persona: 'viewer',
+      role: WorkspaceMembershipRole.viewer,
+      group: { name: `${COVERAGE_PREFIX}Approvers`, roleCodes: [Roles.submission_approver] },
     },
     submitters('overrideRemoved'),
     { persona: 'overrideAdded', role: WorkspaceMembershipRole.member, group: null },
@@ -244,13 +259,30 @@ const ROLES_WORKSPACE: PlannedCoverageWorkspace = {
       'rolesOverride',
       'Roles override',
       'Overrides the form submitters group with submitter and overrideAdded.',
-      { submitterOverride: { members: ['submitter', 'overrideAdded'] } },
+      {
+        groupOverride: {
+          group: { system: SystemGroup.form_submitters },
+          members: ['submitter', 'overrideAdded'],
+        },
+      },
     ),
     form(
       'rolesOverrideCleared',
       'Roles override cleared',
       'Its override of the form submitters group was cleared.',
-      { submitterOverride: { members: ['overrideAdded'], cleared: true } },
+      {
+        groupOverride: {
+          group: { system: SystemGroup.form_submitters },
+          members: ['overrideAdded'],
+          cleared: true,
+        },
+      },
+    ),
+    form(
+      'rolesDesignersOverride',
+      'Roles designers override',
+      'Overrides the designers group with overrideAdded, leaving designer out.',
+      { groupOverride: { group: { name: DESIGNERS_GROUP }, members: ['overrideAdded'] } },
     ),
     form('rolesUnpublished', 'Roles unpublished', 'Never published.', { published: false }),
     form('rolesFormDeleted', 'Roles form deleted', 'Deleted after a draft was saved.', {
