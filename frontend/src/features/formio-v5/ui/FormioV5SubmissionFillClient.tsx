@@ -19,6 +19,7 @@ import {
 import { useSubmitFill } from '@/src/features/formio-v5/data/useSubmitFill';
 import { useSubmissionWriter } from '@/src/features/formio-v5/data/useSubmissionWriter';
 import { SubmissionLoadAlert } from '@/src/features/submissions/ui/SubmissionLoadAlert';
+import { PrintSubmissionButton } from '@/src/features/templates/ui/PrintSubmissionButton';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 
@@ -298,8 +299,8 @@ function SubmissionFillBody({
           />
         </div>
       ) : null}
-      {fillableBundle?.canSaveDraft ? (
-        <div className="mb-3 d-flex gap-2" data-testid="submission-fill-actions">
+      <div className="mb-3 d-flex gap-2" data-testid="submission-fill-actions">
+        {fillableBundle?.canSaveDraft ? (
           <Button
             variant="secondary"
             onPress={() => {
@@ -310,8 +311,11 @@ function SubmissionFillBody({
           >
             {writing === 'save' ? labels.savingDraft : labels.saveDraft}
           </Button>
+        ) : null}
+        <div className="ms-auto">
+          <PrintSubmissionButton />
         </div>
-      ) : null}
+      </div>
       <FormioV5FormRenderErrorBoundary
         fallback={
           <InlineAlert variant="danger" role="alert">

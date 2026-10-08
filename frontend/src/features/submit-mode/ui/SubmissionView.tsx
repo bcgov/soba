@@ -8,6 +8,7 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { SubmissionDetail } from '@/src/features/submissions/ui/SubmissionDetail';
 import { SubmissionLoadAlert } from '@/src/features/submissions/ui/SubmissionLoadAlert';
 import { useSubmitSubmission } from '@/src/features/submit-mode/data/useSubmitSubmission';
+import { PrintSubmissionButton } from '@/src/features/templates/ui/PrintSubmissionButton';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 
 /** A submitter's view of one submission; `success` is the confirmation shown right after submit. */
@@ -34,7 +35,22 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
           content={data.content}
         />
       );
-      if (!success) return detail;
+      const actions = (link: React.ReactNode) => (
+        <div className="mb-3 d-flex align-items-center gap-2">
+          {link}
+          <div className="ms-auto">
+            <PrintSubmissionButton />
+          </div>
+        </div>
+      );
+      if (!success) {
+        return (
+          <>
+            {actions(null)}
+            {detail}
+          </>
+        );
+      }
       if (data.submission.workflowState !== 'submitted') {
         return (
           <InlineAlert
@@ -56,16 +72,16 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
             />
           </div>
           {/* Signed in only; the bare URL opens the list unfiltered. */}
-          {authenticated ? (
-            <div className="mb-3">
+          {actions(
+            authenticated ? (
               <Link
                 data-testid="submission-success-my-submissions"
                 onPress={() => router.push(`/${locale}/my-submissions`)}
               >
                 {dict.mySubmissions.viewAll}
               </Link>
-            </div>
-          ) : null}
+            ) : null,
+          )}
           {detail}
         </div>
       );

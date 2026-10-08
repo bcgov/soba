@@ -368,6 +368,13 @@
       "actionsColumn": "Actions",
       "types": {
         "cdogs": "CDOGS"
+      },
+      "print": {
+        "button": "Print",
+        "modalTitle": "Print Submission",
+        "browserTab": "Browser Print",
+        "templateTab": "Template Print",
+        "print": "Print"
       }
     },
     "descriptionLabel": "Description",

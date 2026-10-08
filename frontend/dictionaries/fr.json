@@ -369,6 +369,13 @@
       "actionsColumn": "Actions",
       "types": {
         "cdogs": "CDOGS"
+      },
+      "print": {
+        "button": "Imprimer",
+        "modalTitle": "Imprimer la soumission",
+        "browserTab": "Impression du navigateur",
+        "templateTab": "Impression du modèle",
+        "print": "Imprimer"
       }
     },
     "descriptionLabel": "Description du Formulaire",
