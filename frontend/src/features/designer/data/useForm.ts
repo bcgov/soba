@@ -1,12 +1,12 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useSWRConfig } from 'swr';
+import { v7 as uuidv7 } from 'uuid';
 import type { FormType } from '@formio/react';
 import {
   createFormVersion,
   createSobaFormioForm,
-  getFormVersionSchema,
   getSobaForm,
   getSobaFormVersion,
   lookupFormVersions,
@@ -14,8 +14,8 @@ import {
   saveFormVersionSchema,
 } from '@/src/shared/api/sobaApi';
 import { updateSobaForm } from '@/src/shared/api/sobaApiDesign';
-import { newFormSchema } from '@soba/lib';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
+import { ApiError } from '@/src/shared/api/sobaHelpers';
 import { sessionReadConfig } from '@/src/shared/api/swrConfig';
 import { classifyDataError } from '@/src/shared/api/dataError';
 import type { DataError, WriteOutcome } from '@/src/shared/api/dataContracts';
@@ -23,6 +23,9 @@ import type {
   CreateFormFields,
   CreateSobaFormioFormResponse,
   FormVersionSummary,
+  SobaFormType,
+  SobaFormVersionType,
+  SobaResponseFormType,
 } from '@/src/types/forms';
 import { versionsKey } from './useFormVersions';
 import { formVersionSchemaKey, useFormVersionSchema } from './useFormVersionSchema';
@@ -183,9 +186,31 @@ export function useForm(formId?: string) {
   };
 }
 
-type FormPatch = Parameters<typeof updateSobaForm>[2];
-type FormRecord = Awaited<ReturnType<typeof updateSobaForm>>;
-type NewVersion = Awaited<ReturnType<typeof createFormVersion>>;
+/**
+ * Runs a create under ids minted for it. The key names the create, not its fields, so a retry sends
+ * the same ids even after an edit and gets back what the first attempt made. A success or a refusal
+ * releases them; after a network error or a 5xx the server may have committed, so they are kept.
+ */
+function usePendingIds<T>(mint: () => T) {
+  const pending = useRef<{ key: string; ids: T } | null>(null);
+  return useCallback(
+    async <R>(key: string, request: (ids: T) => Promise<R>): Promise<R> => {
+      if (pending.current?.key !== key) pending.current = { key, ids: mint() };
+      try {
+        const value = await request(pending.current.ids);
+        pending.current = null;
+        return value;
+      } catch (err) {
+        if (err instanceof ApiError && err.status < 500) pending.current = null;
+        throw err;
+      }
+    },
+    [mint],
+  );
+}
+
+const mintVersionId = () => uuidv7();
+const mintFormIds = () => ({ id: uuidv7(), versionId: uuidv7() });
 
 /**
  * The write side of one form: its record, its version schemas, and new versions. Each action
@@ -213,7 +238,10 @@ export function useFormWriter(formId: string) {
   );
 
   const update = useCallback(
-    async (token: string, patch: FormPatch): Promise<WriteOutcome<FormRecord>> => {
+    async (
+      token: string,
+      patch: Partial<SobaFormType>,
+    ): Promise<WriteOutcome<SobaResponseFormType>> => {
       const value = await updateSobaForm(token, formId, patch);
       await Promise.all([refreshForm(), mutate((key) => Array.isArray(key) && key[0] === 'forms')]);
       return { status: 'applied', value };
@@ -221,27 +249,39 @@ export function useFormWriter(formId: string) {
     [mutate, formId, refreshForm],
   );
 
+  const withNewVersionId = usePendingIds(mintVersionId);
+  const withRestoreId = usePendingIds(mintVersionId);
+
+  // With no schema, the server starts the draft from the source version's, else the default form.
   const createVersion = useCallback(
     async (
       token: string,
-      sourceSchema: FormType,
+      sourceSchema: FormType | null,
       fromVersionId?: string,
-    ): Promise<WriteOutcome<NewVersion>> => {
-      const value = await createFormVersion(token, formId, fromVersionId);
-      await saveFormVersionSchema(token, value.id, sourceSchema);
-      await commitSchema(value.id, sourceSchema);
+    ): Promise<WriteOutcome<SobaFormVersionType>> => {
+      const schema = sourceSchema ?? undefined;
+      const { value, created } = await withNewVersionId(`${formId}:${fromVersionId}`, (id) =>
+        createFormVersion(token, { id, formId, fromFormVersionId: fromVersionId, schema }),
+      );
+      // A retry got back the draft an earlier attempt made, maybe from an older schema: save this one.
+      if (schema && !created) await saveFormVersionSchema(token, value.id, schema);
+      if (schema) await commitSchema(value.id, schema);
       await refreshVersions();
       return { status: 'applied', value };
     },
-    [formId, commitSchema, refreshVersions],
+    [formId, withNewVersionId, commitSchema, refreshVersions],
   );
 
+  // The server starts the draft from the source version's schema.
   const restoreVersion = useCallback(
-    async (token: string, fromVersionId: string): Promise<WriteOutcome<NewVersion>> => {
-      const sourceSchema = ((await getFormVersionSchema(token, fromVersionId)) ?? {}) as FormType;
-      return createVersion(token, sourceSchema, fromVersionId);
+    async (token: string, fromVersionId: string): Promise<WriteOutcome<SobaFormVersionType>> => {
+      const { value } = await withRestoreId(`${formId}:${fromVersionId}`, (id) =>
+        createFormVersion(token, { id, formId, fromFormVersionId: fromVersionId }),
+      );
+      await refreshVersions();
+      return { status: 'applied', value };
     },
-    [createVersion],
+    [formId, withRestoreId, refreshVersions],
   );
 
   const saveSchema = useCallback(
@@ -266,22 +306,25 @@ export function useFormWriter(formId: string) {
   return { update, createVersion, restoreVersion, saveSchema };
 }
 
-/** Create a new form with an empty first-version schema, ready to open in the designer. */
+/**
+ * Create a new form with its first version, ready to open in the designer. One form per mounted
+ * creator and workspace: a retry gets back the form an earlier attempt made, under its first name.
+ */
 export function useFormCreator() {
+  const withFormIds = usePendingIds(mintFormIds);
   const create = useCallback(
     async (
       token: string,
       data: CreateFormFields,
       workspaceId?: string,
     ): Promise<WriteOutcome<CreateSobaFormioFormResponse>> => {
-      const value = await createSobaFormioForm(token, data, workspaceId);
-      // A version with no schema 404s when read, so the first one is saved here.
-      if (value.formVersion?.id) {
-        await saveFormVersionSchema(token, value.formVersion.id, newFormSchema() as FormType);
-      }
+      // No schema: the server gives the first version the default form.
+      const { value } = await withFormIds(workspaceId ?? '', (ids) =>
+        createSobaFormioForm(token, { ...data, ...ids }, workspaceId),
+      );
       return { status: 'applied', value };
     },
-    [],
+    [withFormIds],
   );
   return { create };
 }

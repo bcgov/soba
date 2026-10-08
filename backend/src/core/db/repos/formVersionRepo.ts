@@ -1,15 +1,22 @@
-import { and, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull, sql, type InferSelectModel } from 'drizzle-orm';
 import { DEFAULT_SORT_LOCALE, FORM_VERSION_SORT_FIELDS, type SortToken } from '@soba/lib';
-import { db, type DbOrTx } from '../client';
+import { db, type DbOrTx, type Tx } from '../client';
 import { formVersionRevisions, formVersions, forms } from '../schema';
 import { orderByForSort, prefixPattern, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
+import { NotFoundError } from '../../errors';
+
+export type FormVersionRecord = InferSelectModel<typeof formVersions>;
 
 interface CreateDraftInput {
+  /** Minted by the caller; a new UUIDv7 when absent. */
+  id?: string;
   workspaceId: string;
   formId: string;
   actorId: string;
   actorDisplayLabel: string | null;
+  /** The version's form engine document, already written. */
+  engineSchemaRef: string;
 }
 
 interface SaveRevisionInput {
@@ -88,40 +95,64 @@ export const getFormVersionListContext = async (
   return row[0] ?? null;
 };
 
-export const createEmptyFormVersionDraft = async (input: CreateDraftInput, tx?: DbOrTx) => {
-  const run = async (d: DbOrTx) => {
-    const latest = await d
-      .select({ versionNo: formVersions.versionNo })
-      .from(formVersions)
-      .where(
-        and(eq(formVersions.workspaceId, input.workspaceId), eq(formVersions.formId, input.formId)),
-      )
-      .orderBy(desc(formVersions.versionNo))
-      .limit(1);
+/**
+ * Inserts a draft whose engine document already exists, under the form's next version number. The
+ * form row is locked first, so concurrent drafts of one form are numbered in turn; throws
+ * NotFoundError when the form is gone or deleted.
+ */
+export const createFormVersionDraft = async (
+  input: CreateDraftInput,
+  tx: Tx,
+): Promise<FormVersionRecord> => {
+  const [form] = await tx
+    .select({ deletedAt: forms.deletedAt })
+    .from(forms)
+    .where(and(eq(forms.id, input.formId), eq(forms.workspaceId, input.workspaceId)))
+    .for('no key update');
+  if (!form || form.deletedAt) throw new NotFoundError('Form not found');
 
-    const nextVersion = (latest[0]?.versionNo ?? 0) + 1;
+  const latest = await tx
+    .select({ versionNo: formVersions.versionNo })
+    .from(formVersions)
+    .where(
+      and(eq(formVersions.workspaceId, input.workspaceId), eq(formVersions.formId, input.formId)),
+    )
+    .orderBy(desc(formVersions.versionNo))
+    .limit(1);
 
-    const created = await d
-      .insert(formVersions)
-      .values({
-        workspaceId: input.workspaceId,
-        formId: input.formId,
-        versionNo: nextVersion,
-        state: 'draft',
-        engineSyncStatus: 'pending',
-        currentRevisionNo: 0,
-        createdBy: input.actorDisplayLabel,
-        updatedBy: input.actorDisplayLabel,
-      })
-      .returning();
+  const created = await tx
+    .insert(formVersions)
+    .values({
+      id: input.id,
+      workspaceId: input.workspaceId,
+      formId: input.formId,
+      versionNo: (latest[0]?.versionNo ?? 0) + 1,
+      state: 'draft',
+      engineSchemaRef: input.engineSchemaRef,
+      engineSyncStatus: 'ready',
+      currentRevisionNo: 0,
+      createdBy: input.actorDisplayLabel,
+      updatedBy: input.actorDisplayLabel,
+    })
+    .returning();
 
-    return created[0];
-  };
+  return created[0];
+};
 
-  if (tx) {
-    return run(tx);
-  }
-  return db.transaction(run);
+/** A form version by id in any workspace, deleted included, for checking an id a caller minted. */
+export const findFormVersionAnywhere = async (
+  formVersionId: string,
+): Promise<{ workspaceId: string; formId: string; deletedAt: Date | null } | null> => {
+  const rows = await db
+    .select({
+      workspaceId: formVersions.workspaceId,
+      formId: formVersions.formId,
+      deletedAt: formVersions.deletedAt,
+    })
+    .from(formVersions)
+    .where(eq(formVersions.id, formVersionId))
+    .limit(1);
+  return rows[0] ?? null;
 };
 
 export const getFormVersionById = async (workspaceId: string, formVersionId: string) => {

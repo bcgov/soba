@@ -3,8 +3,7 @@
 import { useCallback } from 'react';
 import { openSobaFormSubmission } from '@/src/shared/api/sobaApi';
 import type { WriteOutcome } from '@/src/shared/api/dataContracts';
-
-type OpenedSubmission = Awaited<ReturnType<typeof openSobaFormSubmission>>;
+import type { SubmissionResponse } from '@/src/types/submissions';
 
 /**
  * Open a new submission for a form's published version. The id is minted by the caller, so a retry
@@ -16,7 +15,7 @@ export function useSubmissionStarter() {
       token: string | undefined,
       formId: string,
       submissionId: string,
-    ): Promise<WriteOutcome<OpenedSubmission>> => {
+    ): Promise<WriteOutcome<SubmissionResponse>> => {
       const value = await openSobaFormSubmission(token, formId, submissionId);
       return { status: 'applied', value };
     },

@@ -126,7 +126,7 @@ Everything else is smaller than the anchors and spread so each distinct state ex
   admin `form_admin`, member `form_designer` + `form_submitter`, viewer `submission_approver`.
   Form access comes only from group roles, so without it a workspace role grants nothing
 - some workspaces have no accepted disclaimer and so hold no forms, which the service blocks
-- forms cover published, draft with a schema, and draft never provisioned
+- forms cover published and draft
 - submissions cover `opened`, `draft`, and `submitted`, attributed to the owner, to dev users, and
   anonymously to the public user
 - workspace audiences cover `protected` (a new workspace's default), `public`, and `members`

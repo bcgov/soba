@@ -1,9 +1,13 @@
 import { FormService } from '../../services/formService';
 import { FormVersionService } from '../../services/formVersionService';
 import { resolveFormPermissions } from '../../db/repos/formAccessRepo';
-import type { FormListSort } from '../../db/repos/formRepo';
+import type { FormListRow, FormListSort, FormRecord } from '../../db/repos/formRepo';
 import type { SubmitterFormListRow } from '../../db/repos/submitterFormRepo';
-import type { FormVersionListSort } from '../../db/repos/formVersionRepo';
+import type {
+  FormVersionListRow,
+  FormVersionListSort,
+  FormVersionRecord,
+} from '../../db/repos/formVersionRepo';
 import {
   type CreateFormSettings,
   type FormListItem,
@@ -56,9 +60,12 @@ interface ListFormVersionsQueryInput {
 }
 
 interface CreateFormInput {
+  id?: string;
+  versionId?: string;
   name: string;
   description?: string;
   formEngineCode?: string;
+  schema?: Record<string, unknown>;
   settings?: CreateFormSettings;
 }
 
@@ -70,19 +77,7 @@ interface UpdateFormInput {
   status?: string;
 }
 
-const toFormDto = (item: {
-  id: string;
-  workspaceId: string;
-  name: string;
-  description: string | null;
-  org: string;
-  useCase: string;
-  status: string;
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string | null;
-  updatedBy: string | null;
-}) => ({
+const toFormDto = (item: FormRecord) => ({
   id: item.id,
   workspaceId: item.workspaceId,
   name: item.name,
@@ -96,19 +91,7 @@ const toFormDto = (item: {
   updatedBy: item.updatedBy,
 });
 
-const toFormListItemDto = (item: {
-  id: string;
-  workspaceId: string;
-  workspaceName: string;
-  name: string;
-  org: string;
-  useCase: string;
-  status: string;
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string | null;
-  updatedBy: string | null;
-}): FormListItem => ({
+const toFormListItemDto = (item: FormListRow): FormListItem => ({
   id: item.id,
   workspaceId: item.workspaceId,
   workspaceName: item.workspaceName,
@@ -134,20 +117,7 @@ const toMyFormListItemDto = (item: SubmitterFormListRow): MyFormListItem => ({
   allowSubmitterDrafts: item.allowSubmitterDrafts,
 });
 
-const toFormVersionDto = (item: {
-  id: string;
-  formId: string;
-  versionNo: number;
-  state: string;
-  engineSyncStatus: string;
-  engineSchemaRef: string | null;
-  currentRevisionNo: number;
-  publishedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string | null;
-  updatedBy: string | null;
-}) => ({
+const toFormVersionDto = (item: FormVersionRecord) => ({
   id: item.id,
   formId: item.formId,
   versionNo: item.versionNo,
@@ -162,18 +132,7 @@ const toFormVersionDto = (item: {
   updatedBy: item.updatedBy,
 });
 
-const toFormVersionListItemDto = (item: {
-  id: string;
-  formId: string;
-  versionNo: number;
-  state: string;
-  engineSyncStatus: string;
-  engineSchemaRef: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string | null;
-  updatedBy: string | null;
-}): FormVersionListItem => ({
+const toFormVersionListItemDto = (item: FormVersionListRow): FormVersionListItem => ({
   id: item.id,
   formId: item.formId,
   versionNo: item.versionNo,
@@ -192,16 +151,19 @@ export function createFormsApiService(
 ) {
   return {
     createForm: async (ctx: FormsContextInput, input: CreateFormInput) => {
-      const { form, version } = await formService.create({
+      const { form, version, created } = await formService.create({
+        id: input.id,
+        versionId: input.versionId,
         workspaceId: ctx.workspaceId,
         actorId: ctx.actorId,
         actorDisplayLabel: ctx.actorDisplayLabel,
         name: input.name,
         description: input.description,
         formEngineCode: input.formEngineCode,
+        schema: input.schema,
         settings: input.settings,
       });
-      return { ...toFormDto(form), formVersion: toFormVersionDto(version) };
+      return { created, form: { ...toFormDto(form), formVersion: toFormVersionDto(version) } };
     },
 
     normalizeSchema: (_ctx: FormsContextInput, schema: Record<string, unknown>) =>
@@ -332,16 +294,23 @@ export function createFormsApiService(
         }),
       ),
 
-    createDraft: async (ctx: FormsContextInput, formId: string, fromFormVersionId?: string) =>
-      toFormVersionDto(
-        await formVersionService.createDraft({
-          workspaceId: ctx.workspaceId,
-          actorId: ctx.actorId,
-          actorDisplayLabel: ctx.actorDisplayLabel,
-          formId,
-          fromFormVersionId,
-        }),
-      ),
+    createDraft: async (
+      ctx: FormsContextInput,
+      input: {
+        id?: string;
+        formId: string;
+        fromFormVersionId?: string;
+        schema?: Record<string, unknown>;
+      },
+    ) => {
+      const { version, created } = await formVersionService.createDraft({
+        ...input,
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.actorId,
+        actorDisplayLabel: ctx.actorDisplayLabel,
+      });
+      return { created, version: toFormVersionDto(version) };
+    },
 
     save: (
       ctx: FormsContextInput,

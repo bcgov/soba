@@ -38,8 +38,9 @@ const FORM_VERSION_NOT_FOUND = 'Form version not found';
 export const createForm = asyncHandler(
   async (req: Request<unknown, unknown, CreateFormBody>, res: Response) => {
     const ctx = req.coreContext!;
-    const result = await formsApiService.createForm(ctx, req.body);
-    res.status(201).json(result);
+    // 201 when this call created the form, 200 when a retry returned the one it made.
+    const { created, form } = await formsApiService.createForm(ctx, req.body);
+    res.status(created ? 201 : 200).json(form);
   },
 );
 
@@ -112,12 +113,9 @@ export const lookupFormVersions = asyncHandler(async (req: Request, res: Respons
 export const createFormVersion = asyncHandler(
   async (req: Request<unknown, unknown, CreateFormVersionBody>, res: Response) => {
     const ctx = req.coreContext!;
-    const result = await formsApiService.createDraft(
-      ctx,
-      req.body.formId,
-      req.body.fromFormVersionId,
-    );
-    res.status(201).json(result);
+    // 201 when this call created the draft, 200 when a retry returned the one it made.
+    const { created, version } = await formsApiService.createDraft(ctx, req.body);
+    res.status(created ? 201 : 200).json(version);
   },
 );
 

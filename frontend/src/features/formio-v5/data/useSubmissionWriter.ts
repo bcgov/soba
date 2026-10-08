@@ -8,9 +8,9 @@ import {
   submitSobaFormSubmission,
 } from '@/src/shared/api/sobaApi';
 import type { WriteOutcome } from '@/src/shared/api/dataContracts';
+import type { SubmitFillBundle } from '@/src/types/forms';
+import type { SubmissionWriteResponse } from '@/src/types/submissions';
 
-type WriteResult = Awaited<ReturnType<typeof submitSobaFormSubmission>>;
-type FillBundle = Awaited<ReturnType<typeof getSubmitFillBundle>>;
 type WriteKind = 'save' | 'submit';
 
 /**
@@ -33,20 +33,23 @@ export function useSubmissionWriter(submissionId: string) {
 
   // A write that got a response is never retried, so the next one mints a fresh id; reusing it would
   // replay the recorded result.
-  const toOutcome = useCallback((value: WriteResult): WriteOutcome<WriteResult> => {
-    pendingRevisionRef.current = null;
-    if (value.revision.status !== 'pending') {
-      return { status: 'applied', value };
-    }
-    return { status: 'held', reason: value.revision.reason };
-  }, []);
+  const toOutcome = useCallback(
+    (value: SubmissionWriteResponse): WriteOutcome<SubmissionWriteResponse> => {
+      pendingRevisionRef.current = null;
+      if (value.revision.status !== 'pending') {
+        return { status: 'applied', value };
+      }
+      return { status: 'held', reason: value.revision.reason };
+    },
+    [],
+  );
 
   const save = useCallback(
     async (
       token: string | undefined,
       data: Record<string, unknown>,
       baseRevisionId: string,
-    ): Promise<WriteOutcome<WriteResult>> => {
+    ): Promise<WriteOutcome<SubmissionWriteResponse>> => {
       const revisionId = revisionIdFor('save', data);
       const value = await saveSobaFormSubmission(token, submissionId, {
         data,
@@ -68,7 +71,7 @@ export function useSubmissionWriter(submissionId: string) {
       token: string | undefined,
       data: Record<string, unknown>,
       baseRevisionId: string | null,
-    ): Promise<WriteOutcome<WriteResult>> => {
+    ): Promise<WriteOutcome<SubmissionWriteResponse>> => {
       const revisionIds = baseRevisionId
         ? { revisionId: revisionIdFor('submit', data), baseRevisionId }
         : {};
@@ -81,7 +84,7 @@ export function useSubmissionWriter(submissionId: string) {
   // Re-read the head after a held write, so the caller can write over it or, if the record is now
   // submitted, leave for the confirmation. Null when the re-read fails.
   const reloadHead = useCallback(
-    async (token: string | undefined): Promise<FillBundle | null> => {
+    async (token: string | undefined): Promise<SubmitFillBundle | null> => {
       try {
         return await getSubmitFillBundle(token, submissionId);
       } catch {

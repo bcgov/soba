@@ -1,7 +1,10 @@
+import { v7 as uuidv7 } from 'uuid';
+import { newFormSchema } from '@soba/lib';
 import {
   FormVersionListSort,
   appendFormVersionRevision,
-  createEmptyFormVersionDraft,
+  createFormVersionDraft,
+  findFormVersionAnywhere,
   finishFormVersionProvisioning,
   getCurrentFormVersion,
   getFormVersionById,
@@ -11,19 +14,19 @@ import {
   lockFormVersion,
   lookupFormVersions,
   updateFormVersionDraft,
+  type FormVersionRecord,
   type LookupFormVersionsInput,
 } from '../db/repos/formVersionRepo';
 import { getFormById, getFormEngineCodeForForm } from '../db/repos/formRepo';
 import { copyDocumentTemplates } from '../db/repos/documentTemplateRepo';
-import { createFormEngineAdapter } from '../integrations/form-engine/FormEngineRegistry';
 import { db, type DbOrTx } from '../db/client';
+import { hasPgCode, isUniqueViolationOn, PG_UNIQUE_VIOLATION } from '../db/pgError';
+import { FORM_VERSION_ONE_PUBLISHED_UNIQUE, FORM_VERSION_PKEY } from '../db/schema';
 import { ConflictError, NotFoundError, ValidationError } from '../errors';
-import { isUniqueViolationOn } from '../db/pgError';
-import { FORM_VERSION_ONE_PUBLISHED_UNIQUE } from '../db/schema';
+import { FORM_VERSION_ID_TAKEN, SOURCE_VERSION_HAS_NO_SCHEMA } from '../messages';
+import { readEngineSchema, schemaWriterFor, writeEngineSchema } from './engineSchema';
 
 const FORM_VERSION_NOT_FOUND = 'Form version not found';
-
-type LockedFormVersion = NonNullable<Awaited<ReturnType<typeof lockFormVersion>>>;
 
 /**
  * Runs `write` with the version row locked, once the version is confirmed as its form's current
@@ -32,7 +35,7 @@ type LockedFormVersion = NonNullable<Awaited<ReturnType<typeof lockFormVersion>>
  */
 function withCurrentVersion<T>(
   input: { workspaceId: string; formVersionId: string },
-  write: (version: LockedFormVersion, tx: DbOrTx) => Promise<T>,
+  write: (version: FormVersionRecord, tx: DbOrTx) => Promise<T>,
 ): Promise<T> {
   return db.transaction(async (tx) => {
     const version = await lockFormVersion(input.workspaceId, input.formVersionId, tx);
@@ -53,7 +56,7 @@ const PROVISIONING_STALE_MS = 2 * 60 * 1000;
  * Only a draft's schema is written, and not while another save is still writing it: the engine
  * call runs after the lock is released.
  */
-function assertSchemaWritable(version: LockedFormVersion): void {
+function assertSchemaWritable(version: FormVersionRecord): void {
   if (version.state !== 'draft') {
     throw new ConflictError('Form version is not a draft');
   }
@@ -66,12 +69,16 @@ function assertSchemaWritable(version: LockedFormVersion): void {
 }
 
 interface CreateDraftInput {
+  /** Minted by the caller, so a retried create returns the draft the first one made. */
+  id?: string;
   workspaceId: string;
   actorId: string;
   actorDisplayLabel: string | null;
   formId: string;
   /** The version whose document templates the draft gets. */
   fromFormVersionId?: string;
+  /** The draft's schema; when absent, the source version's, else the default form. */
+  schema?: Record<string, unknown>;
 }
 
 interface SaveInput {
@@ -152,18 +159,97 @@ function stateStamps(
 }
 
 export class FormVersionService {
-  async createDraft(input: CreateDraftInput) {
-    const { fromFormVersionId } = input;
-    if (!fromFormVersionId) return createEmptyFormVersionDraft(input);
-    const source = await getFormVersionById(input.workspaceId, fromFormVersionId);
-    if (source?.formId !== input.formId) {
+  /** Creates a draft with its schema; a retry with the same id returns the draft it made. */
+  async createDraft(
+    input: CreateDraftInput,
+  ): Promise<{ version: FormVersionRecord; created: boolean }> {
+    const existing = input.id ? await this.findCreatedDraft(input, input.id) : null;
+    if (existing) return { version: existing, created: false };
+
+    const form = await getFormById(input.workspaceId, input.formId);
+    if (!form) throw new NotFoundError('Form not found');
+    const source = input.fromFormVersionId
+      ? await getFormVersionById(input.workspaceId, input.fromFormVersionId)
+      : null;
+    if (input.fromFormVersionId && source?.formId !== input.formId) {
       throw new ValidationError('fromFormVersionId is not a version of this form');
     }
-    return db.transaction(async (tx) => {
-      const draft = await createEmptyFormVersionDraft(input, tx);
-      await copyDocumentTemplates(tx, fromFormVersionId, draft.id, input.actorId);
-      return draft;
+
+    const id = input.id ?? uuidv7();
+    // Written before the row, so a version is never committed without its document.
+    const engineSchemaRef = await writeEngineSchema({
+      engineCode: form.formEngineCode,
+      formVersionId: id,
+      workspaceId: input.workspaceId,
+      schema: await this.draftSchema(input.schema, form.formEngineCode, source),
+      title: form.name,
     });
+
+    try {
+      const version = await db.transaction(async (tx) => {
+        const draft = await createFormVersionDraft(
+          {
+            id,
+            workspaceId: input.workspaceId,
+            formId: input.formId,
+            actorId: input.actorId,
+            actorDisplayLabel: input.actorDisplayLabel,
+            engineSchemaRef,
+          },
+          tx,
+        );
+        if (source) await copyDocumentTemplates(tx, source.id, draft.id, input.actorId);
+        return draft;
+      });
+      return { version, created: true };
+    } catch (err) {
+      // A concurrent create with the same id committed first.
+      if (input.id && hasPgCode(err, [PG_UNIQUE_VIOLATION])) {
+        const replay = await this.findCreatedDraft(input, input.id);
+        if (replay) return { version: replay, created: false };
+      }
+      if (isUniqueViolationOn(err, FORM_VERSION_PKEY)) {
+        throw new ConflictError(FORM_VERSION_ID_TAKEN);
+      }
+      throw err;
+    }
+  }
+
+  /** The schema a new draft starts from: the one sent, else the source version's, else the default. */
+  private async draftSchema(
+    sent: Record<string, unknown> | undefined,
+    engineCode: string,
+    source: FormVersionRecord | null,
+  ): Promise<Record<string, unknown>> {
+    if (sent) return sent;
+    if (!source) return newFormSchema();
+    const copied = await readEngineSchema(engineCode, source.engineSchemaRef);
+    // A version that never got a schema has nothing to copy, and the default form would pass for it.
+    if (!copied) throw new ConflictError(SOURCE_VERSION_HAS_NO_SCHEMA);
+    return copied;
+  }
+
+  /**
+   * The draft a create with this id already made, or null when the id is unused. A 409 when the id
+   * belongs to another form or a deleted version.
+   */
+  private async findCreatedDraft(
+    input: CreateDraftInput,
+    id: string,
+  ): Promise<FormVersionRecord | null> {
+    const found = await findFormVersionAnywhere(id);
+    if (!found) return null;
+    if (
+      found.workspaceId !== input.workspaceId ||
+      found.formId !== input.formId ||
+      found.deletedAt
+    ) {
+      throw new ConflictError(FORM_VERSION_ID_TAKEN);
+    }
+    // Null only when the version was deleted since the read above.
+    const version = await getFormVersionById(input.workspaceId, id);
+    if (!version) throw new ConflictError(FORM_VERSION_ID_TAKEN);
+    return version;
   }
 
   async save(input: SaveInput) {
@@ -298,12 +384,8 @@ export class FormVersionService {
       if (!engineCode) {
         throw new ValidationError('Form has no form engine configured');
       }
-      const adapter = createFormEngineAdapter(engineCode);
-      if (typeof adapter.upsertSchema !== 'function') {
-        throw new ValidationError(
-          `Form engine '${engineCode}' does not support schema provisioning`,
-        );
-      }
+      // Resolved before the claim, so an engine that cannot write schemas claims nothing.
+      const upsertSchema = schemaWriterFor(engineCode);
       const form = await getFormById(input.workspaceId, locked.formId);
 
       const claimed = await updateFormVersionDraft(
@@ -315,7 +397,7 @@ export class FormVersionService {
       );
       if (!claimed) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
       return {
-        upsertSchema: adapter.upsertSchema.bind(adapter),
+        upsertSchema,
         title: form?.name,
         claimedAt: claimed.updatedAt,
       };
@@ -375,10 +457,7 @@ export class FormVersionService {
     const engineCode = await getFormEngineCodeForForm(version.workspaceId, version.formId);
     if (!engineCode) return null;
 
-    const adapter = createFormEngineAdapter(engineCode);
-    if (typeof adapter.readSchema !== 'function') return null;
-
-    return adapter.readSchema(version.engineSchemaRef);
+    return readEngineSchema(engineCode, version.engineSchemaRef);
   }
 
   async get(workspaceId: string, formVersionId: string) {

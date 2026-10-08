@@ -25,7 +25,7 @@ import {
   OFFSET_DRIFT_NOTE,
   sortLocaleQueryField,
 } from '../shared/offsetPagination';
-import { FORM_NAME_TAKEN } from '../../messages';
+import { FORM_NAME_TAKEN, SOURCE_VERSION_HAS_NO_SCHEMA } from '../../messages';
 import {
   workspaceIdQueryField,
   formIdQueryField,
@@ -37,8 +37,13 @@ extendZodWithOpenApi(z);
 
 // @soba/lib builds its schemas before zod is extended, so they only get `.openapi()` once cloned.
 // Composites are rebuilt on the named children so the spec references them instead of inlining.
-export const CreateFormBodySchema =
-  SobaCreateFormBodySchema.clone().openapi('Forms_CreateFormBody');
+export const CreateFormBodySchema = SobaCreateFormBodySchema.clone().openapi(
+  'Forms_CreateFormBody',
+  {
+    description:
+      'A new form and its first version. `id` and `versionId` are caller-minted UUIDv7s sent together, so a retry returns the form the first create made; `schema` defaults to a form holding a Submit button.',
+  },
+);
 export const UpdateFormBodySchema =
   SobaUpdateFormBodySchema.clone().openapi('Forms_UpdateFormBody');
 export const FormListItemSchema = SobaFormListItemSchema.clone().openapi('Forms_FormListItem');
@@ -63,11 +68,20 @@ export const FormVersionListItemSchema = SobaFormVersionListItemSchema.clone().o
   'Forms_FormVersionListItem',
 );
 
+// Ids are lowercased, as Postgres returns them, so a retry matches the stored ones.
 export const CreateFormVersionBodySchema = z
   .object({
-    formId: z.string().min(1),
-    fromFormVersionId: z.uuid().optional().openapi({
-      description: 'The version whose document templates the draft gets.',
+    id: z.uuidv7().toLowerCase().optional().openapi({
+      description:
+        'Minted by the caller, so a retried create returns the draft the first one made.',
+    }),
+    formId: z.string().min(1).toLowerCase(),
+    fromFormVersionId: z.uuid().toLowerCase().optional().openapi({
+      description:
+        'The version whose document templates the draft gets, and whose schema it starts from when no schema is sent.',
+    }),
+    schema: z.record(z.string(), z.unknown()).optional().openapi({
+      description: "The draft's schema; the source version's, else the default form, when absent.",
     }),
   })
   .openapi('Forms_CreateFormVersionBody');
@@ -255,6 +269,14 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
           },
         },
       },
+      200: {
+        description: 'A retry with the same id: the form the first create made',
+        content: {
+          'application/json': {
+            schema: FormWithVersionResponseSchema,
+          },
+        },
+      },
       400: {
         description: VALIDATION_ERROR,
       },
@@ -263,7 +285,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
           'Caller lacks form_create and design_create in the workspace (form_admin via *)',
       },
       409: {
-        description: FORM_NAME_TAKEN,
+        description: `${FORM_NAME_TAKEN}, or the id belongs to another form or version`,
       },
     },
   });
@@ -421,8 +443,21 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         description: 'Created form version draft',
         content: { 'application/json': { schema: FormVersionResponseSchema } },
       },
+      200: {
+        description: 'A retry with the same id: the draft the first create made',
+        content: { 'application/json': { schema: FormVersionResponseSchema } },
+      },
       400: {
         description: VALIDATION_ERROR,
+      },
+      403: {
+        description: 'Caller lacks design_create and design_update on the form',
+      },
+      404: {
+        description: 'Form not found',
+      },
+      409: {
+        description: `The id belongs to another form or a deleted version, or no schema is sent and ${SOURCE_VERSION_HAS_NO_SCHEMA.toLowerCase()}`,
       },
     },
   });

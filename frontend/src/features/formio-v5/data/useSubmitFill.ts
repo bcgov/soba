@@ -8,15 +8,14 @@ import { useMaybeAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { sessionReadConfig } from '@/src/shared/api/swrConfig';
 import { classifyDataError } from '@/src/shared/api/dataError';
 import type { Resource } from '@/src/shared/api/dataContracts';
-
-type FillBundle = Awaited<ReturnType<typeof getSubmitFillBundle>>;
+import type { SubmitFillBundle } from '@/src/types/forms';
 
 /**
  * The bundle for filling one submission: workflow state, its version schema, any saved answers, and
  * whether the caller may write.
  * Works signed in or anonymously; a session read, so it does not revalidate on its own.
  */
-export function useSubmitFill(submissionId: string): Resource<FillBundle> {
+export function useSubmitFill(submissionId: string): Resource<SubmitFillBundle> {
   const { token, initializing, initStarted } = useKeycloak();
   // Wait for Keycloak to answer. Before init, "no token" is the default rather than an answer, so a
   // signed-in caller would read anonymously. Identity is in the key so signing in does not read the
@@ -24,7 +23,7 @@ export function useSubmitFill(submissionId: string): Resource<FillBundle> {
   const ready = initStarted && !initializing && !!submissionId;
 
   const identity = token ? 'user' : 'anonymous';
-  const { data, error, isLoading, mutate } = useMaybeAuthedSWR<FillBundle>(
+  const { data, error, isLoading, mutate } = useMaybeAuthedSWR<SubmitFillBundle>(
     ready ? ['submit-fill', submissionId, identity] : null,
     (authToken) => getSubmitFillBundle(authToken, submissionId),
     sessionReadConfig,

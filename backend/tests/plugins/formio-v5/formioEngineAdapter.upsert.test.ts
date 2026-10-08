@@ -78,6 +78,28 @@ describe('FormioEngineAdapter schema methods', () => {
     expect(body._id).toBe('abc'); // PUT path
   });
 
+  // Two writes for the same version both found no document and both posted; the second updates the
+  // document the first created instead of failing on its name.
+  it('updates the document a concurrent write created when its own create is refused', async () => {
+    const client = makeClient({
+      loadForms: jest
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ _id: 'abc' }]),
+      saveForm: jest
+        .fn()
+        .mockRejectedValueOnce(Object.assign(new Error('path must be unique'), { status: 400 }))
+        .mockResolvedValueOnce({ _id: 'abc' }),
+    });
+    mockedGetClient.mockResolvedValue(client);
+
+    const adapter = new FormioEngineAdapter(makeConfig());
+    const res = await adapter.upsertSchema({ formVersionId: 'v1', workspaceId: 'ws1', schema: {} });
+
+    expect(res).toEqual({ engineRef: 'abc' });
+    expect((client.saveForm.mock.calls[1][0] as Record<string, unknown>)._id).toBe('abc');
+  });
+
   it('throws when no admin client is available', async () => {
     mockedGetClient.mockResolvedValue(null);
     const adapter = new FormioEngineAdapter(makeConfig());
