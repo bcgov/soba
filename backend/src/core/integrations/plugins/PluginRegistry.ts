@@ -1,3 +1,7 @@
+import type {
+  NotificationAdapter,
+  NotificationPluginDefinition,
+} from '../notification/NotificationAdapter';
 /**
  * Plugin discovery + selection. Scans the plugins dir once (lazy, cached), validates each module's
  * exported definitions with Zod, and exposes per-kind definition lists, the discovered catalog, and
@@ -88,6 +92,7 @@ interface CachedPlugin {
   storageDefinition?: StoragePluginDefinition;
   idpDefinition?: IdpPluginDefinition;
   tenantEngineDefinition?: TenantEnginePluginDefinition;
+  notificationDefinition?: NotificationPluginDefinition;
 }
 
 // Each CachedPlugin definition field, the module export it comes from, and the schema that
@@ -105,6 +110,11 @@ const DEFINITION_KINDS: ReadonlyArray<{
   {
     field: 'documentGenerationDefinition',
     exportKey: 'documentGenerationPluginDefinition',
+    schema: MetadataPluginDefinitionSchema,
+  },
+  {
+    field: 'notificationDefinition',
+    exportKey: 'notificationPluginDefinition',
     schema: MetadataPluginDefinitionSchema,
   },
   { field: 'apiDefinition', exportKey: 'pluginApiDefinition', schema: FeatureApiDefinitionSchema },
@@ -286,6 +296,7 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
       p.storageDefinition?.code ??
       p.idpDefinition?.code ??
       p.tenantEngineDefinition?.code ??
+      p.notificationDefinition?.code ??
       p.dir;
     return {
       code,
@@ -386,6 +397,11 @@ export function getIdpPluginDefinitions(): IdpPluginDefinition[] {
 // Active plugin code per selectable kind. The adapter getters and /meta/plugins both resolve
 // through this, so they can't drift. Storage is not here — it is selected per profile.
 const SELECTABLE_PLUGIN_DEFAULTS = {
+  notification: {
+    label: 'notification',
+    configured: () => env.getOptionalEnv('NOTIFICATION_DEFAULT_CODE'),
+    fallback: 'notify-v1',
+  },
   cache: { label: 'cache', configured: () => env.getCacheDefaultCode(), fallback: 'cache-memory' },
   messagebus: {
     label: 'messagebus',
@@ -530,3 +546,11 @@ export async function checkStorageReadiness(): Promise<
   }
   return results;
 }
+
+export function getNotificationPluginDefinitions(): NotificationPluginDefinition[] {
+  return definitionsOf('notificationDefinition');
+}
+export const getNotificationAdapter = lazyAdapter<NotificationAdapter>(
+  'notification',
+  getNotificationPluginDefinitions,
+);

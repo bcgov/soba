@@ -337,6 +337,13 @@
       "when": 1772618021000,
       "tag": "0047_settings_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1772618021001,
+      "tag": "0048_form_notification_setting",
+      "breakpoints": true
     }
   ]
 }

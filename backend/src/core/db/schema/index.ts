@@ -16,3 +16,5 @@ export * from './documentTemplate';
 export * from './documentGenerationAudit';
 export * from './devData';
 export * from './plugins.enterprise';
+
+export * from './formNotificationSetting';

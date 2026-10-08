@@ -327,7 +327,14 @@
       "audienceFormPublicConfirmMessage": "Toute personne, y compris une personne non connectée, pourra soumettre ce formulaire. Les brouillons ne sont pas offerts pour les formulaires publics.",
       "inheritWorkspaceLabel": "Utiliser le paramètre de l'espace de travail",
       "profileDrawerInfo": "L'équipe CHEFS recueille et organise des informations pour servir d'entrée cruciale à l'élaboration de dossiers d'affaires complets. Ces dossiers joueront un rôle central dans l'orientation de l'exploitation stratégique et de l'amélioration continue de CHEFS dans les années à venir. Cette initiative de collecte de données est essentielle pour éclairer les décisions critiques et façonner la trajectoire de CHEFS, garantissant son adaptabilité et son efficacité face aux besoins et défis évolutifs.",
-      "profileDrawerLabel": "Profil du Formulaire"
+      "profileDrawerLabel": "Profil du Formulaire",
+      "notificationSettingsDrawerLabel": "Notifications par courriel",
+      "notificationRecipientsLabel": "Destinataires des notifications de soumission",
+      "notificationRecipientsHelp": "Saisissez une adresse courriel et sélectionnez Ajouter (100 maximum). Supprimez tous les destinataires pour désactiver les notifications. Sélectionnez Enregistrer pour appliquer vos modifications.",
+      "notificationRecipientAdd": "Ajouter",
+      "notificationRecipientRemove": "Supprimer {email}",
+      "notificationRecipientsInvalid": "Saisissez des adresses courriel valides (100 maximum).",
+      "notificationSettingsLoadError": "Impossible de charger les paramètres des notifications par courriel."
     },
     "templates": {
       "drawerLabel": "Modèles de documents",
