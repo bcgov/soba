@@ -103,7 +103,7 @@ export const listFormVersions = asyncHandler(async (req: Request, res: Response)
 export const lookupFormVersions = asyncHandler(async (req: Request, res: Response) => {
   const scope = req.listScope!;
   const result = await formsApiService.lookupFormVersions(
-    { workspaceIds: scope.workspaceIds, actorId: scope.actorId },
+    { workspaceIds: scope.workspaceIds },
     req.query as unknown as FormVersionLookupQuery,
   );
   res.json(result);

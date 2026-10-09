@@ -67,7 +67,7 @@ beforeEach(() => {
 });
 
 describe('requireFormSubmitAccess', () => {
-  it('authorizes a save or submit as a write on the routed submission', async () => {
+  it('authorizes a save or submit as a write on the routed submission, with no role', async () => {
     mockAllowed.mockResolvedValue(true);
     const req = makeReq({ authed: true, id: 's1' });
     const next = await run(requireFormSubmitAccess, req);

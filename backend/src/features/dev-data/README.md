@@ -136,9 +136,10 @@ subjects, so they cannot sign in. They exist to fill member lists, groups, and r
 
 ## Access coverage set
 
-Every seed also builds a fixed set of named cases for submit and design access, the same whatever
-`--size` or `--skip-anonymous` says. Its names start `[dev] Zz `, so it sorts after the anchors and
-the bulk in English and French, and it is created first, so it trails `id:desc` lists too.
+Every seed also builds a fixed set of named cases for submit, design and workspace access, the same
+whatever `--size` or `--skip-anonymous` says. Its names start `[dev] Zz `, so it sorts after the
+anchors and the bulk in English and French, and it is created first, so it trails `id:desc` lists
+too.
 
 Personas are the owner, the public user as an anonymous caller, and twelve generated users:
 `admin`, who owns the three workspaces, plus `submitter`, `designer`, `reviewer`, `viewer` (a

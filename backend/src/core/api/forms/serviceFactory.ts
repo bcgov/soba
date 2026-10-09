@@ -26,6 +26,11 @@ export interface FormsListScopeInput {
   formAccess: FormAccessGrant;
 }
 
+/** Scope for a lookup: the workspaces searched. */
+export interface FormsLookupScopeInput {
+  workspaceIds: string[];
+}
+
 interface ListFormsQueryInput {
   workspaceId?: string;
   formId?: string;
@@ -323,7 +328,7 @@ export function createFormsApiService(
     },
 
     lookupFormVersions: async (
-      scope: Omit<FormsListScopeInput, 'formAccess'>,
+      scope: FormsLookupScopeInput,
       query: { formId: string; q?: string },
     ) =>
       toLookupResponse(

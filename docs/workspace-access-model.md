@@ -51,13 +51,13 @@ adds a third control per submission, who takes part in it; see
 `admin`, `member`, or `viewer`. `owner`/`admin` may administer the workspace, checked with
 `isWorkspaceManageRole(role)` straight off the membership row (e.g. `updateWorkspaceName` in
 `workspaceRepo.ts`, mirrored on the frontend in `workspaceRoles.ts`). `owner`, `admin` and `member`
-may read the workspace's groups and members (`isWorkspacePeopleReadRole`); a `viewer` may not, and
+may read the workspace's groups and members (`isWorkspacePeopleReadRole`); a `viewer` may not, but
 lists the workspace and reads its settings.
 
 Workspace resolution reads the role from the membership on every request (`findActorMembership` in
 `membershipRepo.ts`); nothing caches it, so a role change applies to the caller's next request.
 Submit-surface contexts carry `role: null` for a caller with no membership, and for every caller of
-open, save and submit; neither workspace role guard accepts it.
+open, save, submit and file upload; neither workspace role guard accepts it.
 
 That role is the only source of workspace-management authority. It's never read for form permissions.
 

@@ -268,7 +268,7 @@ async function checkForm(
   };
 }
 
-/** Codes the design lists filter on. */
+/** Code sets run through the designer's forms list and compared with each form's own check. */
 const DESIGN_LIST_CODES: readonly (readonly PermissionCode[])[] = [
   [Permissions.form_read],
   [Permissions.submission_read],
@@ -276,15 +276,14 @@ const DESIGN_LIST_CODES: readonly (readonly PermissionCode[])[] = [
   [Permissions.form_read, Permissions.document_template_read],
 ];
 
-/** Whether the form's own check grants every code. A deleted form grants nothing. */
-async function formGrants(
-  actorId: string,
-  form: CoverageFormRef,
-  required: readonly PermissionCode[],
-): Promise<boolean> {
-  if ((await getWorkspaceIdForForm(form.formId)) === null) return false;
-  const permissions = await resolveFormPermissions(actorId, form.workspaceId, form.formId);
-  return hasAllPermissions(permissions, required);
+/** The keys of the coverage forms in `workspaceId`. */
+const formKeysIn = (manifest: CoverageManifest, workspaceId: string): CoverageFormKey[] =>
+  COVERAGE_FORM_KEYS.filter((key) => manifest.forms[key].workspaceId === workspaceId);
+
+/** The form's own permission codes for the actor. A deleted form has none. */
+async function ownPermissions(actorId: string, form: CoverageFormRef): Promise<Set<string>> {
+  if ((await getWorkspaceIdForForm(form.formId)) === null) return new Set();
+  return resolveFormPermissions(actorId, form.workspaceId, form.formId);
 }
 
 /** The designer's forms list for the actor across `workspaceIds`, as form ids. */
@@ -313,15 +312,18 @@ async function designListInconsistencies(
   const actorId = signedInActorId(caller);
   if (!actorId) return [];
   const workspaceId = manifest.workspaces[workspaceKey].id;
-  const formKeys = COVERAGE_FORM_KEYS.filter(
-    (key) => manifest.forms[key].workspaceId === workspaceId,
+  const forms = await Promise.all(
+    formKeysIn(manifest, workspaceId).map(async (key) => ({
+      key,
+      formId: manifest.forms[key].formId,
+      permissions: await ownPermissions(actorId, manifest.forms[key]),
+    })),
   );
   const issues: string[] = [];
   for (const required of DESIGN_LIST_CODES) {
     const listed = await designListFor(actorId, required, [workspaceId]);
-    for (const key of formKeys) {
-      const form = manifest.forms[key];
-      if ((await formGrants(actorId, form, required)) !== listed.has(form.formId)) {
+    for (const { key, formId, permissions } of forms) {
+      if (hasAllPermissions(permissions, required) !== listed.has(formId)) {
         issues.push(
           `${caller.persona} x ${key}: design list for ${required.join('+')} differs from the form check`,
         );
@@ -339,11 +341,8 @@ async function checkWorkspaceForms(
 ): Promise<CaseCheck<CoverageFormKey, FormCheck>> {
   const workspaceId = manifest.workspaces[workspaceKey].id;
   const rows = await myFormRows(caller, workspaceId);
-  const formKeys = COVERAGE_FORM_KEYS.filter(
-    (key) => manifest.forms[key].workspaceId === workspaceId,
-  );
   const checked = await Promise.all(
-    formKeys.map((formKey) => checkForm(manifest, caller, formKey, rows)),
+    formKeysIn(manifest, workspaceId).map((formKey) => checkForm(manifest, caller, formKey, rows)),
   );
   const listedHere = rows.size > 0;
   const filterIssue =

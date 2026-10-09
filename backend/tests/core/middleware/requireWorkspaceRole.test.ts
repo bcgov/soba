@@ -7,15 +7,15 @@ import { ForbiddenError } from '../../../src/core/errors';
 
 function makeReq(role?: string | null): Request {
   const coreContext =
-    role !== undefined
-      ? {
+    role === undefined
+      ? undefined
+      : {
           workspaceId: 'ws1',
           actorId: 'actor1',
           actorDisplayLabel: 'Actor One',
           workspaceSource: 'resource:workspace',
           role,
-        }
-      : undefined;
+        };
   return { coreContext } as unknown as Request;
 }
 

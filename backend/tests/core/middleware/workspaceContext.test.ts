@@ -463,6 +463,20 @@ describe('openWorkspaceFromResource', () => {
     expect(next).toHaveBeenCalledWith();
   });
 
+  it("carries a member's role", async () => {
+    jest
+      .mocked(getSubmissionListContext)
+      .mockResolvedValue({ workspaceId: 'ws9', formId: 'form1', formVersionId: 'fv1' });
+    jest.mocked(findActorMembership).mockResolvedValue(MEMBER);
+    const req = makeReq({ params: { id: 'sub1' } as Request['params'] });
+    const next = jest.fn() as unknown as NextFunction;
+
+    await middleware(req, makeRes() as Response, next);
+
+    expect(req.coreContext).toMatchObject({ workspaceId: 'ws9', formId: 'form1', role: 'owner' });
+    expect(next).toHaveBeenCalledWith();
+  });
+
   it('builds a context without a label when the actor row is gone', async () => {
     jest
       .mocked(getSubmissionListContext)

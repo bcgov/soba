@@ -22,7 +22,6 @@ import {
   PERSONA_KEYS,
   type CoverageFormKey,
   type CoverageSubmissionKey,
-  type CoverageWorkspaceKey,
   type PersonaKey,
 } from './plan';
 
@@ -135,12 +134,17 @@ function printGrid<TCase extends string, TCheck extends string>(args: {
   }
 }
 
+/** A grid's case labels, one per key. */
+const labelsOf = <TCase extends string>(
+  keys: readonly TCase[],
+  label: (key: TCase) => string,
+): Record<TCase, string> =>
+  Object.fromEntries(keys.map((key) => [key, label(key)])) as Record<TCase, string>;
+
 async function verify(): Promise<void> {
   const manifest = await loadCoverageManifest();
   const report = await checkCoverage(manifest);
-  const formLabels = Object.fromEntries(
-    COVERAGE_FORM_KEYS.map((key) => [key, manifest.forms[key].name]),
-  ) as Record<CoverageFormKey, string>;
+  const formLabels = labelsOf(COVERAGE_FORM_KEYS, (key) => manifest.forms[key].name);
 
   printGrid({
     title: 'Forms',
@@ -168,9 +172,7 @@ async function verify(): Promise<void> {
     title: 'Workspaces',
     letters: { peopleRead: 'P' },
     caseKeys: COVERAGE_WORKSPACE_KEYS,
-    caseLabels: Object.fromEntries(
-      COVERAGE_WORKSPACE_KEYS.map((key) => [key, manifest.workspaces[key].name]),
-    ) as Record<CoverageWorkspaceKey, string>,
+    caseLabels: labelsOf(COVERAGE_WORKSPACE_KEYS, (key) => manifest.workspaces[key].name),
     personas: report.personas,
     results: report.workspaces,
   });
@@ -178,9 +180,7 @@ async function verify(): Promise<void> {
     title: 'Submissions',
     letters: { mine: 'M', read: 'R', write: 'W', delete: 'X' },
     caseKeys: COVERAGE_SUBMISSION_KEYS,
-    caseLabels: Object.fromEntries(
-      COVERAGE_SUBMISSION_KEYS.map((key) => [key, manifest.submissions[key].submissionId]),
-    ) as Record<CoverageSubmissionKey, string>,
+    caseLabels: labelsOf(COVERAGE_SUBMISSION_KEYS, (key) => manifest.submissions[key].submissionId),
     personas: report.personas,
     results: report.submissions,
   });
