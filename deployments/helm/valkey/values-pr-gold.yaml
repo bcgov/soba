@@ -1,0 +1,14 @@
+# One Gold dev PR; cache and event-stream data are lost on pod replacement.
+valkey:
+  replicas: 1
+  maxmemory: "32mb"
+  maxmemoryPolicy: volatile-lru
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      cpu: 5m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi

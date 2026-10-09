@@ -1,0 +1,41 @@
+# Gold dev PR smoke-test profile; one active PR within the supplied request quotas.
+mongodb:
+  enabled: true
+  fullnameOverride: ""
+
+  replicaCount: 1
+
+  auth:
+    existingSecret: soba-pr-mongodb-auth
+    usernames:
+      - formio
+    databases:
+      - formio-ce
+
+  persistence:
+    # Smoke-test data is lost when the MongoDB pod is replaced.
+    enabled: false
+
+  resources:
+    requests:
+      cpu: 25m
+      memory: 192Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+
+  pdb:
+    create: false
+
+  podAntiAffinityPreset: soft
+
+  networkPolicy:
+    ingressPodMatchLabels:
+      app.kubernetes.io/name: soba
+      app.kubernetes.io/component: formio
+    extraEgress:
+      - ports:
+          - port: 5353
+            protocol: UDP
+          - port: 5353
+            protocol: TCP
