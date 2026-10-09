@@ -1,3 +1,4 @@
+import { notificationSection } from './notification';
 import { audienceSection, workspaceAudienceSection } from './audience';
 import { formSection } from './form';
 import { profileSection } from './profile';
@@ -11,6 +12,7 @@ export const formSettingsSections: FormSettingsSection[] = [
   profileSection,
   audienceSection,
   submitterSection,
+  notificationSection,
   templatesSection,
 ].sort((a, b) => a.weight - b.weight);
 

@@ -1,9 +1,14 @@
+import { notifySubmission } from '../../../src/features/notifications/submissionNotification';
 import { SubmissionService } from '../../../src/core/services/submissionService';
 import * as submissionRepo from '../../../src/core/db/repos/submissionRepo';
 import * as versionRepo from '../../../src/core/db/repos/formVersionRepo';
 import * as formRepo from '../../../src/core/db/repos/formRepo';
 import * as registry from '../../../src/core/integrations/form-engine/FormEngineRegistry';
 import { NotFoundError, ValidationError } from '../../../src/core/errors';
+
+jest.mock('../../../src/features/notifications/submissionNotification', () => ({
+  notifySubmission: jest.fn().mockResolvedValue(undefined),
+}));
 
 jest.mock('../../../src/core/db/client', () => ({ db: {} }));
 
@@ -84,6 +89,7 @@ describe('SubmissionService save (versioned engine write)', () => {
 
     const result = await svc.submit(input);
 
+    expect(notifySubmission).toHaveBeenCalledWith(result.record);
     expect(createAdapter).toHaveBeenCalledWith('formio-v5');
     expect(createSubmission).toHaveBeenCalledWith({
       engineFormRef: 'form-ref-1',
@@ -329,5 +335,44 @@ describe('SubmissionService save (versioned engine write)', () => {
       reason: 'conflict',
     });
     expect(createSubmission).not.toHaveBeenCalled();
+  });
+});
+
+describe('notification delivery gate', () => {
+  it.each(['replayed', 'pending'])('does not notify a %s submission write', async (outcome) => {
+    jest.clearAllMocks();
+    getRecord.mockResolvedValue({
+      id: 's1',
+      formId: 'f1',
+      formVersionId: 'v1',
+      headRevisionId: 'rev-2',
+      workflowState: 'draft',
+    });
+    getVersion.mockResolvedValue({ id: 'v1', engineSchemaRef: 'form-ref-1' });
+    getEngineCode.mockResolvedValue('formio-v5');
+    createAdapter.mockReturnValue({
+      createSubmission: jest.fn().mockResolvedValue({ engineRef: 'eng-new' }),
+    });
+    appendRevision.mockResolvedValue({
+      outcome,
+      record: { id: 's1' },
+      revisionId: 'rev-3',
+      status: 'current',
+      reason: 'accepted',
+    });
+    await svc.submit(input);
+    expect(notifySubmission).not.toHaveBeenCalled();
+  });
+  it('does not notify a saved draft', async () => {
+    jest.clearAllMocks();
+    appendRevision.mockResolvedValue({
+      outcome: 'appended',
+      record: { id: 's1' },
+      revisionId: 'rev-3',
+      status: 'current',
+      reason: 'accepted',
+    });
+    await svc.save(input);
+    expect(notifySubmission).not.toHaveBeenCalled();
   });
 });

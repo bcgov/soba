@@ -1,3 +1,4 @@
+import { notifySubmission } from '../../features/notifications/submissionNotification';
 import type { SortLocale, SubmissionListSort } from '@soba/lib';
 import { v7 as uuidv7 } from 'uuid';
 import {
@@ -260,6 +261,10 @@ export class SubmissionService {
       });
 
       if (result.outcome === 'not_found') throw new NotFoundError('Submission not found');
+
+      if (eventType === SubmissionEventType.submitted && result.outcome === 'appended') {
+        await notifySubmission(result.record);
+      }
 
       return {
         record: result.record,
