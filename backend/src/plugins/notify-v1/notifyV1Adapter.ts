@@ -88,7 +88,11 @@ export class NotifyV1Adapter implements NotificationAdapter {
     } catch (err) {
       if (this.debugResponses && err instanceof HttpClientError) {
         log.error(
-          { upstreamStatus: err.status, upstreamStatusText: err.statusText, upstreamBody: err.body },
+          {
+            upstreamStatus: err.status,
+            upstreamStatusText: err.statusText,
+            upstreamBody: err.body,
+          },
           'Notify upstream error response (debug)',
         );
       }
