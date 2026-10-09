@@ -4,7 +4,7 @@ import { db, type DbOrTx } from '../client';
 import { formVersionRevisions, formVersions, forms } from '../schema';
 import { orderByForSort, prefixPattern, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
-import { permittedFormsWhere, type FormAccessFilter } from './formAccessRepo';
+import { grantsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
 
 interface CreateDraftInput {
   workspaceId: string;
@@ -36,7 +36,7 @@ const FORM_VERSION_SORT_COLUMNS: SortColumns<FormVersionListSortField> = {
 export interface ListFormVersionsInput {
   /** The anchored workspace, or every workspace the actor is an active member of. */
   workspaceIds: string[];
-  formAccess: FormAccessFilter;
+  formAccess: FormAccessGrant;
   offset: number;
   limit: number;
   formId?: string;
@@ -145,14 +145,14 @@ export const getFormVersionById = async (workspaceId: string, formVersionId: str
 export const listFormVersionsForWorkspace = async (
   input: ListFormVersionsInput,
 ): Promise<{ items: FormVersionListRow[]; total: number }> => {
-  // No workspace or no access filter means no access, never every row.
-  if (input.workspaceIds.length === 0 || !input.formAccess) {
+  // No workspace or no grant means no access, never every row; an empty grant skips the query.
+  if (input.workspaceIds.length === 0 || !input.formAccess || grantsNothing(input.formAccess)) {
     return { items: [], total: 0 };
   }
   const whereClauses = [
     inArray(formVersions.workspaceId, input.workspaceIds),
     isNull(formVersions.deletedAt),
-    permittedFormsWhere(input.formAccess, input.workspaceIds, {
+    permittedFormsWhere(input.formAccess, {
       workspaceId: formVersions.workspaceId,
       formId: formVersions.formId,
     }),

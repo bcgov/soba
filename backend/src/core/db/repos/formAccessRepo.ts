@@ -4,15 +4,15 @@ import {
   exists,
   inArray,
   isNull,
+  not,
   notExists,
-  notInArray,
   or,
   sql,
   type SQL,
   type SQLWrapper,
 } from 'drizzle-orm';
 import { unionAll, type AnyPgColumn, type PgSelect } from 'drizzle-orm/pg-core';
-import { db } from '../client';
+import { db, type DbOrTx } from '../client';
 import {
   formGroupOverrideMembers,
   formGroupOverrides,
@@ -45,10 +45,18 @@ interface GroupScope {
   liveFormsOnly?: boolean;
 }
 
-/** The actor a list is filtered for, and the codes each row's form must grant them. */
-export interface FormAccessFilter {
-  actorId: string;
-  required: readonly PermissionCode[];
+/**
+ * The forms a list may show, resolved for one actor and set of codes before the list runs. A form
+ * without an active override is allowed by its workspace; an overridden form only by its own
+ * permissions.
+ */
+export interface FormAccessGrant {
+  /** Workspaces where the actor's workspace permissions hold every code. */
+  workspaceIds: string[];
+  /** Forms in scope with an active override. */
+  overriddenFormIds: string[];
+  /** Forms allowed by their own permissions, whatever their workspace grants. */
+  includedFormIds: string[];
 }
 
 const activeMembershipOf = (userId: string) =>
@@ -263,62 +271,94 @@ export const resolveFormPermissions = async (
   return new Set(rows[0]?.permissions ?? []);
 };
 
+/** A grant for one form whose permissions were already checked. */
+export const formAccessGrantFor = (formId: string): FormAccessGrant => ({
+  workspaceIds: [],
+  overriddenFormIds: [],
+  includedFormIds: [formId],
+});
+
+/** Whether the grant allows no form at all. */
+export const grantsNothing = (grant: FormAccessGrant): boolean =>
+  grant.workspaceIds.length === 0 && grant.includedFormIds.length === 0;
+
+/** `column` is one of `ids`, bound as one array parameter however long the list. */
+const isOneOf = (column: AnyPgColumn, ids: string[]): SQL =>
+  ids.length ? sql`${column} = any(${sql.param(ids)}::uuid[])` : sql`false`;
+
+/**
+ * Which forms in `workspaceIds` grant the actor every required code: the workspaces whose
+ * permissions hold them, the forms there with an active override, and which of those hold them on
+ * their own.
+ */
+export const resolveFormAccessGrant = async (
+  actorId: string,
+  required: readonly PermissionCode[],
+  workspaceIds: string[],
+  executor: DbOrTx = db,
+): Promise<FormAccessGrant> => {
+  if (workspaceIds.length === 0) {
+    return { workspaceIds: [], overriddenFormIds: [], includedFormIds: [] };
+  }
+  const granting = await withGroupPermissions(
+    executor
+      .select({ workspaceId: workspaceMemberships.workspaceId })
+      .from(workspaceMemberships)
+      .$dynamic(),
+  )
+    .where(
+      and(activeMembershipOf(actorId), isOneOf(workspaceMemberships.workspaceId, workspaceIds)),
+    )
+    .groupBy(workspaceMemberships.workspaceId)
+    .having(holdsAll(required));
+  const overriddenForms = executor
+    .selectDistinct({ formId: formGroupOverrides.formId })
+    .from(formGroupOverrides)
+    .where(
+      and(
+        isOneOf(formGroupOverrides.workspaceId, workspaceIds),
+        eq(formGroupOverrides.status, FormGroupOverrideStatus.active),
+      ),
+    );
+  const overriddenFormIds = (await overriddenForms).map((row) => row.formId);
+  return {
+    workspaceIds: granting.map((row) => row.workspaceId),
+    overriddenFormIds,
+    includedFormIds: overriddenFormIds.length
+      ? await formsHoldingAll(actorId, required, overriddenForms, executor)
+      : [],
+  };
+};
+
+/** Of the forms `formIds` returns, those whose own permissions hold every required code. */
+const formsHoldingAll = async (
+  actorId: string,
+  required: readonly PermissionCode[],
+  formIds: SQLWrapper,
+  executor: DbOrTx,
+): Promise<string[]> => {
+  const groups = effectiveGroups(actorId, { formIds }).as('effective_group');
+  const rows = await withRolePermissions(
+    executor.select({ formId: groups.formId }).from(groups).$dynamic(),
+    groups.groupId,
+  )
+    .groupBy(groups.formId)
+    .having(holdsAll(required));
+  return rows.map((row) => row.formId);
+};
+
 /** A table's workspace and form columns. */
 interface FormColumns {
   workspaceId: AnyPgColumn;
   formId: AnyPgColumn;
 }
 
-/**
- * Keeps rows whose form the actor holds every required code on. A form without an active override
- * takes the actor's workspace permissions; a form with one takes its own from the actor's effective
- * groups.
- */
-export const permittedFormsWhere = (
-  filter: FormAccessFilter,
-  workspaceIds: string[],
-  columns: FormColumns,
-): SQL => {
-  const overriddenForms = db
-    .select({ formId: formGroupOverrides.formId })
-    .from(formGroupOverrides)
-    .where(
-      and(
-        inArray(formGroupOverrides.workspaceId, workspaceIds),
-        eq(formGroupOverrides.status, FormGroupOverrideStatus.active),
-      ),
-    );
-
-  const grantingWorkspaces = withGroupPermissions(
-    db
-      .select({ workspaceId: workspaceMemberships.workspaceId })
-      .from(workspaceMemberships)
-      .$dynamic(),
-  )
-    .where(
-      and(
-        activeMembershipOf(filter.actorId),
-        inArray(workspaceMemberships.workspaceId, workspaceIds),
-      ),
-    )
-    .groupBy(workspaceMemberships.workspaceId)
-    .having(holdsAll(filter.required));
-
-  const groups = effectiveGroups(filter.actorId, { formIds: overriddenForms }).as(
-    'overridden_group',
-  );
-  const grantingOverriddenForms = withRolePermissions(
-    db.select({ formId: groups.formId }).from(groups).$dynamic(),
-    groups.groupId,
-  )
-    .groupBy(groups.formId)
-    .having(holdsAll(filter.required));
-
-  return or(
+/** Keeps rows whose form the grant allows. */
+export const permittedFormsWhere = (grant: FormAccessGrant, columns: FormColumns): SQL =>
+  or(
     and(
-      inArray(columns.workspaceId, grantingWorkspaces),
-      notInArray(columns.formId, overriddenForms),
+      isOneOf(columns.workspaceId, grant.workspaceIds),
+      not(isOneOf(columns.formId, grant.overriddenFormIds)),
     ),
-    inArray(columns.formId, grantingOverriddenForms),
+    isOneOf(columns.formId, grant.includedFormIds),
   );
-};

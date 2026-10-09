@@ -29,7 +29,7 @@ import {
   type SubmissionWriteEventCode,
   type SubmissionWorkflowStateCode,
 } from '../codes';
-import { permittedFormsWhere, type FormAccessFilter } from './formAccessRepo';
+import { grantsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
 
 export type SubmissionRecord = typeof submissions.$inferSelect;
 
@@ -152,7 +152,7 @@ export interface ListParticipantSubmissionsInput {
 export interface ListSubmissionsInput {
   /** The anchored workspace, or every workspace the actor is an active member of. */
   workspaceIds: string[];
-  formAccess: FormAccessFilter;
+  formAccess: FormAccessGrant;
   offset: number;
   limit: number;
   formId?: string;
@@ -378,14 +378,14 @@ const submittedCodeMatches = (pattern: string) =>
 export const listSubmissionsForWorkspace = async (
   input: ListSubmissionsInput,
 ): Promise<{ items: SubmissionListRow[]; total: number }> => {
-  // No workspace or no access filter means no access, never every row.
-  if (input.workspaceIds.length === 0 || !input.formAccess) {
+  // No workspace or no grant means no access, never every row; an empty grant skips the query.
+  if (input.workspaceIds.length === 0 || !input.formAccess || grantsNothing(input.formAccess)) {
     return { items: [], total: 0 };
   }
   const whereClauses = [
     inArray(submissions.workspaceId, input.workspaceIds),
     isNull(submissions.deletedAt),
-    permittedFormsWhere(input.formAccess, input.workspaceIds, {
+    permittedFormsWhere(input.formAccess, {
       workspaceId: submissions.workspaceId,
       formId: submissions.formId,
     }),

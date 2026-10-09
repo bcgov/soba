@@ -19,7 +19,10 @@ import {
 
 import { db } from '../../../core/db/client';
 import { submissionParticipants } from '../../../core/db/schema';
-import { resolveFormPermissions } from '../../../core/db/repos/formAccessRepo';
+import {
+  resolveFormAccessGrant,
+  resolveFormPermissions,
+} from '../../../core/db/repos/formAccessRepo';
 import { getWorkspaceIdForForm, listFormsForWorkspace } from '../../../core/db/repos/formRepo';
 import {
   findActorMembership,
@@ -293,7 +296,7 @@ async function designListInconsistencies(
   for (const required of DESIGN_LIST_CODES) {
     const { items } = await listFormsForWorkspace({
       workspaceIds: [workspaceId],
-      formAccess: { actorId, required },
+      formAccess: await resolveFormAccessGrant(actorId, required, [workspaceId]),
       offset: 0,
       limit: MAX_ROWS,
       sort: 'name:asc',
@@ -360,10 +363,12 @@ async function designListedIds(manifest: CoverageManifest, caller: Caller): Prom
   const actorId = caller.identity.actorId;
   if (!caller.signedIn || !actorId) return new Set();
   const coverage = new Set(COVERAGE_WORKSPACE_KEYS.map((key) => manifest.workspaces[key].id));
-  const memberships = await getActiveWorkspaceIdsForUser(actorId);
+  const workspaceIds = (await getActiveWorkspaceIdsForUser(actorId)).filter((id) =>
+    coverage.has(id),
+  );
   const { items } = await listFormsForWorkspace({
-    workspaceIds: memberships.filter((id) => coverage.has(id)),
-    formAccess: { actorId, required: [Permissions.form_read] },
+    workspaceIds,
+    formAccess: await resolveFormAccessGrant(actorId, [Permissions.form_read], workspaceIds),
     offset: 0,
     limit: MAX_ROWS,
     sort: 'name:asc',

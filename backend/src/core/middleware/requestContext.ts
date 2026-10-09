@@ -1,4 +1,4 @@
-import type { FormAccessFilter } from '../db/repos/formAccessRepo';
+import type { FormAccessGrant } from '../db/repos/formAccessRepo';
 
 /**
  * Core per-request workspace context, populated by the per-route workspace middleware in
@@ -28,6 +28,6 @@ export interface CoreListScope {
   workspaceIds: string[];
   /** The workspace resolved from the scope anchor. */
   selectedWorkspaceId?: string;
-  /** Set when the list names no form: only rows whose form allows the actor are kept. */
-  formAccess?: FormAccessFilter;
+  /** The forms the list may show, resolved by requireFormPermissions. */
+  formAccess?: FormAccessGrant;
 }

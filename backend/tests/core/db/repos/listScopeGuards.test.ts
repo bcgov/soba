@@ -12,12 +12,16 @@ import {
   lookupFormVersions,
 } from '../../../../src/core/db/repos/formVersionRepo';
 import { listSubmissionsForWorkspace } from '../../../../src/core/db/repos/submissionRepo';
-import type { FormAccessFilter } from '../../../../src/core/db/repos/formAccessRepo';
+import type { FormAccessGrant } from '../../../../src/core/db/repos/formAccessRepo';
 
-const FORM_ACCESS: FormAccessFilter = { actorId: 'actor1', required: ['form_read'] };
+const FORM_ACCESS: FormAccessGrant = {
+  workspaceIds: ['ws1'],
+  overriddenFormIds: [],
+  includedFormIds: [],
+};
 
 const listCalls = {
-  listFormsForWorkspace: (workspaceIds: string[], formAccess: FormAccessFilter) =>
+  listFormsForWorkspace: (workspaceIds: string[], formAccess: FormAccessGrant) =>
     listFormsForWorkspace({
       workspaceIds,
       formAccess,
@@ -26,7 +30,7 @@ const listCalls = {
       sort: 'createdAt:desc',
       locale: 'en',
     }),
-  listFormVersionsForWorkspace: (workspaceIds: string[], formAccess: FormAccessFilter) =>
+  listFormVersionsForWorkspace: (workspaceIds: string[], formAccess: FormAccessGrant) =>
     listFormVersionsForWorkspace({
       workspaceIds,
       formAccess,
@@ -34,7 +38,7 @@ const listCalls = {
       limit: 20,
       sort: 'versionNo:desc',
     }),
-  listSubmissionsForWorkspace: (workspaceIds: string[], formAccess: FormAccessFilter) =>
+  listSubmissionsForWorkspace: (workspaceIds: string[], formAccess: FormAccessGrant) =>
     listSubmissionsForWorkspace({
       workspaceIds,
       formAccess,
@@ -60,9 +64,9 @@ describe('list repos refuse a missing scope', () => {
   );
 
   it.each(Object.entries(listCalls))(
-    '%s returns nothing without an access filter, without querying',
+    '%s returns nothing without an access grant, without querying',
     async (_name, list) => {
-      await expect(list(['ws1'], undefined as unknown as FormAccessFilter)).resolves.toEqual({
+      await expect(list(['ws1'], undefined as unknown as FormAccessGrant)).resolves.toEqual({
         items: [],
         total: 0,
       });

@@ -1,6 +1,9 @@
+jest.mock('../../../src/core/db/client', () => ({ db: {} }));
 jest.mock('../../../src/core/db/repos/formAccessRepo', () => ({
+  ...jest.requireActual('../../../src/core/db/repos/formAccessRepo'),
   resolveFormPermissions: jest.fn(),
   resolveWorkspacePermissions: jest.fn(),
+  resolveFormAccessGrant: jest.fn(),
 }));
 jest.mock('../../../src/core/db/repos/membershipRepo', () => ({
   getActiveWorkspaceIdsForUser: jest.fn(),
@@ -9,6 +12,7 @@ jest.mock('../../../src/core/db/repos/membershipRepo', () => ({
 import type { NextFunction, Request, Response } from 'express';
 import { requireFormPermissions } from '../../../src/core/middleware/requireFormPermissions';
 import {
+  resolveFormAccessGrant,
   resolveFormPermissions,
   resolveWorkspacePermissions,
 } from '../../../src/core/db/repos/formAccessRepo';
@@ -24,8 +28,9 @@ const res = {} as Response;
 const mockOnForm = jest.mocked(resolveFormPermissions);
 const mockOnWorkspace = jest.mocked(resolveWorkspacePermissions);
 const mockMemberships = jest.mocked(getActiveWorkspaceIdsForUser);
+const mockGrant = jest.mocked(resolveFormAccessGrant);
 
-const FORM_READ_ACCESS = { actorId: 'actor1', required: [Permissions.form_read] };
+const GRANT = { workspaceIds: ['ws1'], overriddenFormIds: ['f9'], includedFormIds: [] };
 
 const context = (formId?: string): CoreRequestContext => ({
   workspaceId: 'ws1',
@@ -56,6 +61,8 @@ describe('requireFormPermissions', () => {
     mockOnForm.mockReset();
     mockOnWorkspace.mockReset();
     mockMemberships.mockReset();
+    mockGrant.mockReset();
+    mockGrant.mockResolvedValue(GRANT);
   });
 
   it('checks the form in context and keeps the codes it resolved', async () => {
@@ -106,31 +113,39 @@ describe('requireFormPermissions', () => {
     expect(next).not.toHaveBeenCalledWith(expect.any(ForbiddenError));
   });
 
-  it('checks the form of a form-anchored list and passes its filter on', async () => {
+  it('checks the form of a form-anchored list and grants only that form', async () => {
     mockOnForm.mockResolvedValue(new Set([Permissions.form_read]));
     const req = makeReq(context('f1'), anchoredScope());
 
     const next = await run(req);
 
     expect(mockOnForm).toHaveBeenCalledWith('actor1', 'ws1', 'f1');
-    expect(req.listScope?.formAccess).toEqual(FORM_READ_ACCESS);
+    expect(req.listScope?.formAccess).toEqual({
+      workspaceIds: [],
+      overriddenFormIds: [],
+      includedFormIds: ['f1'],
+    });
+    expect(mockGrant).not.toHaveBeenCalled();
     expect(next).toHaveBeenCalledWith();
   });
 
   it('refuses a form-anchored list when the form misses a code', async () => {
     mockOnForm.mockResolvedValue(new Set());
+    const req = makeReq(context('f1'), anchoredScope());
 
-    const next = await run(makeReq(context('f1'), anchoredScope()));
+    const next = await run(req);
 
     expect(next).toHaveBeenCalledWith(expect.any(ForbiddenError));
+    expect(req.listScope?.formAccess).toBeUndefined();
   });
 
-  it('filters a workspace-anchored list per form', async () => {
+  it('filters a workspace-anchored list by the grant for that workspace', async () => {
     const req = makeReq(context(), anchoredScope());
 
     const next = await run(req);
 
-    expect(req.listScope).toEqual({ ...anchoredScope(), formAccess: FORM_READ_ACCESS });
+    expect(mockGrant).toHaveBeenCalledWith('actor1', [Permissions.form_read], ['ws1']);
+    expect(req.listScope).toEqual({ ...anchoredScope(), formAccess: GRANT });
     expect(mockOnWorkspace).not.toHaveBeenCalled();
     expect(mockMemberships).not.toHaveBeenCalled();
     expect(next).toHaveBeenCalledWith();
@@ -143,10 +158,11 @@ describe('requireFormPermissions', () => {
     const next = await run(req);
 
     expect(mockMemberships).toHaveBeenCalledWith('actor1');
+    expect(mockGrant).toHaveBeenCalledWith('actor1', [Permissions.form_read], ['ws1', 'ws2']);
     expect(req.listScope).toEqual({
       actorId: 'actor1',
       workspaceIds: ['ws1', 'ws2'],
-      formAccess: FORM_READ_ACCESS,
+      formAccess: GRANT,
     });
     expect(next).toHaveBeenCalledWith();
   });

@@ -1,6 +1,6 @@
 import { FormService } from '../../services/formService';
 import { FormVersionService } from '../../services/formVersionService';
-import type { FormAccessFilter } from '../../db/repos/formAccessRepo';
+import type { FormAccessGrant } from '../../db/repos/formAccessRepo';
 import type { FormListSort } from '../../db/repos/formRepo';
 import type { SubmitterFormListRow } from '../../db/repos/submitterFormRepo';
 import type { FormVersionListSort } from '../../db/repos/formVersionRepo';
@@ -19,11 +19,11 @@ import type { CoreRequestContext } from '../../middleware/requestContext';
 
 export type FormsContextInput = CoreRequestContext;
 
-/** Scope for list/search: the workspaces searched and the access filter rows must pass. */
+/** Scope for list/search: the workspaces searched and the access grant rows must pass. */
 export interface FormsListScopeInput {
   workspaceIds: string[];
   actorId: string;
-  formAccess?: FormAccessFilter;
+  formAccess?: FormAccessGrant;
 }
 
 interface ListFormsQueryInput {

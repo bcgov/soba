@@ -268,9 +268,12 @@ anything.
 
 A design list that names no form is filtered, not refused. Anchored by a workspace, it needs
 membership (403 otherwise); with no anchor, it covers every workspace the caller is an active member
-of. The list repos keep only the rows whose form grants every required code (`permittedFormsWhere`):
-a form without an active override takes the caller's workspace permissions, and a form with one takes
-its own. Page and total share the filter, and a list repo called without it returns nothing.
+of. `resolveFormAccessGrant` first reads the workspaces whose permissions hold the codes, the forms
+there with an active override, and which of those hold the codes on their own. The list repos then
+keep only the rows that grant allows (`permittedFormsWhere`): a form without an active override is
+allowed by its workspace, and an overridden form only by its own permissions. Page and total share
+the grant, and a list repo called without one returns nothing. A list anchored by a form, version or
+submission is checked on that form and gets a grant for that form alone.
 
 `GET /design/forms/:id` returns the caller's codes on that form as `permissions` (a sorted array,
 `['*']` for admins) so the UI can gate actions.

@@ -1,6 +1,6 @@
 import { SubmissionService, type SubmissionWriteOutcome } from '../../services/submissionService';
 import { SubmissionWorkflowState } from '../../db/codes';
-import type { FormAccessFilter } from '../../db/repos/formAccessRepo';
+import type { FormAccessGrant } from '../../db/repos/formAccessRepo';
 import type {
   ParticipantSubmissionListRow,
   SubmissionRecord,
@@ -24,11 +24,11 @@ export interface SubmissionsContextInput {
   actorDisplayLabel: string | null;
 }
 
-/** Scope for list/search: the workspaces searched and the access filter rows must pass. */
+/** Scope for list/search: the workspaces searched and the access grant rows must pass. */
 export interface SubmissionsListScopeInput {
   workspaceIds: string[];
   actorId: string;
-  formAccess?: FormAccessFilter;
+  formAccess?: FormAccessGrant;
 }
 
 export interface ListSubmissionsQueryInput {
