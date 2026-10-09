@@ -45,7 +45,6 @@ export type SubmissionReview = z.infer<typeof SubmissionReviewSchema>;
 export const UpdateSubmissionStatusBodySchema = z.object({
   status: SubmissionReviewStatusSchema,
   assignee: z.string().trim().min(1).nullable(),
-  emailComment: z.boolean(),
 });
 export type UpdateSubmissionStatusBody = z.infer<typeof UpdateSubmissionStatusBodySchema>;
 

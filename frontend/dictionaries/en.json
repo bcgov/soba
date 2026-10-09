@@ -419,7 +419,6 @@
       "selectPlaceholder": "Select",
       "assignTo": "Assign To",
       "assignToMe": "Assign to Me",
-      "attachComment": "Attach comment to email",
       "update": "Update",
       "viewHistory": "View History",
       "statusHistoryTitle": "Status History",
@@ -436,7 +435,7 @@
       "noteLabel": "Note",
       "addNote": "Add Note",
       "noNotes": "No notes yet.",
-      "noteByline": "{author} at {date}",
+      "noteByline": "{author}, {date}",
       "submissionHeading": "Submission",
       "confirmChangeTitle": "Confirm Change",
       "confirmChangeMessage": "Are you sure you want to change the submitted data?",
@@ -449,7 +448,8 @@
       "statusUpdated": "Status updated",
       "noteAdded": "Note added",
       "dataUpdated": "Submission updated",
-      "saveFailure": "Could not save your change."
+      "saveFailure": "Could not save your change.",
+      "loadError": "Could not load the status, notes and history of this submission."
     },
     "formList": {
       "columns": {

@@ -120,9 +120,9 @@ describe('submission review calls', () => {
     expect(result).toEqual(REVIEW);
   });
 
-  it('posts a status change with its assignee and email flag', async () => {
+  it('posts a status change with its assignee', async () => {
     const fetchMock = stubFetch();
-    const body = { status: 'ASSIGNED', assignee: 'Grace Hopper', emailComment: true } as const;
+    const body = { status: 'ASSIGNED', assignee: 'Grace Hopper' } as const;
 
     await updateSobaSubmissionStatus('tok', 's1', body);
 

@@ -57,7 +57,7 @@ describe('submission review routes', () => {
   it('puts a status change first, under the caller, and keeps the earlier history', async () => {
     const response = await request(app)
       .post('/submissions/sub-status/review/status')
-      .send({ status: 'COMPLETED', assignee: null, emailComment: false });
+      .send({ status: 'COMPLETED', assignee: null });
 
     expect(response.status).toBe(200);
     expect(response.body.statusHistory).toHaveLength(reviewData.statusHistory.length + 1);
@@ -71,7 +71,7 @@ describe('submission review routes', () => {
   it('refuses a status the workflow does not have', async () => {
     const response = await request(app)
       .post('/submissions/sub-status/review/status')
-      .send({ status: 'ARCHIVED', assignee: null, emailComment: false });
+      .send({ status: 'ARCHIVED', assignee: null });
 
     expect(response.status).toBe(400);
   });

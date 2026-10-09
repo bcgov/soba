@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { Button, TextArea } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
+import { SecondaryText } from '@/src/components/SecondaryText';
 import { useFormatLongDateTime } from '@/src/shared/hooks/useFormatLongDate';
 import type { SubmissionNote } from '@/src/types/submissionReview';
 
 type SubmissionNotesPanelProps = {
   notes: SubmissionNote[];
-  onAdd: (text: string) => Promise<void>;
+  /** Resolves true once the note is saved; the box keeps its text otherwise. */
+  onAdd: (text: string) => Promise<boolean>;
 };
 
 /** Staff notes on a submission, newest first, with the box to add one. */
@@ -20,9 +22,9 @@ export function SubmissionNotesPanel({ notes, onAdd }: Readonly<SubmissionNotesP
 
   const add = async () => {
     setSaving(true);
-    await onAdd(text.trim());
+    const saved = await onAdd(text.trim());
     setSaving(false);
-    setText('');
+    if (saved) setText('');
   };
 
   return (
@@ -45,9 +47,9 @@ export function SubmissionNotesPanel({ notes, onAdd }: Readonly<SubmissionNotesP
         </Button>
       </div>
       {notes.length === 0 ? (
-        <p className="text-muted mb-0" data-testid="submission-notes-empty">
+        <SecondaryText elementType="p" data-testid="submission-notes-empty">
           {dictReview.noNotes}
-        </p>
+        </SecondaryText>
       ) : null}
       <div data-testid="submission-notes-list">
         {notes.map((note) => (
@@ -57,7 +59,7 @@ export function SubmissionNotesPanel({ notes, onAdd }: Readonly<SubmissionNotesP
                 .replace('{author}', note.createdBy)
                 .replace('{date}', formatLongDateTime(note.createdAt))}
             </strong>
-            <div>{note.text}</div>
+            <div style={{ whiteSpace: 'pre-wrap' }}>{note.text}</div>
           </div>
         ))}
       </div>

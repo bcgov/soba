@@ -329,12 +329,11 @@ describe('DesignSubmissionView', () => {
     expect(updateSobaSubmissionStatus).toHaveBeenCalledWith('token', SUBMISSION_ID, {
       status: 'COMPLETED',
       assignee: null,
-      emailComment: false,
     });
     expect(notifications()).toContain('Status updated');
   });
 
-  it('says a note could not be saved and leaves the list as it was', async () => {
+  it('says a note could not be saved, and keeps the list and what was typed', async () => {
     signIn();
     addSobaSubmissionNote.mockRejectedValue(new ApiError('Request failed (500)', 500));
     await renderView();
@@ -349,6 +348,7 @@ describe('DesignSubmissionView', () => {
 
     await waitFor(() => expect(notifications()).toContain('Could not save your change.'));
     expect(screen.getByTestId('submission-notes-empty')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Note' })).toHaveValue('Will not save');
   });
 
   it('keeps Add Note off for a note that is only spaces', async () => {
@@ -410,5 +410,54 @@ describe('DesignSubmissionView', () => {
 
     await waitFor(() => expect(notifications()).toContain('Failed to delete submission'));
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('still shows the answers when the review cannot be read', async () => {
+    signIn();
+    getSobaSubmissionReview.mockRejectedValue(new ApiError('Request failed (500)', 500));
+    await renderView();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('submission-review-loaderror')).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('submission-view-form')).toBeInTheDocument();
+    expect(screen.queryByTestId('submission-status-current')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('submission-note-add')).not.toBeInTheDocument();
+    // Nothing would record the edit, so it is not offered.
+    expect(screen.queryByTestId('submission-data-update')).not.toBeInTheDocument();
+  });
+
+  it('says so when the caller may not read the review', async () => {
+    signIn();
+    getSobaSubmissionReview.mockRejectedValue(new ApiError('Forbidden', 403));
+    await renderView();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('submission-review-loaderror')).toHaveTextContent(
+        'You do not have access to this.',
+      ),
+    );
+  });
+
+  it('shows a draft as a draft, with nothing submitted to change', async () => {
+    signIn();
+    getSobaSubmission.mockResolvedValue({
+      id: SUBMISSION_ID,
+      formId: 'f1',
+      formVersionId: 'v3',
+      workflowState: 'draft',
+      submittedAt: null,
+      confirmationCode: null,
+      createdBy: 'Ada Lovelace',
+    });
+    await renderView();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('submission-view-status')).toHaveTextContent('DRAFT'),
+    );
+    expect(screen.queryByTestId('submission-view-submitted')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('submission-view-confirmation')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('submission-note-add')).toBeInTheDocument());
+    expect(screen.queryByTestId('submission-data-update')).not.toBeInTheDocument();
   });
 });

@@ -50,7 +50,7 @@ describe('SubmissionStatusPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     currentUser.displayName = 'Rev Iewer';
-    onUpdate.mockResolvedValue(undefined);
+    onUpdate.mockResolvedValue(true);
   });
 
   it('shows the latest status change as the current status and assignee', () => {
@@ -71,11 +71,7 @@ describe('SubmissionStatusPanel', () => {
     expect(screen.queryByTestId('submission-status-assignee-select')).not.toBeInTheDocument();
     await user.click(screen.getByTestId('submission-status-update'));
 
-    expect(onUpdate).toHaveBeenCalledWith({
-      status: 'COMPLETED',
-      assignee: null,
-      emailComment: false,
-    });
+    expect(onUpdate).toHaveBeenCalledWith({ status: 'COMPLETED', assignee: null });
   });
 
   it('holds an assignment until someone is picked', async () => {
@@ -86,14 +82,9 @@ describe('SubmissionStatusPanel', () => {
     expect(screen.getByTestId('submission-status-update')).toBeDisabled();
 
     await choose(user, 'submission-status-assignee-select', 'Grace Hopper');
-    await user.click(screen.getByTestId('submission-status-email-comment'));
     await user.click(screen.getByTestId('submission-status-update'));
 
-    expect(onUpdate).toHaveBeenCalledWith({
-      status: 'ASSIGNED',
-      assignee: 'Grace Hopper',
-      emailComment: true,
-    });
+    expect(onUpdate).toHaveBeenCalledWith({ status: 'ASSIGNED', assignee: 'Grace Hopper' });
   });
 
   it('assigns to the signed-in user, who need not be on the list', async () => {
@@ -129,16 +120,47 @@ describe('SubmissionStatusPanel', () => {
     expect(screen.getByTestId('submission-status-update')).toBeDisabled();
   });
 
+  it('keeps what was chosen when the update does not save', async () => {
+    onUpdate.mockResolvedValue(false);
+    const user = userEvent.setup();
+    render(<SubmissionStatusPanel review={REVIEW} onUpdate={onUpdate} />);
+
+    await choose(user, 'submission-status-select', 'Assigned');
+    await user.click(screen.getByTestId('submission-status-assign-me'));
+    await user.click(screen.getByTestId('submission-status-update'));
+
+    expect(onUpdate).toHaveBeenCalled();
+    expect(screen.getByTestId('submission-status-assignee-select')).toHaveTextContent('Rev Iewer');
+    expect(screen.getByTestId('submission-status-update')).toBeEnabled();
+  });
+
+  it('drops the assignee when the status is switched away from Assigned', async () => {
+    const user = userEvent.setup();
+    render(<SubmissionStatusPanel review={REVIEW} onUpdate={onUpdate} />);
+
+    await choose(user, 'submission-status-select', 'Assigned');
+    await user.click(screen.getByTestId('submission-status-assign-me'));
+    await choose(user, 'submission-status-select', 'Revising');
+    await user.click(screen.getByTestId('submission-status-update'));
+
+    expect(onUpdate).toHaveBeenCalledWith({ status: 'REVISING', assignee: null });
+  });
+
+  it('marks the status as required', () => {
+    render(<SubmissionStatusPanel review={REVIEW} onUpdate={onUpdate} />);
+
+    expect(screen.getByTestId('submission-status-select')).toHaveTextContent('(required)');
+  });
+
   it('lists every status change in the history, newest first', async () => {
     const user = userEvent.setup();
     render(<SubmissionStatusPanel review={REVIEW} onUpdate={onUpdate} />);
 
     await user.click(screen.getByTestId('submission-status-history'));
 
-    const rows = within(await screen.findByRole('dialog')).getAllByRole('row');
-    expect(rows[0]).toHaveTextContent('StatusDate Status ChangedAssigneeUpdated By');
-    expect(rows[1]).toHaveTextContent('Assigned');
-    expect(rows[1]).toHaveTextContent('Grace Hopper');
-    expect(rows[2]).toHaveTextContent('Submitted');
+    // A status tag carries rows of its own, so the order is read from the text.
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('StatusDate Status ChangedAssigneeUpdated By');
+    expect(dialog).toHaveTextContent(/Assigned.*Grace Hopper.*Submitted/);
   });
 });

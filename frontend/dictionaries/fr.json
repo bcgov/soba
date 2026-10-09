@@ -420,7 +420,6 @@
       "selectPlaceholder": "Sélectionner",
       "assignTo": "Attribuer à",
       "assignToMe": "Me l’attribuer",
-      "attachComment": "Joindre un commentaire au courriel",
       "update": "Mettre à jour",
       "viewHistory": "Voir l’historique",
       "statusHistoryTitle": "Historique des états",
@@ -450,7 +449,8 @@
       "statusUpdated": "État mis à jour",
       "noteAdded": "Note ajoutée",
       "dataUpdated": "Soumission mise à jour",
-      "saveFailure": "Impossible d’enregistrer votre modification."
+      "saveFailure": "Impossible d’enregistrer votre modification.",
+      "loadError": "Impossible de charger l’état, les notes et l’historique de cette soumission."
     },
     "formList": {
       "columns": {
