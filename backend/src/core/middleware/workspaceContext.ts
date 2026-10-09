@@ -11,7 +11,6 @@ import type { NextFunction, Request, Response } from 'express';
 import { findActorMembership } from '../db/repos/membershipRepo';
 import { getWorkspaceById } from '../db/repos/workspaceRepo';
 import { ForbiddenError, NotFoundError, ValidationError } from '../errors';
-import { WorkspaceMembershipRole } from '../db/codes';
 import { getActorId } from './actor';
 import { getFormListContext, getWorkspaceIdForForm } from '../db/repos/formRepo';
 import { getFormVersionListContext } from '../db/repos/formVersionRepo';
@@ -134,7 +133,7 @@ export const buildCoreContext = async (
 /**
  * Build a context for the submit surface WITHOUT requiring membership: the workspace is resolved so the
  * route's own guard decides access. Members get their real role; non-members (incl. the public user)
- * get a non-manage role so they can never reach workspace-admin routes.
+ * get none, so no workspace role check passes.
  */
 const buildSubmitContext = async (
   actorId: string,
@@ -149,7 +148,7 @@ const buildSubmitContext = async (
     actorId,
     actorDisplayLabel: actor?.displayLabel ?? null,
     workspaceSource: source,
-    role: actor?.role ?? WorkspaceMembershipRole.member,
+    role: actor?.role ?? null,
   };
 };
 

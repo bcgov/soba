@@ -96,7 +96,7 @@ describe('formAccessAllows', () => {
     expect(formAccessAllows(everyone, idir, 'submission_read')).toBe(false);
   });
 
-  it('still allows the staff read codes by role', () => {
+  it('allows the staff read codes by role', () => {
     const reviewer = form({ permissions: ['form_read', 'submission_read'] });
     expect(formAccessAllows(reviewer, idir, 'form_read')).toBe(true);
     expect(formAccessAllows(reviewer, idir, 'submission_read')).toBe(true);

@@ -3,13 +3,14 @@ jest.mock('../../../../src/core/db/client', () => ({ db: {} }));
 import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   formAccessGrantFor,
-  grantsNothing,
+  listAllowsNothing,
   permittedFormsWhere,
+  type FormAccessGrant,
 } from '../../../../src/core/db/repos/formAccessRepo';
 import { forms } from '../../../../src/core/db/schema';
 
 const columns = { workspaceId: forms.workspaceId, formId: forms.id };
-const render = (grant: Parameters<typeof permittedFormsWhere>[0]) =>
+const render = (grant: FormAccessGrant) =>
   new PgDialect().sqlToQuery(permittedFormsWhere(grant, columns));
 
 describe('permittedFormsWhere', () => {
@@ -46,14 +47,17 @@ describe('permittedFormsWhere', () => {
   });
 });
 
-describe('grantsNothing', () => {
-  it('is true only when no workspace and no form is granted', () => {
-    expect(
-      grantsNothing({ workspaceIds: [], overriddenFormIds: ['f1'], includedFormIds: [] }),
-    ).toBe(true);
-    expect(
-      grantsNothing({ workspaceIds: ['ws1'], overriddenFormIds: [], includedFormIds: [] }),
-    ).toBe(false);
-    expect(grantsNothing(formAccessGrantFor('f1'))).toBe(false);
+describe('listAllowsNothing', () => {
+  it('is true for no workspace, no grant, or a grant that allows no form', () => {
+    const none = { workspaceIds: [], overriddenFormIds: ['f1'], includedFormIds: [] };
+    expect(listAllowsNothing([], formAccessGrantFor('f1'))).toBe(true);
+    expect(listAllowsNothing(['ws1'], undefined)).toBe(true);
+    expect(listAllowsNothing(['ws1'], none)).toBe(true);
+  });
+
+  it('is false when the grant allows a workspace or a form', () => {
+    const workspace = { workspaceIds: ['ws1'], overriddenFormIds: [], includedFormIds: [] };
+    expect(listAllowsNothing(['ws1'], workspace)).toBe(false);
+    expect(listAllowsNothing(['ws1'], formAccessGrantFor('f1'))).toBe(false);
   });
 });

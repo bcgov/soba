@@ -64,7 +64,7 @@ describe("reading a workspace's members and groups", () => {
     expect(mockListMembers).not.toHaveBeenCalled();
   });
 
-  it('still needs an owner or admin to create a group', async () => {
+  it('needs an owner or admin to create a group', async () => {
     const res = await request(app)
       .post(GROUPS)
       .set('x-test-role', 'member')

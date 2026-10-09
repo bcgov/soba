@@ -92,6 +92,12 @@ export const COVERAGE_FORM_KEYS = [
 ] as const;
 export type CoverageFormKey = (typeof COVERAGE_FORM_KEYS)[number];
 
+export interface PlannedGroupOverride {
+  group: { system: SystemGroupCode } | { name: string };
+  members: PersonaKey[];
+  cleared?: boolean;
+}
+
 export interface PlannedCoverageForm {
   key: CoverageFormKey;
   name: string;
@@ -102,11 +108,7 @@ export interface PlannedCoverageForm {
   /** The form's own drafts setting; absent inherits the workspace's. */
   allowSubmitterDrafts?: boolean;
   /** Replaces the group's members on this form; cleared leaves the override inactive. */
-  groupOverride?: {
-    group: { system: SystemGroupCode } | { name: string };
-    members: PersonaKey[];
-    cleared?: boolean;
-  };
+  groupOverride?: PlannedGroupOverride;
   /** Applied once the form's submissions exist. */
   afterSubmissions?: 'deleteForm' | 'deleteVersion';
 }

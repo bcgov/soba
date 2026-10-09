@@ -60,6 +60,7 @@ import {
   type CoverageWorkspaceKey,
   type PersonaKey,
   type PlannedCoverageForm,
+  type PlannedGroupOverride,
   type PlannedCoverageSubmission,
   type PlannedCoverageWorkspace,
   type PlannedSeat,
@@ -278,7 +279,7 @@ async function overrideGroup(
   workspaceKey: CoverageWorkspaceKey,
   workspaceId: string,
   formId: string,
-  override: NonNullable<PlannedCoverageForm['groupOverride']>,
+  override: PlannedGroupOverride,
 ): Promise<void> {
   const displayLabel = persona(ctx, ADMIN).displayLabel;
   const memberships = ctx.memberships.get(workspaceKey);

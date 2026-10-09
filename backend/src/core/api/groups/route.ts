@@ -6,7 +6,7 @@ import { workspaceFromResource } from '../../middleware/workspaceContext';
 import {
   requireWorkspaceManage,
   requireWorkspacePeopleRead,
-} from '../../middleware/requireWorkspaceManage';
+} from '../../middleware/requireWorkspaceRole';
 import {
   listGroups,
   createGroup,

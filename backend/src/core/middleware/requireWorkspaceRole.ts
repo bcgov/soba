@@ -7,7 +7,7 @@ import { isWorkspaceManageRole, isWorkspacePeopleReadRole } from '../db/repos/me
  * `req.coreContext`); responds 403 when `allows` refuses the role.
  */
 const requireWorkspaceRole =
-  (name: string, allows: (role: string) => boolean, refusal: string) =>
+  (name: string, allows: (role: string | null) => boolean, refusal: string) =>
   (req: Request, _res: Response, next: NextFunction): void => {
     const context = req.coreContext;
     if (!context) {

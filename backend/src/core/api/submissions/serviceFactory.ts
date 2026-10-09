@@ -28,7 +28,7 @@ export interface SubmissionsContextInput {
 export interface SubmissionsListScopeInput {
   workspaceIds: string[];
   actorId: string;
-  formAccess?: FormAccessGrant;
+  formAccess: FormAccessGrant;
 }
 
 export interface ListSubmissionsQueryInput {

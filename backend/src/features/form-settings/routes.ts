@@ -3,7 +3,7 @@ import type { z, ZodTypeAny } from 'zod';
 import { validateRequest } from '../../core/api/shared/validation';
 import { asyncHandler } from '../../core/api/shared/asyncHandler';
 import { requireFormPermissions } from '../../core/middleware/requireFormPermissions';
-import { requireWorkspaceManage } from '../../core/middleware/requireWorkspaceManage';
+import { requireWorkspaceManage } from '../../core/middleware/requireWorkspaceRole';
 import { Permissions } from '../../core/db/codes';
 import type { CoreRequestContext } from '../../core/middleware/requestContext';
 

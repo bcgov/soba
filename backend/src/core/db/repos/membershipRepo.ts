@@ -161,11 +161,11 @@ export const getWorkspaceForUser = async (workspaceId: string, userId: string) =
 };
 
 /** Owner or admin membership roles may manage or mutate workspace settings. */
-export const isWorkspaceManageRole = (role: string): boolean =>
+export const isWorkspaceManageRole = (role: string | null): boolean =>
   role === WorkspaceMembershipRole.owner || role === WorkspaceMembershipRole.admin;
 
 /** Owner, admin and member roles may read the workspace's members and groups; a viewer may not. */
-export const isWorkspacePeopleReadRole = (role: string): boolean =>
+export const isWorkspacePeopleReadRole = (role: string | null): boolean =>
   isWorkspaceManageRole(role) || role === WorkspaceMembershipRole.member;
 
 /**
@@ -181,14 +181,20 @@ export const getActiveWorkspaceIdsForUser = async (userId: string): Promise<stri
   return rows.map((row) => row.workspaceId);
 };
 
+/** A user's display label and their active membership role in one workspace, null for none. */
+export interface ActorMembership {
+  displayLabel: string | null;
+  role: string | null;
+}
+
 /**
  * The user's display label and their active membership role in the workspace, read together.
- * `role` is null when they are not an active member. Returns null when the user row is gone.
+ * Returns null when the user row is gone.
  */
 export const findActorMembership = async (
   workspaceId: string,
   userId: string,
-): Promise<{ displayLabel: string | null; role: string | null } | null> => {
+): Promise<ActorMembership | null> => {
   const rows = await db
     .select({ displayLabel: appUsers.displayLabel, role: workspaceMemberships.role })
     .from(appUsers)

@@ -135,14 +135,19 @@ const callerOf = (manifest: CoverageManifest, persona: PersonaKey): Caller => {
   return { persona, identity, signedIn: isIdentifiedCaller(identity) };
 };
 
+/** The caller's user id when they are signed in; null for the public user. */
+const signedInActorId = (caller: Caller): string | null =>
+  caller.signedIn ? (caller.identity.actorId ?? null) : null;
+
 /** My Forms rows in the workspace, by form id. */
 async function myFormRows(
   caller: Caller,
   workspaceId: string,
 ): Promise<Map<string, SubmitterFormListRow>> {
-  if (!caller.signedIn || !caller.identity.actorId) return new Map();
+  const actorId = signedInActorId(caller);
+  if (!actorId) return new Map();
   const { items } = await listFormsForSubmitter({
-    userId: caller.identity.actorId,
+    userId: actorId,
     offset: 0,
     limit: MAX_ROWS,
     workspaceId,
@@ -153,9 +158,10 @@ async function myFormRows(
 }
 
 async function myWorkspaceIds(caller: Caller): Promise<Set<string>> {
-  if (!caller.signedIn || !caller.identity.actorId) return new Set();
+  const actorId = signedInActorId(caller);
+  if (!actorId) return new Set();
   const rows = await listWorkspacesForSubmitter({
-    userId: caller.identity.actorId,
+    userId: actorId,
     limit: MAX_ROWS,
     locale: DEFAULT_SORT_LOCALE,
   });
@@ -163,9 +169,10 @@ async function myWorkspaceIds(caller: Caller): Promise<Set<string>> {
 }
 
 async function mySubmissionIds(caller: Caller): Promise<Set<string>> {
-  if (!caller.signedIn || !caller.identity.actorId) return new Set();
+  const actorId = signedInActorId(caller);
+  if (!actorId) return new Set();
   const { items } = await listSubmissionsForParticipant({
-    userId: caller.identity.actorId,
+    userId: actorId,
     offset: 0,
     limit: MAX_ROWS,
     sort: 'createdAt:desc',
@@ -280,29 +287,38 @@ async function formGrants(
   return hasAllPermissions(permissions, required);
 }
 
+/** The designer's forms list for the actor across `workspaceIds`, as form ids. */
+async function designListIds(
+  actorId: string,
+  required: readonly PermissionCode[],
+  workspaceIds: string[],
+): Promise<Set<string>> {
+  const { items } = await listFormsForWorkspace({
+    workspaceIds,
+    formAccess: await resolveFormAccessGrant(actorId, required, workspaceIds),
+    offset: 0,
+    limit: MAX_ROWS,
+    sort: 'name:asc',
+    locale: DEFAULT_SORT_LOCALE,
+  });
+  return new Set(items.map((item) => item.id));
+}
+
 /** The design forms list must hold exactly the forms whose own check grants the codes. */
 async function designListInconsistencies(
   manifest: CoverageManifest,
   caller: Caller,
   workspaceKey: CoverageWorkspaceKey,
 ): Promise<string[]> {
-  const actorId = caller.identity.actorId;
-  if (!caller.signedIn || !actorId) return [];
+  const actorId = signedInActorId(caller);
+  if (!actorId) return [];
   const workspaceId = manifest.workspaces[workspaceKey].id;
   const formKeys = COVERAGE_FORM_KEYS.filter(
     (key) => manifest.forms[key].workspaceId === workspaceId,
   );
   const issues: string[] = [];
   for (const required of DESIGN_LIST_CODES) {
-    const { items } = await listFormsForWorkspace({
-      workspaceIds: [workspaceId],
-      formAccess: await resolveFormAccessGrant(actorId, required, [workspaceId]),
-      offset: 0,
-      limit: MAX_ROWS,
-      sort: 'name:asc',
-      locale: DEFAULT_SORT_LOCALE,
-    });
-    const listed = new Set(items.map((item) => item.id));
+    const listed = await designListIds(actorId, required, [workspaceId]);
     for (const key of formKeys) {
       const form = manifest.forms[key];
       if ((await formGrants(actorId, form, required)) !== listed.has(form.formId)) {
@@ -360,21 +376,13 @@ async function checkForms(
 
 /** The designer's forms list, across the coverage workspaces the persona is an active member of. */
 async function designListedIds(manifest: CoverageManifest, caller: Caller): Promise<Set<string>> {
-  const actorId = caller.identity.actorId;
-  if (!caller.signedIn || !actorId) return new Set();
+  const actorId = signedInActorId(caller);
+  if (!actorId) return new Set();
   const coverage = new Set(COVERAGE_WORKSPACE_KEYS.map((key) => manifest.workspaces[key].id));
   const workspaceIds = (await getActiveWorkspaceIdsForUser(actorId)).filter((id) =>
     coverage.has(id),
   );
-  const { items } = await listFormsForWorkspace({
-    workspaceIds,
-    formAccess: await resolveFormAccessGrant(actorId, [Permissions.form_read], workspaceIds),
-    offset: 0,
-    limit: MAX_ROWS,
-    sort: 'name:asc',
-    locale: DEFAULT_SORT_LOCALE,
-  });
-  return new Set(items.map((item) => item.id));
+  return designListIds(actorId, [Permissions.form_read], workspaceIds);
 }
 
 const NO_DESIGN_ACCESS: Record<DesignCheck, boolean> = {
@@ -391,8 +399,8 @@ async function designAnswers(
   form: CoverageFormRef,
   listed: Set<string>,
 ): Promise<Record<DesignCheck, boolean>> {
-  const actorId = caller.identity.actorId;
-  if (!caller.signedIn || !actorId) return NO_DESIGN_ACCESS;
+  const actorId = signedInActorId(caller);
+  if (!actorId) return NO_DESIGN_ACCESS;
   const permissions = await resolveFormPermissions(actorId, form.workspaceId, form.formId);
   const grants = (...codes: PermissionCode[]) => hasAllPermissions(permissions, codes);
   return {
@@ -424,8 +432,8 @@ async function workspaceAnswers(
   caller: Caller,
   workspaceId: string,
 ): Promise<Record<WorkspaceCheck, boolean>> {
-  const actorId = caller.identity.actorId;
-  if (!caller.signedIn || !actorId) return { peopleRead: false };
+  const actorId = signedInActorId(caller);
+  if (!actorId) return { peopleRead: false };
   const role = (await findActorMembership(workspaceId, actorId))?.role;
   return { peopleRead: !!role && isWorkspacePeopleReadRole(role) };
 }
@@ -519,7 +527,7 @@ export async function explainForm(
   const caller = callerOf(manifest, persona);
   const form = manifest.forms[formKey];
   const facts = await findSubmitterFormFacts({
-    userId: caller.signedIn ? (caller.identity.actorId ?? null) : null,
+    userId: signedInActorId(caller),
     workspaceId: form.workspaceId,
     formId: form.formId,
   });

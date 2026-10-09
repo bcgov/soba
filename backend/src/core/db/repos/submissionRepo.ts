@@ -29,7 +29,7 @@ import {
   type SubmissionWriteEventCode,
   type SubmissionWorkflowStateCode,
 } from '../codes';
-import { grantsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
+import { listAllowsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
 
 export type SubmissionRecord = typeof submissions.$inferSelect;
 
@@ -378,8 +378,7 @@ const submittedCodeMatches = (pattern: string) =>
 export const listSubmissionsForWorkspace = async (
   input: ListSubmissionsInput,
 ): Promise<{ items: SubmissionListRow[]; total: number }> => {
-  // No workspace or no grant means no access, never every row; an empty grant skips the query.
-  if (input.workspaceIds.length === 0 || !input.formAccess || grantsNothing(input.formAccess)) {
+  if (listAllowsNothing(input.workspaceIds, input.formAccess)) {
     return { items: [], total: 0 };
   }
   const whereClauses = [

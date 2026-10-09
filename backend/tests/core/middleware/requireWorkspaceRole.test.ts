@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import {
   requireWorkspaceManage,
   requireWorkspacePeopleRead,
-} from '../../../src/core/middleware/requireWorkspaceManage';
+} from '../../../src/core/middleware/requireWorkspaceRole';
 import { ForbiddenError } from '../../../src/core/errors';
 
 function makeReq(role?: string): Request {

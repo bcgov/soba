@@ -2,7 +2,7 @@ import { isIdentifiedCaller } from '@soba/lib';
 import type { FormAccessTarget } from '../db/repos/formSubmitAccessRepo';
 import { getSubmissionWorkspaceAndState } from '../db/repos/submissionRepo';
 import { getWorkspaceIdForForm } from '../db/repos/formRepo';
-import { PUBLIC_SUBMITTER_LABEL, WorkspaceMembershipRole } from '../db/codes';
+import { PUBLIC_SUBMITTER_LABEL } from '../db/codes';
 import {
   isSubmitterAllowed,
   SubmitterOperation,
@@ -65,8 +65,8 @@ export const setSubmitContext = (req: Request, target: FormAccessTarget): void =
     actorDisplayLabel:
       req.user?.profile?.displayLabel || req.user?.profile?.displayName || PUBLIC_SUBMITTER_LABEL,
     workspaceSource: 'public-submit',
-    // Public submitters have no membership; a non-manage role keeps them off workspace-admin routes.
-    role: WorkspaceMembershipRole.member,
+    // The submit routes read no role; without one, no workspace role check passes.
+    role: null,
   };
 };
 

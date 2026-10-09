@@ -65,6 +65,18 @@ const activeMembershipOf = (userId: string) =>
     eq(workspaceMemberships.status, WorkspaceMembershipStatus.active),
   );
 
+/** Joins workspace_membership to its active user-kind group memberships. */
+const activeUserGroupMembership = and(
+  eq(workspaceGroupMemberships.workspaceMembershipId, workspaceMemberships.id),
+  eq(workspaceGroupMemberships.workspaceId, workspaceMemberships.workspaceId),
+  eq(workspaceGroupMemberships.memberKind, GroupMemberKind.user),
+  eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
+);
+
+/** Joins the active workspace group `groupId` names. */
+const activeGroup = (groupId: SQLWrapper) =>
+  and(eq(workspaceGroups.id, groupId), eq(workspaceGroups.status, WorkspaceGroupStatus.active));
+
 /**
  * The groups the user is an effective member of, per form: a form's active override of a group
  * replaces that group's workspace members with its own. User members only.
@@ -99,23 +111,8 @@ export const effectiveGroups = (userId: string, scope: GroupScope) => {
   const inherited = db
     .select({ formId, groupId })
     .from(workspaceMemberships)
-    .innerJoin(
-      workspaceGroupMemberships,
-      and(
-        eq(workspaceGroupMemberships.workspaceMembershipId, workspaceMemberships.id),
-        eq(workspaceGroupMemberships.workspaceId, workspaceMemberships.workspaceId),
-        eq(workspaceGroupMemberships.memberKind, GroupMemberKind.user),
-        eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
-      ),
-    )
-    .innerJoin(
-      workspaceGroups,
-      and(
-        eq(workspaceGroups.id, workspaceGroupMemberships.groupId),
-        eq(workspaceGroups.status, WorkspaceGroupStatus.active),
-        carriesRole,
-      ),
-    )
+    .innerJoin(workspaceGroupMemberships, activeUserGroupMembership)
+    .innerJoin(workspaceGroups, and(activeGroup(workspaceGroupMemberships.groupId), carriesRole))
     .innerJoin(
       forms,
       and(eq(forms.workspaceId, workspaceMemberships.workspaceId), inScope(forms.id), live),
@@ -158,14 +155,7 @@ export const effectiveGroups = (userId: string, scope: GroupScope) => {
         inScope(formGroupOverrides.formId),
       ),
     )
-    .innerJoin(
-      workspaceGroups,
-      and(
-        eq(workspaceGroups.id, formGroupOverrides.groupId),
-        eq(workspaceGroups.status, WorkspaceGroupStatus.active),
-        carriesRole,
-      ),
-    )
+    .innerJoin(workspaceGroups, and(activeGroup(formGroupOverrides.groupId), carriesRole))
     .innerJoin(
       forms,
       and(
@@ -215,22 +205,8 @@ export const permissionsByForm = (userId: string, scope: GroupScope) => {
 const withGroupPermissions = <T extends PgSelect>(query: T) =>
   withRolePermissions(
     query
-      .innerJoin(
-        workspaceGroupMemberships,
-        and(
-          eq(workspaceGroupMemberships.workspaceMembershipId, workspaceMemberships.id),
-          eq(workspaceGroupMemberships.workspaceId, workspaceMemberships.workspaceId),
-          eq(workspaceGroupMemberships.memberKind, GroupMemberKind.user),
-          eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
-        ),
-      )
-      .innerJoin(
-        workspaceGroups,
-        and(
-          eq(workspaceGroups.id, workspaceGroupMemberships.groupId),
-          eq(workspaceGroups.status, WorkspaceGroupStatus.active),
-        ),
-      ),
+      .innerJoin(workspaceGroupMemberships, activeUserGroupMembership)
+      .innerJoin(workspaceGroups, activeGroup(workspaceGroupMemberships.groupId)),
     workspaceGroups.id,
   );
 
@@ -278,13 +254,38 @@ export const formAccessGrantFor = (formId: string): FormAccessGrant => ({
   includedFormIds: [formId],
 });
 
-/** Whether the grant allows no form at all. */
-export const grantsNothing = (grant: FormAccessGrant): boolean =>
-  grant.workspaceIds.length === 0 && grant.includedFormIds.length === 0;
+/**
+ * Whether a list can have no rows: no workspace, no grant, or a grant that allows no form. A list
+ * without a grant has no rows, never every row.
+ */
+export const listAllowsNothing = (
+  workspaceIds: string[],
+  grant: FormAccessGrant | undefined,
+): boolean =>
+  workspaceIds.length === 0 ||
+  !grant ||
+  (grant.workspaceIds.length === 0 && grant.includedFormIds.length === 0);
 
 /** `column` is one of `ids`, bound as one array parameter however long the list. */
 const isOneOf = (column: AnyPgColumn, ids: string[]): SQL =>
   ids.length ? sql`${column} = any(${sql.param(ids)}::uuid[])` : sql`false`;
+
+/** Of the forms `formIds` returns, those whose own permissions hold every required code. */
+const formsHoldingAll = async (
+  actorId: string,
+  required: readonly PermissionCode[],
+  formIds: SQLWrapper,
+  executor: DbOrTx,
+): Promise<string[]> => {
+  const groups = effectiveGroups(actorId, { formIds }).as('effective_group');
+  const rows = await withRolePermissions(
+    executor.select({ formId: groups.formId }).from(groups).$dynamic(),
+    groups.groupId,
+  )
+    .groupBy(groups.formId)
+    .having(holdsAll(required));
+  return rows.map((row) => row.formId);
+};
 
 /**
  * Which forms in `workspaceIds` grant the actor every required code: the workspaces whose
@@ -328,23 +329,6 @@ export const resolveFormAccessGrant = async (
       ? await formsHoldingAll(actorId, required, overriddenForms, executor)
       : [],
   };
-};
-
-/** Of the forms `formIds` returns, those whose own permissions hold every required code. */
-const formsHoldingAll = async (
-  actorId: string,
-  required: readonly PermissionCode[],
-  formIds: SQLWrapper,
-  executor: DbOrTx,
-): Promise<string[]> => {
-  const groups = effectiveGroups(actorId, { formIds }).as('effective_group');
-  const rows = await withRolePermissions(
-    executor.select({ formId: groups.formId }).from(groups).$dynamic(),
-    groups.groupId,
-  )
-    .groupBy(groups.formId)
-    .having(holdsAll(required));
-  return rows.map((row) => row.formId);
 };
 
 /** A table's workspace and form columns. */

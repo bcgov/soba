@@ -457,7 +457,7 @@ describe('openWorkspaceFromResource', () => {
       workspaceId: 'ws9',
       formId: 'form1',
       actorDisplayLabel: 'Actor One',
-      role: 'member',
+      role: null,
       workspaceSource: 'submit:submission',
     });
     expect(next).toHaveBeenCalledWith();
@@ -473,7 +473,7 @@ describe('openWorkspaceFromResource', () => {
 
     await middleware(req, makeRes() as Response, next);
 
-    expect(req.coreContext).toMatchObject({ actorDisplayLabel: null, role: 'member' });
+    expect(req.coreContext).toMatchObject({ actorDisplayLabel: null, role: null });
     expect(next).toHaveBeenCalledWith();
   });
 

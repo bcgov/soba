@@ -4,7 +4,7 @@ import { forms, formVersions, workspaces } from '../schema';
 import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 import { NotFoundError } from '../../errors';
-import { grantsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
+import { listAllowsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
 
 import { FORM_SORT_FIELDS, type SortLocale, type SortToken } from '@soba/lib';
 export type FormListSortField = (typeof FORM_SORT_FIELDS)[number];
@@ -85,8 +85,7 @@ interface UpdateFormInput {
 export const listFormsForWorkspace = async (
   input: ListFormsForWorkspaceInput,
 ): Promise<{ items: FormListRow[]; total: number }> => {
-  // No workspace or no grant means no access, never every row; an empty grant skips the query.
-  if (input.workspaceIds.length === 0 || !input.formAccess || grantsNothing(input.formAccess)) {
+  if (listAllowsNothing(input.workspaceIds, input.formAccess)) {
     return { items: [], total: 0 };
   }
   const whereClauses = [

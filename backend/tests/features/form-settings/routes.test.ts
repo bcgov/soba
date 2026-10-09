@@ -17,7 +17,7 @@ jest.mock('../../../src/core/middleware/requireFormPermissions', () => {
   };
 });
 
-jest.mock('../../../src/core/middleware/requireWorkspaceManage', () => {
+jest.mock('../../../src/core/middleware/requireWorkspaceRole', () => {
   const { ForbiddenError } = jest.requireActual('../../../src/core/errors');
   return {
     requireWorkspaceManage: (

@@ -49,7 +49,7 @@ const listCalls = {
     }),
 };
 
-// Without the guards the workspace or form filter is dropped and every row leaks.
+// A list with no workspace or no rows to allow returns nothing without querying.
 describe('list repos refuse a missing scope', () => {
   beforeEach(() => {
     selectMock.mockReset();
@@ -59,6 +59,15 @@ describe('list repos refuse a missing scope', () => {
     '%s returns nothing for no workspace, without querying',
     async (_name, list) => {
       await expect(list([], FORM_ACCESS)).resolves.toEqual({ items: [], total: 0 });
+      expect(selectMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(Object.entries(listCalls))(
+    '%s returns nothing for a grant that allows no form, without querying',
+    async (_name, list) => {
+      const nothing = { workspaceIds: [], overriddenFormIds: ['f1'], includedFormIds: [] };
+      await expect(list(['ws1'], nothing)).resolves.toEqual({ items: [], total: 0 });
       expect(selectMock).not.toHaveBeenCalled();
     },
   );

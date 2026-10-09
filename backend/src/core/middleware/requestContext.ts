@@ -12,9 +12,15 @@ export interface CoreRequestContext {
   workspaceSource: string;
   /** The form the resolved resource belongs to, set whenever the resource is a form or under one. */
   formId?: string;
-  /** The actor's workspace membership role (owner/admin/member/viewer), read on every request. */
-  role: string;
-  /** The actor's permission codes on `formId`, or on the workspace without one. */
+  /**
+   * The actor's workspace membership role (owner/admin/member/viewer), read on every request. Null
+   * on the submit surface for a caller with no membership, so no workspace role check passes.
+   */
+  role: string | null;
+  /**
+   * The actor's permission codes on `formId`, or on the workspace without one. Set by
+   * requireFormPermissions.
+   */
   permissions?: ReadonlySet<string>;
 }
 
