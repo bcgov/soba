@@ -85,6 +85,14 @@ export const FORM_VERSIONS_LIST_QUERY: ListQuerySpec = {
   defaultSort: 'versionNo:desc',
 };
 
+/** The access tab inside the designer. Its columns do not sort. */
+export const FORM_TEAM_LIST_QUERY: ListQuerySpec = {
+  resource: 'formTeam',
+  filters: [],
+  sortOptions: ['name:asc'],
+  defaultSort: 'name:asc',
+};
+
 export const SOBA_ADMINS_LIST_QUERY: ListQuerySpec = {
   resource: 'sobaAdmins',
   filters: [],
