@@ -502,6 +502,24 @@ describe('FormForm', () => {
 
   // A form with no current version has nothing to save to. Writing anyway would file the schema
   // against a version the form does not carry.
+  // The builder draws no Submit of its own, so Save writes the button the designer shows.
+  it('starts a version with no saved schema from a Submit button, and saves it', async () => {
+    mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
+    api.getFormVersionSchema.mockResolvedValue(null);
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+    await waitFor(() => expect(screen.getByTestId('form-designer')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByTestId('save-form-button'));
+
+    await waitFor(() => expect(api.saveFormVersionSchema).toHaveBeenCalledTimes(1));
+    expect(api.saveFormVersionSchema.mock.calls[0][1]).toBe('v1');
+    expect(api.saveFormVersionSchema.mock.calls[0][2]).toEqual({
+      components: [expect.objectContaining({ type: 'button', key: 'submit', action: 'submit' })],
+    });
+  });
+
   it('writes nothing for a form with no current version', async () => {
     mockWorkspaceState.versions = [];
     await act(async () => {

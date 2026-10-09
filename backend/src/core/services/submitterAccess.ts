@@ -1,4 +1,5 @@
-import { Permissions, PUBLIC_PROVIDER_CODE, type PermissionCode } from '../db/codes';
+import { isIdentifiedCaller } from '@soba/lib';
+import { Permissions, type PermissionCode } from '../db/codes';
 import {
   hasFormSubmitAccess,
   type CallerIdentity,
@@ -37,13 +38,6 @@ const isParticipant: AccessCheck = async (target, caller) =>
 
 const isOwner: AccessCheck = async (target, caller) =>
   !!target.submissionId && !!caller.actorId && isActiveOwner(target.submissionId, caller.actorId);
-
-/**
- * A signed-in caller. The shared public user owns every anonymous submission, so its ownership grants
- * nothing and it has no submissions of its own to list.
- */
-export const isIdentifiedCaller = (caller: CallerIdentity): boolean =>
-  !!caller.idpCode && caller.idpCode !== PUBLIC_PROVIDER_CODE;
 
 const isIdentified: AccessCheck = (_target, caller) => Promise.resolve(isIdentifiedCaller(caller));
 

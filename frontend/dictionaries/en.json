@@ -455,6 +455,22 @@
     "viewAll": "View my submissions",
     "noCode": "No confirmation ID yet"
   },
+  "myForms": {
+    "columns": {
+      "form": "Form",
+      "workspace": "Workspace",
+      "actions": "Actions"
+    },
+    "start": "Start",
+    "startLabel": "Start a new submission for {form}",
+    "notOpen": "You can't start a new submission",
+    "empty": "You have no forms yet.",
+    "noMatches": "No forms match your search or filter.",
+    "loadError": "Could not load your forms.",
+    "workspacesLoadError": "Could not load your workspaces.",
+    "selectedWorkspace": "Selected workspace",
+    "itemName": "forms"
+  },
   "Basic": "Basic",
   "Text Field": "Text Field",
   "Text Area": "Text Area",

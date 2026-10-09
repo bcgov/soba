@@ -48,10 +48,12 @@ leaves it off.
 ## Commands
 
 ```bash
-pnpm db:dev-data --seed --username <idir-username>   # build the set
-pnpm db:dev-data --purge                             # remove it
-pnpm db:dev-data --reset --username <idir-username>  # purge, then build
+pnpm db:dev-data --seed --username <idir-username>              # build the set
+pnpm db:dev-data --purge                                        # remove it
+pnpm db:dev-data --reset --username <idir-username>             # purge, then build
 pnpm db:dev-data --help
+pnpm db:dev-data:verify                                         # check the access coverage set
+pnpm db:dev-data:verify --persona outsider --form protectedOwn  # explain one case
 ```
 
 `--owner-file` must point inside the project; a path that escapes it is refused.
@@ -72,7 +74,8 @@ second page at that setting.
 | `large`  | 21            | 24         | 74    | 202         | 16s  |
 
 The role split, forms per workspace, submissions per form, and members per workspace are all derived
-from that number, so every state listed below exists at every size.
+from that number, so every state listed below exists at every size. The counts leave out the
+access coverage set, which is the same at every size.
 
 ## Choosing the owner
 
@@ -131,6 +134,44 @@ Everything else is smaller than the anchors and spread so each distinct state ex
 Generated users sit on active login providers (`azureidir`, `bceidbusiness`) with fabricated
 subjects, so they cannot sign in. They exist to fill member lists, groups, and role assignments.
 
+## Access coverage set
+
+Every seed also builds a fixed set of named cases for submit-mode access, the same whatever
+`--size` or `--skip-anonymous` says. Its names start `[dev] Zz `, so it sorts after the anchors and
+the bulk in English and French, and it is created first, so it trails `id:desc` lists too.
+
+Personas are the owner, the public user as an anonymous caller, and eleven generated users:
+`admin`, who owns the three workspaces, plus `submitter`, `designer`, `reviewer`,
+`overrideRemoved`, `overrideAdded`, `inactiveMember`, `inactiveGroupMember`, `outsider`,
+`bceidOutsider` (`bceidbusiness`), and `collaborator`.
+
+| Workspace                    | Audience, drafts           | Forms                                                                                                |
+| ---------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `[dev] Zz Coverage Roles`    | members only, on           | inherits; override; cleared override; never published; form deleted; version deleted; own drafts off |
+| `[dev] Zz Coverage Audience` | protected `azureidir`, off | inherits; own public; own protected `bceidbusiness`; own members only                                |
+| `[dev] Zz Coverage Public`   | public, on                 | inherits; own protected `azureidir`                                                                  |
+
+Nine submissions cover owner and collaborator grants, an inactive grant, the opened, draft and
+submitted states, a deleted submission, anonymous submissions, and submissions on a deleted form
+and a deleted version. The public user also holds a seat in Roles' form submitters group, which
+grants it nothing.
+
+For browser checks the owner is in the form submitters group in Roles and the form admins group in
+Audience, and has a draft in Public without a membership.
+
+[`access/expectations.ts`](./access/expectations.ts) records who each check admits, case by case.
+`pnpm db:dev-data:verify` runs every persona against every case through the list queries and access
+rules the submit routes use, and exits 1 on any difference:
+
+- forms: listed in My Forms, start, draft, and the access check for `document_template_read` and
+  `submission_update`
+- submissions: listed in My Submissions, and the read, write and delete rules
+
+Write is the rule save and submit share; the request itself can still refuse the write or keep it
+as pending. The command only reads, and needs no running backend. Change the table with any access
+rule change. The owner's cells assume they sign in through `azureidir`; any other provider skips
+them.
+
 ## Layout
 
 | File                                     | Role                                                       |
@@ -139,12 +180,16 @@ subjects, so they cannot sign in. They exist to fill member lists, groups, and r
 | [`generate.ts`](./generate.ts)           | Runs the plan through the services, returns a manifest     |
 | [`purge.ts`](./purge.ts)                 | Removes it all, engine documents and stored bytes included |
 | [`fixtures/`](./fixtures)                | Form definitions and answers matching their components     |
+| [`members.ts`](./members.ts)             | Writes workspace memberships directly                      |
+| [`inSequence.ts`](./inSequence.ts)       | Runs async steps one at a time, in order                   |
+| [`access/`](./access)                    | The access coverage set, its expectations, and its checks  |
 | [`ownerFile.ts`](./ownerFile.ts)         | Reads and writes `.devdata-owner`, creates the owner       |
 | [`resolveUser.ts`](./resolveUser.ts)     | Looks the owner up by username                             |
 | [`preconditions.ts`](./preconditions.ts) | Checks the database is migrated and seeded                 |
 | [`guard.ts`](./guard.ts)                 | Refuses to run unless the dev-data feature is on           |
 | [`runs.ts`](./runs.ts)                   | Records each run's ids in `soba.dev_data_run` as it goes   |
 | [`cli.ts`](./cli.ts)                     | Argument parsing, output, exit codes                       |
+| [`cliSupport.ts`](./cliSupport.ts)       | Usage errors, exit codes and pool shutdown for both CLIs   |
 
 `generate()` and `purge()` take options and return results, with no argv, console, or process exit,
 so an admin API route can drive them unchanged.
@@ -155,8 +200,9 @@ so an admin API route can drive them unchanged.
   so a mismatched fixture yields empty submissions rather than an error. The fixture tests pin this.
 - Values come from a row index, not from randomness, so a failing test reproduces tomorrow.
 - Forms, versions, and submissions go through their services, because they are two-sided: a
-  Postgres row without its engine document is broken. Workspaces, groups, audience, and users are
-  direct repo calls, bypassing checks the API applies (workspace creation would reject the BCeID
+  Postgres row without its engine document is broken. Workspaces, groups, settings, overrides,
+  users, and the coverage set's collaborator grants and inactive statuses are direct repo calls or
+  writes, bypassing checks the API applies (workspace creation would reject the BCeID
   dev users). The generated set is therefore not guaranteed to be reproducible through the API.
 - Purge order: read engine refs and stored files, purge Postgres in one transaction, then delete
   engine documents and stored bytes best-effort. The reverse leaves live rows pointing at documents

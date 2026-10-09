@@ -17,18 +17,60 @@ import {
   OffsetPageSchema,
   OFFSET_DRIFT_NOTE,
 } from '../shared/offsetPagination';
+import { MAX_LOOKUP_LIMIT } from '../shared/lookup';
 import {
   SubmitFillBundleSchema as LibSubmitFillBundleSchema,
   MySubmissionStateSchema as LibMySubmissionStateSchema,
   MySubmissionRoleSchema as LibMySubmissionRoleSchema,
   MySubmissionListItemSchema as LibMySubmissionListItemSchema,
   ListMySubmissionsResponseSchema as LibListMySubmissionsResponseSchema,
+  MyFormSortSchema as LibMyFormSortSchema,
+  MyFormListItemSchema as LibMyFormListItemSchema,
+  ListMyFormsResponseSchema as LibListMyFormsResponseSchema,
+  MyWorkspaceLookupItemSchema as LibMyWorkspaceLookupItemSchema,
+  MyWorkspaceLookupResponseSchema as LibMyWorkspaceLookupResponseSchema,
 } from '@soba/lib';
 
 extendZodWithOpenApi(z);
 
 export const SubmitFillBundleSchema =
   LibSubmitFillBundleSchema.clone().openapi('Submit_FillBundle');
+
+export const MyFormSortSchema = LibMyFormSortSchema.clone().openapi('Submit_MyFormSort', {
+  description: 'Valid My Forms sort tokens: `field:asc` or `field:desc`.',
+});
+
+export const ListMyFormsQuerySchema = z
+  .object({
+    ...offsetQueryFields,
+    cursor: rejectedCursorField,
+    workspaceId: z.uuid().optional().openapi({ description: 'Only forms in this workspace.' }),
+    q: searchQueryField.openapi({ description: 'Matches anywhere in the form name.' }),
+    sort: MyFormSortSchema.default('name:asc'),
+    locale: sortLocaleQueryField,
+  })
+  .openapi('Submit_ListMyFormsQuery');
+
+export const MyFormListItemSchema =
+  LibMyFormListItemSchema.clone().openapi('Submit_MyFormListItem');
+
+export const ListMyFormsResponseSchema = LibListMyFormsResponseSchema.extend({
+  items: z.array(MyFormListItemSchema),
+  page: OffsetPageSchema,
+  sort: MyFormSortSchema,
+}).openapi('Submit_ListMyFormsResponse');
+
+export const MyWorkspaceLookupQuerySchema = z
+  .object({ locale: sortLocaleQueryField })
+  .openapi('Submit_MyWorkspaceLookupQuery');
+
+export const MyWorkspaceLookupItemSchema = LibMyWorkspaceLookupItemSchema.clone().openapi(
+  'Submit_MyWorkspaceLookupItem',
+);
+
+export const MyWorkspaceLookupResponseSchema = LibMyWorkspaceLookupResponseSchema.extend({
+  items: z.array(MyWorkspaceLookupItemSchema),
+}).openapi('Submit_MyWorkspaceLookupResponse');
 
 export const MySubmissionStateSchema = LibMySubmissionStateSchema.clone().openapi(
   'Submit_MySubmissionState',
@@ -77,6 +119,8 @@ const SUBMISSION_AUTH_REQUIRED =
 const INVALID_WRITE_BODY =
   'Invalid body (save requires revisionId and baseRevisionId; submit takes both or neither)';
 const WRITE_CONFLICT = 'The revision id is already used by another write';
+const SIGNED_IN_REQUIRED = 'Authentication required';
+const INVALID_QUERY = 'Invalid query';
 // Optional auth: anonymous (the public user) or a bearer token. `{}` marks the no-auth case
 // explicit rather than leaving security unset.
 const PUBLIC_SECURITY = [{}, { bearerAuth: [] }];
@@ -247,8 +291,42 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
         description: "A page of the caller's submissions",
         content: { 'application/json': { schema: ListMySubmissionsResponseSchema } },
       },
-      400: { description: 'Invalid query' },
-      401: { description: 'Authentication required' },
+      400: { description: INVALID_QUERY },
+      401: { description: SIGNED_IN_REQUIRED },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/submit/forms/mine',
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    description: `Forms the caller holds the submitter role on, and forms they have a draft or submitted submission on, across every workspace. Each row carries the facts the access rules in @soba/lib read (canStartSubmission, canSaveSubmissionDraft); the server enforces the same rules. ${OFFSET_DRIFT_NOTE}`,
+    request: { query: ListMyFormsQuerySchema },
+    responses: {
+      200: {
+        description: "A page of the caller's forms",
+        content: { 'application/json': { schema: ListMyFormsResponseSchema } },
+      },
+      400: { description: INVALID_QUERY },
+      401: { description: SIGNED_IN_REQUIRED },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/submit/workspaces/mine',
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    description: `The workspaces the caller's forms belong to, in name order. Returns at most ${MAX_LOOKUP_LIMIT}; \`truncated\` is true when there are more.`,
+    request: { query: MyWorkspaceLookupQuerySchema },
+    responses: {
+      200: {
+        description: "The caller's workspaces",
+        content: { 'application/json': { schema: MyWorkspaceLookupResponseSchema } },
+      },
+      400: { description: INVALID_QUERY },
+      401: { description: SIGNED_IN_REQUIRED },
     },
   });
 
@@ -262,7 +340,7 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
     request: { params: SubmissionIdParamsSchema },
     responses: {
       204: { description: 'Submission deleted' },
-      401: { description: 'Authentication required' },
+      401: { description: SIGNED_IN_REQUIRED },
       403: { description: 'Not the owner of this submission' },
       404: { description: SUBMISSION_NOT_FOUND },
       409: { description: 'The submission is submitted and can no longer be deleted' },

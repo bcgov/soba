@@ -7,6 +7,7 @@ import {
 } from '../../db/repos/membershipRepo';
 import { canCreateWorkspaceByIdp } from '../../db/repos/idpGroupRepo';
 import { createTeamWorkspace, updateWorkspace } from '../../db/repos/workspaceRepo';
+import { listWorkspacesForSubmitter } from '../../db/repos/submitterFormRepo';
 import { ForbiddenError } from '../../errors';
 import { LOOKUP_FETCH_LIMIT, toLookupResponse } from '../shared/lookup';
 
@@ -87,6 +88,13 @@ export class WorkspacesApiService {
         role: r.role,
         disclaimerAccepted: r.disclaimerAcceptedAt != null,
       })),
+    );
+  }
+
+  /** The workspaces of the forms the caller holds the submitter role on or has submitted to. */
+  async listMine(actorId: string, locale: SortLocale) {
+    return toLookupResponse(
+      await listWorkspacesForSubmitter({ userId: actorId, limit: LOOKUP_FETCH_LIMIT, locale }),
     );
   }
 

@@ -17,6 +17,7 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
+import { fillTemplate } from '@/src/shared/util/stringUtils';
 import { useFormatLongDateTime } from '@/src/shared/hooks/useFormatLongDate';
 import { isConflict } from '@/src/shared/api/dataError';
 import { useDataErrorNotice } from '@/src/shared/api/useDataErrorNotice';
@@ -43,10 +44,6 @@ const isDraft = (item: MySubmissionListItem) => item.workflowState === 'draft';
 
 // Only an owner deletes, and only before the submission is submitted.
 const canDelete = (item: MySubmissionListItem) => isDraft(item) && item.role === 'owner';
-
-// A function replacement keeps `$` in a form name literal.
-const fill = (template: string, values: Record<string, string>) =>
-  template.replaceAll(/\{(\w+)\}/g, (match, name: string) => values[name] ?? match);
 
 /** The caller's own drafts and submitted submissions: continue a draft, view a submission. */
 export function MySubmissionsList() {
@@ -202,7 +199,10 @@ export function MySubmissionsList() {
           return (
             <div className="d-flex gap-2 justify-content-start">
               <RowActionButton
-                aria-label={fill(draft ? dictMine.continueLabel : dictMine.viewLabel, values)}
+                aria-label={fillTemplate(
+                  draft ? dictMine.continueLabel : dictMine.viewLabel,
+                  values,
+                )}
                 data-testid={`${item.id}-${draft ? 'continue' : 'view'}`}
                 onPress={() => openSubmission(item)}
               >
@@ -210,7 +210,7 @@ export function MySubmissionsList() {
               </RowActionButton>
               {canDelete(item) ? (
                 <RowActionButton
-                  aria-label={fill(dictMine.deleteLabel, values)}
+                  aria-label={fillTemplate(dictMine.deleteLabel, values)}
                   data-testid={`${item.id}-delete`}
                   onPress={() => setConfirmDelete(item)}
                 >
@@ -243,16 +243,19 @@ export function MySubmissionsList() {
         />
       </ListPageToolbar>
       <ListPageFilters>
-        <Select
-          size="medium"
-          id="my-submissions-state"
-          data-testid="my-submissions-state-select"
-          className={styles.stateField}
-          label={dictMine.statusFilter}
-          selectedKey={state ?? ALL_STATES}
-          onSelectionChange={handleStateChange}
-          items={stateOptions}
-        />
+        {/* The design system replaces its own root class when given one, so the width sits
+            on a wrapper. */}
+        <div className={styles.stateField}>
+          <Select
+            size="medium"
+            id="my-submissions-state"
+            data-testid="my-submissions-state-select"
+            label={dictMine.statusFilter}
+            selectedKey={state ?? ALL_STATES}
+            onSelectionChange={handleStateChange}
+            items={stateOptions}
+          />
+        </div>
         <DSButton
           variant="secondary"
           data-testid="my-submissions-clear-filters"
@@ -276,7 +279,9 @@ export function MySubmissionsList() {
       <ConfirmModal
         show={confirmDelete !== null}
         title={dictMine.deleteTitle}
-        message={confirmDelete ? fill(dictMine.deleteMessage, labelValues(confirmDelete)) : ''}
+        message={
+          confirmDelete ? fillTemplate(dictMine.deleteMessage, labelValues(confirmDelete)) : ''
+        }
         confirmLabel={dictMine.delete}
         pending={deleting}
         onConfirm={handleDelete}

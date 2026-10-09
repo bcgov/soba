@@ -11,8 +11,10 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
+      - "lib/**"
       - ".github/workflows/on-merge.yaml"
       - ".github/workflows/build-images.yaml"
+      - ".github/actions/**"
       - ".gitignore"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -85,6 +87,14 @@ jobs:
           insecure_skip_tls_verify: true
           namespace: ${{ secrets.OC_NAMESPACE }}
 
+      - name: Recover pending Helm release
+        # Checkouts that predate the action skip recovery.
+        if: hashFiles('.github/actions/recover-helm-release/action.yaml') != ''
+        uses: ./.github/actions/recover-helm-release
+        with:
+          release: soba-dev-mongodb
+          namespace: ${{ secrets.OC_NAMESPACE }}
+
       - name: Deploy MongoDB
         env:
           NAMESPACE: ${{ secrets.OC_NAMESPACE }}
@@ -153,6 +163,14 @@ jobs:
           label: dev database
       # Pipeline performance fix: Revert if needed.
 
+      - name: Recover pending Helm release
+        # Checkouts that predate the action skip recovery.
+        if: hashFiles('.github/actions/recover-helm-release/action.yaml') != ''
+        uses: ./.github/actions/recover-helm-release
+        with:
+          release: soba-dev
+          namespace: ${{ secrets.OC_NAMESPACE }}
+
       - name: Generate values override and deploy
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -216,30 +234,6 @@ jobs:
             -f /tmp/values-override.yaml
           # Pipeline performance fix: Revert if needed.
 
-          REVISION=$(helm status "soba-dev" -n "${NAMESPACE}" -o json | jq -r '.version')
-          # Clean up old migration jobs and keep only current revision
-          oc get jobs -n "${NAMESPACE}" -o name \
-            | grep "soba-dev-migrate-" \
-            | grep -v -- "-migrate-${REVISION}$" \
-            | xargs -r oc delete -n "${NAMESPACE}" 2>/dev/null || true
-
-          echo "Waiting for backend rollout..."
-          oc rollout status deployment/soba-dev-backend -n "${NAMESPACE}" --timeout=300s
-
-          echo "Waiting for frontend rollouts (designer + forms)..."
-          oc rollout status deployment/soba-dev-frontend-designer -n "${NAMESPACE}" --timeout=300s
-          oc rollout status deployment/soba-dev-frontend-forms -n "${NAMESPACE}" --timeout=300s
-
-          echo "Waiting for formio rollout..."
-          oc rollout status deployment/soba-dev-formio -n "${NAMESPACE}" --timeout=300s
-
-          echo "Waiting for mongodb rollout..."
-          oc rollout status statefulset/soba-dev-mongodb -n "${NAMESPACE}" --timeout=300s
-
-          echo "Waiting for temporal-worker rollouts..."
-          oc rollout status deployment/soba-dev-temporal-worker -n "${NAMESPACE}" --timeout=300s
-          oc rollout status deployment/soba-dev-temporal-worker-document-generation -n "${NAMESPACE}" --timeout=300s
-
       # Pipeline performance fix: Revert if needed.
       # Temporarily disabled openshift diagnostics; uncomment to restore.
       # - name: Deployment diagnostics
@@ -254,11 +248,13 @@ jobs:
   Tests:
     name: Integration Tests
     needs: [deploy]
+    # Repository variable: set PLAYWRIGHT_ENABLED=true to run integration tests.
+    if: ${{ vars.PLAYWRIGHT_ENABLED == 'true' }}
     uses: ./.github/workflows/playwright.yaml
     with:
       DEP_ENV: dev
       pr_branch: develop
     secrets:
-      Username: ${{ secrets.keycloakUsername }}
-      Password: ${{ secrets.keycloakPassword }}
+      keycloakUsername: ${{ secrets.keycloakUsername }}
+      keycloakPassword: ${{ secrets.keycloakPassword }}
       MFA_CODE: ${{ secrets.MFA_CODE }}

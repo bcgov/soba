@@ -2,11 +2,15 @@ import { FormService } from '../../services/formService';
 import { FormVersionService } from '../../services/formVersionService';
 import { resolveFormPermissions } from '../../db/repos/formAccessRepo';
 import type { FormListSort } from '../../db/repos/formRepo';
+import type { SubmitterFormListRow } from '../../db/repos/submitterFormRepo';
 import type { FormVersionListSort } from '../../db/repos/formVersionRepo';
 import {
   type CreateFormSettings,
   type FormListItem,
   type FormVersionListItem,
+  type ListMyFormsResponse,
+  type MyFormListItem,
+  type MyFormListSort,
   type SortLocale,
 } from '@soba/lib';
 import { LOOKUP_FETCH_LIMIT, toLookupResponse } from '../shared/lookup';
@@ -29,6 +33,15 @@ interface ListFormsQueryInput {
   q?: string;
   status?: string;
   sort: FormListSort;
+  locale: SortLocale;
+}
+
+interface ListMyFormsQueryInput {
+  offset: number;
+  limit: number;
+  workspaceId?: string;
+  q?: string;
+  sort: MyFormListSort;
   locale: SortLocale;
 }
 
@@ -107,6 +120,18 @@ const toFormListItemDto = (item: {
   updatedAt: item.updatedAt.toISOString(),
   createdBy: item.createdBy,
   updatedBy: item.updatedBy,
+});
+
+const toMyFormListItemDto = (item: SubmitterFormListRow): MyFormListItem => ({
+  id: item.id,
+  name: item.name,
+  workspaceId: item.workspaceId,
+  workspaceName: item.workspaceName,
+  publishedVersionId: item.publishedVersionId,
+  permissions: [...item.permissions],
+  audienceMode: item.audienceMode,
+  audienceIdps: [...item.audienceIdps],
+  allowSubmitterDrafts: item.allowSubmitterDrafts,
 });
 
 const toFormVersionDto = (item: {
@@ -238,6 +263,27 @@ export function createFormsApiService(
           q: query.q,
           status: query.status,
         },
+        sort: query.sort,
+      };
+    },
+
+    listMine: async (
+      userId: string,
+      query: ListMyFormsQueryInput,
+    ): Promise<ListMyFormsResponse> => {
+      const result = await formService.listForSubmitter({
+        userId,
+        offset: query.offset,
+        limit: query.limit,
+        workspaceId: query.workspaceId,
+        q: query.q,
+        sort: query.sort,
+        locale: query.locale,
+      });
+      return {
+        items: result.items.map((item) => toMyFormListItemDto(item)),
+        page: { offset: query.offset, limit: query.limit, total: result.total },
+        filters: { workspaceId: query.workspaceId, q: query.q },
         sort: query.sort,
       };
     },

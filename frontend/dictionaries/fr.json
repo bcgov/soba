@@ -456,6 +456,22 @@
     "viewAll": "Voir mes soumissions",
     "noCode": "Aucun ID de confirmation pour l’instant"
   },
+  "myForms": {
+    "columns": {
+      "form": "Formulaire",
+      "workspace": "Espace de travail",
+      "actions": "Actions"
+    },
+    "start": "Démarrer",
+    "startLabel": "Démarrer une nouvelle soumission pour {form}",
+    "notOpen": "Vous ne pouvez pas démarrer de nouvelle soumission",
+    "empty": "Vous n’avez encore aucun formulaire.",
+    "noMatches": "Aucun formulaire ne correspond à votre recherche ou à votre filtre.",
+    "loadError": "Impossible de charger vos formulaires.",
+    "workspacesLoadError": "Impossible de charger vos espaces de travail.",
+    "selectedWorkspace": "Espace de travail sélectionné",
+    "itemName": "formulaires"
+  },
   "Basic": "Basique",
   "Text Field": "Champ de Texte",
   "Text Area": "Zone de Texte",
