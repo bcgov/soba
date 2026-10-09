@@ -1,6 +1,7 @@
 /**
  * The access coverage set: named cases that exist at every size, for checking who may list, open,
- * save and delete what. No DB, no engine, no clock.
+ * save, delete and design what, and who reads a workspace's members and groups. No DB, no engine,
+ * no clock.
  */
 import type { Audience } from '@soba/lib';
 import type { NormalizedProfile } from '../../../core/auth/jwtClaims';

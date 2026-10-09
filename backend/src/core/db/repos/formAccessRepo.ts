@@ -299,7 +299,7 @@ export const resolveFormAccessGrant = async (
   if (workspaceIds.length === 0) {
     return { workspaceIds: [], overriddenFormIds: [], includedFormIds: [] };
   }
-  const granting = await withGroupPermissions(
+  const granting = withGroupPermissions(
     db
       .select({ workspaceId: workspaceMemberships.workspaceId })
       .from(workspaceMemberships)
@@ -319,9 +319,10 @@ export const resolveFormAccessGrant = async (
         eq(formGroupOverrides.status, FormGroupOverrideStatus.active),
       ),
     );
-  const overriddenFormIds = (await overriddenForms).map((row) => row.formId);
+  const [grantingRows, overriddenRows] = await Promise.all([granting, overriddenForms]);
+  const overriddenFormIds = overriddenRows.map((row) => row.formId);
   return {
-    workspaceIds: granting.map((row) => row.workspaceId),
+    workspaceIds: grantingRows.map((row) => row.workspaceId),
     overriddenFormIds,
     // Reused as a subquery so the ids are not bound one parameter each.
     includedFormIds: overriddenFormIds.length

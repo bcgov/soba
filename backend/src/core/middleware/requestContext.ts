@@ -10,7 +10,7 @@ export interface CoreRequestContext {
   actorId: string;
   actorDisplayLabel: string | null;
   workspaceSource: string;
-  /** The form the resolved resource belongs to, set whenever the resource is a form or under one. */
+  /** The form the resolved resource or list anchor is, or belongs to. */
   formId?: string;
   /**
    * The actor's workspace membership role (owner/admin/member/viewer), read on every request. Null

@@ -3,7 +3,7 @@ import request from 'supertest';
 
 // Stands in for workspace resolution, which reads the membership from the database: the caller's
 // membership role comes from a test header.
-jest.mock('../../../src/core/middleware/workspaceContext', () => {
+jest.mock('../../../../src/core/middleware/workspaceContext', () => {
   const resolve = (req: express.Request, _res: express.Response, next: express.NextFunction) => {
     req.coreContext = {
       workspaceId: 'ws1',
@@ -16,18 +16,18 @@ jest.mock('../../../src/core/middleware/workspaceContext', () => {
   };
   return { workspaceFromResource: () => resolve, workspaceFromQuery: resolve };
 });
-jest.mock('../../../src/core/api/groups/service', () => ({
+jest.mock('../../../../src/core/api/groups/service', () => ({
   groupsApiService: { list: jest.fn(), create: jest.fn() },
 }));
-jest.mock('../../../src/core/api/members/service', () => ({
+jest.mock('../../../../src/core/api/members/service', () => ({
   membersApiService: { list: jest.fn() },
 }));
 
-import { groupsRouter } from '../../../src/core/api/groups';
-import { membersRouter } from '../../../src/core/api/members';
-import { groupsApiService } from '../../../src/core/api/groups/service';
-import { membersApiService } from '../../../src/core/api/members/service';
-import { coreErrorHandler } from '../../../src/core/middleware/errorHandler';
+import { groupsRouter } from '../../../../src/core/api/groups';
+import { membersRouter } from '../../../../src/core/api/members';
+import { groupsApiService } from '../../../../src/core/api/groups/service';
+import { membersApiService } from '../../../../src/core/api/members/service';
+import { coreErrorHandler } from '../../../../src/core/middleware/errorHandler';
 
 const WORKSPACE = '01a0dc24-1f2e-7a3b-8c4d-5e6f7a8b9c0d';
 const GROUPS = `/workspaces/${WORKSPACE}/groups`;

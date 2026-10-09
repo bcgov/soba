@@ -65,7 +65,7 @@ export const setSubmitContext = (req: Request, target: FormAccessTarget): void =
     actorDisplayLabel:
       req.user?.profile?.displayLabel || req.user?.profile?.displayName || PUBLIC_SUBMITTER_LABEL,
     workspaceSource: 'public-submit',
-    // The submit routes read no role; without one, no workspace role check passes.
+    // Open, save, submit and upload read no role; without one, no workspace role check passes.
     role: null,
   };
 };
