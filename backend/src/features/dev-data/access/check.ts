@@ -367,24 +367,29 @@ async function designListInconsistencies(
   workspaceKey: CoverageWorkspaceKey,
   permissions: ReadonlyMap<string, ReadonlySet<string>>,
 ): Promise<string[]> {
-  const workspaceId = manifest.workspaces[workspaceKey].id;
-  const issues: string[] = [];
-  for (const list of DESIGN_LISTS) {
-    const full = await list.formIds([workspaceId], coverageFormsGrant(manifest, workspaceId));
-    for (const required of list.codeSets) {
-      const grant = await resolveFormAccessGrant(actorId, required, [workspaceId]);
-      const listed = new Set(await list.formIds([workspaceId], grant));
+  const workspaceIds = [manifest.workspaces[workspaceKey].id];
+  const fullLists = await Promise.all(
+    DESIGN_LISTS.map((list) =>
+      list.formIds(workspaceIds, coverageFormsGrant(manifest, workspaceIds[0])),
+    ),
+  );
+  const cases = DESIGN_LISTS.flatMap((list, index) =>
+    list.codeSets.map((required) => ({ list, required, full: fullLists[index] })),
+  );
+  const issues = await Promise.all(
+    cases.map(async ({ list, required, full }) => {
+      const grant = await resolveFormAccessGrant(actorId, required, workspaceIds);
+      const listed = new Set(await list.formIds(workspaceIds, grant));
       const expected = new Set(
         full.filter((formId) => hasAllPermissions(permissions.get(formId) ?? [], required)),
       );
-      for (const formId of differing(listed, expected)) {
-        issues.push(
+      return differing(listed, expected).map(
+        (formId) =>
           `${persona} x ${formKeyOf(manifest, formId)}: ${list.name} list for ${required.join('+')} differs from the form check`,
-        );
-      }
-    }
-  }
-  return issues;
+      );
+    }),
+  );
+  return issues.flat();
 }
 
 async function checkWorkspaceForms(
