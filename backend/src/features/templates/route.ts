@@ -50,7 +50,7 @@ const onTemplate = [
   validateRequest({ params: TemplateIdParamsSchema }),
   workspaceFromResource({ kind: 'template', idFrom: 'paramsId' }),
 ];
-const canRead = requireFormPermissions([Permissions.document_template_read]);
+const canRead = requireFormPermissions([Permissions.form_read, Permissions.document_template_read]);
 const canWrite = requireFormPermissions([Permissions.document_template_create]);
 const canDelete = requireFormPermissions([Permissions.document_template_delete]);
 

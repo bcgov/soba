@@ -136,20 +136,21 @@ subjects, so they cannot sign in. They exist to fill member lists, groups, and r
 
 ## Access coverage set
 
-Every seed also builds a fixed set of named cases for submit-mode access, the same whatever
-`--size` or `--skip-anonymous` says. Its names start `[dev] Zz `, so it sorts after the anchors and
-the bulk in English and French, and it is created first, so it trails `id:desc` lists too.
+Every seed also builds a fixed set of named cases for submit, design and workspace access, the same
+whatever `--size` or `--skip-anonymous` says. Its names start `[dev] Zz `, so it sorts after the
+anchors and the bulk in English and French, and it is created first, so it trails `id:desc` lists
+too.
 
-Personas are the owner, the public user as an anonymous caller, and eleven generated users:
-`admin`, who owns the three workspaces, plus `submitter`, `designer`, `reviewer`,
-`overrideRemoved`, `overrideAdded`, `inactiveMember`, `inactiveGroupMember`, `outsider`,
-`bceidOutsider` (`bceidbusiness`), and `collaborator`.
+Personas are the owner, the public user as an anonymous caller, and twelve generated users:
+`admin`, who owns the three workspaces, plus `submitter`, `designer`, `reviewer`, `viewer` (a
+`viewer` member in an approvers group), `overrideRemoved`, `overrideAdded`, `inactiveMember`,
+`inactiveGroupMember`, `outsider`, `bceidOutsider` (`bceidbusiness`), and `collaborator`.
 
-| Workspace                    | Audience, drafts           | Forms                                                                                                |
-| ---------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `[dev] Zz Coverage Roles`    | members only, on           | inherits; override; cleared override; never published; form deleted; version deleted; own drafts off |
-| `[dev] Zz Coverage Audience` | protected `azureidir`, off | inherits; own public; own protected `bceidbusiness`; own members only                                |
-| `[dev] Zz Coverage Public`   | public, on                 | inherits; own protected `azureidir`                                                                  |
+| Workspace                    | Audience, drafts           | Forms                                                                                                                    |
+| ---------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `[dev] Zz Coverage Roles`    | members only, on           | inherits; override; cleared override; designers override; never published; form deleted; version deleted; own drafts off |
+| `[dev] Zz Coverage Audience` | protected `azureidir`, off | inherits; own public; own protected `bceidbusiness`; own members only                                                    |
+| `[dev] Zz Coverage Public`   | public, on                 | inherits; own protected `azureidir`                                                                                      |
 
 Nine submissions cover owner and collaborator grants, an inactive grant, the opened, draft and
 submitted states, a deleted submission, anonymous submissions, and submissions on a deleted form
@@ -161,11 +162,18 @@ Audience, and has a draft in Public without a membership.
 
 [`access/expectations.ts`](./access/expectations.ts) records who each check admits, case by case.
 `pnpm db:dev-data:verify` runs every persona against every case through the list queries and access
-rules the submit routes use, and exits 1 on any difference:
+rules the submit and design routes and the workspace members and groups reads use, and exits 1 on
+any difference:
 
 - forms: listed in My Forms, start, draft, and the access check for `document_template_read` and
   `submission_update`
+- design: listed in the designer, and the form's own check for `form_read`, `design_update`,
+  `submission_read`, and `form_read` with `document_template_read` for the staff templates
+- workspaces: reading the workspace's members and groups
 - submissions: listed in My Submissions, and the read, write and delete rules
+
+It also checks that the designer's forms, form versions and submissions lists each hold exactly the
+forms whose own check allows them.
 
 Write is the rule save and submit share; the request itself can still refuse the write or keep it
 as pending. The command only reads, and needs no running backend. Change the table with any access

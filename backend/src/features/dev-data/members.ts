@@ -8,7 +8,6 @@ import {
   type WorkspaceMembershipRoleCode,
   type WorkspaceMembershipStatusCode,
 } from '../../core/db/codes';
-import { invalidateMembershipCache } from '../../core/db/repos/membershipRepo';
 import type { ResolvedUser } from './resolveUser';
 
 /** Written directly: the members API is read-only and the owner bootstrap is private. */
@@ -34,7 +33,5 @@ export async function addMember(args: {
     createdBy: args.invitedBy.displayLabel,
     updatedBy: args.invitedBy.displayLabel,
   });
-  // The cache is process-local, so a long-lived API process would otherwise miss this row.
-  invalidateMembershipCache(args.workspaceId, args.user.id);
   return membershipId;
 }

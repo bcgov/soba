@@ -18,6 +18,7 @@ import { mismatchesOf, type CaseResult } from './expectations';
 import {
   COVERAGE_FORM_KEYS,
   COVERAGE_SUBMISSION_KEYS,
+  COVERAGE_WORKSPACE_KEYS,
   PERSONA_KEYS,
   type CoverageFormKey,
   type CoverageSubmissionKey,
@@ -133,27 +134,53 @@ function printGrid<TCase extends string, TCheck extends string>(args: {
   }
 }
 
+/** A grid's case labels, one per key. */
+const labelsOf = <TCase extends string>(
+  keys: readonly TCase[],
+  label: (key: TCase) => string,
+): Record<TCase, string> =>
+  Object.fromEntries(keys.map((key) => [key, label(key)])) as Record<TCase, string>;
+
 async function verify(): Promise<void> {
   const manifest = await loadCoverageManifest();
   const report = await checkCoverage(manifest);
+  const formLabels = labelsOf(COVERAGE_FORM_KEYS, (key) => manifest.forms[key].name);
 
   printGrid({
     title: 'Forms',
     letters: { listed: 'L', start: 'S', draft: 'D', templates: 'T', update: 'U' },
     caseKeys: COVERAGE_FORM_KEYS,
-    caseLabels: Object.fromEntries(
-      COVERAGE_FORM_KEYS.map((key) => [key, manifest.forms[key].name]),
-    ) as Record<CoverageFormKey, string>,
+    caseLabels: formLabels,
     personas: report.personas,
     results: report.forms,
+  });
+  printGrid({
+    title: 'Design',
+    letters: {
+      designListed: 'L',
+      designRead: 'R',
+      designUpdate: 'U',
+      submissionsRead: 'S',
+      staffTemplates: 'T',
+    },
+    caseKeys: COVERAGE_FORM_KEYS,
+    caseLabels: formLabels,
+    personas: report.personas,
+    results: report.design,
+  });
+  printGrid({
+    title: 'Workspaces',
+    letters: { peopleRead: 'P' },
+    caseKeys: COVERAGE_WORKSPACE_KEYS,
+    caseLabels: labelsOf(COVERAGE_WORKSPACE_KEYS, (key) => manifest.workspaces[key].name),
+    personas: report.personas,
+    results: report.workspaces,
   });
   printGrid({
     title: 'Submissions',
     letters: { mine: 'M', read: 'R', write: 'W', delete: 'X' },
     caseKeys: COVERAGE_SUBMISSION_KEYS,
-    caseLabels: Object.fromEntries(
-      COVERAGE_SUBMISSION_KEYS.map((key) => [key, manifest.submissions[key].submissionId]),
-    ) as Record<CoverageSubmissionKey, string>,
+    caseLabels: labelsOf(COVERAGE_SUBMISSION_KEYS, (key) => manifest.submissions[key].submissionId),
     personas: report.personas,
     results: report.submissions,
   });
@@ -163,6 +190,8 @@ async function verify(): Promise<void> {
 
   const failures =
     mismatchesOf(report.forms).length +
+    mismatchesOf(report.design).length +
+    mismatchesOf(report.workspaces).length +
     mismatchesOf(report.submissions).length +
     report.inconsistencies.length;
   if (failures > 0) {

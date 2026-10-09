@@ -1,5 +1,6 @@
 import { SubmissionService, type SubmissionWriteOutcome } from '../../services/submissionService';
 import { SubmissionWorkflowState } from '../../db/codes';
+import type { FormAccessGrant } from '../../db/repos/formAccessRepo';
 import type {
   ParticipantSubmissionListRow,
   SubmissionRecord,
@@ -23,10 +24,11 @@ export interface SubmissionsContextInput {
   actorDisplayLabel: string | null;
 }
 
-/** Scope for list/search: single workspace resolved from a scope anchor. */
+/** Scope for list/search: the workspaces searched and the access grant rows must pass. */
 export interface SubmissionsListScopeInput {
   workspaceIds: string[];
   actorId: string;
+  formAccess: FormAccessGrant;
 }
 
 export interface ListSubmissionsQueryInput {
@@ -124,6 +126,7 @@ export function createSubmissionsApiService(submissionService: SubmissionService
       const result = await submissionService.list({
         workspaceIds: scope.workspaceIds,
         actorId: scope.actorId,
+        formAccess: scope.formAccess,
         offset: query.offset,
         limit: query.limit,
         formId: query.formId,

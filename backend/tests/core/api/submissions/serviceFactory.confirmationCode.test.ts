@@ -1,6 +1,12 @@
 import { createSubmissionsApiService } from '../../../../src/core/api/submissions/serviceFactory';
 import type { SubmissionService } from '../../../../src/core/services/submissionService';
 
+const SCOPE = {
+  workspaceIds: ['ws1'],
+  actorId: 'u1',
+  formAccess: { workspaceIds: ['ws1'], overriddenFormIds: [], includedFormIds: [] },
+};
+
 const row = (workflowState: string) => ({
   id: 's1',
   formId: 'f1',
@@ -37,14 +43,14 @@ describe('confirmation code in submission responses', () => {
   it.each(['opened', 'draft'])('is null while the submission is %s', async (state) => {
     const api = serviceWith(state);
     expect((await api.get(ctx, 's1'))?.confirmationCode).toBeNull();
-    const list = await api.list({ workspaceIds: ['ws1'], actorId: 'u1' }, listQuery);
+    const list = await api.list(SCOPE, listQuery);
     expect(list.items[0].confirmationCode).toBeNull();
   });
 
   it('is returned once the submission is submitted', async () => {
     const api = serviceWith('submitted');
     expect((await api.get(ctx, 's1'))?.confirmationCode).toBe('K7M2Q9XA');
-    const list = await api.list({ workspaceIds: ['ws1'], actorId: 'u1' }, listQuery);
+    const list = await api.list(SCOPE, listQuery);
     expect(list.items[0].confirmationCode).toBe('K7M2Q9XA');
   });
 });

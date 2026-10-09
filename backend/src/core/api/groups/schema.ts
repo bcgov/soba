@@ -115,7 +115,7 @@ export const registerGroupsOpenApi = (registry: OpenAPIRegistry) => {
     request: { query: SortLocaleQuerySchema, params: WorkspaceGroupParamsSchema },
     responses: {
       200: jsonResponse('Workspace groups with roles and members', ListGroupsResponseSchema),
-      403: { description: 'Actor is not a member of the workspace' },
+      403: { description: 'Actor is not a member of the workspace, or is a viewer' },
       404: { description: ERR_WORKSPACE_NOT_FOUND },
     },
   });

@@ -13,8 +13,6 @@ import {
   rolePermissions,
   workspaces,
 } from '../schema';
-import { getCacheAdapter } from '../../integrations/plugins/PluginRegistry';
-import { membershipKey } from '../../integrations/cache/cacheKeys';
 import { profileHelpers } from '../../auth/jwtClaims';
 import { ForbiddenError } from '../../errors';
 import type { NormalizedProfile, IdpAttributes } from '../../auth/jwtClaims';
@@ -24,6 +22,7 @@ import {
   WorkspaceGroupMembershipStatus,
   WorkspaceGroupRoleStatus,
   WorkspaceMembershipRole,
+  WorkspaceMembershipStatus,
 } from '../codes';
 import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
@@ -162,8 +161,12 @@ export const getWorkspaceForUser = async (workspaceId: string, userId: string) =
 };
 
 /** Owner or admin membership roles may manage or mutate workspace settings. */
-export const isWorkspaceManageRole = (role: string): boolean =>
+export const isWorkspaceManageRole = (role: string | null): boolean =>
   role === WorkspaceMembershipRole.owner || role === WorkspaceMembershipRole.admin;
+
+/** Owner, admin and member roles may read the workspace's members and groups; a viewer may not. */
+export const isWorkspacePeopleReadRole = (role: string | null): boolean =>
+  isWorkspaceManageRole(role) || role === WorkspaceMembershipRole.member;
 
 /**
  * All workspace ids the user is an active member of. Used to scope cross-workspace list/search
@@ -178,18 +181,34 @@ export const getActiveWorkspaceIdsForUser = async (userId: string): Promise<stri
   return rows.map((row) => row.workspaceId);
 };
 
+/** A user's display label and their active membership role in one workspace, null for none. */
+export interface ActorMembership {
+  displayLabel: string | null;
+  role: string | null;
+}
+
 /**
- * Invalidate cached membership for a workspace/user after insert/update/delete.
- * Call from code that mutates workspace memberships (e.g. workspaceRepo, seed).
- * The cached row includes `role`, which gates management — a role change that skips this
- * leaves a demoted admin with authority until the cache TTL expires.
+ * The user's display label and their active membership role in the workspace, read together.
+ * Returns null when the user row is gone.
  */
-export const invalidateMembershipCache = (workspaceId: string, userId: string): void => {
-  try {
-    getCacheAdapter().delete(membershipKey(workspaceId, userId));
-  } catch {
-    // Cache adapter may not be available (e.g. during seed before full app init).
-  }
+export const findActorMembership = async (
+  workspaceId: string,
+  userId: string,
+): Promise<ActorMembership | null> => {
+  const rows = await db
+    .select({ displayLabel: appUsers.displayLabel, role: workspaceMemberships.role })
+    .from(appUsers)
+    .leftJoin(
+      workspaceMemberships,
+      and(
+        eq(workspaceMemberships.userId, appUsers.id),
+        eq(workspaceMemberships.workspaceId, workspaceId),
+        eq(workspaceMemberships.status, WorkspaceMembershipStatus.active),
+      ),
+    )
+    .where(eq(appUsers.id, userId))
+    .limit(1);
+  return rows[0] ?? null;
 };
 
 export type WorkspaceListSortField = (typeof WORKSPACE_SORT_FIELDS)[number];
