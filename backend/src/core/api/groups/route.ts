@@ -3,7 +3,10 @@ import { validateRequest } from '../shared/validation';
 import { SortLocaleQuerySchema } from '../shared/offsetPagination';
 import { sortLocale } from '../../middleware/sortLocale';
 import { workspaceFromResource } from '../../middleware/workspaceContext';
-import { requireWorkspaceManage } from '../../middleware/requireWorkspaceManage';
+import {
+  requireWorkspaceManage,
+  requireWorkspacePeopleRead,
+} from '../../middleware/requireWorkspaceManage';
 import {
   listGroups,
   createGroup,
@@ -31,8 +34,8 @@ const GROUP_ROLES_PATH = '/workspaces/:id/groups/:groupId/roles';
 const GROUP_MEMBERS_PATH = '/workspaces/:id/groups/:groupId/members';
 const GROUP_MEMBER_PATH = '/workspaces/:id/groups/:groupId/members/:memberId';
 
-// The workspace is resolved from :id, so every route requires workspace membership. Reads are open
-// to any member; writes also require workspace-management authority.
+// The workspace is resolved from :id, so every route requires workspace membership. Reads also
+// require an owner, admin or member role; writes require workspace-management authority.
 const workspaceResource = workspaceFromResource({ kind: 'workspace', idFrom: 'paramsId' });
 
 router.get(
@@ -40,6 +43,7 @@ router.get(
   validateRequest({ query: SortLocaleQuerySchema, params: WorkspaceGroupParamsSchema }),
   sortLocale,
   workspaceResource,
+  requireWorkspacePeopleRead,
   listGroups,
 );
 router.post(

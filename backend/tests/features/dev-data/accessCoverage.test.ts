@@ -14,6 +14,7 @@ import {
   FORM_EXPECTATIONS,
   mismatchesOf,
   SUBMISSION_EXPECTATIONS,
+  WORKSPACE_EXPECTATIONS,
 } from '../../../src/features/dev-data/access/expectations';
 
 describe('dev data access coverage plan', () => {
@@ -101,11 +102,14 @@ describe('dev data access coverage expectations', () => {
     expect(staffTemplates.filter((persona) => !designRead.includes(persona))).toEqual([]);
   });
 
-  it('gives the anonymous caller no design access', () => {
+  it('gives the anonymous caller no design or workspace access', () => {
     for (const key of COVERAGE_FORM_KEYS) {
       for (const check of DESIGN_CHECKS) {
         expect(DESIGN_EXPECTATIONS[key][check]).not.toContain(ANONYMOUS);
       }
+    }
+    for (const expectation of Object.values(WORKSPACE_EXPECTATIONS)) {
+      expect(expectation.peopleRead).not.toContain(ANONYMOUS);
     }
   });
 

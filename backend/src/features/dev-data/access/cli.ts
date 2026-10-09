@@ -18,9 +18,11 @@ import { mismatchesOf, type CaseResult } from './expectations';
 import {
   COVERAGE_FORM_KEYS,
   COVERAGE_SUBMISSION_KEYS,
+  COVERAGE_WORKSPACE_KEYS,
   PERSONA_KEYS,
   type CoverageFormKey,
   type CoverageSubmissionKey,
+  type CoverageWorkspaceKey,
   type PersonaKey,
 } from './plan';
 
@@ -164,6 +166,16 @@ async function verify(): Promise<void> {
     results: report.design,
   });
   printGrid({
+    title: 'Workspaces',
+    letters: { peopleRead: 'P' },
+    caseKeys: COVERAGE_WORKSPACE_KEYS,
+    caseLabels: Object.fromEntries(
+      COVERAGE_WORKSPACE_KEYS.map((key) => [key, manifest.workspaces[key].name]),
+    ) as Record<CoverageWorkspaceKey, string>,
+    personas: report.personas,
+    results: report.workspaces,
+  });
+  printGrid({
     title: 'Submissions',
     letters: { mine: 'M', read: 'R', write: 'W', delete: 'X' },
     caseKeys: COVERAGE_SUBMISSION_KEYS,
@@ -180,6 +192,7 @@ async function verify(): Promise<void> {
   const failures =
     mismatchesOf(report.forms).length +
     mismatchesOf(report.design).length +
+    mismatchesOf(report.workspaces).length +
     mismatchesOf(report.submissions).length +
     report.inconsistencies.length;
   if (failures > 0) {

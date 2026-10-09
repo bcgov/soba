@@ -6,6 +6,7 @@ import {
   PERSONA_KEYS,
   type CoverageFormKey,
   type CoverageSubmissionKey,
+  type CoverageWorkspaceKey,
   type PersonaKey,
 } from './plan';
 
@@ -36,6 +37,12 @@ export interface DesignExpectation {
   staffTemplates: PersonaKey[];
 }
 
+/** Workspace access, as the core routes answer it. */
+export interface WorkspaceExpectation {
+  /** Lists the workspace's members and groups. */
+  peopleRead: PersonaKey[];
+}
+
 export interface SubmissionExpectation {
   /** In My Submissions. */
   mine: PersonaKey[];
@@ -54,10 +61,12 @@ export const DESIGN_CHECKS = [
   'submissionsRead',
   'staffTemplates',
 ] as const;
+export const WORKSPACE_CHECKS = ['peopleRead'] as const;
 export const SUBMISSION_CHECKS = ['mine', 'read', 'write', 'delete'] as const;
 
 export type FormCheck = (typeof FORM_CHECKS)[number];
 export type DesignCheck = (typeof DESIGN_CHECKS)[number];
+export type WorkspaceCheck = (typeof WORKSPACE_CHECKS)[number];
 export type SubmissionCheck = (typeof SUBMISSION_CHECKS)[number];
 
 /** One persona's answers on one case. */
@@ -228,6 +237,24 @@ export const DESIGN_EXPECTATIONS: Record<CoverageFormKey, DesignExpectation> = {
   membersOwn: everyCheck(['admin', 'owner']),
   publicInherit: everyCheck(['admin']),
   protectedOwn: everyCheck(['admin']),
+};
+
+/** Every active member but a viewer; the public user never signs in to the core routes. */
+export const WORKSPACE_EXPECTATIONS: Record<CoverageWorkspaceKey, WorkspaceExpectation> = {
+  roles: {
+    peopleRead: [
+      'admin',
+      'owner',
+      'submitter',
+      'designer',
+      'reviewer',
+      'overrideRemoved',
+      'overrideAdded',
+      'inactiveGroupMember',
+    ],
+  },
+  audience: { peopleRead: ['admin', 'owner'] },
+  public: { peopleRead: ['admin'] },
 };
 
 const NONE: SubmissionExpectation = { mine: [], read: [], write: [], delete: [] };

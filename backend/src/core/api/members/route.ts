@@ -2,6 +2,7 @@ import express from 'express';
 import { validateRequest } from '../shared/validation';
 import { sortLocale } from '../../middleware/sortLocale';
 import { workspaceFromQuery } from '../../middleware/workspaceContext';
+import { requireWorkspacePeopleRead } from '../../middleware/requireWorkspaceManage';
 import { listMembers } from './controller';
 import { ListMembersQuerySchema } from './schema';
 
@@ -12,6 +13,7 @@ router.get(
   validateRequest({ query: ListMembersQuerySchema }),
   sortLocale,
   workspaceFromQuery,
+  requireWorkspacePeopleRead,
   listMembers,
 );
 

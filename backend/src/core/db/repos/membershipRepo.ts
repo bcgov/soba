@@ -165,6 +165,10 @@ export const getWorkspaceForUser = async (workspaceId: string, userId: string) =
 export const isWorkspaceManageRole = (role: string): boolean =>
   role === WorkspaceMembershipRole.owner || role === WorkspaceMembershipRole.admin;
 
+/** Owner, admin and member roles may read the workspace's members and groups; a viewer may not. */
+export const isWorkspacePeopleReadRole = (role: string): boolean =>
+  isWorkspaceManageRole(role) || role === WorkspaceMembershipRole.member;
+
 /**
  * All workspace ids the user is an active member of. Used to scope cross-workspace list/search
  * queries when no specific `workspaceId` filter is supplied.

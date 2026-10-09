@@ -21,7 +21,11 @@ import { db } from '../../../core/db/client';
 import { submissionParticipants } from '../../../core/db/schema';
 import { resolveFormPermissions } from '../../../core/db/repos/formAccessRepo';
 import { getWorkspaceIdForForm, listFormsForWorkspace } from '../../../core/db/repos/formRepo';
-import { getActiveWorkspaceIdsForUser } from '../../../core/db/repos/membershipRepo';
+import {
+  getActiveWorkspaceIdsForUser,
+  getWorkspaceForUser,
+  isWorkspacePeopleReadRole,
+} from '../../../core/db/repos/membershipRepo';
 import {
   hasFormSubmitAccess,
   type CallerIdentity,
@@ -51,10 +55,13 @@ import {
   FORM_EXPECTATIONS,
   SUBMISSION_CHECKS,
   SUBMISSION_EXPECTATIONS,
+  WORKSPACE_CHECKS,
+  WORKSPACE_EXPECTATIONS,
   type CaseResult,
   type DesignCheck,
   type FormCheck,
   type SubmissionCheck,
+  type WorkspaceCheck,
 } from './expectations';
 import type { CoverageFormRef, CoverageManifest, CoverageSubmissionRef } from './generate';
 import {
@@ -77,6 +84,7 @@ export interface CoverageReport {
   skipped: string[];
   forms: CaseResult<CoverageFormKey, FormCheck>[];
   design: CaseResult<CoverageFormKey, DesignCheck>[];
+  workspaces: CaseResult<CoverageWorkspaceKey, WorkspaceCheck>[];
   submissions: CaseResult<CoverageSubmissionKey, SubmissionCheck>[];
   /** Disagreements between two code paths that should give the same answer. */
   inconsistencies: string[];
@@ -406,6 +414,31 @@ async function checkDesign(
   );
 }
 
+/** Membership in the workspace, then the role check the members and groups reads use. */
+async function workspaceAnswers(
+  caller: Caller,
+  workspaceId: string,
+): Promise<Record<WorkspaceCheck, boolean>> {
+  const actorId = caller.identity.actorId;
+  if (!caller.signedIn || !actorId) return { peopleRead: false };
+  const membership = await getWorkspaceForUser(workspaceId, actorId);
+  return { peopleRead: !!membership && isWorkspacePeopleReadRole(membership.role) };
+}
+
+async function checkWorkspaces(
+  manifest: CoverageManifest,
+  caller: Caller,
+): Promise<CaseResult<CoverageWorkspaceKey, WorkspaceCheck>[]> {
+  return Promise.all(
+    COVERAGE_WORKSPACE_KEYS.map(async (key) => ({
+      persona: caller.persona,
+      caseKey: key,
+      actual: await workspaceAnswers(caller, manifest.workspaces[key].id),
+      expected: expectedOf(WORKSPACE_CHECKS, WORKSPACE_EXPECTATIONS[key], caller.persona),
+    })),
+  );
+}
+
 async function checkSubmissions(
   manifest: CoverageManifest,
   caller: Caller,
@@ -433,12 +466,13 @@ export async function checkCoverage(manifest: CoverageManifest): Promise<Coverag
   const personas = PERSONA_KEYS.filter((persona) => persona !== OWNER || !skipsOwner(manifest));
   const checked = await inSequence(personas, async (persona) => {
     const caller = callerOf(manifest, persona);
-    const [forms, design, submissions] = await Promise.all([
+    const [forms, design, workspaces, submissions] = await Promise.all([
       checkForms(manifest, caller),
       checkDesign(manifest, caller),
+      checkWorkspaces(manifest, caller),
       checkSubmissions(manifest, caller),
     ]);
-    return { forms, design, submissions };
+    return { forms, design, workspaces, submissions };
   });
   return {
     personas,
@@ -447,6 +481,7 @@ export async function checkCoverage(manifest: CoverageManifest): Promise<Coverag
       : [],
     forms: checked.flatMap((c) => c.forms.results),
     design: checked.flatMap((c) => c.design),
+    workspaces: checked.flatMap((c) => c.workspaces),
     submissions: checked.flatMap((c) => c.submissions),
     inconsistencies: checked.flatMap((c) => c.forms.issues),
   };
