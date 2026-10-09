@@ -17,6 +17,7 @@ import {
   useSubmissionDeleter,
 } from '@/src/features/designer/data/useFormSubmissions';
 import { FORM_SUBMISSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
+import { submissionDeleteMessage } from '@/src/features/submissions/submissionDeleteMessage';
 import { useListQuery } from '@/src/shared/list/useListQuery';
 import { useDataTable } from '@/src/shared/list/useDataTable';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
@@ -69,14 +70,6 @@ export default function FormSubmissionTab({
       setPendingDelete(null);
     }
   }, [token, pendingDelete, submissionDeleter, addNotification, dict]);
-
-  // Names the submission by its confirmation code, or by when it was last changed until it has one.
-  const deleteMessageFor = (sub: SubmissionListItem): string => {
-    const message = sub.confirmationCode
-      ? dict.submission.deleteMessage.replace('{confirmation}', sub.confirmationCode)
-      : dict.submission.deleteDraftMessage.replace('{updated}', formatLongDate(sub.updatedAt));
-    return message.replace('{submitter}', sub.createdBy || dict.submission.anon);
-  };
 
   const columns: Column<SubmissionListItem>[] = useMemo(
     () => [
@@ -160,7 +153,11 @@ export default function FormSubmissionTab({
       <ConfirmModal
         show={pendingDelete !== null}
         title={dict.submission.deleteTitle}
-        message={pendingDelete ? deleteMessageFor(pendingDelete) : ''}
+        message={
+          pendingDelete
+            ? submissionDeleteMessage(dict.submission, pendingDelete, formatLongDate)
+            : ''
+        }
         confirmLabel={dict.submission.delete}
         onConfirm={() => void confirmDelete()}
         onCancel={() => setPendingDelete(null)}

@@ -3,7 +3,11 @@ import { coreErrorHandler, notFoundHandler } from '../middleware/errorHandler';
 import { registerAdminOpenApi } from './admin';
 import { registerHealthOpenApi } from './health';
 import { designFormsRouter, registerFormsOpenApi } from './forms';
-import { designSubmissionsRouter, registerSubmissionsOpenApi } from './submissions';
+import {
+  designSubmissionsRouter,
+  registerSubmissionsOpenApi,
+  registerSubmissionReviewOpenApi,
+} from './submissions';
 import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
 import { groupsDomain } from './groups';
 import { filesDomain } from '../../features/files';
@@ -29,6 +33,7 @@ registerOpenApiPaths((registry) => {
   registerFormsOpenApi(registry);
   registerFormSettingsOpenApi(registry);
   registerSubmissionsOpenApi(registry);
+  registerSubmissionReviewOpenApi(registry);
   registerSubmitOpenApi(registry);
   groupsDomain.registerOpenApi(registry);
   meDomain.registerOpenApi(registry);
