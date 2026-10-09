@@ -18,7 +18,7 @@ export type SendEmail = z.infer<typeof SendEmailSchema>;
 export const NotifyResponseSchema = z.object({
   notifyId: z.uuid(),
   status: z.enum(['accepted', 'pending', 'sending', 'completed', 'failed', 'cancelled']),
-  channel: z.literal('email'),
+  channels: z.array(z.literal('email')).min(1),
   createdAt: z.iso.datetime({ offset: true }),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });

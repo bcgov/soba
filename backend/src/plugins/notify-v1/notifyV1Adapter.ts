@@ -2,6 +2,7 @@ import type { PluginConfigReader } from '../../core/config/pluginConfig';
 import type { NotificationAdapter } from '../../core/integrations/notification/NotificationAdapter';
 import { HttpClient, HttpClientError, HttpClientTimeoutError } from '../../core/http/httpClient';
 import { ServiceUnavailableError } from '../../core/errors';
+import { log } from '../../core/logging';
 import {
   NotifyResponseSchema,
   type NotifyResponse,
@@ -51,12 +52,14 @@ export class NotifyV1Adapter implements NotificationAdapter {
   private readonly endpoint: string;
   private readonly apiKey: string;
   private readonly timeoutMs?: number;
+  private readonly debugResponses: boolean;
 
   constructor(config: PluginConfigReader) {
     // ENDPOINT includes /api/v1.
     this.endpoint = config.getRequired('ENDPOINT');
     this.apiKey = config.getRequired('API_KEY');
     this.timeoutMs = config.getOptionalNumber('TIMEOUT_MS');
+    this.debugResponses = config.getOptional('DEBUG_RESPONSES') === 'true';
   }
 
   private client(): HttpClient {
@@ -72,10 +75,23 @@ export class NotifyV1Adapter implements NotificationAdapter {
       const response = await this.client().postJsonForBinary('notifysimple/email', email);
       const body: unknown = JSON.parse(response.data.toString('utf8'));
       const parsed = NotifyResponseSchema.safeParse(body);
-      if (!parsed.success)
+      if (!parsed.success) {
+        if (this.debugResponses) {
+          log.error(
+            { upstreamBody: body, validationIssues: parsed.error.issues },
+            'Notify unexpected response (debug)',
+          );
+        }
         throw new ServiceUnavailableError('Notify returned an unexpected response');
+      }
       return parsed.data;
     } catch (err) {
+      if (this.debugResponses && err instanceof HttpClientError) {
+        log.error(
+          { upstreamStatus: err.status, upstreamStatusText: err.statusText, upstreamBody: err.body },
+          'Notify upstream error response (debug)',
+        );
+      }
       // Upstream bodies can contain recipient addresses or credentials; keep them private.
       throw new ServiceUnavailableError(failureMessage(err));
     }

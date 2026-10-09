@@ -11,7 +11,7 @@ const email = SendEmailSchema.parse({
 const result = {
   notifyId: 'b4fe3ccc-b989-4a36-82f5-b512f5eb156a',
   status: 'accepted',
-  channel: 'email',
+  channels: ['email'],
   createdAt: '2026-10-05T12:00:00Z',
 };
 const makeAdapter = () =>
