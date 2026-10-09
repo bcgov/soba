@@ -32,6 +32,8 @@ export interface DesignExpectation {
   designUpdate: PersonaKey[];
   /** submission_read on the form: its submissions in the designer. */
   submissionsRead: PersonaKey[];
+  /** form_read and document_template_read on the form: the staff template list and downloads. */
+  staffTemplates: PersonaKey[];
 }
 
 export interface SubmissionExpectation {
@@ -50,6 +52,7 @@ export const DESIGN_CHECKS = [
   'designRead',
   'designUpdate',
   'submissionsRead',
+  'staffTemplates',
 ] as const;
 export const SUBMISSION_CHECKS = ['mine', 'read', 'write', 'delete'] as const;
 
@@ -183,14 +186,15 @@ export const FORM_EXPECTATIONS: Record<CoverageFormKey, FormExpectation> = {
   },
 };
 
-/** form_read in the roles workspace without an override: the staff groups and form submitters. */
-const ROLES_READERS: PersonaKey[] = ['admin', 'designer', 'reviewer', 'viewer', ...ROLE_SUBMITTERS];
+/** form_read in the roles workspace without an override: the staff groups. */
+const ROLES_READERS: PersonaKey[] = ['admin', 'designer', 'reviewer', 'viewer'];
 
 const rolesDesign = (changes: Partial<DesignExpectation> = {}): DesignExpectation => ({
   designListed: ROLES_READERS,
   designRead: ROLES_READERS,
   designUpdate: ['admin', 'designer'],
   submissionsRead: ['admin', 'reviewer', 'viewer'],
+  staffTemplates: ['admin'],
   ...changes,
 });
 
@@ -199,32 +203,15 @@ const everyCheck = (personas: PersonaKey[]): DesignExpectation => ({
   designRead: personas,
   designUpdate: personas,
   submissionsRead: personas,
+  staffTemplates: personas,
 });
 
-const ROLES_OVERRIDE_READERS: PersonaKey[] = [
-  'admin',
-  'designer',
-  'reviewer',
-  'viewer',
-  'submitter',
-  'overrideAdded',
-];
-
-const DESIGNERS_OVERRIDE_READERS: PersonaKey[] = [
-  'admin',
-  'reviewer',
-  'viewer',
-  ...ROLE_SUBMITTERS,
-  'overrideAdded',
-];
+const DESIGNERS_OVERRIDE_READERS: PersonaKey[] = ['admin', 'reviewer', 'viewer', 'overrideAdded'];
 
 /** Only the list leaves out a deleted form; the checks read roles. */
 export const DESIGN_EXPECTATIONS: Record<CoverageFormKey, DesignExpectation> = {
   rolesInherit: rolesDesign(),
-  rolesOverride: rolesDesign({
-    designListed: ROLES_OVERRIDE_READERS,
-    designRead: ROLES_OVERRIDE_READERS,
-  }),
+  rolesOverride: rolesDesign(),
   rolesOverrideCleared: rolesDesign(),
   rolesDesignersOverride: rolesDesign({
     designListed: DESIGNERS_OVERRIDE_READERS,

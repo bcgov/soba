@@ -57,10 +57,10 @@ describe('audienceAdmits', () => {
 });
 
 describe('isAudiencePermission', () => {
-  it('is the four codes an audience can convey, and nothing staff-only', () => {
+  it('is the three codes an audience can convey, and nothing staff-only', () => {
     const conveyed = Object.values(Permissions).filter((code) => isAudiencePermission(code));
     expect(conveyed.sort()).toEqual(
-      ['document_template_read', 'form_read', 'submission_create', 'submission_read'].sort(),
+      ['document_template_read', 'submission_create', 'submission_read'].sort(),
     );
   });
 });

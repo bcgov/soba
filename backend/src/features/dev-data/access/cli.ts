@@ -149,7 +149,13 @@ async function verify(): Promise<void> {
   });
   printGrid({
     title: 'Design',
-    letters: { designListed: 'L', designRead: 'R', designUpdate: 'U', submissionsRead: 'S' },
+    letters: {
+      designListed: 'L',
+      designRead: 'R',
+      designUpdate: 'U',
+      submissionsRead: 'S',
+      staffTemplates: 'T',
+    },
     caseKeys: COVERAGE_FORM_KEYS,
     caseLabels: Object.fromEntries(
       COVERAGE_FORM_KEYS.map((key) => [key, manifest.forms[key].name]),

@@ -369,6 +369,7 @@ const NO_DESIGN_ACCESS: Record<DesignCheck, boolean> = {
   designRead: false,
   designUpdate: false,
   submissionsRead: false,
+  staffTemplates: false,
 };
 
 /** The design routes need a signed-in caller, so the public user never reaches them. */
@@ -380,12 +381,13 @@ async function designAnswers(
   const actorId = caller.identity.actorId;
   if (!caller.signedIn || !actorId) return NO_DESIGN_ACCESS;
   const permissions = await resolveFormPermissions(actorId, form.workspaceId, form.formId);
-  const grants = (code: PermissionCode) => hasAllPermissions(permissions, [code]);
+  const grants = (...codes: PermissionCode[]) => hasAllPermissions(permissions, codes);
   return {
     designListed: listed.has(form.formId),
     designRead: grants(Permissions.form_read),
     designUpdate: grants(Permissions.design_update),
     submissionsRead: grants(Permissions.submission_read),
+    staffTemplates: grants(Permissions.form_read, Permissions.document_template_read),
   };
 }
 

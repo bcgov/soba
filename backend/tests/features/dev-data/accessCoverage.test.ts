@@ -96,6 +96,11 @@ describe('dev data access coverage expectations', () => {
     expect(designListed.filter((persona) => !designRead.includes(persona))).toEqual([]);
   });
 
+  it.each(COVERAGE_FORM_KEYS)('%s: only a reader of the form reads its staff templates', (key) => {
+    const { staffTemplates, designRead } = DESIGN_EXPECTATIONS[key];
+    expect(staffTemplates.filter((persona) => !designRead.includes(persona))).toEqual([]);
+  });
+
   it('gives the anonymous caller no design access', () => {
     for (const key of COVERAGE_FORM_KEYS) {
       for (const check of DESIGN_CHECKS) {

@@ -9,7 +9,6 @@ import {
 
 // What a form's audience conveys to people outside the workspace; anything else stays staff-only.
 const AUDIENCE_PERMISSIONS: ReadonlySet<string> = new Set<PermissionCode>([
-  Permissions.form_read,
   Permissions.submission_create,
   Permissions.submission_read,
   Permissions.document_template_read,

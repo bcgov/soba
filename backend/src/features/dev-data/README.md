@@ -165,8 +165,8 @@ rules the submit and design routes use, and exits 1 on any difference:
 
 - forms: listed in My Forms, start, draft, and the access check for `document_template_read` and
   `submission_update`
-- design: listed in the designer, and the form's own check for `form_read`, `design_update` and
-  `submission_read`
+- design: listed in the designer, and the form's own check for `form_read`, `design_update`,
+  `submission_read`, and `form_read` with `document_template_read` for the staff templates
 - submissions: listed in My Submissions, and the read, write and delete rules
 
 It also checks that the designer's list holds exactly the forms whose own check allows them.
