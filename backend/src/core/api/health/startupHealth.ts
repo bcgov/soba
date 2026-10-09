@@ -27,6 +27,7 @@ import {
 } from '../../integrations/eventstream/eventStreamSelfTest';
 import { checkDocumentGenerationReadiness } from '../../integrations/document-generation/DocumentGenerationRegistry';
 import { checkTenantEngineReadiness } from '../../integrations/tenant/TenantEngineRegistry';
+import { checkWorkflowEngineReadiness } from '../../integrations/workflow/WorkflowEngineRegistry';
 
 /** Run a check; swallow sync throws and rejections. */
 async function probe(check: () => Promise<boolean>): Promise<boolean> {
@@ -256,5 +257,29 @@ export async function logTenantEngineReadiness(): Promise<void> {
     );
   } else {
     log.info({ tenantEngines: results }, 'Tenant engine readiness: all engines ready');
+  }
+}
+
+/** Log per-engine workflow engine readiness (reachability / config) at startup. Never throws. */
+export async function logWorkflowEngineReadiness(): Promise<void> {
+  let results: Record<string, { ok: boolean; message?: string }>;
+  try {
+    results = await checkWorkflowEngineReadiness();
+  } catch (err) {
+    log.warn({ err }, 'Workflow engine readiness could not run');
+    return;
+  }
+
+  const notReady = Object.entries(results)
+    .filter(([, r]) => !r.ok)
+    .map(([code]) => code);
+
+  if (notReady.length > 0) {
+    log.warn(
+      { workflowEngines: results },
+      `Workflow engine readiness: not ready: ${notReady.join(', ')}`,
+    );
+  } else {
+    log.info({ workflowEngines: results }, 'Workflow engine readiness: all engines ready');
   }
 }
