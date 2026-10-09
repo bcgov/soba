@@ -57,11 +57,9 @@ describe('audienceAdmits', () => {
 });
 
 describe('isAudiencePermission', () => {
-  it('is the three codes an audience can convey, and nothing staff-only', () => {
+  it('is the two codes an audience can convey, and nothing staff-only', () => {
     const conveyed = Object.values(Permissions).filter((code) => isAudiencePermission(code));
-    expect(conveyed.sort()).toEqual(
-      ['document_template_read', 'submission_create', 'submission_read'].sort(),
-    );
+    expect(conveyed.sort()).toEqual(['document_template_read', 'submission_create'].sort());
   });
 });
 
@@ -94,6 +92,14 @@ describe('formAccessAllows', () => {
     const everyone = form({ audienceMode: 'public' });
     expect(formAccessAllows(everyone, idir, 'submission_update')).toBe(false);
     expect(formAccessAllows(everyone, idir, 'form_update')).toBe(false);
+    expect(formAccessAllows(everyone, idir, 'form_read')).toBe(false);
+    expect(formAccessAllows(everyone, idir, 'submission_read')).toBe(false);
+  });
+
+  it('still allows the staff read codes by role', () => {
+    const reviewer = form({ permissions: ['form_read', 'submission_read'] });
+    expect(formAccessAllows(reviewer, idir, 'form_read')).toBe(true);
+    expect(formAccessAllows(reviewer, idir, 'submission_read')).toBe(true);
   });
 });
 
