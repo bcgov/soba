@@ -140,7 +140,7 @@ jobs:
           oc_server: ${{ vars.OC_SERVER }}
           oc_namespace: ${{ secrets.OC_NAMESPACE }}
           oc_token: ${{ secrets.OC_TOKEN }}
-          values_file: deployments/helm/action-crunchy/values.yml
+          values_file: ${{ matrix.cluster == 'gold' && 'deployments/helm/action-crunchy/values-pr-gold.yaml' || 'deployments/helm/action-crunchy/values.yml' }}
           release_name: pg-soba
           ref: v2.0.0
 
@@ -211,7 +211,7 @@ jobs:
             --namespace "${NAMESPACE}" \
             --wait \
             --timeout 660s \
-            -f deployments/helm/action-mongodb/values-pr.yaml \
+            -f ${{ matrix.cluster == 'gold' && 'deployments/helm/action-mongodb/values-pr-gold.yaml' || 'deployments/helm/action-mongodb/values-pr.yaml' }} \
             -f /tmp/mongodb-values-override.yaml
 
   deploy:
@@ -266,6 +266,7 @@ jobs:
           temporal_namespace: soba-pr-${{ needs.set-vars.outputs.PR_NUM }}
           retention: "3d"
           chart_version: ${{ vars.TEMPORAL_CHART_VERSION || '0.74.0' }}
+          values_file: ${{ matrix.cluster == 'gold' && 'deployments/helm/temporal/values-pr-gold.yaml' || 'deployments/helm/temporal/values.yaml' }}
 
       - name: Get DB config from Crunchy secret
         id: db
@@ -382,7 +383,7 @@ jobs:
             --wait \
             --wait-for-jobs \
             --timeout 660s \
-            -f deployments/helm/soba/values-pr.yaml \
+            -f ${{ matrix.cluster == 'gold' && 'deployments/helm/soba/values-pr-gold.yaml' || 'deployments/helm/soba/values-pr.yaml' }} \
             -f /tmp/values-override.yaml \
             --set-string "vault.authPath=${VAULT_AUTH_PATH:?Set VAULT_AUTH_PATH}" \
             --set-string "vault.namespace=${VAULT_NAMESPACE:?Set VAULT_NAMESPACE}" \

@@ -1,0 +1,142 @@
+# Gold dev PR smoke test; one active PR with shared Valkey and ClamAV.
+backend:
+  # Development data generator: on for PR review environments.
+  features:
+    dev-data: "enabled"
+  replicas: 1
+  config:
+    documentGenerationDefaultCode: cdogs-v2
+    tenantEngineDefaultCode: cstar-v1
+    # Ephemeral PR namespaces stage temp bytes under os.tmpdir() - no RWX PVC.
+    tempStorageDefaultCode: tempstorage-os
+    # Virus scan inherits virusscan-clamav from values.yaml: PRs deploy into the dev
+    # namespace, so the <release>-clamav alias resolves to the shared dev clamav
+    # (same namespace - no externalName override, no cross-namespace NSP needed).
+    # Same for the cache, message bus and event stream: PRs share the dev-namespace Valkey via the
+    # <release>-valkey alias; the per-release key/channel/stream prefixes keep each PR's cached rows,
+    # bus events and streams separate.
+    cacheDefaultCode: cache-redis
+    messagebusDefaultCode: messagebus-redis
+    eventStreamDefaultCode: eventstream-redis
+  documentGeneration:
+    cdogsV2:
+      endpoint: https://cdogs-dev.api.gov.bc.ca/api
+      tokenUrl: https://dev.loginproxy.gov.bc.ca/auth/realms/comsvcauth/protocol/openid-connect/token
+    cdogsV3:
+      endpoint: http://common-document-generation-service-master.a12c97-prod:3000
+  tenantEngine:
+    cstarV1:
+      apiBaseUrl: https://dev.connect.digital.gov.bc.ca/api/v1
+  sso:
+    jwksUri: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/certs
+    jwtIssuer: https://dev.loginproxy.gov.bc.ca/auth/realms/standard
+    jwtAudience: connected-services-submit-6349
+  migration:
+    activeDeadlineSeconds: 600
+  readinessProbe:
+    initialDelaySeconds: 30
+    timeoutSeconds: 10
+  resources:
+    requests:
+      cpu: 20m
+      memory: 96Mi
+    limits:
+      cpu: 100m
+      memory: 256Mi
+  autoscaling:
+    enabled: false
+
+# PR routes publish to the APS test instance on Gold. The PR deploy sets enabled from APS_PR_ENABLED.
+gatewayNetworkPolicy:
+  namespaceName: "b8840c"
+  environment: test
+
+frontend:
+  replicas: 1
+  readinessProbe:
+    initialDelaySeconds: 25
+    timeoutSeconds: 10
+  resources:
+    requests:
+      cpu: 5m
+      memory: 16Mi
+    limits:
+      cpu: 100m
+      memory: 256Mi
+  autoscaling:
+    enabled: false
+
+formio:
+  internal:
+    enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 20m
+      memory: 96Mi
+    limits:
+      cpu: 100m
+      memory: 256Mi
+  # Formio depends on MongoDB; allow time for MongoDB to be ready after PR deploy
+  readinessProbe:
+    initialDelaySeconds: 45
+    timeoutSeconds: 10
+  livenessProbe:
+    initialDelaySeconds: 60
+
+mongodb:
+  # MongoDB runs as its own release from deployments/helm/action-mongodb. The deploy
+  # workflow supplies external.host and external.authSecretName.
+  internal:
+    enabled: false
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 192Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+  persistence:
+    enabled: false
+
+temporal:
+  allowed: "true"
+  address: ""
+  namespace: "default"
+  taskQueue: "soba"
+
+temporalWorkers:
+  - name: temporal-worker
+    enabled: true
+    taskQueue: "soba"
+    replicas: 1
+    healthPort: 9090
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 512Mi
+
+  - name: temporal-worker-document-generation
+    enabled: true
+    taskQueue: "document-generation"
+    replicas: 1
+    healthPort: 9091
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 512Mi
+
+vault:
+  enabled: true
+  authPath: auth/k8s-gold
+  namespace: platform-services
+  role: b82f30-nonprod
+  secretPath: b82f30-nonprod/soba-dev
+  serviceAccountName: b82f30-vault

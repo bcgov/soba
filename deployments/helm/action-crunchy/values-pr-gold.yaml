@@ -1,0 +1,83 @@
+# Gold dev PR smoke-test profile; one active PR within the supplied request quotas.
+# Crunchy Postgres values for SOBA PR pipelines.
+# Consumed by bcgov/action-crunchy; must be compatible with their chart (charts/crunchy).
+# PR-specific user/database (app-<PR_NUMBER>) is added by the action at runtime.
+global:
+  config:
+    dbName: app
+
+crunchy:
+  enabled: true
+  postgresVersion: 18
+  imagePullPolicy: IfNotPresent
+  image: "artifacts.developer.gov.bc.ca/bcgov-docker-local/crunchy-postgres-gis:ubi9-18.1-3.6-2547"
+  clone:
+    enabled: false
+  restore:
+    enabled: false
+  instances:
+    name: db
+    replicas: 1
+    dataVolumeClaimSpec:
+      # Fresh Gold dev volumes only; existing PVCs cannot be shrunk.
+      storage: 768Mi
+      storageClassName: netapp-block-standard
+      walStorage: 256Mi
+    requests:
+      cpu: 25m
+      memory: 128Mi
+    replicaCertCopy:
+      requests:
+        cpu: 1m
+        memory: 16Mi
+  # No backups for PRs - ephemeral environments; saves resources and storage.
+  pgBackRest:
+    enabled: false
+    s3:
+      enabled: false
+  patroni:
+    postgresql:
+      pg_hba:
+        - "host all all 0.0.0.0/0 md5"
+        - "host all all ::1/128 md5"
+      parameters:
+        shared_buffers: 16MB
+        wal_buffers: "64kB"
+        min_wal_size: 32MB
+        max_wal_size: 64MB
+        max_slot_wal_keep_size: 128MB
+        work_mem: 2MB
+        log_min_duration_statement: 1000ms
+        effective_io_concurrency: 20
+  proxy:
+    enabled: true
+    pgBouncer:
+      replicas: 1
+      requests:
+        cpu: 5m
+        memory: 16Mi
+      maxConnections: 10
+  pgmonitor:
+    enabled: false
+  users:
+    - name: '{{ .Values.global.config.dbName }}'
+      databases:
+        - '{{ .Values.global.config.dbName }}'
+      options: "SUPERUSER CREATEDB CREATEROLE"
+    - name: 'postgres'
+      databases:
+        - 'postgres'
+        - '{{ .Values.global.config.dbName }}'
+    - name: '{{ .Values.global.config.dbName }}proxy'
+      databases:
+        - '{{ .Values.global.config.dbName }}'
+        - 'postgres'
+    - name: '{{ .Values.global.config.dbName }}proxytest'
+      databases:
+        - '{{ .Values.global.config.dbName }}'
+        - 'postgres'
+    - name: 'temporal'
+      databases:
+        - 'temporal'
+        - 'temporal_visibility'
+      options: "SUPERUSER CREATEDB CREATEROLE"

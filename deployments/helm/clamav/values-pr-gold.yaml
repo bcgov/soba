@@ -1,0 +1,13 @@
+# Gold dev smoke test: low reservation, not a measured scanner working set.
+# Keep signature-loading headroom; the 2Gi limit still needs runtime validation.
+clamav:
+  replicaCount: 1
+  limits:
+    maxThreads: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 2Gi
