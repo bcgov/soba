@@ -72,7 +72,10 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [qa, changes]
     if: ${{ needs.changes.outputs.deploy == 'true' && !startsWith(github.head_ref, 'release/') && github.head_ref != 'main' }}
+    environment:
+      name: ${{ format('{0}-pr', fromJSON(vars.DEPLOY_CLUSTERS)[0]) }}
     outputs:
+      clusters: ${{ vars.DEPLOY_CLUSTERS }}
       JOB_NAME: ${{ steps.vars.outputs.JOB_NAME }}
       URL: ${{ steps.vars.outputs.URL }}
       URL_FORMS: ${{ steps.vars.outputs.URL_FORMS }}
@@ -115,6 +118,12 @@ jobs:
   deploy-crunchy:
     name: Deploy Crunchy Postgres
     needs: [set-vars]
+    strategy:
+      fail-fast: false
+      matrix:
+        cluster: ${{ fromJSON(needs.set-vars.outputs.clusters) }}
+    environment:
+      name: ${{ matrix.cluster }}-pr
     runs-on: ubuntu-24.04
     outputs:
       cluster: ${{ steps.crunchy.outputs.cluster }}
@@ -128,6 +137,7 @@ jobs:
         id: crunchy
         uses: bcgov/action-crunchy@7ee9c0bdec27f5251a8239373f51db1e01c7c4d9 # v2.1.0
         with:
+          oc_server: ${{ vars.OC_SERVER }}
           oc_namespace: ${{ secrets.OC_NAMESPACE }}
           oc_token: ${{ secrets.OC_TOKEN }}
           values_file: deployments/helm/action-crunchy/values.yml
@@ -137,10 +147,14 @@ jobs:
   deploy-mongodb:
     name: Deploy MongoDB
     needs: [set-vars]
+    strategy:
+      fail-fast: false
+      matrix:
+        cluster: ${{ fromJSON(needs.set-vars.outputs.clusters) }}
     permissions:
       contents: read
     environment:
-      name: pr
+      name: ${{ matrix.cluster }}-pr
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:
@@ -203,12 +217,16 @@ jobs:
   deploy:
     name: Deploy SOBA
     needs: [set-vars, build, deploy-crunchy, deploy-mongodb]
+    strategy:
+      fail-fast: false
+      matrix:
+        cluster: ${{ fromJSON(needs.set-vars.outputs.clusters) }}
     permissions:
       contents: read
       pull-requests: write
     environment:
-      name: pr
-      url: ${{ needs.set-vars.outputs.URL }}
+      name: ${{ matrix.cluster }}-pr
+      url: ${{ steps.target.outputs.URL }}
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:
@@ -216,6 +234,17 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.set-vars.outputs.ref }}
+
+      - name: Set target URLs
+        id: target
+        env:
+          OC_DOMAIN: ${{ vars.OC_DOMAIN }}
+          PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
+        run: |
+          FRONTEND_HOST="${DEV_HOST_PREFIX}.${OC_DOMAIN}"
+          echo "FRONTEND_HOST=$FRONTEND_HOST" >> "$GITHUB_OUTPUT"
+          echo "URL=https://${FRONTEND_HOST}/designer-${PR_NUM}" >> "$GITHUB_OUTPUT"
+          echo "URL_FORMS=https://${FRONTEND_HOST}/forms-${PR_NUM}" >> "$GITHUB_OUTPUT"
 
       - name: Install OpenShift CLI
         uses: redhat-actions/openshift-tools-installer@e3b32c2ab7b064b2ce189121c4a49f509a99a7b4 # v3.0
@@ -274,8 +303,13 @@ jobs:
           SHORT_SHA: ${{ needs.build.outputs.short_sha }}
           DOMAIN: ${{ vars.OC_DOMAIN }}
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
-          FRONTEND_HOST: ${{ needs.set-vars.outputs.FRONTEND_HOST }}
+          FRONTEND_HOST: ${{ steps.target.outputs.FRONTEND_HOST }}
           APS_PR_ENABLED: ${{ vars.APS_PR_ENABLED == 'true' }}
+          VAULT_AUTH_PATH: ${{ vars.VAULT_AUTH_PATH }}
+          VAULT_NAMESPACE: ${{ vars.VAULT_NAMESPACE }}
+          VAULT_ROLE: ${{ vars.VAULT_ROLE }}
+          VAULT_SECRET_PATH: ${{ vars.VAULT_SECRET_PATH }}
+          VAULT_SERVICE_ACCOUNT_NAME: ${{ vars.VAULT_SERVICE_ACCOUNT_NAME }}
         run: |
           # Pipeline performance fix: Revert if needed.
           set -euo pipefail
@@ -349,7 +383,12 @@ jobs:
             --wait-for-jobs \
             --timeout 660s \
             -f deployments/helm/soba/values-pr.yaml \
-            -f /tmp/values-override.yaml
+            -f /tmp/values-override.yaml \
+            --set-string "vault.authPath=${VAULT_AUTH_PATH:?Set VAULT_AUTH_PATH}" \
+            --set-string "vault.namespace=${VAULT_NAMESPACE:?Set VAULT_NAMESPACE}" \
+            --set-string "vault.role=${VAULT_ROLE:?Set VAULT_ROLE}" \
+            --set-string "vault.secretPath=${VAULT_SECRET_PATH:?Set VAULT_SECRET_PATH}" \
+            --set-string "vault.serviceAccountName=${VAULT_SERVICE_ACCOUNT_NAME:?Set VAULT_SERVICE_ACCOUNT_NAME}"
           # Pipeline performance fix: Revert if needed.
 
       # Pipeline performance fix: Revert if needed.
@@ -367,13 +406,13 @@ jobs:
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         if: success()
         with:
-          header: release
+          header: release-${{ matrix.cluster }}
           hide_and_recreate: true
           hide_classify: "OUTDATED"
           message: |
             Release ${{ github.sha }} deployed:
-            - Designer (design-mode): <${{ needs.set-vars.outputs.URL }}>
-            - Forms (submit-mode): <${{ needs.set-vars.outputs.URL_FORMS }}>
+            - Designer (design-mode): <${{ steps.target.outputs.URL }}>
+            - Forms (submit-mode): <${{ steps.target.outputs.URL_FORMS }}>
           number: ${{ needs.set-vars.outputs.PR_NUM }}
 
   gateway:
