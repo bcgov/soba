@@ -1,18 +1,5 @@
-const selectMock = jest.fn();
-
-jest.mock('../../../src/core/db/client', () => ({
-  db: {
-    select: (...args: unknown[]) => selectMock(...args),
-  },
-}));
-
 jest.mock('../../../src/core/db/repos/membershipRepo', () => ({
-  getWorkspaceForUser: jest.fn(),
-}));
-
-jest.mock('../../../src/core/integrations/plugins/PluginRegistry', () => ({
-  // Empty adapter (no getOrSet) so buildCoreContext calls getWorkspaceForUser directly.
-  getCacheAdapter: () => ({}),
+  findActorMembership: jest.fn(),
 }));
 
 jest.mock('../../../src/core/db/repos/formRepo', () => ({
@@ -44,7 +31,7 @@ import {
   workspaceListScope,
   resolveListWorkspaceScope,
 } from '../../../src/core/middleware/workspaceContext';
-import { getWorkspaceForUser } from '../../../src/core/db/repos/membershipRepo';
+import { findActorMembership } from '../../../src/core/db/repos/membershipRepo';
 import { getFormListContext } from '../../../src/core/db/repos/formRepo';
 import { getFormVersionListContext } from '../../../src/core/db/repos/formVersionRepo';
 import { getSubmissionListContext } from '../../../src/core/db/repos/submissionRepo';
@@ -52,31 +39,8 @@ import { getWorkspaceById } from '../../../src/core/db/repos/workspaceRepo';
 import { getDocumentTemplateScope } from '../../../src/core/db/repos/documentTemplateRepo';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../src/core/errors';
 
-function selectChain(result: unknown) {
-  return {
-    from: () => ({
-      where: () => ({
-        limit: () => Promise.resolve(result),
-      }),
-    }),
-  };
-}
-
-// A complete membership row for mocking getWorkspaceForUser (buildCoreContext only
-// needs a truthy value; the full shape keeps it type-safe without a cast).
-function membershipRow(id: string) {
-  return {
-    id,
-    kind: 'team',
-    name: 'Workspace',
-    status: 'active',
-    org: 'IT',
-    useCase: 'Internal',
-    membershipId: 'membership-1',
-    role: 'owner',
-    disclaimerAcceptedAt: null,
-  };
-}
+const MEMBER = { displayLabel: 'Actor One', role: 'owner' };
+const NON_MEMBER = { displayLabel: 'Actor One', role: null };
 
 function makeReq(overrides: Partial<Request> = {}): Request {
   return {
@@ -97,19 +61,16 @@ function makeRes() {
 }
 
 beforeEach(() => {
-  selectMock.mockReset();
-  jest.mocked(getWorkspaceForUser).mockReset();
+  jest.mocked(findActorMembership).mockReset();
   jest.mocked(getFormListContext).mockReset();
   jest.mocked(getFormVersionListContext).mockReset();
   jest.mocked(getSubmissionListContext).mockReset();
   jest.mocked(getDocumentTemplateScope).mockReset();
-  // Default: actor display label lookup.
-  selectMock.mockReturnValue(selectChain([{ displayLabel: 'Actor One' }]));
 });
 
 describe('workspaceFromQuery', () => {
   it('resolves the workspace from the query param and echoes the header', async () => {
-    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws1'));
+    jest.mocked(findActorMembership).mockResolvedValue(MEMBER);
     const req = makeReq({ query: { workspaceId: 'ws1' } as Request['query'] });
     const res = makeRes();
     const next = jest.fn() as unknown as NextFunction;
@@ -137,8 +98,44 @@ describe('workspaceFromQuery', () => {
     expect(res.set).not.toHaveBeenCalled();
   });
 
+  it('reads the membership on every request', async () => {
+    jest
+      .mocked(findActorMembership)
+      .mockResolvedValueOnce(MEMBER)
+      .mockResolvedValueOnce(NON_MEMBER);
+    const next = jest.fn() as unknown as NextFunction;
+
+    await workspaceFromQuery(
+      makeReq({ query: { workspaceId: 'ws1' } as Request['query'] }),
+      makeRes() as Response,
+      next,
+    );
+    await workspaceFromQuery(
+      makeReq({ query: { workspaceId: 'ws1' } as Request['query'] }),
+      makeRes() as Response,
+      next,
+    );
+
+    expect(findActorMembership).toHaveBeenCalledTimes(2);
+    expect(next).toHaveBeenNthCalledWith(1);
+    expect(next).toHaveBeenNthCalledWith(2, expect.any(ForbiddenError));
+  });
+
+  it('rejects with Forbidden when the actor row is gone', async () => {
+    jest.mocked(findActorMembership).mockResolvedValue(null);
+    const next = jest.fn() as unknown as NextFunction;
+
+    await workspaceFromQuery(
+      makeReq({ query: { workspaceId: 'ws1' } as Request['query'] }),
+      makeRes() as Response,
+      next,
+    );
+
+    expect(next).toHaveBeenCalledWith(expect.any(ForbiddenError));
+  });
+
   it('rejects with Forbidden when the actor is not a member', async () => {
-    jest.mocked(getWorkspaceForUser).mockResolvedValue(null);
+    jest.mocked(findActorMembership).mockResolvedValue(NON_MEMBER);
     const req = makeReq({ query: { workspaceId: 'ws1' } as Request['query'] });
     const res = makeRes();
     const next = jest.fn() as unknown as NextFunction;
@@ -225,7 +222,7 @@ describe('workspaceListScope', () => {
   const formsListScope = workspaceListScope({ anchorOrder: ['formId', 'workspaceId'] });
 
   it('scopes to workspace from workspaceId anchor and echoes the header', async () => {
-    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws1'));
+    jest.mocked(findActorMembership).mockResolvedValue(MEMBER);
     const req = makeReq({ query: { workspaceId: 'ws1' } as Request['query'] });
     const res = makeRes();
     const next = jest.fn() as unknown as NextFunction;
@@ -244,7 +241,7 @@ describe('workspaceListScope', () => {
 
   it('derives workspace from formId anchor and echoes the header', async () => {
     jest.mocked(getFormListContext).mockResolvedValue({ workspaceId: 'ws-form' });
-    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws-form'));
+    jest.mocked(findActorMembership).mockResolvedValue(MEMBER);
     const req = makeReq({ query: { formId: 'form1' } as Request['query'] });
     const res = makeRes();
     const next = jest.fn() as unknown as NextFunction;
@@ -263,7 +260,7 @@ describe('workspaceListScope', () => {
   });
 
   it('rejects with Forbidden when the actor is not a member of the resolved workspace', async () => {
-    jest.mocked(getWorkspaceForUser).mockResolvedValue(null);
+    jest.mocked(findActorMembership).mockResolvedValue(NON_MEMBER);
     const req = makeReq({ query: { workspaceId: 'ws1' } as Request['query'] });
     const res = makeRes();
     const next = jest.fn() as unknown as NextFunction;
@@ -300,7 +297,7 @@ describe('workspaceFromResource', () => {
 
   it('derives the workspace from the resource and echoes the header', async () => {
     getWorkspaceIdForForm.mockResolvedValue('ws9');
-    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws9'));
+    jest.mocked(findActorMembership).mockResolvedValue(MEMBER);
     const req = makeReq({ params: { id: 'form1' } as Request['params'] });
     const res = makeRes();
     const next = jest.fn() as unknown as NextFunction;
@@ -328,7 +325,7 @@ describe('workspaceFromResource', () => {
 
   it('returns 403 (ForbiddenError) when the actor is not a member of the resource workspace', async () => {
     getWorkspaceIdForForm.mockResolvedValue('ws9');
-    jest.mocked(getWorkspaceForUser).mockResolvedValue(null);
+    jest.mocked(findActorMembership).mockResolvedValue(NON_MEMBER);
     const req = makeReq({ params: { id: 'form1' } as Request['params'] });
     const res = makeRes();
     const next = jest.fn() as unknown as NextFunction;
@@ -346,7 +343,7 @@ describe('workspaceFromResource (resources under a form)', () => {
     jest
       .mocked(getFormVersionListContext)
       .mockResolvedValue({ workspaceId: 'ws9', formId: 'form1' });
-    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws9'));
+    jest.mocked(findActorMembership).mockResolvedValue(MEMBER);
     const req = makeReq({ params: { id: 'fv1' } as Request['params'] });
     const next = jest.fn() as unknown as NextFunction;
 
@@ -368,7 +365,7 @@ describe('workspaceFromResource (resources under a form)', () => {
     jest
       .mocked(getSubmissionListContext)
       .mockResolvedValue({ workspaceId: 'ws9', formId: 'form1', formVersionId: 'fv1' });
-    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws9'));
+    jest.mocked(findActorMembership).mockResolvedValue(MEMBER);
     const req = makeReq({ params: { id: 'sub1' } as Request['params'] });
     const next = jest.fn() as unknown as NextFunction;
 
@@ -390,7 +387,7 @@ describe('workspaceFromResource (resources under a form)', () => {
     jest
       .mocked(getDocumentTemplateScope)
       .mockResolvedValue({ workspaceId: 'ws9', formId: 'form1' });
-    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws9'));
+    jest.mocked(findActorMembership).mockResolvedValue(MEMBER);
     const req = makeReq({ params: { id: 't1' } as Request['params'] });
     const next = jest.fn() as unknown as NextFunction;
 
@@ -426,7 +423,7 @@ describe('workspaceFromResource (resources under a form)', () => {
     jest
       .mocked(getFormVersionListContext)
       .mockResolvedValue({ workspaceId: 'ws9', formId: 'form1' });
-    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws9'));
+    jest.mocked(findActorMembership).mockResolvedValue(MEMBER);
     const req = makeReq({ query: { formVersionId: 'fv1' } as Request['query'] });
     const next = jest.fn() as unknown as NextFunction;
 
@@ -450,7 +447,7 @@ describe('openWorkspaceFromResource', () => {
     jest
       .mocked(getSubmissionListContext)
       .mockResolvedValue({ workspaceId: 'ws9', formId: 'form1', formVersionId: 'fv1' });
-    jest.mocked(getWorkspaceForUser).mockResolvedValue(null);
+    jest.mocked(findActorMembership).mockResolvedValue(NON_MEMBER);
     const req = makeReq({ params: { id: 'sub1' } as Request['params'] });
     const next = jest.fn() as unknown as NextFunction;
 
@@ -459,9 +456,24 @@ describe('openWorkspaceFromResource', () => {
     expect(req.coreContext).toMatchObject({
       workspaceId: 'ws9',
       formId: 'form1',
+      actorDisplayLabel: 'Actor One',
       role: 'member',
       workspaceSource: 'submit:submission',
     });
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('builds a context without a label when the actor row is gone', async () => {
+    jest
+      .mocked(getSubmissionListContext)
+      .mockResolvedValue({ workspaceId: 'ws9', formId: 'form1', formVersionId: 'fv1' });
+    jest.mocked(findActorMembership).mockResolvedValue(null);
+    const req = makeReq({ params: { id: 'sub1' } as Request['params'] });
+    const next = jest.fn() as unknown as NextFunction;
+
+    await middleware(req, makeRes() as Response, next);
+
+    expect(req.coreContext).toMatchObject({ actorDisplayLabel: null, role: 'member' });
     expect(next).toHaveBeenCalledWith();
   });
 
@@ -493,13 +505,13 @@ describe('workspaceFromResource (kind: workspace)', () => {
     await middleware(req, res as Response, next);
 
     expect(next).toHaveBeenCalledWith(expect.any(NotFoundError));
-    expect(getWorkspaceForUser).not.toHaveBeenCalled();
+    expect(findActorMembership).not.toHaveBeenCalled();
     expect(res.set).not.toHaveBeenCalled();
   });
 
   it('returns 403 when the workspace exists but the actor is not a member', async () => {
     jest.mocked(getWorkspaceById).mockResolvedValue({ id: 'ws1' });
-    jest.mocked(getWorkspaceForUser).mockResolvedValue(null);
+    jest.mocked(findActorMembership).mockResolvedValue(NON_MEMBER);
     const req = makeReq({ params: { id: 'ws1' } as Request['params'] });
     const res = makeRes();
     const next = jest.fn() as unknown as NextFunction;
@@ -512,7 +524,7 @@ describe('workspaceFromResource (kind: workspace)', () => {
 
   it('resolves and echoes the header when the workspace exists and the actor is a member', async () => {
     jest.mocked(getWorkspaceById).mockResolvedValue({ id: 'ws1' });
-    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws1'));
+    jest.mocked(findActorMembership).mockResolvedValue(MEMBER);
     const req = makeReq({ params: { id: 'ws1' } as Request['params'] });
     const res = makeRes();
     const next = jest.fn() as unknown as NextFunction;

@@ -20,11 +20,7 @@ import {
 } from '../schema';
 import { ConflictError } from '../../errors';
 import { WORKSPACE_NAME_TAKEN } from '../../messages';
-import {
-  getWorkspaceForUser,
-  invalidateMembershipCache,
-  isWorkspaceManageRole,
-} from './membershipRepo';
+import { getWorkspaceForUser, isWorkspaceManageRole } from './membershipRepo';
 import { addUserToGroup, createGroupWithRole } from './workspaceGroupRepo';
 import { createWorkspaceSettings } from '../../../features/form-settings/create';
 
@@ -95,8 +91,6 @@ const bootstrapWorkspaceOwner = async (
     systemCode: SystemGroup.form_submitters,
     displayLabel,
   });
-
-  invalidateMembershipCache(workspaceId, userId);
 };
 
 /**

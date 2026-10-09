@@ -8,13 +8,8 @@
  *
  */
 import type { NextFunction, Request, Response } from 'express';
-import { eq } from 'drizzle-orm';
-import { db } from '../db/client';
-import { appUsers } from '../db/schema';
-import { getWorkspaceForUser } from '../db/repos/membershipRepo';
+import { findActorMembership } from '../db/repos/membershipRepo';
 import { getWorkspaceById } from '../db/repos/workspaceRepo';
-import { getCacheAdapter } from '../integrations/plugins/PluginRegistry';
-import { membershipKey } from '../integrations/cache/cacheKeys';
 import { ForbiddenError, NotFoundError, ValidationError } from '../errors';
 import { WorkspaceMembershipRole } from '../db/codes';
 import { getActorId } from './actor';
@@ -114,63 +109,32 @@ export const resolveListWorkspaceScope = async (
   }
 };
 
-/** The cache getOrSet, or undefined if no working cache adapter is available. Acquisition is guarded
- *  so a missing/misconfigured cache (e.g. cache-redis selected with no URL) falls through to the
- *  source of truth rather than throwing on every request. */
-const cachedGetOrSet = () => {
-  try {
-    const cache = getCacheAdapter();
-    return cache.getOrSet?.bind(cache);
-  } catch {
-    return undefined;
-  }
-};
-
-/** Membership lookup for `workspaceId`/`actorId`, cached when a cache adapter supports getOrSet. */
-const loadMembership = (workspaceId: string, actorId: string) => {
-  const getOrSet = cachedGetOrSet();
-  return getOrSet
-    ? getOrSet(membershipKey(workspaceId, actorId), () => getWorkspaceForUser(workspaceId, actorId))
-    : getWorkspaceForUser(workspaceId, actorId);
-};
-
-/** The actor's display label (null if the user row is gone). */
-const loadActorDisplayLabel = async (actorId: string): Promise<string | null> => {
-  const userRow = await db
-    .select({ displayLabel: appUsers.displayLabel })
-    .from(appUsers)
-    .where(eq(appUsers.id, actorId))
-    .limit(1);
-  return userRow[0]?.displayLabel ?? null;
-};
-
 /**
- * Build the core request context for an already-resolved workspace: verify membership (cached) and
- * load the actor display label. Throws ForbiddenError when the actor is not a member.
+ * Build the core request context for an already-resolved workspace from the actor's membership and
+ * display label. Throws ForbiddenError when the actor is not a member.
  */
 export const buildCoreContext = async (
   actorId: string,
   workspaceId: string,
   source: string,
 ): Promise<CoreRequestContext> => {
-  const membership = await loadMembership(workspaceId, actorId);
-  if (!membership) {
+  const actor = await findActorMembership(workspaceId, actorId);
+  if (!actor?.role) {
     throw new ForbiddenError('Actor does not belong to workspace');
   }
   return {
     workspaceId,
     actorId,
-    actorDisplayLabel: await loadActorDisplayLabel(actorId),
+    actorDisplayLabel: actor.displayLabel,
     workspaceSource: source,
-    role: membership.role,
+    role: actor.role,
   };
 };
 
 /**
  * Build a context for the submit surface WITHOUT requiring membership: the workspace is resolved so the
  * route's own guard decides access. Members get their real role; non-members (incl. the public user)
- * get a non-manage role so they can never reach workspace-admin routes. Shares the cached membership
- * lookup with buildCoreContext.
+ * get a non-manage role so they can never reach workspace-admin routes.
  */
 const buildSubmitContext = async (
   actorId: string,
@@ -178,14 +142,14 @@ const buildSubmitContext = async (
   source: string,
 ): Promise<CoreRequestContext> => {
   const { workspaceId, formId } = scope;
-  const membership = await loadMembership(workspaceId, actorId);
+  const actor = await findActorMembership(workspaceId, actorId);
   return {
     workspaceId,
     ...(formId ? { formId } : {}),
     actorId,
-    actorDisplayLabel: await loadActorDisplayLabel(actorId),
+    actorDisplayLabel: actor?.displayLabel ?? null,
     workspaceSource: source,
-    role: membership?.role ?? WorkspaceMembershipRole.member,
+    role: actor?.role ?? WorkspaceMembershipRole.member,
   };
 };
 

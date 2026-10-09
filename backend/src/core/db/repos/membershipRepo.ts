@@ -13,8 +13,6 @@ import {
   rolePermissions,
   workspaces,
 } from '../schema';
-import { getCacheAdapter } from '../../integrations/plugins/PluginRegistry';
-import { membershipKey } from '../../integrations/cache/cacheKeys';
 import { profileHelpers } from '../../auth/jwtClaims';
 import { ForbiddenError } from '../../errors';
 import type { NormalizedProfile, IdpAttributes } from '../../auth/jwtClaims';
@@ -24,6 +22,7 @@ import {
   WorkspaceGroupMembershipStatus,
   WorkspaceGroupRoleStatus,
   WorkspaceMembershipRole,
+  WorkspaceMembershipStatus,
 } from '../codes';
 import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
@@ -183,17 +182,27 @@ export const getActiveWorkspaceIdsForUser = async (userId: string): Promise<stri
 };
 
 /**
- * Invalidate cached membership for a workspace/user after insert/update/delete.
- * Call from code that mutates workspace memberships (e.g. workspaceRepo, seed).
- * The cached row includes `role`, which gates management — a role change that skips this
- * leaves a demoted admin with authority until the cache TTL expires.
+ * The user's display label and their active membership role in the workspace, read together.
+ * `role` is null when they are not an active member. Returns null when the user row is gone.
  */
-export const invalidateMembershipCache = (workspaceId: string, userId: string): void => {
-  try {
-    getCacheAdapter().delete(membershipKey(workspaceId, userId));
-  } catch {
-    // Cache adapter may not be available (e.g. during seed before full app init).
-  }
+export const findActorMembership = async (
+  workspaceId: string,
+  userId: string,
+): Promise<{ displayLabel: string | null; role: string | null } | null> => {
+  const rows = await db
+    .select({ displayLabel: appUsers.displayLabel, role: workspaceMemberships.role })
+    .from(appUsers)
+    .leftJoin(
+      workspaceMemberships,
+      and(
+        eq(workspaceMemberships.userId, appUsers.id),
+        eq(workspaceMemberships.workspaceId, workspaceId),
+        eq(workspaceMemberships.status, WorkspaceMembershipStatus.active),
+      ),
+    )
+    .where(eq(appUsers.id, userId))
+    .limit(1);
+  return rows[0] ?? null;
 };
 
 export type WorkspaceListSortField = (typeof WORKSPACE_SORT_FIELDS)[number];

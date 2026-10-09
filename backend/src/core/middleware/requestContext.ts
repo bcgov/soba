@@ -12,11 +12,7 @@ export interface CoreRequestContext {
   workspaceSource: string;
   /** The form the resolved resource belongs to, set whenever the resource is a form or under one. */
   formId?: string;
-  /**
-   * The actor's workspace membership role (owner/admin/member/viewer); gates workspace management.
-   * Cached with the membership (see buildCoreContext); any role change must call
-   * invalidateMembershipCache(workspaceId, userId) or a demoted admin keeps authority until the TTL.
-   */
+  /** The actor's workspace membership role (owner/admin/member/viewer), read on every request. */
   role: string;
   /** The actor's permission codes on `formId`, or on the workspace without one. */
   permissions?: ReadonlySet<string>;

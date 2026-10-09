@@ -22,8 +22,8 @@ import { submissionParticipants } from '../../../core/db/schema';
 import { resolveFormPermissions } from '../../../core/db/repos/formAccessRepo';
 import { getWorkspaceIdForForm, listFormsForWorkspace } from '../../../core/db/repos/formRepo';
 import {
+  findActorMembership,
   getActiveWorkspaceIdsForUser,
-  getWorkspaceForUser,
   isWorkspacePeopleReadRole,
 } from '../../../core/db/repos/membershipRepo';
 import {
@@ -421,8 +421,8 @@ async function workspaceAnswers(
 ): Promise<Record<WorkspaceCheck, boolean>> {
   const actorId = caller.identity.actorId;
   if (!caller.signedIn || !actorId) return { peopleRead: false };
-  const membership = await getWorkspaceForUser(workspaceId, actorId);
-  return { peopleRead: !!membership && isWorkspacePeopleReadRole(membership.role) };
+  const role = (await findActorMembership(workspaceId, actorId))?.role;
+  return { peopleRead: !!role && isWorkspacePeopleReadRole(role) };
 }
 
 async function checkWorkspaces(
