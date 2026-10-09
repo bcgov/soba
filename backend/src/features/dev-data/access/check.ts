@@ -1,6 +1,6 @@
 /**
- * Runs every coverage case through the code the submit routes use, and compares the answers with
- * the expectations table. Reads only.
+ * Runs every coverage case through the code the submit, design and workspace routes use, and
+ * compares the answers with the expectations table. Reads only.
  */
 import { and, eq } from 'drizzle-orm';
 import {
@@ -288,7 +288,7 @@ async function formGrants(
 }
 
 /** The designer's forms list for the actor across `workspaceIds`, as form ids. */
-async function designListIds(
+async function designListFor(
   actorId: string,
   required: readonly PermissionCode[],
   workspaceIds: string[],
@@ -318,7 +318,7 @@ async function designListInconsistencies(
   );
   const issues: string[] = [];
   for (const required of DESIGN_LIST_CODES) {
-    const listed = await designListIds(actorId, required, [workspaceId]);
+    const listed = await designListFor(actorId, required, [workspaceId]);
     for (const key of formKeys) {
       const form = manifest.forms[key];
       if ((await formGrants(actorId, form, required)) !== listed.has(form.formId)) {
@@ -352,11 +352,7 @@ async function checkWorkspaceForms(
       : [`${caller.persona} x ${workspaceKey}: My Forms filter disagrees with the listed forms`];
   return {
     results: checked.map((c) => c.result),
-    issues: [
-      ...checked.flatMap((c) => c.issues),
-      ...filterIssue,
-      ...(await designListInconsistencies(manifest, caller, workspaceKey)),
-    ],
+    issues: [...checked.flatMap((c) => c.issues), ...filterIssue],
   };
 }
 
@@ -375,14 +371,17 @@ async function checkForms(
 }
 
 /** The designer's forms list, across the coverage workspaces the persona is an active member of. */
-async function designListedIds(manifest: CoverageManifest, caller: Caller): Promise<Set<string>> {
+async function coverageDesignList(
+  manifest: CoverageManifest,
+  caller: Caller,
+): Promise<Set<string>> {
   const actorId = signedInActorId(caller);
   if (!actorId) return new Set();
   const coverage = new Set(COVERAGE_WORKSPACE_KEYS.map((key) => manifest.workspaces[key].id));
   const workspaceIds = (await getActiveWorkspaceIdsForUser(actorId)).filter((id) =>
     coverage.has(id),
   );
-  return designListIds(actorId, [Permissions.form_read], workspaceIds);
+  return designListFor(actorId, [Permissions.form_read], workspaceIds);
 }
 
 const NO_DESIGN_ACCESS: Record<DesignCheck, boolean> = {
@@ -415,9 +414,9 @@ async function designAnswers(
 async function checkDesign(
   manifest: CoverageManifest,
   caller: Caller,
-): Promise<CaseResult<CoverageFormKey, DesignCheck>[]> {
-  const listed = await designListedIds(manifest, caller);
-  return Promise.all(
+): Promise<CaseCheck<CoverageFormKey, DesignCheck>> {
+  const listed = await coverageDesignList(manifest, caller);
+  const results = await Promise.all(
     COVERAGE_FORM_KEYS.map(async (key) => ({
       persona: caller.persona,
       caseKey: key,
@@ -425,6 +424,10 @@ async function checkDesign(
       expected: expectedOf(DESIGN_CHECKS, DESIGN_EXPECTATIONS[key], caller.persona),
     })),
   );
+  const issues = await Promise.all(
+    COVERAGE_WORKSPACE_KEYS.map((key) => designListInconsistencies(manifest, caller, key)),
+  );
+  return { results, issues: issues.flat() };
 }
 
 /** Membership in the workspace, then the role check the members and groups reads use. */
@@ -434,8 +437,8 @@ async function workspaceAnswers(
 ): Promise<Record<WorkspaceCheck, boolean>> {
   const actorId = signedInActorId(caller);
   if (!actorId) return { peopleRead: false };
-  const role = (await findActorMembership(workspaceId, actorId))?.role;
-  return { peopleRead: !!role && isWorkspacePeopleReadRole(role) };
+  const role = (await findActorMembership(workspaceId, actorId))?.role ?? null;
+  return { peopleRead: isWorkspacePeopleReadRole(role) };
 }
 
 async function checkWorkspaces(
@@ -471,8 +474,9 @@ const skipsOwner = (manifest: CoverageManifest): boolean =>
   manifest.personas[OWNER].identityProviderCode !== OWNER_PROVIDER;
 
 /**
- * Every persona against every form and submission in the coverage set. Personas run in turn and
- * each persona's cases together, which bounds how many queries wait for a pooled connection.
+ * Every persona against every form, workspace and submission in the coverage set. Personas run in
+ * turn and each persona's cases together, which bounds how many queries wait for a pooled
+ * connection.
  */
 export async function checkCoverage(manifest: CoverageManifest): Promise<CoverageReport> {
   const ownerProvider = manifest.personas[OWNER].identityProviderCode;
@@ -493,10 +497,10 @@ export async function checkCoverage(manifest: CoverageManifest): Promise<Coverag
       ? [`${OWNER}: signs in through ${ownerProvider}, the table assumes ${OWNER_PROVIDER}`]
       : [],
     forms: checked.flatMap((c) => c.forms.results),
-    design: checked.flatMap((c) => c.design),
+    design: checked.flatMap((c) => c.design.results),
     workspaces: checked.flatMap((c) => c.workspaces),
     submissions: checked.flatMap((c) => c.submissions),
-    inconsistencies: checked.flatMap((c) => c.forms.issues),
+    inconsistencies: checked.flatMap((c) => [...c.forms.issues, ...c.design.issues]),
   };
 }
 
@@ -534,7 +538,7 @@ export async function explainForm(
   const published = await getPublishedVersionForForm(form.workspaceId, form.formId);
   const rows = await myFormRows(caller, form.workspaceId);
   const answers = { listed: rows.has(form.formId), ...(await formAnswers(caller, form)) };
-  const design = await designAnswers(caller, form, await designListedIds(manifest, caller));
+  const design = await designAnswers(caller, form, await coverageDesignList(manifest, caller));
   const idp = { idpCode: caller.identity.idpCode };
 
   return [

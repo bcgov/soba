@@ -138,14 +138,15 @@ function printGrid<TCase extends string, TCheck extends string>(args: {
 async function verify(): Promise<void> {
   const manifest = await loadCoverageManifest();
   const report = await checkCoverage(manifest);
+  const formLabels = Object.fromEntries(
+    COVERAGE_FORM_KEYS.map((key) => [key, manifest.forms[key].name]),
+  ) as Record<CoverageFormKey, string>;
 
   printGrid({
     title: 'Forms',
     letters: { listed: 'L', start: 'S', draft: 'D', templates: 'T', update: 'U' },
     caseKeys: COVERAGE_FORM_KEYS,
-    caseLabels: Object.fromEntries(
-      COVERAGE_FORM_KEYS.map((key) => [key, manifest.forms[key].name]),
-    ) as Record<CoverageFormKey, string>,
+    caseLabels: formLabels,
     personas: report.personas,
     results: report.forms,
   });
@@ -159,9 +160,7 @@ async function verify(): Promise<void> {
       staffTemplates: 'T',
     },
     caseKeys: COVERAGE_FORM_KEYS,
-    caseLabels: Object.fromEntries(
-      COVERAGE_FORM_KEYS.map((key) => [key, manifest.forms[key].name]),
-    ) as Record<CoverageFormKey, string>,
+    caseLabels: formLabels,
     personas: report.personas,
     results: report.design,
   });

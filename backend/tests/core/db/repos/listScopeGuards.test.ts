@@ -50,7 +50,7 @@ const listCalls = {
 };
 
 // A list with no workspace or no rows to allow returns nothing without querying.
-describe('list repos refuse a missing scope', () => {
+describe('list repos return nothing without querying', () => {
   beforeEach(() => {
     selectMock.mockReset();
   });
@@ -75,7 +75,7 @@ describe('list repos refuse a missing scope', () => {
   it.each(Object.entries(listCalls))(
     '%s returns nothing without an access grant, without querying',
     async (_name, list) => {
-      await expect(list(['ws1'], undefined as unknown as FormAccessGrant)).resolves.toEqual({
+      await expect(list(['ws1'], undefined)).resolves.toEqual({
         items: [],
         total: 0,
       });

@@ -12,7 +12,7 @@ import {
   type SQLWrapper,
 } from 'drizzle-orm';
 import { unionAll, type AnyPgColumn, type PgSelect } from 'drizzle-orm/pg-core';
-import { db, type DbOrTx } from '../client';
+import { db } from '../client';
 import {
   formGroupOverrideMembers,
   formGroupOverrides,
@@ -255,8 +255,8 @@ export const formAccessGrantFor = (formId: string): FormAccessGrant => ({
 });
 
 /**
- * Whether a list can have no rows: no workspace, no grant, or a grant that allows no form. A list
- * without a grant has no rows, never every row.
+ * True when a list is empty without querying: no workspace, no grant, or a grant that allows no
+ * form.
  */
 export const listAllowsNothing = (
   workspaceIds: string[],
@@ -275,11 +275,10 @@ const formsHoldingAll = async (
   actorId: string,
   required: readonly PermissionCode[],
   formIds: SQLWrapper,
-  executor: DbOrTx,
 ): Promise<string[]> => {
   const groups = effectiveGroups(actorId, { formIds }).as('effective_group');
   const rows = await withRolePermissions(
-    executor.select({ formId: groups.formId }).from(groups).$dynamic(),
+    db.select({ formId: groups.formId }).from(groups).$dynamic(),
     groups.groupId,
   )
     .groupBy(groups.formId)
@@ -296,13 +295,12 @@ export const resolveFormAccessGrant = async (
   actorId: string,
   required: readonly PermissionCode[],
   workspaceIds: string[],
-  executor: DbOrTx = db,
 ): Promise<FormAccessGrant> => {
   if (workspaceIds.length === 0) {
     return { workspaceIds: [], overriddenFormIds: [], includedFormIds: [] };
   }
   const granting = await withGroupPermissions(
-    executor
+    db
       .select({ workspaceId: workspaceMemberships.workspaceId })
       .from(workspaceMemberships)
       .$dynamic(),
@@ -312,7 +310,7 @@ export const resolveFormAccessGrant = async (
     )
     .groupBy(workspaceMemberships.workspaceId)
     .having(holdsAll(required));
-  const overriddenForms = executor
+  const overriddenForms = db
     .selectDistinct({ formId: formGroupOverrides.formId })
     .from(formGroupOverrides)
     .where(
@@ -325,8 +323,9 @@ export const resolveFormAccessGrant = async (
   return {
     workspaceIds: granting.map((row) => row.workspaceId),
     overriddenFormIds,
+    // Reused as a subquery so the ids are not bound one parameter each.
     includedFormIds: overriddenFormIds.length
-      ? await formsHoldingAll(actorId, required, overriddenForms, executor)
+      ? await formsHoldingAll(actorId, required, overriddenForms)
       : [],
   };
 };

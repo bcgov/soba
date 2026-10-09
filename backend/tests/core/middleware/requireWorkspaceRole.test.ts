@@ -5,16 +5,17 @@ import {
 } from '../../../src/core/middleware/requireWorkspaceRole';
 import { ForbiddenError } from '../../../src/core/errors';
 
-function makeReq(role?: string): Request {
-  const coreContext = role
-    ? {
-        workspaceId: 'ws1',
-        actorId: 'actor1',
-        actorDisplayLabel: 'Actor One',
-        workspaceSource: 'resource:workspace',
-        role,
-      }
-    : undefined;
+function makeReq(role?: string | null): Request {
+  const coreContext =
+    role !== undefined
+      ? {
+          workspaceId: 'ws1',
+          actorId: 'actor1',
+          actorDisplayLabel: 'Actor One',
+          workspaceSource: 'resource:workspace',
+          role,
+        }
+      : undefined;
   return { coreContext } as unknown as Request;
 }
 
@@ -27,7 +28,7 @@ describe('requireWorkspaceManage', () => {
     expect(next).toHaveBeenCalledWith();
   });
 
-  it.each(['member', 'viewer'])('forbids %s', (role) => {
+  it.each(['member', 'viewer', null])('forbids %s', (role) => {
     const next = jest.fn() as unknown as NextFunction;
     requireWorkspaceManage(makeReq(role), res, next);
     const error = (next as jest.Mock).mock.calls[0][0];
@@ -51,7 +52,7 @@ describe('requireWorkspacePeopleRead', () => {
     expect(next).toHaveBeenCalledWith();
   });
 
-  it.each(['viewer', 'unknown'])('forbids %s', (role) => {
+  it.each(['viewer', 'unknown', null])('forbids %s', (role) => {
     const next = jest.fn() as unknown as NextFunction;
     requireWorkspacePeopleRead(makeReq(role), res, next);
     const error = (next as jest.Mock).mock.calls[0][0];

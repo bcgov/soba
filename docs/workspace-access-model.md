@@ -29,7 +29,7 @@ adds a third control per submission, who takes part in it; see
 > the seeded roles only `form_admin` (via `*`) holds any of these sets. A draft created from an
 > existing version gets that version's templates under `design_create` alone. Reading and managing
 > groups and members is gated by workspace role (`requireWorkspacePeopleRead`,
-> `requireWorkspaceManage`), not by RBAC.
+> `requireWorkspaceManage` in `middleware/requireWorkspaceRole.ts`), not by RBAC.
 
 ```
                         User in a workspace
@@ -51,11 +51,13 @@ adds a third control per submission, who takes part in it; see
 `admin`, `member`, or `viewer`. `owner`/`admin` may administer the workspace, checked with
 `isWorkspaceManageRole(role)` straight off the membership row (e.g. `updateWorkspaceName` in
 `workspaceRepo.ts`, mirrored on the frontend in `workspaceRoles.ts`). `owner`, `admin` and `member`
-may read the workspace's groups and members (`isWorkspacePeopleReadRole`); a `viewer` may not, but
-still sees the workspace in their list and reads its settings.
+may read the workspace's groups and members (`isWorkspacePeopleReadRole`); a `viewer` may not, and
+lists the workspace and reads its settings.
 
 Workspace resolution reads the role from the membership on every request (`findActorMembership` in
 `membershipRepo.ts`); nothing caches it, so a role change applies to the caller's next request.
+Submit-surface contexts carry `role: null` for a caller with no membership, and for every caller of
+open, save and submit; neither workspace role guard accepts it.
 
 That role is the only source of workspace-management authority. It's never read for form permissions.
 
@@ -139,8 +141,7 @@ Six form roles are seeded (`role` + `role_permission`):
 `*` is a wildcard: a role holding it satisfies any permission check. Only `form_admin` has it, so adding
 new permissions later needs no change to that role.
 
-`form_submitter` holds no `form_read`, so someone who can only submit has no design access; they find
-their forms through My Forms or a shared link.
+`form_submitter` holds no `form_read`, so someone who can only submit has no design access.
 
 `form_create` is catalogued but not assigned to any seeded role. Only `form_admin` can create a form
 (via `*`). `form_designer` can create a new design on an existing form (`design_create`).

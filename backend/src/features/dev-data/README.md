@@ -161,7 +161,8 @@ Audience, and has a draft in Public without a membership.
 
 [`access/expectations.ts`](./access/expectations.ts) records who each check admits, case by case.
 `pnpm db:dev-data:verify` runs every persona against every case through the list queries and access
-rules the submit and design routes use, and exits 1 on any difference:
+rules the submit and design routes and the workspace members and groups reads use, and exits 1 on
+any difference:
 
 - forms: listed in My Forms, start, draft, and the access check for `document_template_read` and
   `submission_update`

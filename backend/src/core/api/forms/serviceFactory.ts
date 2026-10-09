@@ -322,7 +322,10 @@ export function createFormsApiService(
       };
     },
 
-    lookupFormVersions: async (scope: FormsListScopeInput, query: { formId: string; q?: string }) =>
+    lookupFormVersions: async (
+      scope: Omit<FormsListScopeInput, 'formAccess'>,
+      query: { formId: string; q?: string },
+    ) =>
       toLookupResponse(
         await formVersionService.lookup({
           workspaceIds: scope.workspaceIds,

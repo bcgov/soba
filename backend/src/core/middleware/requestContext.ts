@@ -14,7 +14,8 @@ export interface CoreRequestContext {
   formId?: string;
   /**
    * The actor's workspace membership role (owner/admin/member/viewer), read on every request. Null
-   * on the submit surface for a caller with no membership, so no workspace role check passes.
+   * for a caller with no membership on the submit surface, and in every context setSubmitContext
+   * builds; no workspace role check accepts null.
    */
   role: string | null;
   /**

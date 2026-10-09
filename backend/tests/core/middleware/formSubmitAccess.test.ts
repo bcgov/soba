@@ -77,7 +77,12 @@ describe('requireFormSubmitAccess', () => {
       expect.objectContaining({ actorId: 'u1' }),
     );
     expect(next).toHaveBeenCalledWith();
-    expect(req.coreContext).toMatchObject({ workspaceId: 'ws1', formId: 'f1', actorId: 'u1' });
+    expect(req.coreContext).toMatchObject({
+      workspaceId: 'ws1',
+      formId: 'f1',
+      actorId: 'u1',
+      role: null,
+    });
   });
 
   it('keeps a body formId from turning a write into an open', async () => {
