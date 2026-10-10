@@ -145,18 +145,20 @@ describe('templates routes', () => {
     expect(templatesService.replaceFile).not.toHaveBeenCalled();
   });
 
+  const READ = [Permissions.form_read, Permissions.document_template_read];
+
   it.each([
-    ['GET', `/templates?formId=${FORM}`, Permissions.document_template_read],
-    ['POST', `/templates?formVersionId=${VERSION}`, Permissions.document_template_create],
-    ['GET', `/templates/${TEMPLATE}`, Permissions.document_template_read],
-    ['GET', `/templates/${TEMPLATE}/content`, Permissions.document_template_read],
-    ['PUT', `/templates/${TEMPLATE}/content`, Permissions.document_template_create],
-    ['PATCH', `/templates/${TEMPLATE}`, Permissions.document_template_create],
-    ['DELETE', `/templates/${TEMPLATE}`, Permissions.document_template_delete],
-  ])('%s %s requires %s', async (method, url, permission) => {
+    ['GET', `/templates?formId=${FORM}`, READ],
+    ['POST', `/templates?formVersionId=${VERSION}`, [Permissions.document_template_create]],
+    ['GET', `/templates/${TEMPLATE}`, READ],
+    ['GET', `/templates/${TEMPLATE}/content`, READ],
+    ['PUT', `/templates/${TEMPLATE}/content`, [Permissions.document_template_create]],
+    ['PATCH', `/templates/${TEMPLATE}`, [Permissions.document_template_create]],
+    ['DELETE', `/templates/${TEMPLATE}`, [Permissions.document_template_delete]],
+  ])('%s %s requires %j', async (method, url, permissions) => {
     const res = await send(method, url);
     expect(res.status).toBe(403);
-    expect(mockAsked).toEqual([[permission]]);
+    expect(mockAsked).toEqual([permissions]);
   });
 
   it.each([

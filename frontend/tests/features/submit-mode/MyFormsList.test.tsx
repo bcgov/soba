@@ -91,7 +91,7 @@ const OPEN = {
   workspaceId: WS_A.id,
   workspaceName: WS_A.name,
   publishedVersionId: 'v1',
-  permissions: ['form_read', 'submission_create'],
+  permissions: ['document_template_read', 'submission_create'],
   audienceMode: 'members' as const,
   audienceIdps: [],
   allowSubmitterDrafts: true,

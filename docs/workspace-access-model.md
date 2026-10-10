@@ -17,16 +17,19 @@ adds a third control per submission, who takes part in it; see
 
 > **Current status.** The design form routes (`api/forms/route.ts`) and the staff submission routes
 > (`api/submissions/route.ts`) are gated by `requireFormPermissions`, except schema normalize (no
-> workspace). Creating a form requires `form_create` and `design_create` — only `form_admin` satisfies
-> that, via `*`. Creating a design on an existing form requires `design_create` (`form_designer`). The
-> submit routes, file uploads and document generation are gated by `isSubmitterAllowed` (see
+> workspace), and check the caller's permissions on the form in question (see
+> [Resolving a user's permissions](#resolving-a-users-permissions)). Creating a form requires
+> `form_create` and `design_create`; only `form_admin` satisfies that, via `*`. Creating a design on
+> an existing form requires `design_create` (`form_designer`). The submit routes, file uploads and
+> document generation are gated by `isSubmitterAllowed` (see
 > [Submission participants](#submission-participants)); rendering a document also needs
 > `document_template_read`. The template routes (`features/templates/route.ts`) are gated by
-> `requireFormPermissions`: `document_template_read` to list and download, `document_template_create`
-> to upload, replace and rename, `document_template_delete` to delete. Only `form_admin` (via `*`)
-> holds the create and delete codes; `form_submitter` holds read. A draft created from an existing
-> version gets that version's templates under `design_create` alone. Group and member management is
-> gated by workspace role (`requireWorkspaceManage`), not by RBAC.
+> `requireFormPermissions`: `form_read` and `document_template_read` to list and download,
+> `document_template_create` to upload, replace and rename, `document_template_delete` to delete. Of
+> the seeded roles only `form_admin` (via `*`) holds any of these sets. A draft created from an
+> existing version gets that version's templates under `design_create` alone. Reading and managing
+> groups and members is gated by workspace role (`requireWorkspacePeopleRead`,
+> `requireWorkspaceManage` in `middleware/requireWorkspaceRole.ts`), not by RBAC.
 
 ```
                         User in a workspace
@@ -47,28 +50,38 @@ adds a third control per submission, who takes part in it; see
 `workspace_membership` is the roster: one row per (user, workspace) with a coarse `role` of `owner`,
 `admin`, `member`, or `viewer`. `owner`/`admin` may administer the workspace, checked with
 `isWorkspaceManageRole(role)` straight off the membership row (e.g. `updateWorkspaceName` in
-`workspaceRepo.ts`, mirrored on the frontend in `workspaceRoles.ts`).
+`workspaceRepo.ts`, mirrored on the frontend in `workspaceRoles.ts`). `owner`, `admin` and `member`
+may read the workspace's groups and members (`isWorkspacePeopleReadRole`); a `viewer` may not, but
+lists the workspace and reads its settings.
+
+Workspace resolution reads the role from the membership on every request (`findActorMembership` in
+`membershipRepo.ts`); nothing caches it, so a role change applies to the caller's next request.
+Submit-surface contexts carry `role: null` for a caller with no membership, and for every caller of
+open, save, submit and file upload; neither workspace role guard accepts it.
 
 That role is the only source of workspace-management authority. It's never read for form permissions.
 
 ### Managing groups and members
 
-Groups, their roles, and their members are managed through the group APIs, gated by
-`requireWorkspaceManage` (owner/admin only, via `req.coreContext.role`):
+Groups, their roles, and their members are managed through the group APIs. Writes are gated by
+`requireWorkspaceManage` (owner/admin, via `req.coreContext.role`) and the list by
+`requireWorkspacePeopleRead` (owner, admin, member):
 
-| method   | path                                                | effect                                                              |
-| -------- | --------------------------------------------------- | ------------------------------------------------------------------- |
-| `GET`    | `/workspaces/:id/groups`                            | list active groups with their roles and `user` members (any member) |
-| `POST`   | `/workspaces/:id/groups`                            | create a group carrying `roleCodes`                                 |
-| `PATCH`  | `/workspaces/:id/groups/:groupId`                   | rename / re-describe a group                                        |
-| `DELETE` | `/workspaces/:id/groups/:groupId`                   | soft-delete a group                                                 |
-| `PUT`    | `/workspaces/:id/groups/:groupId/roles`             | replace a group's role set                                          |
-| `POST`   | `/workspaces/:id/groups/:groupId/members`           | add a workspace member (by `membershipId`)                          |
-| `DELETE` | `/workspaces/:id/groups/:groupId/members/:memberId` | remove a member by its row id                                       |
+| method   | path                                                | effect                                                 |
+| -------- | --------------------------------------------------- | ------------------------------------------------------ |
+| `GET`    | `/workspaces/:id/groups`                            | list active groups with their roles and `user` members |
+| `POST`   | `/workspaces/:id/groups`                            | create a group carrying `roleCodes`                    |
+| `PATCH`  | `/workspaces/:id/groups/:groupId`                   | rename / re-describe a group                           |
+| `DELETE` | `/workspaces/:id/groups/:groupId`                   | soft-delete a group                                    |
+| `PUT`    | `/workspaces/:id/groups/:groupId/roles`             | replace a group's role set                             |
+| `POST`   | `/workspaces/:id/groups/:groupId/members`           | add a workspace member (by `membershipId`)             |
+| `DELETE` | `/workspaces/:id/groups/:groupId/members/:memberId` | remove a member by its row id                          |
 
 Group names are unique among **active** groups in a workspace. Delete is a soft-delete: the group and
 its roles and memberships are set to `inactive` in one transaction, so the resolver (which only reads
 active roles/memberships) stops granting through it, and the name frees up for reuse.
+
+`GET /members?workspaceId=` lists the workspace's members under the same read rule.
 
 Only `user` members are managed here. Per-form overrides are covered in
 [Form-level overrides](#form-level-overrides). The repo (`workspaceGroupRepo.ts`) is shared with
@@ -120,13 +133,15 @@ Six form roles are seeded (`role` + `role_permission`):
 | --------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `form_admin`          | `*` (everything)                                                                                           |
 | `form_designer`       | `form_read`, `design_create`, `design_read`, `design_update`, `design_delete`                              |
-| `form_submitter`      | `form_read`, `submission_create`, `document_template_read`                                                 |
+| `form_submitter`      | `submission_create`, `document_template_read`                                                              |
 | `submission_reviewer` | `form_read`, `submission_read`, `submission_update`, `submission_delete`, `submission_review`, `team_read` |
 | `submission_approver` | `form_read`, `submission_read`, `submission_review`, `team_read`                                           |
 | `team_manager`        | `form_read`, `team_read`, `team_update`                                                                    |
 
 `*` is a wildcard: a role holding it satisfies any permission check. Only `form_admin` has it, so adding
 new permissions later needs no change to that role.
+
+`form_submitter` holds no `form_read`, so someone who can only submit has no design access.
 
 `form_create` is catalogued but not assigned to any seeded role. Only `form_admin` can create a form
 (via `*`). `form_designer` can create a new design on an existing form (`design_create`).
@@ -141,7 +156,8 @@ lives on the group (`workspace_group_role`). A member is `member_kind = user`, r
 `workspace_membership_id`. The table also allows `idp` and `idp_group` kinds, which nothing writes or
 reads.
 
-`user` members are resolved for form permissions by `resolveFormPermissions`.
+`user` members are resolved for form permissions by `resolveFormPermissions` (one form) and
+`resolveWorkspacePermissions` (the workspace) in `formAccessRepo.ts`.
 
 ### The special groups
 
@@ -166,7 +182,7 @@ inherits every group, so a change to a workspace group reaches every form that h
 
 An override replaces the group's whole membership for that form; roles stay on the workspace group.
 Returning to inherit sets the override `inactive` and deletes its members.
-`effectiveGroups` in `submitterFormRepo.ts` resolves, per form, the groups a user is an effective
+`effectiveGroups` in `formAccessRepo.ts` resolves, per form, the groups a user is an effective
 member of: each active group's override members where the form has an active override, otherwise the
 workspace group's members.
 
@@ -178,8 +194,8 @@ caller's effective `user` memberships by the same rule, and decides with `formAc
 `@soba/lib`, which also checks the form's [audience](#form-audience). Submit mode uses it to open a
 submission, alongside participation to save, submit, upload and delete a file on an in-progress
 submission, and on its own (`submission_update`) to delete a file on a submitted submission. Design
-routes and lists still use `resolveFormPermissions`, which reads workspace group membership, so they
-are not form-aware yet.
+routes and lists read overrides by the same rule; see
+[Resolving a user's permissions](#resolving-a-users-permissions).
 
 ### Form Audience
 
@@ -194,6 +210,9 @@ Who outside the workspace may submit is a shared settings group (see [Form setti
 | `public`    | everyone, including anonymous callers                                     |
 | `protected` | callers signed in through one of `idps`, which are active login providers |
 | `members`   | no one beyond role holders                                                |
+
+An audience conveys only `submission_create` and `document_template_read` (`isAudiencePermission` in
+`@soba/lib`); every other permission needs a role.
 
 A form that inherits uses its workspace's audience, read when asked, so a workspace change reaches it
 with nothing copied. A form may be more open than its workspace. Anyone a group gives
@@ -217,15 +236,20 @@ Drafts are not offered on a public audience.
 
 ### Resolving a user's permissions
 
-`resolveFormPermissions(actorId, workspaceId)` in `formAccessRepo.ts` returns the set of permission
-codes a user holds:
+`formAccessRepo.ts` has two resolvers. Each returns the permission codes a user holds through the
+active roles of the active groups they are an active `user` member of; a set containing `*` grants
+everything.
+
+- `resolveFormPermissions(actorId, workspaceId, formId)` - on one form, with its overrides applied
+  (`permissionsByForm` over `effectiveGroups`).
+- `resolveWorkspacePermissions(actorId, workspaceId)` - across the workspace, without overrides.
 
 ```
-   actorId + workspaceId
+   actorId + workspaceId (+ formId)
         |
         v
-   workspace_group_membership     (member_kind = user, active)
-        |
+   workspace_group_membership     (member_kind = user, active; on a form, a group the form
+        |                          overrides takes its form_group_override_member rows instead)
         v
    workspace_group_role
         |
@@ -236,13 +260,24 @@ codes a user holds:
    permission set                 (may contain '*')
 ```
 
-It's workspace-scoped: a user's form permissions are the same for every form in the workspace, because
-it reads workspace group membership and not form overrides. `hasAllPermissions(perms, required)`
-from `@soba/lib` does the check and treats `*` as a match for anything.
+`requireFormPermissions(required)` checks the form in `req.coreContext.formId` when there is one and
+the workspace otherwise (creating a form), and answers 403 when a code is missing.
+`workspaceFromResource` sets `formId` for a form or anything under one (version, submission,
+template), and `workspaceListScope` sets it for a list anchored by a form, version or submission.
+`hasAllPermissions(perms, required)` from `@soba/lib` does the check and treats `*` as a match for
+anything.
 
-`GET /forms/:id` returns the caller's resolved codes as `permissions` (a sorted array, `['*']` for
-admins) so the UI can gate actions. This reads the same resolver, so it upgrades automatically when
-per-form resolution lands.
+A design list that names no form is filtered, not refused. Anchored by a workspace, it needs
+membership (403 otherwise); with no anchor, it covers every workspace the caller is an active member
+of. `resolveFormAccessGrant` first reads the workspaces whose permissions hold the codes, the forms
+there with an active override, and which of those hold the codes on their own. The list repos then
+keep only the rows that grant allows (`permittedFormsWhere`): a form without an active override is
+allowed by its workspace, and an overridden form only by its own permissions. Page and total share
+the grant, and a list repo called without one returns nothing. A list anchored by a form, version or
+submission is checked on that form and gets a grant for that form alone.
+
+`GET /design/forms/:id` returns the caller's codes on that form as `permissions` (a sorted array,
+`['*']` for admins) so the UI can gate actions.
 
 ## Submission participants
 

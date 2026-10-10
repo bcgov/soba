@@ -1,6 +1,6 @@
 import { FormService } from '../../services/formService';
 import { FormVersionService } from '../../services/formVersionService';
-import { resolveFormPermissions } from '../../db/repos/formAccessRepo';
+import type { FormAccessGrant } from '../../db/repos/formAccessRepo';
 import type { FormListSort } from '../../db/repos/formRepo';
 import type { SubmitterFormListRow } from '../../db/repos/submitterFormRepo';
 import type { FormVersionListSort } from '../../db/repos/formVersionRepo';
@@ -19,10 +19,16 @@ import type { CoreRequestContext } from '../../middleware/requestContext';
 
 export type FormsContextInput = CoreRequestContext;
 
-/** Scope for list/search: single workspace resolved from a scope anchor. */
+/** Scope for list/search: the workspaces searched and the access grant rows must pass. */
 export interface FormsListScopeInput {
   workspaceIds: string[];
   actorId: string;
+  formAccess: FormAccessGrant;
+}
+
+/** Scope for a lookup: the workspaces searched. */
+export interface FormsLookupScopeInput {
+  workspaceIds: string[];
 }
 
 interface ListFormsQueryInput {
@@ -225,14 +231,11 @@ export function createFormsApiService(
     getForm: async (ctx: FormsContextInput, formId: string) => {
       const row = await formService.get(ctx.workspaceId, formId);
       if (!row) return null;
-      // Caller's permissions on this form, so the UI can gate actions. Workspace-scoped today.
-      const [permissions, currentVersion] = await Promise.all([
-        resolveFormPermissions(ctx.actorId, ctx.workspaceId),
-        formVersionService.getCurrent(ctx.workspaceId, formId),
-      ]);
+      const currentVersion = await formVersionService.getCurrent(ctx.workspaceId, formId);
       return {
         ...toFormDto(row),
-        permissions: [...permissions].sort((a, b) => a.localeCompare(b)),
+        // The caller's permissions on this form, as requireFormPermissions resolved them.
+        permissions: [...(ctx.permissions ?? [])].sort((a, b) => a.localeCompare(b)),
         currentVersion,
       };
     },
@@ -241,6 +244,7 @@ export function createFormsApiService(
       const result = await formService.list({
         workspaceIds: scope.workspaceIds,
         actorId: scope.actorId,
+        formAccess: scope.formAccess,
         offset: query.offset,
         limit: query.limit,
         formId: query.formId,
@@ -297,6 +301,7 @@ export function createFormsApiService(
       const result = await formVersionService.list({
         workspaceIds: scope.workspaceIds,
         actorId: scope.actorId,
+        formAccess: scope.formAccess,
         offset: query.offset,
         limit: query.limit,
         formId: query.formId,
@@ -322,7 +327,10 @@ export function createFormsApiService(
       };
     },
 
-    lookupFormVersions: async (scope: FormsListScopeInput, query: { formId: string; q?: string }) =>
+    lookupFormVersions: async (
+      scope: FormsLookupScopeInput,
+      query: { formId: string; q?: string },
+    ) =>
       toLookupResponse(
         await formVersionService.lookup({
           workspaceIds: scope.workspaceIds,

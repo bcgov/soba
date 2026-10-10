@@ -1,8 +1,8 @@
 import { isIdentifiedCaller } from '@soba/lib';
-import { hasFormSubmitAccess, type FormAccessTarget } from '../db/repos/formSubmitAccessRepo';
+import type { FormAccessTarget } from '../db/repos/formSubmitAccessRepo';
 import { getSubmissionWorkspaceAndState } from '../db/repos/submissionRepo';
 import { getWorkspaceIdForForm } from '../db/repos/formRepo';
-import { PUBLIC_SUBMITTER_LABEL, WorkspaceMembershipRole, type PermissionCode } from '../db/codes';
+import { PUBLIC_SUBMITTER_LABEL } from '../db/codes';
 import {
   isSubmitterAllowed,
   SubmitterOperation,
@@ -65,8 +65,8 @@ export const setSubmitContext = (req: Request, target: FormAccessTarget): void =
     actorDisplayLabel:
       req.user?.profile?.displayLabel || req.user?.profile?.displayName || PUBLIC_SUBMITTER_LABEL,
     workspaceSource: 'public-submit',
-    // Public submitters have no membership; a non-manage role keeps them off workspace-admin routes.
-    role: WorkspaceMembershipRole.member,
+    // Open, save, submit and upload read no role; without one, no workspace role check passes.
+    role: null,
   };
 };
 
@@ -96,34 +96,6 @@ const resolveSubmitTarget = async (req: Request): Promise<SubmitterAccessTarget>
   }
 
   throw new ValidationError('Missing submission target');
-};
-
-/**
- * Authorizes a read of a form resource whose workspace and form were already resolved into
- * req.coreContext (see openWorkspaceFromResource). Grants role holders with `required`, or a caller the
- * form's audience admits when `required` is an audience permission (isAudiencePermission). On
- * denial, 401 for anonymous / 403 for an authenticated non-member.
- */
-export const requireFormAccess = (required: PermissionCode) => {
-  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const context = req.coreContext;
-      if (!context?.formId) {
-        throw new Error('requireFormAccess must run after form resource resolution');
-      }
-      const allowed = await hasFormSubmitAccess(
-        { workspaceId: context.workspaceId, formId: context.formId },
-        resolveCaller(req),
-        required,
-      );
-      if (!allowed) {
-        throw accessDenial(req, 'Not authorized to access this form');
-      }
-      next();
-    } catch (error) {
-      next(error);
-    }
-  };
 };
 
 /**

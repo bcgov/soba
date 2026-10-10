@@ -15,6 +15,7 @@ import {
 } from '../db/repos/formVersionRepo';
 import { getFormById, getFormEngineCodeForForm } from '../db/repos/formRepo';
 import { copyDocumentTemplates } from '../db/repos/documentTemplateRepo';
+import type { FormAccessGrant } from '../db/repos/formAccessRepo';
 import { createFormEngineAdapter } from '../integrations/form-engine/FormEngineRegistry';
 import { db, type DbOrTx } from '../db/client';
 import { ConflictError, NotFoundError, ValidationError } from '../errors';
@@ -95,6 +96,7 @@ interface VersionActionInput {
 interface ListInput {
   workspaceIds: string[];
   actorId: string;
+  formAccess: FormAccessGrant;
   offset: number;
   limit: number;
   formId?: string;

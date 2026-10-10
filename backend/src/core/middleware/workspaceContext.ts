@@ -8,15 +8,9 @@
  *
  */
 import type { NextFunction, Request, Response } from 'express';
-import { eq } from 'drizzle-orm';
-import { db } from '../db/client';
-import { appUsers } from '../db/schema';
-import { getWorkspaceForUser } from '../db/repos/membershipRepo';
+import { findActorMembership } from '../db/repos/membershipRepo';
 import { getWorkspaceById } from '../db/repos/workspaceRepo';
-import { getCacheAdapter } from '../integrations/plugins/PluginRegistry';
-import { membershipKey } from '../integrations/cache/cacheKeys';
 import { ForbiddenError, NotFoundError, ValidationError } from '../errors';
-import { WorkspaceMembershipRole } from '../db/codes';
 import { getActorId } from './actor';
 import { getFormListContext, getWorkspaceIdForForm } from '../db/repos/formRepo';
 import { getFormVersionListContext } from '../db/repos/formVersionRepo';
@@ -34,6 +28,8 @@ type ListScopeQuery = Partial<Record<ListAnchorKind, string>>;
 export type ResolvedListScope = {
   workspaceId: string;
   anchorKind: ListAnchorKind;
+  /** The form a form, version or submission anchor belongs to. */
+  formId?: string;
 };
 
 const readQueryString = (query: ListScopeQuery, key: ListAnchorKind): string | undefined => {
@@ -85,7 +81,7 @@ export const resolveListWorkspaceScope = async (
       assertHierarchyMatch('formVersionId', context.formVersionId, qFormVersionId);
       assertHierarchyMatch('formId', context.formId, qFormId);
       assertHierarchyMatch('workspaceId', context.workspaceId, qWorkspaceId);
-      return { workspaceId: context.workspaceId, anchorKind };
+      return { workspaceId: context.workspaceId, anchorKind, formId: context.formId };
     }
     case 'formVersionId': {
       const formVersionId = readQueryString(query, 'formVersionId')!;
@@ -95,7 +91,7 @@ export const resolveListWorkspaceScope = async (
       }
       assertHierarchyMatch('formId', context.formId, qFormId);
       assertHierarchyMatch('workspaceId', context.workspaceId, qWorkspaceId);
-      return { workspaceId: context.workspaceId, anchorKind };
+      return { workspaceId: context.workspaceId, anchorKind, formId: context.formId };
     }
     case 'formId': {
       const formId = readQueryString(query, 'formId')!;
@@ -104,7 +100,7 @@ export const resolveListWorkspaceScope = async (
         throw new NotFoundError(RESOURCE_NOT_FOUND);
       }
       assertHierarchyMatch('workspaceId', context.workspaceId, qWorkspaceId);
-      return { workspaceId: context.workspaceId, anchorKind };
+      return { workspaceId: context.workspaceId, anchorKind, formId };
     }
     case 'workspaceId': {
       return { workspaceId: readQueryString(query, 'workspaceId')!, anchorKind };
@@ -112,63 +108,32 @@ export const resolveListWorkspaceScope = async (
   }
 };
 
-/** The cache getOrSet, or undefined if no working cache adapter is available. Acquisition is guarded
- *  so a missing/misconfigured cache (e.g. cache-redis selected with no URL) falls through to the
- *  source of truth rather than throwing on every request. */
-const cachedGetOrSet = () => {
-  try {
-    const cache = getCacheAdapter();
-    return cache.getOrSet?.bind(cache);
-  } catch {
-    return undefined;
-  }
-};
-
-/** Membership lookup for `workspaceId`/`actorId`, cached when a cache adapter supports getOrSet. */
-const loadMembership = (workspaceId: string, actorId: string) => {
-  const getOrSet = cachedGetOrSet();
-  return getOrSet
-    ? getOrSet(membershipKey(workspaceId, actorId), () => getWorkspaceForUser(workspaceId, actorId))
-    : getWorkspaceForUser(workspaceId, actorId);
-};
-
-/** The actor's display label (null if the user row is gone). */
-const loadActorDisplayLabel = async (actorId: string): Promise<string | null> => {
-  const userRow = await db
-    .select({ displayLabel: appUsers.displayLabel })
-    .from(appUsers)
-    .where(eq(appUsers.id, actorId))
-    .limit(1);
-  return userRow[0]?.displayLabel ?? null;
-};
-
 /**
- * Build the core request context for an already-resolved workspace: verify membership (cached) and
- * load the actor display label. Throws ForbiddenError when the actor is not a member.
+ * Build the core request context for an already-resolved workspace from the actor's membership and
+ * display label. Throws ForbiddenError when the actor is not a member.
  */
 export const buildCoreContext = async (
   actorId: string,
   workspaceId: string,
   source: string,
 ): Promise<CoreRequestContext> => {
-  const membership = await loadMembership(workspaceId, actorId);
-  if (!membership) {
+  const actor = await findActorMembership(workspaceId, actorId);
+  if (!actor?.role) {
     throw new ForbiddenError('Actor does not belong to workspace');
   }
   return {
     workspaceId,
     actorId,
-    actorDisplayLabel: await loadActorDisplayLabel(actorId),
+    actorDisplayLabel: actor.displayLabel,
     workspaceSource: source,
-    role: membership.role,
+    role: actor.role,
   };
 };
 
 /**
  * Build a context for the submit surface WITHOUT requiring membership: the workspace is resolved so the
  * route's own guard decides access. Members get their real role; non-members (incl. the public user)
- * get a non-manage role so they can never reach workspace-admin routes. Shares the cached membership
- * lookup with buildCoreContext.
+ * get none, so no workspace role check passes.
  */
 const buildSubmitContext = async (
   actorId: string,
@@ -176,14 +141,14 @@ const buildSubmitContext = async (
   source: string,
 ): Promise<CoreRequestContext> => {
   const { workspaceId, formId } = scope;
-  const membership = await loadMembership(workspaceId, actorId);
+  const actor = await findActorMembership(workspaceId, actorId);
   return {
     workspaceId,
     ...(formId ? { formId } : {}),
     actorId,
-    actorDisplayLabel: await loadActorDisplayLabel(actorId),
+    actorDisplayLabel: actor?.displayLabel ?? null,
     workspaceSource: source,
-    role: membership?.role ?? WorkspaceMembershipRole.member,
+    role: actor?.role ?? null,
   };
 };
 
@@ -266,7 +231,8 @@ export const workspaceFromBody = async (
 
 /**
  * List/search routes: resolve workspace from the most specific scope anchor in the query,
- * verify hierarchy consistency, membership, and restrict results to that single workspace.
+ * verify hierarchy consistency, membership, and restrict results to that workspace. A form,
+ * version or submission anchor also puts its form in context.
  */
 export const workspaceListScope = (config: {
   anchorOrder: ListAnchorKind[];
@@ -304,7 +270,7 @@ export const workspaceListScope = (config: {
         resolved.workspaceId,
         `list:${resolved.anchorKind}`,
       );
-      req.coreContext = context;
+      req.coreContext = resolved.formId ? { ...context, formId: resolved.formId } : context;
       req.listScope = {
         actorId,
         workspaceIds: [resolved.workspaceId],

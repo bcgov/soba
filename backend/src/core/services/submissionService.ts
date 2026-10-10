@@ -17,6 +17,7 @@ import {
 } from '../db/repos/submissionRepo';
 import { getFormVersionById, getPublishedVersionForForm } from '../db/repos/formVersionRepo';
 import { getFormEngineCodeForForm } from '../db/repos/formRepo';
+import type { FormAccessGrant } from '../db/repos/formAccessRepo';
 import { createFormEngineAdapter } from '../integrations/form-engine/FormEngineRegistry';
 import { ConflictError, NotFoundError, ValidationError } from '../errors';
 import {
@@ -77,6 +78,7 @@ interface DeleteInput {
 interface ListInput {
   workspaceIds: string[];
   actorId: string;
+  formAccess: FormAccessGrant;
   offset: number;
   limit: number;
   formId?: string;
