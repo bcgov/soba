@@ -7,6 +7,7 @@ import {
   submissionParticipants,
   userIdentities,
   workspaceGroupMemberships,
+  workspaceGroups,
 } from '../../../core/db/schema';
 import {
   GroupMemberKind,
@@ -14,6 +15,7 @@ import {
   SubmissionParticipantRole,
   SubmissionParticipantStatus,
   WorkspaceGroupMembershipStatus,
+  WorkspaceGroupStatus,
   WorkspaceMembershipStatus,
   type SystemGroupCode,
 } from '../../../core/db/codes';
@@ -180,6 +182,12 @@ async function groupFor(
     roleCodes: [...seat.group.roleCodes],
     displayLabel: admin.displayLabel,
   });
+  if (seat.group.status) {
+    await db
+      .update(workspaceGroups)
+      .set({ status: WorkspaceGroupStatus[seat.group.status] })
+      .where(eq(workspaceGroups.id, groupId));
+  }
   named.set(seat.group.name, groupId);
   return groupId;
 }

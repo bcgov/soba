@@ -1,4 +1,4 @@
-import { and, count, eq, exists, ilike, isNotNull, isNull, or, sql, inArray } from 'drizzle-orm';
+import { and, count, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { WORKSPACE_SORT_FIELDS, type SortLocale, type SortToken } from '@soba/lib';
 import { db } from '../client';
@@ -8,24 +8,15 @@ import {
   userIdentities,
   workspaceDisclaimerAcceptances,
   workspaceMemberships,
-  workspaceGroupMemberships,
-  workspaceGroupRoles,
-  rolePermissions,
   workspaces,
 } from '../schema';
 import { profileHelpers } from '../../auth/jwtClaims';
 import { ForbiddenError } from '../../errors';
 import type { NormalizedProfile, IdpAttributes } from '../../auth/jwtClaims';
-import {
-  GroupMemberKind,
-  Permissions,
-  WorkspaceGroupMembershipStatus,
-  WorkspaceGroupRoleStatus,
-  WorkspaceMembershipRole,
-  WorkspaceMembershipStatus,
-} from '../codes';
+import { WorkspaceMembershipRole, WorkspaceMembershipStatus } from '../codes';
 import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
+import { membershipHoldsPermission } from './formAccessRepo';
 
 /** Second int for `pg_advisory_xact_lock`; must not collide with workspaceRepo / sobaAdminRepo lock ids. */
 const ADV_LOCK_FIND_OR_CREATE_IDENTITY = 2_147_483_622;
@@ -250,29 +241,6 @@ export interface WorkspaceListRow {
   updatedAt: Date;
 }
 
-// Correlated to the actor's own membership row, not just any member of the workspace.
-const holdsPermission = (code: string) =>
-  exists(
-    db
-      .select({ permissionCode: rolePermissions.permissionCode })
-      .from(workspaceGroupMemberships)
-      .innerJoin(
-        workspaceGroupRoles,
-        eq(workspaceGroupRoles.groupId, workspaceGroupMemberships.groupId),
-      )
-      .innerJoin(rolePermissions, eq(rolePermissions.roleCode, workspaceGroupRoles.roleCode))
-      .where(
-        and(
-          eq(workspaceGroupMemberships.workspaceMembershipId, workspaceMemberships.id),
-          eq(workspaceGroupMemberships.workspaceId, workspaceMemberships.workspaceId),
-          eq(workspaceGroupMemberships.memberKind, GroupMemberKind.user),
-          eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
-          eq(workspaceGroupRoles.status, WorkspaceGroupRoleStatus.active),
-          inArray(rolePermissions.permissionCode, [code, Permissions.all]),
-        ),
-      ),
-  );
-
 /** Expects workspace_membership joined to workspace and left joined to the disclaimer acceptance. */
 const workspaceMembershipWhere = (filter: WorkspaceMembershipFilter) => {
   const whereClauses = [
@@ -290,7 +258,7 @@ const workspaceMembershipWhere = (filter: WorkspaceMembershipFilter) => {
     whereClauses.push(or(ilike(workspaces.name, pattern), ilike(workspaces.org, pattern)));
   }
   for (const code of new Set(filter.requiredPermissions)) {
-    whereClauses.push(holdsPermission(code));
+    whereClauses.push(membershipHoldsPermission(code));
   }
   if (filter.disclaimerAccepted !== undefined) {
     const acceptedAt = workspaceDisclaimerAcceptances.acceptedAt;

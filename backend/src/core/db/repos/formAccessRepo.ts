@@ -217,6 +217,27 @@ const holdsAll = (required: readonly string[]): SQL => {
 };
 
 /**
+ * Whether the outer query's workspace_membership row holds `code`, or '*', through an active group's
+ * active role. Correlated to that row, not to any member of its workspace.
+ */
+export const membershipHoldsPermission = (code: string): SQL =>
+  exists(
+    withRolePermissions(
+      db
+        .select({ permissionCode: rolePermissions.permissionCode })
+        .from(workspaceGroupMemberships)
+        .innerJoin(workspaceGroups, activeGroup(workspaceGroupMemberships.groupId))
+        .$dynamic(),
+      workspaceGroups.id,
+    ).where(
+      and(
+        activeUserGroupMembership,
+        inArray(rolePermissions.permissionCode, [code, Permissions.all]),
+      ),
+    ),
+  );
+
+/**
  * Permission codes the user holds across a workspace, from the roles of the workspace groups they
  * belong to, without any form's overrides. A returned set containing '*' grants everything.
  */

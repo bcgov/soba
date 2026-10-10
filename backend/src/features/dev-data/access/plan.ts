@@ -32,6 +32,7 @@ export const PERSONA_KEYS = [
   'overrideAdded',
   'inactiveMember',
   'inactiveGroupMember',
+  'inactiveGroup',
   'outsider',
   'bceidOutsider',
   'collaborator',
@@ -67,7 +68,10 @@ export interface PlannedSeat {
   persona: Exclude<PersonaKey, typeof ADMIN>;
   role: WorkspaceMembershipRoleCode;
   /** A named group is created by the first seat that names it. */
-  group: { system: SystemGroupCode } | { name: string; roleCodes: RoleCode[] } | null;
+  group:
+    | { system: SystemGroupCode }
+    | { name: string; roleCodes: RoleCode[]; status?: 'inactive' }
+    | null;
   membershipStatus?: 'inactive';
   groupMembershipStatus?: 'inactive';
 }
@@ -169,6 +173,7 @@ const PERSONA_PROVIDERS: Record<GeneratedPersonaKey, string> = {
   overrideAdded: 'azureidir',
   inactiveMember: 'azureidir',
   inactiveGroupMember: 'azureidir',
+  inactiveGroup: 'azureidir',
   outsider: 'azureidir',
   bceidOutsider: 'bceidbusiness',
   collaborator: 'azureidir',
@@ -253,6 +258,16 @@ const ROLES_WORKSPACE: PlannedCoverageWorkspace = {
     { persona: 'overrideAdded', role: WorkspaceMembershipRole.member, group: null },
     { ...submitters('inactiveMember'), membershipStatus: 'inactive' },
     { ...submitters('inactiveGroupMember'), groupMembershipStatus: 'inactive' },
+    // Only the group is inactive; its membership and role stay active.
+    {
+      persona: 'inactiveGroup',
+      role: WorkspaceMembershipRole.member,
+      group: {
+        name: `${COVERAGE_PREFIX}Retired admins`,
+        roleCodes: [Roles.form_admin],
+        status: 'inactive',
+      },
+    },
     // The public user's roles never count, even with a seat.
     submitters(ANONYMOUS),
   ],

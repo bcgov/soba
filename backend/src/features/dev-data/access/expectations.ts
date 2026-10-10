@@ -41,6 +41,8 @@ export interface DesignExpectation {
 export interface WorkspaceExpectation {
   /** Lists the workspace's members and groups. */
   peopleRead: PersonaKey[];
+  /** Offered by the Create Form workspace picker. */
+  formCreate: PersonaKey[];
 }
 
 export interface SubmissionExpectation {
@@ -61,7 +63,7 @@ export const DESIGN_CHECKS = [
   'submissionsRead',
   'staffTemplates',
 ] as const;
-export const WORKSPACE_CHECKS = ['peopleRead'] as const;
+export const WORKSPACE_CHECKS = ['peopleRead', 'formCreate'] as const;
 export const SUBMISSION_CHECKS = ['mine', 'read', 'write', 'delete'] as const;
 
 export type FormCheck = (typeof FORM_CHECKS)[number];
@@ -239,7 +241,10 @@ export const DESIGN_EXPECTATIONS: Record<CoverageFormKey, DesignExpectation> = {
   protectedOwn: everyCheck(['admin']),
 };
 
-/** Every active member but a viewer; the public user never signs in to the core routes. */
+/**
+ * People: every active member but a viewer; the public user never signs in to the core routes.
+ * Create: form_admin through an active group, the only role holding form_create.
+ */
 export const WORKSPACE_EXPECTATIONS: Record<CoverageWorkspaceKey, WorkspaceExpectation> = {
   roles: {
     peopleRead: [
@@ -251,10 +256,12 @@ export const WORKSPACE_EXPECTATIONS: Record<CoverageWorkspaceKey, WorkspaceExpec
       'overrideRemoved',
       'overrideAdded',
       'inactiveGroupMember',
+      'inactiveGroup',
     ],
+    formCreate: ['admin'],
   },
-  audience: { peopleRead: ['admin', 'owner'] },
-  public: { peopleRead: ['admin'] },
+  audience: { peopleRead: ['admin', 'owner'], formCreate: ['admin', 'owner'] },
+  public: { peopleRead: ['admin'], formCreate: ['admin'] },
 };
 
 const NONE: SubmissionExpectation = { mine: [], read: [], write: [], delete: [] };

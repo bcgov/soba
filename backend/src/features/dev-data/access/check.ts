@@ -18,10 +18,12 @@ import {
 } from '@soba/lib';
 
 import { db } from '../../../core/db/client';
+import { FormCreatePermissions } from '../../../core/db/codes';
 import { submissionParticipants } from '../../../core/db/schema';
 import {
   resolveFormAccessGrant,
   resolveFormPermissions,
+  resolveWorkspacePermissions,
   type FormAccessGrant,
 } from '../../../core/db/repos/formAccessRepo';
 import { getWorkspaceIdForForm, listFormsForWorkspace } from '../../../core/db/repos/formRepo';
@@ -29,6 +31,7 @@ import {
   findActorMembership,
   getActiveWorkspaceIdsForUser,
   isWorkspacePeopleReadRole,
+  lookupWorkspacesForUser,
 } from '../../../core/db/repos/membershipRepo';
 import {
   hasFormSubmitAccess,
@@ -511,29 +514,71 @@ async function checkDesign(
   return { results, issues: issues.flat() };
 }
 
-/** Membership in the workspace, then the role check the members and groups reads use. */
+const NO_WORKSPACE_ACCESS: Record<WorkspaceCheck, boolean> = {
+  peopleRead: false,
+  formCreate: false,
+};
+
+/** The workspaces the Create Form picker offers the actor. */
+async function formCreateWorkspaceIds(actorId: string): Promise<Set<string>> {
+  const rows = await lookupWorkspacesForUser({
+    userId: actorId,
+    requiredPermissions: FormCreatePermissions,
+    limit: MAX_ROWS,
+    locale: DEFAULT_SORT_LOCALE,
+  });
+  return new Set(rows.map((row) => row.id));
+}
+
+/** The role check the members and groups reads use, and whether the picker offers the workspace. */
 async function workspaceAnswers(
-  caller: Caller,
+  actorId: string,
   workspaceId: string,
+  pickable: Set<string>,
 ): Promise<Record<WorkspaceCheck, boolean>> {
-  const actorId = signedInActorId(caller);
-  if (!actorId) return { peopleRead: false };
   const role = (await findActorMembership(workspaceId, actorId))?.role ?? null;
-  return { peopleRead: isWorkspacePeopleReadRole(role) };
+  return { peopleRead: isWorkspacePeopleReadRole(role), formCreate: pickable.has(workspaceId) };
+}
+
+/** The picker must offer a workspace exactly when the create check passes there. */
+async function formCreateInconsistency(
+  persona: PersonaKey,
+  actorId: string,
+  workspaceKey: CoverageWorkspaceKey,
+  workspaceId: string,
+  pickable: Set<string>,
+): Promise<string[]> {
+  const permissions = await resolveWorkspacePermissions(actorId, workspaceId);
+  return hasAllPermissions(permissions, FormCreatePermissions) === pickable.has(workspaceId)
+    ? []
+    : [`${persona} x ${workspaceKey}: the Create Form picker differs from the create check`];
 }
 
 async function checkWorkspaces(
   manifest: CoverageManifest,
   caller: Caller,
-): Promise<CaseResult<CoverageWorkspaceKey, WorkspaceCheck>[]> {
-  return Promise.all(
-    COVERAGE_WORKSPACE_KEYS.map(async (key) => ({
-      persona: caller.persona,
-      caseKey: key,
-      actual: await workspaceAnswers(caller, manifest.workspaces[key].id),
-      expected: expectedOf(WORKSPACE_CHECKS, WORKSPACE_EXPECTATIONS[key], caller.persona),
-    })),
+): Promise<CaseCheck<CoverageWorkspaceKey, WorkspaceCheck>> {
+  const actorId = signedInActorId(caller);
+  const pickable = actorId ? await formCreateWorkspaceIds(actorId) : new Set<string>();
+  const checked = await Promise.all(
+    COVERAGE_WORKSPACE_KEYS.map(async (key) => {
+      const workspaceId = manifest.workspaces[key].id;
+      return {
+        result: {
+          persona: caller.persona,
+          caseKey: key,
+          actual: actorId
+            ? await workspaceAnswers(actorId, workspaceId, pickable)
+            : NO_WORKSPACE_ACCESS,
+          expected: expectedOf(WORKSPACE_CHECKS, WORKSPACE_EXPECTATIONS[key], caller.persona),
+        },
+        issues: actorId
+          ? await formCreateInconsistency(caller.persona, actorId, key, workspaceId, pickable)
+          : [],
+      };
+    }),
   );
+  return { results: checked.map((c) => c.result), issues: checked.flatMap((c) => c.issues) };
 }
 
 async function checkSubmissions(
@@ -579,9 +624,13 @@ export async function checkCoverage(manifest: CoverageManifest): Promise<Coverag
       : [],
     forms: checked.flatMap((c) => c.forms.results),
     design: checked.flatMap((c) => c.design.results),
-    workspaces: checked.flatMap((c) => c.workspaces),
+    workspaces: checked.flatMap((c) => c.workspaces.results),
     submissions: checked.flatMap((c) => c.submissions),
-    inconsistencies: checked.flatMap((c) => [...c.forms.issues, ...c.design.issues]),
+    inconsistencies: checked.flatMap((c) => [
+      ...c.forms.issues,
+      ...c.design.issues,
+      ...c.workspaces.issues,
+    ]),
   };
 }
 
