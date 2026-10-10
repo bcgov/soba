@@ -20,7 +20,6 @@ interface SaveRevisionInput {
   actorDisplayLabel: string | null;
   eventType: string;
   changeNote?: string;
-  engineSchemaRef?: string | null;
 }
 
 export type FormVersionListSortField = (typeof FORM_VERSION_SORT_FIELDS)[number];
@@ -296,7 +295,6 @@ export const updateFormVersionDraft = async (
   actorDisplayLabel: string | null,
   patch: Partial<{
     state: string;
-    engineSchemaRef: string;
     engineSyncStatus: string;
     engineSyncError: string | null;
     publishedAt: Date | null;
@@ -375,8 +373,8 @@ export const appendFormVersionRevision = async (input: SaveRevisionInput, tx?: D
     formVersionId: input.formVersionId,
     revisionNo: nextRevision,
     eventType: input.eventType,
-    beforeEngineSchemaRef: input.engineSchemaRef ? input.engineSchemaRef : version.engineSchemaRef,
-    afterEngineSchemaRef: input.engineSchemaRef ? input.engineSchemaRef : version.engineSchemaRef,
+    beforeEngineSchemaRef: version.engineSchemaRef,
+    afterEngineSchemaRef: version.engineSchemaRef,
     changedBy: input.actorId,
     changeNote: input.changeNote,
   });
@@ -385,7 +383,6 @@ export const appendFormVersionRevision = async (input: SaveRevisionInput, tx?: D
     .update(formVersions)
     .set({
       currentRevisionNo: nextRevision,
-      ...(input.engineSchemaRef ? { engineSchemaRef: input.engineSchemaRef } : {}),
       updatedBy: input.actorDisplayLabel,
       updatedAt: new Date(),
     })

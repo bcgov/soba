@@ -354,12 +354,7 @@ export function createFormsApiService(
     save: (
       ctx: FormsContextInput,
       formVersionId: string,
-      input: {
-        eventType?: string;
-        note?: string;
-        formioFormDefinition?: Record<string, unknown>;
-        engine_schema_ref?: string;
-      },
+      input: { eventType?: string; note?: string },
     ) =>
       formVersionService
         .save({
@@ -369,8 +364,6 @@ export function createFormsApiService(
           formVersionId,
           eventType: input.eventType || 'save_draft',
           note: input.note,
-          formioFormDefinition: input.formioFormDefinition,
-          engineSchemaRef: input.engine_schema_ref || null,
         })
         .then((row) => toFormVersionDto(row)),
 
