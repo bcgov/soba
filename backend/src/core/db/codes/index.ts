@@ -4,6 +4,12 @@
  */
 import { Permissions } from '@soba/lib';
 export { Permissions, type PermissionCode } from '@soba/lib';
+export {
+  SubmissionParticipantRole,
+  SubmissionWorkflowState,
+  type SubmissionParticipantRoleCode,
+  type SubmissionWorkflowStateCode,
+} from '@soba/lib';
 
 import type { TemplateType } from '@soba/lib';
 
@@ -75,16 +81,6 @@ export const FormVersionState = {
   deleted: 'deleted',
 } as const;
 export type FormVersionStateCode = (typeof FormVersionState)[keyof typeof FormVersionState];
-
-/** Submission lifecycle state (submission.workflow_state). Backend-owned; clients never set it. */
-export const SubmissionWorkflowState = {
-  opened: 'opened',
-  draft: 'draft',
-  submitted: 'submitted',
-  deleted: 'deleted',
-} as const;
-export type SubmissionWorkflowStateCode =
-  (typeof SubmissionWorkflowState)[keyof typeof SubmissionWorkflowState];
 
 /** Submission lifecycle event (submission_revision.event_type). Mirrors the state flow. */
 export const SubmissionEventType = {
@@ -279,17 +275,6 @@ export const FormGroupOverrideStatus = {
 } as const;
 export type FormGroupOverrideStatusCode =
   (typeof FormGroupOverrideStatus)[keyof typeof FormGroupOverrideStatus];
-
-/**
- * A user's standing on one submission (submission_participant.role). Owners and collaborators have
- * the same access, except that only an owner deletes the submission.
- */
-export const SubmissionParticipantRole = {
-  owner: 'owner',
-  collaborator: 'collaborator',
-} as const;
-export type SubmissionParticipantRoleCode =
-  (typeof SubmissionParticipantRole)[keyof typeof SubmissionParticipantRole];
 
 /** Status of a submission_participant row. */
 export const SubmissionParticipantStatus = {

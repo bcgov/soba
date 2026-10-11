@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from 'express';
+import { isSubmissionInProgress } from '@soba/lib';
 import { getSubmissionWorkspaceAndState } from '../../core/db/repos/submissionRepo';
 import { assertSubmitterAllowed, setSubmitContext } from '../../core/middleware/formSubmitAccess';
 import { SubmitterOperation } from '../../core/services/submitterAccess';
-import { SubmissionWorkflowState } from '../../core/db/codes';
 import { ConflictError, NotFoundError, ValidationError } from '../../core/errors';
 
 /**
@@ -33,10 +33,7 @@ export const requireUploadAccess = async (
     };
     await assertSubmitterAllowed(req, SubmitterOperation.write, target);
     setSubmitContext(req, target);
-    if (
-      submission.workflowState !== SubmissionWorkflowState.opened &&
-      submission.workflowState !== SubmissionWorkflowState.draft
-    ) {
+    if (!isSubmissionInProgress(submission.workflowState)) {
       throw new ConflictError('Submission is not accepting file uploads');
     }
     next();

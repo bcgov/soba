@@ -1,4 +1,4 @@
-import type { SortLocale, SubmissionListSort } from '@soba/lib';
+import { SUBMISSION_IN_PROGRESS_STATES, type SortLocale, type SubmissionListSort } from '@soba/lib';
 import { v7 as uuidv7 } from 'uuid';
 import {
   appendSubmissionRevision,
@@ -31,7 +31,6 @@ import {
 } from '../db/codes';
 import { log } from '../logging';
 import { decideSubmissionWrite, type SubmissionWriteDecision } from './submissionWriteGate';
-import { SUBMITTER_DELETABLE_STATES } from './submissionLifecycle';
 import { withNewConfirmationCode } from './confirmationCode';
 
 export interface SubmissionWriteOutcome {
@@ -303,7 +302,7 @@ export class SubmissionService {
   async deleteUnsubmitted(input: DeleteInput) {
     const result = await markSubmissionDeleted({
       ...input,
-      deletableStates: SUBMITTER_DELETABLE_STATES,
+      deletableStates: SUBMISSION_IN_PROGRESS_STATES,
     });
     if (result.outcome === 'not_deletable') {
       throw new ConflictError(`Submission is ${result.workflowState} and can no longer be deleted`);

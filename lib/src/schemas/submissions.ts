@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { OffsetPageSchema, makeSortEnum } from './pagination';
 import { SUBMISSION_SORT_FIELDS } from '../sort';
+import { SubmissionParticipantRole, SubmissionWorkflowState } from '../permissions/codes';
 
 export const OpenSubmissionBodySchema = z.object({
   // v7 only: the client mints this id, and it is the submission's identity.
@@ -103,12 +104,18 @@ export const ListSubmissionsResponseSchema = z.object({
 export type ListSubmissionsResponse = z.infer<typeof ListSubmissionsResponseSchema>;
 
 /** The states the caller's own list shows; an opened submission holds no answers yet. */
-export const MY_SUBMISSION_STATES = ['draft', 'submitted'] as const;
+export const MY_SUBMISSION_STATES = [
+  SubmissionWorkflowState.draft,
+  SubmissionWorkflowState.submitted,
+] as const;
 export const MySubmissionStateSchema = z.enum(MY_SUBMISSION_STATES);
 export type MySubmissionState = z.infer<typeof MySubmissionStateSchema>;
 
 /** The caller's grant on a submission; only an owner deletes. */
-export const MySubmissionRoleSchema = z.enum(['owner', 'collaborator']);
+export const MySubmissionRoleSchema = z.enum([
+  SubmissionParticipantRole.owner,
+  SubmissionParticipantRole.collaborator,
+]);
 export type MySubmissionRole = z.infer<typeof MySubmissionRoleSchema>;
 
 /** A row of the caller's own submissions. */

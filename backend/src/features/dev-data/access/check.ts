@@ -5,6 +5,7 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import {
   audienceAdmits,
+  canDeleteOwnSubmission,
   canSaveSubmissionDraft,
   canStartSubmission,
   DEFAULT_SORT_LOCALE,
@@ -12,9 +13,11 @@ import {
   draftSaveStatusOf,
   hasAllPermissions,
   isIdentifiedCaller,
+  isSubmissionInProgress,
   Permissions,
   PUBLIC_PROVIDER_CODE,
   type PermissionCode,
+  type SubmitterSubmissionFacts,
 } from '@soba/lib';
 
 import { db } from '../../../core/db/client';
@@ -54,7 +57,6 @@ import {
   listWorkspacesForSubmitter,
   type SubmitterFormListRow,
 } from '../../../core/db/repos/submitterFormRepo';
-import { SUBMITTER_DELETABLE_STATES } from '../../../core/services/submissionLifecycle';
 import { isSubmitterAllowed, SubmitterOperation } from '../../../core/services/submitterAccess';
 import { ValidationError } from '../../../core/errors';
 import { getDraftSaveStatus } from '../../form-settings/submitter/drafts';
@@ -180,9 +182,10 @@ async function myWorkspaceIds(caller: Caller): Promise<Set<string>> {
   return new Set(rows.map((row) => row.id));
 }
 
-async function mySubmissionIds(caller: Caller): Promise<Set<string>> {
+/** My Submissions rows, by submission id. */
+async function mySubmissionRows(caller: Caller): Promise<Map<string, SubmitterSubmissionFacts>> {
   const actorId = signedInActorId(caller);
-  if (!actorId) return new Set();
+  if (!actorId) return new Map();
   const { items } = await listSubmissionsForParticipant({
     userId: actorId,
     offset: 0,
@@ -190,7 +193,7 @@ async function mySubmissionIds(caller: Caller): Promise<Set<string>> {
     sort: 'createdAt:desc',
     locale: DEFAULT_SORT_LOCALE,
   });
-  return new Set(items.map((row) => row.id));
+  return new Map(items.map((row) => [row.id, row]));
 }
 
 async function formAnswers(
@@ -224,15 +227,13 @@ async function formAnswers(
 async function submissionAnswers(
   caller: Caller,
   ref: CoverageSubmissionRef,
-  mine: Set<string>,
+  mine: Map<string, SubmitterSubmissionFacts>,
 ): Promise<Record<SubmissionCheck, boolean>> {
   const live = await getSubmissionWorkspaceAndState(ref.submissionId);
   const allows = async (operation: keyof typeof SubmitterOperation) =>
     !!live && isSubmitterAllowed(SubmitterOperation[operation], ref, caller.identity);
   const deletable =
-    !!live &&
-    (SUBMITTER_DELETABLE_STATES as readonly string[]).includes(live.workflowState) &&
-    (await allows('delete'));
+    !!live && isSubmissionInProgress(live.workflowState) && (await allows('delete'));
   return {
     mine: mine.has(ref.submissionId),
     read: await allows('read'),
@@ -685,19 +686,38 @@ async function checkWorkspaces(
   return { results: checked.map((c) => c.result), issues: checked.flatMap((c) => c.issues) };
 }
 
+/** A My Submissions row's own Delete must match what the delete route allows. */
+const rowDeleteIssue = (
+  caller: Caller,
+  key: CoverageSubmissionKey,
+  row: SubmitterSubmissionFacts | undefined,
+  answers: Record<SubmissionCheck, boolean>,
+): string[] =>
+  row && canDeleteOwnSubmission(row) !== answers.delete
+    ? [`${caller.persona} x ${key}: My Submissions row Delete differs from the delete rule`]
+    : [];
+
 async function checkSubmissions(
   manifest: CoverageManifest,
   caller: Caller,
-): Promise<CaseResult<CoverageSubmissionKey, SubmissionCheck>[]> {
-  const mine = await mySubmissionIds(caller);
-  return Promise.all(
-    COVERAGE_SUBMISSION_KEYS.map(async (key) => ({
-      persona: caller.persona,
-      caseKey: key,
-      actual: await submissionAnswers(caller, manifest.submissions[key], mine),
-      expected: expectedOf(SUBMISSION_CHECKS, SUBMISSION_EXPECTATIONS[key], caller.persona),
-    })),
+): Promise<CaseCheck<CoverageSubmissionKey, SubmissionCheck>> {
+  const mine = await mySubmissionRows(caller);
+  const checked = await Promise.all(
+    COVERAGE_SUBMISSION_KEYS.map(async (key) => {
+      const ref = manifest.submissions[key];
+      const answers = await submissionAnswers(caller, ref, mine);
+      return {
+        result: {
+          persona: caller.persona,
+          caseKey: key,
+          actual: answers,
+          expected: expectedOf(SUBMISSION_CHECKS, SUBMISSION_EXPECTATIONS[key], caller.persona),
+        },
+        issues: rowDeleteIssue(caller, key, mine.get(ref.submissionId), answers),
+      };
+    }),
   );
+  return { results: checked.map((c) => c.result), issues: checked.flatMap((c) => c.issues) };
 }
 
 const skipsOwner = (manifest: CoverageManifest): boolean =>
@@ -733,11 +753,16 @@ export async function checkCoverage(manifest: CoverageManifest): Promise<Coverag
     forms: checked.flatMap((c) => c.forms.results),
     design: checked.flatMap((c) => c.design.results),
     workspaces: checked.flatMap((c) => c.workspaces.results),
-    submissions: checked.flatMap((c) => c.submissions),
+    submissions: checked.flatMap((c) => c.submissions.results),
     inconsistencies: [
       ...shown,
       ...lookups,
-      ...checked.flatMap((c) => [...c.forms.issues, ...c.design.issues, ...c.workspaces.issues]),
+      ...checked.flatMap((c) => [
+        ...c.forms.issues,
+        ...c.design.issues,
+        ...c.workspaces.issues,
+        ...c.submissions.issues,
+      ]),
     ],
   };
 }
@@ -826,7 +851,7 @@ export async function explainSubmission(
           ),
         )
     : [];
-  const answers = await submissionAnswers(caller, ref, await mySubmissionIds(caller));
+  const answers = await submissionAnswers(caller, ref, await mySubmissionRows(caller));
 
   return [
     ['persona', `${persona} (${caller.identity.idpCode}) ${caller.identity.actorId}`],

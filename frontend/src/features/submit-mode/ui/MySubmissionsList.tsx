@@ -17,6 +17,7 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
+import { canDeleteOwnSubmission, isSubmissionInProgress } from '@/src/shared/util/permissions';
 import { fillTemplate } from '@/src/shared/util/stringUtils';
 import { useFormatLongDateTime } from '@/src/shared/hooks/useFormatLongDate';
 import { isConflict } from '@/src/shared/api/dataError';
@@ -39,11 +40,6 @@ const ALL_STATES = 'all';
 
 const toState = (raw: string | undefined): MySubmissionState | undefined =>
   MY_SUBMISSION_STATES.find((state) => state === raw);
-
-const isDraft = (item: MySubmissionListItem) => item.workflowState === 'draft';
-
-// Only an owner deletes, and only before the submission is submitted.
-const canDelete = (item: MySubmissionListItem) => isDraft(item) && item.role === 'owner';
 
 /** The caller's own drafts and submitted submissions: continue a draft, view a submission. */
 export function MySubmissionsList() {
@@ -91,7 +87,9 @@ export function MySubmissionsList() {
   const openSubmission = useCallback(
     (item: MySubmissionListItem) =>
       router.push(
-        isDraft(item) ? `/${locale}/submit/${item.id}` : `/${locale}/submission/${item.id}`,
+        isSubmissionInProgress(item.workflowState)
+          ? `/${locale}/submit/${item.id}`
+          : `/${locale}/submission/${item.id}`,
       ),
     [router, locale],
   );
@@ -194,21 +192,21 @@ export function MySubmissionsList() {
         label: dictMine.columns.actions,
         align: 'start',
         render: (item) => {
-          const draft = isDraft(item);
+          const inProgress = isSubmissionInProgress(item.workflowState);
           const values = labelValues(item);
           return (
             <div className="d-flex gap-2 justify-content-start">
               <RowActionButton
                 aria-label={fillTemplate(
-                  draft ? dictMine.continueLabel : dictMine.viewLabel,
+                  inProgress ? dictMine.continueLabel : dictMine.viewLabel,
                   values,
                 )}
-                data-testid={`${item.id}-${draft ? 'continue' : 'view'}`}
+                data-testid={`${item.id}-${inProgress ? 'continue' : 'view'}`}
                 onPress={() => openSubmission(item)}
               >
-                {draft ? dictMine.continue : dictMine.view}
+                {inProgress ? dictMine.continue : dictMine.view}
               </RowActionButton>
-              {canDelete(item) ? (
+              {canDeleteOwnSubmission(item) ? (
                 <RowActionButton
                   aria-label={fillTemplate(dictMine.deleteLabel, values)}
                   data-testid={`${item.id}-delete`}

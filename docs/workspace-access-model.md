@@ -304,7 +304,9 @@ the id has access to those.
 | `delete`: the caller's own submission                                     | a signed-in caller with an active owner grant            |
 
 Owners and collaborators have the same access, except that only an owner deletes. A submitter
-deletes only an opened or draft submission; a submitted one is a 409. The public user's ownership
+deletes only an opened or draft submission; a submitted one is a 409. `@soba/lib` holds those states
+and the rules over a My Submissions row (`isSubmissionInProgress`, `canDeleteOwnSubmission`), so the
+list's Continue and Delete give the server's answer. The public user's ownership
 grants no delete, because every anonymous caller shares it. Design routes do not use these rules;
 staff read and delete submissions through form permissions. Files, print and preview have no design
 route, so staff download files through `/files` or `/submit/files`, and print and preview through
