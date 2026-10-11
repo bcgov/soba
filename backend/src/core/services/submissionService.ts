@@ -1,4 +1,4 @@
-import type { SortLocale, SubmissionListSort } from '@soba/lib';
+import { SUBMISSION_IN_PROGRESS_STATES, type SortLocale, type SubmissionListSort } from '@soba/lib';
 import { v7 as uuidv7 } from 'uuid';
 import {
   appendSubmissionRevision,
@@ -31,7 +31,6 @@ import {
 } from '../db/codes';
 import { log } from '../logging';
 import { decideSubmissionWrite, type SubmissionWriteDecision } from './submissionWriteGate';
-import { SUBMITTER_DELETABLE_STATES } from './submissionLifecycle';
 import { withNewConfirmationCode } from './confirmationCode';
 
 export interface SubmissionWriteOutcome {
@@ -95,8 +94,8 @@ export class SubmissionService {
   /**
    * Open a new submission against the form's currently published version (the only submittable one),
    * under the client-supplied id. Idempotent: a retry of the same id by the same actor+form returns
-   * the existing record ({ created: false }); a collision with a different owner is a 409. A
-   * formVersionId that is not the published version is a 409.
+   * the existing live record ({ created: false }); another owner or form, or a submission, form or
+   * version that is deleted, is a 409. A formVersionId that is not the published version is a 409.
    */
   async open(input: CreateInput) {
     const version = await getPublishedVersionForForm(input.workspaceId, input.formId);
@@ -303,7 +302,7 @@ export class SubmissionService {
   async deleteUnsubmitted(input: DeleteInput) {
     const result = await markSubmissionDeleted({
       ...input,
-      deletableStates: SUBMITTER_DELETABLE_STATES,
+      deletableStates: SUBMISSION_IN_PROGRESS_STATES,
     });
     if (result.outcome === 'not_deletable') {
       throw new ConflictError(`Submission is ${result.workflowState} and can no longer be deleted`);

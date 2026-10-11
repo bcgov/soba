@@ -14,7 +14,8 @@ export interface IdpMapPayloadResult {
   idpAttributes: IdpAttributes;
   /**
    * If true, the IdP indicates this user is a SOBA platform admin (e.g. role: soba_admin).
-   * Used to refresh soba_admin table on login. Omit or false when IdP does not convey admin.
+   * Applied to the soba_admin table on each request. Omit when the IdP does not convey admin; false
+   * revokes this IdP's grant.
    */
   sobaAdmin?: boolean;
 }

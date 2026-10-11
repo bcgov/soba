@@ -1,36 +1,44 @@
-import { and, count, eq, exists, ilike, isNotNull, isNull, or, sql, inArray } from 'drizzle-orm';
+import { and, count, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { WORKSPACE_SORT_FIELDS, type SortLocale, type SortToken } from '@soba/lib';
-import { db } from '../client';
+import { db, type DbOrTx } from '../client';
 import {
   appUsers,
   identityProviders,
   userIdentities,
   workspaceDisclaimerAcceptances,
   workspaceMemberships,
-  workspaceGroupMemberships,
-  workspaceGroupRoles,
-  rolePermissions,
   workspaces,
 } from '../schema';
 import { profileHelpers } from '../../auth/jwtClaims';
 import { ForbiddenError } from '../../errors';
 import type { NormalizedProfile, IdpAttributes } from '../../auth/jwtClaims';
-import {
-  GroupMemberKind,
-  Permissions,
-  WorkspaceGroupMembershipStatus,
-  WorkspaceGroupRoleStatus,
-  WorkspaceMembershipRole,
-  WorkspaceMembershipStatus,
-} from '../codes';
+import { WorkspaceMembershipRole, WorkspaceMembershipStatus } from '../codes';
 import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
+import { membershipHoldsPermission } from './formAccessRepo';
 
-/** Second int for `pg_advisory_xact_lock`; must not collide with workspaceRepo / sobaAdminRepo lock ids. */
+/** Second int for `pg_advisory_xact_lock`; must not collide with the other advisory lock ids. */
 const ADV_LOCK_FIND_OR_CREATE_IDENTITY = 2_147_483_622;
 
 export { findUserIdByIdentity } from './identityLookup';
+
+/** Stores the identity's IdP attributes; writes nothing when the stored ones already match. */
+export const updateIdentityAttributes = async (
+  identityId: string,
+  idpAttributes: IdpAttributes,
+  executor: DbOrTx = db,
+): Promise<void> => {
+  await executor
+    .update(userIdentities)
+    .set({ idpAttributes, updatedAt: new Date() })
+    .where(
+      and(
+        eq(userIdentities.id, identityId),
+        sql`${userIdentities.idpAttributes} is distinct from ${JSON.stringify(idpAttributes)}::jsonb`,
+      ),
+    );
+};
 
 export const findOrCreateUserByIdentity = async (
   providerCode: string,
@@ -48,14 +56,14 @@ export const findOrCreateUserByIdentity = async (
     const provider = providerRow[0];
 
     // Only identity providers present AND active in identity_provider may authenticate.
-    // Unknown or deactivated IdPs are rejected; we no longer implicitly create providers.
+    // Unknown or deactivated IdPs are rejected.
     if (!provider || !provider.isActive) {
       throw new ForbiddenError(
         `Identity provider '${normalizedProvider}' is not enabled for sign-in`,
       );
     }
 
-    // Advisory lock shape shared with findOrCreateUserByIdentity: hashtext(single ::text param), fixed namespace int.
+    // Serialises first sign-ins of one identity: hashtext(provider, subject) under a fixed namespace int.
     const identityLockPayload = `${provider.code}\u001f${subject}`;
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext(${identityLockPayload}::text), ${ADV_LOCK_FIND_OR_CREATE_IDENTITY})`,
@@ -75,11 +83,7 @@ export const findOrCreateUserByIdentity = async (
     const existingRow = existing[0];
 
     if (existingRow) {
-      const updates: { idpAttributes?: IdpAttributes; updatedAt: Date } = { updatedAt: new Date() };
-      if (idpAttributes != null) updates.idpAttributes = idpAttributes;
-      if (updates.idpAttributes != null) {
-        await tx.update(userIdentities).set(updates).where(eq(userIdentities.id, existingRow.id));
-      }
+      if (idpAttributes != null) await updateIdentityAttributes(existingRow.id, idpAttributes, tx);
       return existingRow.userId;
     }
 
@@ -250,29 +254,6 @@ export interface WorkspaceListRow {
   updatedAt: Date;
 }
 
-// Correlated to the actor's own membership row, not just any member of the workspace.
-const holdsPermission = (code: string) =>
-  exists(
-    db
-      .select({ permissionCode: rolePermissions.permissionCode })
-      .from(workspaceGroupMemberships)
-      .innerJoin(
-        workspaceGroupRoles,
-        eq(workspaceGroupRoles.groupId, workspaceGroupMemberships.groupId),
-      )
-      .innerJoin(rolePermissions, eq(rolePermissions.roleCode, workspaceGroupRoles.roleCode))
-      .where(
-        and(
-          eq(workspaceGroupMemberships.workspaceMembershipId, workspaceMemberships.id),
-          eq(workspaceGroupMemberships.workspaceId, workspaceMemberships.workspaceId),
-          eq(workspaceGroupMemberships.memberKind, GroupMemberKind.user),
-          eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
-          eq(workspaceGroupRoles.status, WorkspaceGroupRoleStatus.active),
-          inArray(rolePermissions.permissionCode, [code, Permissions.all]),
-        ),
-      ),
-  );
-
 /** Expects workspace_membership joined to workspace and left joined to the disclaimer acceptance. */
 const workspaceMembershipWhere = (filter: WorkspaceMembershipFilter) => {
   const whereClauses = [
@@ -290,7 +271,7 @@ const workspaceMembershipWhere = (filter: WorkspaceMembershipFilter) => {
     whereClauses.push(or(ilike(workspaces.name, pattern), ilike(workspaces.org, pattern)));
   }
   for (const code of new Set(filter.requiredPermissions)) {
-    whereClauses.push(holdsPermission(code));
+    whereClauses.push(membershipHoldsPermission(code));
   }
   if (filter.disclaimerAccepted !== undefined) {
     const acceptedAt = workspaceDisclaimerAcceptances.acceptedAt;

@@ -4,7 +4,7 @@
  * no clock.
  */
 import type { Audience } from '@soba/lib';
-import type { NormalizedProfile } from '../../../core/auth/jwtClaims';
+import type { IdpAttributes, NormalizedProfile } from '../../../core/auth/jwtClaims';
 import {
   Roles,
   SystemGroup,
@@ -32,6 +32,7 @@ export const PERSONA_KEYS = [
   'overrideAdded',
   'inactiveMember',
   'inactiveGroupMember',
+  'inactiveGroup',
   'outsider',
   'bceidOutsider',
   'collaborator',
@@ -60,6 +61,8 @@ export interface PlannedPersona {
   subject: string;
   identityProviderCode: string;
   profile: NormalizedProfile;
+  /** The token claims stored for the identity, as a sign-in stores them. */
+  idpAttributes: IdpAttributes;
 }
 
 /** A persona's membership in a workspace and the group it gives them. */
@@ -67,7 +70,10 @@ export interface PlannedSeat {
   persona: Exclude<PersonaKey, typeof ADMIN>;
   role: WorkspaceMembershipRoleCode;
   /** A named group is created by the first seat that names it. */
-  group: { system: SystemGroupCode } | { name: string; roleCodes: RoleCode[] } | null;
+  group:
+    | { system: SystemGroupCode }
+    | { name: string; roleCodes: RoleCode[]; status?: 'inactive' }
+    | null;
   membershipStatus?: 'inactive';
   groupMembershipStatus?: 'inactive';
 }
@@ -99,6 +105,9 @@ export interface PlannedGroupOverride {
   cleared?: boolean;
 }
 
+/** Deleting the form, or its published version, once its submissions exist. */
+export type PlannedDelete = 'deleteForm' | 'deleteVersion';
+
 export interface PlannedCoverageForm {
   key: CoverageFormKey;
   name: string;
@@ -110,8 +119,7 @@ export interface PlannedCoverageForm {
   allowSubmitterDrafts?: boolean;
   /** Replaces the group's members on this form; cleared leaves the override inactive. */
   groupOverride?: PlannedGroupOverride;
-  /** Applied once the form's submissions exist. */
-  afterSubmissions?: 'deleteForm' | 'deleteVersion';
+  afterSubmissions?: PlannedDelete;
 }
 
 export interface PlannedCoverageWorkspace {
@@ -169,6 +177,7 @@ const PERSONA_PROVIDERS: Record<GeneratedPersonaKey, string> = {
   overrideAdded: 'azureidir',
   inactiveMember: 'azureidir',
   inactiveGroupMember: 'azureidir',
+  inactiveGroup: 'azureidir',
   outsider: 'azureidir',
   bceidOutsider: 'bceidbusiness',
   collaborator: 'azureidir',
@@ -183,10 +192,11 @@ function buildPersona(key: GeneratedPersonaKey): PlannedPersona {
   const usernameClaim =
     identityProviderCode === 'bceidbusiness' ? 'bceid_username' : 'idir_username';
   const lastName = kebab(key).replaceAll('-', ' ');
+  const subject = `${DEV_SUBJECT_PREFIX}${username}`;
   return {
     key,
     displayLabel,
-    subject: `${DEV_SUBJECT_PREFIX}${username}`,
+    subject,
     identityProviderCode,
     profile: {
       displayName: `Coverage ${lastName}`,
@@ -197,6 +207,14 @@ function buildPersona(key: GeneratedPersonaKey): PlannedPersona {
       name: `Coverage ${lastName}`,
       [usernameClaim]: displayLabel,
       displayLabel,
+    },
+    idpAttributes: {
+      sub: subject,
+      identity_provider: identityProviderCode,
+      preferred_username: username,
+      email: `${username}@example.test`,
+      name: `Coverage ${lastName}`,
+      [usernameClaim]: displayLabel,
     },
   };
 }
@@ -253,6 +271,16 @@ const ROLES_WORKSPACE: PlannedCoverageWorkspace = {
     { persona: 'overrideAdded', role: WorkspaceMembershipRole.member, group: null },
     { ...submitters('inactiveMember'), membershipStatus: 'inactive' },
     { ...submitters('inactiveGroupMember'), groupMembershipStatus: 'inactive' },
+    // Only the group is inactive; its membership and role stay active.
+    {
+      persona: 'inactiveGroup',
+      role: WorkspaceMembershipRole.member,
+      group: {
+        name: `${COVERAGE_PREFIX}Retired admins`,
+        roleCodes: [Roles.form_admin],
+        status: 'inactive',
+      },
+    },
     // The public user's roles never count, even with a seat.
     submitters(ANONYMOUS),
   ],

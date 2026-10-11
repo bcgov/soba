@@ -141,10 +141,11 @@ whatever `--size` or `--skip-anonymous` says. Its names start `[dev] Zz `, so it
 anchors and the bulk in English and French, and it is created first, so it trails `id:desc` lists
 too.
 
-Personas are the owner, the public user as an anonymous caller, and twelve generated users:
+Personas are the owner, the public user as an anonymous caller, and thirteen generated users:
 `admin`, who owns the three workspaces, plus `submitter`, `designer`, `reviewer`, `viewer` (a
 `viewer` member in an approvers group), `overrideRemoved`, `overrideAdded`, `inactiveMember`,
-`inactiveGroupMember`, `outsider`, `bceidOutsider` (`bceidbusiness`), and `collaborator`.
+`inactiveGroupMember`, `inactiveGroup` (in an inactive group carrying form admin), `outsider`,
+`bceidOutsider` (`bceidbusiness`), and `collaborator`.
 
 | Workspace                    | Audience, drafts           | Forms                                                                                                                    |
 | ---------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -169,11 +170,15 @@ any difference:
   `submission_update`
 - design: listed in the designer, and the form's own check for `form_read`, `design_update`,
   `submission_read`, and `form_read` with `document_template_read` for the staff templates
-- workspaces: reading the workspace's members and groups
+- workspaces: reading the workspace's members and groups, and offered by the Create Form picker
 - submissions: listed in My Submissions, and the read, write and delete rules
 
 It also checks that the designer's forms, form versions and submissions lists each hold exactly the
-forms whose own check allows them.
+forms whose own check allows them and leave out the deleted ones, that each form version and
+submission resolves by id only while it, its form and its version are not deleted, that the Create
+Form picker offers exactly the workspaces where the create check passes, and that the sign-in read
+returns each persona's identity, user and admin row, compares IdP attributes as jsonb, and finds
+nothing for an unknown subject or provider.
 
 Write is the rule save and submit share; the request itself can still refuse the write or keep it
 as pending. The command only reads, and needs no running backend. Change the table with any access

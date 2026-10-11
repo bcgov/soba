@@ -170,7 +170,7 @@ async function verify(): Promise<void> {
   });
   printGrid({
     title: 'Workspaces',
-    letters: { peopleRead: 'P' },
+    letters: { peopleRead: 'P', formCreate: 'C' },
     caseKeys: COVERAGE_WORKSPACE_KEYS,
     caseLabels: labelsOf(COVERAGE_WORKSPACE_KEYS, (key) => manifest.workspaces[key].name),
     personas: report.personas,

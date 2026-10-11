@@ -22,8 +22,36 @@ export const Permissions = {
 
 export type PermissionCode = (typeof Permissions)[keyof typeof Permissions];
 
+/**
+ * POST /forms writes the form and its first design. `form_create` is not seeded onto any role;
+ * only form_admin matches it (via `*`). form_designer has `design_create` for new designs on
+ * existing forms.
+ */
+export const FormCreatePermissions = [Permissions.form_create, Permissions.design_create] as const;
+
 /** Provider code of the shared public user that anonymous callers resolve to. */
 export const PUBLIC_PROVIDER_CODE = 'public';
+
+/** Submission lifecycle state (submission.workflow_state). Backend-owned; clients never set it. */
+export const SubmissionWorkflowState = {
+  opened: 'opened',
+  draft: 'draft',
+  submitted: 'submitted',
+  deleted: 'deleted',
+} as const;
+export type SubmissionWorkflowStateCode =
+  (typeof SubmissionWorkflowState)[keyof typeof SubmissionWorkflowState];
+
+/**
+ * A user's standing on one submission (submission_participant.role). Owners and collaborators have
+ * the same access, except that only an owner deletes the submission.
+ */
+export const SubmissionParticipantRole = {
+  owner: 'owner',
+  collaborator: 'collaborator',
+} as const;
+export type SubmissionParticipantRoleCode =
+  (typeof SubmissionParticipantRole)[keyof typeof SubmissionParticipantRole];
 
 export const DraftSaveStatus = {
   allowed: 'allowed',

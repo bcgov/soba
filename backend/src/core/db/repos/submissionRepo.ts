@@ -1,4 +1,4 @@
-import { and, count, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, count, eq, getTableColumns, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import {
   MY_SUBMISSION_STATES,
@@ -7,7 +7,7 @@ import {
   type SortLocale,
   type SubmissionListSort,
 } from '@soba/lib';
-import { db, type Tx } from '../client';
+import { db, type DbOrTx, type Tx } from '../client';
 import {
   submissionParticipants,
   submissionRevisions,
@@ -30,6 +30,7 @@ import {
   type SubmissionWorkflowStateCode,
 } from '../codes';
 import { listAllowsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
+import { liveSubmission } from './liveRows';
 
 export type SubmissionRecord = typeof submissions.$inferSelect;
 
@@ -165,6 +166,21 @@ export interface ListSubmissionsInput {
   locale: SortLocale;
 }
 
+/** The submission row when neither it, its form nor its form version is deleted. */
+export const findLiveSubmissionRecord = async (
+  submissionId: string,
+  executor: DbOrTx = db,
+): Promise<SubmissionRecord | null> => {
+  const [row] = await executor
+    .select(getTableColumns(submissions))
+    .from(submissions)
+    .innerJoin(forms, eq(submissions.formId, forms.id))
+    .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
+    .where(and(eq(submissions.id, submissionId), liveSubmission))
+    .limit(1);
+  return row ?? null;
+};
+
 /**
  * Open a submission against a client-minted id: insert the row in the `opened` state, its
  * revision-0 `opened` event and the opener's owner grant in one transaction, so every submission has
@@ -172,9 +188,10 @@ export interface ListSubmissionsInput {
  * started it (the seeded public user for anonymous fills, who then owns it).
  *
  * Idempotent on the id. `ON CONFLICT DO NOTHING` is the atomic gate: the row is only written when the
- * id is free, so concurrent double-opens are race-safe — the loser inserts nothing, falls through to
- * the select, and sees the winner's committed row. A taken id is a retry (same actor + form → return
- * the existing row) or a genuine collision (different owner → let the caller answer 409, not 500).
+ * id is free, so concurrent double-opens are race-safe: the loser inserts nothing, falls through to
+ * the select, and sees the winner's committed row. A taken id is a retry (same actor and form, on a
+ * live submission: return it) or a collision (another owner or form, or a submission, form or version
+ * that is deleted: the caller answers 409, not 500).
  */
 export const openSubmission = async (
   input: CreateSubmissionInput,
@@ -232,14 +249,9 @@ export const openSubmission = async (
       return { outcome: 'created', record };
     }
 
-    // Only a live row is a valid idempotent retry; a soft-deleted tombstone on the same id is a
-    // collision (409), not a resume — otherwise the caller gets a 200 to a submission that save/
-    // submit/fill all 404 on (they filter deletedAt).
-    const [existing] = await tx
-      .select()
-      .from(submissions)
-      .where(and(eq(submissions.id, input.id), isNull(submissions.deletedAt)))
-      .limit(1);
+    // Only a live submission is a valid idempotent retry; any other row on the id is a collision
+    // (409), not a resume, since save, submit and fill all 404 on it.
+    const existing = await findLiveSubmissionRecord(input.id, tx);
 
     if (existing?.submittedBy === input.actorId && existing?.formId === input.formId) {
       return { outcome: 'existing', record: existing };
@@ -330,7 +342,8 @@ export const getSubmissionById = async (
 };
 
 /**
- * Resolve list-scope context for a submission by id alone. Returns null for missing/deleted submissions.
+ * Resolve list-scope context for a submission by id alone. Returns null when the submission is
+ * missing, or it, its form or its form version is deleted.
  */
 export const getSubmissionListContext = async (
   submissionId: string,
@@ -342,13 +355,18 @@ export const getSubmissionListContext = async (
       formVersionId: submissions.formVersionId,
     })
     .from(submissions)
-    .where(and(eq(submissions.id, submissionId), isNull(submissions.deletedAt)))
+    .innerJoin(forms, eq(submissions.formId, forms.id))
+    .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
+    .where(and(eq(submissions.id, submissionId), liveSubmission))
     .limit(1);
 
   return row[0] ?? null;
 };
 
-/** Resolve a submission's workspace, form and workflow state by id alone (for the write gates). */
+/**
+ * Resolve a submission's workspace, form and workflow state by id alone (for the write gates).
+ * Returns null when the submission is missing, or it, its form or its form version is deleted.
+ */
 export const getSubmissionWorkspaceAndState = async (
   submissionId: string,
 ): Promise<{
@@ -363,7 +381,9 @@ export const getSubmissionWorkspaceAndState = async (
       workflowState: submissions.workflowState,
     })
     .from(submissions)
-    .where(and(eq(submissions.id, submissionId), isNull(submissions.deletedAt)))
+    .innerJoin(forms, eq(submissions.formId, forms.id))
+    .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
+    .where(and(eq(submissions.id, submissionId), liveSubmission))
     .limit(1);
   return rows[0] ?? null;
 };
@@ -383,7 +403,7 @@ export const listSubmissionsForWorkspace = async (
   }
   const whereClauses = [
     inArray(submissions.workspaceId, input.workspaceIds),
-    isNull(submissions.deletedAt),
+    liveSubmission,
     permittedFormsWhere(input.formAccess, {
       workspaceId: submissions.workspaceId,
       formId: submissions.formId,
@@ -450,12 +470,13 @@ export const listSubmissionsForWorkspace = async (
       .limit(input.limit)
       .offset(input.offset);
 
-    // Both parent ids are not-null with validated foreign keys, so the joins can neither drop nor
-    // multiply a row. The count only needs `forms`, and only when the search reads its name.
-    const countQuery = tx.select({ total: count() }).from(submissions);
-    const totals = await (input.q
-      ? countQuery.innerJoin(forms, eq(submissions.formId, forms.id)).where(where)
-      : countQuery.where(where));
+    // Both parent ids are not-null with validated foreign keys, so the joins never multiply a row.
+    const totals = await tx
+      .select({ total: count() })
+      .from(submissions)
+      .innerJoin(forms, eq(submissions.formId, forms.id))
+      .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
+      .where(where);
 
     return { items, total: totals[0]?.total ?? 0 };
   });
@@ -472,12 +493,10 @@ export const listSubmissionsForParticipant = async (
   const whereClauses = [
     eq(submissionParticipants.userId, input.userId),
     eq(submissionParticipants.status, SubmissionParticipantStatus.active),
-    isNull(submissions.deletedAt),
+    liveSubmission,
     input.workflowState
       ? eq(submissions.workflowState, input.workflowState)
       : inArray(submissions.workflowState, [...MY_SUBMISSION_STATES]),
-    isNull(forms.deletedAt),
-    isNull(formVersions.deletedAt),
   ];
 
   if (input.q) {

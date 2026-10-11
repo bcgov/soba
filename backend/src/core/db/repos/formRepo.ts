@@ -5,6 +5,7 @@ import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 import { NotFoundError } from '../../errors';
 import { listAllowsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
+import { liveForm } from './liveRows';
 
 import { FORM_SORT_FIELDS, type SortLocale, type SortToken } from '@soba/lib';
 export type FormListSortField = (typeof FORM_SORT_FIELDS)[number];
@@ -90,7 +91,7 @@ export const listFormsForWorkspace = async (
   }
   const whereClauses = [
     inArray(forms.workspaceId, input.workspaceIds),
-    isNull(forms.deletedAt),
+    liveForm,
     permittedFormsWhere(input.formAccess, {
       workspaceId: forms.workspaceId,
       formId: forms.id,
@@ -293,7 +294,7 @@ export const getFormListContext = async (
   const row = await db
     .select({ workspaceId: forms.workspaceId })
     .from(forms)
-    .where(and(eq(forms.id, formId), isNull(forms.deletedAt)))
+    .where(and(eq(forms.id, formId), liveForm))
     .limit(1);
 
   return row[0] ?? null;

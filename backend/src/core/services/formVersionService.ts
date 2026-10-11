@@ -80,10 +80,7 @@ interface SaveInput {
   actorId: string;
   actorDisplayLabel: string | null;
   formVersionId: string;
-  eventType: string;
   note?: string;
-  formioFormDefinition?: Record<string, unknown>;
-  engineSchemaRef?: string | null;
 }
 
 interface VersionActionInput {
@@ -171,32 +168,17 @@ export class FormVersionService {
   async save(input: SaveInput) {
     const updated = await withCurrentVersion(input, async (locked, tx) => {
       assertSchemaWritable(locked);
-      const revised = await appendFormVersionRevision(
+      return appendFormVersionRevision(
         {
           workspaceId: input.workspaceId,
           formVersionId: input.formVersionId,
           actorId: input.actorId,
           actorDisplayLabel: input.actorDisplayLabel,
-          eventType: input.eventType,
+          eventType: 'save_draft',
           changeNote: input.note,
-          engineSchemaRef: input.engineSchemaRef || null,
         },
         tx,
       );
-      if (!revised) return null;
-      // Persist engineSchemaRef into the main formVersion row if supplied.
-      // A ref means the Form.io document exists, so the version is in sync ('ready').
-      if (input.engineSchemaRef != null) {
-        await updateFormVersionDraft(
-          input.workspaceId,
-          input.formVersionId,
-          input.actorDisplayLabel,
-          { engineSchemaRef: input.engineSchemaRef, engineSyncStatus: 'ready' },
-          tx,
-        );
-      }
-
-      return revised;
     });
 
     if (!updated) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
