@@ -19,13 +19,8 @@ export const SubmissionDataBodySchema = z.object({
   baseRevisionId: z.uuid(),
 });
 
-// Revision ids are optional on submit; send both or neither.
-export const SubmitSubmissionBodySchema = SubmissionDataBodySchema.partial({
-  revisionId: true,
-  baseRevisionId: true,
-}).refine((body) => (body.revisionId === undefined) === (body.baseRevisionId === undefined), {
-  message: 'revisionId and baseRevisionId must be sent together',
-});
+// Same body as save.
+export const SubmitSubmissionBodySchema = SubmissionDataBodySchema;
 
 export const SubmissionListItemSchema = z.object({
   id: z.string(),

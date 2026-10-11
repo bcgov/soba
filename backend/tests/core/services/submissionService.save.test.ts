@@ -48,6 +48,8 @@ const input = {
   actorDisplayLabel: 'Filler',
   submissionId: 's1',
   data: { firstName: 'Ada' },
+  revisionId: 'rev-new',
+  baseRevisionId: 'rev-2',
 };
 
 const svc = new SubmissionService();
@@ -65,6 +67,7 @@ describe('SubmissionService save (versioned engine write)', () => {
       workflowState: 'draft',
       submittedBy: 'actor-1',
     });
+    getRevisionById.mockResolvedValue(null);
     getVersion.mockResolvedValue({ id: 'v1', engineSchemaRef: 'form-ref-1' });
     getEngineCode.mockResolvedValue('formio-v5');
     updateDraft.mockResolvedValue({ id: 's1' });
@@ -78,7 +81,7 @@ describe('SubmissionService save (versioned engine write)', () => {
     });
   });
 
-  it('writes the engine document under a new revision id, then appends it on top of the head it read', async () => {
+  it("writes the engine document under the client's revision id, then appends it on top of the head it read", async () => {
     const createSubmission = jest.fn().mockResolvedValue({ engineRef: 'eng-new' });
     createAdapter.mockReturnValue({ createSubmission });
 
@@ -88,7 +91,7 @@ describe('SubmissionService save (versioned engine write)', () => {
     expect(createSubmission).toHaveBeenCalledWith({
       engineFormRef: 'form-ref-1',
       submissionId: 's1',
-      revisionId: expect.any(String),
+      revisionId: 'rev-new',
       workspaceId: 'ws1',
       data: { firstName: 'Ada' },
       validate: true,
@@ -99,11 +102,10 @@ describe('SubmissionService save (versioned engine write)', () => {
       'Filler',
       expect.objectContaining({ engineSyncStatus: 'provisioning', engineSyncError: null }),
     );
-    const { revisionId } = createSubmission.mock.calls[0][0] as { revisionId: string };
     expect(appendRevision).toHaveBeenCalledWith(
       expect.objectContaining({
         submissionId: 's1',
-        revisionId,
+        revisionId: 'rev-new',
         parentRevisionId: 'rev-2',
         afterEngineSubmissionRef: 'eng-new',
         eventType: 'submitted',
@@ -125,19 +127,6 @@ describe('SubmissionService save (versioned engine write)', () => {
     await svc.save(input);
 
     expect(createSubmission).toHaveBeenCalledWith(expect.objectContaining({ validate: false }));
-  });
-
-  it('mints a distinct revision id for each write', async () => {
-    const createSubmission = jest.fn().mockResolvedValue({ engineRef: 'eng-new' });
-    createAdapter.mockReturnValue({ createSubmission });
-
-    await svc.save(input);
-    await svc.save(input);
-
-    const [first, second] = createSubmission.mock.calls.map(
-      ([arg]) => (arg as { revisionId: string }).revisionId,
-    );
-    expect(first).not.toEqual(second);
   });
 
   it('keeps a write whose head moved after it was read as pending, without an engine error', async () => {
@@ -204,7 +193,7 @@ describe('SubmissionService save (versioned engine write)', () => {
       reason: 'closed',
     });
 
-    const result = await svc.submit(input);
+    const result = await svc.submit({ ...input, baseRevisionId: 'rev-3' });
 
     expect(createSubmission).toHaveBeenCalled();
     expect(updateDraft).not.toHaveBeenCalled();
@@ -256,13 +245,16 @@ describe('SubmissionService save (versioned engine write)', () => {
   it('rejects a base revision from another submission before any engine write', async () => {
     const createSubmission = jest.fn().mockResolvedValue({ engineRef: 'eng-new' });
     createAdapter.mockReturnValue({ createSubmission });
-    getRevisionById.mockResolvedValue({
+    const foreign = {
       submissionId: 'other-submission',
       eventType: 'saved',
       revisionNo: 5,
       status: 'current',
       reason: 'accepted',
-    });
+    };
+    getRevisionById.mockImplementation(async (id: string) =>
+      id === 'rev-foreign' ? foreign : null,
+    );
 
     await expect(svc.save({ ...input, baseRevisionId: 'rev-foreign' })).rejects.toBeInstanceOf(
       ValidationError,

@@ -43,7 +43,7 @@ describe('SubmissionDataBodySchema', () => {
 
 describe('SubmitSubmissionBodySchema', () => {
   it.each([
-    ['no revision ids', { data: {} }, true],
+    ['no revision ids', { data: {} }, false],
     ['both revision ids', { data: {}, revisionId, baseRevisionId }, true],
     ['only revisionId', { data: {}, revisionId }, false],
     ['only baseRevisionId', { data: {}, baseRevisionId }, false],

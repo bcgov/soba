@@ -8,7 +8,13 @@ const draft = { id: 's1', workflowState: 'draft', headRevisionId: 'rev-2' };
 const submitted = { ...draft, workflowState: 'submitted' };
 
 const decide = (over: Partial<SubmissionWriteRequest> = {}) =>
-  decideSubmissionWrite({ submission: draft, eventType: 'saved', recorded: null, ...over });
+  decideSubmissionWrite({
+    submission: draft,
+    eventType: 'saved',
+    baseRevisionId: 'rev-2',
+    recorded: null,
+    ...over,
+  });
 
 describe('decideSubmissionWrite', () => {
   it('replays a submit already recorded on a submitted submission', () => {
@@ -61,7 +67,7 @@ describe('decideSubmissionWrite', () => {
     });
   });
 
-  it('writes as current on top of the current head when no base is sent', () => {
+  it('writes a save as current on top of the head', () => {
     expect(decide()).toEqual({
       kind: 'current',
       workflowState: 'draft',

@@ -1,5 +1,4 @@
 import { SUBMISSION_IN_PROGRESS_STATES, type SortLocale, type SubmissionListSort } from '@soba/lib';
-import { v7 as uuidv7 } from 'uuid';
 import {
   appendSubmissionRevision,
   clearSubmissionProvisioning,
@@ -29,7 +28,6 @@ import {
   type SubmissionWriteEventCode,
   type SubmissionWorkflowStateCode,
 } from '../db/codes';
-import { log } from '../logging';
 import { decideSubmissionWrite, type SubmissionWriteDecision } from './submissionWriteGate';
 import { withNewConfirmationCode } from './confirmationCode';
 
@@ -61,10 +59,10 @@ interface SaveInput {
   actorDisplayLabel: string | null;
   submissionId: string;
   data: Record<string, unknown>;
-  /** Client-minted id for this write; the server mints one when absent. */
-  revisionId?: string;
-  /** Head the client loaded; the current head is assumed when absent. */
-  baseRevisionId?: string;
+  /** Client-minted id for this write. */
+  revisionId: string;
+  /** Head the client loaded. */
+  baseRevisionId: string;
 }
 
 interface DeleteInput {
@@ -136,7 +134,7 @@ export class SubmissionService {
     const submission = await getSubmissionRecordById(input.workspaceId, input.submissionId);
     if (!submission) throw new NotFoundError('Submission not found');
 
-    const recorded = input.revisionId ? await getSubmissionRevisionById(input.revisionId) : null;
+    const recorded = await getSubmissionRevisionById(input.revisionId);
     const decision = decideSubmissionWrite({
       submission,
       eventType,
@@ -152,7 +150,7 @@ export class SubmissionService {
       return {
         record: submission,
         revision: {
-          id: input.revisionId!,
+          id: input.revisionId,
           revisionNo: revision.revisionNo,
           status: landedPending ? RevisionStatus.pending : RevisionStatus.current,
           reason: landedPending ? (revision.reason as RevisionReasonCode) : RevisionReason.accepted,
@@ -163,7 +161,7 @@ export class SubmissionService {
     // The base must be a revision of this submission. A foreign or unknown base is a malformed write,
     // rejected before any engine document is created, so it cannot orphan one or branch across
     // submissions. A base equal to the head is trivially valid.
-    if (input.baseRevisionId && input.baseRevisionId !== submission.headRevisionId) {
+    if (input.baseRevisionId !== submission.headRevisionId) {
       const base = await getSubmissionRevisionById(input.baseRevisionId);
       if (base?.submissionId !== input.submissionId) {
         throw new ValidationError('baseRevisionId is not a revision of this submission');
@@ -213,13 +211,6 @@ export class SubmissionService {
     eventType: SubmissionWriteEventCode,
     decision: Exclude<SubmissionWriteDecision, { kind: 'replay' }>,
   ): Promise<SubmissionWriteOutcome> {
-    if (!input.revisionId) {
-      log.info(
-        { submissionId: input.submissionId, eventType },
-        'Submission write without revision ids',
-      );
-    }
-
     const { engineSchemaRef, createSubmission } = await this.resolveSubmissionEngine(submission);
     const pending = decision.kind === 'pending';
 
@@ -232,7 +223,7 @@ export class SubmissionService {
       });
     }
 
-    const revisionId = input.revisionId ?? uuidv7();
+    const { revisionId } = input;
 
     try {
       const { engineRef } = await createSubmission({

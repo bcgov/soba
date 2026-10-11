@@ -10,8 +10,8 @@ import { isTerminalSubmissionState, resolveSubmissionTransition } from './submis
 export interface SubmissionWriteRequest {
   submission: { id: string; workflowState: string; headRevisionId: string | null };
   eventType: SubmissionWriteEventCode;
-  /** Head the client loaded; the current head is assumed when absent. */
-  baseRevisionId?: string;
+  /** Head the client loaded. */
+  baseRevisionId: string;
   /** The revision already recorded under the request's revision id, if any. */
   recorded: { submissionId: string; eventType: string } | null;
 }
@@ -37,15 +37,13 @@ export type SubmissionWriteDecision =
  * revision id already bound to a different write is a hard ConflictError.
  */
 export const decideSubmissionWrite = (request: SubmissionWriteRequest): SubmissionWriteDecision => {
-  const { submission, eventType, recorded } = request;
+  const { submission, eventType, recorded, baseRevisionId: base } = request;
   if (recorded) {
     if (recorded.submissionId !== submission.id || recorded.eventType !== eventType) {
       throw new ConflictError('Revision id already used by another write');
     }
     return { kind: 'replay' };
   }
-
-  const base = request.baseRevisionId ?? submission.headRevisionId;
 
   if (isTerminalSubmissionState(submission.workflowState)) {
     return { kind: 'pending', reason: RevisionReason.closed, parentRevisionId: base };

@@ -212,6 +212,22 @@ describe('FormioV5SubmissionFillClient', () => {
       });
     });
 
+    it('never submits without a loaded head', async () => {
+      h.getSubmitFillBundle.mockResolvedValue({
+        workflowState: 'opened',
+        formVersionId: 'ver-1',
+        headRevisionId: null,
+        schema: { components: [] },
+        content: null,
+        canWrite: true,
+      });
+      await renderReady();
+      await submit({ a: 1 });
+      expect(h.submitSobaFormSubmission).not.toHaveBeenCalled();
+      expect(h.instance.emit).toHaveBeenCalledWith('submitError', '');
+      expect(screen.getByText('Could not load the form.')).toBeInTheDocument();
+    });
+
     it('reuses the revision id when unchanged answers are resubmitted after a failure', async () => {
       h.submitSobaFormSubmission.mockRejectedValueOnce(new Error('Failed to fetch'));
       h.submitSobaFormSubmission.mockResolvedValue(writeResponse('current'));

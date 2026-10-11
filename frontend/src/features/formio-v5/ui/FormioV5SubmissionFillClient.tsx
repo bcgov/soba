@@ -181,10 +181,16 @@ function SubmissionFillBody({
       formInstanceRef.current?.emit('submitError', '');
       return;
     }
+    const base = baseRevisionIdRef.current;
+    if (!base) {
+      setRenderError(labels.loadError);
+      formInstanceRef.current?.emit('submitError', '');
+      return;
+    }
     setWriting('submit');
     try {
       const data = (submission?.data ?? {}) as Record<string, unknown>;
-      const outcome = await writer.submit(token ?? undefined, data, baseRevisionIdRef.current);
+      const outcome = await writer.submit(token ?? undefined, data, base);
       if (outcome.status === 'held') {
         setRenderError(null);
         onHeld('submit', outcome.reason);

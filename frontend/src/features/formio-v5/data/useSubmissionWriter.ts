@@ -67,12 +67,14 @@ export function useSubmissionWriter(submissionId: string) {
     async (
       token: string | undefined,
       data: Record<string, unknown>,
-      baseRevisionId: string | null,
+      baseRevisionId: string,
     ): Promise<WriteOutcome<WriteResult>> => {
-      const revisionIds = baseRevisionId
-        ? { revisionId: revisionIdFor('submit', data), baseRevisionId }
-        : {};
-      const value = await submitSobaFormSubmission(token, submissionId, { data, ...revisionIds });
+      const revisionId = revisionIdFor('submit', data);
+      const value = await submitSobaFormSubmission(token, submissionId, {
+        data,
+        revisionId,
+        baseRevisionId,
+      });
       return toOutcome(value);
     },
     [submissionId, revisionIdFor, toOutcome],
