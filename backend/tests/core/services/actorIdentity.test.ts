@@ -148,11 +148,12 @@ describe('resolveSignedInActor', () => {
   it('reads the row again when a repoint moves nothing', async () => {
     mockState.mockResolvedValue(state({ admin: idpGrant('other') }));
     mockRepoint.mockResolvedValue(false);
-    mockIsAdmin.mockResolvedValue(false);
+    mockIsAdmin.mockResolvedValue(true);
 
     await expect(resolveSignedInActor('bcgov-sso', mapped(), 'JO')).resolves.toMatchObject({
-      isSobaAdmin: false,
+      isSobaAdmin: true,
     });
+    expect(mockIsAdmin).toHaveBeenCalledWith('user-1');
   });
 
   it('revokes the IdP grant when the IdP stops reporting admin', async () => {

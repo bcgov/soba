@@ -4,7 +4,7 @@
  * no clock.
  */
 import type { Audience } from '@soba/lib';
-import type { NormalizedProfile } from '../../../core/auth/jwtClaims';
+import type { IdpAttributes, NormalizedProfile } from '../../../core/auth/jwtClaims';
 import {
   Roles,
   SystemGroup,
@@ -61,6 +61,8 @@ export interface PlannedPersona {
   subject: string;
   identityProviderCode: string;
   profile: NormalizedProfile;
+  /** The token claims stored for the identity, as a sign-in stores them. */
+  idpAttributes: IdpAttributes;
 }
 
 /** A persona's membership in a workspace and the group it gives them. */
@@ -190,10 +192,11 @@ function buildPersona(key: GeneratedPersonaKey): PlannedPersona {
   const usernameClaim =
     identityProviderCode === 'bceidbusiness' ? 'bceid_username' : 'idir_username';
   const lastName = kebab(key).replaceAll('-', ' ');
+  const subject = `${DEV_SUBJECT_PREFIX}${username}`;
   return {
     key,
     displayLabel,
-    subject: `${DEV_SUBJECT_PREFIX}${username}`,
+    subject,
     identityProviderCode,
     profile: {
       displayName: `Coverage ${lastName}`,
@@ -204,6 +207,14 @@ function buildPersona(key: GeneratedPersonaKey): PlannedPersona {
       name: `Coverage ${lastName}`,
       [usernameClaim]: displayLabel,
       displayLabel,
+    },
+    idpAttributes: {
+      sub: subject,
+      identity_provider: identityProviderCode,
+      preferred_username: username,
+      email: `${username}@example.test`,
+      name: `Coverage ${lastName}`,
+      [usernameClaim]: displayLabel,
     },
   };
 }

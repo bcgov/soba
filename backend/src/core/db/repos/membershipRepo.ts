@@ -56,14 +56,14 @@ export const findOrCreateUserByIdentity = async (
     const provider = providerRow[0];
 
     // Only identity providers present AND active in identity_provider may authenticate.
-    // Unknown or deactivated IdPs are rejected; we no longer implicitly create providers.
+    // Unknown or deactivated IdPs are rejected.
     if (!provider || !provider.isActive) {
       throw new ForbiddenError(
         `Identity provider '${normalizedProvider}' is not enabled for sign-in`,
       );
     }
 
-    // Advisory lock shape shared with findOrCreateUserByIdentity: hashtext(single ::text param), fixed namespace int.
+    // Serialises first sign-ins of one identity: hashtext(provider, subject) under a fixed namespace int.
     const identityLockPayload = `${provider.code}\u001f${subject}`;
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext(${identityLockPayload}::text), ${ADV_LOCK_FIND_OR_CREATE_IDENTITY})`,

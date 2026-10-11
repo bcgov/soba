@@ -188,9 +188,10 @@ export const findLiveSubmissionRecord = async (
  * started it (the seeded public user for anonymous fills, who then owns it).
  *
  * Idempotent on the id. `ON CONFLICT DO NOTHING` is the atomic gate: the row is only written when the
- * id is free, so concurrent double-opens are race-safe — the loser inserts nothing, falls through to
- * the select, and sees the winner's committed row. A taken id is a retry (same actor + form → return
- * the existing row) or a genuine collision (different owner → let the caller answer 409, not 500).
+ * id is free, so concurrent double-opens are race-safe: the loser inserts nothing, falls through to
+ * the select, and sees the winner's committed row. A taken id is a retry (same actor and form, on a
+ * live submission: return it) or a collision (another owner or form, or a submission, form or version
+ * that is deleted: the caller answers 409, not 500).
  */
 export const openSubmission = async (
   input: CreateSubmissionInput,

@@ -144,6 +144,7 @@ async function createPersonas(
       planned.identityProviderCode,
       planned.subject,
       planned.profile,
+      planned.idpAttributes,
     );
     await recordIds(runId, { userIds: [id] });
     const created: Persona = {

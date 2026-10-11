@@ -94,8 +94,8 @@ export class SubmissionService {
   /**
    * Open a new submission against the form's currently published version (the only submittable one),
    * under the client-supplied id. Idempotent: a retry of the same id by the same actor+form returns
-   * the existing record ({ created: false }); a collision with a different owner is a 409. A
-   * formVersionId that is not the published version is a 409.
+   * the existing live record ({ created: false }); another owner or form, or a submission, form or
+   * version that is deleted, is a 409. A formVersionId that is not the published version is a 409.
    */
   async open(input: CreateInput) {
     const version = await getPublishedVersionForForm(input.workspaceId, input.formId);

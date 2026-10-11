@@ -26,6 +26,7 @@ import type { IdpAttributes } from '../../../core/auth/jwtClaims';
 import {
   forms,
   formVersions,
+  identityProviders,
   sobaAdmins,
   submissionParticipants,
   submissions,
@@ -513,6 +514,7 @@ interface StoredIdentity {
   id: string;
   userId: string;
   providerCode: string;
+  providerActive: boolean;
   subject: string;
   attributes: IdpAttributes | null;
   adminSource: string | null;
@@ -530,7 +532,7 @@ async function signInAgrees(row: StoredIdentity): Promise<boolean> {
   ]);
   const current = row.attributes !== null;
   return (
-    state?.providerActive === true &&
+    state?.providerActive === row.providerActive &&
     state.identityId === row.id &&
     state.userId === row.userId &&
     (state.admin?.source ?? null) === row.adminSource &&
@@ -553,11 +555,13 @@ async function signInInconsistencies(manifest: CoverageManifest): Promise<string
       id: userIdentities.id,
       userId: userIdentities.userId,
       providerCode: userIdentities.identityProviderCode,
+      providerActive: identityProviders.isActive,
       subject: userIdentities.subject,
       attributes: userIdentities.idpAttributes,
       adminSource: sobaAdmins.source,
     })
     .from(userIdentities)
+    .innerJoin(identityProviders, eq(identityProviders.code, userIdentities.identityProviderCode))
     .leftJoin(sobaAdmins, eq(sobaAdmins.userId, userIdentities.userId))
     .where(inArray(userIdentities.userId, [...personaOf.keys()]));
   const issues = await Promise.all(
