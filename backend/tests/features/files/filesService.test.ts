@@ -54,7 +54,7 @@ jest.mock('../../../src/core/db/repos/formSubmitAccessRepo', () => ({
   hasFormSubmitAccess: jest.fn(),
 }));
 jest.mock('../../../src/core/db/repos/submissionRepo', () => ({
-  getSubmissionRecordById: jest.fn(),
+  getSubmissionWorkspaceAndState: jest.fn(),
 }));
 jest.mock('../../../src/core/db/repos/submissionParticipantRepo', () => ({
   isActiveParticipant: jest.fn(),
@@ -68,7 +68,7 @@ import { filesService } from '../../../src/features/files/service';
 import { createFileRecord, deleteFileRecord } from '../../../src/core/db/repos/fileRepo';
 import { linkFileToSubmission } from '../../../src/core/db/repos/submissionFileRepo';
 import { hasFormSubmitAccess } from '../../../src/core/db/repos/formSubmitAccessRepo';
-import { getSubmissionRecordById } from '../../../src/core/db/repos/submissionRepo';
+import { getSubmissionWorkspaceAndState } from '../../../src/core/db/repos/submissionRepo';
 import { isActiveParticipant } from '../../../src/core/db/repos/submissionParticipantRepo';
 import { getStorageAdapter } from '../../../src/core/integrations/plugins/PluginRegistry';
 
@@ -79,7 +79,7 @@ process.env.STORAGE_PROFILE_DEFAULT_BACKEND = 'storage-local';
 process.env.STORAGE_PROFILE_DEFAULT_BASE_PATH = tmp;
 
 const audienceMock = hasFormSubmitAccess as jest.Mock;
-const submissionMock = getSubmissionRecordById as jest.Mock;
+const submissionMock = getSubmissionWorkspaceAndState as jest.Mock;
 const participantMock = isActiveParticipant as jest.Mock;
 
 /** Grants the caller exactly the listed form permissions. */
@@ -140,15 +140,18 @@ describe('filesService', () => {
     expect(record.id).toBeTruthy();
 
     audienceMock.mockResolvedValue(true);
-    submissionMock.mockResolvedValue({ id: 'sub1', workflowState: 'draft', formId: 'form1' });
+    submissionMock.mockResolvedValue({
+      workspaceId: 'ws1',
+      workflowState: 'draft',
+      formId: 'form1',
+    });
     const got = await filesService.getForCaller(record.id, owner);
     if (typeof got === 'string' || !got.file.downloadStream) {
       throw new Error('expected a file with a download stream');
     }
     expect(got.record.filename).toBe('a.txt');
     expect(await readAll(got.file.downloadStream)).toBe('abc');
-    // The link's submission is read within the file's own workspace.
-    expect(submissionMock).toHaveBeenCalledWith('ws1', 'sub1');
+    expect(submissionMock).toHaveBeenCalledWith('sub1');
 
     // Un-submitted: a participant who is still in the submit audience may delete.
     expect(await filesService.deleteForCaller(record.id, owner)).toBe('deleted');
@@ -167,14 +170,30 @@ describe('filesService', () => {
 
   it('denies download to a caller who is not a participant, even one in the audience', async () => {
     const record = await uploadFor('sub1', 'b.txt');
-    submissionMock.mockResolvedValue({ id: 'sub1', workflowState: 'draft', formId: 'form1' });
+    submissionMock.mockResolvedValue({
+      workspaceId: 'ws1',
+      workflowState: 'draft',
+      formId: 'form1',
+    });
     audienceMock.mockResolvedValue(true);
     expect(await filesService.getForCaller(record.id, intruder)).toBe('denied');
   });
 
-  it('returns notfound when the owning submission no longer exists (download)', async () => {
+  it('returns notfound when the owning submission, its form or its version is gone', async () => {
     const record = await uploadFor('sub1', 'h.txt');
-    submissionMock.mockResolvedValue(null); // submission soft-deleted / gone
+    submissionMock.mockResolvedValue(null);
+    audienceMock.mockResolvedValue(true);
+    expect(await filesService.getForCaller(record.id, owner)).toBe('notfound');
+    expect(await filesService.deleteForCaller(record.id, owner)).toBe('notfound');
+  });
+
+  it('returns notfound when the owning submission is in another workspace', async () => {
+    const record = await uploadFor('sub1', 'w.txt');
+    submissionMock.mockResolvedValue({
+      workspaceId: 'ws2',
+      workflowState: 'draft',
+      formId: 'form1',
+    });
     audienceMock.mockResolvedValue(true);
     expect(await filesService.getForCaller(record.id, owner)).toBe('notfound');
   });
@@ -183,7 +202,11 @@ describe('filesService', () => {
     const record = await uploadFor('sub1', 'gone.txt');
     await getStorageAdapter(record.profile).deleteFile(record.backendRef);
     audienceMock.mockResolvedValue(true);
-    submissionMock.mockResolvedValue({ id: 'sub1', workflowState: 'draft', formId: 'form1' });
+    submissionMock.mockResolvedValue({
+      workspaceId: 'ws1',
+      workflowState: 'draft',
+      formId: 'form1',
+    });
     expect(await filesService.getForCaller(record.id, owner)).toBe('unavailable');
   });
 
@@ -196,21 +219,33 @@ describe('filesService', () => {
 
   it('lets only a participant delete an un-submitted attachment', async () => {
     const record = await uploadFor('sub1', 'd.txt');
-    submissionMock.mockResolvedValue({ id: 'sub1', workflowState: 'draft', formId: 'form1' });
+    submissionMock.mockResolvedValue({
+      workspaceId: 'ws1',
+      workflowState: 'draft',
+      formId: 'form1',
+    });
     audienceMock.mockResolvedValue(true);
     expect(await filesService.deleteForCaller(record.id, intruder)).toBe('denied');
   });
 
   it("refuses a delete on a submitted submission's file to a participant holding only submission_create", async () => {
     const record = await uploadFor('sub1', 'e.txt');
-    submissionMock.mockResolvedValue({ id: 'sub1', workflowState: 'submitted', formId: 'form1' });
+    submissionMock.mockResolvedValue({
+      workspaceId: 'ws1',
+      workflowState: 'submitted',
+      formId: 'form1',
+    });
     holding(['submission_create']);
     expect(await filesService.deleteForCaller(record.id, owner)).toBe('denied');
   });
 
   it("lets a non-participant with submission_update delete a submitted submission's file", async () => {
     const record = await uploadFor('sub1', 'e2.txt');
-    submissionMock.mockResolvedValue({ id: 'sub1', workflowState: 'submitted', formId: 'form1' });
+    submissionMock.mockResolvedValue({
+      workspaceId: 'ws1',
+      workflowState: 'submitted',
+      formId: 'form1',
+    });
     holding(['submission_update']);
     expect(await filesService.deleteForCaller(record.id, intruder)).toBe('deleted');
     expect(audienceMock).toHaveBeenCalledWith(
@@ -222,7 +257,11 @@ describe('filesService', () => {
 
   it('a participant no longer in the submit audience cannot delete', async () => {
     const record = await uploadFor('sub1', 'f.txt');
-    submissionMock.mockResolvedValue({ id: 'sub1', workflowState: 'draft', formId: 'form1' });
+    submissionMock.mockResolvedValue({
+      workspaceId: 'ws1',
+      workflowState: 'draft',
+      formId: 'form1',
+    });
     audienceMock.mockResolvedValue(false);
     expect(await filesService.deleteForCaller(record.id, owner)).toBe('denied');
   });
@@ -280,7 +319,11 @@ describe('filesService', () => {
 
   it('leaves the blob intact when the row delete fails (row-first ordering)', async () => {
     const record = await uploadFor('sub1', 'keep.txt');
-    submissionMock.mockResolvedValue({ id: 'sub1', workflowState: 'draft', formId: 'form1' });
+    submissionMock.mockResolvedValue({
+      workspaceId: 'ws1',
+      workflowState: 'draft',
+      formId: 'form1',
+    });
     audienceMock.mockResolvedValue(true);
     const blobs = listBlobs(tmp);
     (deleteFileRecord as jest.Mock).mockRejectedValueOnce(new Error('row delete failed'));

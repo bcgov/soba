@@ -276,6 +276,10 @@ allowed by its workspace, and an overridden form only by its own permissions. Pa
 the grant, and a list repo called without one returns nothing. A list anchored by a form, version or
 submission is checked on that form and gets a grant for that form alone.
 
+A record counts as deleted when it, its form or its form version is deleted (`liveRows.ts`). Lists
+leave deleted records out, and looking one up by id returns 404, in design and submit mode alike,
+before any permission check.
+
 `GET /design/forms/:id` returns the caller's codes on that form as `permissions` (a sorted array,
 `['*']` for admins) so the UI can gate actions.
 

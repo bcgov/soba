@@ -174,8 +174,9 @@ any difference:
 - submissions: listed in My Submissions, and the read, write and delete rules
 
 It also checks that the designer's forms, form versions and submissions lists each hold exactly the
-forms whose own check allows them, and that the Create Form picker offers exactly the workspaces
-where the create check passes.
+forms whose own check allows them and leave out the deleted ones, that each form version and
+submission resolves by id only while it, its form and its version are not deleted, and that the
+Create Form picker offers exactly the workspaces where the create check passes.
 
 Write is the rule save and submit share; the request itself can still refuse the write or keep it
 as pending. The command only reads, and needs no running backend. Change the table with any access

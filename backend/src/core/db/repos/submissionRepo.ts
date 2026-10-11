@@ -30,6 +30,7 @@ import {
   type SubmissionWorkflowStateCode,
 } from '../codes';
 import { listAllowsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
+import { liveSubmission } from './liveRows';
 
 export type SubmissionRecord = typeof submissions.$inferSelect;
 
@@ -330,7 +331,8 @@ export const getSubmissionById = async (
 };
 
 /**
- * Resolve list-scope context for a submission by id alone. Returns null for missing/deleted submissions.
+ * Resolve list-scope context for a submission by id alone. Returns null when the submission is
+ * missing, or it, its form or its form version is deleted.
  */
 export const getSubmissionListContext = async (
   submissionId: string,
@@ -342,13 +344,18 @@ export const getSubmissionListContext = async (
       formVersionId: submissions.formVersionId,
     })
     .from(submissions)
-    .where(and(eq(submissions.id, submissionId), isNull(submissions.deletedAt)))
+    .innerJoin(forms, eq(submissions.formId, forms.id))
+    .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
+    .where(and(eq(submissions.id, submissionId), liveSubmission))
     .limit(1);
 
   return row[0] ?? null;
 };
 
-/** Resolve a submission's workspace, form and workflow state by id alone (for the write gates). */
+/**
+ * Resolve a submission's workspace, form and workflow state by id alone (for the write gates).
+ * Returns null when the submission is missing, or it, its form or its form version is deleted.
+ */
 export const getSubmissionWorkspaceAndState = async (
   submissionId: string,
 ): Promise<{
@@ -363,7 +370,9 @@ export const getSubmissionWorkspaceAndState = async (
       workflowState: submissions.workflowState,
     })
     .from(submissions)
-    .where(and(eq(submissions.id, submissionId), isNull(submissions.deletedAt)))
+    .innerJoin(forms, eq(submissions.formId, forms.id))
+    .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
+    .where(and(eq(submissions.id, submissionId), liveSubmission))
     .limit(1);
   return rows[0] ?? null;
 };
@@ -383,7 +392,7 @@ export const listSubmissionsForWorkspace = async (
   }
   const whereClauses = [
     inArray(submissions.workspaceId, input.workspaceIds),
-    isNull(submissions.deletedAt),
+    liveSubmission,
     permittedFormsWhere(input.formAccess, {
       workspaceId: submissions.workspaceId,
       formId: submissions.formId,
@@ -450,12 +459,13 @@ export const listSubmissionsForWorkspace = async (
       .limit(input.limit)
       .offset(input.offset);
 
-    // Both parent ids are not-null with validated foreign keys, so the joins can neither drop nor
-    // multiply a row. The count only needs `forms`, and only when the search reads its name.
-    const countQuery = tx.select({ total: count() }).from(submissions);
-    const totals = await (input.q
-      ? countQuery.innerJoin(forms, eq(submissions.formId, forms.id)).where(where)
-      : countQuery.where(where));
+    // Both parent ids are not-null with validated foreign keys, so the joins never multiply a row.
+    const totals = await tx
+      .select({ total: count() })
+      .from(submissions)
+      .innerJoin(forms, eq(submissions.formId, forms.id))
+      .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
+      .where(where);
 
     return { items, total: totals[0]?.total ?? 0 };
   });
@@ -472,12 +482,10 @@ export const listSubmissionsForParticipant = async (
   const whereClauses = [
     eq(submissionParticipants.userId, input.userId),
     eq(submissionParticipants.status, SubmissionParticipantStatus.active),
-    isNull(submissions.deletedAt),
+    liveSubmission,
     input.workflowState
       ? eq(submissions.workflowState, input.workflowState)
       : inArray(submissions.workflowState, [...MY_SUBMISSION_STATES]),
-    isNull(forms.deletedAt),
-    isNull(formVersions.deletedAt),
   ];
 
   if (input.q) {

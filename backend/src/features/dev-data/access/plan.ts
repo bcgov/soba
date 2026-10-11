@@ -103,6 +103,9 @@ export interface PlannedGroupOverride {
   cleared?: boolean;
 }
 
+/** Deleting the form, or its published version, once its submissions exist. */
+export type PlannedDelete = 'deleteForm' | 'deleteVersion';
+
 export interface PlannedCoverageForm {
   key: CoverageFormKey;
   name: string;
@@ -114,8 +117,7 @@ export interface PlannedCoverageForm {
   allowSubmitterDrafts?: boolean;
   /** Replaces the group's members on this form; cleared leaves the override inactive. */
   groupOverride?: PlannedGroupOverride;
-  /** Applied once the form's submissions exist. */
-  afterSubmissions?: 'deleteForm' | 'deleteVersion';
+  afterSubmissions?: PlannedDelete;
 }
 
 export interface PlannedCoverageWorkspace {

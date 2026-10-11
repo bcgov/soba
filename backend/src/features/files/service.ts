@@ -5,7 +5,7 @@ import {
   linkFileToSubmission,
   unlinkSubmissionFile,
 } from '../../core/db/repos/submissionFileRepo';
-import { getSubmissionRecordById } from '../../core/db/repos/submissionRepo';
+import { getSubmissionWorkspaceAndState } from '../../core/db/repos/submissionRepo';
 import type { CallerIdentity } from '../../core/db/repos/formSubmitAccessRepo';
 import { isSubmitterAllowed, SubmitterOperation } from '../../core/services/submitterAccess';
 import { fileStore, type StoreFileOutcome } from '../../core/services/fileStore';
@@ -23,15 +23,16 @@ export interface UploadFileParams {
   buffer: Buffer;
 }
 
-/** The attachment and its still-present submission; null when either is missing. */
+/**
+ * The attachment and its submission; null when either is missing, or the submission, its form or its
+ * form version is deleted.
+ */
 async function findAttachment(id: string) {
   const attachment = await getSubmissionFileByFileId(id);
   if (!attachment) return null;
-  const submission = await getSubmissionRecordById(
-    attachment.file.workspaceId,
-    attachment.submissionId,
-  );
-  return submission ? { record: attachment.file, submission } : null;
+  const submission = await getSubmissionWorkspaceAndState(attachment.submissionId);
+  if (submission?.workspaceId !== attachment.file.workspaceId) return null;
+  return { record: attachment.file, submission: { ...submission, id: attachment.submissionId } };
 }
 
 export const filesService = {

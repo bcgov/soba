@@ -2,7 +2,7 @@
  * Runs every coverage case through the code the submit, design and workspace routes use, and
  * compares the answers with the expectations table. Reads only.
  */
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import {
   audienceAdmits,
   canSaveSubmissionDraft,
@@ -19,7 +19,7 @@ import {
 
 import { db } from '../../../core/db/client';
 import { FormCreatePermissions } from '../../../core/db/codes';
-import { submissionParticipants } from '../../../core/db/schema';
+import { forms, formVersions, submissionParticipants, submissions } from '../../../core/db/schema';
 import {
   resolveFormAccessGrant,
   resolveFormPermissions,
@@ -38,10 +38,12 @@ import {
   type CallerIdentity,
 } from '../../../core/db/repos/formSubmitAccessRepo';
 import {
+  getFormVersionListContext,
   getPublishedVersionForForm,
   listFormVersionsForWorkspace,
 } from '../../../core/db/repos/formVersionRepo';
 import {
+  getSubmissionListContext,
   getSubmissionWorkspaceAndState,
   listSubmissionsForParticipant,
   listSubmissionsForWorkspace,
@@ -76,6 +78,7 @@ import {
 } from './expectations';
 import type { CoverageFormRef, CoverageManifest, CoverageSubmissionRef } from './generate';
 import {
+  buildCoveragePlan,
   COVERAGE_FORM_KEYS,
   COVERAGE_SUBMISSION_KEYS,
   COVERAGE_WORKSPACE_KEYS,
@@ -86,6 +89,7 @@ import {
   type CoverageSubmissionKey,
   type CoverageWorkspaceKey,
   type PersonaKey,
+  type PlannedDelete,
 } from './plan';
 
 export interface CoverageReport {
@@ -97,7 +101,7 @@ export interface CoverageReport {
   design: CaseResult<CoverageFormKey, DesignCheck>[];
   workspaces: CaseResult<CoverageWorkspaceKey, WorkspaceCheck>[];
   submissions: CaseResult<CoverageSubmissionKey, SubmissionCheck>[];
-  /** Disagreements between two code paths that should give the same answer. */
+  /** Disagreements between code paths that should give the same answer, or with the seeded rows. */
   inconsistencies: string[];
 }
 
@@ -303,6 +307,8 @@ const DESIGN_LISTS: readonly {
   name: string;
   formIds: DesignListFormIds;
   codeSets: readonly (readonly PermissionCode[])[];
+  /** Planned deletes that leave every row of the form out of the list. */
+  hides: readonly PlannedDelete[];
 }[] = [
   {
     name: 'forms',
@@ -313,6 +319,7 @@ const DESIGN_LISTS: readonly {
       [Permissions.design_update],
       [Permissions.form_read, Permissions.document_template_read],
     ],
+    hides: ['deleteForm'],
   },
   {
     name: 'form versions',
@@ -327,6 +334,7 @@ const DESIGN_LISTS: readonly {
       return items.map((item) => item.formId);
     },
     codeSets: [[Permissions.form_read]],
+    hides: ['deleteForm', 'deleteVersion'],
   },
   {
     name: 'submissions',
@@ -342,6 +350,7 @@ const DESIGN_LISTS: readonly {
       return items.map((item) => item.formId);
     },
     codeSets: [[Permissions.submission_read]],
+    hides: ['deleteForm', 'deleteVersion'],
   },
 ];
 
@@ -395,6 +404,95 @@ async function designListInconsistencies(
   return issues.flat();
 }
 
+/** Each coverage form's planned delete, by form key. */
+const PLANNED_DELETES: ReadonlyMap<string, PlannedDelete> = new Map(
+  buildCoveragePlan()
+    .workspaces.flatMap((workspace) => workspace.forms)
+    .flatMap((form) => (form.afterSubmissions ? [[form.key, form.afterSubmissions] as const] : [])),
+);
+
+/** No design list, read with coverageFormsGrant, shows a form whose planned delete it hides. */
+async function deletedRowsShown(manifest: CoverageManifest): Promise<string[]> {
+  const reads = COVERAGE_WORKSPACE_KEYS.flatMap((workspaceKey) =>
+    DESIGN_LISTS.map((list) => ({ workspaceId: manifest.workspaces[workspaceKey].id, list })),
+  );
+  const issues = await Promise.all(
+    reads.map(async ({ workspaceId, list }) => {
+      const shown = await list.formIds([workspaceId], coverageFormsGrant(manifest, workspaceId));
+      return [...new Set(shown)].flatMap((formId) => {
+        const key = formKeyOf(manifest, formId);
+        const planned = PLANNED_DELETES.get(key);
+        return planned && list.hides.includes(planned)
+          ? [`${key}: ${list.name} list shows it after ${planned}`]
+          : [];
+      });
+    }),
+  );
+  return issues.flat();
+}
+
+/**
+ * Each coverage form version and submission resolves by id exactly when it and the records it
+ * belongs to are not deleted, as their own rows say.
+ */
+async function lookupInconsistencies(manifest: CoverageManifest): Promise<string[]> {
+  const versions = await db
+    .select({
+      id: formVersions.id,
+      formId: formVersions.formId,
+      deletedAt: formVersions.deletedAt,
+      formDeletedAt: forms.deletedAt,
+    })
+    .from(formVersions)
+    .innerJoin(forms, eq(forms.id, formVersions.formId))
+    .where(
+      inArray(
+        formVersions.formId,
+        COVERAGE_FORM_KEYS.map((key) => manifest.forms[key].formId),
+      ),
+    );
+  const submissionKeys = new Map(
+    COVERAGE_SUBMISSION_KEYS.map((key) => [manifest.submissions[key].submissionId, key]),
+  );
+  const submissionRows = await db
+    .select({
+      id: submissions.id,
+      deletedAt: submissions.deletedAt,
+      formDeletedAt: forms.deletedAt,
+      versionDeletedAt: formVersions.deletedAt,
+    })
+    .from(submissions)
+    .innerJoin(forms, eq(forms.id, submissions.formId))
+    .innerJoin(formVersions, eq(formVersions.id, submissions.formVersionId))
+    .where(inArray(submissions.id, [...submissionKeys.keys()]));
+
+  const versionIssues = await Promise.all(
+    versions.map(async (row) => {
+      const live = row.deletedAt === null && row.formDeletedAt === null;
+      const resolves = (await getFormVersionListContext(row.id)) !== null;
+      return live === resolves
+        ? []
+        : [
+            `${formKeyOf(manifest, row.formId)} version ${row.id}: lookup by id disagrees with deletedAt`,
+          ];
+    }),
+  );
+  const submissionIssues = await Promise.all(
+    submissionRows.map(async (row) => {
+      const live =
+        row.deletedAt === null && row.formDeletedAt === null && row.versionDeletedAt === null;
+      const lookups = [
+        (await getSubmissionListContext(row.id)) !== null,
+        (await getSubmissionWorkspaceAndState(row.id)) !== null,
+      ];
+      return lookups.every((resolves) => resolves === live)
+        ? []
+        : [`${submissionKeys.get(row.id)}: lookup by id disagrees with deletedAt`];
+    }),
+  );
+  return [...versionIssues.flat(), ...submissionIssues.flat()];
+}
+
 async function checkWorkspaceForms(
   manifest: CoverageManifest,
   caller: Caller,
@@ -444,15 +542,21 @@ async function coverageDesignList(
   return new Set(await designFormsList(workspaceIds, grant));
 }
 
-/** The actor's permission codes on each coverage form, by form id. */
+/** The actor's codes on the form as its design routes see them: none once the form is deleted. */
+async function designPermissions(actorId: string, form: CoverageFormRef): Promise<Set<string>> {
+  if ((await getWorkspaceIdForForm(form.formId)) === null) return new Set();
+  return resolveFormPermissions(actorId, form.workspaceId, form.formId);
+}
+
+/** The actor's design permissions on each coverage form, by form id. */
 async function coverageFormPermissions(
   manifest: CoverageManifest,
   actorId: string,
 ): Promise<Map<string, Set<string>>> {
   const entries = await Promise.all(
     COVERAGE_FORM_KEYS.map(async (key) => {
-      const { workspaceId, formId } = manifest.forms[key];
-      return [formId, await resolveFormPermissions(actorId, workspaceId, formId)] as const;
+      const form = manifest.forms[key];
+      return [form.formId, await designPermissions(actorId, form)] as const;
     }),
   );
   return new Map(entries);
@@ -607,6 +711,10 @@ const skipsOwner = (manifest: CoverageManifest): boolean =>
 export async function checkCoverage(manifest: CoverageManifest): Promise<CoverageReport> {
   const ownerProvider = manifest.personas[OWNER].identityProviderCode;
   const personas = PERSONA_KEYS.filter((persona) => persona !== OWNER || !skipsOwner(manifest));
+  const [shown, lookups] = await Promise.all([
+    deletedRowsShown(manifest),
+    lookupInconsistencies(manifest),
+  ]);
   const checked = await inSequence(personas, async (persona) => {
     const caller = callerOf(manifest, persona);
     const [forms, design, workspaces, submissions] = await Promise.all([
@@ -626,11 +734,11 @@ export async function checkCoverage(manifest: CoverageManifest): Promise<Coverag
     design: checked.flatMap((c) => c.design.results),
     workspaces: checked.flatMap((c) => c.workspaces.results),
     submissions: checked.flatMap((c) => c.submissions),
-    inconsistencies: checked.flatMap((c) => [
-      ...c.forms.issues,
-      ...c.design.issues,
-      ...c.workspaces.issues,
-    ]),
+    inconsistencies: [
+      ...shown,
+      ...lookups,
+      ...checked.flatMap((c) => [...c.forms.issues, ...c.design.issues, ...c.workspaces.issues]),
+    ],
   };
 }
 
@@ -671,7 +779,7 @@ export async function explainForm(
   const answers = { listed: rows.has(form.formId), ...(await formAnswers(caller, form)) };
   const design = actorId
     ? designAnswers(
-        await resolveFormPermissions(actorId, form.workspaceId, form.formId),
+        await designPermissions(actorId, form),
         (await coverageDesignList(manifest, actorId)).has(form.formId),
       )
     : NO_DESIGN_ACCESS;

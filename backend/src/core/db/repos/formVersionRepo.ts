@@ -5,6 +5,7 @@ import { formVersionRevisions, formVersions, forms } from '../schema';
 import { orderByForSort, prefixPattern, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 import { listAllowsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
+import { liveFormVersion } from './liveRows';
 
 interface CreateDraftInput {
   workspaceId: string;
@@ -57,25 +58,9 @@ export interface FormVersionListRow {
   updatedBy: string | null;
 }
 
-/** Whether the form version exists and neither it nor its form is deleted. */
-export const isLiveFormVersion = async (formVersionId: string): Promise<boolean> => {
-  const rows = await db
-    .select({ id: formVersions.id })
-    .from(formVersions)
-    .innerJoin(forms, eq(forms.id, formVersions.formId))
-    .where(
-      and(
-        eq(formVersions.id, formVersionId),
-        isNull(formVersions.deletedAt),
-        isNull(forms.deletedAt),
-      ),
-    )
-    .limit(1);
-  return rows.length > 0;
-};
-
 /**
- * Resolve list-scope context for a form version by id alone. Returns null for missing/deleted versions.
+ * Resolve list-scope context for a form version by id alone. Returns null when the version is
+ * missing, or it or its form is deleted.
  */
 export const getFormVersionListContext = async (
   formVersionId: string,
@@ -83,7 +68,8 @@ export const getFormVersionListContext = async (
   const row = await db
     .select({ workspaceId: formVersions.workspaceId, formId: formVersions.formId })
     .from(formVersions)
-    .where(and(eq(formVersions.id, formVersionId), isNull(formVersions.deletedAt)))
+    .innerJoin(forms, eq(forms.id, formVersions.formId))
+    .where(and(eq(formVersions.id, formVersionId), liveFormVersion))
     .limit(1);
 
   return row[0] ?? null;
@@ -149,7 +135,7 @@ export const listFormVersionsForWorkspace = async (
   }
   const whereClauses = [
     inArray(formVersions.workspaceId, input.workspaceIds),
-    isNull(formVersions.deletedAt),
+    liveFormVersion,
     permittedFormsWhere(input.formAccess, {
       workspaceId: formVersions.workspaceId,
       formId: formVersions.formId,
@@ -185,6 +171,7 @@ export const listFormVersionsForWorkspace = async (
         updatedBy: formVersions.updatedBy,
       })
       .from(formVersions)
+      .innerJoin(forms, eq(forms.id, formVersions.formId))
       .where(where)
       .orderBy(
         ...orderByForSort(
@@ -196,7 +183,11 @@ export const listFormVersionsForWorkspace = async (
       )
       .limit(input.limit)
       .offset(input.offset);
-    const totals = await tx.select({ total: count() }).from(formVersions).where(where);
+    const totals = await tx
+      .select({ total: count() })
+      .from(formVersions)
+      .innerJoin(forms, eq(forms.id, formVersions.formId))
+      .where(where);
     return { items, total: totals[0]?.total ?? 0 };
   });
 };

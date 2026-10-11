@@ -219,7 +219,6 @@ const everyCheck = (personas: PersonaKey[]): DesignExpectation => ({
 
 const DESIGNERS_OVERRIDE_READERS: PersonaKey[] = ['admin', 'reviewer', 'viewer', 'overrideAdded'];
 
-/** Only the list leaves out a deleted form; the checks read roles. */
 export const DESIGN_EXPECTATIONS: Record<CoverageFormKey, DesignExpectation> = {
   rolesInherit: rolesDesign(),
   rolesOverride: rolesDesign(),
@@ -230,7 +229,8 @@ export const DESIGN_EXPECTATIONS: Record<CoverageFormKey, DesignExpectation> = {
     designUpdate: ['admin', 'overrideAdded'],
   }),
   rolesUnpublished: rolesDesign(),
-  rolesFormDeleted: rolesDesign({ designListed: [] }),
+  // A deleted form's routes return 404 before any permission check.
+  rolesFormDeleted: everyCheck([]),
   rolesVersionDeleted: rolesDesign(),
   rolesDraftsOff: rolesDesign(),
   protectedInherit: everyCheck(['admin', 'owner']),
@@ -276,18 +276,9 @@ export const SUBMISSION_EXPECTATIONS: Record<CoverageSubmissionKey, SubmissionEx
   outsiderSubmitted: { mine: ['outsider'], read: ['outsider'], write: ['outsider'], delete: [] },
   outsiderOpened: { mine: [], read: ['outsider'], write: ['outsider'], delete: ['outsider'] },
   bceidDeleted: NONE,
-  submitterOnDeletedVersion: {
-    mine: [],
-    read: ['submitter'],
-    write: ['submitter'],
-    delete: [],
-  },
-  submitterOnDeletedForm: {
-    mine: [],
-    read: ['submitter'],
-    write: ['submitter'],
-    delete: ['submitter'],
-  },
+  // A deleted form or form version closes the submissions on it.
+  submitterOnDeletedVersion: NONE,
+  submitterOnDeletedForm: NONE,
   ownerDraft: { mine: ['owner'], read: ['owner'], write: ['owner'], delete: ['owner'] },
   // The public user owns every anonymous submission, so any anonymous caller holding the id passes.
   anonymousSubmitted: { mine: [], read: ['anonymous'], write: ['anonymous'], delete: [] },
