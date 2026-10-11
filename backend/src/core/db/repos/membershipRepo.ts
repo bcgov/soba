@@ -18,7 +18,7 @@ import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 import { membershipHoldsPermission } from './formAccessRepo';
 
-/** Second int for `pg_advisory_xact_lock`; must not collide with workspaceRepo / sobaAdminRepo lock ids. */
+/** Second int for `pg_advisory_xact_lock`; must not collide with the other advisory lock ids. */
 const ADV_LOCK_FIND_OR_CREATE_IDENTITY = 2_147_483_622;
 
 export { findUserIdByIdentity } from './identityLookup';
@@ -101,6 +101,22 @@ export const findOrCreateUserByIdentity = async (
 
     return userId;
   });
+};
+
+/** Stores the identity's IdP attributes; writes nothing when the stored ones already match. */
+export const updateIdentityAttributes = async (
+  identityId: string,
+  idpAttributes: IdpAttributes,
+): Promise<void> => {
+  await db
+    .update(userIdentities)
+    .set({ idpAttributes, updatedAt: new Date() })
+    .where(
+      and(
+        eq(userIdentities.id, identityId),
+        sql`${userIdentities.idpAttributes} is distinct from ${JSON.stringify(idpAttributes)}::jsonb`,
+      ),
+    );
 };
 
 export const actorBelongsToWorkspace = async (workspaceId: string, userId: string) => {

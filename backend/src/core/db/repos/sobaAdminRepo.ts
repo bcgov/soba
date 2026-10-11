@@ -1,12 +1,9 @@
-import { and, count, eq, ilike, sql } from 'drizzle-orm';
+import { and, count, eq, ilike } from 'drizzle-orm';
 import { SOBA_ADMIN_SORT_FIELDS, type SortLocale, type SortToken } from '@soba/lib';
 import { db } from '../client';
 import { appUsers, sobaAdmins } from '../schema';
 import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
-
-/** Second int for `pg_advisory_xact_lock`; must not collide with workspaceRepo / membershipRepo lock ids. */
-const ADV_LOCK_UPSERT_SOBA_ADMIN = 1_774_566_321;
 
 export const SOBA_ADMIN_SOURCE_IDP = 'idp';
 export const SOBA_ADMIN_SOURCE_DIRECT = 'direct';
@@ -90,65 +87,55 @@ export async function isSobaAdmin(userId: string): Promise<boolean> {
   return Boolean(row[0]);
 }
 
-/**
- * Refreshes soba_admin from IdP on login.
- * - If isAdmin: insert new row with source='idp', or update existing only when it is already idp-sourced (refresh syncedAt). Never overwrite a direct grant with idp.
- * - If !isAdmin: delete row only when current row is idp-sourced for this IdP (revoke IdP grant).
- * Direct grants are never changed or removed here.
- */
-export async function upsertSobaAdminFromIdp(
+/** Grants platform admin from the IdP `idpCode`; any existing row, direct or IdP, is kept as it is. */
+export async function grantSobaAdminFromIdp(
   userId: string,
   idpCode: string,
-  isAdmin: boolean,
+  actorDisplayLabel: string | null,
+): Promise<void> {
+  await db
+    .insert(sobaAdmins)
+    .values({
+      userId,
+      source: SOBA_ADMIN_SOURCE_IDP,
+      identityProviderCode: idpCode,
+      syncedAt: new Date(),
+      createdBy: actorDisplayLabel,
+      updatedBy: actorDisplayLabel,
+    })
+    .onConflictDoNothing({ target: sobaAdmins.userId });
+}
+
+/** Moves an IdP grant to the IdP `idpCode`; a direct grant is left alone. */
+export async function repointSobaAdminFromIdp(
+  userId: string,
+  idpCode: string,
   actorDisplayLabel: string | null,
 ): Promise<void> {
   const now = new Date();
-  const normalizedIdp = idpCode.toLowerCase();
+  await db
+    .update(sobaAdmins)
+    .set({
+      identityProviderCode: idpCode,
+      syncedAt: now,
+      updatedAt: now,
+      updatedBy: actorDisplayLabel,
+    })
+    .where(and(eq(sobaAdmins.userId, userId), eq(sobaAdmins.source, SOBA_ADMIN_SOURCE_IDP)));
+}
 
-  await db.transaction(async (tx) => {
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext(${userId}::text), ${ADV_LOCK_UPSERT_SOBA_ADMIN})`,
+/** Removes the grant the IdP `idpCode` gave, never a direct one. Whether a row was removed. */
+export async function revokeSobaAdminFromIdp(userId: string, idpCode: string): Promise<boolean> {
+  const result = await db
+    .delete(sobaAdmins)
+    .where(
+      and(
+        eq(sobaAdmins.userId, userId),
+        eq(sobaAdmins.source, SOBA_ADMIN_SOURCE_IDP),
+        eq(sobaAdmins.identityProviderCode, idpCode),
+      ),
     );
-    const existing = await tx
-      .select()
-      .from(sobaAdmins)
-      .where(eq(sobaAdmins.userId, userId))
-      .limit(1);
-
-    const row = existing[0];
-
-    if (isAdmin) {
-      if (row) {
-        // Only update when already idp-sourced; never overwrite direct with idp (would lose direct grant if IdP later revokes)
-        if (row.source === SOBA_ADMIN_SOURCE_IDP) {
-          await tx
-            .update(sobaAdmins)
-            .set({
-              identityProviderCode: normalizedIdp,
-              syncedAt: now,
-              updatedAt: now,
-              updatedBy: actorDisplayLabel,
-            })
-            .where(eq(sobaAdmins.userId, userId));
-        }
-        // else: source is direct — leave as-is
-      } else {
-        await tx.insert(sobaAdmins).values({
-          userId,
-          source: SOBA_ADMIN_SOURCE_IDP,
-          identityProviderCode: normalizedIdp,
-          syncedAt: now,
-          createdBy: actorDisplayLabel,
-          updatedBy: actorDisplayLabel,
-        });
-      }
-    } else {
-      // Revoke: remove only if current grant is from this IdP
-      if (row?.source === SOBA_ADMIN_SOURCE_IDP && row.identityProviderCode === normalizedIdp) {
-        await tx.delete(sobaAdmins).where(eq(sobaAdmins.userId, userId));
-      }
-    }
-  });
+  return (result.rowCount ?? 0) > 0;
 }
 
 /**
