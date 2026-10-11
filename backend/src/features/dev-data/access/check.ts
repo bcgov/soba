@@ -22,7 +22,15 @@ import {
 
 import { db } from '../../../core/db/client';
 import { FormCreatePermissions } from '../../../core/db/codes';
-import { forms, formVersions, submissionParticipants, submissions } from '../../../core/db/schema';
+import type { IdpAttributes } from '../../../core/auth/jwtClaims';
+import {
+  forms,
+  formVersions,
+  sobaAdmins,
+  submissionParticipants,
+  submissions,
+  userIdentities,
+} from '../../../core/db/schema';
 import {
   resolveFormAccessGrant,
   resolveFormPermissions,
@@ -30,6 +38,7 @@ import {
   type FormAccessGrant,
 } from '../../../core/db/repos/formAccessRepo';
 import { getWorkspaceIdForForm, listFormsForWorkspace } from '../../../core/db/repos/formRepo';
+import { findSignInState } from '../../../core/db/repos/identityLookup';
 import {
   findActorMembership,
   getActiveWorkspaceIdsForUser,
@@ -46,6 +55,7 @@ import {
   listFormVersionsForWorkspace,
 } from '../../../core/db/repos/formVersionRepo';
 import {
+  findLiveSubmissionRecord,
   getSubmissionListContext,
   getSubmissionWorkspaceAndState,
   listSubmissionsForParticipant,
@@ -80,8 +90,10 @@ import {
 } from './expectations';
 import type { CoverageFormRef, CoverageManifest, CoverageSubmissionRef } from './generate';
 import {
+  ANONYMOUS,
   buildCoveragePlan,
   COVERAGE_FORM_KEYS,
+  COVERAGE_PREFIX,
   COVERAGE_SUBMISSION_KEYS,
   COVERAGE_WORKSPACE_KEYS,
   OWNER,
@@ -485,6 +497,7 @@ async function lookupInconsistencies(manifest: CoverageManifest): Promise<string
       const lookups = [
         (await getSubmissionListContext(row.id)) !== null,
         (await getSubmissionWorkspaceAndState(row.id)) !== null,
+        (await findLiveSubmissionRecord(row.id)) !== null,
       ];
       return lookups.every((resolves) => resolves === live)
         ? []
@@ -492,6 +505,83 @@ async function lookupInconsistencies(manifest: CoverageManifest): Promise<string
     }),
   );
   return [...versionIssues.flat(), ...submissionIssues.flat()];
+}
+
+/** A stored identity row, its user's admin source, and the persona it belongs to. */
+interface StoredIdentity {
+  persona: string;
+  id: string;
+  userId: string;
+  providerCode: string;
+  subject: string;
+  attributes: IdpAttributes | null;
+  adminSource: string | null;
+}
+
+/** Whether the sign-in read gives back what the identity's own rows hold. */
+async function signInAgrees(row: StoredIdentity): Promise<boolean> {
+  const stored = row.attributes ?? {};
+  const read = (attributes: IdpAttributes) =>
+    findSignInState(row.providerCode, row.subject, attributes);
+  const [state, reversed, changed] = await Promise.all([
+    read(stored),
+    read(Object.fromEntries(Object.entries(stored).reverse())),
+    read({ ...stored, coverageProbe: true }),
+  ]);
+  const current = row.attributes !== null;
+  return (
+    state?.providerActive === true &&
+    state.identityId === row.id &&
+    state.userId === row.userId &&
+    (state.admin?.source ?? null) === row.adminSource &&
+    state.attributesCurrent === current &&
+    reversed?.attributesCurrent === current &&
+    changed?.attributesCurrent === false
+  );
+}
+
+/**
+ * The sign-in read finds each signed-in persona's identity, user and platform admin row, compares
+ * attributes as jsonb, and finds nothing for an unknown subject or provider.
+ */
+async function signInInconsistencies(manifest: CoverageManifest): Promise<string[]> {
+  const personaOf = new Map<string, string>(
+    PERSONA_KEYS.filter((key) => key !== ANONYMOUS).map((key) => [manifest.personas[key].id, key]),
+  );
+  const identities = await db
+    .select({
+      id: userIdentities.id,
+      userId: userIdentities.userId,
+      providerCode: userIdentities.identityProviderCode,
+      subject: userIdentities.subject,
+      attributes: userIdentities.idpAttributes,
+      adminSource: sobaAdmins.source,
+    })
+    .from(userIdentities)
+    .leftJoin(sobaAdmins, eq(sobaAdmins.userId, userIdentities.userId))
+    .where(inArray(userIdentities.userId, [...personaOf.keys()]));
+  const issues = await Promise.all(
+    identities.map(async (identity) => {
+      const row = {
+        ...identity,
+        persona: personaOf.get(identity.userId) ?? identity.userId,
+        attributes: identity.attributes as IdpAttributes | null,
+      };
+      return (await signInAgrees(row))
+        ? []
+        : [`${row.persona}: the sign-in read disagrees with the stored identity`];
+    }),
+  );
+  const ownerProvider = manifest.personas[OWNER].identityProviderCode;
+  const [unknownSubject, unknownProvider] = await Promise.all([
+    findSignInState(ownerProvider, `${COVERAGE_PREFIX}unknown-subject`, {}),
+    findSignInState(`${COVERAGE_PREFIX}unknown-provider`, 'unknown', {}),
+  ]);
+  const unknowns =
+    unknownSubject?.identityId === null && unknownProvider === null
+      ? []
+      : ['the sign-in read finds an identity for an unknown subject or provider'];
+  return [...issues.flat(), ...unknowns];
 }
 
 async function checkWorkspaceForms(
@@ -731,9 +821,10 @@ const skipsOwner = (manifest: CoverageManifest): boolean =>
 export async function checkCoverage(manifest: CoverageManifest): Promise<CoverageReport> {
   const ownerProvider = manifest.personas[OWNER].identityProviderCode;
   const personas = PERSONA_KEYS.filter((persona) => persona !== OWNER || !skipsOwner(manifest));
-  const [shown, lookups] = await Promise.all([
+  const [shown, lookups, signIns] = await Promise.all([
     deletedRowsShown(manifest),
     lookupInconsistencies(manifest),
+    signInInconsistencies(manifest),
   ]);
   const checked = await inSequence(personas, async (persona) => {
     const caller = callerOf(manifest, persona);
@@ -757,6 +848,7 @@ export async function checkCoverage(manifest: CoverageManifest): Promise<Coverag
     inconsistencies: [
       ...shown,
       ...lookups,
+      ...signIns,
       ...checked.flatMap((c) => [
         ...c.forms.issues,
         ...c.design.issues,

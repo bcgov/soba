@@ -80,7 +80,6 @@ interface SaveInput {
   actorId: string;
   actorDisplayLabel: string | null;
   formVersionId: string;
-  eventType: string;
   note?: string;
 }
 
@@ -175,7 +174,7 @@ export class FormVersionService {
           formVersionId: input.formVersionId,
           actorId: input.actorId,
           actorDisplayLabel: input.actorDisplayLabel,
-          eventType: input.eventType,
+          eventType: 'save_draft',
           changeNote: input.note,
         },
         tx,

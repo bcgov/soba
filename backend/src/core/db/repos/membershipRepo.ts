@@ -1,7 +1,7 @@
 import { and, count, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { WORKSPACE_SORT_FIELDS, type SortLocale, type SortToken } from '@soba/lib';
-import { db } from '../client';
+import { db, type DbOrTx } from '../client';
 import {
   appUsers,
   identityProviders,
@@ -22,6 +22,23 @@ import { membershipHoldsPermission } from './formAccessRepo';
 const ADV_LOCK_FIND_OR_CREATE_IDENTITY = 2_147_483_622;
 
 export { findUserIdByIdentity } from './identityLookup';
+
+/** Stores the identity's IdP attributes; writes nothing when the stored ones already match. */
+export const updateIdentityAttributes = async (
+  identityId: string,
+  idpAttributes: IdpAttributes,
+  executor: DbOrTx = db,
+): Promise<void> => {
+  await executor
+    .update(userIdentities)
+    .set({ idpAttributes, updatedAt: new Date() })
+    .where(
+      and(
+        eq(userIdentities.id, identityId),
+        sql`${userIdentities.idpAttributes} is distinct from ${JSON.stringify(idpAttributes)}::jsonb`,
+      ),
+    );
+};
 
 export const findOrCreateUserByIdentity = async (
   providerCode: string,
@@ -66,11 +83,7 @@ export const findOrCreateUserByIdentity = async (
     const existingRow = existing[0];
 
     if (existingRow) {
-      const updates: { idpAttributes?: IdpAttributes; updatedAt: Date } = { updatedAt: new Date() };
-      if (idpAttributes != null) updates.idpAttributes = idpAttributes;
-      if (updates.idpAttributes != null) {
-        await tx.update(userIdentities).set(updates).where(eq(userIdentities.id, existingRow.id));
-      }
+      if (idpAttributes != null) await updateIdentityAttributes(existingRow.id, idpAttributes, tx);
       return existingRow.userId;
     }
 
@@ -101,22 +114,6 @@ export const findOrCreateUserByIdentity = async (
 
     return userId;
   });
-};
-
-/** Stores the identity's IdP attributes; writes nothing when the stored ones already match. */
-export const updateIdentityAttributes = async (
-  identityId: string,
-  idpAttributes: IdpAttributes,
-): Promise<void> => {
-  await db
-    .update(userIdentities)
-    .set({ idpAttributes, updatedAt: new Date() })
-    .where(
-      and(
-        eq(userIdentities.id, identityId),
-        sql`${userIdentities.idpAttributes} is distinct from ${JSON.stringify(idpAttributes)}::jsonb`,
-      ),
-    );
 };
 
 export const actorBelongsToWorkspace = async (workspaceId: string, userId: string) => {

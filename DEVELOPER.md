@@ -274,7 +274,7 @@ Form rendering and submission storage are delegated to a **form engine** plugin.
 
 ### Form engine cross-references
 
-Data lives in **two systems**: domain metadata in **PostgreSQL** and form definitions/submission payloads in the **form engine**. Cross-reference columns: `form_version.engine_schema_ref`, `submission.engine_submission_ref`. Provision via `POST /form-versions/:id/schema`; saves can still accept `engine_schema_ref` on `POST /form-versions/:id/save` when needed. See [In Detail — Form engine cross-references](#form-engine-cross-references).
+Data lives in **two systems**: domain metadata in **PostgreSQL** and form definitions/submission payloads in the **form engine**. Cross-reference columns: `form_version.engine_schema_ref`, `submission.engine_submission_ref`. Provision via `POST /form-versions/:id/schema`, the only way a version's `engine_schema_ref` is set. See [In Detail — Form engine cross-references](#form-engine-cross-references).
 
 ### Auth plugins and responsibilities
 

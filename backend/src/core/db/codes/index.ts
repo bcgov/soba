@@ -2,8 +2,7 @@
  * Single source of truth for all seeded code values. Seed and application code
  * import from here; no string literals for codes in logic. Compile-time safety.
  */
-import { Permissions } from '@soba/lib';
-export { Permissions, type PermissionCode } from '@soba/lib';
+export { FormCreatePermissions, Permissions, type PermissionCode } from '@soba/lib';
 export {
   SubmissionParticipantRole,
   SubmissionWorkflowState,
@@ -23,13 +22,6 @@ export const Roles = {
   team_manager: 'team_manager',
 } as const;
 export type RoleCode = (typeof Roles)[keyof typeof Roles];
-
-/**
- * POST /forms writes the form and its first design. `form_create` is not seeded onto any role;
- * only form_admin matches it (via `*`). form_designer has `design_create` for new designs on
- * existing forms.
- */
-export const FormCreatePermissions = [Permissions.form_create, Permissions.design_create] as const;
 
 export const RoleStatus = {
   active: 'active',

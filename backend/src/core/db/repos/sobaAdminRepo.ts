@@ -106,14 +106,14 @@ export async function grantSobaAdminFromIdp(
     .onConflictDoNothing({ target: sobaAdmins.userId });
 }
 
-/** Moves an IdP grant to the IdP `idpCode`; a direct grant is left alone. */
+/** Moves an IdP grant to the IdP `idpCode`, never a direct one. Whether a row was moved. */
 export async function repointSobaAdminFromIdp(
   userId: string,
   idpCode: string,
   actorDisplayLabel: string | null,
-): Promise<void> {
+): Promise<boolean> {
   const now = new Date();
-  await db
+  const result = await db
     .update(sobaAdmins)
     .set({
       identityProviderCode: idpCode,
@@ -122,6 +122,7 @@ export async function repointSobaAdminFromIdp(
       updatedBy: actorDisplayLabel,
     })
     .where(and(eq(sobaAdmins.userId, userId), eq(sobaAdmins.source, SOBA_ADMIN_SOURCE_IDP)));
+  return (result.rowCount ?? 0) > 0;
 }
 
 /** Removes the grant the IdP `idpCode` gave, never a direct one. Whether a row was removed. */

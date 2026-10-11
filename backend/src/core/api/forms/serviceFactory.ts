@@ -351,18 +351,13 @@ export function createFormsApiService(
         }),
       ),
 
-    save: (
-      ctx: FormsContextInput,
-      formVersionId: string,
-      input: { eventType?: string; note?: string },
-    ) =>
+    save: (ctx: FormsContextInput, formVersionId: string, input: { note?: string }) =>
       formVersionService
         .save({
           workspaceId: ctx.workspaceId,
           actorId: ctx.actorId,
           actorDisplayLabel: ctx.actorDisplayLabel,
           formVersionId,
-          eventType: input.eventType || 'save_draft',
           note: input.note,
         })
         .then((row) => toFormVersionDto(row)),

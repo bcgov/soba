@@ -92,7 +92,6 @@ export const SaveFormVersionParamsSchema = z
 
 export const SaveFormVersionBodySchema = z
   .object({
-    eventType: z.string().min(1).optional(),
     note: z.string().optional(),
   })
   .openapi('Forms_SaveFormVersionBody');

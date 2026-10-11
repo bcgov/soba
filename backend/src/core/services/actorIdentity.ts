@@ -41,8 +41,10 @@ async function applySobaAdminClaim(
       await grantSobaAdminFromIdp(actorId, idpCode, displayLabel);
       return true;
     case 'repoint':
-      await repointSobaAdminFromIdp(actorId, idpCode, displayLabel);
-      return true;
+      // Nothing moved means the row changed since the read: revoked, or made direct.
+      return (
+        (await repointSobaAdminFromIdp(actorId, idpCode, displayLabel)) || isSobaAdmin(actorId)
+      );
     case 'revoke':
       // A row left in place is a direct grant made since the read.
       return (await revokeSobaAdminFromIdp(actorId, idpCode)) ? false : isSobaAdmin(actorId);

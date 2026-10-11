@@ -1,4 +1,4 @@
-import { and, count, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, count, eq, getTableColumns, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import {
   MY_SUBMISSION_STATES,
@@ -7,7 +7,7 @@ import {
   type SortLocale,
   type SubmissionListSort,
 } from '@soba/lib';
-import { db, type Tx } from '../client';
+import { db, type DbOrTx, type Tx } from '../client';
 import {
   submissionParticipants,
   submissionRevisions,
@@ -166,6 +166,21 @@ export interface ListSubmissionsInput {
   locale: SortLocale;
 }
 
+/** The submission row when neither it, its form nor its form version is deleted. */
+export const findLiveSubmissionRecord = async (
+  submissionId: string,
+  executor: DbOrTx = db,
+): Promise<SubmissionRecord | null> => {
+  const [row] = await executor
+    .select(getTableColumns(submissions))
+    .from(submissions)
+    .innerJoin(forms, eq(submissions.formId, forms.id))
+    .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
+    .where(and(eq(submissions.id, submissionId), liveSubmission))
+    .limit(1);
+  return row ?? null;
+};
+
 /**
  * Open a submission against a client-minted id: insert the row in the `opened` state, its
  * revision-0 `opened` event and the opener's owner grant in one transaction, so every submission has
@@ -233,14 +248,9 @@ export const openSubmission = async (
       return { outcome: 'created', record };
     }
 
-    // Only a live row is a valid idempotent retry; a soft-deleted tombstone on the same id is a
-    // collision (409), not a resume — otherwise the caller gets a 200 to a submission that save/
-    // submit/fill all 404 on (they filter deletedAt).
-    const [existing] = await tx
-      .select()
-      .from(submissions)
-      .where(and(eq(submissions.id, input.id), isNull(submissions.deletedAt)))
-      .limit(1);
+    // Only a live submission is a valid idempotent retry; any other row on the id is a collision
+    // (409), not a resume, since save, submit and fill all 404 on it.
+    const existing = await findLiveSubmissionRecord(input.id, tx);
 
     if (existing?.submittedBy === input.actorId && existing?.formId === input.formId) {
       return { outcome: 'existing', record: existing };

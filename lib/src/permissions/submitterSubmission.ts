@@ -11,7 +11,10 @@ export interface SubmitterSubmissionFacts {
   role: string;
 }
 
-/** The states in which a submitter saves, submits, uploads a file to, or deletes a submission. */
+/**
+ * The states before a submission is submitted: continued rather than viewed, open to file uploads,
+ * and deletable by its owner.
+ */
 export const SUBMISSION_IN_PROGRESS_STATES: readonly SubmissionWorkflowStateCode[] = [
   SubmissionWorkflowState.opened,
   SubmissionWorkflowState.draft,

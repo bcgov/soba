@@ -22,7 +22,6 @@ const baseInput = {
   actorId: 'a1',
   actorDisplayLabel: 'Author',
   formVersionId: 'v1',
-  eventType: 'save_draft',
 };
 
 describe('FormVersionService.save', () => {

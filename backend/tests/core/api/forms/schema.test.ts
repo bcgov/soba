@@ -1,9 +1,9 @@
 import { SaveFormVersionBodySchema } from '../../../../src/core/api/forms/schema';
 
 describe('SaveFormVersionBodySchema', () => {
-  it('keeps only the event type and note', () => {
+  it('keeps only the note', () => {
     const result = SaveFormVersionBodySchema.safeParse({
-      eventType: 'save_draft',
+      eventType: 'publish',
       note: 'Reworded the intro',
       engine_schema_ref: 'another-form',
       formioFormDefinition: { components: [] },
@@ -11,6 +11,6 @@ describe('SaveFormVersionBodySchema', () => {
 
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.data).toEqual({ eventType: 'save_draft', note: 'Reworded the intro' });
+    expect(result.data).toEqual({ note: 'Reworded the intro' });
   });
 });

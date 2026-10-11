@@ -22,6 +22,13 @@ export const Permissions = {
 
 export type PermissionCode = (typeof Permissions)[keyof typeof Permissions];
 
+/**
+ * POST /forms writes the form and its first design. `form_create` is not seeded onto any role;
+ * only form_admin matches it (via `*`). form_designer has `design_create` for new designs on
+ * existing forms.
+ */
+export const FormCreatePermissions = [Permissions.form_create, Permissions.design_create] as const;
+
 /** Provider code of the shared public user that anonymous callers resolve to. */
 export const PUBLIC_PROVIDER_CODE = 'public';
 
