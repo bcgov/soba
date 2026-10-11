@@ -64,10 +64,8 @@ export const isSessionExpired = (err: unknown): boolean =>
   err instanceof Error && err.name === 'SessionExpiredError';
 
 /**
- * The token to send for an authenticated call. Only an affirmative `no-session` refuses to send:
- * the submit surface accepts an invalid bearer as anonymous, so a stale token there would silently
- * file the caller's work as the public user. Without a verdict we send what we have and let the
- * response decide.
+ * The token to send for an authenticated call. An affirmative `no-session` refuses to send; without
+ * a verdict we send what we have and let the response decide.
  */
 async function resolveToken(callerToken: string): Promise<string> {
   const outcome = await ensureFreshToken();

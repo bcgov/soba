@@ -65,9 +65,9 @@ export function resolveActor(req: Request, res: Response, next: NextFunction): v
 
 /**
  * Actor resolver for routes mounted with `checkJwt({ allowPublic: true })`: resolves the authenticated
- * actor when a token/identity is present, otherwise attributes the request to the seeded public user
- * (idp `public`). The route's own authorization (e.g. the form's audience) decides access;
- * the public user is a member of no workspace, so staff-only routes still reject it.
+ * actor, or attributes a request that sent no bearer to the seeded public user (idp `public`). The
+ * route's own authorization (e.g. the form's audience) decides access; the public user is a member
+ * of no workspace, so staff-only routes still reject it.
  */
 export function resolveActorOrPublic(req: Request, res: Response, next: NextFunction): void {
   if (req.idpPluginCode && req.authPayload) {

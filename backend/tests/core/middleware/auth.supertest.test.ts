@@ -5,6 +5,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { checkJwt } from '../../../src/core/middleware/auth';
 import { initializePassport, resetPassportForTests } from '../../../src/core/auth/passport';
 import { getIdpPlugins } from '../../../src/core/auth/idpRegistry';
+import { getToken } from '../../../src/core/auth/IdpPlugin';
 
 jest.mock('../../../src/core/auth/idpRegistry', () => ({
   getIdpPlugins: jest.fn(),
@@ -45,17 +46,29 @@ function createPlugin(
   };
 }
 
+// Same shape as the real plugins: no bearer passes through, a bearer is verified or refused.
+const verifyingPlugin = createPlugin('verifying-idp', (req, _res, next) => {
+  const token = getToken(req);
+  if (!token) return next();
+  if (token !== 'good') return next(Object.assign(new Error('bad token'), { status: 401 }));
+  req.idpPluginCode = 'verifying-idp';
+  req.authPayload = { sub: 'user-3' };
+  next();
+});
+
 function createApp() {
   const app = express();
   initializePassport();
   app.use(passport.initialize());
-  app.get('/protected', checkJwt(), (req, res) => {
+  const echoUser: express.RequestHandler = (req, res) => {
     res.json({
       pluginCode: req.idpPluginCode,
       userPluginCode: req.user?.pluginCode ?? null,
       subject: req.user?.subject ?? null,
     });
-  });
+  };
+  app.get('/protected', checkJwt(), echoUser);
+  app.get('/public', checkJwt({ allowPublic: true }), echoUser);
   app.use((err: Error & { status?: number }, _req: Request, res: Response, next: NextFunction) => {
     void next;
     res.status(err.status ?? 500).json({ message: err.message });
@@ -139,6 +152,48 @@ describe('checkJwt Passport wrapper', () => {
       error: 'Unauthorized',
       message: 'Error occurred during authentication',
       statusCode: 401,
+    });
+  });
+
+  it('with allowPublic, continues anonymously when no bearer is sent', async () => {
+    getIdpPluginsMock.mockReturnValue([verifyingPlugin] as never[]);
+
+    const res = await request(createApp()).get('/public');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ userPluginCode: null, subject: null });
+  });
+
+  it('with allowPublic, refuses a bearer that fails verification', async () => {
+    getIdpPluginsMock.mockReturnValue([verifyingPlugin] as never[]);
+
+    const res = await request(createApp()).get('/public').set('Authorization', 'Bearer x');
+
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ message: 'bad token' });
+  });
+
+  it('with allowPublic, refuses a bearer that no plugin recognises', async () => {
+    getIdpPluginsMock.mockReturnValue([
+      createPlugin('first-idp', (_req, _res, next) => next()),
+    ] as never[]);
+
+    const res = await request(createApp()).get('/public').set('Authorization', 'Bearer x');
+
+    expect(res.status).toBe(401);
+    expect(res.body.statusCode).toBe(401);
+  });
+
+  it('with allowPublic, authenticates a valid bearer', async () => {
+    getIdpPluginsMock.mockReturnValue([verifyingPlugin] as never[]);
+
+    const res = await request(createApp()).get('/public').set('Authorization', 'Bearer good');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      pluginCode: 'verifying-idp',
+      userPluginCode: 'verifying-idp',
+      subject: 'user-3',
     });
   });
 });
