@@ -65,6 +65,13 @@ interface SaveInput {
   baseRevisionId: string;
 }
 
+/** Where a submission's answer document lives in its form's engine. */
+export interface SubmissionContentRefs {
+  engineCode: string;
+  engineSchemaRef: string | null;
+  engineSubmissionRef: string | null;
+}
+
 interface DeleteInput {
   workspaceId: string;
   actorId: string;
@@ -324,10 +331,19 @@ export class SubmissionService {
     const engineCode = await getFormEngineCodeForForm(input.workspaceId, submission.formId);
     if (!engineCode) return null;
 
-    const adapter = createFormEngineAdapter(engineCode);
-    if (typeof adapter.readSubmission !== 'function') return null;
+    return this.readContent({
+      engineCode,
+      engineSchemaRef: version.engineSchemaRef,
+      engineSubmissionRef: submission.engineSubmissionRef,
+    });
+  }
 
-    return adapter.readSubmission(version.engineSchemaRef, submission.engineSubmissionRef);
+  /** Reads an answer document from the engine by its refs; null when there is nothing to read. */
+  async readContent(refs: SubmissionContentRefs) {
+    if (!refs.engineSchemaRef || !refs.engineSubmissionRef) return null;
+    const adapter = createFormEngineAdapter(refs.engineCode);
+    if (typeof adapter.readSubmission !== 'function') return null;
+    return adapter.readSubmission(refs.engineSchemaRef, refs.engineSubmissionRef);
   }
 
   async list(input: ListInput) {

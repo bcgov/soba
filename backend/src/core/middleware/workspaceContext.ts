@@ -3,8 +3,6 @@
  * - `workspaceFromQuery`: read the `workspaceId` query param.
  * - `workspaceListScope`: resolve workspace from a scope anchor (workspace or resource hierarchy id).
  * - `workspaceFromResource`: derive the workspace from the target resource.
- * The `open*` variants build a membership-optional context for the public-capable submit surface,
- * leaving authorization to a downstream guard.
  *
  */
 import type { NextFunction, Request, Response } from 'express';
@@ -127,59 +125,6 @@ export const buildCoreContext = async (
     actorDisplayLabel: actor.displayLabel,
     workspaceSource: source,
     role: actor.role,
-  };
-};
-
-/**
- * Build a context for the submit surface WITHOUT requiring membership: the workspace is resolved so the
- * route's own guard decides access. Members get their real role; non-members (incl. the public user)
- * get none, so no workspace role check passes.
- */
-const buildSubmitContext = async (
-  actorId: string,
-  scope: ResourceScope,
-  source: string,
-): Promise<CoreRequestContext> => {
-  const { workspaceId, formId } = scope;
-  const actor = await findActorMembership(workspaceId, actorId);
-  return {
-    workspaceId,
-    ...(formId ? { formId } : {}),
-    actorId,
-    actorDisplayLabel: actor?.displayLabel ?? null,
-    workspaceSource: source,
-    role: actor?.role ?? null,
-  };
-};
-
-/**
- * Resource (deep-link) read routes reachable by non-members/anonymous: derive the workspace from the
- * target resource (404 if missing) and build a membership-optional context. Authorization is left to a
- * downstream guard rather than to membership.
- */
-export const openWorkspaceFromResource = (config: {
-  kind: WorkspaceResourceKind;
-  idFrom: ResourceIdSource;
-}) => {
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const actorId = getActorId(req);
-      if (!actorId) {
-        throw new ValidationError(MISSING_ACTOR_IDENTITY);
-      }
-      const resourceId = readResourceId(req, config.idFrom);
-      if (!resourceId) {
-        throw new ValidationError('Missing resource identifier for workspace resolution');
-      }
-      const scope = await lookupResourceScope(config.kind, resourceId);
-      if (!scope) {
-        throw new NotFoundError(RESOURCE_NOT_FOUND);
-      }
-      req.coreContext = await buildSubmitContext(actorId, scope, `submit:${config.kind}`);
-      next();
-    } catch (error) {
-      next(error);
-    }
   };
 };
 

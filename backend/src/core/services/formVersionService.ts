@@ -347,10 +347,15 @@ export class FormVersionService {
     const engineCode = await getFormEngineCodeForForm(version.workspaceId, version.formId);
     if (!engineCode) return null;
 
-    const adapter = createFormEngineAdapter(engineCode);
-    if (typeof adapter.readSchema !== 'function') return null;
+    return this.readSchema({ engineCode, engineSchemaRef: version.engineSchemaRef });
+  }
 
-    return adapter.readSchema(version.engineSchemaRef);
+  /** Reads a schema from the engine by its ref; null when there is nothing to read. */
+  async readSchema(refs: { engineCode: string; engineSchemaRef: string | null }) {
+    if (!refs.engineSchemaRef) return null;
+    const adapter = createFormEngineAdapter(refs.engineCode);
+    if (typeof adapter.readSchema !== 'function') return null;
+    return adapter.readSchema(refs.engineSchemaRef);
   }
 
   async get(workspaceId: string, formVersionId: string) {

@@ -1,11 +1,21 @@
-import { isIdentifiedCaller } from '@soba/lib';
-import { Permissions, type PermissionCode } from '../db/codes';
+import {
+  canReadSubmission,
+  canRenderSubmission,
+  canWriteSubmission,
+  formAccessAllows,
+  ownDeleteStatusOf,
+  SubmissionChangeStatus,
+} from '@soba/lib';
+import { Permissions } from '../db/codes';
 import {
   hasFormSubmitAccess,
   type CallerIdentity,
   type FormAccessTarget,
 } from '../db/repos/formSubmitAccessRepo';
-import { isActiveOwner, isActiveParticipant } from '../db/repos/submissionParticipantRepo';
+import {
+  findSubmitterSubmission,
+  type SubmitterSubmission,
+} from '../db/repos/submitterSubmissionRepo';
 
 /** What a caller does through submit mode. Design-mode routes do not use this policy. */
 export const SubmitterOperation = {
@@ -29,42 +39,40 @@ export interface SubmitterAccessTarget extends FormAccessTarget {
   submissionId?: string;
 }
 
-type AccessCheck = (target: SubmitterAccessTarget, caller: CallerIdentity) => Promise<boolean>;
+type SubmissionOperation = Exclude<SubmitterOperationCode, 'open'>;
 
-const isParticipant: AccessCheck = async (target, caller) =>
-  !!target.submissionId &&
-  !!caller.actorId &&
-  isActiveParticipant(target.submissionId, caller.actorId);
-
-const isOwner: AccessCheck = async (target, caller) =>
-  !!target.submissionId && !!caller.actorId && isActiveOwner(target.submissionId, caller.actorId);
-
-const isIdentified: AccessCheck = (_target, caller) => Promise.resolve(isIdentifiedCaller(caller));
-
-const hasFormPermission =
-  (permission: PermissionCode): AccessCheck =>
-  (target, caller) =>
-    hasFormSubmitAccess(target, caller, permission);
-
-// Every check in a rule must pass. They run in order and stop at the first refusal, so the index
-// lookup for participation runs before the heavier form permission resolution.
-const RULES: Record<SubmitterOperationCode, readonly AccessCheck[]> = {
-  open: [hasFormPermission(Permissions.submission_create)],
-  read: [isParticipant],
-  write: [isParticipant, hasFormPermission(Permissions.submission_create)],
-  deleteSubmittedFile: [hasFormPermission(Permissions.submission_update)],
-  render: [isParticipant, hasFormPermission(Permissions.document_template_read)],
-  delete: [isIdentified, isOwner],
+const SUBMISSION_RULES: Record<
+  SubmissionOperation,
+  (loaded: SubmitterSubmission, caller: CallerIdentity) => boolean
+> = {
+  read: ({ access }) => canReadSubmission(access),
+  write: ({ access, form }, caller) => canWriteSubmission(access, form, caller),
+  deleteSubmittedFile: ({ form }, caller) =>
+    formAccessAllows(form, caller, Permissions.submission_update),
+  render: ({ access, form }, caller) => canRenderSubmission(access, form, caller),
+  // The signed-in owner, whatever the state; the delete itself refuses a submitted submission.
+  delete: ({ access }, caller) =>
+    ownDeleteStatusOf(access, caller).status !== SubmissionChangeStatus.denied,
 };
 
-/** Whether the caller may perform a submit-mode operation on the target. */
+/**
+ * Whether the caller may perform a submit-mode operation on the target. An operation on a submission
+ * applies the @soba/lib rules over the read the submit routes use, and needs it, its form and its
+ * version live. Open checks the form's submit permission only, not its published version.
+ */
 export const isSubmitterAllowed = async (
   operation: SubmitterOperationCode,
   target: SubmitterAccessTarget,
   caller: CallerIdentity,
 ): Promise<boolean> => {
-  for (const check of RULES[operation]) {
-    if (!(await check(target, caller))) return false;
+  if (operation === SubmitterOperation.open) {
+    return hasFormSubmitAccess(target, caller, Permissions.submission_create);
   }
-  return true;
+  if (!target.submissionId || !caller.actorId) return false;
+  const loaded = await findSubmitterSubmission({
+    submissionId: target.submissionId,
+    actorId: caller.actorId,
+    idpCode: caller.idpCode,
+  });
+  return !!loaded && SUBMISSION_RULES[operation](loaded, caller);
 };

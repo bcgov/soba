@@ -20,8 +20,9 @@ adds a third control per submission, who takes part in it; see
 > workspace), and check the caller's permissions on the form in question (see
 > [Resolving a user's permissions](#resolving-a-users-permissions)). Creating a form requires
 > `form_create` and `design_create`; only `form_admin` satisfies that, via `*`. Creating a design on
-> an existing form requires `design_create` (`form_designer`). The submit routes, file uploads and
-> document generation are gated by `isSubmitterAllowed` (see
+> an existing form requires `design_create` (`form_designer`). The submit routes decide with the
+> submitter rules in `@soba/lib`; file uploads and document generation go through
+> `isSubmitterAllowed`, which applies the same rules (see
 > [Submission participants](#submission-participants)); rendering a document also needs
 > `document_template_read`. The template routes (`features/templates/route.ts`) are gated by
 > `requireFormPermissions`: `form_read` and `document_template_read` to list and download,
@@ -292,7 +293,12 @@ grant is revoked, never deleted, so the rows are the access history. Opening a s
 opener its owner. The shared public user owns anonymous submissions, so any anonymous caller holding
 the id has access to those.
 
-`isSubmitterAllowed` in `services/submitterAccess.ts` holds the rules:
+The rules are pure functions in `@soba/lib` (`permissions/submitterSubmission.ts`), and the browser
+runs the same functions. A submit route on one submission reads it once with
+`findSubmitterSubmission` (the submission, the caller's active grant and its form's facts), then
+one guard decides; open reads its form once with `findLiveSubmitterForm`. File uploads, file
+reads and deletes, and document generation use `isSubmitterAllowed` in
+`services/submitterAccess.ts`, which applies the same rules over the same read:
 
 | operation                                                                 | needs                                                    |
 | ------------------------------------------------------------------------- | -------------------------------------------------------- |

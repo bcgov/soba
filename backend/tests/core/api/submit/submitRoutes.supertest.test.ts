@@ -1,0 +1,291 @@
+jest.mock('../../../../src/core/container', () => ({
+  submissionsApiService: {
+    readContent: jest.fn(),
+    open: jest.fn(),
+    save: jest.fn(),
+    submit: jest.fn(),
+    deleteUnsubmitted: jest.fn(),
+  },
+  formVersionService: { readSchema: jest.fn() },
+  formsApiService: {},
+}));
+jest.mock('../../../../src/core/db/repos/submitterSubmissionRepo', () => ({
+  findSubmitterSubmission: jest.fn(),
+}));
+jest.mock('../../../../src/core/db/repos/submitterFormRepo', () => ({
+  ...jest.requireActual('../../../../src/core/db/repos/submitterFormRepo'),
+  findLiveSubmitterForm: jest.fn(),
+}));
+
+import express from 'express';
+import request from 'supertest';
+import { submitRouter } from '../../../../src/core/api/submit';
+import { formVersionService, submissionsApiService } from '../../../../src/core/container';
+import { findSubmitterSubmission } from '../../../../src/core/db/repos/submitterSubmissionRepo';
+import { findLiveSubmitterForm } from '../../../../src/core/db/repos/submitterFormRepo';
+import { coreErrorHandler } from '../../../../src/core/middleware/errorHandler';
+import { storedSubmission } from './storedSubmission';
+
+const mockRead = jest.mocked(findSubmitterSubmission);
+const mockForm = jest.mocked(findLiveSubmitterForm);
+const mockSchema = jest.mocked(formVersionService.readSchema);
+const service = jest.mocked(submissionsApiService);
+
+// Stands in for checkJwt + resolveActorOrPublic, which need a signed token. The router, guards and
+// @soba/lib rules are real; the reads and services they call are stubbed.
+function buildApp(caller: 'signedIn' | 'anonymous') {
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => {
+    if (caller === 'signedIn') {
+      req.user = {
+        providerCode: 'idir',
+        profile: { displayLabel: 'Signed In' },
+      } as unknown as Express.User;
+      req.actorId = 'u1';
+    } else {
+      req.actorId = 'public-user';
+      req.idpType = 'public';
+    }
+    next();
+  });
+  app.use('/api/v1/submit', submitRouter);
+  app.use(coreErrorHandler);
+  return app;
+}
+
+const signedIn = () => request(buildApp('signedIn'));
+const anonymous = () => request(buildApp('anonymous'));
+const BASE = '/api/v1/submit/submissions';
+const writeBody = {
+  data: { a: 1 },
+  revisionId: '01a12d03-761e-70a8-9eb2-b5113a6cb3e5',
+  baseRevisionId: '01a12d03-7640-748f-b008-2c331de67244',
+};
+const submitterForm = (overrides: Record<string, unknown> = {}) => ({
+  id: 'f1',
+  name: 'Permit application',
+  workspaceId: 'ws9',
+  workspaceName: 'Roads',
+  publishedVersionId: 'v1',
+  permissions: ['submission_create'],
+  audienceMode: 'members' as const,
+  audienceIdps: [],
+  allowSubmitterDrafts: true,
+  ...overrides,
+});
+
+beforeEach(() => {
+  jest.resetAllMocks();
+  mockRead.mockResolvedValue(storedSubmission());
+  mockSchema.mockResolvedValue({ components: [] });
+  service.readContent.mockResolvedValue({ data: { a: 1 } });
+});
+
+describe('submit routes over one read', () => {
+  it('reads the submission once, as the caller, the public user without permissions', async () => {
+    await signedIn().get(`${BASE}/s1/fill`);
+    await anonymous().get(`${BASE}/s1/fill`);
+    expect(mockRead.mock.calls).toEqual([
+      [{ submissionId: 's1', actorId: 'u1', idpCode: 'idir' }],
+      [{ submissionId: 's1', actorId: 'public-user', idpCode: 'public' }],
+    ]);
+  });
+
+  it('builds the fill bundle from the read and its engine refs', async () => {
+    const res = await signedIn().get(`${BASE}/s1/fill`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      workflowState: 'draft',
+      formVersionId: 'v1',
+      headRevisionId: 'r1',
+      schema: { components: [] },
+      content: { data: { a: 1 } },
+      canWrite: true,
+      canSaveDraft: true,
+    });
+    expect(mockSchema).toHaveBeenCalledWith({
+      engineCode: 'formio-v5',
+      engineSchemaRef: 'engine-form',
+    });
+    expect(service.readContent).toHaveBeenCalledWith({
+      engineCode: 'formio-v5',
+      engineSchemaRef: 'engine-form',
+      engineSubmissionRef: 'engine-submission',
+    });
+  });
+
+  it.each([
+    ['without the submit permission', { form: { permissions: [] } }, false, false],
+    ['with drafts off', { form: { allowSubmitterDrafts: false } }, true, false],
+  ])('serves the fill bundle %s', async (_label, overrides, canWrite, canSaveDraft) => {
+    mockRead.mockResolvedValue(storedSubmission(overrides));
+    const res = await signedIn().get(`${BASE}/s1/fill`);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ canWrite, canSaveDraft });
+  });
+
+  it('answers the submission from the read, its code hidden until submitted', async () => {
+    const res = await signedIn().get(`${BASE}/s1`);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      id: 's1',
+      formName: 'Permit application',
+      versionNo: 3,
+      workflowState: 'draft',
+      confirmationCode: null,
+      createdAt: '2026-10-01T00:00:00.000Z',
+    });
+  });
+
+  it('answers the saved answers, or 404 before the first write', async () => {
+    expect((await signedIn().get(`${BASE}/s1/data`)).body).toEqual({ data: { a: 1 } });
+    service.readContent.mockResolvedValue(null);
+    expect((await signedIn().get(`${BASE}/s1/data`)).status).toBe(404);
+  });
+
+  it.each(['', '/data', '/schema', '/fill'])(
+    'answers 404 when GET %s finds nothing live',
+    async (path) => {
+      mockRead.mockResolvedValue(null);
+      expect((await signedIn().get(`${BASE}/s1${path}`)).status).toBe(404);
+    },
+  );
+
+  it('refuses a read without a grant, 403 signed in and 401 anonymous', async () => {
+    mockRead.mockResolvedValue(storedSubmission({ role: null }));
+    expect((await signedIn().get(`${BASE}/s1`)).status).toBe(403);
+    expect((await anonymous().get(`${BASE}/s1`)).status).toBe(401);
+  });
+
+  it.each([
+    [
+      'drafts off',
+      { form: { allowSubmitterDrafts: false } },
+      'Drafts are not enabled for this form',
+    ],
+    [
+      'no submit permission',
+      { form: { permissions: [] } },
+      'Not authorized to change this submission',
+    ],
+  ])('refuses a save with %s, 403', async (_label, overrides, error) => {
+    mockRead.mockResolvedValue(storedSubmission(overrides));
+    const res = await signedIn().post(`${BASE}/s1/save`).send(writeBody);
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe(error);
+    expect(service.save).not.toHaveBeenCalled();
+  });
+
+  it('refuses an anonymous save on a public form with 403, not 401', async () => {
+    mockRead.mockResolvedValue(
+      storedSubmission({ form: { audienceMode: 'public', permissions: [] } }),
+    );
+    const res = await anonymous().post(`${BASE}/s1/save`).send(writeBody);
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('Drafts are not available on a public form');
+  });
+
+  it.each([
+    ['post', '/save'],
+    ['post', '/submit'],
+    ['delete', ''],
+  ] as const)('answers 404 when %s %s finds nothing live', async (method, path) => {
+    mockRead.mockResolvedValue(null);
+    const call = signedIn()[method](`${BASE}/s1${path}`);
+    const res = method === 'post' ? await call.send(writeBody) : await call;
+    expect(res.status).toBe(404);
+  });
+
+  it('saves as the caller, in the submission workspace', async () => {
+    service.save.mockResolvedValue({ id: 's1' } as never);
+    const res = await signedIn().post(`${BASE}/s1/save`).send(writeBody);
+    expect(res.status).toBe(200);
+    expect(service.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: 'ws1',
+        actorId: 'u1',
+        actorDisplayLabel: 'Signed In',
+      }),
+      's1',
+      writeBody,
+    );
+  });
+
+  it('refuses a submit without the submit permission, 403 signed in and 401 anonymous', async () => {
+    mockRead.mockResolvedValue(storedSubmission({ form: { permissions: [] } }));
+    expect((await signedIn().post(`${BASE}/s1/submit`).send(writeBody)).status).toBe(403);
+    expect((await anonymous().post(`${BASE}/s1/submit`).send(writeBody)).status).toBe(401);
+    expect(service.submit).not.toHaveBeenCalled();
+  });
+
+  it('passes a submit on a submitted submission to the service, which holds it', async () => {
+    mockRead.mockResolvedValue(storedSubmission({ workflowState: 'submitted' }));
+    service.submit.mockResolvedValue({ id: 's1' } as never);
+    expect((await signedIn().post(`${BASE}/s1/submit`).send(writeBody)).status).toBe(200);
+  });
+
+  it.each([
+    ['a collaborator', { role: 'collaborator' }, 403],
+    ['the owner, once submitted', { workflowState: 'submitted' }, 409],
+    ['the owner of a draft', {}, 204],
+  ])('answers a delete by %s with %s', async (_label, overrides, status) => {
+    mockRead.mockResolvedValue(storedSubmission(overrides));
+    service.deleteUnsubmitted.mockResolvedValue({ id: 's1' } as never);
+    expect((await signedIn().delete(`${BASE}/s1`)).status).toBe(status);
+  });
+
+  const openBody = { id: '01a12d03-75a8-73bc-a106-ce3787ee9a1e', formId: 'f1' };
+
+  it('reads the form once to open, as the caller, the public user without permissions', async () => {
+    mockForm.mockResolvedValue(null);
+    await signedIn().post(BASE).send(openBody);
+    await anonymous().post(BASE).send(openBody);
+    expect(mockForm.mock.calls).toEqual([
+      [{ userId: 'u1', formId: 'f1' }],
+      [{ userId: null, formId: 'f1' }],
+    ]);
+  });
+
+  it.each([
+    ['a missing form', null, 'signedIn', 404, 'Form not found'],
+    [
+      'a form with no published version',
+      submitterForm({ publishedVersionId: null }),
+      'signedIn',
+      404,
+      'Form has no published version',
+    ],
+    [
+      'a members form, anonymously',
+      submitterForm({ permissions: [] }),
+      'anonymous',
+      401,
+      'Not authorized to submit this form',
+    ],
+    [
+      'a members form without the role',
+      submitterForm({ permissions: [] }),
+      'signedIn',
+      403,
+      'Not authorized to submit this form',
+    ],
+  ] as const)('refuses an open of %s', async (_label, form, caller, status, error) => {
+    mockForm.mockResolvedValue(form);
+    const res = await request(buildApp(caller)).post(BASE).send(openBody);
+    expect(res.status).toBe(status);
+    expect(res.body.error).toBe(error);
+    expect(service.open).not.toHaveBeenCalled();
+  });
+
+  it('opens in the form workspace', async () => {
+    mockForm.mockResolvedValue(submitterForm());
+    service.open.mockResolvedValue({ created: true, submission: { id: openBody.id } } as never);
+    const res = await signedIn().post(BASE).send(openBody);
+    expect(res.status).toBe(201);
+    expect(service.open).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: 'ws9', formId: 'f1', actorId: 'u1' }),
+      openBody,
+    );
+  });
+});

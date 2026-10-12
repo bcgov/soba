@@ -1,16 +1,19 @@
 import express from 'express';
 import { validateRequest } from '../shared/validation';
-import { openWorkspaceFromResource } from '../../middleware/workspaceContext';
 import { sortLocale } from '../../middleware/sortLocale';
 import {
-  requireFormSubmitAccess,
+  loadSubmitterSubmission,
   requireSignedInSubmitter,
   requireSubmissionDelete,
+  requireSubmissionOpen,
   requireSubmissionRead,
+  requireSubmissionWrite,
 } from '../../middleware/formSubmitAccess';
 import {
-  getSubmitSubmissionSchema,
   getSubmitFillBundle,
+  getSubmitSubmission,
+  getSubmitSubmissionData,
+  getSubmitSubmissionSchema,
   listMyForms,
   listMySubmissions,
   listMyWorkspaces,
@@ -18,8 +21,6 @@ import {
 import { requireDraftSave } from './draftSave';
 import {
   openSubmission,
-  getSubmission,
-  getSubmissionData,
   saveSubmission,
   submitSubmission,
   deleteUnsubmittedSubmission,
@@ -37,32 +38,31 @@ import {
 } from './schema';
 
 // Submit-mode: mounted under /api/v1/submit with optional auth (anonymous resolves to the public user).
-// Each route authorizes through isSubmitterAllowed (services/submitterAccess), except the caller's
-// own lists, which need a signed-in caller (requireSignedInSubmitter).
+// A route on one submission reads it once (loadSubmitterSubmission), then one guard decides with the
+// @soba/lib rules. Open reads its form once. The caller's own lists need a signed-in caller.
 const router = express.Router();
 
-const openSubmissionResource = openWorkspaceFromResource({
-  kind: 'submission',
-  idFrom: 'paramsId',
-});
+const submissionParams = validateRequest({ params: SubmissionIdParamsSchema });
 
 router.post(
   '/submissions',
   validateRequest({ body: OpenSubmissionBodySchema }),
-  requireFormSubmitAccess,
+  requireSubmissionOpen,
   openSubmission,
 );
 router.post(
   '/submissions/:id/save',
   validateRequest({ params: SubmissionIdParamsSchema, body: SubmissionDataBodySchema }),
-  requireFormSubmitAccess,
+  loadSubmitterSubmission,
+  requireSubmissionWrite,
   requireDraftSave,
   saveSubmission,
 );
 router.post(
   '/submissions/:id/submit',
   validateRequest({ params: SubmissionIdParamsSchema, body: SubmitSubmissionBodySchema }),
-  requireFormSubmitAccess,
+  loadSubmitterSubmission,
+  requireSubmissionWrite,
   submitSubmission,
 );
 
@@ -93,24 +93,24 @@ router.get(
 
 router.get(
   '/submissions/:id',
-  validateRequest({ params: SubmissionIdParamsSchema }),
-  openSubmissionResource,
+  submissionParams,
+  loadSubmitterSubmission,
   requireSubmissionRead,
-  getSubmission,
+  getSubmitSubmission,
 );
 router.get(
   '/submissions/:id/data',
-  validateRequest({ params: SubmissionIdParamsSchema }),
-  openSubmissionResource,
+  submissionParams,
+  loadSubmitterSubmission,
   requireSubmissionRead,
-  getSubmissionData,
+  getSubmitSubmissionData,
 );
 
 // The submission's own form-version schema, for rendering its read-only confirmation.
 router.get(
   '/submissions/:id/schema',
-  validateRequest({ params: SubmissionIdParamsSchema }),
-  openSubmissionResource,
+  submissionParams,
+  loadSubmitterSubmission,
   requireSubmissionRead,
   getSubmitSubmissionSchema,
 );
@@ -119,8 +119,8 @@ router.get(
 // the caller may write and save a draft.
 router.get(
   '/submissions/:id/fill',
-  validateRequest({ params: SubmissionIdParamsSchema }),
-  openSubmissionResource,
+  submissionParams,
+  loadSubmitterSubmission,
   requireSubmissionRead,
   getSubmitFillBundle,
 );
@@ -128,8 +128,8 @@ router.get(
 // The owner deletes their own submission before it is submitted.
 router.delete(
   '/submissions/:id',
-  validateRequest({ params: SubmissionIdParamsSchema }),
-  openSubmissionResource,
+  submissionParams,
+  loadSubmitterSubmission,
   requireSubmissionDelete,
   deleteUnsubmittedSubmission,
 );

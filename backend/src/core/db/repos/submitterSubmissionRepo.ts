@@ -4,17 +4,12 @@ import { db, type DbOrTx } from '../client';
 import { PUBLIC_PROVIDER_CODE, SubmissionParticipantStatus } from '../codes';
 import { formVersions, forms, submissionParticipants, submissions } from '../schema';
 import { liveSubmission } from './liveRows';
+import type { SubmissionDetailRow } from './submissionRepo';
 import { formFacts } from './submitterFormRepo';
 
-/** A live submission as the submit routes read it. */
-export interface SubmitterSubmissionRow {
-  id: string;
+/** A live submission as the submit routes read it: its detail, and what the engine reads need. */
+export interface SubmitterSubmissionRow extends SubmissionDetailRow {
   workspaceId: string;
-  formId: string;
-  formVersionId: string;
-  headRevisionId: string | null;
-  currentRevisionNo: number;
-  workflowState: string;
   engineSubmissionRef: string | null;
   /** The submission's own form version in the engine. */
   engineSchemaRef: string | null;
@@ -51,10 +46,19 @@ export const findSubmitterSubmission = async (
           id: submissions.id,
           workspaceId: submissions.workspaceId,
           formId: submissions.formId,
+          form: { name: forms.name },
           formVersionId: submissions.formVersionId,
+          formVersion: { versionNo: formVersions.versionNo },
           headRevisionId: submissions.headRevisionId,
           currentRevisionNo: submissions.currentRevisionNo,
           workflowState: submissions.workflowState,
+          engineSyncStatus: submissions.engineSyncStatus,
+          submittedAt: submissions.submittedAt,
+          createdAt: submissions.createdAt,
+          updatedAt: submissions.updatedAt,
+          createdBy: submissions.createdBy,
+          submittedBy: submissions.submittedBy,
+          confirmationCode: submissions.confirmationCode,
           engineSubmissionRef: submissions.engineSubmissionRef,
           engineSchemaRef: formVersions.engineSchemaRef,
           formEngineCode: forms.formEngineCode,

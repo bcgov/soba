@@ -25,7 +25,6 @@ jest.mock('../../../src/core/db/repos/documentTemplateRepo', () => ({
 
 import type { NextFunction, Request, Response } from 'express';
 import {
-  openWorkspaceFromResource,
   workspaceFromQuery,
   workspaceFromResource,
   workspaceListScope,
@@ -436,70 +435,6 @@ describe('workspaceFromResource (resources under a form)', () => {
     expect(getFormVersionListContext).toHaveBeenCalledWith('fv1');
     expect(req.coreContext).toMatchObject({ workspaceId: 'ws9', formId: 'form1' });
     expect(next).toHaveBeenCalledWith();
-  });
-});
-
-describe('openWorkspaceFromResource', () => {
-  const middleware = openWorkspaceFromResource({ kind: 'submission', idFrom: 'paramsId' });
-
-  // The submit reads authorize against the submission's form, for members and non-members alike.
-  it('carries the submission form into a non-member context', async () => {
-    jest
-      .mocked(getSubmissionListContext)
-      .mockResolvedValue({ workspaceId: 'ws9', formId: 'form1', formVersionId: 'fv1' });
-    jest.mocked(findActorMembership).mockResolvedValue(NON_MEMBER);
-    const req = makeReq({ params: { id: 'sub1' } as Request['params'] });
-    const next = jest.fn() as unknown as NextFunction;
-
-    await middleware(req, makeRes() as Response, next);
-
-    expect(req.coreContext).toMatchObject({
-      workspaceId: 'ws9',
-      formId: 'form1',
-      actorDisplayLabel: 'Actor One',
-      role: null,
-      workspaceSource: 'submit:submission',
-    });
-    expect(next).toHaveBeenCalledWith();
-  });
-
-  it("carries a member's role", async () => {
-    jest
-      .mocked(getSubmissionListContext)
-      .mockResolvedValue({ workspaceId: 'ws9', formId: 'form1', formVersionId: 'fv1' });
-    jest.mocked(findActorMembership).mockResolvedValue(MEMBER);
-    const req = makeReq({ params: { id: 'sub1' } as Request['params'] });
-    const next = jest.fn() as unknown as NextFunction;
-
-    await middleware(req, makeRes() as Response, next);
-
-    expect(req.coreContext).toMatchObject({ workspaceId: 'ws9', formId: 'form1', role: 'owner' });
-    expect(next).toHaveBeenCalledWith();
-  });
-
-  it('builds a context without a label when the actor row is gone', async () => {
-    jest
-      .mocked(getSubmissionListContext)
-      .mockResolvedValue({ workspaceId: 'ws9', formId: 'form1', formVersionId: 'fv1' });
-    jest.mocked(findActorMembership).mockResolvedValue(null);
-    const req = makeReq({ params: { id: 'sub1' } as Request['params'] });
-    const next = jest.fn() as unknown as NextFunction;
-
-    await middleware(req, makeRes() as Response, next);
-
-    expect(req.coreContext).toMatchObject({ actorDisplayLabel: null, role: null });
-    expect(next).toHaveBeenCalledWith();
-  });
-
-  it('returns 404 when the submission is missing', async () => {
-    jest.mocked(getSubmissionListContext).mockResolvedValue(null);
-    const req = makeReq({ params: { id: 'missing' } as Request['params'] });
-    const next = jest.fn() as unknown as NextFunction;
-
-    await middleware(req, makeRes() as Response, next);
-
-    expect(next).toHaveBeenCalledWith(expect.any(NotFoundError));
-    expect(req.coreContext).toBeUndefined();
   });
 });
 

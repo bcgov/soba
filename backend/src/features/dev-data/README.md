@@ -178,8 +178,10 @@ forms whose own check allows them and leave out the deleted ones, that each form
 submission resolves by id only while it, its form and its version are not deleted, that the Create
 Form picker offers exactly the workspaces where the create check passes, and that the sign-in read
 returns each persona's identity, user and admin row, compares IdP attributes as jsonb, and finds
-nothing for an unknown subject or provider. For each submission, the `@soba/lib` rules over its one
-read (`findSubmitterSubmission`) must give the routes' read, write, delete and render answers.
+nothing for an unknown subject or provider. The submit routes decide from one read of each
+submission (`findSubmitterSubmission`); it must hold the role, form facts and submission detail the
+separate participant, form and detail reads give, and find the same submissions live. Start from the
+open route's form read (`findLiveSubmitterForm`) must match the open rules.
 
 Write is the rule save and submit share; the request itself can still refuse the write or keep it
 as pending. The command only reads, and needs no running backend. Change the table with any access

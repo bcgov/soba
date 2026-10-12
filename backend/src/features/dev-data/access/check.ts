@@ -2,15 +2,13 @@
  * Runs every coverage case through the code the submit, design and workspace routes use, and
  * compares the answers with the expectations table. Reads only.
  */
+import { isDeepStrictEqual } from 'node:util';
 import { and, eq, inArray } from 'drizzle-orm';
 import {
   audienceAdmits,
   canDeleteOwnSubmission,
-  canReadSubmission,
-  canRenderSubmission,
   canSaveSubmissionDraft,
   canStartSubmission,
-  canWriteSubmission,
   DEFAULT_SORT_LOCALE,
   DraftSaveStatus,
   draftSaveStatusOf,
@@ -19,6 +17,7 @@ import {
   isSubmissionInProgress,
   Permissions,
   PUBLIC_PROVIDER_CODE,
+  SubmissionParticipantRole,
   type PermissionCode,
   type SubmissionAccessFacts,
 } from '@soba/lib';
@@ -60,19 +59,26 @@ import {
 } from '../../../core/db/repos/formVersionRepo';
 import {
   findLiveSubmissionRecord,
+  getSubmissionById,
   getSubmissionListContext,
   getSubmissionWorkspaceAndState,
   listSubmissionsForParticipant,
   listSubmissionsForWorkspace,
 } from '../../../core/db/repos/submissionRepo';
 import {
+  findLiveSubmitterForm,
   findSubmitterFormFacts,
   listFormsForSubmitter,
   listWorkspacesForSubmitter,
   type SubmitterFormListRow,
 } from '../../../core/db/repos/submitterFormRepo';
+import {
+  isActiveOwner,
+  isActiveParticipant,
+} from '../../../core/db/repos/submissionParticipantRepo';
 import { findSubmitterSubmission } from '../../../core/db/repos/submitterSubmissionRepo';
 import { isSubmitterAllowed, SubmitterOperation } from '../../../core/services/submitterAccess';
+import { toSubmissionDto } from '../../../core/api/submissions/serviceFactory';
 import { ValidationError } from '../../../core/errors';
 import { getDraftSaveStatus } from '../../form-settings/submitter/drafts';
 import { inSequence } from '../inSequence';
@@ -294,8 +300,31 @@ async function checkForm(
       actual: { listed: !!row, ...answers },
       expected: expectedOf(FORM_CHECKS, FORM_EXPECTATIONS[formKey], caller.persona),
     },
-    issues: row ? rowInconsistencies(caller, formKey, row, answers) : [],
+    issues: [
+      ...(row ? rowInconsistencies(caller, formKey, row, answers) : []),
+      ...(await openReadIssues(caller, formKey, form, answers.start)),
+    ],
   };
+}
+
+/** The open route decides from one read of the form; Start from it must match the open rules. */
+async function openReadIssues(
+  caller: Caller,
+  formKey: CoverageFormKey,
+  form: CoverageFormRef,
+  start: boolean,
+): Promise<string[]> {
+  const { actorId, idpCode } = caller.identity;
+  const read = await findLiveSubmitterForm({
+    userId: actorId && idpCode !== PUBLIC_PROVIDER_CODE ? actorId : null,
+    formId: form.formId,
+  });
+  const fromRead = !!read && canStartSubmission(read, caller.identity);
+  return fromRead === start
+    ? []
+    : [
+        `${caller.persona} x ${formKey}: Start from the open route's read differs from the open rules`,
+      ];
 }
 
 /** The keys of the coverage forms in `workspaceId`. */
@@ -795,12 +824,19 @@ const rowDeleteIssue = (
     ? [`${caller.persona} x ${key}: My Submissions row Delete differs from the delete rule`]
     : [];
 
-/** The lib rules over one read of the submission must give the routes' answers. */
+const roleOf = (owner: boolean, participant: boolean): string | null => {
+  if (owner) return SubmissionParticipantRole.owner;
+  return participant ? SubmissionParticipantRole.collaborator : null;
+};
+
+/**
+ * The routes decide from one read of the submission. It must hold the role and form facts the
+ * separate participant and form reads give, and find the same submissions live.
+ */
 async function submissionReadIssues(
   caller: Caller,
   key: CoverageSubmissionKey,
   ref: CoverageSubmissionRef,
-  answers: Record<SubmissionCheck, boolean>,
 ): Promise<string[]> {
   const { actorId, idpCode } = caller.identity;
   if (!actorId) return [];
@@ -812,21 +848,27 @@ async function submissionReadIssues(
   if (!read || !live) {
     return !read === !live ? [] : [`${prefix}: the one read and the routes disagree on liveness`];
   }
-  const fromRead = {
-    read: canReadSubmission(read.access),
-    write: canWriteSubmission(read.access, read.form, caller.identity),
-    delete: canDeleteOwnSubmission(read.access, caller.identity),
-    render: canRenderSubmission(read.access, read.form, caller.identity),
-  };
-  const fromRoutes = {
-    read: answers.read,
-    write: answers.write,
-    delete: answers.delete,
-    render: await isSubmitterAllowed(SubmitterOperation.render, ref, caller.identity),
-  };
-  return (Object.keys(fromRead) as Array<keyof typeof fromRead>)
-    .filter((check) => fromRead[check] !== fromRoutes[check])
-    .map((check) => `${prefix}: ${check} from the one read differs from the route`);
+  const [owner, participant, form, detail] = await Promise.all([
+    isActiveOwner(ref.submissionId, actorId),
+    isActiveParticipant(ref.submissionId, actorId),
+    findSubmitterFormFacts({
+      userId: idpCode === PUBLIC_PROVIDER_CODE ? null : actorId,
+      workspaceId: live.workspaceId,
+      formId: live.formId,
+    }),
+    getSubmissionById(live.workspaceId, ref.submissionId),
+  ]);
+  const issues: string[] = [];
+  if (read.access.role !== roleOf(owner, participant)) {
+    issues.push(`${prefix}: the one read's role differs from the participant read`);
+  }
+  if (!isDeepStrictEqual(read.form, form)) {
+    issues.push(`${prefix}: the one read's form facts differ from the form read`);
+  }
+  if (!detail || !isDeepStrictEqual(toSubmissionDto(read.submission), toSubmissionDto(detail))) {
+    issues.push(`${prefix}: the one read's submission differs from the detail read`);
+  }
+  return issues;
 }
 
 async function checkSubmissions(
@@ -847,7 +889,7 @@ async function checkSubmissions(
         },
         issues: [
           ...rowDeleteIssue(caller, key, mine.get(ref.submissionId), answers),
-          ...(await submissionReadIssues(caller, key, ref, answers)),
+          ...(await submissionReadIssues(caller, key, ref)),
         ],
       };
     }),

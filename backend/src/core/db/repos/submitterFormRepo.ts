@@ -35,6 +35,7 @@ import { FormVersionState, Roles, SubmissionParticipantStatus } from '../codes';
 import { collated, likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 import { effectiveGroups, permissionsByForm } from './formAccessRepo';
+import { liveForm } from './liveRows';
 
 type SubmitterFormSortField = (typeof MY_FORM_SORT_FIELDS)[number];
 
@@ -248,6 +249,31 @@ export const listFormsForSubmitter = async (
     const totals = await tx.select({ total: count() }).from(forms).where(where);
     return { items, total: totals[0]?.total ?? 0 };
   });
+};
+
+/** A live form with its facts for one caller, or null when it is missing or deleted. */
+export const findLiveSubmitterForm = async (
+  input: { userId: string | null; formId: string },
+  executor: DbOrTx = db,
+): Promise<SubmitterFormListRow | null> => {
+  const facts = formFacts(input.userId, { formIds: [input.formId] });
+  const [row] = await facts
+    .join(
+      executor
+        .select({
+          id: forms.id,
+          name: forms.name,
+          workspaceId: forms.workspaceId,
+          workspaceName: workspaces.name,
+          ...facts.columns,
+        })
+        .from(forms)
+        .innerJoin(workspaces, eq(workspaces.id, forms.workspaceId))
+        .$dynamic(),
+    )
+    .where(and(eq(forms.id, input.formId), liveForm))
+    .limit(1);
+  return row ?? null;
 };
 
 /** The given forms with their facts for one caller, across workspaces, in no particular order. */
