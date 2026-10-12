@@ -86,7 +86,8 @@ export const setSubmitContext = (req: Request, target: FormAccessTarget): void =
   };
 };
 
-const actorIdOf = (req: Request): string => {
+/** The actor resolveActorOrPublic resolved; every submit route has one. */
+export const actorIdOf = (req: Request): string => {
   if (!req.actorId) throw new Error('Submit routes require a resolved actor');
   return req.actorId;
 };

@@ -70,6 +70,24 @@ it.each(routes.map((r) => [`${r.method.toUpperCase()} ${r.path}`, r.handlers] as
   },
 );
 
+it.each([
+  ['/submissions/:id/save', 'replayRecordedSave'],
+  ['/submissions/:id/submit', 'replayRecordedSubmit'],
+])('POST %s answers a recorded write after the load, before any guard', (path, replay) => {
+  const handlers = handlersFor('post', path);
+  const at = handlers.indexOf(replay);
+  expect(at).toBeGreaterThan(handlers.indexOf('loadSubmitterSubmission'));
+  expect(at).toBeLessThan(handlers.indexOf('requireSubmissionWrite'));
+});
+
+it('POST /submissions answers a recorded open before requireSubmissionOpen', () => {
+  const handlers = handlersFor('post', '/submissions');
+  expect(handlers.indexOf('replayRecordedOpen')).toBeGreaterThanOrEqual(0);
+  expect(handlers.indexOf('replayRecordedOpen')).toBeLessThan(
+    handlers.indexOf('requireSubmissionOpen'),
+  );
+});
+
 it('POST /submissions/:id/save checks drafts after write access, before its handler', () => {
   const handlers = handlersFor('post', '/submissions/:id/save');
   const draftGuard = handlers.indexOf('requireDraftSave');

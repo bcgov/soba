@@ -16,6 +16,10 @@ jest.mock('../../../../src/core/db/repos/submitterFormRepo', () => ({
   ...jest.requireActual('../../../../src/core/db/repos/submitterFormRepo'),
   findLiveSubmitterForm: jest.fn(),
 }));
+jest.mock('../../../../src/core/db/repos/submissionRepo', () => ({
+  ...jest.requireActual('../../../../src/core/db/repos/submissionRepo'),
+  getSubmissionRevisionById: jest.fn(),
+}));
 
 import express from 'express';
 import request from 'supertest';
@@ -23,11 +27,13 @@ import { submitRouter } from '../../../../src/core/api/submit';
 import { formVersionService, submissionsApiService } from '../../../../src/core/container';
 import { findSubmitterSubmission } from '../../../../src/core/db/repos/submitterSubmissionRepo';
 import { findLiveSubmitterForm } from '../../../../src/core/db/repos/submitterFormRepo';
+import { getSubmissionRevisionById } from '../../../../src/core/db/repos/submissionRepo';
 import { coreErrorHandler } from '../../../../src/core/middleware/errorHandler';
 import { storedSubmission } from './storedSubmission';
 
 const mockRead = jest.mocked(findSubmitterSubmission);
 const mockForm = jest.mocked(findLiveSubmitterForm);
+const mockRevision = jest.mocked(getSubmissionRevisionById);
 const mockSchema = jest.mocked(formVersionService.readSchema);
 const service = jest.mocked(submissionsApiService);
 
@@ -212,6 +218,58 @@ describe('submit routes over one read', () => {
     );
   });
 
+  const recordedSave = {
+    submissionId: 's1',
+    eventType: 'saved',
+    changedBy: 'u1',
+    revisionNo: 2,
+    status: 'current',
+    reason: 'accepted',
+  };
+
+  it('answers a recorded save with where it landed, though drafts are now off', async () => {
+    mockRead.mockResolvedValue(storedSubmission({ form: { allowSubmitterDrafts: false } }));
+    mockRevision.mockResolvedValue(recordedSave);
+    const res = await signedIn().post(`${BASE}/s1/save`).send(writeBody);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      id: 's1',
+      headRevisionId: 'r1',
+      revision: { id: writeBody.revisionId, revisionNo: 2, status: 'current', reason: 'accepted' },
+    });
+    expect(mockRevision).toHaveBeenCalledWith(writeBody.revisionId);
+    expect(service.save).not.toHaveBeenCalled();
+  });
+
+  it('answers a recorded submit, though the submit permission is gone', async () => {
+    mockRead.mockResolvedValue(
+      storedSubmission({ workflowState: 'submitted', form: { permissions: [] } }),
+    );
+    mockRevision.mockResolvedValue({ ...recordedSave, eventType: 'submitted' });
+    const res = await signedIn().post(`${BASE}/s1/submit`).send(writeBody);
+    expect(res.status).toBe(200);
+    expect(res.body.revision).toMatchObject({ status: 'current', revisionNo: 2 });
+    expect(service.submit).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['another actor', { changedBy: 'u2' }],
+    ['another event', { eventType: 'submitted' }],
+  ])('refuses a revision id recorded by %s with 409', async (_label, over) => {
+    mockRevision.mockResolvedValue({ ...recordedSave, ...over });
+    const res = await signedIn().post(`${BASE}/s1/save`).send(writeBody);
+    expect(res.status).toBe(409);
+    expect(service.save).not.toHaveBeenCalled();
+  });
+
+  it('gives no recorded answer without a grant, 403 signed in and 401 anonymous', async () => {
+    mockRead.mockResolvedValue(storedSubmission({ role: null }));
+    mockRevision.mockResolvedValue(recordedSave);
+    expect((await signedIn().post(`${BASE}/s1/save`).send(writeBody)).status).toBe(403);
+    expect((await anonymous().post(`${BASE}/s1/save`).send(writeBody)).status).toBe(401);
+    expect(mockRevision).not.toHaveBeenCalled();
+  });
+
   it('refuses a submit without the submit permission, 403 signed in and 401 anonymous', async () => {
     mockRead.mockResolvedValue(storedSubmission({ form: { permissions: [] } }));
     expect((await signedIn().post(`${BASE}/s1/submit`).send(writeBody)).status).toBe(403);
@@ -237,7 +295,42 @@ describe('submit routes over one read', () => {
 
   const openBody = { id: '01a12d03-75a8-73bc-a106-ce3787ee9a1e', formId: 'f1' };
 
+  it('answers an open of an id the caller owns with it, without reading the form', async () => {
+    const res = await signedIn().post(BASE).send(openBody);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ id: 's1', formId: 'f1', workflowState: 'draft' });
+    expect(mockRead).toHaveBeenCalledWith({
+      submissionId: openBody.id,
+      actorId: 'u1',
+      idpCode: 'idir',
+    });
+    expect(mockForm).not.toHaveBeenCalled();
+    expect(service.open).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['nothing live', null],
+    ['a collaborator', storedSubmission({ role: 'collaborator' })],
+    ['no grant', storedSubmission({ role: null })],
+  ])('decides an open on its form when the id holds %s', async (_label, stored) => {
+    mockRead.mockResolvedValue(stored);
+    mockForm.mockResolvedValue(submitterForm({ publishedVersionId: null }));
+    const res = await signedIn().post(BASE).send(openBody);
+    expect(res.status).toBe(404);
+    expect(mockForm).toHaveBeenCalled();
+  });
+
+  it.each([
+    ['another form', { ...openBody, formId: 'f2' }],
+    ['another version', { ...openBody, formVersionId: '01a12d03-7640-748f-b008-2c331de67244' }],
+  ])('decides an open on its form when it names %s', async (_label, body) => {
+    mockForm.mockResolvedValue(null);
+    expect((await signedIn().post(BASE).send(body)).status).toBe(404);
+    expect(mockForm).toHaveBeenCalled();
+  });
+
   it('reads the form once to open, as the caller, the public user without permissions', async () => {
+    mockRead.mockResolvedValue(null);
     mockForm.mockResolvedValue(null);
     await signedIn().post(BASE).send(openBody);
     await anonymous().post(BASE).send(openBody);
@@ -271,6 +364,7 @@ describe('submit routes over one read', () => {
       'Not authorized to submit this form',
     ],
   ] as const)('refuses an open of %s', async (_label, form, caller, status, error) => {
+    mockRead.mockResolvedValue(null);
     mockForm.mockResolvedValue(form);
     const res = await request(buildApp(caller)).post(BASE).send(openBody);
     expect(res.status).toBe(status);
@@ -279,6 +373,7 @@ describe('submit routes over one read', () => {
   });
 
   it('opens in the form workspace', async () => {
+    mockRead.mockResolvedValue(null);
     mockForm.mockResolvedValue(submitterForm());
     service.open.mockResolvedValue({ created: true, submission: { id: openBody.id } } as never);
     const res = await signedIn().post(BASE).send(openBody);

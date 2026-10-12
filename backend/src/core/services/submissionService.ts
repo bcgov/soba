@@ -23,23 +23,20 @@ import {
   RevisionReason,
   RevisionStatus,
   SubmissionEventType,
-  type RevisionReasonCode,
-  type RevisionStatusCode,
   type SubmissionWriteEventCode,
   type SubmissionWorkflowStateCode,
 } from '../db/codes';
-import { decideSubmissionWrite, type SubmissionWriteDecision } from './submissionWriteGate';
+import {
+  decideRecordedWrite,
+  decideSubmissionWrite,
+  type SubmissionWriteDecision,
+  type WriteLanding,
+} from './submissionWriteGate';
 import { withNewConfirmationCode } from './confirmationCode';
 
 export interface SubmissionWriteOutcome {
   record: SubmissionRecord;
-  /** Where this write landed: `current` applied it, `pending` held it for review. */
-  revision: {
-    id: string;
-    revisionNo: number;
-    status: RevisionStatusCode;
-    reason: RevisionReasonCode;
-  };
+  revision: WriteLanding;
 }
 
 interface CreateInput {
@@ -98,9 +95,10 @@ interface ListInput {
 export class SubmissionService {
   /**
    * Open a new submission against the form's currently published version (the only submittable one),
-   * under the client-supplied id. Idempotent: a retry of the same id by the same actor+form returns
-   * the existing live record ({ created: false }); another owner or form, or a submission, form or
-   * version that is deleted, is a 409. A formVersionId that is not the published version is a 409.
+   * under the client-supplied id. Idempotent: a retry of the same id by its owner on the same form
+   * returns the existing live record ({ created: false }); another owner or form, or a submission,
+   * form or version that is deleted, is a 409. A formVersionId that is not the published version is a
+   * 409.
    */
   async open(input: CreateInput) {
     const version = await getPublishedVersionForForm(input.workspaceId, input.formId);
@@ -141,29 +139,21 @@ export class SubmissionService {
     const submission = await getSubmissionRecordById(input.workspaceId, input.submissionId);
     if (!submission) throw new NotFoundError('Submission not found');
 
-    const recorded = await getSubmissionRevisionById(input.revisionId);
+    // The replay guard answers most repeats before access; this catches one that lands after it.
+    const recorded = decideRecordedWrite({
+      submissionId: input.submissionId,
+      eventType,
+      actorId: input.actorId,
+      revisionId: input.revisionId,
+      recorded: await getSubmissionRevisionById(input.revisionId),
+    });
+    if (recorded.kind === 'replay') return { record: submission, revision: recorded.revision };
+
     const decision = decideSubmissionWrite({
       submission,
       eventType,
       baseRevisionId: input.baseRevisionId,
-      recorded,
     });
-    if (decision.kind === 'replay') {
-      // The gate returns replay only when a matching revision was recorded. Report the write's landing
-      // disposition, not the revision's current standing: a revision that landed as current and was
-      // later superseded still replays as `current`, never `superseded`.
-      const revision = recorded!;
-      const landedPending = revision.status === RevisionStatus.pending;
-      return {
-        record: submission,
-        revision: {
-          id: input.revisionId,
-          revisionNo: revision.revisionNo,
-          status: landedPending ? RevisionStatus.pending : RevisionStatus.current,
-          reason: landedPending ? (revision.reason as RevisionReasonCode) : RevisionReason.accepted,
-        },
-      };
-    }
 
     // The base must be a revision of this submission. A foreign or unknown base is a malformed write,
     // rejected before any engine document is created, so it cannot orphan one or branch across
@@ -216,7 +206,7 @@ export class SubmissionService {
     input: SaveInput,
     submission: SubmissionRecord,
     eventType: SubmissionWriteEventCode,
-    decision: Exclude<SubmissionWriteDecision, { kind: 'replay' }>,
+    decision: SubmissionWriteDecision,
   ): Promise<SubmissionWriteOutcome> {
     const { engineSchemaRef, createSubmission } = await this.resolveSubmissionEngine(submission);
     const pending = decision.kind === 'pending';

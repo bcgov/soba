@@ -19,6 +19,7 @@ import {
   listMyWorkspaces,
 } from './controller';
 import { requireDraftSave } from './draftSave';
+import { replayRecordedOpen, replayRecordedSave, replayRecordedSubmit } from './replay';
 import {
   openSubmission,
   saveSubmission,
@@ -39,7 +40,8 @@ import {
 
 // Submit-mode: mounted under /api/v1/submit with optional auth (anonymous resolves to the public user).
 // A route on one submission reads it once (loadSubmitterSubmission), then one guard decides with the
-// @soba/lib rules. Open reads its form once. The caller's own lists need a signed-in caller.
+// @soba/lib rules. Open reads its form once. A repeated open, save or submit gets its recorded answer
+// before any guard. The caller's own lists need a signed-in caller.
 const router = express.Router();
 
 const submissionParams = validateRequest({ params: SubmissionIdParamsSchema });
@@ -47,6 +49,7 @@ const submissionParams = validateRequest({ params: SubmissionIdParamsSchema });
 router.post(
   '/submissions',
   validateRequest({ body: OpenSubmissionBodySchema }),
+  replayRecordedOpen,
   requireSubmissionOpen,
   openSubmission,
 );
@@ -54,6 +57,7 @@ router.post(
   '/submissions/:id/save',
   validateRequest({ params: SubmissionIdParamsSchema, body: SubmissionDataBodySchema }),
   loadSubmitterSubmission,
+  replayRecordedSave,
   requireSubmissionWrite,
   requireDraftSave,
   saveSubmission,
@@ -62,6 +66,7 @@ router.post(
   '/submissions/:id/submit',
   validateRequest({ params: SubmissionIdParamsSchema, body: SubmitSubmissionBodySchema }),
   loadSubmitterSubmission,
+  replayRecordedSubmit,
   requireSubmissionWrite,
   submitSubmission,
 );

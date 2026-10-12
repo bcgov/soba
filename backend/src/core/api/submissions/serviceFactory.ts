@@ -1,8 +1,5 @@
-import {
-  SubmissionService,
-  type SubmissionContentRefs,
-  type SubmissionWriteOutcome,
-} from '../../services/submissionService';
+import { SubmissionService, type SubmissionContentRefs } from '../../services/submissionService';
+import type { WriteLanding } from '../../services/submissionWriteGate';
 import { SubmissionWorkflowState } from '../../db/codes';
 import type { FormAccessGrant } from '../../db/repos/formAccessRepo';
 import type {
@@ -83,7 +80,10 @@ export const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) =>
   };
 };
 
-const toSubmissionWriteDto = (outcome: SubmissionWriteOutcome) => ({
+export const toSubmissionWriteDto = (outcome: {
+  record: SubmissionRecord | SubmissionDetailRow;
+  revision: WriteLanding;
+}) => ({
   ...toSubmissionDto(outcome.record),
   revision: outcome.revision,
 });

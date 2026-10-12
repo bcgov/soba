@@ -3,7 +3,7 @@ import * as submissionRepo from '../../../src/core/db/repos/submissionRepo';
 import * as versionRepo from '../../../src/core/db/repos/formVersionRepo';
 import * as formRepo from '../../../src/core/db/repos/formRepo';
 import * as registry from '../../../src/core/integrations/form-engine/FormEngineRegistry';
-import { NotFoundError, ValidationError } from '../../../src/core/errors';
+import { ConflictError, NotFoundError, ValidationError } from '../../../src/core/errors';
 
 jest.mock('../../../src/core/db/client', () => ({ db: {} }));
 
@@ -282,6 +282,7 @@ describe('SubmissionService save (versioned engine write)', () => {
     getRevisionById.mockResolvedValue({
       submissionId: 's1',
       eventType: 'saved',
+      changedBy: 'actor-1',
       revisionNo: 1,
       status: 'superseded',
       reason: 'replaced',
@@ -305,6 +306,7 @@ describe('SubmissionService save (versioned engine write)', () => {
     getRevisionById.mockResolvedValue({
       submissionId: 's1',
       eventType: 'saved',
+      changedBy: 'actor-1',
       revisionNo: 2,
       status: 'pending',
       reason: 'conflict',
@@ -321,5 +323,23 @@ describe('SubmissionService save (versioned engine write)', () => {
       reason: 'conflict',
     });
     expect(createSubmission).not.toHaveBeenCalled();
+  });
+
+  it('refuses a revision id another actor recorded before any engine write', async () => {
+    getRevisionById.mockResolvedValue({
+      submissionId: 's1',
+      eventType: 'saved',
+      changedBy: 'actor-2',
+      revisionNo: 3,
+      status: 'current',
+      reason: 'accepted',
+    });
+    const createSubmission = jest.fn();
+    createAdapter.mockReturnValue({ createSubmission });
+
+    await expect(svc.save({ ...input, revisionId: 'rev-3' })).rejects.toBeInstanceOf(ConflictError);
+
+    expect(createSubmission).not.toHaveBeenCalled();
+    expect(appendRevision).not.toHaveBeenCalled();
   });
 });

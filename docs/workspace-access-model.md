@@ -318,6 +318,11 @@ staff read and delete submissions through form permissions. Files, print and pre
 route, so staff download files through `/files` or `/submit/files`, and print and preview through
 the submit routes, all of which need a grant.
 
+A repeated write gets its recorded answer before these rules run, so a retry keeps its answer after
+the form's settings change. A save or submit whose revision id the caller already recorded on the
+submission answers where it landed, given an active grant; the same id from another actor or event
+is a 409. An open of an id the caller already owns, on the same form, answers that submission.
+
 `GET /submit/submissions/mine` lists the draft and submitted submissions the caller holds an active
 grant on, across every workspace, with the caller's role on each. Submissions on a deleted form or
 form version are left out. Anonymous callers get a 401, since the public user's grants are shared.
