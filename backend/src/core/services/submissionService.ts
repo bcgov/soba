@@ -1,6 +1,6 @@
 import {
   SUBMISSION_IN_PROGRESS_STATES,
-  SubmitRefusal,
+  SubmitError,
   type SortLocale,
   type SubmissionListSort,
 } from '@soba/lib';
@@ -108,16 +108,19 @@ export class SubmissionService {
   async open(input: CreateInput) {
     const version = await getPublishedVersionForForm(input.workspaceId, input.formId);
     if (!version)
-      throw new NotFoundError('Form has no published version', SubmitRefusal.not_published);
+      throw new NotFoundError('Form has no published version', SubmitError.not_published);
     if (input.formVersionId && input.formVersionId !== version.id) {
-      throw new ConflictError('Form version is not the published version');
+      throw new ConflictError(
+        'Form version is not the published version',
+        SubmitError.version_not_published,
+      );
     }
 
     const result = await withNewConfirmationCode((confirmationCode) =>
       openSubmission({ ...input, formVersionId: version.id, confirmationCode }),
     );
     if (result.outcome === 'conflict') {
-      throw new ConflictError('Submission id already in use');
+      throw new ConflictError('Submission id already in use', SubmitError.submission_id_taken);
     }
     return { created: result.outcome === 'created', record: result.record };
   }
@@ -143,7 +146,9 @@ export class SubmissionService {
     eventType: SubmissionWriteEventCode,
   ): Promise<SubmissionWriteOutcome> {
     const submission = await getSubmissionRecordById(input.workspaceId, input.submissionId);
-    if (!submission) throw new NotFoundError('Submission not found');
+    if (!submission) {
+      throw new NotFoundError('Submission not found', SubmitError.submission_not_found);
+    }
 
     // The replay guard answers most repeats before access; this catches one that lands after it.
     const recorded = decideRecordedWrite({
@@ -167,7 +172,10 @@ export class SubmissionService {
     if (input.baseRevisionId !== submission.headRevisionId) {
       const base = await getSubmissionRevisionById(input.baseRevisionId);
       if (base?.submissionId !== input.submissionId) {
-        throw new ValidationError('baseRevisionId is not a revision of this submission');
+        throw new ValidationError(
+          'baseRevisionId is not a revision of this submission',
+          SubmitError.revision_base_invalid,
+        );
       }
     }
 
@@ -189,17 +197,23 @@ export class SubmissionService {
   private async resolveSubmissionEngine(submission: SubmissionRecord) {
     const version = await getFormVersionById(submission.workspaceId, submission.formVersionId);
     if (!version || !version.engineSchemaRef) {
-      throw new ValidationError('Form version is not provisioned in the engine');
+      throw new ValidationError(
+        'Form version is not provisioned in the engine',
+        SubmitError.form_not_ready,
+      );
     }
 
     const engineCode = await getFormEngineCodeForForm(submission.workspaceId, submission.formId);
     if (!engineCode) {
-      throw new ValidationError('Form has no form engine configured');
+      throw new ValidationError('Form has no form engine configured', SubmitError.form_not_ready);
     }
 
     const adapter = createFormEngineAdapter(engineCode);
     if (typeof adapter.createSubmission !== 'function') {
-      throw new ValidationError(`Form engine '${engineCode}' does not support submissions`);
+      throw new ValidationError(
+        `Form engine '${engineCode}' does not support submissions`,
+        SubmitError.form_not_ready,
+      );
     }
 
     return {
@@ -254,7 +268,9 @@ export class SubmissionService {
         afterEngineSubmissionRef: engineRef,
       });
 
-      if (result.outcome === 'not_found') throw new NotFoundError('Submission not found');
+      if (result.outcome === 'not_found') {
+        throw new NotFoundError('Submission not found', SubmitError.submission_not_found);
+      }
 
       return {
         record: result.record,
@@ -301,7 +317,7 @@ export class SubmissionService {
     if (result.outcome === 'not_deletable') {
       throw new ConflictError(
         `Submission is ${result.workflowState} and can no longer be deleted`,
-        SubmitRefusal.delete_closed,
+        SubmitError.delete_closed,
       );
     }
     return result.outcome === 'deleted' ? result.record : null;

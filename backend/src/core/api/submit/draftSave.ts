@@ -2,9 +2,9 @@ import type { NextFunction, Request, Response } from 'express';
 import {
   draftSaveStatusOf,
   DraftSaveStatus,
-  SubmitRefusal,
+  SubmitError,
   type DraftSaveStatusCode,
-  type SubmitRefusalCode,
+  type SubmitErrorCode,
 } from '@soba/lib';
 import { loadedSubmission } from '../../middleware/formSubmitAccess';
 import { ForbiddenError } from '../../errors';
@@ -12,15 +12,15 @@ import { log } from '../../logging';
 
 const REFUSALS: Record<
   Exclude<DraftSaveStatusCode, 'allowed'>,
-  { message: string; code: SubmitRefusalCode }
+  { message: string; code: SubmitErrorCode }
 > = {
   disabled: {
     message: 'Drafts are not enabled for this form',
-    code: SubmitRefusal.drafts_disabled,
+    code: SubmitError.drafts_disabled,
   },
   public: {
     message: 'Drafts are not available on a public form',
-    code: SubmitRefusal.drafts_public,
+    code: SubmitError.drafts_public,
   },
 };
 

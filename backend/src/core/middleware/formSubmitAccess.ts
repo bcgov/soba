@@ -5,8 +5,8 @@ import {
   ownDeleteStatusOf,
   startStatusOf,
   SubmissionChangeStatus,
-  SubmitRefusal,
-  type SubmitRefusalCode,
+  SubmitError,
+  type SubmitErrorCode,
 } from '@soba/lib';
 import type { CallerIdentity, FormAccessTarget } from '../db/repos/formSubmitAccessRepo';
 import { findLiveSubmitterForm } from '../db/repos/submitterFormRepo';
@@ -22,7 +22,7 @@ import { resolveCaller } from './actor';
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
 /** A denial that distinguishes an authenticated caller (403) from an anonymous one (401). */
-export const accessDenial = (req: Request, message: string, code?: SubmitRefusalCode): Error =>
+export const accessDenial = (req: Request, message: string, code?: SubmitErrorCode): Error =>
   req.user ? new ForbiddenError(message, code) : new UnauthorizedError(message, code);
 
 const CHANGE_DENIED = 'Not authorized to change this submission';
@@ -42,7 +42,7 @@ export const refuseSubmitter = (
   req: Request,
   operation: SubmitterOperationCode,
   target: { formId?: string; submissionId?: string },
-  code: SubmitRefusalCode,
+  code: SubmitErrorCode,
 ): never => {
   log.warn(
     {
@@ -103,7 +103,7 @@ export const loadSubmitterSubmission = async (
       actorId: actorIdOf(req),
       idpCode: resolveCaller(req).idpCode,
     });
-    if (!loaded) throw new NotFoundError('Submission not found');
+    if (!loaded) throw new NotFoundError('Submission not found', SubmitError.submission_not_found);
     req.submitterSubmission = loaded;
     setSubmitContext(req, {
       workspaceId: loaded.submission.workspaceId,
@@ -128,7 +128,7 @@ const decide = (
   req: Request,
   next: NextFunction,
   operation: SubmitterOperationCode,
-  code: SubmitRefusalCode,
+  code: SubmitErrorCode,
   allows: (loaded: SubmitterSubmission, caller: CallerIdentity) => boolean,
 ): void => {
   try {
@@ -149,7 +149,7 @@ const decide = (
 
 /** Authorizes a read of an existing submission: confirmation, data, schema, fill bundle. */
 export const requireSubmissionRead: RequestHandler = (req, _res, next) =>
-  decide(req, next, SubmitterOperation.read, SubmitRefusal.read_denied, ({ access }) =>
+  decide(req, next, SubmitterOperation.read, SubmitError.read_denied, ({ access }) =>
     canReadSubmission(access),
   );
 
@@ -159,7 +159,7 @@ export const requireSubmissionWrite: RequestHandler = (req, _res, next) =>
     req,
     next,
     SubmitterOperation.write,
-    SubmitRefusal.write_denied,
+    SubmitError.write_denied,
     ({ access, form }, caller) => canWriteSubmission(access, form, caller),
   );
 
@@ -205,7 +205,7 @@ export const requireSubmissionOpen = async (
       userId: permissionUserId(actorId, caller),
       formId,
     });
-    if (!form) throw new NotFoundError('Form not found');
+    if (!form) throw new NotFoundError('Form not found', SubmitError.form_not_found);
     const change = startStatusOf(form, caller);
     if (change.status === SubmissionChangeStatus.denied) {
       refuseSubmitter(req, SubmitterOperation.open, { formId }, change.code);

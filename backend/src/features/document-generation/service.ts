@@ -29,6 +29,7 @@ import type { DocumentRenderRequest } from '../../core/integrations/document-gen
 import { templateFileType } from '../../core/integrations/document-generation/templateFileType';
 import { upstreamStatusOf } from '../../core/http/httpErrorMapper';
 import { env } from '../../core/config/env';
+import { SubmitError } from '@soba/lib';
 import { AppError, UnprocessableEntityError } from '../../core/errors';
 import { log, getCorrelationId } from '../../core/logging';
 import { readTemplateContent } from './templateContent';
@@ -231,7 +232,11 @@ async function renderWith(
   if (!fileType || (size ?? 0) > maxBytes) {
     const reason = fileType ? 'exceeds the template size limit' : 'not a template file type';
     log.warn({ templateId, fileId, profile, reason }, 'Stored template is not renderable');
-    return { status: 'error', code, error: new UnprocessableEntityError(TEMPLATE_NOT_RENDERED) };
+    return {
+      status: 'error',
+      code,
+      error: new UnprocessableEntityError(TEMPLATE_NOT_RENDERED, SubmitError.render_failed),
+    };
   }
 
   const rendered = await withRenderSlot(

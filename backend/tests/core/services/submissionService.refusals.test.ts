@@ -15,6 +15,7 @@ jest.mock('../../../src/core/db/repos/formVersionRepo', () => ({
 }));
 
 const markDeleted = jest.mocked(submissionRepo.markSubmissionDeleted);
+const openSubmission = jest.mocked(submissionRepo.openSubmission);
 const getPublished = jest.mocked(versionRepo.getPublishedVersionForForm);
 
 const svc = new SubmissionService();
@@ -29,6 +30,21 @@ describe('SubmissionService refusals carry the route codes', () => {
     const refused = svc.open({ ...ctx, id: 's1', formId: 'f1' });
     await expect(refused).rejects.toBeInstanceOf(NotFoundError);
     await expect(refused).rejects.toMatchObject({ code: 'not_published' });
+  });
+
+  it('refuses an open naming a version that is not the published one with version_not_published', async () => {
+    getPublished.mockResolvedValue({ id: 'v2' } as never);
+    const refused = svc.open({ ...ctx, id: 's1', formId: 'f1', formVersionId: 'v1' });
+    await expect(refused).rejects.toBeInstanceOf(ConflictError);
+    await expect(refused).rejects.toMatchObject({ code: 'version_not_published' });
+  });
+
+  it('refuses an open whose id another submission holds with submission_id_taken', async () => {
+    getPublished.mockResolvedValue({ id: 'v1' } as never);
+    openSubmission.mockResolvedValue({ outcome: 'conflict' } as never);
+    const refused = svc.open({ ...ctx, id: 's1', formId: 'f1' });
+    await expect(refused).rejects.toBeInstanceOf(ConflictError);
+    await expect(refused).rejects.toMatchObject({ code: 'submission_id_taken' });
   });
 
   it('refuses a delete of a submission submitted in the meantime with delete_closed', async () => {

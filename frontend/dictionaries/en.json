@@ -236,7 +236,8 @@
       "alreadySubmitted": "This form has already been submitted.",
       "readOnly": "You can view this submission, but you can no longer change or submit it.",
       "starting": "Starting your submission…",
-      "startError": "The submission could not be started. Please try again."
+      "startError": "The submission could not be started. Please try again.",
+      "requestFailed": "The request could not be completed. Please try again."
     }
   },
   "form": {
@@ -447,7 +448,7 @@
     "viewAll": "View my submissions",
     "noCode": "No confirmation ID yet"
   },
-  "submitRefusals": {
+  "submitErrors": {
     "open_denied": "You are not able to submit this form.",
     "read_denied": "You do not have access to this submission.",
     "write_denied": "You are not able to change this submission or submit it.",
@@ -457,7 +458,29 @@
     "drafts_public": "Drafts cannot be saved on a public form.",
     "upload_closed": "Files can no longer be added to this submission.",
     "delete_closed": "This draft has been submitted and can no longer be deleted.",
-    "not_published": "This form is not accepting submissions."
+    "not_published": "This form is not accepting submissions.",
+    "form_not_found": "This form could not be found.",
+    "submission_id_taken": "The submission could not be started. Please try again.",
+    "version_not_published": "This version of the form is no longer accepting submissions.",
+    "submission_not_found": "This submission could not be found. It may have been deleted.",
+    "schema_not_found": "This form could not be loaded.",
+    "content_not_found": "The answers for this submission could not be found.",
+    "revision_id_taken": "Your changes could not be saved. Reload the page and try again.",
+    "revision_base_invalid": "Your changes could not be saved. Reload the page and try again.",
+    "form_not_ready": "This form is not ready to accept submissions.",
+    "file_not_found": "This file could not be found.",
+    "file_unavailable": "This file is not available right now. Please try again later.",
+    "file_type_blocked": "This type of file is not allowed.",
+    "file_too_large": "This file is too large.",
+    "upload_invalid": "The file could not be uploaded.",
+    "file_infected": "This file failed the virus scan and was not uploaded.",
+    "scan_unavailable": "Virus scanning is not available right now, so the file was not uploaded. Please try again later.",
+    "template_not_found": "This document template could not be found.",
+    "template_unavailable": "This document template is not available right now. Please try again later.",
+    "render_unavailable": "Documents cannot be created right now. Please try again later.",
+    "render_busy": "Document creation is busy. Please try again shortly.",
+    "render_failed": "The document could not be created from this template.",
+    "no_saved_data": "This submission has no saved answers to print."
   },
   "myForms": {
     "columns": {

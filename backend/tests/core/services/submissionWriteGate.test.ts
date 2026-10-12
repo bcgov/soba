@@ -67,6 +67,9 @@ describe('decideRecordedWrite', () => {
     ['with no actor', { changedBy: null }],
   ])('refuses a revision id recorded %s', (_label, over) => {
     expect(() => decideRecorded({ ...recordedSave, ...over })).toThrow(ConflictError);
+    expect(() => decideRecorded({ ...recordedSave, ...over })).toThrow(
+      expect.objectContaining({ code: 'revision_id_taken' }),
+    );
   });
 });
 

@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { SubmissionChangeStatus, uploadStatusOf } from '@soba/lib';
+import { SubmissionChangeStatus, SubmitError, uploadStatusOf } from '@soba/lib';
 import { resolveCaller } from '../../core/middleware/actor';
 import { refuseSubmitter, setSubmitContext } from '../../core/middleware/formSubmitAccess';
 import { findSubmissionForCaller, SubmitterOperation } from '../../core/services/submitterAccess';
@@ -19,12 +19,15 @@ export const requireUploadAccess = async (
   try {
     const submissionId = (req.body as { submissionId?: unknown } | undefined)?.submissionId;
     if (typeof submissionId !== 'string' || !submissionId) {
-      throw new ValidationError('submissionId is required to upload a file');
+      throw new ValidationError(
+        'submissionId is required to upload a file',
+        SubmitError.upload_invalid,
+      );
     }
     const caller = resolveCaller(req);
     const loaded = await findSubmissionForCaller(submissionId, caller);
     if (!loaded) {
-      throw new NotFoundError('Submission not found');
+      throw new NotFoundError('Submission not found', SubmitError.submission_not_found);
     }
     const { submission, access, form } = loaded;
     const target = { workspaceId: submission.workspaceId, formId: submission.formId, submissionId };

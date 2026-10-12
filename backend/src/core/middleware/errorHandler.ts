@@ -1,12 +1,12 @@
 import { NextFunction, Request, RequestHandler, Response } from 'express';
-import type { SubmitRefusalCode } from '@soba/lib';
+import type { SubmitErrorCode } from '@soba/lib';
 import { AppError, NotFoundError } from '../errors';
 import { log } from '../logging';
 import { hasPgCode, PG_UNIQUE_VIOLATION, pgErrorFields } from '../db/pgError';
 
 export interface ErrorHttpResponse {
   statusCode: number;
-  body: { error: string; code?: SubmitRefusalCode };
+  body: { error: string; code?: SubmitErrorCode };
 }
 
 // Text the column type can't hold: invalid text representation (a non-uuid id), and a character the

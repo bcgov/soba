@@ -1,3 +1,4 @@
+import { SubmitError } from '@soba/lib';
 import { AppError, ServiceUnavailableError, UnprocessableEntityError } from '../../core/errors';
 import { upstreamStatusOf } from '../../core/http/httpErrorMapper';
 import { log } from '../../core/logging';
@@ -18,7 +19,7 @@ export function toRenderError(
       { ...context, err },
       'document generation backend failed (config or unexpected error)',
     );
-    return new ServiceUnavailableError(GENERATION_UNAVAILABLE);
+    return new ServiceUnavailableError(GENERATION_UNAVAILABLE, SubmitError.render_unavailable);
   }
   // PI-safe: log statuses and the error class only, never the backend's message, which can carry
   // its response body.
@@ -31,8 +32,8 @@ export function toRenderError(
   // A backend that refuses the request as too large is refusing this template, not failing.
   if (err.statusCode >= 500 && failure.upstreamStatus !== 413) {
     log.warn(failure, 'document generation backend failed');
-    return new ServiceUnavailableError(GENERATION_UNAVAILABLE);
+    return new ServiceUnavailableError(GENERATION_UNAVAILABLE, SubmitError.render_unavailable);
   }
   log.warn(failure, 'document generation backend refused the render');
-  return new UnprocessableEntityError(TEMPLATE_NOT_RENDERED);
+  return new UnprocessableEntityError(TEMPLATE_NOT_RENDERED, SubmitError.render_failed);
 }

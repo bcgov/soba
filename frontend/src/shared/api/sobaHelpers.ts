@@ -1,14 +1,14 @@
-import { SubmitRefusalCodeSchema, type SubmitRefusalCode } from '@soba/lib';
+import { SubmitErrorCodeSchema, type SubmitErrorCode } from '@soba/lib';
 
 /**
- * Carries the HTTP status so callers can tell a refusal from a failure, and the server's refusal
- * code when it sent one, so a caller can show its own message.
+ * Carries the HTTP status so callers can tell a refusal from a failure, and the server's error code
+ * when it sent one, so a caller can show its own message.
  */
 export class ApiError extends Error {
   readonly status: number;
-  readonly code: SubmitRefusalCode | undefined;
+  readonly code: SubmitErrorCode | undefined;
 
-  constructor(message: string, status: number, code?: SubmitRefusalCode) {
+  constructor(message: string, status: number, code?: SubmitErrorCode) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
@@ -31,13 +31,13 @@ export const isConflict = (err: unknown): boolean => err instanceof ApiError && 
 export async function parseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     // Surface the backend's `{ error }` message (e.g. name-taken, disclaimer) when present, and its
-    // refusal code when it is one this client knows.
+    // error code when it is one this client knows.
     let message = `Request failed (${response.status})`;
-    let code: SubmitRefusalCode | undefined;
+    let code: SubmitErrorCode | undefined;
     try {
       const body = (await response.json()) as { error?: unknown; code?: unknown };
       if (typeof body?.error === 'string' && body.error) message = body.error;
-      const parsed = SubmitRefusalCodeSchema.safeParse(body?.code);
+      const parsed = SubmitErrorCodeSchema.safeParse(body?.code);
       if (parsed.success) code = parsed.data;
     } catch {
       // Non-JSON error body; keep the status-based message.

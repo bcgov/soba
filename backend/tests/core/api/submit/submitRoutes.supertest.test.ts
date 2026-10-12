@@ -168,14 +168,25 @@ describe('submit routes over one read', () => {
   it('answers the saved answers, or 404 before the first write', async () => {
     expect((await signedIn().get(`${BASE}/s1/data`)).body).toEqual({ data: { a: 1 } });
     service.readContent.mockResolvedValue(null);
-    expect((await signedIn().get(`${BASE}/s1/data`)).status).toBe(404);
+    const res = await signedIn().get(`${BASE}/s1/data`);
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('content_not_found');
+  });
+
+  it.each(['/schema', '/fill'])('answers 404 when GET %s finds no schema', async (path) => {
+    mockSchema.mockResolvedValue(null);
+    const res = await signedIn().get(`${BASE}/s1${path}`);
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('schema_not_found');
   });
 
   it.each(['', '/data', '/schema', '/fill'])(
     'answers 404 when GET %s finds nothing live',
     async (path) => {
       mockRead.mockResolvedValue(null);
-      expect((await signedIn().get(`${BASE}/s1${path}`)).status).toBe(404);
+      const res = await signedIn().get(`${BASE}/s1${path}`);
+      expect(res.status).toBe(404);
+      expect(res.body.code).toBe('submission_not_found');
     },
   );
 
@@ -231,6 +242,7 @@ describe('submit routes over one read', () => {
     const call = signedIn()[method](`${BASE}/s1${path}`);
     const res = method === 'post' ? await call.send(writeBody) : await call;
     expect(res.status).toBe(404);
+    expect(res.body.code).toBe('submission_not_found');
   });
 
   it('saves as the caller, in the submission workspace', async () => {
@@ -289,6 +301,7 @@ describe('submit routes over one read', () => {
     mockRevision.mockResolvedValue({ ...recordedSave, ...over });
     const res = await signedIn().post(`${BASE}/s1/save`).send(writeBody);
     expect(res.status).toBe(409);
+    expect(res.body.code).toBe('revision_id_taken');
     expect(service.save).not.toHaveBeenCalled();
   });
 
@@ -377,7 +390,7 @@ describe('submit routes over one read', () => {
   });
 
   it.each([
-    ['a missing form', null, 'signedIn', 404, 'Form not found', undefined],
+    ['a missing form', null, 'signedIn', 404, 'Form not found', 'form_not_found'],
     [
       'a form with no published version',
       submitterForm({ publishedVersionId: null }),

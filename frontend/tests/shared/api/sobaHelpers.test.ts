@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import type { SubmitRefusalCode } from '@soba/lib';
+import type { SubmitErrorCode } from '@soba/lib';
 import { ApiError, parseJson } from '@/src/shared/api/sobaHelpers';
-import { submitRefusalMessage } from '@/src/shared/api/dataError';
+import { submitErrorMessage } from '@/src/shared/api/dataError';
 
 const errorResponse = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -10,7 +10,7 @@ const errorResponse = (status: number, body: unknown) =>
   });
 
 /** The error parseJson throws for a failed response. */
-const refusalFrom = (response: Response): Promise<unknown> =>
+const errorFrom = (response: Response): Promise<unknown> =>
   parseJson(response).then(
     () => {
       throw new Error('expected parseJson to throw');
@@ -19,8 +19,8 @@ const refusalFrom = (response: Response): Promise<unknown> =>
   );
 
 describe('parseJson', () => {
-  it('keeps the server message and a known refusal code', async () => {
-    const err = await refusalFrom(
+  it('keeps the server message and a known error code', async () => {
+    const err = await errorFrom(
       errorResponse(403, {
         error: 'Drafts are not enabled for this form',
         code: 'drafts_disabled',
@@ -35,25 +35,34 @@ describe('parseJson', () => {
   });
 
   it.each([
-    ['an unknown code', { error: 'No', code: 'not_a_refusal' }],
+    ['an unknown code', { error: 'No', code: 'not_a_code' }],
     ['no code', { error: 'No' }],
   ])('drops %s', async (_label, body) => {
-    expect(await refusalFrom(errorResponse(403, body))).toMatchObject({ code: undefined });
+    expect(await errorFrom(errorResponse(403, body))).toMatchObject({ code: undefined });
   });
 });
 
-describe('submitRefusalMessage', () => {
-  const messages = { drafts_disabled: 'Drafts are off.' } as Record<SubmitRefusalCode, string>;
+describe('submitErrorMessage', () => {
+  const messages = { drafts_disabled: 'Drafts are off.' } as Record<SubmitErrorCode, string>;
 
-  it('picks the message for a coded refusal', () => {
+  it('picks the message for a coded error', () => {
     const refused = new ApiError('Drafts are not enabled for this form', 403, 'drafts_disabled');
-    expect(submitRefusalMessage(refused, messages)).toBe('Drafts are off.');
+    expect(submitErrorMessage(refused, messages)).toBe('Drafts are off.');
   });
 
   it.each([
-    ['a refusal without a code', new ApiError('No', 403)],
+    ['an error without a code', new ApiError('No', 403)],
     ['an error that is not an API error', new Error('boom')],
   ])('is null for %s', (_label, cause) => {
-    expect(submitRefusalMessage(cause, messages)).toBeNull();
+    expect(submitErrorMessage(cause, messages)).toBeNull();
+  });
+
+  it.each([
+    ['a server failure', new ApiError('Internal server error', 500), 'Try again.'],
+    ['a request that never reached the server', new TypeError('Failed to fetch'), 'Try again.'],
+    ['a coded error', new ApiError('No', 403, 'drafts_disabled'), 'Drafts are off.'],
+    ['an uncoded client error', new ApiError('Engine says no', 400), null],
+  ])('with a fallback, answers %s', (_label, cause, expected) => {
+    expect(submitErrorMessage(cause, messages, 'Try again.')).toBe(expected);
   });
 });

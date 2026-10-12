@@ -17,9 +17,10 @@ vi.mock('@/app/[lang]/Providers', () => ({
         missingId: 'Missing form id.',
       },
     },
-    submitRefusals: {
+    submitErrors: {
       open_denied: 'This form is not open to you.',
       not_published: 'This form is closed.',
+      form_not_found: 'There is no such form.',
     },
   }),
 }));
@@ -83,7 +84,17 @@ describe('StartSubmission', () => {
       new ApiError('Form has no published version', 404, 'not_published'),
       'This form is closed.',
     ],
-    ['the server text without a code', new ApiError('Form not found', 404), 'Form not found'],
+    [
+      'the message for a missing form',
+      new ApiError('Form not found', 404, 'form_not_found'),
+      'There is no such form.',
+    ],
+    [
+      'the generic message for a server failure',
+      new ApiError('Internal server error', 500),
+      'Could not start the form.',
+    ],
+    ['the server text for an uncoded client error', new ApiError('Bad id', 400), 'Bad id'],
   ])('shows %s when the open is refused', async (_label, refused, text) => {
     h.openSobaFormSubmission.mockRejectedValue(refused);
     await renderInStore(store, <StartSubmission />);

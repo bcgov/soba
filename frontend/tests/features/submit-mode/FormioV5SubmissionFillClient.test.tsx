@@ -31,7 +31,11 @@ vi.mock('@/app/[lang]/Providers', () => ({
     general: { sessionExpired: 'Your session has ended.', noAccess: 'You do not have access.' },
     submission: { notFound: 'Submission not found.', loadError: 'Could not load this submission.' },
     form: { loading: 'Loading...' },
-    submitRefusals: { drafts_disabled: 'Drafts are off for this form.' },
+    submitErrors: {
+      drafts_disabled: 'Drafts are off for this form.',
+      submission_not_found: 'This submission is gone.',
+      revision_id_taken: 'Reload and try again.',
+    },
     formioV5: {
       formRender: {
         loadError: 'Could not load the form.',
@@ -48,6 +52,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
         saveMine: 'Save my version',
         submitMine: 'Submit my version',
         alreadySubmitted: 'Already submitted.',
+        requestFailed: 'The request failed.',
       },
     },
   }),
@@ -454,27 +459,43 @@ describe('FormioV5SubmissionFillClient', () => {
       expect(h.getSubmitFillBundle).toHaveBeenCalledTimes(1);
     });
 
-    it('shows the message for the refusal code when a save is refused', async () => {
-      h.saveSobaFormSubmission.mockRejectedValue(
+    it.each([
+      [
+        'the message for its code',
         new ApiError('Drafts are not enabled for this form', 403, 'drafts_disabled'),
-      );
+        'Drafts are off for this form.',
+      ],
+      [
+        'the message for a submission deleted meanwhile',
+        new ApiError('Submission not found', 404, 'submission_not_found'),
+        'This submission is gone.',
+      ],
+      [
+        'the message for a revision id another write used',
+        new ApiError('Revision id already used by another write', 409, 'revision_id_taken'),
+        'Reload and try again.',
+      ],
+      [
+        'the generic message for a server failure',
+        new ApiError('Internal server error', 500),
+        'The request failed.',
+      ],
+      [
+        'the generic message when the server is unreachable',
+        new TypeError('Failed to fetch'),
+        'The request failed.',
+      ],
+      [
+        'the server text for an uncoded client error',
+        new ApiError('Engine rejected the data', 400),
+        'Engine rejected the data',
+      ],
+    ])('shows %s when a save fails', async (_label, failure, text) => {
+      h.saveSobaFormSubmission.mockRejectedValue(failure);
       await renderLoaded();
       await saveDraft();
       await waitFor(() =>
-        expect(screen.getByTestId('submission-fill-render-error')).toHaveTextContent(
-          'Drafts are off for this form.',
-        ),
-      );
-    });
-
-    it('shows the server text for a failure without a refusal code', async () => {
-      h.saveSobaFormSubmission.mockRejectedValue(new ApiError('Engine rejected the data', 400));
-      await renderLoaded();
-      await saveDraft();
-      await waitFor(() =>
-        expect(screen.getByTestId('submission-fill-render-error')).toHaveTextContent(
-          'Engine rejected the data',
-        ),
+        expect(screen.getByTestId('submission-fill-render-error')).toHaveTextContent(text),
       );
     });
 

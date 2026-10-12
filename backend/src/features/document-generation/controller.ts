@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { SubmitRefusal } from '@soba/lib';
+import { SubmitError } from '@soba/lib';
 import { documentGenerationService, type DocumentRenderOutcome } from './service';
 import { resolveCaller } from '../../core/middleware/actor';
 import { accessDenial } from '../../core/middleware/formSubmitAccess';
@@ -37,19 +37,31 @@ function respond(
 ): void {
   switch (outcome.status) {
     case 'notfound':
-      throw new NotFoundError('Submission not found');
+      throw new NotFoundError('Submission not found', SubmitError.submission_not_found);
     case 'template-notfound':
-      throw new NotFoundError('Template not found');
+      throw new NotFoundError('Template not found', SubmitError.template_not_found);
     case 'template-unavailable':
-      throw new ServiceUnavailableError('Template content unavailable');
+      throw new ServiceUnavailableError(
+        'Template content unavailable',
+        SubmitError.template_unavailable,
+      );
     case 'denied':
-      throw accessDenial(req, NOT_AUTHORIZED, SubmitRefusal.render_denied);
+      throw accessDenial(req, NOT_AUTHORIZED, SubmitError.render_denied);
     case 'unavailable':
-      throw new ServiceUnavailableError('Document generation is not available for this submission');
+      throw new ServiceUnavailableError(
+        'Document generation is not available for this submission',
+        SubmitError.render_unavailable,
+      );
     case 'busy':
-      throw new ServiceUnavailableError('Document generation is busy; try again shortly');
+      throw new ServiceUnavailableError(
+        'Document generation is busy; try again shortly',
+        SubmitError.render_busy,
+      );
     case 'no-content':
-      throw new UnprocessableEntityError('Submission has no saved data to print');
+      throw new UnprocessableEntityError(
+        'Submission has no saved data to print',
+        SubmitError.no_saved_data,
+      );
     case 'error':
       // The generic error for a failed render, or for a stored template that cannot be rendered.
       throw outcome.error;
@@ -68,9 +80,11 @@ function respond(
 
 export async function listSubmissionTemplatesHandler(req: Request, res: Response): Promise<void> {
   const outcome = await documentGenerationService.listTemplates(resolveCaller(req), req.params.id);
-  if (outcome.status === 'notfound') throw new NotFoundError('Submission not found');
+  if (outcome.status === 'notfound') {
+    throw new NotFoundError('Submission not found', SubmitError.submission_not_found);
+  }
   if (outcome.status === 'denied')
-    throw accessDenial(req, NOT_AUTHORIZED, SubmitRefusal.render_denied);
+    throw accessDenial(req, NOT_AUTHORIZED, SubmitError.render_denied);
   res.json({ items: outcome.templates });
 }
 

@@ -1,4 +1,4 @@
-import type { SubmitRefusalCode } from '@soba/lib';
+import type { SubmitErrorCode } from '@soba/lib';
 import type { DataError } from './dataContracts';
 import { isSessionExpired } from './sobaFetch';
 import { ApiError, isForbidden, isNotFound } from './sobaHelpers';
@@ -23,12 +23,21 @@ export function messageForDataError(error: DataError, messages: DataErrorMessage
   return messages[error.kind] ?? messages.failed;
 }
 
-/** The message for a refusal the server sent a code with; null for any other error. */
-export function submitRefusalMessage(
+/** A request the server failed on (5xx) or that never reached it. */
+const isServerOrNetworkFailure = (cause: unknown): boolean =>
+  (cause instanceof ApiError && cause.status >= 500) || classifyDataError(cause).kind === 'offline';
+
+/**
+ * The message for an error the server sent a code with. Without a code, `failed` stands in for a
+ * server or network failure; any other error is null, so the caller can show the server's text.
+ */
+export function submitErrorMessage(
   cause: unknown,
-  messages: Record<SubmitRefusalCode, string>,
+  messages: Record<SubmitErrorCode, string>,
+  failed?: string,
 ): string | null {
-  return cause instanceof ApiError && cause.code ? messages[cause.code] : null;
+  if (cause instanceof ApiError && cause.code) return messages[cause.code];
+  return failed !== undefined && isServerOrNetworkFailure(cause) ? failed : null;
 }
 
 export { isSessionExpired } from './sobaFetch';

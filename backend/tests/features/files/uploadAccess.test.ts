@@ -80,11 +80,15 @@ describe('requireUploadAccess', () => {
 
   it('is a 404 when the submission is not live', async () => {
     mockRead.mockResolvedValue(null);
-    expect(await run(upload())).toHaveBeenCalledWith(expect.any(NotFoundError));
+    const error = (await run(upload())).mock.calls[0][0];
+    expect(error).toBeInstanceOf(NotFoundError);
+    expect(error).toMatchObject({ code: 'submission_not_found' });
   });
 
   it('needs a submissionId, with no read', async () => {
-    expect(await run(upload({}))).toHaveBeenCalledWith(expect.any(ValidationError));
+    const error = (await run(upload({}))).mock.calls[0][0];
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error).toMatchObject({ code: 'upload_invalid' });
     expect(mockRead).not.toHaveBeenCalled();
   });
 });

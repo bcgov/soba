@@ -10,6 +10,7 @@ import {
 import type { GetFileResult } from '../integrations/storage-engine/StorageEngineAdapter';
 import { isStoragePrefix } from '../integrations/storage-engine/storageKey';
 import { scanUpload, type ScanOutcome } from './scanUpload';
+import { SubmitError } from '@soba/lib';
 import { ServiceUnavailableError, UnprocessableEntityError } from '../errors';
 import { log } from '../logging';
 
@@ -32,9 +33,11 @@ export type StoreFileOutcome = FileRecord | Exclude<ScanOutcome, 'clean'>;
 /** The stored file, or the API error for a scan that refused it. */
 export function storedOrThrow(outcome: StoreFileOutcome): FileRecord {
   // Infected is a problem with the content; scan-unavailable fails closed, so nothing is stored.
-  if (outcome === 'infected') throw new UnprocessableEntityError('File failed virus scan');
+  if (outcome === 'infected') {
+    throw new UnprocessableEntityError('File failed virus scan', SubmitError.file_infected);
+  }
   if (outcome === 'scan-unavailable') {
-    throw new ServiceUnavailableError('Virus scanning unavailable');
+    throw new ServiceUnavailableError('Virus scanning unavailable', SubmitError.scan_unavailable);
   }
   return outcome;
 }

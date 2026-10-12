@@ -167,6 +167,7 @@ describe('SubmissionService save (versioned engine write)', () => {
     appendRevision.mockResolvedValue({ outcome: 'not_found' });
 
     await expect(svc.save(input)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(svc.save(input)).rejects.toMatchObject({ code: 'submission_not_found' });
     expect(clearProvisioning).toHaveBeenCalledWith('ws1', 's1');
     expect(failProvisioning).not.toHaveBeenCalled();
   });
@@ -221,24 +222,28 @@ describe('SubmissionService save (versioned engine write)', () => {
   it('throws NotFoundError when the submission is missing', async () => {
     getRecord.mockResolvedValue(null);
     await expect(svc.submit(input)).rejects.toThrow(/not found/i);
+    await expect(svc.submit(input)).rejects.toMatchObject({ code: 'submission_not_found' });
     expect(updateDraft).not.toHaveBeenCalled();
   });
 
   it('throws when the form version is not provisioned in the engine', async () => {
     getVersion.mockResolvedValue({ id: 'v1', engineSchemaRef: null });
     await expect(svc.submit(input)).rejects.toThrow(/not provisioned/i);
+    await expect(svc.submit(input)).rejects.toMatchObject({ code: 'form_not_ready' });
     expect(updateDraft).not.toHaveBeenCalled();
   });
 
   it('throws when the form has no engine configured', async () => {
     getEngineCode.mockResolvedValue(null);
     await expect(svc.submit(input)).rejects.toThrow(/form engine/i);
+    await expect(svc.submit(input)).rejects.toMatchObject({ code: 'form_not_ready' });
     expect(updateDraft).not.toHaveBeenCalled();
   });
 
   it('throws when the engine adapter does not support submissions', async () => {
     createAdapter.mockReturnValue({}); // no createSubmission
     await expect(svc.submit(input)).rejects.toThrow(/does not support/i);
+    await expect(svc.submit(input)).rejects.toMatchObject({ code: 'form_not_ready' });
     expect(updateDraft).not.toHaveBeenCalled();
   });
 
@@ -270,6 +275,9 @@ describe('SubmissionService save (versioned engine write)', () => {
     createAdapter.mockReturnValue({ createSubmission });
     getRevisionById.mockResolvedValue(null);
 
+    await expect(svc.save({ ...input, baseRevisionId: 'rev-ghost' })).rejects.toMatchObject({
+      code: 'revision_base_invalid',
+    });
     await expect(svc.save({ ...input, baseRevisionId: 'rev-ghost' })).rejects.toBeInstanceOf(
       ValidationError,
     );

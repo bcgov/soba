@@ -72,10 +72,13 @@ export type SubmissionChangeStatusCode =
   (typeof SubmissionChangeStatus)[keyof typeof SubmissionChangeStatus];
 
 /**
- * Why a submit-mode request was refused. A `*_denied` refusal is 401 for an anonymous caller and 403
- * otherwise; `drafts_*` is 403; `*_closed` is 409; `not_published` is 404.
+ * Why a submit-mode, file or document request failed. A `*_denied` refusal is 401 for an anonymous
+ * caller and 403 otherwise; `drafts_*` is 403; `*_closed`, `*_taken` and `version_not_published` are
+ * 409; `*_not_found` and `not_published` are 404; `*_invalid` and `form_not_ready` are 400;
+ * `*_unavailable` and `render_busy` are 503; `render_failed`, `no_saved_data` and `file_infected`
+ * are 422; `file_type_blocked` is 415; `file_too_large` is 413.
  */
-export const SubmitRefusal = {
+export const SubmitError = {
   open_denied: 'open_denied',
   read_denied: 'read_denied',
   write_denied: 'write_denied',
@@ -86,5 +89,31 @@ export const SubmitRefusal = {
   upload_closed: 'upload_closed',
   delete_closed: 'delete_closed',
   not_published: 'not_published',
+  // Opening a submission.
+  form_not_found: 'form_not_found',
+  submission_id_taken: 'submission_id_taken',
+  version_not_published: 'version_not_published',
+  // An existing submission and its writes.
+  submission_not_found: 'submission_not_found',
+  schema_not_found: 'schema_not_found',
+  content_not_found: 'content_not_found',
+  revision_id_taken: 'revision_id_taken',
+  revision_base_invalid: 'revision_base_invalid',
+  form_not_ready: 'form_not_ready',
+  // Files.
+  file_not_found: 'file_not_found',
+  file_unavailable: 'file_unavailable',
+  file_type_blocked: 'file_type_blocked',
+  file_too_large: 'file_too_large',
+  upload_invalid: 'upload_invalid',
+  file_infected: 'file_infected',
+  scan_unavailable: 'scan_unavailable',
+  // Documents.
+  template_not_found: 'template_not_found',
+  template_unavailable: 'template_unavailable',
+  render_unavailable: 'render_unavailable',
+  render_busy: 'render_busy',
+  render_failed: 'render_failed',
+  no_saved_data: 'no_saved_data',
 } as const;
-export type SubmitRefusalCode = (typeof SubmitRefusal)[keyof typeof SubmitRefusal];
+export type SubmitErrorCode = (typeof SubmitError)[keyof typeof SubmitError];
