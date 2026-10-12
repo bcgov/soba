@@ -57,9 +57,12 @@ vi.mock('@/app/[lang]/Providers', () => ({
       deleteMessage: 'Your draft of {form}, last updated {updated}, will be deleted.',
       deleteSuccess: 'Draft deleted.',
       deleteError: 'Could not delete this draft.',
-      deleteSubmitted: 'This draft has been submitted and can no longer be deleted.',
       viewAll: 'View my submissions',
       noCode: 'No confirmation ID yet',
+    },
+    submitRefusals: {
+      delete_closed: 'Already submitted, so it stays.',
+      delete_denied: 'Only its owner can delete it.',
     },
     dataTable: { itemName: 'items', pageOf: 'of {totalPages} page(s)' },
     modal: { dialogActions: 'Dialog actions' },
@@ -365,8 +368,18 @@ describe('MySubmissionsList', () => {
   it.each([
     [
       'a draft submitted elsewhere',
+      new ApiError('Submission is submitted', 409, 'delete_closed'),
+      'Already submitted, so it stays.',
+    ],
+    [
+      'a draft submitted elsewhere, refused without a code',
       new ApiError('Submission is submitted', 409),
-      'This draft has been submitted and can no longer be deleted.',
+      'Already submitted, so it stays.',
+    ],
+    [
+      'a caller who may not delete it',
+      new ApiError('Not authorized to delete this submission', 403, 'delete_denied'),
+      'Only its owner can delete it.',
     ],
     ['an ended session', new SessionExpiredError(), 'Your session has ended.'],
     ['any other failure', new Error('boom'), 'Could not delete this draft.'],

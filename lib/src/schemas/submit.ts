@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SubmitRefusal } from '../permissions/codes';
 import { SubmitterFormSchema } from './forms';
 import { MySubmissionRoleSchema } from './submissions';
 
@@ -28,3 +29,6 @@ export const SubmitFillBundleSchema = z.object({
   canSaveDraft: z.boolean(),
 });
 export type SubmitFillBundle = z.infer<typeof SubmitFillBundleSchema>;
+
+/** Why submit mode refused a request; an error response carries it as `code`. */
+export const SubmitRefusalCodeSchema = z.enum(SubmitRefusal);

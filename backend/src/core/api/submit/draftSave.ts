@@ -1,12 +1,27 @@
 import type { NextFunction, Request, Response } from 'express';
-import { draftSaveStatusOf, DraftSaveStatus, type DraftSaveStatusCode } from '@soba/lib';
+import {
+  draftSaveStatusOf,
+  DraftSaveStatus,
+  SubmitRefusal,
+  type DraftSaveStatusCode,
+  type SubmitRefusalCode,
+} from '@soba/lib';
 import { loadedSubmission } from '../../middleware/formSubmitAccess';
 import { ForbiddenError } from '../../errors';
 import { log } from '../../logging';
 
-const REFUSAL_MESSAGES: Record<Exclude<DraftSaveStatusCode, 'allowed'>, string> = {
-  disabled: 'Drafts are not enabled for this form',
-  public: 'Drafts are not available on a public form',
+const REFUSALS: Record<
+  Exclude<DraftSaveStatusCode, 'allowed'>,
+  { message: string; code: SubmitRefusalCode }
+> = {
+  disabled: {
+    message: 'Drafts are not enabled for this form',
+    code: SubmitRefusal.drafts_disabled,
+  },
+  public: {
+    message: 'Drafts are not available on a public form',
+    code: SubmitRefusal.drafts_public,
+  },
 };
 
 /** Refuses a save when the form does not accept drafts. Runs after requireSubmissionWrite. */
@@ -24,7 +39,7 @@ export const requireDraftSave = (req: Request, _res: Response, next: NextFunctio
         },
         'Draft save refused',
       );
-      throw new ForbiddenError(REFUSAL_MESSAGES[status]);
+      throw new ForbiddenError(REFUSALS[status].message, REFUSALS[status].code);
     }
     next();
   } catch (error) {

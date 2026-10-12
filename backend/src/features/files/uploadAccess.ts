@@ -30,11 +30,11 @@ export const requireUploadAccess = async (
     const target = { workspaceId: submission.workspaceId, formId: submission.formId, submissionId };
     const change = uploadStatusOf(access, form, caller);
     if (change.status === SubmissionChangeStatus.denied) {
-      refuseSubmitter(req, SubmitterOperation.upload, target);
+      refuseSubmitter(req, SubmitterOperation.upload, target, change.code);
     }
     setSubmitContext(req, target);
     if (change.status === SubmissionChangeStatus.closed) {
-      throw new ConflictError('Submission is not accepting file uploads');
+      throw new ConflictError('Submission is not accepting file uploads', change.code);
     }
     next();
   } catch (error) {

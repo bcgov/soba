@@ -21,6 +21,8 @@ import { useSubmissionWriter } from '@/src/features/formio-v5/data/useSubmission
 import { SubmissionLoadAlert } from '@/src/features/submissions/ui/SubmissionLoadAlert';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
+import { submitRefusalMessage } from '@/src/shared/api/dataError';
+import type { SubmitRefusalCode } from '@soba/lib';
 
 type FillLabels = {
   loading: string;
@@ -38,6 +40,7 @@ type FillLabels = {
   saveMine: string;
   submitMine: string;
   alreadySubmitted: string;
+  refusals: Record<SubmitRefusalCode, string>;
 };
 
 type WriteKind = 'save' | 'submit';
@@ -160,7 +163,10 @@ function SubmissionFillBody({
   };
 
   const writeError = (err: unknown) =>
-    setRenderError(normalizeFormioRenderError(err, labels.rendererError, labels.sessionExpired));
+    setRenderError(
+      submitRefusalMessage(err, labels.refusals) ??
+        normalizeFormioRenderError(err, labels.rendererError, labels.sessionExpired),
+    );
 
   const runSave = async () => {
     const base = baseRevisionIdRef.current;
@@ -394,6 +400,7 @@ export default function FormioV5SubmissionFillClient() {
           saveMine: labels.saveMine,
           submitMine: labels.submitMine,
           alreadySubmitted: labels.alreadySubmitted,
+          refusals: dict.submitRefusals,
         }}
       />
     </div>

@@ -444,9 +444,20 @@
     "deleteMessage": "Your draft of {form}, last updated {updated}, will be deleted. This cannot be undone.",
     "deleteSuccess": "Draft deleted.",
     "deleteError": "Could not delete this draft.",
-    "deleteSubmitted": "This draft has been submitted and can no longer be deleted.",
     "viewAll": "View my submissions",
     "noCode": "No confirmation ID yet"
+  },
+  "submitRefusals": {
+    "open_denied": "You are not able to submit this form.",
+    "read_denied": "You do not have access to this submission.",
+    "write_denied": "You are not able to change this submission or submit it.",
+    "render_denied": "You are not able to print this submission.",
+    "delete_denied": "You are not able to delete this submission.",
+    "drafts_disabled": "Drafts are not turned on for this form.",
+    "drafts_public": "Drafts cannot be saved on a public form.",
+    "upload_closed": "Files can no longer be added to this submission.",
+    "delete_closed": "This draft has been submitted and can no longer be deleted.",
+    "not_published": "This form is not accepting submissions."
   },
   "myForms": {
     "columns": {

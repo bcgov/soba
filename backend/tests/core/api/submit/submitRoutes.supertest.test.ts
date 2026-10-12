@@ -181,8 +181,12 @@ describe('submit routes over one read', () => {
 
   it('refuses a read without a grant, 403 signed in and 401 anonymous', async () => {
     mockRead.mockResolvedValue(storedSubmission({ role: null }));
-    expect((await signedIn().get(`${BASE}/s1`)).status).toBe(403);
-    expect((await anonymous().get(`${BASE}/s1`)).status).toBe(401);
+    const signedInRes = await signedIn().get(`${BASE}/s1`);
+    expect(signedInRes.status).toBe(403);
+    expect(signedInRes.body.code).toBe('read_denied');
+    const anonymousRes = await anonymous().get(`${BASE}/s1`);
+    expect(anonymousRes.status).toBe(401);
+    expect(anonymousRes.body.code).toBe('read_denied');
   });
 
   it.each([
@@ -190,17 +194,19 @@ describe('submit routes over one read', () => {
       'drafts off',
       { form: { allowSubmitterDrafts: false } },
       'Drafts are not enabled for this form',
+      'drafts_disabled',
     ],
     [
       'no submit permission',
       { form: { permissions: [] } },
       'Not authorized to change this submission',
+      'write_denied',
     ],
-  ])('refuses a save with %s, 403', async (_label, overrides, error) => {
+  ])('refuses a save with %s, 403', async (_label, overrides, error, code) => {
     mockRead.mockResolvedValue(storedSubmission(overrides));
     const res = await signedIn().post(`${BASE}/s1/save`).send(writeBody);
     expect(res.status).toBe(403);
-    expect(res.body.error).toBe(error);
+    expect(res.body).toEqual({ error, code });
     expect(service.save).not.toHaveBeenCalled();
   });
 
@@ -210,7 +216,10 @@ describe('submit routes over one read', () => {
     );
     const res = await anonymous().post(`${BASE}/s1/save`).send(writeBody);
     expect(res.status).toBe(403);
-    expect(res.body.error).toBe('Drafts are not available on a public form');
+    expect(res.body).toEqual({
+      error: 'Drafts are not available on a public form',
+      code: 'drafts_public',
+    });
   });
 
   it.each([
@@ -293,8 +302,12 @@ describe('submit routes over one read', () => {
 
   it('refuses a submit without the submit permission, 403 signed in and 401 anonymous', async () => {
     mockRead.mockResolvedValue(storedSubmission({ form: { permissions: [] } }));
-    expect((await signedIn().post(`${BASE}/s1/submit`).send(writeBody)).status).toBe(403);
-    expect((await anonymous().post(`${BASE}/s1/submit`).send(writeBody)).status).toBe(401);
+    const signedInRes = await signedIn().post(`${BASE}/s1/submit`).send(writeBody);
+    expect(signedInRes.status).toBe(403);
+    expect(signedInRes.body.code).toBe('write_denied');
+    const anonymousRes = await anonymous().post(`${BASE}/s1/submit`).send(writeBody);
+    expect(anonymousRes.status).toBe(401);
+    expect(anonymousRes.body.code).toBe('write_denied');
     expect(service.submit).not.toHaveBeenCalled();
   });
 
@@ -305,13 +318,15 @@ describe('submit routes over one read', () => {
   });
 
   it.each([
-    ['a collaborator', { role: 'collaborator' }, 403],
-    ['the owner, once submitted', { workflowState: 'submitted' }, 409],
-    ['the owner of a draft', {}, 204],
-  ])('answers a delete by %s with %s', async (_label, overrides, status) => {
+    ['a collaborator', { role: 'collaborator' }, 403, 'delete_denied'],
+    ['the owner, once submitted', { workflowState: 'submitted' }, 409, 'delete_closed'],
+    ['the owner of a draft', {}, 204, undefined],
+  ])('answers a delete by %s with %s', async (_label, overrides, status, code) => {
     mockRead.mockResolvedValue(storedSubmission(overrides));
     service.deleteUnsubmitted.mockResolvedValue({ id: 's1' } as never);
-    expect((await signedIn().delete(`${BASE}/s1`)).status).toBe(status);
+    const res = await signedIn().delete(`${BASE}/s1`);
+    expect(res.status).toBe(status);
+    expect(res.body.code).toBe(code);
   });
 
   const openBody = { id: '01a12d03-75a8-73bc-a106-ce3787ee9a1e', formId: 'f1' };
@@ -362,13 +377,14 @@ describe('submit routes over one read', () => {
   });
 
   it.each([
-    ['a missing form', null, 'signedIn', 404, 'Form not found'],
+    ['a missing form', null, 'signedIn', 404, 'Form not found', undefined],
     [
       'a form with no published version',
       submitterForm({ publishedVersionId: null }),
       'signedIn',
       404,
       'Form has no published version',
+      'not_published',
     ],
     [
       'a members form, anonymously',
@@ -376,6 +392,7 @@ describe('submit routes over one read', () => {
       'anonymous',
       401,
       'Not authorized to submit this form',
+      'open_denied',
     ],
     [
       'a members form without the role',
@@ -383,13 +400,14 @@ describe('submit routes over one read', () => {
       'signedIn',
       403,
       'Not authorized to submit this form',
+      'open_denied',
     ],
-  ] as const)('refuses an open of %s', async (_label, form, caller, status, error) => {
+  ] as const)('refuses an open of %s', async (_label, form, caller, status, error, code) => {
     mockRead.mockResolvedValue(null);
     mockForm.mockResolvedValue(form);
     const res = await request(buildApp(caller)).post(BASE).send(openBody);
     expect(res.status).toBe(status);
-    expect(res.body.error).toBe(error);
+    expect(res.body).toEqual(code ? { error, code } : { error });
     expect(service.open).not.toHaveBeenCalled();
   });
 

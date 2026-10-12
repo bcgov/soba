@@ -17,6 +17,10 @@ vi.mock('@/app/[lang]/Providers', () => ({
         missingId: 'Missing form id.',
       },
     },
+    submitRefusals: {
+      open_denied: 'This form is not open to you.',
+      not_published: 'This form is closed.',
+    },
   }),
 }));
 
@@ -32,6 +36,7 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
 
 import makeStore from '@/lib/store';
 import StartSubmission from '@/src/features/submit-mode/ui/StartSubmission';
+import { ApiError } from '@/src/shared/api/sobaHelpers';
 import { answerInit, renderInStore } from './keycloakInit';
 
 let store: ReturnType<typeof makeStore>;
@@ -65,5 +70,24 @@ describe('StartSubmission', () => {
     await waitFor(() => expect(h.replace).toHaveBeenCalledWith('/en/submit/sub-1'));
     expect(h.openSobaFormSubmission).toHaveBeenCalledTimes(1);
     expect(h.openSobaFormSubmission).toHaveBeenCalledWith('token', 'form-1', expect.any(String));
+  });
+
+  it.each([
+    [
+      'the message for its code',
+      new ApiError('Not authorized to submit this form', 403, 'open_denied'),
+      'This form is not open to you.',
+    ],
+    [
+      'the message for an unpublished form',
+      new ApiError('Form has no published version', 404, 'not_published'),
+      'This form is closed.',
+    ],
+    ['the server text without a code', new ApiError('Form not found', 404), 'Form not found'],
+  ])('shows %s when the open is refused', async (_label, refused, text) => {
+    h.openSobaFormSubmission.mockRejectedValue(refused);
+    await renderInStore(store, <StartSubmission />);
+    await answerInit(store, { authenticated: true, token: 'token' });
+    expect(await screen.findByTestId('start-submission-error')).toHaveTextContent(text);
   });
 });

@@ -1,4 +1,9 @@
-import { SUBMISSION_IN_PROGRESS_STATES, type SortLocale, type SubmissionListSort } from '@soba/lib';
+import {
+  SUBMISSION_IN_PROGRESS_STATES,
+  SubmitRefusal,
+  type SortLocale,
+  type SubmissionListSort,
+} from '@soba/lib';
 import {
   appendSubmissionRevision,
   clearSubmissionProvisioning,
@@ -102,7 +107,8 @@ export class SubmissionService {
    */
   async open(input: CreateInput) {
     const version = await getPublishedVersionForForm(input.workspaceId, input.formId);
-    if (!version) throw new NotFoundError('Form has no published version');
+    if (!version)
+      throw new NotFoundError('Form has no published version', SubmitRefusal.not_published);
     if (input.formVersionId && input.formVersionId !== version.id) {
       throw new ConflictError('Form version is not the published version');
     }
@@ -293,7 +299,10 @@ export class SubmissionService {
       deletableStates: SUBMISSION_IN_PROGRESS_STATES,
     });
     if (result.outcome === 'not_deletable') {
-      throw new ConflictError(`Submission is ${result.workflowState} and can no longer be deleted`);
+      throw new ConflictError(
+        `Submission is ${result.workflowState} and can no longer be deleted`,
+        SubmitRefusal.delete_closed,
+      );
     }
     return result.outcome === 'deleted' ? result.record : null;
   }

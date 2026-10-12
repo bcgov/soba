@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { SubmitRefusal } from '@soba/lib';
 import { documentGenerationService, type DocumentRenderOutcome } from './service';
 import { resolveCaller } from '../../core/middleware/actor';
 import { accessDenial } from '../../core/middleware/formSubmitAccess';
@@ -42,7 +43,7 @@ function respond(
     case 'template-unavailable':
       throw new ServiceUnavailableError('Template content unavailable');
     case 'denied':
-      throw accessDenial(req, NOT_AUTHORIZED);
+      throw accessDenial(req, NOT_AUTHORIZED, SubmitRefusal.render_denied);
     case 'unavailable':
       throw new ServiceUnavailableError('Document generation is not available for this submission');
     case 'busy':
@@ -68,7 +69,8 @@ function respond(
 export async function listSubmissionTemplatesHandler(req: Request, res: Response): Promise<void> {
   const outcome = await documentGenerationService.listTemplates(resolveCaller(req), req.params.id);
   if (outcome.status === 'notfound') throw new NotFoundError('Submission not found');
-  if (outcome.status === 'denied') throw accessDenial(req, NOT_AUTHORIZED);
+  if (outcome.status === 'denied')
+    throw accessDenial(req, NOT_AUTHORIZED, SubmitRefusal.render_denied);
   res.json({ items: outcome.templates });
 }
 

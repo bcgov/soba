@@ -445,9 +445,20 @@
     "deleteMessage": "Votre brouillon de {form}, mis à jour le {updated}, sera supprimé. Cette action est irréversible.",
     "deleteSuccess": "Brouillon supprimé.",
     "deleteError": "Impossible de supprimer ce brouillon.",
-    "deleteSubmitted": "Ce brouillon a été soumis et ne peut plus être supprimé.",
     "viewAll": "Voir mes soumissions",
     "noCode": "Aucun ID de confirmation pour l’instant"
+  },
+  "submitRefusals": {
+    "open_denied": "Vous ne pouvez pas soumettre ce formulaire.",
+    "read_denied": "Vous n’avez pas accès à cette soumission.",
+    "write_denied": "Vous ne pouvez pas modifier cette soumission ni la soumettre.",
+    "render_denied": "Vous ne pouvez pas imprimer cette soumission.",
+    "delete_denied": "Vous ne pouvez pas supprimer cette soumission.",
+    "drafts_disabled": "Les brouillons ne sont pas activés pour ce formulaire.",
+    "drafts_public": "Les brouillons ne peuvent pas être enregistrés pour un formulaire public.",
+    "upload_closed": "Il n’est plus possible d’ajouter des fichiers à cette soumission.",
+    "delete_closed": "Ce brouillon a été soumis et ne peut plus être supprimé.",
+    "not_published": "Ce formulaire n’accepte pas de soumissions."
   },
   "myForms": {
     "columns": {

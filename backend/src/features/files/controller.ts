@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { SubmitRefusal } from '@soba/lib';
 import { filesService } from './service';
 import { isBlockedExtension } from './config';
 import { resolveCaller } from '../../core/middleware/actor';
@@ -58,7 +59,7 @@ export async function downloadFileHandler(req: Request, res: Response): Promise<
     throw new NotFoundError('File not found');
   }
   if (result === 'denied') {
-    throw accessDenial(req, 'Not authorized to access this file');
+    throw accessDenial(req, 'Not authorized to access this file', SubmitRefusal.read_denied);
   }
   if (result === 'unavailable') {
     throw new ServiceUnavailableError('File content unavailable');
@@ -75,5 +76,5 @@ export async function deleteFileHandler(req: Request, res: Response): Promise<vo
   if (outcome === 'notfound') {
     throw new NotFoundError('File not found');
   }
-  throw accessDenial(req, 'Not authorized to access this file');
+  throw accessDenial(req, 'Not authorized to access this file', SubmitRefusal.write_denied);
 }

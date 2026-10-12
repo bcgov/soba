@@ -1,11 +1,12 @@
 import { NextFunction, Request, RequestHandler, Response } from 'express';
+import type { SubmitRefusalCode } from '@soba/lib';
 import { AppError, NotFoundError } from '../errors';
 import { log } from '../logging';
 import { hasPgCode, PG_UNIQUE_VIOLATION, pgErrorFields } from '../db/pgError';
 
 export interface ErrorHttpResponse {
   statusCode: number;
-  body: { error: string };
+  body: { error: string; code?: SubmitRefusalCode };
 }
 
 // Text the column type can't hold: invalid text representation (a non-uuid id), and a character the
@@ -29,7 +30,8 @@ function clientErrorStatus(err: unknown): number | null {
 
 export function errorToHttpResponse(err: unknown): ErrorHttpResponse {
   if (err instanceof AppError) {
-    return { statusCode: err.statusCode, body: { error: err.message } };
+    const body = err.code ? { error: err.message, code: err.code } : { error: err.message };
+    return { statusCode: err.statusCode, body };
   }
   // A unique-index violation is a conflict (e.g. a name-uniqueness race), not a server error.
   if (hasPgCode(err, [PG_UNIQUE_VIOLATION])) {

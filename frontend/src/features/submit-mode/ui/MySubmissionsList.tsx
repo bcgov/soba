@@ -20,7 +20,7 @@ import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { canDeleteOwnSubmission, isSubmissionInProgress } from '@/src/shared/util/permissions';
 import { fillTemplate } from '@/src/shared/util/stringUtils';
 import { useFormatLongDateTime } from '@/src/shared/hooks/useFormatLongDate';
-import { isConflict } from '@/src/shared/api/dataError';
+import { isConflict, submitRefusalMessage } from '@/src/shared/api/dataError';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useDataErrorNotice } from '@/src/shared/api/useDataErrorNotice';
 import { MY_SUBMISSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
@@ -102,11 +102,16 @@ export function MySubmissionsList() {
     setDeleting(true);
     remove(token, item.id)
       .then(() => addNotification({ text: dictMine.deleteSuccess, type: 'success' }))
-      .catch((cause: unknown) =>
-        notifyError(cause, {
-          failed: isConflict(cause) ? dictMine.deleteSubmitted : dictMine.deleteError,
-        }),
-      )
+      .catch((cause: unknown) => {
+        // The only delete the server answers with 409 is one already submitted, coded or not.
+        const refusal =
+          submitRefusalMessage(cause, dict.submitRefusals) ??
+          (isConflict(cause) ? dict.submitRefusals.delete_closed : null);
+        notifyError(
+          cause,
+          refusal ? { failed: refusal, forbidden: refusal } : { failed: dictMine.deleteError },
+        );
+      })
       .finally(() => {
         setDeleting(false);
         setConfirmDelete(null);
@@ -118,7 +123,7 @@ export function MySubmissionsList() {
     addNotification,
     notifyError,
     dictMine.deleteSuccess,
-    dictMine.deleteSubmitted,
+    dict.submitRefusals,
     dictMine.deleteError,
   ]);
 

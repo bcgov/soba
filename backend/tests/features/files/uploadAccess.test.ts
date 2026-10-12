@@ -60,7 +60,9 @@ describe('requireUploadAccess', () => {
     mockRead.mockResolvedValue(
       storedSubmission({ workflowState: 'submitted', form: { permissions: [] } }),
     );
-    expect(await run(upload())).toHaveBeenCalledWith(expect.any(ForbiddenError));
+    const signedInError = (await run(upload())).mock.calls[0][0];
+    expect(signedInError).toBeInstanceOf(ForbiddenError);
+    expect(signedInError).toMatchObject({ code: 'write_denied' });
     expect(await run(anonymousUpload())).toHaveBeenCalledWith(expect.any(UnauthorizedError));
   });
 
@@ -71,7 +73,9 @@ describe('requireUploadAccess', () => {
 
   it('is a 409 for a writer on a submitted submission', async () => {
     mockRead.mockResolvedValue(storedSubmission({ workflowState: 'submitted' }));
-    expect(await run(upload())).toHaveBeenCalledWith(expect.any(ConflictError));
+    const error = (await run(upload())).mock.calls[0][0];
+    expect(error).toBeInstanceOf(ConflictError);
+    expect(error).toMatchObject({ code: 'upload_closed' });
   });
 
   it('is a 404 when the submission is not live', async () => {

@@ -3,7 +3,7 @@ import { UnauthorizedError } from 'express-jwt';
 import { coreErrorHandler, errorToHttpResponse } from '../../../src/core/middleware/errorHandler';
 import { HttpClientError } from '../../../src/core/http/httpClient';
 import { FormioApiError } from '../../../src/plugins/formio-v5/formioV5Client';
-import { AppError, NotFoundError, ValidationError } from '../../../src/core/errors';
+import { AppError, ForbiddenError, NotFoundError, ValidationError } from '../../../src/core/errors';
 import { log } from '../../../src/core/logging';
 
 /** A Drizzle-style query error wrapping a pg DatabaseError, with the submitted value in params. */
@@ -26,6 +26,14 @@ describe('errorHandler', () => {
     const result = errorToHttpResponse(err);
     expect(result.statusCode).toBe(404);
     expect(result.body).toEqual({ error: 'Resource missing' });
+  });
+
+  it('errorToHttpResponse sends an AppError code with its message, and none when unset', () => {
+    expect(errorToHttpResponse(new ForbiddenError('Drafts are off', 'drafts_disabled'))).toEqual({
+      statusCode: 403,
+      body: { error: 'Drafts are off', code: 'drafts_disabled' },
+    });
+    expect(Object.keys(errorToHttpResponse(new ForbiddenError('No')).body)).toEqual(['error']);
   });
 
   it('errorToHttpResponse returns 400 for ValidationError', () => {

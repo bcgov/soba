@@ -1,6 +1,7 @@
+import type { SubmitRefusalCode } from '@soba/lib';
 import type { DataError } from './dataContracts';
 import { isSessionExpired } from './sobaFetch';
-import { isForbidden, isNotFound } from './sobaHelpers';
+import { ApiError, isForbidden, isNotFound } from './sobaHelpers';
 
 /**
  * The single place an API failure becomes a `DataError`. Callers outside the api folder reach the
@@ -20,6 +21,14 @@ export type DataErrorMessages = Partial<Record<DataError['kind'], string>> & { f
 
 export function messageForDataError(error: DataError, messages: DataErrorMessages): string {
   return messages[error.kind] ?? messages.failed;
+}
+
+/** The message for a refusal the server sent a code with; null for any other error. */
+export function submitRefusalMessage(
+  cause: unknown,
+  messages: Record<SubmitRefusalCode, string>,
+): string | null {
+  return cause instanceof ApiError && cause.code ? messages[cause.code] : null;
 }
 
 export { isSessionExpired } from './sobaFetch';

@@ -1,10 +1,14 @@
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
+import { SubmitRefusalCodeSchema } from '@soba/lib';
 import { z } from 'zod';
 
 extendZodWithOpenApi(z);
 
 export const ApiErrorSchema = z.object({
   error: z.string(),
+  code: SubmitRefusalCodeSchema.optional().openapi({
+    description: 'Why submit mode refused the request, for a client to choose its own message.',
+  }),
 });
 
 export const IdParamSchema = z.object({

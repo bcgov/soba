@@ -5,6 +5,8 @@ import {
   ownDeleteStatusOf,
   startStatusOf,
   SubmissionChangeStatus,
+  SubmitRefusal,
+  type SubmitRefusalCode,
 } from '@soba/lib';
 import type { CallerIdentity, FormAccessTarget } from '../db/repos/formSubmitAccessRepo';
 import { findLiveSubmitterForm } from '../db/repos/submitterFormRepo';
@@ -20,8 +22,8 @@ import { resolveCaller } from './actor';
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
 /** A denial that distinguishes an authenticated caller (403) from an anonymous one (401). */
-export const accessDenial = (req: Request, message: string): Error =>
-  req.user ? new ForbiddenError(message) : new UnauthorizedError(message);
+export const accessDenial = (req: Request, message: string, code?: SubmitRefusalCode): Error =>
+  req.user ? new ForbiddenError(message, code) : new UnauthorizedError(message, code);
 
 const CHANGE_DENIED = 'Not authorized to change this submission';
 
@@ -40,17 +42,19 @@ export const refuseSubmitter = (
   req: Request,
   operation: SubmitterOperationCode,
   target: { formId?: string; submissionId?: string },
+  code: SubmitRefusalCode,
 ): never => {
   log.warn(
     {
       operation,
+      code,
       formId: target.formId,
       submissionId: target.submissionId,
       actorId: req.actorId,
     },
     'Submit-mode access refused',
   );
-  throw accessDenial(req, DENIAL_MESSAGES[operation]);
+  throw accessDenial(req, DENIAL_MESSAGES[operation], code);
 };
 
 /**
@@ -124,15 +128,18 @@ const decide = (
   req: Request,
   next: NextFunction,
   operation: SubmitterOperationCode,
+  code: SubmitRefusalCode,
   allows: (loaded: SubmitterSubmission, caller: CallerIdentity) => boolean,
 ): void => {
   try {
     const loaded = loadedSubmission(req);
     if (!allows(loaded, resolveCaller(req))) {
-      refuseSubmitter(req, operation, {
-        formId: loaded.submission.formId,
-        submissionId: loaded.submission.id,
-      });
+      refuseSubmitter(
+        req,
+        operation,
+        { formId: loaded.submission.formId, submissionId: loaded.submission.id },
+        code,
+      );
     }
     next();
   } catch (error) {
@@ -142,12 +149,18 @@ const decide = (
 
 /** Authorizes a read of an existing submission: confirmation, data, schema, fill bundle. */
 export const requireSubmissionRead: RequestHandler = (req, _res, next) =>
-  decide(req, next, SubmitterOperation.read, ({ access }) => canReadSubmission(access));
+  decide(req, next, SubmitterOperation.read, SubmitRefusal.read_denied, ({ access }) =>
+    canReadSubmission(access),
+  );
 
 /** Authorizes a save or submit. Its state does not refuse it; the write may be kept as pending. */
 export const requireSubmissionWrite: RequestHandler = (req, _res, next) =>
-  decide(req, next, SubmitterOperation.write, ({ access, form }, caller) =>
-    canWriteSubmission(access, form, caller),
+  decide(
+    req,
+    next,
+    SubmitterOperation.write,
+    SubmitRefusal.write_denied,
+    ({ access, form }, caller) => canWriteSubmission(access, form, caller),
   );
 
 /** Authorizes the owner's delete of their own submission: 409 once it is submitted. */
@@ -156,14 +169,17 @@ export const requireSubmissionDelete: RequestHandler = (req, _res, next) => {
     const { submission, access } = loadedSubmission(req);
     const change = ownDeleteStatusOf(access, resolveCaller(req));
     if (change.status === SubmissionChangeStatus.denied) {
-      refuseSubmitter(req, SubmitterOperation.delete, {
-        formId: submission.formId,
-        submissionId: submission.id,
-      });
+      refuseSubmitter(
+        req,
+        SubmitterOperation.delete,
+        { formId: submission.formId, submissionId: submission.id },
+        change.code,
+      );
     }
     if (change.status === SubmissionChangeStatus.closed) {
       throw new ConflictError(
         `Submission is ${submission.workflowState} and can no longer be deleted`,
+        change.code,
       );
     }
     next();
@@ -192,10 +208,10 @@ export const requireSubmissionOpen = async (
     if (!form) throw new NotFoundError('Form not found');
     const change = startStatusOf(form, caller);
     if (change.status === SubmissionChangeStatus.denied) {
-      refuseSubmitter(req, SubmitterOperation.open, { formId });
+      refuseSubmitter(req, SubmitterOperation.open, { formId }, change.code);
     }
     if (change.status === SubmissionChangeStatus.closed) {
-      throw new NotFoundError('Form has no published version');
+      throw new NotFoundError('Form has no published version', change.code);
     }
     setSubmitContext(req, { workspaceId: form.workspaceId, formId });
     next();

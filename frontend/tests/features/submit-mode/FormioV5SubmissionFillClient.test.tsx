@@ -31,6 +31,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
     general: { sessionExpired: 'Your session has ended.', noAccess: 'You do not have access.' },
     submission: { notFound: 'Submission not found.', loadError: 'Could not load this submission.' },
     form: { loading: 'Loading...' },
+    submitRefusals: { drafts_disabled: 'Drafts are off for this form.' },
     formioV5: {
       formRender: {
         loadError: 'Could not load the form.',
@@ -453,15 +454,26 @@ describe('FormioV5SubmissionFillClient', () => {
       expect(h.getSubmitFillBundle).toHaveBeenCalledTimes(1);
     });
 
-    it('shows the refusal when a save fails', async () => {
+    it('shows the message for the refusal code when a save is refused', async () => {
       h.saveSobaFormSubmission.mockRejectedValue(
-        new ApiError('Drafts are not enabled for this form', 403),
+        new ApiError('Drafts are not enabled for this form', 403, 'drafts_disabled'),
       );
       await renderLoaded();
       await saveDraft();
       await waitFor(() =>
         expect(screen.getByTestId('submission-fill-render-error')).toHaveTextContent(
-          'Drafts are not enabled for this form',
+          'Drafts are off for this form.',
+        ),
+      );
+    });
+
+    it('shows the server text for a failure without a refusal code', async () => {
+      h.saveSobaFormSubmission.mockRejectedValue(new ApiError('Engine rejected the data', 400));
+      await renderLoaded();
+      await saveDraft();
+      await waitFor(() =>
+        expect(screen.getByTestId('submission-fill-render-error')).toHaveTextContent(
+          'Engine rejected the data',
         ),
       );
     });
