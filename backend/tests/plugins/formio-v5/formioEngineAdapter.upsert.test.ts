@@ -51,7 +51,7 @@ describe('FormioEngineAdapter schema methods', () => {
     });
 
     expect(res).toEqual({ engineRef: 'new-id' });
-    expect(client.loadForms).toHaveBeenCalledWith({ params: { name: 'soba-v1' } });
+    expect(client.loadForms).toHaveBeenCalledWith({ params: { name: 'soba-v1' } }, undefined);
 
     const body = client.saveForm.mock.calls[0][0] as Record<string, unknown>;
     expect(body._id).toBeUndefined(); // POST path, not PUT
@@ -76,6 +76,19 @@ describe('FormioEngineAdapter schema methods', () => {
     expect(res).toEqual({ engineRef: 'abc' });
     const body = client.saveForm.mock.calls[0][0] as Record<string, unknown>;
     expect(body._id).toBe('abc'); // PUT path
+  });
+
+  it("gives both engine calls the caller's signal", async () => {
+    const client = makeClient({ loadForms: jest.fn().mockResolvedValue([{ _id: 'abc' }]) });
+    mockedGetClient.mockResolvedValue(client);
+    const signal = new AbortController().signal;
+
+    const adapter = new FormioEngineAdapter(makeConfig());
+    await adapter.upsertSchema({ formVersionId: 'v1', workspaceId: 'ws1', schema: {}, signal });
+
+    expect(client.loadForms.mock.calls[0][1]).toBe(signal);
+    expect(client.saveForm.mock.calls[0][1]).toBe(signal);
+    expect(client.saveForm.mock.calls[0][0]).not.toHaveProperty('signal');
   });
 
   it('throws when no admin client is available', async () => {

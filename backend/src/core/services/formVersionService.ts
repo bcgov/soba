@@ -49,6 +49,8 @@ function withCurrentVersion<T>(
 
 /** A provision this old is taken to have died, and no longer blocks the version. */
 const PROVISIONING_STALE_MS = 2 * 60 * 1000;
+/** A provision's engine calls are abandoned by then, before its claim can go stale. */
+const PROVISIONING_BUDGET_MS = 90 * 1000;
 
 /**
  * Only a draft's schema is written, and not while another save is still writing it: the engine
@@ -108,7 +110,7 @@ const ALLOWED_TRANSITIONS: Record<LifecycleState, LifecycleState[]> = {
   draft: ['published', 'deleted'],
   published: ['archived', 'deleted'],
   archived: ['published', 'deleted'],
-  deleted: ['draft'],
+  deleted: [],
 };
 
 /** Throws if a form version may not move from `from` to `to`. */
@@ -248,21 +250,6 @@ export class FormVersionService {
     );
   }
 
-  async restore(input: VersionActionInput) {
-    const version = await getFormVersionByIdIncludingDeleted(
-      input.workspaceId,
-      input.formVersionId,
-    );
-    if (!version) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
-    assertTransition(version.state, 'draft');
-    return updateFormVersionDraft(
-      input.workspaceId,
-      input.formVersionId,
-      input.actorDisplayLabel,
-      stateStamps('draft', input),
-    );
-  }
-
   /**
    * Provision (create-or-update) the form version's schema in the form engine, server-side via the
    * admin client. Sets engineSyncStatus 'provisioning' → 'ready' (with engineSchemaRef) or 'error'.
@@ -312,6 +299,7 @@ export class FormVersionService {
         workspaceId: input.workspaceId,
         schema: input.schema,
         title: claim.title,
+        signal: AbortSignal.timeout(PROVISIONING_BUDGET_MS),
       }));
     } catch (err) {
       await finishFormVersionProvisioning(

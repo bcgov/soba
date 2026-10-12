@@ -14,6 +14,8 @@ export interface UpsertSchemaInput {
   schema: Record<string, unknown>;
   /** Optional human-readable title; defaults to the schema's own title. */
   title?: string;
+  /** Abandons the engine calls when it fires. */
+  signal?: AbortSignal;
 }
 
 /** Input for creating a new (immutable) submission document in the engine for a save/revision. */

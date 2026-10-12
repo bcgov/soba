@@ -390,16 +390,6 @@ export function createFormsApiService(
       return row ? toFormVersionDto(row) : null;
     },
 
-    restore: async (ctx: FormsContextInput, formVersionId: string) => {
-      const row = await formVersionService.restore({
-        workspaceId: ctx.workspaceId,
-        actorId: ctx.actorId,
-        actorDisplayLabel: ctx.actorDisplayLabel,
-        formVersionId,
-      });
-      return row ? toFormVersionDto(row) : null;
-    },
-
     provision: async (
       ctx: FormsContextInput,
       formVersionId: string,

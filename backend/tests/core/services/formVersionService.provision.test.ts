@@ -69,6 +69,7 @@ describe('FormVersionService provision/getSchema', () => {
       workspaceId: 'ws1',
       schema,
       title: 'My Form',
+      signal: expect.any(AbortSignal),
     });
     expect(updateDraft).toHaveBeenCalledWith(
       'ws1',
