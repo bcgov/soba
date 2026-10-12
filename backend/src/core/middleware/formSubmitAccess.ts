@@ -13,12 +13,7 @@ import {
   type SubmitterSubmission,
 } from '../db/repos/submitterSubmissionRepo';
 import { PUBLIC_PROVIDER_CODE, PUBLIC_SUBMITTER_LABEL } from '../db/codes';
-import {
-  isSubmitterAllowed,
-  SubmitterOperation,
-  type SubmitterAccessTarget,
-  type SubmitterOperationCode,
-} from '../services/submitterAccess';
+import { SubmitterOperation, type SubmitterOperationCode } from '../services/submitterAccess';
 import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from '../errors';
 import { log } from '../logging';
 import { resolveCaller } from './actor';
@@ -28,17 +23,20 @@ import type { Request, Response, NextFunction, RequestHandler } from 'express';
 export const accessDenial = (req: Request, message: string): Error =>
   req.user ? new ForbiddenError(message) : new UnauthorizedError(message);
 
+const CHANGE_DENIED = 'Not authorized to change this submission';
+
 const DENIAL_MESSAGES: Record<SubmitterOperationCode, string> = {
   open: 'Not authorized to submit this form',
   read: 'Not authorized to access this submission',
-  write: 'Not authorized to change this submission',
-  deleteSubmittedFile: 'Not authorized to change this submission',
+  write: CHANGE_DENIED,
+  upload: CHANGE_DENIED,
+  deleteFile: CHANGE_DENIED,
   render: 'Not authorized to generate this document',
   delete: 'Not authorized to delete this submission',
 };
 
 /** Logs and throws the refusal: 401 for anonymous, 403 for an authenticated caller. */
-const refuse = (
+export const refuseSubmitter = (
   req: Request,
   operation: SubmitterOperationCode,
   target: { formId?: string; submissionId?: string },
@@ -53,16 +51,6 @@ const refuse = (
     'Submit-mode access refused',
   );
   throw accessDenial(req, DENIAL_MESSAGES[operation]);
-};
-
-/** Throws unless the caller may perform the submit-mode operation. */
-export const assertSubmitterAllowed = async (
-  req: Request,
-  operation: SubmitterOperationCode,
-  target: SubmitterAccessTarget,
-): Promise<void> => {
-  if (await isSubmitterAllowed(operation, target, resolveCaller(req))) return;
-  refuse(req, operation, target);
 };
 
 /**
@@ -141,7 +129,7 @@ const decide = (
   try {
     const loaded = loadedSubmission(req);
     if (!allows(loaded, resolveCaller(req))) {
-      refuse(req, operation, {
+      refuseSubmitter(req, operation, {
         formId: loaded.submission.formId,
         submissionId: loaded.submission.id,
       });
@@ -168,7 +156,7 @@ export const requireSubmissionDelete: RequestHandler = (req, _res, next) => {
     const { submission, access } = loadedSubmission(req);
     const change = ownDeleteStatusOf(access, resolveCaller(req));
     if (change.status === SubmissionChangeStatus.denied) {
-      refuse(req, SubmitterOperation.delete, {
+      refuseSubmitter(req, SubmitterOperation.delete, {
         formId: submission.formId,
         submissionId: submission.id,
       });
@@ -204,7 +192,7 @@ export const requireSubmissionOpen = async (
     if (!form) throw new NotFoundError('Form not found');
     const change = startStatusOf(form, caller);
     if (change.status === SubmissionChangeStatus.denied) {
-      refuse(req, SubmitterOperation.open, { formId });
+      refuseSubmitter(req, SubmitterOperation.open, { formId });
     }
     if (change.status === SubmissionChangeStatus.closed) {
       throw new NotFoundError('Form has no published version');

@@ -1,7 +1,6 @@
 jest.mock('../../../src/core/db/client', () => ({ db: {} }));
 
 jest.mock('../../../src/core/db/repos/submissionRepo', () => ({
-  getSubmissionListContext: jest.fn(),
   getSubmissionRecordById: jest.fn(),
 }));
 jest.mock('../../../src/core/db/repos/submitterSubmissionRepo', () => ({
@@ -51,11 +50,12 @@ import { ServiceUnavailableError } from '../../../src/core/errors';
 import { HttpClientError } from '../../../src/core/http/httpClient';
 import { httpErrorToAppError } from '../../../src/core/http/httpErrorMapper';
 
-const getSubmissionListContext = submissionRepo.getSubmissionListContext as unknown as jest.Mock;
 const getSubmissionRecordById = submissionRepo.getSubmissionRecordById as unknown as jest.Mock;
 const readMock = jest.mocked(findSubmitterSubmission);
 // Whether the caller holds a grant on the submission; the one read carries it.
 const holdsGrant = jest.fn();
+// Whether the submission, its form and its version are live; the one read is null otherwise.
+const isLive = jest.fn();
 const getDefs = pluginRegistry.getDocumentGenerationPluginDefinitions as unknown as jest.Mock;
 const resolveDefault = docgenRegistry.resolveDefaultDocumentGenerationCode as unknown as jest.Mock;
 const createAdapter = docgenRegistry.createDocumentGenerationAdapter as unknown as jest.Mock;
@@ -76,11 +76,13 @@ const storedTemplate = {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  getSubmissionListContext.mockResolvedValue(scope);
+  isLive.mockReturnValue(true);
   getSubmissionRecordById.mockResolvedValue({ id: 's1' });
-  readMock.mockImplementation(async () =>
-    storedSubmission({ role: (await holdsGrant()) ? 'owner' : null }),
-  );
+  readMock.mockImplementation(async () => {
+    if (!isLive()) return null;
+    const stored = storedSubmission({ role: (await holdsGrant()) ? 'owner' : null });
+    return { ...stored, submission: { ...stored.submission, ...scope } };
+  });
   getLiveTemplate.mockResolvedValue(storedTemplate);
   openFile.mockImplementation(async () => ({
     downloadStream: Readable.from(Buffer.from('tpl bytes')),
@@ -110,7 +112,7 @@ beforeEach(() => {
 
 describe('documentGenerationService.preview', () => {
   it('is notfound when the submission does not exist', async () => {
-    getSubmissionListContext.mockResolvedValue(null);
+    isLive.mockReturnValue(false);
     const outcome = await documentGenerationService.preview(caller, {
       submissionId: 's1',
       templateId,
@@ -139,7 +141,7 @@ describe('documentGenerationService.preview', () => {
     });
     expect(outcome).toMatchObject({ status: 'ok', code: 'cdogs-v2' });
     expect(readMock).toHaveBeenCalledWith({ submissionId: 's1', ...caller });
-    expect(getLiveTemplate).toHaveBeenCalledWith(templateId, expect.any(String), 'cdogs');
+    expect(getLiveTemplate).toHaveBeenCalledWith(templateId, scope.formVersionId, 'cdogs');
     expect(createAdapter).toHaveBeenCalledWith('cdogs-v2');
     // Service passes the stored template's bytes and type; CDOGS-specific shaping is in the plugin.
     expect(renderMock).toHaveBeenCalledWith({
@@ -216,7 +218,7 @@ describe('documentGenerationService.print', () => {
 
     expect(outcome).toMatchObject({ status: 'ok' });
     expect(readMock).toHaveBeenCalledWith({ submissionId: 's1', ...caller });
-    expect(getLiveTemplate).toHaveBeenCalledWith(templateId, expect.any(String), 'cdogs');
+    expect(getLiveTemplate).toHaveBeenCalledWith(templateId, scope.formVersionId, 'cdogs');
     // Service passes the raw persisted doc through; the plugin flattens it for the template.
     expect(renderMock).toHaveBeenCalledWith(
       expect.objectContaining({ data: { data: { field: 'saved' } } }),

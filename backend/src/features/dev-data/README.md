@@ -171,16 +171,18 @@ any difference:
 - design: listed in the designer, and the form's own check for `form_read`, `design_update`,
   `submission_read`, and `form_read` with `document_template_read` for the staff templates
 - workspaces: reading the workspace's members and groups, and offered by the Create Form picker
-- submissions: listed in My Submissions, and the read, write and delete rules
+- submissions: listed in My Submissions, and the read, write, file upload, file delete, render
+  and delete rules
 
 It also checks that the designer's forms, form versions and submissions lists each hold exactly the
 forms whose own check allows them and leave out the deleted ones, that each form version and
 submission resolves by id only while it, its form and its version are not deleted, that the Create
 Form picker offers exactly the workspaces where the create check passes, and that the sign-in read
 returns each persona's identity, user and admin row, compares IdP attributes as jsonb, and finds
-nothing for an unknown subject or provider. The submit routes decide from one read of each
-submission (`findSubmitterSubmission`); it must hold the role, form facts and submission detail the
-separate participant, form and detail reads give, and find the same submissions live. Start from the
+nothing for an unknown subject or provider. The submit, file and document routes decide from one
+read of each submission (`findSubmitterSubmission`); it must hold the role, form facts and
+submission detail the separate participant, form and detail reads give, and find the same
+submissions live. Start from the
 open route's form read (`findLiveSubmitterForm`) must match the open rules.
 
 Write is the rule save and submit share; the request itself can still refuse the write or keep it

@@ -1,24 +1,33 @@
-jest.mock('../../../src/core/services/submitterAccess', () => ({
-  ...jest.requireActual('../../../src/core/services/submitterAccess'),
-  isSubmitterAllowed: jest.fn(),
-}));
-jest.mock('../../../src/core/db/repos/submissionRepo', () => ({
-  getSubmissionWorkspaceAndState: jest.fn(),
+jest.mock('../../../src/core/db/repos/submitterSubmissionRepo', () => ({
+  findSubmitterSubmission: jest.fn(),
 }));
 
 import type { NextFunction, Request, Response } from 'express';
 import { requireUploadAccess } from '../../../src/features/files/uploadAccess';
-import { isSubmitterAllowed } from '../../../src/core/services/submitterAccess';
-import { getSubmissionWorkspaceAndState } from '../../../src/core/db/repos/submissionRepo';
-import { ConflictError, ForbiddenError } from '../../../src/core/errors';
+import { findSubmitterSubmission } from '../../../src/core/db/repos/submitterSubmissionRepo';
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from '../../../src/core/errors';
+import { storedSubmission } from '../../core/api/submit/storedSubmission';
 
-const mockAllowed = jest.mocked(isSubmitterAllowed);
-const mockSubmission = jest.mocked(getSubmissionWorkspaceAndState);
+const mockRead = jest.mocked(findSubmitterSubmission);
 
-const upload = () =>
+const upload = (body: Record<string, unknown> = { submissionId: 's1' }) =>
   ({
     actorId: 'u1',
     user: { providerCode: 'idir', profile: {} } as Express.User,
+    params: {},
+    body,
+  }) as unknown as Request;
+
+const anonymousUpload = () =>
+  ({
+    actorId: 'public-user',
+    idpType: 'public',
     params: {},
     body: { submissionId: 's1' },
   }) as unknown as Request;
@@ -29,38 +38,49 @@ const run = async (req: Request) => {
   return next;
 };
 
-const inState = (workflowState: string) =>
-  mockSubmission.mockResolvedValue({ workspaceId: 'ws1', formId: 'f1', workflowState });
-
 beforeEach(() => {
-  mockAllowed.mockReset();
-  mockSubmission.mockReset();
-  inState('draft');
+  mockRead.mockReset();
+  mockRead.mockResolvedValue(storedSubmission());
 });
 
 describe('requireUploadAccess', () => {
-  it('lets a caller who may write upload to an in-progress submission', async () => {
-    mockAllowed.mockResolvedValue(true);
-    const req = upload();
-    const next = await run(req);
-    expect(mockAllowed).toHaveBeenCalledWith(
-      'write',
-      { workspaceId: 'ws1', formId: 'f1', submissionId: 's1' },
-      expect.objectContaining({ actorId: 'u1' }),
+  it.each(['draft', 'opened'])(
+    'lets a caller who may write upload to a %s submission',
+    async (workflowState) => {
+      mockRead.mockResolvedValue(storedSubmission({ workflowState }));
+      const req = upload();
+      const next = await run(req);
+      expect(mockRead).toHaveBeenCalledWith({ submissionId: 's1', actorId: 'u1', idpCode: 'idir' });
+      expect(next).toHaveBeenCalledWith();
+      expect(req.coreContext).toMatchObject({ workspaceId: 'ws1', formId: 'f1', actorId: 'u1' });
+    },
+  );
+
+  it('refuses access before revealing the state, 403 signed in and 401 anonymous', async () => {
+    mockRead.mockResolvedValue(
+      storedSubmission({ workflowState: 'submitted', form: { permissions: [] } }),
     );
-    expect(next).toHaveBeenCalledWith();
-    expect(req.coreContext).toMatchObject({ workspaceId: 'ws1', formId: 'f1' });
+    expect(await run(upload())).toHaveBeenCalledWith(expect.any(ForbiddenError));
+    expect(await run(anonymousUpload())).toHaveBeenCalledWith(expect.any(UnauthorizedError));
   });
 
-  it('refuses access before revealing the state, so a non-writer gets 403 not 409', async () => {
-    mockAllowed.mockResolvedValue(false);
-    inState('submitted');
+  it('refuses a caller without a grant', async () => {
+    mockRead.mockResolvedValue(storedSubmission({ role: null }));
     expect(await run(upload())).toHaveBeenCalledWith(expect.any(ForbiddenError));
   });
 
   it('is a 409 for a writer on a submitted submission', async () => {
-    mockAllowed.mockResolvedValue(true);
-    inState('submitted');
+    mockRead.mockResolvedValue(storedSubmission({ workflowState: 'submitted' }));
     expect(await run(upload())).toHaveBeenCalledWith(expect.any(ConflictError));
+  });
+
+  it('is a 404 when the submission is not live', async () => {
+    mockRead.mockResolvedValue(null);
+    expect(await run(upload())).toHaveBeenCalledWith(expect.any(NotFoundError));
+  });
+
+  it('needs a submissionId, with no read', async () => {
+    expect(await run(upload({}))).toHaveBeenCalledWith(expect.any(ValidationError));
+    expect(mockRead).not.toHaveBeenCalled();
   });
 });

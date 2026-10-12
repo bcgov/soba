@@ -51,6 +51,12 @@ export interface SubmissionExpectation {
   read: PersonaKey[];
   /** The write rule save and submit share. The request can still refuse or hold the write. */
   write: PersonaKey[];
+  /** Uploads a file: the write rule, before it is submitted. */
+  upload: PersonaKey[];
+  /** Deletes a file: the write rule before it is submitted, then submission_update with no grant. */
+  fileDelete: PersonaKey[];
+  /** Prints or previews it: a grant and document_template_read. */
+  render: PersonaKey[];
   /** Deletes it: an owner grant, signed in, before it is submitted. */
   delete: PersonaKey[];
 }
@@ -64,7 +70,15 @@ export const DESIGN_CHECKS = [
   'staffTemplates',
 ] as const;
 export const WORKSPACE_CHECKS = ['peopleRead', 'formCreate'] as const;
-export const SUBMISSION_CHECKS = ['mine', 'read', 'write', 'delete'] as const;
+export const SUBMISSION_CHECKS = [
+  'mine',
+  'read',
+  'write',
+  'upload',
+  'fileDelete',
+  'render',
+  'delete',
+] as const;
 
 export type FormCheck = (typeof FORM_CHECKS)[number];
 export type DesignCheck = (typeof DESIGN_CHECKS)[number];
@@ -264,23 +278,61 @@ export const WORKSPACE_EXPECTATIONS: Record<CoverageWorkspaceKey, WorkspaceExpec
   public: { peopleRead: ['admin'], formCreate: ['admin'] },
 };
 
-const NONE: SubmissionExpectation = { mine: [], read: [], write: [], delete: [] };
+const NONE: SubmissionExpectation = {
+  mine: [],
+  read: [],
+  write: [],
+  upload: [],
+  fileDelete: [],
+  render: [],
+  delete: [],
+};
+
+/** Every check but mine and delete for the caller who opened it, on an in-progress submission. */
+const inProgressFor = (persona: PersonaKey) => ({
+  read: [persona],
+  write: [persona],
+  upload: [persona],
+  fileDelete: [persona],
+  render: [persona],
+});
 
 export const SUBMISSION_EXPECTATIONS: Record<CoverageSubmissionKey, SubmissionExpectation> = {
+  // The IDIR audience refuses the BCeID collaborator everything but the read.
   outsiderDraft: {
     mine: ['outsider', 'collaborator', 'bceidOutsider'],
     read: ['outsider', 'collaborator', 'bceidOutsider'],
     write: ['outsider', 'collaborator'],
+    upload: ['outsider', 'collaborator'],
+    fileDelete: ['outsider', 'collaborator'],
+    render: ['outsider', 'collaborator'],
     delete: ['outsider'],
   },
-  outsiderSubmitted: { mine: ['outsider'], read: ['outsider'], write: ['outsider'], delete: [] },
-  outsiderOpened: { mine: [], read: ['outsider'], write: ['outsider'], delete: ['outsider'] },
+  // Once submitted, only the form administrators delete a file, without a grant.
+  outsiderSubmitted: {
+    mine: ['outsider'],
+    read: ['outsider'],
+    write: ['outsider'],
+    upload: [],
+    fileDelete: ['owner', 'admin'],
+    render: ['outsider'],
+    delete: [],
+  },
+  outsiderOpened: { mine: [], ...inProgressFor('outsider'), delete: ['outsider'] },
   bceidDeleted: NONE,
   // A deleted form or form version closes the submissions on it.
   submitterOnDeletedVersion: NONE,
   submitterOnDeletedForm: NONE,
-  ownerDraft: { mine: ['owner'], read: ['owner'], write: ['owner'], delete: ['owner'] },
+  ownerDraft: { mine: ['owner'], ...inProgressFor('owner'), delete: ['owner'] },
   // The public user owns every anonymous submission, so any anonymous caller holding the id passes.
-  anonymousSubmitted: { mine: [], read: ['anonymous'], write: ['anonymous'], delete: [] },
-  anonymousOpened: { mine: [], read: ['anonymous'], write: ['anonymous'], delete: [] },
+  anonymousSubmitted: {
+    mine: [],
+    read: ['anonymous'],
+    write: ['anonymous'],
+    upload: [],
+    fileDelete: ['admin'],
+    render: ['anonymous'],
+    delete: [],
+  },
+  anonymousOpened: { mine: [], ...inProgressFor('anonymous'), delete: [] },
 };

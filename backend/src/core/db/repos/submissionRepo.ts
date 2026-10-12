@@ -370,8 +370,8 @@ export const getSubmissionListContext = async (
 };
 
 /**
- * Resolve a submission's workspace, form and workflow state by id alone (for the write gates).
- * Returns null when the submission is missing, or it, its form or its form version is deleted.
+ * Resolve a submission's workspace, form and workflow state by id alone. Returns null when the
+ * submission is missing, or it, its form or its form version is deleted.
  */
 export const getSubmissionWorkspaceAndState = async (
   submissionId: string,

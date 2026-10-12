@@ -11,12 +11,13 @@ import {
   DocumentTemplateType,
   FeatureAvailability,
 } from '../../core/db/codes';
-import {
-  getSubmissionListContext,
-  getSubmissionRecordById,
-} from '../../core/db/repos/submissionRepo';
+import { getSubmissionRecordById } from '../../core/db/repos/submissionRepo';
 import type { CallerIdentity } from '../../core/db/repos/formSubmitAccessRepo';
-import { isSubmitterAllowed, SubmitterOperation } from '../../core/services/submitterAccess';
+import {
+  allowsSubmitterOperation,
+  findSubmissionForCaller,
+  SubmitterOperation,
+} from '../../core/services/submitterAccess';
 import { createDocumentGenerationAudit } from '../../core/db/repos/documentGenerationAuditRepo';
 import {
   getLiveDocumentTemplate,
@@ -167,11 +168,11 @@ async function renderScope(
   caller: CallerIdentity,
   submissionId: string,
 ): Promise<ResolvedScope | 'notfound' | 'denied'> {
-  const scope = await getSubmissionListContext(submissionId);
-  if (!scope) return 'notfound';
-  const target = { ...scope, submissionId };
-  if (!(await isSubmitterAllowed(SubmitterOperation.render, target, caller))) return 'denied';
-  return scope;
+  const loaded = await findSubmissionForCaller(submissionId, caller);
+  if (!loaded) return 'notfound';
+  if (!allowsSubmitterOperation(SubmitterOperation.render, loaded, caller)) return 'denied';
+  const { workspaceId, formId, formVersionId } = loaded.submission;
+  return { workspaceId, formId, formVersionId };
 }
 
 /** Call the backend once, audited: one row per call, success or error. */

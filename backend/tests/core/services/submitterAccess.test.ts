@@ -20,7 +20,7 @@ const mockRead = jest.mocked(findSubmitterSubmission);
 
 const caller = { actorId: 'u1', idpCode: 'idir' };
 const target = { workspaceId: 'ws1', formId: 'f1', submissionId: 's1' };
-const { read, write, deleteSubmittedFile, render } = SubmitterOperation;
+const { read, write, upload, deleteFile, render } = SubmitterOperation;
 const NO_PERMISSIONS = { form: { permissions: [] } };
 const UPDATE = { form: { permissions: [Permissions.submission_update] } };
 
@@ -51,8 +51,14 @@ describe('isSubmitterAllowed', () => {
     [write, {}, true],
     [write, NO_PERMISSIONS, false],
     [write, { role: null }, false],
-    [deleteSubmittedFile, { role: null, workflowState: 'submitted', ...UPDATE }, true],
-    [deleteSubmittedFile, { workflowState: 'submitted' }, false],
+    [upload, {}, true],
+    [upload, { workflowState: 'opened' }, true],
+    [upload, { workflowState: 'submitted' }, false],
+    [upload, NO_PERMISSIONS, false],
+    [deleteFile, {}, true],
+    [deleteFile, { role: null }, false],
+    [deleteFile, { role: null, workflowState: 'submitted', ...UPDATE }, true],
+    [deleteFile, { workflowState: 'submitted' }, false],
     [render, {}, true],
     [render, NO_PERMISSIONS, false],
     [render, { role: null }, false],

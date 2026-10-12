@@ -49,10 +49,7 @@ jest.mock('../../../src/core/db/repos/submissionFileRepo', () => ({
   }),
 }));
 
-// Authorization lookups are mocked; the storage + service logic is exercised for real.
-jest.mock('../../../src/core/db/repos/submissionRepo', () => ({
-  getSubmissionWorkspaceAndState: jest.fn(),
-}));
+// The authorization read is mocked; the storage + service logic is exercised for real.
 jest.mock('../../../src/core/db/repos/submitterSubmissionRepo', () => ({
   findSubmitterSubmission: jest.fn(),
 }));
@@ -64,7 +61,6 @@ jest.mock('../../../src/core/db/repos/featureRepo', () => ({
 import { filesService } from '../../../src/features/files/service';
 import { createFileRecord, deleteFileRecord } from '../../../src/core/db/repos/fileRepo';
 import { linkFileToSubmission } from '../../../src/core/db/repos/submissionFileRepo';
-import { getSubmissionWorkspaceAndState } from '../../../src/core/db/repos/submissionRepo';
 import { findSubmitterSubmission } from '../../../src/core/db/repos/submitterSubmissionRepo';
 import { storedSubmission } from '../../core/api/submit/storedSubmission';
 import { getStorageAdapter } from '../../../src/core/integrations/plugins/PluginRegistry';
@@ -75,7 +71,8 @@ process.env.FILES_STORAGE_PROFILE = 'default';
 process.env.STORAGE_PROFILE_DEFAULT_BACKEND = 'storage-local';
 process.env.STORAGE_PROFILE_DEFAULT_BASE_PATH = tmp;
 
-const submissionMock = getSubmissionWorkspaceAndState as jest.Mock;
+/** The submission's workspace and state as the one read finds it; null when it is not live. */
+const submissionMock = jest.fn();
 const readMock = jest.mocked(findSubmitterSubmission);
 
 const owner = { actorId: 'actor1', idpCode: 'idir' };
@@ -91,11 +88,12 @@ const holding = (codes: string[]) => {
 const readAsStored = async (input: { submissionId: string; actorId: string }) => {
   const live = await submissionMock(input.submissionId);
   if (!live) return null;
-  return storedSubmission({
+  const stored = storedSubmission({
     role: input.actorId === owner.actorId ? 'owner' : null,
     workflowState: live.workflowState,
     form: { permissions: held },
   });
+  return { ...stored, submission: { ...stored.submission, workspaceId: live.workspaceId } };
 };
 
 // upload() returns a discriminated union once antivirus can reject; with the feature off here it is
@@ -158,7 +156,6 @@ describe('filesService', () => {
     }
     expect(got.record.filename).toBe('a.txt');
     expect(await readAll(got.file.downloadStream)).toBe('abc');
-    expect(submissionMock).toHaveBeenCalledWith('sub1');
 
     // Un-submitted: a participant who is still in the submit audience may delete.
     expect(await filesService.deleteForCaller(record.id, owner)).toBe('deleted');
