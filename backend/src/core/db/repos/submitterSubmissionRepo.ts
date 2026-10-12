@@ -1,11 +1,11 @@
 import { and, eq } from 'drizzle-orm';
-import type { SubmissionAccessFacts, SubmitterFormFacts } from '@soba/lib';
+import type { SubmissionAccessFacts } from '@soba/lib';
 import { db, type DbOrTx } from '../client';
 import { PUBLIC_PROVIDER_CODE, SubmissionParticipantStatus } from '../codes';
-import { formVersions, forms, submissionParticipants, submissions } from '../schema';
+import { formVersions, forms, submissionParticipants, submissions, workspaces } from '../schema';
 import { liveSubmission } from './liveRows';
 import type { SubmissionDetailRow } from './submissionRepo';
-import { formFacts } from './submitterFormRepo';
+import { formFacts, type SubmitterFormListRow } from './submitterFormRepo';
 
 /** A live submission as the submit routes read it: its detail, and what the engine reads need. */
 export interface SubmitterSubmissionRow extends SubmissionDetailRow {
@@ -16,17 +16,18 @@ export interface SubmitterSubmissionRow extends SubmissionDetailRow {
   formEngineCode: string;
 }
 
-/** A submission, the caller's standing on it, and its form's facts for the caller. */
+/** A submission, the caller's standing on it, and its form with its facts for the caller. */
 export interface SubmitterSubmission {
   submission: SubmitterSubmissionRow;
   access: SubmissionAccessFacts;
-  form: SubmitterFormFacts;
+  form: SubmitterFormListRow;
 }
 
 /**
  * Everything the submit routes decide on, in one statement: the submission, the caller's active
- * grant, and its form's facts. Null when the submission, its form or its version is deleted. The
- * public user's grant counts; its form permissions are not read, as it belongs to no workspace.
+ * grant, and its form with its facts. Null when the submission, its form or its version is
+ * deleted. The public user's grant counts; its form permissions are not read, as it belongs to no
+ * workspace.
  */
 export const findSubmitterSubmission = async (
   input: { submissionId: string; actorId: string; idpCode?: string | null },
@@ -62,11 +63,13 @@ export const findSubmitterSubmission = async (
           engineSubmissionRef: submissions.engineSubmissionRef,
           engineSchemaRef: formVersions.engineSchemaRef,
           formEngineCode: forms.formEngineCode,
+          workspaceName: workspaces.name,
           role: submissionParticipants.role,
           ...facts.columns,
         })
         .from(submissions)
         .innerJoin(forms, eq(forms.id, submissions.formId))
+        .innerJoin(workspaces, eq(workspaces.id, submissions.workspaceId))
         .innerJoin(formVersions, eq(formVersions.id, submissions.formVersionId))
         .leftJoin(
           submissionParticipants,
@@ -83,6 +86,7 @@ export const findSubmitterSubmission = async (
   if (!row) return null;
 
   const {
+    workspaceName,
     role,
     publishedVersionId,
     permissions,
@@ -94,6 +98,16 @@ export const findSubmitterSubmission = async (
   return {
     submission,
     access: { role, workflowState: submission.workflowState },
-    form: { publishedVersionId, permissions, audienceMode, audienceIdps, allowSubmitterDrafts },
+    form: {
+      id: submission.formId,
+      name: submission.form.name,
+      workspaceId: submission.workspaceId,
+      workspaceName,
+      publishedVersionId,
+      permissions,
+      audienceMode,
+      audienceIdps,
+      allowSubmitterDrafts,
+    },
   };
 };

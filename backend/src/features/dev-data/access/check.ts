@@ -69,6 +69,7 @@ import {
   findLiveSubmitterForm,
   findSubmitterFormFacts,
   listFormsForSubmitter,
+  listSubmitterForms,
   listWorkspacesForSubmitter,
   type SubmitterFormListRow,
 } from '../../../core/db/repos/submitterFormRepo';
@@ -833,8 +834,8 @@ const roleOf = (owner: boolean, participant: boolean): string | null => {
 };
 
 /**
- * The routes decide from one read of the submission. It must hold the role and form facts the
- * separate participant and form reads give, and find the same submissions live.
+ * The routes decide from one read of the submission. It must hold the role the participant read
+ * gives and the form My Forms lists, and find the same submissions live.
  */
 async function submissionReadIssues(
   caller: Caller,
@@ -854,11 +855,10 @@ async function submissionReadIssues(
   const [owner, participant, form, detail] = await Promise.all([
     isActiveOwner(ref.submissionId, actorId),
     isActiveParticipant(ref.submissionId, actorId),
-    findSubmitterFormFacts({
+    listSubmitterForms({
       userId: idpCode === PUBLIC_PROVIDER_CODE ? null : actorId,
-      workspaceId: live.workspaceId,
-      formId: live.formId,
-    }),
+      formIds: [live.formId],
+    }).then((rows) => rows[0]),
     getSubmissionById(live.workspaceId, ref.submissionId),
   ]);
   const issues: string[] = [];
@@ -866,7 +866,7 @@ async function submissionReadIssues(
     issues.push(`${prefix}: the one read's role differs from the participant read`);
   }
   if (!isDeepStrictEqual(read.form, form)) {
-    issues.push(`${prefix}: the one read's form facts differ from the form read`);
+    issues.push(`${prefix}: the one read's form differs from the My Forms row`);
   }
   if (!detail || !isDeepStrictEqual(toSubmissionDto(read.submission), toSubmissionDto(detail))) {
     issues.push(`${prefix}: the one read's submission differs from the detail read`);

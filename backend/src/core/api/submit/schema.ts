@@ -26,6 +26,7 @@ import {
   ListMySubmissionsResponseSchema as LibListMySubmissionsResponseSchema,
   MyFormSortSchema as LibMyFormSortSchema,
   MyFormListItemSchema as LibMyFormListItemSchema,
+  SubmitterFormSchema as LibSubmitterFormSchema,
   ListMyFormsResponseSchema as LibListMyFormsResponseSchema,
   MyWorkspaceLookupItemSchema as LibMyWorkspaceLookupItemSchema,
   MyWorkspaceLookupResponseSchema as LibMyWorkspaceLookupResponseSchema,
@@ -33,8 +34,8 @@ import {
 
 extendZodWithOpenApi(z);
 
-export const SubmitFillBundleSchema =
-  LibSubmitFillBundleSchema.clone().openapi('Submit_FillBundle');
+/** A form as a submitter sees it: what it is, and its facts for the caller. */
+export const SubmitterFormSchema = LibSubmitterFormSchema.clone().openapi('Submit_SubmitterForm');
 
 export const MyFormSortSchema = LibMyFormSortSchema.clone().openapi('Submit_MyFormSort', {
   description: 'Valid My Forms sort tokens: `field:asc` or `field:desc`.',
@@ -91,6 +92,19 @@ export const ListMySubmissionsQuerySchema = z
 
 export const MySubmissionRoleSchema =
   LibMySubmissionRoleSchema.clone().openapi('Submit_MySubmissionRole');
+
+export const SubmitFillBundleSchema = LibSubmitFillBundleSchema.extend({
+  role: MySubmissionRoleSchema,
+  form: SubmitterFormSchema,
+  canWrite: z.boolean().openapi({
+    deprecated: true,
+    description: 'Whether the caller may edit and submit; role, workflowState and form give it.',
+  }),
+  canSaveDraft: z.boolean().openapi({
+    deprecated: true,
+    description: 'Whether the caller may save a draft; role, workflowState and form give it.',
+  }),
+}).openapi('Submit_FillBundle');
 
 export const MySubmissionListItemSchema = LibMySubmissionListItemSchema.extend({
   workflowState: MySubmissionStateSchema,

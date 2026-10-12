@@ -102,9 +102,23 @@ describe('submit routes over one read', () => {
     const res = await signedIn().get(`${BASE}/s1/fill`);
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
+      formId: 'f1',
       workflowState: 'draft',
       formVersionId: 'v1',
       headRevisionId: 'r1',
+      currentRevisionNo: 1,
+      role: 'owner',
+      form: {
+        id: 'f1',
+        name: 'Permit application',
+        workspaceId: 'ws1',
+        workspaceName: 'Roads',
+        publishedVersionId: 'v1',
+        permissions: ['submission_create', 'document_template_read'],
+        audienceMode: 'members',
+        audienceIdps: [],
+        allowSubmitterDrafts: true,
+      },
       schema: { components: [] },
       content: { data: { a: 1 } },
       canWrite: true,
@@ -119,6 +133,13 @@ describe('submit routes over one read', () => {
       engineSchemaRef: 'engine-form',
       engineSubmissionRef: 'engine-submission',
     });
+  });
+
+  it("reports a collaborator's role in the fill bundle", async () => {
+    mockRead.mockResolvedValue(storedSubmission({ role: 'collaborator' }));
+    const res = await signedIn().get(`${BASE}/s1/fill`);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ role: 'collaborator', canWrite: true });
   });
 
   it.each([

@@ -1,12 +1,18 @@
 import { Response } from 'express';
 import { z } from 'zod';
-import { canSaveDraftOnSubmission, canWriteSubmission, type SubmitFillBundle } from '@soba/lib';
+import {
+  canSaveDraftOnSubmission,
+  canWriteSubmission,
+  type MySubmissionRole,
+  type SubmitFillBundle,
+} from '@soba/lib';
 import { asyncHandler } from '../shared/asyncHandler';
 import { NotFoundError } from '../../errors';
 import { formsApiService, formVersionService, submissionsApiService } from '../../container';
 import type { SubmitterSubmissionRow } from '../../db/repos/submitterSubmissionRepo';
 import { resolveCaller } from '../../middleware/actor';
 import { loadedSubmission } from '../../middleware/formSubmitAccess';
+import { toSubmitterFormDto } from '../forms/serviceFactory';
 import { toSubmissionDto } from '../submissions/serviceFactory';
 import { workspacesApiService } from '../workspaces/service';
 import type { Request } from 'express';
@@ -54,9 +60,9 @@ export const getSubmitSubmissionSchema = asyncHandler(async (req: Request, res: 
 
 /**
  * The one payload the fill page needs for an in-progress submission: its workflow state, form
- * version and schema, head revision (the base for the next write), any saved answers, and whether the
- * caller may write and save a draft. `content` is null for a just-`opened` submission (no engine
- * document yet), so the client renders an empty form without a second, 404-ing data call.
+ * version and schema, head revision (the base for the next write), any saved answers, the caller's
+ * role, and the form with its facts, from one read. `content` is null for a just-`opened` submission
+ * (no engine document yet), so the client renders an empty form without a second, 404-ing data call.
  */
 export const getSubmitFillBundle = asyncHandler(async (req: Request, res: Response) => {
   const { submission, access, form } = loadedSubmission(req);
@@ -65,9 +71,14 @@ export const getSubmitFillBundle = asyncHandler(async (req: Request, res: Respon
   const schema = await readOwnSchema(submission);
   const content = await readContent(submission);
   const bundle: SubmitFillBundle = {
+    formId: submission.formId,
     workflowState: submission.workflowState,
     formVersionId: submission.formVersionId,
     headRevisionId: submission.headRevisionId,
+    currentRevisionNo: submission.currentRevisionNo,
+    // The read guard refuses a caller without a grant, and the database holds only these roles.
+    role: access.role as MySubmissionRole,
+    form: toSubmitterFormDto(form),
     schema,
     content: content ?? null,
     canWrite: canWriteSubmission(access, form, caller),

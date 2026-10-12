@@ -1,4 +1,4 @@
-import type { SubmitterFormFacts } from '@soba/lib';
+import type { SubmitterFormListRow } from '../../../../src/core/db/repos/submitterFormRepo';
 import type { SubmitterSubmission } from '../../../../src/core/db/repos/submitterSubmissionRepo';
 
 /**
@@ -9,7 +9,7 @@ export const storedSubmission = (
   overrides: {
     role?: string | null;
     workflowState?: string;
-    form?: Partial<SubmitterFormFacts>;
+    form?: Partial<SubmitterFormListRow>;
   } = {},
 ): SubmitterSubmission => {
   const workflowState = overrides.workflowState ?? 'draft';
@@ -37,6 +37,10 @@ export const storedSubmission = (
     },
     access: { role: overrides.role === undefined ? 'owner' : overrides.role, workflowState },
     form: {
+      id: 'f1',
+      name: 'Permit application',
+      workspaceId: 'ws1',
+      workspaceName: 'Roads',
       publishedVersionId: 'v1',
       permissions: ['submission_create', 'document_template_read'],
       audienceMode: 'members',
