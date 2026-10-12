@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
   instance: {
     emit: vi.fn(),
     submit: vi.fn(),
+    setSubmission: vi.fn(),
     get submission() {
       return { data: h.formData };
     },
@@ -67,18 +68,23 @@ vi.mock('@/src/features/formio-v5/useBcgovFileOption', () => ({
   useBcgovFileOption: () => ({}),
 }));
 
-vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => ({
-  DynamicForm: (props: {
+vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => {
+  // Like @formio/react: onFormReady once, when the webform is built.
+  function MockDynamicForm(props: {
     onSubmit: typeof h.onSubmit;
     options: typeof h.options;
     onFormReady?: (instance: unknown) => void;
-  }) => {
+  }) {
     h.onSubmit = props.onSubmit;
     h.options = props.options;
-    props.onFormReady?.(h.instance);
+    const { onFormReady } = props;
+    React.useEffect(() => {
+      onFormReady?.(h.instance);
+    }, [onFormReady]);
     return <div data-testid="fill-form">rendered</div>;
-  },
-}));
+  }
+  return { DynamicForm: MockDynamicForm };
+});
 
 import makeStore from '@/lib/store';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
@@ -94,6 +100,7 @@ describe('FormioV5SubmissionFillClient', () => {
     vi.clearAllMocks();
     store = makeStore();
     h.formData = {};
+    h.instance.setSubmission.mockResolvedValue(undefined);
     h.getSubmitFillBundle.mockResolvedValue({
       workflowState: 'opened',
       formVersionId: 'ver-1',
@@ -327,7 +334,12 @@ describe('FormioV5SubmissionFillClient', () => {
       await answerInit(store, { authenticated: false });
       await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
     };
-    const saveDraft = () => userEvent.click(screen.getByTestId('submission-fill-save-draft'));
+    const saveButton = () => screen.getByTestId('submission-fill-save-draft');
+    const renderLoaded = async () => {
+      await renderReady();
+      await waitFor(() => expect(saveButton()).toBeEnabled());
+    };
+    const saveDraft = () => userEvent.click(saveButton());
     const savedBody = (call: number) =>
       h.saveSobaFormSubmission.mock.calls[call][2] as {
         data: Record<string, unknown>;
@@ -351,10 +363,27 @@ describe('FormioV5SubmissionFillClient', () => {
       expect(screen.queryByTestId('submission-fill-actions')).not.toBeInTheDocument();
     });
 
+    it('keeps Save draft disabled, and sends nothing, until the loaded answers are in the form', async () => {
+      let applied: (value?: unknown) => void = () => undefined;
+      h.instance.setSubmission.mockReturnValue(
+        new Promise((resolve) => {
+          applied = resolve;
+        }),
+      );
+      h.getSubmitFillBundle.mockResolvedValue(bundle({ content: { data: { a: 1 } } }));
+      await renderReady();
+      expect(h.instance.setSubmission).toHaveBeenCalledWith({ data: { a: 1 } });
+      expect(saveButton()).toBeDisabled();
+      await saveDraft();
+      expect(h.saveSobaFormSubmission).not.toHaveBeenCalled();
+      await act(async () => applied());
+      expect(saveButton()).toBeEnabled();
+    });
+
     it('saves the current answers based on the loaded head', async () => {
       h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-1'));
       h.formData = { a: 1 };
-      await renderReady();
+      await renderLoaded();
       await saveDraft();
       await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(1));
       expect(savedBody(0)).toEqual({
@@ -369,7 +398,7 @@ describe('FormioV5SubmissionFillClient', () => {
       h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-1'));
       h.submitSobaFormSubmission.mockResolvedValue(saveResponse('rev-2'));
       h.formData = { a: 1 };
-      await renderReady();
+      await renderLoaded();
       await saveDraft();
       await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(1));
       h.formData = { a: 2 };
@@ -385,7 +414,7 @@ describe('FormioV5SubmissionFillClient', () => {
     it('mints a new revision id for an unchanged save after a successful one', async () => {
       h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-1'));
       h.formData = { a: 1 };
-      await renderReady();
+      await renderLoaded();
       await saveDraft();
       await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(1));
       await saveDraft();
@@ -397,7 +426,7 @@ describe('FormioV5SubmissionFillClient', () => {
       h.saveSobaFormSubmission.mockRejectedValueOnce(new Error('Failed to fetch'));
       h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-1'));
       h.formData = { a: 1 };
-      await renderReady();
+      await renderLoaded();
       await saveDraft();
       await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(1));
       await saveDraft();
@@ -410,7 +439,7 @@ describe('FormioV5SubmissionFillClient', () => {
         ...saveResponse('rev-1'),
         workflowState: 'submitted',
       });
-      await renderReady();
+      await renderLoaded();
       await saveDraft();
       await waitFor(() => expect(h.replace).toHaveBeenCalledWith('/en/submission/sub-1'));
       expect(notices()).toEqual(['Already submitted.']);
@@ -418,7 +447,7 @@ describe('FormioV5SubmissionFillClient', () => {
 
     it('does not reload the form after a save', async () => {
       h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-1'));
-      await renderReady();
+      await renderLoaded();
       await saveDraft();
       await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(1));
       expect(h.getSubmitFillBundle).toHaveBeenCalledTimes(1);
@@ -428,7 +457,7 @@ describe('FormioV5SubmissionFillClient', () => {
       h.saveSobaFormSubmission.mockRejectedValue(
         new ApiError('Drafts are not enabled for this form', 403),
       );
-      await renderReady();
+      await renderLoaded();
       await saveDraft();
       await waitFor(() =>
         expect(screen.getByTestId('submission-fill-render-error')).toHaveTextContent(
@@ -439,7 +468,7 @@ describe('FormioV5SubmissionFillClient', () => {
 
     it('offers to reload or keep the filler version when the save conflicts', async () => {
       h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-x', 'pending', 'conflict'));
-      await renderReady();
+      await renderLoaded();
       await saveDraft();
       await waitFor(() =>
         expect(screen.getByTestId('submission-fill-held')).toHaveTextContent(
@@ -451,7 +480,7 @@ describe('FormioV5SubmissionFillClient', () => {
 
     it('disables Save draft while the held notice shows', async () => {
       h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-x', 'pending', 'conflict'));
-      await renderReady();
+      await renderLoaded();
       await saveDraft();
       await waitFor(() => expect(screen.getByTestId('submission-fill-held')).toBeInTheDocument());
       expect(screen.getByTestId('submission-fill-save-draft')).toBeDisabled();
@@ -464,7 +493,7 @@ describe('FormioV5SubmissionFillClient', () => {
           finishSave = resolve;
         }),
       );
-      await renderReady();
+      await renderLoaded();
       await saveDraft();
       const submitting = act(() => h.onSubmit!({ data: { a: 1 } }));
       finishSave(saveResponse('rev-x', 'pending', 'conflict'));
@@ -477,7 +506,7 @@ describe('FormioV5SubmissionFillClient', () => {
       h.saveSobaFormSubmission.mockResolvedValueOnce(saveResponse('rev-x', 'pending', 'conflict'));
       h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-10'));
       h.formData = { a: 1 };
-      await renderReady();
+      await renderLoaded();
       await saveDraft();
       await waitFor(() => expect(screen.getByTestId('submission-fill-held')).toBeInTheDocument());
       h.getSubmitFillBundle.mockResolvedValueOnce(bundle({ headRevisionId: 'rev-9' }));
@@ -490,7 +519,7 @@ describe('FormioV5SubmissionFillClient', () => {
 
     it('reloads the latest version when the filler discards theirs', async () => {
       h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-x', 'pending', 'conflict'));
-      await renderReady();
+      await renderLoaded();
       await saveDraft();
       await waitFor(() => expect(screen.getByTestId('submission-fill-held')).toBeInTheDocument());
       h.getSubmitFillBundle.mockResolvedValue(bundle({ headRevisionId: 'rev-9' }));
@@ -505,7 +534,7 @@ describe('FormioV5SubmissionFillClient', () => {
 
     it('disables both held actions while one is running', async () => {
       h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-x', 'pending', 'conflict'));
-      await renderReady();
+      await renderLoaded();
       await saveDraft();
       await waitFor(() => expect(screen.getByTestId('submission-fill-held')).toBeInTheDocument());
       h.getSubmitFillBundle.mockReturnValueOnce(new Promise(() => undefined));
@@ -517,7 +546,7 @@ describe('FormioV5SubmissionFillClient', () => {
 
     it('leaves with a notice when keeping theirs finds the record submitted', async () => {
       h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-x', 'pending', 'conflict'));
-      await renderReady();
+      await renderLoaded();
       await saveDraft();
       await waitFor(() => expect(screen.getByTestId('submission-fill-held')).toBeInTheDocument());
       h.getSubmitFillBundle.mockResolvedValueOnce(bundle({ workflowState: 'submitted' }));
@@ -534,7 +563,7 @@ describe('FormioV5SubmissionFillClient', () => {
         }),
       );
       h.submitSobaFormSubmission.mockResolvedValue(saveResponse('rev-2'));
-      await renderReady();
+      await renderLoaded();
       await saveDraft();
       const submitting = act(() => h.onSubmit!({ data: { a: 1 } }));
       expect(h.submitSobaFormSubmission).not.toHaveBeenCalled();
@@ -547,7 +576,7 @@ describe('FormioV5SubmissionFillClient', () => {
 
     it('leaves for the submission view when the record was already submitted', async () => {
       h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-x', 'pending', 'closed'));
-      await renderReady();
+      await renderLoaded();
       await saveDraft();
       await waitFor(() => expect(h.replace).toHaveBeenCalledWith('/en/submission/sub-1'));
     });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useRouter, usePathname } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Submission } from '@formio/react';
 import type { FormType } from '@formio/react';
 import { Button, InlineAlert } from '@bcgov/design-system-react-components';
@@ -47,7 +47,8 @@ type Busy = WriteKind | 'resolve';
 type FormInstance = {
   emit: (event: string, ...args: unknown[]) => void;
   submit: () => Promise<unknown>;
-  submission?: { data?: Record<string, unknown> };
+  setSubmission: (submission: { data: Record<string, unknown> }) => Promise<unknown>;
+  submission: { data?: Record<string, unknown> };
 };
 
 /**
@@ -80,6 +81,8 @@ function SubmissionFillBody({
   // The live Form.io webform: a save reads its answers, "Submit my version" submits it, and a failed
   // submit must emit on it or its button spins forever.
   const formInstanceRef = useRef<FormInstance | null>(null);
+  // True once the loaded answers are in the webform.
+  const [formReady, setFormReady] = useState(false);
   // A submit waits for an in-flight save, so it is based on the revision that save produces.
   const saveInFlightRef = useRef<Promise<void> | null>(null);
   const [writing, setWriting] = useState<Busy | null>(null);
@@ -126,6 +129,12 @@ function SubmissionFillBody({
     () => ({ data: (fillableBundle?.content?.data ?? {}) as Submission['data'] }),
     [fillableBundle],
   );
+  // onFormReady reads this, since a new onFormReady identity makes @formio/react rebuild the
+  // webform. A layout effect, so it is current before any child effect runs.
+  const loadedSubmissionRef = useRef(submissionProp);
+  useLayoutEffect(() => {
+    loadedSubmissionRef.current = submissionProp;
+  }, [submissionProp]);
   // We own all submit messaging (success toast + redirect, inline error), so suppress Form.io's
   // built-in green "Submission Complete" alert.
   const formOptions = useMemo(
@@ -133,8 +142,11 @@ function SubmissionFillBody({
     [bcgovFileOption, canWrite],
   );
 
+  // @formio/react applies the submission prop only after this callback, and Form.io applies it
+  // asynchronously, so the loaded answers are set here and saving waits for them.
   const onFormReady = useCallback((instance: FormInstance) => {
     formInstanceRef.current = instance;
+    void instance.setSubmission(loadedSubmissionRef.current).then(() => setFormReady(true));
   }, []);
 
   // `closed`: submitted elsewhere, so there is nothing left to fill.
@@ -152,10 +164,10 @@ function SubmissionFillBody({
 
   const runSave = async () => {
     const base = baseRevisionIdRef.current;
-    if (!base) return;
+    const instance = formReady ? formInstanceRef.current : null;
+    if (!base || !instance) return;
     setRenderError(null);
-    const data = formInstanceRef.current?.submission?.data ?? {};
-    const outcome = await writer.save(token ?? undefined, data, base);
+    const outcome = await writer.save(token ?? undefined, instance.submission.data ?? {}, base);
     if (outcome.status === 'applied') {
       baseRevisionIdRef.current = outcome.value.revision.id;
       markHeld(null);
@@ -311,7 +323,7 @@ function SubmissionFillBody({
             onPress={() => {
               saveDraft().catch(writeError);
             }}
-            isDisabled={writing !== null || held !== null}
+            isDisabled={!formReady || writing !== null || held !== null}
             data-testid="submission-fill-save-draft"
           >
             {writing === 'save' ? labels.savingDraft : labels.saveDraft}
