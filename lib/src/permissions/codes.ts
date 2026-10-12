@@ -61,3 +61,30 @@ export const DraftSaveStatus = {
   public: 'public',
 } as const;
 export type DraftSaveStatusCode = (typeof DraftSaveStatus)[keyof typeof DraftSaveStatus];
+
+/** Whether a change goes ahead, is refused for this caller, or is refused for the target's state. */
+export const SubmissionChangeStatus = {
+  allowed: 'allowed',
+  denied: 'denied',
+  closed: 'closed',
+} as const;
+export type SubmissionChangeStatusCode =
+  (typeof SubmissionChangeStatus)[keyof typeof SubmissionChangeStatus];
+
+/**
+ * Why a submit-mode request was refused. A `*_denied` refusal is 401 for an anonymous caller and 403
+ * otherwise; `drafts_*` is 403; `*_closed` is 409; `not_published` is 404.
+ */
+export const SubmitRefusal = {
+  open_denied: 'open_denied',
+  read_denied: 'read_denied',
+  write_denied: 'write_denied',
+  render_denied: 'render_denied',
+  delete_denied: 'delete_denied',
+  drafts_disabled: 'drafts_disabled',
+  drafts_public: 'drafts_public',
+  upload_closed: 'upload_closed',
+  delete_closed: 'delete_closed',
+  not_published: 'not_published',
+} as const;
+export type SubmitRefusalCode = (typeof SubmitRefusal)[keyof typeof SubmitRefusal];

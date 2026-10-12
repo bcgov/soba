@@ -21,6 +21,7 @@ import { canDeleteOwnSubmission, isSubmissionInProgress } from '@/src/shared/uti
 import { fillTemplate } from '@/src/shared/util/stringUtils';
 import { useFormatLongDateTime } from '@/src/shared/hooks/useFormatLongDate';
 import { isConflict } from '@/src/shared/api/dataError';
+import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useDataErrorNotice } from '@/src/shared/api/useDataErrorNotice';
 import { MY_SUBMISSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { useListQuery } from '@/src/shared/list/useListQuery';
@@ -51,6 +52,7 @@ export function MySubmissionsList() {
   const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
   const formatDateTime = useFormatLongDateTime();
+  const idpCode = useCurrentUser().data?.profile.idpCode ?? null;
 
   const listQuery = useListQuery(MY_SUBMISSIONS_LIST_QUERY);
   const rawState = listQuery.filters.state;
@@ -206,7 +208,7 @@ export function MySubmissionsList() {
               >
                 {inProgress ? dictMine.continue : dictMine.view}
               </RowActionButton>
-              {canDeleteOwnSubmission(item) ? (
+              {canDeleteOwnSubmission(item, { idpCode }) ? (
                 <RowActionButton
                   aria-label={fillTemplate(dictMine.deleteLabel, values)}
                   data-testid={`${item.id}-delete`}
@@ -220,7 +222,7 @@ export function MySubmissionsList() {
         },
       },
     ],
-    [dictMine, formatDateTime, labelValues, openSubmission],
+    [dictMine, formatDateTime, idpCode, labelValues, openSubmission],
   );
 
   // Loading, including Keycloak init, shows inside the table so the heading stays put.

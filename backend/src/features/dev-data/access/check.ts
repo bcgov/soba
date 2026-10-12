@@ -17,7 +17,7 @@ import {
   Permissions,
   PUBLIC_PROVIDER_CODE,
   type PermissionCode,
-  type SubmitterSubmissionFacts,
+  type SubmissionAccessFacts,
 } from '@soba/lib';
 
 import { db } from '../../../core/db/client';
@@ -196,7 +196,7 @@ async function myWorkspaceIds(caller: Caller): Promise<Set<string>> {
 }
 
 /** My Submissions rows, by submission id. */
-async function mySubmissionRows(caller: Caller): Promise<Map<string, SubmitterSubmissionFacts>> {
+async function mySubmissionRows(caller: Caller): Promise<Map<string, SubmissionAccessFacts>> {
   const actorId = signedInActorId(caller);
   if (!actorId) return new Map();
   const { items } = await listSubmissionsForParticipant({
@@ -240,7 +240,7 @@ async function formAnswers(
 async function submissionAnswers(
   caller: Caller,
   ref: CoverageSubmissionRef,
-  mine: Map<string, SubmitterSubmissionFacts>,
+  mine: Map<string, SubmissionAccessFacts>,
 ): Promise<Record<SubmissionCheck, boolean>> {
   const live = await getSubmissionWorkspaceAndState(ref.submissionId);
   const allows = async (operation: keyof typeof SubmitterOperation) =>
@@ -784,10 +784,10 @@ async function checkWorkspaces(
 const rowDeleteIssue = (
   caller: Caller,
   key: CoverageSubmissionKey,
-  row: SubmitterSubmissionFacts | undefined,
+  row: SubmissionAccessFacts | undefined,
   answers: Record<SubmissionCheck, boolean>,
 ): string[] =>
-  row && canDeleteOwnSubmission(row) !== answers.delete
+  row && canDeleteOwnSubmission(row, caller.identity) !== answers.delete
     ? [`${caller.persona} x ${key}: My Submissions row Delete differs from the delete rule`]
     : [];
 

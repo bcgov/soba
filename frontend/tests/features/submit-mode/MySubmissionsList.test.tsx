@@ -3,13 +3,20 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const { kc, search } = vi.hoisted(() => ({
+const { kc, search, me } = vi.hoisted(() => ({
   kc: { authenticated: true, initializing: false },
   search: { value: '' },
+  me: { idpCode: 'idir' as string | null },
 }));
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
   useKeycloak: () => ({ ...kc, token: 'token' }),
+}));
+
+vi.mock('@/src/shared/api/useCurrentUser', () => ({
+  useCurrentUser: () => ({
+    data: me.idpCode ? { profile: { idpCode: me.idpCode } } : null,
+  }),
 }));
 
 vi.mock('@/app/[lang]/Providers', () => ({
@@ -181,6 +188,7 @@ describe('MySubmissionsList', () => {
     search.value = '';
     kc.authenticated = true;
     kc.initializing = false;
+    me.idpCode = 'idir';
     store = makeStore();
     store.dispatch(setToken('token'));
     store.dispatch(setAuthenticated(true));
@@ -252,6 +260,13 @@ describe('MySubmissionsList', () => {
     expect(screen.queryByTestId('s2-continue')).not.toBeInTheDocument();
     expect(screen.getByTestId('s3-continue')).toBeInTheDocument();
     expect(screen.queryByTestId('s3-delete')).not.toBeInTheDocument();
+  });
+
+  it('offers no delete until the caller is known', async () => {
+    me.idpCode = null;
+    await renderList();
+    expect(await screen.findByTestId('s1-continue')).toBeInTheDocument();
+    expect(screen.queryByTestId('s1-delete')).not.toBeInTheDocument();
   });
 
   it.each([

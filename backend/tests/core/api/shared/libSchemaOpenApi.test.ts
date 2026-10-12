@@ -134,4 +134,35 @@ describe('OpenAPI components for lib-backed schemas', () => {
       ref('Forms_FormResponse'),
     );
   });
+
+  // The My Forms row is the lib's submitter form; clients read these fields as-is.
+  it('keeps the My Forms row shape', () => {
+    const text = { type: 'string' };
+    const textList = { type: 'array', items: text };
+    expect(at(schemas, 'Submit_MyFormListItem')).toEqual({
+      type: 'object',
+      properties: {
+        id: text,
+        name: text,
+        workspaceId: text,
+        workspaceName: text,
+        publishedVersionId: { ...text, nullable: true },
+        permissions: textList,
+        audienceMode: { ...text, nullable: true, enum: ['public', 'protected', 'members', null] },
+        audienceIdps: textList,
+        allowSubmitterDrafts: { type: 'boolean' },
+      },
+      required: [
+        'id',
+        'name',
+        'workspaceId',
+        'workspaceName',
+        'publishedVersionId',
+        'permissions',
+        'audienceMode',
+        'audienceIdps',
+        'allowSubmitterDrafts',
+      ],
+    });
+  });
 });
