@@ -6,8 +6,11 @@ import { and, eq, inArray } from 'drizzle-orm';
 import {
   audienceAdmits,
   canDeleteOwnSubmission,
+  canReadSubmission,
+  canRenderSubmission,
   canSaveSubmissionDraft,
   canStartSubmission,
+  canWriteSubmission,
   DEFAULT_SORT_LOCALE,
   DraftSaveStatus,
   draftSaveStatusOf,
@@ -68,6 +71,7 @@ import {
   listWorkspacesForSubmitter,
   type SubmitterFormListRow,
 } from '../../../core/db/repos/submitterFormRepo';
+import { findSubmitterSubmission } from '../../../core/db/repos/submitterSubmissionRepo';
 import { isSubmitterAllowed, SubmitterOperation } from '../../../core/services/submitterAccess';
 import { ValidationError } from '../../../core/errors';
 import { getDraftSaveStatus } from '../../form-settings/submitter/drafts';
@@ -791,6 +795,40 @@ const rowDeleteIssue = (
     ? [`${caller.persona} x ${key}: My Submissions row Delete differs from the delete rule`]
     : [];
 
+/** The lib rules over one read of the submission must give the routes' answers. */
+async function submissionReadIssues(
+  caller: Caller,
+  key: CoverageSubmissionKey,
+  ref: CoverageSubmissionRef,
+  answers: Record<SubmissionCheck, boolean>,
+): Promise<string[]> {
+  const { actorId, idpCode } = caller.identity;
+  if (!actorId) return [];
+  const prefix = `${caller.persona} x ${key}`;
+  const [read, live] = await Promise.all([
+    findSubmitterSubmission({ submissionId: ref.submissionId, actorId, idpCode }),
+    getSubmissionWorkspaceAndState(ref.submissionId),
+  ]);
+  if (!read || !live) {
+    return !read === !live ? [] : [`${prefix}: the one read and the routes disagree on liveness`];
+  }
+  const fromRead = {
+    read: canReadSubmission(read.access),
+    write: canWriteSubmission(read.access, read.form, caller.identity),
+    delete: canDeleteOwnSubmission(read.access, caller.identity),
+    render: canRenderSubmission(read.access, read.form, caller.identity),
+  };
+  const fromRoutes = {
+    read: answers.read,
+    write: answers.write,
+    delete: answers.delete,
+    render: await isSubmitterAllowed(SubmitterOperation.render, ref, caller.identity),
+  };
+  return (Object.keys(fromRead) as Array<keyof typeof fromRead>)
+    .filter((check) => fromRead[check] !== fromRoutes[check])
+    .map((check) => `${prefix}: ${check} from the one read differs from the route`);
+}
+
 async function checkSubmissions(
   manifest: CoverageManifest,
   caller: Caller,
@@ -807,7 +845,10 @@ async function checkSubmissions(
           actual: answers,
           expected: expectedOf(SUBMISSION_CHECKS, SUBMISSION_EXPECTATIONS[key], caller.persona),
         },
-        issues: rowDeleteIssue(caller, key, mine.get(ref.submissionId), answers),
+        issues: [
+          ...rowDeleteIssue(caller, key, mine.get(ref.submissionId), answers),
+          ...(await submissionReadIssues(caller, key, ref, answers)),
+        ],
       };
     }),
   );

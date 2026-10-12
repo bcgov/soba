@@ -175,7 +175,7 @@ const NO_PERMISSIONS = sql<string[]>`'{}'::text[]`;
  * The facts columns for the forms in `scope`, and the joins they read. Permissions are read only for
  * a user; the public user belongs to no workspace, so it has none.
  */
-const formFacts = (
+export const formFacts = (
   userId: string | null,
   scope: { workspaceId?: string; formIds: string[] | SQLWrapper },
 ) => {
