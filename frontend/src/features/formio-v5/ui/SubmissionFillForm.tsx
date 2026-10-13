@@ -1,15 +1,18 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormType, Submission } from '@formio/react';
 import { Button, InlineAlert } from '@bcgov/design-system-react-components';
 import type { ApiErrorCode } from '@soba/lib';
 import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFormioRenderError';
 import { FormioV5FormRenderErrorBoundary } from '@/src/features/formio-v5/ui/FormioV5FormRenderErrorBoundary';
 import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
-import { useSubmissionWriter } from '@/src/features/formio-v5/data/useSubmissionWriter';
-import { useKeycloak } from '@/lib/hooks/useKeycloak';
+import { BLOCKED_REASON, useFillWriter } from '@/src/features/formio-v5/data/useFillWriter';
+import {
+  clearActiveSubmission,
+  setActiveSubmission,
+} from '@/src/features/formio-v5/activeSubmission';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { apiErrorMessage } from '@/src/shared/api/dataError';
 import type { SubmitFillBundle } from '@/src/types/forms';
@@ -43,10 +46,6 @@ export type FillView = {
   fileOption: Record<string, unknown>;
 };
 
-type WriteKind = 'save' | 'submit';
-// `resolve`: reloading or writing over after a held write.
-type Busy = WriteKind | 'resolve';
-
 type FormInstance = {
   emit: (event: string, ...args: unknown[]) => void;
   submit: () => Promise<unknown>;
@@ -75,31 +74,25 @@ export function SubmissionFillForm({
   onReload: () => Promise<void>;
 }>) {
   const [{ snapshot, canWrite, canSaveDraft, fileOption }] = useState(view);
-  // Token is optional: a submission opened anonymously is fillable without signing in.
-  const { token } = useKeycloak();
   const { addNotification } = useNotificationStore();
   const router = useRouter();
-  const writer = useSubmissionWriter(submissionId);
+  const writer = useFillWriter(submissionId, snapshot.headRevisionId);
+  const { busy, held } = writer.status;
 
   const [renderError, setRenderError] = useState<string | null>(null);
-  // The head revision each write is based on: the loaded head, then each applied save.
-  const baseRevisionIdRef = useRef<string | null>(snapshot.headRevisionId);
   // The live Form.io webform: a save reads its answers, "Submit my version" submits it, and a failed
   // submit must emit on it or its button spins forever.
   const formInstanceRef = useRef<FormInstance | null>(null);
   // True once the loaded answers are in the webform.
   const [formReady, setFormReady] = useState(false);
-  // A submit waits for an in-flight save, so it is based on the revision that save produces.
-  const saveInFlightRef = useRef<Promise<void> | null>(null);
-  const [writing, setWriting] = useState<Busy | null>(null);
-  // The write held because the record changed elsewhere. Until the filler reloads or writes over it,
-  // saves and submits are refused. The ref gives a submit that waited on a save the current value.
-  const [held, setHeld] = useState<WriteKind | null>(null);
-  const heldRef = useRef<WriteKind | null>(null);
-  const markHeld = (kind: WriteKind | null) => {
-    heldRef.current = kind;
-    setHeld(kind);
-  };
+
+  // Expose the submission being filled, and its session, to the CHEFS upload provider; clear it when
+  // leaving so a stale id can't tag an unrelated upload (e.g. a designer preview).
+  const { signedIn } = writer;
+  useEffect(() => {
+    setActiveSubmission({ submissionId, signedIn });
+    return () => clearActiveSubmission();
+  }, [submissionId, signedIn]);
 
   const schema = snapshot.schema as FormType;
   // Built from the snapshot, so they keep their identity for the life of the form: Form.io resets
@@ -125,14 +118,10 @@ export function SubmissionFillForm({
     [submissionProp],
   );
 
-  // `closed`: submitted elsewhere, so there is nothing left to fill.
-  const onHeld = (kind: WriteKind, reason: string) => {
-    if (reason === 'closed') {
-      addNotification({ text: labels.alreadySubmitted, type: 'warning' });
-      router.replace(submissionPath);
-      return;
-    }
-    markHeld(kind);
+  // Submitted elsewhere, so there is nothing left to fill.
+  const leaveClosed = () => {
+    addNotification({ text: labels.alreadySubmitted, type: 'warning' });
+    router.replace(submissionPath);
   };
 
   const writeError = (err: unknown) =>
@@ -141,99 +130,73 @@ export function SubmissionFillForm({
         normalizeFormioRenderError(err, labels.rendererError, labels.sessionExpired),
     );
 
-  const runSave = async () => {
-    const base = baseRevisionIdRef.current;
-    const instance = formReady ? formInstanceRef.current : null;
-    if (!base || !instance) return;
-    setRenderError(null);
-    const outcome = await writer.save(token ?? undefined, instance.submission.data ?? {}, base);
-    if (outcome.status === 'applied') {
-      baseRevisionIdRef.current = outcome.value.revision.id;
-      markHeld(null);
-      addNotification({ text: labels.draftSaved, type: 'success' });
-    } else if (outcome.status === 'held') {
-      onHeld('save', outcome.reason);
-    }
-  };
+  // Releases Form.io's submit button without its success state.
+  const releaseSubmit = (message = '') => formInstanceRef.current?.emit('submitError', message);
 
   // Saves the answers as they are, without Form.io's validation.
   const saveDraft = async () => {
-    setWriting('save');
-    const run = runSave().catch(writeError);
-    saveInFlightRef.current = run;
-    await run;
-    saveInFlightRef.current = null;
-    setWriting(null);
+    const instance = formReady ? formInstanceRef.current : null;
+    if (!instance || !writer.hasBase()) return;
+    setRenderError(null);
+    const outcome = await writer.save(instance.submission.data ?? {});
+    switch (outcome.status) {
+      case 'applied':
+        addNotification({ text: labels.draftSaved, type: 'success' });
+        break;
+      case 'held':
+        // A conflict shows the held notice from the writer's status; a blocked save sent nothing.
+        if (outcome.reason === 'closed') leaveClosed();
+        break;
+      case 'queued':
+        // Not sent yet: no notice.
+        break;
+    }
   };
 
   const submitForm = async (submission: Submission) => {
-    await saveInFlightRef.current;
-    if (heldRef.current) {
-      formInstanceRef.current?.emit('submitError', '');
-      return;
-    }
-    const base = baseRevisionIdRef.current;
-    if (!base) {
+    if (!writer.hasBase()) {
       setRenderError(labels.loadError);
-      formInstanceRef.current?.emit('submitError', '');
+      releaseSubmit();
       return;
     }
-    setWriting('submit');
     try {
-      const data = (submission?.data ?? {}) as Record<string, unknown>;
-      const outcome = await writer.submit(token ?? undefined, data, base);
-      if (outcome.status === 'held') {
-        setRenderError(null);
-        onHeld('submit', outcome.reason);
-        // Releases the submit button without Form.io's success state.
-        formInstanceRef.current?.emit('submitError', '');
-        return;
+      const outcome = await writer.submit((submission?.data ?? {}) as Record<string, unknown>);
+      switch (outcome.status) {
+        case 'applied':
+          addNotification({ text: labels.submitSuccess, type: 'success' });
+          // Straight to the confirmation; navigating away unmounts the form, so there's no need to
+          // emit `submitDone` and no flash of Form.io's own success screen. replace, so Back does
+          // not return to the fill page of a submitted record.
+          router.replace(`${submissionPath}/success`);
+          break;
+        case 'held':
+          // A blocked submit sent nothing, so a message on screen still stands.
+          if (outcome.reason === 'closed') leaveClosed();
+          else if (outcome.reason !== BLOCKED_REASON) setRenderError(null);
+          releaseSubmit();
+          break;
+        case 'queued':
+          releaseSubmit();
+          break;
       }
-      addNotification({ text: labels.submitSuccess, type: 'success' });
-      // Straight to the confirmation; navigating away unmounts the form, so there's no need to emit
-      // `submitDone` and no flash of Form.io's own success screen. replace, so Back does not return
-      // to the fill page of a submitted record.
-      router.replace(`${submissionPath}/success`);
     } catch (err) {
       writeError(err);
-      formInstanceRef.current?.emit('submitError', labels.rendererError);
-    } finally {
-      setWriting(null);
+      releaseSubmit(labels.rendererError);
     }
   };
 
   // Discards the typed answers: the container mounts a new form on the latest bundle.
-  const reloadLatest = async () => {
-    setWriting('resolve');
-    try {
-      markHeld(null);
-      await onReload();
-    } finally {
-      setWriting(null);
-    }
-  };
+  const reloadLatest = () => writer.discardMine(onReload);
 
   // Writes the typed answers over the current head. A submit goes through Form.io again, so an
   // invalid form shows its field errors and never reaches submitForm.
   const writeMine = async () => {
-    const kind = held;
-    if (!kind) return;
-    setWriting('resolve');
-    const head = await writer.reloadHead(token ?? undefined);
-    if (head?.workflowState === 'submitted') {
-      onHeld(kind, 'closed');
-      return;
-    }
-    setWriting(null);
-    if (!head) {
-      setRenderError(labels.loadError);
-      return;
-    }
-    baseRevisionIdRef.current = head.headRevisionId;
-    markHeld(null);
-    if (kind === 'save') {
+    const kept = await writer.keepMine();
+    if (kept === 'closed') {
+      leaveClosed();
+    } else if (kept === 'save') {
       await saveDraft();
-    } else {
+    } else if (kept === 'submit') {
       await formInstanceRef.current?.submit().catch(() => undefined);
     }
   };
@@ -266,7 +229,7 @@ export function SubmissionFillForm({
                   onPress={() => {
                     reloadLatest().catch(writeError);
                   }}
-                  isDisabled={writing !== null}
+                  isDisabled={busy !== null}
                   data-testid="submission-fill-reload-latest"
                 >
                   {labels.reloadLatest}
@@ -277,7 +240,7 @@ export function SubmissionFillForm({
                   onPress={() => {
                     writeMine().catch(writeError);
                   }}
-                  isDisabled={writing !== null}
+                  isDisabled={busy !== null}
                   data-testid="submission-fill-write-mine"
                 >
                   {held === 'save' ? labels.saveMine : labels.submitMine}
@@ -294,10 +257,10 @@ export function SubmissionFillForm({
             onPress={() => {
               saveDraft().catch(writeError);
             }}
-            isDisabled={!formReady || writing !== null || held !== null}
+            isDisabled={!formReady || busy !== null || held !== null}
             data-testid="submission-fill-save-draft"
           >
-            {writing === 'save' ? labels.savingDraft : labels.saveDraft}
+            {busy === 'save' ? labels.savingDraft : labels.saveDraft}
           </Button>
         </div>
       ) : null}

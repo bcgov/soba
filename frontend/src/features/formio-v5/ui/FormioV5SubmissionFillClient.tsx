@@ -8,10 +8,6 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { canSaveDraftOnSubmission, canWriteSubmission } from '@/src/shared/util/permissions';
 import { useBcgovFileOption } from '@/src/features/formio-v5/useBcgovFileOption';
-import {
-  setActiveSubmissionId,
-  clearActiveSubmissionId,
-} from '@/src/features/formio-v5/activeSubmission';
 import { useSubmitFill } from '@/src/features/formio-v5/data/useSubmitFill';
 import {
   SubmissionFillForm,
@@ -47,13 +43,6 @@ function SubmissionFill({
   useEffect(() => {
     if (submitted) router.replace(submissionPath);
   }, [submitted, submissionPath, router]);
-
-  // Expose the submission being filled to the CHEFS upload provider; clear it when leaving so a stale
-  // id can't tag an unrelated upload (e.g. a designer preview).
-  useEffect(() => {
-    setActiveSubmissionId(submissionId);
-    return () => clearActiveSubmissionId();
-  }, [submissionId]);
 
   const { refresh } = fill;
   const reload = useCallback(async () => {

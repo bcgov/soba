@@ -46,7 +46,7 @@ const toState = (raw: string | undefined): MySubmissionState | undefined =>
 export function MySubmissionsList() {
   const dict = useDictionary();
   const dictMine = dict.mySubmissions;
-  const { authenticated, initializing, token } = useKeycloak();
+  const { authenticated, initializing } = useKeycloak();
   const { addNotification } = useNotificationStore();
   const notifyError = useDataErrorNotice();
   const router = useRouter();
@@ -98,10 +98,20 @@ export function MySubmissionsList() {
 
   const handleDelete = useCallback(() => {
     const item = confirmDelete;
-    if (!token || !item) return;
+    if (!item) return;
     setDeleting(true);
-    remove(token, item.id)
-      .then(() => addNotification({ text: dictMine.deleteSuccess, type: 'success' }))
+    remove(item.id)
+      .then((outcome) => {
+        switch (outcome.status) {
+          case 'applied':
+            addNotification({ text: dictMine.deleteSuccess, type: 'success' });
+            break;
+          case 'held':
+          case 'queued':
+            // Not deleted yet; the re-read list shows the row as it stands.
+            break;
+        }
+      })
       .catch((cause: unknown) => {
         // The only delete the server answers with 409 is one already submitted, coded or not.
         const message =
@@ -117,7 +127,6 @@ export function MySubmissionsList() {
         setConfirmDelete(null);
       });
   }, [
-    token,
     confirmDelete,
     remove,
     addNotification,

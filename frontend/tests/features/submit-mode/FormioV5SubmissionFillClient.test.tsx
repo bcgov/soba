@@ -108,6 +108,8 @@ vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => {
 });
 
 import makeStore from '@/lib/store';
+import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
+import { getActiveSubmission } from '@/src/features/formio-v5/activeSubmission';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 import FormioV5SubmissionFillClient from '@/src/features/formio-v5/ui/FormioV5SubmissionFillClient';
 import {
@@ -607,6 +609,32 @@ describe('FormioV5SubmissionFillClient', () => {
       expect(savedBody(1).revisionId).toBe(savedBody(0).revisionId);
     });
 
+    it('reuses the revision id when an unchanged save is retried after a server failure', async () => {
+      h.saveSobaFormSubmission.mockRejectedValueOnce(new ApiError('Gateway timeout', 504));
+      h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-1'));
+      h.formData = { a: 1 };
+      await renderLoaded();
+      await saveDraft();
+      await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(1));
+      await saveDraft();
+      await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(2));
+      expect(savedBody(1).revisionId).toBe(savedBody(0).revisionId);
+    });
+
+    it('mints a new revision id when an unchanged save is retried after a refusal', async () => {
+      h.saveSobaFormSubmission.mockRejectedValueOnce(
+        new ApiError('Revision id already used by another write', 409, 'revision_id_taken'),
+      );
+      h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-1'));
+      h.formData = { a: 1 };
+      await renderLoaded();
+      await saveDraft();
+      await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(1));
+      await saveDraft();
+      await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(2));
+      expect(savedBody(1).revisionId).not.toBe(savedBody(0).revisionId);
+    });
+
     it('leaves for the submission view when a replayed save finds the record submitted', async () => {
       h.saveSobaFormSubmission.mockResolvedValue({
         ...saveResponse('rev-1'),
@@ -702,6 +730,44 @@ describe('FormioV5SubmissionFillClient', () => {
       expect(screen.getByTestId('submission-fill-held')).toBeInTheDocument();
     });
 
+    it('sends no submit, and leaves once, when the save it waited on finds the record submitted', async () => {
+      let finishSave: (value: unknown) => void = () => undefined;
+      h.saveSobaFormSubmission.mockReturnValue(
+        new Promise((resolve) => {
+          finishSave = resolve;
+        }),
+      );
+      await renderLoaded();
+      await saveDraft();
+      const submitting = act(() => h.onSubmit!({ data: { a: 1 } }));
+      finishSave(saveResponse('rev-x', 'pending', 'closed'));
+      await submitting;
+      expect(h.submitSobaFormSubmission).not.toHaveBeenCalled();
+      expect(h.instance.emit).toHaveBeenCalledWith('submitError', '');
+      await waitFor(() => expect(h.replace).toHaveBeenCalledWith('/en/submission/sub-1'));
+      expect(h.replace).toHaveBeenCalledTimes(1);
+      expect(notices()).toEqual(['Already submitted.']);
+    });
+
+    it('keeps the message on screen when a submit is refused while a write is held', async () => {
+      h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-x', 'pending', 'conflict'));
+      await renderLoaded();
+      await saveDraft();
+      await waitFor(() => expect(screen.getByTestId('submission-fill-held')).toBeInTheDocument());
+      h.getSubmitFillBundle.mockRejectedValueOnce(new ApiError('Internal server error', 500));
+      await userEvent.click(screen.getByTestId('submission-fill-write-mine'));
+      await waitFor(() =>
+        expect(screen.getByTestId('submission-fill-render-error')).toHaveTextContent(
+          'The request failed.',
+        ),
+      );
+      await act(() => h.onSubmit!({ data: { a: 1 } }));
+      expect(h.submitSobaFormSubmission).not.toHaveBeenCalled();
+      expect(screen.getByTestId('submission-fill-render-error')).toHaveTextContent(
+        'The request failed.',
+      );
+    });
+
     it('saves over the latest version with a fresh revision id when the filler keeps theirs', async () => {
       h.saveSobaFormSubmission.mockResolvedValueOnce(saveResponse('rev-x', 'pending', 'conflict'));
       h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-10'));
@@ -757,6 +823,23 @@ describe('FormioV5SubmissionFillClient', () => {
       await userEvent.click(screen.getByTestId('submission-fill-write-mine'));
       await waitFor(() => expect(h.replace).toHaveBeenCalledWith('/en/submission/sub-1'));
       expect(notices()).toContain('Already submitted.');
+    });
+
+    it('keeps the held notice, with the failure, when keeping theirs cannot re-read the head', async () => {
+      h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-x', 'pending', 'conflict'));
+      await renderLoaded();
+      await saveDraft();
+      await waitFor(() => expect(screen.getByTestId('submission-fill-held')).toBeInTheDocument());
+      h.getSubmitFillBundle.mockRejectedValueOnce(new ApiError('Internal server error', 500));
+      await userEvent.click(screen.getByTestId('submission-fill-write-mine'));
+      await waitFor(() =>
+        expect(screen.getByTestId('submission-fill-render-error')).toHaveTextContent(
+          'The request failed.',
+        ),
+      );
+      expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('submission-fill-held')).toBeInTheDocument();
+      expect(screen.getByTestId('submission-fill-write-mine')).toBeEnabled();
     });
 
     it('bases a submit made during a save on the revision that save produces', async () => {
@@ -843,6 +926,93 @@ describe('SubmissionFillForm', () => {
     store = makeStore();
     h.mounts = 0;
     h.instance.setSubmission.mockResolvedValue(undefined);
+  });
+
+  describe('session', () => {
+    const labels = {
+      sessionExpired: 'Your session has ended.',
+      requestFailed: 'The request failed.',
+      rendererError: 'The form could not be displayed.',
+      saveDraft: 'Save draft',
+      draftSaved: 'Draft saved.',
+      errors: {},
+    } as unknown as FillLabels;
+    const writable: FillView = { ...view({ a: 1 }), canSaveDraft: true };
+    const renderForm = async () => {
+      let rendered: ReturnType<typeof render> | undefined;
+      await act(async () => {
+        rendered = render(
+          <Provider store={store}>
+            <SubmissionFillForm
+              submissionId="sub-1"
+              submissionPath="/en/submission/sub-1"
+              view={writable}
+              labels={labels}
+              onReload={async () => undefined}
+            />
+          </Provider>,
+        );
+      });
+      await waitFor(() => expect(screen.getByTestId('submission-fill-save-draft')).toBeEnabled());
+      return rendered!;
+    };
+    const signIn = (token: string | undefined) =>
+      act(() => {
+        store.dispatch(setAuthenticated(true));
+        store.dispatch(setToken(token));
+      });
+    const saveDraft = () => userEvent.click(screen.getByTestId('submission-fill-save-draft'));
+
+    beforeEach(() => {
+      h.formData = { a: 1 };
+      h.saveSobaFormSubmission.mockResolvedValue({
+        revision: { id: 'rev-2', revisionNo: 2, status: 'current', reason: 'accepted' },
+      });
+    });
+
+    it('sends a save with the token the session holds when it is sent', async () => {
+      await signIn('token');
+      await renderForm();
+      await act(() => store.dispatch(setToken('token-2')));
+      await saveDraft();
+      await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(1));
+      expect(h.saveSobaFormSubmission.mock.calls[0][0]).toBe('token-2');
+    });
+
+    it('never sends a save anonymously for a form mounted signed in', async () => {
+      await signIn('token');
+      await renderForm();
+      await act(() => store.dispatch(setToken(undefined)));
+      await saveDraft();
+      await waitFor(() =>
+        expect(screen.getByTestId('submission-fill-render-error')).toHaveTextContent(
+          'Your session has ended.',
+        ),
+      );
+      expect(h.saveSobaFormSubmission).not.toHaveBeenCalled();
+    });
+
+    // The first save re-renders the form, so the second shows what a later render decides.
+    it('keeps saving anonymously a form mounted signed out', async () => {
+      await renderForm();
+      await signIn('token');
+      await saveDraft();
+      await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(1));
+      await saveDraft();
+      await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(2));
+      expect(h.saveSobaFormSubmission.mock.calls.map(([token]) => token)).toEqual([
+        undefined,
+        undefined,
+      ]);
+    });
+
+    it('tells the upload provider which submission is filled, and in which session', async () => {
+      await signIn('token');
+      const rendered = await renderForm();
+      expect(getActiveSubmission()).toEqual({ submissionId: 'sub-1', signedIn: true });
+      rendered.unmount();
+      expect(getActiveSubmission()).toBeNull();
+    });
   });
 
   it('keeps Form.io on the bundle it mounted with when given a new one', async () => {

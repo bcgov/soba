@@ -73,6 +73,15 @@ describe('StartSubmission', () => {
     expect(h.openSobaFormSubmission).toHaveBeenCalledWith('token', 'form-1', expect.any(String));
   });
 
+  it('opens nothing, and says the session ended, when a signed-in session holds no token', async () => {
+    await renderInStore(store, <StartSubmission />);
+    await answerInit(store, { authenticated: true });
+    expect(await screen.findByTestId('start-submission-error')).toHaveTextContent(
+      'Your session has ended.',
+    );
+    expect(h.openSobaFormSubmission).not.toHaveBeenCalled();
+  });
+
   it.each([
     [
       'the message for its code',

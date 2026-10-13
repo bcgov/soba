@@ -349,6 +349,22 @@ describe('MySubmissionsList', () => {
     expect(screen.queryByTestId('confirm-modal-message')).not.toBeInTheDocument();
   });
 
+  it('deletes nothing, and says the session ended, when the session holds no token', async () => {
+    await renderList();
+    await userEvent.click(await screen.findByTestId('s1-delete'));
+    await act(async () => {
+      store.dispatch(setToken(undefined));
+    });
+    await userEvent.click(screen.getByTestId('confirm-modal-confirm'));
+
+    await waitFor(() =>
+      expect(addNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'Your session has ended.', type: 'error' }),
+      ),
+    );
+    expect(deleteSubmitSubmission).not.toHaveBeenCalled();
+  });
+
   it('holds the dialog open, with confirm disabled, until the delete settles', async () => {
     const settle = deferredDelete();
     await renderList();
