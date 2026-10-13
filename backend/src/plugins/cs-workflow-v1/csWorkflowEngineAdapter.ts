@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { safeParse, z } from 'zod';
 import type { PluginConfigReader } from '../../core/config/pluginConfig';
 import type {
   WorkflowEngineAdapter,
@@ -12,17 +12,19 @@ const SERVICE = 'Connected Services Workflow';
 const WORKFLOWS_PATH = 'workflows';
 const WORKFLOW_PATH = 'workflow';
 
-const WorkflowsResponseSchema = z.object({ data: z.array(z.object()) });
-const WorkflowResponseSchema = z.object({ data: z.object() });
+const WorkflowsResponseSchema = z.object({ data: z.array(z.object().loose()) });
+const WorkflowResponseSchema = z.object({ data: z.object().loose() });
 
 /** Connected Services workflows, started and read with the caller's own token. */
 export class CsWorkflowEngineAdapter implements WorkflowEngineAdapter {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
   private readonly apiKey: string;
+  private readonly baseUrlWithoutApi: string;
 
   constructor(config: PluginConfigReader) {
     this.baseUrl = config.getRequired('API_BASE_URL');
+    this.baseUrlWithoutApi = this.baseUrl.replace(/^\/*api\/v\d+\/*/, '');
     this.timeoutMs = resolveTimeoutMs(
       config.getOptionalNumber('TIMEOUT_MS'),
       'PLUGIN_CS_WORKFLOW_V1_TIMEOUT_MS',
@@ -44,14 +46,15 @@ export class CsWorkflowEngineAdapter implements WorkflowEngineAdapter {
     }
   }
 
-  async getWorkflows(): Promise<GetWorkflowsResult> {
-    const res = await this.request('GET', WORKFLOWS_PATH);
+  async getWorkflows(name?: string): Promise<GetWorkflowsResult> {
+    const url = WORKFLOWS_PATH + (name ? `?name=${encodeURIComponent(name)}` : '');
+    const res = await this.request('GET', url);
     const body: unknown = await res.json().catch(() => undefined);
     const safeParseResult = WorkflowsResponseSchema.safeParse(body);
     if (!safeParseResult.data) {
       throw new Error(`Unexpected ${SERVICE} workflows response`);
     }
-    return { workflows: safeParseResult.data.data as Array<Workflow> };
+    return { workflows: safeParseResult.data.data as unknown as Array<Workflow> };
   }
 
   async getWorkflow(id: string): Promise<Workflow> {
@@ -61,15 +64,18 @@ export class CsWorkflowEngineAdapter implements WorkflowEngineAdapter {
     if (!safeParseResult.data) {
       throw new Error(JSON.stringify(safeParseResult));
     }
-    return { workflow: safeParseResult.data.data as Workflow };
+    return { id: safeParseResult.data.data.id };
   }
 
-  // IMPORTANT!!
-  // TODO: This isn't actually how you would kick off a workflow in n8n. You have to get the workflow,
-  // find out how it's triggered and then trigger it. So it'll require some finesse on our end
-  // IMPORTANT!!
   async startWorkflow(id: string, payload: object): Promise<boolean> {
-    const res = await this.request('GET', `${WORKFLOW_PATH}/${id}`, payload);
+    const workflow = await this.getWorkflow(id);
+    //the
+    const path =
+      (workflow as unknown as Record<string, unknown>).node?.[0]?.parameters?.path ?? null;
+    if (!path) {
+      throw new Error(`Workflow ${id} does not have a path parameter`);
+    }
+    const res = await this.request('GET', `webhook/${path}`, payload, true);
     const body: unknown = await res.json().catch(() => undefined);
     const safeParseResult = WorkflowsResponseSchema.safeParse(body);
     if (!safeParseResult.data) {
@@ -83,8 +89,9 @@ export class CsWorkflowEngineAdapter implements WorkflowEngineAdapter {
     method: 'GET' | 'POST',
     path: string,
     payload?: unknown,
+    withoutApi = false,
   ): Promise<Response> {
-    const url = joinUrl(this.baseUrl, path);
+    const url = joinUrl(withoutApi ? this.baseUrlWithoutApi : this.baseUrl, path);
     const headers: Record<string, string> = {};
     if (this.apiKey) headers['X-N8N-API-KEY'] = this.apiKey;
     if (payload !== undefined) headers['Content-Type'] = 'application/json';

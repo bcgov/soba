@@ -6,13 +6,6 @@ import {
 } from '../../../src/core/config/pluginConfig';
 import { createEnvReader } from '../../../src/core/config/env';
 
-import {
-  json,
-  startCsWorkflow,
-  type CsWorkflowHandler,
-  type FakeCsWorkflow,
-} from './fakeCsWorkflow';
-
 function makeConfig(values: Record<string, string>): PluginConfigReader {
   return createPluginConfigReaderFrom(
     createEnvReader(
@@ -24,17 +17,14 @@ function makeConfig(values: Record<string, string>): PluginConfigReader {
   );
 }
 
-// What a base URL missing /api reaches: the frontend, which answers every path with 200 HTML.
-const frontendPage: CsWorkflowHandler = (_req, res) => {
-  res.writeHead(200, { 'content-type': 'text/html' });
-  res.end('<!doctype html><p>Connected Services</p>');
-};
-
 describe('cs-workflow-v1 plugin', () => {
-  let api: FakeCsWorkflow | undefined;
-  afterEach(async () => {
-    await api?.close();
-    api = undefined;
+  let fetchMock: jest.SpyInstance;
+
+  beforeEach(() => {
+    fetchMock = jest.spyOn(global, 'fetch');
+  });
+
+  afterEach(() => {
     jest.restoreAllMocks();
   });
 
@@ -54,24 +44,33 @@ describe('cs-workflow-v1 plugin', () => {
   });
 
   it('readinessCheck is ok when health answers with its JSON body', async () => {
-    api = await startCsWorkflow(json(200, { data: [] }));
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [] }),
+    });
+
     const adapter = new CsWorkflowEngineAdapter(
-      makeConfig({ API_BASE_URL: api.baseUrl, API_KEY: 'test-key' }),
+      makeConfig({ API_BASE_URL: 'http://localhost/api/v1', API_KEY: 'test-key' }),
     );
 
     await expect(adapter.readinessCheck()).resolves.toEqual({ ok: true });
-    expect(api.requests[0]).toEqual({
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost/api/v1/workflows', expect.objectContaining({
       method: 'GET',
-      url: '/api/v1/workflows',
-      authorization: undefined,
-      body: undefined,
-    });
+      headers: {
+        'X-N8N-API-KEY': 'test-key',
+      }
+    }));
   });
 
   it('readinessCheck is not ok when the base URL reaches the frontend', async () => {
-    api = await startCsWorkflow(frontendPage);
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => { throw new Error('Not JSON'); },
+    });
+
     const adapter = new CsWorkflowEngineAdapter(
-      makeConfig({ API_BASE_URL: api.baseUrl, API_KEY: 'test-key' }),
+      makeConfig({ API_BASE_URL: 'http://localhost/api/v1', API_KEY: 'test-key' }),
     );
 
     await expect(adapter.readinessCheck()).resolves.toEqual({
@@ -81,12 +80,10 @@ describe('cs-workflow-v1 plugin', () => {
   });
 
   it('readinessCheck is not ok when the API is unreachable', async () => {
-    api = await startCsWorkflow(json(200, {}));
-    const { baseUrl } = api;
-    await api.close();
-    api = undefined;
+    fetchMock.mockRejectedValue(new TypeError('fetch failed'));
+
     const adapter = new CsWorkflowEngineAdapter(
-      makeConfig({ API_BASE_URL: baseUrl, API_KEY: 'test-key' }),
+      makeConfig({ API_BASE_URL: 'http://localhost/api/v1', API_KEY: 'test-key' }),
     );
 
     const result = await adapter.readinessCheck();
@@ -94,32 +91,37 @@ describe('cs-workflow-v1 plugin', () => {
   });
 
   it('workflows is ok when n8n answers with its JSON body', async () => {
-    api = await startCsWorkflow(json(200, { data: [] }));
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [] }),
+    });
+
     const adapter = new CsWorkflowEngineAdapter(
-      makeConfig({ API_BASE_URL: api.baseUrl, API_KEY: 'test-key' }),
+      makeConfig({ API_BASE_URL: 'http://localhost/api/v1', API_KEY: 'test-key' }),
     );
 
     await expect(adapter.getWorkflows()).resolves.toEqual({ workflows: [] });
-    expect(api.requests[0]).toEqual({
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost/api/v1/workflows', expect.objectContaining({
       method: 'GET',
-      url: '/api/v1/workflows',
-      authorization: undefined,
-      body: undefined,
-    });
+    }));
   });
 
   it('workflow is ok when n8n answers with its JSON body', async () => {
-    api = await startCsWorkflow(json(200, { data: { workflow: {} } }));
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: 123 } }),
+    });
+
     const adapter = new CsWorkflowEngineAdapter(
-      makeConfig({ API_BASE_URL: api.baseUrl, API_KEY: 'test-key' }),
+      makeConfig({ API_BASE_URL: 'http://localhost/api/v1', API_KEY: 'test-key' }),
     );
 
-    await expect(adapter.getWorkflow('123')).resolves.toEqual({ workflow: {} });
-    expect(api.requests[0]).toEqual({
+    await expect(adapter.getWorkflow('123')).resolves.toEqual({ id: 123 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost/api/v1/workflow/123', expect.objectContaining({
       method: 'GET',
-      url: '/api/v1/workflow/123',
-      authorization: undefined,
-      body: undefined,
-    });
+    }));
   });
 });
+

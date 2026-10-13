@@ -6,12 +6,12 @@ const CODE = 'workflow-noop';
 
 /** No-op workflow engine: starts nothing and knows no instances, no external call. */
 function createNoopWorkflowEngineAdapter(config: PluginConfigReader): WorkflowEngineAdapter {
-  void config; // Required by interface; this plugin does not use config
+  config = null; // unused, but required by the interface
   return {
-    readinessCheck: async () => ({ ok: true }),
-    getWorkflows: async () => ({ workflows: [] }),
-    getWorkflow: async (workflowId: string) => ({ id: workflowId }),
-    startWorkflow: async () => false,
+    readinessCheck: () => Promise.resolve({ ok: true }),
+    getWorkflows: () => Promise.resolve({ workflows: [] }),
+    getWorkflow: (workflowId: string) => Promise.resolve({ id: workflowId }),
+    startWorkflow: () => Promise.resolve(false),
   };
 }
 
