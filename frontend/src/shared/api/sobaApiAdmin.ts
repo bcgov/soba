@@ -1,8 +1,10 @@
 import { parseJson } from './sobaHelpers';
 import { sobaFetch } from './sobaFetch';
 import { toListRequestQuery, type ListQueryArgs } from '../../types/list';
+import { sortLocaleHeaders } from './sortLocaleRequest';
 
 import type {
+  AddSobaAdminBody,
   DocumentGenerationAuditsQuery,
   DocumentGenerationAuditsResponse,
   FeatureScopeItem,
@@ -23,15 +25,17 @@ export async function fetchSobaAdmins(
   const response = await sobaFetch('/admin/soba-admins', {
     token,
     query: toListRequestQuery(args),
+    headers: sortLocaleHeaders(args.locale),
   });
   return parseJson(response);
 }
 
 export async function addSobaAdmin(token: string, userId: string): Promise<void> {
+  const body: AddSobaAdminBody = { userId };
   const response = await sobaFetch('/admin/soba-admins', {
     token,
     method: 'POST',
-    json: { userId },
+    json: body,
   });
   if (!response.ok) await parseJson(response);
 }

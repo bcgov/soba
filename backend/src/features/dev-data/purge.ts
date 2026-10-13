@@ -5,6 +5,7 @@
  * best-effort. Deleting documents first would leave live rows pointing at nothing.
  */
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
+import { getTableConfig } from 'drizzle-orm/pg-core';
 
 import { db, type DbOrTx } from '../../core/db/client';
 import {
@@ -17,10 +18,13 @@ import {
   enterpriseWorkspaceBindings,
   featureScopes,
   files,
+  formGroupOverrideMembers,
+  formGroupOverrides,
   formVersionRevisions,
   formVersions,
   forms,
   sobaAdmins,
+  submissionParticipants,
   submissionRevisions,
   submissions,
   userIdentities,
@@ -33,7 +37,11 @@ import {
 } from '../../core/db/schema';
 import { createFormEngineAdapter } from '../../core/integrations/form-engine/FormEngineRegistry';
 import { log } from '../../core/logging';
+import { formSettingsModules } from '../form-settings/registry';
 import { idsFromRuns, listOpenRuns, markRunsPurged } from './runs';
+
+/** Tables owned by form settings groups; each is cleared by workspace before forms are deleted. */
+const FORM_SETTINGS_TABLES = formSettingsModules.flatMap((module) => module.tables);
 
 export interface PurgeResult {
   rowsDeleted: Record<string, number>;
@@ -193,6 +201,12 @@ async function purgeUserScoped(tx: DbOrTx, userIds: string[], record: RecordFn):
 
   if (membershipIds.length > 0) {
     await record(
+      'form_group_override_member (by user)',
+      tx
+        .delete(formGroupOverrideMembers)
+        .where(inArray(formGroupOverrideMembers.workspaceMembershipId, membershipIds)),
+    );
+    await record(
       'workspace_group_membership (by user)',
       tx
         .delete(workspaceGroupMemberships)
@@ -215,13 +229,17 @@ async function purgeUserScoped(tx: DbOrTx, userIds: string[], record: RecordFn):
  * table carrying a workspace_id, so a new one cannot be added without purge being updated. The test
  * checks this list, not the function body: adding a name here without a delete below defeats it.
  */
-export const WORKSPACE_SCOPED_TABLES = [
+export const WORKSPACE_SCOPED_TABLES: readonly string[] = [
   'document_generation_audit',
   'submission_revision',
+  'submission_participant',
   'submission',
   'file',
   'form_version_revision',
   'form_version',
+  'form_group_override_member',
+  'form_group_override',
+  ...FORM_SETTINGS_TABLES.map((table) => getTableConfig(table).name),
   'form',
   'workspace_group_role',
   'workspace_group_membership',
@@ -235,7 +253,7 @@ export const WORKSPACE_SCOPED_TABLES = [
   'enterprise_membership_binding',
   'enterprise_workspace_binding',
   'workspace',
-] as const;
+];
 
 /**
  * Tables handled by user id rather than workspace id, plus app_user itself. Together with
@@ -277,9 +295,18 @@ async function purgeWorkspaceScoped(
     'document_generation_audit',
     tx.delete(documentGenerationAudits).where(inArray(documentGenerationAudits.workspaceId, ids)),
   );
+  // submission.head_revision_id references the revisions, so the pointer is cleared first.
+  await tx
+    .update(submissions)
+    .set({ headRevisionId: null })
+    .where(inArray(submissions.workspaceId, ids));
   await record(
     'submission_revision',
     tx.delete(submissionRevisions).where(inArray(submissionRevisions.workspaceId, ids)),
+  );
+  await record(
+    'submission_participant',
+    tx.delete(submissionParticipants).where(inArray(submissionParticipants.workspaceId, ids)),
   );
   await record('submission', tx.delete(submissions).where(inArray(submissions.workspaceId, ids)));
   await record('file', tx.delete(files).where(inArray(files.workspaceId, ids)));
@@ -291,6 +318,20 @@ async function purgeWorkspaceScoped(
     'form_version',
     tx.delete(formVersions).where(inArray(formVersions.workspaceId, ids)),
   );
+  await record(
+    'form_group_override_member',
+    tx.delete(formGroupOverrideMembers).where(inArray(formGroupOverrideMembers.workspaceId, ids)),
+  );
+  await record(
+    'form_group_override',
+    tx.delete(formGroupOverrides).where(inArray(formGroupOverrides.workspaceId, ids)),
+  );
+  for (const table of FORM_SETTINGS_TABLES) {
+    await record(
+      getTableConfig(table).name,
+      tx.delete(table).where(inArray(table.workspaceId, ids)),
+    );
+  }
   await record('form', tx.delete(forms).where(inArray(forms.workspaceId, ids)));
   await record(
     'workspace_group_role',

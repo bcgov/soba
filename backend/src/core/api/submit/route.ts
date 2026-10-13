@@ -1,8 +1,7 @@
 import express from 'express';
 import { validateRequest } from '../shared/validation';
 import { openWorkspaceFromResource } from '../../middleware/workspaceContext';
-import { requireFormAccess, requireFormSubmitAccess } from '../../middleware/formSubmitAccess';
-import { Permissions } from '../../db/codes';
+import { requireFormSubmitAccess, requireSubmissionRead } from '../../middleware/formSubmitAccess';
 import { getSubmitSubmissionSchema, getSubmitFillBundle } from './controller';
 import {
   openSubmission,
@@ -15,11 +14,11 @@ import {
   OpenSubmissionBodySchema,
   SubmissionDataBodySchema,
   SubmissionIdParamsSchema,
+  SubmitSubmissionBodySchema,
 } from '../submissions/schema';
 
 // Submit-mode: mounted under /api/v1/submit with optional auth (anonymous resolves to the public user).
-// Access is decided by the workspace Form submitters audience (requireFormAccess / requireFormSubmitAccess),
-// so non-members and anonymous callers can read a published form, submit to it, and view the confirmation.
+// Each route authorizes through isSubmitterAllowed (services/submitterAccess).
 const router = express.Router();
 
 const openSubmissionResource = openWorkspaceFromResource({
@@ -41,24 +40,23 @@ router.post(
 );
 router.post(
   '/submissions/:id/submit',
-  validateRequest({ params: SubmissionIdParamsSchema, body: SubmissionDataBodySchema }),
+  validateRequest({ params: SubmissionIdParamsSchema, body: SubmitSubmissionBodySchema }),
   requireFormSubmitAccess,
   submitSubmission,
 );
 
-// Confirmation read (a public form's submissions are public data; the UUID is the practical capability).
 router.get(
   '/submissions/:id',
   validateRequest({ params: SubmissionIdParamsSchema }),
   openSubmissionResource,
-  requireFormAccess(Permissions.submission_read),
+  requireSubmissionRead,
   getSubmission,
 );
 router.get(
   '/submissions/:id/data',
   validateRequest({ params: SubmissionIdParamsSchema }),
   openSubmissionResource,
-  requireFormAccess(Permissions.submission_read),
+  requireSubmissionRead,
   getSubmissionData,
 );
 
@@ -67,16 +65,17 @@ router.get(
   '/submissions/:id/schema',
   validateRequest({ params: SubmissionIdParamsSchema }),
   openSubmissionResource,
-  requireFormAccess(Permissions.submission_read),
+  requireSubmissionRead,
   getSubmitSubmissionSchema,
 );
 
-// The one bundle the fill page needs: workflow state + schema + any saved answers (resume).
+// The one bundle the fill page needs: workflow state + schema + any saved answers (resume) + whether
+// the caller may write.
 router.get(
   '/submissions/:id/fill',
   validateRequest({ params: SubmissionIdParamsSchema }),
   openSubmissionResource,
-  requireFormAccess(Permissions.submission_read),
+  requireSubmissionRead,
   getSubmitFillBundle,
 );
 

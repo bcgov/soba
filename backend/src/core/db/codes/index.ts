@@ -10,12 +10,14 @@ export const Roles = {
   form_submitter: 'form_submitter',
   submission_reviewer: 'submission_reviewer',
   submission_approver: 'submission_approver',
+  team_manager: 'team_manager',
 } as const;
 export type RoleCode = (typeof Roles)[keyof typeof Roles];
 
 /** Form permissions. `all` is the `*` wildcard, held only by form_admin. */
 export const Permissions = {
   all: '*',
+  form_create: 'form_create',
   form_read: 'form_read',
   form_update: 'form_update',
   form_delete: 'form_delete',
@@ -30,8 +32,18 @@ export const Permissions = {
   submission_review: 'submission_review',
   team_read: 'team_read',
   team_update: 'team_update',
+  document_template_create: 'document_template_create',
+  document_template_read: 'document_template_read',
+  document_template_delete: 'document_template_delete',
 } as const;
 export type PermissionCode = (typeof Permissions)[keyof typeof Permissions];
+
+/**
+ * POST /forms writes the form and its first design. `form_create` is not seeded onto any role;
+ * only form_admin matches it (via `*`). form_designer has `design_create` for new designs on
+ * existing forms.
+ */
+export const FormCreatePermissions = [Permissions.form_create, Permissions.design_create] as const;
 
 export const RoleStatus = {
   active: 'active',
@@ -99,9 +111,37 @@ export const SubmissionEventType = {
   opened: 'opened',
   saved: 'saved',
   submitted: 'submitted',
+  deleted: 'deleted',
 } as const;
 export type SubmissionEventTypeCode =
   (typeof SubmissionEventType)[keyof typeof SubmissionEventType];
+/** The events a submitter's save or submit records. Open and delete have their own paths. */
+export type SubmissionWriteEventCode = Extract<SubmissionEventTypeCode, 'saved' | 'submitted'>;
+
+/**
+ * Standing of a revision within its submission (submission_revision.status).
+ * current — the submission's live version. superseded — a former current, replaced by a later one.
+ * pending — a conflicting or post-submit write held for staff to resolve; not on the current chain.
+ */
+export const RevisionStatus = {
+  current: 'current',
+  superseded: 'superseded',
+  pending: 'pending',
+} as const;
+export type RevisionStatusCode = (typeof RevisionStatus)[keyof typeof RevisionStatus];
+
+/**
+ * Why a revision holds its status (submission_revision.reason).
+ * accepted — applied as the current version. replaced — superseded by a later current version.
+ * conflict — its base was no longer the head. closed — the submission was already submitted.
+ */
+export const RevisionReason = {
+  accepted: 'accepted',
+  replaced: 'replaced',
+  conflict: 'conflict',
+  closed: 'closed',
+} as const;
+export type RevisionReasonCode = (typeof RevisionReason)[keyof typeof RevisionReason];
 
 export const FeatureStatus = {
   enabled: 'enabled',
@@ -242,6 +282,33 @@ export const WorkspaceGroupMembershipStatus = {
 } as const;
 export type WorkspaceGroupMembershipStatusCode =
   (typeof WorkspaceGroupMembershipStatus)[keyof typeof WorkspaceGroupMembershipStatus];
+
+/** Status of a form_group_override row; an active row replaces the group's membership for that form. */
+export const FormGroupOverrideStatus = {
+  active: 'active',
+  inactive: 'inactive',
+} as const;
+export type FormGroupOverrideStatusCode =
+  (typeof FormGroupOverrideStatus)[keyof typeof FormGroupOverrideStatus];
+
+/**
+ * A user's standing on one submission (submission_participant.role). Owners and collaborators have
+ * the same access.
+ */
+export const SubmissionParticipantRole = {
+  owner: 'owner',
+  collaborator: 'collaborator',
+} as const;
+export type SubmissionParticipantRoleCode =
+  (typeof SubmissionParticipantRole)[keyof typeof SubmissionParticipantRole];
+
+/** Status of a submission_participant row. */
+export const SubmissionParticipantStatus = {
+  active: 'active',
+  inactive: 'inactive',
+} as const;
+export type SubmissionParticipantStatusCode =
+  (typeof SubmissionParticipantStatus)[keyof typeof SubmissionParticipantStatus];
 
 /** Status of a role assigned to a workspace group (workspace_group_role.status). */
 export const WorkspaceGroupRoleStatus = {

@@ -4,8 +4,10 @@ import { z } from 'zod';
 extendZodWithOpenApi(z);
 
 const NOT_FOUND_DESC = 'Not found';
-const AUTH_REQUIRED = 'Authentication required (form is not public)';
-// Public-capable surface: anonymous (public audience) or a bearer token for an authenticated member.
+const SUBMISSION_AUTH_REQUIRED =
+  'Authentication required (anonymous caller has no access to this submission)';
+// Optional auth: anonymous (the public user) or a bearer token. `{}` marks the no-auth case
+// explicit rather than leaving security unset.
 const PUBLIC_SECURITY = [{}, { bearerAuth: [] }];
 const FILES_PATH = '/submit/files';
 
@@ -49,8 +51,10 @@ export function registerFilesOpenApi(registry: OpenAPIRegistry) {
         content: { 'application/json': { schema: FileUploadResponseSchema } },
       },
       400: { description: 'Missing submissionId or file' },
-      401: { description: AUTH_REQUIRED },
-      403: { description: 'Not in the form submitters audience' },
+      401: { description: SUBMISSION_AUTH_REQUIRED },
+      403: {
+        description: 'Not a participant on this submission, or not in the form submitters audience',
+      },
       404: { description: 'Submission not found' },
       409: { description: 'Submission is not accepting file uploads' },
       415: { description: 'File type not allowed (blocked extension)' },
@@ -65,7 +69,7 @@ export function registerFilesOpenApi(registry: OpenAPIRegistry) {
     request: { params: z.object({ id: z.string().min(1) }).openapi('Files_GetParams') },
     responses: {
       200: { description: 'File contents (stream or redirect)', content: {} },
-      401: { description: AUTH_REQUIRED },
+      401: { description: SUBMISSION_AUTH_REQUIRED },
       403: { description: 'Not authorized to access this file' },
       404: { description: NOT_FOUND_DESC },
     },
@@ -79,7 +83,7 @@ export function registerFilesOpenApi(registry: OpenAPIRegistry) {
     request: { params: z.object({ id: z.string().min(1) }).openapi('Files_DeleteParams') },
     responses: {
       204: { description: 'Deleted' },
-      401: { description: AUTH_REQUIRED },
+      401: { description: SUBMISSION_AUTH_REQUIRED },
       403: { description: 'Not authorized to delete this file' },
       404: { description: NOT_FOUND_DESC },
     },

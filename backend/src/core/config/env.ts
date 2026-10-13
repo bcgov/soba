@@ -124,6 +124,20 @@ export function resolveTrustProxySetting(source: EnvSource): number | boolean {
   return getOptionalEnvFrom(source, 'NODE_ENV') === 'development' ? false : 1;
 }
 
+/**
+ * URL path the API is served under, normalised to a leading slash and no trailing one. Express
+ * mounts a path without a leading slash against the wrong prefix rather than failing, and nothing
+ * else validates this value.
+ */
+export function resolveApiBasePath(source: EnvSource): string {
+  const raw = (getOptionalEnvFrom(source, 'API_BASE_PATH') ?? '').trim();
+  if (raw === '' || raw === '/') {
+    return '';
+  }
+  const withLeadingSlash = raw.startsWith('/') ? raw : `/${raw}`;
+  return withLeadingSlash.endsWith('/') ? withLeadingSlash.slice(0, -1) : withLeadingSlash;
+}
+
 /** Build an env reader that reads from the given source. Use in tests with a simulated .env object. */
 export function createEnvReader(source: EnvSource) {
   return {
@@ -186,6 +200,8 @@ export function createEnvReader(source: EnvSource) {
     getRateLimitApiMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_API_MAX'),
     getRateLimitPublicWindowMs: () => getNumberEnvFrom(source, 'RATE_LIMIT_PUBLIC_WINDOW_MS'),
     getRateLimitPublicMax: () => getNumberEnvFrom(source, 'RATE_LIMIT_PUBLIC_MAX'),
+    /** URL path the API is served under, e.g. `/chefs`. Empty serves at the host root. */
+    getApiBasePath: () => resolveApiBasePath(source),
     getTrustProxySetting: () => resolveTrustProxySetting(source),
     /** Production CORS allowlist (comma-separated trusted origins). */
     getCorsOrigins: () => getCsvEnvFrom(source, 'CORS_ORIGIN'),
@@ -265,6 +281,8 @@ export const env = {
   getRateLimitApiMax: () => getNumberEnv('RATE_LIMIT_API_MAX'),
   getRateLimitPublicWindowMs: () => getNumberEnv('RATE_LIMIT_PUBLIC_WINDOW_MS'),
   getRateLimitPublicMax: () => getNumberEnv('RATE_LIMIT_PUBLIC_MAX'),
+  /** URL path the API is served under, e.g. `/chefs`. Empty serves at the host root. */
+  getApiBasePath: () => resolveApiBasePath(process.env),
   getTrustProxySetting: () => resolveTrustProxySetting(process.env),
   /** Production CORS allowlist (comma-separated trusted origins). */
   getCorsOrigins: () => getCsvEnv('CORS_ORIGIN'),

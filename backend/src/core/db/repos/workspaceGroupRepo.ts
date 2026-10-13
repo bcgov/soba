@@ -1,6 +1,8 @@
 import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
+import type { SortLocale } from '@soba/lib';
 import { db, type DbOrTx } from '../client';
+import { collated } from '../listSort';
 import {
   appUsers,
   identityProviders,
@@ -116,6 +118,7 @@ export interface WorkspaceGroupRow {
 /** Active workspace groups with their role codes and members. Filter to one group with `groupId`. */
 export const listWorkspaceGroups = async (
   workspaceId: string,
+  locale: SortLocale,
   groupId?: string,
 ): Promise<WorkspaceGroupRow[]> => {
   const groupWhere = and(
@@ -133,7 +136,7 @@ export const listWorkspaceGroups = async (
     })
     .from(workspaceGroups)
     .where(groupWhere)
-    .orderBy(asc(workspaceGroups.name));
+    .orderBy(asc(collated(workspaceGroups.name, locale)));
   if (!groups.length) return [];
 
   const groupIds = groups.map((g) => g.id);
@@ -171,7 +174,7 @@ export const listWorkspaceGroups = async (
         eq(workspaceMemberships.status, WorkspaceMembershipStatus.active),
       ),
     )
-    .orderBy(asc(appUsers.displayLabel));
+    .orderBy(asc(collated(appUsers.displayLabel, locale)));
 
   const idpRows = await db
     .select({
@@ -192,7 +195,7 @@ export const listWorkspaceGroups = async (
         eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
       ),
     )
-    .orderBy(asc(identityProviders.name));
+    .orderBy(asc(collated(identityProviders.name, locale)));
 
   return groups.map((g) => ({
     id: g.id,
@@ -231,8 +234,9 @@ export const listWorkspaceGroups = async (
 export const getWorkspaceGroup = async (
   workspaceId: string,
   groupId: string,
+  locale: SortLocale,
 ): Promise<WorkspaceGroupRow | null> => {
-  const groups = await listWorkspaceGroups(workspaceId, groupId);
+  const groups = await listWorkspaceGroups(workspaceId, locale, groupId);
   return groups[0] ?? null;
 };
 

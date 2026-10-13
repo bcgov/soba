@@ -1,7 +1,12 @@
 'use client';
 
 import React from 'react';
-import { Modal as BCModal, Dialog, Heading, ButtonGroup } from '@bcgov/design-system-react-components';
+import {
+  Modal as BCModal,
+  Dialog,
+  Heading,
+  ButtonGroup,
+} from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
 import styles from './Modal.module.css';
 

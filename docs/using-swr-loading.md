@@ -112,7 +112,7 @@ Existing hooks, in `src/shared/api/`:
 - `useWorkspaces`, `useWritableWorkspaces`, `useWorkspace`, `useRefreshWorkspaces`,
   `useRefreshWorkspace`
 - `useCurrentUser`, `useRefreshCurrentUser`
-- `useFormDraft` (in `src/features/designer/`) for a form, its versions and the selected
+- `useForm` (in `src/features/designer/`) for a form, its versions and the selected
   version's schema
 - `useFormSubmissions` (in `src/features/designer/`) for one form's submissions, read by the
   designer tab and the submissions page

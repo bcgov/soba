@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import type { CodesKeyedMetaResponse, RolesMetaResponse } from '@soba/lib';
 import { metaApiService } from './service';
 import { asyncHandler } from '../shared/asyncHandler';
 import { codeService } from '../../services/codeService';
@@ -63,10 +64,7 @@ export const getCodesMeta = asyncHandler(async (req: Request, res: Response) => 
     );
   }
 
-  const result: Record<
-    string,
-    Array<{ code: string; display: string; sort_order: number; is_active: boolean; source: string }>
-  > = {};
+  const result: CodesKeyedMetaResponse = {};
   for (const codeSet of codeSetNames) {
     const items = await codeService.getCodes(codeSet, {
       activeOnly: isActiveFilter === 'true',
@@ -105,7 +103,7 @@ export const getRolesMeta = asyncHandler(async (req: Request, res: Response) => 
     status: query.status,
     onlyEnabledFeatures: query.only_enabled_features === 'true',
   });
-  res.json({
+  const body: RolesMetaResponse = {
     roles: result.roles.map((r) => ({
       roleCode: r.code,
       name: r.name,
@@ -115,5 +113,6 @@ export const getRolesMeta = asyncHandler(async (req: Request, res: Response) => 
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
     })),
-  });
+  };
+  res.json(body);
 });

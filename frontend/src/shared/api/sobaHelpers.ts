@@ -16,6 +16,11 @@ export class ApiError extends Error {
  */
 export const isForbidden = (err: unknown): boolean => err instanceof ApiError && err.status === 403;
 
+export const isNotFound = (err: unknown): boolean => err instanceof ApiError && err.status === 404;
+
+/** The server refused a write because what it targets changed since the caller read it. */
+export const isConflict = (err: unknown): boolean => err instanceof ApiError && err.status === 409;
+
 export async function parseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     // Surface the backend's `{ error }` message (e.g. name-taken, disclaimer) when present.

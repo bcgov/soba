@@ -3,8 +3,10 @@ import { z } from 'zod';
 
 extendZodWithOpenApi(z);
 
-const AUTH_REQUIRED = 'Authentication required (form is not public)';
-// Public-capable surface: anonymous (public audience) or a bearer token for an authenticated member.
+const SUBMISSION_AUTH_REQUIRED =
+  'Authentication required (anonymous caller has no access to this submission)';
+// Optional auth: anonymous (the public user) or a bearer token. `{}` marks the no-auth case
+// explicit rather than leaving security unset.
 const PUBLIC_SECURITY = [{}, { bearerAuth: [] }];
 const BASE = '/submit/submissions/{id}';
 
@@ -32,7 +34,7 @@ export const PrintBodySchema = z
 
 const documentResponses = {
   200: { description: 'Rendered document bytes (attachment)', content: {} },
-  401: { description: AUTH_REQUIRED },
+  401: { description: SUBMISSION_AUTH_REQUIRED },
   403: {
     description: 'Not authorized, or no document-generation backend available for this scope',
   },

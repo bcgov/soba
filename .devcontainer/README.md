@@ -9,7 +9,7 @@ Open the repo in VS Code and **Reopen in Container**.
 - `docker-compose.devcontainer.yml` — the workspace container (`app`) the dev container runs in.
 - `docker-compose.yml` — the sidecars. Started separately, reached over `host.docker.internal`.
 - `.env` — optional, gitignored, per-developer resource caps (see below).
-- `post-create.sh` / `post-start.sh` — pnpm setup and env-file sync.
+- `post-create.sh` / `post-start.sh` — pnpm setup and env-file sync; `post-start.sh` also builds the shared lib (`lib/dist`).
 
 ## First run
 

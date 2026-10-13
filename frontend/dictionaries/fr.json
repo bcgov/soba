@@ -12,6 +12,8 @@
     "unknown": "Inconnu",
     "home": "Accueil",
     "forms": "Formulaires",
+    "myForms": "Mes formulaires",
+    "mySubmissions": "Mes soumissions",
     "formDesigner": "Concepteur de formulaires",
     "feedback": "Retour d'information",
     "help": "Aidé",
@@ -33,7 +35,11 @@
     "create": "Créer",
     "version": "Version",
     "clearFilters": "Effacer les filtres",
-    "noAccess": "Vous n'avez pas accès à ceci."
+    "noAccess": "Vous n'avez pas accès à ceci.",
+    "sortBy": "Trier par",
+    "lookupTruncated": "Affichage des {limit} premiers.",
+    "next": "Suivant",
+    "fieldRequired": "Ce champ est obligatoire."
   },
   "dataTable": {
     "emptyMessage": "Aucun élément trouvé.",
@@ -188,12 +194,9 @@
   "header": {
     "workspaces": "Espaces de travail",
     "design": "Conception",
-    "submit": "Soumettre",
     "skipToMain": "Aller au contenu principal",
-    "designer": "Générateur de Formulaire",
     "selectLanguage": "Choisir la langue",
     "bcgovTitle": "Gouvernement de la Colombie-Britannique",
-    "primaryNavAria": "Principal",
     "languages": {
       "en": "EN",
       "fr": "FR"
@@ -214,15 +217,16 @@
       "pageTitle": "Formulaire",
       "backToList": "Retour à la liste",
       "missingId": "Aucun formulaire sélectionné.",
-      "unavailable": "Ce formulaire n’est pas disponible pour soumission actuellement.",
       "loadError": "Le formulaire n’a pas pu être chargé. Vérifiez l’onglet réseau du navigateur et les journaux de l’API.",
       "rendererError": "Le moteur de formulaire s’est arrêté de façon inattendue. Réessayez ou revenez à la liste.",
       "segmentError": {
         "title": "Un problème est survenu lors du chargement de cette page de formulaire.",
         "tryAgain": "Réessayer",
-        "backToList": "Retour à la liste"
+        "backToHome": "Retour à l'accueil"
       },
       "submitSuccess": "Formulaire soumis avec succès.",
+      "submitPending": "Ce formulaire a changé depuis son ouverture; vos réponses ont été enregistrées pour examen au lieu d'être soumises.",
+      "readOnly": "Vous pouvez consulter cette soumission, mais vous ne pouvez plus la modifier ni la soumettre.",
       "starting": "Démarrage de votre soumission…",
       "startError": "La soumission n’a pas pu être démarrée. Veuillez réessayer."
     }
@@ -230,6 +234,9 @@
   "form": {
     "saved": "Formulaire enregistré avec succès.",
     "saveError": "Erreur lors de l'enregistrement du formulaire.",
+    "versionConflict": "Ce formulaire a été modifié depuis son ouverture. Enregistrez vos modifications comme nouvelle version, ou abandonnez-les.",
+    "staleEdits": "Vos modifications non enregistrées ont été faites sur une version antérieure de ce formulaire. Enregistrez-les comme nouvelle version, ou abandonnez-les.",
+    "discardEdits": "Abandonner les modifications",
     "noActiveWorkspace": "Sélectionnez un espace de travail avant de créer un formulaire.",
     "noActiveWorkspaceError": "Sélectionnez un espace de travail avant d'enregistrer ce formulaire.",
     "published": "Formulaire publié avec succès !",
@@ -252,11 +259,15 @@
     "submitterAudienceCancel": "Annuler",
     "submitterAudienceLoadError": "Impossible de charger l'accès de soumission",
     "submitterAudienceSaveError": "Impossible d'enregistrer l'accès de soumission",
+    "submitterAudienceInherit": "Hériter de l'espace de travail",
+    "submitterAudienceInheritedSummary": "Hérité : {summary}",
+    "submitterAudienceUsersNotApplied": "Les personnes nommées dans l'audience de l'espace de travail ne peuvent pas soumettre ce formulaire, sauf si un autre groupe leur en donne l'accès.",
     "disclaimerLabel": "J'accepte l'avis de non-responsabilité et la déclaration de responsabilité",
     "disclaimerRequired": "Acceptez l'avis de non-responsabilité de l'espace de travail dans les paramètres avant de créer un formulaire.",
     "exportJson": "Exporter JSON",
     "importJson": "Importer JSON",
     "designerTab": "Formulaire",
+    "designerTabs": "Onglets du concepteur de formulaire",
     "teamTab": "Accès",
     "settingsTab": "Paramètres",
     "historyTab": "Version l'historique",
@@ -293,22 +304,37 @@
     "copiedNotification": "Copié dans le presse-papiers",
     "newVersionFrom": "Nouvelle Version De",
     "emptyHistory": "Aucune version précédente",
-    "loadVersionsError": "Échec du chargement de l'historique des versions."
+    "loadVersionsError": "Échec du chargement de l'historique des versions.",
+    "settings": {
+      "formSettingsDrawerLabel": "Paramètres du Formulaire",
+      "formSettingsDrawerSaveSuccessMessage": "Modifications mises à jour avec succès.",
+      "formSettingsDrawerSaveErrorMessage": "Échec de l'enregistrement des modifications.",
+      "submitterSettingsDrawerLabel": "Paramètres des Soumissionnaires",
+      "allowSubmitterDraftsLabel": "Permettre aux soumissionnaires d'enregistrer et de modifier des brouillons",
+      "allowSubmitterDraftsPublicNote": "Les brouillons ne sont pas disponibles pour les formulaires publics.",
+      "submitterSettingsLoadError": "Impossible de charger les paramètres des soumissionnaires.",
+      "profileDrawerInfo": "L'équipe CHEFS recueille et organise des informations pour servir d'entrée cruciale à l'élaboration de dossiers d'affaires complets. Ces dossiers joueront un rôle central dans l'orientation de l'exploitation stratégique et de l'amélioration continue de CHEFS dans les années à venir. Cette initiative de collecte de données est essentielle pour éclairer les décisions critiques et façonner la trajectoire de CHEFS, garantissant son adaptabilité et son efficacité face aux besoins et défis évolutifs.",
+      "profileDrawerLabel": "Profil du Formulaire"
+    },
+    "descriptionLabel": "Description du Formulaire",
+    "submit": "Soumettre",
+    "noFormName": "Nom de formulaire est requise"
   },
   "submission": {
     "submissions": "Soumissions",
     "anon": "Anonyme",
     "pageTitle": "Soumission",
     "loading": "Chargement des soumissions…",
-    "empty": "Aucune soumission dans cet espace pour l’instant.",
     "error": "Impossible de charger les soumissions.",
     "submittedOn": "Soumis le",
     "noContent": "Aucune réponse soumise à afficher.",
     "notFound": "Soumission introuvable.",
+    "loadError": "Impossible de charger cette soumission.",
     "workflow": "Flux de travail",
     "confirmationId": "ID de confirmation",
     "submittedAt": "Date de Soumission",
     "submitter": "Soumissionnaire",
+    "backToSubmissions": "Retour aux soumissions",
     "deleteConfirm": "Confirmer la suppression",
     "deleteConfirmText": "Voulez-vous vraiment supprimer cette soumission",
     "delete": "Suppression",
@@ -318,14 +344,6 @@
     "emptyList": "Aucune soumission",
     "deleteSuccess": "Soumission supprimée avec succès",
     "deleteFailure": "Échec de la suppression de la soumission",
-    "columns": {
-      "id": "ID de Soumission",
-      "formName": "Nom du Formulaire",
-      "formId": "ID du Formulaire",
-      "version": "Version",
-      "status": "Statut",
-      "user": "Utilisateur"
-    },
     "formList": {
       "columns": {
         "name": "Nom du Formulaire",
@@ -382,7 +400,7 @@
     "collection": "Collecte d'ensembles de données, soumission de données",
     "feedback": "Formulaire de rétroaction pour déterminer la satisfaction, l'accord, la probabilité ou d'autres questions qualitatives",
     "report": "Rapports généralement sur un calendrier répétitif ou événementiel comme des suivis",
-    "registration": "Registrations or Sign up - no evaluation"
+    "registration": "Inscriptions - aucune évaluation"
   },
   "ministries": {
     "AF": "Agriculture et Alimentation (AF)",

@@ -11,14 +11,15 @@ import { ForbiddenError, UnauthorizedError } from '../../../src/core/errors';
 const res = {} as Response;
 const mockHas = jest.mocked(hasFormSubmitAccess);
 
-function makeReq(opts: { workspaceId?: string; authed?: boolean }): Request {
+function makeReq(opts: { workspaceId?: string; formId?: string; authed?: boolean }): Request {
   return {
     coreContext: opts.workspaceId
       ? {
           workspaceId: opts.workspaceId,
+          formId: opts.formId,
           actorId: 'actor1',
           actorDisplayLabel: null,
-          workspaceSource: 'submit:form',
+          workspaceSource: 'submit:submission',
           role: 'member',
         }
       : undefined,
@@ -32,11 +33,19 @@ function makeReq(opts: { workspaceId?: string; authed?: boolean }): Request {
 describe('requireFormAccess', () => {
   beforeEach(() => mockHas.mockReset());
 
-  it('passes when the audience/permission check grants access', async () => {
+  it('checks access against the resolved form', async () => {
     mockHas.mockResolvedValue(true);
     const next = jest.fn() as unknown as NextFunction;
-    await requireFormAccess(Permissions.form_read)(makeReq({ workspaceId: 'ws1' }), res, next);
-    expect(mockHas).toHaveBeenCalledWith('ws1', expect.anything(), Permissions.form_read);
+    await requireFormAccess(Permissions.form_read)(
+      makeReq({ workspaceId: 'ws1', formId: 'f1' }),
+      res,
+      next,
+    );
+    expect(mockHas).toHaveBeenCalledWith(
+      { workspaceId: 'ws1', formId: 'f1' },
+      expect.anything(),
+      Permissions.form_read,
+    );
     expect(next).toHaveBeenCalledWith();
   });
 
@@ -44,7 +53,7 @@ describe('requireFormAccess', () => {
     mockHas.mockResolvedValue(false);
     const next = jest.fn() as unknown as NextFunction;
     await requireFormAccess(Permissions.form_read)(
-      makeReq({ workspaceId: 'ws1', authed: true }),
+      makeReq({ workspaceId: 'ws1', formId: 'f1', authed: true }),
       res,
       next,
     );
@@ -56,7 +65,11 @@ describe('requireFormAccess', () => {
   it('denies an anonymous caller with 401', async () => {
     mockHas.mockResolvedValue(false);
     const next = jest.fn() as unknown as NextFunction;
-    await requireFormAccess(Permissions.form_read)(makeReq({ workspaceId: 'ws1' }), res, next);
+    await requireFormAccess(Permissions.form_read)(
+      makeReq({ workspaceId: 'ws1', formId: 'f1' }),
+      res,
+      next,
+    );
     const error = (next as jest.Mock).mock.calls[0][0];
     expect(error).toBeInstanceOf(UnauthorizedError);
     expect(error.statusCode).toBe(401);
@@ -68,5 +81,15 @@ describe('requireFormAccess', () => {
     const error = (next as jest.Mock).mock.calls[0][0];
     expect(error).toBeInstanceOf(Error);
     expect(error).not.toBeInstanceOf(ForbiddenError);
+  });
+
+  // A workspace alone can't answer for a form that overrides its audience.
+  it('errors when the form was not resolved', async () => {
+    const next = jest.fn() as unknown as NextFunction;
+    await requireFormAccess(Permissions.form_read)(makeReq({ workspaceId: 'ws1' }), res, next);
+    const error = (next as jest.Mock).mock.calls[0][0];
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(ForbiddenError);
+    expect(mockHas).not.toHaveBeenCalled();
   });
 });

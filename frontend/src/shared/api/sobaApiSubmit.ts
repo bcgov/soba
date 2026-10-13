@@ -1,13 +1,23 @@
-// Submit-mode API service: public form read + submission create/save + confirmation read. All calls
-// hit /submit/* and take an optional token — anonymous callers on a public-audience form are attributed
-// to the seeded public user by the backend. Access is decided by the workspace Form submitters audience.
+// Submit-mode API service: submission open/save/submit + reads of an existing submission. All calls
+// hit /submit/* and take an optional token; the backend attributes anonymous callers to the seeded
+// public user. Opening needs the form's Form submitters audience; reading an existing submission needs
+// participation in it, and writing it needs both.
 import { sobaFetch } from './sobaFetch';
 import { parseJson } from './sobaHelpers';
 import { FormType } from '@formio/react';
-import type { SubmitFillBundle } from '../../types/forms';
-import type { SubmissionResponse, SubmissionListItem } from '@/src/types/submissions';
+import type { SubmitFillBundle, SubmissionDataDocument } from '../../types/forms';
+import type {
+  SubmissionDataBody,
+  SubmissionResponse,
+  SubmissionWriteResponse,
+  SubmissionListItem,
+  SubmitSubmissionBody,
+} from '@/src/types/submissions';
 
-/** The one payload the fill page needs: workflow state + schema + any saved answers (resume). */
+/**
+ * The one payload the fill page needs: workflow state, form version, head revision, schema, any
+ * saved answers (resume) and whether the caller may write.
+ */
 export async function getSubmitFillBundle(
   token: string | undefined,
   submissionId: string,
@@ -29,18 +39,20 @@ export async function getSubmitSubmissionSchema(
 /**
  * Open a SOBA submission (a PG row in the `opened` state) under a client-minted id (uuidv7); its
  * answer data is written later via saveSobaFormSubmission (draft) or submitSobaFormSubmission (submit).
- * The create is idempotent on the id, so a retry with the same id returns the same record. Token is
- * optional: anonymous submissions to a public-audience form are attributed to the public user.
+ * The create is idempotent on the id, so a retry with the same id returns the same record. A
+ * formVersionId must be the published version (409 otherwise). Token is optional: anonymous
+ * submissions to a public-audience form are attributed to the public user.
  */
 export async function openSobaFormSubmission(
   token: string | undefined,
   formId: string,
   id: string,
+  formVersionId?: string,
 ): Promise<SubmissionResponse> {
   const response = await sobaFetch('/submit/submissions', {
     token,
     method: 'POST',
-    json: { id, formId },
+    json: { id, formId, formVersionId },
   });
   return parseJson<SubmissionResponse>(response);
 }
@@ -48,36 +60,41 @@ export async function openSobaFormSubmission(
 /**
  * Save a submission's answer data as a draft; the server writes a new engine document + revision.
  * Reserved for the (deferred) draft-save UI — the fill flow is resume-only for now, so nothing calls
- * this yet. Kept as the client half of POST /submit/submissions/:id/save.
+ * this yet. Kept as the client half of POST /submit/submissions/:id/save. `revision.status` reports
+ * whether the save became current or was held as pending.
  */
 export async function saveSobaFormSubmission(
   token: string | undefined,
   submissionId: string,
-  data: Record<string, unknown>,
-): Promise<SubmissionResponse> {
+  body: SubmissionDataBody,
+): Promise<SubmissionWriteResponse> {
   const response = await sobaFetch(`/submit/submissions/${submissionId}/save`, {
     token,
     method: 'POST',
-    json: { data },
+    json: body,
   });
-  return parseJson<SubmissionResponse>(response);
+  return parseJson<SubmissionWriteResponse>(response);
 }
 
-/** Submit a submission's answer data; the server records the submit and marks it submitted. */
+/**
+ * Submit a submission's answer data. `revision.status` is `current` when the submit landed, or
+ * `pending` when it was held for review (a conflict, or a submit against an already-submitted
+ * record). A retry with the same revisionId replays the recorded revision.
+ */
 export async function submitSobaFormSubmission(
   token: string | undefined,
   submissionId: string,
-  data: Record<string, unknown>,
-): Promise<SubmissionResponse> {
+  body: SubmitSubmissionBody,
+): Promise<SubmissionWriteResponse> {
   const response = await sobaFetch(`/submit/submissions/${submissionId}/submit`, {
     token,
     method: 'POST',
-    json: { data },
+    json: body,
   });
-  return parseJson<SubmissionResponse>(response);
+  return parseJson<SubmissionWriteResponse>(response);
 }
 
-/** Read a submission's metadata for the confirmation view (audience-readable). */
+/** Read a submission's metadata for the confirmation view. */
 export async function getSubmitSubmission(
   token: string | undefined,
   id: string,
@@ -89,9 +106,9 @@ export async function getSubmitSubmission(
 /** Read a submission's answer document for the confirmation view (null if not yet provisioned). */
 export async function getSubmitSubmissionData(
   token: string | undefined,
-  id: string,
-): Promise<{ data?: Record<string, unknown> } | null> {
-  const response = await sobaFetch(`/submit/submissions/${id}/data`, { token });
+  submissionId: string,
+): Promise<SubmissionDataDocument | null> {
+  const response = await sobaFetch(`/submit/submissions/${submissionId}/data`, { token });
   if (response.status === 404) return null;
-  return parseJson(response);
+  return parseJson<SubmissionDataDocument>(response);
 }

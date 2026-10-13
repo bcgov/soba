@@ -2,7 +2,6 @@ import type { FeaturesMetaPayload } from '@/src/shared/config/featuresMeta';
 
 /** Feature `code` values aligned with `GET /meta/features` and `soba.feature`. */
 export const FEATURE_CODES = {
-  WORKSPACES: 'workspaces',
   DESIGN_MODE: 'design-mode',
   SUBMIT_MODE: 'submit-mode',
   /** Backend `soba.feature` seed code `meta` (API meta & health). Mirrored here so

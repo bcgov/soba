@@ -25,10 +25,10 @@ Everything except `--purge` checks this and stops with one instruction if it has
 Everything here is gated on the `dev-data` feature, which the migration inserts as **disabled**.
 Each environment decides with `FEATURE_DEV_DATA_STATUS`, applied to `soba.feature` by `db:seed`:
 
-| Value | Effect |
-| ----- | ------ |
-| unset or empty | leave the feature as the migration set it |
-| any `feature_status` code | set the feature to that status |
+| Value                     | Effect                                    |
+| ------------------------- | ----------------------------------------- |
+| unset or empty            | leave the feature as the migration set it |
+| any `feature_status` code | set the feature to that status            |
 
 Statuses are `enabled`, `disabled`, `experimental`, and `deprecated`; a value outside the
 `feature_status` table stops the seed rather than leaving the environment quietly wrong. The same
@@ -135,16 +135,16 @@ subjects, so they cannot sign in. They exist to fill member lists, groups, and r
 
 | File                                     | Role                                                     |
 | ---------------------------------------- | -------------------------------------------------------- |
-| [`plan.ts`](./plan.ts)                   | What gets created, as data. No DB, no engine, no clock    |
-| [`generate.ts`](./generate.ts)           | Runs the plan through the services, returns a manifest    |
-| [`purge.ts`](./purge.ts)                 | Removes it all, engine documents included                 |
-| [`fixtures/`](./fixtures)                | Form definitions and answers matching their components    |
-| [`ownerFile.ts`](./ownerFile.ts)         | Reads and writes `.devdata-owner`, creates the owner      |
-| [`resolveUser.ts`](./resolveUser.ts)     | Looks the owner up by username                            |
-| [`preconditions.ts`](./preconditions.ts) | Checks the database is migrated and seeded                |
-| [`guard.ts`](./guard.ts)                 | Refuses to run unless the dev-data feature is on          |
-| [`runs.ts`](./runs.ts)                   | Records each run's ids in `soba.dev_data_run` as it goes  |
-| [`cli.ts`](./cli.ts)                     | Argument parsing, output, exit codes                      |
+| [`plan.ts`](./plan.ts)                   | What gets created, as data. No DB, no engine, no clock   |
+| [`generate.ts`](./generate.ts)           | Runs the plan through the services, returns a manifest   |
+| [`purge.ts`](./purge.ts)                 | Removes it all, engine documents included                |
+| [`fixtures/`](./fixtures)                | Form definitions and answers matching their components   |
+| [`ownerFile.ts`](./ownerFile.ts)         | Reads and writes `.devdata-owner`, creates the owner     |
+| [`resolveUser.ts`](./resolveUser.ts)     | Looks the owner up by username                           |
+| [`preconditions.ts`](./preconditions.ts) | Checks the database is migrated and seeded               |
+| [`guard.ts`](./guard.ts)                 | Refuses to run unless the dev-data feature is on         |
+| [`runs.ts`](./runs.ts)                   | Records each run's ids in `soba.dev_data_run` as it goes |
+| [`cli.ts`](./cli.ts)                     | Argument parsing, output, exit codes                     |
 
 `generate()` and `purge()` take options and return results, with no argv, console, or process exit,
 so an admin API route can drive them unchanged.

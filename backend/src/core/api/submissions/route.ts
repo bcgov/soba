@@ -1,5 +1,6 @@
 import express from 'express';
 import { validateRequest } from '../shared/validation';
+import { sortLocale } from '../../middleware/sortLocale';
 import { workspaceListScope, workspaceFromResource } from '../../middleware/workspaceContext';
 import { requireFormPermissions } from '../../middleware/requireFormPermissions';
 import { Permissions } from '../../db/codes';
@@ -7,8 +8,8 @@ import { deleteSubmission, getSubmission, getSubmissionData, listSubmissions } f
 import { ListSubmissionsQuerySchema, SubmissionIdParamsSchema } from './schema';
 
 // Design-mode submission management: mounted under /api/v1/design/submissions with mandatory auth.
-// Staff-only (list/read/delete). Opening/saving/submitting a submission and the public confirmation
-// read live in the submit feature.
+// Staff-only (list/read/delete). Opening/saving/submitting a submission and the submit-mode
+// confirmation read live in the submit feature.
 const router = express.Router();
 
 const submissionResource = workspaceFromResource({ kind: 'submission', idFrom: 'paramsId' });
@@ -17,6 +18,7 @@ const ID_PATH = '/:id';
 router.get(
   '/',
   validateRequest({ query: ListSubmissionsQuerySchema }),
+  sortLocale,
   workspaceListScope({
     anchorOrder: ['submissionId', 'formVersionId', 'formId', 'workspaceId'],
   }),

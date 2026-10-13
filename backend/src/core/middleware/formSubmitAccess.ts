@@ -1,13 +1,15 @@
-import { hasFormSubmitAccess } from '../db/repos/formSubmitAccessRepo';
-import { getWorkspaceIdForSubmission } from '../db/repos/submissionRepo';
+import { hasFormSubmitAccess, type FormAccessTarget } from '../db/repos/formSubmitAccessRepo';
+import { getSubmissionWorkspaceAndState } from '../db/repos/submissionRepo';
 import { getWorkspaceIdForForm } from '../db/repos/formRepo';
+import { PUBLIC_SUBMITTER_LABEL, WorkspaceMembershipRole, type PermissionCode } from '../db/codes';
 import {
-  Permissions,
-  PUBLIC_SUBMITTER_LABEL,
-  WorkspaceMembershipRole,
-  type PermissionCode,
-} from '../db/codes';
+  isSubmitterAllowed,
+  SubmitterOperation,
+  type SubmitterAccessTarget,
+  type SubmitterOperationCode,
+} from '../services/submitterAccess';
 import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from '../errors';
+import { log } from '../logging';
 import { resolveCaller } from './actor';
 import type { Request, Response, NextFunction } from 'express';
 
@@ -15,47 +17,102 @@ import type { Request, Response, NextFunction } from 'express';
 export const accessDenial = (req: Request, message: string): Error =>
   req.user ? new ForbiddenError(message) : new UnauthorizedError(message);
 
-/** The workspace a submission request authorizes against. */
-interface SubmitTarget {
-  workspaceId: string;
-}
+const DENIAL_MESSAGES: Record<SubmitterOperationCode, string> = {
+  open: 'Not authorized to submit this form',
+  read: 'Not authorized to access this submission',
+  write: 'Not authorized to change this submission',
+  deleteSubmittedFile: 'Not authorized to change this submission',
+};
 
 /**
- * Resolve the workspace a submission request authorizes against. POST /submissions (open) names its
- * form in the body; the published version is resolved server-side by the service, so here we only need
- * the form's workspace. POST /submissions/:id/{save,submit} carry the submission id. Throws 404 when the
- * named form or submission doesn't exist, so the downstream controller never runs without a context.
+ * Throws unless the caller may perform the submit-mode operation: 401 for anonymous, 403 for an
+ * authenticated caller.
  */
-const resolveSubmitTarget = async (req: Request): Promise<SubmitTarget> => {
+export const assertSubmitterAllowed = async (
+  req: Request,
+  operation: SubmitterOperationCode,
+  target: SubmitterAccessTarget,
+): Promise<void> => {
+  if (await isSubmitterAllowed(operation, target, resolveCaller(req))) return;
+  log.warn(
+    {
+      operation,
+      formId: target.formId,
+      submissionId: target.submissionId,
+      actorId: req.actorId,
+    },
+    'Submit-mode access refused',
+  );
+  throw accessDenial(req, DENIAL_MESSAGES[operation]);
+};
+
+/**
+ * Populate the public-submit req.coreContext for an authorized open, save, submit or upload.
+ * Anonymous callers are attributed to the seeded public user, already resolved as req.actorId.
+ */
+export const setSubmitContext = (req: Request, target: FormAccessTarget): void => {
+  // Guaranteed by resolveActorOrPublic upstream; guard so a missing id can't become an empty-string FK.
+  if (!req.actorId) {
+    throw new Error('setSubmitContext requires a resolved actor');
+  }
+  req.coreContext = {
+    workspaceId: target.workspaceId,
+    formId: target.formId,
+    actorId: req.actorId,
+    actorDisplayLabel:
+      req.user?.profile?.displayLabel || req.user?.profile?.displayName || PUBLIC_SUBMITTER_LABEL,
+    workspaceSource: 'public-submit',
+    // Public submitters have no membership; a non-manage role keeps them off workspace-admin routes.
+    role: WorkspaceMembershipRole.member,
+  };
+};
+
+/**
+ * Resolve the target a submission request authorizes against. POST /submissions (open) names its form
+ * in the body; the published version is resolved server-side by the service. POST
+ * /submissions/:id/{save,submit} carry the submission id. Throws 404 when the named form or submission
+ * doesn't exist, so the downstream controller never runs without a context.
+ */
+const resolveSubmitTarget = async (req: Request): Promise<SubmitterAccessTarget> => {
+  // The :id branch goes first so a body formId can never turn a write into an open.
+  if (req.params.id) {
+    const submission = await getSubmissionWorkspaceAndState(req.params.id);
+    if (!submission) throw new NotFoundError('Submission not found');
+    return {
+      workspaceId: submission.workspaceId,
+      formId: submission.formId,
+      submissionId: req.params.id,
+    };
+  }
+
   const bodyFormId = (req.body as { formId?: unknown } | undefined)?.formId;
   if (typeof bodyFormId === 'string' && bodyFormId) {
     const workspaceId = await getWorkspaceIdForForm(bodyFormId);
     if (!workspaceId) throw new NotFoundError('Form not found');
-    return { workspaceId };
-  }
-
-  if (req.params.id) {
-    const workspaceId = await getWorkspaceIdForSubmission(req.params.id);
-    if (!workspaceId) throw new NotFoundError('Submission not found');
-    return { workspaceId };
+    return { workspaceId, formId: bodyFormId };
   }
 
   throw new ValidationError('Missing submission target');
 };
 
 /**
- * Authorizes a read of a form resource whose workspace was already resolved into req.coreContext (see
- * the open workspace resolvers). Grants staff with `required`, or the Form submitters audience for
- * form_read. On denial, 401 for anonymous / 403 for an authenticated non-member.
+ * Authorizes a read of a form resource whose workspace and form were already resolved into
+ * req.coreContext (see openWorkspaceFromResource). Grants staff with `required`, or the form's Form
+ * submitters audience when `required` is in AUDIENCE_PERMISSIONS. On denial, 401 for anonymous / 403
+ * for an authenticated non-member.
  */
 export const requireFormAccess = (required: PermissionCode) => {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     try {
       const context = req.coreContext;
-      if (!context) {
-        throw new Error('requireFormAccess must run after workspace resolution');
+      if (!context?.formId) {
+        throw new Error('requireFormAccess must run after form resource resolution');
       }
-      const allowed = await hasFormSubmitAccess(context.workspaceId, resolveCaller(req), required);
+      const allowed = await hasFormSubmitAccess(
+        { workspaceId: context.workspaceId, formId: context.formId },
+        resolveCaller(req),
+        required,
+      );
       if (!allowed) {
         throw accessDenial(req, 'Not authorized to access this form');
       }
@@ -67,54 +124,44 @@ export const requireFormAccess = (required: PermissionCode) => {
 };
 
 /**
- * Authorize a caller against a workspace's Form submitters audience (or their staff permissions) for
- * `permission`, then populate the public-submit req.coreContext — anonymous callers are attributed to
- * the seeded public user (already resolved as req.actorId). Shared by the submit routes and file
- * uploads. Throws 401 (anonymous) / 403 (authenticated non-member) on denial.
- */
-export const authorizeSubmitterForWorkspace = async (
-  req: Request,
-  res: Response,
-  workspaceId: string,
-  permission: PermissionCode,
-): Promise<void> => {
-  const allowed = await hasFormSubmitAccess(workspaceId, resolveCaller(req), permission);
-  if (!allowed) {
-    throw accessDenial(req, 'Not authorized to submit this form');
-  }
-  // Guaranteed by resolveActorOrPublic upstream; guard so a missing id can't become an empty-string FK.
-  if (!req.actorId) {
-    throw new Error('authorizeSubmitterForWorkspace requires a resolved actor');
-  }
-  req.coreContext = {
-    workspaceId,
-    actorId: req.actorId,
-    actorDisplayLabel:
-      req.user?.profile?.displayLabel || req.user?.profile?.displayName || PUBLIC_SUBMITTER_LABEL,
-    workspaceSource: 'public-submit',
-    // Public submitters have no membership; a non-manage role keeps them off workspace-admin routes.
-    role: WorkspaceMembershipRole.member,
-  };
-};
-
-/**
- * Authorizes a submission (open / save / submit) against the target form's workspace Form submitters
- * audience (or the caller's staff permissions), then populates req.coreContext for the downstream
- * controller.
+ * Authorizes POST /submissions (open) and POST /submissions/:id/{save,submit} (write), then populates
+ * req.coreContext for the downstream controller.
  */
 export const requireFormSubmitAccess = async (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction,
 ): Promise<void> => {
   try {
     const target = await resolveSubmitTarget(req);
-    await authorizeSubmitterForWorkspace(
-      req,
-      res,
-      target.workspaceId,
-      Permissions.submission_create,
-    );
+    const operation = target.submissionId ? SubmitterOperation.write : SubmitterOperation.open;
+    await assertSubmitterAllowed(req, operation, target);
+    setSubmitContext(req, target);
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Authorizes a submit-mode read of an existing submission. Runs after openWorkspaceFromResource, which
+ * 404s a missing submission and resolves its form.
+ */
+export const requireSubmissionRead = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const context = req.coreContext;
+    if (!context?.formId || !req.params.id) {
+      throw new Error('requireSubmissionRead must run after submission resource resolution');
+    }
+    await assertSubmitterAllowed(req, SubmitterOperation.read, {
+      workspaceId: context.workspaceId,
+      formId: context.formId,
+      submissionId: req.params.id,
+    });
     next();
   } catch (error) {
     next(error);

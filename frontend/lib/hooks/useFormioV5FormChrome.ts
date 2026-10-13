@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { disableFormioBrowserAuth } from '@/src/features/formio-v5/disableFormioBrowserAuth';
+import { withBasePath } from '@/src/shared/config/basePath';
 
 /**
  * Form.io renderer/builder stylesheet, injected only while a Form.io component
@@ -38,7 +39,7 @@ export function useFormioV5FormChrome(variant: Variant | null): void {
 
     const style = document.createElement('style');
     style.id = id;
-    style.textContent = `@import url("${STYLESHEET}") layer(formio);`;
+    style.textContent = `@import url("${withBasePath(STYLESHEET)}") layer(formio);`;
     document.head.appendChild(style);
 
     return () => {

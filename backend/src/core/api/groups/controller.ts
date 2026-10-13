@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { z } from 'zod';
 import { groupsApiService } from './service';
+import { withSortLocale } from '../../middleware/sortLocale';
 import { asyncHandler } from '../shared/asyncHandler';
 import type { Request } from 'express';
 import {
@@ -24,14 +25,13 @@ type GroupIdParams = z.infer<typeof GroupIdParamsSchema>;
 type GroupMemberParams = z.infer<typeof GroupMemberParamsSchema>;
 
 export const listGroups = asyncHandler(async (req: Request, res: Response) => {
-  const ctx = req.coreContext!;
-  const result = await groupsApiService.list(ctx.workspaceId);
+  const result = await groupsApiService.list(withSortLocale(req));
   res.json(result);
 });
 
 export const createGroup = asyncHandler(
   async (req: Request<unknown, unknown, CreateGroupBody>, res: Response) => {
-    const ctx = req.coreContext!;
+    const ctx = withSortLocale(req);
     const result = await groupsApiService.create(ctx, req.body);
     res.status(201).json(result);
   },
@@ -39,21 +39,21 @@ export const createGroup = asyncHandler(
 
 export const updateGroup = asyncHandler(
   async (req: Request<GroupIdParams, unknown, UpdateGroupBody>, res: Response) => {
-    const ctx = req.coreContext!;
+    const ctx = withSortLocale(req);
     const result = await groupsApiService.rename(ctx, req.params.groupId, req.body);
     res.json(result);
   },
 );
 
 export const deleteGroup = asyncHandler(async (req: Request<GroupIdParams>, res: Response) => {
-  const ctx = req.coreContext!;
+  const ctx = withSortLocale(req);
   await groupsApiService.remove(ctx, req.params.groupId);
   res.status(204).send();
 });
 
 export const setGroupRoles = asyncHandler(
   async (req: Request<GroupIdParams, unknown, SetGroupRolesBody>, res: Response) => {
-    const ctx = req.coreContext!;
+    const ctx = withSortLocale(req);
     const result = await groupsApiService.setRoles(ctx, req.params.groupId, req.body.roleCodes);
     res.json(result);
   },
@@ -61,7 +61,7 @@ export const setGroupRoles = asyncHandler(
 
 export const addGroupMember = asyncHandler(
   async (req: Request<GroupIdParams, unknown, AddGroupMemberBody>, res: Response) => {
-    const ctx = req.coreContext!;
+    const ctx = withSortLocale(req);
     const result = await groupsApiService.addMember(ctx, req.params.groupId, req.body);
     res.json(result);
   },
@@ -69,7 +69,7 @@ export const addGroupMember = asyncHandler(
 
 export const removeGroupMember = asyncHandler(
   async (req: Request<GroupMemberParams>, res: Response) => {
-    const ctx = req.coreContext!;
+    const ctx = withSortLocale(req);
     const result = await groupsApiService.removeMember(
       ctx,
       req.params.groupId,
@@ -80,13 +80,13 @@ export const removeGroupMember = asyncHandler(
 );
 
 export const getSubmitterAudience = asyncHandler(async (req: Request, res: Response) => {
-  const result = await submitterAudienceService.get(req.coreContext!);
+  const result = await submitterAudienceService.get(withSortLocale(req));
   res.json(result);
 });
 
 export const setSubmitterAudience = asyncHandler(
   async (req: Request<unknown, unknown, SetSubmitterAudienceBody>, res: Response) => {
-    const result = await submitterAudienceService.set(req.coreContext!, req.body);
+    const result = await submitterAudienceService.set(withSortLocale(req), req.body);
     res.json(result);
   },
 );

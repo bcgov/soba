@@ -8,8 +8,9 @@ import {
   type FileRecord,
 } from '../../core/db/repos/fileRepo';
 import { getSubmissionRecordById } from '../../core/db/repos/submissionRepo';
-import { hasFormSubmitAccess, type CallerIdentity } from '../../core/db/repos/formSubmitAccessRepo';
-import { Permissions, SubmissionWorkflowState } from '../../core/db/codes';
+import type { CallerIdentity } from '../../core/db/repos/formSubmitAccessRepo';
+import { isSubmitterAllowed, SubmitterOperation } from '../../core/services/submitterAccess';
+import { SubmissionWorkflowState } from '../../core/db/codes';
 import type { GetFileResult } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 import { extractChefsFileIds } from './fileReferences';
 import { scanUpload } from './scanUpload';
@@ -66,8 +67,8 @@ export const filesService = {
 
   /**
    * Fetch a file for a caller, scoped to its owning submission: the file must belong to a still-present
-   * submission, and the caller must have submission_read on that submission's workspace (Form submitters
-   * audience or staff). 'notfound' when missing / no live owning submission; 'denied' when unauthorized.
+   * submission, and the caller must be allowed to read it. 'notfound' when missing / no live owning
+   * submission; 'denied' when unauthorized.
    */
   async getForCaller(
     id: string,
@@ -77,12 +78,12 @@ export const filesService = {
     if (!record?.submissionId) return 'notfound';
     const submission = await getSubmissionRecordById(record.workspaceId, record.submissionId);
     if (!submission) return 'notfound';
-    const allowed = await hasFormSubmitAccess(
-      record.workspaceId,
-      caller,
-      Permissions.submission_read,
-    );
-    if (!allowed) return 'denied';
+    const target = {
+      workspaceId: record.workspaceId,
+      formId: submission.formId,
+      submissionId: submission.id,
+    };
+    if (!(await isSubmitterAllowed(SubmitterOperation.read, target, caller))) return 'denied';
     const file = await getStorageAdapter(record.profile).getFile(record.backendRef);
     if (!file) return 'notfound';
     return { record, file };
@@ -102,9 +103,9 @@ export const filesService = {
   },
 
   /**
-   * Delete a file per its owning submission: while un-submitted, only the submission's owner
-   * (submittedBy) may delete; once submitted, only staff with submission_update. 'notfound' when
-   * missing; 'denied' when the caller isn't authorized.
+   * Delete a file per its owning submission: while un-submitted, a caller allowed to write it; once
+   * submitted, only a caller with submission_update on the form. 'notfound' when missing; 'denied' when
+   * the caller isn't authorized.
    */
   async deleteForCaller(
     id: string,
@@ -114,14 +115,15 @@ export const filesService = {
     if (!record?.submissionId) return 'notfound';
     const submission = await getSubmissionRecordById(record.workspaceId, record.submissionId);
     if (!submission) return 'notfound';
-    const allowed =
+    const operation =
       submission.workflowState === SubmissionWorkflowState.submitted
-        ? await hasFormSubmitAccess(record.workspaceId, caller, Permissions.submission_update)
-        : // Un-submitted: the submission owner may delete, but only where they're actually in the
-          // submit audience — this bounds anonymous (shared public id) to forms they can submit to.
-          !!caller.actorId &&
-          submission.submittedBy === caller.actorId &&
-          (await hasFormSubmitAccess(record.workspaceId, caller, Permissions.submission_create));
+        ? SubmitterOperation.deleteSubmittedFile
+        : SubmitterOperation.write;
+    const allowed = await isSubmitterAllowed(
+      operation,
+      { workspaceId: record.workspaceId, formId: submission.formId, submissionId: submission.id },
+      caller,
+    );
     if (!allowed) return 'denied';
     // Row first: if the row delete throws, nothing is destroyed (retryable). A blob delete failing
     // after the row is gone leaves a reclaimable orphan, not a dangling, un-downloadable row.

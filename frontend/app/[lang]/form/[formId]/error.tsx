@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Segment error UI for `/[lang]/forms/[formId]` only.
+ * Segment error UI for `/[lang]/form/[formId]` only.
  *
  * Today: catches uncaught errors in this route segment (including escaped RSC/client failures).
  * The Form.io tree also uses `FormioV5FormRenderErrorBoundary` for renderer-local throws.
@@ -33,11 +33,8 @@ export default function FormIdRouteError({
         <Button type="button" variant="primary" onPress={() => reset()}>
           {labels.tryAgain}
         </Button>
-        <Link
-          className="text-decoration-underline"
-          href={`/${locale}/forms`}
-        >
-          {labels.backToList}
+        <Link className="text-decoration-underline" href={`/${locale}`}>
+          {labels.backToHome}
         </Link>
       </div>
     </div>

@@ -1,12 +1,14 @@
 import express from 'express';
 import { validateRequest } from '../shared/validation';
+import { SortLocaleQuerySchema } from '../shared/offsetPagination';
+import { sortLocale } from '../../middleware/sortLocale';
 import {
   workspaceFromBody,
   workspaceListScope,
   workspaceFromResource,
 } from '../../middleware/workspaceContext';
 import { requireFormPermissions } from '../../middleware/requireFormPermissions';
-import { Permissions } from '../../db/codes';
+import { FormCreatePermissions, Permissions } from '../../db/codes';
 import {
   createForm,
   normalizeFormSchema,
@@ -16,6 +18,7 @@ import {
   getFormVersion,
   listForms,
   listFormVersions,
+  lookupFormVersions,
   deleteForm,
   deleteFormVersion,
   saveFormVersion,
@@ -24,6 +27,8 @@ import {
   restoreFormVersion,
   provisionFormVersionSchema,
   getFormVersionSchema,
+  getFormSubmitterAudience,
+  setFormSubmitterAudience,
 } from './controller';
 import {
   CreateFormBodySchema,
@@ -33,9 +38,11 @@ import {
   NormalizeSchemaBodySchema,
   ListFormsQuerySchema,
   ListFormVersionsQuerySchema,
+  FormVersionLookupQuerySchema,
   ProvisionSchemaBodySchema,
   SaveFormVersionBodySchema,
   SaveFormVersionParamsSchema,
+  SetFormSubmitterAudienceBodySchema,
   UpdateFormBodySchema,
 } from './schema';
 
@@ -46,6 +53,7 @@ const router = express.Router();
 
 const FORMS_PATH = '/forms';
 const FORMS_ID_PATH = `${FORMS_PATH}/:id`;
+const FORM_SUBMITTER_AUDIENCE_PATH = `${FORMS_ID_PATH}/submitter-audience`;
 const FORM_VERSIONS_PATH = '/form-versions';
 const FORM_VERSIONS_ID_PATH = `${FORM_VERSIONS_PATH}/:id`;
 
@@ -57,15 +65,17 @@ const formFromBodyResource = workspaceFromResource({ kind: 'form', idFrom: 'body
 router.get(
   FORMS_PATH,
   validateRequest({ query: ListFormsQuerySchema }),
+  sortLocale,
   workspaceListScope({ anchorOrder: ['formId', 'workspaceId'], allowEmpty: true }),
   requireFormPermissions([Permissions.form_read]),
   listForms,
 );
-// Membership-only (workspace resolved from the body); the disclaimer gate lives in the service.
+// Workspace from the body; disclaimer is checked in the service. form_create is form_admin-only (`*`).
 router.post(
   FORMS_PATH,
   validateRequest({ body: CreateFormBodySchema }),
   workspaceFromBody,
+  requireFormPermissions(FormCreatePermissions),
   createForm,
 );
 // Schema-shaping utility; actor-only (no workspace context).
@@ -89,11 +99,39 @@ router.patch(
   updateForm,
 );
 router.get(
+  FORM_SUBMITTER_AUDIENCE_PATH,
+  validateRequest({ query: SortLocaleQuerySchema, params: FormIdParamsSchema }),
+  sortLocale,
+  formResource,
+  requireFormPermissions([Permissions.form_read]),
+  getFormSubmitterAudience,
+);
+router.put(
+  FORM_SUBMITTER_AUDIENCE_PATH,
+  validateRequest({
+    query: SortLocaleQuerySchema,
+    params: FormIdParamsSchema,
+    body: SetFormSubmitterAudienceBodySchema,
+  }),
+  sortLocale,
+  formResource,
+  requireFormPermissions([Permissions.form_update]),
+  setFormSubmitterAudience,
+);
+router.get(
   FORM_VERSIONS_PATH,
   validateRequest({ query: ListFormVersionsQuerySchema }),
   workspaceListScope({ anchorOrder: ['formVersionId', 'formId', 'workspaceId'], allowEmpty: true }),
   requireFormPermissions([Permissions.form_read]),
   listFormVersions,
+);
+// Registered before the `:id` route, which would otherwise take `lookup` as an id.
+router.get(
+  `${FORM_VERSIONS_PATH}/lookup`,
+  validateRequest({ query: FormVersionLookupQuerySchema }),
+  workspaceListScope({ anchorOrder: ['formId'] }),
+  requireFormPermissions([Permissions.form_read]),
+  lookupFormVersions,
 );
 router.get(
   FORM_VERSIONS_ID_PATH,

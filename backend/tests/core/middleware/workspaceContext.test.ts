@@ -22,12 +22,10 @@ jest.mock('../../../src/core/db/repos/formRepo', () => ({
 
 jest.mock('../../../src/core/db/repos/formVersionRepo', () => ({
   getFormVersionListContext: jest.fn(),
-  getWorkspaceIdForFormVersion: jest.fn(),
 }));
 
 jest.mock('../../../src/core/db/repos/submissionRepo', () => ({
   getSubmissionListContext: jest.fn(),
-  getWorkspaceIdForSubmission: jest.fn(),
 }));
 
 jest.mock('../../../src/core/db/repos/workspaceRepo', () => ({
@@ -36,6 +34,7 @@ jest.mock('../../../src/core/db/repos/workspaceRepo', () => ({
 
 import type { NextFunction, Request, Response } from 'express';
 import {
+  openWorkspaceFromResource,
   workspaceFromQuery,
   workspaceFromResource,
   workspaceListScope,
@@ -302,6 +301,7 @@ describe('workspaceFromResource', () => {
 
     expect(getWorkspaceIdForForm).toHaveBeenCalledWith('form1');
     expect(req.coreContext?.workspaceId).toBe('ws9');
+    expect(req.coreContext?.formId).toBe('form1');
     expect(req.coreContext?.workspaceSource).toBe('resource:form');
     expect(next).toHaveBeenCalledWith();
   });
@@ -329,6 +329,88 @@ describe('workspaceFromResource', () => {
 
     expect(next).toHaveBeenCalledWith(expect.any(ForbiddenError));
     expect(res.set).not.toHaveBeenCalled();
+  });
+});
+
+// Access checks on a form's resources need the form, not only its workspace.
+describe('workspaceFromResource (resources under a form)', () => {
+  it('carries the form of a form version', async () => {
+    jest
+      .mocked(getFormVersionListContext)
+      .mockResolvedValue({ workspaceId: 'ws9', formId: 'form1' });
+    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws9'));
+    const req = makeReq({ params: { id: 'fv1' } as Request['params'] });
+    const next = jest.fn() as unknown as NextFunction;
+
+    await workspaceFromResource({ kind: 'formVersion', idFrom: 'paramsId' })(
+      req,
+      makeRes() as Response,
+      next,
+    );
+
+    expect(req.coreContext).toMatchObject({
+      workspaceId: 'ws9',
+      formId: 'form1',
+      workspaceSource: 'resource:formVersion',
+    });
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('carries the form of a submission', async () => {
+    jest
+      .mocked(getSubmissionListContext)
+      .mockResolvedValue({ workspaceId: 'ws9', formId: 'form1', formVersionId: 'fv1' });
+    jest.mocked(getWorkspaceForUser).mockResolvedValue(membershipRow('ws9'));
+    const req = makeReq({ params: { id: 'sub1' } as Request['params'] });
+    const next = jest.fn() as unknown as NextFunction;
+
+    await workspaceFromResource({ kind: 'submission', idFrom: 'paramsId' })(
+      req,
+      makeRes() as Response,
+      next,
+    );
+
+    expect(req.coreContext).toMatchObject({
+      workspaceId: 'ws9',
+      formId: 'form1',
+      workspaceSource: 'resource:submission',
+    });
+    expect(next).toHaveBeenCalledWith();
+  });
+});
+
+describe('openWorkspaceFromResource', () => {
+  const middleware = openWorkspaceFromResource({ kind: 'submission', idFrom: 'paramsId' });
+
+  // The submit reads authorize against the submission's form, for members and non-members alike.
+  it('carries the submission form into a non-member context', async () => {
+    jest
+      .mocked(getSubmissionListContext)
+      .mockResolvedValue({ workspaceId: 'ws9', formId: 'form1', formVersionId: 'fv1' });
+    jest.mocked(getWorkspaceForUser).mockResolvedValue(null);
+    const req = makeReq({ params: { id: 'sub1' } as Request['params'] });
+    const next = jest.fn() as unknown as NextFunction;
+
+    await middleware(req, makeRes() as Response, next);
+
+    expect(req.coreContext).toMatchObject({
+      workspaceId: 'ws9',
+      formId: 'form1',
+      role: 'member',
+      workspaceSource: 'submit:submission',
+    });
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('returns 404 when the submission is missing', async () => {
+    jest.mocked(getSubmissionListContext).mockResolvedValue(null);
+    const req = makeReq({ params: { id: 'missing' } as Request['params'] });
+    const next = jest.fn() as unknown as NextFunction;
+
+    await middleware(req, makeRes() as Response, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(NotFoundError));
+    expect(req.coreContext).toBeUndefined();
   });
 });
 
@@ -375,6 +457,7 @@ describe('workspaceFromResource (kind: workspace)', () => {
     await middleware(req, res as Response, next);
 
     expect(req.coreContext?.workspaceId).toBe('ws1');
+    expect(req.coreContext?.formId).toBeUndefined();
     expect(req.coreContext?.workspaceSource).toBe('resource:workspace');
     expect(next).toHaveBeenCalledWith();
   });

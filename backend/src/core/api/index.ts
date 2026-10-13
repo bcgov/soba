@@ -8,6 +8,7 @@ import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
 import { groupsDomain } from './groups';
 import { filesDomain } from '../../features/files';
 import { documentGenerationDomain } from '../../features/document-generation';
+import { formSettingsRouter, registerFormSettingsOpenApi } from '../../features/form-settings';
 import { meDomain } from './me';
 import { membersDomain } from './members';
 import { workspacesDomain } from './workspaces';
@@ -16,10 +17,11 @@ import { registerOpenApiPaths } from './shared/openapi';
 
 // API surfaces, each mounted under its own base path with its own auth (see app.ts):
 //  - designRouter  (/api/v1/design): staff form authoring + submission management.
-//  - submitRouter  (/api/v1/submit): public-capable form read/submit/confirmation + file attachments.
+//  - submitRouter  (/api/v1/submit): public-capable submissions, file attachments, preview/print.
 //  - coreRouter    (/api/v1):        workspace/account management (not a toggled feature).
 registerOpenApiPaths((registry) => {
   registerFormsOpenApi(registry);
+  registerFormSettingsOpenApi(registry);
   registerSubmissionsOpenApi(registry);
   registerSubmitOpenApi(registry);
   groupsDomain.registerOpenApi(registry);
@@ -33,15 +35,18 @@ registerOpenApiPaths((registry) => {
   registerHealthOpenApi(registry);
 });
 
-// Design feature: form authoring + submission management.
+// Design feature: form authoring + submission management. Form settings groups are self-contained
+// modules under /forms/:id/settings (features/form-settings).
 const designRouter = express.Router();
+designRouter.use('/forms/:id/settings', formSettingsRouter);
 designRouter.use('/', designFormsRouter);
 designRouter.use('/submissions', designSubmissionsRouter);
 designRouter.use(coreErrorHandler);
 
-// Submit feature: public form read + submission create/save + confirmation read, plus submitter file
-// attachments at /files (upload/download/delete), authorized per operation by the Form submitters
-// audience / submission ownership. The files feature flag is enforced inside filesDomain.router.
+// Submit feature: submission open/save/submit + reads of an existing submission, plus file
+// attachments at /files (upload/download/delete) and document preview/print, each authorized through
+// isSubmitterAllowed (services/submitterAccess). The files feature flag is enforced inside
+// filesDomain.router.
 const submitRouter = express.Router();
 submitRouter.use('/', submitRoutes);
 submitRouter.use('/files', filesDomain.router);

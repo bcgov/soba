@@ -12,8 +12,8 @@ Work from **branches** (not forks) off `develop`. Open a **pull request** into `
 
 Before requesting review, ensure:
 
-- **All checks pass** — e.g. `pnpm check` at the repo root (type-check and lint for backend and frontend). See [pnpm](#pnpm) for root commands.
-- **Unit tests** — New or changed behaviour is covered by tests. See [Backend](#backend) and [Frontend](#frontend) for how tests are run and where they live.
+- **All checks pass** — e.g. `pnpm check` at the repo root (type-check and lint for lib, backend and frontend). See [pnpm](#pnpm) for root commands.
+- **Unit tests** — New or changed behaviour is covered by tests. See [Backend](#backend), [Frontend](#frontend) and [Lib](#lib) for how tests are run and where they live.
 
 ---
 
@@ -60,7 +60,7 @@ This starts:
 - **Temporal** (gRPC port 7233) — workflow engine
 - **Temporal UI** (port 8088) — workflow dashboard
 
-**Inside the devcontainer** use `host.docker.internal` to reach sidecars from backend processes (e.g. `mongodb://host.docker.internal:27017`, `postgresql://postgres:postgres@host.docker.internal:5432/postgres`, `http://host.docker.internal:3001`). The `app` service sets `extra_hosts: host.docker.internal:host-gateway` so that this hostname works on Linux as well as on Docker Desktop (Mac/Windows). **Committed `.env.example` files use `localhost`** for DB, Form.io, and API URLs — that works when the browser and forwarded ports are on the host (e.g. http://localhost:3000 with `NEXT_PUBLIC_SOBA_API_BASE_URL=http://localhost:4000/api/v1`). Use `host.docker.internal` in backend env when the API server runs inside the container and must reach compose services. Form.io login: `formio@localhost.com` / `formio`.
+**Inside the devcontainer** use `host.docker.internal` to reach sidecars from backend processes (e.g. `mongodb://host.docker.internal:27017`, `postgresql://postgres:postgres@host.docker.internal:5432/postgres`, `http://host.docker.internal:3001`). The `app` service sets `extra_hosts: host.docker.internal:host-gateway` so that this hostname works on Linux as well as on Docker Desktop (Mac/Windows). **Committed `.env.example` files use `localhost`** for DB, Form.io, and API URLs — that works when the browser and forwarded ports are on the host (e.g. http://localhost:3000 with `NEXT_PUBLIC_SOBA_API_BASE_URL=http://localhost:4000/chefs/api/v1`). Use `host.docker.internal` in backend env when the API server runs inside the container and must reach compose services. Form.io login: `formio@localhost.com` / `formio`.
 
 **Database (migrate + seed):** After the sidecars are up, from the repo root run `pnpm db:init` (or `pnpm dev:db:up` to start services and init in one step). See [Drizzle](#drizzle) for individual `db:migrate` / `db:seed` commands.
 
@@ -68,7 +68,7 @@ This starts:
 
 ## pnpm
 
-The repo is a **[pnpm](https://pnpm.io) workspace** (faster installs, shared store, strict dependency graph). Root `package.json` delegates to the `frontend` and `backend` workspaces.
+The repo is a **[pnpm](https://pnpm.io) workspace** (faster installs, shared store, strict dependency graph). Root `package.json` delegates to the `lib`, `frontend` and `backend` workspaces.
 
 **Why pnpm:** Single lockfile and workspace protocol for frontend + backend, disk-efficient store, and consistent installs across dev and CI.
 
@@ -77,20 +77,29 @@ The repo is a **[pnpm](https://pnpm.io) workspace** (faster installs, shared sto
 | Command                                            | What it does                                                    |
 | -------------------------------------------------- | --------------------------------------------------------------- |
 | `pnpm install`                                     | Install all workspace deps (run after clone / when deps change) |
-| `pnpm build`                                       | `build:frontend` then `build:backend`                           |
+| `pnpm build`                                       | `build:lib`, `build:frontend`, then `build:backend`             |
 | `pnpm build:frontend` / `pnpm build:backend`       | Build one app                                                   |
-| `pnpm test`                                        | Run frontend and backend tests                                  |
+| `pnpm build:lib`                                   | Build the shared lib into `lib/dist`                            |
+| `pnpm test`                                        | Run lib, frontend and backend tests                             |
 | `pnpm test:frontend` / `pnpm test:backend`         | Test one app                                                    |
-| `pnpm lint`                                        | Lint frontend and backend                                       |
-| `pnpm lint:fix`                                    | Lint with auto-fix both                                         |
+| `pnpm test:lib`                                    | Test the shared lib                                             |
+| `pnpm lint`                                        | Lint lib, frontend and backend                                  |
+| `pnpm lint:fix`                                    | Lint with auto-fix, all three                                   |
 | `pnpm db:migrate`                                  | Run pending DB migrations (backend)                             |
 | `pnpm db:seed`                                     | Seed DB (run after migrate)                                     |
 | `pnpm db:init`                                     | Migrate then seed (full DB setup)                               |
 | `pnpm db:dev-data`                                 | Build/remove development data ([guide](backend/src/features/dev-data/README.md)) |
 | `pnpm lint:frontend` / `pnpm lint:backend`         | Lint one app                                                    |
 | `pnpm lint:fix:frontend` / `pnpm lint:fix:backend` | Lint fix one app                                                |
-| `pnpm check`                                       | Type/style checks for both apps                                 |
+| `pnpm lint:lib` / `pnpm lint:fix:lib`              | Lint or lint fix the shared lib                                 |
+| `pnpm format`                                      | Prettier write, lib and both apps                               |
+| `pnpm format:check`                                | Prettier check, lib and both apps (CI gate)                     |
+| `pnpm format:frontend` / `pnpm format:backend`     | Format one app                                                  |
+| `pnpm format:check:frontend` / `pnpm format:check:backend` | Format check one app                                    |
+| `pnpm format:lib` / `pnpm format:check:lib`        | Format or format check the shared lib                           |
+| `pnpm check`                                       | Type/style checks for lib and both apps                         |
 | `pnpm check:frontend` / `pnpm check:backend`       | Check one app                                                   |
+| `pnpm check:lib`                                   | Check the shared lib                                            |
 | `pnpm qa`                                          | `check` then `test` (PR readiness shortcut)                     |
 | `pnpm qa:build`                                    | `qa` then `build`                                               |
 | `pnpm dev:services:up`                             | Start sidecars via docker compose (`up -d --wait`)              |
@@ -306,9 +315,9 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 ### App structure and routing
 
-- **App Router:** `app/layout.tsx` is the root (html/body, globals.css). `app/[lang]/layout.tsx` wraps locale routes with `DictionaryProvider`, `Header`, `SideNav`, `<main>`, and `Footer`. Locale is required (e.g. `/en`, `/fr`). Home (`app/[lang]/page.tsx`) redirects logged-in users to `/forms`.
-- **Key routes:** `/{lang}/designer` (design-mode), `/{lang}/forms` (form list), `/{lang}/form/{formId}` (submit/render), `/{lang}/submissions/...`, `/{lang}/meta` (meta-review).
-- **Where code lives:** `app/` — pages, layouts, shared UI (`app/ui/`). `src/features/` — feature UI (designer, submit-mode, formio-v5, workspaces, meta-review). `src/shared/` — API, config, feature flags. `src/app/` — plugin types and registry. `lib/` — Redux store, slices, hooks, runtime config. Path aliases: `@/lib`, `@/app`, `@/src`.
+- **App Router:** `app/layout.tsx` is the root (html/body, globals.css). `app/[lang]/layout.tsx` wraps locale routes with `DictionaryProvider`, `Header`, `SideNav`, `<main>`, and `Footer`. Locale is required (e.g. `/en`, `/fr`). Home (`app/[lang]/page.tsx`) is the signed-out landing page. `AppAccessGuard` redirects signed-in users from it to `/forms` (or `/onboarding` or `/workspaces` for users without workspaces) when `design-mode` is allowed, otherwise to `/my-forms`.
+- **Key routes:** `/{lang}/build` (design-mode), `/{lang}/forms` (form list), `/{lang}/my-forms` and `/{lang}/my-submissions` (submit-mode), `/{lang}/form/{formId}` (submit/render), `/{lang}/meta` (feature support).
+- **Where code lives:** `app/` - pages, layouts, shared UI (`app/ui/`). `src/features/` - feature UI (admin, designer, formio-v5, onboarding, submit-mode, workspaces). `src/shared/` - API, config, feature flags. `src/app/` - providers and routing. `lib/` - Redux store, slices, hooks, runtime config. Path aliases: `@/lib`, `@/app`, `@/src`.
 - **Adding pages:** Add under `app/[lang]/`; use the locale layout for nav and dictionary.
 
 ### Runtime config and env
@@ -333,14 +342,14 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 - **Location:** `src/shared/api/sobaApi.ts` and `sobaApiForms.ts`. Functions use `getSobaApiBaseUrl()` (from runtime config cache or env fallback). Protected endpoints send `Authorization: Bearer ${token}` and, for form/submission calls, **`x-workspace-id`** from the active workspace. Examples: `fetchHealth()`, `fetchWorkspaces(token)`, `fetchCurrentUser(token)`, `getFormVersionSchema(token, ...)`. See [In Detail — API layer (frontend)](#api-layer-frontend).
 
-### Plugins and navigation
+### Navigation
 
-- **AppPlugin:** id, optional `featureCode`, order, `getNavItem`, optional `showInHeaderNav`. The **registry** (`src/app/plugins/registry.ts`) registers: **workspaces** (always on), **designer** (`design-mode`), **submit-mode**, **meta-review** (`meta`). Plugins are filtered with `createIsFeatureAllowed(meta)`; `getHeaderNavigationItems` and `getOverlayNavigationItems` drive Header and SideNav. See [In Detail — Plugins (frontend)](#plugins-frontend).
+- **SideNav** (`app/ui/SideNav.tsx`) builds its items from the `design-mode` and `submit-mode` flags, which the locale layout resolves server-side with `createIsFeatureAllowed(meta)`.
 
 ### Feature flags
 
 - **Platform:** `GET /meta/features` returns each row with **`platformAllowed`** (from `soba.feature` status). Loaded via `src/shared/config/featuresMeta.ts` (`loadFeaturesMeta`).
-- **Per-frontend deployment:** **`NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`** — comma-separated codes (same as meta, e.g. `workspaces`, `design-mode`, `submit-mode`, `marketing`), or **`*`** / **`all`** alone to allow every platform-allowed feature. **Empty/unset** = no codes allowed at the frontend layer (intersected with `platformAllowed`). Use a subset for submit-only or design-only Next.js images that share one API.
+- **Per-frontend deployment:** **`NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`** - comma-separated codes (same as meta, e.g. `design-mode`, `submit-mode`, `files`, `marketing`), or **`*`** / **`all`** alone to allow every platform-allowed feature. **Empty/unset** = no codes allowed at the frontend layer (intersected with `platformAllowed`). Use a subset for submit-only or design-only Next.js images that share one API.
 - **`createIsFeatureAllowed(meta)`** returns `isFeatureAllowed(code)` = `platformAllowed && frontendAllowlist`. Constants: `FEATURE_CODES` in `src/shared/featureFlags/flags.ts`.
 
 ### IDP groups and form visibility
@@ -358,8 +367,8 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 ### Forms
 
-- **Designer** (`src/features/designer/`, `design-mode`): form list and builder at `/{lang}/designer`; provisions schema via `POST /form-versions/:id/schema`, loads schema via `GET /form-versions/:id/schema`.
-- **Submit** (`src/features/submit-mode/`, `submit-mode`): form list at `/{lang}/forms`; render at `/{lang}/form/{formId}` via **`src/features/formio-v5/`** (`FormioProvider` + `DynamicForm` from `@formio/react`). **The browser does not call Form.io** — schema and submissions go through the SOBA API only.
+- **Designer** (`src/features/designer/`, `design-mode`): form list at `/{lang}/forms` and builder at `/{lang}/build`; provisions schema via `POST /form-versions/:id/schema`, loads schema via `GET /form-versions/:id/schema`.
+- **Submit** (`src/features/submit-mode/`, `submit-mode`): My Forms and My Submissions at `/{lang}/my-forms` and `/{lang}/my-submissions`; render at `/{lang}/form/{formId}` via **`src/features/formio-v5/`** (`FormioProvider` + `DynamicForm` from `@formio/react`). **The browser does not call Form.io** - schema and submissions go through the SOBA API only.
 - **Renderer CSS:** static copies under `public/formio-v5/`; `useFormioV5FormChrome` loads them next to `<Form />` (avoid global Form.io CSS imports with Turbopack).
 
 ### Testing
@@ -372,11 +381,40 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 ---
 
+## Lib
+
+Shared code for the backend and frontend, used in the workspace as `@soba/lib`:
+
+- Zod schemas and inferred types for the request bodies and responses both sides use, with the sort-field constants and sort enums of each list.
+- `normalizeSchema` for Form.io schema import and export.
+
+Query and params schemas stay in the backend. The frontend re-exports the lib types from `frontend/src/types/<domain>.ts`. A runtime import from `@soba/lib` bundles zod and every schema, so frontend code that loads on every page takes the sort fields from `@soba/lib/sort` instead.
+
+lib builds its schemas before the backend extends zod, so calling `.openapi()` on a lib schema directly works or fails depending on which module requires lib first. The backend names a lib schema by cloning it: `XSchema.clone().openapi('Domain_X')`. A composite, such as a list response, is rebuilt with `.extend()` on the named children so the spec references each child with `$ref`. Cloning a composite inlines its children. `libSchemaLoadOrder.test.ts` and `libSchemaOpenApi.test.ts` in `backend/tests/core/api/shared/` check both, and each new schema module and composite needs a row there.
+
+`lib/dist/` is generated and not committed. `pnpm install` builds it (the `prepare` script) and the devcontainer rebuilds it on start. While editing lib, run `pnpm dev` in `lib/` to keep `dist/` current. The backend's watcher follows `backend/src` only, so restart the backend after a lib change.
+
+### Scripts
+
+| Command                        | Purpose                                  |
+| ------------------------------ | ---------------------------------------- |
+| `pnpm build`                   | Clean `dist/` and compile `src/` into it |
+| `pnpm dev`                     | Compile `src/` into `dist/` on change    |
+| `pnpm test`                    | Run Jest unit tests                      |
+| `pnpm lint` / `lint:fix`       | ESLint; fix applies auto-fix             |
+| `pnpm format` / `format:check` | Prettier write / check                   |
+| `pnpm type-check`              | `tsc --noEmit` over `src/` and `tests/`  |
+| `pnpm check`                   | Type-check + lint (run before PR)        |
+
+Tests live under `lib/tests/`.
+
+---
+
 ## Integration
 
 Integration tests live in the **integration** app (repo root). An integration test specialist will own and expand this area; below is the minimum for running tests and for frontend support.
 
-**Tech:** [Playwright](https://playwright.dev) (Chromium). Tests target the running frontend and backend (default: `http://localhost:3000`, `http://localhost:4000/api/v1`; override with `E2E_BASE_URL`, `E2E_API_BASE_URL`).
+**Tech:** [Playwright](https://playwright.dev) (Chromium). Tests target the running frontend and backend (default: `http://localhost:3000`, `http://localhost:4000/chefs/api/v1`; override with `E2E_BASE_URL`, `E2E_API_BASE_URL`).
 
 **Run tests:** From repo root, `pnpm -C integration/playwright test`. In the devcontainer, dependencies and Playwright Chromium are installed by post-create; otherwise run `npm ci --prefix integration/playwright` and `npm exec --prefix integration/playwright -- playwright install chromium` once.
 
@@ -440,8 +478,8 @@ Auth-related env: `IDP_PLUGINS`, `IDP_PLUGIN_DEFAULT_*`, and per-IdP `PLUGIN_<ID
 ### App structure (frontend)
 
 - **Root layout** (`app/layout.tsx`): Minimal — html/body, globals.css. No providers here so the tree stays simple.
-- **Locale layout** (`app/[lang]/layout.tsx`): Wraps all `[lang]` routes. Loads dictionary and features meta server-side, provides `DictionaryProvider`, renders `Header`, `SideNav`, `<main>{children}</main>`, and `Footer`. SideNav shows home (when `marketing` allowed) and app links (when `design-mode` or `submit-mode` allowed).
-- **Folders:** `app/ui/` — shared UI (Header, SideNav, Footer, forms). `lib/` — Redux store, slices, hooks, Keycloak init, runtime config. `src/features/` — designer, submit-mode, formio-v5, workspaces, meta-review. `src/shared/` — API client, config, feature flags. `src/app/` — plugin types and registry. Use `@/lib`, `@/app`, `@/src` for imports.
+- **Locale layout** (`app/[lang]/layout.tsx`): Wraps all `[lang]` routes. Loads dictionary and features meta server-side, provides `DictionaryProvider`, renders `Header`, `SideNav`, `<main>{children}</main>`, and `Footer`. For signed-in users, SideNav shows Forms and Workspaces when `design-mode` is allowed, then My Forms and My Submissions when `submit-mode` is allowed, then Administration for SOBA admins. Feedback and Help always show.
+- **Folders:** `app/ui/` - shared UI (Header, SideNav, Footer, forms). `lib/` - Redux store, slices, hooks, Keycloak init, runtime config. `src/features/` - admin, designer, formio-v5, onboarding, submit-mode, workspaces. `src/shared/` - API client, config, feature flags. `src/app/` - providers and routing. Use `@/lib`, `@/app`, `@/src` for imports.
 
 ### Runtime config (frontend)
 
@@ -472,12 +510,6 @@ Auth-related env: `IDP_PLUGINS`, `IDP_PLUGIN_DEFAULT_*`, and per-IdP `PLUGIN_<ID
 
 - **Base URL:** From `getSobaApiBaseUrl()` in `src/shared/config/runtimeConfig.ts` (cached config or `NEXT_PUBLIC_SOBA_API_BASE_URL`).
 - **Pattern:** Protected calls set `Authorization: Bearer ${token}`. Form/submission helpers in `sobaApiForms.ts` also send **`x-workspace-id`** when a workspace is selected. Use fetch with cache: 'no-store' for dynamic data. Types for responses live in sobaApi.ts / sobaApiForms.ts.
-
-### Plugins (frontend)
-
-- **Registered plugins:** workspaces (no `featureCode`), designer (`design-mode`), submit-mode, meta-review (`meta`). Marketing is a feature flag only (SideNav home link), not a separate plugin.
-- **Adding a plugin:** (1) Optionally add a row to `soba.feature` if platform-gated; set `featureCode` on the plugin. Omit for always-on shell (e.g. workspaces). (2) Create `src/features/<name>/plugin.tsx` exporting `AppPlugin`: id, optional featureCode, order, getNavItem, optional showInHeaderNav. (3) Register in `src/app/plugins/registry.ts`.
-- **getNavItem** returns { id, href, label }; href includes locale (e.g. `/${locale}/designer`).
 
 ### Testing
 

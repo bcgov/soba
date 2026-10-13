@@ -20,10 +20,10 @@ export interface UpsertSchemaInput {
 export interface CreateSubmissionInput {
   /** Engine ref of the form the submission belongs to (the form version's engineSchemaRef). */
   engineFormRef: string;
-  /** SOBA submission id; part of the deterministic per-revision idempotency key. */
+  /** SOBA submission id; recorded on the engine document for correlation. */
   submissionId: string;
-  /** Target revision number for this save; part of the idempotency key. */
-  revisionNo: number;
+  /** SOBA revision id this document is written for; the idempotency key. */
+  revisionId: string;
   /** SOBA workspace id; recorded on the engine document for tenancy/filtering. */
   workspaceId: string;
   /** The submission answer data to store. */
@@ -44,8 +44,8 @@ export interface FormEngineAdapter {
   deleteSchema?(engineRef: string): Promise<void>;
   /**
    * Create a new submission document under `engineFormRef`. Each save makes a new (immutable)
-   * document; idempotent per `(submissionId, revisionNo)` via a planted correlation key, so a
-   * retried save converges on one document. Returns the engine ref.
+   * document; idempotent per revision id via a planted correlation key, so a retried write for the
+   * same revision converges on one document. Returns the engine ref.
    */
   createSubmission?(input: CreateSubmissionInput): Promise<{ engineRef: string }>;
   /** Read a submission document by form ref + submission ref, stripped of engine-managed fields. Null if not found. */

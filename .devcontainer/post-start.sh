@@ -22,4 +22,9 @@ source "$SCRIPT_DIR/scripts/pnpm-setup.sh"
 configure_pnpm
 install_workspace_deps ensure
 
+# The install above is skipped unless the lockfile changed, and lib's dist is generated, so build it
+# here or a pulled lib change leaves it stale.
+echo "==> Building shared lib..."
+pnpm --filter @soba/lib run build
+
 echo "══════════════════════════════════════════════════════════════"

@@ -1,15 +1,16 @@
 import { and, count, eq, ilike, inArray, isNull, ne } from 'drizzle-orm';
 import { db, type DbOrTx } from '../client';
-import { forms, formVersions } from '../schema';
-import { likePattern, orderByForSort, type SortColumns, type SortToken } from '../listSort';
+import { forms, formVersions, workspaces } from '../schema';
+import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
+import { NotFoundError } from '../../errors';
 
-export const FORM_SORT_FIELDS = ['name', 'status', 'createdAt', 'updatedAt'] as const;
+import { FORM_SORT_FIELDS, type SortLocale, type SortToken } from '@soba/lib';
 export type FormListSortField = (typeof FORM_SORT_FIELDS)[number];
 export type FormListSort = SortToken<FormListSortField>;
 
 const FORM_SORT_COLUMNS: SortColumns<FormListSortField> = {
-  name: { column: forms.name, caseInsensitive: true },
+  name: { column: forms.name, linguistic: true },
   status: { column: forms.status },
   createdAt: { column: forms.createdAt },
   updatedAt: { column: forms.updatedAt },
@@ -24,13 +25,17 @@ export interface ListFormsForWorkspaceInput {
   q?: string;
   status?: string;
   sort: FormListSort;
+  locale: SortLocale;
 }
 
 export interface FormListRow {
   id: string;
   workspaceId: string;
+  workspaceName: string;
   name: string;
   status: string;
+  org: string;
+  useCase: string;
   createdAt: Date;
   updatedAt: Date;
   createdBy: string | null;
@@ -43,6 +48,8 @@ export interface FormRecord {
   formEngineCode: string;
   name: string;
   description: string | null;
+  org: string;
+  useCase: string;
   status: string;
   createdAt: Date;
   updatedAt: Date;
@@ -69,6 +76,8 @@ interface UpdateFormInput {
   name?: string;
   description?: string | null;
   status?: string;
+  org?: string;
+  useCase?: string;
 }
 
 export const listFormsForWorkspace = async (
@@ -99,7 +108,10 @@ export const listFormsForWorkspace = async (
       .select({
         id: forms.id,
         workspaceId: forms.workspaceId,
+        workspaceName: workspaces.name,
         name: forms.name,
+        org: forms.org,
+        useCase: forms.useCase,
         status: forms.status,
         createdAt: forms.createdAt,
         updatedAt: forms.updatedAt,
@@ -107,8 +119,9 @@ export const listFormsForWorkspace = async (
         updatedBy: forms.updatedBy,
       })
       .from(forms)
+      .innerJoin(workspaces, eq(workspaces.id, forms.workspaceId))
       .where(where)
-      .orderBy(...orderByForSort(FORM_SORT_COLUMNS, input.sort, forms.id))
+      .orderBy(...orderByForSort(FORM_SORT_COLUMNS, input.sort, forms.id, input.locale))
       .limit(input.limit)
       .offset(input.offset);
     const totals = await tx.select({ total: count() }).from(forms).where(where);
@@ -140,6 +153,8 @@ export const getFormByEngineSchemaRef = async (
       formEngineCode: forms.formEngineCode,
       name: forms.name,
       description: forms.description,
+      org: forms.org,
+      useCase: forms.useCase,
       status: forms.status,
       createdAt: forms.createdAt,
       updatedAt: forms.updatedAt,
@@ -165,6 +180,19 @@ export const getFormByEngineSchemaRef = async (
 
 export const createForm = async (input: CreateFormInput, tx?: DbOrTx): Promise<FormRecord> => {
   const d = tx ?? db;
+
+  const ws = await d
+    .select({ org: workspaces.org, useCase: workspaces.useCase })
+    .from(workspaces)
+    .where(eq(workspaces.id, input.workspaceId))
+    .limit(1);
+
+  // A form's org and use case are seeded from its workspace and owned by the form after that.
+  const workspace = ws[0];
+  if (!workspace) {
+    throw new NotFoundError(`Workspace not found: ${input.workspaceId}`);
+  }
+
   const created = await d
     .insert(forms)
     .values({
@@ -172,6 +200,8 @@ export const createForm = async (input: CreateFormInput, tx?: DbOrTx): Promise<F
       formEngineCode: input.formEngineCode,
       name: input.name,
       description: input.description,
+      org: workspace.org,
+      useCase: workspace.useCase,
       status: 'active',
       createdBy: input.actorDisplayLabel,
       updatedBy: input.actorDisplayLabel,
@@ -209,6 +239,8 @@ export const updateForm = async (input: UpdateFormInput): Promise<FormRecord | n
       name: input.name,
       description: input.description,
       status: input.status,
+      org: input.org,
+      useCase: input.useCase,
       updatedBy: input.actorDisplayLabel,
       updatedAt: new Date(),
     })
