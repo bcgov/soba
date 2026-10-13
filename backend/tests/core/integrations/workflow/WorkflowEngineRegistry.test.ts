@@ -25,6 +25,7 @@ describe('WorkflowEngineRegistry', () => {
 
   it('creates an adapter for a configured engine', () => {
     process.env.PLUGIN_CS_WORKFLOW_V1_API_BASE_URL = 'http://workflow.test/api/v1';
+    process.env.PLUGIN_CS_WORKFLOW_V1_API_KEY = 'test';
     expect(createWorkflowEngineAdapter('cs-workflow-v1')).toBeInstanceOf(CsWorkflowEngineAdapter);
   });
 
