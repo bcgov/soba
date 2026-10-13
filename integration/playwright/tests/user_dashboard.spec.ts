@@ -1,39 +1,48 @@
+import path from "path";
 import { test, expect, Page } from "@playwright/test";
-import { login } from "../support/soba_login";
 
-let sharedPage: Page;
+let unauthenticatedPage: Page;
+let authenticatedPage: Page;
 
 test.describe.serial("Landing page tests", () => {
   test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext();
-    sharedPage = await context.newPage();
+    const authFile = path.resolve(__dirname, "../support/user.json");
+
+    const authenticatedContext = await browser.newContext({
+      storageState: authFile,
+    });
+    authenticatedPage = await authenticatedContext.newPage();
+
+    const guestContext = await browser.newContext();
+    unauthenticatedPage = await guestContext.newPage();
   });
 
   test.afterAll(async () => {
-    //Logout after tests — logout lives inside the user dropdown, so open it first
-    await sharedPage.click('[data-testid="user-dropdown"]');
-    await sharedPage.click('[data-testid="logout-button"]');
-    await sharedPage.context().close();
+    await authenticatedPage.context().close();
+    await unauthenticatedPage.context().close();
   });
 
   test("Checks the login functionality", async () => {
-    await sharedPage.goto("");
+    await unauthenticatedPage.goto("");
     await expect(
-      sharedPage.locator('[data-testid="login-button"]'),
+      unauthenticatedPage.locator('[data-testid="login-button"]'),
     ).toBeVisible();
-    await login(sharedPage);
-    // The user dropdown only renders once authenticated, so it confirms login
     await expect(
-      sharedPage.locator('[data-testid="user-dropdown"]'),
-    ).toBeVisible();
+      unauthenticatedPage.locator('[data-testid="user-dropdown"]'),
+    ).not.toBeVisible();
   });
 
   test("Checks the navigation links", async () => {
+    await authenticatedPage.goto("");
     // The SideNav is always visible for authenticated users (no menu toggle).
-    await expect(sharedPage.locator('[data-testid="forms-nav"]')).toBeVisible();
     await expect(
-      sharedPage.locator('[data-testid="feedback-nav"]'),
+      authenticatedPage.locator('[data-testid="forms-nav"]'),
     ).toBeVisible();
-    await expect(sharedPage.locator('[data-testid="help-nav"]')).toBeVisible();
+    await expect(
+      authenticatedPage.locator('[data-testid="feedback-nav"]'),
+    ).toBeVisible();
+    await expect(
+      authenticatedPage.locator('[data-testid="help-nav"]'),
+    ).toBeVisible();
   });
 });

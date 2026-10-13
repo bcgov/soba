@@ -23,10 +23,18 @@ export async function login(page: Page) {
   const { username, password, mfaCode } = formsettings();
 
   await page.getByTestId("login-button").click();
-  await expect(page.locator("#social-azureidir")).toBeVisible();
-  await expect(page.locator("#social-bceidbusiness")).toBeVisible();
 
-  await page.locator("#social-azureidir").click();
+  const idirButton = page
+    .locator('#social-azureidir, a:has-text("IDIR - MFA")')
+    .first();
+  const bceidButton = page
+    .locator('#social-bceidbusiness, a:has-text("Business BCeID")')
+    .first();
+
+  await expect(idirButton).toBeVisible({ timeout: 20000 });
+  await expect(bceidButton).toBeVisible({ timeout: 20000 });
+
+  await idirButton.click();
   await page.fill('input[type="email"]', username);
   await page.click('input[type="submit"]');
   await page.fill('input[name="passwd"]', password);

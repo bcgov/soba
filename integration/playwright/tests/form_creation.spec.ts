@@ -10,19 +10,23 @@ test.use({
 async function createForm({ page, title }: { page: Page; title: string }) {
   await page.goto("");
 
-  // Check whether initial workspace setup is required.
-  const workspaceModal = page
-    .locator(".bcds-react-aria-Modal")
-    .filter({ hasText: "Default Workspace Setup" });
+  // Wait for the first-run workspace setup modal if it appears, then close it
+  // before attempting to navigate to the Forms page.
+  const workspaceModal = page.getByRole("dialog", {
+    name: /Default Workspace Setup/i,
+  });
+  const workspaceSetupVisible = await workspaceModal
+    .waitFor({ state: "visible", timeout: 15000 })
+    .then(() => true)
+    .catch(() => false);
 
-  if (await workspaceModal.isVisible().catch(() => false)) {
+  if (workspaceSetupVisible) {
     await page
       .getByTestId("workspace-name")
       .locator("input")
       .fill("Test Workspace");
 
     await page.getByTestId("workspace-your-org").click();
-
     await page
       .getByRole("option", {
         name: "Health (HLTH)",
@@ -33,24 +37,36 @@ async function createForm({ page, title }: { page: Page; title: string }) {
     await page.getByTestId("workspace-use-case").click();
 
     const collectionUseCase = dictionaries.useCases["collection"];
-
     if (collectionUseCase) {
-      const collectionOption = page.getByRole("option", {
-        name: new RegExp(
-          collectionUseCase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-        ),
-      });
-
-      await collectionOption.click();
+      await page
+        .getByRole("option", {
+          name: new RegExp(
+            collectionUseCase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+          ),
+        })
+        .click();
     }
 
-    await page.getByTestId("workspace-disclaimer-switch").click();
+    const disclaimerCheckbox = page.getByRole("checkbox", {
+      name: /I agree to the disclaimer and statement of responsibility/i,
+    });
+    const disclaimerLabel = page.getByText(
+      /I agree to the disclaimer and statement of responsibility/i,
+    );
+    await disclaimerLabel.scrollIntoViewIfNeeded();
+    await expect(disclaimerLabel).toBeVisible();
+    await disclaimerLabel.click({ force: true });
+    await expect(disclaimerCheckbox).toBeChecked();
 
-    await expect(
-      page.getByTestId("workspace-disclaimer-switch").locator("input"),
-    ).toBeChecked();
+    const saveButton = page.getByTestId("workspace-save");
+    await expect(saveButton).toBeEnabled({ timeout: 15000 });
+    await saveButton.click();
 
-    await page.getByTestId("workspace-save").click();
+    await expect(workspaceModal).not.toBeVisible({ timeout: 15000 });
+    await expect(page.locator(".react-aria-ModalOverlay")).not.toBeVisible({
+      timeout: 15000,
+    });
+    await page.waitForTimeout(500);
   }
 
   await page.getByTestId("forms-nav").click();
@@ -219,12 +235,17 @@ test("Create, edit, search, preview, and publish one form", async ({
   ).toBeVisible();
 
   const publishedNotice = page.getByTestId("page-notice-published-version");
-
   await expect(publishedNotice).toBeVisible();
   await expect(publishedNotice).toContainText("Published Version:");
   await expect(publishedNotice).toContainText(
     "This version is published and cannot be modified directly.",
   );
-
+  //Publish button should be disabled after publishing the form
   await expect(publishButton).toBeDisabled();
+  // Check that all the tabs are visible after publishing the form
+  await expect(page.getByTestId("settings-tab")).toBeVisible();
+  await expect(page.getByTestId("version-tab")).toBeVisible();
+  await expect(page.getByTestId("team-tab")).toBeVisible();
+  await expect(page.getByTestId("submission-tab")).toBeVisible();
+  await expect(page.getByTestId("share-tab")).toBeVisible();
 });
