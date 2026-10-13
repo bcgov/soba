@@ -1,9 +1,10 @@
 /**
  * The access coverage set: named cases that exist at every size, for checking who may list, open,
- * save and delete what. No DB, no engine, no clock.
+ * save, delete and design what, and who reads a workspace's members and groups. No DB, no engine,
+ * no clock.
  */
 import type { Audience } from '@soba/lib';
-import type { NormalizedProfile } from '../../../core/auth/jwtClaims';
+import type { IdpAttributes, NormalizedProfile } from '../../../core/auth/jwtClaims';
 import {
   Roles,
   SystemGroup,
@@ -26,10 +27,12 @@ export const PERSONA_KEYS = [
   'submitter',
   'designer',
   'reviewer',
+  'viewer',
   'overrideRemoved',
   'overrideAdded',
   'inactiveMember',
   'inactiveGroupMember',
+  'inactiveGroup',
   'outsider',
   'bceidOutsider',
   'collaborator',
@@ -58,13 +61,19 @@ export interface PlannedPersona {
   subject: string;
   identityProviderCode: string;
   profile: NormalizedProfile;
+  /** The token claims stored for the identity, as a sign-in stores them. */
+  idpAttributes: IdpAttributes;
 }
 
 /** A persona's membership in a workspace and the group it gives them. */
 export interface PlannedSeat {
   persona: Exclude<PersonaKey, typeof ADMIN>;
   role: WorkspaceMembershipRoleCode;
-  group: { system: SystemGroupCode } | { name: string; roleCodes: RoleCode[] } | null;
+  /** A named group is created by the first seat that names it. */
+  group:
+    | { system: SystemGroupCode }
+    | { name: string; roleCodes: RoleCode[]; status?: 'inactive' }
+    | null;
   membershipStatus?: 'inactive';
   groupMembershipStatus?: 'inactive';
 }
@@ -76,6 +85,7 @@ export const COVERAGE_FORM_KEYS = [
   'rolesInherit',
   'rolesOverride',
   'rolesOverrideCleared',
+  'rolesDesignersOverride',
   'rolesUnpublished',
   'rolesFormDeleted',
   'rolesVersionDeleted',
@@ -89,6 +99,15 @@ export const COVERAGE_FORM_KEYS = [
 ] as const;
 export type CoverageFormKey = (typeof COVERAGE_FORM_KEYS)[number];
 
+export interface PlannedGroupOverride {
+  group: { system: SystemGroupCode } | { name: string };
+  members: PersonaKey[];
+  cleared?: boolean;
+}
+
+/** Deleting the form, or its published version, once its submissions exist. */
+export type PlannedDelete = 'deleteForm' | 'deleteVersion';
+
 export interface PlannedCoverageForm {
   key: CoverageFormKey;
   name: string;
@@ -98,10 +117,9 @@ export interface PlannedCoverageForm {
   audience?: Audience;
   /** The form's own drafts setting; absent inherits the workspace's. */
   allowSubmitterDrafts?: boolean;
-  /** Replaces the form submitters group's members on this form; cleared leaves it inactive. */
-  submitterOverride?: { members: PersonaKey[]; cleared?: boolean };
-  /** Applied once the form's submissions exist. */
-  afterSubmissions?: 'deleteForm' | 'deleteVersion';
+  /** Replaces the group's members on this form; cleared leaves the override inactive. */
+  groupOverride?: PlannedGroupOverride;
+  afterSubmissions?: PlannedDelete;
 }
 
 export interface PlannedCoverageWorkspace {
@@ -154,10 +172,12 @@ const PERSONA_PROVIDERS: Record<GeneratedPersonaKey, string> = {
   submitter: 'azureidir',
   designer: 'azureidir',
   reviewer: 'azureidir',
+  viewer: 'azureidir',
   overrideRemoved: 'azureidir',
   overrideAdded: 'azureidir',
   inactiveMember: 'azureidir',
   inactiveGroupMember: 'azureidir',
+  inactiveGroup: 'azureidir',
   outsider: 'azureidir',
   bceidOutsider: 'bceidbusiness',
   collaborator: 'azureidir',
@@ -172,10 +192,11 @@ function buildPersona(key: GeneratedPersonaKey): PlannedPersona {
   const usernameClaim =
     identityProviderCode === 'bceidbusiness' ? 'bceid_username' : 'idir_username';
   const lastName = kebab(key).replaceAll('-', ' ');
+  const subject = `${DEV_SUBJECT_PREFIX}${username}`;
   return {
     key,
     displayLabel,
-    subject: `${DEV_SUBJECT_PREFIX}${username}`,
+    subject,
     identityProviderCode,
     profile: {
       displayName: `Coverage ${lastName}`,
@@ -187,8 +208,18 @@ function buildPersona(key: GeneratedPersonaKey): PlannedPersona {
       [usernameClaim]: displayLabel,
       displayLabel,
     },
+    idpAttributes: {
+      sub: subject,
+      identity_provider: identityProviderCode,
+      preferred_username: username,
+      email: `${username}@example.test`,
+      name: `Coverage ${lastName}`,
+      [usernameClaim]: displayLabel,
+    },
   };
 }
+
+const DESIGNERS_GROUP = `${COVERAGE_PREFIX}Designers`;
 
 const submitters = (persona: PlannedSeat['persona']): PlannedSeat => ({
   persona,
@@ -224,17 +255,32 @@ const ROLES_WORKSPACE: PlannedCoverageWorkspace = {
     {
       persona: 'designer',
       role: WorkspaceMembershipRole.member,
-      group: { name: `${COVERAGE_PREFIX}Designers`, roleCodes: [Roles.form_designer] },
+      group: { name: DESIGNERS_GROUP, roleCodes: [Roles.form_designer] },
     },
     {
       persona: 'reviewer',
       role: WorkspaceMembershipRole.member,
       group: { name: `${COVERAGE_PREFIX}Reviewers`, roleCodes: [Roles.submission_reviewer] },
     },
+    {
+      persona: 'viewer',
+      role: WorkspaceMembershipRole.viewer,
+      group: { name: `${COVERAGE_PREFIX}Approvers`, roleCodes: [Roles.submission_approver] },
+    },
     submitters('overrideRemoved'),
     { persona: 'overrideAdded', role: WorkspaceMembershipRole.member, group: null },
     { ...submitters('inactiveMember'), membershipStatus: 'inactive' },
     { ...submitters('inactiveGroupMember'), groupMembershipStatus: 'inactive' },
+    // Only the group is inactive; its membership and role stay active.
+    {
+      persona: 'inactiveGroup',
+      role: WorkspaceMembershipRole.member,
+      group: {
+        name: `${COVERAGE_PREFIX}Retired admins`,
+        roleCodes: [Roles.form_admin],
+        status: 'inactive',
+      },
+    },
     // The public user's roles never count, even with a seat.
     submitters(ANONYMOUS),
   ],
@@ -244,13 +290,30 @@ const ROLES_WORKSPACE: PlannedCoverageWorkspace = {
       'rolesOverride',
       'Roles override',
       'Overrides the form submitters group with submitter and overrideAdded.',
-      { submitterOverride: { members: ['submitter', 'overrideAdded'] } },
+      {
+        groupOverride: {
+          group: { system: SystemGroup.form_submitters },
+          members: ['submitter', 'overrideAdded'],
+        },
+      },
     ),
     form(
       'rolesOverrideCleared',
       'Roles override cleared',
       'Its override of the form submitters group was cleared.',
-      { submitterOverride: { members: ['overrideAdded'], cleared: true } },
+      {
+        groupOverride: {
+          group: { system: SystemGroup.form_submitters },
+          members: ['overrideAdded'],
+          cleared: true,
+        },
+      },
+    ),
+    form(
+      'rolesDesignersOverride',
+      'Roles designers override',
+      'Overrides the designers group with overrideAdded, leaving designer out.',
+      { groupOverride: { group: { name: DESIGNERS_GROUP }, members: ['overrideAdded'] } },
     ),
     form('rolesUnpublished', 'Roles unpublished', 'Never published.', { published: false }),
     form('rolesFormDeleted', 'Roles form deleted', 'Deleted after a draft was saved.', {

@@ -144,20 +144,18 @@ describe('FormVersionService state transitions', () => {
     expect(updateDraft).not.toHaveBeenCalled();
   });
 
-  it('restore: deleted → draft, clears deletedAt/By', async () => {
-    getByIdInclDeleted.mockResolvedValue({ id: 'v1', formId: 'f1', state: 'deleted' });
-    await svc.restore(actor);
-    expect(updateDraft).toHaveBeenCalledWith(
-      'ws1',
-      'v1',
-      'Author',
-      expect.objectContaining({ state: 'draft', deletedAt: null, deletedBy: null }),
-    );
-  });
-
-  it('restore: rejects a non-deleted version', async () => {
-    getByIdInclDeleted.mockResolvedValue({ id: 'v1', formId: 'f1', state: 'draft' });
-    await expect(svc.restore(actor)).rejects.toThrow(/Cannot change/i);
+  // Lookups skip deleted rows; the transition table refuses them even when one is read.
+  it.each([
+    ['publish', () => svc.publish(actor)],
+    ['unpublish', () => svc.unpublish(actor)],
+  ])('%s: a deleted version stays deleted', async (_label, action) => {
+    getById.mockResolvedValue({
+      id: 'v1',
+      formId: 'f1',
+      state: 'deleted',
+      engineSyncStatus: 'ready',
+    });
+    await expect(action()).rejects.toThrow(/Cannot change form version state from 'deleted'/);
     expect(updateDraft).not.toHaveBeenCalled();
   });
 
@@ -176,12 +174,6 @@ describe('FormVersionService state transitions', () => {
   it('delete: throws NotFoundError when the version is missing', async () => {
     getByIdInclDeleted.mockResolvedValue(null);
     await expect(svc.delete(actor)).rejects.toThrow(/not found/i);
-    expect(updateDraft).not.toHaveBeenCalled();
-  });
-
-  it('restore: throws NotFoundError when the version is missing', async () => {
-    getByIdInclDeleted.mockResolvedValue(null);
-    await expect(svc.restore(actor)).rejects.toThrow(/not found/i);
     expect(updateDraft).not.toHaveBeenCalled();
   });
 

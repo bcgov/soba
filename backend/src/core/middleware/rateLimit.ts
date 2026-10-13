@@ -1,10 +1,11 @@
 import rateLimit, { type Options } from 'express-rate-limit';
+import { ApiErrorCodes } from '@soba/lib';
 import { env } from '../config/env';
 
 const defaults: Partial<Options> = {
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  message: { error: 'Too many requests, please try again later' },
+  message: { error: 'Too many requests, please try again later', code: ApiErrorCodes.rate_limited },
 };
 
 /**

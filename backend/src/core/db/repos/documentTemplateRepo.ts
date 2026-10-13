@@ -3,6 +3,7 @@ import { db, type Tx } from '../client';
 import { documentTemplates, files, formVersions, forms } from '../schema';
 import type { DocumentTemplateTypeCode } from '../codes';
 import type { FileRecord } from './fileRepo';
+import { liveFormVersion } from './liveRows';
 
 export type DocumentTemplateRecord = typeof documentTemplates.$inferSelect;
 
@@ -154,8 +155,7 @@ const onLiveVersion = (formVersionId: string, type: DocumentTemplateTypeCode) =>
   and(
     eq(documentTemplates.formVersionId, formVersionId),
     eq(documentTemplates.type, type),
-    isNull(formVersions.deletedAt),
-    isNull(forms.deletedAt),
+    liveFormVersion,
   );
 
 /** The template when it is of the type on the form version and neither is deleted; null otherwise. */
@@ -191,9 +191,7 @@ export const getDocumentTemplateScope = async (
     .from(documentTemplates)
     .innerJoin(formVersions, eq(formVersions.id, documentTemplates.formVersionId))
     .innerJoin(forms, eq(forms.id, documentTemplates.formId))
-    .where(
-      and(eq(documentTemplates.id, id), isNull(formVersions.deletedAt), isNull(forms.deletedAt)),
-    )
+    .where(and(eq(documentTemplates.id, id), liveFormVersion))
     .limit(1);
   return rows[0] ?? null;
 };

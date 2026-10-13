@@ -26,6 +26,7 @@ import {
   ListMySubmissionsResponseSchema as LibListMySubmissionsResponseSchema,
   MyFormSortSchema as LibMyFormSortSchema,
   MyFormListItemSchema as LibMyFormListItemSchema,
+  SubmitterFormSchema as LibSubmitterFormSchema,
   ListMyFormsResponseSchema as LibListMyFormsResponseSchema,
   MyWorkspaceLookupItemSchema as LibMyWorkspaceLookupItemSchema,
   MyWorkspaceLookupResponseSchema as LibMyWorkspaceLookupResponseSchema,
@@ -33,8 +34,8 @@ import {
 
 extendZodWithOpenApi(z);
 
-export const SubmitFillBundleSchema =
-  LibSubmitFillBundleSchema.clone().openapi('Submit_FillBundle');
+/** A form as a submitter sees it: what it is, and its facts for the caller. */
+export const SubmitterFormSchema = LibSubmitterFormSchema.clone().openapi('Submit_SubmitterForm');
 
 export const MyFormSortSchema = LibMyFormSortSchema.clone().openapi('Submit_MyFormSort', {
   description: 'Valid My Forms sort tokens: `field:asc` or `field:desc`.',
@@ -92,6 +93,11 @@ export const ListMySubmissionsQuerySchema = z
 export const MySubmissionRoleSchema =
   LibMySubmissionRoleSchema.clone().openapi('Submit_MySubmissionRole');
 
+export const SubmitFillBundleSchema = LibSubmitFillBundleSchema.extend({
+  role: MySubmissionRoleSchema,
+  form: SubmitterFormSchema,
+}).openapi('Submit_FillBundle');
+
 export const MySubmissionListItemSchema = LibMySubmissionListItemSchema.extend({
   workflowState: MySubmissionStateSchema,
   role: MySubmissionRoleSchema,
@@ -116,8 +122,7 @@ const NOT_PARTICIPANT = 'Not a participant on this submission';
 const WRITE_AUTHZ = "Not a participant on this submission, or not in the form's audience";
 const SUBMISSION_AUTH_REQUIRED =
   'Authentication required (anonymous caller has no access to this submission)';
-const INVALID_WRITE_BODY =
-  'Invalid body (save requires revisionId and baseRevisionId; submit takes both or neither)';
+const INVALID_WRITE_BODY = 'Invalid body (revisionId and baseRevisionId are required)';
 const WRITE_CONFLICT = 'The revision id is already used by another write';
 const SIGNED_IN_REQUIRED = 'Authentication required';
 const INVALID_QUERY = 'Invalid query';
@@ -153,7 +158,7 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
     responses: {
       200: {
         description:
-          'Workflow state + schema + saved answers + write and draft access for the fill page (resume)',
+          "Workflow state, schema and saved answers for the fill page (resume), with the caller's role and the form's facts",
         content: { 'application/json': { schema: SubmitFillBundleSchema } },
       },
       401: { description: SUBMISSION_AUTH_REQUIRED },
@@ -182,8 +187,10 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
         description: 'Existing submission (idempotent open: same id, actor, and form)',
         content: { 'application/json': { schema: SubmissionResponseSchema } },
       },
+      400: { description: 'Invalid body' },
       401: { description: AUTH_REQUIRED },
       403: { description: AUTHZ },
+      404: { description: 'Form not found, or the form has no published version' },
       409: {
         description:
           'Submission id already in use by a different owner, or formVersionId is not the published version',

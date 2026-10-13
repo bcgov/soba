@@ -134,4 +134,50 @@ describe('OpenAPI components for lib-backed schemas', () => {
       ref('Forms_FormResponse'),
     );
   });
+
+  // The My Forms row is the lib's submitter form; clients read these fields as-is.
+  it('keeps the My Forms row shape', () => {
+    const text = { type: 'string' };
+    const textList = { type: 'array', items: text };
+    expect(at(schemas, 'Submit_MyFormListItem')).toEqual({
+      type: 'object',
+      properties: {
+        id: text,
+        name: text,
+        workspaceId: text,
+        workspaceName: text,
+        publishedVersionId: { ...text, nullable: true },
+        permissions: textList,
+        audienceMode: { ...text, nullable: true, enum: ['public', 'protected', 'members', null] },
+        audienceIdps: textList,
+        allowSubmitterDrafts: { type: 'boolean' },
+      },
+      required: [
+        'id',
+        'name',
+        'workspaceId',
+        'workspaceName',
+        'publishedVersionId',
+        'permissions',
+        'audienceMode',
+        'audienceIdps',
+        'allowSubmitterDrafts',
+      ],
+    });
+  });
+
+  // The fill bundle's form is the same submitter form My Forms lists, and is never null.
+  it('builds the fill bundle on the named submitter form and role', () => {
+    expect(at(schemas, 'Submit_SubmitterForm')).toEqual(at(schemas, 'Submit_MyFormListItem'));
+    expect(at(schemas, 'Submit_FillBundle', 'properties', 'form')).toEqual(
+      ref('Submit_SubmitterForm'),
+    );
+    expect(at(schemas, 'Submit_FillBundle', 'properties', 'role')).toEqual(
+      ref('Submit_MySubmissionRole'),
+    );
+    expect(at(schemas, 'Submit_MySubmissionRole', 'nullable')).toBeUndefined();
+    expect(at(schemas, 'Submit_FillBundle', 'required')).toEqual(
+      expect.arrayContaining(['formId', 'currentRevisionNo', 'role', 'form']),
+    );
+  });
 });

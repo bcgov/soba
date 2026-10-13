@@ -19,6 +19,7 @@ import {
   getFormVersionById,
   type FormVersionRecord,
 } from '../db/repos/formVersionRepo';
+import type { FormAccessGrant } from '../db/repos/formAccessRepo';
 import { isWorkspaceDisclaimerAccepted } from '../db/repos/workspaceRepo';
 import { db } from '../db/client';
 import { hasPgCode, isUniqueViolationOn, PG_UNIQUE_VIOLATION } from '../db/pgError';
@@ -44,6 +45,7 @@ interface DeleteInput {
 interface ListInput {
   workspaceIds: string[];
   actorId: string;
+  formAccess: FormAccessGrant;
   offset: number;
   limit: number;
   formId?: string;

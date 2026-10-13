@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 
 const { kc, search, me } = vi.hoisted(() => ({
-  kc: { authenticated: true, initializing: false },
+  kc: { authenticated: true, initializing: false, initStarted: true },
   search: { value: '' },
   me: { idpCode: 'idir' as string | null, loaded: true, hasError: false },
 }));
@@ -91,7 +91,7 @@ const OPEN = {
   workspaceId: WS_A.id,
   workspaceName: WS_A.name,
   publishedVersionId: 'v1',
-  permissions: ['form_read', 'submission_create'],
+  permissions: ['document_template_read', 'submission_create'],
   audienceMode: 'members' as const,
   audienceIdps: [],
   allowSubmitterDrafts: true,

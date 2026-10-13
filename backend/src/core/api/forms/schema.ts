@@ -106,10 +106,7 @@ export const SaveFormVersionParamsSchema = z
 
 export const SaveFormVersionBodySchema = z
   .object({
-    eventType: z.string().min(1).optional(),
     note: z.string().optional(),
-    formioFormDefinition: z.record(z.string(), z.unknown()).optional(),
-    engine_schema_ref: z.string().min(1).optional(),
   })
   .openapi('Forms_SaveFormVersionBody');
 
@@ -543,23 +540,21 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
     },
   });
 
-  for (const action of ['unpublish', 'restore'] as const) {
-    registry.registerPath({
-      method: 'post',
-      path: `${FORM_VERSION_PATH}/${action}`,
-      tags: [TAG],
-      security: [{ bearerAuth: [] }],
-      request: { params: FormVersionIdParamsSchema },
-      responses: {
-        200: {
-          description: `Form version ${action} action`,
-          content: { 'application/json': { schema: FormVersionResponseSchema } },
-        },
-        400: { description: 'Invalid state transition' },
-        404: { description: FORM_VERSION_NOT_FOUND },
+  registry.registerPath({
+    method: 'post',
+    path: `${FORM_VERSION_PATH}/unpublish`,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: { params: FormVersionIdParamsSchema },
+    responses: {
+      200: {
+        description: 'Form version unpublish action',
+        content: { 'application/json': { schema: FormVersionResponseSchema } },
       },
-    });
-  }
+      400: { description: 'Invalid state transition' },
+      404: { description: FORM_VERSION_NOT_FOUND },
+    },
+  });
 
   registry.registerPath({
     method: 'get',

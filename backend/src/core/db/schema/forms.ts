@@ -111,6 +111,8 @@ export const formVersionRevisions = sobaSchema.table(
 
 export const SUBMISSION_CONFIRMATION_CODE_UNIQUE = 'submission_confirmation_code_uq';
 
+export const SUBMISSION_REVISION_PKEY = 'submission_revision_pkey';
+
 export const submissions = sobaSchema.table(
   'submission',
   {

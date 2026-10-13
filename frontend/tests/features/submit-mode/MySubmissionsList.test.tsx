@@ -3,13 +3,20 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const { kc, search } = vi.hoisted(() => ({
+const { kc, search, me } = vi.hoisted(() => ({
   kc: { authenticated: true, initializing: false },
   search: { value: '' },
+  me: { idpCode: 'idir' as string | null },
 }));
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
   useKeycloak: () => ({ ...kc, token: 'token' }),
+}));
+
+vi.mock('@/src/shared/api/useCurrentUser', () => ({
+  useCurrentUser: () => ({
+    data: me.idpCode ? { profile: { idpCode: me.idpCode } } : null,
+  }),
 }));
 
 vi.mock('@/app/[lang]/Providers', () => ({
@@ -50,9 +57,12 @@ vi.mock('@/app/[lang]/Providers', () => ({
       deleteMessage: 'Your draft of {form}, last updated {updated}, will be deleted.',
       deleteSuccess: 'Draft deleted.',
       deleteError: 'Could not delete this draft.',
-      deleteSubmitted: 'This draft has been submitted and can no longer be deleted.',
       viewAll: 'View my submissions',
       noCode: 'No confirmation ID yet',
+    },
+    apiErrors: {
+      delete_closed: 'Already submitted, so it stays.',
+      delete_denied: 'Only its owner can delete it.',
     },
     dataTable: { itemName: 'items', pageOf: 'of {totalPages} page(s)' },
     modal: { dialogActions: 'Dialog actions' },
@@ -181,6 +191,7 @@ describe('MySubmissionsList', () => {
     search.value = '';
     kc.authenticated = true;
     kc.initializing = false;
+    me.idpCode = 'idir';
     store = makeStore();
     store.dispatch(setToken('token'));
     store.dispatch(setAuthenticated(true));
@@ -252,6 +263,13 @@ describe('MySubmissionsList', () => {
     expect(screen.queryByTestId('s2-continue')).not.toBeInTheDocument();
     expect(screen.getByTestId('s3-continue')).toBeInTheDocument();
     expect(screen.queryByTestId('s3-delete')).not.toBeInTheDocument();
+  });
+
+  it('offers no delete until the caller is known', async () => {
+    me.idpCode = null;
+    await renderList();
+    expect(await screen.findByTestId('s1-continue')).toBeInTheDocument();
+    expect(screen.queryByTestId('s1-delete')).not.toBeInTheDocument();
   });
 
   it.each([
@@ -331,6 +349,22 @@ describe('MySubmissionsList', () => {
     expect(screen.queryByTestId('confirm-modal-message')).not.toBeInTheDocument();
   });
 
+  it('deletes nothing, and says the session ended, when the session holds no token', async () => {
+    await renderList();
+    await userEvent.click(await screen.findByTestId('s1-delete'));
+    await act(async () => {
+      store.dispatch(setToken(undefined));
+    });
+    await userEvent.click(screen.getByTestId('confirm-modal-confirm'));
+
+    await waitFor(() =>
+      expect(addNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'Your session has ended.', type: 'error' }),
+      ),
+    );
+    expect(deleteSubmitSubmission).not.toHaveBeenCalled();
+  });
+
   it('holds the dialog open, with confirm disabled, until the delete settles', async () => {
     const settle = deferredDelete();
     await renderList();
@@ -350,8 +384,18 @@ describe('MySubmissionsList', () => {
   it.each([
     [
       'a draft submitted elsewhere',
+      new ApiError('Submission is submitted', 409, 'delete_closed'),
+      'Already submitted, so it stays.',
+    ],
+    [
+      'a draft submitted elsewhere, refused without a code',
       new ApiError('Submission is submitted', 409),
-      'This draft has been submitted and can no longer be deleted.',
+      'Already submitted, so it stays.',
+    ],
+    [
+      'a caller who may not delete it',
+      new ApiError('Not authorized to delete this submission', 403, 'delete_denied'),
+      'Only its owner can delete it.',
     ],
     ['an ended session', new SessionExpiredError(), 'Your session has ended.'],
     ['any other failure', new Error('boom'), 'Could not delete this draft.'],

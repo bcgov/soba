@@ -135,15 +135,8 @@ export const ListFormsResponseSchema = z.object({
 
 export type ListFormsResponse = z.infer<typeof ListFormsResponseSchema>;
 
-/**
- * A form the caller holds the submitter role on, or has a draft or submitted submission on, with
- * the facts canStartSubmission and canSaveSubmissionDraft read.
- */
-export const MyFormListItemSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  workspaceId: z.string(),
-  workspaceName: z.string(),
+/** What the submitter rules in @soba/lib read about one form, for one caller. */
+export const SubmitterFormFactsSchema = z.object({
   // Null when the form has no published version.
   publishedVersionId: z.string().nullable(),
   // The caller's permission codes on the form.
@@ -154,6 +147,19 @@ export const MyFormListItemSchema = z.object({
   // The form's own drafts setting, or its workspace's when it inherits.
   allowSubmitterDrafts: z.boolean(),
 });
+
+/** A form as a submitter sees it: what it is, and its facts. */
+export const SubmitterFormSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    workspaceId: z.string(),
+    workspaceName: z.string(),
+  })
+  .extend(SubmitterFormFactsSchema.shape);
+
+/** A form the caller holds the submitter role on, or has a draft or submitted submission on. */
+export const MyFormListItemSchema = SubmitterFormSchema;
 
 export const MyFormSortSchema = makeSortEnum(MY_FORM_SORT_FIELDS);
 
@@ -167,6 +173,7 @@ export const ListMyFormsResponseSchema = z.object({
   sort: MyFormSortSchema,
 });
 
+export type SubmitterForm = z.infer<typeof SubmitterFormSchema>;
 export type MyFormListItem = z.infer<typeof MyFormListItemSchema>;
 export type MyFormListSort = z.infer<typeof MyFormSortSchema>;
 export type ListMyFormsResponse = z.infer<typeof ListMyFormsResponseSchema>;

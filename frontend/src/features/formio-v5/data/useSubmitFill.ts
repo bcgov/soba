@@ -11,8 +11,8 @@ import type { Resource } from '@/src/shared/api/dataContracts';
 import type { SubmitFillBundle } from '@/src/types/forms';
 
 /**
- * The bundle for filling one submission: workflow state, its version schema, any saved answers, and
- * whether the caller may write.
+ * The bundle for filling one submission: workflow state, its version schema, any saved answers, the
+ * caller's role and the form's facts.
  * Works signed in or anonymously; a session read, so it does not revalidate on its own.
  */
 export function useSubmitFill(submissionId: string): Resource<SubmitFillBundle> {

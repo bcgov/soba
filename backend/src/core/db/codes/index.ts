@@ -2,8 +2,13 @@
  * Single source of truth for all seeded code values. Seed and application code
  * import from here; no string literals for codes in logic. Compile-time safety.
  */
-import { Permissions } from '@soba/lib';
-export { Permissions, type PermissionCode } from '@soba/lib';
+export { FormCreatePermissions, Permissions, type PermissionCode } from '@soba/lib';
+export {
+  SubmissionParticipantRole,
+  SubmissionWorkflowState,
+  type SubmissionParticipantRoleCode,
+  type SubmissionWorkflowStateCode,
+} from '@soba/lib';
 
 import type { TemplateType } from '@soba/lib';
 
@@ -17,13 +22,6 @@ export const Roles = {
   team_manager: 'team_manager',
 } as const;
 export type RoleCode = (typeof Roles)[keyof typeof Roles];
-
-/**
- * POST /forms writes the form and its first design. `form_create` is not seeded onto any role;
- * only form_admin matches it (via `*`). form_designer has `design_create` for new designs on
- * existing forms.
- */
-export const FormCreatePermissions = [Permissions.form_create, Permissions.design_create] as const;
 
 export const RoleStatus = {
   active: 'active',
@@ -75,16 +73,6 @@ export const FormVersionState = {
   deleted: 'deleted',
 } as const;
 export type FormVersionStateCode = (typeof FormVersionState)[keyof typeof FormVersionState];
-
-/** Submission lifecycle state (submission.workflow_state). Backend-owned; clients never set it. */
-export const SubmissionWorkflowState = {
-  opened: 'opened',
-  draft: 'draft',
-  submitted: 'submitted',
-  deleted: 'deleted',
-} as const;
-export type SubmissionWorkflowStateCode =
-  (typeof SubmissionWorkflowState)[keyof typeof SubmissionWorkflowState];
 
 /** Submission lifecycle event (submission_revision.event_type). Mirrors the state flow. */
 export const SubmissionEventType = {
@@ -279,17 +267,6 @@ export const FormGroupOverrideStatus = {
 } as const;
 export type FormGroupOverrideStatusCode =
   (typeof FormGroupOverrideStatus)[keyof typeof FormGroupOverrideStatus];
-
-/**
- * A user's standing on one submission (submission_participant.role). Owners and collaborators have
- * the same access, except that only an owner deletes the submission.
- */
-export const SubmissionParticipantRole = {
-  owner: 'owner',
-  collaborator: 'collaborator',
-} as const;
-export type SubmissionParticipantRoleCode =
-  (typeof SubmissionParticipantRole)[keyof typeof SubmissionParticipantRole];
 
 /** Status of a submission_participant row. */
 export const SubmissionParticipantStatus = {

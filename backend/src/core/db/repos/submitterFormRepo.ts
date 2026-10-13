@@ -6,7 +6,6 @@ import {
   ilike,
   inArray,
   isNull,
-  notExists,
   sql,
   type SQL,
   type SQLWrapper,
@@ -16,44 +15,27 @@ import {
   MY_FORM_SORT_FIELDS,
   MY_SUBMISSION_STATES,
   type AudienceMode,
-  type DraftSaveFacts,
-  type FormAccessFacts,
   type MyFormListSort,
   type SortLocale,
   type SubmitterFormFacts,
 } from '@soba/lib';
-import { db } from '../client';
+import { db, type DbOrTx } from '../client';
 import {
   formAudienceSettings,
-  formGroupOverrideMembers,
-  formGroupOverrides,
   forms,
   formSubmitterSettings,
   formVersions,
-  rolePermissions,
   submissionParticipants,
   submissions,
   workspaceAudienceSettings,
-  workspaceGroupMemberships,
-  workspaceGroupRoles,
-  workspaceGroups,
-  workspaceMemberships,
   workspaceSubmitterSettings,
   workspaces,
 } from '../schema';
-import {
-  FormGroupOverrideStatus,
-  FormVersionState,
-  GroupMemberKind,
-  Roles,
-  SubmissionParticipantStatus,
-  WorkspaceGroupMembershipStatus,
-  WorkspaceGroupRoleStatus,
-  WorkspaceGroupStatus,
-  WorkspaceMembershipStatus,
-} from '../codes';
+import { FormVersionState, Roles, SubmissionParticipantStatus } from '../codes';
 import { collated, likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
+import { effectiveGroups, permissionsByForm } from './formAccessRepo';
+import { liveForm } from './liveRows';
 
 type SubmitterFormSortField = (typeof MY_FORM_SORT_FIELDS)[number];
 
@@ -68,9 +50,6 @@ export interface SubmitterFormListRow extends SubmitterFormFacts {
   workspaceName: string;
 }
 
-/** What the access and drafts rules read about one form for one caller. */
-export type FormRuleFacts = FormAccessFacts & DraftSaveFacts;
-
 export interface ListSubmitterFormsInput {
   userId: string;
   offset: number;
@@ -79,17 +58,6 @@ export interface ListSubmitterFormsInput {
   q?: string;
   sort: MyFormListSort;
   locale: SortLocale;
-}
-
-/** Narrows the groups a caller is an effective member of. */
-interface GroupScope {
-  workspaceId?: string;
-  /** Only these forms: ids, or a subquery returning them. */
-  formIds?: string[] | SQLWrapper;
-  /** Only groups carrying this role, active. */
-  roleCode?: string;
-  /** Leave out deleted forms. */
-  liveFormsOnly?: boolean;
 }
 
 const isPublished = and(
@@ -111,143 +79,6 @@ const publishedVersionIdOf = (formId: SQLWrapper) =>
     .from(formVersions)
     .where(and(eq(formVersions.formId, formId), isPublished))
     .limit(1)})`;
-
-/**
- * The groups the user is an effective member of, per form: a form's active override of a group
- * replaces that group's workspace members with its own. User members only.
- */
-const effectiveGroups = (userId: string, scope: GroupScope) => {
-  const activeMembership = and(
-    eq(workspaceMemberships.userId, userId),
-    eq(workspaceMemberships.status, WorkspaceMembershipStatus.active),
-    scope.workspaceId ? eq(workspaceMemberships.workspaceId, scope.workspaceId) : undefined,
-  );
-  const inScope = (formId: SQLWrapper) =>
-    scope.formIds ? inArray(formId, scope.formIds) : undefined;
-  // Checked on the group before its forms are joined, so other groups never reach the forms.
-  const carriesRole = scope.roleCode
-    ? exists(
-        db
-          .select({ id: workspaceGroupRoles.id })
-          .from(workspaceGroupRoles)
-          .where(
-            and(
-              eq(workspaceGroupRoles.groupId, workspaceGroups.id),
-              eq(workspaceGroupRoles.status, WorkspaceGroupRoleStatus.active),
-              eq(workspaceGroupRoles.roleCode, scope.roleCode),
-            ),
-          ),
-      )
-    : undefined;
-  const live = scope.liveFormsOnly ? isNull(forms.deletedAt) : undefined;
-  // Drizzle does not qualify a subquery's aliased columns, so the names must not match a table's.
-  const formId = sql<string>`${forms.id}`.as('effective_form_id');
-  const groupId = sql<string>`${workspaceGroups.id}`.as('effective_group_id');
-
-  const inherited = db
-    .select({ formId, groupId })
-    .from(workspaceMemberships)
-    .innerJoin(
-      workspaceGroupMemberships,
-      and(
-        eq(workspaceGroupMemberships.workspaceMembershipId, workspaceMemberships.id),
-        eq(workspaceGroupMemberships.workspaceId, workspaceMemberships.workspaceId),
-        eq(workspaceGroupMemberships.memberKind, GroupMemberKind.user),
-        eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
-      ),
-    )
-    .innerJoin(
-      workspaceGroups,
-      and(
-        eq(workspaceGroups.id, workspaceGroupMemberships.groupId),
-        eq(workspaceGroups.status, WorkspaceGroupStatus.active),
-        carriesRole,
-      ),
-    )
-    .innerJoin(
-      forms,
-      and(eq(forms.workspaceId, workspaceMemberships.workspaceId), inScope(forms.id), live),
-    )
-    .where(
-      and(
-        activeMembership,
-        notExists(
-          db
-            .select({ id: formGroupOverrides.id })
-            .from(formGroupOverrides)
-            .where(
-              and(
-                eq(formGroupOverrides.formId, forms.id),
-                eq(formGroupOverrides.groupId, workspaceGroups.id),
-                eq(formGroupOverrides.status, FormGroupOverrideStatus.active),
-              ),
-            ),
-        ),
-      ),
-    );
-
-  const overridden = db
-    .select({ formId, groupId })
-    .from(workspaceMemberships)
-    .innerJoin(
-      formGroupOverrideMembers,
-      and(
-        eq(formGroupOverrideMembers.workspaceMembershipId, workspaceMemberships.id),
-        eq(formGroupOverrideMembers.memberKind, GroupMemberKind.user),
-        eq(formGroupOverrideMembers.status, WorkspaceGroupMembershipStatus.active),
-      ),
-    )
-    .innerJoin(
-      formGroupOverrides,
-      and(
-        eq(formGroupOverrides.id, formGroupOverrideMembers.overrideId),
-        eq(formGroupOverrides.workspaceId, workspaceMemberships.workspaceId),
-        eq(formGroupOverrides.status, FormGroupOverrideStatus.active),
-        inScope(formGroupOverrides.formId),
-      ),
-    )
-    .innerJoin(
-      workspaceGroups,
-      and(
-        eq(workspaceGroups.id, formGroupOverrides.groupId),
-        eq(workspaceGroups.status, WorkspaceGroupStatus.active),
-        carriesRole,
-      ),
-    )
-    .innerJoin(
-      forms,
-      and(
-        eq(forms.id, formGroupOverrides.formId),
-        eq(forms.workspaceId, workspaceMemberships.workspaceId),
-        live,
-      ),
-    )
-    .where(activeMembership);
-
-  return unionAll(inherited, overridden);
-};
-
-/** Per form, the user's permission codes from the active roles of their effective groups. */
-const permissionsByForm = (userId: string, scope: GroupScope) => {
-  const groups = effectiveGroups(userId, scope).as('effective_group');
-  return db
-    .select({
-      formId: groups.formId,
-      permissions: sql<string[]>`array_agg(distinct ${rolePermissions.permissionCode})`.as(
-        'access_permissions',
-      ),
-    })
-    .from(groups)
-    .innerJoin(
-      workspaceGroupRoles,
-      and(
-        eq(workspaceGroupRoles.groupId, groups.groupId),
-        eq(workspaceGroupRoles.status, WorkspaceGroupRoleStatus.active),
-      ),
-    )
-    .innerJoin(rolePermissions, eq(rolePermissions.roleCode, workspaceGroupRoles.roleCode))
-    .groupBy(groups.formId);
-};
 
 /**
  * Ids of the forms the user holds the form_submitter role on, plus the forms of their draft and
@@ -341,6 +172,36 @@ const withSettings = <T extends PgSelect>(query: T) =>
 
 const NO_PERMISSIONS = sql<string[]>`'{}'::text[]`;
 
+/**
+ * The facts columns for the forms in `scope`, and the joins they read. Permissions are read only for
+ * a user; the public user belongs to no workspace, so it has none.
+ */
+export const formFacts = (
+  userId: string | null,
+  scope: { workspaceId?: string; formIds: string[] | SQLWrapper },
+) => {
+  const permissions = userId ? permissionsByForm(userId, scope).as('caller_permission') : null;
+  return {
+    columns: {
+      publishedVersionId: publishedVersionIdOf(forms.id),
+      permissions: permissions
+        ? sql<string[]>`coalesce(${permissions.permissions}, ${NO_PERMISSIONS})`
+        : NO_PERMISSIONS,
+      ...settingsColumns,
+    },
+    join: <T extends PgSelect>(query: T) => {
+      const joined = withSettings(query);
+      // A dynamic query joins in place, and every caller selects explicitly, so the type holds.
+      return permissions
+        ? (joined.leftJoin(
+            permissions,
+            eq(permissions.formId, forms.id),
+          ) as unknown as typeof joined)
+        : joined;
+    },
+  };
+};
+
 /** One page of the forms the user holds the submitter role on or has submitted to, with facts. */
 export const listFormsForSubmitter = async (
   input: ListSubmitterFormsInput,
@@ -362,33 +223,82 @@ export const listFormsForSubmitter = async (
       .limit(input.limit)
       .offset(input.offset),
   );
-  const permissions = permissionsByForm(input.userId, {
+  const facts = formFacts(input.userId, {
     workspaceId: input.workspaceId,
     formIds: db.select({ formId: page.formId }).from(page),
-  }).as('caller_permission');
+  });
 
   return readListPage(async (tx) => {
-    const items = await withSettings(
-      tx
-        .with(page)
+    const items = await facts
+      .join(
+        tx
+          .with(page)
+          .select({
+            id: forms.id,
+            name: forms.name,
+            workspaceId: forms.workspaceId,
+            workspaceName: workspaces.name,
+            ...facts.columns,
+          })
+          .from(forms)
+          .innerJoin(page, eq(page.formId, forms.id))
+          .innerJoin(workspaces, eq(workspaces.id, forms.workspaceId))
+          .$dynamic(),
+      )
+      .orderBy(...order);
+    const totals = await tx.select({ total: count() }).from(forms).where(where);
+    return { items, total: totals[0]?.total ?? 0 };
+  });
+};
+
+/** A live form with its facts for one caller, or null when it is missing or deleted. */
+export const findLiveSubmitterForm = async (
+  input: { userId: string | null; formId: string },
+  executor: DbOrTx = db,
+): Promise<SubmitterFormListRow | null> => {
+  const facts = formFacts(input.userId, { formIds: [input.formId] });
+  const [row] = await facts
+    .join(
+      executor
         .select({
           id: forms.id,
           name: forms.name,
           workspaceId: forms.workspaceId,
           workspaceName: workspaces.name,
-          publishedVersionId: publishedVersionIdOf(forms.id),
-          permissions: sql<string[]>`coalesce(${permissions.permissions}, ${NO_PERMISSIONS})`,
-          ...settingsColumns,
+          ...facts.columns,
         })
         .from(forms)
-        .innerJoin(page, eq(page.formId, forms.id))
         .innerJoin(workspaces, eq(workspaces.id, forms.workspaceId))
-        .leftJoin(permissions, eq(permissions.formId, forms.id))
         .$dynamic(),
-    ).orderBy(...order);
-    const totals = await tx.select({ total: count() }).from(forms).where(where);
-    return { items, total: totals[0]?.total ?? 0 };
-  });
+    )
+    .where(and(eq(forms.id, input.formId), liveForm))
+    .limit(1);
+  return row ?? null;
+};
+
+/** The given forms with their facts for one caller, across workspaces, in no particular order. */
+export const listSubmitterForms = (
+  input: { userId: string | null; formIds: readonly string[] },
+  executor: DbOrTx = db,
+): Promise<SubmitterFormListRow[]> => {
+  if (input.formIds.length === 0) return Promise.resolve([]);
+  const formIds = [...input.formIds];
+  const facts = formFacts(input.userId, { formIds });
+  return facts
+    .join(
+      executor
+        .select({
+          id: forms.id,
+          name: forms.name,
+          workspaceId: forms.workspaceId,
+          workspaceName: workspaces.name,
+          ...facts.columns,
+        })
+        .from(forms)
+        .innerJoin(workspaces, eq(workspaces.id, forms.workspaceId))
+        .$dynamic(),
+    )
+    .where(inArray(forms.id, formIds));
 };
 
 /** Workspaces of the forms the user holds the submitter role on or has submitted to, by name. */
@@ -414,33 +324,19 @@ export const listWorkspacesForSubmitter = (input: {
 
 /**
  * What the rules read about one form for one caller, or null when the form is not in the
- * workspace. The caller's permissions are read only when `userId` is given; the public user
- * belongs to no workspace, so it has none.
+ * workspace. A deleted form still answers; whether its submission or version is live is the
+ * caller's lookup.
  */
-export const findSubmitterFormFacts = async (input: {
-  userId: string | null;
-  workspaceId: string;
-  formId: string;
-}): Promise<FormRuleFacts | null> => {
-  const permissions = input.userId
-    ? permissionsByForm(input.userId, {
-        workspaceId: input.workspaceId,
-        formIds: [input.formId],
-      }).as('caller_permission')
-    : null;
-  let query = withSettings(
-    db
-      .select({
-        permissions: permissions
-          ? sql<string[]>`coalesce(${permissions.permissions}, ${NO_PERMISSIONS})`
-          : NO_PERMISSIONS,
-        ...settingsColumns,
-      })
-      .from(forms)
-      .$dynamic(),
-  );
-  if (permissions) query = query.leftJoin(permissions, eq(permissions.formId, forms.id));
-  const rows = await query
+export const findSubmitterFormFacts = async (
+  input: { userId: string | null; workspaceId: string; formId: string },
+  executor: DbOrTx = db,
+): Promise<SubmitterFormFacts | null> => {
+  const facts = formFacts(input.userId, {
+    workspaceId: input.workspaceId,
+    formIds: [input.formId],
+  });
+  const rows = await facts
+    .join(executor.select(facts.columns).from(forms).$dynamic())
     .where(and(eq(forms.id, input.formId), eq(forms.workspaceId, input.workspaceId)))
     .limit(1);
   return rows[0] ?? null;

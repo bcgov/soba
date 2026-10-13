@@ -4,6 +4,7 @@ import { useCallback, useMemo } from 'react';
 import { useSWRConfig } from 'swr';
 import { deleteSubmitSubmission, getMySubmissions } from '@/src/shared/api/sobaApi';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
+import { useCallToken } from '@/src/shared/api/callToken';
 import { listReadConfig } from '@/src/shared/api/swrConfig';
 import { classifyDataError } from '@/src/shared/api/dataError';
 import type { ListResult, WriteOutcome } from '@/src/shared/api/dataContracts';
@@ -52,11 +53,16 @@ export function useMySubmissions(
   };
 }
 
-/** Delete one of the caller's own unsubmitted submissions, then re-read the list. */
+/**
+ * Delete one of the caller's own unsubmitted submissions, then re-read the list. Signed in only: a
+ * session left with no token throws SessionExpiredError and sends nothing.
+ */
 export function useMySubmissionDeleter() {
   const { mutate } = useSWRConfig();
+  const { signedInToken } = useCallToken();
   const remove = useCallback(
-    async (token: string, submissionId: string): Promise<WriteOutcome<void>> => {
+    async (submissionId: string): Promise<WriteOutcome<void>> => {
+      const token = signedInToken();
       try {
         await deleteSubmitSubmission(token, submissionId);
         return { status: 'applied', value: undefined };
@@ -65,7 +71,7 @@ export function useMySubmissionDeleter() {
         await mutate((key) => Array.isArray(key) && key[0] === KEY);
       }
     },
-    [mutate],
+    [mutate, signedInToken],
   );
   return { remove };
 }

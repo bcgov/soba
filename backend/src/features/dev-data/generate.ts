@@ -2,8 +2,6 @@
  * Runs the plan through the real services, so forms and submissions exist in Postgres and in the
  * form engine. No argv, console, or process exit: takes options, returns a manifest.
  */
-import { v7 as uuidv7 } from 'uuid';
-
 import { db } from '../../core/db/client';
 import type { WorkspaceMembershipRoleCode } from '../../core/db/codes';
 import { ConflictError } from '../../core/errors';
@@ -13,7 +11,6 @@ import { addUserToGroup, createGroupWithRole } from '../../core/db/repos/workspa
 import { updateWorkspaceAudience } from '../../core/db/repos/audienceSettingRepo';
 import { FormService } from '../../core/services/formService';
 import { FormVersionService } from '../../core/services/formVersionService';
-import { SubmissionService } from '../../core/services/submissionService';
 
 import { generateCoverage, type CoverageManifest } from './access/generate';
 import { getFixture, type DevFormFixture } from './fixtures';
@@ -32,11 +29,11 @@ import {
 import { requireBaseSeed } from './preconditions';
 import { finishRun, hasOpenRun, recordIds, startRun } from './runs';
 import { resolveTargetUser, type ResolvedUser, type UserRef } from './resolveUser';
+import { seedSubmission } from './seedSubmission';
 
 // Not from the core container, which also wires the API service layer this tool does not use.
 const formService = new FormService();
 const formVersionService = new FormVersionService();
-const submissionService = new SubmissionService();
 
 export interface GenerateOptions {
   /** The real user the data is built around. */
@@ -226,21 +223,14 @@ async function createSubmission(args: {
   planned: PlannedSubmission;
 }): Promise<string> {
   const actor = submitterOf(args.ctx, args.planned.submitter);
-  const submissionId = uuidv7();
-  const actorInput = { actorId: actor.id, actorDisplayLabel: actor.displayLabel };
-  await submissionService.open({
-    id: submissionId,
+  return seedSubmission({
     workspaceId: args.workspaceId,
     formId: args.formId,
-    ...actorInput,
+    actorId: actor.id,
+    actorDisplayLabel: actor.displayLabel,
+    data: args.fixture.answers(args.planned.index),
+    events: args.planned.events,
   });
-
-  const data = args.fixture.answers(args.planned.index);
-  for (const event of args.planned.events) {
-    const input = { workspaceId: args.workspaceId, submissionId, data, ...actorInput };
-    await (event === 'saved' ? submissionService.save(input) : submissionService.submit(input));
-  }
-  return submissionId;
 }
 
 async function createForm(

@@ -72,6 +72,7 @@ export const registerMembersOpenApi = (registry: OpenAPIRegistry) => {
         },
       },
       400: { description: 'Invalid query' },
+      403: { description: 'Actor is not a member of the workspace, or is a viewer' },
     },
   });
 };

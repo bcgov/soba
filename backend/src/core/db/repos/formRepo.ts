@@ -4,6 +4,8 @@ import { forms, formVersions, workspaces } from '../schema';
 import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 import { NotFoundError } from '../../errors';
+import { listAllowsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
+import { liveForm } from './liveRows';
 
 import { FORM_SORT_FIELDS, type SortLocale, type SortToken } from '@soba/lib';
 export type FormListSortField = (typeof FORM_SORT_FIELDS)[number];
@@ -17,8 +19,9 @@ const FORM_SORT_COLUMNS: SortColumns<FormListSortField> = {
 };
 
 export interface ListFormsForWorkspaceInput {
-  /** Workspace resolved from the list scope anchor. */
+  /** The anchored workspace, or every workspace the actor is an active member of. */
   workspaceIds: string[];
+  formAccess: FormAccessGrant;
   offset: number;
   limit: number;
   formId?: string;
@@ -70,11 +73,17 @@ interface UpdateFormInput {
 export const listFormsForWorkspace = async (
   input: ListFormsForWorkspaceInput,
 ): Promise<{ items: FormListRow[]; total: number }> => {
-  // An empty scope means the actor holds the permission in no workspace, never "all workspaces".
-  if (input.workspaceIds.length === 0) {
+  if (listAllowsNothing(input.workspaceIds, input.formAccess)) {
     return { items: [], total: 0 };
   }
-  const whereClauses = [inArray(forms.workspaceId, input.workspaceIds), isNull(forms.deletedAt)];
+  const whereClauses = [
+    inArray(forms.workspaceId, input.workspaceIds),
+    liveForm,
+    permittedFormsWhere(input.formAccess, {
+      workspaceId: forms.workspaceId,
+      formId: forms.id,
+    }),
+  ];
 
   if (input.status) {
     whereClauses.push(eq(forms.status, input.status));
@@ -285,7 +294,7 @@ export const getFormListContext = async (
   const row = await db
     .select({ workspaceId: forms.workspaceId })
     .from(forms)
-    .where(and(eq(forms.id, formId), isNull(forms.deletedAt)))
+    .where(and(eq(forms.id, formId), liveForm))
     .limit(1);
 
   return row[0] ?? null;

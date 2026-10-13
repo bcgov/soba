@@ -23,7 +23,6 @@ import {
   saveFormVersion,
   publishFormVersion,
   unpublishFormVersion,
-  restoreFormVersion,
   provisionFormVersionSchema,
   getFormVersionSchema,
 } from './controller';
@@ -143,13 +142,6 @@ router.post(
   formVersionResource,
   requireFormPermissions([Permissions.design_update]),
   unpublishFormVersion,
-);
-router.post(
-  `${FORM_VERSIONS_ID_PATH}/restore`,
-  validateRequest({ params: FormVersionIdParamsSchema }),
-  formVersionResource,
-  requireFormPermissions([Permissions.design_update]),
-  restoreFormVersion,
 );
 router.get(
   `${FORM_VERSIONS_ID_PATH}/schema`,

@@ -17,6 +17,11 @@ vi.mock('@/app/[lang]/Providers', () => ({
         missingId: 'Missing form id.',
       },
     },
+    apiErrors: {
+      open_denied: 'This form is not open to you.',
+      not_published: 'This form is closed.',
+      form_not_found: 'There is no such form.',
+    },
   }),
 }));
 
@@ -32,6 +37,7 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
 
 import makeStore from '@/lib/store';
 import StartSubmission from '@/src/features/submit-mode/ui/StartSubmission';
+import { ApiError } from '@/src/shared/api/sobaHelpers';
 import { answerInit, renderInStore } from './keycloakInit';
 
 let store: ReturnType<typeof makeStore>;
@@ -65,5 +71,48 @@ describe('StartSubmission', () => {
     await waitFor(() => expect(h.replace).toHaveBeenCalledWith('/en/submit/sub-1'));
     expect(h.openSobaFormSubmission).toHaveBeenCalledTimes(1);
     expect(h.openSobaFormSubmission).toHaveBeenCalledWith('token', 'form-1', expect.any(String));
+  });
+
+  it('opens nothing, and says the session ended, when a signed-in session holds no token', async () => {
+    await renderInStore(store, <StartSubmission />);
+    await answerInit(store, { authenticated: true });
+    expect(await screen.findByTestId('start-submission-error')).toHaveTextContent(
+      'Your session has ended.',
+    );
+    expect(h.openSobaFormSubmission).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      'the message for its code',
+      new ApiError('Not authorized to submit this form', 403, 'open_denied'),
+      'This form is not open to you.',
+    ],
+    [
+      'the message for an unpublished form',
+      new ApiError('Form has no published version', 404, 'not_published'),
+      'This form is closed.',
+    ],
+    [
+      'the message for a missing form',
+      new ApiError('Form not found', 404, 'form_not_found'),
+      'There is no such form.',
+    ],
+    [
+      'the generic message for a server failure',
+      new ApiError('Internal server error', 500),
+      'Could not start the form.',
+    ],
+    ['the server text for an uncoded client error', new ApiError('Bad id', 400), 'Bad id'],
+    [
+      'the generic message for an error that is not from the API',
+      new TypeError('x is undefined'),
+      'Could not start the form.',
+    ],
+  ])('shows %s when the open is refused', async (_label, refused, text) => {
+    h.openSobaFormSubmission.mockRejectedValue(refused);
+    await renderInStore(store, <StartSubmission />);
+    await answerInit(store, { authenticated: true, token: 'token' });
+    expect(await screen.findByTestId('start-submission-error')).toHaveTextContent(text);
   });
 });

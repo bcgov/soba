@@ -19,6 +19,7 @@ import {
 } from '../db/repos/formVersionRepo';
 import { getFormById, getFormEngineCodeForForm } from '../db/repos/formRepo';
 import { copyDocumentTemplates } from '../db/repos/documentTemplateRepo';
+import type { FormAccessGrant } from '../db/repos/formAccessRepo';
 import { db, type DbOrTx } from '../db/client';
 import { hasPgCode, isUniqueViolationOn, PG_UNIQUE_VIOLATION } from '../db/pgError';
 import { FORM_VERSION_ONE_PUBLISHED_UNIQUE, FORM_VERSION_PKEY } from '../db/schema';
@@ -51,6 +52,8 @@ function withCurrentVersion<T>(
 
 /** A provision this old is taken to have died, and no longer blocks the version. */
 const PROVISIONING_STALE_MS = 2 * 60 * 1000;
+/** A provision's engine calls are abandoned by then, before its claim can go stale. */
+const PROVISIONING_BUDGET_MS = 90 * 1000;
 
 /**
  * Only a draft's schema is written, and not while another save is still writing it: the engine
@@ -86,10 +89,7 @@ interface SaveInput {
   actorId: string;
   actorDisplayLabel: string | null;
   formVersionId: string;
-  eventType: string;
   note?: string;
-  formioFormDefinition?: Record<string, unknown>;
-  engineSchemaRef?: string | null;
 }
 
 interface VersionActionInput {
@@ -102,6 +102,7 @@ interface VersionActionInput {
 interface ListInput {
   workspaceIds: string[];
   actorId: string;
+  formAccess: FormAccessGrant;
   offset: number;
   limit: number;
   formId?: string;
@@ -116,7 +117,7 @@ const ALLOWED_TRANSITIONS: Record<LifecycleState, LifecycleState[]> = {
   draft: ['published', 'deleted'],
   published: ['archived', 'deleted'],
   archived: ['published', 'deleted'],
-  deleted: ['draft'],
+  deleted: [],
 };
 
 /** Throws if a form version may not move from `from` to `to`. */
@@ -255,32 +256,17 @@ export class FormVersionService {
   async save(input: SaveInput) {
     const updated = await withCurrentVersion(input, async (locked, tx) => {
       assertSchemaWritable(locked);
-      const revised = await appendFormVersionRevision(
+      return appendFormVersionRevision(
         {
           workspaceId: input.workspaceId,
           formVersionId: input.formVersionId,
           actorId: input.actorId,
           actorDisplayLabel: input.actorDisplayLabel,
-          eventType: input.eventType,
+          eventType: 'save_draft',
           changeNote: input.note,
-          engineSchemaRef: input.engineSchemaRef || null,
         },
         tx,
       );
-      if (!revised) return null;
-      // Persist engineSchemaRef into the main formVersion row if supplied.
-      // A ref means the Form.io document exists, so the version is in sync ('ready').
-      if (input.engineSchemaRef != null) {
-        await updateFormVersionDraft(
-          input.workspaceId,
-          input.formVersionId,
-          input.actorDisplayLabel,
-          { engineSchemaRef: input.engineSchemaRef, engineSyncStatus: 'ready' },
-          tx,
-        );
-      }
-
-      return revised;
     });
 
     if (!updated) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
@@ -350,21 +336,6 @@ export class FormVersionService {
     );
   }
 
-  async restore(input: VersionActionInput) {
-    const version = await getFormVersionByIdIncludingDeleted(
-      input.workspaceId,
-      input.formVersionId,
-    );
-    if (!version) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
-    assertTransition(version.state, 'draft');
-    return updateFormVersionDraft(
-      input.workspaceId,
-      input.formVersionId,
-      input.actorDisplayLabel,
-      stateStamps('draft', input),
-    );
-  }
-
   /**
    * Provision (create-or-update) the form version's schema in the form engine, server-side via the
    * admin client. Sets engineSyncStatus 'provisioning' → 'ready' (with engineSchemaRef) or 'error'.
@@ -410,6 +381,7 @@ export class FormVersionService {
         workspaceId: input.workspaceId,
         schema: input.schema,
         title: claim.title,
+        signal: AbortSignal.timeout(PROVISIONING_BUDGET_MS),
       }));
     } catch (err) {
       await finishFormVersionProvisioning(
@@ -457,7 +429,12 @@ export class FormVersionService {
     const engineCode = await getFormEngineCodeForForm(version.workspaceId, version.formId);
     if (!engineCode) return null;
 
-    return readEngineSchema(engineCode, version.engineSchemaRef);
+    return this.readSchema({ engineCode, engineSchemaRef: version.engineSchemaRef });
+  }
+
+  /** Reads a schema from the engine by its ref; null when there is nothing to read. */
+  async readSchema(refs: { engineCode: string; engineSchemaRef: string | null }) {
+    return readEngineSchema(refs.engineCode, refs.engineSchemaRef);
   }
 
   async get(workspaceId: string, formVersionId: string) {

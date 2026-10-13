@@ -5,8 +5,9 @@ interface RouteLayer {
 }
 
 const GUARDS = [
+  'requireSubmissionOpen',
   'requireSubmissionRead',
-  'requireFormSubmitAccess',
+  'requireSubmissionWrite',
   'requireSubmissionDelete',
   'requireSignedInSubmitter',
 ];
@@ -29,20 +30,24 @@ const handlersFor = (method: string, path: string): string[] => {
 };
 
 it.each([
-  '/submissions/:id',
-  '/submissions/:id/data',
-  '/submissions/:id/schema',
-  '/submissions/:id/fill',
-])('GET %s reads through requireSubmissionRead', (path) => {
-  expect(handlersFor('get', path)).toContain('requireSubmissionRead');
+  ['get', '/submissions/:id', 'requireSubmissionRead'],
+  ['get', '/submissions/:id/data', 'requireSubmissionRead'],
+  ['get', '/submissions/:id/schema', 'requireSubmissionRead'],
+  ['get', '/submissions/:id/fill', 'requireSubmissionRead'],
+  ['post', '/submissions/:id/save', 'requireSubmissionWrite'],
+  ['post', '/submissions/:id/submit', 'requireSubmissionWrite'],
+  ['delete', '/submissions/:id', 'requireSubmissionDelete'],
+])('%s %s loads the submission once, then decides with %s', (method, path, guard) => {
+  const handlers = handlersFor(method, path);
+  expect(handlers.filter((name) => name === 'loadSubmitterSubmission')).toHaveLength(1);
+  expect(handlers.indexOf('loadSubmitterSubmission')).toBeLessThan(handlers.indexOf(guard));
 });
 
-it.each(['/submissions', '/submissions/:id/save', '/submissions/:id/submit'])(
-  'POST %s goes through requireFormSubmitAccess',
-  (path) => {
-    expect(handlersFor('post', path)).toContain('requireFormSubmitAccess');
-  },
-);
+it('POST /submissions decides with requireSubmissionOpen, with no submission to load', () => {
+  const handlers = handlersFor('post', '/submissions');
+  expect(handlers).toContain('requireSubmissionOpen');
+  expect(handlers).not.toContain('loadSubmitterSubmission');
+});
 
 it.each(['/submissions/mine', '/forms/mine', '/workspaces/mine'])(
   'GET %s goes through requireSignedInSubmitter',
@@ -56,10 +61,6 @@ it('registers GET /submissions/mine before GET /submissions/:id, which would tak
   expect(order.indexOf('/submissions/mine')).toBeLessThan(order.indexOf('/submissions/:id'));
 });
 
-it('DELETE /submissions/:id goes through requireSubmissionDelete', () => {
-  expect(handlersFor('delete', '/submissions/:id')).toContain('requireSubmissionDelete');
-});
-
 it.each(routes.map((r) => [`${r.method.toUpperCase()} ${r.path}`, r.handlers] as const))(
   '%s runs exactly one submit-mode guard, before its handler',
   (_route, handlers) => {
@@ -69,10 +70,28 @@ it.each(routes.map((r) => [`${r.method.toUpperCase()} ${r.path}`, r.handlers] as
   },
 );
 
+it.each([
+  ['/submissions/:id/save', 'replayRecordedSave'],
+  ['/submissions/:id/submit', 'replayRecordedSubmit'],
+])('POST %s answers a recorded write after the load, before any guard', (path, replay) => {
+  const handlers = handlersFor('post', path);
+  const at = handlers.indexOf(replay);
+  expect(at).toBeGreaterThan(handlers.indexOf('loadSubmitterSubmission'));
+  expect(at).toBeLessThan(handlers.indexOf('requireSubmissionWrite'));
+});
+
+it('POST /submissions answers a recorded open before requireSubmissionOpen', () => {
+  const handlers = handlersFor('post', '/submissions');
+  expect(handlers.indexOf('replayRecordedOpen')).toBeGreaterThanOrEqual(0);
+  expect(handlers.indexOf('replayRecordedOpen')).toBeLessThan(
+    handlers.indexOf('requireSubmissionOpen'),
+  );
+});
+
 it('POST /submissions/:id/save checks drafts after write access, before its handler', () => {
   const handlers = handlersFor('post', '/submissions/:id/save');
   const draftGuard = handlers.indexOf('requireDraftSave');
-  expect(draftGuard).toBeGreaterThan(handlers.indexOf('requireFormSubmitAccess'));
+  expect(draftGuard).toBeGreaterThan(handlers.indexOf('requireSubmissionWrite'));
   expect(draftGuard).toBeLessThan(handlers.length - 1);
 });
 

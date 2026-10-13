@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { ApiErrorCodes } from '@soba/lib';
 import { filesService } from './service';
 import { isBlockedExtension } from './config';
 import { resolveCaller } from '../../core/middleware/actor';
@@ -26,7 +27,7 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
   // Always reject blocked extensions, regardless of the form's designer-configured fileTypes.
   // Check both the stored name and the real uploaded name (they can differ via fileNameTemplate).
   if (isBlockedExtension(uploaded.originalname) || isBlockedExtension(filename)) {
-    throw new UnsupportedMediaTypeError('File type not allowed');
+    throw new UnsupportedMediaTypeError('File type not allowed', ApiErrorCodes.file_type_blocked);
   }
 
   const record = storedOrThrow(
@@ -55,13 +56,13 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
 export async function downloadFileHandler(req: Request, res: Response): Promise<void> {
   const result = await filesService.getForCaller(req.params.id, resolveCaller(req));
   if (result === 'notfound') {
-    throw new NotFoundError('File not found');
+    throw new NotFoundError('File not found', ApiErrorCodes.file_not_found);
   }
   if (result === 'denied') {
-    throw accessDenial(req, 'Not authorized to access this file');
+    throw accessDenial(req, 'Not authorized to access this file', ApiErrorCodes.read_denied);
   }
   if (result === 'unavailable') {
-    throw new ServiceUnavailableError('File content unavailable');
+    throw new ServiceUnavailableError('File content unavailable', ApiErrorCodes.file_unavailable);
   }
   await sendStoredFile(res, result.record, result.file, 'inline');
 }
@@ -73,7 +74,7 @@ export async function deleteFileHandler(req: Request, res: Response): Promise<vo
     return;
   }
   if (outcome === 'notfound') {
-    throw new NotFoundError('File not found');
+    throw new NotFoundError('File not found', ApiErrorCodes.file_not_found);
   }
-  throw accessDenial(req, 'Not authorized to access this file');
+  throw accessDenial(req, 'Not authorized to access this file', ApiErrorCodes.write_denied);
 }

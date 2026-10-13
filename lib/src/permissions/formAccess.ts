@@ -9,9 +9,7 @@ import {
 
 // What a form's audience conveys to people outside the workspace; anything else stays staff-only.
 const AUDIENCE_PERMISSIONS: ReadonlySet<string> = new Set<PermissionCode>([
-  Permissions.form_read,
   Permissions.submission_create,
-  Permissions.submission_read,
   Permissions.document_template_read,
 ]);
 
@@ -97,11 +95,3 @@ export const draftSaveStatusOf = (facts: DraftSaveFacts): DraftSaveStatusCode =>
   if (facts.audienceMode === 'public') return DraftSaveStatus.public;
   return DraftSaveStatus.allowed;
 };
-
-/** Whether opening a new submission is allowed: a published version and the open permission. */
-export const canStartSubmission = (form: SubmitterFormFacts, caller: AccessCaller): boolean =>
-  form.publishedVersionId !== null && formAccessAllows(form, caller, Permissions.submission_create);
-
-/** Whether a new submission on the form could save a draft. */
-export const canSaveSubmissionDraft = (form: SubmitterFormFacts, caller: AccessCaller): boolean =>
-  canStartSubmission(form, caller) && draftSaveStatusOf(form) === DraftSaveStatus.allowed;
