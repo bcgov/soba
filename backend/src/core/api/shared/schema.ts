@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 extendZodWithOpenApi(z);
 
-/** The JSON body of every error response. */
+/** The JSON body of an API error. */
 export const ApiErrorSchema = z
   .object({
     error: z.string(),
