@@ -22,6 +22,11 @@ export class FormioApiError extends Error {
   }
 }
 
+/** Form.io answers a read of a missing form or submission with 404, or 400 "Resource not found". */
+export const isFormioNotFound = (err: unknown): boolean =>
+  err instanceof FormioApiError &&
+  (err.status === 404 || (err.status === 400 && /resource not found/i.test(err.body)));
+
 export type FormioQuery = { params?: Record<string, unknown> } | undefined;
 
 function buildQueryString(query?: FormioQuery): string {

@@ -1,6 +1,6 @@
 import {
   SUBMISSION_IN_PROGRESS_STATES,
-  SubmitError,
+  ApiErrorCodes,
   type SortLocale,
   type SubmissionListSort,
 } from '@soba/lib';
@@ -38,6 +38,8 @@ import {
   type WriteLanding,
 } from './submissionWriteGate';
 import { withNewConfirmationCode } from './confirmationCode';
+import { isUniqueViolationOn } from '../db/pgError';
+import { SUBMISSION_REVISION_PKEY } from '../db/schema';
 
 export interface SubmissionWriteOutcome {
   record: SubmissionRecord;
@@ -108,11 +110,11 @@ export class SubmissionService {
   async open(input: CreateInput) {
     const version = await getPublishedVersionForForm(input.workspaceId, input.formId);
     if (!version)
-      throw new NotFoundError('Form has no published version', SubmitError.not_published);
+      throw new NotFoundError('Form has no published version', ApiErrorCodes.not_published);
     if (input.formVersionId && input.formVersionId !== version.id) {
       throw new ConflictError(
         'Form version is not the published version',
-        SubmitError.version_not_published,
+        ApiErrorCodes.version_not_published,
       );
     }
 
@@ -120,7 +122,7 @@ export class SubmissionService {
       openSubmission({ ...input, formVersionId: version.id, confirmationCode }),
     );
     if (result.outcome === 'conflict') {
-      throw new ConflictError('Submission id already in use', SubmitError.submission_id_taken);
+      throw new ConflictError('Submission id already in use', ApiErrorCodes.submission_id_taken);
     }
     return { created: result.outcome === 'created', record: result.record };
   }
@@ -147,7 +149,7 @@ export class SubmissionService {
   ): Promise<SubmissionWriteOutcome> {
     const submission = await getSubmissionRecordById(input.workspaceId, input.submissionId);
     if (!submission) {
-      throw new NotFoundError('Submission not found', SubmitError.submission_not_found);
+      throw new NotFoundError('Submission not found', ApiErrorCodes.submission_not_found);
     }
 
     // The replay guard answers most repeats before access; this catches one that lands after it.
@@ -174,7 +176,7 @@ export class SubmissionService {
       if (base?.submissionId !== input.submissionId) {
         throw new ValidationError(
           'baseRevisionId is not a revision of this submission',
-          SubmitError.revision_base_invalid,
+          ApiErrorCodes.revision_base_invalid,
         );
       }
     }
@@ -199,20 +201,20 @@ export class SubmissionService {
     if (!version || !version.engineSchemaRef) {
       throw new ValidationError(
         'Form version is not provisioned in the engine',
-        SubmitError.form_not_ready,
+        ApiErrorCodes.form_not_ready,
       );
     }
 
     const engineCode = await getFormEngineCodeForForm(submission.workspaceId, submission.formId);
     if (!engineCode) {
-      throw new ValidationError('Form has no form engine configured', SubmitError.form_not_ready);
+      throw new ValidationError('Form has no form engine configured', ApiErrorCodes.form_not_ready);
     }
 
     const adapter = createFormEngineAdapter(engineCode);
     if (typeof adapter.createSubmission !== 'function') {
       throw new ValidationError(
         `Form engine '${engineCode}' does not support submissions`,
-        SubmitError.form_not_ready,
+        ApiErrorCodes.form_not_ready,
       );
     }
 
@@ -266,10 +268,19 @@ export class SubmissionService {
           ? (submission.workflowState as SubmissionWorkflowStateCode)
           : decision.workflowState,
         afterEngineSubmissionRef: engineRef,
+      }).catch((err: unknown) => {
+        // Another write committed this revision id first.
+        if (isUniqueViolationOn(err, SUBMISSION_REVISION_PKEY)) {
+          throw new ConflictError(
+            'Revision id already used by another write',
+            ApiErrorCodes.revision_id_taken,
+          );
+        }
+        throw err;
       });
 
       if (result.outcome === 'not_found') {
-        throw new NotFoundError('Submission not found', SubmitError.submission_not_found);
+        throw new NotFoundError('Submission not found', ApiErrorCodes.submission_not_found);
       }
 
       return {
@@ -284,8 +295,11 @@ export class SubmissionService {
     } catch (err) {
       // A pending write never set a provisioning flag, so there is nothing to reset for it.
       if (pending) throw err;
-      // A deleted submission is not an engine failure.
-      if (err instanceof NotFoundError) {
+      // A deleted submission, or a revision id another write took, is not an engine failure.
+      if (
+        err instanceof NotFoundError ||
+        (err instanceof ConflictError && err.code === ApiErrorCodes.revision_id_taken)
+      ) {
         await clearSubmissionProvisioning(input.workspaceId, input.submissionId);
         throw err;
       }
@@ -317,7 +331,7 @@ export class SubmissionService {
     if (result.outcome === 'not_deletable') {
       throw new ConflictError(
         `Submission is ${result.workflowState} and can no longer be deleted`,
-        SubmitError.delete_closed,
+        ApiErrorCodes.delete_closed,
       );
     }
     return result.outcome === 'deleted' ? result.record : null;

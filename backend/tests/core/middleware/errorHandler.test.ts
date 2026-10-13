@@ -46,7 +46,7 @@ describe('errorHandler', () => {
   it('errorToHttpResponse maps a Postgres unique violation to 409', () => {
     const result = errorToHttpResponse({ code: '23505', message: 'duplicate key' });
     expect(result.statusCode).toBe(409);
-    expect(result.body.error).toBe('Resource already exists');
+    expect(result.body).toEqual({ error: 'Resource already exists', code: 'already_exists' });
   });
 
   it('errorToHttpResponse maps a unique violation wrapped on the cause chain to 409', () => {
@@ -62,7 +62,7 @@ describe('errorHandler', () => {
       });
       expect(errorToHttpResponse(wrapped)).toEqual({
         statusCode: 400,
-        body: { error: 'Invalid input' },
+        body: { error: 'Invalid input', code: 'request_invalid' },
       });
     },
   );
@@ -74,18 +74,24 @@ describe('errorHandler', () => {
     });
     expect(errorToHttpResponse(parseError)).toEqual({
       statusCode: 400,
-      body: { error: 'Unexpected token } in JSON' },
+      body: { error: 'Unexpected token } in JSON', code: 'request_invalid' },
     });
     const tooLarge = Object.assign(new Error('request entity too large'), {
       status: 413,
       expose: true,
     });
-    expect(errorToHttpResponse(tooLarge).statusCode).toBe(413);
+    expect(errorToHttpResponse(tooLarge)).toEqual({
+      statusCode: 413,
+      body: { error: 'request entity too large', code: 'request_too_large' },
+    });
   });
 
   it('errorToHttpResponse keeps 401 for an express-jwt UnauthorizedError', () => {
     const err = new UnauthorizedError('invalid_token', { message: 'jwt malformed' });
-    expect(errorToHttpResponse(err)).toEqual({ statusCode: 401, body: { error: 'jwt malformed' } });
+    expect(errorToHttpResponse(err)).toEqual({
+      statusCode: 401,
+      body: { error: 'jwt malformed', code: 'unauthenticated' },
+    });
   });
 
   it('errorToHttpResponse keeps 400 for the URIError Express raises on an undecodable param', () => {
@@ -95,7 +101,7 @@ describe('errorHandler', () => {
     });
     expect(errorToHttpResponse(err)).toEqual({
       statusCode: 400,
-      body: { error: "Failed to decode param '%E0%A4%A'" },
+      body: { error: "Failed to decode param '%E0%A4%A'", code: 'request_invalid' },
     });
   });
 

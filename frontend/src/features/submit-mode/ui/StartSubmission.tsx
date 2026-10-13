@@ -9,15 +9,15 @@ import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFormioRenderError';
 import { useSubmissionStarter } from '@/src/features/submit-mode/data/useSubmissionStarter';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import { submitErrorMessage } from '@/src/shared/api/dataError';
-import type { SubmitErrorCode } from '@soba/lib';
+import { apiErrorMessage } from '@/src/shared/api/dataError';
+import type { ApiErrorCode } from '@soba/lib';
 import { v7 as uuidv7 } from 'uuid';
 
 type StartLabels = {
   starting: string;
   startError: string;
   sessionExpired: string;
-  errors: Record<SubmitErrorCode, string>;
+  errors: Record<ApiErrorCode, string>;
 };
 
 /**
@@ -60,7 +60,7 @@ function StartSubmissionBody({
         }
       } catch (err) {
         setError(
-          submitErrorMessage(err, labels.errors, labels.startError) ??
+          apiErrorMessage(err, labels.errors, labels.startError) ??
             normalizeFormioRenderError(err, labels.startError, labels.sessionExpired),
         );
       }
@@ -111,7 +111,7 @@ export default function StartSubmission() {
         starting: labels.starting,
         startError: labels.startError,
         sessionExpired: dict.general.sessionExpired,
-        errors: dict.submitErrors,
+        errors: dict.apiErrors,
       }}
     />
   );

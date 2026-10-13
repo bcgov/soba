@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { SubmitError } from '../permissions/codes';
 import { SubmitterFormSchema } from './forms';
 import { MySubmissionRoleSchema } from './submissions';
 
@@ -29,6 +28,3 @@ export const SubmitFillBundleSchema = z.object({
   canSaveDraft: z.boolean(),
 });
 export type SubmitFillBundle = z.infer<typeof SubmitFillBundleSchema>;
-
-/** Why a submit-mode, file or document request failed; an error response carries it as `code`. */
-export const SubmitErrorCodeSchema = z.enum(SubmitError);

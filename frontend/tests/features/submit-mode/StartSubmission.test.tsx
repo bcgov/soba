@@ -17,7 +17,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
         missingId: 'Missing form id.',
       },
     },
-    submitErrors: {
+    apiErrors: {
       open_denied: 'This form is not open to you.',
       not_published: 'This form is closed.',
       form_not_found: 'There is no such form.',

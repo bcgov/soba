@@ -9,6 +9,7 @@ import {
 import { submissionsApiService } from './service';
 import type { ListSubmissionsQueryInput } from './serviceFactory';
 import { asyncHandler } from '../shared/asyncHandler';
+import { ApiErrorCodes } from '@soba/lib';
 import { NotFoundError } from '../../errors';
 import type { Request } from 'express';
 
@@ -91,7 +92,7 @@ export const deleteUnsubmittedSubmission = asyncHandler(
     const ctx = req.coreContext!;
     const result = await submissionsApiService.deleteUnsubmitted(ctx, req.params.id);
     if (!result) {
-      throw new NotFoundError(SUBMISSION_NOT_FOUND);
+      throw new NotFoundError(SUBMISSION_NOT_FOUND, ApiErrorCodes.submission_not_found);
     }
     res.status(204).send();
   },

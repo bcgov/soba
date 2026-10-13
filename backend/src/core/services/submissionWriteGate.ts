@@ -6,7 +6,7 @@ import {
   type SubmissionWriteEventCode,
   type SubmissionWorkflowStateCode,
 } from '../db/codes';
-import { SubmitError } from '@soba/lib';
+import { ApiErrorCodes } from '@soba/lib';
 import { ConflictError } from '../errors';
 import { isTerminalSubmissionState, resolveSubmissionTransition } from './submissionLifecycle';
 
@@ -52,7 +52,7 @@ export const decideRecordedWrite = (request: {
   ) {
     throw new ConflictError(
       'Revision id already used by another write',
-      SubmitError.revision_id_taken,
+      ApiErrorCodes.revision_id_taken,
     );
   }
   const landedPending = recorded.status === RevisionStatus.pending;

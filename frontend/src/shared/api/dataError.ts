@@ -1,4 +1,4 @@
-import type { SubmitErrorCode } from '@soba/lib';
+import type { ApiErrorCode } from '@soba/lib';
 import type { DataError } from './dataContracts';
 import { isSessionExpired } from './sobaFetch';
 import { ApiError, isForbidden, isNotFound } from './sobaHelpers';
@@ -31,9 +31,9 @@ const isServerOrNetworkFailure = (cause: unknown): boolean =>
  * The message for an error the server sent a code with. Without a code, `failed` stands in for a
  * server or network failure; any other error is null, so the caller can show the server's text.
  */
-export function submitErrorMessage(
+export function apiErrorMessage(
   cause: unknown,
-  messages: Record<SubmitErrorCode, string>,
+  messages: Record<ApiErrorCode, string>,
   failed?: string,
 ): string | null {
   if (cause instanceof ApiError && cause.code) return messages[cause.code];

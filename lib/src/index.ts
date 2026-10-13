@@ -9,6 +9,7 @@ export * from './formio/normalizeSchema';
 export * from './formio/newFormSchema';
 export * from './schemas/me';
 export * from './schemas/submit';
+export * from './schemas/errors';
 export * from './schemas/meta';
 export * from './permissions';
 export * from './schemas/tenants';

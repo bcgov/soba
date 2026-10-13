@@ -5,9 +5,27 @@ import {
   type UpsertSchemaInput,
 } from '../../core/integrations/form-engine/FormEngineAdapter';
 import { PluginConfigReader } from '../../core/config/pluginConfig';
-import { ValidationError } from '../../core/errors';
-import { getAuthenticatedFormioClient } from './formioV5Client';
-import { normalizeSchema as normalizeFormioSchema } from '@soba/lib';
+import { InternalError, ValidationError } from '../../core/errors';
+import { getAuthenticatedFormioClient, isFormioNotFound } from './formioV5Client';
+import { ApiErrorCodes, normalizeSchema as normalizeFormioSchema } from '@soba/lib';
+
+/**
+ * The read's result. A document SOBA refers to that Form.io no longer has is an inconsistency, not
+ * an empty read, so it fails with engine_document_missing.
+ */
+const missingAsError = async <T>(read: Promise<T>): Promise<T> => {
+  try {
+    return await read;
+  } catch (err) {
+    if (isFormioNotFound(err)) {
+      throw new InternalError(
+        'Form engine document is missing',
+        ApiErrorCodes.engine_document_missing,
+      );
+    }
+    throw err;
+  }
+};
 
 export interface FormioV5Config {
   apiBaseUrl: string;
@@ -199,13 +217,19 @@ export class FormioEngineAdapter implements FormEngineAdapter {
     return { engineRef: String(engineRef) };
   }
 
-  /** Read the Form.io document by engine ref, stripped of engine-managed fields. Null if not found. */
+  /**
+   * Read the Form.io document by engine ref, stripped of engine-managed fields. A document Form.io
+   * no longer has fails with engine_document_missing.
+   */
   async readSchema(engineRef: string): Promise<Record<string, unknown> | null> {
     const client = await getAuthenticatedFormioClient(this.pluginConfig);
     if (!client) {
       throw new Error('Form.io admin client unavailable; cannot read form schema');
     }
-    const doc = (await client.loadForm(engineRef)) as Record<string, unknown> | null;
+    const doc = (await missingAsError(client.loadForm(engineRef))) as Record<
+      string,
+      unknown
+    > | null;
     return doc ? stripEngineManagedFields(doc) : null;
   }
 
@@ -255,7 +279,8 @@ export class FormioEngineAdapter implements FormEngineAdapter {
   }
 
   /** Read a Form.io submission by form ref + submission ref, stripped of engine-managed fields and
-   *  the SOBA correlation `metadata` (internal bookkeeping, not answer content). Null if not found. */
+   *  the SOBA correlation `metadata` (internal bookkeeping, not answer content). A document Form.io
+   *  no longer has fails with engine_document_missing. */
   async readSubmission(
     engineFormRef: string,
     engineRef: string,
@@ -264,7 +289,7 @@ export class FormioEngineAdapter implements FormEngineAdapter {
     if (!client) {
       throw new Error('Form.io admin client unavailable; cannot read submission');
     }
-    const doc = (await client.loadSubmission(engineFormRef, engineRef)) as Record<
+    const doc = (await missingAsError(client.loadSubmission(engineFormRef, engineRef))) as Record<
       string,
       unknown
     > | null;

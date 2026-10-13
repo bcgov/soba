@@ -72,13 +72,15 @@ export type SubmissionChangeStatusCode =
   (typeof SubmissionChangeStatus)[keyof typeof SubmissionChangeStatus];
 
 /**
- * Why a submit-mode, file or document request failed. A `*_denied` refusal is 401 for an anonymous
- * caller and 403 otherwise; `drafts_*` is 403; `*_closed`, `*_taken` and `version_not_published` are
- * 409; `*_not_found` and `not_published` are 404; `*_invalid` and `form_not_ready` are 400;
+ * Why an API request failed; an error response carries it as `code`. A `*_denied` refusal and
+ * `sign_in_required` are 401 for an anonymous caller and 403 otherwise; `drafts_*` is 403;
+ * `*_closed`, `*_taken`, `version_not_published` and `already_exists` are 409; `*_not_found` and
+ * `not_published` are 404; `*_invalid` and `form_not_ready` are 400;
  * `*_unavailable` and `render_busy` are 503; `render_failed`, `no_saved_data` and `file_infected`
- * are 422; `file_type_blocked` is 415; `file_too_large` is 413.
+ * are 422; `file_type_blocked` is 415; `file_too_large` and `request_too_large` are 413;
+ * `unauthenticated` is 401; `rate_limited` is 429; `engine_document_missing` is 500.
  */
-export const SubmitError = {
+export const ApiErrorCodes = {
   open_denied: 'open_denied',
   read_denied: 'read_denied',
   write_denied: 'write_denied',
@@ -100,6 +102,7 @@ export const SubmitError = {
   revision_id_taken: 'revision_id_taken',
   revision_base_invalid: 'revision_base_invalid',
   form_not_ready: 'form_not_ready',
+  engine_document_missing: 'engine_document_missing',
   // Files.
   file_not_found: 'file_not_found',
   file_unavailable: 'file_unavailable',
@@ -115,5 +118,13 @@ export const SubmitError = {
   render_busy: 'render_busy',
   render_failed: 'render_failed',
   no_saved_data: 'no_saved_data',
+  // Any route.
+  request_invalid: 'request_invalid',
+  request_too_large: 'request_too_large',
+  unauthenticated: 'unauthenticated',
+  sign_in_required: 'sign_in_required',
+  already_exists: 'already_exists',
+  route_not_found: 'route_not_found',
+  rate_limited: 'rate_limited',
 } as const;
-export type SubmitErrorCode = (typeof SubmitError)[keyof typeof SubmitError];
+export type ApiErrorCode = (typeof ApiErrorCodes)[keyof typeof ApiErrorCodes];

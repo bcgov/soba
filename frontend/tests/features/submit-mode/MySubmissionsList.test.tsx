@@ -60,7 +60,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
       viewAll: 'View my submissions',
       noCode: 'No confirmation ID yet',
     },
-    submitErrors: {
+    apiErrors: {
       delete_closed: 'Already submitted, so it stays.',
       delete_denied: 'Only its owner can delete it.',
     },

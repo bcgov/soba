@@ -1,4 +1,4 @@
-import { SubmitErrorCodeSchema, type SubmitErrorCode } from '@soba/lib';
+import { ApiErrorCodeSchema, type ApiErrorCode } from '@soba/lib';
 
 /**
  * Carries the HTTP status so callers can tell a refusal from a failure, and the server's error code
@@ -6,9 +6,9 @@ import { SubmitErrorCodeSchema, type SubmitErrorCode } from '@soba/lib';
  */
 export class ApiError extends Error {
   readonly status: number;
-  readonly code: SubmitErrorCode | undefined;
+  readonly code: ApiErrorCode | undefined;
 
-  constructor(message: string, status: number, code?: SubmitErrorCode) {
+  constructor(message: string, status: number, code?: ApiErrorCode) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
@@ -33,11 +33,11 @@ export async function parseJson<T>(response: Response): Promise<T> {
     // Surface the backend's `{ error }` message (e.g. name-taken, disclaimer) when present, and its
     // error code when it is one this client knows.
     let message = `Request failed (${response.status})`;
-    let code: SubmitErrorCode | undefined;
+    let code: ApiErrorCode | undefined;
     try {
       const body = (await response.json()) as { error?: unknown; code?: unknown };
       if (typeof body?.error === 'string' && body.error) message = body.error;
-      const parsed = SubmitErrorCodeSchema.safeParse(body?.code);
+      const parsed = ApiErrorCodeSchema.safeParse(body?.code);
       if (parsed.success) code = parsed.data;
     } catch {
       // Non-JSON error body; keep the status-based message.

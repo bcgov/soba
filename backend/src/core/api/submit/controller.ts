@@ -3,7 +3,7 @@ import { z } from 'zod';
 import {
   canSaveDraftOnSubmission,
   canWriteSubmission,
-  SubmitError,
+  ApiErrorCodes,
   type MySubmissionRole,
   type SubmitFillBundle,
 } from '@soba/lib';
@@ -29,7 +29,7 @@ const readOwnSchema = async (submission: SubmitterSubmissionRow) => {
     engineSchemaRef: submission.engineSchemaRef,
   });
   if (!schema)
-    throw new NotFoundError('Form version schema not found', SubmitError.schema_not_found);
+    throw new NotFoundError('Form version schema not found', ApiErrorCodes.schema_not_found);
   return schema;
 };
 
@@ -48,7 +48,7 @@ export const getSubmitSubmission = asyncHandler(async (req: Request, res: Respon
 export const getSubmitSubmissionData = asyncHandler(async (req: Request, res: Response) => {
   const content = await readContent(loadedSubmission(req).submission);
   if (!content)
-    throw new NotFoundError('Submission content not found', SubmitError.content_not_found);
+    throw new NotFoundError('Submission content not found', ApiErrorCodes.content_not_found);
   res.json(content);
 });
 

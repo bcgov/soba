@@ -150,6 +150,7 @@ describe('checkJwt Passport wrapper', () => {
     expect(res.status).toBe(401);
     expect(res.body).toEqual({
       error: 'Unauthorized',
+      code: 'unauthenticated',
       message: 'Error occurred during authentication',
       statusCode: 401,
     });

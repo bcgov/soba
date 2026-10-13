@@ -1,14 +1,13 @@
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { SubmitErrorCodeSchema } from '@soba/lib';
+import { ApiErrorCodeSchema } from '@soba/lib';
 import { z } from 'zod';
 
 extendZodWithOpenApi(z);
 
 export const ApiErrorSchema = z.object({
   error: z.string(),
-  code: SubmitErrorCodeSchema.optional().openapi({
-    description:
-      'Why a submit-mode, file or document request failed, for a client to choose its own message.',
+  code: ApiErrorCodeSchema.optional().openapi({
+    description: 'Why the request failed, for a client to choose its own message.',
   }),
 });
 

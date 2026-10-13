@@ -29,7 +29,7 @@ import type { DocumentRenderRequest } from '../../core/integrations/document-gen
 import { templateFileType } from '../../core/integrations/document-generation/templateFileType';
 import { upstreamStatusOf } from '../../core/http/httpErrorMapper';
 import { env } from '../../core/config/env';
-import { SubmitError } from '@soba/lib';
+import { ApiErrorCodes } from '@soba/lib';
 import { AppError, UnprocessableEntityError } from '../../core/errors';
 import { log, getCorrelationId } from '../../core/logging';
 import { readTemplateContent } from './templateContent';
@@ -235,7 +235,7 @@ async function renderWith(
     return {
       status: 'error',
       code,
-      error: new UnprocessableEntityError(TEMPLATE_NOT_RENDERED, SubmitError.render_failed),
+      error: new UnprocessableEntityError(TEMPLATE_NOT_RENDERED, ApiErrorCodes.render_failed),
     };
   }
 

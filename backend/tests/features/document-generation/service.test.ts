@@ -329,6 +329,24 @@ describe('documentGenerationService audit', () => {
     expect(outcome.status).toBe('ok');
   });
 
+  it.each([
+    ['not a template file type', { filename: 'receipt.txt', size: 9 }],
+    ['over the template size limit', { filename: 'receipt.docx', size: Number.MAX_SAFE_INTEGER }],
+  ])('refuses a stored template that is %s with render_failed', async (_label, file) => {
+    holdsGrant.mockResolvedValue(true);
+    getLiveTemplate.mockResolvedValue({
+      ...storedTemplate,
+      file: { ...storedTemplate.file, ...file },
+    });
+    const outcome = await documentGenerationService.preview(caller, {
+      submissionId: 's1',
+      templateId,
+      data: {},
+    });
+    expect(outcome).toMatchObject({ status: 'error', error: { code: 'render_failed' } });
+    expect(renderMock).not.toHaveBeenCalled();
+  });
+
   it('does not audit when no backend call is made', async () => {
     // denied: never reaches the backend
     holdsGrant.mockResolvedValue(false);

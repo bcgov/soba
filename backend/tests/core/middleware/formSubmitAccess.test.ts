@@ -111,5 +111,6 @@ describe('submit guards decide from the stored read', () => {
     const next = jest.fn() as jest.MockedFunction<NextFunction>;
     requireSignedInSubmitter(makeReq({}), res, next);
     expect(next).toHaveBeenCalledWith(expect.any(UnauthorizedError));
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ code: 'sign_in_required' }));
   });
 });

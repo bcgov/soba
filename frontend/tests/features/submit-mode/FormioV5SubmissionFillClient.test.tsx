@@ -31,10 +31,11 @@ vi.mock('@/app/[lang]/Providers', () => ({
     general: { sessionExpired: 'Your session has ended.', noAccess: 'You do not have access.' },
     submission: { notFound: 'Submission not found.', loadError: 'Could not load this submission.' },
     form: { loading: 'Loading...' },
-    submitErrors: {
+    apiErrors: {
       drafts_disabled: 'Drafts are off for this form.',
       submission_not_found: 'This submission is gone.',
       revision_id_taken: 'Reload and try again.',
+      engine_document_missing: 'The saved data is missing.',
     },
     formioV5: {
       formRender: {
@@ -196,6 +197,25 @@ describe('FormioV5SubmissionFillClient', () => {
       ),
     );
     expect(screen.queryByText('Not authorized to access this submission')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    [
+      'the message for its code',
+      new ApiError('Form engine document is missing', 500, 'engine_document_missing'),
+      'The saved data is missing.',
+    ],
+    [
+      'the load message without a code',
+      new ApiError('Internal server error', 500),
+      'Could not load this submission.',
+    ],
+  ])('shows %s when the load fails', async (_label, failure, text) => {
+    h.getSubmitFillBundle.mockRejectedValue(failure);
+    await renderSignedOut();
+    await waitFor(() =>
+      expect(screen.getByTestId('submission-view-loaderror')).toHaveTextContent(text),
+    );
   });
 
   describe('submit', () => {

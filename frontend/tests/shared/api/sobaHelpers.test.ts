@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import type { SubmitErrorCode } from '@soba/lib';
+import type { ApiErrorCode } from '@soba/lib';
 import { ApiError, parseJson } from '@/src/shared/api/sobaHelpers';
-import { submitErrorMessage } from '@/src/shared/api/dataError';
+import { apiErrorMessage } from '@/src/shared/api/dataError';
+import { SessionExpiredError } from '@/src/shared/api/sobaFetch';
 
 const errorResponse = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -42,19 +43,19 @@ describe('parseJson', () => {
   });
 });
 
-describe('submitErrorMessage', () => {
-  const messages = { drafts_disabled: 'Drafts are off.' } as Record<SubmitErrorCode, string>;
+describe('apiErrorMessage', () => {
+  const messages = { drafts_disabled: 'Drafts are off.' } as Record<ApiErrorCode, string>;
 
   it('picks the message for a coded error', () => {
     const refused = new ApiError('Drafts are not enabled for this form', 403, 'drafts_disabled');
-    expect(submitErrorMessage(refused, messages)).toBe('Drafts are off.');
+    expect(apiErrorMessage(refused, messages)).toBe('Drafts are off.');
   });
 
   it.each([
     ['an error without a code', new ApiError('No', 403)],
     ['an error that is not an API error', new Error('boom')],
   ])('is null for %s', (_label, cause) => {
-    expect(submitErrorMessage(cause, messages)).toBeNull();
+    expect(apiErrorMessage(cause, messages)).toBeNull();
   });
 
   it.each([
@@ -62,7 +63,8 @@ describe('submitErrorMessage', () => {
     ['a request that never reached the server', new TypeError('Failed to fetch'), 'Try again.'],
     ['a coded error', new ApiError('No', 403, 'drafts_disabled'), 'Drafts are off.'],
     ['an uncoded client error', new ApiError('Engine says no', 400), null],
+    ['an ended session', new SessionExpiredError(), null],
   ])('with a fallback, answers %s', (_label, cause, expected) => {
-    expect(submitErrorMessage(cause, messages, 'Try again.')).toBe(expected);
+    expect(apiErrorMessage(cause, messages, 'Try again.')).toBe(expected);
   });
 });

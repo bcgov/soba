@@ -1,6 +1,6 @@
 import type { Request, RequestHandler } from 'express';
 import multer, { MulterError } from 'multer';
-import { SubmitError } from '@soba/lib';
+import { ApiErrorCodes } from '@soba/lib';
 import { AppError, PayloadTooLargeError, ValidationError } from '../errors';
 import { log } from '../logging';
 
@@ -23,7 +23,7 @@ export const checkedFileName = (name: string): string => {
   if (Buffer.byteLength(name, 'utf8') > MAX_FILE_NAME_BYTES) {
     throw new ValidationError(
       `File name is longer than ${MAX_FILE_NAME_BYTES} bytes`,
-      SubmitError.upload_invalid,
+      ApiErrorCodes.upload_invalid,
     );
   }
   return name;
@@ -32,7 +32,7 @@ export const checkedFileName = (name: string): string => {
 /** The file parseUpload read from the request. */
 export function getUploadedFile(req: Request): UploadedFile {
   const uploaded = (req as Request & { files?: UploadedFile[] }).files?.[0];
-  if (!uploaded) throw new ValidationError('no file', SubmitError.upload_invalid);
+  if (!uploaded) throw new ValidationError('no file', ApiErrorCodes.upload_invalid);
   return uploaded;
 }
 
@@ -41,11 +41,11 @@ function toUploadError(err: unknown): AppError {
     // multer has no type declarations here, so instanceof doesn't narrow.
     const { code, message } = err as { code: string; message: string };
     return code === 'LIMIT_FILE_SIZE'
-      ? new PayloadTooLargeError(message, SubmitError.file_too_large)
-      : new ValidationError(message, SubmitError.upload_invalid);
+      ? new PayloadTooLargeError(message, ApiErrorCodes.file_too_large)
+      : new ValidationError(message, ApiErrorCodes.upload_invalid);
   }
   // Busboy's parse errors (missing boundary, truncated body) reach us as plain Errors.
-  return new ValidationError('Malformed multipart body', SubmitError.upload_invalid);
+  return new ValidationError('Malformed multipart body', ApiErrorCodes.upload_invalid);
 }
 
 /** Parse a multipart upload of one file into memory, under any file field name. */

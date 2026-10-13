@@ -342,6 +342,13 @@ describe('submit routes over one read', () => {
     expect(res.body.code).toBe(code);
   });
 
+  it('answers a delete of a submission removed after the load with submission_not_found', async () => {
+    service.deleteUnsubmitted.mockResolvedValue(null as never);
+    const res = await signedIn().delete(`${BASE}/s1`);
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('submission_not_found');
+  });
+
   const openBody = { id: '01a12d03-75a8-73bc-a106-ce3787ee9a1e', formId: 'f1' };
 
   it('answers an open of an id the caller owns with it, without reading the form', async () => {
@@ -420,7 +427,7 @@ describe('submit routes over one read', () => {
     mockForm.mockResolvedValue(form);
     const res = await request(buildApp(caller)).post(BASE).send(openBody);
     expect(res.status).toBe(status);
-    expect(res.body).toEqual(code ? { error, code } : { error });
+    expect(res.body).toEqual({ error, code });
     expect(service.open).not.toHaveBeenCalled();
   });
 

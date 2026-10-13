@@ -4,9 +4,9 @@ import {
   SubmissionChangeStatus,
   SubmissionParticipantRole,
   SubmissionWorkflowState,
-  SubmitError,
+  ApiErrorCodes,
   type SubmissionWorkflowStateCode,
-  type SubmitErrorCode,
+  type ApiErrorCode,
 } from './codes';
 import {
   draftSaveStatusOf,
@@ -29,17 +29,17 @@ export type SubmissionChange =
   | { status: typeof SubmissionChangeStatus.allowed }
   | {
       status: typeof SubmissionChangeStatus.denied | typeof SubmissionChangeStatus.closed;
-      code: SubmitErrorCode;
+      code: ApiErrorCode;
     };
 
 const ALLOWED: SubmissionChange = { status: SubmissionChangeStatus.allowed };
 
-const denied = (code: SubmitErrorCode): SubmissionChange => ({
+const denied = (code: ApiErrorCode): SubmissionChange => ({
   status: SubmissionChangeStatus.denied,
   code,
 });
 
-const closed = (code: SubmitErrorCode): SubmissionChange => ({
+const closed = (code: ApiErrorCode): SubmissionChange => ({
   status: SubmissionChangeStatus.closed,
   code,
 });
@@ -63,9 +63,9 @@ export const isSubmissionInProgress = (workflowState: string): boolean =>
 /** Opening a new submission: the form's submit permission, then a published version. */
 export const startStatusOf = (form: SubmitterFormFacts, caller: AccessCaller): SubmissionChange => {
   if (!formAccessAllows(form, caller, Permissions.submission_create)) {
-    return denied(SubmitError.open_denied);
+    return denied(ApiErrorCodes.open_denied);
   }
-  if (form.publishedVersionId === null) return closed(SubmitError.not_published);
+  if (form.publishedVersionId === null) return closed(ApiErrorCodes.not_published);
   return ALLOWED;
 };
 
@@ -106,10 +106,10 @@ export const saveDraftStatusOf = (
   form: SubmitterFormFacts,
   caller: AccessCaller,
 ): SubmissionChange => {
-  if (!canWriteSubmission(submission, form, caller)) return denied(SubmitError.write_denied);
+  if (!canWriteSubmission(submission, form, caller)) return denied(ApiErrorCodes.write_denied);
   const drafts = draftSaveStatusOf(form);
-  if (drafts === DraftSaveStatus.disabled) return denied(SubmitError.drafts_disabled);
-  if (drafts === DraftSaveStatus.public) return denied(SubmitError.drafts_public);
+  if (drafts === DraftSaveStatus.disabled) return denied(ApiErrorCodes.drafts_disabled);
+  if (drafts === DraftSaveStatus.public) return denied(ApiErrorCodes.drafts_public);
   return ALLOWED;
 };
 
@@ -125,9 +125,9 @@ export const uploadStatusOf = (
   form: FormAccessFacts,
   caller: AccessCaller,
 ): SubmissionChange => {
-  if (!canWriteSubmission(submission, form, caller)) return denied(SubmitError.write_denied);
+  if (!canWriteSubmission(submission, form, caller)) return denied(ApiErrorCodes.write_denied);
   if (!isSubmissionInProgress(submission.workflowState)) {
-    return closed(SubmitError.upload_closed);
+    return closed(ApiErrorCodes.upload_closed);
   }
   return ALLOWED;
 };
@@ -163,10 +163,10 @@ export const ownDeleteStatusOf = (
   caller: AccessCaller,
 ): SubmissionChange => {
   if (!isIdentifiedCaller(caller) || submission.role !== SubmissionParticipantRole.owner) {
-    return denied(SubmitError.delete_denied);
+    return denied(ApiErrorCodes.delete_denied);
   }
   if (!isSubmissionInProgress(submission.workflowState)) {
-    return closed(SubmitError.delete_closed);
+    return closed(ApiErrorCodes.delete_closed);
   }
   return ALLOWED;
 };

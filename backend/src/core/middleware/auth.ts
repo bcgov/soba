@@ -1,10 +1,12 @@
 import type { RequestHandler } from 'express';
 import passport from 'passport';
+import { ApiErrorCodes } from '@soba/lib';
 import { getToken } from '../auth/IdpPlugin';
 import { SOBA_PASSPORT_STRATEGY } from '../auth/passport';
 
 const unauthorizedResponse = {
   error: 'Unauthorized',
+  code: ApiErrorCodes.unauthenticated,
   message: 'Error occurred during authentication',
   statusCode: 401,
 };

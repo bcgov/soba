@@ -41,6 +41,7 @@ describe('toRenderError', () => {
     const mapped = toRenderError(httpErrorToAppError(tooLarge, 'CDOGS'), context);
     expect(mapped).toBeInstanceOf(UnprocessableEntityError);
     expect(mapped.message).toBe(TEMPLATE_NOT_RENDERED);
+    expect(mapped.code).toBe('render_failed');
   });
 
   it('logs the statuses and error class, never the backend body', () => {

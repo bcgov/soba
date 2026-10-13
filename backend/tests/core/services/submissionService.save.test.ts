@@ -161,6 +161,33 @@ describe('SubmissionService save (versioned engine write)', () => {
     expect(failProvisioning).not.toHaveBeenCalled();
   });
 
+  const uniqueViolationOn = (constraint: string) =>
+    Object.assign(new Error('duplicate key'), {
+      cause: { code: '23505', severity: 'ERROR', constraint },
+    });
+
+  it('answers revision_id_taken when another write committed the revision id first', async () => {
+    createAdapter.mockReturnValue({
+      createSubmission: jest.fn().mockResolvedValue({ engineRef: 'eng-new' }),
+    });
+    appendRevision.mockRejectedValue(uniqueViolationOn('submission_revision_pkey'));
+
+    await expect(svc.save(input)).rejects.toBeInstanceOf(ConflictError);
+    await expect(svc.save(input)).rejects.toMatchObject({ code: 'revision_id_taken' });
+    expect(clearProvisioning).toHaveBeenCalledWith('ws1', 's1');
+    expect(failProvisioning).not.toHaveBeenCalled();
+  });
+
+  it('passes on a unique violation of any other constraint', async () => {
+    createAdapter.mockReturnValue({
+      createSubmission: jest.fn().mockResolvedValue({ engineRef: 'eng-new' }),
+    });
+    const other = uniqueViolationOn('some_other_uq');
+    appendRevision.mockRejectedValue(other);
+
+    await expect(svc.save(input)).rejects.toBe(other);
+  });
+
   it('answers not found when the submission is deleted before the revision lands', async () => {
     const createSubmission = jest.fn().mockResolvedValue({ engineRef: 'eng-new' });
     createAdapter.mockReturnValue({ createSubmission });
