@@ -59,7 +59,7 @@ export default defineConfig({
   projects: [
     {
       name: "setup",
-      testMatch: /.*\.setup\.ts/,
+      testMatch: /\.setup\.ts$/,
       use: {
         ...devices["Desktop Chrome"],
         baseURL: BASE_URL,

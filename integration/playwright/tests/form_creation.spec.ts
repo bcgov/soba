@@ -55,7 +55,8 @@ async function createForm({ page, title }: { page: Page; title: string }) {
     );
     await disclaimerLabel.scrollIntoViewIfNeeded();
     await expect(disclaimerLabel).toBeVisible();
-    await disclaimerLabel.click({ force: true });
+    await expect(disclaimerLabel).toBeEnabled();
+    await disclaimerLabel.click();
     await expect(disclaimerCheckbox).toBeChecked();
 
     const saveButton = page.getByTestId("workspace-save");
@@ -66,7 +67,6 @@ async function createForm({ page, title }: { page: Page; title: string }) {
     await expect(page.locator(".react-aria-ModalOverlay")).not.toBeVisible({
       timeout: 15000,
     });
-    await page.waitForTimeout(500);
   }
 
   await page.getByTestId("forms-nav").click();
@@ -120,32 +120,32 @@ test("Create, edit, search, preview, and publish one form", async ({
   const txt_box = page.locator("text=Text Field"); // component from builder palette
   await dragComponentToCanvas(txt_box, target);
   await page.click('button[ref="saveButton"]');
-  await page.waitForTimeout(1000); // waits 1 second
+  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
   const text_area = page.getByText("Text Area", { exact: true }).first();
   await dragComponentToCanvas(text_area, target);
   await expect(page.locator('button[ref="saveButton"]')).toBeVisible({
     timeout: 5000,
   });
   await page.click('button[ref="saveButton"]');
-  await page.waitForTimeout(1000); // waits 1 second
+  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
   const number = page.locator(
     'span[data-group="basic"][data-key="number"][data-type="number"]',
   );
   await dragComponentToCanvas(number, target);
   await page.click('button[ref="saveButton"]');
-  await page.waitForTimeout(1000); // waits 1 second
+  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
   const password = page.locator(
     'span[data-group="basic"][data-key="password"][data-type="password"]',
   );
   await dragComponentToCanvas(password, target);
   await page.click('button[ref="saveButton"]');
-  await page.waitForTimeout(1000); // waits 1 second
+  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
   const checkbox = page.locator(
     'span[data-group="basic"][data-key="checkbox"][data-type="checkbox"]',
   );
   await dragComponentToCanvas(checkbox, target);
   await page.click('button[ref="saveButton"]');
-  await page.waitForTimeout(1000); // waits 1 second
+  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
   const selectboxes = page.locator(
     'span[data-group="basic"][data-key="selectboxes"][data-type="selectboxes"]',
   );
@@ -153,13 +153,13 @@ test("Create, edit, search, preview, and publish one form", async ({
   await page.locator('a[href="#data"]').click();
   await page.locator('input[name="data[values][0][value]"]').fill("1");
   await page.click('button[ref="saveButton"]');
-  await page.waitForTimeout(1000); // waits 1 second
+  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
   const select = page.locator(
     'span[data-group="basic"][data-key="select"][data-type="select"]',
   );
   await dragComponentToCanvas(select, target);
   await page.click('button[ref="saveButton"]');
-  await page.waitForTimeout(1000); // waits 1 second
+  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
   const radio = page.locator(
     'span[data-group="basic"][data-key="radio"][data-type="radio"]',
   );
@@ -167,23 +167,23 @@ test("Create, edit, search, preview, and publish one form", async ({
   await page.locator('a[href="#data"]').click();
   await page.locator('input[name="data[values][0][value]"]').fill("1");
   await page.click('button[ref="saveButton"]');
-  await page.waitForTimeout(1000); // waits 1 second
+  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
   const button = page.locator(
     'span[data-group="basic"][data-key="button"][data-type="button"]',
   );
   await dragComponentToCanvas(button, target);
   await page.click('button[ref="saveButton"]');
-  await page.waitForTimeout(1000); // waits 1 second
+  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
 
   const saveButton = page.getByRole("button", {
     name: "Save",
     exact: true,
   });
-  await saveButton.click({ force: true });
+  await expect(saveButton).toBeVisible();
+  await saveButton.click();
   await expect(
     page.getByText("Form saved successfully.", { exact: true }),
   ).toBeVisible();
-  await page.waitForTimeout(1000);
 
   await page.getByTestId("forms-nav").click();
 

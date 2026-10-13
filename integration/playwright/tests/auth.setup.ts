@@ -1,6 +1,6 @@
 import { test as setup } from "@playwright/test";
-import fs from "fs";
-import path from "path";
+import fs from "node:fs";
+import path from "node:path";
 import { login } from "../support/soba_login";
 
 const authFile = path.resolve(__dirname, "../support/user.json");
