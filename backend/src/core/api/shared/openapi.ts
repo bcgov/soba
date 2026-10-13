@@ -25,14 +25,43 @@ export const registerOpenApiPaths = (registrar: RegisterOpenApiPaths): void => {
   openApiPathRegistrars.push(registrar);
 };
 
-type ResponseLike = { $ref?: string; content?: unknown };
+type ResponseLike = { $ref?: string; content?: unknown; description?: string };
+type OperationLike = {
+  security?: Record<string, unknown>[];
+  responses?: Record<string, ResponseLike>;
+};
 
-const responsesOf = (document: { paths?: Record<string, unknown> }) =>
+const operationsOf = (document: { paths?: Record<string, unknown> }): OperationLike[] =>
   Object.values(document.paths ?? {})
     .flatMap((pathItem) => Object.values(pathItem as Record<string, unknown>))
-    .flatMap((operation) =>
-      Object.entries((operation as { responses?: Record<string, ResponseLike> }).responses ?? {}),
-    );
+    .filter((value): value is OperationLike => typeof value === 'object' && value !== null)
+    .filter((operation) => 'responses' in operation);
+
+const responsesOf = (document: { paths?: Record<string, unknown> }) =>
+  operationsOf(document).flatMap((operation) => Object.entries(operation.responses ?? {}));
+
+/**
+ * Adds the responses middleware sends on every operation it covers, unless the operation declares
+ * them: 429 from the rate limiter on every request, and 401 where a bearer token is accepted.
+ */
+export const withMiddlewareErrors = <T extends { paths?: Record<string, unknown> }>(
+  document: T,
+): T => {
+  for (const operation of operationsOf(document)) {
+    const responses = (operation.responses ??= {});
+    responses['429'] ??= { description: 'Too many requests' };
+    const security = operation.security ?? [];
+    if (security.some((entry) => 'bearerAuth' in entry)) {
+      const optional = security.some((entry) => Object.keys(entry).length === 0);
+      responses['401'] ??= {
+        description: optional
+          ? 'Invalid or expired bearer token'
+          : 'Missing, invalid or expired bearer token',
+      };
+    }
+  }
+  return document;
+};
 
 /** Gives every 4xx and 5xx response that declares no body of its own the shared error body. */
 export const withErrorBodies = <T extends { paths?: Record<string, unknown> }>(document: T): T => {
@@ -75,7 +104,7 @@ export const buildOpenApiDocument = (registrars: readonly RegisterOpenApiPaths[]
       },
     ],
   });
-  return withErrorBodies(document);
+  return withErrorBodies(withMiddlewareErrors(document));
 };
 
 export const buildOpenApiSpec = () => buildOpenApiDocument(openApiPathRegistrars);

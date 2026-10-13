@@ -3,6 +3,7 @@ import { ApiErrorCodes } from '@soba/lib';
 import {
   buildOpenApiDocument,
   withErrorBodies,
+  withMiddlewareErrors,
   type RegisterOpenApiPaths,
 } from '../../../../src/core/api/shared/openapi';
 import { registerAdminOpenApi } from '../../../../src/core/api/admin/schema';
@@ -38,7 +39,8 @@ const REGISTRARS: RegisterOpenApiPaths[] = [
   registerHealthOpenApi,
 ];
 
-type Response = { content?: Record<string, { schema?: unknown }> };
+type Response = { description?: string; content?: Record<string, { schema?: unknown }> };
+type Operation = { security?: Record<string, unknown>[]; responses: Record<string, Response> };
 
 const document = buildOpenApiDocument(REGISTRARS);
 const errorBody = { $ref: '#/components/schemas/Core_ApiError' };
@@ -94,6 +96,64 @@ describe('OpenAPI error bodies', () => {
       )
       .map(([label]) => label);
     expect(withErrorBody).toEqual([]);
+  });
+});
+
+/** Every operation, as `METHOD /path`. */
+const operations = (): [string, Operation][] =>
+  Object.entries(document.paths ?? {}).flatMap(([path, item]) =>
+    Object.entries(item as Record<string, Operation>).map(
+      ([method, operation]) =>
+        [`${method.toUpperCase()} ${path}`, operation] as [string, Operation],
+    ),
+  );
+
+const acceptsBearer = (operation: Operation) =>
+  (operation.security ?? []).some((entry) => 'bearerAuth' in entry);
+
+describe('OpenAPI middleware responses', () => {
+  it('declares the rate limit on every operation, with the error body', () => {
+    const missing = operations()
+      .filter(([, operation]) => !operation.responses['429']?.content)
+      .map(([label]) => label);
+    expect(missing).toEqual([]);
+  });
+
+  it('declares a 401 on exactly the operations that accept a bearer token', () => {
+    const wrong = operations()
+      .filter(([, operation]) => acceptsBearer(operation) !== '401' in operation.responses)
+      .map(([label]) => label);
+    expect(wrong).toEqual([]);
+    expect(operations().some(([, operation]) => !acceptsBearer(operation))).toBe(true);
+  });
+
+  it.each([
+    ['optional', [{}, { bearerAuth: [] }], 'Invalid or expired bearer token'],
+    ['required', [{ bearerAuth: [] }], 'Missing, invalid or expired bearer token'],
+  ])('describes the 401 where a bearer token is %s', (_label, security, description) => {
+    const result = withMiddlewareErrors({ paths: { '/x': { get: { security, responses: {} } } } });
+    expect((result.paths['/x'] as { get: Operation }).get.responses['401']).toEqual({
+      description,
+    });
+  });
+
+  it('keeps a 401 or 429 an operation declares, and adds no 401 without a bearer', () => {
+    const own401 = { description: 'Own 401' };
+    const own429 = { description: 'Own 429' };
+    const result = withMiddlewareErrors({
+      paths: {
+        '/own': {
+          get: { security: [{ bearerAuth: [] }], responses: { '401': own401, '429': own429 } },
+        },
+        '/public': { get: { responses: {} } },
+      },
+    });
+    const own = (result.paths['/own'] as { get: Operation }).get.responses;
+    expect(own['401']).toBe(own401);
+    expect(own['429']).toBe(own429);
+    const open = (result.paths['/public'] as { get: Operation }).get.responses;
+    expect(open['401']).toBeUndefined();
+    expect(open['429']).toEqual({ description: 'Too many requests' });
   });
 });
 
