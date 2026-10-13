@@ -105,6 +105,7 @@ export const MySubmissionListItemSchema = LibMySubmissionListItemSchema.extend({
 
 export const ListMySubmissionsResponseSchema = LibListMySubmissionsResponseSchema.extend({
   items: z.array(MySubmissionListItemSchema),
+  forms: z.array(SubmitterFormSchema),
   page: OffsetPageSchema,
   filters: z.object({
     workflowState: MySubmissionStateSchema.optional(),
@@ -291,7 +292,7 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
     path: '/submit/submissions/mine',
     tags: [TAG],
     security: [{ bearerAuth: [] }],
-    description: `The caller's draft and submitted submissions, across every workspace. Anonymous callers have none. ${OFFSET_DRIFT_NOTE}`,
+    description: `The caller's draft and submitted submissions, across every workspace, with the forms of the page's rows once each and their facts for the caller, read with the rows. Anonymous callers have none. ${OFFSET_DRIFT_NOTE}`,
     request: { query: ListMySubmissionsQuerySchema },
     responses: {
       200: {

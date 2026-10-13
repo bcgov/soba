@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { OffsetPageSchema, makeSortEnum } from './pagination';
 import { SUBMISSION_SORT_FIELDS } from '../sort';
 import { SubmissionParticipantRole, SubmissionWorkflowState } from '../permissions/codes';
+import { SubmitterFormSchema } from './forms';
 
 export const OpenSubmissionBodySchema = z.object({
   // v7 only: the client mints this id, and it is the submission's identity.
@@ -119,8 +120,12 @@ export const MySubmissionListItemSchema = z.object({
   id: z.string(),
   formId: z.string(),
   formName: z.string(),
+  formVersionId: z.string(),
   workflowState: MySubmissionStateSchema,
   role: MySubmissionRoleSchema,
+  // The revision the next write is based on, and its number in append order over every revision.
+  headRevisionId: z.string().nullable(),
+  currentRevisionNo: z.number().int(),
   submittedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -130,6 +135,8 @@ export const MySubmissionListItemSchema = z.object({
 
 export const ListMySubmissionsResponseSchema = z.object({
   items: z.array(MySubmissionListItemSchema),
+  // The forms of the page's rows, once each, with their facts for the caller.
+  forms: z.array(SubmitterFormSchema),
   page: OffsetPageSchema,
   filters: z.object({
     workflowState: MySubmissionStateSchema.optional(),

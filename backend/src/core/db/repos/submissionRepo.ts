@@ -32,6 +32,7 @@ import {
 import { listAllowsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
 import { liveSubmission } from './liveRows';
 import { isActiveOwner } from './submissionParticipantRepo';
+import { listSubmitterForms, type SubmitterFormListRow } from './submitterFormRepo';
 
 export type SubmissionRecord = typeof submissions.$inferSelect;
 
@@ -132,9 +133,12 @@ export interface ParticipantSubmissionListRow {
   id: string;
   formId: string;
   formName: string;
+  formVersionId: string;
   workflowState: string;
   /** The user's own grant on the submission. */
   role: string;
+  headRevisionId: string | null;
+  currentRevisionNo: number;
   submittedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -489,13 +493,18 @@ export const listSubmissionsForWorkspace = async (
 };
 
 /**
- * The draft and submitted submissions the user holds an active grant on, across every workspace.
- * An opened submission holds no answers yet, and a submission on a deleted form or form version
- * can no longer be opened, so none of these is listed.
+ * The draft and submitted submissions the user holds an active grant on, across every workspace,
+ * with the forms of the page's rows and their facts for the user, read in one snapshot. An opened
+ * submission holds no answers yet, and a submission on a deleted form or form version can no longer
+ * be opened, so none of these is listed.
  */
 export const listSubmissionsForParticipant = async (
   input: ListParticipantSubmissionsInput,
-): Promise<{ items: ParticipantSubmissionListRow[]; total: number }> => {
+): Promise<{
+  items: ParticipantSubmissionListRow[];
+  total: number;
+  forms: SubmitterFormListRow[];
+}> => {
   const whereClauses = [
     eq(submissionParticipants.userId, input.userId),
     eq(submissionParticipants.status, SubmissionParticipantStatus.active),
@@ -518,8 +527,11 @@ export const listSubmissionsForParticipant = async (
         id: submissions.id,
         formId: submissions.formId,
         formName: forms.name,
+        formVersionId: submissions.formVersionId,
         workflowState: submissions.workflowState,
         role: submissionParticipants.role,
+        headRevisionId: submissions.headRevisionId,
+        currentRevisionNo: submissions.currentRevisionNo,
         submittedAt: submissions.submittedAt,
         createdAt: submissions.createdAt,
         updatedAt: submissions.updatedAt,
@@ -543,7 +555,11 @@ export const listSubmissionsForParticipant = async (
       .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
       .where(where);
 
-    return { items, total: totals[0]?.total ?? 0 };
+    const formIds = [...new Set(items.map((item) => item.formId))];
+    const pageForms = await listSubmitterForms({ userId: input.userId, formIds }, tx);
+    const byId = (a: SubmitterFormListRow, b: SubmitterFormListRow) => a.id.localeCompare(b.id);
+
+    return { items, total: totals[0]?.total ?? 0, forms: pageForms.sort(byId) };
   });
 };
 

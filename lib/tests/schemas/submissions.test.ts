@@ -1,4 +1,5 @@
 import {
+  ListMySubmissionsResponseSchema,
   OpenSubmissionBodySchema,
   SubmissionDataBodySchema,
   SubmitSubmissionBodySchema,
@@ -49,5 +50,59 @@ describe('SubmitSubmissionBodySchema', () => {
     ['only baseRevisionId', { data: {}, baseRevisionId }, false],
   ])('%s', (_label, body, ok) => {
     expect(SubmitSubmissionBodySchema.safeParse(body).success).toBe(ok);
+  });
+});
+
+describe('ListMySubmissionsResponseSchema', () => {
+  const row = {
+    id: 's1',
+    formId: 'f1',
+    formName: 'Permit',
+    formVersionId: 'v1',
+    workflowState: 'draft',
+    role: 'owner',
+    headRevisionId: null,
+    currentRevisionNo: 0,
+    submittedAt: null,
+    createdAt: '2026-10-13T00:00:00.000Z',
+    updatedAt: '2026-10-13T00:00:00.000Z',
+    confirmationCode: null,
+  };
+  const form = {
+    id: 'f1',
+    name: 'Permit',
+    workspaceId: 'w1',
+    workspaceName: 'Roads',
+    publishedVersionId: 'v1',
+    permissions: ['submission_create'],
+    audienceMode: 'members',
+    audienceIdps: [],
+    allowSubmitterDrafts: true,
+  };
+  const page = { offset: 0, limit: 10, total: 1 };
+  const response = (over: Record<string, unknown> = {}) => ({
+    items: [row],
+    forms: [form],
+    page,
+    filters: {},
+    sort: 'updatedAt:desc',
+    ...over,
+  });
+
+  it.each([
+    ['a row with no head revision yet, and its form', response(), true],
+    ['a page with no forms list', { ...response(), forms: undefined }, false],
+    [
+      'a row without its form version',
+      response({ items: [{ ...row, formVersionId: undefined }] }),
+      false,
+    ],
+    [
+      'a row without its revision number',
+      response({ items: [{ ...row, currentRevisionNo: undefined }] }),
+      false,
+    ],
+  ])('%s', (_label, body, ok) => {
+    expect(ListMySubmissionsResponseSchema.safeParse(body).success).toBe(ok);
   });
 });

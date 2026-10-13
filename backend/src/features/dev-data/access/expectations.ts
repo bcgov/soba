@@ -324,6 +324,8 @@ export const SUBMISSION_EXPECTATIONS: Record<CoverageSubmissionKey, SubmissionEx
   submitterOnDeletedVersion: NONE,
   submitterOnDeletedForm: NONE,
   ownerDraft: { mine: ['owner'], ...inProgressFor('owner'), delete: ['owner'] },
+  // The submitter role grants the write and the render; the members audience admits no one else.
+  submitterDraft: { mine: ['submitter'], ...inProgressFor('submitter'), delete: ['submitter'] },
   // The public user owns every anonymous submission, so any anonymous caller holding the id passes.
   anonymousSubmitted: {
     mine: [],

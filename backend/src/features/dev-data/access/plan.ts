@@ -143,6 +143,7 @@ export const COVERAGE_SUBMISSION_KEYS = [
   'submitterOnDeletedVersion',
   'submitterOnDeletedForm',
   'ownerDraft',
+  'submitterDraft',
   'anonymousSubmitted',
   'anonymousOpened',
 ] as const;
@@ -409,6 +410,8 @@ const SUBMISSIONS: PlannedCoverageSubmission[] = [
   },
   { key: 'submitterOnDeletedForm', form: 'rolesFormDeleted', by: 'submitter', events: ['saved'] },
   { key: 'ownerDraft', form: 'protectedOwn', by: OWNER, events: ['saved'] },
+  // The only listed submission whose access comes from the form's roles, not its audience.
+  { key: 'submitterDraft', form: 'rolesInherit', by: 'submitter', events: ['saved'] },
   { key: 'anonymousSubmitted', form: 'publicInherit', by: ANONYMOUS, events: ['submitted'] },
   { key: 'anonymousOpened', form: 'publicInherit', by: ANONYMOUS, events: [] },
 ];

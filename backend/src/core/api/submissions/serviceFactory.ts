@@ -2,6 +2,7 @@ import { SubmissionService, type SubmissionContentRefs } from '../../services/su
 import type { WriteLanding } from '../../services/submissionWriteGate';
 import { SubmissionWorkflowState } from '../../db/codes';
 import type { FormAccessGrant } from '../../db/repos/formAccessRepo';
+import { toSubmitterFormDto } from '../forms/serviceFactory';
 import type {
   ParticipantSubmissionListRow,
   SubmissionRecord,
@@ -108,8 +109,11 @@ const toMySubmissionListItemDto = (item: ParticipantSubmissionListRow) => ({
   id: item.id,
   formId: item.formId,
   formName: item.formName,
+  formVersionId: item.formVersionId,
   workflowState: item.workflowState as MySubmissionState,
   role: item.role as MySubmissionRole,
+  headRevisionId: item.headRevisionId,
+  currentRevisionNo: item.currentRevisionNo,
   submittedAt: item.submittedAt?.toISOString() ?? null,
   createdAt: item.createdAt.toISOString(),
   updatedAt: item.updatedAt.toISOString(),
@@ -180,6 +184,7 @@ export function createSubmissionsApiService(submissionService: SubmissionService
       });
       return {
         items: result.items.map((item) => toMySubmissionListItemDto(item)),
+        forms: result.forms.map(toSubmitterFormDto),
         page: { offset: query.offset, limit: query.limit, total: result.total },
         filters: { workflowState: query.workflowState, q: query.q },
         sort: query.sort,

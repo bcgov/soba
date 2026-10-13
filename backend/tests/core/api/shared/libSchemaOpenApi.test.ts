@@ -180,4 +180,22 @@ describe('OpenAPI components for lib-backed schemas', () => {
       expect.arrayContaining(['formId', 'currentRevisionNo', 'role', 'form']),
     );
   });
+
+  // A row's head revision is nullable, like its column; its forms are the named submitter form.
+  it('builds My Submissions rows with their revision fields and the page forms', () => {
+    const row = 'Submit_MySubmissionListItem';
+    expect(at(schemas, row, 'properties', 'headRevisionId')).toEqual({
+      type: 'string',
+      nullable: true,
+    });
+    expect(at(schemas, row, 'properties', 'currentRevisionNo', 'type')).toBe('integer');
+    expect(at(schemas, row, 'required')).toEqual(
+      expect.arrayContaining(['formVersionId', 'headRevisionId', 'currentRevisionNo']),
+    );
+    const response = 'Submit_ListMySubmissionsResponse';
+    expect(at(schemas, response, 'properties', 'forms', 'items')).toEqual(
+      ref('Submit_SubmitterForm'),
+    );
+    expect(at(schemas, response, 'required')).toEqual(expect.arrayContaining(['forms']));
+  });
 });

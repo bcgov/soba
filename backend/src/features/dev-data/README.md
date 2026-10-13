@@ -183,7 +183,9 @@ nothing for an unknown subject or provider. The submit, file and document routes
 read of each submission (`findSubmitterSubmission`); it must hold the role, form facts and
 submission detail the separate participant, form and detail reads give, and find the same
 submissions live. Start from the
-open route's form read (`findLiveSubmitterForm`) must match the open rules.
+open route's form read (`findLiveSubmitterForm`) must match the open rules. Each My Submissions row
+is read with its form's facts; that form must equal the My Forms row, and Continue over it must
+match the write rule on a submission still in progress.
 
 Write is the rule save and submit share; the request itself can still refuse the write or keep it
 as pending. The command only reads, and needs no running backend. Change the table with any access
