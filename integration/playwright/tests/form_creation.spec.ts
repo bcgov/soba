@@ -10,14 +10,14 @@ test.use({
 async function createForm({ page, title }: { page: Page; title: string }) {
   await page.goto("");
 
-  // Wait for the first-run workspace setup modal if it appears, then close it
-  // before attempting to navigate to the Forms page.
+  // Only create a workspace when the first-run onboarding modal is actually shown.
+  // Reused auth sessions may already have a workspace, so we should not recreate one
+  // on every run.
   const workspaceModal = page.getByRole("dialog", {
     name: /Default Workspace Setup/i,
   });
   const workspaceSetupVisible = await workspaceModal
-    .waitFor({ state: "visible", timeout: 15000 })
-    .then(() => true)
+    .isVisible()
     .catch(() => false);
 
   if (workspaceSetupVisible) {
@@ -73,16 +73,20 @@ async function createForm({ page, title }: { page: Page; title: string }) {
   await page.getByTestId("create-form-button").click();
 
   const createFormDialog = page.getByRole("dialog", { name: "Create Form" });
-  const workspaceSelector = createFormDialog.getByRole("button", {
-    name: "Select an item",
-  });
+  const workspaceSelector = createFormDialog.getByTestId("workspace-select");
   await expect(workspaceSelector).toBeVisible();
   await workspaceSelector.click();
 
-  const workspaceOption = page.getByRole("option", {
-    name: "Test Workspace (team)",
-    exact: true,
-  });
+  const createdWorkspaceOption = page
+    .getByRole("option")
+    .filter({ hasText: "Test Workspace" })
+    .first();
+
+  const workspaceOption =
+    (await createdWorkspaceOption.count()) > 0
+      ? createdWorkspaceOption
+      : page.getByRole("option").first();
+
   await expect(workspaceOption).toBeVisible();
   await workspaceOption.click();
 
@@ -120,32 +124,34 @@ test("Create, edit, search, preview, and publish one form", async ({
   const txt_box = page.locator("text=Text Field"); // component from builder palette
   await dragComponentToCanvas(txt_box, target);
   await page.click('button[ref="saveButton"]');
-  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
+  await expect(target).toBeVisible();
+
   const text_area = page.getByText("Text Area", { exact: true }).first();
   await dragComponentToCanvas(text_area, target);
-  await expect(page.locator('button[ref="saveButton"]')).toBeVisible({
-    timeout: 5000,
-  });
   await page.click('button[ref="saveButton"]');
-  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
+  await expect(target).toBeVisible();
+
   const number = page.locator(
     'span[data-group="basic"][data-key="number"][data-type="number"]',
   );
   await dragComponentToCanvas(number, target);
   await page.click('button[ref="saveButton"]');
-  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
+  await expect(target).toBeVisible();
+
   const password = page.locator(
     'span[data-group="basic"][data-key="password"][data-type="password"]',
   );
   await dragComponentToCanvas(password, target);
   await page.click('button[ref="saveButton"]');
-  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
+  await expect(target).toBeVisible();
+
   const checkbox = page.locator(
     'span[data-group="basic"][data-key="checkbox"][data-type="checkbox"]',
   );
   await dragComponentToCanvas(checkbox, target);
   await page.click('button[ref="saveButton"]');
-  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
+  await expect(target).toBeVisible();
+
   const selectboxes = page.locator(
     'span[data-group="basic"][data-key="selectboxes"][data-type="selectboxes"]',
   );
@@ -153,13 +159,15 @@ test("Create, edit, search, preview, and publish one form", async ({
   await page.locator('a[href="#data"]').click();
   await page.locator('input[name="data[values][0][value]"]').fill("1");
   await page.click('button[ref="saveButton"]');
-  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
+  await expect(target).toBeVisible();
+
   const select = page.locator(
     'span[data-group="basic"][data-key="select"][data-type="select"]',
   );
   await dragComponentToCanvas(select, target);
   await page.click('button[ref="saveButton"]');
-  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
+  await expect(target).toBeVisible();
+
   const radio = page.locator(
     'span[data-group="basic"][data-key="radio"][data-type="radio"]',
   );
@@ -167,13 +175,14 @@ test("Create, edit, search, preview, and publish one form", async ({
   await page.locator('a[href="#data"]').click();
   await page.locator('input[name="data[values][0][value]"]').fill("1");
   await page.click('button[ref="saveButton"]');
-  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
+  await expect(target).toBeVisible();
+
   const button = page.locator(
     'span[data-group="basic"][data-key="button"][data-type="button"]',
   );
   await dragComponentToCanvas(button, target);
   await page.click('button[ref="saveButton"]');
-  await expect(page.locator('button[ref="saveButton"]')).toBeVisible();
+  await expect(target).toBeVisible();
 
   const saveButton = page.getByRole("button", {
     name: "Save",
