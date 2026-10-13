@@ -10,9 +10,9 @@ import {
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 import { useCallToken } from '@/src/shared/api/callToken';
 import type { WriteOutcome } from '@/src/shared/api/dataContracts';
+import type { SubmitFillBundle } from '@/src/types/forms';
+import type { SubmissionWriteResponse } from '@/src/types/submissions';
 
-export type WriteResult = Awaited<ReturnType<typeof submitSobaFormSubmission>>;
-type FillBundle = Awaited<ReturnType<typeof getSubmitFillBundle>>;
 type WriteKind = 'save' | 'submit';
 
 /**
@@ -45,7 +45,7 @@ export function useSubmissionWriter(submissionId: string, signedIn: boolean) {
       kind: WriteKind,
       data: Record<string, unknown>,
       baseRevisionId: string,
-    ): Promise<WriteResult> => {
+    ): Promise<SubmissionWriteResponse> => {
       const token = tokenFor(signedIn);
       const body = { data, revisionId: revisionIdFor(kind, data), baseRevisionId };
       try {
@@ -62,7 +62,7 @@ export function useSubmissionWriter(submissionId: string, signedIn: boolean) {
     [submissionId, signedIn, tokenFor, revisionIdFor],
   );
 
-  const toOutcome = (value: WriteResult): WriteOutcome<WriteResult> =>
+  const toOutcome = (value: SubmissionWriteResponse): WriteOutcome<SubmissionWriteResponse> =>
     value.revision.status === 'pending'
       ? { status: 'held', reason: value.revision.reason }
       : { status: 'applied', value };
@@ -92,7 +92,7 @@ export function useSubmissionWriter(submissionId: string, signedIn: boolean) {
   // Re-read the head after a held write, so the caller can write over it or, if the record is now
   // submitted, leave for the confirmation.
   const reloadHead = useCallback(
-    async (): Promise<FillBundle> => getSubmitFillBundle(tokenFor(signedIn), submissionId),
+    async (): Promise<SubmitFillBundle> => getSubmitFillBundle(tokenFor(signedIn), submissionId),
     [submissionId, signedIn, tokenFor],
   );
 

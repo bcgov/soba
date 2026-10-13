@@ -270,7 +270,7 @@ IdP plugins are ordered via env (`IDP_PLUGINS`); the first successful IdP wins. 
 
 Form rendering and submission storage are delegated to a **form engine** plugin. The default is `formio-v5` (Form.io v5). The core stores form and submission metadata in PostgreSQL; the form engine (Form.io/Mongo) holds form definitions and submission payloads. The **FormioEngineAdapter** (`backend/src/plugins/formio-v5/`) talks to Form.io over HTTP using a **server-side admin client**. Config is via `PLUGIN_FORMIO_V5_*` (API URLs, admin credentials). `FORM_ENGINE_DEFAULT_CODE` selects which engine to use; forms reference an engine code.
 
-**Server-mediated flow (no browser → Form.io proxy):** The browser never calls Form.io directly. Protected API routes provision and read schemas (`POST|GET /form-versions/:id/schema`); `SubmissionService.save()` creates submission documents in the engine server-side and stores `engine_submission_ref`. `engine_sync_status` on domain rows tracks provisioning state. Readiness is on the adapter and reported via `/api/v1/health/ready`. See [In Detail — Form engine cross-references](#form-engine-cross-references).
+**Server-mediated flow (no browser → Form.io proxy):** The browser never calls Form.io directly. Protected API routes write a schema when a form or version is created (`POST /forms`, `POST /form-versions`) or saved, and read it back (`POST|GET /form-versions/:id/schema`); `SubmissionService.save()` creates submission documents in the engine server-side and stores `engine_submission_ref`. `engine_sync_status` on domain rows tracks provisioning state. Readiness is on the adapter and reported via `/api/v1/health/ready`. See [In Detail — Form engine cross-references](#form-engine-cross-references).
 
 ### Form engine cross-references
 
@@ -372,7 +372,7 @@ Tests live under `frontend/tests/`. See [In Detail — Testing](#testing).
 
 ### Forms
 
-- **Designer** (`src/features/designer/`, `design-mode`): form list at `/{lang}/forms` and builder at `/{lang}/build`; provisions schema via `POST /form-versions/:id/schema`, loads schema via `GET /form-versions/:id/schema`.
+- **Designer** (`src/features/designer/`, `design-mode`): form list at `/{lang}/forms` and builder at `/{lang}/build`; creates a form or version with its schema in one request (`POST /forms`, `POST /form-versions`), saves schema via `POST /form-versions/:id/schema`, loads schema via `GET /form-versions/:id/schema`.
 - **Submit** (`src/features/submit-mode/`, `submit-mode`): My Forms and My Submissions at `/{lang}/my-forms` and `/{lang}/my-submissions`; render at `/{lang}/form/{formId}` via **`src/features/formio-v5/`** (`FormioProvider` + `DynamicForm` from `@formio/react`). **The browser does not call Form.io** - schema and submissions go through the SOBA API only.
 - **Renderer CSS:** static copies under `public/formio-v5/`; `useFormioV5FormChrome` loads them next to `<Form />` (avoid global Form.io CSS imports with Turbopack).
 
@@ -444,6 +444,8 @@ Form data spans two systems: domain metadata in **PostgreSQL**, and form definit
 
 - **form_version.engine_schema_ref** — engine reference for the form schema (e.g. Form.io form id/path).
 - **submission.engine_submission_ref** — engine reference for a submission document.
+
+**Creating (server-side):** `FormService.create()` and `FormVersionService.createDraft()` write the engine document first, keyed by the caller-minted version id, then commit the rows `ready` in one transaction. A retry with the same ids returns what the first attempt made.
 
 **Provisioning (server-side):** `FormVersionService.provision()` calls the adapter to create/update the schema in Form.io, sets `engine_schema_ref`, and tracks `engine_sync_status` (`provisioning` → `ready` or `error`). Exposed as `POST /form-versions/:id/schema`; read back via `GET /form-versions/:id/schema`. The designer UI sends schema JSON to this endpoint — browsers never talk to Form.io directly.
 

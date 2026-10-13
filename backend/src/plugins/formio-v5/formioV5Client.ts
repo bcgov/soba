@@ -218,8 +218,8 @@ export class FormioCommunityEditionAPIv5Client {
     return this.request<FormioForm>('/form', 'POST', data, signal);
   }
 
-  async deleteForm(formId: string): Promise<void> {
-    await this.request(`/form/${formId}`, 'DELETE');
+  async deleteForm(formId: string, signal?: AbortSignal): Promise<void> {
+    await this.request(`/form/${formId}`, 'DELETE', undefined, signal);
   }
 
   async loadSubmissions(formId: string, query?: FormioQuery): Promise<FormioSubmission[]> {

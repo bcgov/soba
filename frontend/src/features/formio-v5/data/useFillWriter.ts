@@ -3,7 +3,8 @@
 import { useCallback, useRef, useState } from 'react';
 import { useCallToken } from '@/src/shared/api/callToken';
 import type { WriteOutcome } from '@/src/shared/api/dataContracts';
-import { useSubmissionWriter, type WriteResult } from './useSubmissionWriter';
+import type { SubmissionWriteResponse } from '@/src/types/submissions';
+import { useSubmissionWriter } from './useSubmissionWriter';
 
 export type FillWrite = 'save' | 'submit';
 /** `resolve`: reloading or writing over after a held write. */
@@ -19,9 +20,9 @@ export type SaveStatus =
 
 /** The reason a write refused without sending carries. */
 export const BLOCKED_REASON = 'blocked';
-const BLOCKED: WriteOutcome<WriteResult> = { status: 'held', reason: BLOCKED_REASON };
+const BLOCKED: WriteOutcome<SubmissionWriteResponse> = { status: 'held', reason: BLOCKED_REASON };
 
-const saveStatusOf = (outcome: WriteOutcome<WriteResult>): SaveStatus => {
+const saveStatusOf = (outcome: WriteOutcome<SubmissionWriteResponse>): SaveStatus => {
   switch (outcome.status) {
     case 'applied':
       return { state: 'saved', at: new Date() };
@@ -68,7 +69,7 @@ export function useFillWriter(submissionId: string, headRevisionId: string | nul
   const hasBase = useCallback(() => baseRef.current !== null, []);
 
   const settle = useCallback(
-    (kind: FillWrite, outcome: WriteOutcome<WriteResult>) => {
+    (kind: FillWrite, outcome: WriteOutcome<SubmissionWriteResponse>) => {
       if (outcome.status === 'applied') {
         if (kind === 'save') baseRef.current = outcome.value.revision.id;
         hold(null);
@@ -82,7 +83,7 @@ export function useFillWriter(submissionId: string, headRevisionId: string | nul
   );
 
   const save = useCallback(
-    async (data: Record<string, unknown>): Promise<WriteOutcome<WriteResult>> => {
+    async (data: Record<string, unknown>): Promise<WriteOutcome<SubmissionWriteResponse>> => {
       if (blocked()) return BLOCKED;
       setBusy('save');
       setSaveStatus({ state: 'saving' });
@@ -105,7 +106,7 @@ export function useFillWriter(submissionId: string, headRevisionId: string | nul
   );
 
   const submit = useCallback(
-    async (data: Record<string, unknown>): Promise<WriteOutcome<WriteResult>> => {
+    async (data: Record<string, unknown>): Promise<WriteOutcome<SubmissionWriteResponse>> => {
       await saveInFlightRef.current;
       if (blocked()) return BLOCKED;
       setBusy('submit');

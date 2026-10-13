@@ -10,13 +10,28 @@ export const CreateFormSettingsSchema = z.strictObject({
 export type CreateFormSettings = z.infer<typeof CreateFormSettingsSchema>;
 
 /** Refuses keys it does not know, so a choice the create would not apply is never dropped silently. */
-export const CreateFormBodySchema = z.strictObject({
-  workspaceId: z.string().min(1),
-  name: z.string().trim().min(1),
-  description: z.string().optional(),
-  formEngineCode: z.string().trim().min(1).optional(),
-  settings: CreateFormSettingsSchema.optional(),
-});
+export const CreateFormBodySchema = z
+  .strictObject({
+    /**
+     * Minted by the caller, so a retried create returns the form the first one made. Lowercased, as
+     * Postgres returns it, so a retry matches the stored id.
+     */
+    id: z.uuidv7().toLowerCase().optional(),
+    /** Minted by the caller for the form's first version. */
+    versionId: z.uuidv7().toLowerCase().optional(),
+    workspaceId: z.string().min(1),
+    name: z.string().trim().min(1),
+    description: z.string().optional(),
+    formEngineCode: z.string().trim().min(1).optional(),
+    /** The first version's schema; the default form when absent. */
+    schema: z.record(z.string(), z.unknown()).optional(),
+    settings: CreateFormSettingsSchema.optional(),
+  })
+  // A retry is matched on both, so they are minted and sent together.
+  .refine((body) => (body.id === undefined) === (body.versionId === undefined), {
+    message: 'id and versionId are sent together',
+    path: ['versionId'],
+  });
 
 export const UpdateFormBodySchema = z.object({
   name: z.string().trim().min(1).optional(),

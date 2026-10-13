@@ -20,16 +20,18 @@ adds a third control per submission, who takes part in it; see
 > workspace), and check the caller's permissions on the form in question (see
 > [Resolving a user's permissions](#resolving-a-users-permissions)). Creating a form requires
 > `form_create` and `design_create`; only `form_admin` satisfies that, via `*`. Creating a design on
-> an existing form requires `design_create` (`form_designer`). The submit routes decide with the
-> submitter rules in `@soba/lib`; the file and document generation routes make the same read and
-> decide by the same rules (see [Submission participants](#submission-participants)); rendering a
-> document also needs `document_template_read`. The template routes (`features/templates/route.ts`)
-> are gated by `requireFormPermissions`: `form_read` and `document_template_read` to list and
-> download, `document_template_create` to upload, replace and rename, `document_template_delete` to
-> delete. Of the seeded roles only `form_admin` (via `*`) holds any of these sets. A draft created
-> from an existing version gets that version's templates under `design_create` alone. Reading and
-> managing groups and members is gated by workspace role (`requireWorkspacePeopleRead`,
-> `requireWorkspaceManage` in `middleware/requireWorkspaceRole.ts`), not by RBAC.
+> an existing form requires `design_create` and `design_update` (`form_designer`), since the create
+> writes the design's schema. The submit routes decide with the submitter rules in `@soba/lib`; the
+> file and document generation routes make the same read and decide by the same rules (see
+> [Submission participants](#submission-participants)); rendering a document also needs
+> `document_template_read`. The template routes (`features/templates/route.ts`) are gated by
+> `requireFormPermissions`: `form_read` and `document_template_read` to list and download,
+> `document_template_create` to upload, replace and rename, `document_template_delete` to delete. Of
+> the seeded roles only `form_admin` (via `*`) holds any of these sets. A draft created from an
+> existing version gets that version's templates under the draft's own permissions, without
+> `document_template_create`. Reading and managing groups and members is gated by workspace role
+> (`requireWorkspacePeopleRead`, `requireWorkspaceManage` in `middleware/requireWorkspaceRole.ts`),
+> not by RBAC.
 
 ```
                         User in a workspace
@@ -144,7 +146,8 @@ new permissions later needs no change to that role.
 `form_submitter` holds no `form_read`, so someone who can only submit has no design access.
 
 `form_create` is catalogued but not assigned to any seeded role. Only `form_admin` can create a form
-(via `*`). `form_designer` can create a new design on an existing form (`design_create`).
+(via `*`). `form_designer` can create a new design on an existing form (`design_create` and
+`design_update`).
 
 The permission codes are: `form_create/read/update/delete`, `design_create/read/update/delete`,
 `submission_create/read/update/delete/review`, `team_read/update`, `document_template_create/read/delete`.

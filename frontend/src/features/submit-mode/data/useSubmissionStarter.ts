@@ -4,8 +4,7 @@ import { useCallback } from 'react';
 import { openSobaFormSubmission } from '@/src/shared/api/sobaApi';
 import { useCallToken } from '@/src/shared/api/callToken';
 import type { WriteOutcome } from '@/src/shared/api/dataContracts';
-
-type OpenedSubmission = Awaited<ReturnType<typeof openSobaFormSubmission>>;
+import type { SubmissionResponse } from '@/src/types/submissions';
 
 /**
  * Open a new submission for a form's published version, as the session is when called. The id is
@@ -14,7 +13,7 @@ type OpenedSubmission = Awaited<ReturnType<typeof openSobaFormSubmission>>;
 export function useSubmissionStarter() {
   const { isSignedIn, tokenFor } = useCallToken();
   const open = useCallback(
-    async (formId: string, submissionId: string): Promise<WriteOutcome<OpenedSubmission>> => {
+    async (formId: string, submissionId: string): Promise<WriteOutcome<SubmissionResponse>> => {
       const value = await openSobaFormSubmission(tokenFor(isSignedIn()), formId, submissionId);
       return { status: 'applied', value };
     },

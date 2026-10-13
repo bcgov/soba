@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { FormCreateCapability, ListTenantsResponse, MeResponse } from '@soba/lib';
 import { findAppUserById, updateAppUserProfile } from '../../db/repos/appUserRepo';
-import { toAppUserView } from '../../db/appUserView';
+import { toAppUserView, type AppUserRow } from '../../db/appUserView';
 import { canCreateWorkspaceByIdp } from '../../db/repos/idpGroupRepo';
 import {
   actorBelongsToWorkspace,
@@ -40,7 +40,7 @@ export class MeApiService {
   }
 
   private async toResponse(
-    user: NonNullable<Awaited<ReturnType<typeof findAppUserById>>>,
+    user: AppUserRow,
     idpCode: string | null,
     isSobaAdmin: boolean,
   ): Promise<MeResponse> {

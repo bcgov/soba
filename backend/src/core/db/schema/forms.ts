@@ -11,6 +11,11 @@ import { sql } from 'drizzle-orm';
 import { auditColumns, idColumn, softDeleteColumns } from './audit';
 import { appUsers, sobaSchema, workspaces } from './core';
 
+/** Constraint names a unique violation is matched on; the primary keys keep Postgres's default names. */
+export const FORM_PKEY = 'form_pkey';
+export const FORM_VERSION_PKEY = 'form_version_pkey';
+export const FORM_WORKSPACE_NAME_UNIQUE = 'form_workspace_name_uq';
+
 export const forms = sobaSchema.table(
   'form',
   {
@@ -29,7 +34,7 @@ export const forms = sobaSchema.table(
   },
   (table) => ({
     // Non-deleted forms only, so a soft-deleted form frees its name for reuse.
-    workspaceNameUnique: uniqueIndex('form_workspace_name_uq')
+    workspaceNameUnique: uniqueIndex(FORM_WORKSPACE_NAME_UNIQUE)
       .on(table.workspaceId, table.name)
       .where(sql`${table.deletedAt} is null`),
     workspaceIdx: index('form_workspace_idx').on(table.workspaceId),
