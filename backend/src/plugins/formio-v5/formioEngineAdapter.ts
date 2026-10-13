@@ -126,6 +126,34 @@ export function stripEngineManagedFields(doc: Record<string, unknown>): Record<s
   return cleaned;
 }
 
+/**
+ * Fields the renderer reads when filling: page or wizard display, form settings, the components
+ * with their validation, the submit action, and the form properties (number separators, wizard
+ * button order). Name, path, title, tags and access identify or describe the stored document; a
+ * component template that reads one of them sees a change the hash does not.
+ */
+const RENDERED_FIELDS = ['display', 'settings', 'components', 'action', 'properties'];
+
+/** Properties buildSchemaBody writes onto every stored form, naming its workspace and version. */
+const SOBA_PROPERTIES = new Set(['soba_workspace_id', 'soba_form_version_id']);
+
+/** The form's own properties, without SOBA's; undefined when none are left. */
+const ownProperties = (value: unknown): unknown => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
+  const own = Object.entries(value).filter(([key]) => !SOBA_PROPERTIES.has(key));
+  return own.length > 0 ? Object.fromEntries(own) : undefined;
+};
+
+/** The rendered fields of a Form.io form document, without the properties SOBA adds. */
+export function renderedFormioSchema(doc: Record<string, unknown>): Record<string, unknown> {
+  const rendered: Record<string, unknown> = {};
+  for (const key of RENDERED_FIELDS) {
+    const value = key === 'properties' ? ownProperties(doc.properties) : doc[key];
+    if (value !== undefined) rendered[key] = value;
+  }
+  return rendered;
+}
+
 /** Build the Form.io form document for an upsert: strip engine-managed fields, then apply
  *  deterministic identity + SOBA tenancy metadata. */
 export function buildSchemaBody(input: UpsertSchemaInput): Record<string, unknown> {
@@ -291,6 +319,11 @@ export class FormioEngineAdapter implements FormEngineAdapter {
   /** Normalize a schema (import or export) to a clean, portable, builder-ready form definition. */
   normalizeSchema(schema: Record<string, unknown>): Record<string, unknown> {
     return normalizeFormioSchema(schema);
+  }
+
+  /** What the renderer reads from a stored form document. */
+  renderedSchema(schema: Record<string, unknown>): Record<string, unknown> {
+    return renderedFormioSchema(schema);
   }
 
   /**

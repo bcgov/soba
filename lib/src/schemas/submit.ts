@@ -24,3 +24,14 @@ export const SubmitFillBundleSchema = z.object({
   content: SubmissionDataDocumentSchema.nullable(),
 });
 export type SubmitFillBundle = z.infer<typeof SubmitFillBundleSchema>;
+
+/** A form version's schema for starting a submission: the published version, as stored. */
+export const SubmitFormVersionSchemaResponseSchema = z.object({
+  formId: z.string(),
+  formVersionId: z.string(),
+  versionNo: z.number().int(),
+  schema: z.record(z.string(), z.unknown()),
+  // Covers what the engine renders, not the stored identity: versions differing only there match.
+  schemaHash: z.string(),
+});
+export type SubmitFormVersionSchemaResponse = z.infer<typeof SubmitFormVersionSchemaResponseSchema>;

@@ -410,8 +410,8 @@ function recordOf<K extends string, V, R>(
   ) as Record<K, R>;
 }
 
-/** Form and version deletes, once the submissions on them exist. */
-async function applyDeletes(
+/** Form and version deletes, and versions published over the old, once the submissions exist. */
+async function applyChanges(
   ctx: CoverageContext,
   plannedForms: PlannedCoverageForm[],
 ): Promise<void> {
@@ -421,11 +421,24 @@ async function applyDeletes(
     async (planned) => {
       const form = ctx.forms.get(planned.key);
       if (!form) throw new Error(`Coverage form ${planned.key} was not created`);
-      const { workspaceId } = form;
-      if (planned.afterSubmissions === 'deleteForm') {
-        await formService.delete({ workspaceId, formId: form.formId, ...actor });
-      } else {
-        await formVersionService.delete({ workspaceId, formVersionId: form.versionId, ...actor });
+      const { workspaceId, formId, versionId } = form;
+      switch (planned.afterSubmissions) {
+        case 'deleteForm':
+          await formService.delete({ workspaceId, formId, ...actor });
+          break;
+        case 'deleteVersion':
+          await formVersionService.delete({ workspaceId, formVersionId: versionId, ...actor });
+          break;
+        case 'publishNewVersion': {
+          const { version } = await formVersionService.createDraft({
+            workspaceId,
+            formId,
+            fromFormVersionId: versionId,
+            ...actor,
+          });
+          await formVersionService.publish({ workspaceId, formVersionId: version.id, ...actor });
+          break;
+        }
       }
     },
   );
@@ -457,7 +470,7 @@ export async function generateCoverage(args: {
     plan.submissions,
     async (planned, index) => [planned.key, await createSubmission(ctx, planned, index)] as const,
   );
-  await applyDeletes(
+  await applyChanges(
     ctx,
     plan.workspaces.flatMap((w) => w.forms),
   );

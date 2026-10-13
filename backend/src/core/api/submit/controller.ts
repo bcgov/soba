@@ -1,11 +1,16 @@
 import { Response } from 'express';
 import { z } from 'zod';
-import { ApiErrorCodes, type MySubmissionRole, type SubmitFillBundle } from '@soba/lib';
+import {
+  ApiErrorCodes,
+  type MySubmissionRole,
+  type SubmitFillBundle,
+  type SubmitFormVersionSchemaResponse,
+} from '@soba/lib';
 import { asyncHandler } from '../shared/asyncHandler';
 import { NotFoundError } from '../../errors';
 import { formsApiService, formVersionService, submissionsApiService } from '../../container';
 import type { SubmitterSubmissionRow } from '../../db/repos/submitterSubmissionRepo';
-import { loadedSubmission } from '../../middleware/formSubmitAccess';
+import { loadedForm, loadedFormVersion, loadedSubmission } from '../../middleware/formSubmitAccess';
 import { toSubmitterFormDto } from '../forms/serviceFactory';
 import { toSubmissionDto } from '../submissions/serviceFactory';
 import { workspacesApiService } from '../workspaces/service';
@@ -15,11 +20,14 @@ import { ListMyFormsQuerySchema, ListMySubmissionsQuerySchema } from './schema';
 type ListMySubmissionsQuery = z.infer<typeof ListMySubmissionsQuerySchema>;
 type ListMyFormsQuery = z.infer<typeof ListMyFormsQuerySchema>;
 
-/** The schema of the submission's own form version, or 404. */
-const readOwnSchema = async (submission: SubmitterSubmissionRow) => {
+/** The schema of a form version in its engine, or 404. */
+const readVersionSchema = async (version: {
+  formEngineCode: string;
+  engineSchemaRef: string | null;
+}) => {
   const schema = await formVersionService.readSchema({
-    engineCode: submission.formEngineCode,
-    engineSchemaRef: submission.engineSchemaRef,
+    engineCode: version.formEngineCode,
+    engineSchemaRef: version.engineSchemaRef,
   });
   if (!schema)
     throw new NotFoundError('Form version schema not found', ApiErrorCodes.schema_not_found);
@@ -51,7 +59,7 @@ export const getSubmitSubmissionData = asyncHandler(async (req: Request, res: Re
  * version is reachable by UUID.
  */
 export const getSubmitSubmissionSchema = asyncHandler(async (req: Request, res: Response) => {
-  res.json(await readOwnSchema(loadedSubmission(req).submission));
+  res.json(await readVersionSchema(loadedSubmission(req).submission));
 });
 
 /**
@@ -63,7 +71,7 @@ export const getSubmitSubmissionSchema = asyncHandler(async (req: Request, res: 
 export const getSubmitFillBundle = asyncHandler(async (req: Request, res: Response) => {
   const { submission, access, form } = loadedSubmission(req);
   // Schema first: a missing schema is a 404 whatever the content read would do.
-  const schema = await readOwnSchema(submission);
+  const schema = await readVersionSchema(submission);
   const content = await readContent(submission);
   const bundle: SubmitFillBundle = {
     formId: submission.formId,
@@ -78,6 +86,25 @@ export const getSubmitFillBundle = asyncHandler(async (req: Request, res: Respon
     content: content ?? null,
   };
   res.json(bundle);
+});
+
+/** The form with its facts for the caller. Runs after requireSubmissionStart. */
+export const getSubmitForm: RequestHandler = (req, res) => {
+  res.json(toSubmitterFormDto(loadedForm(req)));
+};
+
+/** The published version's schema to start from. Runs after requireVersionSchemaRead. */
+export const getSubmitFormVersionSchema = asyncHandler(async (req: Request, res: Response) => {
+  const version = loadedFormVersion(req);
+  const schema = await readVersionSchema(version);
+  const body: SubmitFormVersionSchemaResponse = {
+    formId: version.formId,
+    formVersionId: version.id,
+    versionNo: version.versionNo,
+    schema,
+    schemaHash: formVersionService.schemaHash({ engineCode: version.formEngineCode, schema }),
+  };
+  res.json(body);
 });
 
 /** The caller's own draft and submitted submissions. Runs after requireSignedInSubmitter. */

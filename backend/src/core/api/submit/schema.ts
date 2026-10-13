@@ -20,6 +20,7 @@ import {
 import { MAX_LOOKUP_LIMIT } from '../shared/lookup';
 import {
   SubmitFillBundleSchema as LibSubmitFillBundleSchema,
+  SubmitFormVersionSchemaResponseSchema as LibSubmitFormVersionSchemaResponseSchema,
   MySubmissionStateSchema as LibMySubmissionStateSchema,
   MySubmissionRoleSchema as LibMySubmissionRoleSchema,
   MySubmissionListItemSchema as LibMySubmissionListItemSchema,
@@ -92,6 +93,17 @@ export const ListMySubmissionsQuerySchema = z
 
 export const MySubmissionRoleSchema =
   LibMySubmissionRoleSchema.clone().openapi('Submit_MySubmissionRole');
+
+export const SubmitFormIdParamsSchema = z
+  .object({ formId: z.string().min(1) })
+  .openapi('Submit_FormIdParams');
+
+export const SubmitFormVersionIdParamsSchema = z
+  .object({ id: z.string().min(1) })
+  .openapi('Submit_FormVersionIdParams');
+
+export const SubmitFormVersionSchemaResponseSchema =
+  LibSubmitFormVersionSchemaResponseSchema.clone().openapi('Submit_FormVersionSchema');
 
 export const SubmitFillBundleSchema = LibSubmitFillBundleSchema.extend({
   role: MySubmissionRoleSchema,
@@ -318,6 +330,47 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
       },
       400: { description: INVALID_QUERY },
       401: { description: SIGNED_IN_REQUIRED },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/submit/forms/{formId}',
+    tags: [TAG],
+    security: PUBLIC_SECURITY,
+    description:
+      'A form the caller may start a submission on, with the facts the access rules in @soba/lib read. Refused as an open of the form would be.',
+    request: { params: SubmitFormIdParamsSchema },
+    responses: {
+      200: {
+        description: 'The form with its facts for the caller',
+        content: { 'application/json': { schema: SubmitterFormSchema } },
+      },
+      401: { description: AUTH_REQUIRED },
+      403: { description: AUTHZ },
+      404: { description: 'Form not found, or the form has no published version' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/submit/form-versions/{id}/schema',
+    tags: [TAG],
+    security: PUBLIC_SECURITY,
+    description:
+      "The schema of a form's published version, to render a new submission from before it is opened, to a caller who may start one. `schemaHash` covers what the engine renders, not the stored document's identity, so versions that differ only in identity carry the same hash.",
+    request: { params: SubmitFormVersionIdParamsSchema },
+    responses: {
+      200: {
+        description: 'The published version and its schema',
+        content: { 'application/json': { schema: SubmitFormVersionSchemaResponseSchema } },
+      },
+      401: { description: AUTH_REQUIRED },
+      403: { description: AUTHZ },
+      404: {
+        description: 'Form version or its schema not found, or the form has no published version',
+      },
+      409: { description: 'The form version is not the published version' },
     },
   });
 

@@ -2,15 +2,20 @@ import express from 'express';
 import { validateRequest } from '../shared/validation';
 import { sortLocale } from '../../middleware/sortLocale';
 import {
+  loadSubmitterForm,
+  loadSubmitterFormVersion,
   loadSubmitterSubmission,
   requireSignedInSubmitter,
   requireSubmissionDelete,
-  requireSubmissionOpen,
   requireSubmissionRead,
+  requireSubmissionStart,
   requireSubmissionWrite,
+  requireVersionSchemaRead,
 } from '../../middleware/formSubmitAccess';
 import {
   getSubmitFillBundle,
+  getSubmitForm,
+  getSubmitFormVersionSchema,
   getSubmitSubmission,
   getSubmitSubmissionData,
   getSubmitSubmissionSchema,
@@ -36,12 +41,14 @@ import {
   ListMyFormsQuerySchema,
   ListMySubmissionsQuerySchema,
   MyWorkspaceLookupQuerySchema,
+  SubmitFormIdParamsSchema,
+  SubmitFormVersionIdParamsSchema,
 } from './schema';
 
 // Submit-mode: mounted under /api/v1/submit with optional auth (anonymous resolves to the public user).
-// A route on one submission reads it once (loadSubmitterSubmission), then one guard decides with the
-// @soba/lib rules. Open reads its form once. A repeated open, save or submit gets its recorded answer
-// before any guard. The caller's own lists need a signed-in caller.
+// A route on one submission, form or form version reads it once, then one guard decides with the
+// @soba/lib rules. A repeated open, save or submit gets its recorded answer before any guard. The
+// caller's own lists need a signed-in caller.
 const router = express.Router();
 
 const submissionParams = validateRequest({ params: SubmissionIdParamsSchema });
@@ -50,7 +57,8 @@ router.post(
   '/submissions',
   validateRequest({ body: OpenSubmissionBodySchema }),
   replayRecordedOpen,
-  requireSubmissionOpen,
+  loadSubmitterForm,
+  requireSubmissionStart,
   openSubmission,
 );
 router.post(
@@ -77,6 +85,25 @@ router.get(
   sortLocale,
   requireSignedInSubmitter,
   listMyForms,
+);
+
+// Registered after /forms/mine, which it would otherwise take as a form id. The form a caller may
+// start, with its facts; refused as an open would be.
+router.get(
+  '/forms/:formId',
+  validateRequest({ params: SubmitFormIdParamsSchema }),
+  loadSubmitterForm,
+  requireSubmissionStart,
+  getSubmitForm,
+);
+
+// The published version's schema, to render a new submission before it is opened.
+router.get(
+  '/form-versions/:id/schema',
+  validateRequest({ params: SubmitFormVersionIdParamsSchema }),
+  loadSubmitterFormVersion,
+  requireVersionSchemaRead,
+  getSubmitFormVersionSchema,
 );
 
 router.get(

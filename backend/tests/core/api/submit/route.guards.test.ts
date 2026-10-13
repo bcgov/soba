@@ -5,7 +5,8 @@ interface RouteLayer {
 }
 
 const GUARDS = [
-  'requireSubmissionOpen',
+  'requireSubmissionStart',
+  'requireVersionSchemaRead',
   'requireSubmissionRead',
   'requireSubmissionWrite',
   'requireSubmissionDelete',
@@ -43,10 +44,14 @@ it.each([
   expect(handlers.indexOf('loadSubmitterSubmission')).toBeLessThan(handlers.indexOf(guard));
 });
 
-it('POST /submissions decides with requireSubmissionOpen, with no submission to load', () => {
-  const handlers = handlersFor('post', '/submissions');
-  expect(handlers).toContain('requireSubmissionOpen');
-  expect(handlers).not.toContain('loadSubmitterSubmission');
+it.each([
+  ['post', '/submissions', 'loadSubmitterForm', 'requireSubmissionStart'],
+  ['get', '/forms/:formId', 'loadSubmitterForm', 'requireSubmissionStart'],
+  ['get', '/form-versions/:id/schema', 'loadSubmitterFormVersion', 'requireVersionSchemaRead'],
+])('%s %s reads once with %s, then decides with %s', (method, path, load, guard) => {
+  const handlers = handlersFor(method, path);
+  expect(handlers.filter((name) => name.startsWith('loadSubmitter'))).toEqual([load]);
+  expect(handlers.indexOf(load)).toBeLessThan(handlers.indexOf(guard));
 });
 
 it.each(['/submissions/mine', '/forms/mine', '/workspaces/mine'])(
@@ -56,9 +61,13 @@ it.each(['/submissions/mine', '/forms/mine', '/workspaces/mine'])(
   },
 );
 
-it('registers GET /submissions/mine before GET /submissions/:id, which would take it as an id', () => {
+it.each([
+  ['/submissions/mine', '/submissions/:id'],
+  ['/forms/mine', '/forms/:formId'],
+])('registers GET %s before GET %s, which would take it as an id', (mine, byId) => {
   const order = routes.filter((r) => r.method === 'get').map((r) => r.path);
-  expect(order.indexOf('/submissions/mine')).toBeLessThan(order.indexOf('/submissions/:id'));
+  expect(order.indexOf(mine)).toBeGreaterThanOrEqual(0);
+  expect(order.indexOf(mine)).toBeLessThan(order.indexOf(byId));
 });
 
 it.each(routes.map((r) => [`${r.method.toUpperCase()} ${r.path}`, r.handlers] as const))(
@@ -80,11 +89,11 @@ it.each([
   expect(at).toBeLessThan(handlers.indexOf('requireSubmissionWrite'));
 });
 
-it('POST /submissions answers a recorded open before requireSubmissionOpen', () => {
+it('POST /submissions answers a recorded open before it reads the form', () => {
   const handlers = handlersFor('post', '/submissions');
   expect(handlers.indexOf('replayRecordedOpen')).toBeGreaterThanOrEqual(0);
   expect(handlers.indexOf('replayRecordedOpen')).toBeLessThan(
-    handlers.indexOf('requireSubmissionOpen'),
+    handlers.indexOf('loadSubmitterForm'),
   );
 });
 

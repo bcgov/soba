@@ -8,6 +8,7 @@ import {
   audienceAdmits,
   canContinueSubmission,
   canDeleteOwnSubmission,
+  canReadVersionSchema,
   canSaveSubmissionDraft,
   canStartSubmission,
   DEFAULT_SORT_LOCALE,
@@ -70,6 +71,7 @@ import {
 import {
   findLiveSubmitterForm,
   findSubmitterFormFacts,
+  findSubmitterFormVersion,
   listFormsForSubmitter,
   listSubmitterForms,
   listWorkspacesForSubmitter,
@@ -331,28 +333,64 @@ async function checkForm(
     issues: [
       ...(row ? rowInconsistencies(caller, formKey, row, answers) : []),
       ...(await openReadIssues(caller, formKey, form, answers.start)),
+      ...(await versionSchemaIssues(caller, formKey, form, answers.start)),
     ],
   };
 }
 
-/** The open route decides from one read of the form; Start from it must match the open rules. */
+/** The user whose form permissions the submit reads count: none for the public user. */
+const factsUserId = ({ identity }: Caller): string | null =>
+  identity.actorId && identity.idpCode !== PUBLIC_PROVIDER_CODE ? identity.actorId : null;
+
+/**
+ * The open route and the form read decide from one read of the form; Start from it must match the
+ * open rules.
+ */
 async function openReadIssues(
   caller: Caller,
   formKey: CoverageFormKey,
   form: CoverageFormRef,
   start: boolean,
 ): Promise<string[]> {
-  const { actorId, idpCode } = caller.identity;
-  const read = await findLiveSubmitterForm({
-    userId: actorId && idpCode !== PUBLIC_PROVIDER_CODE ? actorId : null,
-    formId: form.formId,
-  });
+  const read = await findLiveSubmitterForm({ userId: factsUserId(caller), formId: form.formId });
   const fromRead = !!read && canStartSubmission(read, caller.identity);
   return fromRead === start
     ? []
     : [
         `${caller.persona} x ${formKey}: Start from the open route's read differs from the open rules`,
       ];
+}
+
+/**
+ * The version schema read, from its own read of each of the form's versions, admits the caller to
+ * the published version exactly when they may start, and to no other version.
+ */
+async function versionSchemaIssues(
+  caller: Caller,
+  formKey: CoverageFormKey,
+  form: CoverageFormRef,
+  start: boolean,
+): Promise<string[]> {
+  const versions = await db
+    .select({ id: formVersions.id, versionNo: formVersions.versionNo })
+    .from(formVersions)
+    .where(eq(formVersions.formId, form.formId));
+  const published = await getPublishedVersionForForm(form.workspaceId, form.formId);
+  const issues = await Promise.all(
+    versions.map(async (version) => {
+      const read = await findSubmitterFormVersion({
+        userId: factsUserId(caller),
+        formVersionId: version.id,
+      });
+      const admits = !!read && canReadVersionSchema(version.id, read.form, caller.identity);
+      return admits === (start && version.id === published?.id)
+        ? []
+        : [
+            `${caller.persona} x ${formKey}: schema read of version ${version.versionNo} (${version.id === published?.id ? 'published' : 'not published'}) ${admits ? 'admits' : 'refuses'} where the start rules ${start ? 'allow' : 'refuse'}`,
+          ];
+    }),
+  );
+  return issues.flat();
 }
 
 /** The keys of the coverage forms in `workspaceId`. */
@@ -483,7 +521,11 @@ async function designListInconsistencies(
 const PLANNED_DELETES: ReadonlyMap<string, PlannedDelete> = new Map(
   buildCoveragePlan()
     .workspaces.flatMap((workspace) => workspace.forms)
-    .flatMap((form) => (form.afterSubmissions ? [[form.key, form.afterSubmissions] as const] : [])),
+    .flatMap(({ key, afterSubmissions }) =>
+      afterSubmissions === 'deleteForm' || afterSubmissions === 'deleteVersion'
+        ? [[key, afterSubmissions] as const]
+        : [],
+    ),
 );
 
 /** No design list, read with coverageFormsGrant, shows a form whose planned delete it hides. */

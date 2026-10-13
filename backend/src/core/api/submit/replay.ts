@@ -66,7 +66,8 @@ const isOwnOpen = ({ submission, access }: SubmitterSubmission, body: OpenSubmis
 
 /**
  * Answers an open of an id the caller already owns with that submission, before the form's access
- * and published version are checked. Any other request goes on to requireSubmissionOpen.
+ * and published version are checked. Any other request goes on to loadSubmitterForm and
+ * requireSubmissionStart.
  */
 export const replayRecordedOpen = async (
   req: Request,

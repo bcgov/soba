@@ -2,6 +2,7 @@ import { createFormEngineAdapter } from '../integrations/form-engine/FormEngineR
 import type { UpsertSchemaInput } from '../integrations/form-engine/FormEngineAdapter';
 import { ValidationError } from '../errors';
 import { log } from '../logging';
+import { schemaHashOf } from './schemaHash';
 
 type SchemaWriter = (input: UpsertSchemaInput) => Promise<{ engineRef: string }>;
 
@@ -62,3 +63,7 @@ export const readEngineSchema = async (
   if (typeof adapter.readSchema !== 'function') return null;
   return adapter.readSchema(engineSchemaRef);
 };
+
+/** The hash of what the engine renders from a schema it stored. */
+export const hashEngineSchema = (engineCode: string, schema: Record<string, unknown>): string =>
+  schemaHashOf(schema, createFormEngineAdapter(engineCode));

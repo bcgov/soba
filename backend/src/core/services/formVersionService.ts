@@ -27,6 +27,7 @@ import { ConflictError, NotFoundError, ValidationError } from '../errors';
 import { FORM_VERSION_ID_TAKEN, SOURCE_VERSION_HAS_NO_SCHEMA } from '../messages';
 import {
   discardLostEngineSchema,
+  hashEngineSchema,
   readEngineSchema,
   schemaWriterFor,
   writeEngineSchema,
@@ -445,6 +446,11 @@ export class FormVersionService {
   /** Reads a schema from the engine by its ref; null when there is nothing to read. */
   async readSchema(refs: { engineCode: string; engineSchemaRef: string | null }) {
     return readEngineSchema(refs.engineCode, refs.engineSchemaRef);
+  }
+
+  /** A hash of what the engine renders from the schema; its stored identity does not count. */
+  schemaHash(input: { engineCode: string; schema: Record<string, unknown> }): string {
+    return hashEngineSchema(input.engineCode, input.schema);
   }
 
   async get(workspaceId: string, formVersionId: string) {
