@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 
 const { kc, search, me } = vi.hoisted(() => ({
-  kc: { authenticated: true, initializing: false },
+  kc: { authenticated: true, initializing: false, initStarted: true },
   search: { value: '' },
   me: { idpCode: 'idir' as string | null, loaded: true, hasError: false },
 }));

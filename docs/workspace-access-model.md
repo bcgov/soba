@@ -20,15 +20,15 @@ adds a third control per submission, who takes part in it; see
 > workspace), and check the caller's permissions on the form in question (see
 > [Resolving a user's permissions](#resolving-a-users-permissions)). Creating a form requires
 > `form_create` and `design_create`; only `form_admin` satisfies that, via `*`. Creating a design on
-> an existing form requires `design_create` (`form_designer`). The submit routes, file uploads and
-> document generation are gated by `isSubmitterAllowed` (see
-> [Submission participants](#submission-participants)); rendering a document also needs
-> `document_template_read`. The template routes (`features/templates/route.ts`) are gated by
-> `requireFormPermissions`: `form_read` and `document_template_read` to list and download,
-> `document_template_create` to upload, replace and rename, `document_template_delete` to delete. Of
-> the seeded roles only `form_admin` (via `*`) holds any of these sets. A draft created from an
-> existing version gets that version's templates under `design_create` alone. Reading and managing
-> groups and members is gated by workspace role (`requireWorkspacePeopleRead`,
+> an existing form requires `design_create` (`form_designer`). The submit routes decide with the
+> submitter rules in `@soba/lib`; the file and document generation routes make the same read and
+> decide by the same rules (see [Submission participants](#submission-participants)); rendering a
+> document also needs `document_template_read`. The template routes (`features/templates/route.ts`)
+> are gated by `requireFormPermissions`: `form_read` and `document_template_read` to list and
+> download, `document_template_create` to upload, replace and rename, `document_template_delete` to
+> delete. Of the seeded roles only `form_admin` (via `*`) holds any of these sets. A draft created
+> from an existing version gets that version's templates under `design_create` alone. Reading and
+> managing groups and members is gated by workspace role (`requireWorkspacePeopleRead`,
 > `requireWorkspaceManage` in `middleware/requireWorkspaceRole.ts`), not by RBAC.
 
 ```
@@ -292,16 +292,22 @@ grant is revoked, never deleted, so the rows are the access history. Opening a s
 opener its owner. The shared public user owns anonymous submissions, so any anonymous caller holding
 the id has access to those.
 
-`isSubmitterAllowed` in `services/submitterAccess.ts` holds the rules:
+The rules are pure functions in `@soba/lib` (`permissions/submitterSubmission.ts`), and the browser
+runs the same functions. A submit route on one submission reads it once with
+`findSubmitterSubmission` (the submission, the caller's active grant and its form's facts), then
+one guard decides; open reads its form once with `findLiveSubmitterForm`. File uploads, file
+reads and deletes, and document generation make the same read and decide by the same rules;
+`services/submitterAccess.ts` maps each operation to its rule:
 
-| operation                                                                 | needs                                                    |
-| ------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `open`                                                                    | `submission_create` on the form (`hasFormSubmitAccess`)  |
-| `read`: confirmation, data, schema, fill, file download                   | an active grant                                          |
-| `write`: save, submit, upload, delete a file on an in-progress submission | an active grant and `submission_create` on the form      |
-| `deleteSubmittedFile`                                                     | `submission_update` on the form                          |
-| `render`: print, preview, template list                                   | an active grant and `document_template_read` on the form |
-| `delete`: the caller's own submission                                     | a signed-in caller with an active owner grant            |
+| operation                                               | needs                                                                                     |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `open`                                                  | `submission_create` on the form (`hasFormSubmitAccess`)                                   |
+| `read`: confirmation, data, schema, fill, file download | an active grant                                                                           |
+| `write`: save, submit                                   | an active grant and `submission_create` on the form                                       |
+| `upload`: a file                                        | `write`, on an opened or draft submission                                                 |
+| `deleteFile`                                            | `write` on an opened or draft submission; once submitted, `submission_update` on the form |
+| `render`: print, preview, template list                 | an active grant and `document_template_read` on the form                                  |
+| `delete`: the caller's own submission                   | a signed-in caller with an active owner grant                                             |
 
 Owners and collaborators have the same access, except that only an owner deletes. A submitter
 deletes only an opened or draft submission; a submitted one is a 409. `@soba/lib` holds those states
@@ -311,6 +317,11 @@ grants no delete, because every anonymous caller shares it. Design routes do not
 staff read and delete submissions through form permissions. Files, print and preview have no design
 route, so staff download files through `/files` or `/submit/files`, and print and preview through
 the submit routes, all of which need a grant.
+
+A repeated write gets its recorded answer before these rules run, so a retry keeps its answer after
+the form's settings change. A save or submit whose revision id the caller already recorded on the
+submission answers where it landed, given an active grant; the same id from another actor or event
+is a 409. An open of an id the caller already owns, on the same form, answers that submission.
 
 `GET /submit/submissions/mine` lists the draft and submitted submissions the caller holds an active
 grant on, across every workspace, with the caller's role on each. Submissions on a deleted form or

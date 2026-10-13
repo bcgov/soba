@@ -143,17 +143,6 @@ export const unpublishFormVersion = asyncHandler(
   },
 );
 
-export const restoreFormVersion = asyncHandler(
-  async (req: Request<FormVersionIdParams>, res: Response) => {
-    const ctx = req.coreContext!;
-    const result = await formsApiService.restore(ctx, req.params.id);
-    if (!result) {
-      throw new NotFoundError(FORM_VERSION_NOT_FOUND);
-    }
-    res.json(result);
-  },
-);
-
 export const provisionFormVersionSchema = asyncHandler(
   async (req: Request<FormVersionIdParams, unknown, ProvisionSchemaBody>, res: Response) => {
     const ctx = req.coreContext!;

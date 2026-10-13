@@ -88,8 +88,15 @@ describe('dev data access coverage expectations', () => {
   });
 
   it.each(COVERAGE_SUBMISSION_KEYS)('%s: every listing, write or delete is by a reader', (key) => {
-    const { mine, read, write, delete: remove } = SUBMISSION_EXPECTATIONS[key];
-    expect([...mine, ...write, ...remove].filter((persona) => !read.includes(persona))).toEqual([]);
+    const { mine, read, write, render, delete: remove } = SUBMISSION_EXPECTATIONS[key];
+    expect(
+      [...mine, ...write, ...render, ...remove].filter((persona) => !read.includes(persona)),
+    ).toEqual([]);
+  });
+
+  it.each(COVERAGE_SUBMISSION_KEYS)('%s: only a writer uploads a file', (key) => {
+    const { write, upload } = SUBMISSION_EXPECTATIONS[key];
+    expect(upload.filter((persona) => !write.includes(persona))).toEqual([]);
   });
 
   it.each(COVERAGE_FORM_KEYS)('%s: the designer lists only forms the persona can read', (key) => {

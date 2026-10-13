@@ -9,12 +9,15 @@ import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFormioRenderError';
 import { useSubmissionStarter } from '@/src/features/submit-mode/data/useSubmissionStarter';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
+import { apiErrorMessage } from '@/src/shared/api/dataError';
+import type { ApiErrorCode } from '@soba/lib';
 import { v7 as uuidv7 } from 'uuid';
 
 type StartLabels = {
   starting: string;
   startError: string;
   sessionExpired: string;
+  errors: Record<ApiErrorCode, string>;
 };
 
 /**
@@ -30,14 +33,14 @@ function StartSubmissionBody({
   formId,
   labels,
 }: Readonly<{ formId: string; labels: StartLabels }>) {
-  // Token is optional: a public-audience form can be started without signing in.
-  const { token, initializing, initStarted } = useKeycloak();
+  // A public-audience form can be started without signing in.
+  const { initializing, initStarted } = useKeycloak();
   const starter = useSubmissionStarter();
   const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
 
   const [error, setError] = useState<string | null>(null);
-  // Fire the open exactly once per mount, even if token/deps settle in stages.
+  // Fire the open exactly once per mount, even if the deps settle in stages.
   const startedRef = useRef(false);
 
   useEffect(() => {
@@ -50,25 +53,35 @@ function StartSubmissionBody({
     void (async () => {
       try {
         // Mint the id client-side; a retry of this same id is idempotent server-side.
-        const outcome = await starter.open(token ?? undefined, formId, uuidv7());
-        // replace, not push: the start URL shouldn't sit in history and re-open on Back.
-        if (outcome.status === 'applied') {
-          router.replace(`/${locale}/submit/${outcome.value.id}`);
+        const outcome = await starter.open(formId, uuidv7());
+        switch (outcome.status) {
+          case 'applied':
+            // replace, not push: the start URL shouldn't sit in history and re-open on Back.
+            router.replace(`/${locale}/submit/${outcome.value.id}`);
+            break;
+          case 'held':
+          case 'queued':
+            // No submission was opened to fill.
+            setError(labels.startError);
+            break;
         }
       } catch (err) {
-        setError(normalizeFormioRenderError(err, labels.startError, labels.sessionExpired));
+        setError(
+          apiErrorMessage(err, labels.errors, labels.startError) ??
+            normalizeFormioRenderError(err, labels.startError, labels.sessionExpired),
+        );
       }
     })();
   }, [
     initStarted,
     initializing,
-    token,
     formId,
     locale,
     router,
     starter,
     labels.startError,
     labels.sessionExpired,
+    labels.errors,
   ]);
 
   if (error) {
@@ -104,6 +117,7 @@ export default function StartSubmission() {
         starting: labels.starting,
         startError: labels.startError,
         sessionExpired: dict.general.sessionExpired,
+        errors: dict.apiErrors,
       }}
     />
   );

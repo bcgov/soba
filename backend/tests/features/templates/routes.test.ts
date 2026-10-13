@@ -249,7 +249,10 @@ describe('templates routes', () => {
       .field('type', 'cdogs')
       .field('name', 'Receipt');
     expect(res.status).toBe(400);
-    expect(res.body).toEqual({ error: 'File name is longer than 255 bytes' });
+    expect(res.body).toEqual({
+      error: 'File name is longer than 255 bytes',
+      code: 'upload_invalid',
+    });
     expect(templatesService.create).not.toHaveBeenCalled();
   });
 });

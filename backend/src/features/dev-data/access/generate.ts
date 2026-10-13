@@ -1,6 +1,5 @@
 /** Builds the coverage set and returns the ids its checks look each case up by. */
 import { and, asc, eq } from 'drizzle-orm';
-import { v7 as uuidv7 } from 'uuid';
 
 import { db } from '../../../core/db/client';
 import {
@@ -47,6 +46,7 @@ import { inSequence } from '../inSequence';
 import { addMember } from '../members';
 import type { ResolvedUser } from '../resolveUser';
 import { recordIds } from '../runs';
+import { seedSubmission } from '../seedSubmission';
 import {
   ADMIN,
   ANONYMOUS,
@@ -365,19 +365,13 @@ async function createSubmission(
   const by = persona(ctx, planned.by);
   const actor = actorOf(by);
   const { workspaceId, formId } = form;
-  const submissionId = uuidv7();
-
-  await submissionService.open({ id: submissionId, workspaceId, formId, ...actor });
-  const input = {
+  const submissionId = await seedSubmission({
     workspaceId,
-    submissionId,
+    formId,
+    ...actor,
     data: getFixture(COVERAGE_FIXTURE_CODE).answers(index),
-  };
-  await inSequence(planned.events, (event) =>
-    event === 'saved'
-      ? submissionService.save({ ...input, ...actor })
-      : submissionService.submit({ ...input, ...actor }),
-  );
+    events: planned.events,
+  });
 
   const grants = planned.collaborators ?? [];
   if (grants.length > 0) {

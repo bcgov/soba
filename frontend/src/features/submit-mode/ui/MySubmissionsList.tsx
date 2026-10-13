@@ -20,7 +20,8 @@ import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { canDeleteOwnSubmission, isSubmissionInProgress } from '@/src/shared/util/permissions';
 import { fillTemplate } from '@/src/shared/util/stringUtils';
 import { useFormatLongDateTime } from '@/src/shared/hooks/useFormatLongDate';
-import { isConflict } from '@/src/shared/api/dataError';
+import { isConflict, apiErrorMessage } from '@/src/shared/api/dataError';
+import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useDataErrorNotice } from '@/src/shared/api/useDataErrorNotice';
 import { MY_SUBMISSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { useListQuery } from '@/src/shared/list/useListQuery';
@@ -45,12 +46,13 @@ const toState = (raw: string | undefined): MySubmissionState | undefined =>
 export function MySubmissionsList() {
   const dict = useDictionary();
   const dictMine = dict.mySubmissions;
-  const { authenticated, initializing, token } = useKeycloak();
+  const { authenticated, initializing } = useKeycloak();
   const { addNotification } = useNotificationStore();
   const notifyError = useDataErrorNotice();
   const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
   const formatDateTime = useFormatLongDateTime();
+  const idpCode = useCurrentUser().data?.profile.idpCode ?? null;
 
   const listQuery = useListQuery(MY_SUBMISSIONS_LIST_QUERY);
   const rawState = listQuery.filters.state;
@@ -96,27 +98,41 @@ export function MySubmissionsList() {
 
   const handleDelete = useCallback(() => {
     const item = confirmDelete;
-    if (!token || !item) return;
+    if (!item) return;
     setDeleting(true);
-    remove(token, item.id)
-      .then(() => addNotification({ text: dictMine.deleteSuccess, type: 'success' }))
-      .catch((cause: unknown) =>
-        notifyError(cause, {
-          failed: isConflict(cause) ? dictMine.deleteSubmitted : dictMine.deleteError,
-        }),
-      )
+    remove(item.id)
+      .then((outcome) => {
+        switch (outcome.status) {
+          case 'applied':
+            addNotification({ text: dictMine.deleteSuccess, type: 'success' });
+            break;
+          case 'held':
+          case 'queued':
+            // Not deleted yet; the re-read list shows the row as it stands.
+            break;
+        }
+      })
+      .catch((cause: unknown) => {
+        // The only delete the server answers with 409 is one already submitted, coded or not.
+        const message =
+          apiErrorMessage(cause, dict.apiErrors) ??
+          (isConflict(cause) ? dict.apiErrors.delete_closed : null);
+        notifyError(
+          cause,
+          message ? { failed: message, forbidden: message } : { failed: dictMine.deleteError },
+        );
+      })
       .finally(() => {
         setDeleting(false);
         setConfirmDelete(null);
       });
   }, [
-    token,
     confirmDelete,
     remove,
     addNotification,
     notifyError,
     dictMine.deleteSuccess,
-    dictMine.deleteSubmitted,
+    dict.apiErrors,
     dictMine.deleteError,
   ]);
 
@@ -206,7 +222,7 @@ export function MySubmissionsList() {
               >
                 {inProgress ? dictMine.continue : dictMine.view}
               </RowActionButton>
-              {canDeleteOwnSubmission(item) ? (
+              {canDeleteOwnSubmission(item, { idpCode }) ? (
                 <RowActionButton
                   aria-label={fillTemplate(dictMine.deleteLabel, values)}
                   data-testid={`${item.id}-delete`}
@@ -220,7 +236,7 @@ export function MySubmissionsList() {
         },
       },
     ],
-    [dictMine, formatDateTime, labelValues, openSubmission],
+    [dictMine, formatDateTime, idpCode, labelValues, openSubmission],
   );
 
   // Loading, including Keycloak init, shows inside the table so the heading stays put.

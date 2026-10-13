@@ -15,17 +15,13 @@ export const SubmissionDataBodySchema = z.object({
   data: z.record(z.string(), z.unknown()),
   // Client-minted id for the revision this write creates. A retry reuses it.
   revisionId: z.uuidv7(),
-  // The head revision the client loaded. A write whose base is no longer the head is refused.
+  // The head revision the client loaded. A write whose base is no longer the head is kept as a
+  // pending revision (200, `revision.status` pending), not applied.
   baseRevisionId: z.uuid(),
 });
 
-// Revision ids are optional on submit; send both or neither.
-export const SubmitSubmissionBodySchema = SubmissionDataBodySchema.partial({
-  revisionId: true,
-  baseRevisionId: true,
-}).refine((body) => (body.revisionId === undefined) === (body.baseRevisionId === undefined), {
-  message: 'revisionId and baseRevisionId must be sent together',
-});
+// Same body as save.
+export const SubmitSubmissionBodySchema = SubmissionDataBodySchema;
 
 export const SubmissionListItemSchema = z.object({
   id: z.string(),

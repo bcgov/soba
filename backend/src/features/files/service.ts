@@ -5,11 +5,13 @@ import {
   linkFileToSubmission,
   unlinkSubmissionFile,
 } from '../../core/db/repos/submissionFileRepo';
-import { getSubmissionWorkspaceAndState } from '../../core/db/repos/submissionRepo';
 import type { CallerIdentity } from '../../core/db/repos/formSubmitAccessRepo';
-import { isSubmitterAllowed, SubmitterOperation } from '../../core/services/submitterAccess';
+import {
+  allowsSubmitterOperation,
+  findSubmissionForCaller,
+  SubmitterOperation,
+} from '../../core/services/submitterAccess';
 import { fileStore, type StoreFileOutcome } from '../../core/services/fileStore';
-import { SubmissionWorkflowState } from '../../core/db/codes';
 import { log } from '../../core/logging';
 import type { GetFileResult } from '../../core/integrations/storage-engine/StorageEngineAdapter';
 
@@ -24,15 +26,15 @@ export interface UploadFileParams {
 }
 
 /**
- * The attachment and its submission; null when either is missing, or the submission, its form or its
- * form version is deleted.
+ * The attachment and the caller's read of its submission; null when either is missing, the
+ * submission, its form or its form version is deleted, or the file is in another workspace.
  */
-async function findAttachment(id: string) {
+async function findAttachment(id: string, caller: CallerIdentity) {
   const attachment = await getSubmissionFileByFileId(id);
   if (!attachment) return null;
-  const submission = await getSubmissionWorkspaceAndState(attachment.submissionId);
-  if (submission?.workspaceId !== attachment.file.workspaceId) return null;
-  return { record: attachment.file, submission: { ...submission, id: attachment.submissionId } };
+  const loaded = await findSubmissionForCaller(attachment.submissionId, caller);
+  if (loaded?.submission.workspaceId !== attachment.file.workspaceId) return null;
+  return { record: attachment.file, loaded };
 }
 
 export const filesService = {
@@ -68,15 +70,10 @@ export const filesService = {
     id: string,
     caller: CallerIdentity,
   ): Promise<{ record: FileRecord; file: GetFileResult } | 'notfound' | 'denied' | 'unavailable'> {
-    const attachment = await findAttachment(id);
+    const attachment = await findAttachment(id, caller);
     if (!attachment) return 'notfound';
-    const { record, submission } = attachment;
-    const target = {
-      workspaceId: record.workspaceId,
-      formId: submission.formId,
-      submissionId: submission.id,
-    };
-    if (!(await isSubmitterAllowed(SubmitterOperation.read, target, caller))) return 'denied';
+    const { record, loaded } = attachment;
+    if (!allowsSubmitterOperation(SubmitterOperation.read, loaded, caller)) return 'denied';
     const file = await fileStore.open(record);
     if (!file) {
       log.warn({ fileId: record.id, profile: record.profile }, 'File content unavailable');
@@ -94,19 +91,10 @@ export const filesService = {
     id: string,
     caller: CallerIdentity,
   ): Promise<'deleted' | 'notfound' | 'denied'> {
-    const attachment = await findAttachment(id);
+    const attachment = await findAttachment(id, caller);
     if (!attachment) return 'notfound';
-    const { record, submission } = attachment;
-    const operation =
-      submission.workflowState === SubmissionWorkflowState.submitted
-        ? SubmitterOperation.deleteSubmittedFile
-        : SubmitterOperation.write;
-    const allowed = await isSubmitterAllowed(
-      operation,
-      { workspaceId: record.workspaceId, formId: submission.formId, submissionId: submission.id },
-      caller,
-    );
-    if (!allowed) return 'denied';
+    const { record, loaded } = attachment;
+    if (!allowsSubmitterOperation(SubmitterOperation.deleteFile, loaded, caller)) return 'denied';
     await fileStore.remove(record, (tx) => unlinkSubmissionFile(tx, record.id));
     return 'deleted';
   },

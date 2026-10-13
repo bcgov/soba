@@ -3,13 +3,9 @@ jest.mock('../../../../src/core/db/repos/submitterFormRepo', () => ({
 }));
 
 import { DraftSaveStatus } from '@soba/lib';
-import {
-  getDraftSaveStatus,
-  offersDraftSave,
-} from '../../../../src/features/form-settings/submitter/drafts';
+import { getDraftSaveStatus } from '../../../../src/features/form-settings/submitter/drafts';
 import { findSubmitterFormFacts } from '../../../../src/core/db/repos/submitterFormRepo';
 import { NotFoundError } from '../../../../src/core/errors';
-import { log } from '../../../../src/core/logging';
 
 const mockFacts = jest.mocked(findSubmitterFormFacts);
 const ctx = { workspaceId: 'ws1', actorDisplayLabel: null };
@@ -42,25 +38,5 @@ describe('getDraftSaveStatus', () => {
   it('is not found for a form outside the workspace', async () => {
     mockFacts.mockResolvedValue(null);
     await expect(getDraftSaveStatus(ctx, 'f1')).rejects.toBeInstanceOf(NotFoundError);
-  });
-});
-
-describe('offersDraftSave', () => {
-  it('offers a draft save only when drafts are allowed', async () => {
-    mockFacts.mockResolvedValue(facts(true, 'protected'));
-    expect(await offersDraftSave(ctx, 'f1')).toBe(true);
-    mockFacts.mockResolvedValue(facts(true, 'public'));
-    expect(await offersDraftSave(ctx, 'f1')).toBe(false);
-  });
-
-  it('offers none, and logs, when the lookup fails', async () => {
-    mockFacts.mockRejectedValue(new Error('read failed'));
-    const error = jest.spyOn(log, 'error').mockImplementation(() => undefined);
-    expect(await offersDraftSave(ctx, 'f1')).toBe(false);
-    expect(error).toHaveBeenCalledWith(
-      expect.objectContaining({ formId: 'f1' }),
-      'Draft save status lookup failed',
-    );
-    error.mockRestore();
   });
 });

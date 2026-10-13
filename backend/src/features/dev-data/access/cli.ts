@@ -178,7 +178,15 @@ async function verify(): Promise<void> {
   });
   printGrid({
     title: 'Submissions',
-    letters: { mine: 'M', read: 'R', write: 'W', delete: 'X' },
+    letters: {
+      mine: 'M',
+      read: 'R',
+      write: 'W',
+      upload: 'U',
+      fileDelete: 'F',
+      render: 'P',
+      delete: 'X',
+    },
     caseKeys: COVERAGE_SUBMISSION_KEYS,
     caseLabels: labelsOf(COVERAGE_SUBMISSION_KEYS, (key) => manifest.submissions[key].submissionId),
     personas: report.personas,

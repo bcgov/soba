@@ -1,5 +1,9 @@
-import { SUBMISSION_IN_PROGRESS_STATES, type SortLocale, type SubmissionListSort } from '@soba/lib';
-import { v7 as uuidv7 } from 'uuid';
+import {
+  SUBMISSION_IN_PROGRESS_STATES,
+  ApiErrorCodes,
+  type SortLocale,
+  type SubmissionListSort,
+} from '@soba/lib';
 import {
   appendSubmissionRevision,
   clearSubmissionProvisioning,
@@ -24,24 +28,23 @@ import {
   RevisionReason,
   RevisionStatus,
   SubmissionEventType,
-  type RevisionReasonCode,
-  type RevisionStatusCode,
   type SubmissionWriteEventCode,
   type SubmissionWorkflowStateCode,
 } from '../db/codes';
-import { log } from '../logging';
-import { decideSubmissionWrite, type SubmissionWriteDecision } from './submissionWriteGate';
+import {
+  decideRecordedWrite,
+  decideSubmissionWrite,
+  replayedLanding,
+  type SubmissionWriteDecision,
+  type WriteLanding,
+} from './submissionWriteGate';
 import { withNewConfirmationCode } from './confirmationCode';
+import { isUniqueViolationOn } from '../db/pgError';
+import { SUBMISSION_REVISION_PKEY } from '../db/schema';
 
 export interface SubmissionWriteOutcome {
   record: SubmissionRecord;
-  /** Where this write landed: `current` applied it, `pending` held it for review. */
-  revision: {
-    id: string;
-    revisionNo: number;
-    status: RevisionStatusCode;
-    reason: RevisionReasonCode;
-  };
+  revision: WriteLanding;
 }
 
 interface CreateInput {
@@ -61,10 +64,17 @@ interface SaveInput {
   actorDisplayLabel: string | null;
   submissionId: string;
   data: Record<string, unknown>;
-  /** Client-minted id for this write; the server mints one when absent. */
-  revisionId?: string;
-  /** Head the client loaded; the current head is assumed when absent. */
-  baseRevisionId?: string;
+  /** Client-minted id for this write. */
+  revisionId: string;
+  /** Head the client loaded. */
+  baseRevisionId: string;
+}
+
+/** Where a submission's answer document lives in its form's engine. */
+export interface SubmissionContentRefs {
+  engineCode: string;
+  engineSchemaRef: string | null;
+  engineSubmissionRef: string | null;
 }
 
 interface DeleteInput {
@@ -93,22 +103,27 @@ interface ListInput {
 export class SubmissionService {
   /**
    * Open a new submission against the form's currently published version (the only submittable one),
-   * under the client-supplied id. Idempotent: a retry of the same id by the same actor+form returns
-   * the existing live record ({ created: false }); another owner or form, or a submission, form or
-   * version that is deleted, is a 409. A formVersionId that is not the published version is a 409.
+   * under the client-supplied id. Idempotent: a retry of the same id by its owner on the same form
+   * returns the existing live record ({ created: false }); another owner or form, or a submission,
+   * form or version that is deleted, is a 409. A formVersionId that is not the published version is a
+   * 409.
    */
   async open(input: CreateInput) {
     const version = await getPublishedVersionForForm(input.workspaceId, input.formId);
-    if (!version) throw new NotFoundError('Form has no published version');
+    if (!version)
+      throw new NotFoundError('Form has no published version', ApiErrorCodes.not_published);
     if (input.formVersionId && input.formVersionId !== version.id) {
-      throw new ConflictError('Form version is not the published version');
+      throw new ConflictError(
+        'Form version is not the published version',
+        ApiErrorCodes.version_not_published,
+      );
     }
 
     const result = await withNewConfirmationCode((confirmationCode) =>
       openSubmission({ ...input, formVersionId: version.id, confirmationCode }),
     );
     if (result.outcome === 'conflict') {
-      throw new ConflictError('Submission id already in use');
+      throw new ConflictError('Submission id already in use', ApiErrorCodes.submission_id_taken);
     }
     return { created: result.outcome === 'created', record: result.record };
   }
@@ -134,39 +149,37 @@ export class SubmissionService {
     eventType: SubmissionWriteEventCode,
   ): Promise<SubmissionWriteOutcome> {
     const submission = await getSubmissionRecordById(input.workspaceId, input.submissionId);
-    if (!submission) throw new NotFoundError('Submission not found');
+    if (!submission) {
+      throw new NotFoundError('Submission not found', ApiErrorCodes.submission_not_found);
+    }
 
-    const recorded = input.revisionId ? await getSubmissionRevisionById(input.revisionId) : null;
+    // The replay guard answers most repeats before access; this catches one that lands after it.
+    const recorded = decideRecordedWrite({
+      submissionId: input.submissionId,
+      eventType,
+      actorId: input.actorId,
+      revisionId: input.revisionId,
+      baseRevisionId: input.baseRevisionId,
+      recorded: await getSubmissionRevisionById(input.revisionId),
+    });
+    if (recorded.kind === 'replay') return { record: submission, revision: recorded.revision };
+
     const decision = decideSubmissionWrite({
       submission,
       eventType,
       baseRevisionId: input.baseRevisionId,
-      recorded,
     });
-    if (decision.kind === 'replay') {
-      // The gate returns replay only when a matching revision was recorded. Report the write's landing
-      // disposition, not the revision's current standing: a revision that landed as current and was
-      // later superseded still replays as `current`, never `superseded`.
-      const revision = recorded!;
-      const landedPending = revision.status === RevisionStatus.pending;
-      return {
-        record: submission,
-        revision: {
-          id: input.revisionId!,
-          revisionNo: revision.revisionNo,
-          status: landedPending ? RevisionStatus.pending : RevisionStatus.current,
-          reason: landedPending ? (revision.reason as RevisionReasonCode) : RevisionReason.accepted,
-        },
-      };
-    }
 
     // The base must be a revision of this submission. A foreign or unknown base is a malformed write,
     // rejected before any engine document is created, so it cannot orphan one or branch across
     // submissions. A base equal to the head is trivially valid.
-    if (input.baseRevisionId && input.baseRevisionId !== submission.headRevisionId) {
+    if (input.baseRevisionId !== submission.headRevisionId) {
       const base = await getSubmissionRevisionById(input.baseRevisionId);
       if (base?.submissionId !== input.submissionId) {
-        throw new ValidationError('baseRevisionId is not a revision of this submission');
+        throw new ValidationError(
+          'baseRevisionId is not a revision of this submission',
+          ApiErrorCodes.revision_base_invalid,
+        );
       }
     }
 
@@ -188,17 +201,23 @@ export class SubmissionService {
   private async resolveSubmissionEngine(submission: SubmissionRecord) {
     const version = await getFormVersionById(submission.workspaceId, submission.formVersionId);
     if (!version || !version.engineSchemaRef) {
-      throw new ValidationError('Form version is not provisioned in the engine');
+      throw new ValidationError(
+        'Form version is not provisioned in the engine',
+        ApiErrorCodes.form_not_ready,
+      );
     }
 
     const engineCode = await getFormEngineCodeForForm(submission.workspaceId, submission.formId);
     if (!engineCode) {
-      throw new ValidationError('Form has no form engine configured');
+      throw new ValidationError('Form has no form engine configured', ApiErrorCodes.form_not_ready);
     }
 
     const adapter = createFormEngineAdapter(engineCode);
     if (typeof adapter.createSubmission !== 'function') {
-      throw new ValidationError(`Form engine '${engineCode}' does not support submissions`);
+      throw new ValidationError(
+        `Form engine '${engineCode}' does not support submissions`,
+        ApiErrorCodes.form_not_ready,
+      );
     }
 
     return {
@@ -211,15 +230,8 @@ export class SubmissionService {
     input: SaveInput,
     submission: SubmissionRecord,
     eventType: SubmissionWriteEventCode,
-    decision: Exclude<SubmissionWriteDecision, { kind: 'replay' }>,
+    decision: SubmissionWriteDecision,
   ): Promise<SubmissionWriteOutcome> {
-    if (!input.revisionId) {
-      log.info(
-        { submissionId: input.submissionId, eventType },
-        'Submission write without revision ids',
-      );
-    }
-
     const { engineSchemaRef, createSubmission } = await this.resolveSubmissionEngine(submission);
     const pending = decision.kind === 'pending';
 
@@ -232,7 +244,7 @@ export class SubmissionService {
       });
     }
 
-    const revisionId = input.revisionId ?? uuidv7();
+    const { revisionId } = input;
 
     try {
       const { engineRef } = await createSubmission({
@@ -258,24 +270,42 @@ export class SubmissionService {
           ? (submission.workflowState as SubmissionWorkflowStateCode)
           : decision.workflowState,
         afterEngineSubmissionRef: engineRef,
+      }).catch((err: unknown) => {
+        // Another write committed this revision id first.
+        if (isUniqueViolationOn(err, SUBMISSION_REVISION_PKEY)) {
+          throw new ConflictError(
+            'Revision id already used by another write',
+            ApiErrorCodes.revision_id_taken,
+          );
+        }
+        throw err;
       });
 
-      if (result.outcome === 'not_found') throw new NotFoundError('Submission not found');
+      if (result.outcome === 'not_found') {
+        throw new NotFoundError('Submission not found', ApiErrorCodes.submission_not_found);
+      }
 
       return {
         record: result.record,
-        revision: {
-          id: result.revisionId,
-          revisionNo: result.revisionNo,
-          status: result.status,
-          reason: result.reason,
-        },
+        // A concurrent duplicate answers as any replay does, not with the revision's stored status.
+        revision:
+          result.outcome === 'replayed'
+            ? replayedLanding(result.revisionId, result)
+            : {
+                id: result.revisionId,
+                revisionNo: result.revisionNo,
+                status: result.status,
+                reason: result.reason,
+              },
       };
     } catch (err) {
       // A pending write never set a provisioning flag, so there is nothing to reset for it.
       if (pending) throw err;
-      // A deleted submission is not an engine failure.
-      if (err instanceof NotFoundError) {
+      // A deleted submission, or a revision id another write took, is not an engine failure.
+      if (
+        err instanceof NotFoundError ||
+        (err instanceof ConflictError && err.code === ApiErrorCodes.revision_id_taken)
+      ) {
         await clearSubmissionProvisioning(input.workspaceId, input.submissionId);
         throw err;
       }
@@ -305,7 +335,10 @@ export class SubmissionService {
       deletableStates: SUBMISSION_IN_PROGRESS_STATES,
     });
     if (result.outcome === 'not_deletable') {
-      throw new ConflictError(`Submission is ${result.workflowState} and can no longer be deleted`);
+      throw new ConflictError(
+        `Submission is ${result.workflowState} and can no longer be deleted`,
+        ApiErrorCodes.delete_closed,
+      );
     }
     return result.outcome === 'deleted' ? result.record : null;
   }
@@ -333,10 +366,19 @@ export class SubmissionService {
     const engineCode = await getFormEngineCodeForForm(input.workspaceId, submission.formId);
     if (!engineCode) return null;
 
-    const adapter = createFormEngineAdapter(engineCode);
-    if (typeof adapter.readSubmission !== 'function') return null;
+    return this.readContent({
+      engineCode,
+      engineSchemaRef: version.engineSchemaRef,
+      engineSubmissionRef: submission.engineSubmissionRef,
+    });
+  }
 
-    return adapter.readSubmission(version.engineSchemaRef, submission.engineSubmissionRef);
+  /** Reads an answer document from the engine by its refs; null when there is nothing to read. */
+  async readContent(refs: SubmissionContentRefs) {
+    if (!refs.engineSchemaRef || !refs.engineSubmissionRef) return null;
+    const adapter = createFormEngineAdapter(refs.engineCode);
+    if (typeof adapter.readSubmission !== 'function') return null;
+    return adapter.readSubmission(refs.engineSchemaRef, refs.engineSubmissionRef);
   }
 
   async list(input: ListInput) {

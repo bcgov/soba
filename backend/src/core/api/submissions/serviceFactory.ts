@@ -1,4 +1,5 @@
-import { SubmissionService, type SubmissionWriteOutcome } from '../../services/submissionService';
+import { SubmissionService, type SubmissionContentRefs } from '../../services/submissionService';
+import type { WriteLanding } from '../../services/submissionWriteGate';
 import { SubmissionWorkflowState } from '../../db/codes';
 import type { FormAccessGrant } from '../../db/repos/formAccessRepo';
 import type {
@@ -58,7 +59,7 @@ export interface ListMySubmissionsQueryInput {
 const confirmationCodeOf = (item: { workflowState: string; confirmationCode: string }) =>
   item.workflowState === SubmissionWorkflowState.submitted ? item.confirmationCode : null;
 
-const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
+export const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
   const detail = item as Partial<SubmissionDetailRow>;
   return {
     id: item.id,
@@ -79,7 +80,10 @@ const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
   };
 };
 
-const toSubmissionWriteDto = (outcome: SubmissionWriteOutcome) => ({
+export const toSubmissionWriteDto = (outcome: {
+  record: SubmissionRecord | SubmissionDetailRow;
+  revision: WriteLanding;
+}) => ({
   ...toSubmissionDto(outcome.record),
   revision: outcome.revision,
 });
@@ -121,6 +125,8 @@ export function createSubmissionsApiService(submissionService: SubmissionService
 
     getData: (ctx: SubmissionsContextInput, submissionId: string) =>
       submissionService.getContent({ workspaceId: ctx.workspaceId, submissionId }),
+
+    readContent: (refs: SubmissionContentRefs) => submissionService.readContent(refs),
 
     list: async (scope: SubmissionsListScopeInput, query: ListSubmissionsQueryInput) => {
       const result = await submissionService.list({

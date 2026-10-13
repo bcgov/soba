@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { db } from '../client';
+import { db, type DbOrTx } from '../client';
 import { submissionParticipants } from '../schema';
 import {
   SubmissionParticipantRole,
@@ -11,8 +11,9 @@ const hasActiveGrant = async (
   submissionId: string,
   userId: string,
   role?: SubmissionParticipantRoleCode,
+  executor: DbOrTx = db,
 ): Promise<boolean> => {
-  const rows = await db
+  const rows = await executor
     .select({ id: submissionParticipants.id })
     .from(submissionParticipants)
     .where(
@@ -32,5 +33,9 @@ export const isActiveParticipant = (submissionId: string, userId: string): Promi
   hasActiveGrant(submissionId, userId);
 
 /** Whether the user holds an active owner grant on the submission. */
-export const isActiveOwner = (submissionId: string, userId: string): Promise<boolean> =>
-  hasActiveGrant(submissionId, userId, SubmissionParticipantRole.owner);
+export const isActiveOwner = (
+  submissionId: string,
+  userId: string,
+  executor: DbOrTx = db,
+): Promise<boolean> =>
+  hasActiveGrant(submissionId, userId, SubmissionParticipantRole.owner, executor);

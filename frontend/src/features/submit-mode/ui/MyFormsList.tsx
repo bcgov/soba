@@ -13,7 +13,7 @@ import { ListPageSearchField } from '@/src/components/ListPageSearchField';
 import { RowActionButton } from '@/src/components/RowActionButton';
 import { Tag } from '@/src/components/Tag';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
+import { useAccessCaller } from '@/src/shared/api/useAccessCaller';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { fillTemplate } from '@/src/shared/util/stringUtils';
@@ -58,10 +58,8 @@ export function MyFormsList() {
   const notifyError = useDataErrorNotice();
   const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
-  const currentUser = useCurrentUser();
-  const idpCode = currentUser.data?.profile.idpCode ?? null;
-  // The audience rule reads the caller's provider, so rows wait for it unless it cannot be read.
-  const callerPending = !currentUser.loaded && !currentUser.hasError;
+  // The audience rule reads the caller's provider, so rows wait for it.
+  const { caller, pending: callerPending } = useAccessCaller();
 
   const listQuery = useListQuery(MY_FORMS_LIST_QUERY);
   const workspaceOptions = useMyWorkspaceOptions();
@@ -141,7 +139,7 @@ export function MyFormsList() {
         label: dictMine.columns.actions,
         align: 'start',
         render: (item) =>
-          canStartSubmission(item, { idpCode }) ? (
+          canStartSubmission(item, caller) ? (
             <RowActionButton
               aria-label={fillTemplate(dictMine.startLabel, { form: item.name })}
               data-testid={`${item.id}-start`}
@@ -157,7 +155,7 @@ export function MyFormsList() {
           ),
       },
     ],
-    [dictMine, router, locale, idpCode],
+    [dictMine, router, locale, caller],
   );
 
   // Loading, including Keycloak init, shows inside the table so the heading stays put.

@@ -43,6 +43,7 @@ describe('requireFeatureAvailable', () => {
     } as Partial<Request>);
 
     expect(err).toBeInstanceOf(NotFoundError);
+    expect(err).toMatchObject({ message: 'Not found', code: 'route_not_found' });
   });
 
   it('fails loud (not a silent 404) when mounted before workspace resolution', async () => {

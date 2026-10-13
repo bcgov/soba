@@ -95,11 +95,3 @@ export const draftSaveStatusOf = (facts: DraftSaveFacts): DraftSaveStatusCode =>
   if (facts.audienceMode === 'public') return DraftSaveStatus.public;
   return DraftSaveStatus.allowed;
 };
-
-/** Whether opening a new submission is allowed: a published version and the open permission. */
-export const canStartSubmission = (form: SubmitterFormFacts, caller: AccessCaller): boolean =>
-  form.publishedVersionId !== null && formAccessAllows(form, caller, Permissions.submission_create);
-
-/** Whether a new submission on the form could save a draft. */
-export const canSaveSubmissionDraft = (form: SubmitterFormFacts, caller: AccessCaller): boolean =>
-  canStartSubmission(form, caller) && draftSaveStatusOf(form) === DraftSaveStatus.allowed;

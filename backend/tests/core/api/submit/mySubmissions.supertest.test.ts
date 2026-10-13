@@ -77,6 +77,7 @@ describe('GET /submit/submissions/mine', () => {
     const res = await request(buildApp('anonymous')).get(MINE);
 
     expect(res.status).toBe(401);
+    expect(res.body.code).toBe('sign_in_required');
     expect(listMine).not.toHaveBeenCalled();
   });
 

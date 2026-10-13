@@ -505,23 +505,21 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
     },
   });
 
-  for (const action of ['unpublish', 'restore'] as const) {
-    registry.registerPath({
-      method: 'post',
-      path: `${FORM_VERSION_PATH}/${action}`,
-      tags: [TAG],
-      security: [{ bearerAuth: [] }],
-      request: { params: FormVersionIdParamsSchema },
-      responses: {
-        200: {
-          description: `Form version ${action} action`,
-          content: { 'application/json': { schema: FormVersionResponseSchema } },
-        },
-        400: { description: 'Invalid state transition' },
-        404: { description: FORM_VERSION_NOT_FOUND },
+  registry.registerPath({
+    method: 'post',
+    path: `${FORM_VERSION_PATH}/unpublish`,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: { params: FormVersionIdParamsSchema },
+    responses: {
+      200: {
+        description: 'Form version unpublish action',
+        content: { 'application/json': { schema: FormVersionResponseSchema } },
       },
-    });
-  }
+      400: { description: 'Invalid state transition' },
+      404: { description: FORM_VERSION_NOT_FOUND },
+    },
+  });
 
   registry.registerPath({
     method: 'get',

@@ -9,7 +9,7 @@ import {
   type FormListItem,
   type FormVersionListItem,
   type ListMyFormsResponse,
-  type MyFormListItem,
+  type SubmitterForm,
   type MyFormListSort,
   type SortLocale,
 } from '@soba/lib';
@@ -128,7 +128,8 @@ const toFormListItemDto = (item: {
   updatedBy: item.updatedBy,
 });
 
-const toMyFormListItemDto = (item: SubmitterFormListRow): MyFormListItem => ({
+/** A form as a submitter sees it: a My Forms row, and the fill bundle's form. */
+export const toSubmitterFormDto = (item: SubmitterFormListRow): SubmitterForm => ({
   id: item.id,
   name: item.name,
   workspaceId: item.workspaceId,
@@ -285,7 +286,7 @@ export function createFormsApiService(
         locale: query.locale,
       });
       return {
-        items: result.items.map((item) => toMyFormListItemDto(item)),
+        items: result.items.map((item) => toSubmitterFormDto(item)),
         page: { offset: query.offset, limit: query.limit, total: result.total },
         filters: { workspaceId: query.workspaceId, q: query.q },
         sort: query.sort,
@@ -382,16 +383,6 @@ export function createFormsApiService(
 
     unpublish: async (ctx: FormsContextInput, formVersionId: string) => {
       const row = await formVersionService.unpublish({
-        workspaceId: ctx.workspaceId,
-        actorId: ctx.actorId,
-        actorDisplayLabel: ctx.actorDisplayLabel,
-        formVersionId,
-      });
-      return row ? toFormVersionDto(row) : null;
-    },
-
-    restore: async (ctx: FormsContextInput, formVersionId: string) => {
-      const row = await formVersionService.restore({
         workspaceId: ctx.workspaceId,
         actorId: ctx.actorId,
         actorDisplayLabel: ctx.actorDisplayLabel,

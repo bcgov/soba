@@ -31,6 +31,7 @@ import {
 } from '../codes';
 import { listAllowsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
 import { liveSubmission } from './liveRows';
+import { isActiveOwner } from './submissionParticipantRepo';
 
 export type SubmissionRecord = typeof submissions.$inferSelect;
 
@@ -189,9 +190,9 @@ export const findLiveSubmissionRecord = async (
  *
  * Idempotent on the id. `ON CONFLICT DO NOTHING` is the atomic gate: the row is only written when the
  * id is free, so concurrent double-opens are race-safe: the loser inserts nothing, falls through to
- * the select, and sees the winner's committed row. A taken id is a retry (same actor and form, on a
- * live submission: return it) or a collision (another owner or form, or a submission, form or version
- * that is deleted: the caller answers 409, not 500).
+ * the select, and sees the winner's committed row. A taken id is a retry (the caller's own live
+ * submission on the same form: return it) or a collision (another owner or form, or a submission,
+ * form or version that is deleted: the caller answers 409, not 500).
  */
 export const openSubmission = async (
   input: CreateSubmissionInput,
@@ -249,11 +250,14 @@ export const openSubmission = async (
       return { outcome: 'created', record };
     }
 
-    // Only a live submission is a valid idempotent retry; any other row on the id is a collision
-    // (409), not a resume, since save, submit and fill all 404 on it.
+    // Only a live submission the caller owns, on the same form, is a valid idempotent retry; any other
+    // row on the id is a collision (409), not a resume, since save, submit and fill all 404 on it.
     const existing = await findLiveSubmissionRecord(input.id, tx);
 
-    if (existing?.submittedBy === input.actorId && existing?.formId === input.formId) {
+    if (
+      existing?.formId === input.formId &&
+      (await isActiveOwner(existing.id, input.actorId, tx))
+    ) {
       return { outcome: 'existing', record: existing };
     }
     return { outcome: 'conflict' };
@@ -266,6 +270,7 @@ export const getSubmissionRevisionById = async (
 ): Promise<{
   submissionId: string;
   eventType: string;
+  changedBy: string | null;
   revisionNo: number;
   status: string;
   reason: string;
@@ -274,6 +279,7 @@ export const getSubmissionRevisionById = async (
     .select({
       submissionId: submissionRevisions.submissionId,
       eventType: submissionRevisions.eventType,
+      changedBy: submissionRevisions.changedBy,
       revisionNo: submissionRevisions.revisionNo,
       status: submissionRevisions.status,
       reason: submissionRevisions.reason,
@@ -364,8 +370,8 @@ export const getSubmissionListContext = async (
 };
 
 /**
- * Resolve a submission's workspace, form and workflow state by id alone (for the write gates).
- * Returns null when the submission is missing, or it, its form or its form version is deleted.
+ * Resolve a submission's workspace, form and workflow state by id alone. Returns null when the
+ * submission is missing, or it, its form or its form version is deleted.
  */
 export const getSubmissionWorkspaceAndState = async (
   submissionId: string,
@@ -723,7 +729,8 @@ const demoteHead = async (
  * the current chain and the submission row is left entirely untouched (head, current revision no,
  * workflow state, engine ref and sync status all unchanged), so a side-branch write never disturbs the
  * live version. The new engine document stays referenced by the pending revision, so no document is
- * orphaned. A revision id already on the submission is answered as replayed.
+ * orphaned. The caller's own write of the same event, already recorded under the revision id, is
+ * answered as replayed; another write under the id fails on the revision's primary key.
  */
 export const appendSubmissionRevision = async (
   input: SaveSubmissionInput,
@@ -745,6 +752,7 @@ export const appendSubmissionRevision = async (
           eq(submissionRevisions.id, input.revisionId),
           eq(submissionRevisions.submissionId, input.submissionId),
           eq(submissionRevisions.eventType, input.eventType),
+          eq(submissionRevisions.changedBy, input.actorId),
         ),
       )
       .limit(1);

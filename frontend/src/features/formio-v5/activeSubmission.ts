@@ -1,10 +1,13 @@
 /**
- * Per-tab persistence of the submission id currently being filled, so the CHEFS storage provider can
+ * Per-tab persistence of the submission currently being filled, so the CHEFS storage provider can
  * tag uploads with it (the backend derives the workspace from that submission and authorizes against
- * it). Backed by sessionStorage — survives a refresh, is independent per tab, and clears on tab close.
- * The fill page sets it on mount and clears it on unmount; the provider reads it per upload.
+ * it) and send them as the fill session is: signed in, or anonymous. Backed by sessionStorage:
+ * survives a refresh, is independent per tab, and clears on tab close. The fill form sets it on mount
+ * and clears it on unmount; the provider reads it per upload.
  */
-const STORAGE_KEY = 'soba.submissionId';
+const STORAGE_KEY = 'soba.activeSubmission';
+
+export type ActiveSubmission = { submissionId: string; signedIn: boolean };
 
 function getStorage(): Storage | null {
   if (!('window' in globalThis)) return null;
@@ -16,27 +19,34 @@ function getStorage(): Storage | null {
   }
 }
 
-export function getActiveSubmissionId(): string | null {
+const isActiveSubmission = (value: unknown): value is ActiveSubmission =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as ActiveSubmission).submissionId === 'string' &&
+  typeof (value as ActiveSubmission).signedIn === 'boolean';
+
+export function getActiveSubmission(): ActiveSubmission | null {
   const storage = getStorage();
   if (!storage) return null;
   try {
-    return storage.getItem(STORAGE_KEY);
+    const value: unknown = JSON.parse(storage.getItem(STORAGE_KEY) ?? 'null');
+    return isActiveSubmission(value) ? value : null;
   } catch {
     return null;
   }
 }
 
-export function setActiveSubmissionId(submissionId: string): void {
+export function setActiveSubmission(active: ActiveSubmission): void {
   const storage = getStorage();
   if (!storage) return;
   try {
-    storage.setItem(STORAGE_KEY, submissionId);
+    storage.setItem(STORAGE_KEY, JSON.stringify(active));
   } catch {
     // Ignore write failures.
   }
 }
 
-export function clearActiveSubmissionId(): void {
+export function clearActiveSubmission(): void {
   const storage = getStorage();
   if (!storage) return;
   try {

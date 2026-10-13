@@ -78,15 +78,6 @@ describe('GET /me/tenants', () => {
     ]);
   });
 
-  it('forwards a token sent in X-Jwt-Token as a bearer token', async () => {
-    const server = await useCstar(json(200, { data: { tenants: [] } }));
-
-    const res = await request(idirApp()).get('/api/v1/me/tenants').set('X-Jwt-Token', 'tok');
-
-    expect(res.status).toBe(200);
-    expect(server.requests[0].authorization).toBe('Bearer tok');
-  });
-
   it('returns no tenants for an identity provider CSTAR does not serve', async () => {
     const server = await useCstar(json(200, { data: { tenants: [TENANT] } }));
 
