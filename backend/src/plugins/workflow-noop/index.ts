@@ -6,9 +6,8 @@ const CODE = 'workflow-noop';
 
 /** No-op workflow engine: starts nothing and knows no instances, no external call. */
 function createNoopWorkflowEngineAdapter(config: PluginConfigReader): WorkflowEngineAdapter {
-  config = null; // unused, but required by the interface
   return {
-    readinessCheck: () => Promise.resolve({ ok: true }),
+    readinessCheck: () => Promise.resolve({ ok: !!config }),
     getWorkflows: () => Promise.resolve({ workflows: [] }),
     getWorkflow: (workflowId: string) => Promise.resolve({ id: workflowId }),
     startWorkflow: () => Promise.resolve(false),

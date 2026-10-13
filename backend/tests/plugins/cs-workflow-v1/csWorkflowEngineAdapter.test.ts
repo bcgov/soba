@@ -55,18 +55,23 @@ describe('cs-workflow-v1 plugin', () => {
 
     await expect(adapter.readinessCheck()).resolves.toEqual({ ok: true });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith('http://localhost/api/v1/workflows', expect.objectContaining({
-      method: 'GET',
-      headers: {
-        'X-N8N-API-KEY': 'test-key',
-      }
-    }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost/api/v1/workflows',
+      expect.objectContaining({
+        method: 'GET',
+        headers: {
+          'X-N8N-API-KEY': 'test-key',
+        },
+      }),
+    );
   });
 
   it('readinessCheck is not ok when the base URL reaches the frontend', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
-      json: async () => { throw new Error('Not JSON'); },
+      json: async () => {
+        throw new Error('Not JSON');
+      },
     });
 
     const adapter = new CsWorkflowEngineAdapter(
@@ -102,9 +107,12 @@ describe('cs-workflow-v1 plugin', () => {
 
     await expect(adapter.getWorkflows()).resolves.toEqual({ workflows: [] });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith('http://localhost/api/v1/workflows', expect.objectContaining({
-      method: 'GET',
-    }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost/api/v1/workflows',
+      expect.objectContaining({
+        method: 'GET',
+      }),
+    );
   });
 
   it('workflow is ok when n8n answers with its JSON body', async () => {
@@ -119,9 +127,11 @@ describe('cs-workflow-v1 plugin', () => {
 
     await expect(adapter.getWorkflow('123')).resolves.toEqual({ id: 123 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith('http://localhost/api/v1/workflow/123', expect.objectContaining({
-      method: 'GET',
-    }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost/api/v1/workflow/123',
+      expect.objectContaining({
+        method: 'GET',
+      }),
+    );
   });
 });
-

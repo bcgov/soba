@@ -1,4 +1,4 @@
-import { safeParse, z } from 'zod';
+import { z } from 'zod';
 import type { PluginConfigReader } from '../../core/config/pluginConfig';
 import type {
   WorkflowEngineAdapter,
@@ -64,7 +64,7 @@ export class CsWorkflowEngineAdapter implements WorkflowEngineAdapter {
     if (!safeParseResult.data) {
       throw new Error(JSON.stringify(safeParseResult));
     }
-    return { id: safeParseResult.data.data.id };
+    return { id: safeParseResult.data.data.id as string };
   }
 
   async startWorkflow(id: string, payload: object): Promise<boolean> {

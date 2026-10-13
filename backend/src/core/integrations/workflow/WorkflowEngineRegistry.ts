@@ -53,20 +53,25 @@ export const checkWorkflowEngineReadiness = async (): Promise<
   Record<string, WorkflowEngineReadinessResult>
 > => {
   const catalog = getWorkflowEnginePluginCatalog();
-  const results: Record<string, WorkflowEngineReadinessResult> = {};
-  for (const entry of catalog) {
+  const checks = catalog.map(async (entry): Promise<[string, WorkflowEngineReadinessResult]> => {
     try {
       const adapter = createWorkflowEngineAdapter(entry.code);
-      results[entry.code] =
+      const result =
         typeof adapter.readinessCheck === 'function'
           ? await adapter.readinessCheck()
           : { ok: true };
+      return [entry.code, result];
     } catch (err) {
-      results[entry.code] = {
-        ok: false,
-        message: err instanceof Error ? err.message : String(err),
-      };
+      return [
+        entry.code,
+        {
+          ok: false,
+          message: err instanceof Error ? err.message : String(err),
+        },
+      ];
     }
-  }
-  return results;
+  });
+
+  const entries = await Promise.all(checks);
+  return Object.fromEntries(entries);
 };
