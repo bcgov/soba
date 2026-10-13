@@ -314,8 +314,9 @@ reads and deletes, and document generation make the same read and decide by the 
 
 Owners and collaborators have the same access, except that only an owner deletes. A submitter
 deletes only an opened or draft submission; a submitted one is a 409. `@soba/lib` holds those states
-and the rules over a My Submissions row (`isSubmissionInProgress`, `canDeleteOwnSubmission`), so the
-list's Continue and Delete give the server's answer. The public user's ownership
+and the rules the routes decide with; My Submissions applies them to each row and the form facts
+read with it (`canContinueSubmission`, `canDeleteOwnSubmission`), so a row offers Continue only when
+the caller can still write it and Delete only when they can delete it. The public user's ownership
 grants no delete, because every anonymous caller shares it. Design routes do not use these rules;
 staff read and delete submissions through form permissions. Files, print and preview have no design
 route, so staff download files through `/files` or `/submit/files`, and print and preview through

@@ -19,6 +19,7 @@ export type {
   MyFormListItem,
   SubmitFillBundle,
   SubmissionDataDocument,
+  SubmitterForm,
 } from '@soba/lib';
 
 export type {
