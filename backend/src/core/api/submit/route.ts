@@ -120,8 +120,8 @@ router.get(
   getSubmitSubmissionSchema,
 );
 
-// The one bundle the fill page needs: workflow state + schema + any saved answers (resume) + whether
-// the caller may write and save a draft.
+// The one bundle the fill page needs: workflow state, schema and any saved answers (resume), with the
+// caller's role and the form's facts, from which the page decides writing and draft saves.
 router.get(
   '/submissions/:id/fill',
   submissionParams,

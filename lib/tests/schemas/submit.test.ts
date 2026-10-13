@@ -20,8 +20,6 @@ const bundle = {
   },
   schema: { components: [] },
   content: null,
-  canWrite: true,
-  canSaveDraft: true,
 };
 
 /** A copy of the object without the key. */

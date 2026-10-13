@@ -96,14 +96,6 @@ export const MySubmissionRoleSchema =
 export const SubmitFillBundleSchema = LibSubmitFillBundleSchema.extend({
   role: MySubmissionRoleSchema,
   form: SubmitterFormSchema,
-  canWrite: z.boolean().openapi({
-    deprecated: true,
-    description: 'Whether the caller may edit and submit; role, workflowState and form give it.',
-  }),
-  canSaveDraft: z.boolean().openapi({
-    deprecated: true,
-    description: 'Whether the caller may save a draft; role, workflowState and form give it.',
-  }),
 }).openapi('Submit_FillBundle');
 
 export const MySubmissionListItemSchema = LibMySubmissionListItemSchema.extend({
@@ -167,7 +159,7 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
     responses: {
       200: {
         description:
-          'Workflow state + schema + saved answers + write and draft access for the fill page (resume)',
+          "Workflow state, schema and saved answers for the fill page (resume), with the caller's role and the form's facts",
         content: { 'application/json': { schema: SubmitFillBundleSchema } },
       },
       401: { description: SUBMISSION_AUTH_REQUIRED },

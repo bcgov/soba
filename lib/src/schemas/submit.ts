@@ -22,9 +22,5 @@ export const SubmitFillBundleSchema = z.object({
   form: SubmitterFormSchema,
   schema: z.record(z.string(), z.unknown()),
   content: SubmissionDataDocumentSchema.nullable(),
-  // Deprecated: canWriteSubmission over role, workflowState and form gives the same answer.
-  canWrite: z.boolean(),
-  // Deprecated: canSaveDraftOnSubmission over role, workflowState and form gives the same answer.
-  canSaveDraft: z.boolean(),
 });
 export type SubmitFillBundle = z.infer<typeof SubmitFillBundleSchema>;

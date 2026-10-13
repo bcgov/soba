@@ -121,8 +121,6 @@ describe('submit routes over one read', () => {
       },
       schema: { components: [] },
       content: { data: { a: 1 } },
-      canWrite: true,
-      canSaveDraft: true,
     });
     expect(mockSchema).toHaveBeenCalledWith({
       engineCode: 'formio-v5',
@@ -139,17 +137,18 @@ describe('submit routes over one read', () => {
     mockRead.mockResolvedValue(storedSubmission({ role: 'collaborator' }));
     const res = await signedIn().get(`${BASE}/s1/fill`);
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ role: 'collaborator', canWrite: true });
+    expect(res.body.role).toBe('collaborator');
   });
 
-  it.each([
-    ['without the submit permission', { form: { permissions: [] } }, false, false],
-    ['with drafts off', { form: { allowSubmitterDrafts: false } }, true, false],
-  ])('serves the fill bundle %s', async (_label, overrides, canWrite, canSaveDraft) => {
-    mockRead.mockResolvedValue(storedSubmission(overrides));
+  it('serves the form facts the page decides from, whatever they allow', async () => {
+    mockRead.mockResolvedValue(
+      storedSubmission({ form: { permissions: [], allowSubmitterDrafts: false } }),
+    );
     const res = await signedIn().get(`${BASE}/s1/fill`);
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ canWrite, canSaveDraft });
+    expect(res.body.form).toMatchObject({ permissions: [], allowSubmitterDrafts: false });
+    expect(res.body).not.toHaveProperty('canWrite');
+    expect(res.body).not.toHaveProperty('canSaveDraft');
   });
 
   it('answers the submission from the read, its code hidden until submitted', async () => {

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
-import { SWRConfig } from 'swr';
+import { SWRConfig, useSWRConfig } from 'swr';
 
 const h = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -23,7 +23,12 @@ const h = vi.hoisted(() => ({
   onSubmit: undefined as
     | undefined
     | ((submission: { data: Record<string, unknown> }) => Promise<void>),
-  options: undefined as undefined | { readOnly?: boolean },
+  options: undefined as undefined | { readOnly?: boolean; bcgovFile?: unknown },
+  submission: undefined as unknown,
+  mounts: 0,
+  access: { caller: { idpCode: 'idir' as string | null }, pending: false },
+  files: { option: {} as Record<string, unknown>, ready: true },
+  swrMutate: undefined as undefined | ((key: unknown, data: unknown, opts: unknown) => unknown),
 }));
 
 vi.mock('@/app/[lang]/Providers', () => ({
@@ -72,7 +77,11 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
 }));
 
 vi.mock('@/src/features/formio-v5/useBcgovFileOption', () => ({
-  useBcgovFileOption: () => ({}),
+  useBcgovFileOption: () => h.files,
+}));
+
+vi.mock('@/src/shared/api/useAccessCaller', () => ({
+  useAccessCaller: () => h.access,
 }));
 
 vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => {
@@ -80,11 +89,16 @@ vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => {
   function MockDynamicForm(props: {
     onSubmit: typeof h.onSubmit;
     options: typeof h.options;
+    submission: unknown;
     onFormReady?: (instance: unknown) => void;
   }) {
     h.onSubmit = props.onSubmit;
     h.options = props.options;
+    h.submission = props.submission;
     const { onFormReady } = props;
+    React.useEffect(() => {
+      h.mounts += 1;
+    }, []);
     React.useEffect(() => {
       onFormReady?.(h.instance);
     }, [onFormReady]);
@@ -96,17 +110,41 @@ vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => {
 import makeStore from '@/lib/store';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 import FormioV5SubmissionFillClient from '@/src/features/formio-v5/ui/FormioV5SubmissionFillClient';
+import {
+  SubmissionFillForm,
+  type FillLabels,
+  type FillView,
+} from '@/src/features/formio-v5/ui/SubmissionFillForm';
 import { answerInit, renderInStore } from './keycloakInit';
 
 let store: ReturnType<typeof makeStore>;
 
 const notices = () => store.getState().notification.notifications.map((n) => n.text);
 
+// The caller's role and the form's facts; with an IDIR caller these allow writing and draft saves.
+const facts = {
+  role: 'owner',
+  form: {
+    id: 'form-1',
+    name: 'Permit application',
+    workspaceId: 'ws-1',
+    workspaceName: 'Roads',
+    publishedVersionId: 'ver-1',
+    permissions: ['submission_create'],
+    audienceMode: 'members',
+    audienceIdps: [],
+    allowSubmitterDrafts: true,
+  },
+};
+
 describe('FormioV5SubmissionFillClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     store = makeStore();
     h.formData = {};
+    h.mounts = 0;
+    h.access = { caller: { idpCode: 'idir' }, pending: false };
+    h.files = { option: {}, ready: true };
     h.instance.setSubmission.mockResolvedValue(undefined);
     h.getSubmitFillBundle.mockResolvedValue({
       workflowState: 'opened',
@@ -114,20 +152,20 @@ describe('FormioV5SubmissionFillClient', () => {
       headRevisionId: 'rev-0',
       schema: { components: [] },
       content: null,
-      canWrite: true,
+      ...facts,
     });
   });
 
   // Before Keycloak answers, "no token" is the default rather than an answer. Reading there sends a
   // signed-in visitor's request anonymously.
   it('reads nothing until Keycloak has answered', async () => {
-    await renderInStore(store, <FormioV5SubmissionFillClient />);
+    await renderInStore(store, <FormioV5SubmissionFillClient submissionId="sub-1" />);
     expect(h.getSubmitFillBundle).not.toHaveBeenCalled();
     expect(screen.getByRole('progressbar', { name: 'Loading...' })).toBeInTheDocument();
   });
 
   it('reads once without a token when there is no session', async () => {
-    await renderInStore(store, <FormioV5SubmissionFillClient />);
+    await renderInStore(store, <FormioV5SubmissionFillClient submissionId="sub-1" />);
     await answerInit(store, { authenticated: false });
     await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
     expect(h.getSubmitFillBundle).toHaveBeenCalledTimes(1);
@@ -135,7 +173,7 @@ describe('FormioV5SubmissionFillClient', () => {
   });
 
   it('reads once with the token when signed in', async () => {
-    await renderInStore(store, <FormioV5SubmissionFillClient />);
+    await renderInStore(store, <FormioV5SubmissionFillClient submissionId="sub-1" />);
     await answerInit(store, { authenticated: true, token: 'token' });
     await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
     expect(h.getSubmitFillBundle).toHaveBeenCalledTimes(1);
@@ -143,7 +181,7 @@ describe('FormioV5SubmissionFillClient', () => {
   });
 
   const renderSignedOut = async () => {
-    await renderInStore(store, <FormioV5SubmissionFillClient />);
+    await renderInStore(store, <FormioV5SubmissionFillClient submissionId="sub-1" />);
     await answerInit(store, { authenticated: false });
   };
 
@@ -161,7 +199,8 @@ describe('FormioV5SubmissionFillClient', () => {
       headRevisionId: 'rev-1',
       schema: { components: [] },
       content: null,
-      canWrite: false,
+      ...facts,
+      form: { ...facts.form, permissions: [] },
     });
     await renderSignedOut();
     await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
@@ -171,19 +210,129 @@ describe('FormioV5SubmissionFillClient', () => {
     );
   });
 
-  // An older backend sends no canWrite at all.
-  it('renders an editable form when the bundle does not say whether the caller may write', async () => {
+  it('waits for the caller before mounting the form', async () => {
+    h.access = { caller: { idpCode: null }, pending: true };
+    await renderSignedOut();
+    await waitFor(() => expect(h.getSubmitFillBundle).toHaveBeenCalled());
+    expect(screen.getByRole('progressbar', { name: 'Loading...' })).toBeInTheDocument();
+    expect(screen.queryByTestId('fill-form')).not.toBeInTheDocument();
+  });
+
+  it('waits for the file limits before mounting the form', async () => {
+    h.files = { option: {}, ready: false };
+    await renderSignedOut();
+    await waitFor(() => expect(h.getSubmitFillBundle).toHaveBeenCalled());
+    expect(screen.queryByTestId('fill-form')).not.toBeInTheDocument();
+  });
+
+  it('gives Form.io the file limits', async () => {
+    const bcgovFile = { blockedExtensions: ['.exe'], fileMaxSize: '25MB' };
+    h.files = { option: { bcgovFile }, ready: true };
+    await renderSignedOut();
+    await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+    expect(h.options?.bcgovFile).toEqual(bcgovFile);
+  });
+
+  // The public caller's roles never count, and a members audience admits no one outside it.
+  it('lets a public caller on a members form only view, with no draft save', async () => {
+    h.access = { caller: { idpCode: 'public' }, pending: false };
+    await renderSignedOut();
+    await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+    expect(h.options?.readOnly).toBe(true);
+    expect(screen.queryByTestId('submission-fill-actions')).not.toBeInTheDocument();
+  });
+
+  /** Renders under one SWR cache, so a re-render reads the same bundle; exposes SWR's mutate. */
+  const renderLive = async () => {
+    const cache = new Map();
+    function CaptureMutate() {
+      h.swrMutate = useSWRConfig().mutate as typeof h.swrMutate;
+      return null;
+    }
+    const tree = () => (
+      <Provider store={store}>
+        <SWRConfig
+          value={{ provider: () => cache, dedupingInterval: 0, shouldRetryOnError: false }}
+        >
+          <CaptureMutate />
+          <FormioV5SubmissionFillClient submissionId="sub-1" />
+        </SWRConfig>
+      </Provider>
+    );
+    let view: ReturnType<typeof render> | undefined;
+    await act(async () => {
+      view = render(tree());
+    });
+    await answerInit(store, { authenticated: false });
+    return { rerender: () => act(async () => view!.rerender(tree())) };
+  };
+
+  it('leaves a submitted record for its view without mounting the form', async () => {
+    h.getSubmitFillBundle.mockResolvedValue({
+      workflowState: 'submitted',
+      formVersionId: 'ver-1',
+      headRevisionId: 'rev-3',
+      schema: { components: [] },
+      content: null,
+      ...facts,
+    });
+    await renderSignedOut();
+    await waitFor(() => expect(h.replace).toHaveBeenCalledWith('/en/submission/sub-1'));
+    expect(screen.queryByTestId('fill-form')).not.toBeInTheDocument();
+  });
+
+  it('does not remount the form when the bundle refreshes in the background', async () => {
+    await renderLive();
+    await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+    await act(async () => {
+      await h.swrMutate!(
+        ['submit-fill', 'sub-1', 'anonymous'],
+        {
+          workflowState: 'draft',
+          formVersionId: 'ver-1',
+          headRevisionId: 'rev-7',
+          schema: { components: [] },
+          content: { data: { a: 9 } },
+          ...facts,
+        },
+        { revalidate: false },
+      );
+    });
+    expect(h.mounts).toBe(1);
+    expect(h.instance.setSubmission).toHaveBeenCalledTimes(1);
+  });
+
+  it('mounts the form once the caller is known, with its decision', async () => {
+    h.access = { caller: { idpCode: null }, pending: true };
+    const live = await renderLive();
+    await waitFor(() => expect(h.getSubmitFillBundle).toHaveBeenCalled());
+    expect(screen.queryByTestId('fill-form')).not.toBeInTheDocument();
+    h.access = { caller: { idpCode: 'public' }, pending: false };
+    await live.rerender();
+    await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+    expect(h.options?.readOnly).toBe(true);
+  });
+
+  // An audience-only form: no role, an IDIR audience.
+  it('mounts a writable form when the caller provider arrives after a failed /me', async () => {
     h.getSubmitFillBundle.mockResolvedValue({
       workflowState: 'draft',
       formVersionId: 'ver-1',
       headRevisionId: 'rev-1',
       schema: { components: [] },
       content: null,
+      ...facts,
+      form: { ...facts.form, permissions: [], audienceMode: 'protected', audienceIdps: ['idir'] },
     });
-    await renderSignedOut();
+    h.access = { caller: { idpCode: null }, pending: false };
+    const live = await renderLive();
     await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+    expect(h.options?.readOnly).toBe(true);
+    h.access = { caller: { idpCode: 'idir' }, pending: false };
+    await live.rerender();
+    await waitFor(() => expect(h.mounts).toBe(2));
     expect(h.options?.readOnly).toBe(false);
-    expect(screen.queryByTestId('submission-fill-readonly')).not.toBeInTheDocument();
+    expect(screen.getByTestId('submission-fill-save-draft')).toBeInTheDocument();
   });
 
   it('shows the translated no-access message when the read is refused', async () => {
@@ -220,7 +369,7 @@ describe('FormioV5SubmissionFillClient', () => {
 
   describe('submit', () => {
     const renderReady = async () => {
-      await renderInStore(store, <FormioV5SubmissionFillClient />);
+      await renderInStore(store, <FormioV5SubmissionFillClient submissionId="sub-1" />);
       await answerInit(store, { authenticated: false });
       await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
     };
@@ -252,7 +401,7 @@ describe('FormioV5SubmissionFillClient', () => {
         headRevisionId: null,
         schema: { components: [] },
         content: null,
-        canWrite: true,
+        ...facts,
       });
       await renderReady();
       await submit({ a: 1 });
@@ -324,7 +473,7 @@ describe('FormioV5SubmissionFillClient', () => {
         headRevisionId: 'rev-9',
         schema: { components: [] },
         content: null,
-        canWrite: true,
+        ...facts,
       });
       await userEvent.click(screen.getByTestId('submission-fill-write-mine'));
       await waitFor(() => expect(h.instance.submit).toHaveBeenCalled());
@@ -351,12 +500,11 @@ describe('FormioV5SubmissionFillClient', () => {
       headRevisionId: 'rev-0',
       schema: { components: [] },
       content: null,
-      canWrite: true,
-      canSaveDraft: true,
+      ...facts,
       ...overrides,
     });
     const renderReady = async () => {
-      await renderInStore(store, <FormioV5SubmissionFillClient />);
+      await renderInStore(store, <FormioV5SubmissionFillClient submissionId="sub-1" />);
       await answerInit(store, { authenticated: false });
       await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
     };
@@ -380,11 +528,10 @@ describe('FormioV5SubmissionFillClient', () => {
       h.getSubmitFillBundle.mockResolvedValue(bundle());
     });
 
-    it.each([
-      ['off', { canSaveDraft: false }],
-      ['not reported', { canSaveDraft: undefined }],
-    ])('shows no save action when drafts are %s', async (_label, overrides) => {
-      h.getSubmitFillBundle.mockResolvedValue(bundle(overrides));
+    it('shows no save action when the form does not accept drafts', async () => {
+      h.getSubmitFillBundle.mockResolvedValue(
+        bundle({ form: { ...facts.form, allowSubmitterDrafts: false } }),
+      );
       await renderReady();
       expect(screen.queryByTestId('submission-fill-actions')).not.toBeInTheDocument();
     });
@@ -575,9 +722,13 @@ describe('FormioV5SubmissionFillClient', () => {
       await renderLoaded();
       await saveDraft();
       await waitFor(() => expect(screen.getByTestId('submission-fill-held')).toBeInTheDocument());
-      h.getSubmitFillBundle.mockResolvedValue(bundle({ headRevisionId: 'rev-9' }));
+      h.getSubmitFillBundle.mockResolvedValue(
+        bundle({ headRevisionId: 'rev-9', content: { data: { b: 2 } } }),
+      );
       await userEvent.click(screen.getByTestId('submission-fill-reload-latest'));
       await waitFor(() => expect(h.getSubmitFillBundle).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(h.mounts).toBe(2));
+      expect(h.instance.setSubmission).toHaveBeenLastCalledWith({ data: { b: 2 } });
       expect(screen.queryByTestId('submission-fill-held')).not.toBeInTheDocument();
       h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-10'));
       await saveDraft();
@@ -641,7 +792,7 @@ describe('FormioV5SubmissionFillClient', () => {
     const tree = (show: boolean) => (
       <Provider store={store}>
         <SWRConfig value={{ provider: () => cache, dedupingInterval: 0 }}>
-          {show ? <FormioV5SubmissionFillClient /> : null}
+          {show ? <FormioV5SubmissionFillClient submissionId="sub-1" /> : null}
         </SWRConfig>
       </Provider>
     );
@@ -654,5 +805,57 @@ describe('FormioV5SubmissionFillClient', () => {
     await act(async () => view!.rerender(tree(false)));
     await act(async () => view!.rerender(tree(true)));
     await waitFor(() => expect(h.getSubmitFillBundle).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe('SubmissionFillForm', () => {
+  const view = (data: Record<string, unknown>): FillView => ({
+    snapshot: {
+      formId: 'form-1',
+      workflowState: 'draft',
+      formVersionId: 'ver-1',
+      headRevisionId: 'rev-1',
+      currentRevisionNo: 1,
+      schema: { components: [] },
+      content: { data },
+      ...facts,
+    } as FillView['snapshot'],
+    canWrite: true,
+    canSaveDraft: false,
+    fileOption: {},
+  });
+  const tree = (current: FillView) => (
+    <Provider store={store}>
+      <SWRConfig value={{ provider: () => new Map() }}>
+        <SubmissionFillForm
+          submissionId="sub-1"
+          submissionPath="/en/submission/sub-1"
+          view={current}
+          labels={{ errors: {} } as unknown as FillLabels}
+          onReload={async () => undefined}
+        />
+      </SWRConfig>
+    </Provider>
+  );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store = makeStore();
+    h.mounts = 0;
+    h.instance.setSubmission.mockResolvedValue(undefined);
+  });
+
+  it('keeps Form.io on the bundle it mounted with when given a new one', async () => {
+    const view1 = view({ a: 1 });
+    let rendered: ReturnType<typeof render> | undefined;
+    await act(async () => {
+      rendered = render(tree(view1));
+    });
+    expect(h.mounts).toBe(1);
+    await act(async () => rendered!.rerender(tree(view({ a: 2 }))));
+    expect(h.mounts).toBe(1);
+    expect(h.submission).toEqual({ data: { a: 1 } });
+    expect(h.instance.setSubmission).toHaveBeenCalledTimes(1);
+    expect(h.instance.setSubmission).toHaveBeenCalledWith({ data: { a: 1 } });
   });
 });

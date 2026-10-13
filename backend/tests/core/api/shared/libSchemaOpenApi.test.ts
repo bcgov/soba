@@ -180,8 +180,4 @@ describe('OpenAPI components for lib-backed schemas', () => {
       expect.arrayContaining(['formId', 'currentRevisionNo', 'role', 'form']),
     );
   });
-
-  it.each(['canWrite', 'canSaveDraft'])('marks the fill bundle %s deprecated', (field) => {
-    expect(at(schemas, 'Submit_FillBundle', 'properties', field, 'deprecated')).toBe(true);
-  });
 });

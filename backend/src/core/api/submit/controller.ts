@@ -1,17 +1,10 @@
 import { Response } from 'express';
 import { z } from 'zod';
-import {
-  canSaveDraftOnSubmission,
-  canWriteSubmission,
-  ApiErrorCodes,
-  type MySubmissionRole,
-  type SubmitFillBundle,
-} from '@soba/lib';
+import { ApiErrorCodes, type MySubmissionRole, type SubmitFillBundle } from '@soba/lib';
 import { asyncHandler } from '../shared/asyncHandler';
 import { NotFoundError } from '../../errors';
 import { formsApiService, formVersionService, submissionsApiService } from '../../container';
 import type { SubmitterSubmissionRow } from '../../db/repos/submitterSubmissionRepo';
-import { resolveCaller } from '../../middleware/actor';
 import { loadedSubmission } from '../../middleware/formSubmitAccess';
 import { toSubmitterFormDto } from '../forms/serviceFactory';
 import { toSubmissionDto } from '../submissions/serviceFactory';
@@ -69,7 +62,6 @@ export const getSubmitSubmissionSchema = asyncHandler(async (req: Request, res: 
  */
 export const getSubmitFillBundle = asyncHandler(async (req: Request, res: Response) => {
   const { submission, access, form } = loadedSubmission(req);
-  const caller = resolveCaller(req);
   // Schema first: a missing schema is a 404 whatever the content read would do.
   const schema = await readOwnSchema(submission);
   const content = await readContent(submission);
@@ -84,8 +76,6 @@ export const getSubmitFillBundle = asyncHandler(async (req: Request, res: Respon
     form: toSubmitterFormDto(form),
     schema,
     content: content ?? null,
-    canWrite: canWriteSubmission(access, form, caller),
-    canSaveDraft: canSaveDraftOnSubmission(access, form, caller),
   };
   res.json(bundle);
 });
