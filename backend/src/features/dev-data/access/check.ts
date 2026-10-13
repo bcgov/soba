@@ -850,7 +850,9 @@ async function submissionReadIssues(
     getSubmissionWorkspaceAndState(ref.submissionId),
   ]);
   if (!read || !live) {
-    return !read === !live ? [] : [`${prefix}: the one read and the liveness read disagree`];
+    return Boolean(read) === Boolean(live)
+      ? []
+      : [`${prefix}: the one read and the liveness read disagree`];
   }
   const [owner, participant, form, detail] = await Promise.all([
     isActiveOwner(ref.submissionId, actorId),

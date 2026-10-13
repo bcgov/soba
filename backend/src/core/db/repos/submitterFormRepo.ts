@@ -277,11 +277,11 @@ export const findLiveSubmitterForm = async (
 };
 
 /** The given forms with their facts for one caller, across workspaces, in no particular order. */
-export const listSubmitterForms = async (
+export const listSubmitterForms = (
   input: { userId: string | null; formIds: readonly string[] },
   executor: DbOrTx = db,
 ): Promise<SubmitterFormListRow[]> => {
-  if (input.formIds.length === 0) return [];
+  if (input.formIds.length === 0) return Promise.resolve([]);
   const formIds = [...input.formIds];
   const facts = formFacts(input.userId, { formIds });
   return facts

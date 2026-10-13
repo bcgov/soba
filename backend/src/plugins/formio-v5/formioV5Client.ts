@@ -166,7 +166,7 @@ export class FormioCommunityEditionAPIv5Client {
    * Authenticates with `this.token` (the admin JWT from `login()`) as `x-jwt-token`.
    *
    * **HTTP 440** is treated as admin JWT expiry: clear `this.token`, `login()` once, and retry the same
-   * request. `refreshedFor440` allows at most one admin refresh per `request()` call.
+   * request once.
    *
    * The call, the re-login and the retry share one budget; `signal` cuts it short.
    */
@@ -179,25 +179,21 @@ export class FormioCommunityEditionAPIv5Client {
     const url = `${this._baseUrl}${path}`;
     const serializedBody = body !== undefined ? JSON.stringify(body) : undefined;
     const budget = this.budget(signal);
-    let refreshedFor440 = false;
 
-    while (true) {
-      const { ok, status, text } = await this.performFetch(url, method, serializedBody, budget);
-      if (ok) {
-        if (status === 204 || !text) return undefined as T;
-        try {
-          return JSON.parse(text) as T;
-        } catch {
-          return undefined as T;
-        }
-      }
-      if (!refreshedFor440 && status === 440 && this.hasAdminCredentials()) {
-        this.token = null;
-        await this.login(budget);
-        refreshedFor440 = true;
-        continue;
-      }
-      throw new FormioApiError(status, text, url);
+    let response = await this.performFetch(url, method, serializedBody, budget);
+    // An expired session (440) re-logs in and retries once.
+    if (!response.ok && response.status === 440 && this.hasAdminCredentials()) {
+      this.token = null;
+      await this.login(budget);
+      response = await this.performFetch(url, method, serializedBody, budget);
+    }
+    const { ok, status, text } = response;
+    if (!ok) throw new FormioApiError(status, text, url);
+    if (status === 204 || !text) return undefined as T;
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      return undefined as T;
     }
   }
 

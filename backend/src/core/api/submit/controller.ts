@@ -9,7 +9,7 @@ import { loadedSubmission } from '../../middleware/formSubmitAccess';
 import { toSubmitterFormDto } from '../forms/serviceFactory';
 import { toSubmissionDto } from '../submissions/serviceFactory';
 import { workspacesApiService } from '../workspaces/service';
-import type { Request } from 'express';
+import type { Request, RequestHandler } from 'express';
 import { ListMyFormsQuerySchema, ListMySubmissionsQuerySchema } from './schema';
 
 type ListMySubmissionsQuery = z.infer<typeof ListMySubmissionsQuerySchema>;
@@ -34,9 +34,9 @@ const readContent = (submission: SubmitterSubmissionRow) =>
     engineSubmissionRef: submission.engineSubmissionRef,
   });
 
-export const getSubmitSubmission = asyncHandler(async (req: Request, res: Response) => {
+export const getSubmitSubmission: RequestHandler = (req, res) => {
   res.json(toSubmissionDto(loadedSubmission(req).submission));
-});
+};
 
 export const getSubmitSubmissionData = asyncHandler(async (req: Request, res: Response) => {
   const content = await readContent(loadedSubmission(req).submission);

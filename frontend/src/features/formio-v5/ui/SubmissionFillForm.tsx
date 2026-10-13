@@ -283,13 +283,9 @@ export function SubmissionFillForm({
           >
             {labels.saveDraft}
           </Button>
-          <span
-            role="status"
-            className="align-self-center"
-            data-testid="submission-fill-save-status"
-          >
+          <output className="align-self-center" data-testid="submission-fill-save-status">
             {saveStatusText(saveStatus)}
-          </span>
+          </output>
         </div>
       ) : null}
       <FormioV5FormRenderErrorBoundary
