@@ -14,6 +14,11 @@ export interface UpsertSchemaInput {
   schema: Record<string, unknown>;
   /** Optional human-readable title; defaults to the schema's own title. */
   title?: string;
+  /**
+   * The document the version refers to, written when it still exists. When given, every other
+   * document with the version's identity is deleted before the write.
+   */
+  engineRef?: string;
   /** Abandons the engine calls when it fires. */
   signal?: AbortSignal;
 }

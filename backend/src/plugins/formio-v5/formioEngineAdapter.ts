@@ -6,7 +6,11 @@ import {
 } from '../../core/integrations/form-engine/FormEngineAdapter';
 import { PluginConfigReader } from '../../core/config/pluginConfig';
 import { InternalError, ValidationError } from '../../core/errors';
-import { getAuthenticatedFormioClient, isFormioNotFound } from './formioV5Client';
+import {
+  getAuthenticatedFormioClient,
+  isFormioNotFound,
+  type FormioCommunityEditionAPIv5Client,
+} from './formioV5Client';
 import { ApiErrorCodes, normalizeSchema as normalizeFormioSchema } from '@soba/lib';
 
 /**
@@ -96,6 +100,19 @@ const rethrowEngineRejection =
     }
     throw err;
   };
+
+/** Deletes a form document; one already gone counts as deleted. */
+const deleteFormIfPresent = async (
+  client: FormioCommunityEditionAPIv5Client,
+  formId: string,
+  signal?: AbortSignal,
+): Promise<void> => {
+  try {
+    await client.deleteForm(formId, signal);
+  } catch (err) {
+    if (!isFormioNotFound(err)) throw err;
+  }
+};
 
 /** Form.io-managed identity/audit fields the client must never set (write) or receive (read). */
 const ENGINE_MANAGED_FIELDS = ['_id', 'machineName', 'created', 'modified', 'owner', 'project'];
@@ -205,14 +222,25 @@ export class FormioEngineAdapter implements FormEngineAdapter {
     const body = buildSchemaBody(input);
     const name = sobaEngineName(input.formVersionId);
 
-    // Find an existing document by the deterministic name so a retry updates instead of duplicating.
-    const findId = async (): Promise<unknown> => {
+    // Find existing documents by the deterministic name so a retry updates instead of duplicating.
+    const findIds = async (): Promise<string[]> => {
       const found = (await client.loadForms({ params: { name } }, input.signal)) as Array<
         Record<string, unknown>
       >;
-      return found.length > 0 ? found[0]._id : undefined;
+      return found.map((doc) => doc._id).filter((id): id is string => typeof id === 'string');
     };
-    const existingId = await findId();
+    const found = await findIds();
+    const existingId =
+      input.engineRef && found.includes(input.engineRef) ? input.engineRef : found[0];
+    if (input.engineRef) {
+      // Overlapping creates can each leave a document with the name, and Form.io refuses a name
+      // another document has.
+      await Promise.all(
+        found
+          .filter((id) => id !== existingId)
+          .map((id) => deleteFormIfPresent(client, id, input.signal)),
+      );
+    }
     if (existingId) {
       body._id = existingId;
     }
@@ -222,7 +250,7 @@ export class FormioEngineAdapter implements FormEngineAdapter {
       saved = (await client.saveForm(body, input.signal)) as Record<string, unknown> | null;
     } catch (err) {
       // A concurrent write for the same version created the document first: update that one.
-      const createdId = existingId ? undefined : await findId();
+      const createdId = existingId ? undefined : (await findIds())[0];
       if (!createdId) rethrowEngineRejection('schema')(err);
       saved = (await client
         .saveForm({ ...body, _id: createdId }, input.signal)

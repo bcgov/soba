@@ -33,7 +33,7 @@ import {
 import { ConflictError, ValidationError } from '../errors';
 import { FORM_ID_TAKEN, FORM_NAME_TAKEN, FORM_VERSION_ID_TAKEN } from '../messages';
 import { createFormSettings } from '../../features/form-settings/create';
-import { writeEngineSchema } from './engineSchema';
+import { discardLostEngineSchema, writeEngineSchema } from './engineSchema';
 
 interface DeleteInput {
   workspaceId: string;
@@ -72,6 +72,14 @@ interface CreateInput {
   settings?: CreateFormSettings;
 }
 
+interface PreparedForm {
+  formId: string;
+  versionId: string;
+  engineCode: string;
+  /** The first version's engine document, written before the rows. */
+  engineSchemaRef: string;
+}
+
 interface CreatedForm {
   form: FormRecord;
   version: FormVersionRecord;
@@ -96,15 +104,25 @@ export class FormService {
     // A retry returns before the checks, which the form it made would fail.
     const existing = input.id ? await this.findCreated(input, input.id) : null;
     if (existing) return existing;
+    let prepared: PreparedForm | undefined;
     try {
-      return await this.createNew(input);
+      prepared = await this.prepareNew(input);
+      return await this.commitNew(input, prepared);
     } catch (err) {
-      return this.answerRefusedCreate(err, input);
+      const replay = await this.answerRefusedCreate(err, input);
+      if (prepared) {
+        await discardLostEngineSchema(
+          prepared.engineCode,
+          replay.version,
+          prepared.engineSchemaRef,
+        );
+      }
+      return replay;
     }
   }
 
-  /** Checks, writes the first version's engine document, then commits the rows together. */
-  private async createNew(input: CreateInput): Promise<CreatedForm> {
+  /** Checks the create, then writes the first version's engine document. */
+  private async prepareNew(input: CreateInput): Promise<PreparedForm> {
     // Gate: the workspace disclaimer must be accepted before any form can be created.
     if (!(await isWorkspaceDisclaimerAccepted(input.workspaceId))) {
       throw new ConflictError('Accept the workspace disclaimer before creating forms');
@@ -119,7 +137,6 @@ export class FormService {
       throw new ConflictError(FORM_VERSION_ID_TAKEN);
     }
 
-    const formId = input.id ?? uuidv7();
     const versionId = input.versionId ?? uuidv7();
     // Written before the rows, so a version is never committed without its document.
     const engineSchemaRef = await writeEngineSchema({
@@ -129,8 +146,12 @@ export class FormService {
       schema: input.schema ?? newFormSchema(),
       title: input.name,
     });
+    return { formId: input.id ?? uuidv7(), versionId, engineCode, engineSchemaRef };
+  }
 
-    // The form, its first version and every settings group's row, in one transaction.
+  /** The form, its first version and every settings group's row, in one transaction. */
+  private commitNew(input: CreateInput, prepared: PreparedForm): Promise<CreatedForm> {
+    const { formId, versionId, engineCode, engineSchemaRef } = prepared;
     return db.transaction(async (tx) => {
       const form = await createForm(
         {

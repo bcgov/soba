@@ -1,6 +1,7 @@
 import { createFormEngineAdapter } from '../integrations/form-engine/FormEngineRegistry';
 import type { UpsertSchemaInput } from '../integrations/form-engine/FormEngineAdapter';
 import { ValidationError } from '../errors';
+import { log } from '../logging';
 
 type SchemaWriter = (input: UpsertSchemaInput) => Promise<{ engineRef: string }>;
 
@@ -27,6 +28,28 @@ export const writeEngineSchema = async (
     title: input.title,
   });
   return engineRef;
+};
+
+/**
+ * Deletes the document a create wrote when an overlapping create with the same version id committed
+ * another. A document a failed delete leaves is removed if the version is saved again.
+ */
+export const discardLostEngineSchema = async (
+  engineCode: string,
+  committed: { id: string; engineSchemaRef: string | null },
+  written: string,
+): Promise<void> => {
+  if (committed.engineSchemaRef === written) return;
+  const adapter = createFormEngineAdapter(engineCode);
+  if (typeof adapter.deleteSchema !== 'function') return;
+  try {
+    await adapter.deleteSchema(written);
+  } catch (err) {
+    log.warn(
+      { err, formVersionId: committed.id, engineRef: written },
+      'Unused form engine document not deleted',
+    );
+  }
 };
 
 /** Reads a schema from its engine document; null when there is none or the engine cannot read. */

@@ -25,7 +25,12 @@ import { hasPgCode, isUniqueViolationOn, PG_UNIQUE_VIOLATION } from '../db/pgErr
 import { FORM_VERSION_ONE_PUBLISHED_UNIQUE, FORM_VERSION_PKEY } from '../db/schema';
 import { ConflictError, NotFoundError, ValidationError } from '../errors';
 import { FORM_VERSION_ID_TAKEN, SOURCE_VERSION_HAS_NO_SCHEMA } from '../messages';
-import { readEngineSchema, schemaWriterFor, writeEngineSchema } from './engineSchema';
+import {
+  discardLostEngineSchema,
+  readEngineSchema,
+  schemaWriterFor,
+  writeEngineSchema,
+} from './engineSchema';
 
 const FORM_VERSION_NOT_FOUND = 'Form version not found';
 
@@ -207,7 +212,10 @@ export class FormVersionService {
       // A concurrent create with the same id committed first.
       if (input.id && hasPgCode(err, [PG_UNIQUE_VIOLATION])) {
         const replay = await this.findCreatedDraft(input, input.id);
-        if (replay) return { version: replay, created: false };
+        if (replay) {
+          await discardLostEngineSchema(form.formEngineCode, replay, engineSchemaRef);
+          return { version: replay, created: false };
+        }
       }
       if (isUniqueViolationOn(err, FORM_VERSION_PKEY)) {
         throw new ConflictError(FORM_VERSION_ID_TAKEN);
@@ -370,6 +378,7 @@ export class FormVersionService {
       return {
         upsertSchema,
         title: form?.name,
+        engineRef: locked.engineSchemaRef ?? undefined,
         claimedAt: claimed.updatedAt,
       };
     });
@@ -381,6 +390,7 @@ export class FormVersionService {
         workspaceId: input.workspaceId,
         schema: input.schema,
         title: claim.title,
+        engineRef: claim.engineRef,
         signal: AbortSignal.timeout(PROVISIONING_BUDGET_MS),
       }));
     } catch (err) {
