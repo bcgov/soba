@@ -15,6 +15,38 @@ import {
 } from '@/src/features/formio-v5/ui/SubmissionFillForm';
 import { SubmissionLoadAlert } from '@/src/features/submissions/ui/SubmissionLoadAlert';
 import { useAccessCaller } from '@/src/shared/api/useAccessCaller';
+import type { SubmitFillBundle } from '@/src/types/forms';
+
+/** What one load mounted the form with: the bundle, and the decisions over it. */
+interface MountedLoad {
+  loadId: number;
+  bundle: SubmitFillBundle;
+  canWrite: boolean;
+  canSaveDraft: boolean;
+}
+
+/**
+ * The load the form shows. A load keeps the bundle it mounted with, so a later read that empties or
+ * fails it, such as the re-read when the session ends, leaves the typed answers alone. Its decisions
+ * only widen, as when the provider arrives after a failed /me; the next load decides afresh.
+ */
+const nextMount = (
+  held: MountedLoad | null,
+  live: MountedLoad | null,
+  loadId: number,
+): MountedLoad | null => {
+  const current = held?.loadId === loadId ? held : null;
+  if (!current || !live) return current ?? live;
+  const widens =
+    (live.canWrite && !current.canWrite) || (live.canSaveDraft && !current.canSaveDraft);
+  return widens
+    ? {
+        ...current,
+        canWrite: current.canWrite || live.canWrite,
+        canSaveDraft: current.canSaveDraft || live.canSaveDraft,
+      }
+    : current;
+};
 
 /**
  * Loads an already-opened submission for filling and decides, with the @soba/lib rules over the
@@ -35,6 +67,7 @@ function SubmissionFill({
   const files = useBcgovFileOption();
   // Each load the filler asks for mounts a new form; no other bundle reaches Form.io.
   const [loadId, setLoadId] = useState(0);
+  const [held, setHeld] = useState<MountedLoad | null>(null);
 
   const bundle = fill.data;
   const submitted = bundle?.workflowState === 'submitted';
@@ -50,26 +83,37 @@ function SubmissionFill({
     setLoadId((id) => id + 1);
   }, [refresh]);
 
-  if (fill.error) {
-    return <SubmissionLoadAlert error={fill.error} />;
-  }
-
   // A submitted submission isn't fillable; the effect above leaves for its view.
-  if (!bundle || submitted || callerPending || !files.ready) {
-    return <CenteredProgress label={labels.loading} />;
+  const ready = !!bundle && !fill.error && !submitted && !callerPending && files.ready;
+  let live: MountedLoad | null = null;
+  if (ready) {
+    const access = { role: bundle.role, workflowState: bundle.workflowState };
+    live = {
+      loadId,
+      bundle,
+      canWrite: canWriteSubmission(access, bundle.form, caller),
+      canSaveDraft: canSaveDraftOnSubmission(access, bundle.form, caller),
+    };
+  }
+  const mounted = nextMount(held, live, loadId);
+  if (mounted !== held) setHeld(mounted);
+
+  if (!mounted) {
+    return fill.error ? (
+      <SubmissionLoadAlert error={fill.error} />
+    ) : (
+      <CenteredProgress label={labels.loading} />
+    );
   }
 
-  const access = { role: bundle.role, workflowState: bundle.workflowState };
-  const canWrite = canWriteSubmission(access, bundle.form, caller);
-  const canSaveDraft = canSaveDraftOnSubmission(access, bundle.form, caller);
+  const { canWrite, canSaveDraft } = mounted;
   return (
     <SubmissionFillForm
-      // A changed decision, such as the caller's provider arriving after a failed /me, mounts a new
-      // form. It can only open the form up, so no typed answers are lost.
-      key={`${loadId}:${canWrite}:${canSaveDraft}`}
+      // A wider decision mounts a new form; it can only open the form up, so no typed answers are lost.
+      key={`${mounted.loadId}:${canWrite}:${canSaveDraft}`}
       submissionId={submissionId}
       submissionPath={submissionPath}
-      view={{ snapshot: bundle, canWrite, canSaveDraft, fileOption: files.option }}
+      view={{ snapshot: mounted.bundle, canWrite, canSaveDraft, fileOption: files.option }}
       labels={labels}
       onReload={reload}
     />

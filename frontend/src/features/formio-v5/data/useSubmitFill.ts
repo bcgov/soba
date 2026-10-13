@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { unstable_serialize, useSWRConfig } from 'swr';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { getSubmitFillBundle } from '@/src/shared/api/sobaApi';
+import { useCallToken } from '@/src/shared/api/callToken';
 import { useMaybeAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { sessionReadConfig } from '@/src/shared/api/swrConfig';
 import { classifyDataError } from '@/src/shared/api/dataError';
@@ -16,16 +17,23 @@ import type { SubmitFillBundle } from '@/src/types/forms';
  * Works signed in or anonymously; a session read, so it does not revalidate on its own.
  */
 export function useSubmitFill(submissionId: string): Resource<SubmitFillBundle> {
-  const { token, initializing, initStarted } = useKeycloak();
+  const { authenticated, initializing, initStarted } = useKeycloak();
+  const { tokenFor } = useCallToken();
   // Wait for Keycloak to answer. Before init, "no token" is the default rather than an answer, so a
-  // signed-in caller would read anonymously. Identity is in the key so signing in does not read the
-  // anonymous copy.
+  // signed-in caller would read anonymously.
   const ready = initStarted && !initializing && !!submissionId;
 
-  const identity = token ? 'user' : 'anonymous';
+  // The first read's identity holds for the page. Identity is in the key, so a signed-in read never
+  // serves an anonymous copy; once the session ends, a read fails as ended rather than going out
+  // anonymously.
+  const [pinned, setPinned] = useState<boolean | null>(null);
+  if (ready && pinned === null) setPinned(authenticated);
+  const signedIn = pinned ?? authenticated;
+  const identity = signedIn ? 'user' : 'anonymous';
+
   const { data, error, isLoading, mutate } = useMaybeAuthedSWR<SubmitFillBundle>(
     ready ? ['submit-fill', submissionId, identity] : null,
-    (authToken) => getSubmitFillBundle(authToken, submissionId),
+    () => getSubmitFillBundle(tokenFor(signedIn), submissionId),
     sessionReadConfig,
   );
 

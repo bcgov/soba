@@ -252,7 +252,9 @@ describe('FormioV5SubmissionFillClient', () => {
   });
 
   /** Renders under one SWR cache, so a re-render reads the same bundle; exposes SWR's mutate. */
-  const renderLive = async () => {
+  const renderLive = async (
+    session: Parameters<typeof answerInit>[1] = { authenticated: false },
+  ) => {
     const cache = new Map();
     function CaptureMutate() {
       h.swrMutate = useSWRConfig().mutate as typeof h.swrMutate;
@@ -272,7 +274,7 @@ describe('FormioV5SubmissionFillClient', () => {
     await act(async () => {
       view = render(tree());
     });
-    await answerInit(store, { authenticated: false });
+    await answerInit(store, session);
     return { rerender: () => act(async () => view!.rerender(tree())) };
   };
 
@@ -342,6 +344,73 @@ describe('FormioV5SubmissionFillClient', () => {
     await waitFor(() => expect(h.mounts).toBe(2));
     expect(h.options?.readOnly).toBe(false);
     expect(screen.getByTestId('submission-fill-save-draft')).toBeInTheDocument();
+  });
+
+  it('keeps the form writable when a later decision is narrower', async () => {
+    const live = await renderLive();
+    await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+    h.access = { caller: { idpCode: 'public' }, pending: false };
+    await live.rerender();
+    expect(h.mounts).toBe(1);
+    expect(h.options?.readOnly).toBe(false);
+  });
+
+  describe('when the session ends', () => {
+    const renderSignedIn = async () => {
+      const live = await renderLive({ authenticated: true, token: 'token' });
+      await waitFor(() => expect(screen.getByTestId('submission-fill-save-draft')).toBeEnabled());
+      return live;
+    };
+    // What a rejected refresh leaves: no token, the public caller, and the Header's sweep of every
+    // read, which empties each one and reads it again.
+    const endSession = async () => {
+      h.access = { caller: { idpCode: 'public' }, pending: false };
+      await act(async () => {
+        store.dispatch(clear());
+      });
+      await act(async () => {
+        await h.swrMutate!(() => true, undefined, { revalidate: true });
+      });
+    };
+
+    it('keeps the form mounted and writable, and reads nothing anonymously', async () => {
+      await renderSignedIn();
+      await endSession();
+      expect(screen.getByTestId('fill-form')).toBeInTheDocument();
+      expect(h.mounts).toBe(1);
+      expect(h.options?.readOnly).toBe(false);
+      expect(screen.queryByTestId('submission-view-session-expired')).not.toBeInTheDocument();
+      expect(h.getSubmitFillBundle.mock.calls).toEqual([['token', 'sub-1']]);
+    });
+
+    it('says the draft was not saved because the session ended', async () => {
+      await renderSignedIn();
+      await endSession();
+      await userEvent.click(screen.getByTestId('submission-fill-save-draft'));
+      await waitFor(() =>
+        expect(screen.getByTestId('submission-fill-save-status')).toHaveTextContent(
+          'Draft not saved. Your session has ended.',
+        ),
+      );
+      expect(h.saveSobaFormSubmission).not.toHaveBeenCalled();
+    });
+
+    it('shows the ended session when the filler reloads after it', async () => {
+      h.saveSobaFormSubmission.mockResolvedValue({
+        headRevisionId: 'rev-head',
+        revision: { id: 'rev-x', revisionNo: 1, status: 'pending', reason: 'conflict' },
+      });
+      await renderSignedIn();
+      await userEvent.click(screen.getByTestId('submission-fill-save-draft'));
+      await waitFor(() => expect(screen.getByTestId('submission-fill-held')).toBeInTheDocument());
+      await endSession();
+      await userEvent.click(screen.getByTestId('submission-fill-reload-latest'));
+      await waitFor(() =>
+        expect(screen.getByTestId('submission-view-session-expired')).toBeInTheDocument(),
+      );
+      expect(screen.queryByTestId('fill-form')).not.toBeInTheDocument();
+      expect(h.getSubmitFillBundle).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('shows the translated no-access message when the read is refused', async () => {
