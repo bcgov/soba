@@ -473,6 +473,8 @@
     "revision_base_invalid": "Vos modifications n’ont pas pu être envoyées. Rechargez la page et réessayez.",
     "form_not_ready": "Ce formulaire n’est pas prêt à accepter des soumissions.",
     "engine_document_missing": "Les données enregistrées de ce formulaire sont introuvables. Communiquez avec l’administrateur du formulaire.",
+    "engine_data_rejected": "Le moteur de formulaire n’a pas accepté ces réponses. Vérifiez les champs et réessayez.",
+    "engine_schema_rejected": "Le moteur de formulaire n’a pas accepté cette conception de formulaire. Vérifiez ses composants et réessayez.",
     "file_not_found": "Ce fichier est introuvable.",
     "file_unavailable": "Ce fichier n’est pas disponible pour le moment. Veuillez réessayer plus tard.",
     "file_type_blocked": "Ce type de fichier n’est pas autorisé.",
@@ -492,7 +494,8 @@
     "sign_in_required": "Connectez-vous pour voir vos formulaires et vos soumissions.",
     "already_exists": "Cet élément existe déjà. Rechargez la page et réessayez.",
     "route_not_found": "Cette page ou cette fonctionnalité n’est pas disponible.",
-    "rate_limited": "Trop de demandes. Veuillez patienter un moment et réessayer."
+    "rate_limited": "Trop de demandes. Veuillez patienter un moment et réessayer.",
+    "internal_error": "Une erreur s’est produite sur le serveur. Veuillez réessayer."
   },
   "myForms": {
     "columns": {

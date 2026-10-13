@@ -111,7 +111,7 @@ describe('errorHandler', () => {
   ])('errorToHttpResponse maps an upstream %s 4xx to a generic 500', (_label, err) => {
     expect(errorToHttpResponse(err)).toEqual({
       statusCode: 500,
-      body: { error: 'Internal server error' },
+      body: { error: 'Internal server error', code: 'internal_error' },
     });
   });
 

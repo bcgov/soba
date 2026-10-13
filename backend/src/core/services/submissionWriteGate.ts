@@ -31,19 +31,42 @@ export interface WriteLanding {
 export type RecordedWriteDecision = { kind: 'new' } | { kind: 'replay'; revision: WriteLanding };
 
 /**
+ * Where a recorded write replays: where it first landed. A revision that landed as current and was
+ * later superseded replays as `current`; the response's head shows it is no longer the head.
+ */
+export const replayedLanding = (
+  revisionId: string,
+  recorded: { revisionNo: number; status: string; reason: string },
+): WriteLanding => {
+  const landedPending = recorded.status === RevisionStatus.pending;
+  return {
+    id: revisionId,
+    revisionNo: recorded.revisionNo,
+    status: landedPending ? RevisionStatus.pending : RevisionStatus.current,
+    reason: landedPending ? (recorded.reason as RevisionReasonCode) : RevisionReason.accepted,
+  };
+};
+
+/**
  * Whether a save/submit was already recorded under its revision id. The caller's own write of the
- * same event on the same submission replays where it first landed: a revision that landed as current
- * and was later superseded still replays as `current`. Any other write under the id is a
- * ConflictError.
+ * same event on the same submission replays where it first landed. Any other write under the id, or
+ * a revision id equal to its own base, is a ConflictError.
  */
 export const decideRecordedWrite = (request: {
   submissionId: string;
   eventType: SubmissionWriteEventCode;
   actorId: string;
   revisionId: string;
+  baseRevisionId: string;
   recorded: RecordedRevision | null;
 }): RecordedWriteDecision => {
   const { recorded } = request;
+  if (request.revisionId === request.baseRevisionId) {
+    throw new ConflictError(
+      'Revision id already used by another write',
+      ApiErrorCodes.revision_id_taken,
+    );
+  }
   if (!recorded) return { kind: 'new' };
   if (
     recorded.submissionId !== request.submissionId ||
@@ -55,16 +78,7 @@ export const decideRecordedWrite = (request: {
       ApiErrorCodes.revision_id_taken,
     );
   }
-  const landedPending = recorded.status === RevisionStatus.pending;
-  return {
-    kind: 'replay',
-    revision: {
-      id: request.revisionId,
-      revisionNo: recorded.revisionNo,
-      status: landedPending ? RevisionStatus.pending : RevisionStatus.current,
-      reason: landedPending ? (recorded.reason as RevisionReasonCode) : RevisionReason.accepted,
-    },
-  };
+  return { kind: 'replay', revision: replayedLanding(request.revisionId, recorded) };
 };
 
 export interface SubmissionWriteRequest {

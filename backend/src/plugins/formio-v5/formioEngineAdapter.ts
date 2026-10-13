@@ -72,23 +72,30 @@ function mergeSobaWorkspaceTags(existing: unknown, workspaceId: string): string[
   return [...out];
 }
 
+const ENGINE_REJECTIONS = {
+  schema: { subject: 'the schema', code: ApiErrorCodes.engine_schema_rejected },
+  data: { subject: 'the submission data', code: ApiErrorCodes.engine_data_rejected },
+} as const;
+
 /**
- * Map a Form.io rejection that carries a 4xx status into a ValidationError (HTTP 400), so a
- * malformed/rejected schema surfaces as a client error rather than a 500. Re-throws anything else
- * (network/5xx) unchanged.
+ * Map a Form.io rejection that carries a 4xx status into a coded ValidationError (HTTP 400), so a
+ * rejected schema or submission surfaces as a client error rather than a 500. Re-throws anything
+ * else (network/5xx) unchanged.
  */
-function rethrowEngineRejection(err: unknown): never {
-  const status =
-    typeof err === 'object' && err !== null && 'status' in err
-      ? Number((err as { status: unknown }).status)
-      : NaN;
-  if (Number.isFinite(status) && status >= 400 && status < 500) {
-    const message =
-      err instanceof Error && err.message ? err.message : 'Form engine rejected the schema';
-    throw new ValidationError(`Form engine rejected the schema: ${message}`);
-  }
-  throw err;
-}
+const rethrowEngineRejection =
+  (what: keyof typeof ENGINE_REJECTIONS) =>
+  (err: unknown): never => {
+    const status =
+      typeof err === 'object' && err !== null && 'status' in err
+        ? Number((err as { status: unknown }).status)
+        : NaN;
+    if (Number.isFinite(status) && status >= 400 && status < 500) {
+      const { subject, code } = ENGINE_REJECTIONS[what];
+      const detail = err instanceof Error && err.message ? `: ${err.message}` : '';
+      throw new ValidationError(`Form engine rejected ${subject}${detail}`, code);
+    }
+    throw err;
+  };
 
 /** Form.io-managed identity/audit fields the client must never set (write) or receive (read). */
 const ENGINE_MANAGED_FIELDS = ['_id', 'machineName', 'created', 'modified', 'owner', 'project'];
@@ -209,7 +216,7 @@ export class FormioEngineAdapter implements FormEngineAdapter {
 
     const saved = (await client
       .saveForm(body, input.signal)
-      .catch(rethrowEngineRejection)) as Record<string, unknown> | null;
+      .catch(rethrowEngineRejection('schema'))) as Record<string, unknown> | null;
     const engineRef = saved?._id;
     if (engineRef == null || engineRef === '') {
       throw new Error('Form.io saveForm did not return an _id');
@@ -270,7 +277,7 @@ export class FormioEngineAdapter implements FormEngineAdapter {
     const query = input.validate ? undefined : { params: { noValidate: true } };
     const saved = (await client
       .saveSubmission(input.engineFormRef, body, query)
-      .catch(rethrowEngineRejection)) as Record<string, unknown> | null;
+      .catch(rethrowEngineRejection('data'))) as Record<string, unknown> | null;
     const engineRef = saved?._id;
     if (engineRef == null || engineRef === '') {
       throw new Error('Form.io saveSubmission did not return an _id');

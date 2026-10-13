@@ -141,13 +141,16 @@ export function useFillWriter(submissionId: string, headRevisionId: string | nul
     return kind;
   }, [writer, hold]);
 
-  /** Drops the held write; `reload` mounts a new form on the latest bundle. */
+  /**
+   * Drops the held write once `reload` has mounted a new form on the latest bundle. Writes stay
+   * blocked until then, and a failed reload keeps the held notice.
+   */
   const discardMine = useCallback(
     async (reload: () => Promise<void>) => {
       setBusy('resolve');
       try {
-        hold(null);
         await reload();
+        hold(null);
       } finally {
         setBusy(null);
       }

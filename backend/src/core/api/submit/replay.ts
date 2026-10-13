@@ -33,12 +33,13 @@ const replayRecordedWrite = async (
       next();
       return;
     }
-    const { revisionId } = req.body as SubmissionDataBody;
+    const { revisionId, baseRevisionId } = req.body as SubmissionDataBody;
     const recorded = decideRecordedWrite({
       submissionId: submission.id,
       eventType,
       actorId: actorIdOf(req),
       revisionId,
+      baseRevisionId,
       recorded: await getSubmissionRevisionById(revisionId),
     });
     if (recorded.kind === 'new') {

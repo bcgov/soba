@@ -78,7 +78,8 @@ export type SubmissionChangeStatusCode =
  * `not_published` are 404; `*_invalid` and `form_not_ready` are 400;
  * `*_unavailable` and `render_busy` are 503; `render_failed`, `no_saved_data` and `file_infected`
  * are 422; `file_type_blocked` is 415; `file_too_large` and `request_too_large` are 413;
- * `unauthenticated` is 401; `rate_limited` is 429; `engine_document_missing` is 500.
+ * `engine_*_rejected` are 400; `unauthenticated` is 401; `rate_limited` is 429;
+ * `engine_document_missing` and `internal_error` are 500.
  */
 export const ApiErrorCodes = {
   open_denied: 'open_denied',
@@ -103,6 +104,8 @@ export const ApiErrorCodes = {
   revision_base_invalid: 'revision_base_invalid',
   form_not_ready: 'form_not_ready',
   engine_document_missing: 'engine_document_missing',
+  engine_data_rejected: 'engine_data_rejected',
+  engine_schema_rejected: 'engine_schema_rejected',
   // Files.
   file_not_found: 'file_not_found',
   file_unavailable: 'file_unavailable',
@@ -126,5 +129,6 @@ export const ApiErrorCodes = {
   already_exists: 'already_exists',
   route_not_found: 'route_not_found',
   rate_limited: 'rate_limited',
+  internal_error: 'internal_error',
 } as const;
 export type ApiErrorCode = (typeof ApiErrorCodes)[keyof typeof ApiErrorCodes];

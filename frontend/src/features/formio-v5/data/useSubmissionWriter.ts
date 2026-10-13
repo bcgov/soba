@@ -71,9 +71,12 @@ export function useSubmissionWriter(submissionId: string, signedIn: boolean) {
     async (data: Record<string, unknown>, baseRevisionId: string) => {
       const value = await send('save', data, baseRevisionId);
       const outcome = toOutcome(value);
-      // A replayed save reports where it first landed; the record may have been submitted since.
-      if (outcome.status === 'applied' && value.workflowState === 'submitted') {
-        return { status: 'held', reason: 'closed' } as const;
+      if (outcome.status !== 'applied') return outcome;
+      // A replayed save reports where it first landed; the record may have been submitted, or saved
+      // again elsewhere, since.
+      if (value.workflowState === 'submitted') return { status: 'held', reason: 'closed' } as const;
+      if (value.headRevisionId !== value.revision.id) {
+        return { status: 'held', reason: 'conflict' } as const;
       }
       return outcome;
     },

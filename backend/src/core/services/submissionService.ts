@@ -34,6 +34,7 @@ import {
 import {
   decideRecordedWrite,
   decideSubmissionWrite,
+  replayedLanding,
   type SubmissionWriteDecision,
   type WriteLanding,
 } from './submissionWriteGate';
@@ -158,6 +159,7 @@ export class SubmissionService {
       eventType,
       actorId: input.actorId,
       revisionId: input.revisionId,
+      baseRevisionId: input.baseRevisionId,
       recorded: await getSubmissionRevisionById(input.revisionId),
     });
     if (recorded.kind === 'replay') return { record: submission, revision: recorded.revision };
@@ -285,12 +287,16 @@ export class SubmissionService {
 
       return {
         record: result.record,
-        revision: {
-          id: result.revisionId,
-          revisionNo: result.revisionNo,
-          status: result.status,
-          reason: result.reason,
-        },
+        // A concurrent duplicate answers as any replay does, not with the revision's stored status.
+        revision:
+          result.outcome === 'replayed'
+            ? replayedLanding(result.revisionId, result)
+            : {
+                id: result.revisionId,
+                revisionNo: result.revisionNo,
+                status: result.status,
+                reason: result.reason,
+              },
       };
     } catch (err) {
       // A pending write never set a provisioning flag, so there is nothing to reset for it.

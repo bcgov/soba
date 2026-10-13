@@ -160,6 +160,20 @@ const CASES: Array<[string, SubmissionAccessFacts, SubmitterFormFacts, AccessCal
     idir,
     all(false),
   ],
+  [
+    'owner of a draft on a form granting create but not template read',
+    sub('owner', 'draft'),
+    form({ permissions: [Permissions.submission_create] }),
+    idir,
+    { ...all(true), render: false },
+  ],
+  [
+    'owner with update, on a submission neither in progress nor submitted',
+    sub('owner', 'archived'),
+    form({ permissions: [...SUBMITTER, Permissions.submission_update] }),
+    idir,
+    { ...all(false), read: true, write: true, saveDraft: true, render: true },
+  ],
 ];
 
 describe('submission rules', () => {

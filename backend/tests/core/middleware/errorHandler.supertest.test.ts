@@ -50,7 +50,7 @@ describe('errorHandler supertest', () => {
     });
     const res = await request(app).get('/');
     expect(res.status).toBe(500);
-    expect(res.body).toEqual({ error: 'Internal server error' });
+    expect(res.body).toEqual({ error: 'Internal server error', code: 'internal_error' });
   });
 
   it('returns 500 and Internal server error when route throws non-Error', async () => {
@@ -59,7 +59,7 @@ describe('errorHandler supertest', () => {
     });
     const res = await request(app).get('/');
     expect(res.status).toBe(500);
-    expect(res.body).toEqual({ error: 'Internal server error' });
+    expect(res.body).toEqual({ error: 'Internal server error', code: 'internal_error' });
   });
 
   it('returns custom statusCode when route throws AppError with custom code', async () => {

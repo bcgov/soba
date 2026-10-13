@@ -108,17 +108,19 @@ describe('FormioEngineAdapter schema methods', () => {
     ).rejects.toThrow(/_id/i);
   });
 
-  it('maps a Form.io 4xx rejection to a ValidationError', async () => {
-    const client = makeClient({
-      saveForm: jest
-        .fn()
-        .mockRejectedValue({ status: 400, message: 'The Path must be unique per Project.' }),
+  it('maps a Form.io 4xx rejection to a coded ValidationError', async () => {
+    const rejected = Object.assign(new Error('The Path must be unique per Project.'), {
+      status: 400,
     });
+    const client = makeClient({ saveForm: jest.fn().mockRejectedValue(rejected) });
     mockedGetClient.mockResolvedValue(client);
     const adapter = new FormioEngineAdapter(makeConfig());
-    await expect(
-      adapter.upsertSchema({ formVersionId: 'v1', workspaceId: 'ws1', schema: {} }),
-    ).rejects.toBeInstanceOf(ValidationError);
+    const upsert = adapter.upsertSchema({ formVersionId: 'v1', workspaceId: 'ws1', schema: {} });
+    await expect(upsert).rejects.toBeInstanceOf(ValidationError);
+    await expect(upsert).rejects.toMatchObject({
+      code: 'engine_schema_rejected',
+      message: 'Form engine rejected the schema: The Path must be unique per Project.',
+    });
   });
 
   it('re-throws a non-4xx (5xx/network) saveForm rejection unchanged', async () => {

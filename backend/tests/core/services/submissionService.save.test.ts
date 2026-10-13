@@ -161,6 +161,35 @@ describe('SubmissionService save (versioned engine write)', () => {
     expect(failProvisioning).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['superseded', 'replaced', 'current', 'accepted'],
+    ['pending', 'conflict', 'pending', 'conflict'],
+  ])(
+    'answers a concurrent duplicate that landed %s as any replay does',
+    async (status, reason, replayStatus, replayReason) => {
+      createAdapter.mockReturnValue({
+        createSubmission: jest.fn().mockResolvedValue({ engineRef: 'eng-new' }),
+      });
+      appendRevision.mockResolvedValue({
+        outcome: 'replayed',
+        record: { id: 's1', currentRevisionNo: 4 },
+        revisionId: 'rev-new',
+        revisionNo: 3,
+        status,
+        reason,
+      });
+
+      const result = await svc.save(input);
+
+      expect(result.revision).toEqual({
+        id: 'rev-new',
+        revisionNo: 3,
+        status: replayStatus,
+        reason: replayReason,
+      });
+    },
+  );
+
   const uniqueViolationOn = (constraint: string) =>
     Object.assign(new Error('duplicate key'), {
       cause: { code: '23505', severity: 'ERROR', constraint },
@@ -349,10 +378,10 @@ describe('SubmissionService save (versioned engine write)', () => {
     const createSubmission = jest.fn();
     createAdapter.mockReturnValue({ createSubmission });
 
-    const result = await svc.save({ ...input, revisionId: 'rev-2' });
+    const result = await svc.save({ ...input, revisionId: 'rev-held' });
 
     expect(result.revision).toEqual({
-      id: 'rev-2',
+      id: 'rev-held',
       revisionNo: 2,
       status: 'pending',
       reason: 'conflict',

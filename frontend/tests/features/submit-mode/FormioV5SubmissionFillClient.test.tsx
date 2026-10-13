@@ -111,7 +111,7 @@ vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => {
 });
 
 import makeStore from '@/lib/store';
-import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
+import { clear, setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import { getActiveSubmission } from '@/src/features/formio-v5/activeSubmission';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 import { NetworkError, SessionExpiredError } from '@/src/shared/api/sobaFetch';
@@ -544,7 +544,9 @@ describe('FormioV5SubmissionFillClient', () => {
         revisionId: string;
         baseRevisionId: string;
       };
+    // A write that became current is the head; a held one leaves the head where it was.
     const saveResponse = (id: string, status = 'current', reason = 'accepted') => ({
+      headRevisionId: status === 'current' ? id : 'rev-head',
       revision: { id, revisionNo: 1, status, reason },
     });
 
@@ -710,6 +712,27 @@ describe('FormioV5SubmissionFillClient', () => {
       await saveDraft();
       await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(2));
       expect(savedBody(1).revisionId).not.toBe(savedBody(0).revisionId);
+    });
+
+    it('holds a replayed save that another save has since replaced, and keeps its base', async () => {
+      h.saveSobaFormSubmission.mockResolvedValueOnce({
+        ...saveResponse('rev-1'),
+        headRevisionId: 'rev-9',
+      });
+      h.submitSobaFormSubmission.mockResolvedValue(saveResponse('rev-10'));
+      await renderLoaded();
+      await saveDraft();
+      await waitFor(() =>
+        expect(screen.getByTestId('submission-fill-held')).toHaveTextContent(
+          'Changed elsewhere; draft not saved.',
+        ),
+      );
+      expect(saveStatus().textContent).toBe('Draft not saved.');
+      h.getSubmitFillBundle.mockResolvedValueOnce(bundle({ headRevisionId: 'rev-9' }));
+      h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-11'));
+      await userEvent.click(screen.getByTestId('submission-fill-write-mine'));
+      await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(2));
+      expect(savedBody(1).baseRevisionId).toBe('rev-9');
     });
 
     it('leaves for the submission view when a replayed save finds the record submitted', async () => {
@@ -888,6 +911,19 @@ describe('FormioV5SubmissionFillClient', () => {
       expect(savedBody(1).baseRevisionId).toBe('rev-9');
     });
 
+    it('keeps the held notice, and refuses a submit, until the latest version has loaded', async () => {
+      h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-x', 'pending', 'conflict'));
+      await renderLoaded();
+      await saveDraft();
+      await waitFor(() => expect(screen.getByTestId('submission-fill-held')).toBeInTheDocument());
+      h.getSubmitFillBundle.mockReturnValueOnce(new Promise(() => undefined));
+      await userEvent.click(screen.getByTestId('submission-fill-reload-latest'));
+      await waitFor(() => expect(h.getSubmitFillBundle).toHaveBeenCalledTimes(2));
+      await act(() => h.onSubmit!({ data: { a: 1 } }));
+      expect(h.submitSobaFormSubmission).not.toHaveBeenCalled();
+      expect(screen.getByTestId('submission-fill-held')).toBeInTheDocument();
+    });
+
     it('disables both held actions while one is running', async () => {
       h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-x', 'pending', 'conflict'));
       await renderLoaded();
@@ -1056,6 +1092,7 @@ describe('SubmissionFillForm', () => {
     beforeEach(() => {
       h.formData = { a: 1 };
       h.saveSobaFormSubmission.mockResolvedValue({
+        headRevisionId: 'rev-2',
         revision: { id: 'rev-2', revisionNo: 2, status: 'current', reason: 'accepted' },
       });
     });
@@ -1072,7 +1109,7 @@ describe('SubmissionFillForm', () => {
     it('never sends a save anonymously for a form mounted signed in', async () => {
       await signIn('token');
       await renderForm();
-      await act(() => store.dispatch(setToken(undefined)));
+      await act(() => store.dispatch(clear()));
       await saveDraft();
       await waitFor(() =>
         expect(screen.getByTestId('submission-fill-save-status')).toHaveTextContent(

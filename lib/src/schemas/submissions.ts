@@ -15,7 +15,8 @@ export const SubmissionDataBodySchema = z.object({
   data: z.record(z.string(), z.unknown()),
   // Client-minted id for the revision this write creates. A retry reuses it.
   revisionId: z.uuidv7(),
-  // The head revision the client loaded. A write whose base is no longer the head is refused.
+  // The head revision the client loaded. A write whose base is no longer the head is kept as a
+  // pending revision (200, `revision.status` pending), not applied.
   baseRevisionId: z.uuid(),
 });
 

@@ -23,6 +23,7 @@ const target = { workspaceId: 'ws1', formId: 'f1', submissionId: 's1' };
 const { read, write, upload, deleteFile, render } = SubmitterOperation;
 const NO_PERMISSIONS = { form: { permissions: [] } };
 const UPDATE = { form: { permissions: [Permissions.submission_update] } };
+const CREATE_ONLY = { form: { permissions: [Permissions.submission_create] } };
 
 beforeEach(() => {
   mockFormPermission.mockReset();
@@ -61,6 +62,8 @@ describe('isSubmitterAllowed', () => {
     [deleteFile, { workflowState: 'submitted' }, false],
     [render, {}, true],
     [render, NO_PERMISSIONS, false],
+    [write, CREATE_ONLY, true],
+    [render, CREATE_ONLY, false],
     [render, { role: null }, false],
     [SubmitterOperation.delete, {}, true],
     [SubmitterOperation.delete, { workflowState: 'submitted' }, true],

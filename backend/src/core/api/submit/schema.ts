@@ -122,8 +122,7 @@ const NOT_PARTICIPANT = 'Not a participant on this submission';
 const WRITE_AUTHZ = "Not a participant on this submission, or not in the form's audience";
 const SUBMISSION_AUTH_REQUIRED =
   'Authentication required (anonymous caller has no access to this submission)';
-const INVALID_WRITE_BODY =
-  'Invalid body (save requires revisionId and baseRevisionId; submit takes both or neither)';
+const INVALID_WRITE_BODY = 'Invalid body (revisionId and baseRevisionId are required)';
 const WRITE_CONFLICT = 'The revision id is already used by another write';
 const SIGNED_IN_REQUIRED = 'Authentication required';
 const INVALID_QUERY = 'Invalid query';
@@ -188,8 +187,10 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
         description: 'Existing submission (idempotent open: same id, actor, and form)',
         content: { 'application/json': { schema: SubmissionResponseSchema } },
       },
+      400: { description: 'Invalid body' },
       401: { description: AUTH_REQUIRED },
       403: { description: AUTHZ },
+      404: { description: 'Form not found, or the form has no published version' },
       409: {
         description:
           'Submission id already in use by a different owner, or formVersionId is not the published version',

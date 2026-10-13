@@ -60,7 +60,7 @@ export function errorToHttpResponse(err: unknown): ErrorHttpResponse {
     return { statusCode: clientStatus, body: code ? { error, code } : { error } };
   }
   // Unexpected errors can carry SQL or hostnames, so their detail goes to the log only.
-  return { statusCode: 500, body: { error: INTERNAL_ERROR } };
+  return { statusCode: 500, body: { error: INTERNAL_ERROR, code: ApiErrorCodes.internal_error } };
 }
 
 export const coreErrorHandler = (

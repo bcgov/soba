@@ -472,6 +472,8 @@
     "revision_base_invalid": "Your changes could not be sent. Reload the page and try again.",
     "form_not_ready": "This form is not ready to accept submissions.",
     "engine_document_missing": "This form's saved data could not be found. Contact the form's administrator.",
+    "engine_data_rejected": "The form engine did not accept these answers. Check the fields and try again.",
+    "engine_schema_rejected": "The form engine did not accept this form design. Check its components and try again.",
     "file_not_found": "This file could not be found.",
     "file_unavailable": "This file is not available right now. Please try again later.",
     "file_type_blocked": "This type of file is not allowed.",
@@ -491,7 +493,8 @@
     "sign_in_required": "Sign in to see your forms and submissions.",
     "already_exists": "This already exists. Reload the page and try again.",
     "route_not_found": "This page or feature is not available.",
-    "rate_limited": "Too many requests. Please wait a moment and try again."
+    "rate_limited": "Too many requests. Please wait a moment and try again.",
+    "internal_error": "Something went wrong on the server. Please try again."
   },
   "myForms": {
     "columns": {

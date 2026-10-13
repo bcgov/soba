@@ -114,14 +114,18 @@ describe('FormioEngineAdapter submission methods', () => {
     expect(client.saveSubmission).not.toHaveBeenCalled();
   });
 
-  it('maps a Form.io 4xx rejection to a ValidationError', async () => {
-    const client = makeClient({
-      saveSubmission: jest.fn().mockRejectedValue({ status: 400, message: 'invalid submission' }),
-    });
+  it('maps a Form.io 4xx rejection to a coded ValidationError about the data', async () => {
+    const rejected = Object.assign(new Error('invalid submission'), { status: 400 });
+    const client = makeClient({ saveSubmission: jest.fn().mockRejectedValue(rejected) });
     mockedGetClient.mockResolvedValue(client);
 
     const adapter = new FormioEngineAdapter(makeConfig());
-    await expect(adapter.createSubmission(createInput)).rejects.toBeInstanceOf(ValidationError);
+    const created = adapter.createSubmission(createInput);
+    await expect(created).rejects.toBeInstanceOf(ValidationError);
+    await expect(created).rejects.toMatchObject({
+      code: 'engine_data_rejected',
+      message: 'Form engine rejected the submission data: invalid submission',
+    });
   });
 
   it('throws when no admin client is available', async () => {

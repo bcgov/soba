@@ -1,6 +1,7 @@
 import {
   decideRecordedWrite,
   decideSubmissionWrite,
+  replayedLanding,
   type RecordedRevision,
   type SubmissionWriteRequest,
 } from '../../../src/core/services/submissionWriteGate';
@@ -26,14 +27,31 @@ const recordedSave: RecordedRevision = {
   reason: 'accepted',
 };
 
-const decideRecorded = (recorded: RecordedRevision | null) =>
+const decideRecorded = (recorded: RecordedRevision | null, baseRevisionId = 'rev-2') =>
   decideRecordedWrite({
     submissionId: 's1',
     eventType: 'saved',
     actorId: 'actor-1',
     revisionId: 'rev-3',
+    baseRevisionId,
     recorded,
   });
+
+describe('replayedLanding', () => {
+  it.each([
+    ['current', 'accepted', 'current', 'accepted'],
+    ['superseded', 'replaced', 'current', 'accepted'],
+    ['pending', 'conflict', 'pending', 'conflict'],
+    ['pending', 'closed', 'pending', 'closed'],
+  ])('replays a %s/%s revision as %s/%s', (status, reason, replayStatus, replayReason) => {
+    expect(replayedLanding('rev-3', { revisionNo: 3, status, reason })).toEqual({
+      id: 'rev-3',
+      revisionNo: 3,
+      status: replayStatus,
+      reason: replayReason,
+    });
+  });
+});
 
 describe('decideRecordedWrite', () => {
   it('treats an unrecorded revision id as a new write', () => {
@@ -68,6 +86,16 @@ describe('decideRecordedWrite', () => {
   ])('refuses a revision id recorded %s', (_label, over) => {
     expect(() => decideRecorded({ ...recordedSave, ...over })).toThrow(ConflictError);
     expect(() => decideRecorded({ ...recordedSave, ...over })).toThrow(
+      expect.objectContaining({ code: 'revision_id_taken' }),
+    );
+  });
+
+  // Otherwise the base revision would replay and the write's answers would be dropped.
+  it.each([
+    ['recorded as the base', recordedSave],
+    ['not recorded', null],
+  ])('refuses a revision id equal to its base, %s', (_label, recorded) => {
+    expect(() => decideRecorded(recorded, 'rev-3')).toThrow(
       expect.objectContaining({ code: 'revision_id_taken' }),
     );
   });

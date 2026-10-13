@@ -138,15 +138,23 @@ export const canUploadSubmissionFile = (
   caller: AccessCaller,
 ): boolean => isAllowed(uploadStatusOf(submission, form, caller));
 
-/** A file delete: a write while in progress; once submitted, only the form's update permission. */
+/**
+ * A file delete: a write while in progress; once submitted, only the form's update permission; in
+ * any other state, no one.
+ */
 export const canDeleteSubmissionFile = (
   submission: SubmissionAccessFacts,
   form: FormAccessFacts,
   caller: AccessCaller,
-): boolean =>
-  submission.workflowState === SubmissionWorkflowState.submitted
-    ? formAccessAllows(form, caller, Permissions.submission_update)
-    : canWriteSubmission(submission, form, caller);
+): boolean => {
+  if (isSubmissionInProgress(submission.workflowState)) {
+    return canWriteSubmission(submission, form, caller);
+  }
+  return (
+    submission.workflowState === SubmissionWorkflowState.submitted &&
+    formAccessAllows(form, caller, Permissions.submission_update)
+  );
+};
 
 /** A document render: a grant and the form's template read permission. */
 export const canRenderSubmission = (
