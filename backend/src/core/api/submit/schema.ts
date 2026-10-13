@@ -197,7 +197,8 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
         content: { 'application/json': { schema: SubmissionResponseSchema } },
       },
       200: {
-        description: 'Existing submission (idempotent open: same id, actor, and form)',
+        description:
+          'Existing submission (idempotent open: same id, owner and form, and the same version when the body names one)',
         content: { 'application/json': { schema: SubmissionResponseSchema } },
       },
       400: { description: 'Invalid body' },
@@ -206,7 +207,7 @@ export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
       404: { description: 'Form not found, or the form has no published version' },
       409: {
         description:
-          'Submission id already in use by a different owner, or formVersionId is not the published version',
+          'Submission id already in use by another owner, form or version, or by a submission, form or version that is deleted; or formVersionId is not the published version',
       },
     },
   });

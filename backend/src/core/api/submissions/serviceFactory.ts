@@ -5,7 +5,6 @@ import type { FormAccessGrant } from '../../db/repos/formAccessRepo';
 import { toSubmitterFormDto } from '../forms/serviceFactory';
 import type {
   ParticipantSubmissionListRow,
-  SubmissionRecord,
   SubmissionListRow,
   SubmissionDetailRow,
 } from '../../db/repos/submissionRepo';
@@ -60,29 +59,26 @@ export interface ListMySubmissionsQueryInput {
 const confirmationCodeOf = (item: { workflowState: string; confirmationCode: string }) =>
   item.workflowState === SubmissionWorkflowState.submitted ? item.confirmationCode : null;
 
-export const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
-  const detail = item as Partial<SubmissionDetailRow>;
-  return {
-    id: item.id,
-    formId: item.formId,
-    formName: detail.form?.name ?? 'Untitled Form',
-    formVersionId: item.formVersionId,
-    versionNo: detail.formVersion?.versionNo ?? item.currentRevisionNo ?? 1,
-    workflowState: item.workflowState,
-    engineSyncStatus: item.engineSyncStatus,
-    currentRevisionNo: item.currentRevisionNo,
-    headRevisionId: item.headRevisionId,
-    submittedAt: item.submittedAt?.toISOString() ?? null,
-    createdAt: item.createdAt.toISOString(),
-    updatedAt: item.updatedAt.toISOString(),
-    createdBy: detail.createdBy ?? null,
-    submittedBy: detail.submittedBy ?? null,
-    confirmationCode: confirmationCodeOf(item),
-  };
-};
+export const toSubmissionDto = (item: SubmissionDetailRow) => ({
+  id: item.id,
+  formId: item.formId,
+  formName: item.form.name ?? 'Untitled Form',
+  formVersionId: item.formVersionId,
+  versionNo: item.formVersion.versionNo ?? 1,
+  workflowState: item.workflowState,
+  engineSyncStatus: item.engineSyncStatus,
+  currentRevisionNo: item.currentRevisionNo,
+  headRevisionId: item.headRevisionId,
+  submittedAt: item.submittedAt?.toISOString() ?? null,
+  createdAt: item.createdAt.toISOString(),
+  updatedAt: item.updatedAt.toISOString(),
+  createdBy: item.createdBy,
+  submittedBy: item.submittedBy,
+  confirmationCode: confirmationCodeOf(item),
+});
 
 export const toSubmissionWriteDto = (outcome: {
-  record: SubmissionRecord | SubmissionDetailRow;
+  record: SubmissionDetailRow;
   revision: WriteLanding;
 }) => ({
   ...toSubmissionDto(outcome.record),

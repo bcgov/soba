@@ -57,6 +57,10 @@ export interface SubmissionDetailRow extends SubmissionListRow {
   headRevisionId: string | null;
 }
 
+/** A submission row with its form's name and its version's number, as responses show them. */
+export type LabelledSubmissionRecord = SubmissionRecord &
+  Pick<SubmissionDetailRow, 'form' | 'formVersion'>;
+
 interface CreateSubmissionInput {
   /** Client-minted uuidv7; the submission's primary key (no longer server-generated). */
   id: string;
@@ -69,15 +73,15 @@ interface CreateSubmissionInput {
 }
 
 /**
- * created  - the id was free; a new opened submission, its revision 0 and the opener's owner grant
- *            were written.
- * existing - the id is already bound to this actor + form; the retry returns that row (idempotent).
- * conflict - the id is bound to a different actor or form (caller maps to 409).
+ * created - the id was free; a new opened submission, its revision 0 and the opener's owner grant
+ *           were written.
+ * taken   - the id is in use. `live` is that submission unless it, its form or its version is
+ *           deleted, and `owner` whether the opener holds its active owner grant. The caller decides
+ *           whether the open is a retry.
  */
 export type OpenSubmissionResult =
   | { outcome: 'created'; record: SubmissionRecord }
-  | { outcome: 'existing'; record: SubmissionRecord }
-  | { outcome: 'conflict' };
+  | { outcome: 'taken'; live: SubmissionRecord | null; owner: boolean };
 
 interface SaveSubmissionInput {
   workspaceId: string;
@@ -192,11 +196,9 @@ export const findLiveSubmissionRecord = async (
  * a full history and an owner from the moment a fill begins. `submittedBy` captures the actor who
  * started it (the seeded public user for anonymous fills, who then owns it).
  *
- * Idempotent on the id. `ON CONFLICT DO NOTHING` is the atomic gate: the row is only written when the
- * id is free, so concurrent double-opens are race-safe: the loser inserts nothing, falls through to
- * the select, and sees the winner's committed row. A taken id is a retry (the caller's own live
- * submission on the same form: return it) or a collision (another owner or form, or a submission,
- * form or version that is deleted: the caller answers 409, not 500).
+ * `ON CONFLICT DO NOTHING` is the atomic gate: the row is only written when the id is free, so
+ * concurrent double-opens are race-safe: the loser inserts nothing, falls through to the select, and
+ * sees the winner's committed row. A taken id reports what holds it.
  */
 export const openSubmission = async (
   input: CreateSubmissionInput,
@@ -254,18 +256,23 @@ export const openSubmission = async (
       return { outcome: 'created', record };
     }
 
-    // Only a live submission the caller owns, on the same form, is a valid idempotent retry; any other
-    // row on the id is a collision (409), not a resume, since save, submit and fill all 404 on it.
-    const existing = await findLiveSubmissionRecord(input.id, tx);
-
-    if (
-      existing?.formId === input.formId &&
-      (await isActiveOwner(existing.id, input.actorId, tx))
-    ) {
-      return { outcome: 'existing', record: existing };
-    }
-    return { outcome: 'conflict' };
+    const live = await findLiveSubmissionRecord(input.id, tx);
+    const owner = !!live && (await isActiveOwner(live.id, input.actorId, tx));
+    return { outcome: 'taken', live, owner };
   });
+};
+
+/** The form's name and the version's number for a form version, deleted or not. */
+export const getFormVersionLabels = async (
+  formVersionId: string,
+): Promise<Pick<SubmissionDetailRow, 'form' | 'formVersion'> | null> => {
+  const [row] = await db
+    .select({ form: { name: forms.name }, formVersion: { versionNo: formVersions.versionNo } })
+    .from(formVersions)
+    .innerJoin(forms, eq(forms.id, formVersions.formId))
+    .where(eq(formVersions.id, formVersionId))
+    .limit(1);
+  return row ?? null;
 };
 
 /** Look up a revision by id alone, to recognise a retried write and report its standing. */

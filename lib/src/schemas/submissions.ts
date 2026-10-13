@@ -44,7 +44,9 @@ export const SubmissionListItemSchema = z.object({
 export const SubmissionResponseSchema = z.object({
   id: z.string(),
   formId: z.string(),
+  formName: z.string(),
   formVersionId: z.string(),
+  versionNo: z.number().int(),
   workflowState: z.string(),
   engineSyncStatus: z.string(),
   currentRevisionNo: z.number().int(),
