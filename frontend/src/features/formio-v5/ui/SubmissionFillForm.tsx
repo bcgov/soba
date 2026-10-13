@@ -8,13 +8,18 @@ import type { ApiErrorCode } from '@soba/lib';
 import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFormioRenderError';
 import { FormioV5FormRenderErrorBoundary } from '@/src/features/formio-v5/ui/FormioV5FormRenderErrorBoundary';
 import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
-import { BLOCKED_REASON, useFillWriter } from '@/src/features/formio-v5/data/useFillWriter';
+import {
+  BLOCKED_REASON,
+  useFillWriter,
+  type SaveStatus,
+} from '@/src/features/formio-v5/data/useFillWriter';
 import {
   clearActiveSubmission,
   setActiveSubmission,
 } from '@/src/features/formio-v5/activeSubmission';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { apiErrorMessage } from '@/src/shared/api/dataError';
+import { apiErrorMessage, isNetworkError, isOutcomeUnknown } from '@/src/shared/api/dataError';
+import { useFormatTime } from '@/src/shared/hooks/useFormatLongDate';
 import type { SubmitFillBundle } from '@/src/types/forms';
 
 export type FillLabels = {
@@ -26,7 +31,12 @@ export type FillLabels = {
   readOnly: string;
   saveDraft: string;
   savingDraft: string;
-  draftSaved: string;
+  /** "{time}" is replaced with the time of day. */
+  savedAt: string;
+  notSaved: string;
+  /** A save that got a server failure or no response, so it may have landed. */
+  notConfirmed: string;
+  offline: string;
   heldSave: string;
   heldSubmit: string;
   reloadLatest: string;
@@ -77,7 +87,8 @@ export function SubmissionFillForm({
   const { addNotification } = useNotificationStore();
   const router = useRouter();
   const writer = useFillWriter(submissionId, snapshot.headRevisionId);
-  const { busy, held } = writer.status;
+  const { busy, held, save: saveStatus } = writer.status;
+  const formatTime = useFormatTime();
 
   const [renderError, setRenderError] = useState<string | null>(null);
   // The live Form.io webform: a save reads its answers, "Submit my version" submits it, and a failed
@@ -124,33 +135,43 @@ export function SubmissionFillForm({
     router.replace(submissionPath);
   };
 
-  const writeError = (err: unknown) =>
-    setRenderError(
+  const errorMessage = (err: unknown) => {
+    if (isNetworkError(err)) return labels.offline;
+    return (
       apiErrorMessage(err, labels.errors, labels.requestFailed) ??
-        normalizeFormioRenderError(err, labels.rendererError, labels.sessionExpired),
+      normalizeFormioRenderError(err, labels.rendererError, labels.sessionExpired)
     );
+  };
+  const writeError = (err: unknown) => setRenderError(errorMessage(err));
+
+  const saveStatusText = (status: SaveStatus): string => {
+    switch (status.state) {
+      case 'idle':
+        return '';
+      case 'saving':
+        return labels.savingDraft;
+      case 'saved':
+        return labels.savedAt.replace('{time}', formatTime(status.at.toISOString()));
+      case 'held':
+        return labels.notSaved;
+      case 'failed': {
+        const prefix = isOutcomeUnknown(status.cause) ? labels.notConfirmed : labels.notSaved;
+        return `${prefix} ${errorMessage(status.cause)}`;
+      }
+    }
+  };
 
   // Releases Form.io's submit button without its success state.
   const releaseSubmit = (message = '') => formInstanceRef.current?.emit('submitError', message);
 
-  // Saves the answers as they are, without Form.io's validation.
+  // Saves the answers as they are, without Form.io's validation. The status line reports the result,
+  // a failure included.
   const saveDraft = async () => {
     const instance = formReady ? formInstanceRef.current : null;
     if (!instance || !writer.hasBase()) return;
     setRenderError(null);
-    const outcome = await writer.save(instance.submission.data ?? {});
-    switch (outcome.status) {
-      case 'applied':
-        addNotification({ text: labels.draftSaved, type: 'success' });
-        break;
-      case 'held':
-        // A conflict shows the held notice from the writer's status; a blocked save sent nothing.
-        if (outcome.reason === 'closed') leaveClosed();
-        break;
-      case 'queued':
-        // Not sent yet: no notice.
-        break;
-    }
+    const outcome = await writer.save(instance.submission.data ?? {}).catch(() => null);
+    if (outcome?.status === 'held' && outcome.reason === 'closed') leaveClosed();
   };
 
   const submitForm = async (submission: Submission) => {
@@ -260,8 +281,15 @@ export function SubmissionFillForm({
             isDisabled={!formReady || busy !== null || held !== null}
             data-testid="submission-fill-save-draft"
           >
-            {busy === 'save' ? labels.savingDraft : labels.saveDraft}
+            {labels.saveDraft}
           </Button>
+          <span
+            role="status"
+            className="align-self-center"
+            data-testid="submission-fill-save-status"
+          >
+            {saveStatusText(saveStatus)}
+          </span>
         </div>
       ) : null}
       <FormioV5FormRenderErrorBoundary

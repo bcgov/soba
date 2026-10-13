@@ -1,6 +1,6 @@
 import type { ApiErrorCode } from '@soba/lib';
 import type { DataError } from './dataContracts';
-import { isSessionExpired } from './sobaFetch';
+import { isNetworkError, isSessionExpired } from './sobaFetch';
 import { ApiError, isForbidden, isNotFound } from './sobaHelpers';
 
 /**
@@ -11,8 +11,7 @@ export function classifyDataError(cause: unknown): DataError {
   if (isSessionExpired(cause)) return { kind: 'sessionExpired', cause };
   if (isForbidden(cause)) return { kind: 'forbidden', cause };
   if (isNotFound(cause)) return { kind: 'notFound', cause };
-  // A fetch that never reached the server throws a TypeError.
-  if (cause instanceof TypeError) return { kind: 'offline', cause };
+  if (isNetworkError(cause)) return { kind: 'offline', cause };
   return { kind: 'failed', cause };
 }
 
@@ -23,13 +22,17 @@ export function messageForDataError(error: DataError, messages: DataErrorMessage
   return messages[error.kind] ?? messages.failed;
 }
 
-/** A request the server failed on (5xx) or that never reached it. */
-const isServerOrNetworkFailure = (cause: unknown): boolean =>
-  (cause instanceof ApiError && cause.status >= 500) || classifyDataError(cause).kind === 'offline';
+/**
+ * A server failure (5xx) or no response at all: the write may or may not have landed, so a retry
+ * must replay it.
+ */
+export const isOutcomeUnknown = (cause: unknown): boolean =>
+  (cause instanceof ApiError && cause.status >= 500) || isNetworkError(cause);
 
 /**
  * The message for an error the server sent a code with. Without a code, `failed` stands in for a
- * server or network failure; any other error is null, so the caller can show the server's text.
+ * server failure, no response, or an error that is not from the API. An uncoded client error (4xx)
+ * and an ended session are null, so the caller can show the server's text or the session message.
  */
 export function apiErrorMessage(
   cause: unknown,
@@ -37,8 +40,10 @@ export function apiErrorMessage(
   failed?: string,
 ): string | null {
   if (cause instanceof ApiError && cause.code) return messages[cause.code];
-  return failed !== undefined && isServerOrNetworkFailure(cause) ? failed : null;
+  if (failed === undefined || isSessionExpired(cause)) return null;
+  if (cause instanceof ApiError) return cause.status >= 500 ? failed : null;
+  return failed;
 }
 
-export { isSessionExpired } from './sobaFetch';
+export { isNetworkError, isSessionExpired } from './sobaFetch';
 export { isForbidden, isNotFound, isConflict } from './sobaHelpers';

@@ -27,7 +27,21 @@ function buildUrl(path: string, options: SobaFetchOptions): string {
   return `${getSobaApiBaseUrl()}${path}${queryString}`;
 }
 
-function send(
+/**
+ * Thrown when no response came back: fetch rejected, or the body was cut off mid-read. The request
+ * may or may not have reached the server.
+ */
+export class NetworkError extends Error {
+  constructor(cause: unknown) {
+    super('Network request failed', { cause });
+    this.name = 'NetworkError';
+  }
+}
+
+export const isNetworkError = (err: unknown): boolean =>
+  err instanceof Error && err.name === 'NetworkError';
+
+async function send(
   url: string,
   options: SobaFetchOptions,
   token: string | undefined,
@@ -44,12 +58,16 @@ function send(
     headers['Content-Type'] = 'application/json';
   }
 
-  return fetch(url, {
-    method: options.method ?? 'GET',
-    cache: options.cache ?? 'no-store',
-    headers,
-    body,
-  });
+  try {
+    return await fetch(url, {
+      method: options.method ?? 'GET',
+      cache: options.cache ?? 'no-store',
+      headers,
+      body,
+    });
+  } catch (err) {
+    throw new NetworkError(err);
+  }
 }
 
 /** Thrown instead of sending a call the caller meant to authenticate but no longer can. */

@@ -9,9 +9,28 @@ export type FillWrite = 'save' | 'submit';
 /** `resolve`: reloading or writing over after a held write. */
 export type FillBusy = FillWrite | 'resolve';
 
+/** The last draft save of this form, for a status line. */
+export type SaveStatus =
+  | { state: 'idle' }
+  | { state: 'saving' }
+  | { state: 'saved'; at: Date }
+  | { state: 'held' }
+  | { state: 'failed'; cause: unknown };
+
 /** The reason a write refused without sending carries. */
 export const BLOCKED_REASON = 'blocked';
 const BLOCKED: WriteOutcome<WriteResult> = { status: 'held', reason: BLOCKED_REASON };
+
+const saveStatusOf = (outcome: WriteOutcome<WriteResult>): SaveStatus => {
+  switch (outcome.status) {
+    case 'applied':
+      return { state: 'saved', at: new Date() };
+    case 'held':
+      return { state: 'held' };
+    case 'queued':
+      return { state: 'idle' };
+  }
+};
 
 const required = (base: { current: string | null }) => {
   if (base.current === null) throw new Error('No head revision to write on');
@@ -34,6 +53,7 @@ export function useFillWriter(submissionId: string, headRevisionId: string | nul
   const baseRef = useRef(headRevisionId);
   const saveInFlightRef = useRef<Promise<unknown> | null>(null);
   const [busy, setBusy] = useState<FillBusy | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>({ state: 'idle' });
   const [held, setHeld] = useState<FillWrite | null>(null);
   // Read by a submit that waited on a save, so it sees what that save left.
   const heldRef = useRef<FillWrite | null>(null);
@@ -65,11 +85,17 @@ export function useFillWriter(submissionId: string, headRevisionId: string | nul
     async (data: Record<string, unknown>): Promise<WriteOutcome<WriteResult>> => {
       if (blocked()) return BLOCKED;
       setBusy('save');
-      const run = writer.save(data, required(baseRef)).then((outcome) => settle('save', outcome));
+      setSaveStatus({ state: 'saving' });
+      const run = (async () => settle('save', await writer.save(data, required(baseRef))))();
       const inFlight = run.catch(() => undefined);
       saveInFlightRef.current = inFlight;
       try {
-        return await run;
+        const outcome = await run;
+        setSaveStatus(saveStatusOf(outcome));
+        return outcome;
+      } catch (err) {
+        setSaveStatus({ state: 'failed', cause: err });
+        throw err;
       } finally {
         if (saveInFlightRef.current === inFlight) saveInFlightRef.current = null;
         setBusy(null);
@@ -131,7 +157,7 @@ export function useFillWriter(submissionId: string, headRevisionId: string | nul
 
   return {
     signedIn,
-    status: { busy, held },
+    status: { busy, held, save: saveStatus },
     hasBase,
     save,
     submit,

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { ApiErrorCode } from '@soba/lib';
 import { ApiError, parseJson } from '@/src/shared/api/sobaHelpers';
-import { apiErrorMessage } from '@/src/shared/api/dataError';
-import { SessionExpiredError } from '@/src/shared/api/sobaFetch';
+import { apiErrorMessage, classifyDataError } from '@/src/shared/api/dataError';
+import { isNetworkError, NetworkError, SessionExpiredError } from '@/src/shared/api/sobaFetch';
 
 const errorResponse = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -41,6 +41,31 @@ describe('parseJson', () => {
   ])('drops %s', async (_label, body) => {
     expect(await errorFrom(errorResponse(403, body))).toMatchObject({ code: undefined });
   });
+
+  it('reports a body cut off mid-read as a NetworkError', async () => {
+    const cutOff = new TypeError('network error');
+    const response = { ok: true, status: 200, json: () => Promise.reject(cutOff) } as Response;
+    const err = await errorFrom(response);
+    expect(isNetworkError(err)).toBe(true);
+    expect((err as Error).cause).toBe(cutOff);
+  });
+
+  it('keeps invalid JSON a SyntaxError', async () => {
+    const response = new Response('not json', { status: 200 });
+    expect(await errorFrom(response)).toBeInstanceOf(SyntaxError);
+  });
+});
+
+describe('classifyDataError', () => {
+  it.each([
+    ['a request that never reached the server', new NetworkError(new TypeError('x')), 'offline'],
+    ['a TypeError from code', new TypeError('x is undefined'), 'failed'],
+    ['an ended session', new SessionExpiredError(), 'sessionExpired'],
+    ['a refusal', new ApiError('No', 403), 'forbidden'],
+    ['a server failure', new ApiError('Internal server error', 500), 'failed'],
+  ])('classifies %s', (_label, cause, kind) => {
+    expect(classifyDataError(cause).kind).toBe(kind);
+  });
 });
 
 describe('apiErrorMessage', () => {
@@ -60,7 +85,12 @@ describe('apiErrorMessage', () => {
 
   it.each([
     ['a server failure', new ApiError('Internal server error', 500), 'Try again.'],
-    ['a request that never reached the server', new TypeError('Failed to fetch'), 'Try again.'],
+    [
+      'a request that never reached the server',
+      new NetworkError(new TypeError('Failed to fetch')),
+      'Try again.',
+    ],
+    ['an error that is not from the API', new TypeError('x is undefined'), 'Try again.'],
     ['a coded error', new ApiError('No', 403, 'drafts_disabled'), 'Drafts are off.'],
     ['an uncoded client error', new ApiError('Engine says no', 400), null],
     ['an ended session', new SessionExpiredError(), null],

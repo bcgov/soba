@@ -51,7 +51,10 @@ vi.mock('@/app/[lang]/Providers', () => ({
         readOnly: 'You can view this submission only.',
         saveDraft: 'Save draft',
         savingDraft: 'Saving draft...',
-        draftSaved: 'Draft saved.',
+        savedAt: 'Draft saved at {time}',
+        notSaved: 'Draft not saved.',
+        notConfirmed: 'Draft may not be saved.',
+        offline: 'You are offline.',
         heldSave: 'Changed elsewhere; draft not saved.',
         heldSubmit: 'Changed elsewhere; not submitted.',
         reloadLatest: 'Reload latest version',
@@ -111,6 +114,7 @@ import makeStore from '@/lib/store';
 import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import { getActiveSubmission } from '@/src/features/formio-v5/activeSubmission';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
+import { NetworkError, SessionExpiredError } from '@/src/shared/api/sobaFetch';
 import FormioV5SubmissionFillClient from '@/src/features/formio-v5/ui/FormioV5SubmissionFillClient';
 import {
   SubmissionFillForm,
@@ -122,6 +126,9 @@ import { answerInit, renderInStore } from './keycloakInit';
 let store: ReturnType<typeof makeStore>;
 
 const notices = () => store.getState().notification.notifications.map((n) => n.text);
+
+// What sobaFetch throws when no response came back.
+const networkFailure = () => new NetworkError(new TypeError('Failed to fetch'));
 
 // The caller's role and the form's facts; with an IDIR caller these allow writing and draft saves.
 const facts = {
@@ -413,7 +420,7 @@ describe('FormioV5SubmissionFillClient', () => {
     });
 
     it('reuses the revision id when unchanged answers are resubmitted after a failure', async () => {
-      h.submitSobaFormSubmission.mockRejectedValueOnce(new Error('Failed to fetch'));
+      h.submitSobaFormSubmission.mockRejectedValueOnce(networkFailure());
       h.submitSobaFormSubmission.mockResolvedValue(writeResponse('current'));
       await renderReady();
       await submit({ a: 1 });
@@ -422,13 +429,27 @@ describe('FormioV5SubmissionFillClient', () => {
     });
 
     it('mints a new revision id when the answers change', async () => {
-      h.submitSobaFormSubmission.mockRejectedValueOnce(new Error('Failed to fetch'));
+      h.submitSobaFormSubmission.mockRejectedValueOnce(networkFailure());
       h.submitSobaFormSubmission.mockResolvedValue(writeResponse('current'));
       await renderReady();
       await submit({ a: 1 });
       await submit({ a: 2 });
       expect(sentBody(1).revisionId).not.toBe(sentBody(0).revisionId);
       expect(sentBody(1).baseRevisionId).toBe('rev-0');
+    });
+
+    it('shows the offline message, and releases the button, when the submit never left', async () => {
+      h.submitSobaFormSubmission.mockRejectedValue(networkFailure());
+      await renderReady();
+      await submit({ a: 1 });
+      expect(screen.getByTestId('submission-fill-render-error')).toHaveTextContent(
+        'You are offline.',
+      );
+      expect(h.instance.emit).toHaveBeenCalledWith(
+        'submitError',
+        'The form could not be displayed.',
+      );
+      expect(h.replace).not.toHaveBeenCalled();
     });
 
     it('replaces the fill page with the confirmation when the submit becomes current', async () => {
@@ -516,6 +537,7 @@ describe('FormioV5SubmissionFillClient', () => {
       await waitFor(() => expect(saveButton()).toBeEnabled());
     };
     const saveDraft = () => userEvent.click(saveButton());
+    const saveStatus = () => screen.getByTestId('submission-fill-save-status');
     const savedBody = (call: number) =>
       h.saveSobaFormSubmission.mock.calls[call][2] as {
         data: Record<string, unknown>;
@@ -566,7 +588,62 @@ describe('FormioV5SubmissionFillClient', () => {
         revisionId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7/),
         baseRevisionId: 'rev-0',
       });
-      await waitFor(() => expect(notices()).toEqual(['Draft saved.']));
+    });
+
+    it('reports the save in the status line, with the time it landed', async () => {
+      const clicked = new Date('2026-10-12T21:42:00Z');
+      const landed = new Date('2026-10-12T21:47:00Z');
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(clicked);
+      try {
+        h.saveSobaFormSubmission.mockImplementation(async () => {
+          vi.setSystemTime(landed);
+          return saveResponse('rev-1');
+        });
+        await renderLoaded();
+        expect(saveStatus().textContent).toBe('');
+        await saveDraft();
+        const time = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+        await waitFor(() =>
+          expect(saveStatus().textContent).toBe(`Draft saved at ${time.format(landed)}`),
+        );
+        expect(notices()).toEqual([]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('says the draft is saving in the status line, with the button label unchanged', async () => {
+      h.saveSobaFormSubmission.mockReturnValue(new Promise(() => undefined));
+      await renderLoaded();
+      await saveDraft();
+      expect(saveStatus()).toHaveTextContent('Saving draft...');
+      expect(saveButton()).toHaveTextContent('Save draft');
+      expect(saveButton()).toBeDisabled();
+    });
+
+    it('says the draft was not saved when the save is held', async () => {
+      h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-x', 'pending', 'conflict'));
+      await renderLoaded();
+      await saveDraft();
+      await waitFor(() => expect(saveStatus().textContent).toBe('Draft not saved.'));
+    });
+
+    it('replays the save id after a submit that also got no response', async () => {
+      h.saveSobaFormSubmission.mockRejectedValueOnce(networkFailure());
+      h.submitSobaFormSubmission.mockRejectedValueOnce(networkFailure());
+      h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-1'));
+      h.formData = { a: 1 };
+      await renderLoaded();
+      await saveDraft();
+      await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(1));
+      await act(() => h.onSubmit!({ data: { a: 1 } }));
+      expect(h.submitSobaFormSubmission).toHaveBeenCalledTimes(1);
+      const submitted = h.submitSobaFormSubmission.mock.calls[0][2] as { revisionId: string };
+      expect(submitted.revisionId).not.toBe(savedBody(0).revisionId);
+      await saveDraft();
+      await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(2));
+      expect(savedBody(1).revisionId).toBe(savedBody(0).revisionId);
     });
 
     it('bases the next save and the submit on the revision the save produced', async () => {
@@ -598,7 +675,7 @@ describe('FormioV5SubmissionFillClient', () => {
     });
 
     it('reuses the revision id when an unchanged save is retried after a failure', async () => {
-      h.saveSobaFormSubmission.mockRejectedValueOnce(new Error('Failed to fetch'));
+      h.saveSobaFormSubmission.mockRejectedValueOnce(networkFailure());
       h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-1'));
       h.formData = { a: 1 };
       await renderLoaded();
@@ -658,40 +735,49 @@ describe('FormioV5SubmissionFillClient', () => {
       [
         'the message for its code',
         new ApiError('Drafts are not enabled for this form', 403, 'drafts_disabled'),
-        'Drafts are off for this form.',
+        'Draft not saved. Drafts are off for this form.',
       ],
       [
         'the message for a submission deleted meanwhile',
         new ApiError('Submission not found', 404, 'submission_not_found'),
-        'This submission is gone.',
+        'Draft not saved. This submission is gone.',
       ],
       [
         'the message for a revision id another write used',
         new ApiError('Revision id already used by another write', 409, 'revision_id_taken'),
-        'Reload and try again.',
+        'Draft not saved. Reload and try again.',
       ],
       [
-        'the generic message for a server failure',
+        'that a save the server failed on may have landed',
         new ApiError('Internal server error', 500),
-        'The request failed.',
+        'Draft may not be saved. The request failed.',
       ],
       [
-        'the generic message when the server is unreachable',
-        new TypeError('Failed to fetch'),
-        'The request failed.',
+        'that a save with no response may have landed',
+        networkFailure(),
+        'Draft may not be saved. You are offline.',
+      ],
+      [
+        'the ended session message',
+        new SessionExpiredError(),
+        'Draft not saved. Your session has ended.',
+      ],
+      [
+        'the generic message, not the offline one, for an error that is not from the API',
+        new TypeError('x is undefined'),
+        'Draft not saved. The request failed.',
       ],
       [
         'the server text for an uncoded client error',
         new ApiError('Engine rejected the data', 400),
-        'Engine rejected the data',
+        'Draft not saved. Engine rejected the data',
       ],
-    ])('shows %s when a save fails', async (_label, failure, text) => {
+    ])('shows %s in the status line when a save fails', async (_label, failure, text) => {
       h.saveSobaFormSubmission.mockRejectedValue(failure);
       await renderLoaded();
       await saveDraft();
-      await waitFor(() =>
-        expect(screen.getByTestId('submission-fill-render-error')).toHaveTextContent(text),
-      );
+      await waitFor(() => expect(saveStatus().textContent).toBe(text));
+      expect(screen.queryByTestId('submission-fill-render-error')).not.toBeInTheDocument();
     });
 
     it('offers to reload or keep the filler version when the save conflicts', async () => {
@@ -934,7 +1020,11 @@ describe('SubmissionFillForm', () => {
       requestFailed: 'The request failed.',
       rendererError: 'The form could not be displayed.',
       saveDraft: 'Save draft',
-      draftSaved: 'Draft saved.',
+      savingDraft: 'Saving draft...',
+      savedAt: 'Draft saved at {time}',
+      notSaved: 'Draft not saved.',
+      notConfirmed: 'Draft may not be saved.',
+      offline: 'You are offline.',
       errors: {},
     } as unknown as FillLabels;
     const writable: FillView = { ...view({ a: 1 }), canSaveDraft: true };
@@ -985,8 +1075,8 @@ describe('SubmissionFillForm', () => {
       await act(() => store.dispatch(setToken(undefined)));
       await saveDraft();
       await waitFor(() =>
-        expect(screen.getByTestId('submission-fill-render-error')).toHaveTextContent(
-          'Your session has ended.',
+        expect(screen.getByTestId('submission-fill-save-status')).toHaveTextContent(
+          'Draft not saved. Your session has ended.',
         ),
       );
       expect(h.saveSobaFormSubmission).not.toHaveBeenCalled();

@@ -104,6 +104,11 @@ describe('StartSubmission', () => {
       'Could not start the form.',
     ],
     ['the server text for an uncoded client error', new ApiError('Bad id', 400), 'Bad id'],
+    [
+      'the generic message for an error that is not from the API',
+      new TypeError('x is undefined'),
+      'Could not start the form.',
+    ],
   ])('shows %s when the open is refused', async (_label, refused, text) => {
     h.openSobaFormSubmission.mockRejectedValue(refused);
     await renderInStore(store, <StartSubmission />);

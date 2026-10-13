@@ -1,4 +1,5 @@
 import { ApiErrorCodeSchema, type ApiErrorCode } from '@soba/lib';
+import { NetworkError } from './sobaFetch';
 
 /**
  * Carries the HTTP status so callers can tell a refusal from a failure, and the server's error code
@@ -44,6 +45,12 @@ export async function parseJson<T>(response: Response): Promise<T> {
     }
     throw new ApiError(message, response.status, code);
   }
-  // Unchecked cast. A caller that expects a list has to guard for one.
-  return (await response.json()) as T;
+  try {
+    // Unchecked cast. A caller that expects a list has to guard for one.
+    return (await response.json()) as T;
+  } catch (err) {
+    // A body cut off mid-read rejects with a TypeError; invalid JSON is a SyntaxError.
+    if (err instanceof TypeError) throw new NetworkError(err);
+    throw err;
+  }
 }
