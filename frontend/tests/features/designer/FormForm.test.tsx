@@ -156,9 +156,17 @@ vi.mock('@bcgov/design-system-react-components', async (importOriginal) => {
     }) => {
       return (
         <div data-testid={testId}>
+          {/* As react-aria's hidden select does, input and change both report a selection that
+              differs from the selected key. */}
           <select
             value={selectedKey || ''}
-            onChange={(e) => onSelectionChange?.(e.target.value)}
+            onChange={(e) => {
+              if (e.target.value !== (selectedKey || '')) onSelectionChange?.(e.target.value);
+            }}
+            onInput={(e) => {
+              const value = e.currentTarget.value;
+              if (value !== (selectedKey || '')) onSelectionChange?.(value);
+            }}
             aria-label={ariaLabel}
           >
             <option value="">Select...</option>
@@ -508,6 +516,26 @@ describe('FormForm', () => {
     await userEvent.click(screen.getByTestId('save-form-button'));
     await waitFor(() => expect(api.saveFormVersionSchema).toHaveBeenCalledTimes(1));
     expect(api.saveFormVersionSchema.mock.calls[0][1]).toBe('v-new');
+  });
+
+  // A change to the native select fires input and then change in one task, before React re-renders.
+  it('creates one version when one pick reports the selection twice', async () => {
+    mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+    await waitFor(() => expect(screen.getByTestId('form-designer')).toBeInTheDocument());
+
+    const picker = screen
+      .getByTestId('form-version-select')
+      .querySelector('select') as HTMLSelectElement;
+    act(() => {
+      picker.value = 'create';
+      picker.dispatchEvent(new Event('input', { bubbles: true }));
+      picker.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await waitFor(() => expect(api.createFormVersion).toHaveBeenCalled());
+    expect(api.createFormVersion).toHaveBeenCalledTimes(1);
   });
 
   // A new version's 409 is the backend's reason, not a form that changed since it was opened.

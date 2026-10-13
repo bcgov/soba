@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Tabs, Tab } from 'react-bootstrap';
 import { Button, Select } from '@bcgov/design-system-react-components';
@@ -149,6 +149,8 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   const { addNotification } = useNotificationStore();
 
   const [isSaving, setIsSaving] = useState(false);
+  // isSaving lags a render, so a second call in the same task still sees false; this does not.
+  const writing = useRef(false);
   const [showPreview, setShowPreview] = useState(false);
 
   const {
@@ -258,7 +260,8 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   const applyNewVersion = async (
     run: () => ReturnType<typeof formWriter.createVersion>,
   ): Promise<boolean> => {
-    if (isSaving || draftUnavailable || !token) return false;
+    if (writing.current || draftUnavailable || !token) return false;
+    writing.current = true;
     setIsSaving(true);
     try {
       const outcome = await run();
@@ -282,6 +285,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
       await reportWriteFailure(e, dict.form.createVersionError || 'Failed to create new version.');
       return false;
     } finally {
+      writing.current = false;
       setIsSaving(false);
     }
   };
@@ -307,9 +311,10 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   };
 
   const saveForm = async (publish: boolean = false) => {
-    if (isSaving || draftUnavailable) return;
+    if (writing.current || draftUnavailable) return;
     // An existing form with no current version. Saving here would file the edits under a second form.
     if (!currentVersion?.id) return;
+    writing.current = true;
     setIsSaving(true);
     try {
       await formWriter.saveSchema(
@@ -326,6 +331,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     } catch (e: unknown) {
       await reportWriteFailure(e, dict.form.saveError);
     } finally {
+      writing.current = false;
       setIsSaving(false);
     }
   };
