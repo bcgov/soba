@@ -54,10 +54,16 @@ export function setActiveOpener(open: (() => Promise<void>) | null): void {
   activeOpener = open;
 }
 
-/** The active submission's id, once it is open: an upload must not name one that does not exist. */
+/**
+ * The active submission's id, once it is open: an upload must not name one that does not exist. The
+ * id and its opener are read together, so a form mounted while the open is in flight does not rename
+ * the upload.
+ */
 export async function openedActiveSubmissionId(): Promise<string> {
-  await activeOpener?.();
-  return getActiveSubmission()?.submissionId ?? '';
+  const submissionId = getActiveSubmission()?.submissionId ?? '';
+  const open = activeOpener;
+  await open?.();
+  return submissionId;
 }
 
 export function clearActiveSubmission(): void {

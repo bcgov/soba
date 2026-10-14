@@ -22,7 +22,11 @@ import { isFormUpdated } from '@/src/features/formio-v5/data/useSubmissionOpener
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { apiErrorMessage, isNetworkError, isOutcomeUnknown } from '@/src/shared/api/dataError';
 import { useFormatTime } from '@/src/shared/hooks/useFormatLongDate';
-import type { SubmitFillBundle, SubmitFormVersionSchemaResponse } from '@/src/types/forms';
+import type {
+  SubmitFillBundle,
+  SubmitFormVersionSchemaResponse,
+  SubmitterForm,
+} from '@/src/types/forms';
 
 export type FillLabels = {
   loading: string;
@@ -64,9 +68,14 @@ export type FillView = {
   open?: () => Promise<string>;
 };
 
-/** A newer version to move a submission not opened yet to, with the answers typed so far. */
-export type FormUpdate = {
+/** A newer version of the form, with its facts as read with it. */
+type NewerVersion = {
   version: SubmitFormVersionSchemaResponse;
+  form: SubmitterForm;
+};
+
+/** A newer version to move a submission not opened yet to, with the answers typed so far. */
+export type FormUpdate = NewerVersion & {
   data: Record<string, unknown>;
 };
 
@@ -75,6 +84,8 @@ type FormInstance = {
   submit: () => Promise<unknown>;
   setSubmission: (submission: { data: Record<string, unknown> }) => Promise<unknown>;
   submission: { data?: Record<string, unknown> };
+  /** Form.io's blur, scheduled to run a moment after a field loses focus. */
+  pendingBlur?: { cancel?: () => void } | null;
 };
 
 /**
@@ -114,12 +125,19 @@ export function SubmissionFillForm({
 
   const [renderError, setRenderError] = useState<string | null>(null);
   // A newer version of the form, found by an open; the filler moves over to it.
-  const [updated, setUpdated] = useState<SubmitFormVersionSchemaResponse | null>(null);
+  const [updated, setUpdated] = useState<NewerVersion | null>(null);
   // The live Form.io webform: a save reads its answers, "Submit my version" submits it, and a failed
   // submit must emit on it or its button spins forever.
   const formInstanceRef = useRef<FormInstance | null>(null);
   // True once the loaded answers are in the webform.
   const [formReady, setFormReady] = useState(false);
+
+  // A field that loses focus as the form unmounts, as when a click mounts a new one, leaves Form.io
+  // a blur to run a moment later on the destroyed webform, where it throws.
+  useEffect(() => {
+    const instance = formInstanceRef;
+    return () => instance.current?.pendingBlur?.cancel?.();
+  }, []);
 
   // Expose the submission being filled, its session and, while it is not opened yet, how to open it,
   // to the CHEFS upload provider; clear it when leaving so a stale id can't tag an unrelated upload
@@ -131,7 +149,7 @@ export function SubmissionFillForm({
       open
         ? () =>
             ensureOpened().catch((err: unknown) => {
-              if (isFormUpdated(err)) setUpdated(err.version);
+              if (isFormUpdated(err)) setUpdated({ version: err.version, form: err.form });
               throw err;
             })
         : null,
@@ -207,7 +225,7 @@ export function SubmissionFillForm({
     if (!instance || !writer.hasBase()) return;
     setRenderError(null);
     const outcome = await writer.save(instance.submission.data ?? {}).catch((err: unknown) => {
-      if (isFormUpdated(err)) setUpdated(err.version);
+      if (isFormUpdated(err)) setUpdated({ version: err.version, form: err.form });
       return null;
     });
     if (outcome?.status === 'held' && outcome.reason === 'closed') leaveClosed();
@@ -241,7 +259,7 @@ export function SubmissionFillForm({
       }
     } catch (err) {
       if (isFormUpdated(err)) {
-        setUpdated(err.version);
+        setUpdated({ version: err.version, form: err.form });
         releaseSubmit();
         return;
       }
@@ -253,7 +271,7 @@ export function SubmissionFillForm({
   // Mounts the newer version with the answers typed so far; nothing is sent until the filler writes.
   const continueUpdated = () => {
     if (!updated) return;
-    onFormUpdated?.({ version: updated, data: formInstanceRef.current?.submission.data ?? {} });
+    onFormUpdated?.({ ...updated, data: formInstanceRef.current?.submission.data ?? {} });
   };
 
   // Discards the typed answers: the container mounts a new form on the latest bundle.

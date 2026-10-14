@@ -1213,6 +1213,25 @@ describe('SubmissionFillForm', () => {
     });
   });
 
+  // A click that mounts a new form blurs the field Form.io had focused, and Form.io runs that blur a
+  // moment later, on the webform it has destroyed by then.
+  it('cancels the blur Form.io scheduled when the form unmounts', async () => {
+    const cancel = vi.fn();
+    const instance = h.instance as typeof h.instance & { pendingBlur?: { cancel: () => void } };
+    instance.pendingBlur = { cancel };
+    try {
+      let rendered: ReturnType<typeof render> | undefined;
+      await act(async () => {
+        rendered = render(tree(view({ a: 1 })));
+      });
+      expect(cancel).not.toHaveBeenCalled();
+      rendered!.unmount();
+      expect(cancel).toHaveBeenCalledTimes(1);
+    } finally {
+      delete instance.pendingBlur;
+    }
+  });
+
   it('keeps Form.io on the bundle it mounted with when given a new one', async () => {
     const view1 = view({ a: 1 });
     let rendered: ReturnType<typeof render> | undefined;

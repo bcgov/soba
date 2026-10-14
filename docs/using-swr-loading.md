@@ -13,14 +13,7 @@ it.
 ```ts
 const { data, isLoading, error, mutate } = useAuthedSWR(
   formId && opened
-    ? [
-        "form-submissions",
-        formId,
-        query.offset,
-        query.limit,
-        query.sort,
-        query.q ?? "",
-      ]
+    ? ['form-submissions', formId, query.offset, query.limit, query.sort, query.q ?? '']
     : null,
   (token) =>
     getSobaSubmissions(token, {
@@ -86,7 +79,7 @@ must say which identity it is, or signing in gets served the anonymous reader's 
 ```ts
 !initStarted || initializing || !submissionId
   ? null
-  : ["submit-submission", submissionId, token ? "user" : "anonymous"];
+  : ['submit-submission', submissionId, token ? 'user' : 'anonymous'];
 ```
 
 `!initStarted` is the guard that matters. Before Keycloak has run, "no token" is the
@@ -103,17 +96,10 @@ requests.
 export function useWorkspaces() {
   const { data, isLoading, error, mutate } = useAuthedSWR<WorkspaceItem[]>(
     WORKSPACES_KEY,
-    async (token) =>
-      toItems((await fetchWorkspaces(token, PICKER_QUERY)).items),
+    async (token) => toItems((await fetchWorkspaces(token, PICKER_QUERY)).items),
     sessionReadConfig,
   );
-  return {
-    workspaces: data ?? EMPTY,
-    loaded: data !== undefined,
-    isLoading,
-    error,
-    mutate,
-  };
+  return { workspaces: data ?? EMPTY, loaded: data !== undefined, isLoading, error, mutate };
 }
 ```
 

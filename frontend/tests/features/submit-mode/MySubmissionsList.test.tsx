@@ -288,6 +288,9 @@ describe('MySubmissionsList', () => {
     access.pending = true;
     const view = await renderList();
     await waitFor(() => expect(getMySubmissions).toHaveBeenCalled());
+    // The response has landed; the rows still wait for the caller.
+    await act(async () => undefined);
+    expect(screen.getByTestId('datatable-loading')).toBeInTheDocument();
     expect(screen.queryByTestId('s1-continue')).not.toBeInTheDocument();
     expect(screen.queryByTestId('s1-view')).not.toBeInTheDocument();
     access.pending = false;

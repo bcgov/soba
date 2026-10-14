@@ -4,12 +4,13 @@ import { SUBMISSION_SORT_FIELDS } from '../sort';
 import { SubmissionParticipantRole, SubmissionWorkflowState } from '../permissions/codes';
 import { SubmitterFormSchema } from './forms';
 
+// Ids are lower-cased as Postgres stores them, so a retry spelled in another case still matches.
 export const OpenSubmissionBodySchema = z.object({
   // v7 only: the client mints this id, and it is the submission's identity.
-  id: z.uuidv7(),
-  formId: z.string().min(1),
+  id: z.uuidv7().toLowerCase(),
+  formId: z.string().min(1).toLowerCase(),
   // Must be the form's published version when given.
-  formVersionId: z.uuid().optional(),
+  formVersionId: z.uuid().toLowerCase().optional(),
 });
 
 export const SubmissionDataBodySchema = z.object({

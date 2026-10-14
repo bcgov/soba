@@ -52,9 +52,9 @@ export interface FillWriterOptions {
  * filler keeps their version. A new submission is opened by its first save, submit or upload, one
  * open at a time, and a failed open is tried again by the next. A save opens it inside its own
  * flight, so a submit waiting on that save waits for the open too. A submit waits for a save in
- * flight and is based on the revision that save produces. A write held as a conflict blocks every later write until the filler reloads or
- * keeps theirs; a record found submitted blocks every later write. A blocked write sends nothing and
- * returns held with BLOCKED_REASON.
+ * flight and is based on the revision that save produces. A write held as a conflict blocks every
+ * later write until the filler reloads or keeps theirs; a record found submitted blocks every later
+ * write. A blocked write sends nothing and returns held with BLOCKED_REASON.
  */
 export function useFillWriter(
   submissionId: string,

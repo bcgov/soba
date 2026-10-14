@@ -16,6 +16,21 @@ describe('OpenSubmissionBodySchema', () => {
     expect(OpenSubmissionBodySchema.safeParse({ id, formId: 'f1' }).success).toBe(false);
   });
 
+  // A retried open must match the row Postgres stores, which spells ids lower-case.
+  it('lower-cases the ids an open names', () => {
+    expect(
+      OpenSubmissionBodySchema.parse({
+        id: '01A12D03-75A8-73BC-A106-CE3787EE9A1E',
+        formId: '01A12D03-1D06-764D-B997-599461E8AB19',
+        formVersionId: '01A12D03-7640-748F-B008-2C331DE67244',
+      }),
+    ).toEqual({
+      id: '01a12d03-75a8-73bc-a106-ce3787ee9a1e',
+      formId: '01a12d03-1d06-764d-b997-599461e8ab19',
+      formVersionId: '01a12d03-7640-748f-b008-2c331de67244',
+    });
+  });
+
   it('accepts a v7 id', () => {
     const id = '01a08da2-5717-7348-a6a7-ee556b9980b3';
     expect(OpenSubmissionBodySchema.safeParse({ id, formId: 'f1' }).success).toBe(true);

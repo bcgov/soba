@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { ApiErrorCodes } from '@soba/lib';
 import {
   getSubmitForm,
@@ -9,7 +9,7 @@ import {
 } from '@/src/shared/api/sobaApi';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 import { useCallToken } from '@/src/shared/api/callToken';
-import type { SubmitFormVersionSchemaResponse } from '@/src/types/forms';
+import type { SubmitFormVersionSchemaResponse, SubmitterForm } from '@/src/types/forms';
 import type { SubmissionResponse } from '@/src/types/submissions';
 
 /** The version a new submission was rendered from, as the schema read gave it. */
@@ -18,9 +18,15 @@ export interface RenderedVersion {
   schemaHash: string;
 }
 
-/** The form was published again with a schema that renders differently from the one filled in. */
+/**
+ * The form was published again with a schema that renders differently from the one filled in.
+ * Carries the new version and the form's facts as read with it.
+ */
 export class FormUpdatedError extends Error {
-  constructor(readonly version: SubmitFormVersionSchemaResponse) {
+  constructor(
+    readonly version: SubmitFormVersionSchemaResponse,
+    readonly form: SubmitterForm,
+  ) {
     super('The form was updated after it was opened');
     this.name = 'FormUpdatedError';
   }
@@ -41,18 +47,30 @@ const headOf = (opened: SubmissionResponse): string => {
 /**
  * Opens a new submission on the version it was rendered from, as the page's session, under the id the
  * page minted; a retry of the same id replays. When that version has been replaced, opens on the new
- * one if its schema renders the same, or throws FormUpdatedError for the filler to move over.
+ * one if its schema renders the same, or throws FormUpdatedError for the filler to move over. A retry
+ * starts from the version it last sent when that renders the same, since an open whose answer was
+ * lost may have landed there.
  */
 export function useSubmissionOpener(formId: string, submissionId: string, signedIn: boolean) {
   const { tokenFor } = useCallToken();
+  const lastSent = useRef<RenderedVersion | null>(null);
   const open = useCallback(
     async (rendered: RenderedVersion): Promise<string> => {
-      const openOn = async (formVersionId: string) =>
-        headOf(
-          await openSobaFormSubmission(tokenFor(signedIn), formId, submissionId, formVersionId),
+      const openOn = async (version: RenderedVersion) => {
+        lastSent.current = version;
+        return headOf(
+          await openSobaFormSubmission(
+            tokenFor(signedIn),
+            formId,
+            submissionId,
+            version.formVersionId,
+          ),
         );
+      };
+      const first =
+        lastSent.current?.schemaHash === rendered.schemaHash ? lastSent.current : rendered;
       try {
-        return await openOn(rendered.formVersionId);
+        return await openOn(first);
       } catch (err) {
         if (!isVersionReplaced(err)) throw err;
         const form = await getSubmitForm(tokenFor(signedIn), formId);
@@ -61,8 +79,8 @@ export function useSubmissionOpener(formId: string, submissionId: string, signed
           tokenFor(signedIn),
           form.publishedVersionId ?? '',
         );
-        if (latest.schemaHash !== rendered.schemaHash) throw new FormUpdatedError(latest);
-        return openOn(latest.formVersionId);
+        if (latest.schemaHash !== rendered.schemaHash) throw new FormUpdatedError(latest, form);
+        return openOn(latest);
       }
     },
     [formId, submissionId, signedIn, tokenFor],

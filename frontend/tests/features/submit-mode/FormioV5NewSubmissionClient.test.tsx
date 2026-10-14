@@ -45,6 +45,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
       not_published: 'This form is not accepting submissions.',
       form_not_found: 'This form could not be found.',
       submission_id_taken: 'Reload the page to start again.',
+      version_not_published: 'This version of the form is no longer accepting submissions.',
     },
     formioV5: {
       formRender: {
@@ -121,7 +122,10 @@ vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => {
 
 import makeStore from '@/lib/store';
 import { clear } from '@/lib/slices/keycloakSlice';
-import { openedActiveSubmissionId } from '@/src/features/formio-v5/activeSubmission';
+import {
+  openedActiveSubmissionId,
+  setActiveSubmission,
+} from '@/src/features/formio-v5/activeSubmission';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 import { NetworkError } from '@/src/shared/api/sobaFetch';
 import FormioV5NewSubmissionClient from '@/src/features/formio-v5/ui/FormioV5NewSubmissionClient';
@@ -289,7 +293,7 @@ describe('FormioV5NewSubmissionClient', () => {
     expect(h.replace).toHaveBeenCalledWith(`/en/submission/${openedId()}/success`);
   });
 
-  it('opens once for a save and a submit made together', async () => {
+  it('bases a submit made during the first save on that save, opening once', async () => {
     let finishOpen: (value: unknown) => void = () => undefined;
     h.openSobaFormSubmission.mockImplementationOnce(
       (_token: unknown, _formId: unknown, id: string) =>
@@ -449,9 +453,82 @@ describe('FormioV5NewSubmissionClient', () => {
     const page = await renderTree();
     await waitFor(() => expect(saveButton()).toBeEnabled());
     await userEvent.click(saveButton());
+    await waitFor(() => expect(h.openSobaFormSubmission).toHaveBeenCalledTimes(1));
     await page.unmount();
     await land();
     expect(replaceState).not.toHaveBeenCalled();
+  });
+
+  it('moves the address under the base path the app is served from', async () => {
+    vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/designer');
+    try {
+      globalThis.history.pushState(null, '', '/designer/en/form/form-1');
+      await renderLoaded();
+      await userEvent.click(saveButton());
+      await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(1));
+      expect(replaceState).toHaveBeenCalledWith(null, '', `/designer/en/submit/${openedId()}`);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('names nothing for an upload once the page is gone, and opens nothing', async () => {
+    const page = await renderTree();
+    await waitFor(() => expect(saveButton()).toBeEnabled());
+    await page.unmount();
+    let named: string | null = null;
+    await act(async () => {
+      named = await openedActiveSubmissionId();
+    });
+    expect(named).toBe('');
+    expect(h.openSobaFormSubmission).not.toHaveBeenCalled();
+  });
+
+  it('names the submission an upload was opened for, though another is filled by then', async () => {
+    const land = holdOpen();
+    await renderLoaded();
+    let named: Promise<string> = Promise.resolve('');
+    act(() => {
+      named = openedActiveSubmissionId();
+    });
+    await waitFor(() => expect(h.openSobaFormSubmission).toHaveBeenCalledTimes(1));
+    setActiveSubmission({ submissionId: 'another-submission', signedIn: false });
+    await land();
+    expect(await named).toBe(openedId());
+  });
+
+  it.each([
+    ['the caller', () => (h.access = { caller: { idpCode: null }, pending: true })],
+    ['the file limits', () => (h.files = { option: {}, ready: false })],
+  ])('waits for %s before mounting the form', async (_label, arrange) => {
+    arrange();
+    await renderPage();
+    await waitFor(() => expect(h.getSubmitFormVersionSchema).toHaveBeenCalled());
+    await act(async () => undefined);
+    expect(screen.queryByTestId('fill-form')).not.toBeInTheDocument();
+  });
+
+  it('shows the load text, not the fill page offline text, when the form cannot be reached', async () => {
+    h.getSubmitForm.mockRejectedValue(new NetworkError(new TypeError('Failed')));
+    await renderPage();
+    await waitFor(() =>
+      expect(screen.getByTestId('new-submission-loaderror')).toHaveTextContent(
+        'Could not load the form.',
+      ),
+    );
+  });
+
+  it('says why when the schema read is refused', async () => {
+    h.getSubmitFormVersionSchema.mockRejectedValue(
+      new ApiError('Form version is not the published version', 409, 'version_not_published'),
+    );
+    await renderPage();
+    await waitFor(() =>
+      expect(screen.getByTestId('new-submission-loaderror')).toHaveTextContent(
+        'This version of the form is no longer accepting submissions.',
+      ),
+    );
+    expect(screen.queryByTestId('fill-form')).not.toBeInTheDocument();
   });
 
   it('stays busy after Reload latest until the fill page takes over', async () => {
@@ -494,6 +571,47 @@ describe('FormioV5NewSubmissionClient', () => {
         .mockResolvedValue({ ...form, publishedVersionId: 'ver-2' });
     });
 
+    // A form without drafts has no Save draft, so its submit is the write that opens.
+    it('asks on a submit, and moves with the facts read with the new version', async () => {
+      const changed = { components: [{ key: 'email', type: 'email' }] };
+      h.getSubmitForm.mockReset();
+      h.getSubmitForm
+        .mockResolvedValueOnce({ ...form, allowSubmitterDrafts: false })
+        .mockResolvedValue({ ...form, publishedVersionId: 'ver-2', allowSubmitterDrafts: true });
+      h.getSubmitFormVersionSchema.mockImplementation(async (_token: unknown, id: string) =>
+        id === 'ver-2' ? version(id, 'hash-2', changed) : version(id, 'hash-1'),
+      );
+      await renderPage();
+      await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+      expect(screen.queryByTestId('submission-fill-save-draft')).not.toBeInTheDocument();
+      await submit({ name: 'Ada' });
+      expect(screen.getByTestId('submission-fill-form-updated')).toBeInTheDocument();
+      expect(h.instance.emit).toHaveBeenCalledWith('submitError', '');
+      expect(screen.queryByTestId('submission-fill-render-error')).not.toBeInTheDocument();
+      expect(h.submitSobaFormSubmission).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByTestId('submission-fill-continue-updated'));
+      await waitFor(() => expect(h.mounts).toBe(2));
+      expect(h.form).toEqual(changed);
+      expect(screen.getByTestId('submission-fill-save-draft')).toBeInTheDocument();
+    });
+
+    it('tries the version it last sent first, where an open whose answer was lost landed', async () => {
+      h.getSubmitFormVersionSchema.mockImplementation(async (_token: unknown, id: string) =>
+        version(id, 'hash-1'),
+      );
+      h.openSobaFormSubmission.mockRejectedValueOnce(new NetworkError(new TypeError('Failed')));
+      await renderLoaded();
+      await userEvent.click(saveButton());
+      await waitFor(() =>
+        expect(saveStatus().textContent).toBe('Draft may not be saved. You are offline.'),
+      );
+      expect([openedOn(0), openedOn(1)]).toEqual(['ver-1', 'ver-2']);
+      await userEvent.click(saveButton());
+      await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(1));
+      expect(openedOn(2)).toBe('ver-2');
+      expect(openedId(2)).toBe(openedId(0));
+    });
+
     it('opens on the new version without asking when it renders the same', async () => {
       h.getSubmitFormVersionSchema.mockImplementation(async (_token: unknown, id: string) =>
         version(id, 'hash-1'),
@@ -533,6 +651,8 @@ describe('FormioV5NewSubmissionClient', () => {
       expect(h.form).toEqual(changed);
       expect(h.submission).toEqual({ data: { name: 'Ada', extra: 'typed' } });
       expect(screen.queryByTestId('new-submission-session-expired')).not.toBeInTheDocument();
+      // Still writable: the next write reports the ended session rather than a read-only form.
+      expect(h.options?.readOnly).toBe(false);
     });
 
     it('asks before moving to a version that renders differently, and sends nothing', async () => {

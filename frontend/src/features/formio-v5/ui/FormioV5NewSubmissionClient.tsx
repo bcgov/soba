@@ -28,7 +28,7 @@ import { apiErrorMessage } from '@/src/shared/api/dataError';
 import { useAccessCaller } from '@/src/shared/api/useAccessCaller';
 import { useAuthErrorDefaults } from '@/src/shared/api/useDataErrorNotice';
 import { LoadErrorAlert } from '@/src/shared/ui/LoadErrorAlert';
-import type { SubmitFillBundle, SubmitterForm } from '@/src/types/forms';
+import type { SubmitFillBundle } from '@/src/types/forms';
 
 /** A form or schema read failure, with the form's copy: refused as an open would be. */
 function FormLoadAlert({ error, labels }: Readonly<{ error: DataError; labels: FillLabels }>) {
@@ -41,7 +41,9 @@ function FormLoadAlert({ error, labels }: Readonly<{ error: DataError; labels: F
         ...authDefaults,
         forbidden: coded ?? authDefaults.forbidden,
         notFound: coded ?? labels.errors.form_not_found,
-        offline: labels.offline,
+        // The form never loaded, so the fill page's offline text, which speaks of kept answers, would
+        // mislead.
+        offline: labels.loadError,
         failed: apiErrorMessage(error.cause, labels.errors, labels.loadError) ?? labels.loadError,
       }}
       testIds={{
@@ -54,8 +56,8 @@ function FormLoadAlert({ error, labels }: Readonly<{ error: DataError; labels: F
   );
 }
 
-/** A move to a newer version, with the form facts the move was made under. */
-type MovedTo = FormUpdate & { form: SubmitterForm };
+/** A move to a newer version, with the decisions of the form it moved from. */
+type MovedTo = FormUpdate & { canWrite: boolean; canSaveDraft: boolean };
 
 /** A path as the ids in it read: the router keeps an address percent-encoded. */
 const decodedPath = (path: string): string => {
@@ -153,7 +155,9 @@ function NewSubmissionFill({ formId, labels }: Readonly<{ formId: string; labels
 
   // The published version is one load and each move to a newer version another. A move carries
   // the facts and the version it needs, so a read failing since, as when the session ends, does not
-  // stop it.
+  // stop it. Its decisions only widen on the form it moved from: a caller who could write keeps
+  // writing, and the server still refuses what it must, while a session that ended since reports
+  // that on the next write rather than turning the form read-only.
   const loadId = moved?.version.formVersionId ?? 'published';
   const error = moved ? null : (form.error ?? published.error);
   let live: MountedLoad | null = null;
@@ -161,19 +165,19 @@ function NewSubmissionFill({ formId, labels }: Readonly<{ formId: string; labels
     live = {
       loadId,
       bundle: snapshot,
-      canWrite: canStartSubmission(facts, caller),
-      canSaveDraft: canSaveSubmissionDraft(facts, caller),
+      canWrite: canStartSubmission(facts, caller) || (moved?.canWrite ?? false),
+      canSaveDraft: canSaveSubmissionDraft(facts, caller) || (moved?.canSaveDraft ?? false),
     };
   }
   const mounted = useMountedLoad(live, loadId);
 
-  // The facts of the load on screen: a read emptied since, as when the session ends, keeps them.
-  const mountedForm = mounted?.bundle.form ?? null;
+  const mountedWrite = mounted?.canWrite ?? false;
+  const mountedDraft = mounted?.canSaveDraft ?? false;
   const moveTo = useCallback(
     (update: FormUpdate) => {
-      if (mountedForm) setMoved({ ...update, form: mountedForm });
+      setMoved({ ...update, canWrite: mountedWrite, canSaveDraft: mountedDraft });
     },
-    [mountedForm],
+    [mountedWrite, mountedDraft],
   );
 
   if (leaving) return <CenteredProgress label={labels.loading} />;

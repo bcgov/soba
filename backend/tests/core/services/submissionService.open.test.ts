@@ -60,6 +60,8 @@ describe('SubmissionService open', () => {
       created: false,
       record: { ...held(), ...LABELS },
     });
+    // The submission's own version names it, not the one published since.
+    expect(getLabels).toHaveBeenCalledWith('v1');
   });
 
   it.each([

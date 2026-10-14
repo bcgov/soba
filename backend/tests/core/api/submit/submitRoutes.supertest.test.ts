@@ -399,6 +399,15 @@ describe('submit routes over one read', () => {
     expect(service.open).not.toHaveBeenCalled();
   });
 
+  // Postgres stores ids lower-case; a link spelled upper-case must still replay its own open.
+  it('answers an open spelled in another case with the submission it already opened', async () => {
+    const res = await signedIn().post(BASE).send({ id: openBody.id.toUpperCase(), formId: 'F1' });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ id: 's1', formId: 'f1' });
+    expect(mockRead).toHaveBeenCalledWith(expect.objectContaining({ submissionId: openBody.id }));
+    expect(service.open).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['nothing live', null],
     ['a collaborator', storedSubmission({ role: 'collaborator' })],
