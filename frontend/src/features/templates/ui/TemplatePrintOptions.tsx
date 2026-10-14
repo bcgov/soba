@@ -1,6 +1,6 @@
 'use client';
 
-import { useId } from 'react';
+import { useId, useMemo } from 'react';
 import { InlineAlert, Radio, RadioGroup } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useDictionary } from '@/app/[lang]/Providers';
@@ -39,14 +39,17 @@ export function TemplatePrintOptions({
   const fileInputId = useId();
   const typesId = useId();
 
-  const columns: Column<SubmissionTemplate>[] = [
-    { key: 'filename', label: text.print.fileNameColumn },
-    {
-      key: 'createdAt',
-      label: text.print.uploadDateColumn,
-      render: (template) => formatLongDate(template.createdAt),
-    },
-  ];
+  const columns: Column<SubmissionTemplate>[] = useMemo(
+    () => [
+      { key: 'filename', label: text.print.fileNameColumn },
+      {
+        key: 'createdAt',
+        label: text.print.uploadDateColumn,
+        render: (template) => formatLongDate(template.createdAt),
+      },
+    ],
+    [text.print.fileNameColumn, text.print.uploadDateColumn, formatLongDate],
+  );
 
   if (isLoading) return <CenteredProgress label={dict.general.loading} />;
 
