@@ -1,11 +1,10 @@
 import { Request, Response } from 'express';
-import { ApiErrorCodes } from '@soba/lib';
+import { ApiErrorCodes, templateExtensionsText } from '@soba/lib';
 import { documentGenerationService, type DocumentRenderOutcome } from './service';
 import { resolveCaller } from '../../core/middleware/actor';
 import { accessDenial } from '../../core/middleware/formSubmitAccess';
 import { contentDisposition } from '../../core/api/shared/contentDisposition';
 import { checkedFileName, getUploadedFile } from '../../core/middleware/parseUpload';
-import { templateExtensionsText } from '@soba/lib';
 import { templateFileType } from '../../core/integrations/document-generation/templateFileType';
 import {
   InternalError,
