@@ -1,4 +1,5 @@
 import express from 'express';
+import { identitySearchDomain } from './identity-search';
 import { coreErrorHandler, notFoundHandler } from '../middleware/errorHandler';
 import { registerAdminOpenApi } from './admin';
 import { registerHealthOpenApi } from './health';
@@ -37,6 +38,7 @@ registerOpenApiPaths((registry) => {
   registerSubmitOpenApi(registry);
   groupsDomain.registerOpenApi(registry);
   meDomain.registerOpenApi(registry);
+  identitySearchDomain.registerOpenApi(registry);
   membersDomain.registerOpenApi(registry);
   workspacesDomain.registerOpenApi(registry);
   filesDomain.registerOpenApi(registry);
@@ -79,7 +81,14 @@ filesApiRouter.use(coreErrorHandler);
 const coreRouter = express.Router();
 // The workspace level of settings groups whose values a workspace shares with its forms.
 coreRouter.use('/workspaces/:id/settings', workspaceSettingsRouter);
-for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain, templatesDomain]) {
+for (const domain of [
+  workspacesDomain,
+  groupsDomain,
+  meDomain,
+  membersDomain,
+  templatesDomain,
+  identitySearchDomain,
+]) {
   coreRouter.use(domain.path, domain.router);
 }
 coreRouter.use(notFoundHandler);

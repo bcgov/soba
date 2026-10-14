@@ -257,3 +257,10 @@ describe('env', () => {
     expect(reader.getTenantEngineDefaultCode()).toBeUndefined();
   });
 });
+
+it('reads the configured user directory code', () => {
+  expect(
+    createEnvReader({ USER_DIRECTORY_DEFAULT_CODE: 'css-v1' }).getUserDirectoryDefaultCode(),
+  ).toBe('css-v1');
+  expect(createEnvReader({}).getUserDirectoryDefaultCode()).toBeUndefined();
+});

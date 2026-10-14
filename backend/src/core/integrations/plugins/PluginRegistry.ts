@@ -40,6 +40,7 @@ import type {
   StoragePluginDefinition,
 } from '../storage-engine/StorageEngineAdapter';
 import type { TenantEnginePluginDefinition } from '../tenant/TenantEnginePluginDefinition';
+import type { UserDirectoryPluginDefinition } from '../user-directory/UserDirectoryPluginDefinition';
 
 // --- Definition schemas -----------------------------------------------------
 
@@ -88,6 +89,7 @@ interface CachedPlugin {
   storageDefinition?: StoragePluginDefinition;
   idpDefinition?: IdpPluginDefinition;
   tenantEngineDefinition?: TenantEnginePluginDefinition;
+  userDirectoryDefinition?: UserDirectoryPluginDefinition;
 }
 
 // Each CachedPlugin definition field, the module export it comes from, and the schema that
@@ -137,6 +139,11 @@ const DEFINITION_KINDS: ReadonlyArray<{
     field: 'storageDefinition',
     exportKey: 'storagePluginDefinition',
     schema: AdapterPluginDefinitionSchema,
+  },
+  {
+    field: 'userDirectoryDefinition',
+    exportKey: 'userDirectoryPluginDefinition',
+    schema: MetadataPluginDefinitionSchema,
   },
   { field: 'idpDefinition', exportKey: 'idpPluginDefinition', schema: IdpPluginDefinitionSchema },
   {
@@ -286,6 +293,7 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
       p.storageDefinition?.code ??
       p.idpDefinition?.code ??
       p.tenantEngineDefinition?.code ??
+      p.userDirectoryDefinition?.code ??
       p.dir;
     return {
       code,
@@ -351,6 +359,18 @@ export function getTenantEnginePluginCatalog(): TenantEnginePluginCatalogEntry[]
 
 export function getTenantEnginePluginDefinitions(): TenantEnginePluginDefinition[] {
   return definitionsOf('tenantEngineDefinition');
+}
+
+export interface UserDirectoryPluginCatalogEntry {
+  code: string;
+  name: string;
+  version?: string;
+}
+export function getUserDirectoryPluginDefinitions(): UserDirectoryPluginDefinition[] {
+  return definitionsOf('userDirectoryDefinition');
+}
+export function getUserDirectoryPluginCatalog(): UserDirectoryPluginCatalogEntry[] {
+  return getUserDirectoryPluginDefinitions().map((d) => ({ ...d.metadata }));
 }
 
 export function getCachePluginDefinitions(): CachePluginDefinition[] {

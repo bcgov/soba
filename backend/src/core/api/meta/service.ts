@@ -10,6 +10,7 @@ import packageJson from '../../../../package.json';
 import { env } from '../../config/env';
 import { authEnv } from '../../config/authEnv';
 import { getFormEnginePlugins } from '../../integrations/form-engine/FormEngineRegistry';
+import { resolveDefaultUserDirectoryCode } from '../../integrations/user-directory/UserDirectoryRegistry';
 import { resolveDefaultTenantEngineCode } from '../../integrations/tenant/TenantEngineRegistry';
 import {
   getActivePluginCodes,
@@ -53,6 +54,7 @@ export class MetaApiService {
     const activeCodes = new Set([
       activeFormEngineCode,
       resolveDefaultTenantEngineCode(),
+      resolveDefaultUserDirectoryCode(),
       ...getActivePluginCodes(),
       ...getActiveStorageBackendCodes(),
     ]);

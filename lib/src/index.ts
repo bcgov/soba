@@ -15,3 +15,4 @@ export * from './schemas/meta';
 export * from './permissions';
 export * from './schemas/tenants';
 export * from './schemas/templates';
+export * from './schemas/idirUsers';

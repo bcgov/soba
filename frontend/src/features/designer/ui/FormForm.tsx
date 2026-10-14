@@ -17,6 +17,7 @@ import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
 import { usePageHeading, usePageNotices, type PageNotice } from '@/src/components/PageHeader';
 import FormSettingsTab from './FormSettingsTab';
 import FormTeamTab from './FormTeamTab';
+import { isWorkspaceManageRole } from '@/src/features/workspaces/workspaceRoles';
 import FormHistoryTab from './FormHistoryTab';
 import FormSubmissionTab from './FormSubmissionTab';
 import FormShareTab from './FormShareTab';
@@ -224,8 +225,11 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   }, [permissions]);
 
   const canSeeAccessTab = useMemo(() => {
-    return hasPermission(permissions, Permissions.team_update);
-  }, [permissions]);
+    return (
+      hasPermission(permissions, Permissions.team_update) ||
+      isWorkspaceManageRole(formWorkspace?.role ?? '')
+    );
+  }, [permissions, formWorkspace?.role]);
 
   const canSeeHistoryTab = useMemo(() => {
     return hasPermission(permissions, Permissions.design_update);
@@ -526,7 +530,11 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
             disabled={isSaving || draftUnavailable}
             title={dict.form.teamTab || 'Team'}
           >
-            <FormTeamTab dict={dict} />
+            <FormTeamTab
+              dict={dict}
+              workspaceId={selectedWorkspaceId}
+              canSearch={isWorkspaceManageRole(formWorkspace?.role ?? '')}
+            />
           </Tab>
         )}
         {canSeeHistoryTab && (

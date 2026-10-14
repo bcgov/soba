@@ -40,6 +40,7 @@ export const HealthReadinessResponseSchema = z
     tempStorage: AdapterReadinessResultSchema,
     virusScanner: AdapterReadinessResultSchema,
     documentGeneration: z.record(z.string(), AdapterReadinessResultSchema),
+    userDirectories: z.record(z.string(), AdapterReadinessResultSchema),
     tenantEngines: z.record(z.string(), AdapterReadinessResultSchema),
     cache: AdapterReadinessResultSchema,
     messageBus: AdapterReadinessResultSchema,
@@ -71,7 +72,7 @@ export const registerHealthOpenApi = (registry: OpenAPIRegistry) => {
     responses: {
       200: {
         description:
-          'Readiness probe (DB and form engines OK; storage, temp storage, virus scanner, document generation, tenant engines, cache, message bus and event stream reported but non-gating)',
+          'Readiness probe (DB and form engines OK; storage, temp storage, virus scanner, document generation, tenant engines, user directories, cache, message bus and event stream reported but non-gating)',
         content: {
           'application/json': {
             schema: HealthReadinessResponseSchema,

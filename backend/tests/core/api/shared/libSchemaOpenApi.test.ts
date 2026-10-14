@@ -4,6 +4,7 @@ import { registerSubmissionsOpenApi } from '../../../../src/core/api/submissions
 import { registerWorkspacesOpenApi } from '../../../../src/core/api/workspaces/schema';
 import { registerAdminOpenApi } from '../../../../src/core/api/admin/schema';
 import { registerMetaOpenApi } from '../../../../src/core/api/meta/schema';
+import { registerIdentitySearchOpenApi } from '../../../../src/core/api/identity-search/schema';
 import { registerMeOpenApi } from '../../../../src/core/api/me/schema';
 import { registerSubmitOpenApi } from '../../../../src/core/api/submit/schema';
 import { registerFormSettingsOpenApi } from '../../../../src/features/form-settings';
@@ -17,6 +18,7 @@ function componentSchemas(): unknown {
   registerAdminOpenApi(registry);
   registerMetaOpenApi(registry);
   registerMeOpenApi(registry);
+  registerIdentitySearchOpenApi(registry);
   registerSubmitOpenApi(registry);
   const doc = new OpenApiGeneratorV3(registry.definitions).generateDocument({
     openapi: '3.0.3',
@@ -198,4 +200,10 @@ describe('OpenAPI components for lib-backed schemas', () => {
     );
     expect(at(schemas, response, 'required')).toEqual(expect.arrayContaining(['forms']));
   });
+});
+
+it('uses a named IDIR user component', () => {
+  expect(
+    at(componentSchemas(), 'IdentitySearch_IdirSearchResponse', 'properties', 'users', 'items'),
+  ).toEqual(ref('IdentitySearch_IdirUser'));
 });

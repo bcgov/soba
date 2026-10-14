@@ -167,6 +167,14 @@ export class HttpClient {
     await this.send(path, { method: 'GET' }, deadline);
   }
 
+  /** GET JSON, including body decoding within the operation deadline. */
+  async getJson(path: string, deadline: number = this.deadline()): Promise<unknown> {
+    const res = await this.send(path, { method: 'GET' }, deadline);
+    return this.withTimeout(this.buildUrl(path), Math.max(0, deadline - Date.now()), () =>
+      res.json(),
+    );
+  }
+
   private buildUrl(path: string): string {
     return joinUrl(this.baseUrl, path);
   }

@@ -176,6 +176,7 @@ export function createEnvReader(source: EnvSource) {
     getTempStorageDefaultCode: () => getOptionalEnvFrom(source, 'TEMPSTORAGE_DEFAULT_CODE'),
     getVirusScanDefaultCode: () => getOptionalEnvFrom(source, 'VIRUSSCAN_DEFAULT_CODE'),
     getFormEngineDefaultCode: () => getOptionalEnvFrom(source, 'FORM_ENGINE_DEFAULT_CODE'),
+    getUserDirectoryDefaultCode: () => getOptionalEnvFrom(source, 'USER_DIRECTORY_DEFAULT_CODE'),
     getTenantEngineDefaultCode: () => getOptionalEnvFrom(source, 'TENANT_ENGINE_DEFAULT_CODE'),
     getDocumentGenerationDefaultCode: () =>
       getOptionalEnvFrom(source, 'DOCUMENT_GENERATION_DEFAULT_CODE'),
@@ -261,6 +262,7 @@ export const env = {
   getTempStorageDefaultCode: () => getOptionalEnv('TEMPSTORAGE_DEFAULT_CODE'),
   getVirusScanDefaultCode: () => getOptionalEnv('VIRUSSCAN_DEFAULT_CODE'),
   getFormEngineDefaultCode: () => getOptionalEnv('FORM_ENGINE_DEFAULT_CODE'),
+  getUserDirectoryDefaultCode: () => getOptionalEnv('USER_DIRECTORY_DEFAULT_CODE'),
   getTenantEngineDefaultCode: () => getOptionalEnv('TENANT_ENGINE_DEFAULT_CODE'),
   /** Document generation backend the consumer defaults to (a discovered plugin code). */
   getDocumentGenerationDefaultCode: () => getOptionalEnv('DOCUMENT_GENERATION_DEFAULT_CODE'),
