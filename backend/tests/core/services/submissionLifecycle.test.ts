@@ -1,14 +1,8 @@
-import {
-  SUBMITTER_DELETABLE_STATES,
-  isTerminalSubmissionState,
-} from '../../../src/core/services/submissionLifecycle';
+import { SUBMISSION_IN_PROGRESS_STATES } from '@soba/lib';
+import { isTerminalSubmissionState } from '../../../src/core/services/submissionLifecycle';
 
-describe('SUBMITTER_DELETABLE_STATES', () => {
-  it('is exactly the states before a submission is submitted', () => {
-    expect([...SUBMITTER_DELETABLE_STATES].sort()).toEqual(['draft', 'opened']);
-  });
-
+describe('SUBMISSION_IN_PROGRESS_STATES', () => {
   it('holds no terminal state', () => {
-    expect(SUBMITTER_DELETABLE_STATES.filter(isTerminalSubmissionState)).toEqual([]);
+    expect(SUBMISSION_IN_PROGRESS_STATES.filter(isTerminalSubmissionState)).toEqual([]);
   });
 });

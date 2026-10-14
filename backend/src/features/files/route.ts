@@ -16,7 +16,7 @@ router.use(requireFeature(Features.files));
 
 // Upload: the multipart body is parsed first (any file field name; Form.io's fileKey is
 // configurable), then requireUploadAccess resolves the workspace from the `submissionId` field and
-// authorizes a write on that submission.
+// authorizes an upload to that submission.
 router.post(
   '/',
   parseUpload(maxSizeMb * 1024 * 1024),

@@ -53,8 +53,8 @@ describe('hasFormSubmitAccess', () => {
 
   it('refuses when the form is not in the workspace', async () => {
     mockFacts.mockResolvedValue(null);
-    expect(await hasFormSubmitAccess(target, { actorId: 'u1', idpCode: 'idir' }, 'form_read')).toBe(
-      false,
-    );
+    expect(
+      await hasFormSubmitAccess(target, { actorId: 'u1', idpCode: 'idir' }, 'submission_create'),
+    ).toBe(false);
   });
 });

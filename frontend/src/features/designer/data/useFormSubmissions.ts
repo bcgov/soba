@@ -10,6 +10,8 @@ import type { ListResult, WriteOutcome } from '@/src/shared/api/dataContracts';
 import type { ListQueryArgs } from '@/src/types/list';
 import type { SubmissionListItem } from '@/src/types/submissions';
 import { useSortLocale } from '@/src/shared/list/useSortLocale';
+import { designSubmissionKey } from './useDesignSubmission';
+import { submissionReviewKey } from './useSubmissionReview';
 
 const EMPTY: SubmissionListItem[] = [];
 
@@ -63,7 +65,12 @@ export function useSubmissionDeleter() {
   const remove = useCallback(
     async (token: string, submissionId: string): Promise<WriteOutcome<void>> => {
       await deleteSobaSubmission(token, submissionId);
-      await mutate((key) => Array.isArray(key) && key[0] === 'form-submissions');
+      await Promise.all([
+        mutate((key) => Array.isArray(key) && key[0] === 'form-submissions'),
+        // Dropped, not re-read: an open review page would read a 404 before it navigates away.
+        mutate(designSubmissionKey(submissionId), undefined, { revalidate: false }),
+        mutate(submissionReviewKey(submissionId), undefined, { revalidate: false }),
+      ]);
       return { status: 'applied', value: undefined };
     },
     [mutate],

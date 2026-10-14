@@ -1,16 +1,15 @@
 import type { NextFunction, Request, Response } from 'express';
-import { getSubmissionWorkspaceAndState } from '../../core/db/repos/submissionRepo';
-import { assertSubmitterAllowed, setSubmitContext } from '../../core/middleware/formSubmitAccess';
-import { SubmitterOperation } from '../../core/services/submitterAccess';
-import { SubmissionWorkflowState } from '../../core/db/codes';
+import { SubmissionChangeStatus, ApiErrorCodes, uploadStatusOf } from '@soba/lib';
+import { resolveCaller } from '../../core/middleware/actor';
+import { refuseSubmitter, setSubmitContext } from '../../core/middleware/formSubmitAccess';
+import { findSubmissionForCaller, SubmitterOperation } from '../../core/services/submitterAccess';
 import { ConflictError, NotFoundError, ValidationError } from '../../core/errors';
 
 /**
- * Authorize a file upload against the submission it belongs to. The submission id is the source of
- * truth for the workspace; the caller must be allowed to write the submission, and only an in-progress
- * submission (opened/draft) accepts uploads. Access is checked before state so a caller who may not
- * write can't read the state from a 409. Runs after multer so the multipart `submissionId` field is
- * parsed.
+ * Authorize a file upload from one read of the submission it belongs to, which also gives the
+ * workspace. Only an in-progress submission (opened/draft) accepts uploads. Access is decided before
+ * state so a caller who may not write can't read the state from a 409. Runs after multer so the
+ * multipart `submissionId` field is parsed.
  */
 export const requireUploadAccess = async (
   req: Request,
@@ -20,24 +19,25 @@ export const requireUploadAccess = async (
   try {
     const submissionId = (req.body as { submissionId?: unknown } | undefined)?.submissionId;
     if (typeof submissionId !== 'string' || !submissionId) {
-      throw new ValidationError('submissionId is required to upload a file');
+      throw new ValidationError(
+        'submissionId is required to upload a file',
+        ApiErrorCodes.upload_invalid,
+      );
     }
-    const submission = await getSubmissionWorkspaceAndState(submissionId);
-    if (!submission) {
-      throw new NotFoundError('Submission not found');
+    const caller = resolveCaller(req);
+    const loaded = await findSubmissionForCaller(submissionId, caller);
+    if (!loaded) {
+      throw new NotFoundError('Submission not found', ApiErrorCodes.submission_not_found);
     }
-    const target = {
-      workspaceId: submission.workspaceId,
-      formId: submission.formId,
-      submissionId,
-    };
-    await assertSubmitterAllowed(req, SubmitterOperation.write, target);
+    const { submission, access, form } = loaded;
+    const target = { workspaceId: submission.workspaceId, formId: submission.formId, submissionId };
+    const change = uploadStatusOf(access, form, caller);
+    if (change.status === SubmissionChangeStatus.denied) {
+      refuseSubmitter(req, SubmitterOperation.upload, target, change.code);
+    }
     setSubmitContext(req, target);
-    if (
-      submission.workflowState !== SubmissionWorkflowState.opened &&
-      submission.workflowState !== SubmissionWorkflowState.draft
-    ) {
-      throw new ConflictError('Submission is not accepting file uploads');
+    if (change.status === SubmissionChangeStatus.closed) {
+      throw new ConflictError('Submission is not accepting file uploads', change.code);
     }
     next();
   } catch (error) {

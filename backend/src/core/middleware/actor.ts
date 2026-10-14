@@ -1,13 +1,12 @@
 /**
  * Resolves req.actorId from the JWT (via IdP plugins).
- * Refreshes soba_admin from IdP when the mapper returns sobaAdmin, then sets req.isSobaAdmin.
+ * Applies the IdP's admin claim to soba_admin when the mapper returns sobaAdmin, then sets req.isSobaAdmin.
  * Must run after checkJwt() so that req.idpPluginCode and req.authPayload are set.
  */
 import { Request, Response, NextFunction } from 'express';
 import { getIdpPlugins } from '../auth/idpRegistry';
 import type { CallerIdentity } from '../db/repos/formSubmitAccessRepo';
-import { findOrCreateUserByIdentity } from '../db/repos/membershipRepo';
-import { isSobaAdmin, upsertSobaAdminFromIdp } from '../db/repos/sobaAdminRepo';
+import { resolveSignedInActor } from '../services/actorIdentity';
 import { ValidationError } from '../errors';
 import { profileHelpers, type IdpAttributes } from '../auth/jwtClaims';
 import { getPublicUser } from '../services/publicUser';
@@ -55,24 +54,10 @@ export function resolveActor(req: Request, res: Response, next: NextFunction): v
     profileHelpers.getDisplayLabel(mapped.profile, mapped.subject) ??
     null;
 
-  findOrCreateUserByIdentity(
-    mapped.providerCode,
-    mapped.subject,
-    mapped.profile,
-    mapped.idpAttributes,
-  )
-    .then((actorId) => {
+  resolveSignedInActor(pluginCode, mapped, actorDisplayLabel)
+    .then(({ actorId, isSobaAdmin }) => {
       req.actorId = actorId;
-
-      const refresh =
-        typeof mapped.sobaAdmin === 'boolean'
-          ? upsertSobaAdminFromIdp(actorId, pluginCode, mapped.sobaAdmin, actorDisplayLabel)
-          : Promise.resolve();
-
-      return refresh.then(() => isSobaAdmin(actorId));
-    })
-    .then((admin) => {
-      req.isSobaAdmin = admin;
+      req.isSobaAdmin = isSobaAdmin;
       next();
     })
     .catch(next);
@@ -80,9 +65,9 @@ export function resolveActor(req: Request, res: Response, next: NextFunction): v
 
 /**
  * Actor resolver for routes mounted with `checkJwt({ allowPublic: true })`: resolves the authenticated
- * actor when a token/identity is present, otherwise attributes the request to the seeded public user
- * (idp `public`). The route's own authorization (e.g. the form's audience) decides access;
- * the public user is a member of no workspace, so staff-only routes still reject it.
+ * actor, or attributes a request that sent no bearer to the seeded public user (idp `public`). The
+ * route's own authorization (e.g. the form's audience) decides access; the public user is a member
+ * of no workspace, so staff-only routes still reject it.
  */
 export function resolveActorOrPublic(req: Request, res: Response, next: NextFunction): void {
   if (req.idpPluginCode && req.authPayload) {

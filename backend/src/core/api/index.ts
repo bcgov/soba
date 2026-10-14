@@ -3,7 +3,11 @@ import { coreErrorHandler, notFoundHandler } from '../middleware/errorHandler';
 import { registerAdminOpenApi } from './admin';
 import { registerHealthOpenApi } from './health';
 import { designFormsRouter, registerFormsOpenApi } from './forms';
-import { designSubmissionsRouter, registerSubmissionsOpenApi } from './submissions';
+import {
+  designSubmissionsRouter,
+  registerSubmissionsOpenApi,
+  registerSubmissionReviewOpenApi,
+} from './submissions';
 import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
 import { groupsDomain } from './groups';
 import { filesDomain } from '../../features/files';
@@ -29,6 +33,7 @@ registerOpenApiPaths((registry) => {
   registerFormsOpenApi(registry);
   registerFormSettingsOpenApi(registry);
   registerSubmissionsOpenApi(registry);
+  registerSubmissionReviewOpenApi(registry);
   registerSubmitOpenApi(registry);
   groupsDomain.registerOpenApi(registry);
   meDomain.registerOpenApi(registry);
@@ -53,9 +58,8 @@ designRouter.use(coreErrorHandler);
 
 // Submit feature: submission open/save/submit + reads of an existing submission, plus file
 // attachments at /files (upload/download/delete) and document templates/preview/print, each
-// authorized through isSubmitterAllowed (services/submitterAccess). The files feature flag is
-// enforced inside filesDomain.router. Same routes as /files, mounted under submit for the Form.io
-// file component.
+// authorized by the submitter rules in @soba/lib. The files feature flag is enforced inside
+// filesDomain.router. Same routes as /files, mounted under submit for the Form.io file component.
 const submitRouter = express.Router();
 submitRouter.use('/', submitRoutes);
 submitRouter.use('/files', filesDomain.router);

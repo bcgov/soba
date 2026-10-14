@@ -38,8 +38,9 @@ const FORM_VERSION_NOT_FOUND = 'Form version not found';
 export const createForm = asyncHandler(
   async (req: Request<unknown, unknown, CreateFormBody>, res: Response) => {
     const ctx = req.coreContext!;
-    const result = await formsApiService.createForm(ctx, req.body);
-    res.status(201).json(result);
+    // 201 when this call created the form, 200 when a retry returned the one it made.
+    const { created, form } = await formsApiService.createForm(ctx, req.body);
+    res.status(created ? 201 : 200).json(form);
   },
 );
 
@@ -74,7 +75,7 @@ export const getForm = asyncHandler(async (req: Request<FormIdParams>, res: Resp
 export const listForms = asyncHandler(async (req: Request, res: Response) => {
   const scope = req.listScope!;
   const result = await formsApiService.list(
-    { workspaceIds: scope.workspaceIds, actorId: scope.actorId },
+    { workspaceIds: scope.workspaceIds, actorId: scope.actorId, formAccess: scope.formAccess },
     { ...(req.query as unknown as ListFormsQuery), locale: req.sortLocale! },
   );
   res.json(result);
@@ -94,7 +95,7 @@ export const getFormVersion = asyncHandler(
 export const listFormVersions = asyncHandler(async (req: Request, res: Response) => {
   const scope = req.listScope!;
   const result = await formsApiService.listFormVersions(
-    { workspaceIds: scope.workspaceIds, actorId: scope.actorId },
+    { workspaceIds: scope.workspaceIds, actorId: scope.actorId, formAccess: scope.formAccess },
     req.query as unknown as ListFormVersionsQuery,
   );
   res.json(result);
@@ -103,7 +104,7 @@ export const listFormVersions = asyncHandler(async (req: Request, res: Response)
 export const lookupFormVersions = asyncHandler(async (req: Request, res: Response) => {
   const scope = req.listScope!;
   const result = await formsApiService.lookupFormVersions(
-    { workspaceIds: scope.workspaceIds, actorId: scope.actorId },
+    { workspaceIds: scope.workspaceIds },
     req.query as unknown as FormVersionLookupQuery,
   );
   res.json(result);
@@ -112,12 +113,9 @@ export const lookupFormVersions = asyncHandler(async (req: Request, res: Respons
 export const createFormVersion = asyncHandler(
   async (req: Request<unknown, unknown, CreateFormVersionBody>, res: Response) => {
     const ctx = req.coreContext!;
-    const result = await formsApiService.createDraft(
-      ctx,
-      req.body.formId,
-      req.body.fromFormVersionId,
-    );
-    res.status(201).json(result);
+    // 201 when this call created the draft, 200 when a retry returned the one it made.
+    const { created, version } = await formsApiService.createDraft(ctx, req.body);
+    res.status(created ? 201 : 200).json(version);
   },
 );
 
@@ -136,17 +134,6 @@ export const unpublishFormVersion = asyncHandler(
   async (req: Request<FormVersionIdParams>, res: Response) => {
     const ctx = req.coreContext!;
     const result = await formsApiService.unpublish(ctx, req.params.id);
-    if (!result) {
-      throw new NotFoundError(FORM_VERSION_NOT_FOUND);
-    }
-    res.json(result);
-  },
-);
-
-export const restoreFormVersion = asyncHandler(
-  async (req: Request<FormVersionIdParams>, res: Response) => {
-    const ctx = req.coreContext!;
-    const result = await formsApiService.restore(ctx, req.params.id);
     if (!result) {
       throw new NotFoundError(FORM_VERSION_NOT_FOUND);
     }

@@ -22,6 +22,9 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
 import makeStore from '@/lib/store';
 import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import { useForm, useFormWriter } from '@/src/features/designer/data/useForm';
+import { ApiError } from '@/src/shared/api/sobaHelpers';
+
+const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 const V1 = { id: 'v1', versionNo: 1, state: 'published' };
 const V2 = { id: 'v2', versionNo: 2, state: 'draft' };
@@ -106,17 +109,83 @@ describe('useForm', () => {
     expect(result.current.schemaVersionId).toBe('v3');
   });
 
-  it('restores a version as a new draft from that version', async () => {
-    createFormVersion.mockResolvedValue({ id: 'v3', versionNo: 3, state: 'draft' });
-    saveFormVersionSchema.mockResolvedValue(undefined);
+  // The server starts the draft from the source version's schema, so the browser never reads it.
+  it('restores a version as a new draft from that version, in one request', async () => {
+    createFormVersion.mockResolvedValue({ value: V3, created: true });
     const { result } = renderHook(() => useFormWriter('f1'), { wrapper });
 
     await act(async () => {
       await result.current.restoreVersion('token', 'v1');
     });
 
-    expect(getFormVersionSchema).toHaveBeenCalledWith('token', 'v1');
-    expect(createFormVersion).toHaveBeenCalledWith('token', 'f1', 'v1');
+    expect(createFormVersion).toHaveBeenCalledWith('token', {
+      id: expect.stringMatching(UUID_V7),
+      formId: 'f1',
+      fromFormVersionId: 'v1',
+    });
+    expect(getFormVersionSchema).not.toHaveBeenCalled();
+    expect(saveFormVersionSchema).not.toHaveBeenCalled();
+  });
+
+  // A retry with the same id returns the draft the first attempt made, rather than a second one, even
+  // when the schema was edited in between.
+  it('sends the same id when a failed new version is tried again after an edit, and a new id after one lands', async () => {
+    createFormVersion
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValue({ value: V3, created: true });
+    const { result } = renderHook(() => useFormWriter('f1'), { wrapper });
+    const schema = { components: [] } as never;
+    const edited = { components: [{ key: 'edited' }] } as never;
+
+    await act(async () => {
+      await expect(result.current.createVersion('token', schema, 'v2')).rejects.toThrow();
+    });
+    await act(async () => {
+      await result.current.createVersion('token', edited, 'v2');
+    });
+    await act(async () => {
+      await result.current.createVersion('token', schema, 'v2');
+    });
+
+    const [failed, retried, next] = createFormVersion.mock.calls.map((call) => call[1].id);
+    expect(failed).toMatch(UUID_V7);
+    expect(retried).toBe(failed);
+    expect(next).not.toBe(failed);
+    expect(saveFormVersionSchema).not.toHaveBeenCalled();
+  });
+
+  // The first attempt committed but its response was lost, so the draft it returns may hold the
+  // schema from before the edit.
+  it('saves the schema sent on a retry that got back an earlier draft', async () => {
+    createFormVersion.mockResolvedValue({ value: V3, created: false });
+    saveFormVersionSchema.mockResolvedValue(V3);
+    const { result } = renderHook(() => useFormWriter('f1'), { wrapper });
+    const edited = { components: [{ key: 'edited' }] } as never;
+
+    await act(async () => {
+      await result.current.createVersion('token', edited, 'v2');
+    });
+
+    expect(saveFormVersionSchema).toHaveBeenCalledWith('token', 'v3', edited);
+  });
+
+  // A refusal answers the request, so trying again is a new create under a new id.
+  it('mints a new id after a new version is refused', async () => {
+    createFormVersion
+      .mockRejectedValueOnce(new ApiError('Form version id already in use', 409))
+      .mockResolvedValue({ value: V3, created: true });
+    const { result } = renderHook(() => useFormWriter('f1'), { wrapper });
+    const schema = { components: [] } as never;
+
+    await act(async () => {
+      await expect(result.current.createVersion('token', schema, 'v2')).rejects.toThrow();
+    });
+    await act(async () => {
+      await result.current.createVersion('token', schema, 'v2');
+    });
+
+    const [refused, next] = createFormVersion.mock.calls.map((call) => call[1].id);
+    expect(next).not.toBe(refused);
   });
 
   it('opens an older version as history, read by id', async () => {

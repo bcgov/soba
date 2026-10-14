@@ -36,10 +36,16 @@ export {
   getFormVersionSchema,
   updateSobaForm,
   deleteSobaSubmission,
+  getSobaSubmissionReview,
+  updateSobaSubmissionStatus,
+  addSobaSubmissionNote,
+  recordSobaSubmissionEdit,
 } from './sobaApiDesign';
 // Submit-mode (public-capable, /submit/*)
 export {
   getSubmitFillBundle,
+  getSubmitForm,
+  getSubmitFormVersionSchema,
   getSubmitSubmissionSchema,
   openSobaFormSubmission,
   saveSobaFormSubmission,

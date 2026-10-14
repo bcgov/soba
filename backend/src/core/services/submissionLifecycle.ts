@@ -17,20 +17,14 @@ import { ConflictError } from '../errors';
  *
  * Flow: opened --saved--> draft --saved--> draft --submitted--> submitted.
  * Terminal states (submitted, deleted) accept no further edits or submits. Staff delete from any live
- * state; a submitter deletes only from SUBMITTER_DELETABLE_STATES. Neither passes through
- * resolveSubmissionTransition.
+ * state; a submitter deletes only from SUBMISSION_IN_PROGRESS_STATES (@soba/lib). Neither passes
+ * through resolveSubmissionTransition.
  */
 
 const TERMINAL_STATES: ReadonlySet<string> = new Set([
   SubmissionWorkflowState.submitted,
   SubmissionWorkflowState.deleted,
 ]);
-
-/** A submitter deletes their own submission only before it is submitted. */
-export const SUBMITTER_DELETABLE_STATES: readonly SubmissionWorkflowStateCode[] = [
-  SubmissionWorkflowState.opened,
-  SubmissionWorkflowState.draft,
-];
 
 /** A terminal submission accepts no new current version; a write against it is held as pending. */
 export const isTerminalSubmissionState = (state: string): boolean => TERMINAL_STATES.has(state);

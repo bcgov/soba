@@ -6,7 +6,7 @@
 
 /**
  * A read or write failure, already classified. `cause` is the original error, kept for the console
- * sink. `offline` is reserved for a device that cannot reach the network; nothing produces it yet.
+ * sink. `offline` is a request that got no response.
  */
 export type DataError = {
   kind: 'sessionExpired' | 'forbidden' | 'notFound' | 'offline' | 'failed';

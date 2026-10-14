@@ -33,6 +33,7 @@ const MINE = '/api/v1/submit/submissions/mine';
 
 const PAGE = {
   items: [],
+  forms: [],
   page: { offset: 0, limit: 20, total: 0 },
   filters: {},
   sort: 'updatedAt:desc' as const,
@@ -77,6 +78,7 @@ describe('GET /submit/submissions/mine', () => {
     const res = await request(buildApp('anonymous')).get(MINE);
 
     expect(res.status).toBe(401);
+    expect(res.body.code).toBe('sign_in_required');
     expect(listMine).not.toHaveBeenCalled();
   });
 

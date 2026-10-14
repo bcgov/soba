@@ -1,6 +1,7 @@
 export * from './schemas/forms';
 export * from './schemas/formSettings';
 export * from './schemas/submissions';
+export * from './schemas/submissionReview';
 export * from './schemas/pagination';
 export * from './sort';
 export * from './schemas/admin';
@@ -9,6 +10,7 @@ export * from './formio/normalizeSchema';
 export * from './formio/newFormSchema';
 export * from './schemas/me';
 export * from './schemas/submit';
+export * from './schemas/errors';
 export * from './schemas/meta';
 export * from './permissions';
 export * from './schemas/tenants';

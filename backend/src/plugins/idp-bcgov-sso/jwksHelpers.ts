@@ -40,11 +40,16 @@ const DEFAULT_OMIT_CLAIMS = new Set([
   'rh',
   'uti',
   'aio',
+  'azp',
+  'aud',
+  'scope',
+  'client_roles',
 ]);
 
 /**
  * Copy of token claims safe to store as user_identity.idp_attributes.
- * Drops short-lived/session fields; keeps identity and profile-related claims.
+ * Drops short-lived/session fields and those of the client the token was issued to; keeps identity
+ * and profile-related claims.
  */
 export function sanitizeIdpAttributes(
   decoded: Record<string, unknown>,

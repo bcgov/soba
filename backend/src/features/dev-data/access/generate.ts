@@ -1,21 +1,22 @@
 /** Builds the coverage set and returns the ids its checks look each case up by. */
 import { and, asc, eq } from 'drizzle-orm';
-import { v7 as uuidv7 } from 'uuid';
 
 import { db } from '../../../core/db/client';
 import {
   submissionParticipants,
   userIdentities,
   workspaceGroupMemberships,
+  workspaceGroups,
 } from '../../../core/db/schema';
 import {
   GroupMemberKind,
   PUBLIC_PROVIDER_CODE,
   SubmissionParticipantRole,
   SubmissionParticipantStatus,
-  SystemGroup,
   WorkspaceGroupMembershipStatus,
+  WorkspaceGroupStatus,
   WorkspaceMembershipStatus,
+  type SystemGroupCode,
 } from '../../../core/db/codes';
 import type { SettingsSaveStatus } from '../../../core/db/repos/settingsRow';
 import {
@@ -45,6 +46,7 @@ import { inSequence } from '../inSequence';
 import { addMember } from '../members';
 import type { ResolvedUser } from '../resolveUser';
 import { recordIds } from '../runs';
+import { seedSubmission } from '../seedSubmission';
 import {
   ADMIN,
   ANONYMOUS,
@@ -60,6 +62,7 @@ import {
   type CoverageWorkspaceKey,
   type PersonaKey,
   type PlannedCoverageForm,
+  type PlannedGroupOverride,
   type PlannedCoverageSubmission,
   type PlannedCoverageWorkspace,
   type PlannedSeat,
@@ -100,6 +103,8 @@ interface CoverageContext {
   personas: Map<PersonaKey, Persona>;
   /** Membership ids by workspace, then persona. */
   memberships: Map<CoverageWorkspaceKey, Map<PersonaKey, string>>;
+  /** Named group ids by workspace, then name. */
+  groups: Map<CoverageWorkspaceKey, Map<string, string>>;
   forms: Map<CoverageFormKey, CoverageFormRef & { versionId: string }>;
 }
 
@@ -139,6 +144,7 @@ async function createPersonas(
       planned.identityProviderCode,
       planned.subject,
       planned.profile,
+      planned.idpAttributes,
     );
     await recordIds(runId, { userIds: [id] });
     const created: Persona = {
@@ -155,29 +161,43 @@ async function createPersonas(
   ]);
 }
 
+async function systemGroupId(workspaceId: string, system: SystemGroupCode): Promise<string> {
+  const groupId = await getSystemGroupId(workspaceId, system);
+  if (!groupId) throw new Error(`Workspace ${workspaceId} has no ${system} group`);
+  return groupId;
+}
+
 async function groupFor(
   workspaceId: string,
   seat: PlannedSeat,
   admin: ResolvedUser,
+  named: Map<string, string>,
 ): Promise<string | null> {
   if (!seat.group) return null;
-  if ('system' in seat.group) {
-    const groupId = await getSystemGroupId(workspaceId, seat.group.system);
-    if (!groupId) throw new Error(`Workspace ${workspaceId} has no ${seat.group.system} group`);
-    return groupId;
-  }
-  return createGroupWithRole(db, {
+  if ('system' in seat.group) return systemGroupId(workspaceId, seat.group.system);
+  const existing = named.get(seat.group.name);
+  if (existing) return existing;
+  const groupId = await createGroupWithRole(db, {
     workspaceId,
     name: seat.group.name,
     roleCodes: [...seat.group.roleCodes],
     displayLabel: admin.displayLabel,
   });
+  if (seat.group.status) {
+    await db
+      .update(workspaceGroups)
+      .set({ status: WorkspaceGroupStatus[seat.group.status] })
+      .where(eq(workspaceGroups.id, groupId));
+  }
+  named.set(seat.group.name, groupId);
+  return groupId;
 }
 
 async function addSeat(
   ctx: CoverageContext,
   workspaceId: string,
   seat: PlannedSeat,
+  named: Map<string, string>,
 ): Promise<string> {
   const admin = persona(ctx, ADMIN);
   const membershipId = await addMember({
@@ -187,7 +207,7 @@ async function addSeat(
     invitedBy: admin,
     status: seat.membershipStatus ? WorkspaceMembershipStatus[seat.membershipStatus] : undefined,
   });
-  const groupId = await groupFor(workspaceId, seat, admin);
+  const groupId = await groupFor(workspaceId, seat, admin, named);
   if (groupId) await joinGroup({ workspaceId, groupId, membershipId, seat, admin });
   return membershipId;
 }
@@ -231,11 +251,6 @@ async function createForm(
     workspaceId,
     name: planned.name,
     description: planned.description,
-    ...actor,
-  });
-  await formVersionService.provision({
-    workspaceId,
-    formVersionId: version.id,
     schema: getFixture(COVERAGE_FIXTURE_CODE).schema,
     ...actor,
   });
@@ -251,8 +266,8 @@ async function createForm(
     const settings = { allowSubmitterDrafts: planned.allowSubmitterDrafts };
     assertSaved(await updateSubmitterSettings({ ...formRef, settings }), 'drafts setting');
   }
-  if (planned.submitterOverride) {
-    await overrideSubmitters(ctx, workspace.key, workspaceId, form.id, planned.submitterOverride);
+  if (planned.groupOverride) {
+    await overrideGroup(ctx, workspace.key, workspaceId, form.id, planned.groupOverride);
   }
 
   ctx.forms.set(planned.key, {
@@ -263,17 +278,20 @@ async function createForm(
   });
 }
 
-async function overrideSubmitters(
+async function overrideGroup(
   ctx: CoverageContext,
   workspaceKey: CoverageWorkspaceKey,
   workspaceId: string,
   formId: string,
-  override: NonNullable<PlannedCoverageForm['submitterOverride']>,
+  override: PlannedGroupOverride,
 ): Promise<void> {
   const displayLabel = persona(ctx, ADMIN).displayLabel;
   const memberships = ctx.memberships.get(workspaceKey);
-  const groupId = await getSystemGroupId(workspaceId, SystemGroup.form_submitters);
-  if (!groupId) throw new Error(`Workspace ${workspaceId} has no form submitters group`);
+  const groupId =
+    'system' in override.group
+      ? await systemGroupId(workspaceId, override.group.system)
+      : ctx.groups.get(workspaceKey)?.get(override.group.name);
+  if (!groupId) throw new Error(`${workspaceKey} has no group to override on form ${formId}`);
   await replaceOverrideMembers({
     workspaceId,
     formId,
@@ -320,9 +338,11 @@ async function createWorkspace(
     'workspace drafts setting',
   );
 
+  const named = new Map<string, string>();
+  ctx.groups.set(planned.key, named);
   const seats = await inSequence(
     planned.seats,
-    async (seat) => [seat.persona, await addSeat(ctx, workspaceId, seat)] as const,
+    async (seat) => [seat.persona, await addSeat(ctx, workspaceId, seat, named)] as const,
   );
   ctx.memberships.set(planned.key, new Map<PersonaKey, string>(seats));
 
@@ -340,19 +360,13 @@ async function createSubmission(
   const by = persona(ctx, planned.by);
   const actor = actorOf(by);
   const { workspaceId, formId } = form;
-  const submissionId = uuidv7();
-
-  await submissionService.open({ id: submissionId, workspaceId, formId, ...actor });
-  const input = {
+  const submissionId = await seedSubmission({
     workspaceId,
-    submissionId,
+    formId,
+    ...actor,
     data: getFixture(COVERAGE_FIXTURE_CODE).answers(index),
-  };
-  await inSequence(planned.events, (event) =>
-    event === 'saved'
-      ? submissionService.save({ ...input, ...actor })
-      : submissionService.submit({ ...input, ...actor }),
-  );
+    events: planned.events,
+  });
 
   const grants = planned.collaborators ?? [];
   if (grants.length > 0) {
@@ -396,8 +410,8 @@ function recordOf<K extends string, V, R>(
   ) as Record<K, R>;
 }
 
-/** Form and version deletes, once the submissions on them exist. */
-async function applyDeletes(
+/** Form and version deletes, and versions published over the old, once the submissions exist. */
+async function applyChanges(
   ctx: CoverageContext,
   plannedForms: PlannedCoverageForm[],
 ): Promise<void> {
@@ -407,11 +421,24 @@ async function applyDeletes(
     async (planned) => {
       const form = ctx.forms.get(planned.key);
       if (!form) throw new Error(`Coverage form ${planned.key} was not created`);
-      const { workspaceId } = form;
-      if (planned.afterSubmissions === 'deleteForm') {
-        await formService.delete({ workspaceId, formId: form.formId, ...actor });
-      } else {
-        await formVersionService.delete({ workspaceId, formVersionId: form.versionId, ...actor });
+      const { workspaceId, formId, versionId } = form;
+      switch (planned.afterSubmissions) {
+        case 'deleteForm':
+          await formService.delete({ workspaceId, formId, ...actor });
+          break;
+        case 'deleteVersion':
+          await formVersionService.delete({ workspaceId, formVersionId: versionId, ...actor });
+          break;
+        case 'publishNewVersion': {
+          const { version } = await formVersionService.createDraft({
+            workspaceId,
+            formId,
+            fromFormVersionId: versionId,
+            ...actor,
+          });
+          await formVersionService.publish({ workspaceId, formVersionId: version.id, ...actor });
+          break;
+        }
       }
     },
   );
@@ -431,6 +458,7 @@ export async function generateCoverage(args: {
     runId: args.runId,
     personas: await createPersonas(args.runId, args.owner, args.publicUser),
     memberships: new Map(),
+    groups: new Map(),
     forms: new Map(),
   };
 
@@ -442,7 +470,7 @@ export async function generateCoverage(args: {
     plan.submissions,
     async (planned, index) => [planned.key, await createSubmission(ctx, planned, index)] as const,
   );
-  await applyDeletes(
+  await applyChanges(
     ctx,
     plan.workspaces.flatMap((w) => w.forms),
   );

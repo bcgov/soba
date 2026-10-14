@@ -17,6 +17,7 @@ import { classifyDataError } from './dataError';
 import { useRefreshCurrentUser } from './useCurrentUser';
 import type { ListResult, WriteOutcome } from './dataContracts';
 import { EMPTY_LIST_PAGE, type ListQueryArgs, type OffsetPage } from '@/src/types/list';
+import { FormCreatePermissions } from '@/src/types/permissions';
 import type {
   CreateWorkspaceBody,
   UpdateWorkspaceBody,
@@ -26,9 +27,6 @@ import type {
 } from '@/src/types/workspaces';
 import { useSortLocale } from '@/src/shared/list/useSortLocale';
 import type { SortLocale } from '@soba/lib/sort';
-
-/** Same pair as FormCreatePermissions: form + first design. Only form_admin matches form_create. */
-const FORM_CREATE_PERMISSIONS = ['form_create', 'design_create'] as const;
 
 const WORKSPACES_KEY = ['workspaces'] as const;
 const OPTIONS_KEY = ['workspaces', 'lookup'] as const;
@@ -71,7 +69,7 @@ export function useWorkspaceOptions() {
 export function useFormCreateWorkspaceOptions(enabled = true) {
   return useWorkspaceLookup(enabled ? FORM_CREATE_OPTIONS_KEY : null, (token, locale) =>
     lookupWorkspaces(token, {
-      requiredPermissions: FORM_CREATE_PERMISSIONS,
+      requiredPermissions: FormCreatePermissions,
       disclaimerAccepted: true,
       locale,
     }),

@@ -1,9 +1,11 @@
-import { and, count, eq, ilike, inArray, isNull, ne } from 'drizzle-orm';
+import { and, count, eq, ilike, inArray, isNull, ne, type InferSelectModel } from 'drizzle-orm';
 import { db, type DbOrTx } from '../client';
 import { forms, formVersions, workspaces } from '../schema';
 import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 import { NotFoundError } from '../../errors';
+import { listAllowsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
+import { liveForm } from './liveRows';
 
 import { FORM_SORT_FIELDS, type SortLocale, type SortToken } from '@soba/lib';
 export type FormListSortField = (typeof FORM_SORT_FIELDS)[number];
@@ -17,8 +19,9 @@ const FORM_SORT_COLUMNS: SortColumns<FormListSortField> = {
 };
 
 export interface ListFormsForWorkspaceInput {
-  /** Workspace resolved from the list scope anchor. */
+  /** The anchored workspace, or every workspace the actor is an active member of. */
   workspaceIds: string[];
+  formAccess: FormAccessGrant;
   offset: number;
   limit: number;
   formId?: string;
@@ -42,24 +45,11 @@ export interface FormListRow {
   updatedBy: string | null;
 }
 
-export interface FormRecord {
-  id: string;
-  workspaceId: string;
-  formEngineCode: string;
-  name: string;
-  description: string | null;
-  org: string;
-  useCase: string;
-  status: string;
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string | null;
-  updatedBy: string | null;
-  deletedAt: Date | null;
-  deletedBy: string | null;
-}
+export type FormRecord = InferSelectModel<typeof forms>;
 
 interface CreateFormInput {
+  /** Minted by the caller; a new UUIDv7 when absent. */
+  id?: string;
   workspaceId: string;
   actorId: string;
   actorDisplayLabel: string | null;
@@ -83,11 +73,17 @@ interface UpdateFormInput {
 export const listFormsForWorkspace = async (
   input: ListFormsForWorkspaceInput,
 ): Promise<{ items: FormListRow[]; total: number }> => {
-  // An empty scope means the actor holds the permission in no workspace, never "all workspaces".
-  if (input.workspaceIds.length === 0) {
+  if (listAllowsNothing(input.workspaceIds, input.formAccess)) {
     return { items: [], total: 0 };
   }
-  const whereClauses = [inArray(forms.workspaceId, input.workspaceIds), isNull(forms.deletedAt)];
+  const whereClauses = [
+    inArray(forms.workspaceId, input.workspaceIds),
+    liveForm,
+    permittedFormsWhere(input.formAccess, {
+      workspaceId: forms.workspaceId,
+      formId: forms.id,
+    }),
+  ];
 
   if (input.status) {
     whereClauses.push(eq(forms.status, input.status));
@@ -196,6 +192,7 @@ export const createForm = async (input: CreateFormInput, tx?: DbOrTx): Promise<F
   const created = await d
     .insert(forms)
     .values({
+      id: input.id,
       workspaceId: input.workspaceId,
       formEngineCode: input.formEngineCode,
       name: input.name,
@@ -209,6 +206,18 @@ export const createForm = async (input: CreateFormInput, tx?: DbOrTx): Promise<F
     .returning();
 
   return created[0] as FormRecord;
+};
+
+/** A form by id in any workspace, deleted included, for checking an id a caller minted. */
+export const findFormAnywhere = async (
+  formId: string,
+): Promise<{ workspaceId: string; deletedAt: Date | null } | null> => {
+  const rows = await db
+    .select({ workspaceId: forms.workspaceId, deletedAt: forms.deletedAt })
+    .from(forms)
+    .where(eq(forms.id, formId))
+    .limit(1);
+  return rows[0] ?? null;
 };
 
 /** True if a non-deleted form with this name exists in the workspace (optionally excluding one form). */
@@ -285,7 +294,7 @@ export const getFormListContext = async (
   const row = await db
     .select({ workspaceId: forms.workspaceId })
     .from(forms)
-    .where(and(eq(forms.id, formId), isNull(forms.deletedAt)))
+    .where(and(eq(forms.id, formId), liveForm))
     .limit(1);
 
   return row[0] ?? null;
