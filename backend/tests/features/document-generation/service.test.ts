@@ -377,7 +377,7 @@ describe('documentGenerationService audit', () => {
 
 describe('documentGenerationService.listTemplates', () => {
   it('lists each template with its file name and upload date', async () => {
-    isActiveParticipant.mockResolvedValue(true);
+    holdsGrant.mockResolvedValue(true);
     const createdAt = new Date('2026-01-02T03:04:05.000Z');
     listLiveTemplates.mockResolvedValue([
       {
@@ -407,7 +407,7 @@ describe('documentGenerationService.printUpload', () => {
   };
 
   it('renders the persisted answers with the uploaded template and stores nothing', async () => {
-    isActiveParticipant.mockResolvedValue(true);
+    holdsGrant.mockResolvedValue(true);
     const outcome = await documentGenerationService.printUpload(caller, input);
     expect(outcome).toMatchObject({ status: 'ok', code: 'cdogs-v2' });
     expect(getLiveTemplate).not.toHaveBeenCalled();
@@ -419,7 +419,7 @@ describe('documentGenerationService.printUpload', () => {
   });
 
   it('denies a caller who is not a participant before scanning', async () => {
-    isActiveParticipant.mockResolvedValue(false);
+    holdsGrant.mockResolvedValue(false);
     const outcome = await documentGenerationService.printUpload(caller, input);
     expect(outcome.status).toBe('denied');
     expect(scanUploadMock).not.toHaveBeenCalled();
@@ -428,7 +428,7 @@ describe('documentGenerationService.printUpload', () => {
   it.each(['infected', 'scan-unavailable'])(
     'refuses a template the scan returns %s for',
     async (verdict) => {
-      isActiveParticipant.mockResolvedValue(true);
+      holdsGrant.mockResolvedValue(true);
       scanUploadMock.mockResolvedValue(verdict);
       const outcome = await documentGenerationService.printUpload(caller, input);
       expect(outcome.status).toBe(verdict);
@@ -437,7 +437,7 @@ describe('documentGenerationService.printUpload', () => {
   );
 
   it('is no-content when the submission has no persisted data', async () => {
-    isActiveParticipant.mockResolvedValue(true);
+    holdsGrant.mockResolvedValue(true);
     getContentMock.mockResolvedValue(null);
     const outcome = await documentGenerationService.printUpload(caller, input);
     expect(outcome.status).toBe('no-content');
@@ -452,7 +452,7 @@ describe('documentGenerationService.previewUpload', () => {
   };
 
   it('renders the live data with the uploaded template, without reading saved answers', async () => {
-    isActiveParticipant.mockResolvedValue(true);
+    holdsGrant.mockResolvedValue(true);
     const outcome = await documentGenerationService.previewUpload(caller, input);
     expect(outcome).toMatchObject({ status: 'ok', code: 'cdogs-v2' });
     expect(getContentMock).not.toHaveBeenCalled();
@@ -464,14 +464,14 @@ describe('documentGenerationService.previewUpload', () => {
   });
 
   it('denies a caller who is not a participant before scanning', async () => {
-    isActiveParticipant.mockResolvedValue(false);
+    holdsGrant.mockResolvedValue(false);
     const outcome = await documentGenerationService.previewUpload(caller, input);
     expect(outcome.status).toBe('denied');
     expect(scanUploadMock).not.toHaveBeenCalled();
   });
 
   it('refuses an infected template', async () => {
-    isActiveParticipant.mockResolvedValue(true);
+    holdsGrant.mockResolvedValue(true);
     scanUploadMock.mockResolvedValue('infected');
     const outcome = await documentGenerationService.previewUpload(caller, input);
     expect(outcome.status).toBe('infected');
