@@ -1,19 +1,28 @@
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
-    general: { cancel: 'Cancel' },
+    general: { cancel: 'Cancel', loading: 'Loading...' },
+    dataTable: {},
     modal: { dialogActions: 'Dialog actions' },
     form: {
       templates: {
+        fileLabel: 'Template File',
+        acceptedTypes: 'Accepted file types: {types}.',
         print: {
           button: 'Print',
           modalTitle: 'Print Submission',
           browserTab: 'Browser Print',
           templateTab: 'Template Print',
           print: 'Print',
+          printing: 'Printing...',
+          sourceLabel: 'Template',
+          uploadOption: 'Upload CDOGS template',
+          defaultOption: 'Use default CDOGS template',
+          fileNameColumn: 'File Name',
+          uploadDateColumn: 'Upload Date',
         },
       },
     },
@@ -22,13 +31,22 @@ vi.mock('@/app/[lang]/Providers', () => ({
 
 import { PrintSubmissionButton } from '@/src/features/templates/ui/PrintSubmissionButton';
 
+vi.mock('@/lib/hooks/useKeycloak', () => ({ useKeycloak: () => ({ token: undefined }) }));
+vi.mock('@/src/features/templates/data/useSubmissionTemplates', () => ({
+  useSubmissionTemplates: () => ({ templates: [], isLoading: false, error: null }),
+}));
+
 describe('PrintSubmissionButton', () => {
   beforeEach(() => {
     vi.spyOn(window, 'print').mockImplementation(() => {});
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('opens the modal with browser and template tabs', async () => {
-    render(<PrintSubmissionButton />);
+    render(<PrintSubmissionButton submissionId="sub-1" />);
     expect(screen.queryByTestId('print-submission-tabs')).toBeNull();
 
     fireEvent.click(screen.getByTestId('print-submission-button'));
@@ -40,7 +58,7 @@ describe('PrintSubmissionButton', () => {
   });
 
   it('closes on cancel without printing', async () => {
-    render(<PrintSubmissionButton />);
+    render(<PrintSubmissionButton submissionId="sub-1" />);
     fireEvent.click(screen.getByTestId('print-submission-button'));
     fireEvent.click(await screen.findByTestId('print-submission-cancel'));
 
@@ -49,7 +67,7 @@ describe('PrintSubmissionButton', () => {
   });
 
   it('closes the modal and opens the browser print', async () => {
-    render(<PrintSubmissionButton />);
+    render(<PrintSubmissionButton submissionId="sub-1" />);
     fireEvent.click(screen.getByTestId('print-submission-button'));
     fireEvent.click(await screen.findByTestId('print-submission-print'));
 

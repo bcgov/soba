@@ -39,7 +39,7 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
         <div className="mb-3 d-flex align-items-center gap-2">
           {link}
           <div className="ms-auto">
-            <PrintSubmissionButton />
+            <PrintSubmissionButton submissionId={submissionId} />
           </div>
         </div>
       );

@@ -313,7 +313,12 @@ function SubmissionFillBody({
           </Button>
         ) : null}
         <div className="ms-auto">
-          <PrintSubmissionButton />
+          <PrintSubmissionButton
+            submissionId={submissionId}
+            getLiveData={() =>
+              (formInstanceRef.current?.submission?.data ?? {}) as Record<string, unknown>
+            }
+          />
         </div>
       </div>
       <FormioV5FormRenderErrorBoundary

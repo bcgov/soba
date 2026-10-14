@@ -1,5 +1,7 @@
 import express from 'express';
+import { env } from '../../core/config/env';
 import { requireFeature } from '../../core/middleware/requireFeature';
+import { parseUpload } from '../../core/middleware/parseUpload';
 import { renderRateLimit } from '../../core/middleware/rateLimit';
 import { Features } from '../../core/db/codes';
 import { asyncHandler } from '../../core/api/shared/asyncHandler';
@@ -8,10 +10,14 @@ import {
   listSubmissionTemplatesHandler,
   previewDocumentHandler,
   printDocumentHandler,
+  printUploadedTemplateHandler,
+  previewUploadedTemplateHandler,
 } from './controller';
 import { PreviewBodySchema, PrintBodySchema, SubmissionIdParamSchema } from './schema';
 
 const router = express.Router();
+
+const upload = parseUpload(env.getTemplatesMaxFileSizeMb() * 1024 * 1024);
 
 // Gate the whole feature on the `document-generation` and `templates` flags (within the submit
 // surface's submit-mode).
@@ -39,6 +45,26 @@ router.post(
   renderRateLimit,
   validateRequest({ params: SubmissionIdParamSchema, body: PrintBodySchema }),
   asyncHandler(printDocumentHandler),
+);
+
+// print/upload: like print, but with a template sent in this request (multipart, one file) instead
+// of a stored one. Rate limited before the body is read.
+router.post(
+  '/:id/print/upload',
+  renderRateLimit,
+  validateRequest({ params: SubmissionIdParamSchema }),
+  upload,
+  asyncHandler(printUploadedTemplateHandler),
+);
+
+// preview/upload: like preview, but with a template sent in this request; the live answers come in
+// the multipart `data` field as JSON.
+router.post(
+  '/:id/preview/upload',
+  renderRateLimit,
+  validateRequest({ params: SubmissionIdParamSchema }),
+  upload,
+  asyncHandler(previewUploadedTemplateHandler),
 );
 
 export { router as documentGenerationRouter };

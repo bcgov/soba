@@ -375,7 +375,15 @@
         "modalTitle": "Imprimer la soumission",
         "browserTab": "Impression du navigateur",
         "templateTab": "Impression du modèle",
-        "print": "Imprimer"
+        "print": "Imprimer",
+        "printing": "Impression…",
+        "sourceLabel": "Modèle",
+        "uploadOption": "Téléverser un modèle CDOGS",
+        "defaultOption": "Utiliser le modèle CDOGS par défaut",
+        "fileNameColumn": "Nom du fichier",
+        "uploadDateColumn": "Date de téléversement",
+        "failed": "Échec de la génération du document.",
+        "unprocessable": "Le document n'a pas pu être généré à partir de ce modèle."
       }
     },
     "descriptionLabel": "Description du Formulaire",

@@ -29,7 +29,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
     general: { sessionExpired: 'Your session has ended.', noAccess: 'You do not have access.' },
     submission: { notFound: 'Submission not found.', loadError: 'Could not load this submission.' },
-    form: { loading: 'Loading...' },
+    form: { loading: 'Loading...', templates: { print: { button: 'Print' } } },
     formioV5: {
       formRender: {
         loadError: 'Could not load the form.',
@@ -332,7 +332,7 @@ describe('FormioV5SubmissionFillClient', () => {
     ])('shows no save action when drafts are %s', async (_label, overrides) => {
       h.getSubmitFillBundle.mockResolvedValue(bundle(overrides));
       await renderReady();
-      expect(screen.queryByTestId('submission-fill-actions')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('submission-fill-save-draft')).not.toBeInTheDocument();
     });
 
     it('saves the current answers based on the loaded head', async () => {

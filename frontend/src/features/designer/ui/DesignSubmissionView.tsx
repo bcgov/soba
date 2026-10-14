@@ -53,7 +53,7 @@ export function DesignSubmissionView({
         </Link>
         {data ? (
           <div className="ms-auto">
-            <PrintSubmissionButton />
+            <PrintSubmissionButton submissionId={submissionId} />
           </div>
         ) : null}
       </div>

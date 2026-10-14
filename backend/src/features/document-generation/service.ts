@@ -25,12 +25,16 @@ import {
 } from '../../core/db/repos/documentTemplateRepo';
 import { SubmissionService } from '../../core/services/submissionService';
 import type { DocumentRenderRequest } from '../../core/integrations/document-generation/DocumentGenerationAdapter';
-import { templateFileType } from '../../core/integrations/document-generation/templateFileType';
+import {
+  templateFileType,
+  type TemplateFileType,
+} from '../../core/integrations/document-generation/templateFileType';
 import { upstreamStatusOf } from '../../core/http/httpErrorMapper';
 import { env } from '../../core/config/env';
 import { AppError, UnprocessableEntityError } from '../../core/errors';
 import { log, getCorrelationId } from '../../core/logging';
 import { readTemplateContent } from './templateContent';
+import { scanUpload } from '../../core/services/scanUpload';
 import { TEMPLATE_NOT_RENDERED, toRenderError } from './renderError';
 import { withRenderSlot } from './renderSlots';
 
@@ -51,6 +55,17 @@ export interface PrintInput {
   options?: PayloadObject;
 }
 
+export interface PrintUploadInput {
+  submissionId: string;
+  /** A template the caller supplies for this render only; it is not stored. */
+  template: { content: Buffer; fileType: TemplateFileType; filename: string };
+}
+
+export interface PreviewUploadInput extends PrintUploadInput {
+  /** Live, on-screen answer data supplied by the caller. */
+  data: PayloadObject;
+}
+
 export type DocumentRenderOutcome =
   | { status: 'ok'; code: string; data: Buffer; contentType?: string }
   | { status: 'error'; code: string; error: unknown }
@@ -60,10 +75,15 @@ export type DocumentRenderOutcome =
   | { status: 'denied' }
   | { status: 'unavailable' }
   | { status: 'busy' }
-  | { status: 'no-content' };
+  | { status: 'no-content' }
+  | { status: 'infected' }
+  | { status: 'scan-unavailable' };
 
 export type TemplateListOutcome =
-  | { status: 'ok'; templates: { id: string; name: string }[] }
+  | {
+      status: 'ok';
+      templates: { id: string; name: string; filename: string; createdAt: string }[];
+    }
   | { status: 'notfound' }
   | { status: 'denied' };
 
@@ -250,6 +270,30 @@ async function renderWith(
   return rendered === 'busy' ? { status: 'busy' } : rendered;
 }
 
+/** Render with a template the caller supplied for this call, which is not stored. */
+async function renderInline(
+  scope: ResolvedScope,
+  template: PrintUploadInput['template'],
+  data: PayloadObject,
+  audit: AuditContext,
+): Promise<DocumentRenderOutcome> {
+  const code = await resolveBackendCode(scope);
+  if (!code) return { status: 'unavailable' };
+
+  const rendered = await withRenderSlot(
+    maxConcurrentRenders,
+    (): Promise<DocumentRenderOutcome> =>
+      callBackend(
+        code,
+        scope,
+        { template: { content: template.content, fileType: template.fileType }, options: {}, data },
+        audit,
+        'inline',
+      ),
+  );
+  return rendered === 'busy' ? { status: 'busy' } : rendered;
+}
+
 export const documentGenerationService = {
   /** The templates the caller may render from the submission: the CDOGS ones on its form version. */
   async listTemplates(caller: CallerIdentity, submissionId: string): Promise<TemplateListOutcome> {
@@ -261,7 +305,12 @@ export const documentGenerationService = {
     );
     return {
       status: 'ok',
-      templates: templates.map(({ template }) => ({ id: template.id, name: template.name })),
+      templates: templates.map(({ template, file }) => ({
+        id: template.id,
+        name: template.name,
+        filename: file.filename,
+        createdAt: file.createdAt.toISOString(),
+      })),
     };
   },
 
@@ -311,5 +360,51 @@ export const documentGenerationService = {
       { options: input.options, data },
       { mode: DocumentGenerationMode.print, caller, submissionId: input.submissionId },
     );
+  },
+
+  /** Render the persisted answers with a template the caller uploads for this call only. */
+  async printUpload(
+    caller: CallerIdentity,
+    input: PrintUploadInput,
+  ): Promise<DocumentRenderOutcome> {
+    const scope = await renderScope(caller, input.submissionId);
+    if (scope === 'notfound' || scope === 'denied') return { status: scope };
+    const record = await getSubmissionRecordById(scope.workspaceId, input.submissionId);
+    if (!record) return { status: 'notfound' };
+
+    // The bytes are never stored, so scan them here as an upload would be.
+    const scan = await scanUpload(input.template.content, input.template.filename);
+    if (scan !== 'clean') return { status: scan };
+
+    const data = await submissionReader.getContent({
+      workspaceId: scope.workspaceId,
+      submissionId: input.submissionId,
+      record,
+    });
+    if (!data) return { status: 'no-content' };
+
+    return renderInline(scope, input.template, data, {
+      mode: DocumentGenerationMode.print,
+      caller,
+      submissionId: input.submissionId,
+    });
+  },
+
+  /** Render the caller's live (on-screen) data with a template uploaded for this call only. */
+  async previewUpload(
+    caller: CallerIdentity,
+    input: PreviewUploadInput,
+  ): Promise<DocumentRenderOutcome> {
+    const scope = await renderScope(caller, input.submissionId);
+    if (scope === 'notfound' || scope === 'denied') return { status: scope };
+
+    const scan = await scanUpload(input.template.content, input.template.filename);
+    if (scan !== 'clean') return { status: scan };
+
+    return renderInline(scope, input.template, input.data, {
+      mode: DocumentGenerationMode.preview,
+      caller,
+      submissionId: input.submissionId,
+    });
   },
 };

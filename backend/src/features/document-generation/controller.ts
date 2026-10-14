@@ -3,11 +3,16 @@ import { documentGenerationService, type DocumentRenderOutcome } from './service
 import { resolveCaller } from '../../core/middleware/actor';
 import { accessDenial } from '../../core/middleware/formSubmitAccess';
 import { contentDisposition } from '../../core/api/shared/contentDisposition';
+import { checkedFileName, getUploadedFile } from '../../core/middleware/parseUpload';
+import { templateExtensionsText } from '@soba/lib';
+import { templateFileType } from '../../core/integrations/document-generation/templateFileType';
 import {
   InternalError,
   NotFoundError,
   ServiceUnavailableError,
   UnprocessableEntityError,
+  UnsupportedMediaTypeError,
+  ValidationError,
 } from '../../core/errors';
 
 interface RenderBody {
@@ -49,6 +54,10 @@ function respond(
       throw new ServiceUnavailableError('Document generation is busy; try again shortly');
     case 'no-content':
       throw new UnprocessableEntityError('Submission has no saved data to print');
+    case 'infected':
+      throw new UnprocessableEntityError('File failed virus scan');
+    case 'scan-unavailable':
+      throw new ServiceUnavailableError('Virus scanning unavailable');
     case 'error':
       // The generic error for a failed render, or for a stored template that cannot be rendered.
       throw outcome.error;
@@ -91,4 +100,49 @@ export async function printDocumentHandler(req: Request, res: Response): Promise
     options: body.options,
   });
   respond(req, res, outcome, buildFilename(body.options));
+}
+
+/** Print with a template uploaded in this request; it is rendered and discarded. */
+export async function printUploadedTemplateHandler(req: Request, res: Response): Promise<void> {
+  const outcome = await documentGenerationService.printUpload(resolveCaller(req), {
+    submissionId: req.params.id,
+    template: uploadedTemplate(req),
+  });
+  respond(req, res, outcome, buildFilename(undefined));
+}
+
+/** Preview the caller's live data (multipart `data` field, JSON) with an uploaded template. */
+export async function previewUploadedTemplateHandler(req: Request, res: Response): Promise<void> {
+  const template = uploadedTemplate(req);
+  const outcome = await documentGenerationService.previewUpload(resolveCaller(req), {
+    submissionId: req.params.id,
+    template,
+    data: liveData((req.body as Record<string, unknown> | undefined)?.data),
+  });
+  respond(req, res, outcome, buildFilename(undefined));
+}
+
+function uploadedTemplate(req: Request) {
+  const upload = getUploadedFile(req);
+  const fileType = templateFileType(upload.originalname);
+  if (!fileType) {
+    throw new UnsupportedMediaTypeError(
+      `Template must be one of: ${templateExtensionsText('cdogs')}`,
+    );
+  }
+  return { content: upload.buffer, fileType, filename: checkedFileName(upload.originalname) };
+}
+
+function liveData(field: unknown): Record<string, unknown> {
+  if (field === undefined) return {};
+  let parsed: unknown;
+  try {
+    parsed = typeof field === 'string' ? JSON.parse(field) : undefined;
+  } catch {
+    parsed = undefined;
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new ValidationError('data must be a JSON object');
+  }
+  return parsed as Record<string, unknown>;
 }

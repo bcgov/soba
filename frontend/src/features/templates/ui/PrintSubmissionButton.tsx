@@ -3,10 +3,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
-import { PrintSubmissionModal, type PrintMethod } from './PrintSubmissionModal';
+import { PrintSubmissionModal } from './PrintSubmissionModal';
+
+type PrintSubmissionButtonProps = {
+  submissionId: string;
+  /** The on-screen answers to print instead of the saved ones. */
+  getLiveData?: () => Record<string, unknown>;
+};
 
 /** Opens the print options for a submission. */
-export function PrintSubmissionButton() {
+export function PrintSubmissionButton({
+  submissionId,
+  getLiveData,
+}: Readonly<PrintSubmissionButtonProps>) {
   const dict = useDictionary();
   const [open, setOpen] = useState(false);
   const browserPrintPending = useRef(false);
@@ -17,11 +26,6 @@ export function PrintSubmissionButton() {
     browserPrintPending.current = false;
     window.print();
   }, [open]);
-
-  const handlePrint = (method: PrintMethod) => {
-    if (method === 'browser') browserPrintPending.current = true;
-    setOpen(false);
-  };
 
   return (
     <>
@@ -34,7 +38,16 @@ export function PrintSubmissionButton() {
         {dict.form.templates.print.button}
       </Button>
       {open ? (
-        <PrintSubmissionModal show onPrint={handlePrint} onCancel={() => setOpen(false)} />
+        <PrintSubmissionModal
+          show
+          submissionId={submissionId}
+          getLiveData={getLiveData}
+          onBrowserPrint={() => {
+            browserPrintPending.current = true;
+            setOpen(false);
+          }}
+          onClose={() => setOpen(false)}
+        />
       ) : null}
     </>
   );
