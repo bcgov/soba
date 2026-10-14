@@ -3,7 +3,7 @@ import { UnauthorizedError } from 'express-jwt';
 import { coreErrorHandler, errorToHttpResponse } from '../../../src/core/middleware/errorHandler';
 import { HttpClientError } from '../../../src/core/http/httpClient';
 import { FormioApiError } from '../../../src/plugins/formio-v5/formioV5Client';
-import { AppError, NotFoundError, ValidationError } from '../../../src/core/errors';
+import { AppError, ForbiddenError, NotFoundError, ValidationError } from '../../../src/core/errors';
 import { log } from '../../../src/core/logging';
 
 /** A Drizzle-style query error wrapping a pg DatabaseError, with the submitted value in params. */
@@ -28,6 +28,14 @@ describe('errorHandler', () => {
     expect(result.body).toEqual({ error: 'Resource missing' });
   });
 
+  it('errorToHttpResponse sends an AppError code with its message, and none when unset', () => {
+    expect(errorToHttpResponse(new ForbiddenError('Drafts are off', 'drafts_disabled'))).toEqual({
+      statusCode: 403,
+      body: { error: 'Drafts are off', code: 'drafts_disabled' },
+    });
+    expect(Object.keys(errorToHttpResponse(new ForbiddenError('No')).body)).toEqual(['error']);
+  });
+
   it('errorToHttpResponse returns 400 for ValidationError', () => {
     const err = new ValidationError('Invalid input');
     const result = errorToHttpResponse(err);
@@ -38,7 +46,7 @@ describe('errorHandler', () => {
   it('errorToHttpResponse maps a Postgres unique violation to 409', () => {
     const result = errorToHttpResponse({ code: '23505', message: 'duplicate key' });
     expect(result.statusCode).toBe(409);
-    expect(result.body.error).toBe('Resource already exists');
+    expect(result.body).toEqual({ error: 'Resource already exists', code: 'already_exists' });
   });
 
   it('errorToHttpResponse maps a unique violation wrapped on the cause chain to 409', () => {
@@ -54,7 +62,7 @@ describe('errorHandler', () => {
       });
       expect(errorToHttpResponse(wrapped)).toEqual({
         statusCode: 400,
-        body: { error: 'Invalid input' },
+        body: { error: 'Invalid input', code: 'request_invalid' },
       });
     },
   );
@@ -66,18 +74,24 @@ describe('errorHandler', () => {
     });
     expect(errorToHttpResponse(parseError)).toEqual({
       statusCode: 400,
-      body: { error: 'Unexpected token } in JSON' },
+      body: { error: 'Unexpected token } in JSON', code: 'request_invalid' },
     });
     const tooLarge = Object.assign(new Error('request entity too large'), {
       status: 413,
       expose: true,
     });
-    expect(errorToHttpResponse(tooLarge).statusCode).toBe(413);
+    expect(errorToHttpResponse(tooLarge)).toEqual({
+      statusCode: 413,
+      body: { error: 'request entity too large', code: 'request_too_large' },
+    });
   });
 
   it('errorToHttpResponse keeps 401 for an express-jwt UnauthorizedError', () => {
     const err = new UnauthorizedError('invalid_token', { message: 'jwt malformed' });
-    expect(errorToHttpResponse(err)).toEqual({ statusCode: 401, body: { error: 'jwt malformed' } });
+    expect(errorToHttpResponse(err)).toEqual({
+      statusCode: 401,
+      body: { error: 'jwt malformed', code: 'unauthenticated' },
+    });
   });
 
   it('errorToHttpResponse keeps 400 for the URIError Express raises on an undecodable param', () => {
@@ -87,7 +101,7 @@ describe('errorHandler', () => {
     });
     expect(errorToHttpResponse(err)).toEqual({
       statusCode: 400,
-      body: { error: "Failed to decode param '%E0%A4%A'" },
+      body: { error: "Failed to decode param '%E0%A4%A'", code: 'request_invalid' },
     });
   });
 
@@ -97,7 +111,7 @@ describe('errorHandler', () => {
   ])('errorToHttpResponse maps an upstream %s 4xx to a generic 500', (_label, err) => {
     expect(errorToHttpResponse(err)).toEqual({
       statusCode: 500,
-      body: { error: 'Internal server error' },
+      body: { error: 'Internal server error', code: 'internal_error' },
     });
   });
 

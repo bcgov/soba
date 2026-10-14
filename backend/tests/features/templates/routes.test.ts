@@ -36,10 +36,6 @@ jest.mock('../../../src/core/middleware/workspaceContext', () => ({
       next();
     },
 }));
-const mockLiveVersion = jest.fn();
-jest.mock('../../../src/core/db/repos/formVersionRepo', () => ({
-  isLiveFormVersion: (...args: unknown[]) => mockLiveVersion(...args),
-}));
 const mockFeatureAvailable = jest.fn();
 jest.mock('../../../src/core/services/featureAvailabilityService', () => ({
   isFeatureAvailable: (...args: unknown[]) => mockFeatureAvailable(...args),
@@ -96,7 +92,6 @@ describe('templates routes', () => {
     mockResolvedFrom.length = 0;
     mockGranted.clear();
     jest.clearAllMocks();
-    mockLiveVersion.mockResolvedValue(true);
     mockFeatureAvailable.mockResolvedValue(true);
   });
 
@@ -145,18 +140,20 @@ describe('templates routes', () => {
     expect(templatesService.replaceFile).not.toHaveBeenCalled();
   });
 
+  const READ = [Permissions.form_read, Permissions.document_template_read];
+
   it.each([
-    ['GET', `/templates?formId=${FORM}`, Permissions.document_template_read],
-    ['POST', `/templates?formVersionId=${VERSION}`, Permissions.document_template_create],
-    ['GET', `/templates/${TEMPLATE}`, Permissions.document_template_read],
-    ['GET', `/templates/${TEMPLATE}/content`, Permissions.document_template_read],
-    ['PUT', `/templates/${TEMPLATE}/content`, Permissions.document_template_create],
-    ['PATCH', `/templates/${TEMPLATE}`, Permissions.document_template_create],
-    ['DELETE', `/templates/${TEMPLATE}`, Permissions.document_template_delete],
-  ])('%s %s requires %s', async (method, url, permission) => {
+    ['GET', `/templates?formId=${FORM}`, READ],
+    ['POST', `/templates?formVersionId=${VERSION}`, [Permissions.document_template_create]],
+    ['GET', `/templates/${TEMPLATE}`, READ],
+    ['GET', `/templates/${TEMPLATE}/content`, READ],
+    ['PUT', `/templates/${TEMPLATE}/content`, [Permissions.document_template_create]],
+    ['PATCH', `/templates/${TEMPLATE}`, [Permissions.document_template_create]],
+    ['DELETE', `/templates/${TEMPLATE}`, [Permissions.document_template_delete]],
+  ])('%s %s requires %j', async (method, url, permissions) => {
     const res = await send(method, url);
     expect(res.status).toBe(403);
-    expect(mockAsked).toEqual([[permission]]);
+    expect(mockAsked).toEqual([permissions]);
   });
 
   it.each([
@@ -244,22 +241,6 @@ describe('templates routes', () => {
     expect(mockAsked).toEqual([]);
   });
 
-  it('returns 404 on an upload to a version whose form is deleted, before any upload', async () => {
-    Object.values(Permissions).forEach((p) => mockGranted.add(p));
-    mockLiveVersion.mockResolvedValue(false);
-    const res = await send('POST', `/templates?formVersionId=${VERSION}`);
-    expect(res.status).toBe(404);
-    expect(res.body).toEqual({ error: 'Form version not found' });
-    expect(templatesService.create).not.toHaveBeenCalled();
-  });
-
-  it('answers a caller without permission 403, whether or not the form is deleted', async () => {
-    mockLiveVersion.mockResolvedValue(false);
-    const res = await send('POST', `/templates?formVersionId=${VERSION}`);
-    expect(res.status).toBe(403);
-    expect(mockLiveVersion).not.toHaveBeenCalled();
-  });
-
   it('refuses a template file name over 255 bytes with 400', async () => {
     Object.values(Permissions).forEach((p) => mockGranted.add(p));
     const res = await request(app)
@@ -268,7 +249,10 @@ describe('templates routes', () => {
       .field('type', 'cdogs')
       .field('name', 'Receipt');
     expect(res.status).toBe(400);
-    expect(res.body).toEqual({ error: 'File name is longer than 255 bytes' });
+    expect(res.body).toEqual({
+      error: 'File name is longer than 255 bytes',
+      code: 'upload_invalid',
+    });
     expect(templatesService.create).not.toHaveBeenCalled();
   });
 });

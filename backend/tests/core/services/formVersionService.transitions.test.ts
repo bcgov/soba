@@ -144,20 +144,18 @@ describe('FormVersionService state transitions', () => {
     expect(updateDraft).not.toHaveBeenCalled();
   });
 
-  it('restore: deleted → draft, clears deletedAt/By', async () => {
-    getByIdInclDeleted.mockResolvedValue({ id: 'v1', formId: 'f1', state: 'deleted' });
-    await svc.restore(actor);
-    expect(updateDraft).toHaveBeenCalledWith(
-      'ws1',
-      'v1',
-      'Author',
-      expect.objectContaining({ state: 'draft', deletedAt: null, deletedBy: null }),
-    );
-  });
-
-  it('restore: rejects a non-deleted version', async () => {
-    getByIdInclDeleted.mockResolvedValue({ id: 'v1', formId: 'f1', state: 'draft' });
-    await expect(svc.restore(actor)).rejects.toThrow(/Cannot change/i);
+  // Lookups skip deleted rows; the transition table refuses them even when one is read.
+  it.each([
+    ['publish', () => svc.publish(actor)],
+    ['unpublish', () => svc.unpublish(actor)],
+  ])('%s: a deleted version stays deleted', async (_label, action) => {
+    getById.mockResolvedValue({
+      id: 'v1',
+      formId: 'f1',
+      state: 'deleted',
+      engineSyncStatus: 'ready',
+    });
+    await expect(action()).rejects.toThrow(/Cannot change form version state from 'deleted'/);
     expect(updateDraft).not.toHaveBeenCalled();
   });
 
@@ -179,12 +177,6 @@ describe('FormVersionService state transitions', () => {
     expect(updateDraft).not.toHaveBeenCalled();
   });
 
-  it('restore: throws NotFoundError when the version is missing', async () => {
-    getByIdInclDeleted.mockResolvedValue(null);
-    await expect(svc.restore(actor)).rejects.toThrow(/not found/i);
-    expect(updateDraft).not.toHaveBeenCalled();
-  });
-
   // A stale designer publishing an older version would archive the version that is live.
   it('publish: refuses a version that is no longer the current one', async () => {
     getById.mockResolvedValue({
@@ -198,5 +190,38 @@ describe('FormVersionService state transitions', () => {
     await expect(svc.publish(actor)).rejects.toMatchObject({ statusCode: 409 });
     expect(getPublished).not.toHaveBeenCalled();
     expect(updateDraft).not.toHaveBeenCalled();
+  });
+
+  // Another version of the form published between this one's read and its write.
+  it.each([
+    [
+      'answers a clash on the one-published-version index with a conflict',
+      'form_version_one_published_uq',
+      409,
+    ],
+    [
+      'passes any other unique violation through',
+      'form_version_workspace_form_version_uq',
+      undefined,
+    ],
+  ])('publish: %s', async (_label, constraint, statusCode) => {
+    getById.mockResolvedValue({
+      id: 'v1',
+      formId: 'f1',
+      state: 'draft',
+      engineSyncStatus: 'ready',
+    });
+    getPublished.mockResolvedValue(null);
+    const violation = Object.assign(new Error('duplicate key'), {
+      code: '23505',
+      severity: 'ERROR',
+      constraint,
+    });
+    updateDraft.mockRejectedValue(violation);
+
+    const outcome = svc.publish(actor);
+
+    if (statusCode) await expect(outcome).rejects.toMatchObject({ statusCode });
+    else await expect(outcome).rejects.toBe(violation);
   });
 });

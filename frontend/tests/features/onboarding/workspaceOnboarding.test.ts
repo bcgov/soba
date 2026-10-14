@@ -10,7 +10,7 @@ const readyContext = {
 function user(capabilities: { canCreateWorkspace: boolean; hasWorkspaces: boolean }) {
   return {
     actor: { id: 'u1', displayLabel: 'User', status: 'active' },
-    profile: { displayName: 'User', email: null, preferredUsername: null },
+    profile: { displayName: 'User', email: null, preferredUsername: null, idpCode: 'idir' },
     preferences: { defaultWorkspaceId: null },
     capabilities: { ...capabilities, formCreate: 'none' as const, isSobaAdmin: false },
   };

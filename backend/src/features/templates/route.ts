@@ -7,8 +7,6 @@ import { parseUpload } from '../../core/middleware/parseUpload';
 import { requireFeature } from '../../core/middleware/requireFeature';
 import { requireFormPermissions } from '../../core/middleware/requireFormPermissions';
 import { workspaceFromResource } from '../../core/middleware/workspaceContext';
-import { isLiveFormVersion } from '../../core/db/repos/formVersionRepo';
-import { NotFoundError } from '../../core/errors';
 import {
   TemplateIdParamsSchema,
   TemplateNameBodySchema,
@@ -30,14 +28,6 @@ const router = express.Router();
 
 const upload = parseUpload(env.getTemplatesMaxFileSizeMb() * 1024 * 1024);
 
-// A deleted form keeps its versions, so the version alone does not say whether its form is live.
-const liveFormVersion = asyncHandler(async (req, _res, next) => {
-  if (!(await isLiveFormVersion(req.query.formVersionId as string))) {
-    throw new NotFoundError('Form version not found');
-  }
-  next();
-});
-
 const onForm = [
   validateRequest({ query: TemplatesFormQuerySchema }),
   workspaceFromResource({ kind: 'form', idFrom: 'queryFormId' }),
@@ -50,7 +40,7 @@ const onTemplate = [
   validateRequest({ params: TemplateIdParamsSchema }),
   workspaceFromResource({ kind: 'template', idFrom: 'paramsId' }),
 ];
-const canRead = requireFormPermissions([Permissions.document_template_read]);
+const canRead = requireFormPermissions([Permissions.form_read, Permissions.document_template_read]);
 const canWrite = requireFormPermissions([Permissions.document_template_create]);
 const canDelete = requireFormPermissions([Permissions.document_template_delete]);
 
@@ -58,13 +48,10 @@ router.use(requireFeature(Features.templates), requireFeature(Features.design_mo
 
 router.get('/', ...onForm, canRead, asyncHandler(listTemplatesHandler));
 // Uploads are authorized before the body is parsed, so an unauthorized caller never buffers a file.
-// liveFormVersion follows the permission check, so only a caller who may see the form learns its
-// state.
 router.post(
   '/',
   ...onFormVersion,
   canWrite,
-  liveFormVersion,
   upload,
   validateRequest({ body: TemplateUploadBodySchema }),
   asyncHandler(createTemplateHandler),

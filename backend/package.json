@@ -6,12 +6,12 @@
   "scripts": {
     "test": "NODE_OPTIONS='--max-old-space-size=1024' jest --runInBand",
     "test:parallel": "NODE_OPTIONS='--max-old-space-size=1024' jest --maxWorkers=2",
-    "script:test-formio-proxy": "tsx scripts/test-formio-proxy.ts",
     "test:watch": "NODE_OPTIONS='--max-old-space-size=1024' jest --watch --runInBand",
     "test:coverage": "NODE_OPTIONS='--max-old-space-size=1024' jest --coverage --runInBand",
     "db:migrate": "tsx src/core/db/migrate.ts",
     "db:seed": "tsx src/core/db/seed.ts",
     "db:dev-data": "tsx src/features/dev-data/cli.ts",
+    "db:dev-data:verify": "tsx src/features/dev-data/access/cli.ts",
     "build": "tsc",
     "serve": "pnpm run build && node dist/src/app.js",
     "dev": "npx nodemon",

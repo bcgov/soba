@@ -11,6 +11,11 @@ import { sql } from 'drizzle-orm';
 import { auditColumns, idColumn, softDeleteColumns } from './audit';
 import { appUsers, sobaSchema, workspaces } from './core';
 
+/** Constraint names a unique violation is matched on; the primary keys keep Postgres's default names. */
+export const FORM_PKEY = 'form_pkey';
+export const FORM_VERSION_PKEY = 'form_version_pkey';
+export const FORM_WORKSPACE_NAME_UNIQUE = 'form_workspace_name_uq';
+
 export const forms = sobaSchema.table(
   'form',
   {
@@ -29,12 +34,14 @@ export const forms = sobaSchema.table(
   },
   (table) => ({
     // Non-deleted forms only, so a soft-deleted form frees its name for reuse.
-    workspaceNameUnique: uniqueIndex('form_workspace_name_uq')
+    workspaceNameUnique: uniqueIndex(FORM_WORKSPACE_NAME_UNIQUE)
       .on(table.workspaceId, table.name)
       .where(sql`${table.deletedAt} is null`),
     workspaceIdx: index('form_workspace_idx').on(table.workspaceId),
   }),
 );
+
+export const FORM_VERSION_ONE_PUBLISHED_UNIQUE = 'form_version_one_published_uq';
 
 export const formVersions = sobaSchema.table(
   'form_version',
@@ -65,6 +72,10 @@ export const formVersions = sobaSchema.table(
     ),
     workspaceIdx: index('form_version_workspace_idx').on(table.workspaceId),
     formIdx: index('form_version_form_idx').on(table.formId),
+    // Publishing archives the previous version first, so a form has at most one published version.
+    onePublished: uniqueIndex(FORM_VERSION_ONE_PUBLISHED_UNIQUE)
+      .on(table.formId)
+      .where(sql`${table.state} = 'published' and ${table.deletedAt} is null`),
   }),
 );
 
@@ -99,6 +110,8 @@ export const formVersionRevisions = sobaSchema.table(
 );
 
 export const SUBMISSION_CONFIRMATION_CODE_UNIQUE = 'submission_confirmation_code_uq';
+
+export const SUBMISSION_REVISION_PKEY = 'submission_revision_pkey';
 
 export const submissions = sobaSchema.table(
   'submission',

@@ -13,7 +13,7 @@ function uploadApp(): express.Express {
   return app;
 }
 
-const MALFORMED = { error: 'Malformed multipart body' };
+const MALFORMED = { error: 'Malformed multipart body', code: 'upload_invalid' };
 
 describe('checkedFileName', () => {
   it('passes a name of up to 255 bytes', () => {
@@ -23,7 +23,10 @@ describe('checkedFileName', () => {
 
   it('refuses a longer name with 400', () => {
     expect(() => checkedFileName(`${'a'.repeat(252)}.pdf`)).toThrow(
-      'File name is longer than 255 bytes',
+      expect.objectContaining({
+        message: 'File name is longer than 255 bytes',
+        code: 'upload_invalid',
+      }),
     );
   });
 });
@@ -59,7 +62,7 @@ describe('parseUpload', () => {
       .post('/upload')
       .attach('file', Buffer.from('too many bytes'), 'big.txt');
     expect(res.status).toBe(413);
-    expect(res.body).toEqual({ error: 'File too large' });
+    expect(res.body).toEqual({ error: 'File too large', code: 'file_too_large' });
   });
 
   it('returns 400 for any other multer limit, such as a second file', async () => {
@@ -68,7 +71,7 @@ describe('parseUpload', () => {
       .attach('first', Buffer.from('a'), 'a.txt')
       .attach('second', Buffer.from('b'), 'b.txt');
     expect(res.status).toBe(400);
-    expect(res.body).toEqual({ error: 'Too many files' });
+    expect(res.body).toEqual({ error: 'Too many files', code: 'upload_invalid' });
   });
 
   it('returns 400 for more text fields than the parser allows', async () => {

@@ -11,12 +11,13 @@ import {
   DocumentTemplateType,
   FeatureAvailability,
 } from '../../core/db/codes';
-import {
-  getSubmissionListContext,
-  getSubmissionRecordById,
-} from '../../core/db/repos/submissionRepo';
+import { getSubmissionRecordById } from '../../core/db/repos/submissionRepo';
 import type { CallerIdentity } from '../../core/db/repos/formSubmitAccessRepo';
-import { isSubmitterAllowed, SubmitterOperation } from '../../core/services/submitterAccess';
+import {
+  allowsSubmitterOperation,
+  findSubmissionForCaller,
+  SubmitterOperation,
+} from '../../core/services/submitterAccess';
 import { createDocumentGenerationAudit } from '../../core/db/repos/documentGenerationAuditRepo';
 import {
   getLiveDocumentTemplate,
@@ -31,6 +32,7 @@ import {
 } from '../../core/integrations/document-generation/templateFileType';
 import { upstreamStatusOf } from '../../core/http/httpErrorMapper';
 import { env } from '../../core/config/env';
+import { ApiErrorCodes } from '@soba/lib';
 import { AppError, UnprocessableEntityError } from '../../core/errors';
 import { log, getCorrelationId } from '../../core/logging';
 import { readTemplateContent } from './templateContent';
@@ -187,11 +189,11 @@ async function renderScope(
   caller: CallerIdentity,
   submissionId: string,
 ): Promise<ResolvedScope | 'notfound' | 'denied'> {
-  const scope = await getSubmissionListContext(submissionId);
-  if (!scope) return 'notfound';
-  const target = { ...scope, submissionId };
-  if (!(await isSubmitterAllowed(SubmitterOperation.render, target, caller))) return 'denied';
-  return scope;
+  const loaded = await findSubmissionForCaller(submissionId, caller);
+  if (!loaded) return 'notfound';
+  if (!allowsSubmitterOperation(SubmitterOperation.render, loaded, caller)) return 'denied';
+  const { workspaceId, formId, formVersionId } = loaded.submission;
+  return { workspaceId, formId, formVersionId };
 }
 
 /** Call the backend once, audited: one row per call, success or error. */
@@ -250,7 +252,11 @@ async function renderWith(
   if (!fileType || (size ?? 0) > maxBytes) {
     const reason = fileType ? 'exceeds the template size limit' : 'not a template file type';
     log.warn({ templateId, fileId, profile, reason }, 'Stored template is not renderable');
-    return { status: 'error', code, error: new UnprocessableEntityError(TEMPLATE_NOT_RENDERED) };
+    return {
+      status: 'error',
+      code,
+      error: new UnprocessableEntityError(TEMPLATE_NOT_RENDERED, ApiErrorCodes.render_failed),
+    };
   }
 
   const rendered = await withRenderSlot(

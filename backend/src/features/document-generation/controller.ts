@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { ApiErrorCodes } from '@soba/lib';
 import { documentGenerationService, type DocumentRenderOutcome } from './service';
 import { resolveCaller } from '../../core/middleware/actor';
 import { accessDenial } from '../../core/middleware/formSubmitAccess';
@@ -41,19 +42,31 @@ function respond(
 ): void {
   switch (outcome.status) {
     case 'notfound':
-      throw new NotFoundError('Submission not found');
+      throw new NotFoundError('Submission not found', ApiErrorCodes.submission_not_found);
     case 'template-notfound':
-      throw new NotFoundError('Template not found');
+      throw new NotFoundError('Template not found', ApiErrorCodes.template_not_found);
     case 'template-unavailable':
-      throw new ServiceUnavailableError('Template content unavailable');
+      throw new ServiceUnavailableError(
+        'Template content unavailable',
+        ApiErrorCodes.template_unavailable,
+      );
     case 'denied':
-      throw accessDenial(req, NOT_AUTHORIZED);
+      throw accessDenial(req, NOT_AUTHORIZED, ApiErrorCodes.render_denied);
     case 'unavailable':
-      throw new ServiceUnavailableError('Document generation is not available for this submission');
+      throw new ServiceUnavailableError(
+        'Document generation is not available for this submission',
+        ApiErrorCodes.render_unavailable,
+      );
     case 'busy':
-      throw new ServiceUnavailableError('Document generation is busy; try again shortly');
+      throw new ServiceUnavailableError(
+        'Document generation is busy; try again shortly',
+        ApiErrorCodes.render_busy,
+      );
     case 'no-content':
-      throw new UnprocessableEntityError('Submission has no saved data to print');
+      throw new UnprocessableEntityError(
+        'Submission has no saved data to print',
+        ApiErrorCodes.no_saved_data,
+      );
     case 'infected':
       throw new UnprocessableEntityError('File failed virus scan');
     case 'scan-unavailable':
@@ -76,8 +89,11 @@ function respond(
 
 export async function listSubmissionTemplatesHandler(req: Request, res: Response): Promise<void> {
   const outcome = await documentGenerationService.listTemplates(resolveCaller(req), req.params.id);
-  if (outcome.status === 'notfound') throw new NotFoundError('Submission not found');
-  if (outcome.status === 'denied') throw accessDenial(req, NOT_AUTHORIZED);
+  if (outcome.status === 'notfound') {
+    throw new NotFoundError('Submission not found', ApiErrorCodes.submission_not_found);
+  }
+  if (outcome.status === 'denied')
+    throw accessDenial(req, NOT_AUTHORIZED, ApiErrorCodes.render_denied);
   res.json({ items: outcome.templates });
 }
 

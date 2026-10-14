@@ -11,6 +11,8 @@ export const MeProfileSchema = z.object({
   displayName: z.string().nullable(),
   email: z.string().nullable(),
   preferredUsername: z.string().nullable(),
+  // The provider this session signed in through, which a protected audience is checked against.
+  idpCode: z.string().nullable(),
 });
 export type MeProfile = z.infer<typeof MeProfileSchema>;
 

@@ -72,3 +72,16 @@ export const WorkspaceLookupResponseSchema = LookupMetaSchema.extend({
 
 export type WorkspaceLookupItem = z.infer<typeof WorkspaceLookupItemSchema>;
 export type WorkspaceLookupResponse = z.infer<typeof WorkspaceLookupResponseSchema>;
+
+/** A workspace the caller's My Forms come from. */
+export const MyWorkspaceLookupItemSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+
+export const MyWorkspaceLookupResponseSchema = LookupMetaSchema.extend({
+  items: z.array(MyWorkspaceLookupItemSchema),
+});
+
+export type MyWorkspaceLookupItem = z.infer<typeof MyWorkspaceLookupItemSchema>;
+export type MyWorkspaceLookupResponse = z.infer<typeof MyWorkspaceLookupResponseSchema>;

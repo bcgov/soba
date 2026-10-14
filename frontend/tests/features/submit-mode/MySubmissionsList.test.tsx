@@ -3,13 +3,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const { kc, search } = vi.hoisted(() => ({
+const { kc, search, access } = vi.hoisted(() => ({
   kc: { authenticated: true, initializing: false },
   search: { value: '' },
+  access: { caller: { idpCode: 'idir' as string | null }, pending: false },
 }));
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
   useKeycloak: () => ({ ...kc, token: 'token' }),
+}));
+
+vi.mock('@/src/shared/api/useAccessCaller', () => ({
+  useAccessCaller: () => access,
 }));
 
 vi.mock('@/app/[lang]/Providers', () => ({
@@ -50,9 +55,12 @@ vi.mock('@/app/[lang]/Providers', () => ({
       deleteMessage: 'Your draft of {form}, last updated {updated}, will be deleted.',
       deleteSuccess: 'Draft deleted.',
       deleteError: 'Could not delete this draft.',
-      deleteSubmitted: 'This draft has been submitted and can no longer be deleted.',
       viewAll: 'View my submissions',
       noCode: 'No confirmation ID yet',
+    },
+    apiErrors: {
+      delete_closed: 'Already submitted, so it stays.',
+      delete_denied: 'Only its owner can delete it.',
     },
     dataTable: { itemName: 'items', pageOf: 'of {totalPages} page(s)' },
     modal: { dialogActions: 'Dialog actions' },
@@ -122,8 +130,28 @@ const DRAFT_UPDATED = new Intl.DateTimeFormat('en-US', {
   minute: '2-digit',
 }).format(new Date(DRAFT.updatedAt));
 
-const page = (items: unknown[]) => ({
+// An IDIR audience: the IDIR caller writes what they hold a grant on, through the audience.
+const writableForm = (id: string) => ({
+  id,
+  name: 'Form ' + id,
+  workspaceId: 'w1',
+  workspaceName: 'Roads',
+  publishedVersionId: 'v1',
+  permissions: [],
+  audienceMode: 'protected',
+  audienceIdps: ['idir'],
+  allowSubmitterDrafts: true,
+});
+// Members only and no role: a grant still reads, but nothing writes.
+const readOnlyForm = (id: string) => ({
+  ...writableForm(id),
+  audienceMode: 'members',
+  audienceIdps: [],
+});
+
+const page = (items: unknown[], forms: unknown[] = [writableForm('f1'), writableForm('f2')]) => ({
   items,
+  forms,
   page: { offset: 0, limit: 10, total: items.length },
   filters: {},
   sort: 'updatedAt:desc',
@@ -181,6 +209,8 @@ describe('MySubmissionsList', () => {
     search.value = '';
     kc.authenticated = true;
     kc.initializing = false;
+    access.caller = { idpCode: 'idir' };
+    access.pending = false;
     store = makeStore();
     store.dispatch(setToken('token'));
     store.dispatch(setAuthenticated(true));
@@ -252,6 +282,51 @@ describe('MySubmissionsList', () => {
     expect(screen.queryByTestId('s2-continue')).not.toBeInTheDocument();
     expect(screen.getByTestId('s3-continue')).toBeInTheDocument();
     expect(screen.queryByTestId('s3-delete')).not.toBeInTheDocument();
+  });
+
+  it('shows rows only once the caller is known', async () => {
+    access.pending = true;
+    const view = await renderList();
+    await waitFor(() => expect(getMySubmissions).toHaveBeenCalled());
+    // The response has landed; the rows still wait for the caller.
+    await act(async () => undefined);
+    expect(screen.getByTestId('datatable-loading')).toBeInTheDocument();
+    expect(screen.queryByTestId('s1-continue')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('s1-view')).not.toBeInTheDocument();
+    access.pending = false;
+    await act(async () => view.rerender(listTree()));
+    expect(await screen.findByTestId('s1-continue')).toBeInTheDocument();
+  });
+
+  // A grant still reads the draft, but the form no longer admits the caller to write it.
+  it('views a draft the caller can no longer write, from the action and the name', async () => {
+    getMySubmissions.mockResolvedValue(page([DRAFT], [readOnlyForm('f1')]));
+    await renderList();
+    await userEvent.click(await screen.findByTestId('s1-view'));
+    expect(mockPush).toHaveBeenCalledWith('/en/submission/s1');
+    expect(screen.queryByTestId('s1-continue')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('my-submission-link-s1'));
+    expect(mockPush).toHaveBeenLastCalledWith('/en/submission/s1');
+    // Delete does not need the write: an owner still deletes their own draft.
+    expect(screen.getByTestId('s1-delete')).toBeInTheDocument();
+  });
+
+  it('views a row whose form came without its facts', async () => {
+    getMySubmissions.mockResolvedValue(page([DRAFT], []));
+    await renderList();
+    expect(await screen.findByTestId('s1-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('s1-continue')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['whose provider is unknown', null],
+    ['who is the public user', 'public'],
+  ])('offers a caller %s no Continue and no Delete', async (_label, idpCode) => {
+    access.caller = { idpCode };
+    await renderList();
+    expect(await screen.findByTestId('s1-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('s1-continue')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('s1-delete')).not.toBeInTheDocument();
   });
 
   it.each([
@@ -331,6 +406,22 @@ describe('MySubmissionsList', () => {
     expect(screen.queryByTestId('confirm-modal-message')).not.toBeInTheDocument();
   });
 
+  it('deletes nothing, and says the session ended, when the session holds no token', async () => {
+    await renderList();
+    await userEvent.click(await screen.findByTestId('s1-delete'));
+    await act(async () => {
+      store.dispatch(setToken(undefined));
+    });
+    await userEvent.click(screen.getByTestId('confirm-modal-confirm'));
+
+    await waitFor(() =>
+      expect(addNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'Your session has ended.', type: 'error' }),
+      ),
+    );
+    expect(deleteSubmitSubmission).not.toHaveBeenCalled();
+  });
+
   it('holds the dialog open, with confirm disabled, until the delete settles', async () => {
     const settle = deferredDelete();
     await renderList();
@@ -350,8 +441,18 @@ describe('MySubmissionsList', () => {
   it.each([
     [
       'a draft submitted elsewhere',
+      new ApiError('Submission is submitted', 409, 'delete_closed'),
+      'Already submitted, so it stays.',
+    ],
+    [
+      'a draft submitted elsewhere, refused without a code',
       new ApiError('Submission is submitted', 409),
-      'This draft has been submitted and can no longer be deleted.',
+      'Already submitted, so it stays.',
+    ],
+    [
+      'a caller who may not delete it',
+      new ApiError('Not authorized to delete this submission', 403, 'delete_denied'),
+      'Only its owner can delete it.',
     ],
     ['an ended session', new SessionExpiredError(), 'Your session has ended.'],
     ['any other failure', new Error('boom'), 'Could not delete this draft.'],

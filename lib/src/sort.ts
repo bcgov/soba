@@ -9,6 +9,8 @@ export const sortTokensFor = <TField extends string>(
 
 export const FORM_SORT_FIELDS = ['name', 'status', 'createdAt', 'updatedAt'] as const;
 
+export const MY_FORM_SORT_FIELDS = ['name'] as const;
+
 export const FORM_VERSION_SORT_FIELDS = ['versionNo', 'state', 'createdAt', 'updatedAt'] as const;
 
 export const SUBMISSION_SORT_FIELDS = [

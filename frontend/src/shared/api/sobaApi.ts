@@ -40,12 +40,16 @@ export {
 // Submit-mode (public-capable, /submit/*)
 export {
   getSubmitFillBundle,
+  getSubmitForm,
+  getSubmitFormVersionSchema,
   getSubmitSubmissionSchema,
   openSobaFormSubmission,
   saveSobaFormSubmission,
   submitSobaFormSubmission,
   deleteSubmitSubmission,
+  getMyForms,
   getMySubmissions,
+  getMyWorkspaces,
   getSubmitSubmission,
   getSubmitSubmissionData,
 } from './sobaApiSubmit';

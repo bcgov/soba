@@ -136,7 +136,10 @@ export const updateWorkspaceAudience = (input: {
     },
   );
 
-/** A form's audience row with its workspace's, or null when either row is missing. */
+/**
+ * A form's audience row with its workspace's, or null when either row is missing. The submit-side
+ * facts query in submitterFormRepo applies the same rule in SQL.
+ */
 export const findFormAudience = async (
   workspaceId: string,
   formId: string,
@@ -186,15 +189,6 @@ export const countFormsInheritingAudience = async (workspaceId: string): Promise
       ),
     );
   return rows[0]?.count ?? 0;
-};
-
-/** The audience that applies to a form: its own, or its workspace's while it inherits. */
-export const findEffectiveAudience = async (target: {
-  workspaceId: string;
-  formId: string;
-}): Promise<Audience | null> => {
-  const row = await findFormAudience(target.workspaceId, target.formId);
-  return row ? (row.own ?? row.workspace) : null;
 };
 
 /**

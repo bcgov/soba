@@ -2,6 +2,7 @@
 
 import { useDictionary } from '@/app/[lang]/Providers';
 import type { DataError } from '@/src/shared/api/dataContracts';
+import { apiErrorMessage } from '@/src/shared/api/dataError';
 import { useAuthErrorDefaults } from '@/src/shared/api/useDataErrorNotice';
 import { LoadErrorAlert } from '@/src/shared/ui/LoadErrorAlert';
 
@@ -15,7 +16,7 @@ export function SubmissionLoadAlert({ error }: Readonly<{ error: DataError }>) {
       messages={{
         ...authDefaults,
         notFound: dict.submission.notFound,
-        failed: dict.submission.loadError,
+        failed: apiErrorMessage(error.cause, dict.apiErrors) ?? dict.submission.loadError,
       }}
       testIds={{
         sessionExpired: 'submission-view-session-expired',

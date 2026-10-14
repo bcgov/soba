@@ -1,30 +1,29 @@
 import { z } from 'zod';
 import { OffsetPageSchema, makeSortEnum } from './pagination';
 import { SUBMISSION_SORT_FIELDS } from '../sort';
+import { SubmissionParticipantRole, SubmissionWorkflowState } from '../permissions/codes';
+import { SubmitterFormSchema } from './forms';
 
+// Ids are lower-cased as Postgres stores them, so a retry spelled in another case still matches.
 export const OpenSubmissionBodySchema = z.object({
   // v7 only: the client mints this id, and it is the submission's identity.
-  id: z.uuidv7(),
-  formId: z.string().min(1),
+  id: z.uuidv7().toLowerCase(),
+  formId: z.string().min(1).toLowerCase(),
   // Must be the form's published version when given.
-  formVersionId: z.uuid().optional(),
+  formVersionId: z.uuid().toLowerCase().optional(),
 });
 
 export const SubmissionDataBodySchema = z.object({
   data: z.record(z.string(), z.unknown()),
   // Client-minted id for the revision this write creates. A retry reuses it.
   revisionId: z.uuidv7(),
-  // The head revision the client loaded. A write whose base is no longer the head is refused.
+  // The head revision the client loaded. A write whose base is no longer the head is kept as a
+  // pending revision (200, `revision.status` pending), not applied.
   baseRevisionId: z.uuid(),
 });
 
-// Revision ids are optional on submit; send both or neither.
-export const SubmitSubmissionBodySchema = SubmissionDataBodySchema.partial({
-  revisionId: true,
-  baseRevisionId: true,
-}).refine((body) => (body.revisionId === undefined) === (body.baseRevisionId === undefined), {
-  message: 'revisionId and baseRevisionId must be sent together',
-});
+// Same body as save.
+export const SubmitSubmissionBodySchema = SubmissionDataBodySchema;
 
 export const SubmissionListItemSchema = z.object({
   id: z.string(),
@@ -46,7 +45,9 @@ export const SubmissionListItemSchema = z.object({
 export const SubmissionResponseSchema = z.object({
   id: z.string(),
   formId: z.string(),
+  formName: z.string(),
   formVersionId: z.string(),
+  versionNo: z.number().int(),
   workflowState: z.string(),
   engineSyncStatus: z.string(),
   currentRevisionNo: z.number().int(),
@@ -103,12 +104,18 @@ export const ListSubmissionsResponseSchema = z.object({
 export type ListSubmissionsResponse = z.infer<typeof ListSubmissionsResponseSchema>;
 
 /** The states the caller's own list shows; an opened submission holds no answers yet. */
-export const MY_SUBMISSION_STATES = ['draft', 'submitted'] as const;
+export const MY_SUBMISSION_STATES = [
+  SubmissionWorkflowState.draft,
+  SubmissionWorkflowState.submitted,
+] as const;
 export const MySubmissionStateSchema = z.enum(MY_SUBMISSION_STATES);
 export type MySubmissionState = z.infer<typeof MySubmissionStateSchema>;
 
 /** The caller's grant on a submission; only an owner deletes. */
-export const MySubmissionRoleSchema = z.enum(['owner', 'collaborator']);
+export const MySubmissionRoleSchema = z.enum([
+  SubmissionParticipantRole.owner,
+  SubmissionParticipantRole.collaborator,
+]);
 export type MySubmissionRole = z.infer<typeof MySubmissionRoleSchema>;
 
 /** A row of the caller's own submissions. */
@@ -116,8 +123,12 @@ export const MySubmissionListItemSchema = z.object({
   id: z.string(),
   formId: z.string(),
   formName: z.string(),
+  formVersionId: z.string(),
   workflowState: MySubmissionStateSchema,
   role: MySubmissionRoleSchema,
+  // The revision the next write is based on, and its number in append order over every revision.
+  headRevisionId: z.string().nullable(),
+  currentRevisionNo: z.number().int(),
   submittedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -127,6 +138,8 @@ export const MySubmissionListItemSchema = z.object({
 
 export const ListMySubmissionsResponseSchema = z.object({
   items: z.array(MySubmissionListItemSchema),
+  // The forms of the page's rows, once each, with their facts for the caller.
+  forms: z.array(SubmitterFormSchema),
   page: OffsetPageSchema,
   filters: z.object({
     workflowState: MySubmissionStateSchema.optional(),

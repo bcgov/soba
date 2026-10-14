@@ -50,7 +50,7 @@ describe('errorHandler supertest', () => {
     });
     const res = await request(app).get('/');
     expect(res.status).toBe(500);
-    expect(res.body).toEqual({ error: 'Internal server error' });
+    expect(res.body).toEqual({ error: 'Internal server error', code: 'internal_error' });
   });
 
   it('returns 500 and Internal server error when route throws non-Error', async () => {
@@ -59,7 +59,7 @@ describe('errorHandler supertest', () => {
     });
     const res = await request(app).get('/');
     expect(res.status).toBe(500);
-    expect(res.body).toEqual({ error: 'Internal server error' });
+    expect(res.body).toEqual({ error: 'Internal server error', code: 'internal_error' });
   });
 
   it('returns custom statusCode when route throws AppError with custom code', async () => {
@@ -100,13 +100,13 @@ describe('surface endings', () => {
   it('answers an unmatched path inside the surface with a JSON 404, not the later mount', async () => {
     const res = await request(app).put('/api/surface/known');
     expect(res.status).toBe(404);
-    expect(res.body).toEqual({ error: 'Not found' });
+    expect(res.body).toEqual({ error: 'Not found', code: 'route_not_found' });
   });
 
   it('answers a path outside every surface with a JSON 404', async () => {
     const res = await request(app).get('/elsewhere');
     expect(res.status).toBe(404);
-    expect(res.body).toEqual({ error: 'Not found' });
+    expect(res.body).toEqual({ error: 'Not found', code: 'route_not_found' });
   });
 
   it('returns JSON for an error raised in the app-level chain before the surface router', async () => {
@@ -115,12 +115,15 @@ describe('surface endings', () => {
       .set('Content-Type', 'application/json')
       .send('{"broken":');
     expect(res.status).toBe(400);
-    expect(res.body).toEqual({ error: expect.any(String) });
+    expect(res.body).toEqual({ error: expect.any(String), code: 'request_invalid' });
   });
 
   it('returns 400 for a path param Express cannot decode', async () => {
     const res = await request(app).get('/api/surface/items/%E0%A4%A');
     expect(res.status).toBe(400);
-    expect(res.body).toEqual({ error: "Failed to decode param '%E0%A4%A'" });
+    expect(res.body).toEqual({
+      error: "Failed to decode param '%E0%A4%A'",
+      code: 'request_invalid',
+    });
   });
 });

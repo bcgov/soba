@@ -10,7 +10,8 @@ export interface InheritableRow<T> {
 /**
  * A form's view of a shared group: its choice, its own values, the workspace's, and the values that
  * apply. A form that inherits uses the workspace's, read when asked, so a workspace change reaches
- * it with nothing copied.
+ * it with nothing copied. The submit-side facts query in submitterFormRepo applies the same rule in
+ * SQL.
  */
 export const toInheritableSettings = <T>(
   row: InheritableRow<T>,

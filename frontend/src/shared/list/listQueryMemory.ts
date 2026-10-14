@@ -3,6 +3,7 @@ import {
   FEATURE_SCOPE_SORT_FIELDS,
   FORM_SORT_FIELDS,
   FORM_VERSION_SORT_FIELDS,
+  MY_FORM_SORT_FIELDS,
   SOBA_ADMIN_SORT_FIELDS,
   SUBMISSION_SORT_FIELDS,
   WORKSPACE_SORT_FIELDS,
@@ -75,6 +76,14 @@ export const MY_SUBMISSIONS_LIST_QUERY: ListQuerySpec = {
   filters: ['state'],
   sortOptions: sortTokensFor(SUBMISSION_SORT_FIELDS),
   defaultSort: UPDATED_DESC,
+};
+
+/** The forms the caller holds the submitter role on or has submitted to, in submit mode. */
+export const MY_FORMS_LIST_QUERY: ListQuerySpec = {
+  resource: 'myForms',
+  filters: ['workspace'],
+  sortOptions: sortTokensFor(MY_FORM_SORT_FIELDS),
+  defaultSort: 'name:asc',
 };
 
 /** The version history tab inside the designer. */

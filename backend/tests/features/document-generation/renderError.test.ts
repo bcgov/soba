@@ -23,6 +23,7 @@ describe('toRenderError', () => {
     const mapped = toRenderError(err, context);
     expect(mapped).toBeInstanceOf(UnprocessableEntityError);
     expect(mapped.message).toBe(TEMPLATE_NOT_RENDERED);
+    expect(mapped.code).toBe('render_failed');
   });
 
   it.each([
@@ -32,6 +33,7 @@ describe('toRenderError', () => {
     const mapped = toRenderError(err, context);
     expect(mapped).toBeInstanceOf(ServiceUnavailableError);
     expect(mapped.message).toBe('Document generation is unavailable');
+    expect(mapped.code).toBe('render_unavailable');
   });
 
   it('returns a generic 422 when the backend refuses the request as too large', () => {
@@ -39,6 +41,7 @@ describe('toRenderError', () => {
     const mapped = toRenderError(httpErrorToAppError(tooLarge, 'CDOGS'), context);
     expect(mapped).toBeInstanceOf(UnprocessableEntityError);
     expect(mapped.message).toBe(TEMPLATE_NOT_RENDERED);
+    expect(mapped.code).toBe('render_failed');
   });
 
   it('logs the statuses and error class, never the backend body', () => {

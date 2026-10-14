@@ -5,8 +5,10 @@ interface RouteLayer {
 }
 
 const GUARDS = [
+  'requireSubmissionStart',
+  'requireVersionSchemaRead',
   'requireSubmissionRead',
-  'requireFormSubmitAccess',
+  'requireSubmissionWrite',
   'requireSubmissionDelete',
   'requireSignedInSubmitter',
 ];
@@ -29,32 +31,43 @@ const handlersFor = (method: string, path: string): string[] => {
 };
 
 it.each([
-  '/submissions/:id',
-  '/submissions/:id/data',
-  '/submissions/:id/schema',
-  '/submissions/:id/fill',
-])('GET %s reads through requireSubmissionRead', (path) => {
-  expect(handlersFor('get', path)).toContain('requireSubmissionRead');
+  ['get', '/submissions/:id', 'requireSubmissionRead'],
+  ['get', '/submissions/:id/data', 'requireSubmissionRead'],
+  ['get', '/submissions/:id/schema', 'requireSubmissionRead'],
+  ['get', '/submissions/:id/fill', 'requireSubmissionRead'],
+  ['post', '/submissions/:id/save', 'requireSubmissionWrite'],
+  ['post', '/submissions/:id/submit', 'requireSubmissionWrite'],
+  ['delete', '/submissions/:id', 'requireSubmissionDelete'],
+])('%s %s loads the submission once, then decides with %s', (method, path, guard) => {
+  const handlers = handlersFor(method, path);
+  expect(handlers.filter((name) => name === 'loadSubmitterSubmission')).toHaveLength(1);
+  expect(handlers.indexOf('loadSubmitterSubmission')).toBeLessThan(handlers.indexOf(guard));
 });
 
-it.each(['/submissions', '/submissions/:id/save', '/submissions/:id/submit'])(
-  'POST %s goes through requireFormSubmitAccess',
+it.each([
+  ['post', '/submissions', 'loadSubmitterForm', 'requireSubmissionStart'],
+  ['get', '/forms/:formId', 'loadSubmitterForm', 'requireSubmissionStart'],
+  ['get', '/form-versions/:id/schema', 'loadSubmitterFormVersion', 'requireVersionSchemaRead'],
+])('%s %s reads once with %s, then decides with %s', (method, path, load, guard) => {
+  const handlers = handlersFor(method, path);
+  expect(handlers.filter((name) => name.startsWith('loadSubmitter'))).toEqual([load]);
+  expect(handlers.indexOf(load)).toBeLessThan(handlers.indexOf(guard));
+});
+
+it.each(['/submissions/mine', '/forms/mine', '/workspaces/mine'])(
+  'GET %s goes through requireSignedInSubmitter',
   (path) => {
-    expect(handlersFor('post', path)).toContain('requireFormSubmitAccess');
+    expect(handlersFor('get', path)).toContain('requireSignedInSubmitter');
   },
 );
 
-it('GET /submissions/mine goes through requireSignedInSubmitter', () => {
-  expect(handlersFor('get', '/submissions/mine')).toContain('requireSignedInSubmitter');
-});
-
-it('registers GET /submissions/mine before GET /submissions/:id, which would take it as an id', () => {
+it.each([
+  ['/submissions/mine', '/submissions/:id'],
+  ['/forms/mine', '/forms/:formId'],
+])('registers GET %s before GET %s, which would take it as an id', (mine, byId) => {
   const order = routes.filter((r) => r.method === 'get').map((r) => r.path);
-  expect(order.indexOf('/submissions/mine')).toBeLessThan(order.indexOf('/submissions/:id'));
-});
-
-it('DELETE /submissions/:id goes through requireSubmissionDelete', () => {
-  expect(handlersFor('delete', '/submissions/:id')).toContain('requireSubmissionDelete');
+  expect(order.indexOf(mine)).toBeGreaterThanOrEqual(0);
+  expect(order.indexOf(mine)).toBeLessThan(order.indexOf(byId));
 });
 
 it.each(routes.map((r) => [`${r.method.toUpperCase()} ${r.path}`, r.handlers] as const))(
@@ -66,10 +79,28 @@ it.each(routes.map((r) => [`${r.method.toUpperCase()} ${r.path}`, r.handlers] as
   },
 );
 
+it.each([
+  ['/submissions/:id/save', 'replayRecordedSave'],
+  ['/submissions/:id/submit', 'replayRecordedSubmit'],
+])('POST %s answers a recorded write after the load, before any guard', (path, replay) => {
+  const handlers = handlersFor('post', path);
+  const at = handlers.indexOf(replay);
+  expect(at).toBeGreaterThan(handlers.indexOf('loadSubmitterSubmission'));
+  expect(at).toBeLessThan(handlers.indexOf('requireSubmissionWrite'));
+});
+
+it('POST /submissions answers a recorded open before it reads the form', () => {
+  const handlers = handlersFor('post', '/submissions');
+  expect(handlers.indexOf('replayRecordedOpen')).toBeGreaterThanOrEqual(0);
+  expect(handlers.indexOf('replayRecordedOpen')).toBeLessThan(
+    handlers.indexOf('loadSubmitterForm'),
+  );
+});
+
 it('POST /submissions/:id/save checks drafts after write access, before its handler', () => {
   const handlers = handlersFor('post', '/submissions/:id/save');
   const draftGuard = handlers.indexOf('requireDraftSave');
-  expect(draftGuard).toBeGreaterThan(handlers.indexOf('requireFormSubmitAccess'));
+  expect(draftGuard).toBeGreaterThan(handlers.indexOf('requireSubmissionWrite'));
   expect(draftGuard).toBeLessThan(handlers.length - 1);
 });
 
