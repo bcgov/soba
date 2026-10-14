@@ -6,7 +6,9 @@ import { isDeepStrictEqual } from 'node:util';
 import { and, eq, inArray } from 'drizzle-orm';
 import {
   audienceAdmits,
+  canContinueSubmission,
   canDeleteOwnSubmission,
+  canReadVersionSchema,
   canSaveSubmissionDraft,
   canStartSubmission,
   DEFAULT_SORT_LOCALE,
@@ -64,10 +66,12 @@ import {
   getSubmissionWorkspaceAndState,
   listSubmissionsForParticipant,
   listSubmissionsForWorkspace,
+  type ParticipantSubmissionListRow,
 } from '../../../core/db/repos/submissionRepo';
 import {
   findLiveSubmitterForm,
   findSubmitterFormFacts,
+  findSubmitterFormVersion,
   listFormsForSubmitter,
   listSubmitterForms,
   listWorkspacesForSubmitter,
@@ -206,15 +210,37 @@ async function myWorkspaceIds(caller: Caller): Promise<Set<string>> {
   return new Set(rows.map((row) => row.id));
 }
 
-/** My Submissions rows, by submission id. */
-async function mySubmissionRows(caller: Caller): Promise<Map<string, SubmissionAccessFacts>> {
+/** My Submissions rows by submission id, and the forms read with them by form id. */
+interface MySubmissions {
+  rows: Map<string, ParticipantSubmissionListRow>;
+  forms: Map<string, SubmitterFormListRow>;
+}
+
+async function mySubmissionRows(caller: Caller): Promise<MySubmissions> {
   const actorId = signedInActorId(caller);
-  if (!actorId) return new Map();
-  const { items } = await listSubmissionsForParticipant({
+  if (!actorId) return { rows: new Map(), forms: new Map() };
+  const { items, forms: pageForms } = await listSubmissionsForParticipant({
     userId: actorId,
     offset: 0,
     limit: MAX_ROWS,
     sort: 'createdAt:desc',
+    locale: DEFAULT_SORT_LOCALE,
+  });
+  return {
+    rows: new Map(items.map((row) => [row.id, row])),
+    forms: new Map(pageForms.map((form) => [form.id, form])),
+  };
+}
+
+/** My Forms rows across every workspace, by form id. */
+async function allMyFormRows(caller: Caller): Promise<Map<string, SubmitterFormListRow>> {
+  const actorId = signedInActorId(caller);
+  if (!actorId) return new Map();
+  const { items } = await listFormsForSubmitter({
+    userId: actorId,
+    offset: 0,
+    limit: MAX_ROWS,
+    sort: 'name:asc',
     locale: DEFAULT_SORT_LOCALE,
   });
   return new Map(items.map((row) => [row.id, row]));
@@ -307,28 +333,64 @@ async function checkForm(
     issues: [
       ...(row ? rowInconsistencies(caller, formKey, row, answers) : []),
       ...(await openReadIssues(caller, formKey, form, answers.start)),
+      ...(await versionSchemaIssues(caller, formKey, form, answers.start)),
     ],
   };
 }
 
-/** The open route decides from one read of the form; Start from it must match the open rules. */
+/** The user whose form permissions the submit reads count: none for the public user. */
+const factsUserId = ({ identity }: Caller): string | null =>
+  identity.actorId && identity.idpCode !== PUBLIC_PROVIDER_CODE ? identity.actorId : null;
+
+/**
+ * The open route and the form read decide from one read of the form; Start from it must match the
+ * open rules.
+ */
 async function openReadIssues(
   caller: Caller,
   formKey: CoverageFormKey,
   form: CoverageFormRef,
   start: boolean,
 ): Promise<string[]> {
-  const { actorId, idpCode } = caller.identity;
-  const read = await findLiveSubmitterForm({
-    userId: actorId && idpCode !== PUBLIC_PROVIDER_CODE ? actorId : null,
-    formId: form.formId,
-  });
+  const read = await findLiveSubmitterForm({ userId: factsUserId(caller), formId: form.formId });
   const fromRead = !!read && canStartSubmission(read, caller.identity);
   return fromRead === start
     ? []
     : [
         `${caller.persona} x ${formKey}: Start from the open route's read differs from the open rules`,
       ];
+}
+
+/**
+ * The version schema read, from its own read of each of the form's versions, admits the caller to
+ * the published version exactly when they may start, and to no other version.
+ */
+async function versionSchemaIssues(
+  caller: Caller,
+  formKey: CoverageFormKey,
+  form: CoverageFormRef,
+  start: boolean,
+): Promise<string[]> {
+  const versions = await db
+    .select({ id: formVersions.id, versionNo: formVersions.versionNo })
+    .from(formVersions)
+    .where(eq(formVersions.formId, form.formId));
+  const published = await getPublishedVersionForForm(form.workspaceId, form.formId);
+  const issues = await Promise.all(
+    versions.map(async (version) => {
+      const read = await findSubmitterFormVersion({
+        userId: factsUserId(caller),
+        formVersionId: version.id,
+      });
+      const admits = !!read && canReadVersionSchema(version.id, read.form, caller.identity);
+      return admits === (start && version.id === published?.id)
+        ? []
+        : [
+            `${caller.persona} x ${formKey}: schema read of version ${version.versionNo} (${version.id === published?.id ? 'published' : 'not published'}) ${admits ? 'admits' : 'refuses'} where the start rules ${start ? 'allow' : 'refuse'}`,
+          ];
+    }),
+  );
+  return issues.flat();
 }
 
 /** The keys of the coverage forms in `workspaceId`. */
@@ -459,7 +521,11 @@ async function designListInconsistencies(
 const PLANNED_DELETES: ReadonlyMap<string, PlannedDelete> = new Map(
   buildCoveragePlan()
     .workspaces.flatMap((workspace) => workspace.forms)
-    .flatMap((form) => (form.afterSubmissions ? [[form.key, form.afterSubmissions] as const] : [])),
+    .flatMap(({ key, afterSubmissions }) =>
+      afterSubmissions === 'deleteForm' || afterSubmissions === 'deleteVersion'
+        ? [[key, afterSubmissions] as const]
+        : [],
+    ),
 );
 
 /** No design list, read with coverageFormsGrant, shows a form whose planned delete it hides. */
@@ -828,6 +894,33 @@ const rowDeleteIssue = (
     ? [`${caller.persona} x ${key}: My Submissions row Delete differs from the delete rule`]
     : [];
 
+/**
+ * A My Submissions row is decided from the facts read with it: its form must be the form My Forms
+ * lists, and Continue must match a write the routes allow on a submission still in progress.
+ */
+function rowFactsIssues(
+  caller: Caller,
+  key: CoverageSubmissionKey,
+  row: ParticipantSubmissionListRow | undefined,
+  mine: MySubmissions,
+  myForms: Map<string, SubmitterFormListRow>,
+  answers: Record<SubmissionCheck, boolean>,
+): string[] {
+  if (!row) return [];
+  const prefix = `${caller.persona} x ${key}`;
+  const form = mine.forms.get(row.formId);
+  if (!form) return [`${prefix}: My Submissions row has no form read with it`];
+  const issues: string[] = [];
+  if (!isDeepStrictEqual(form, myForms.get(row.formId))) {
+    issues.push(`${prefix}: My Submissions row's form differs from the My Forms row`);
+  }
+  const canContinue = canContinueSubmission(row, form, { idpCode: caller.identity.idpCode });
+  if (canContinue !== (answers.write && isSubmissionInProgress(row.workflowState))) {
+    issues.push(`${prefix}: My Submissions row Continue differs from the write rule`);
+  }
+  return issues;
+}
+
 const roleOf = (owner: boolean, participant: boolean): string | null => {
   if (owner) return SubmissionParticipantRole.owner;
   return participant ? SubmissionParticipantRole.collaborator : null;
@@ -880,11 +973,11 @@ async function checkSubmissions(
   manifest: CoverageManifest,
   caller: Caller,
 ): Promise<CaseCheck<CoverageSubmissionKey, SubmissionCheck>> {
-  const mine = await mySubmissionRows(caller);
+  const [mine, myForms] = await Promise.all([mySubmissionRows(caller), allMyFormRows(caller)]);
   const checked = await Promise.all(
     COVERAGE_SUBMISSION_KEYS.map(async (key) => {
       const ref = manifest.submissions[key];
-      const answers = await submissionAnswers(caller, ref, mine);
+      const answers = await submissionAnswers(caller, ref, mine.rows);
       return {
         result: {
           persona: caller.persona,
@@ -893,7 +986,8 @@ async function checkSubmissions(
           expected: expectedOf(SUBMISSION_CHECKS, SUBMISSION_EXPECTATIONS[key], caller.persona),
         },
         issues: [
-          ...rowDeleteIssue(caller, key, mine.get(ref.submissionId), answers),
+          ...rowDeleteIssue(caller, key, mine.rows.get(ref.submissionId), answers),
+          ...rowFactsIssues(caller, key, mine.rows.get(ref.submissionId), mine, myForms, answers),
           ...(await submissionReadIssues(caller, key, ref)),
         ],
       };
@@ -1035,7 +1129,7 @@ export async function explainSubmission(
           ),
         )
     : [];
-  const answers = await submissionAnswers(caller, ref, await mySubmissionRows(caller));
+  const answers = await submissionAnswers(caller, ref, (await mySubmissionRows(caller)).rows);
 
   return [
     ['persona', `${persona} (${caller.identity.idpCode}) ${caller.identity.actorId}`],

@@ -40,6 +40,8 @@ export {
 // Submit-mode (public-capable, /submit/*)
 export {
   getSubmitFillBundle,
+  getSubmitForm,
+  getSubmitFormVersionSchema,
   getSubmitSubmissionSchema,
   openSobaFormSubmission,
   saveSobaFormSubmission,

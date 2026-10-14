@@ -70,4 +70,9 @@ export interface FormEngineAdapter {
    * Returns the schema unchanged if the engine has nothing to do.
    */
   normalizeSchema?(schema: Record<string, unknown>): Record<string, unknown>;
+  /**
+   * The parts of a stored schema that decide what a filler sees and how their answers validate,
+   * without the document's identity and metadata; what a schema hash covers. Pure, no engine call.
+   */
+  renderedSchema?(schema: Record<string, unknown>): Record<string, unknown>;
 }

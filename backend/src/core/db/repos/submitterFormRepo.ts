@@ -35,7 +35,7 @@ import { FormVersionState, Roles, SubmissionParticipantStatus } from '../codes';
 import { collated, likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 import { effectiveGroups, permissionsByForm } from './formAccessRepo';
-import { liveForm } from './liveRows';
+import { liveForm, liveFormVersion } from './liveRows';
 
 type SubmitterFormSortField = (typeof MY_FORM_SORT_FIELDS)[number];
 
@@ -274,6 +274,59 @@ export const findLiveSubmitterForm = async (
     .where(and(eq(forms.id, input.formId), liveForm))
     .limit(1);
   return row ?? null;
+};
+
+/** A live form version, as the submit reads need it. */
+export interface SubmitterFormVersionRow {
+  id: string;
+  formId: string;
+  versionNo: number;
+  engineSchemaRef: string | null;
+  formEngineCode: string;
+}
+
+/**
+ * A live form version and its form with its facts for one caller, in one statement; null when the
+ * version or its form is missing or deleted. The version may be in any state.
+ */
+export const findSubmitterFormVersion = async (
+  input: { userId: string | null; formVersionId: string },
+  executor: DbOrTx = db,
+): Promise<{ version: SubmitterFormVersionRow; form: SubmitterFormListRow } | null> => {
+  const facts = formFacts(input.userId, {
+    formIds: db
+      .select({ formId: formVersions.formId })
+      .from(formVersions)
+      .where(eq(formVersions.id, input.formVersionId)),
+  });
+  const [row] = await facts
+    .join(
+      executor
+        .select({
+          versionId: formVersions.id,
+          versionNo: formVersions.versionNo,
+          engineSchemaRef: formVersions.engineSchemaRef,
+          formEngineCode: forms.formEngineCode,
+          id: forms.id,
+          name: forms.name,
+          workspaceId: forms.workspaceId,
+          workspaceName: workspaces.name,
+          ...facts.columns,
+        })
+        .from(formVersions)
+        .innerJoin(forms, eq(forms.id, formVersions.formId))
+        .innerJoin(workspaces, eq(workspaces.id, forms.workspaceId))
+        .$dynamic(),
+    )
+    .where(and(eq(formVersions.id, input.formVersionId), liveFormVersion))
+    .limit(1);
+  if (!row) return null;
+
+  const { versionId, versionNo, engineSchemaRef, formEngineCode, ...form } = row;
+  return {
+    version: { id: versionId, formId: form.id, versionNo, engineSchemaRef, formEngineCode },
+    form,
+  };
 };
 
 /** The given forms with their facts for one caller, across workspaces, in no particular order. */

@@ -1,6 +1,7 @@
 import {
   decideRecordedWrite,
   decideSubmissionWrite,
+  opensSameSubmission,
   replayedLanding,
   type RecordedRevision,
   type SubmissionWriteRequest,
@@ -98,6 +99,20 @@ describe('decideRecordedWrite', () => {
     expect(() => decideRecorded(recorded, 'rev-3')).toThrow(
       expect.objectContaining({ code: 'revision_id_taken' }),
     );
+  });
+});
+
+describe('opensSameSubmission', () => {
+  const held = { formId: 'f1', formVersionId: 'v1' };
+
+  it.each([
+    ['the same form and version', { formId: 'f1', formVersionId: 'v1' }, true],
+    ['the same form, naming no version', { formId: 'f1' }, true],
+    ['the same form on another version', { formId: 'f1', formVersionId: 'v2' }, false],
+    ['another form', { formId: 'f2', formVersionId: 'v1' }, false],
+    ['another form, naming no version', { formId: 'f2' }, false],
+  ])('an open of %s: %s', (_label, open, same) => {
+    expect(opensSameSubmission(held, open)).toBe(same);
   });
 });
 

@@ -160,6 +160,7 @@ export const FORM_EXPECTATIONS: Record<CoverageFormKey, FormExpectation> = {
   rolesUnpublished: rolesUnlisted(),
   rolesFormDeleted: rolesUnlisted(),
   rolesVersionDeleted: rolesUnlisted(),
+  rolesVersionReplaced: rolesInherited(),
   rolesDraftsOff: {
     listed: ROLE_SUBMITTERS,
     start: ['admin', ...ROLE_SUBMITTERS],
@@ -246,6 +247,7 @@ export const DESIGN_EXPECTATIONS: Record<CoverageFormKey, DesignExpectation> = {
   // A deleted form's routes return 404 before any permission check.
   rolesFormDeleted: everyCheck([]),
   rolesVersionDeleted: rolesDesign(),
+  rolesVersionReplaced: rolesDesign(),
   rolesDraftsOff: rolesDesign(),
   protectedInherit: everyCheck(['admin', 'owner']),
   publicOwn: everyCheck(['admin', 'owner']),
@@ -324,6 +326,14 @@ export const SUBMISSION_EXPECTATIONS: Record<CoverageSubmissionKey, SubmissionEx
   submitterOnDeletedVersion: NONE,
   submitterOnDeletedForm: NONE,
   ownerDraft: { mine: ['owner'], ...inProgressFor('owner'), delete: ['owner'] },
+  // The submitter role grants the write and the render; the members audience admits no one else.
+  submitterDraft: { mine: ['submitter'], ...inProgressFor('submitter'), delete: ['submitter'] },
+  // A version published after it does not close it; it stays on its own version.
+  submitterOnReplacedVersion: {
+    mine: ['submitter'],
+    ...inProgressFor('submitter'),
+    delete: ['submitter'],
+  },
   // The public user owns every anonymous submission, so any anonymous caller holding the id passes.
   anonymousSubmitted: {
     mine: [],

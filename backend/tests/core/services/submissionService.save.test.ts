@@ -15,6 +15,7 @@ jest.mock('../../../src/core/db/repos/submissionRepo', () => ({
   clearSubmissionProvisioning: jest.fn(),
   failSubmissionProvisioning: jest.fn(),
   openSubmission: jest.fn(),
+  getFormVersionLabels: jest.fn(),
   getSubmissionById: jest.fn(),
   listSubmissionsForWorkspace: jest.fn(),
   markSubmissionDeleted: jest.fn(),
@@ -38,6 +39,7 @@ const updateDraft = submissionRepo.updateSubmissionDraft as unknown as jest.Mock
 const appendRevision = submissionRepo.appendSubmissionRevision as unknown as jest.Mock;
 const clearProvisioning = submissionRepo.clearSubmissionProvisioning as unknown as jest.Mock;
 const failProvisioning = submissionRepo.failSubmissionProvisioning as unknown as jest.Mock;
+const getLabels = submissionRepo.getFormVersionLabels as unknown as jest.Mock;
 const getVersion = versionRepo.getFormVersionById as unknown as jest.Mock;
 const getEngineCode = formRepo.getFormEngineCodeForForm as unknown as jest.Mock;
 const createAdapter = registry.createFormEngineAdapter as unknown as jest.Mock;
@@ -54,6 +56,8 @@ const input = {
 
 const svc = new SubmissionService();
 
+const LABELS = { form: { name: 'Permit application' }, formVersion: { versionNo: 4 } };
+
 describe('SubmissionService save (versioned engine write)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -68,12 +72,13 @@ describe('SubmissionService save (versioned engine write)', () => {
       submittedBy: 'actor-1',
     });
     getRevisionById.mockResolvedValue(null);
+    getLabels.mockResolvedValue(LABELS);
     getVersion.mockResolvedValue({ id: 'v1', engineSchemaRef: 'form-ref-1' });
     getEngineCode.mockResolvedValue('formio-v5');
     updateDraft.mockResolvedValue({ id: 's1' });
     appendRevision.mockResolvedValue({
       outcome: 'appended',
-      record: { id: 's1', currentRevisionNo: 3 },
+      record: { id: 's1', formVersionId: 'v1', currentRevisionNo: 3 },
       revisionId: 'rev-3',
       revisionNo: 3,
       status: 'current',
@@ -115,9 +120,12 @@ describe('SubmissionService save (versioned engine write)', () => {
       }),
     );
     expect(result).toEqual({
-      record: { id: 's1', currentRevisionNo: 3 },
+      record: { id: 's1', formVersionId: 'v1', currentRevisionNo: 3, ...LABELS },
       revision: { id: 'rev-3', revisionNo: 3, status: 'current', reason: 'accepted' },
     });
+    // The row's state is the write's own; only the labels are read after it.
+    expect(getLabels).toHaveBeenCalledWith('v1');
+    expect(getRecord).toHaveBeenCalledTimes(1);
   });
 
   it('writes a draft save without engine validation', async () => {
@@ -362,6 +370,7 @@ describe('SubmissionService save (versioned engine write)', () => {
       status: 'current',
       reason: 'accepted',
     });
+    expect(result.record).toMatchObject({ id: 's1', headRevisionId: 'rev-2', ...LABELS });
     expect(createSubmission).not.toHaveBeenCalled();
     expect(appendRevision).not.toHaveBeenCalled();
   });

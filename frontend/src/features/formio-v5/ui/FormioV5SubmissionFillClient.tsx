@@ -8,11 +8,14 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { canSaveDraftOnSubmission, canWriteSubmission } from '@/src/shared/util/permissions';
 import { useBcgovFileOption } from '@/src/features/formio-v5/useBcgovFileOption';
+import { useMountedLoad, type MountedLoad } from '@/src/features/formio-v5/fillMount';
+import { useFillSession } from '@/src/features/formio-v5/data/useFillSession';
 import { useSubmitFill } from '@/src/features/formio-v5/data/useSubmitFill';
 import {
   SubmissionFillForm,
   type FillLabels,
 } from '@/src/features/formio-v5/ui/SubmissionFillForm';
+import { useFillLabels } from '@/src/features/formio-v5/ui/useFillLabels';
 import { SubmissionLoadAlert } from '@/src/features/submissions/ui/SubmissionLoadAlert';
 import { useAccessCaller } from '@/src/shared/api/useAccessCaller';
 
@@ -30,7 +33,8 @@ function SubmissionFill({
 }>) {
   const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
-  const fill = useSubmitFill(submissionId);
+  const session = useFillSession();
+  const fill = useSubmitFill(submissionId, session);
   const { caller, pending: callerPending } = useAccessCaller();
   const files = useBcgovFileOption();
   // Each load the filler asks for mounts a new form; no other bundle reaches Form.io.
@@ -50,26 +54,42 @@ function SubmissionFill({
     setLoadId((id) => id + 1);
   }, [refresh]);
 
-  if (fill.error) {
-    return <SubmissionLoadAlert error={fill.error} />;
-  }
-
   // A submitted submission isn't fillable; the effect above leaves for its view.
-  if (!bundle || submitted || callerPending || !files.ready) {
-    return <CenteredProgress label={labels.loading} />;
+  const ready = !!bundle && !fill.error && !submitted && !callerPending && files.ready;
+  let live: MountedLoad | null = null;
+  if (ready) {
+    const access = { role: bundle.role, workflowState: bundle.workflowState };
+    live = {
+      loadId: String(loadId),
+      bundle,
+      canWrite: canWriteSubmission(access, bundle.form, caller),
+      canSaveDraft: canSaveDraftOnSubmission(access, bundle.form, caller),
+    };
+  }
+  const mounted = useMountedLoad(live, String(loadId));
+
+  if (!mounted) {
+    return fill.error ? (
+      <SubmissionLoadAlert error={fill.error} />
+    ) : (
+      <CenteredProgress label={labels.loading} />
+    );
   }
 
-  const access = { role: bundle.role, workflowState: bundle.workflowState };
-  const canWrite = canWriteSubmission(access, bundle.form, caller);
-  const canSaveDraft = canSaveDraftOnSubmission(access, bundle.form, caller);
+  const { canWrite, canSaveDraft } = mounted;
   return (
     <SubmissionFillForm
-      // A changed decision, such as the caller's provider arriving after a failed /me, mounts a new
-      // form. It can only open the form up, so no typed answers are lost.
-      key={`${loadId}:${canWrite}:${canSaveDraft}`}
+      // A wider decision mounts a new form; it can only open the form up, so no typed answers are lost.
+      key={`${mounted.loadId}:${canWrite}:${canSaveDraft}`}
       submissionId={submissionId}
       submissionPath={submissionPath}
-      view={{ snapshot: bundle, canWrite, canSaveDraft, fileOption: files.option }}
+      view={{
+        snapshot: mounted.bundle,
+        canWrite,
+        canSaveDraft,
+        fileOption: files.option,
+        signedIn: session.signedIn,
+      }}
       labels={labels}
       onReload={reload}
     />
@@ -80,44 +100,19 @@ export default function FormioV5SubmissionFillClient({
   submissionId,
 }: Readonly<{ submissionId: string }>) {
   const dict = useDictionary();
-  const labels = dict.formioV5.formRender;
+  const labels = useFillLabels();
 
   if (!submissionId) {
     return (
       <InlineAlert variant="danger" role="alert">
-        {labels.missingId}
+        {dict.formioV5.formRender.missingId}
       </InlineAlert>
     );
   }
 
   return (
     <div className="mt-3">
-      <SubmissionFill
-        key={submissionId}
-        submissionId={submissionId}
-        labels={{
-          loading: dict.form?.loading || 'Loading…',
-          loadError: labels.loadError,
-          rendererError: labels.rendererError,
-          submitSuccess: labels.submitSuccess,
-          sessionExpired: dict.general.sessionExpired,
-          readOnly: labels.readOnly,
-          saveDraft: labels.saveDraft,
-          savingDraft: labels.savingDraft,
-          savedAt: labels.savedAt,
-          notSaved: labels.notSaved,
-          notConfirmed: labels.notConfirmed,
-          offline: labels.offline,
-          heldSave: labels.heldSave,
-          heldSubmit: labels.heldSubmit,
-          reloadLatest: labels.reloadLatest,
-          saveMine: labels.saveMine,
-          submitMine: labels.submitMine,
-          alreadySubmitted: labels.alreadySubmitted,
-          requestFailed: labels.requestFailed,
-          errors: dict.apiErrors,
-        }}
-      />
+      <SubmissionFill key={submissionId} submissionId={submissionId} labels={labels} />
     </div>
   );
 }

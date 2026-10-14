@@ -6,7 +6,7 @@ jest.mock('../../../../src/core/container', () => ({
     submit: jest.fn(),
     deleteUnsubmitted: jest.fn(),
   },
-  formVersionService: { readSchema: jest.fn() },
+  formVersionService: { readSchema: jest.fn(), schemaHash: jest.fn() },
   formsApiService: {},
 }));
 jest.mock('../../../../src/core/db/repos/submitterSubmissionRepo', () => ({
@@ -15,6 +15,7 @@ jest.mock('../../../../src/core/db/repos/submitterSubmissionRepo', () => ({
 jest.mock('../../../../src/core/db/repos/submitterFormRepo', () => ({
   ...jest.requireActual('../../../../src/core/db/repos/submitterFormRepo'),
   findLiveSubmitterForm: jest.fn(),
+  findSubmitterFormVersion: jest.fn(),
 }));
 jest.mock('../../../../src/core/db/repos/submissionRepo', () => ({
   ...jest.requireActual('../../../../src/core/db/repos/submissionRepo'),
@@ -26,15 +27,20 @@ import request from 'supertest';
 import { submitRouter } from '../../../../src/core/api/submit';
 import { formVersionService, submissionsApiService } from '../../../../src/core/container';
 import { findSubmitterSubmission } from '../../../../src/core/db/repos/submitterSubmissionRepo';
-import { findLiveSubmitterForm } from '../../../../src/core/db/repos/submitterFormRepo';
+import {
+  findLiveSubmitterForm,
+  findSubmitterFormVersion,
+} from '../../../../src/core/db/repos/submitterFormRepo';
 import { getSubmissionRevisionById } from '../../../../src/core/db/repos/submissionRepo';
 import { coreErrorHandler } from '../../../../src/core/middleware/errorHandler';
 import { storedSubmission } from './storedSubmission';
 
 const mockRead = jest.mocked(findSubmitterSubmission);
 const mockForm = jest.mocked(findLiveSubmitterForm);
+const mockVersion = jest.mocked(findSubmitterFormVersion);
 const mockRevision = jest.mocked(getSubmissionRevisionById);
 const mockSchema = jest.mocked(formVersionService.readSchema);
+const mockHash = jest.mocked(formVersionService.schemaHash);
 const service = jest.mocked(submissionsApiService);
 
 // Stands in for checkJwt + resolveActorOrPublic, which need a signed token. The router, guards and
@@ -80,6 +86,36 @@ const submitterForm = (overrides: Record<string, unknown> = {}) => ({
   allowSubmitterDrafts: true,
   ...overrides,
 });
+
+// Refused as an open is: the caller may not start (401 anonymous, 403 signed in), then no published
+// version.
+const START_REFUSALS = [
+  ['a missing form', null, 'signedIn', 404, 'Form not found', 'form_not_found'],
+  [
+    'a form with no published version',
+    submitterForm({ publishedVersionId: null }),
+    'signedIn',
+    404,
+    'Form has no published version',
+    'not_published',
+  ],
+  [
+    'a members form, anonymously',
+    submitterForm({ permissions: [] }),
+    'anonymous',
+    401,
+    'Not authorized to submit this form',
+    'open_denied',
+  ],
+  [
+    'a members form without the role',
+    submitterForm({ permissions: [] }),
+    'signedIn',
+    403,
+    'Not authorized to submit this form',
+    'open_denied',
+  ],
+] as const;
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -363,6 +399,15 @@ describe('submit routes over one read', () => {
     expect(service.open).not.toHaveBeenCalled();
   });
 
+  // Postgres stores ids lower-case; a link spelled upper-case must still replay its own open.
+  it('answers an open spelled in another case with the submission it already opened', async () => {
+    const res = await signedIn().post(BASE).send({ id: openBody.id.toUpperCase(), formId: 'F1' });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ id: 's1', formId: 'f1' });
+    expect(mockRead).toHaveBeenCalledWith(expect.objectContaining({ submissionId: openBody.id }));
+    expect(service.open).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['nothing live', null],
     ['a collaborator', storedSubmission({ role: 'collaborator' })],
@@ -395,40 +440,17 @@ describe('submit routes over one read', () => {
     ]);
   });
 
-  it.each([
-    ['a missing form', null, 'signedIn', 404, 'Form not found', 'form_not_found'],
-    [
-      'a form with no published version',
-      submitterForm({ publishedVersionId: null }),
-      'signedIn',
-      404,
-      'Form has no published version',
-      'not_published',
-    ],
-    [
-      'a members form, anonymously',
-      submitterForm({ permissions: [] }),
-      'anonymous',
-      401,
-      'Not authorized to submit this form',
-      'open_denied',
-    ],
-    [
-      'a members form without the role',
-      submitterForm({ permissions: [] }),
-      'signedIn',
-      403,
-      'Not authorized to submit this form',
-      'open_denied',
-    ],
-  ] as const)('refuses an open of %s', async (_label, form, caller, status, error, code) => {
-    mockRead.mockResolvedValue(null);
-    mockForm.mockResolvedValue(form);
-    const res = await request(buildApp(caller)).post(BASE).send(openBody);
-    expect(res.status).toBe(status);
-    expect(res.body).toEqual({ error, code });
-    expect(service.open).not.toHaveBeenCalled();
-  });
+  it.each(START_REFUSALS)(
+    'refuses an open of %s',
+    async (_label, form, caller, status, error, code) => {
+      mockRead.mockResolvedValue(null);
+      mockForm.mockResolvedValue(form);
+      const res = await request(buildApp(caller)).post(BASE).send(openBody);
+      expect(res.status).toBe(status);
+      expect(res.body).toEqual({ error, code });
+      expect(service.open).not.toHaveBeenCalled();
+    },
+  );
 
   it('opens in the form workspace', async () => {
     mockRead.mockResolvedValue(null);
@@ -440,5 +462,128 @@ describe('submit routes over one read', () => {
       expect.objectContaining({ workspaceId: 'ws9', formId: 'f1', actorId: 'u1' }),
       openBody,
     );
+  });
+});
+
+describe('submit reads to start a submission', () => {
+  const version = {
+    id: 'v1',
+    formId: 'f1',
+    versionNo: 3,
+    engineSchemaRef: 'engine-form',
+    formEngineCode: 'formio-v5',
+  };
+  const SCHEMA_PATH = '/api/v1/submit/form-versions/v1/schema';
+  const publicForm = submitterForm({ audienceMode: 'public', permissions: [] });
+
+  it('serves the form a caller may start, read once as the caller', async () => {
+    mockForm.mockResolvedValue(submitterForm());
+    const res = await signedIn().get('/api/v1/submit/forms/f1');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(submitterForm());
+    expect(mockForm.mock.calls).toEqual([[{ userId: 'u1', formId: 'f1' }]]);
+  });
+
+  it('serves a public form anonymously, read without permissions', async () => {
+    mockForm.mockResolvedValue(publicForm);
+    const res = await anonymous().get('/api/v1/submit/forms/f1');
+    expect(res.status).toBe(200);
+    expect(mockForm.mock.calls).toEqual([[{ userId: null, formId: 'f1' }]]);
+  });
+
+  it.each(START_REFUSALS)(
+    'refuses a form read of %s as an open',
+    async (_label, form, caller, status, error, code) => {
+      mockForm.mockResolvedValue(form);
+      const res = await request(buildApp(caller)).get('/api/v1/submit/forms/f1');
+      expect(res.status).toBe(status);
+      expect(res.body).toEqual({ error, code });
+    },
+  );
+
+  it('serves the published version schema with its hash, read once as the caller', async () => {
+    mockVersion.mockResolvedValue({ version, form: submitterForm() });
+    mockHash.mockReturnValue('rendered-hash');
+    const res = await signedIn().get(SCHEMA_PATH);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      formId: 'f1',
+      formVersionId: 'v1',
+      versionNo: 3,
+      schema: { components: [] },
+      schemaHash: 'rendered-hash',
+    });
+    expect(mockHash).toHaveBeenCalledWith({ engineCode: 'formio-v5', schema: { components: [] } });
+    expect(mockVersion.mock.calls).toEqual([[{ userId: 'u1', formVersionId: 'v1' }]]);
+    expect(mockSchema).toHaveBeenCalledWith({
+      engineCode: 'formio-v5',
+      engineSchemaRef: 'engine-form',
+    });
+  });
+
+  it('serves a public form version schema anonymously, read without permissions', async () => {
+    mockVersion.mockResolvedValue({ version, form: publicForm });
+    expect((await anonymous().get(SCHEMA_PATH)).status).toBe(200);
+    expect(mockVersion.mock.calls).toEqual([[{ userId: null, formVersionId: 'v1' }]]);
+  });
+
+  it.each([
+    [
+      'a missing version',
+      null,
+      'signedIn',
+      404,
+      'Form version schema not found',
+      'schema_not_found',
+    ],
+    [
+      'a members form, anonymously',
+      { version, form: submitterForm({ permissions: [] }) },
+      'anonymous',
+      401,
+      'Not authorized to submit this form',
+      'open_denied',
+    ],
+    [
+      'a replaced version, to a caller who may not start',
+      { version, form: submitterForm({ permissions: [], publishedVersionId: 'v2' }) },
+      'signedIn',
+      403,
+      'Not authorized to submit this form',
+      'open_denied',
+    ],
+    [
+      'a form with no published version',
+      { version, form: submitterForm({ publishedVersionId: null }) },
+      'signedIn',
+      404,
+      'Form has no published version',
+      'not_published',
+    ],
+    [
+      'a replaced version',
+      { version, form: submitterForm({ publishedVersionId: 'v2' }) },
+      'signedIn',
+      409,
+      'Form version is not the published version',
+      'version_not_published',
+    ],
+  ] as const)(
+    'refuses a schema read of %s, before the engine read',
+    async (_label, loaded, caller, status, error, code) => {
+      mockVersion.mockResolvedValue(loaded);
+      const res = await request(buildApp(caller)).get(SCHEMA_PATH);
+      expect(res.status).toBe(status);
+      expect(res.body).toEqual({ error, code });
+      expect(mockSchema).not.toHaveBeenCalled();
+    },
+  );
+
+  it('answers a published version without an engine schema with schema_not_found', async () => {
+    mockVersion.mockResolvedValue({ version, form: submitterForm() });
+    mockSchema.mockResolvedValue(null);
+    const res = await signedIn().get(SCHEMA_PATH);
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'Form version schema not found', code: 'schema_not_found' });
   });
 });

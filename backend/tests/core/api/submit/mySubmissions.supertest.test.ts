@@ -33,6 +33,7 @@ const MINE = '/api/v1/submit/submissions/mine';
 
 const PAGE = {
   items: [],
+  forms: [],
   page: { offset: 0, limit: 20, total: 0 },
   filters: {},
   sort: 'updatedAt:desc' as const,
