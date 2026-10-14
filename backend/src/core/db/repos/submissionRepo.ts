@@ -566,7 +566,7 @@ export const listSubmissionsForParticipant = async (
     const pageForms = await listSubmitterForms({ userId: input.userId, formIds }, tx);
     const byId = (a: SubmitterFormListRow, b: SubmitterFormListRow) => a.id.localeCompare(b.id);
 
-    return { items, total: totals[0]?.total ?? 0, forms: pageForms.sort(byId) };
+    return { items, total: totals[0]?.total ?? 0, forms: pageForms.toSorted(byId) };
   });
 };
 
