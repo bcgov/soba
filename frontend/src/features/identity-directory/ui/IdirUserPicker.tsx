@@ -10,10 +10,10 @@ const userLabel = (user: IdirUser) =>
 export function IdirUserPicker({
   workspaceId,
   onSelect,
-}: {
+}: Readonly<{
   workspaceId: string;
   onSelect?: (user: IdirUser | null) => void;
-}) {
+}>) {
   const id = useId();
   const { signedInToken } = useCallToken();
   const [field, setField] = useState<keyof IdirUserSearch>('email');
@@ -150,17 +150,20 @@ export function IdirUserPicker({
               style={{ zIndex: 10, maxHeight: '18rem', overflowY: 'auto' }}
             >
               {users.map((user, index) => (
-                <li
-                  key={`${user.username}-${index}`}
-                  id={`${id}-option-${index}`}
-                  role="option"
-                  aria-selected={active === index}
-                  className={`list-group-item list-group-item-action${active === index ? ' active' : ''}`}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onMouseEnter={() => setActive(index)}
-                  onClick={() => select(user)}
-                >
-                  {userLabel(user)}
+                <li key={`${user.username}-${index}`} role="none">
+                  <button
+                    type="button"
+                    id={`${id}-option-${index}`}
+                    role="option"
+                    aria-selected={active === index}
+                    tabIndex={-1}
+                    className={`list-group-item list-group-item-action${active === index ? ' active' : ''}`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onMouseEnter={() => setActive(index)}
+                    onClick={() => select(user)}
+                  >
+                    {userLabel(user)}
+                  </button>
                 </li>
               ))}
             </ul>

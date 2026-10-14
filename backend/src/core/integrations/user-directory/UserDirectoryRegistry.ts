@@ -53,20 +53,22 @@ export const checkUserDirectoryReadiness = async (): Promise<
   Record<string, UserDirectoryReadinessResult>
 > => {
   const catalog = getUserDirectoryPluginCatalog();
-  const results: Record<string, UserDirectoryReadinessResult> = {};
-  for (const entry of catalog) {
-    try {
-      const adapter = createUserDirectoryAdapter(entry.code);
-      results[entry.code] =
-        typeof adapter.readinessCheck === 'function'
-          ? await adapter.readinessCheck()
-          : { ok: true };
-    } catch (err) {
-      results[entry.code] = {
-        ok: false,
-        message: err instanceof Error ? err.message : String(err),
-      };
-    }
-  }
-  return results;
+  const results = await Promise.all(
+    catalog.map(async (entry): Promise<[string, UserDirectoryReadinessResult]> => {
+      try {
+        const adapter = createUserDirectoryAdapter(entry.code);
+        const result =
+          typeof adapter.readinessCheck === 'function'
+            ? await adapter.readinessCheck()
+            : { ok: true };
+        return [entry.code, result];
+      } catch (err) {
+        return [
+          entry.code,
+          { ok: false, message: err instanceof Error ? err.message : String(err) },
+        ];
+      }
+    }),
+  );
+  return Object.fromEntries(results);
 };

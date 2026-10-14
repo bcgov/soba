@@ -5,11 +5,11 @@ import { IdirUserPicker } from '@/src/features/identity-directory/ui/IdirUserPic
 export default function FormTeamTab({
   workspaceId,
   canSearch,
-}: {
+}: Readonly<{
   dict: Dictionary;
   workspaceId?: string | null;
   canSearch?: boolean;
-}) {
+}>) {
   return (
     <div className="p-3 border rounded-bottom bg-white border-top-0">
       {workspaceId && canSearch ? (
