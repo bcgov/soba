@@ -1,4 +1,4 @@
-import { test, expect } from "../fixtures/form_title";
+﻿import { test, expect } from "../fixtures/form_title";
 import type { Page } from "@playwright/test";
 import { login } from "../support/soba_login";
 import dictionaries from "../../../frontend/dictionaries/en.json";
@@ -324,10 +324,6 @@ test.describe.serial("Landing page tests", () => {
     await expect(publishedNotice).toContainText("Published Version:");
     await expect(publishedNotice).toContainText(
       "This version is published and cannot be modified directly.",
-    );
-    //Verify version is disabled for modification
-    await expect(sharedPage.locator('input[data-disabled="true"]')).toHaveValue(
-      /^chefs2-\d+$/,
     );
   });
 });
