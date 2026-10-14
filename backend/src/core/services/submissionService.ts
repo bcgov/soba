@@ -1,3 +1,4 @@
+import { notifySubmission } from '../../features/notifications/submissionNotification';
 import {
   SUBMISSION_IN_PROGRESS_STATES,
   ApiErrorCodes,
@@ -300,17 +301,11 @@ export class SubmissionService {
           ? (submission.workflowState as SubmissionWorkflowStateCode)
           : decision.workflowState,
         afterEngineSubmissionRef: engineRef,
-      }).catch((err: unknown) => {
-        // Another write committed this revision id first.
-        if (isUniqueViolationOn(err, SUBMISSION_REVISION_PKEY)) {
-          throw new ConflictError(
-            'Revision id already used by another write',
-            ApiErrorCodes.revision_id_taken,
-          );
-        }
-        throw err;
       });
 
+      if (eventType === SubmissionEventType.submitted && result.outcome === 'appended') {
+        await notifySubmission(result.record);
+      }
       if (result.outcome === 'not_found') {
         throw new NotFoundError('Submission not found', ApiErrorCodes.submission_not_found);
       }
