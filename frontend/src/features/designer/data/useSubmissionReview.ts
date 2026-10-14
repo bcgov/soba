@@ -12,10 +12,12 @@ import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { classifyDataError } from '@/src/shared/api/dataError';
 import type { Resource } from '@/src/shared/api/dataContracts';
 
+export const submissionReviewKey = (submissionId: string) => ['submission-review', submissionId];
+
 /** Staff review state of one submission: status, notes and edit history, with their writes. */
 export function useSubmissionReview(submissionId: string) {
   const { data, error, isLoading, mutate } = useAuthedSWR(
-    ['submission-review', submissionId],
+    submissionReviewKey(submissionId),
     (token) => getSobaSubmissionReview(token, submissionId),
   );
 

@@ -70,18 +70,21 @@ function signIn() {
   store.dispatch(setAuthenticated(true));
 }
 
-async function renderView() {
+// Pass a cache to keep it across mounts, as leaving the page and coming back does.
+async function renderView({ cache = new Map(), submissionId = 'sub-1' } = {}) {
+  let view!: ReturnType<typeof render>;
   await act(async () => {
-    render(
+    view = render(
       <Provider store={store}>
         <SWRConfig
-          value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}
+          value={{ provider: () => cache, dedupingInterval: 0, shouldRetryOnError: false }}
         >
-          <DesignSubmissionView formId="f1" submissionId="sub-1" />
+          <DesignSubmissionView formId="f1" submissionId={submissionId} />
         </SWRConfig>
       </Provider>,
     );
   });
+  return view;
 }
 
 describe('DesignSubmissionView', () => {
@@ -410,6 +413,73 @@ describe('DesignSubmissionView', () => {
 
     await waitFor(() => expect(notifications()).toContain('Failed to delete submission'));
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('reads a deleted submission again when the page is opened after the delete', async () => {
+    signIn();
+    deleteSobaSubmission.mockResolvedValue(undefined);
+    const cache = new Map();
+    const first = await renderView({ cache, submissionId: SUBMISSION_ID });
+    await waitFor(() => expect(screen.getByTestId('submission-review-delete')).toBeInTheDocument());
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('submission-review-delete'));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('confirm-modal-confirm'));
+    });
+    await waitFor(() => expect(mockPush).toHaveBeenCalled());
+    first.unmount();
+
+    getSobaSubmission.mockRejectedValue(new ApiError('Submission not found', 404));
+    await renderView({ cache, submissionId: SUBMISSION_ID });
+
+    await waitFor(() => expect(screen.getByTestId('submission-view-notfound')).toBeInTheDocument());
+    expect(screen.queryByTestId('submission-review-delete')).not.toBeInTheDocument();
+  });
+
+  it('says so when the caller may not add a note', async () => {
+    signIn();
+    addSobaSubmissionNote.mockRejectedValue(new ApiError('Forbidden', 403));
+    await renderView();
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Note' })).toBeInTheDocument());
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Note' }), {
+      target: { value: 'Will not save' },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('submission-note-add'));
+    });
+
+    await waitFor(() => expect(notifications()).toContain('You do not have access to this.'));
+  });
+
+  it('leaves the data history open when a note saved before it was opened lands', async () => {
+    signIn();
+    let saveNote: (review: typeof REVIEW) => void = () => {};
+    addSobaSubmissionNote.mockReturnValue(
+      new Promise((resolve) => {
+        saveNote = resolve;
+      }),
+    );
+    await renderView();
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Note' })).toBeInTheDocument());
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Note' }), {
+      target: { value: 'Needs a second look' },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('submission-note-add'));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('submission-data-history'));
+    });
+    await act(async () => {
+      saveNote(REVIEW);
+    });
+
+    await waitFor(() => expect(notifications()).toContain('Note added'));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
   it('still shows the answers when the review cannot be read', async () => {

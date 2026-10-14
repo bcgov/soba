@@ -23,7 +23,7 @@ import { useSubmissionDeleter } from '@/src/features/designer/data/useFormSubmis
 import { useSubmissionReview } from '@/src/features/designer/data/useSubmissionReview';
 import type { SubmissionEdit } from '@/src/types/submissionReview';
 import { useFormatLongDate, useFormatLongDateTime } from '@/src/shared/hooks/useFormatLongDate';
-import { useAuthErrorDefaults } from '@/src/shared/api/useDataErrorNotice';
+import { useAuthErrorDefaults, useDataErrorNotice } from '@/src/shared/api/useDataErrorNotice';
 import { LoadErrorAlert } from '@/src/shared/ui/LoadErrorAlert';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import type { SubmissionDataDocument } from '@/src/types/forms';
@@ -65,10 +65,13 @@ export function SubmissionReview({ submission, schema, content }: Readonly<Submi
   const { token } = useKeycloak();
   const { addNotification } = useNotificationStore();
   const authDefaults = useAuthErrorDefaults();
+  const notifyError = useDataErrorNotice();
   const submissionDeleter = useSubmissionDeleter();
   const { review, updateStatus, addNote, saveData } = useSubmissionReview(submission.id);
   const [open, setOpen] = useState<'delete' | 'confirmChange' | 'dataHistory' | null>(null);
-  const [pending, setPending] = useState(false);
+  // A count, so one write settling does not clear pending while another is still running.
+  const [inFlight, setInFlight] = useState(0);
+  const pending = inFlight > 0;
 
   usePageNotices([
     { id: 'submission-review-sample', variant: 'info', body: dictReview.stubNotice },
@@ -81,22 +84,21 @@ export function SubmissionReview({ submission, schema, content }: Readonly<Submi
       addNotification({ text: dict.general.sessionExpired, type: 'error' });
       return false;
     }
-    setPending(true);
+    setInFlight((count) => count + 1);
     try {
       await write(token);
       addNotification({ text: done, type: 'success' });
       return true;
     } catch (e: unknown) {
-      addNotification({ text: failed, type: 'error', consoleError: e });
+      notifyError(e, { failed });
       return false;
     } finally {
-      setPending(false);
-      setOpen(null);
+      setInFlight((count) => count - 1);
     }
   };
 
-  const remove = () =>
-    run(
+  const remove = async () => {
+    await run(
       async (current) => {
         await submissionDeleter.remove(current, submission.id);
         router.push(`/${locale}/build/${submission.formId}?tab=submissions`);
@@ -104,6 +106,13 @@ export function SubmissionReview({ submission, schema, content }: Readonly<Submi
       dictSub.deleteSuccess,
       dictSub.deleteFailure,
     );
+    setOpen(null);
+  };
+
+  const confirmChange = async () => {
+    await run(saveData, dictReview.dataUpdated, dictReview.saveFailure);
+    setOpen(null);
+  };
 
   const editColumns: Column<SubmissionEdit>[] = useMemo(
     () => [
@@ -273,7 +282,7 @@ export function SubmissionReview({ submission, schema, content }: Readonly<Submi
         title={dictReview.confirmChangeTitle}
         message={dictReview.confirmChangeMessage}
         confirmLabel={dictReview.submit}
-        onConfirm={() => void run(saveData, dictReview.dataUpdated, dictReview.saveFailure)}
+        onConfirm={() => void confirmChange()}
         onCancel={() => setOpen(null)}
         pending={pending}
       />
