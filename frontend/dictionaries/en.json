@@ -238,9 +238,9 @@
       "submitMine": "Submit my version",
       "alreadySubmitted": "This form has already been submitted.",
       "readOnly": "You can view this submission, but you can no longer change or submit it.",
-      "starting": "Starting your submission…",
-      "startError": "The submission could not be started. Please try again.",
-      "requestFailed": "The request could not be completed. Please try again."
+      "requestFailed": "The request could not be completed. Please try again.",
+      "formUpdated": "This form was updated after you opened it. Your answers are kept.",
+      "continueUpdated": "Continue on the updated form"
     }
   },
   "form": {
@@ -463,7 +463,7 @@
     "delete_closed": "This draft has been submitted and can no longer be deleted.",
     "not_published": "This form is not accepting submissions.",
     "form_not_found": "This form could not be found.",
-    "submission_id_taken": "The submission could not be started. Please try again.",
+    "submission_id_taken": "The submission could not be started. Reload the page to start again.",
     "version_not_published": "This version of the form is no longer accepting submissions.",
     "submission_not_found": "This submission could not be found. It may have been deleted.",
     "schema_not_found": "This form could not be loaded.",

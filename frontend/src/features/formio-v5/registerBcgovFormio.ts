@@ -1,7 +1,7 @@
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 import { getKeycloakInstance } from '@/lib/slices/keycloakSlice';
-import { getActiveSubmission } from './activeSubmission';
+import { openedActiveSubmissionId } from './activeSubmission';
 import { uploadToken } from './data/uploadToken';
 import { getSobaApiBaseUrl, loadFrontendRuntimeConfig } from '@/src/shared/config/runtimeConfig';
 
@@ -60,9 +60,10 @@ export function ensureBcgovFormioRegistered(): Promise<{ filesEnabled: boolean }
             return `${apiUrl}/submit/files`;
           },
           getToken: () => uploadToken(() => getKeycloakInstance()?.token),
-          // The submission currently being filled (set by the fill form); uploads are tagged with it,
-          // and the backend derives the workspace from it, so no workspace id is passed.
-          getSubmissionId: () => getActiveSubmission()?.submissionId ?? '',
+          // The submission currently being filled (set by the fill form), opened first if it is new;
+          // uploads are tagged with it, and the backend derives the workspace from it, so no
+          // workspace id is passed.
+          getSubmissionId: openedActiveSubmissionId,
         }),
       );
     }

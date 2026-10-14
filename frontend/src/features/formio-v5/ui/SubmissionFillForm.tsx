@@ -15,12 +15,14 @@ import {
 } from '@/src/features/formio-v5/data/useFillWriter';
 import {
   clearActiveSubmission,
+  setActiveOpener,
   setActiveSubmission,
 } from '@/src/features/formio-v5/activeSubmission';
+import { isFormUpdated } from '@/src/features/formio-v5/data/useSubmissionOpener';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { apiErrorMessage, isNetworkError, isOutcomeUnknown } from '@/src/shared/api/dataError';
 import { useFormatTime } from '@/src/shared/hooks/useFormatLongDate';
-import type { SubmitFillBundle } from '@/src/types/forms';
+import type { SubmitFillBundle, SubmitFormVersionSchemaResponse } from '@/src/types/forms';
 
 export type FillLabels = {
   loading: string;
@@ -44,6 +46,8 @@ export type FillLabels = {
   submitMine: string;
   alreadySubmitted: string;
   requestFailed: string;
+  formUpdated: string;
+  continueUpdated: string;
   errors: Record<ApiErrorCode, string>;
 };
 
@@ -54,6 +58,16 @@ export type FillView = {
   canSaveDraft: boolean;
   /** Form.io options for the BCGovFile component. */
   fileOption: Record<string, unknown>;
+  /** The page's session, which every write goes out as. */
+  signedIn: boolean;
+  /** Opens a submission not opened yet, from the version this view shows, and returns its head. */
+  open?: () => Promise<string>;
+};
+
+/** A newer version to move a submission not opened yet to, with the answers typed so far. */
+export type FormUpdate = {
+  version: SubmitFormVersionSchemaResponse;
+  data: Record<string, unknown>;
 };
 
 type FormInstance = {
@@ -64,9 +78,10 @@ type FormInstance = {
 };
 
 /**
- * Fills one loaded bundle of a submission: saves drafts and submits; it never creates. It reads its
- * view once, when it mounts, so a re-render with a new bundle object never reaches Form.io; showing
- * a newly loaded bundle mounts a new form.
+ * Fills one loaded bundle of a submission: saves drafts and submits. A submission not opened yet is
+ * opened by its first write or upload, through the view's `open`. It reads its view once, when it
+ * mounts, so a re-render with a new bundle object never reaches Form.io; showing a newly loaded
+ * bundle mounts a new form.
  */
 export function SubmissionFillForm({
   submissionId,
@@ -74,6 +89,7 @@ export function SubmissionFillForm({
   view,
   labels,
   onReload,
+  onFormUpdated,
 }: Readonly<{
   submissionId: string;
   /** The submission's read-only view, for a submitted record. */
@@ -82,28 +98,46 @@ export function SubmissionFillForm({
   labels: FillLabels;
   /** Loads the latest bundle and mounts a new form on it. */
   onReload: () => Promise<void>;
+  /** Moves a submission not opened yet to a newer version of the form. */
+  onFormUpdated?: (update: FormUpdate) => void;
 }>) {
-  const [{ snapshot, canWrite, canSaveDraft, fileOption }] = useState(view);
+  const [{ snapshot, canWrite, canSaveDraft, fileOption, signedIn, open }] = useState(view);
   const { addNotification } = useNotificationStore();
   const router = useRouter();
-  const writer = useFillWriter(submissionId, snapshot.headRevisionId);
+  const writer = useFillWriter(submissionId, {
+    headRevisionId: snapshot.headRevisionId,
+    signedIn,
+    open,
+  });
   const { busy, held, save: saveStatus } = writer.status;
   const formatTime = useFormatTime();
 
   const [renderError, setRenderError] = useState<string | null>(null);
+  // A newer version of the form, found by an open; the filler moves over to it.
+  const [updated, setUpdated] = useState<SubmitFormVersionSchemaResponse | null>(null);
   // The live Form.io webform: a save reads its answers, "Submit my version" submits it, and a failed
   // submit must emit on it or its button spins forever.
   const formInstanceRef = useRef<FormInstance | null>(null);
   // True once the loaded answers are in the webform.
   const [formReady, setFormReady] = useState(false);
 
-  // Expose the submission being filled, and its session, to the CHEFS upload provider; clear it when
-  // leaving so a stale id can't tag an unrelated upload (e.g. a designer preview).
-  const { signedIn } = writer;
+  // Expose the submission being filled, its session and, while it is not opened yet, how to open it,
+  // to the CHEFS upload provider; clear it when leaving so a stale id can't tag an unrelated upload
+  // (e.g. a designer preview).
+  const { ensureOpened } = writer;
   useEffect(() => {
     setActiveSubmission({ submissionId, signedIn });
+    setActiveOpener(
+      open
+        ? () =>
+            ensureOpened().catch((err: unknown) => {
+              if (isFormUpdated(err)) setUpdated(err.version);
+              throw err;
+            })
+        : null,
+    );
     return () => clearActiveSubmission();
-  }, [submissionId, signedIn]);
+  }, [submissionId, signedIn, open, ensureOpened]);
 
   const schema = snapshot.schema as FormType;
   // Built from the snapshot, so they keep their identity for the life of the form: Form.io resets
@@ -155,6 +189,8 @@ export function SubmissionFillForm({
       case 'held':
         return labels.notSaved;
       case 'failed': {
+        // The notice says why, and what to do.
+        if (isFormUpdated(status.cause)) return labels.notSaved;
         const prefix = isOutcomeUnknown(status.cause) ? labels.notConfirmed : labels.notSaved;
         return `${prefix} ${errorMessage(status.cause)}`;
       }
@@ -170,7 +206,10 @@ export function SubmissionFillForm({
     const instance = formReady ? formInstanceRef.current : null;
     if (!instance || !writer.hasBase()) return;
     setRenderError(null);
-    const outcome = await writer.save(instance.submission.data ?? {}).catch(() => null);
+    const outcome = await writer.save(instance.submission.data ?? {}).catch((err: unknown) => {
+      if (isFormUpdated(err)) setUpdated(err.version);
+      return null;
+    });
     if (outcome?.status === 'held' && outcome.reason === 'closed') leaveClosed();
   };
 
@@ -201,9 +240,20 @@ export function SubmissionFillForm({
           break;
       }
     } catch (err) {
+      if (isFormUpdated(err)) {
+        setUpdated(err.version);
+        releaseSubmit();
+        return;
+      }
       writeError(err);
       releaseSubmit(labels.rendererError);
     }
+  };
+
+  // Mounts the newer version with the answers typed so far; nothing is sent until the filler writes.
+  const continueUpdated = () => {
+    if (!updated) return;
+    onFormUpdated?.({ version: updated, data: formInstanceRef.current?.submission.data ?? {} });
   };
 
   // Discards the typed answers: the container mounts a new form on the latest bundle.
@@ -234,6 +284,26 @@ export function SubmissionFillForm({
           {labels.readOnly}
         </InlineAlert>
       )}
+      {updated ? (
+        <div className="mb-3">
+          <InlineAlert
+            variant="warning"
+            title={labels.formUpdated}
+            role="status"
+            data-testid="submission-fill-form-updated"
+            buttons={
+              <Button
+                size="small"
+                variant="primary"
+                onPress={continueUpdated}
+                data-testid="submission-fill-continue-updated"
+              >
+                {labels.continueUpdated}
+              </Button>
+            }
+          />
+        </div>
+      ) : null}
       {held ? (
         <div className="mb-3">
           <InlineAlert
@@ -278,7 +348,7 @@ export function SubmissionFillForm({
             onPress={() => {
               saveDraft().catch(writeError);
             }}
-            isDisabled={!formReady || busy !== null || held !== null}
+            isDisabled={!formReady || busy !== null || held !== null || updated !== null}
             data-testid="submission-fill-save-draft"
           >
             {labels.saveDraft}

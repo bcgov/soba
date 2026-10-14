@@ -239,9 +239,9 @@
       "submitMine": "Soumettre ma version",
       "alreadySubmitted": "Ce formulaire a déjà été soumis.",
       "readOnly": "Vous pouvez consulter cette soumission, mais vous ne pouvez plus la modifier ni la soumettre.",
-      "starting": "Démarrage de votre soumission…",
-      "startError": "La soumission n’a pas pu être démarrée. Veuillez réessayer.",
-      "requestFailed": "La demande n’a pas pu être traitée. Veuillez réessayer."
+      "requestFailed": "La demande n’a pas pu être traitée. Veuillez réessayer.",
+      "formUpdated": "Ce formulaire a été mis à jour depuis que vous l’avez ouvert. Vos réponses sont conservées.",
+      "continueUpdated": "Continuer avec le formulaire mis à jour"
     }
   },
   "form": {
@@ -464,7 +464,7 @@
     "delete_closed": "Ce brouillon a été soumis et ne peut plus être supprimé.",
     "not_published": "Ce formulaire n’accepte pas de soumissions.",
     "form_not_found": "Ce formulaire est introuvable.",
-    "submission_id_taken": "La soumission n’a pas pu être démarrée. Veuillez réessayer.",
+    "submission_id_taken": "La soumission n’a pas pu être démarrée. Rechargez la page pour recommencer.",
     "version_not_published": "Cette version du formulaire n’accepte plus de soumissions.",
     "submission_not_found": "Cette soumission est introuvable. Elle a peut-être été supprimée.",
     "schema_not_found": "Ce formulaire n’a pas pu être chargé.",

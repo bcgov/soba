@@ -15,6 +15,7 @@ export {
   canContinueSubmission,
   canDeleteOwnSubmission,
   canSaveDraftOnSubmission,
+  canSaveSubmissionDraft,
   canStartSubmission,
   canWriteSubmission,
 } from '@soba/lib';

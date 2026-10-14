@@ -13,7 +13,14 @@ it.
 ```ts
 const { data, isLoading, error, mutate } = useAuthedSWR(
   formId && opened
-    ? ['form-submissions', formId, query.offset, query.limit, query.sort, query.q ?? '']
+    ? [
+        "form-submissions",
+        formId,
+        query.offset,
+        query.limit,
+        query.sort,
+        query.q ?? "",
+      ]
     : null,
   (token) =>
     getSobaSubmissions(token, {
@@ -79,7 +86,7 @@ must say which identity it is, or signing in gets served the anonymous reader's 
 ```ts
 !initStarted || initializing || !submissionId
   ? null
-  : ['submit-submission', submissionId, token ? 'user' : 'anonymous'];
+  : ["submit-submission", submissionId, token ? "user" : "anonymous"];
 ```
 
 `!initStarted` is the guard that matters. Before Keycloak has run, "no token" is the
@@ -96,10 +103,17 @@ requests.
 export function useWorkspaces() {
   const { data, isLoading, error, mutate } = useAuthedSWR<WorkspaceItem[]>(
     WORKSPACES_KEY,
-    async (token) => toItems((await fetchWorkspaces(token, PICKER_QUERY)).items),
+    async (token) =>
+      toItems((await fetchWorkspaces(token, PICKER_QUERY)).items),
     sessionReadConfig,
   );
-  return { workspaces: data ?? EMPTY, loaded: data !== undefined, isLoading, error, mutate };
+  return {
+    workspaces: data ?? EMPTY,
+    loaded: data !== undefined,
+    isLoading,
+    error,
+    mutate,
+  };
 }
 ```
 
@@ -244,11 +258,12 @@ Resolving too early scopes the request to nothing.
 
 ## Screens with their own loading
 
-`FormioV5SubmissionFillClient` and `StartSubmission`.
+`FormioV5SubmissionFillClient` and `FormioV5NewSubmissionClient`.
 
-The fill client holds answers the user has typed that no server has seen, and Form.io
-resets the live webform when the submission prop is not deep-equal to what is on screen. A
-revalidating cache over it discards work. `StartSubmission` is a fire-once idempotent POST.
+Both hold answers the user has typed that no server has seen, and Form.io resets the live
+webform when the submission prop is not deep-equal to what is on screen. A revalidating
+cache over them discards work, so their reads are session reads keyed per mount, and each
+keeps the load it mounted with.
 
 ## Testing
 

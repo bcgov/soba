@@ -297,7 +297,7 @@ describe('FormioV5SubmissionFillClient', () => {
     await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
     await act(async () => {
       await h.swrMutate!(
-        ['submit-fill', 'sub-1', 'anonymous'],
+        (key: unknown) => Array.isArray(key) && key[0] === 'submit-fill',
         {
           workflowState: 'draft',
           formVersionId: 'ver-1',
@@ -1097,6 +1097,7 @@ describe('SubmissionFillForm', () => {
     canWrite: true,
     canSaveDraft: false,
     fileOption: {},
+    signedIn: false,
   });
   const tree = (current: FillView) => (
     <Provider store={store}>
@@ -1133,7 +1134,8 @@ describe('SubmissionFillForm', () => {
       errors: {},
     } as unknown as FillLabels;
     const writable: FillView = { ...view({ a: 1 }), canSaveDraft: true };
-    const renderForm = async () => {
+    // The page's session: the identity it pinned, which every write goes out as.
+    const renderForm = async (signedIn = false) => {
       let rendered: ReturnType<typeof render> | undefined;
       await act(async () => {
         rendered = render(
@@ -1141,7 +1143,7 @@ describe('SubmissionFillForm', () => {
             <SubmissionFillForm
               submissionId="sub-1"
               submissionPath="/en/submission/sub-1"
-              view={writable}
+              view={{ ...writable, signedIn }}
               labels={labels}
               onReload={async () => undefined}
             />
@@ -1168,7 +1170,7 @@ describe('SubmissionFillForm', () => {
 
     it('sends a save with the token the session holds when it is sent', async () => {
       await signIn('token');
-      await renderForm();
+      await renderForm(true);
       await act(() => store.dispatch(setToken('token-2')));
       await saveDraft();
       await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(1));
@@ -1177,7 +1179,7 @@ describe('SubmissionFillForm', () => {
 
     it('never sends a save anonymously for a form mounted signed in', async () => {
       await signIn('token');
-      await renderForm();
+      await renderForm(true);
       await act(() => store.dispatch(clear()));
       await saveDraft();
       await waitFor(() =>
@@ -1204,7 +1206,7 @@ describe('SubmissionFillForm', () => {
 
     it('tells the upload provider which submission is filled, and in which session', async () => {
       await signIn('token');
-      const rendered = await renderForm();
+      const rendered = await renderForm(true);
       expect(getActiveSubmission()).toEqual({ submissionId: 'sub-1', signedIn: true });
       rendered.unmount();
       expect(getActiveSubmission()).toBeNull();
