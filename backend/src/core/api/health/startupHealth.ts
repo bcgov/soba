@@ -26,6 +26,7 @@ import {
   type EventStreamSelfTestResult,
 } from '../../integrations/eventstream/eventStreamSelfTest';
 import { checkDocumentGenerationReadiness } from '../../integrations/document-generation/DocumentGenerationRegistry';
+import { checkUserDirectoryReadiness } from '../../integrations/user-directory/UserDirectoryRegistry';
 import { checkTenantEngineReadiness } from '../../integrations/tenant/TenantEngineRegistry';
 
 /** Run a check; swallow sync throws and rejections. */
@@ -256,5 +257,28 @@ export async function logTenantEngineReadiness(): Promise<void> {
     );
   } else {
     log.info({ tenantEngines: results }, 'Tenant engine readiness: all engines ready');
+  }
+}
+
+export async function logUserDirectoryReadiness(): Promise<void> {
+  let results: Record<string, { ok: boolean; message?: string }>;
+  try {
+    results = await checkUserDirectoryReadiness();
+  } catch (err) {
+    log.warn({ err }, 'User directory readiness could not run');
+    return;
+  }
+
+  const notReady = Object.entries(results)
+    .filter(([, r]) => !r.ok)
+    .map(([code]) => code);
+
+  if (notReady.length > 0) {
+    log.warn(
+      { userDirectories: results },
+      `User directory readiness: not ready: ${notReady.join(', ')}`,
+    );
+  } else {
+    log.info({ userDirectories: results }, 'User directory readiness: all directories ready');
   }
 }

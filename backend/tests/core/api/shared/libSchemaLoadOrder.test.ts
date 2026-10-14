@@ -5,6 +5,7 @@ describe.each([
   'forms',
   'groups',
   'me',
+  'identity-search',
   'members',
   'meta',
   'submissions',

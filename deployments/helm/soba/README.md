@@ -465,3 +465,14 @@ removed from Secrets and PVCs. This allows `helm uninstall` to delete them norma
 | ----------------- | ------------------------------------------------- |
 | `false` (default) | Secrets and PVCs are **retained**                 |
 | `true`            | Secrets and PVCs are **deleted** with the release |
+
+### IDIR directory
+
+| Value                                            | Description                                                             |
+| ------------------------------------------------ | ----------------------------------------------------------------------- |
+| `backend.config.userDirectoryDefaultCode`        | `css-v1` (default)                                                      |
+| `backend.userDirectory.cssV1.apiBaseUrl`         | CSS API base URL including `/api/v1`                                    |
+| `backend.userDirectory.cssV1.environment`        | CSS directory environment: dev, test, prod                              |
+| `backend.userDirectory.cssV1.tokenUrl`           | CSS OAuth token endpoint                                                |
+| `backend.userDirectory.cssV1.timeoutMs`          | Total outbound timeout (default 10000 ms)                               |
+| `backend.userDirectory.cssV1.existingSecretName` | Secret with `PLUGIN_CSS_V1_CLIENT_ID` and `PLUGIN_CSS_V1_CLIENT_SECRET` |

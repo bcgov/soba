@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { pool } from '../../db/client';
 import { checkFormEngineReadiness } from '../../integrations/form-engine/FormEngineRegistry';
 import { checkDocumentGenerationReadiness } from '../../integrations/document-generation/DocumentGenerationRegistry';
+import { checkUserDirectoryReadiness } from '../../integrations/user-directory/UserDirectoryRegistry';
 import { checkTenantEngineReadiness } from '../../integrations/tenant/TenantEngineRegistry';
 import {
   checkStorageReadiness,
@@ -67,6 +68,7 @@ export async function readinessHandler(_req: Request, res: Response): Promise<vo
     virusScanner,
     documentGeneration,
     tenantEngines,
+    userDirectories: await checkUserDirectoryReadiness(),
     cache,
     messageBus,
     eventStream,
