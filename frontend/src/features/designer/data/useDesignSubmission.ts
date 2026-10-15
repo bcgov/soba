@@ -12,6 +12,8 @@ import type { DataError, Resource } from '@/src/shared/api/dataContracts';
 
 type DesignSubmission = Awaited<ReturnType<typeof loadDesignSubmission>>;
 
+export const designSubmissionKey = (submissionId: string) => ['design-submission', submissionId];
+
 async function loadDesignSubmission(token: string, submissionId: string) {
   const submission = await getSobaSubmission(token, submissionId);
   const [schema, content] = await Promise.all([
@@ -27,7 +29,7 @@ export function useDesignSubmission(
   formId: string,
 ): Resource<DesignSubmission> {
   const { data, error, isLoading, mutate } = useAuthedSWR(
-    submissionId ? ['design-submission', submissionId] : null,
+    submissionId ? designSubmissionKey(submissionId) : null,
     (token) => loadDesignSubmission(token, submissionId),
   );
 
