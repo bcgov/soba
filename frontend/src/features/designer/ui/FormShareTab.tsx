@@ -35,9 +35,18 @@ export default function FormShareTab({
   }, [locale, formId]);
 
   const copyToClipboard = useCallback(() => {
-    addNotification({ text: dict.form.copiedNotification, type: 'success' });
-    navigator.clipboard.writeText(link);
-  }, [link, addNotification, dict.form.copiedNotification]);
+    // Chained so a missing clipboard (insecure context) also lands in catch.
+    Promise.resolve()
+      .then(() => navigator.clipboard.writeText(link))
+      .then(() => addNotification({ text: dict.form.copiedNotification, type: 'success' }))
+      .catch((cause: unknown) =>
+        addNotification({
+          text: dict.form.copyFailedNotification,
+          type: 'error',
+          consoleError: cause,
+        }),
+      );
+  }, [link, addNotification, dict.form.copiedNotification, dict.form.copyFailedNotification]);
 
   return (
     <>
