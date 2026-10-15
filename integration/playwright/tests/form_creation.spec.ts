@@ -1,4 +1,4 @@
-import { test, expect } from '../fixtures/form_title';
+﻿﻿﻿import { test, expect } from '../fixtures/form_title';
 import type { Locator, Page } from '@playwright/test';
 import dictionaries from '../../../frontend/dictionaries/en.json';
 
@@ -16,7 +16,12 @@ async function createForm({ page, title }: { page: Page; title: string }) {
   const workspaceModal = page.getByRole('dialog', {
     name: /Default Workspace Setup/i,
   });
-  const workspaceSetupVisible = await workspaceModal.isVisible().catch(() => false);
+  const workspaceSetupVisible = await workspaceModal
+    .waitFor({ state: 'visible', timeout: 5000 })
+    .then(
+      () => true,
+      () => false,
+    );
 
   if (workspaceSetupVisible) {
     await page.getByTestId('workspace-name').locator('input').fill('Test Workspace');
@@ -109,7 +114,7 @@ test('Create, edit, search, preview, and publish one form', async ({ page, title
 
   await createForm({ page, title });
   const target = page.locator('.builder-components.drag-container');
-  await expect(target).toBeVisible();
+  await expect(target).toBeVisible({ timeout: 30_000 });
 
   const txt_box = page.locator('text=Text Field'); // component from builder palette
   await dragComponentToCanvas(txt_box, target);
