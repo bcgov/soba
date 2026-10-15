@@ -40,9 +40,9 @@ function buildQueryString(query?: FormioQuery): string {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type FormioForm = any;
+type FormioForm = Record<string, any>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type FormioSubmission = any;
+type FormioSubmission = Record<string, any>;
 
 export interface FormioCommunityEditionAPIv5Options {
   baseUrl: string;
@@ -81,18 +81,22 @@ export class FormioCommunityEditionAPIv5Client {
     const body = JSON.stringify({ data: { email: this.username, password: this.password } });
     const loginPaths = ['/admin/login', '/user/login'];
     let lastError: Error | null = null;
+    // In order, stopping at the first path that logs in.
     for (const path of loginPaths) {
       const url = `${this._baseUrl}${path}`;
+      const init = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: budget,
+      };
       let res: Response;
       let text: string;
       try {
-        res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body,
-          signal: budget,
-        });
-        text = await res.text();
+        // eslint-disable-next-line no-await-in-loop
+        res = await fetch(url, init); // NOSONAR
+        // eslint-disable-next-line no-await-in-loop
+        text = await res.text(); // NOSONAR
       } catch (err) {
         if (budget.aborted) throw timedOut('login');
         lastError = new Error(

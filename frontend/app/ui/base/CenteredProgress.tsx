@@ -30,19 +30,18 @@ export function CenteredProgress({
   label = 'Loading',
   minHeight,
   'data-testid': testId = 'loading-indicator',
-}: CenteredProgressProps) {
+}: Readonly<CenteredProgressProps>) {
   const isMounted = useClientMounted();
   const dict = useDictionary();
   const finalLabel = label === 'Loading' ? dict.general.loading : label;
 
   return (
-    <div
-      role="status"
+    <output
       className="d-flex justify-content-center align-items-center p-5"
       style={minHeight ? { minHeight } : undefined}
       data-testid={testId}
     >
       {isMounted && <ProgressCircle isIndeterminate aria-label={finalLabel} />}
-    </div>
+    </output>
   );
 }

@@ -26,7 +26,7 @@ export function parseBooleanEnvValue(value: string): boolean {
 export function parseNumberEnvValue(value: string): number {
   const parsed = Number(value);
   if (Number.isNaN(parsed)) {
-    throw new Error('Value must be a number');
+    throw new TypeError('Value must be a number');
   }
   return parsed;
 }

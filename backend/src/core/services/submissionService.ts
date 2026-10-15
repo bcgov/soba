@@ -230,7 +230,7 @@ export class SubmissionService {
    */
   private async resolveSubmissionEngine(submission: SubmissionRecord) {
     const version = await getFormVersionById(submission.workspaceId, submission.formVersionId);
-    if (!version || !version.engineSchemaRef) {
+    if (!version?.engineSchemaRef) {
       throw new ValidationError(
         'Form version is not provisioned in the engine',
         ApiErrorCodes.form_not_ready,
@@ -388,10 +388,10 @@ export class SubmissionService {
   }) {
     const submission =
       input.record ?? (await getSubmissionRecordById(input.workspaceId, input.submissionId));
-    if (!submission || !submission.engineSubmissionRef) return null;
+    if (!submission?.engineSubmissionRef) return null;
 
     const version = await getFormVersionById(input.workspaceId, submission.formVersionId);
-    if (!version || !version.engineSchemaRef) return null;
+    if (!version?.engineSchemaRef) return null;
 
     const engineCode = await getFormEngineCodeForForm(input.workspaceId, submission.formId);
     if (!engineCode) return null;

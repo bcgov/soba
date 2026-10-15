@@ -92,7 +92,7 @@ const rethrowEngineRejection =
     const status =
       typeof err === 'object' && err !== null && 'status' in err
         ? Number((err as { status: unknown }).status)
-        : NaN;
+        : Number.NaN;
     if (Number.isFinite(status) && status >= 400 && status < 500) {
       const { subject, code } = ENGINE_REJECTIONS[what];
       const detail = err instanceof Error && err.message ? `: ${err.message}` : '';
@@ -158,7 +158,7 @@ export function renderedFormioSchema(doc: Record<string, unknown>): Record<strin
  *  deterministic identity + SOBA tenancy metadata. */
 export function buildSchemaBody(input: UpsertSchemaInput): Record<string, unknown> {
   const base = stripEngineManagedFields(
-    JSON.parse(JSON.stringify(input.schema ?? {})) as Record<string, unknown>,
+    structuredClone(input.schema ?? {}) as Record<string, unknown>,
   );
   const name = sobaEngineName(input.formVersionId);
 
@@ -170,9 +170,7 @@ export function buildSchemaBody(input: UpsertSchemaInput): Record<string, unknow
       : {};
 
   const title =
-    (input.title && input.title.trim()) ||
-    (typeof base.title === 'string' && base.title.trim()) ||
-    'Form';
+    input.title?.trim() || (typeof base.title === 'string' && base.title.trim()) || 'Form';
 
   return {
     ...base,
@@ -200,7 +198,7 @@ const SOBA_REVISION_ID_FIELD = 'soba_revision_id';
 export function buildSubmissionBody(input: CreateSubmissionInput): Record<string, unknown> {
   const answers =
     typeof input.data === 'object' && input.data !== null && !Array.isArray(input.data)
-      ? (JSON.parse(JSON.stringify(input.data)) as Record<string, unknown>)
+      ? (structuredClone(input.data) as Record<string, unknown>)
       : {};
   return {
     data: answers,

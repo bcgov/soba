@@ -370,10 +370,9 @@ async function purgeWorkspaceScoped(
     tx.delete(settingsAudit).where(inArray(settingsAudit.workspaceId, ids)),
   );
   for (const table of FORM_SETTINGS_TABLES) {
-    await record(
-      getTableConfig(table).name,
-      tx.delete(table).where(inArray(table.workspaceId, ids)),
-    );
+    const run = tx.delete(table).where(inArray(table.workspaceId, ids));
+    // eslint-disable-next-line no-await-in-loop
+    await record(getTableConfig(table).name, run); // NOSONAR
   }
   await record('form', tx.delete(forms).where(inArray(forms.workspaceId, ids)));
   await record(
@@ -478,6 +477,7 @@ async function purgeEngine(
   };
 
   // Called on the adapter, not detached: these are prototype methods that read this.pluginConfig.
+  // One engine request at a time, submissions before the forms that hold them.
   for (const ref of targets.submissionRefs) {
     const adapter = adapterFor(ref.engineCode);
     if (typeof adapter?.deleteSubmission !== 'function' || !ref.submissionRef) {
@@ -485,9 +485,10 @@ async function purgeEngine(
       continue;
     }
     const { formRef, submissionRef } = ref;
-    if (await attempt(() => adapter.deleteSubmission!(formRef, submissionRef), submissionRef)) {
-      engineSubmissionsDeleted += 1;
-    }
+    const deleteSubmission = () => adapter.deleteSubmission!(formRef, submissionRef);
+    // eslint-disable-next-line no-await-in-loop
+    const deleted = await attempt(deleteSubmission, submissionRef); // NOSONAR
+    if (deleted) engineSubmissionsDeleted += 1;
   }
 
   for (const ref of targets.schemaRefs) {
@@ -497,9 +498,9 @@ async function purgeEngine(
       continue;
     }
     const { formRef } = ref;
-    if (await attempt(() => adapter.deleteSchema!(formRef), formRef)) {
-      engineFormsDeleted += 1;
-    }
+    // eslint-disable-next-line no-await-in-loop
+    const deleted = await attempt(() => adapter.deleteSchema!(formRef), formRef); // NOSONAR
+    if (deleted) engineFormsDeleted += 1;
   }
 
   return { engineFormsDeleted, engineSubmissionsDeleted, engineFailures, engineSkipped };
@@ -514,9 +515,11 @@ async function purgeStoredFiles(
 ): Promise<Pick<PurgeResult, 'storedFilesDeleted' | 'storedFilesSkipped'>> {
   let storedFilesDeleted = 0;
   let storedFilesSkipped = 0;
+  // One storage request at a time.
   for (const { profile, backendRef } of targets.storedFiles) {
     try {
-      await getStorageAdapter(profile).deleteFile(backendRef);
+      // eslint-disable-next-line no-await-in-loop
+      await getStorageAdapter(profile).deleteFile(backendRef); // NOSONAR
       storedFilesDeleted += 1;
     } catch (err) {
       storedFilesSkipped += 1;

@@ -76,12 +76,14 @@ async function fetchFeaturesMetaOnce(): Promise<FeaturesMetaPayload> {
 async function fetchFeaturesMeta(): Promise<FeaturesMetaPayload> {
   for (let attempt = 1; ; attempt += 1) {
     try {
-      return await fetchFeaturesMetaOnce();
+      // eslint-disable-next-line no-await-in-loop
+      return await fetchFeaturesMetaOnce(); // NOSONAR
     } catch (error) {
       if (!(error instanceof RetryableFeaturesMetaError) || attempt >= FETCH_ATTEMPTS) {
         throw error;
       }
-      await delay(RETRY_DELAY_MS * attempt);
+      // eslint-disable-next-line no-await-in-loop
+      await delay(RETRY_DELAY_MS * attempt); // NOSONAR
     }
   }
 }

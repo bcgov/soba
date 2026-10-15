@@ -143,7 +143,7 @@ const FormDesigner: React.FC<DesignerProps> = ({
 
   // Export the live builder design (may be unsaved): normalize it to a clean,
   // portable form definition, then download.
-  const handleExport = useCallback(async () => {
+  const handleExport = useCallback(() => {
     if (!token) return;
     try {
       const schema = (liveSchemaRef.current ?? stableForm) as Record<string, unknown>;

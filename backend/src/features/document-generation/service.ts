@@ -147,11 +147,12 @@ async function resolveBackendCode(scope: ResolvedScope): Promise<string | null> 
   // registration order wins — add an explicit priority before a second scoped backend is installed.
   for (const def of definitions) {
     if (def.code === defaultCode || !def.featureCode) continue;
-    const gate = await getFeatureGateCached(def.featureCode, Date.now());
-    const isScopedBackend = gate?.availability === FeatureAvailability.scoped;
-    if (isScopedBackend && (await isFeatureAvailable(def.featureCode, scope))) {
-      return def.code;
-    }
+    // eslint-disable-next-line no-await-in-loop
+    const gate = await getFeatureGateCached(def.featureCode, Date.now()); // NOSONAR
+    if (gate?.availability !== FeatureAvailability.scoped) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const available = await isFeatureAvailable(def.featureCode, scope); // NOSONAR
+    if (available) return def.code;
   }
 
   // Fall back to the configured default — but only if it is actually installed, so a stale/typo'd

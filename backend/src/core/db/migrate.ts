@@ -16,14 +16,17 @@ const withRetry = async <T>(label: string, task: () => Promise<T>): Promise<T> =
   const sleepMs = env.getDbMigrationReadySleepMs();
 
   let lastError: unknown;
+  // Each attempt waits for the previous one to fail.
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      return await task();
+      // eslint-disable-next-line no-await-in-loop
+      return await task(); // NOSONAR
     } catch (error) {
       lastError = error;
       console.error(`${label} failed on attempt ${attempt}/${attempts}`, error);
       if (attempt < attempts) {
-        await sleep(sleepMs);
+        // eslint-disable-next-line no-await-in-loop
+        await sleep(sleepMs); // NOSONAR
       }
     }
   }

@@ -14,7 +14,8 @@ export const newConfirmationCode = (): string =>
 export async function withNewConfirmationCode<T>(write: (code: string) => Promise<T>): Promise<T> {
   for (let attempt = 1; attempt < MAX_ATTEMPTS; attempt++) {
     try {
-      return await write(newConfirmationCode());
+      // eslint-disable-next-line no-await-in-loop
+      return await write(newConfirmationCode()); // NOSONAR
     } catch (err) {
       if (!isUniqueViolationOn(err, SUBMISSION_CONFIRMATION_CODE_UNIQUE)) throw err;
     }

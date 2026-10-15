@@ -54,9 +54,11 @@ export async function authenticateWithIdpPlugins(
   const plugins = getIdpPlugins();
   let lastError: unknown;
 
+  // In order, stopping at the first plugin that authenticates; each one writes to req.
   for (const plugin of plugins) {
     clearPluginAuthState(req);
-    const err = await runPluginMiddleware(plugin, req, res);
+    // eslint-disable-next-line no-await-in-loop
+    const err = await runPluginMiddleware(plugin, req, res); // NOSONAR
     const principal = err ? null : buildPrincipal(plugin, req);
     if (principal) {
       return { principal };
