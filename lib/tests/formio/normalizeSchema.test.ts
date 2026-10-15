@@ -16,6 +16,11 @@ describe('normalizeSchema', () => {
     expect((out.components as Comp[])[0].type).toBe(expected);
   });
 
+  it('maps a simple* type without reaching into the fields after it', () => {
+    const out = normalizeSchema({ components: [{ type: 'simpletextfield', key: 'advanced' }] });
+    expect((out.components as Comp[])[0]).toMatchObject({ type: 'textfield', key: 'advanced' });
+  });
+
   it('keeps only form-definition fields and drops engine/document metadata', () => {
     const out = normalizeSchema({
       title: 'My Form',
