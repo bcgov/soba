@@ -1,4 +1,4 @@
-﻿﻿﻿import { test, expect } from '../fixtures/form_title';
+﻿﻿import { test, expect } from '../fixtures/form_title';
 import type { Locator, Page } from '@playwright/test';
 import dictionaries from '../../../frontend/dictionaries/en.json';
 
