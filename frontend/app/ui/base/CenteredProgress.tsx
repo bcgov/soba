@@ -22,9 +22,9 @@ import { useDictionary } from '@/app/[lang]/Providers';
  * ProgressCircle with no visible text. Use everywhere a screen, page data area,
  * or table body is pending so loading looks and behaves the same throughout.
  *
- * Accessibility: the wrapper is a `role="status"` live region (implicit
- * `aria-live="polite"`) so screen readers announce the spinner when it appears,
- * and the ProgressCircle carries an `aria-label` as its accessible name.
+ * Accessibility: the wrapper is a polite, atomic live region so screen readers
+ * announce the spinner when it appears, and the ProgressCircle carries an
+ * `aria-label` as its accessible name.
  */
 export function CenteredProgress({
   label = 'Loading',
@@ -36,12 +36,14 @@ export function CenteredProgress({
   const finalLabel = label === 'Loading' ? dict.general.loading : label;
 
   return (
-    <output
+    <div
+      aria-live="polite"
+      aria-atomic="true"
       className="d-flex justify-content-center align-items-center p-5"
       style={minHeight ? { minHeight } : undefined}
       data-testid={testId}
     >
       {isMounted && <ProgressCircle isIndeterminate aria-label={finalLabel} />}
-    </output>
+    </div>
   );
 }
