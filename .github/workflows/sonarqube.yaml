@@ -37,11 +37,12 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-      # PR checks report only new issues. Branch runs also show the Overall Code
-      # issue count and link in GitHub Actions.
-      - name: Publish branch issue count to Actions summary
-        if: ${{ github.event_name != 'pull_request' && (github.ref_name == 'develop' || github.ref_name == 'main') }}
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_BRANCH: ${{ github.ref_name }}
-        run: node scripts/sonar-report.mjs
+      - name: Link to SonarQube analysis
+        shell: bash
+        run: |
+          dashboard_url=$(sed -n 's/^dashboardUrl=//p' .scannerwork/report-task.txt)
+          if [[ -z "$dashboard_url" ]]; then
+            echo 'SonarQube scan did not provide a results link.' >&2
+            exit 1
+          fi
+          printf '### SonarQube analysis\n\n[View analysis results](%s)\n' "$dashboard_url" >> "$GITHUB_STEP_SUMMARY"
