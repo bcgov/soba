@@ -1,11 +1,6 @@
-﻿import { test, expect } from '../fixtures/form_title';
+import { test, expect } from '../fixtures/form_title';
 import type { Locator, Page } from '@playwright/test';
 import dictionaries from '../../../frontend/dictionaries/en.json';
-
-// Load the authenticated session.
-test.use({
-  storageState: 'support/user.json',
-});
 
 async function createForm({ page, title }: { page: Page; title: string }) {
   await page.goto('');

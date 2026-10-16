@@ -12,7 +12,6 @@ function getExpectedURL(depEnv: string): string {
   // PR environments: DEP_ENV is a PR number
   if (/^\d+$/.test(depEnv)) {
     const prNumber = Number(depEnv);
-    //const slot = prNumber % 20;
     return `https://soba-dev.apps.silver.devops.gov.bc.ca/designer-${prNumber}/en`;
   }
 

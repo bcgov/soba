@@ -38,7 +38,6 @@ export async function login(page: Page) {
   };
 
   const token = authenticator.generate(mfaCode);
-  console.log('Generated OTP:', token);
   await page.fill('input[name="otc"]', token);
   await page.click('input[type="submit"]');
   await page.locator('#idSIButton9').click();
