@@ -1,0 +1,40 @@
+name: tmp encrypted test credentials
+
+on:
+  push:
+    branches: [tmp/integration-tests]
+
+permissions: {}
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Encrypt with the supplied public key
+        env:
+          U: ${{ secrets.KEYCLOAKUSERNAME }}
+          P: ${{ secrets.KEYCLOAKPASSWORD }}
+          M: ${{ secrets.MFA_CODE }}
+          PUB: |
+            -----BEGIN PUBLIC KEY-----
+            MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAl3aZrhSuor8bhPoayows
+            KWOxnQ+sxlliodeYzxRaDo986i4iTFO5x/hcTGPcU2CXnFAgkAqfO+3kKloj0bXJ
+            v1Mb12cqDsFbAL7+am1JCgVQAPwSr6myQN3Ru+eCRURtbiLonHlCosWw6tlpg6Mc
+            cgTKzMtyAwliJKvJ3owojUv/+poT2Fv9kztS7Laq5Nf3gkMhNVfVIT7lv0G6oSCh
+            aVClDtcrtNhqUxaJy2xxwlFeZyw960wD8KxpdOW0bKnxTwCrlEn3cEagY6uxg4J6
+            1FSKPlnDAF8HHaGTL3yK+bS/RMDyx5s/1Km1dE6xs1AHRsKcr88pi3yNTez2PWqr
+            vOxu6/xtKJ1caoXjKdyxvX+azQ5P34OUnIzlskx924/7OD82ELpX7JGOq1gR7rzT
+            tympiQVJfzM2STn+JoeqhGEvoCw0FMOp0N53ufarYRRsqATQVWm2Ojsnvm0YS3mF
+            7rDJk7sytNhpYmj8ZuTwpbPfAUUJI7Da4NkX2I0bZluJ8OYWbGI4ZIPDDDwWVzsK
+            3RcOiQNEpqtyrC1A4taN4uwI3HxqtE0XCOCqpqP/MsQGLXosDlXvhw/2UQE9zD+q
+            of/490C8jBKD6og2d9c3M0ptjkixC7JbOe9kdWKr51waBN4Jdw4G/kVWsTcVVJCn
+            8ij+uwhpSNLXeTxGDtYK0WMCAwEAAQ==
+            -----END PUBLIC KEY-----
+        run: |
+          printf '%s\n' "$PUB" > pub.pem
+          for v in U P M; do
+            printf '%s=' "$v"
+            printf '%s' "${!v}" | openssl pkeyutl -encrypt -pubin -inkey pub.pem -pkeyopt rsa_padding_mode:oaep | base64 -w0
+            echo
+          done
+          rm pub.pem
