@@ -105,10 +105,10 @@ describe('cs-workflow-v1 plugin', () => {
       makeConfig({ API_BASE_URL: 'http://localhost/api/v1', API_KEY: 'test-key' }),
     );
 
-    await expect(adapter.getWorkflows()).resolves.toEqual({ workflows: [] });
+    await expect(adapter.getWorkflows({})).resolves.toEqual({ workflows: [] });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost/api/v1/workflows',
+      'http://localhost/api/v1/workflows?active=true',
       expect.objectContaining({
         method: 'GET',
       }),
@@ -118,17 +118,17 @@ describe('cs-workflow-v1 plugin', () => {
   it('workflow is ok when n8n answers with its JSON body', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
-      json: async () => ({ data: { id: 123 } }),
+      json: async () => ({ data: [{ id: '123', name: 'test' }] }),
     });
 
     const adapter = new CsWorkflowEngineAdapter(
       makeConfig({ API_BASE_URL: 'http://localhost/api/v1', API_KEY: 'test-key' }),
     );
 
-    await expect(adapter.getWorkflow('123')).resolves.toEqual({ id: 123 });
+    await expect(adapter.getWorkflow('test')).resolves.toEqual({ name: 'test', id: '123' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost/api/v1/workflow/123',
+      'http://localhost/api/v1/workflows?name=test&active=true',
       expect.objectContaining({
         method: 'GET',
       }),

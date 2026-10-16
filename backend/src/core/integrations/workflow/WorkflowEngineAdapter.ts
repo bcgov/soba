@@ -6,16 +6,24 @@ export interface WorkflowEngineReadinessResult {
 
 export interface Workflow {
   id: string;
+  name: string;
+  nodes?: Array<Record<string, unknown>>;
 }
 
 /** Result of a workflow engine readiness check; no config or credentials are exposed. */
 export interface GetWorkflowsResult {
   workflows: Array<Workflow>;
+  cursor?: string;
+}
+
+export interface getWorkflowParams {
+  name?: string;
+  cursor?: string;
 }
 
 export interface WorkflowEngineAdapter {
   readinessCheck?(): Promise<WorkflowEngineReadinessResult>;
-  getWorkflows?(): Promise<GetWorkflowsResult>;
-  getWorkflow?(workflowId: string): Promise<Workflow>;
-  startWorkflow?(workflowId: string, payload: unknown): Promise<boolean>;
+  getWorkflows?(params: getWorkflowParams): Promise<GetWorkflowsResult>;
+  getWorkflow?(name: string): Promise<Workflow>;
+  startWorkflow?(name: string, payload: unknown): Promise<boolean>;
 }

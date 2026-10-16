@@ -9,8 +9,9 @@ function createNoopWorkflowEngineAdapter(config: PluginConfigReader): WorkflowEn
   return {
     readinessCheck: () => Promise.resolve({ ok: !!config }),
     getWorkflows: () => Promise.resolve({ workflows: [] }),
-    getWorkflow: (workflowId: string) => Promise.resolve({ id: workflowId }),
-    startWorkflow: () => Promise.resolve(false),
+    getWorkflow: (name: string) => Promise.resolve({ id: name, name }),
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    startWorkflow: (name: string, payload: unknown) => Promise.resolve(true),
   };
 }
 

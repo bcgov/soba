@@ -5,15 +5,27 @@ import type {
   WorkflowEngineReadinessResult,
   GetWorkflowsResult,
   Workflow,
+  getWorkflowParams,
 } from '../../core/integrations/workflow/WorkflowEngineAdapter';
 import { HttpClientError, joinUrl, resolveTimeoutMs } from '../../core/http/httpClient';
+import { ServiceUnavailableError } from '../../core/errors';
+import { log } from '../../core/logging';
 
+const PLUGIN = 'cs-workflow-v1';
 const SERVICE = 'Connected Services Workflow';
 const WORKFLOWS_PATH = 'workflows';
-const WORKFLOW_PATH = 'workflow';
 
-const WorkflowsResponseSchema = z.object({ data: z.array(z.object().loose()) });
-const WorkflowResponseSchema = z.object({ data: z.object().loose() });
+const workflowItem = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  node: z
+    .array(z.object({ parameters: z.object({ path: z.string().optional() }).optional() }))
+    .optional(),
+});
+const WorkflowsResponseSchema = z.object({
+  data: z.array(workflowItem),
+  nextCursor: z.string().optional(),
+});
 
 /** Connected Services workflows, started and read with the caller's own token. */
 export class CsWorkflowEngineAdapter implements WorkflowEngineAdapter {
@@ -24,7 +36,7 @@ export class CsWorkflowEngineAdapter implements WorkflowEngineAdapter {
 
   constructor(config: PluginConfigReader) {
     this.baseUrl = config.getRequired('API_BASE_URL');
-    this.baseUrlWithoutApi = this.baseUrl.replace(/^\/*api\/v\d+\/*/, '');
+    this.baseUrlWithoutApi = this.baseUrl.replace(/\/api\/v\d+\/*$/, '');
     this.timeoutMs = resolveTimeoutMs(
       config.getOptionalNumber('TIMEOUT_MS'),
       'PLUGIN_CS_WORKFLOW_V1_TIMEOUT_MS',
@@ -46,42 +58,65 @@ export class CsWorkflowEngineAdapter implements WorkflowEngineAdapter {
     }
   }
 
-  async getWorkflows(name?: string): Promise<GetWorkflowsResult> {
-    const url = WORKFLOWS_PATH + (name ? `?name=${encodeURIComponent(name)}` : '');
-    const res = await this.request('GET', url);
-    const body: unknown = await res.json().catch(() => undefined);
+  async getWorkflows(params: getWorkflowParams): Promise<GetWorkflowsResult> {
+    const { name, cursor } = params;
+    const url =
+      WORKFLOWS_PATH +
+      '?' +
+      (name ? `name=${encodeURIComponent(name)}` : '') +
+      (name && cursor ? '&' : '') +
+      (cursor ? `cursor=${encodeURIComponent(cursor)}` : '') +
+      (name || cursor ? '&' : '') +
+      'active=true';
+
+    let body: unknown;
+    try {
+      const res = await this.request('GET', url);
+      body = await res.json();
+    } catch (err) {
+      const status = err instanceof HttpClientError ? err.status : undefined;
+      const message = err instanceof Error ? err.message : String(err);
+      log.warn({ plugin: PLUGIN, status, error: message }, 'Workflow request failed');
+      // The caller sends no input, so a CSTAR 4xx is a 503 too; upstream detail stays out of the response.
+      throw new ServiceUnavailableError(
+        status ? `${SERVICE} error ${status}` : `${SERVICE} is unavailable`,
+      );
+    }
+
     const safeParseResult = WorkflowsResponseSchema.safeParse(body);
     if (!safeParseResult.data) {
-      throw new Error(`Unexpected ${SERVICE} workflows response`);
+      throw new Error(`Unexpected ${SERVICE} workflows response: ${safeParseResult.error.message}`);
     }
-    return { workflows: safeParseResult.data.data as unknown as Array<Workflow> };
+    return {
+      workflows: safeParseResult.data.data as unknown as Array<Workflow>,
+      cursor: safeParseResult.data.nextCursor,
+    };
   }
 
-  async getWorkflow(id: string): Promise<Workflow> {
-    const res = await this.request('GET', `${WORKFLOW_PATH}/${id}`);
-    const body: unknown = await res.json().catch(() => undefined);
-    const safeParseResult = WorkflowResponseSchema.safeParse(body);
-    if (!safeParseResult.data) {
-      throw new Error(JSON.stringify(safeParseResult));
+  async getWorkflow(name: string): Promise<Workflow> {
+    const workflows = await this.getWorkflows({ name });
+    const workflow = workflows.workflows.find((w) => w.name === name);
+    if (!workflow) {
+      throw new Error(`Workflow ${name} not found`);
     }
-    return { id: safeParseResult.data.data.id as string };
+    return workflow;
   }
 
-  async startWorkflow(id: string, payload: object): Promise<boolean> {
-    const workflow = await this.getWorkflow(id);
-    //the
-    const path =
-      (workflow as unknown as Record<string, unknown>).node?.[0]?.parameters?.path ?? null;
+  async startWorkflow(name: string, payload: object): Promise<boolean> {
+    const workflow = await this.getWorkflow(name);
+    const webhookNode = (workflow as unknown as Workflow).nodes.find(
+      (n) => n.type === 'n8n-nodes-base.webhook',
+    );
+
+    const path = (webhookNode.parameters as { path?: string } | null)?.path ?? null;
     if (!path) {
-      throw new Error(`Workflow ${id} does not have a path parameter`);
+      throw new Error(`Workflow ${name} does not have a path parameter`);
     }
-    const res = await this.request('GET', `webhook/${path}`, payload, true);
-    const body: unknown = await res.json().catch(() => undefined);
-    const safeParseResult = WorkflowsResponseSchema.safeParse(body);
-    if (!safeParseResult.data) {
-      throw new Error(`Unexpected ${SERVICE} workflows response`);
+    const res = await this.request('POST', `webhook/${path}`, payload, true);
+    if (res.status >= 200 && res.status < 300) {
+      return true;
     }
-    return true;
+    throw new Error(`Unexpected ${SERVICE} workflows response`);
   }
 
   /** Request under the base URL; a non-2xx response throws HttpClientError. */
