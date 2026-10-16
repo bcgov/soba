@@ -1,6 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { Button } from '@bcgov/design-system-react-components';
+import { Button, InlineAlert } from '@bcgov/design-system-react-components';
 
 import type { Dictionary } from '@/src/types/dictionary';
 import type { TeamMember } from '@/src/types/formTeam';
@@ -23,12 +23,13 @@ import FormTeamMemberForm from './FormTeamMemberForm';
 
 interface FormTeamTabProps {
   dict: Dictionary;
+  formId: string;
 }
 
-export default function FormTeamTab({ dict }: Readonly<FormTeamTabProps>) {
+export default function FormTeamTab({ dict, formId }: Readonly<FormTeamTabProps>) {
   const t = dict.team;
   const query = useListQuery(FORM_TEAM_LIST_QUERY);
-  const membersResult = useFormTeamMembers({
+  const membersResult = useFormTeamMembers(formId, {
     offset: query.offset,
     limit: query.pageSize,
     sort: query.sort,
@@ -36,7 +37,7 @@ export default function FormTeamTab({ dict }: Readonly<FormTeamTabProps>) {
   });
   const { table } = useDataTable(query, membersResult, t.loadError);
   const groups = useTeamGroups();
-  const teamWriter = useFormTeamWriter();
+  const teamWriter = useFormTeamWriter(formId);
   const { addNotification } = useNotificationStore();
   // The list, the add form, or the edit form for one member.
   const [view, setView] = useState<'list' | 'add' | TeamMember>('list');
@@ -100,18 +101,32 @@ export default function FormTeamTab({ dict }: Readonly<FormTeamTabProps>) {
     [t, groups],
   );
 
+  // Until the team API exists nothing on this tab is saved, so the tab says so.
+  const sampleNotice = (
+    <div className="mb-3">
+      <InlineAlert variant="info" data-testid="team-sample-notice">
+        {t.sampleNotice}
+      </InlineAlert>
+    </div>
+  );
+
   if (view !== 'list') {
     return (
-      <FormTeamMemberForm
-        dict={dict}
-        member={view === 'add' ? undefined : view}
-        onDone={() => setView('list')}
-      />
+      <>
+        {sampleNotice}
+        <FormTeamMemberForm
+          dict={dict}
+          formId={formId}
+          member={view === 'add' ? undefined : view}
+          onDone={() => setView('list')}
+        />
+      </>
     );
   }
 
   return (
     <div data-testid="team-list">
+      {sampleNotice}
       <ListPageToolbar align="between">
         <ListPageSearchField
           value={query.searchInput}

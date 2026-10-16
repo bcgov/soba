@@ -6,6 +6,8 @@ import {
   CheckboxGroup,
   Form,
   Heading,
+  Radio,
+  RadioGroup,
 } from '@bcgov/design-system-react-components';
 
 import type { Dictionary } from '@/src/types/dictionary';
@@ -23,6 +25,7 @@ import { DEFAULT_PAGE_SIZE } from '@/src/shared/list/useListQuery';
 
 interface FormTeamMemberFormProps {
   dict: Dictionary;
+  formId: string;
   /** The member whose groups are being edited. Left out, the form searches for a user to add. */
   member?: TeamMember;
   onDone: () => void;
@@ -30,12 +33,13 @@ interface FormTeamMemberFormProps {
 
 export default function FormTeamMemberForm({
   dict,
+  formId,
   member,
   onDone,
 }: Readonly<FormTeamMemberFormProps>) {
   const t = dict.team;
   const groups = useTeamGroups();
-  const teamWriter = useFormTeamWriter();
+  const teamWriter = useFormTeamWriter(formId);
   const { addNotification } = useNotificationStore();
   const [searchInput, setSearchInput] = useState('');
   const [q, setQ] = useState('');
@@ -44,7 +48,7 @@ export default function FormTeamMemberForm({
   const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
   const [selectedGroups, setSelectedGroups] = useState(member?.groups ?? []);
   const [saving, setSaving] = useState(false);
-  const users = useUserSearch(q);
+  const users = useUserSearch(formId, q);
 
   const search = () => {
     setQ(searchInput);
@@ -75,22 +79,28 @@ export default function FormTeamMemberForm({
       {
         key: 'select',
         label: '',
-        render: (user) => (
-          // One user is added at a time, so ticking a row unticks the last one.
-          <Checkbox
-            aria-label={t.select.replace('{name}', `${user.firstName} ${user.lastName}`)}
-            data-testid={`${user.id}-select`}
-            isSelected={selectedUser?.id === user.id}
-            onChange={(isSelected) => setSelectedUser(isSelected ? user : null)}
-          />
-        ),
+        // Someone already on the team is changed through Edit, so they are marked and cannot be
+        // picked. Text inside the radio group needs a slot, so the mark is the radio's own label.
+        render: (user) => {
+          const name = `${user.firstName} ${user.lastName}`;
+          return (
+            <Radio
+              value={user.id}
+              isDisabled={user.onTeam}
+              aria-label={(user.onTeam ? t.onTeamLabel : t.select).replace('{name}', name)}
+              data-testid={`${user.id}-select`}
+            >
+              {user.onTeam ? t.onTeam : undefined}
+            </Radio>
+          );
+        },
       },
       { key: 'firstName', label: t.firstName },
       { key: 'lastName', label: t.lastName },
       { key: 'email', label: t.email },
       { key: 'identityProvider', label: t.identityProvider },
     ],
-    [t, selectedUser],
+    [t],
   );
 
   return (
@@ -114,18 +124,25 @@ export default function FormTeamMemberForm({
             />
           </div>
           {q.trim() && (
-            <DataTable<UserSearchResult>
-              data={users.slice((page - 1) * pageSize, page * pageSize)}
-              columns={columns}
-              emptyMessage={t.noUsersFound}
-              caption={t.searchResults}
-              totalItems={users.length}
-              pageSize={pageSize}
-              currentPage={page}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              keyExtractor={(user) => user.id}
-            />
+            // One user is added at a time, so the rows are a single radio group.
+            <RadioGroup
+              aria-label={t.searchResults}
+              value={selectedUser?.id ?? null}
+              onChange={(id) => setSelectedUser(users.find((user) => user.id === id) ?? null)}
+            >
+              <DataTable<UserSearchResult>
+                data={users.slice((page - 1) * pageSize, page * pageSize)}
+                columns={columns}
+                emptyMessage={t.noUsersFound}
+                caption={t.searchResults}
+                totalItems={users.length}
+                pageSize={pageSize}
+                currentPage={page}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                keyExtractor={(user) => user.id}
+              />
+            </RadioGroup>
           )}
         </>
       )}
