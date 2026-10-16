@@ -51,8 +51,12 @@ vi.mock('@/app/[lang]/Providers', () => ({
     submission: {
       error: 'Error',
     },
+    team: {
+      loadError: 'Error',
+    },
     dataTable: {
       emptyMessage: 'Empty',
+      pageOf: 'of {totalPages} page(s)',
     },
   }),
 }));
