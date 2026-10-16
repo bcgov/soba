@@ -37,12 +37,12 @@ import { createTeamWorkspace } from '../../../core/db/repos/workspaceRepo';
 import { FormService } from '../../../core/services/formService';
 import { FormVersionService } from '../../../core/services/formVersionService';
 import { SubmissionService } from '../../../core/services/submissionService';
+import { mapInOrder } from '../../../core/inOrder';
 import {
   updateSubmitterSettings,
   updateWorkspaceSubmitterSettings,
 } from '../../form-settings/submitter/repo';
 import { getFixture } from '../fixtures';
-import { inSequence } from '../inSequence';
 import { addMember } from '../members';
 import type { ResolvedUser } from '../resolveUser';
 import { recordIds } from '../runs';
@@ -139,7 +139,7 @@ async function createPersonas(
   owner: ResolvedUser,
   publicUser: ResolvedUser,
 ): Promise<Map<PersonaKey, Persona>> {
-  const generated = await inSequence(buildCoveragePlan().personas, async (planned) => {
+  const generated = await mapInOrder(buildCoveragePlan().personas, async (planned) => {
     const id = await findOrCreateUserByIdentity(
       planned.identityProviderCode,
       planned.subject,
@@ -340,13 +340,13 @@ async function createWorkspace(
 
   const named = new Map<string, string>();
   ctx.groups.set(planned.key, named);
-  const seats = await inSequence(
+  const seats = await mapInOrder(
     planned.seats,
     async (seat) => [seat.persona, await addSeat(ctx, workspaceId, seat, named)] as const,
   );
   ctx.memberships.set(planned.key, new Map<PersonaKey, string>(seats));
 
-  await inSequence(planned.forms, (form) => createForm(ctx, planned, workspaceId, form));
+  await mapInOrder(planned.forms, (form) => createForm(ctx, planned, workspaceId, form));
   return { id: workspaceId, name: planned.name };
 }
 
@@ -416,7 +416,7 @@ async function applyChanges(
   plannedForms: PlannedCoverageForm[],
 ): Promise<void> {
   const actor = actorOf(persona(ctx, ADMIN));
-  await inSequence(
+  await mapInOrder(
     plannedForms.filter((planned) => planned.afterSubmissions),
     async (planned) => {
       const form = ctx.forms.get(planned.key);
@@ -462,11 +462,11 @@ export async function generateCoverage(args: {
     forms: new Map(),
   };
 
-  const workspaces = await inSequence(
+  const workspaces = await mapInOrder(
     plan.workspaces,
     async (planned) => [planned.key, await createWorkspace(ctx, planned)] as const,
   );
-  const submissions = await inSequence(
+  const submissions = await mapInOrder(
     plan.submissions,
     async (planned, index) => [planned.key, await createSubmission(ctx, planned, index)] as const,
   );

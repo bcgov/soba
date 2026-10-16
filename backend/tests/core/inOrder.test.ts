@@ -29,6 +29,12 @@ describe('mapInOrder', () => {
     expect(events).toEqual(['start a', 'end a', 'start b', 'end b', 'start c', 'end c']);
   });
 
+  it('passes each item its index', async () => {
+    await expect(
+      mapInOrder(['x', 'y'], (item, index) => Promise.resolve(`${item}${index}`)),
+    ).resolves.toEqual(['x0', 'y1']);
+  });
+
   it('resolves to an empty array for no items', async () => {
     await expect(mapInOrder([], () => Promise.resolve(1))).resolves.toEqual([]);
   });
@@ -53,7 +59,7 @@ describe('mapInOrder', () => {
 });
 
 describe('findInOrder', () => {
-  it('returns the first defined result and skips the rest', async () => {
+  it('returns the first result that is not null or undefined and skips the rest', async () => {
     const seen: number[] = [];
     const found = await findInOrder([1, 2, 3, 4], (n) => {
       seen.push(n);
@@ -64,9 +70,15 @@ describe('findInOrder', () => {
     expect(seen).toEqual([1, 2]);
   });
 
-  it('treats null and other falsy values as a match', async () => {
-    await expect(findInOrder([1, 2], () => Promise.resolve(null))).resolves.toBeNull();
-    await expect(findInOrder([1, 2], () => Promise.resolve(0))).resolves.toBe(0);
+  it('skips null and undefined but matches other falsy values', async () => {
+    const seen: number[] = [];
+    const found = await findInOrder([1, 2, 3, 4], (n) => {
+      seen.push(n);
+      return Promise.resolve([null, undefined, 0, 1][n - 1]);
+    });
+
+    expect(found).toBe(0);
+    expect(seen).toEqual([1, 2, 3]);
   });
 
   it('resolves to undefined when nothing matches', async () => {

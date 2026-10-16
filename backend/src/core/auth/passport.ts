@@ -62,7 +62,7 @@ export async function authenticateWithIdpPlugins(
       lastError = err;
       return undefined;
     }
-    return buildPrincipal(plugin, req) ?? undefined;
+    return buildPrincipal(plugin, req);
   });
   if (principal) {
     return { principal };
