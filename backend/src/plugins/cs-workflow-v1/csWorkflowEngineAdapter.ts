@@ -19,7 +19,12 @@ const workflowItem = z.object({
   id: z.string(),
   name: z.string().optional(),
   nodes: z
-    .array(z.object({ parameters: z.object({ path: z.string().optional() }).optional() }))
+    .array(
+      z.object({
+        type: z.string(),
+        parameters: z.object({ path: z.string().optional() }).optional(),
+      }),
+    )
     .optional(),
 });
 const WorkflowsResponseSchema = z.object({
