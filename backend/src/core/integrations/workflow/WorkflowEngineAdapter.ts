@@ -16,14 +16,14 @@ export interface GetWorkflowsResult {
   cursor?: string;
 }
 
-export interface getWorkflowParams {
+export interface GetWorkflowParams {
   name?: string;
   cursor?: string;
 }
 
 export interface WorkflowEngineAdapter {
   readinessCheck?(): Promise<WorkflowEngineReadinessResult>;
-  getWorkflows?(params: getWorkflowParams): Promise<GetWorkflowsResult>;
+  getWorkflows?(params: GetWorkflowParams): Promise<GetWorkflowsResult>;
   getWorkflow?(name: string): Promise<Workflow>;
   startWorkflow?(name: string, payload: unknown): Promise<boolean>;
 }

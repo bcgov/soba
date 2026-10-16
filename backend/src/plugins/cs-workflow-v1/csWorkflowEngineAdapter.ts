@@ -5,7 +5,7 @@ import type {
   WorkflowEngineReadinessResult,
   GetWorkflowsResult,
   Workflow,
-  getWorkflowParams,
+  GetWorkflowParams,
 } from '../../core/integrations/workflow/WorkflowEngineAdapter';
 import { HttpClientError, joinUrl, resolveTimeoutMs } from '../../core/http/httpClient';
 import { ServiceUnavailableError } from '../../core/errors';
@@ -58,7 +58,7 @@ export class CsWorkflowEngineAdapter implements WorkflowEngineAdapter {
     }
   }
 
-  async getWorkflows(params: getWorkflowParams): Promise<GetWorkflowsResult> {
+  async getWorkflows(params: GetWorkflowParams): Promise<GetWorkflowsResult> {
     const { name, cursor } = params;
     const url =
       WORKFLOWS_PATH +
