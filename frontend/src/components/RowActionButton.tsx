@@ -27,7 +27,7 @@ export function RowActionButton({
   children,
   'aria-label': ariaLabel,
   'data-testid': testId,
-}: RowActionButtonProps) {
+}: Readonly<RowActionButtonProps>) {
   return (
     <span className={main ? styles.main : undefined}>
       <Button

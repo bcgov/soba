@@ -326,7 +326,7 @@ export const isUserInGroup = async (groupId: string, membershipId: string): Prom
 };
 
 /** Creates a group carrying the given roles; returns the new group id. */
-export const createWorkspaceGroup = async (args: {
+export const createWorkspaceGroup = (args: {
   workspaceId: string;
   name: string;
   description?: string | null;

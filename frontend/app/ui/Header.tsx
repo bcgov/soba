@@ -40,7 +40,7 @@ function Header({ designMode }: Readonly<HeaderProps>) {
   const previousSubjectRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    init();
+    void init();
   }, [init]);
 
   // The aside sticks below the header, so its height has to be a real number. It is a design system
@@ -95,7 +95,7 @@ function Header({ designMode }: Readonly<HeaderProps>) {
     }
     if (!intervalRef.current) {
       intervalRef.current = setInterval(() => {
-        refresh();
+        void refresh();
       }, 30000);
     }
   }, [authenticated, token, idTokenParsed, refresh, clearSessionState, initStarted, initializing]);

@@ -168,7 +168,7 @@ export const login = () => async (dispatch: AppDispatch) => {
         redirectUri:
           typeof window !== 'undefined' ? window.location.origin + getBasePath() : undefined,
       };
-      kc?.login(opts);
+      await kc?.login(opts);
     } catch {
       // no-op
     }
@@ -178,7 +178,7 @@ export const login = () => async (dispatch: AppDispatch) => {
 export const logout = () => (dispatch: AppDispatch) => {
   const kc: Keycloak.KeycloakInstance | null = kcInstance;
   if (kc) {
-    kc.logout();
+    void kc.logout();
   }
   kcInstance = null;
   disableFormioBrowserAuth();

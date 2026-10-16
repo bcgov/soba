@@ -5,8 +5,8 @@
  * virus scan).
  * Storage is discovered here too but selected per profile (see getStorageAdapter).
  */
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import { z } from 'zod';
 import { env } from '../../config/env';
 import { log } from '../../logging';
@@ -40,6 +40,7 @@ import type {
   StoragePluginDefinition,
 } from '../storage-engine/StorageEngineAdapter';
 import type { TenantEnginePluginDefinition } from '../tenant/TenantEnginePluginDefinition';
+import { reportReadinessByKey } from './readiness';
 
 // --- Definition schemas -----------------------------------------------------
 
@@ -516,17 +517,8 @@ export function getStorageAdapter(profile: string = 'default'): StorageEngineAda
  * that is unreachable or misconfigured yields { ok: false, message }; one with no readinessCheck
  * yields { ok: true }.
  */
-export async function checkStorageReadiness(): Promise<
-  Record<string, StorageEngineReadinessResult>
-> {
-  const results: Record<string, StorageEngineReadinessResult> = {};
-  for (const profile of Object.keys(getStorageProfilesConfig())) {
-    try {
-      const adapter = getStorageAdapter(profile);
-      results[profile] = (await adapter.readinessCheck?.()) ?? { ok: true };
-    } catch (err) {
-      results[profile] = { ok: false, message: err instanceof Error ? err.message : String(err) };
-    }
-  }
-  return results;
+export function checkStorageReadiness(): Promise<Record<string, StorageEngineReadinessResult>> {
+  return reportReadinessByKey(Object.keys(getStorageProfilesConfig()), (profile) =>
+    getStorageAdapter(profile).readinessCheck?.(),
+  );
 }

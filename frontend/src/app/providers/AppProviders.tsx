@@ -17,11 +17,11 @@ export default function AppProviders({
   dictionary,
   locale,
   children,
-}: {
+}: Readonly<{
   dictionary: Dictionary;
   locale: string;
   children: React.ReactNode;
-}) {
+}>) {
   const store = useMemo(() => makeStore(), []);
 
   // sobaFetch can't import the slice (that would close an import cycle), so it reaches Keycloak

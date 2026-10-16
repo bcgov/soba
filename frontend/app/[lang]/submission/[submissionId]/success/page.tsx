@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: PageProps) {
   );
 }
 
-export default async function Page({ params }: PageProps) {
+export default async function Page({ params }: Readonly<PageProps>) {
   await assertFeatureAllowed(FEATURE_CODES.SUBMIT_MODE);
 
   const { lang, submissionId } = await params;
