@@ -85,6 +85,7 @@ if [[ "$DEPS_ONLY" == false ]]; then
   add_path "backend/dist"
   add_path "lib/dist"
   add_path "frontend/.next"
+  add_path "frontend/.next-designer"
   add_path "frontend/.next-forms"
   add_glob "frontend/*.tsbuildinfo"
   add_path "frontend/.vite"
