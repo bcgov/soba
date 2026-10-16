@@ -78,6 +78,7 @@ spec:
             - |
               . /vault/secrets/soba-formio
               . /vault/secrets/soba-cdogs
+              . /vault/secrets/soba-workflow
               exec node backend/dist/src/app.js
           {{- end }}
           envFrom:

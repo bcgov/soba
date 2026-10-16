@@ -18,13 +18,13 @@ const WORKFLOWS_PATH = 'workflows';
 const workflowItem = z.object({
   id: z.string(),
   name: z.string().optional(),
-  node: z
+  nodes: z
     .array(z.object({ parameters: z.object({ path: z.string().optional() }).optional() }))
     .optional(),
 });
 const WorkflowsResponseSchema = z.object({
   data: z.array(workflowItem),
-  nextCursor: z.string().optional(),
+  nextCursor: z.string().nullable().optional(),
 });
 
 /** Connected Services workflows, started and read with the caller's own token. */
@@ -108,7 +108,7 @@ export class CsWorkflowEngineAdapter implements WorkflowEngineAdapter {
       (n) => n.type === 'n8n-nodes-base.webhook',
     );
 
-    const path = (webhookNode.parameters as { path?: string } | null)?.path ?? null;
+    const path = (webhookNode?.parameters as { path?: string } | null)?.path ?? null;
     if (!path) {
       throw new Error(`Workflow ${name} does not have a path parameter`);
     }
