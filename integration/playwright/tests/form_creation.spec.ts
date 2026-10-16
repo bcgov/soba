@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures/form_title';
 import type { Locator, Page } from '@playwright/test';
 import dictionaries from '../../../frontend/dictionaries/en.json';
 
-async function createForm({ page, title }: { page: Page; title: string }) {
+async function createForm({ page, title }: { page: Page; title: string }): Promise<string> {
   await page.goto('');
 
   // Only create a workspace when the first-run onboarding modal is actually shown.
@@ -70,17 +70,18 @@ async function createForm({ page, title }: { page: Page; title: string }) {
   await expect(workspaceSelector).toBeVisible();
   await workspaceSelector.click();
 
-  const createdWorkspaceOption = page
-    .getByRole('option')
-    .filter({ hasText: 'Test Workspace' })
-    .first();
+  const workspaceOptions = page
+    .getByRole('listbox', { name: dictionaries.workspaces.workspace })
+    .getByRole('option');
+  await expect(workspaceOptions.first()).toBeVisible();
+
+  const createdWorkspaceOption = workspaceOptions.filter({ hasText: 'Test Workspace' }).first();
 
   const workspaceOption =
-    (await createdWorkspaceOption.count()) > 0
-      ? createdWorkspaceOption
-      : page.getByRole('option').first();
+    (await createdWorkspaceOption.count()) > 0 ? createdWorkspaceOption : workspaceOptions.first();
 
-  await expect(workspaceOption).toBeVisible();
+  // Options read "<name> (<kind>)".
+  const workspaceName = (await workspaceOption.innerText()).trim().replace(/ \([^)]*\)$/, '');
   await workspaceOption.click();
 
   const formNameInput = createFormDialog
@@ -88,6 +89,8 @@ async function createForm({ page, title }: { page: Page; title: string }) {
     .locator('xpath=following-sibling::div//input');
   await formNameInput.fill(title);
   await createFormDialog.getByTestId('save-create-form').click();
+
+  return workspaceName;
 }
 
 async function dragComponentToCanvas(component: Locator, target: Locator) {
@@ -107,7 +110,7 @@ async function dragComponentToCanvas(component: Locator, target: Locator) {
 test('Create, edit, search, preview, and publish one form', async ({ page, title }) => {
   test.setTimeout(120_000);
 
-  await createForm({ page, title });
+  const workspaceName = await createForm({ page, title });
   const target = page.locator('.builder-components.drag-container');
   await expect(target).toBeVisible({ timeout: 30_000 });
 
@@ -187,7 +190,9 @@ test('Create, edit, search, preview, and publish one form', async ({ page, title
 
   await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
 
-  await expect(page.getByText('Workspace: Test Workspace')).toHaveText('Workspace: Test Workspace');
+  await expect(page.getByText(`Workspace: ${workspaceName}`)).toHaveText(
+    `Workspace: ${workspaceName}`,
+  );
 
   await expect(page.getByRole('button', { name: 'Preview', exact: true })).toBeVisible();
 
