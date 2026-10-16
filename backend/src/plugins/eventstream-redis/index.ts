@@ -9,6 +9,7 @@ import type {
 } from '../../core/integrations/eventstream/EventStreamAdapter';
 import type { PluginConfigReader } from '../../core/config/pluginConfig';
 import { resolveStreamRetention } from '../../core/integrations/eventstream/streamRetention';
+import { mapInOrder } from '../../core/inOrder';
 import { createRedisClient, optionalNumber } from '../shared/redis/redisClient';
 import { log } from '../../core/logging';
 
@@ -246,19 +247,16 @@ export function buildRedisEventStreamAdapter(config: PluginConfigReader): {
         )) as PendingEntry[] | null;
         if (!Array.isArray(pend)) return;
         // One message at a time, so a consumer never runs its handler concurrently.
-        for (const [id, , , deliveryCount] of pend) {
+        await mapInOrder(pend, async ([id, , , deliveryCount]) => {
           if (stopped) return;
           if (Number(deliveryCount) >= maxDeliveries) {
-            // eslint-disable-next-line no-await-in-loop
-            await deadLetter(key, group, id); // NOSONAR
-            continue;
+            await deadLetter(key, group, id);
+            return;
           }
-          // eslint-disable-next-line no-await-in-loop
-          const reply = await client.call('XCLAIM', key, group, consumer, minIdleMs, id); // NOSONAR
+          const reply = await client.call('XCLAIM', key, group, consumer, minIdleMs, id);
           const claimed = reply as StreamEntry[] | null;
-          // eslint-disable-next-line no-await-in-loop
-          if (claimed?.[0]) await process(id, claimed[0][1], Number(deliveryCount) + 1); // NOSONAR
-        }
+          if (claimed?.[0]) await process(id, claimed[0][1], Number(deliveryCount) + 1);
+        });
       };
 
       const readNew = async (): Promise<void> => {
@@ -277,36 +275,32 @@ export function buildRedisEventStreamAdapter(config: PluginConfigReader): {
           '>',
         );
         // One message at a time, in order.
-        for (const [id, fields] of extractEntries(reply)) {
+        await mapInOrder(extractEntries(reply), async ([id, fields]) => {
           if (stopped) return;
-          // eslint-disable-next-line no-await-in-loop
-          await process(id, fields, 1); // NOSONAR
-        }
+          await process(id, fields, 1);
+        });
       };
 
       // Each pass finishes before the next starts: the read blocks, and errors back off first.
       const loop = async (): Promise<void> => {
-        while (!stopped) {
-          try {
-            // eslint-disable-next-line no-await-in-loop
-            await reclaimPending(); // NOSONAR
-            // eslint-disable-next-line no-await-in-loop
-            await readNew(); // NOSONAR
-          } catch (err) {
-            if (stopped) break;
-            // The group/stream can vanish under us (backend restart without persistence, or an
-            // explicit delete). Recreate it and carry on rather than spinning on NOGROUP forever.
-            if (err instanceof Error && err.message.includes('NOGROUP')) {
-              log.warn({ stream, group }, `[${CODE}] consumer group missing; recreating`);
-              // eslint-disable-next-line no-await-in-loop
-              await ensureGroup(key, group, options?.from ?? 'new').catch(() => undefined); // NOSONAR
-              continue;
-            }
+        if (stopped) return;
+        try {
+          await reclaimPending();
+          await readNew();
+        } catch (err) {
+          if (stopped) return;
+          // The group/stream can vanish under us (backend restart without persistence, or an
+          // explicit delete). Recreate it and carry on rather than spinning on NOGROUP forever.
+          if (err instanceof Error && err.message.includes('NOGROUP')) {
+            log.warn({ stream, group }, `[${CODE}] consumer group missing; recreating`);
+            await ensureGroup(key, group, options?.from ?? 'new').catch(() => undefined);
+          } else {
             log.warn({ err, stream, group }, `[${CODE}] consume loop error; retrying`);
-            // eslint-disable-next-line no-await-in-loop
-            await new Promise((resolve) => setTimeout(resolve, 500)); // NOSONAR
+            await new Promise((resolve) => setTimeout(resolve, 500));
           }
         }
+        // Not awaited, so pending promises do not pile up per pass.
+        void loop();
       };
 
       void loop();

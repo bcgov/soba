@@ -88,21 +88,19 @@ function createInMemoryEventStreamAdapter(): EventStreamAdapter {
 
       // One message at a time, in order.
       const loop = async (): Promise<void> => {
-        while (!stopped) {
-          const pending = redeliver.shift();
-          if (pending) {
-            // eslint-disable-next-line no-await-in-loop
-            await deliver(pending.message, pending.attempt); // NOSONAR
-          } else if (cursor < messages.length) {
-            // eslint-disable-next-line no-await-in-loop
-            await deliver(messages[cursor++], 1); // NOSONAR
-          } else {
-            // Block until the next append or a stop() (both call wake). Registration is synchronous,
-            // so there's no lost-wakeup window; no polling timer is needed (and it would leak waiters).
-            // eslint-disable-next-line no-await-in-loop
-            await waitForAppend(stream); // NOSONAR
-          }
+        if (stopped) return;
+        const pending = redeliver.shift();
+        if (pending) {
+          await deliver(pending.message, pending.attempt);
+        } else if (cursor < messages.length) {
+          await deliver(messages[cursor++], 1);
+        } else {
+          // Block until the next append or a stop() (both call wake). Registration is synchronous,
+          // so there's no lost-wakeup window; no polling timer is needed (and it would leak waiters).
+          await waitForAppend(stream);
         }
+        // Not awaited, so pending promises do not pile up per pass.
+        void loop();
       };
 
       void loop();

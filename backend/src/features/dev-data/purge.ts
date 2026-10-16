@@ -39,6 +39,7 @@ import {
   workspaceMemberships,
   workspaces,
 } from '../../core/db/schema';
+import { mapInOrder } from '../../core/inOrder';
 import { createFormEngineAdapter } from '../../core/integrations/form-engine/FormEngineRegistry';
 import { getStorageAdapter } from '../../core/integrations/plugins/PluginRegistry';
 import { log } from '../../core/logging';
@@ -369,11 +370,9 @@ async function purgeWorkspaceScoped(
     'settings_audit',
     tx.delete(settingsAudit).where(inArray(settingsAudit.workspaceId, ids)),
   );
-  for (const table of FORM_SETTINGS_TABLES) {
-    const run = tx.delete(table).where(inArray(table.workspaceId, ids));
-    // eslint-disable-next-line no-await-in-loop
-    await record(getTableConfig(table).name, run); // NOSONAR
-  }
+  await mapInOrder(FORM_SETTINGS_TABLES, (table) =>
+    record(getTableConfig(table).name, tx.delete(table).where(inArray(table.workspaceId, ids))),
+  );
   await record('form', tx.delete(forms).where(inArray(forms.workspaceId, ids)));
   await record(
     'workspace_group_role',
@@ -478,30 +477,28 @@ async function purgeEngine(
 
   // Called on the adapter, not detached: these are prototype methods that read this.pluginConfig.
   // One engine request at a time, submissions before the forms that hold them.
-  for (const ref of targets.submissionRefs) {
+  await mapInOrder(targets.submissionRefs, async (ref) => {
     const adapter = adapterFor(ref.engineCode);
     if (typeof adapter?.deleteSubmission !== 'function' || !ref.submissionRef) {
       engineSkipped += 1;
-      continue;
+      return;
     }
     const { formRef, submissionRef } = ref;
     const deleteSubmission = () => adapter.deleteSubmission!(formRef, submissionRef);
-    // eslint-disable-next-line no-await-in-loop
-    const deleted = await attempt(deleteSubmission, submissionRef); // NOSONAR
+    const deleted = await attempt(deleteSubmission, submissionRef);
     if (deleted) engineSubmissionsDeleted += 1;
-  }
+  });
 
-  for (const ref of targets.schemaRefs) {
+  await mapInOrder(targets.schemaRefs, async (ref) => {
     const adapter = adapterFor(ref.engineCode);
     if (typeof adapter?.deleteSchema !== 'function') {
       engineSkipped += 1;
-      continue;
+      return;
     }
     const { formRef } = ref;
-    // eslint-disable-next-line no-await-in-loop
-    const deleted = await attempt(() => adapter.deleteSchema!(formRef), formRef); // NOSONAR
+    const deleted = await attempt(() => adapter.deleteSchema!(formRef), formRef);
     if (deleted) engineFormsDeleted += 1;
-  }
+  });
 
   return { engineFormsDeleted, engineSubmissionsDeleted, engineFailures, engineSkipped };
 }
@@ -516,16 +513,15 @@ async function purgeStoredFiles(
   let storedFilesDeleted = 0;
   let storedFilesSkipped = 0;
   // One storage request at a time.
-  for (const { profile, backendRef } of targets.storedFiles) {
+  await mapInOrder(targets.storedFiles, async ({ profile, backendRef }) => {
     try {
-      // eslint-disable-next-line no-await-in-loop
-      await getStorageAdapter(profile).deleteFile(backendRef); // NOSONAR
+      await getStorageAdapter(profile).deleteFile(backendRef);
       storedFilesDeleted += 1;
     } catch (err) {
       storedFilesSkipped += 1;
       log.warn({ err, profile }, 'Dev data purge cannot resolve a storage profile');
     }
-  }
+  });
   return { storedFilesDeleted, storedFilesSkipped };
 }
 

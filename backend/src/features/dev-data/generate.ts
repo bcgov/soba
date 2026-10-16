@@ -5,6 +5,7 @@
 import { db } from '../../core/db/client';
 import type { WorkspaceMembershipRoleCode } from '../../core/db/codes';
 import { ConflictError } from '../../core/errors';
+import { mapInOrder } from '../../core/inOrder';
 import { createTeamWorkspace } from '../../core/db/repos/workspaceRepo';
 import { findOrCreateUserByIdentity } from '../../core/db/repos/membershipRepo';
 import { addUserToGroup, createGroupWithRole } from '../../core/db/repos/workspaceGroupRepo';
@@ -99,14 +100,12 @@ async function createUsers(
 ): Promise<Map<number, ResolvedUser>> {
   const users = new Map<number, ResolvedUser>();
   // Recorded one at a time: a failure part way through must not orphan the ones already made.
-  for (const planned of plannedUsers) {
+  await mapInOrder(plannedUsers, async (planned) => {
     const { identityProviderCode, subject, profile } = planned;
-    // eslint-disable-next-line no-await-in-loop
-    const id = await findOrCreateUserByIdentity(identityProviderCode, subject, profile); // NOSONAR
-    // eslint-disable-next-line no-await-in-loop
-    await recordIds(runId, { userIds: [id] }); // NOSONAR
+    const id = await findOrCreateUserByIdentity(identityProviderCode, subject, profile);
+    await recordIds(runId, { userIds: [id] });
     users.set(planned.index, { id, displayLabel: planned.displayLabel });
-  }
+  });
   return users;
 }
 
@@ -139,13 +138,16 @@ async function addMembers(
   }
 
   // In plan order, so the time-ordered ids follow the plan.
-  for (const member of planned.members) {
+  await mapInOrder(planned.members, async (member) => {
     const user = requireUser(ctx, member.userIndex);
-    const input = { workspaceId, user, role: member.role, invitedBy: owner };
-    // eslint-disable-next-line no-await-in-loop
-    const membershipId = await addMember(input); // NOSONAR
+    const membershipId = await addMember({
+      workspaceId,
+      user,
+      role: member.role,
+      invitedBy: owner,
+    });
     dev.set(member.userIndex, membershipId);
-  }
+  });
   return { dev, target };
 }
 
@@ -174,22 +176,19 @@ async function createGroups(
 
   // A transaction runs its statements one at a time on one connection.
   await db.transaction(async (tx) => {
-    for (const group of planned.groups) {
-      const input = {
+    await mapInOrder(planned.groups, async (group) => {
+      const groupId = await createGroupWithRole(tx, {
         workspaceId,
         name: group.name,
         roleCodes: [...group.roleCodes],
         displayLabel,
-      };
-      // eslint-disable-next-line no-await-in-loop
-      const groupId = await createGroupWithRole(tx, input); // NOSONAR
-      for (const userIndex of group.memberUserIndexes) {
+      });
+      await mapInOrder(group.memberUserIndexes, async (userIndex) => {
         const membershipId = memberships.dev.get(userIndex);
         if (!membershipId) throw new Error(`No membership for dev user ${userIndex}`);
-        // eslint-disable-next-line no-await-in-loop
-        await addUserToGroup(tx, { workspaceId, groupId, membershipId, displayLabel }); // NOSONAR
-      }
-    }
+        await addUserToGroup(tx, { workspaceId, groupId, membershipId, displayLabel });
+      });
+    });
 
     // Without this the target user's workspace role grants no form access at all.
     if (planned.targetGroup && memberships.target) {
@@ -256,13 +255,10 @@ async function createForm(
     await formVersionService.publish({ workspaceId, formVersionId: version.id, ...actor });
   }
 
-  const submissionIds: string[] = [];
   // In plan order, so the time-ordered ids follow the plan.
-  for (const submission of planned.submissions) {
-    const input = { ctx, workspaceId, formId: form.id, fixture, planned: submission };
-    // eslint-disable-next-line no-await-in-loop
-    submissionIds.push(await createSubmission(input)); // NOSONAR
-  }
+  const submissionIds = await mapInOrder(planned.submissions, (submission) =>
+    createSubmission({ ctx, workspaceId, formId: form.id, fixture, planned: submission }),
+  );
 
   return { id: form.id, name: planned.name, published: planned.published, submissionIds };
 }
@@ -292,12 +288,10 @@ async function createWorkspace(
   await applyAudience(workspaceId, planned, owner);
   await createGroups(workspaceId, planned, memberships, owner);
 
-  const forms: ManifestForm[] = [];
   // In plan order, so the time-ordered ids follow the plan.
-  for (const plannedForm of planned.forms) {
-    // eslint-disable-next-line no-await-in-loop
-    forms.push(await createForm(ctx, workspaceId, plannedForm, owner)); // NOSONAR
-  }
+  const forms = await mapInOrder(planned.forms, (plannedForm) =>
+    createForm(ctx, workspaceId, plannedForm, owner),
+  );
 
   return {
     id: workspaceId,
@@ -370,10 +364,9 @@ export async function generate(options: GenerateOptions): Promise<DevDataManifes
   // and lead the default id:desc list instead of trailing it. Written back by plan index, so the
   // manifest still lines up with the plan.
   const created: ManifestWorkspace[] = new Array(plan.workspaces.length);
-  for (const planned of [...plan.workspaces].reverse()) {
-    // eslint-disable-next-line no-await-in-loop
-    created[planned.index] = await createWorkspace(ctx, planned); // NOSONAR
-  }
+  await mapInOrder([...plan.workspaces].reverse(), async (planned) => {
+    created[planned.index] = await createWorkspace(ctx, planned);
+  });
 
   const manifest: DevDataManifest = {
     generatedAt: new Date().toISOString(),

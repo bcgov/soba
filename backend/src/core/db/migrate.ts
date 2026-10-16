@@ -11,27 +11,21 @@ const quoteIdentifier = (identifier: string) => `"${identifier.replace(/"/g, '""
 // Pipeline performance fix: Revert if needed.
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const withRetry = async <T>(label: string, task: () => Promise<T>): Promise<T> => {
+const withRetry = <T>(label: string, task: () => Promise<T>): Promise<T> => {
   const attempts = env.getDbMigrationReadyAttempts();
   const sleepMs = env.getDbMigrationReadySleepMs();
 
-  let lastError: unknown;
-  // Each attempt waits for the previous one to fail.
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+  const tryAttempt = async (attempt: number): Promise<T> => {
     try {
-      // eslint-disable-next-line no-await-in-loop
-      return await task(); // NOSONAR
+      return await task();
     } catch (error) {
-      lastError = error;
       console.error(`${label} failed on attempt ${attempt}/${attempts}`, error);
-      if (attempt < attempts) {
-        // eslint-disable-next-line no-await-in-loop
-        await sleep(sleepMs); // NOSONAR
-      }
+      if (attempt >= attempts) throw error;
+      await sleep(sleepMs);
+      return tryAttempt(attempt + 1);
     }
-  }
-
-  throw lastError;
+  };
+  return tryAttempt(1);
 };
 
 const ensureDatabaseExists = async () => {

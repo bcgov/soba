@@ -48,18 +48,19 @@ export async function messageBusSelfTest(
   try {
     const deadline = Date.now() + timeoutMs;
     // Publishes again each interval until delivery or the deadline.
-    while (!received && Date.now() < deadline) {
-      // eslint-disable-next-line no-await-in-loop
-      await adapter.publish(topic, { probe }); // NOSONAR
+    const publishUntilDelivered = async (): Promise<void> => {
+      if (received || Date.now() >= deadline) return;
+      await adapter.publish(topic, { probe });
       // Cancelable retry cadence: clear it when delivery wins, so no orphaned timer lingers.
       let timer: ReturnType<typeof setTimeout> | undefined;
       const interval = new Promise<void>(
         (resolve) => (timer = setTimeout(resolve, RETRY_INTERVAL_MS)),
       );
-      // eslint-disable-next-line no-await-in-loop
-      await Promise.race([got, interval]); // NOSONAR
+      await Promise.race([got, interval]);
       clearTimeout(timer);
-    }
+      return publishUntilDelivered();
+    };
+    await publishUntilDelivered();
     return received
       ? { delivered: true }
       : { delivered: false, message: 'no delivery within timeout' };
