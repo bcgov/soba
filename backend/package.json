@@ -4,7 +4,7 @@
   "description": "",
   "main": "app.ts",
   "scripts": {
-    "test": "NODE_OPTIONS='--max-old-space-size=1024' jest --runInBand",
+    "test": "NODE_OPTIONS='--max-old-space-size=1024' jest --runInBand --logHeapUsage",
     "test:parallel": "NODE_OPTIONS='--max-old-space-size=1024' jest --maxWorkers=2",
     "test:watch": "NODE_OPTIONS='--max-old-space-size=1024' jest --watch --runInBand",
     "test:coverage": "NODE_OPTIONS='--max-old-space-size=1024' jest --coverage --runInBand",
