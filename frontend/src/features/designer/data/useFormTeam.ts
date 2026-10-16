@@ -1,14 +1,15 @@
 'use client';
 
 import { useMemo, useSyncExternalStore } from 'react';
-import type { ListResult } from '@/src/shared/api/dataContracts';
+import type { ListResult, WriteOutcome } from '@/src/shared/api/dataContracts';
 import type { ListQueryArgs } from '@/src/types/list';
 import type { TeamGroup, TeamMember, UserSearchResult } from '@/src/types/formTeam';
 
 /**
  * Sample data behind the Access tab (CCP-5928). There is no team API yet, so these hooks answer
- * from memory: every form shows the same team and changes last until the page reloads. This file
- * is the only one a real implementation has to replace.
+ * from memory: each form starts with the same sample team and changes last until the page
+ * reloads. The hooks take a form id and return `WriteOutcome` as the API-backed ones will, so the
+ * screens should not need to change when the bodies here are replaced.
  */
 const GROUPS: TeamGroup[] = [
   { id: 'group-1', name: 'Group 1' },
@@ -17,7 +18,9 @@ const GROUPS: TeamGroup[] = [
   { id: 'group-4', name: 'Group 4' },
 ];
 
-const USERS: UserSearchResult[] = [
+type SampleUser = Omit<UserSearchResult, 'onTeam'>;
+
+const USERS: SampleUser[] = [
   ['Orla', 'Venn'],
   ['Tobin', 'Venn'],
   ['Mirela', 'Quist'],
@@ -33,32 +36,41 @@ const USERS: UserSearchResult[] = [
   identityProvider: 'IDIR',
 }));
 
-const toMember = (user: UserSearchResult, groups: string[]): TeamMember => ({
+const toMember = (user: SampleUser, groups: string[]): TeamMember => ({
   id: user.id,
   name: `${user.firstName} ${user.lastName}`,
   email: user.email,
   groups,
 });
 
-let members: TeamMember[] = [
+const SAMPLE_TEAM: TeamMember[] = [
   toMember(USERS[0], ['group-1']),
   toMember(USERS[2], ['group-1']),
   toMember(USERS[3], ['group-2']),
   toMember(USERS[4], ['group-4']),
 ];
 
+/** Teams by form id. A form not in the map still has the sample team. */
+let teams = new Map<string, TeamMember[]>();
+
 const listeners = new Set<() => void>();
 const subscribe = (listener: () => void) => {
   listeners.add(listener);
   return () => listeners.delete(listener);
 };
-const getMembers = () => members;
+const teamOf = (formId: string) => teams.get(formId) ?? SAMPLE_TEAM;
 // Resolves once stored, as a real write would, so callers already wait and handle a failure.
-const setMembers = (next: TeamMember[]) => {
-  members = next;
+const setTeam = (formId: string, next: TeamMember[]): Promise<WriteOutcome<void>> => {
+  teams = new Map(teams).set(formId, next);
   listeners.forEach((listener) => listener());
-  return Promise.resolve();
+  return Promise.resolve({ status: 'applied', value: undefined });
 };
+const useTeam = (formId: string) =>
+  useSyncExternalStore(
+    subscribe,
+    () => teamOf(formId),
+    () => teamOf(formId),
+  );
 
 const matches = (q: string, ...fields: string[]) =>
   fields.some((field) => field.toLowerCase().includes(q.trim().toLowerCase()));
@@ -73,23 +85,29 @@ const settled = <T>(rows: T[], total: number): ListResult<T> => ({
 });
 
 /** One page of the form's team members, by name. */
-export function useFormTeamMembers(query: ListQueryArgs): ListResult<TeamMember> {
-  const all = useSyncExternalStore(subscribe, getMembers, getMembers);
+export function useFormTeamMembers(formId: string, query: ListQueryArgs): ListResult<TeamMember> {
+  const team = useTeam(formId);
   const { q = '', offset, limit } = query;
   return useMemo(() => {
-    const found = all
+    const found = team
       .filter((member) => matches(q, member.name, member.email))
       .sort((a, b) => a.name.localeCompare(b.name));
     return settled(found.slice(offset, offset + limit), found.length);
-  }, [all, q, offset, limit]);
+  }, [team, q, offset, limit]);
 }
 
-/** Users matching the search term who could be added. Nothing is searched until there is a term. */
-export function useUserSearch(q: string): UserSearchResult[] {
+/**
+ * Users matching the search term, with the ones already on the form's team marked. Nothing is
+ * searched until there is a term.
+ */
+export function useUserSearch(formId: string, q: string): UserSearchResult[] {
+  const team = useTeam(formId);
   return useMemo(() => {
     if (!q.trim()) return [];
-    return USERS.filter((user) => matches(q, user.firstName, user.lastName, user.email));
-  }, [q]);
+    return USERS.filter((user) => matches(q, user.firstName, user.lastName, user.email)).map(
+      (user) => ({ ...user, onTeam: team.some((member) => member.id === user.id) }),
+    );
+  }, [team, q]);
 }
 
 /** The groups a team member can be assigned to. */
@@ -97,22 +115,34 @@ export function useTeamGroups(): TeamGroup[] {
   return GROUPS;
 }
 
-export function useFormTeamWriter() {
+export function useFormTeamWriter(formId: string) {
   return useMemo(
     () => ({
-      /** Adds the user to the team; a user already on it gets the new groups instead. */
-      add: (user: UserSearchResult, groups: string[]) =>
-        setMembers([...members.filter((member) => member.id !== user.id), toMember(user, groups)]),
+      /** Refused for a user already on the team, as the API will be: their groups change by Edit. */
+      add: (user: UserSearchResult, groups: string[]) => {
+        const team = teamOf(formId);
+        if (team.some((member) => member.id === user.id)) {
+          return Promise.reject(new Error(`${user.id} is already on the team`));
+        }
+        return setTeam(formId, [...team, toMember(user, groups)]);
+      },
       setGroups: (memberId: string, groups: string[]) =>
-        setMembers(
-          members.map((member) => (member.id === memberId ? { ...member, groups } : member)),
+        setTeam(
+          formId,
+          teamOf(formId).map((member) => (member.id === memberId ? { ...member, groups } : member)),
         ),
-      remove: (memberId: string) => setMembers(members.filter((member) => member.id !== memberId)),
+      remove: (memberId: string) =>
+        setTeam(
+          formId,
+          teamOf(formId).filter((member) => member.id !== memberId),
+        ),
     }),
-    [],
+    [formId],
   );
 }
 
-/** Puts the sample team back as it started. For tests. */
-const INITIAL_MEMBERS = members;
-export const resetFormTeam = () => void setMembers(INITIAL_MEMBERS);
+/** Puts every form back to the sample team. For tests. */
+export const resetFormTeam = () => {
+  teams = new Map();
+  listeners.forEach((listener) => listener());
+};

@@ -13,11 +13,14 @@ import type { TeamMember } from '@/src/types/formTeam';
 import { click, clickTestId, failWrites, renderWithStore, resetTeam } from './formTeamTestKit';
 
 const onDone = vi.fn();
+const FORM_ID = 'f1';
 const TOBIN = 'Select Tobin Venn (sample)';
 const GROUPS_REQUIRED = 'Select at least one group.';
 
 const checkbox = (name: string) => screen.getByRole('checkbox', { name });
+const radio = (name: string) => screen.getByRole('radio', { name });
 const tick = (name: string) => click(checkbox(name));
+const choose = (name: string) => click(radio(name));
 const save = () => clickTestId('team-save-button');
 const searchFor = async (term: string) => {
   fireEvent.change(screen.getByLabelText('Search'), { target: { value: term } });
@@ -25,16 +28,18 @@ const searchFor = async (term: string) => {
 };
 const memberById = (id: string) =>
   renderHook(() =>
-    useFormTeamMembers({ offset: 0, limit: 10, sort: 'name:asc' }),
+    useFormTeamMembers(FORM_ID, { offset: 0, limit: 10, sort: 'name:asc' }),
   ).result.current.rows.find((member) => member.id === id);
 
 const renderForm = (member?: TeamMember) =>
-  renderWithStore(<FormTeamMemberForm dict={dict} member={member} onDone={onDone} />);
-/** The add form with Tobin, who is not on the team yet (user-2), found and ticked. */
+  renderWithStore(
+    <FormTeamMemberForm dict={dict} formId={FORM_ID} member={member} onDone={onDone} />,
+  );
+/** The add form with Tobin, who is not on the team yet (user-2), found and chosen. */
 const renderWithTobinChosen = async () => {
   renderForm();
   await searchFor('tobin');
-  await tick(TOBIN);
+  await choose(TOBIN);
 };
 /** The edit form for Dax (user-4), who starts in Group 2. */
 const renderEditOfDax = () => renderForm(memberById('user-4'));
@@ -60,14 +65,24 @@ describe('FormTeamMemberForm', () => {
     expect(screen.getByTestId('datatable-empty')).toHaveTextContent('No users found');
   });
 
-  it('selects one user at a time', async () => {
+  it('offers the results as one choice', async () => {
+    renderForm();
+    await searchFor('a');
+    await choose('Select Pell Arvidsen (sample)');
+    await choose(TOBIN);
+
+    expect(screen.getByRole('radiogroup', { name: 'Search results' })).toBeInTheDocument();
+    expect(radio('Select Pell Arvidsen (sample)')).not.toBeChecked();
+    expect(radio(TOBIN)).toBeChecked();
+  });
+
+  it('marks a user already on the team and does not offer them', async () => {
     renderForm();
     await searchFor('venn');
-    await tick('Select Orla Venn (sample)');
-    await tick(TOBIN);
 
-    expect(checkbox('Select Orla Venn (sample)')).not.toBeChecked();
-    expect(checkbox(TOBIN)).toBeChecked();
+    expect(screen.getByTestId('user-1-select')).toHaveTextContent('Already on the team');
+    expect(radio('Orla Venn (sample) is already on the team')).toBeDisabled();
+    expect(radio(TOBIN)).toBeEnabled();
   });
 
   it('holds the add until a user is chosen', async () => {
@@ -75,7 +90,7 @@ describe('FormTeamMemberForm', () => {
     expect(screen.getByTestId('team-save-button')).toBeDisabled();
 
     await searchFor('tobin');
-    await tick(TOBIN);
+    await choose(TOBIN);
     expect(screen.getByTestId('team-save-button')).toBeEnabled();
   });
 
@@ -129,7 +144,7 @@ describe('FormTeamMemberForm', () => {
 
     await waitFor(() => expect(screen.getByTestId('team-save-button')).toBeEnabled());
     expect(onDone).not.toHaveBeenCalled();
-    expect(checkbox(TOBIN)).toBeChecked();
+    expect(radio(TOBIN)).toBeChecked();
     expect(checkbox('Group 3')).toBeChecked();
     expect(memberById('user-2')).toBeUndefined();
   });

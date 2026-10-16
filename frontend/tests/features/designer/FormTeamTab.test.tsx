@@ -15,7 +15,7 @@ vi.mock('next/navigation', () => ({
 import FormTeamTab from '@/src/features/designer/ui/FormTeamTab';
 import { clickTestId, failWrites, renderWithStore, resetTeam } from './formTeamTestKit';
 
-const renderTab = () => renderWithStore(<FormTeamTab dict={dict} />);
+const renderTab = () => renderWithStore(<FormTeamTab dict={dict} formId="f1" />);
 
 const confirmRemoveOf = async (memberId: string) => {
   await clickTestId(`${memberId}-remove-link`);
@@ -32,6 +32,13 @@ describe('FormTeamTab', () => {
     expect(screen.getByTestId('team-list')).toHaveTextContent('dax.halloran@example.gov.bc.ca');
     expect(screen.getByTestId('user-4-group-2-tag')).toBeInTheDocument();
     expect(screen.queryByTestId('user-4-group-1-tag')).toBeNull();
+  });
+
+  it('says the team is sample data, on the list and on the form', async () => {
+    renderTab();
+    expect(screen.getByTestId('team-sample-notice')).toHaveTextContent('sample data');
+    await clickTestId('team-add-button');
+    expect(screen.getByTestId('team-sample-notice')).toBeInTheDocument();
   });
 
   it('opens the add form and comes back on cancel', async () => {

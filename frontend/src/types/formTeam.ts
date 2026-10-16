@@ -11,11 +11,13 @@ export type TeamMember = {
   groups: string[];
 };
 
-/** A user found by the add-member search, not yet on the team. */
+/** A user found by the add-member search. */
 export type UserSearchResult = {
   id: string;
   firstName: string;
   lastName: string;
   email: string;
   identityProvider: string;
+  /** Already on the form's team. They cannot be added again; their groups change through Edit. */
+  onTeam: boolean;
 };
