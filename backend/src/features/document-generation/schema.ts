@@ -37,7 +37,16 @@ export const PrintBodySchema = z
   .openapi('DocumentGeneration_PrintBody');
 
 const SubmissionTemplatesSchema = z
-  .object({ items: z.array(z.object({ id: z.uuid(), name: z.string() })) })
+  .object({
+    items: z.array(
+      z.object({
+        id: z.uuid(),
+        name: z.string(),
+        filename: z.string(),
+        createdAt: z.iso.datetime(),
+      }),
+    ),
+  })
   .openapi('DocumentGeneration_SubmissionTemplates');
 
 const accessResponses = {
@@ -105,6 +114,65 @@ export function registerDocumentGenerationOpenApi(registry: OpenAPIRegistry) {
     responses: {
       ...documentResponses,
       422: { description: 'Template could not be rendered, or the submission has no saved data' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: `${BASE}/print/upload`,
+    tags: [tag],
+    security: PUBLIC_SECURITY,
+    summary: "Render a document from an uploaded template and the submission's persisted data",
+    request: {
+      params: SubmissionIdParamSchema,
+      body: {
+        required: true,
+        content: {
+          'multipart/form-data': {
+            schema: z.object({ file: z.string().openapi({ format: 'binary' }) }),
+          },
+        },
+      },
+    },
+    responses: {
+      ...documentResponses,
+      413: { description: 'Template file too large' },
+      415: { description: 'Template file type not accepted' },
+      422: {
+        description:
+          'Template could not be rendered, failed the virus scan, or the submission has no saved data',
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: `${BASE}/preview/upload`,
+    tags: [tag],
+    security: PUBLIC_SECURITY,
+    summary: 'Render a document from an uploaded template and live (on-screen) submission data',
+    request: {
+      params: SubmissionIdParamSchema,
+      body: {
+        required: true,
+        content: {
+          'multipart/form-data': {
+            schema: z.object({
+              file: z.string().openapi({ format: 'binary' }),
+              data: z
+                .string()
+                .optional()
+                .openapi({ description: 'The answers, as a JSON object.' }),
+            }),
+          },
+        },
+      },
+    },
+    responses: {
+      ...documentResponses,
+      413: { description: 'Template file too large' },
+      415: { description: 'Template file type not accepted' },
+      422: { description: 'Template could not be rendered, or failed the virus scan' },
     },
   });
 }

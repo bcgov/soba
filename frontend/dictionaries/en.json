@@ -373,6 +373,21 @@
       "actionsColumn": "Actions",
       "types": {
         "cdogs": "CDOGS"
+      },
+      "print": {
+        "button": "Print",
+        "modalTitle": "Print Submission",
+        "browserTab": "Browser Print",
+        "templateTab": "Template Print",
+        "print": "Print",
+        "printing": "Printing…",
+        "sourceLabel": "Template",
+        "uploadOption": "Upload CDOGS template",
+        "defaultOption": "Use default CDOGS template",
+        "fileNameColumn": "File Name",
+        "uploadDateColumn": "Upload Date",
+        "failed": "Failed to generate the document.",
+        "unprocessable": "The document could not be generated from this template."
       }
     },
     "descriptionLabel": "Description",

@@ -33,6 +33,9 @@ jest.mock('../../../src/core/db/repos/documentTemplateRepo', () => ({
 jest.mock('../../../src/core/services/fileStore', () => ({
   fileStore: { open: jest.fn() },
 }));
+jest.mock('../../../src/core/services/scanUpload', () => ({
+  scanUpload: jest.fn(),
+}));
 
 import { documentGenerationService } from '../../../src/features/document-generation/service';
 import * as submissionRepo from '../../../src/core/db/repos/submissionRepo';
@@ -45,6 +48,7 @@ import * as availability from '../../../src/core/services/featureAvailabilitySer
 import * as auditRepo from '../../../src/core/db/repos/documentGenerationAuditRepo';
 import * as templateRepo from '../../../src/core/db/repos/documentTemplateRepo';
 import { fileStore } from '../../../src/core/services/fileStore';
+import { scanUpload } from '../../../src/core/services/scanUpload';
 import { Readable } from 'node:stream';
 import { ServiceUnavailableError } from '../../../src/core/errors';
 import { HttpClientError } from '../../../src/core/http/httpClient';
@@ -64,6 +68,8 @@ const isFeatureAvailable = availability.isFeatureAvailable as unknown as jest.Mo
 const createAudit = auditRepo.createDocumentGenerationAudit as unknown as jest.Mock;
 const getLiveTemplate = templateRepo.getLiveDocumentTemplate as unknown as jest.Mock;
 const openFile = fileStore.open as unknown as jest.Mock;
+const scanUploadMock = scanUpload as unknown as jest.Mock;
+const listLiveTemplates = templateRepo.listLiveDocumentTemplates as unknown as jest.Mock;
 
 const caller = { actorId: 'user-1', idpCode: 'idir' };
 const scope = { workspaceId: 'ws-1', formId: 'form-1', formVersionId: 'fv-1' };
@@ -108,6 +114,7 @@ beforeEach(() => {
   createAdapter.mockReturnValue({ render: renderMock });
   getContentMock.mockResolvedValue({ data: { field: 'saved' } });
   createAudit.mockResolvedValue(undefined);
+  scanUploadMock.mockResolvedValue('clean');
 });
 
 describe('documentGenerationService.preview', () => {
@@ -365,5 +372,109 @@ describe('documentGenerationService audit', () => {
     await documentGenerationService.print(caller, { submissionId: 's1', templateId });
 
     expect(createAudit).not.toHaveBeenCalled();
+  });
+});
+
+describe('documentGenerationService.listTemplates', () => {
+  it('lists each template with its file name and upload date', async () => {
+    holdsGrant.mockResolvedValue(true);
+    const createdAt = new Date('2026-01-02T03:04:05.000Z');
+    listLiveTemplates.mockResolvedValue([
+      {
+        template: { id: templateId, name: 'Receipt' },
+        file: { filename: 'receipt.docx', createdAt },
+      },
+    ]);
+    const outcome = await documentGenerationService.listTemplates(caller, 's1');
+    expect(outcome).toEqual({
+      status: 'ok',
+      templates: [
+        {
+          id: templateId,
+          name: 'Receipt',
+          filename: 'receipt.docx',
+          createdAt: '2026-01-02T03:04:05.000Z',
+        },
+      ],
+    });
+  });
+});
+
+describe('documentGenerationService.printUpload', () => {
+  const input = {
+    submissionId: 's1',
+    template: { content: Buffer.from('uploaded'), fileType: 'docx' as const, filename: 't.docx' },
+  };
+
+  it('renders the persisted answers with the uploaded template and stores nothing', async () => {
+    holdsGrant.mockResolvedValue(true);
+    const outcome = await documentGenerationService.printUpload(caller, input);
+    expect(outcome).toMatchObject({ status: 'ok', code: 'cdogs-v2' });
+    expect(getLiveTemplate).not.toHaveBeenCalled();
+    expect(renderMock).toHaveBeenCalledWith({
+      template: { content: Buffer.from('uploaded'), fileType: 'docx' },
+      options: {},
+      data: { data: { field: 'saved' } },
+    });
+  });
+
+  it('denies a caller who is not a participant before scanning', async () => {
+    holdsGrant.mockResolvedValue(false);
+    const outcome = await documentGenerationService.printUpload(caller, input);
+    expect(outcome.status).toBe('denied');
+    expect(scanUploadMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['infected', 'scan-unavailable'])(
+    'refuses a template the scan returns %s for',
+    async (verdict) => {
+      holdsGrant.mockResolvedValue(true);
+      scanUploadMock.mockResolvedValue(verdict);
+      const outcome = await documentGenerationService.printUpload(caller, input);
+      expect(outcome.status).toBe(verdict);
+      expect(renderMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('is no-content when the submission has no persisted data', async () => {
+    holdsGrant.mockResolvedValue(true);
+    getContentMock.mockResolvedValue(null);
+    const outcome = await documentGenerationService.printUpload(caller, input);
+    expect(outcome.status).toBe('no-content');
+  });
+});
+
+describe('documentGenerationService.previewUpload', () => {
+  const input = {
+    submissionId: 's1',
+    template: { content: Buffer.from('uploaded'), fileType: 'docx' as const, filename: 't.docx' },
+    data: { field: 'live' },
+  };
+
+  it('renders the live data with the uploaded template, without reading saved answers', async () => {
+    holdsGrant.mockResolvedValue(true);
+    const outcome = await documentGenerationService.previewUpload(caller, input);
+    expect(outcome).toMatchObject({ status: 'ok', code: 'cdogs-v2' });
+    expect(getContentMock).not.toHaveBeenCalled();
+    expect(renderMock).toHaveBeenCalledWith({
+      template: { content: Buffer.from('uploaded'), fileType: 'docx' },
+      options: {},
+      data: { field: 'live' },
+    });
+  });
+
+  it('denies a caller who is not a participant before scanning', async () => {
+    holdsGrant.mockResolvedValue(false);
+    const outcome = await documentGenerationService.previewUpload(caller, input);
+    expect(outcome.status).toBe('denied');
+    expect(scanUploadMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses an infected template', async () => {
+    holdsGrant.mockResolvedValue(true);
+    scanUploadMock.mockResolvedValue('infected');
+    const outcome = await documentGenerationService.previewUpload(caller, input);
+    expect(outcome.status).toBe('infected');
+    expect(renderMock).not.toHaveBeenCalled();
   });
 });

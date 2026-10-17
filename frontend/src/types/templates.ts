@@ -4,5 +4,6 @@ export {
   TEMPLATE_TYPES,
   templateExtensionsText,
   templateFileAccept,
+  templateFileTypeFor,
 } from '@soba/lib';
 export type { TemplateListResponse, TemplateResponse, TemplateType } from '@soba/lib';
