@@ -4,6 +4,7 @@ import {
   resolveDefaultDocumentGenerationCode,
 } from '../../core/integrations/document-generation/DocumentGenerationRegistry';
 import { getFeatureGateCached } from '../../core/db/repos/featureRepo';
+import { findInOrder } from '../../core/inOrder';
 import { isFeatureAvailable } from '../../core/services/featureAvailabilityService';
 import {
   DocumentGenerationMode,
@@ -165,14 +166,14 @@ async function resolveBackendCode(scope: ResolvedScope): Promise<string | null> 
 
   // A granted scoped backend overrides the default. With more than one scoped backend the first in
   // registration order wins — add an explicit priority before a second scoped backend is installed.
-  for (const def of definitions) {
-    if (def.code === defaultCode || !def.featureCode) continue;
+  const scopedCode = await findInOrder(definitions, async (def) => {
+    if (def.code === defaultCode || !def.featureCode) return undefined;
     const gate = await getFeatureGateCached(def.featureCode, Date.now());
-    const isScopedBackend = gate?.availability === FeatureAvailability.scoped;
-    if (isScopedBackend && (await isFeatureAvailable(def.featureCode, scope))) {
-      return def.code;
-    }
-  }
+    if (gate?.availability !== FeatureAvailability.scoped) return undefined;
+    const available = await isFeatureAvailable(def.featureCode, scope);
+    return available ? def.code : undefined;
+  });
+  if (scopedCode) return scopedCode;
 
   // Fall back to the configured default — but only if it is actually installed, so a stale/typo'd
   // DOCUMENT_GENERATION_DEFAULT_CODE surfaces as unavailable rather than an adapter-lookup 500.

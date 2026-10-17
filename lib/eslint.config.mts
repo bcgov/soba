@@ -4,7 +4,14 @@ import tseslint from 'typescript-eslint';
 import json from '@eslint/json';
 import pluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 import sonarjs from 'eslint-plugin-sonarjs';
+import unicorn from 'eslint-plugin-unicorn';
 import { defineConfig, globalIgnores } from 'eslint/config';
+import { sonarParityRules, sonarParityTestRules } from '../eslint.sonar-parity.mjs';
+
+const TEST_FILES = ['tests/**/*.test.ts'];
+const typeInformation = {
+  parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+};
 
 export default defineConfig([
   {
@@ -17,7 +24,15 @@ export default defineConfig([
   tseslint.configs.recommended,
   { files: ['**/*.json'], plugins: { json }, language: 'json/json', extends: ['json/recommended'] },
   {
-    // Minimal SonarCloud parity for the smells that have bitten us, at Sonar Way thresholds.
+    files: ['src/**/*.ts', 'tests/**/*.ts'],
+    ignores: TEST_FILES,
+    plugins: { sonarjs, unicorn },
+    languageOptions: typeInformation,
+    rules: { ...sonarjs.configs.recommended.rules, ...sonarParityRules },
+  },
+  { files: TEST_FILES, languageOptions: typeInformation, rules: sonarParityTestRules },
+  {
+    // Sonar Way thresholds; after the recommended set so these settings win.
     files: ['**/*.{ts,mts,cts}'],
     plugins: { sonarjs },
     rules: {

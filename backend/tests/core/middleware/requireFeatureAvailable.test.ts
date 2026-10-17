@@ -15,8 +15,8 @@ const runGuard = (
   middleware: ReturnType<typeof requireFeatureAvailable>,
   req: Partial<Request>,
 ): Promise<unknown> =>
-  new Promise((resolve) => {
-    middleware(req as Request, {} as Response, (err?: unknown) => resolve(err));
+  new Promise((resolve, reject) => {
+    middleware(req as Request, {} as Response, (err?: unknown) => resolve(err)).catch(reject);
   });
 
 describe('requireFeatureAvailable', () => {

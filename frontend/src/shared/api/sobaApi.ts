@@ -4,7 +4,6 @@ import { getSobaApiBaseUrl } from '../config/runtimeConfig';
 import { parseJson } from './sobaHelpers';
 import { sobaFetch } from './sobaFetch';
 
-import type { SobaFormType } from '../../types/forms';
 import type {
   WorkspaceItem,
   WorkspacesResponse,
@@ -18,7 +17,9 @@ import type { LoginProvidersMetaResponse } from '@soba/lib';
 import type { ListQueryArgs } from '../../types/list';
 import { sortLocaleHeaders } from './sortLocaleRequest';
 
-export type { SobaFormType, WorkspaceItem, WorkspacesResponse, CurrentUserResponse };
+export type { SobaFormType } from '../../types/forms';
+export type { WorkspaceItem, WorkspacesResponse } from '../../types/workspaces';
+export type { CurrentUserResponse } from '../../types/user';
 // Design-mode (staff, /design/*)
 export {
   createSobaFormioForm,

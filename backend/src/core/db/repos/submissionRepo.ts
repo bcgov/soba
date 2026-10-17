@@ -200,9 +200,7 @@ export const findLiveSubmissionRecord = async (
  * concurrent double-opens are race-safe: the loser inserts nothing, falls through to the select, and
  * sees the winner's committed row. A taken id reports what holds it.
  */
-export const openSubmission = async (
-  input: CreateSubmissionInput,
-): Promise<OpenSubmissionResult> => {
+export const openSubmission = (input: CreateSubmissionInput): Promise<OpenSubmissionResult> => {
   return db.transaction(async (tx) => {
     const [created] = await tx
       .insert(submissions)
@@ -755,7 +753,7 @@ const demoteHead = async (
  * orphaned. The caller's own write of the same event, already recorded under the revision id, is
  * answered as replayed; another write under the id fails on the revision's primary key.
  */
-export const appendSubmissionRevision = async (
+export const appendSubmissionRevision = (
   input: SaveSubmissionInput,
 ): Promise<AppendSubmissionRevisionResult> => {
   return db.transaction(async (tx) => {

@@ -85,8 +85,8 @@ import { findSubmitterSubmission } from '../../../core/db/repos/submitterSubmiss
 import { isSubmitterAllowed, SubmitterOperation } from '../../../core/services/submitterAccess';
 import { toSubmissionDto } from '../../../core/api/submissions/serviceFactory';
 import { ValidationError } from '../../../core/errors';
+import { mapInOrder } from '../../../core/inOrder';
 import { getDraftSaveStatus } from '../../form-settings/submitter/drafts';
-import { inSequence } from '../inSequence';
 import { findActiveManifest } from '../runs';
 import {
   DESIGN_CHECKS,
@@ -1012,7 +1012,7 @@ export async function checkCoverage(manifest: CoverageManifest): Promise<Coverag
     lookupInconsistencies(manifest),
     signInInconsistencies(manifest),
   ]);
-  const checked = await inSequence(personas, async (persona) => {
+  const checked = await mapInOrder(personas, async (persona) => {
     const caller = callerOf(manifest, persona);
     const [forms, design, workspaces, submissions] = await Promise.all([
       checkForms(manifest, caller),

@@ -2,6 +2,13 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import nextVitals from 'eslint-config-next/core-web-vitals';
 import nextTs from 'eslint-config-next/typescript';
 import sonarjs from 'eslint-plugin-sonarjs';
+import unicorn from 'eslint-plugin-unicorn';
+import { sonarParityRules, sonarParityTestRules } from '../eslint.sonar-parity.mjs';
+
+const TEST_FILES = ['**/*.test.{ts,tsx}'];
+const typeInformation = {
+  parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+};
 
 const RESOURCE_HOOKS_MESSAGE =
   'Read and write data through a resource hook (src/shared/api or a feature data/ folder), not this module directly.';
@@ -37,13 +44,25 @@ const eslintConfig = defineConfig([
     // Generated ESLint bulk-suppressions baseline; not hand-edited, so don't lint it.
     'eslint-suppressions.json',
   ]),
+  {
+    files: ['**/*.{ts,tsx,mts}'],
+    ignores: TEST_FILES,
+    plugins: { sonarjs, unicorn },
+    languageOptions: typeInformation,
+    rules: {
+      ...sonarjs.configs.recommended.rules,
+      ...sonarParityRules,
+      'react/no-unused-prop-types': 'error',
+    },
+  },
+  { files: TEST_FILES, languageOptions: typeInformation, rules: sonarParityTestRules },
   // Disallow console in app code. Error logging goes through useNotificationStore's
   // `consoleError` option (the single sanctioned logging sink).
   {
     plugins: { sonarjs },
     rules: {
       'no-console': 'error',
-      // Minimal SonarCloud parity for the smells that have bitten us, at Sonar Way thresholds.
+      // Sonar Way thresholds; after the recommended set so these settings win.
       'sonarjs/cognitive-complexity': ['error', 15],
       'sonarjs/no-duplicate-string': ['error', { threshold: 3 }],
       // S3358: ternary operators should not be nested.

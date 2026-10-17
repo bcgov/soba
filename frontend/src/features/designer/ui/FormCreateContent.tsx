@@ -155,7 +155,7 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
     <Form
       onSubmit={(e) => {
         e.preventDefault();
-        saveForm();
+        void saveForm();
       }}
       className="d-flex flex-column gap-3 mb-3"
       style={{ maxWidth: '640px' }}

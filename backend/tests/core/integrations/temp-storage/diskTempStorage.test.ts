@@ -53,13 +53,14 @@ describe('diskTempStorage', () => {
 
   it('ping resolves false when the base dir cannot be created', async () => {
     // A regular file as the parent makes mkdir fail (ENOTDIR).
-    const file = path.join(os.tmpdir(), `soba-notadir-${randomUUID()}`);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'soba-notadir-'));
+    const file = path.join(dir, 'file');
     fs.writeFileSync(file, 'x');
     try {
       const adapter = createDiskTempStorageAdapter(path.join(file, 'sub'));
       await expect(adapter.ping()).resolves.toBe(false);
     } finally {
-      fs.rmSync(file, { force: true });
+      fs.rmSync(dir, { recursive: true, force: true });
     }
   });
 

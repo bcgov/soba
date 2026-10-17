@@ -302,6 +302,7 @@
     "ministryOrOrg": "Ministère / Organisation",
     "copy": "Copier Lien",
     "copiedNotification": "Copié dans le presse-papiers",
+    "copyFailedNotification": "Impossible de copier dans le presse-papiers",
     "newVersionFrom": "Nouvelle Version De",
     "emptyHistory": "Aucune version précédente",
     "loadVersionsError": "Échec du chargement de l'historique des versions.",

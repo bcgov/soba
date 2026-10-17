@@ -40,9 +40,9 @@ function buildQueryString(query?: FormioQuery): string {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type FormioForm = any;
+type FormioForm = Record<string, any>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type FormioSubmission = any;
+type FormioSubmission = Record<string, any>;
 
 export interface FormioCommunityEditionAPIv5Options {
   baseUrl: string;
@@ -80,39 +80,36 @@ export class FormioCommunityEditionAPIv5Client {
   async login(budget = this.budget()): Promise<void> {
     const body = JSON.stringify({ data: { email: this.username, password: this.password } });
     const loginPaths = ['/admin/login', '/user/login'];
-    let lastError: Error | null = null;
-    for (const path of loginPaths) {
-      const url = `${this._baseUrl}${path}`;
+    // In order, stopping at the first path that logs in.
+    const tryPath = async (index: number, lastError: Error | null): Promise<string> => {
+      if (index === loginPaths.length) throw lastError ?? new Error('Formio login failed');
+      const url = `${this._baseUrl}${loginPaths[index]}`;
+      const init = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: budget,
+      };
       let res: Response;
       let text: string;
       try {
-        res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body,
-          signal: budget,
-        });
+        res = await fetch(url, init);
         text = await res.text();
       } catch (err) {
         if (budget.aborted) throw timedOut('login');
-        lastError = new Error(
-          `Formio login request failed: ${err instanceof Error ? err.message : err}`,
-        );
-        continue;
+        const message = err instanceof Error ? err.message : err;
+        return tryPath(index + 1, new Error(`Formio login request failed: ${message}`));
       }
       if (!res.ok) {
-        lastError = new Error(`Formio login failed ${res.status}: ${text}`);
-        continue;
+        return tryPath(index + 1, new Error(`Formio login failed ${res.status}: ${text}`));
       }
       const jwt = res.headers.get('x-jwt-token');
       if (!jwt) {
-        lastError = new Error('Formio login response missing x-jwt-token header');
-        continue;
+        return tryPath(index + 1, new Error('Formio login response missing x-jwt-token header'));
       }
-      this.token = jwt;
-      return;
-    }
-    throw lastError ?? new Error('Formio login failed');
+      return jwt;
+    };
+    this.token = await tryPath(0, null);
   }
 
   getToken(): string | null {

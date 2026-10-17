@@ -15,10 +15,10 @@ import React from 'react';
 export default async function RootLayout({
   children,
   params,
-}: {
+}: Readonly<{
   children: React.ReactNode;
   params: Promise<{ lang: string }>;
-}) {
+}>) {
   const { lang } = await params;
   // Every first path segment routes here, including /robots.txt and scanner traffic. The dictionary
   // is a lookup over the known locales, so an unchecked value throws and the request 500s.

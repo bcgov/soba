@@ -73,8 +73,8 @@ async function fetchFeaturesMetaOnce(): Promise<FeaturesMetaPayload> {
  * still throws and is caught by the root error boundary rather than degrading to "no features",
  * which would render as a misconfigured app instead of an unavailable one.
  */
-async function fetchFeaturesMeta(): Promise<FeaturesMetaPayload> {
-  for (let attempt = 1; ; attempt += 1) {
+function fetchFeaturesMeta(): Promise<FeaturesMetaPayload> {
+  const tryAttempt = async (attempt: number): Promise<FeaturesMetaPayload> => {
     try {
       return await fetchFeaturesMetaOnce();
     } catch (error) {
@@ -82,8 +82,10 @@ async function fetchFeaturesMeta(): Promise<FeaturesMetaPayload> {
         throw error;
       }
       await delay(RETRY_DELAY_MS * attempt);
+      return tryAttempt(attempt + 1);
     }
-  }
+  };
+  return tryAttempt(1);
 }
 
 // Server: memoised per render, so nested layouts and pages share one fetch and the next request

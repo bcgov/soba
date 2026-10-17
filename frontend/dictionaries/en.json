@@ -301,6 +301,7 @@
     "ministryOrOrg": "Ministry / Organization",
     "copy": "Copy URL",
     "copiedNotification": "Copied to clipboard",
+    "copyFailedNotification": "Could not copy to the clipboard",
     "newVersionFrom": "New Version From",
     "emptyHistory": "No Previous Versions",
     "loadVersionsError": "Failed to load version history.",

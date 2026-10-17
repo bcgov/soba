@@ -13,8 +13,8 @@ COPY lib ./lib
 
 RUN pnpm install --filter ./lib --frozen-lockfile && pnpm install --filter ./backend... --frozen-lockfile
 
-# copy entire repo and build backend
-COPY . .
+# copy backend source and build it
+COPY backend ./backend
 # OpenShift / arbitrary UID: run non-root; g=u lets assigned user (often gid 0) read /app
 RUN pnpm --filter ./backend run build && chgrp -R 0 /app && chmod -R g=u /app
 
