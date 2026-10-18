@@ -5,20 +5,23 @@ import { Tab, Tabs } from 'react-bootstrap';
 import { Button, InlineAlert } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { Modal } from '@/src/components/Modal';
-import { useKeycloak } from '@/lib/hooks/useKeycloak';
-import { messageForDataError } from '@/src/shared/api/dataError';
-import { templateFileTypeFor } from '@/src/types/templates';
-import { printWithStoredTemplate, printWithUploadedTemplate } from '../data/printApi';
+import { classifyDataError, messageForDataError } from '@/src/shared/api/dataError';
+import { useAuthErrorDefaults } from '@/src/shared/api/useDataErrorNotice';
+import { templateFileTypeFor, type PrintOptions } from '@/src/types/templates';
 import { saveBlob } from '../data/saveBlob';
-import { useSubmissionTemplates } from '../data/useSubmissionTemplates';
-import { printErrorText } from '../printError';
+import type { StaffPrintOptions, SubmissionPrint } from '../data/useSubmissionPrint';
+import { printFailureMessages } from '../printError';
+import { printFileName } from '../printFileName';
 import { TemplatePrintOptions, type TemplateSource } from './TemplatePrintOptions';
 
 type PrintMethod = 'browser' | 'template';
 
 type PrintSubmissionModalProps = {
   show: boolean;
-  submissionId: string;
+  staff: StaffPrintOptions;
+  printTemplate: SubmissionPrint['printTemplate'];
+  /** The download's name, without an extension. */
+  baseName: string;
   onBrowserPrint: () => void;
   onClose: () => void;
 };
@@ -26,14 +29,15 @@ type PrintSubmissionModalProps = {
 /** Lets the user choose between the browser's print and a document template print. */
 export function PrintSubmissionModal({
   show,
-  submissionId,
+  staff,
+  printTemplate,
+  baseName,
   onBrowserPrint,
   onClose,
 }: Readonly<PrintSubmissionModalProps>) {
   const dict = useDictionary();
   const text = dict.form.templates;
-  const { token } = useKeycloak();
-  const { templates, isLoading, error: loadError } = useSubmissionTemplates(submissionId);
+  const authDefaults = useAuthErrorDefaults();
 
   const [method, setMethod] = useState<PrintMethod>('browser');
   const [pickedSource, setPickedSource] = useState<TemplateSource | null>(null);
@@ -42,8 +46,7 @@ export function PrintSubmissionModal({
   const [printing, setPrinting] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
 
-  // A form version holds at most one CDOGS template, so the first is the default.
-  const defaultTemplate = templates[0] ?? null;
+  const defaultTemplate = staff.template;
   const source: TemplateSource =
     pickedSource === 'upload' || !defaultTemplate ? 'upload' : 'default';
 
@@ -65,7 +68,7 @@ export function PrintSubmissionModal({
     setFileError(null);
   };
 
-  const templateReady = !isLoading && (source === 'default' || file !== null);
+  const templateReady = !staff.error && (source === 'default' || file !== null);
   const canPrint = !printing && (method === 'browser' || templateReady);
 
   const print = async () => {
@@ -75,24 +78,19 @@ export function PrintSubmissionModal({
     }
     setPrinting(true);
     setPrintError(null);
+    const options: PrintOptions = { convertTo: 'pdf', reportName: baseName };
     try {
-      if (source === 'upload' && file) {
-        const blob = await printWithUploadedTemplate(token, submissionId, file);
-        saveBlob(blob, file.name);
-      } else if (defaultTemplate) {
-        const blob = await printWithStoredTemplate(token, submissionId, defaultTemplate.id);
-        saveBlob(blob, defaultTemplate.filename);
-      }
+      const rendered =
+        source === 'upload' && file
+          ? await staff.printUploaded(file, options)
+          : await printTemplate(options);
+      saveBlob(rendered, printFileName(baseName, rendered));
       onClose();
-    } catch (e: unknown) {
+    } catch (cause: unknown) {
       setPrintError(
-        printErrorText(e, {
-          failed: text.print.failed,
-          unprocessable: text.print.unprocessable,
-          tooLarge: text.uploadTooLarge,
-          wrongType: text.uploadWrongType,
-          sessionExpired: dict.general.sessionExpired,
-          forbidden: dict.general.noAccess,
+        messageForDataError(classifyDataError(cause), {
+          ...authDefaults,
+          ...printFailureMessages(cause, dict.apiErrors, text.print.failed),
         }),
       );
     } finally {
@@ -100,12 +98,8 @@ export function PrintSubmissionModal({
     }
   };
 
-  const loadErrorText = loadError
-    ? messageForDataError(loadError, {
-        sessionExpired: dict.general.sessionExpired,
-        forbidden: dict.general.noAccess,
-        failed: text.loadError,
-      })
+  const loadErrorText = staff.error
+    ? messageForDataError(staff.error, { ...authDefaults, failed: text.loadError })
     : null;
 
   return (
@@ -148,8 +142,7 @@ export function PrintSubmissionModal({
         </Tab>
         <Tab eventKey="template" title={text.print.templateTab}>
           <TemplatePrintOptions
-            templates={templates}
-            isLoading={isLoading}
+            template={defaultTemplate}
             loadError={loadErrorText}
             source={source}
             onSourceChange={pickSource}

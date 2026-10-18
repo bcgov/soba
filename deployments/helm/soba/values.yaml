@@ -299,7 +299,7 @@ frontend:
       routePath: /designer
     forms:
       enabled: true
-      featuresAllowed: "submit-mode,files,meta"
+      featuresAllowed: "submit-mode,files,meta,templates"
       routePath: /forms
 
 # -- Database (external Postgres) -----------------------------------------

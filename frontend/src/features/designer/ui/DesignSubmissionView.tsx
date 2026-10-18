@@ -7,6 +7,8 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { usePageHeading } from '@/src/components/PageHeader';
 import { SubmissionLoadAlert } from '@/src/features/submissions/ui/SubmissionLoadAlert';
 import { useDesignSubmission } from '@/src/features/designer/data/useDesignSubmission';
+import { useStaffPrint } from '@/src/features/templates/data/useSubmissionPrint';
+import { printBaseName } from '@/src/features/templates/printFileName';
 import { PrintSubmissionButton } from '@/src/features/templates/ui/PrintSubmissionButton';
 import { SubmissionReview } from './SubmissionReview';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
@@ -26,6 +28,7 @@ export function DesignSubmissionView({
   const locale = getLocaleFromPath(usePathname());
 
   const { data, error } = useDesignSubmission(submissionId, formId);
+  const print = useStaffPrint(formId, submissionId);
 
   usePageHeading({ heading: dict.submission.review.heading });
 
@@ -55,7 +58,7 @@ export function DesignSubmissionView({
         </Link>
         {data ? (
           <div className="ms-auto">
-            <PrintSubmissionButton submissionId={submissionId} />
+            <PrintSubmissionButton print={print} baseName={printBaseName(data.submission)} />
           </div>
         ) : null}
       </div>

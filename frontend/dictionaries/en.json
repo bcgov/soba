@@ -386,8 +386,7 @@
         "defaultOption": "Use default CDOGS template",
         "fileNameColumn": "File Name",
         "uploadDateColumn": "Upload Date",
-        "failed": "Failed to generate the document.",
-        "unprocessable": "The document could not be generated from this template."
+        "failed": "Failed to generate the document."
       }
     },
     "descriptionLabel": "Description",

@@ -2,18 +2,17 @@
 
 import { useId, useMemo } from 'react';
 import { InlineAlert, Radio, RadioGroup } from '@bcgov/design-system-react-components';
-import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import { templateExtensionsText, templateFileAccept } from '@/src/types/templates';
-import type { SubmissionTemplate } from '../data/printApi';
+import type { StaffPrintTemplate } from '../data/useSubmissionPrint';
 
 export type TemplateSource = 'upload' | 'default';
 
 type TemplatePrintOptionsProps = Readonly<{
-  templates: SubmissionTemplate[];
-  isLoading: boolean;
+  /** The form version's stored template, when there is one to print with. */
+  template: StaffPrintTemplate | null;
   loadError: string | null;
   source: TemplateSource;
   onSourceChange: (source: TemplateSource) => void;
@@ -24,8 +23,7 @@ type TemplatePrintOptionsProps = Readonly<{
 
 /** The template print options: a one-off template upload, or the form version's own template. */
 export function TemplatePrintOptions({
-  templates,
-  isLoading,
+  template,
   loadError,
   source,
   onSourceChange,
@@ -39,19 +37,17 @@ export function TemplatePrintOptions({
   const fileInputId = useId();
   const typesId = useId();
 
-  const columns: Column<SubmissionTemplate>[] = useMemo(
+  const columns: Column<StaffPrintTemplate>[] = useMemo(
     () => [
       { key: 'filename', label: text.print.fileNameColumn },
       {
         key: 'createdAt',
         label: text.print.uploadDateColumn,
-        render: (template) => formatLongDate(template.createdAt),
+        render: (row) => formatLongDate(row.createdAt),
       },
     ],
     [text.print.fileNameColumn, text.print.uploadDateColumn, formatLongDate],
   );
-
-  if (isLoading) return <CenteredProgress label={dict.general.loading} />;
 
   return (
     <div data-testid="print-submission-template-tab">
@@ -69,7 +65,7 @@ export function TemplatePrintOptions({
         <Radio value="upload" data-testid="print-template-source-upload">
           {text.print.uploadOption}
         </Radio>
-        {templates.length > 0 ? (
+        {template ? (
           <Radio value="default" data-testid="print-template-source-default">
             {text.print.defaultOption}
           </Radio>
@@ -102,11 +98,11 @@ export function TemplatePrintOptions({
         </div>
       ) : (
         <div className="mt-3" data-testid="print-template-default-table">
-          <DataTable<SubmissionTemplate>
-            data={templates}
+          <DataTable<StaffPrintTemplate>
+            data={template ? [template] : []}
             columns={columns}
             caption={text.print.defaultOption}
-            keyExtractor={(template) => template.id}
+            keyExtractor={(row) => row.id}
           />
         </div>
       )}

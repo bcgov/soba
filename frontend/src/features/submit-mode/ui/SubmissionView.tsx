@@ -8,6 +8,8 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { SubmissionDetail } from '@/src/features/submissions/ui/SubmissionDetail';
 import { SubmissionLoadAlert } from '@/src/features/submissions/ui/SubmissionLoadAlert';
 import { useSubmitSubmission } from '@/src/features/submit-mode/data/useSubmitSubmission';
+import { useSubmitterPrint } from '@/src/features/templates/data/useSubmissionPrint';
+import { printBaseName } from '@/src/features/templates/printFileName';
 import { PrintSubmissionButton } from '@/src/features/templates/ui/PrintSubmissionButton';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 
@@ -24,6 +26,7 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
     typeof submissionIdRaw === 'string' ? decodeURIComponent(submissionIdRaw) : '';
 
   const { data, isLoading, error } = useSubmitSubmission(submissionId);
+  const print = useSubmitterPrint(submissionId);
 
   const renderContent = () => {
     // A failed background revalidation keeps the submission already on screen.
@@ -39,7 +42,7 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
         <div className="mb-3 d-flex align-items-center gap-2">
           {link}
           <div className="ms-auto">
-            <PrintSubmissionButton submissionId={submissionId} />
+            <PrintSubmissionButton print={print} baseName={printBaseName(data.submission)} />
           </div>
         </div>
       );

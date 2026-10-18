@@ -1,53 +1,69 @@
 import { sobaFetch } from '@/src/shared/api/sobaFetch';
-import { ApiError, parseJson } from '@/src/shared/api/sobaHelpers';
+import { parseJson } from '@/src/shared/api/sobaHelpers';
+import type { PrintOptions, StaffPrintFacts, SubmissionPrintFacts } from '@/src/types/templates';
 
-/** A template the caller may render from a submission. */
-export type SubmissionTemplate = {
-  id: string;
-  name: string;
-  filename: string;
-  createdAt: string;
-};
+/** Which API a print goes through: the submitter's, or the staff design surface. */
+export type PrintSurface = 'submit' | 'design';
 
-const submissionPath = (submissionId: string) => `/submit/submissions/${submissionId}`;
+const submissionPath = (surface: PrintSurface, submissionId: string) =>
+  `/${surface}/submissions/${submissionId}`;
 
+/** The rendered document. A refused render throws its ApiError, with the server's code. */
 async function documentBlob(response: Response): Promise<Blob> {
-  if (!response.ok) throw new ApiError(`Request failed (${response.status})`, response.status);
+  if (!response.ok) await parseJson(response);
   return response.blob();
 }
 
-/** The templates the caller may render from the submission. The token is optional (anonymous). */
-export async function listSubmissionTemplates(
+/** The submission's stored template and whether it can render, signed in or not. */
+export async function getSubmitterPrintFacts(
   token: string | undefined,
   submissionId: string,
-): Promise<SubmissionTemplate[]> {
-  const response = await sobaFetch(`${submissionPath(submissionId)}/templates`, { token });
-  return (await parseJson<{ items: SubmissionTemplate[] }>(response)).items;
+): Promise<SubmissionPrintFacts> {
+  const response = await sobaFetch(`${submissionPath('submit', submissionId)}/templates`, {
+    token,
+  });
+  return parseJson(response);
+}
+
+/** The submission's stored templates and whether they can render, for staff. */
+export async function getStaffPrintFacts(
+  token: string,
+  submissionId: string,
+): Promise<StaffPrintFacts> {
+  const response = await sobaFetch(`${submissionPath('design', submissionId)}/templates`, {
+    token,
+  });
+  return parseJson(response);
 }
 
 /** The submission rendered with a template already on its form version. */
 export async function printWithStoredTemplate(
+  surface: PrintSurface,
   token: string | undefined,
   submissionId: string,
   templateId: string,
+  options: PrintOptions,
 ): Promise<Blob> {
-  const response = await sobaFetch(`${submissionPath(submissionId)}/print`, {
+  const response = await sobaFetch(`${submissionPath(surface, submissionId)}/print`, {
     token,
     method: 'POST',
-    json: { templateId },
+    json: { templateId, options },
   });
   return documentBlob(response);
 }
 
 /** The submission rendered with a template sent along with the request; nothing is stored. */
 export async function printWithUploadedTemplate(
-  token: string | undefined,
+  token: string,
   submissionId: string,
   file: File,
+  options: PrintOptions,
 ): Promise<Blob> {
   const form = new FormData();
+  if (options.convertTo) form.set('convertTo', options.convertTo);
+  if (options.reportName) form.set('reportName', options.reportName);
   form.set('file', file);
-  const response = await sobaFetch(`${submissionPath(submissionId)}/print/upload`, {
+  const response = await sobaFetch(`${submissionPath('design', submissionId)}/print/upload`, {
     token,
     method: 'POST',
     form,
