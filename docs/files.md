@@ -140,15 +140,14 @@ Rendering needs the `document-generation` and `templates` features:
 | route                                          | does                                                         |
 | ---------------------------------------------- | ------------------------------------------------------------ |
 | `GET /api/v1/submit/submissions/:id/templates` | lists the `cdogs` templates of the submission's form version |
-| `POST /api/v1/submit/submissions/:id/preview`  | renders `templateId` with the `data` in the body             |
 | `POST /api/v1/submit/submissions/:id/print`    | renders `templateId` with the saved submission               |
 
 These need access to the submission and `document_template_read`, and render only `cdogs`
-templates. `options` passes through to the backend (CDOGS `convertTo`, `reportName`). Preview and
-print are rate limited by `RATE_LIMIT_RENDER_*`. Each pod renders at most
-`DOCUMENT_GENERATION_MAX_CONCURRENT` (2) at a time and returns 503 beyond that. A template that
-cannot be rendered, or a print with no saved data, returns 422. An unavailable backend or missing
-template bytes return 503.
+templates. `options` passes through to the backend (CDOGS `convertTo`, `reportName`). Only saved
+answers print; printing unsaved ones needs a new route. Print is rate limited by
+`RATE_LIMIT_RENDER_*`. Each pod renders at most `DOCUMENT_GENERATION_MAX_CONCURRENT` (2) at a time
+and returns 503 beyond that. A template that cannot be rendered, or a print with no saved data,
+returns 422. An unavailable backend or missing template bytes return 503.
 
 ## Submit files (deprecated)
 

@@ -55,7 +55,7 @@ export interface SubmissionExpectation {
   upload: PersonaKey[];
   /** Deletes a file: the write rule before it is submitted, then submission_update with no grant. */
   fileDelete: PersonaKey[];
-  /** Prints or previews it: a grant and document_template_read. */
+  /** Prints it: a grant and document_template_read. */
   render: PersonaKey[];
   /** Deletes it: an owner grant, signed in, before it is submitted. */
   delete: PersonaKey[];

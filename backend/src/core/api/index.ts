@@ -57,13 +57,13 @@ designRouter.use(notFoundHandler);
 designRouter.use(coreErrorHandler);
 
 // Submit feature: submission open/save/submit + reads of an existing submission, plus file
-// attachments at /files (upload/download/delete) and document templates/preview/print, each
+// attachments at /files (upload/download/delete) and document templates/print, each
 // authorized by the submitter rules in @soba/lib. The files feature flag is enforced inside
 // filesDomain.router. Same routes as /files, mounted under submit for the Form.io file component.
 const submitRouter = express.Router();
 submitRouter.use('/', submitRoutes);
 submitRouter.use('/files', filesDomain.router);
-// Mounted after submitRoutes so only the fall-through actions (templates, preview, print) reach it;
+// Mounted after submitRoutes so only the fall-through actions (templates, print) reach it;
 // the document-generation and templates feature gates live inside the router.
 submitRouter.use('/submissions', documentGenerationDomain.router);
 submitRouter.use(notFoundHandler);

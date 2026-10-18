@@ -7,15 +7,10 @@ import { PrintSubmissionModal } from './PrintSubmissionModal';
 
 type PrintSubmissionButtonProps = {
   submissionId: string;
-  /** The on-screen answers to print instead of the saved ones. */
-  getLiveData?: () => Record<string, unknown>;
 };
 
 /** Opens the print options for a submission. */
-export function PrintSubmissionButton({
-  submissionId,
-  getLiveData,
-}: Readonly<PrintSubmissionButtonProps>) {
+export function PrintSubmissionButton({ submissionId }: Readonly<PrintSubmissionButtonProps>) {
   const dict = useDictionary();
   const [open, setOpen] = useState(false);
   const browserPrintPending = useRef(false);
@@ -41,7 +36,6 @@ export function PrintSubmissionButton({
         <PrintSubmissionModal
           show
           submissionId={submissionId}
-          getLiveData={getLiveData}
           onBrowserPrint={() => {
             browserPrintPending.current = true;
             setOpen(false);

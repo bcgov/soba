@@ -309,7 +309,7 @@ reads and deletes, and document generation make the same read and decide by the 
 | `write`: save, submit                                   | an active grant and `submission_create` on the form                                       |
 | `upload`: a file                                        | `write`, on an opened or draft submission                                                 |
 | `deleteFile`                                            | `write` on an opened or draft submission; once submitted, `submission_update` on the form |
-| `render`: print, preview, template list                 | an active grant and `document_template_read` on the form                                  |
+| `render`: print, template list                          | an active grant and `document_template_read` on the form                                  |
 | `delete`: the caller's own submission                   | a signed-in caller with an active owner grant                                             |
 
 Owners and collaborators have the same access, except that only an owner deletes. A submitter
@@ -318,9 +318,9 @@ and the rules the routes decide with; My Submissions applies them to each row an
 read with it (`canContinueSubmission`, `canDeleteOwnSubmission`), so a row offers Continue only when
 the caller can still write it and Delete only when they can delete it. The public user's ownership
 grants no delete, because every anonymous caller shares it. Design routes do not use these rules;
-staff read and delete submissions through form permissions. Files, print and preview have no design
-route, so staff download files through `/files` or `/submit/files`, and print and preview through
-the submit routes, all of which need a grant.
+staff read and delete submissions through form permissions. Files and print have no design route,
+so staff download files through `/files` or `/submit/files`, and print through the submit routes,
+all of which need a grant.
 
 A repeated write gets its recorded answer before these rules run, so a retry keeps its answer after
 the form's settings change. A save or submit whose revision id the caller already recorded on the

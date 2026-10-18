@@ -12,13 +12,11 @@ import {
   ServiceUnavailableError,
   UnprocessableEntityError,
   UnsupportedMediaTypeError,
-  ValidationError,
 } from '../../core/errors';
 
 interface RenderBody {
   templateId: string;
   options?: Record<string, unknown>;
-  data?: Record<string, unknown>;
 }
 
 const NOT_AUTHORIZED = 'Not authorized to generate this document';
@@ -96,17 +94,6 @@ export async function listSubmissionTemplatesHandler(req: Request, res: Response
   res.json({ items: outcome.templates });
 }
 
-export async function previewDocumentHandler(req: Request, res: Response): Promise<void> {
-  const body = req.body as RenderBody;
-  const outcome = await documentGenerationService.preview(resolveCaller(req), {
-    submissionId: req.params.id,
-    templateId: body.templateId,
-    options: body.options,
-    data: body.data ?? {},
-  });
-  respond(req, res, outcome, buildFilename(body.options));
-}
-
 export async function printDocumentHandler(req: Request, res: Response): Promise<void> {
   const body = req.body as RenderBody;
   const outcome = await documentGenerationService.print(resolveCaller(req), {
@@ -126,17 +113,6 @@ export async function printUploadedTemplateHandler(req: Request, res: Response):
   respond(req, res, outcome, buildFilename(undefined));
 }
 
-/** Preview the caller's live data (multipart `data` field, JSON) with an uploaded template. */
-export async function previewUploadedTemplateHandler(req: Request, res: Response): Promise<void> {
-  const template = uploadedTemplate(req);
-  const outcome = await documentGenerationService.previewUpload(resolveCaller(req), {
-    submissionId: req.params.id,
-    template,
-    data: liveData((req.body as Record<string, unknown> | undefined)?.data),
-  });
-  respond(req, res, outcome, buildFilename(undefined));
-}
-
 function uploadedTemplate(req: Request) {
   const upload = getUploadedFile(req);
   const fileType = templateFileType(upload.originalname);
@@ -146,18 +122,4 @@ function uploadedTemplate(req: Request) {
     );
   }
   return { content: upload.buffer, fileType, filename: checkedFileName(upload.originalname) };
-}
-
-function liveData(field: unknown): Record<string, unknown> {
-  if (field === undefined) return {};
-  let parsed: unknown;
-  try {
-    parsed = typeof field === 'string' ? JSON.parse(field) : undefined;
-  } catch {
-    parsed = undefined;
-  }
-  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new ValidationError('data must be a JSON object');
-  }
-  return parsed as Record<string, unknown>;
 }

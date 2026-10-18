@@ -55,15 +55,11 @@ vi.mock('@/src/features/templates/data/useSubmissionTemplates', () => ({
 const api = vi.hoisted(() => ({
   printWithStoredTemplate: vi.fn(),
   printWithUploadedTemplate: vi.fn(),
-  previewWithStoredTemplate: vi.fn(),
-  previewWithUploadedTemplate: vi.fn(),
   saveBlob: vi.fn(),
 }));
 vi.mock('@/src/features/templates/data/printApi', () => ({
   printWithStoredTemplate: api.printWithStoredTemplate,
   printWithUploadedTemplate: api.printWithUploadedTemplate,
-  previewWithStoredTemplate: api.previewWithStoredTemplate,
-  previewWithUploadedTemplate: api.previewWithUploadedTemplate,
 }));
 vi.mock('@/src/features/templates/data/saveBlob', () => ({ saveBlob: api.saveBlob }));
 
@@ -72,8 +68,8 @@ import { PrintSubmissionButton } from '@/src/features/templates/ui/PrintSubmissi
 
 const blob = new Blob(['doc']);
 
-async function openTemplateTab(getLiveData?: () => Record<string, unknown>) {
-  render(<PrintSubmissionButton submissionId="sub-1" getLiveData={getLiveData} />);
+async function openTemplateTab() {
+  render(<PrintSubmissionButton submissionId="sub-1" />);
   fireEvent.click(screen.getByTestId('print-submission-button'));
   fireEvent.click(await screen.findByRole('tab', { name: 'Template Print' }));
 }
@@ -87,42 +83,6 @@ describe('template print tab', () => {
     templatesState.templates = [];
     api.printWithUploadedTemplate.mockResolvedValue(blob);
     api.printWithStoredTemplate.mockResolvedValue(blob);
-    api.previewWithUploadedTemplate.mockResolvedValue(blob);
-    api.previewWithStoredTemplate.mockResolvedValue(blob);
-  });
-
-  describe('with on-screen answers (the fill page)', () => {
-    const live = () => ({ field: 'unsaved' });
-
-    it('previews the live answers with an uploaded template', async () => {
-      await openTemplateTab(live);
-      const file = new File(['x'], 'mine.docx');
-      pickFile(file);
-      await waitFor(() =>
-        expect(screen.getByTestId('print-submission-print').hasAttribute('disabled')).toBe(false),
-      );
-      fireEvent.click(screen.getByTestId('print-submission-print'));
-
-      await waitFor(() => expect(api.saveBlob).toHaveBeenCalledWith(blob, 'mine.docx'));
-      expect(api.previewWithUploadedTemplate).toHaveBeenCalledWith('tok', 'sub-1', file, {
-        field: 'unsaved',
-      });
-      expect(api.printWithUploadedTemplate).not.toHaveBeenCalled();
-    });
-
-    it('previews the live answers with the stored template', async () => {
-      templatesState.templates = [
-        { id: 'tpl-1', name: 'R', filename: 'r.docx', createdAt: '2026-01-02T03:04:05.000Z' },
-      ];
-      await openTemplateTab(live);
-      fireEvent.click(screen.getByTestId('print-submission-print'));
-
-      await waitFor(() => expect(api.saveBlob).toHaveBeenCalledWith(blob, 'r.docx'));
-      expect(api.previewWithStoredTemplate).toHaveBeenCalledWith('tok', 'sub-1', 'tpl-1', {
-        field: 'unsaved',
-      });
-      expect(api.printWithStoredTemplate).not.toHaveBeenCalled();
-    });
   });
 
   describe('without a template on the form version', () => {

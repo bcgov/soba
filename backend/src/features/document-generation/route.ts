@@ -8,12 +8,10 @@ import { asyncHandler } from '../../core/api/shared/asyncHandler';
 import { validateRequest } from '../../core/api/shared/validation';
 import {
   listSubmissionTemplatesHandler,
-  previewDocumentHandler,
   printDocumentHandler,
   printUploadedTemplateHandler,
-  previewUploadedTemplateHandler,
 } from './controller';
-import { PreviewBodySchema, PrintBodySchema, SubmissionIdParamSchema } from './schema';
+import { PrintBodySchema, SubmissionIdParamSchema } from './schema';
 
 const router = express.Router();
 
@@ -23,20 +21,12 @@ const upload = parseUpload(env.getTemplatesMaxFileSizeMb() * 1024 * 1024);
 // surface's submit-mode).
 router.use(requireFeature(Features.document_generation), requireFeature(Features.templates));
 
-// Mounted under /submit/submissions, so these are /submit/submissions/:id/{templates,preview,print}.
+// Mounted under /submit/submissions, so these are /submit/submissions/:id/{templates,print}.
 // templates: what the caller may render from the submission.
 router.get(
   '/:id/templates',
   validateRequest({ params: SubmissionIdParamSchema }),
   asyncHandler(listSubmissionTemplatesHandler),
-);
-
-// preview: render the caller's live on-screen data (submission is the authorization anchor).
-router.post(
-  '/:id/preview',
-  renderRateLimit,
-  validateRequest({ params: SubmissionIdParamSchema, body: PreviewBodySchema }),
-  asyncHandler(previewDocumentHandler),
 );
 
 // print: render the submission's persisted data (read from the form engine).
@@ -55,16 +45,6 @@ router.post(
   validateRequest({ params: SubmissionIdParamSchema }),
   upload,
   asyncHandler(printUploadedTemplateHandler),
-);
-
-// preview/upload: like preview, but with a template sent in this request; the live answers come in
-// the multipart `data` field as JSON.
-router.post(
-  '/:id/preview/upload',
-  renderRateLimit,
-  validateRequest({ params: SubmissionIdParamSchema }),
-  upload,
-  asyncHandler(previewUploadedTemplateHandler),
 );
 
 export { router as documentGenerationRouter };

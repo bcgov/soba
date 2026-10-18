@@ -21,14 +21,6 @@ export const SubmissionIdParamSchema = z
   .object({ id: z.uuid() })
   .openapi('DocumentGeneration_SubmissionIdParam');
 
-export const PreviewBodySchema = z
-  .object({
-    templateId,
-    options: payloadObject.optional(),
-    data: payloadObject,
-  })
-  .openapi('DocumentGeneration_PreviewBody');
-
 export const PrintBodySchema = z
   .object({
     templateId,
@@ -90,19 +82,6 @@ export function registerDocumentGenerationOpenApi(registry: OpenAPIRegistry) {
 
   registry.registerPath({
     method: 'post',
-    path: `${BASE}/preview`,
-    tags: [tag],
-    security: PUBLIC_SECURITY,
-    summary: 'Render a document from a stored template and live (on-screen) submission data',
-    request: {
-      params: SubmissionIdParamSchema,
-      body: { required: true, content: { 'application/json': { schema: PreviewBodySchema } } },
-    },
-    responses: documentResponses,
-  });
-
-  registry.registerPath({
-    method: 'post',
     path: `${BASE}/print`,
     tags: [tag],
     security: PUBLIC_SECURITY,
@@ -142,37 +121,6 @@ export function registerDocumentGenerationOpenApi(registry: OpenAPIRegistry) {
         description:
           'Template could not be rendered, failed the virus scan, or the submission has no saved data',
       },
-    },
-  });
-
-  registry.registerPath({
-    method: 'post',
-    path: `${BASE}/preview/upload`,
-    tags: [tag],
-    security: PUBLIC_SECURITY,
-    summary: 'Render a document from an uploaded template and live (on-screen) submission data',
-    request: {
-      params: SubmissionIdParamSchema,
-      body: {
-        required: true,
-        content: {
-          'multipart/form-data': {
-            schema: z.object({
-              file: z.string().openapi({ format: 'binary' }),
-              data: z
-                .string()
-                .optional()
-                .openapi({ description: 'The answers, as a JSON object.' }),
-            }),
-          },
-        },
-      },
-    },
-    responses: {
-      ...documentResponses,
-      413: { description: 'Template file too large' },
-      415: { description: 'Template file type not accepted' },
-      422: { description: 'Template could not be rendered, or failed the virus scan' },
     },
   });
 }

@@ -54,36 +54,3 @@ export async function printWithUploadedTemplate(
   });
   return documentBlob(response);
 }
-
-/** Live (on-screen) answers rendered with a template already on the form version. */
-export async function previewWithStoredTemplate(
-  token: string | undefined,
-  submissionId: string,
-  templateId: string,
-  data: Record<string, unknown>,
-): Promise<Blob> {
-  const response = await sobaFetch(`${submissionPath(submissionId)}/preview`, {
-    token,
-    method: 'POST',
-    json: { templateId, data },
-  });
-  return documentBlob(response);
-}
-
-/** Live (on-screen) answers rendered with a template sent along with the request. */
-export async function previewWithUploadedTemplate(
-  token: string | undefined,
-  submissionId: string,
-  file: File,
-  data: Record<string, unknown>,
-): Promise<Blob> {
-  const form = new FormData();
-  form.set('data', JSON.stringify(data));
-  form.set('file', file);
-  const response = await sobaFetch(`${submissionPath(submissionId)}/preview/upload`, {
-    token,
-    method: 'POST',
-    form,
-  });
-  return documentBlob(response);
-}

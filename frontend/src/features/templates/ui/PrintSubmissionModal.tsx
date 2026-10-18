@@ -8,12 +8,7 @@ import { Modal } from '@/src/components/Modal';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { messageForDataError } from '@/src/shared/api/dataError';
 import { templateFileTypeFor } from '@/src/types/templates';
-import {
-  previewWithStoredTemplate,
-  previewWithUploadedTemplate,
-  printWithStoredTemplate,
-  printWithUploadedTemplate,
-} from '../data/printApi';
+import { printWithStoredTemplate, printWithUploadedTemplate } from '../data/printApi';
 import { saveBlob } from '../data/saveBlob';
 import { useSubmissionTemplates } from '../data/useSubmissionTemplates';
 import { printErrorText } from '../printError';
@@ -24,8 +19,6 @@ type PrintMethod = 'browser' | 'template';
 type PrintSubmissionModalProps = {
   show: boolean;
   submissionId: string;
-  /** The on-screen answers, when there are unsaved ones (the fill page); otherwise the saved ones print. */
-  getLiveData?: () => Record<string, unknown>;
   onBrowserPrint: () => void;
   onClose: () => void;
 };
@@ -34,7 +27,6 @@ type PrintSubmissionModalProps = {
 export function PrintSubmissionModal({
   show,
   submissionId,
-  getLiveData,
   onBrowserPrint,
   onClose,
 }: Readonly<PrintSubmissionModalProps>) {
@@ -84,16 +76,11 @@ export function PrintSubmissionModal({
     setPrinting(true);
     setPrintError(null);
     try {
-      const live = getLiveData?.();
       if (source === 'upload' && file) {
-        const blob = live
-          ? await previewWithUploadedTemplate(token, submissionId, file, live)
-          : await printWithUploadedTemplate(token, submissionId, file);
+        const blob = await printWithUploadedTemplate(token, submissionId, file);
         saveBlob(blob, file.name);
       } else if (defaultTemplate) {
-        const blob = live
-          ? await previewWithStoredTemplate(token, submissionId, defaultTemplate.id, live)
-          : await printWithStoredTemplate(token, submissionId, defaultTemplate.id);
+        const blob = await printWithStoredTemplate(token, submissionId, defaultTemplate.id);
         saveBlob(blob, defaultTemplate.filename);
       }
       onClose();

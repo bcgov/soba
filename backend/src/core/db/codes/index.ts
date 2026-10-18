@@ -177,9 +177,11 @@ export const FeatureScopeStatus = {
 } as const;
 export type FeatureScopeStatusCode = (typeof FeatureScopeStatus)[keyof typeof FeatureScopeStatus];
 
-/** Which render operation an audit row records (document_generation_audit.mode). */
+/**
+ * Which render operation an audit row records (document_generation_audit.mode). Older rows may
+ * hold 'preview'.
+ */
 export const DocumentGenerationMode = {
-  preview: 'preview',
   print: 'print',
 } as const;
 export type DocumentGenerationModeCode =

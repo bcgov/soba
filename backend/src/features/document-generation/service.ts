@@ -44,14 +44,6 @@ import { withRenderSlot } from './renderSlots';
 // Backend-specific parts of the request, passed through to the adapter.
 type PayloadObject = Record<string, unknown>;
 
-export interface PreviewInput {
-  submissionId: string;
-  templateId: string;
-  options?: PayloadObject;
-  /** Live, on-screen answer data supplied by the caller (not read from the persisted submission). */
-  data: PayloadObject;
-}
-
 export interface PrintInput {
   submissionId: string;
   templateId: string;
@@ -62,11 +54,6 @@ export interface PrintUploadInput {
   submissionId: string;
   /** A template the caller supplies for this render only; it is not stored. */
   template: { content: Buffer; fileType: TemplateFileType; filename: string };
-}
-
-export interface PreviewUploadInput extends PrintUploadInput {
-  /** Live, on-screen answer data supplied by the caller. */
-  data: PayloadObject;
 }
 
 export type DocumentRenderOutcome =
@@ -321,24 +308,6 @@ export const documentGenerationService = {
     };
   },
 
-  /** Render from the caller's live (on-screen) data. The submission is only the authorization anchor. */
-  async preview(caller: CallerIdentity, input: PreviewInput): Promise<DocumentRenderOutcome> {
-    const scope = await renderScope(caller, input.submissionId);
-    if (scope === 'notfound' || scope === 'denied') return { status: scope };
-    const stored = await getLiveDocumentTemplate(
-      input.templateId,
-      scope.formVersionId,
-      DocumentTemplateType.cdogs,
-    );
-    if (!stored) return { status: 'template-notfound' };
-    return renderWith(
-      scope,
-      stored,
-      { options: input.options, data: input.data },
-      { mode: DocumentGenerationMode.preview, caller, submissionId: input.submissionId },
-    );
-  },
-
   /** Render from the submission's persisted answer data (read from the form engine). */
   async print(caller: CallerIdentity, input: PrintInput): Promise<DocumentRenderOutcome> {
     const scope = await renderScope(caller, input.submissionId);
@@ -392,24 +361,6 @@ export const documentGenerationService = {
 
     return renderInline(scope, input.template, data, {
       mode: DocumentGenerationMode.print,
-      caller,
-      submissionId: input.submissionId,
-    });
-  },
-
-  /** Render the caller's live (on-screen) data with a template uploaded for this call only. */
-  async previewUpload(
-    caller: CallerIdentity,
-    input: PreviewUploadInput,
-  ): Promise<DocumentRenderOutcome> {
-    const scope = await renderScope(caller, input.submissionId);
-    if (scope === 'notfound' || scope === 'denied') return { status: scope };
-
-    const scan = await scanUpload(input.template.content, input.template.filename);
-    if (scan !== 'clean') return { status: scan };
-
-    return renderInline(scope, input.template, input.data, {
-      mode: DocumentGenerationMode.preview,
       caller,
       submissionId: input.submissionId,
     });
