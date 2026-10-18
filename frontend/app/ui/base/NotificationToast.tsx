@@ -53,7 +53,7 @@ function NotificationToast() {
   return (
     <div
       data-testid="notification-toast"
-      className="d-flex flex-column gap-2"
+      className="d-flex flex-column gap-2 d-print-none"
       style={{
         position: 'fixed',
         // Sit just below the DS Header (min-height 65px) rather than overlapping it.

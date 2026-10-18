@@ -49,7 +49,7 @@ export function DesignSubmissionView({
 
   return (
     <div className="mt-3" data-testid="design-submission-view">
-      <div className="mb-3 d-flex align-items-center gap-2">
+      <div className="mb-3 d-flex align-items-center gap-2 d-print-none">
         <Link
           data-testid="design-submission-back"
           onPress={() => router.push(`/${locale}/build/${formId}?tab=submissions`)}

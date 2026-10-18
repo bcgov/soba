@@ -39,7 +39,7 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
         />
       );
       const actions = (link: React.ReactNode) => (
-        <div className="mb-3 d-flex align-items-center gap-2">
+        <div className="mb-3 d-flex align-items-center gap-2 d-print-none">
           {link}
           <div className="ms-auto">
             <PrintSubmissionButton print={print} baseName={printBaseName(data.submission)} />
