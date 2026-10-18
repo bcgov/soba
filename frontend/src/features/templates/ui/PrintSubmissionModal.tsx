@@ -73,8 +73,7 @@ export function PrintSubmissionModal({
     setFileError(null);
   };
 
-  const templateReady =
-    !isLoading && (source === 'upload' ? file !== null : defaultTemplate !== null);
+  const templateReady = !isLoading && (source === 'default' || file !== null);
   const canPrint = !printing && (method === 'browser' || templateReady);
 
   const print = async () => {
