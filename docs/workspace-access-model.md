@@ -15,14 +15,15 @@ They don't overlap: being a workspace admin grants no form permissions, and vice
 adds a third control per submission, who takes part in it; see
 [Submission participants](#submission-participants).
 
-> **Current status.** The design form routes (`api/forms/route.ts`) and the staff submission routes
-> (`api/submissions/route.ts`) are gated by `requireFormPermissions`, except schema normalize (no
-> workspace), and check the caller's permissions on the form in question (see
+> **Current status.** The design form routes (`api/forms/route.ts`), the staff submission routes
+> (`api/submissions/route.ts`) and staff print (`features/document-generation/designRoute.ts`) are
+> gated by `requireFormPermissions`, except schema normalize (no workspace), and check the caller's
+> permissions on the form in question (see
 > [Resolving a user's permissions](#resolving-a-users-permissions)). Creating a form requires
 > `form_create` and `design_create`; only `form_admin` satisfies that, via `*`. Creating a design on
 > an existing form requires `design_create` and `design_update` (`form_designer`), since the create
 > writes the design's schema. The submit routes decide with the submitter rules in `@soba/lib`; the
-> file and document generation routes make the same read and decide by the same rules (see
+> file and submit document generation routes make the same read and decide by the same rules (see
 > [Submission participants](#submission-participants)); rendering a document also needs
 > `document_template_read`. The template routes (`features/templates/route.ts`) are gated by
 > `requireFormPermissions`: `form_read` and `document_template_read` to list and download,
@@ -321,9 +322,10 @@ and the rules the routes decide with; My Submissions applies them to each row an
 read with it (`canContinueSubmission`, `canDeleteOwnSubmission`), so a row offers Continue only when
 the caller can still write it and Delete only when they can delete it. The public user's ownership
 grants no delete, because every anonymous caller shares it. Design routes do not use these rules;
-staff read and delete submissions through form permissions. Files and print have no design route,
-so staff download files through `/files` or `/submit/files`, and print through the submit routes,
-all of which need a grant.
+staff read, delete and print submissions through form permissions. Files have no design route, so
+staff download them through `/files` or `/submit/files`, which need a grant. Staff print through
+`/design/submissions/:id/{templates,print}` with `submission_read`, and with a template uploaded for
+that print through `/print/upload` with `submission_print_upload` as well.
 
 A repeated write gets its recorded answer before these rules run, so a retry keeps its answer after
 the form's settings change. A save or submit whose revision id the caller already recorded on the

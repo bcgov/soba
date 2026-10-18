@@ -1,4 +1,6 @@
 import {
+  PrintBodySchema,
+  PrintOptionsSchema,
   TemplateNameBodySchema,
   TemplateResponseSchema,
   TemplateUploadBodySchema,
@@ -85,5 +87,28 @@ describe('template schemas', () => {
     expect(TemplateResponseSchema.safeParse(response).success).toBe(true);
     expect(TemplateResponseSchema.safeParse({ ...response, type: 'other' }).success).toBe(false);
     expect(TemplateResponseSchema.safeParse({ ...response, size: '512' }).success).toBe(false);
+  });
+});
+
+describe('print schemas', () => {
+  it('takes pdf and a report name, and nothing else', () => {
+    expect(PrintOptionsSchema.parse({ convertTo: 'pdf', reportName: ' Receipt ' })).toEqual({
+      convertTo: 'pdf',
+      reportName: 'Receipt',
+    });
+    expect(PrintOptionsSchema.parse({})).toEqual({});
+    expect(PrintOptionsSchema.safeParse({ convertTo: 'docx' }).success).toBe(false);
+    expect(PrintOptionsSchema.safeParse({ reportName: ' ' }).success).toBe(false);
+    expect(PrintOptionsSchema.safeParse({ reportName: 'x'.repeat(256) }).success).toBe(false);
+    expect(PrintOptionsSchema.safeParse({ overwrite: false }).success).toBe(false);
+  });
+
+  it('takes a template id and the options, and nothing else', () => {
+    expect(PrintBodySchema.safeParse({ templateId: UUID }).success).toBe(true);
+    expect(PrintBodySchema.safeParse({ templateId: 'x' }).success).toBe(false);
+    expect(PrintBodySchema.safeParse({ templateId: UUID, data: {} }).success).toBe(false);
+    expect(
+      PrintBodySchema.safeParse({ templateId: UUID, options: { convertTo: 'html' } }).success,
+    ).toBe(false);
   });
 });

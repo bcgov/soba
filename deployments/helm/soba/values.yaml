@@ -47,7 +47,7 @@ backend:
     # Router tuning for the API host; see README.
     annotations:
       # Inactivity timeout. The router's 30s default is tight for the synchronous CDOGS
-      # call under /submit/submissions/:id/print, which cannot be scoped below.
+      # call under /{submit,design}/submissions/:id/print, which cannot be scoped below.
       haproxy.router.openshift.io/timeout: "60s"
       # The router sets a session cookie on edge routes whether or not we ask; this just
       # names it. sobaFetch sends no credentials, so nothing returns it on this host.

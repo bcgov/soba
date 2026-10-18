@@ -19,11 +19,8 @@ jest.mock('../../../src/core/middleware/formSubmitAccess', () => {
   };
 });
 jest.mock('../../../src/features/document-generation/service', () => ({
-  documentGenerationService: {
-    listTemplates: jest.fn(),
-    print: jest.fn(),
-    printUpload: jest.fn(),
-  },
+  documentGenerationService: { listTemplates: jest.fn(), print: jest.fn() },
+  staffDocumentService: {},
 }));
 
 import { coreErrorHandler } from '../../../src/core/middleware/errorHandler';
@@ -31,7 +28,9 @@ import { documentGenerationRouter } from '../../../src/features/document-generat
 import { documentGenerationService } from '../../../src/features/document-generation/service';
 
 const SUBMISSION = '01a0dc24-1f2e-7a3b-8c4d-5e6f7a8b9c0d';
-const printUpload = documentGenerationService.printUpload as jest.Mock;
+const TEMPLATE = '01a0dc26-a35e-75c4-bff6-4cdaa9b2b274';
+const listTemplates = documentGenerationService.listTemplates as jest.Mock;
+const print = documentGenerationService.print as jest.Mock;
 
 const app = express();
 app.use(express.json());
@@ -40,60 +39,78 @@ app.use(coreErrorHandler);
 
 const ok = {
   status: 'ok',
-  code: 'cdogs-v3',
+  code: 'cdogs-v2',
   data: Buffer.from('doc'),
   contentType: 'application/pdf',
 };
 
-const postUpload = (filename = 't.docx') =>
-  request(app)
-    .post(`/submissions/${SUBMISSION}/print/upload`)
-    .attach('file', Buffer.from('template'), filename);
+const postPrint = (body: object) =>
+  request(app).post(`/submissions/${SUBMISSION}/print`).send(body);
 
 beforeEach(() => {
   jest.clearAllMocks();
-  printUpload.mockResolvedValue(ok);
+  print.mockResolvedValue(ok);
+});
+
+describe('GET /:id/templates', () => {
+  it('returns the print facts', async () => {
+    const facts = { items: [{ id: TEMPLATE }], renderAvailable: true };
+    listTemplates.mockResolvedValue({ status: 'ok', facts });
+    const res = await request(app).get(`/submissions/${SUBMISSION}/templates`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(facts);
+  });
+
+  it('refuses a caller the submitter rules deny', async () => {
+    listTemplates.mockResolvedValue({ status: 'denied' });
+    const res = await request(app).get(`/submissions/${SUBMISSION}/templates`);
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('POST /:id/print', () => {
+  it('streams the document named from the options', async () => {
+    const options = { convertTo: 'pdf', reportName: 'Receipt' };
+    const res = await postPrint({ templateId: TEMPLATE, options });
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toBe('application/pdf');
+    expect(res.headers['content-disposition']).toContain('Receipt.pdf');
+    expect(print).toHaveBeenCalledWith(expect.anything(), {
+      submissionId: SUBMISSION,
+      templateId: TEMPLATE,
+      options,
+    });
+  });
+
+  it.each([
+    ['an option the print does not take', { overwrite: false }],
+    ['a format other than pdf', { convertTo: 'docx' }],
+    ['an empty report name', { reportName: ' ' }],
+  ])('refuses %s with 400', async (_label, options) => {
+    const res = await postPrint({ templateId: TEMPLATE, options });
+    expect(res.status).toBe(400);
+    expect(print).not.toHaveBeenCalled();
+  });
+
+  it('refuses a body field the print does not take with 400', async () => {
+    const res = await postPrint({ templateId: TEMPLATE, data: { field: 'x' } });
+    expect(res.status).toBe(400);
+    expect(print).not.toHaveBeenCalled();
+  });
+
+  it('answers 422 no_saved_data when the submission has no saved answers', async () => {
+    print.mockResolvedValue({ status: 'no-content' });
+    const res = await postPrint({ templateId: TEMPLATE });
+    expect(res.status).toBe(422);
+    expect(res.body.code).toBe('no_saved_data');
+  });
 });
 
 describe('POST /:id/print/upload', () => {
-  it('streams the rendered document as an attachment', async () => {
-    const res = await postUpload();
-    expect(res.status).toBe(200);
-    expect(res.headers['content-type']).toBe('application/pdf');
-    expect(res.headers['content-disposition']).toContain('attachment');
-    expect(printUpload).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        submissionId: SUBMISSION,
-        template: { content: Buffer.from('template'), fileType: 'docx', filename: 't.docx' },
-      }),
-    );
-  });
-
-  it('refuses a file type a CDOGS template does not accept with 415', async () => {
-    const res = await postUpload('t.pdf');
-    expect(res.status).toBe(415);
-    expect(res.body).toEqual({ error: 'Template must be one of: docx, xlsx, html' });
-    expect(printUpload).not.toHaveBeenCalled();
-  });
-
-  it('refuses a request without a file with 400', async () => {
-    const res = await request(app).post(`/submissions/${SUBMISSION}/print/upload`).field('x', 'y');
-    expect(res.status).toBe(400);
-    expect(printUpload).not.toHaveBeenCalled();
-  });
-
-  it('refuses an infected template with 422', async () => {
-    printUpload.mockResolvedValue({ status: 'infected' });
-    const res = await postUpload();
-    expect(res.status).toBe(422);
-    expect(res.body).toEqual({ error: 'File failed virus scan' });
-  });
-
-  it('answers 503 when the virus scan cannot run', async () => {
-    printUpload.mockResolvedValue({ status: 'scan-unavailable' });
-    const res = await postUpload();
-    expect(res.status).toBe(503);
-    expect(res.body).toEqual({ error: 'Virus scanning unavailable' });
+  it('is not a submit route', async () => {
+    const res = await request(app)
+      .post(`/submissions/${SUBMISSION}/print/upload`)
+      .attach('file', Buffer.from('template'), 't.docx');
+    expect(res.status).toBe(404);
   });
 });

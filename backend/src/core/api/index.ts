@@ -11,7 +11,10 @@ import {
 import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
 import { groupsDomain } from './groups';
 import { filesDomain } from '../../features/files';
-import { documentGenerationDomain } from '../../features/document-generation';
+import {
+  documentGenerationDesignRouter,
+  documentGenerationDomain,
+} from '../../features/document-generation';
 import { templatesDomain } from '../../features/templates';
 import {
   formSettingsRouter,
@@ -52,7 +55,8 @@ registerOpenApiPaths((registry) => {
 const designRouter = express.Router();
 designRouter.use('/forms/:id/settings', formSettingsRouter);
 designRouter.use('/', designFormsRouter);
-designRouter.use('/submissions', designSubmissionsRouter);
+// Staff print (templates, print) takes what the submission routes leave; it gates itself.
+designRouter.use('/submissions', designSubmissionsRouter, documentGenerationDesignRouter);
 designRouter.use(notFoundHandler);
 designRouter.use(coreErrorHandler);
 
