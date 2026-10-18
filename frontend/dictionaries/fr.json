@@ -378,13 +378,12 @@
       "print": {
         "button": "Imprimer",
         "modalTitle": "Imprimer la soumission",
-        "browserTab": "Impression du navigateur",
-        "templateTab": "Impression du modèle",
+        "methodLabel": "Imprimer avec",
+        "browserOption": "Impression du navigateur",
         "print": "Imprimer",
         "printing": "Impression…",
-        "sourceLabel": "Modèle",
         "uploadOption": "Téléverser un modèle CDOGS",
-        "defaultOption": "Utiliser le modèle CDOGS par défaut",
+        "storedOption": "Utiliser le modèle CDOGS par défaut",
         "fileNameColumn": "Nom du fichier",
         "uploadDateColumn": "Date de téléversement",
         "failed": "Échec de la génération du document."

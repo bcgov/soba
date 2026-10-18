@@ -21,13 +21,22 @@ interface NotificationItemProps {
 }
 
 function NotificationItem({ id, text, type, onRemove }: Readonly<NotificationItemProps>) {
+  const isError = type === 'error';
+
+  // An error stays until it is closed, so it can be read at any pace.
   useEffect(() => {
+    if (isError) return undefined;
     const timer = setTimeout(() => onRemove(id), AUTO_DISMISS_MS);
     return () => clearTimeout(timer);
-  }, [id, onRemove]);
+  }, [id, isError, onRemove]);
 
   return (
-    <InlineAlert variant={toVariant(type)} isCloseable onClose={() => onRemove(id)}>
+    <InlineAlert
+      variant={toVariant(type)}
+      role={isError ? 'alert' : 'status'}
+      isCloseable
+      onClose={() => onRemove(id)}
+    >
       {text}
     </InlineAlert>
   );

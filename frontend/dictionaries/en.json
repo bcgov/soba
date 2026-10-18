@@ -377,13 +377,12 @@
       "print": {
         "button": "Print",
         "modalTitle": "Print Submission",
-        "browserTab": "Browser Print",
-        "templateTab": "Template Print",
+        "methodLabel": "Print with",
+        "browserOption": "Browser print",
         "print": "Print",
         "printing": "Printing…",
-        "sourceLabel": "Template",
         "uploadOption": "Upload CDOGS template",
-        "defaultOption": "Use default CDOGS template",
+        "storedOption": "Use default CDOGS template",
         "fileNameColumn": "File Name",
         "uploadDateColumn": "Upload Date",
         "failed": "Failed to generate the document."

@@ -9,7 +9,7 @@ import type { SubmissionPrint } from '../data/useSubmissionPrint';
 import { saveBlob } from '../data/saveBlob';
 import { printFailureMessages } from '../printError';
 import { printFileName } from '../printFileName';
-import { PrintSubmissionModal } from './PrintSubmissionModal';
+import { StaffPrintDialog } from './StaffPrintDialog';
 
 type PrintSubmissionButtonProps = {
   print: SubmissionPrint;
@@ -73,8 +73,7 @@ export function PrintSubmissionButton({ print, baseName }: Readonly<PrintSubmiss
         {dict.form.templates.print.button}
       </Button>
       {optionsOpen && print.staff ? (
-        <PrintSubmissionModal
-          show
+        <StaffPrintDialog
           staff={print.staff}
           printTemplate={print.printTemplate}
           baseName={baseName}

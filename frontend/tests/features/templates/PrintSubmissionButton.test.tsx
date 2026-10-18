@@ -15,13 +15,12 @@ vi.mock('@/app/[lang]/Providers', () => ({
         print: {
           button: 'Print',
           modalTitle: 'Print Submission',
-          browserTab: 'Browser Print',
-          templateTab: 'Template Print',
+          methodLabel: 'Print with',
+          browserOption: 'Browser print',
+          storedOption: 'Use default CDOGS template',
+          uploadOption: 'Upload CDOGS template',
           print: 'Print',
           printing: 'Printing...',
-          sourceLabel: 'Template',
-          uploadOption: 'Upload CDOGS template',
-          defaultOption: 'Use default CDOGS template',
           fileNameColumn: 'File Name',
           uploadDateColumn: 'Upload Date',
           failed: 'Failed to generate the document.',
@@ -131,12 +130,12 @@ describe('PrintSubmissionButton', () => {
       }),
     );
     press();
-    expect(await screen.findByRole('tab', { name: 'Browser Print' })).toBeTruthy();
+    expect(await screen.findByTestId('print-method')).toBeTruthy();
     expect(window.print).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId('print-submission-print'));
     await waitFor(() => expect(window.print).toHaveBeenCalledTimes(1));
-    expect(screen.queryByTestId('print-submission-tabs')).toBeNull();
+    expect(screen.queryByTestId('print-method')).toBeNull();
   });
 
   it('closes the staff options on cancel without printing', async () => {
@@ -149,7 +148,7 @@ describe('PrintSubmissionButton', () => {
     press();
     fireEvent.click(await screen.findByTestId('print-submission-cancel'));
 
-    await waitFor(() => expect(screen.queryByTestId('print-submission-tabs')).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId('print-method')).toBeNull());
     expect(window.print).not.toHaveBeenCalled();
   });
 });

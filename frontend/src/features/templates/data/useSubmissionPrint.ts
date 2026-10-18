@@ -76,27 +76,24 @@ function useTemplatePrintAllowed(): boolean | null {
   return data ?? null;
 }
 
-/** Facts read for this surface, or what the choice reads when there are none to read. */
-const factsFor = <T extends PrintFacts>(
-  allowed: boolean | null,
-  data: T | undefined,
-  error: unknown,
-): T | PrintFacts | null => {
-  if (allowed === false || error) return NO_TEMPLATE_PRINT;
-  return data ?? null;
-};
-
-const choiceOf = (
-  facts: PrintFacts | null,
-  permissions: readonly string[] | null,
-): PrintChoiceCode | null =>
-  facts && permissions
-    ? printChoiceOf({
-        renderAvailable: facts.renderAvailable,
-        hasTemplate: facts.items.length > 0,
-        permissions,
-      })
-    : null;
+/** The print choice from what a surface read; null while any of it is still loading. */
+export function printChoiceFrom(read: {
+  /** Whether the app offers template print; null while unknown. */
+  allowed: boolean | null;
+  facts: PrintFacts | undefined;
+  /** The facts request failed. */
+  failed: boolean;
+  /** The caller's form permissions; null while unknown. */
+  permissions: readonly string[] | null;
+}): PrintChoiceCode | null {
+  const facts = read.allowed === false || read.failed ? NO_TEMPLATE_PRINT : read.facts;
+  if (!facts || !read.permissions) return null;
+  return printChoiceOf({
+    renderAvailable: facts.renderAvailable,
+    hasTemplate: facts.items.length > 0,
+    permissions: read.permissions,
+  });
+}
 
 const NO_STORED_TEMPLATE = 'The form version has no stored template';
 
@@ -113,7 +110,6 @@ export function useSubmitterPrint(submissionId: string): SubmissionPrint {
     (authToken) => getSubmitterPrintFacts(authToken, submissionId),
     printFactsReadConfig,
   );
-  const facts = factsFor(allowed, data, error);
   const templateId = error ? undefined : data?.items[0]?.id;
 
   const printTemplate = useCallback(
@@ -130,7 +126,13 @@ export function useSubmitterPrint(submissionId: string): SubmissionPrint {
     [isSignedIn, submissionId, templateId, tokenFor],
   );
 
-  return { choice: choiceOf(facts, NO_PERMISSIONS), printTemplate, staff: null };
+  const choice = printChoiceFrom({
+    allowed,
+    facts: data,
+    failed: !!error,
+    permissions: NO_PERMISSIONS,
+  });
+  return { choice, printTemplate, staff: null };
 }
 
 /** Print on the design surface: the caller's form permissions decide what it offers. */
@@ -149,7 +151,6 @@ export function useStaffPrint(formId: string, submissionId: string): SubmissionP
     (token) => getStaffPrintFacts(token, submissionId),
     printFactsReadConfig,
   );
-  const facts = factsFor(allowed, data, error);
   const template = error ? null : (data?.items[0] ?? null);
   const permissions = formError ? NO_PERMISSIONS : (form?.permissions ?? null);
 
@@ -167,7 +168,7 @@ export function useStaffPrint(formId: string, submissionId: string): SubmissionP
   );
 
   return {
-    choice: choiceOf(facts, permissions),
+    choice: printChoiceFrom({ allowed, facts: data, failed: !!error, permissions }),
     printTemplate,
     staff: { template, error: error ? classifyDataError(error) : null, printUploaded },
   };
