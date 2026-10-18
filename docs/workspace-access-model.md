@@ -131,14 +131,14 @@ each role grants permissions. Users are members of groups.
 
 Six form roles are seeded (`role` + `role_permission`):
 
-| role                  | permissions                                                                                                |
-| --------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `form_admin`          | `*` (everything)                                                                                           |
-| `form_designer`       | `form_read`, `design_create`, `design_read`, `design_update`, `design_delete`                              |
-| `form_submitter`      | `submission_create`, `document_template_read`                                                              |
-| `submission_reviewer` | `form_read`, `submission_read`, `submission_update`, `submission_delete`, `submission_review`, `team_read` |
-| `submission_approver` | `form_read`, `submission_read`, `submission_review`, `team_read`                                           |
-| `team_manager`        | `form_read`, `team_read`, `team_update`                                                                    |
+| role                  | permissions                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `form_admin`          | `*` (everything)                                                                                                                      |
+| `form_designer`       | `form_read`, `design_create`, `design_read`, `design_update`, `design_delete`                                                         |
+| `form_submitter`      | `submission_create`, `document_template_read`                                                                                         |
+| `submission_reviewer` | `form_read`, `submission_read`, `submission_update`, `submission_delete`, `submission_review`, `submission_print_upload`, `team_read` |
+| `submission_approver` | `form_read`, `submission_read`, `submission_review`, `submission_print_upload`, `team_read`                                           |
+| `team_manager`        | `form_read`, `team_read`, `team_update`                                                                                               |
 
 `*` is a wildcard: a role holding it satisfies any permission check. Only `form_admin` has it, so adding
 new permissions later needs no change to that role.
@@ -149,8 +149,11 @@ new permissions later needs no change to that role.
 (via `*`). `form_designer` can create a new design on an existing form (`design_create` and
 `design_update`).
 
+`submission_print_upload`, with `submission_read`, lets staff print a submission with a template
+uploaded for that print only.
+
 The permission codes are: `form_create/read/update/delete`, `design_create/read/update/delete`,
-`submission_create/read/update/delete/review`, `team_read/update`, `document_template_create/read/delete`.
+`submission_create/read/update/delete/review/print_upload`, `team_read/update`, `document_template_create/read/delete`.
 
 ### Group membership is "who", not "what"
 

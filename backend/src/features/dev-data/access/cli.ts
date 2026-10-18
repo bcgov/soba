@@ -162,6 +162,7 @@ async function verify(): Promise<void> {
       designUpdate: 'U',
       submissionsRead: 'S',
       staffTemplates: 'T',
+      printUpload: 'P',
     },
     caseKeys: COVERAGE_FORM_KEYS,
     caseLabels: formLabels,

@@ -2,7 +2,12 @@
  * Single source of truth for all seeded code values. Seed and application code
  * import from here; no string literals for codes in logic. Compile-time safety.
  */
-export { FormCreatePermissions, Permissions, type PermissionCode } from '@soba/lib';
+export {
+  FormCreatePermissions,
+  Permissions,
+  PrintUploadPermissions,
+  type PermissionCode,
+} from '@soba/lib';
 export {
   SubmissionParticipantRole,
   SubmissionWorkflowState,
