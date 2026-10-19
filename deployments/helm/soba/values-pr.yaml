@@ -65,7 +65,7 @@ frontend:
       cpu: 25m
       memory: 128Mi
     limits:
-      cpu: 100m
+      cpu: 250m
       memory: 256Mi
   autoscaling:
     enabled: false
@@ -79,8 +79,8 @@ formio:
       cpu: 25m
       memory: 128Mi
     limits:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 250m
+      memory: 512Mi
   # Formio depends on MongoDB; allow time for MongoDB to be ready after PR deploy
   readinessProbe:
     initialDelaySeconds: 45
@@ -93,16 +93,6 @@ mongodb:
   # workflow supplies external.host and external.authSecretName.
   internal:
     enabled: false
-  replicas: 1
-  resources:
-    requests:
-      cpu: 50m
-      memory: 256Mi
-    limits:
-      cpu: 250m
-      memory: 512Mi
-  persistence:
-    size: 1Gi
 
 temporal:
   allowed: "true"
