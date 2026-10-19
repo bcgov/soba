@@ -39,7 +39,7 @@ const runMiddleware = (handler: RequestHandler, req: Request, res: Response): Pr
   new Promise((resolve, reject) => {
     handler(req, res, (err?: unknown) => {
       if (!err) resolve();
-      else reject(err instanceof Error ? err : new Error(String(err)));
+      else reject(err instanceof Error ? err : new Error('Middleware failed', { cause: err }));
     });
   });
 
