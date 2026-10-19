@@ -13,14 +13,14 @@ const REVIEWER = [...READ_ONLY, ...UPLOAD_ONLY];
 
 describe('printChoiceOf', () => {
   it.each([
-    ['a submitter with a stored template', facts(), 'template'],
-    ['a submitter without one', facts({ hasTemplate: false }), 'browser'],
-    ['staff with submission_read only', facts({ permissions: READ_ONLY }), 'template'],
-    ['staff with the upload permission only', facts({ permissions: UPLOAD_ONLY }), 'template'],
-    ['a reviewer', facts({ permissions: REVIEWER }), 'options'],
-    ['a reviewer, no template', facts({ permissions: REVIEWER, hasTemplate: false }), 'options'],
-    ['a form administrator', facts({ permissions: ['*'], hasTemplate: false }), 'options'],
-  ])('gives %s %s', (_label, input, expected) => {
+    ['a submitter with a stored template', 'template', facts()],
+    ['a submitter without one', 'browser', facts({ hasTemplate: false })],
+    ['staff with submission_read only', 'template', facts({ permissions: READ_ONLY })],
+    ['staff with the upload permission only', 'template', facts({ permissions: UPLOAD_ONLY })],
+    ['a reviewer', 'options', facts({ permissions: REVIEWER })],
+    ['a reviewer, no template', 'options', facts({ permissions: REVIEWER, hasTemplate: false })],
+    ['a form administrator', 'options', facts({ permissions: ['*'], hasTemplate: false })],
+  ])('gives %s the %s print', (_label, expected, input) => {
     expect(printChoiceOf(input)).toBe(expected);
   });
 

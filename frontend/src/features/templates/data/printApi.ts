@@ -63,7 +63,7 @@ export async function printWithUploadedTemplate(
   if (options.convertTo) form.set('convertTo', options.convertTo);
   if (options.reportName) form.set('reportName', options.reportName);
   form.set('file', file);
-  const response = await sobaFetch(`${submissionPath('design', submissionId)}/print/upload`, {
+  const response = await sobaFetch(`/design/print-upload/${submissionId}`, {
     token,
     method: 'POST',
     form,

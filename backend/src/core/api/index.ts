@@ -55,8 +55,9 @@ registerOpenApiPaths((registry) => {
 const designRouter = express.Router();
 designRouter.use('/forms/:id/settings', formSettingsRouter);
 designRouter.use('/', designFormsRouter);
-// Staff print (templates, print) takes what the submission routes leave; it gates itself.
-designRouter.use('/submissions', designSubmissionsRouter, documentGenerationDesignRouter);
+designRouter.use('/submissions', designSubmissionsRouter);
+// Staff print: /submissions/:id/{templates,print} and /print-upload/:id; it gates itself.
+designRouter.use(documentGenerationDesignRouter);
 designRouter.use(notFoundHandler);
 designRouter.use(coreErrorHandler);
 

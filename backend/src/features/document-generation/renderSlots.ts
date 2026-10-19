@@ -1,7 +1,3 @@
-import type { RequestHandler } from 'express';
-import { ApiErrorCodes } from '@soba/lib';
-import { ServiceUnavailableError } from '../../core/errors';
-
 export const RENDER_BUSY = 'Document generation is busy; try again shortly';
 
 // Renders in progress in this process.
@@ -32,19 +28,3 @@ export async function withRenderSlot<T>(
     release();
   }
 }
-
-/**
- * Hold a render slot until the response closes; 503 when every slot is taken. Before an upload
- * parser, it also caps the uploaded templates a process holds in memory.
- */
-export const holdRenderSlot =
-  (max: number): RequestHandler =>
-  (_req, res, next) => {
-    const release = takeRenderSlot(max);
-    if (!release) {
-      next(new ServiceUnavailableError(RENDER_BUSY, ApiErrorCodes.render_busy));
-      return;
-    }
-    res.once('close', release);
-    next();
-  };

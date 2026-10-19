@@ -167,15 +167,17 @@ export function SubmissionReview({ submission, schema, content }: Readonly<Submi
             testId="submission-view-modified-by"
           />
         </div>
-        <Button
-          variant="secondary"
-          size="small"
-          danger
-          onPress={() => setOpen('delete')}
-          data-testid="submission-review-delete"
-        >
-          {dictSub.delete}
-        </Button>
+        <div className="d-print-none">
+          <Button
+            variant="secondary"
+            size="small"
+            danger
+            onPress={() => setOpen('delete')}
+            data-testid="submission-review-delete"
+          >
+            {dictSub.delete}
+          </Button>
+        </div>
       </div>
 
       {review.error ? (
@@ -247,7 +249,7 @@ export function SubmissionReview({ submission, schema, content }: Readonly<Submi
             )}
             {/* Only a submitted submission has submitted data to change, and a review to record it. */}
             {submission.submittedAt && review.data ? (
-              <div className="d-flex gap-2 mt-3">
+              <div className="d-flex gap-2 mt-3 d-print-none">
                 <Button
                   isDisabled={pending}
                   onPress={() => setOpen('confirmChange')}

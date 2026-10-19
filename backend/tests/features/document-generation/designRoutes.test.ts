@@ -1,4 +1,6 @@
 import express from 'express';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import request from 'supertest';
 
 // Records the permissions each request asks for and grants only mockGranted. The real middleware
@@ -45,7 +47,9 @@ jest.mock('../../../src/features/document-generation/service', () => ({
   },
 }));
 
+import rTracer from 'cls-rtracer';
 import { env } from '../../../src/core/config/env';
+import { httpLogger } from '../../../src/core/logging';
 import { Permissions } from '../../../src/core/db/codes';
 import { coreErrorHandler } from '../../../src/core/middleware/errorHandler';
 import { documentGenerationDesignRouter } from '../../../src/features/document-generation/designRoute';
@@ -58,9 +62,13 @@ const service = jest.mocked(staffDocumentService);
 const MAX_RENDERS = env.getDocumentGenerationMaxConcurrent();
 const MAX_TEMPLATE_BYTES = env.getTemplatesMaxFileSizeMb() * 1024 * 1024;
 
+// The tracer and request logger app.ts mounts: the tracer's removeListener drops the last listener
+// added for an event, whichever one the logger asked to remove.
 const app = express();
+app.use(rTracer.expressMiddleware());
+app.use(httpLogger);
 app.use(express.json());
-app.use('/submissions', documentGenerationDesignRouter);
+app.use(documentGenerationDesignRouter);
 app.use(coreErrorHandler);
 
 const prepared = {
@@ -75,7 +83,7 @@ const ok = {
   contentType: 'application/pdf',
 } as const;
 
-const UPLOAD_PATH = `/submissions/${SUBMISSION}/print/upload`;
+const UPLOAD_PATH = `/print-upload/${SUBMISSION}`;
 const postUpload = (content = Buffer.from('template'), filename = 't.docx') =>
   request(app).post(UPLOAD_PATH).attach('file', content, filename);
 
@@ -135,7 +143,7 @@ describe('POST /:id/print', () => {
   });
 });
 
-describe('POST /:id/print/upload', () => {
+describe('POST /print-upload/:id', () => {
   it('renders the uploaded template with the options from the form fields', async () => {
     const res = await postUpload().field('convertTo', 'pdf').field('reportName', 'Receipt');
     expect(res.status).toBe(200);
@@ -176,8 +184,12 @@ describe('POST /:id/print/upload', () => {
     }
   });
 
-  it('frees its render slot once the response is sent, refused or not', async () => {
+  it('frees its render slot once the print ends, refused or not', async () => {
     await postUpload().expect(200);
+    await postUpload(Buffer.alloc(MAX_TEMPLATE_BYTES + 1)).expect(413);
+    await postUpload().field('data', '{}').expect(400);
+    service.printUpload.mockResolvedValueOnce({ status: 'infected' });
+    await postUpload().expect(422);
     service.prepareUpload.mockResolvedValue({ status: 'no-content' });
     await postUpload().expect(422);
     const slots = Array.from({ length: MAX_RENDERS }, () => takeRenderSlot(MAX_RENDERS));
@@ -206,7 +218,40 @@ describe('POST /:id/print/upload', () => {
   it('refuses a file type a CDOGS template does not accept with 415', async () => {
     const res = await postUpload(Buffer.from('template'), 't.pdf');
     expect(res.status).toBe(415);
+    expect(res.body.code).toBe('file_type_blocked');
     expect(service.printUpload).not.toHaveBeenCalled();
+  });
+
+  it('frees its render slot when the client leaves during the preflight', async () => {
+    let preflightDone: () => void = () => undefined;
+    const preflightRan = new Promise<void>((resolve) => (preflightDone = resolve));
+    service.prepareUpload.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      preflightDone();
+      return { status: 'ok', prepared };
+    });
+    const server = app.listen(0);
+    try {
+      const { port } = server.address() as AddressInfo;
+      const client = http.request({
+        port,
+        method: 'POST',
+        path: UPLOAD_PATH,
+        headers: { 'content-type': 'multipart/form-data; boundary=b', 'content-length': '100000' },
+      });
+      client.on('error', () => undefined);
+      client.write('--b\r\n');
+      setTimeout(() => client.destroy(), 50);
+      await preflightRan;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      const slots = Array.from({ length: MAX_RENDERS }, () => takeRenderSlot(MAX_RENDERS));
+      slots.forEach((release) => release?.());
+      expect(slots.every((release) => release !== null)).toBe(true);
+      expect(service.printUpload).not.toHaveBeenCalled();
+    } finally {
+      server.close();
+    }
   });
 
   it.each([

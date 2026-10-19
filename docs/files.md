@@ -137,13 +137,13 @@ file for that template only.
 
 Rendering needs the `document-generation` and `templates` features:
 
-| route                                              | access                                       | does                                                                                |
-| -------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `GET /api/v1/submit/submissions/:id/templates`     | the submitter `render` rule                  | the id of the form version's `cdogs` template, and `renderAvailable`                |
-| `POST /api/v1/submit/submissions/:id/print`        | the submitter `render` rule                  | renders `templateId` with the saved submission                                      |
-| `GET /api/v1/design/submissions/:id/templates`     | `submission_read`                            | the form version's `cdogs` templates with file name and date, and `renderAvailable` |
-| `POST /api/v1/design/submissions/:id/print`        | `submission_read`                            | renders `templateId` with the saved submission                                      |
-| `POST /api/v1/design/submissions/:id/print/upload` | `submission_read`, `submission_print_upload` | renders the multipart `file` with the saved submission, without storing it          |
+| route                                          | access                                       | does                                                                                |
+| ---------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `GET /api/v1/submit/submissions/:id/templates` | the submitter `render` rule                  | the id of the form version's `cdogs` template, and `renderAvailable`                |
+| `POST /api/v1/submit/submissions/:id/print`    | the submitter `render` rule                  | renders `templateId` with the saved submission                                      |
+| `GET /api/v1/design/submissions/:id/templates` | `submission_read`                            | the form version's `cdogs` templates with file name and date, and `renderAvailable` |
+| `POST /api/v1/design/submissions/:id/print`    | `submission_read`                            | renders `templateId` with the saved submission                                      |
+| `POST /api/v1/design/print-upload/:id`         | `submission_read`, `submission_print_upload` | renders the multipart `file` with the saved submission `:id`, without storing it    |
 
 The `render` rule needs access to the submission and `document_template_read`. Only `cdogs`
 templates render, and only saved answers print; printing unsaved ones needs a new route.
@@ -152,7 +152,8 @@ templates render, and only saved answers print; printing unsaved ones needs a ne
 is rate limited by `RATE_LIMIT_RENDER_*`. Each pod renders at most
 `DOCUMENT_GENERATION_MAX_CONCURRENT` (2) at a time and returns 503 beyond that; an upload takes its
 slot before its body is read. A template that cannot be rendered, an infected upload, or a print
-with no saved data returns 422. An unavailable backend, scanner or template bytes return 503.
+with no saved data returns 422. An unavailable backend, scanner or template bytes return 503. The
+upload has its own path so its route can wait out the scan (300s, like the other uploads).
 
 ## Submit files (deprecated)
 

@@ -103,6 +103,12 @@ describe('print schemas', () => {
     expect(PrintOptionsSchema.safeParse({ overwrite: false }).success).toBe(false);
   });
 
+  it('takes a report name with whole characters only', () => {
+    expect(PrintOptionsSchema.safeParse({ reportName: 'Receipt \u{1F600}' }).success).toBe(true);
+    expect(PrintOptionsSchema.safeParse({ reportName: 'Receipt \uD83D' }).success).toBe(false);
+    expect(PrintOptionsSchema.safeParse({ reportName: '\uDE00 Receipt' }).success).toBe(false);
+  });
+
   it('takes a template id and the options, and nothing else', () => {
     expect(PrintBodySchema.safeParse({ templateId: UUID }).success).toBe(true);
     expect(PrintBodySchema.safeParse({ templateId: 'x' }).success).toBe(false);

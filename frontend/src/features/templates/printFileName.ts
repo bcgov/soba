@@ -17,10 +17,12 @@ export function printBaseName(submission: {
     .filter(Boolean)
     .join(' ');
   // Characters a file name cannot hold on Windows.
-  return name
+  const cut = name
     .replaceAll(/[\\/:*?"<>|]+/g, '-')
     .trim()
     .slice(0, PRINT_REPORT_NAME_MAX_LENGTH);
+  // A cut inside a surrogate pair leaves half a character, which the server refuses.
+  return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
 }
 
 /** The base name with the extension the document's content type implies. */

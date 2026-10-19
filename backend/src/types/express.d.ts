@@ -6,7 +6,6 @@ import type {
   SubmitterFormListRow,
   SubmitterFormVersionRow,
 } from '../core/db/repos/submitterFormRepo';
-import type { PreparedUploadPrint } from '../features/document-generation/service';
 
 declare global {
   namespace Express {
@@ -34,8 +33,6 @@ declare global {
       submitterForm?: SubmitterFormListRow;
       /** The form version a submit route reads, read once by loadSubmitterFormVersion. */
       submitterFormVersion?: SubmitterFormVersionRow;
-      /** The staff upload print preparePrintUploadHandler checked before the body was read. */
-      printUpload?: PreparedUploadPrint;
       sortLocale?: SortLocale;
       actorId?: string;
       isSobaAdmin?: boolean;

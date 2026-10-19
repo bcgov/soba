@@ -25,6 +25,15 @@ describe('printBaseName', () => {
       printBaseName({ id: ID, formName: 'x'.repeat(300), confirmationCode: 'X1' }),
     ).toHaveLength(255);
   });
+
+  it('does not cut a character in half at the report name limit', () => {
+    const name = printBaseName({
+      id: ID,
+      formName: `${'x'.repeat(254)}\u{1F600}`,
+      confirmationCode: 'X1',
+    });
+    expect(name).toBe('x'.repeat(254));
+  });
 });
 
 describe('printFileName', () => {

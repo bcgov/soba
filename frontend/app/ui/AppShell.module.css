@@ -55,12 +55,11 @@
   }
 }
 
-/* Paper gets the page content only: no header, nav or footer, and nothing sticky. Last in the file
-   so it wins over the min-width padding above. */
+/* Paper gets the page content only: no header or nav, and nothing sticky. The footer hides itself.
+   Last in the file so it wins over the min-width padding above. */
 @media print {
   .header,
-  .aside,
-  .shell > footer {
+  .aside {
     display: none;
   }
 

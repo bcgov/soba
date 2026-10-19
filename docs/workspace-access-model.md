@@ -325,7 +325,7 @@ grants no delete, because every anonymous caller shares it. Design routes do not
 staff read, delete and print submissions through form permissions. Files have no design route, so
 staff download them through `/files` or `/submit/files`, which need a grant. Staff print through
 `/design/submissions/:id/{templates,print}` with `submission_read`, and with a template uploaded for
-that print through `/print/upload` with `submission_print_upload` as well.
+that print through `/design/print-upload/:id` with `submission_print_upload` as well.
 
 A repeated write gets its recorded answer before these rules run, so a retry keeps its answer after
 the form's settings change. A save or submit whose revision id the caller already recorded on the

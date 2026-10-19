@@ -126,7 +126,7 @@ export function registerDocumentGenerationOpenApi(registry: OpenAPIRegistry) {
 
   registry.registerPath({
     method: 'post',
-    path: `${DESIGN_BASE}/print/upload`,
+    path: '/design/print-upload/{id}',
     tags: [tag],
     security: STAFF_SECURITY,
     summary: "Render a document from an uploaded template and the submission's persisted data",

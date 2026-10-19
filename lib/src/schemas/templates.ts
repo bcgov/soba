@@ -84,10 +84,19 @@ export const PRINT_CONVERT_TO = ['pdf'] as const;
 
 export const PRINT_REPORT_NAME_MAX_LENGTH = 255;
 
+// No lone surrogate: the name goes into the download's Content-Disposition, which cannot encode one.
+const WELL_FORMED = /^(?:[^\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF])*$/;
+
 /** The render options a print accepts. */
 export const PrintOptionsSchema = z.strictObject({
   convertTo: z.enum(PRINT_CONVERT_TO).optional(),
-  reportName: z.string().trim().min(1).max(PRINT_REPORT_NAME_MAX_LENGTH).optional(),
+  reportName: z
+    .string()
+    .trim()
+    .min(1)
+    .max(PRINT_REPORT_NAME_MAX_LENGTH)
+    .regex(WELL_FORMED)
+    .optional(),
 });
 
 /** A print with a template stored on the submission's form version. */

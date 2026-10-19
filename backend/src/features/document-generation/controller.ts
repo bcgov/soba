@@ -1,6 +1,7 @@
-import { NextFunction, Request, Response } from 'express';
+import { Request, RequestHandler, Response } from 'express';
 import {
   ApiErrorCodes,
+  PrintOptionsSchema,
   templateExtensionsText,
   type PrintBody,
   type PrintOptions,
@@ -11,11 +12,12 @@ import {
   type DocumentRenderOutcome,
   type UploadedTemplate,
 } from './service';
-import { RENDER_BUSY } from './renderSlots';
+import { RENDER_BUSY, takeRenderSlot } from './renderSlots';
+import { env } from '../../core/config/env';
 import { resolveCaller } from '../../core/middleware/actor';
 import { accessDenial } from '../../core/middleware/formSubmitAccess';
 import { contentDisposition } from '../../core/api/shared/contentDisposition';
-import { checkedFileName, getUploadedFile } from '../../core/middleware/parseUpload';
+import { checkedFileName, getUploadedFile, parseUpload } from '../../core/middleware/parseUpload';
 import { templateFileType } from '../../core/integrations/document-generation/templateFileType';
 import {
   InternalError,
@@ -23,10 +25,23 @@ import {
   ServiceUnavailableError,
   UnprocessableEntityError,
   UnsupportedMediaTypeError,
+  ValidationError,
 } from '../../core/errors';
 
 const NOT_AUTHORIZED = 'Not authorized to generate this document';
 const SUBMISSION_NOT_FOUND = 'Submission not found';
+
+const maxConcurrentRenders = env.getDocumentGenerationMaxConcurrent();
+const parseTemplateUpload = parseUpload(env.getTemplatesMaxFileSizeMb() * 1024 * 1024);
+
+/** Run a middleware that always calls next, as a promise. */
+const runMiddleware = (handler: RequestHandler, req: Request, res: Response): Promise<void> =>
+  new Promise((resolve, reject) => {
+    handler(req, res, (err?: unknown) => {
+      if (!err) resolve();
+      else reject(err instanceof Error ? err : new Error(String(err)));
+    });
+  });
 
 /** Filename from the print options: `${reportName}.${convertTo}`, falling back to `document`. */
 function buildFilename(options: PrintOptions | undefined): string {
@@ -101,6 +116,7 @@ function uploadedTemplate(req: Request): UploadedTemplate {
   if (!fileType) {
     throw new UnsupportedMediaTypeError(
       `Template must be one of: ${templateExtensionsText('cdogs')}`,
+      ApiErrorCodes.file_type_blocked,
     );
   }
   return { content: upload.buffer, fileType, filename: checkedFileName(upload.originalname) };
@@ -151,32 +167,34 @@ export async function printStaffDocumentHandler(req: Request, res: Response): Pr
   respond(req, res, outcome, buildFilename(body.options));
 }
 
-/** Refuse an upload print that cannot render before its body is read. */
-export async function preparePrintUploadHandler(
-  req: Request,
-  _res: Response,
-  next: NextFunction,
-): Promise<void> {
-  const outcome = await staffDocumentService.prepareUpload(
-    req.coreContext!.workspaceId,
-    req.params.id,
-  );
-  if (outcome.status !== 'ok') throwRefusal(req, outcome);
-  req.printUpload = outcome.prepared;
-  next();
-}
-
-/** Print with a template uploaded in this request; it is rendered and discarded. */
+/**
+ * Print with a template uploaded in this request; it is rendered and discarded. The render slot is
+ * taken before the body is read and released when the print ends, so a process holds at most one
+ * uploaded template per slot.
+ */
 export async function printStaffUploadHandler(req: Request, res: Response): Promise<void> {
-  const prepared = req.printUpload;
-  if (!prepared)
-    throw new Error('printStaffUploadHandler must run after preparePrintUploadHandler');
-  const options = req.body as PrintOptions;
-  const outcome = await staffDocumentService.printUpload(
-    prepared,
-    uploadedTemplate(req),
-    options,
-    req.coreContext!.actorId,
-  );
-  respond(req, res, outcome, buildFilename(options));
+  const release = takeRenderSlot(maxConcurrentRenders);
+  if (!release) throw new ServiceUnavailableError(RENDER_BUSY, ApiErrorCodes.render_busy);
+  try {
+    const { workspaceId, actorId } = req.coreContext!;
+    const prepared = await staffDocumentService.prepareUpload(workspaceId, req.params.id);
+    if (prepared.status !== 'ok') throwRefusal(req, prepared);
+
+    // A request the client already dropped emits nothing more, so the parser would wait forever.
+    if (req.destroyed) throw new ValidationError('Request closed', ApiErrorCodes.upload_invalid);
+    await runMiddleware(parseTemplateUpload, req, res);
+    const options = PrintOptionsSchema.safeParse(req.body);
+    if (!options.success) {
+      throw new ValidationError('Invalid request body', ApiErrorCodes.request_invalid);
+    }
+    const outcome = await staffDocumentService.printUpload(
+      prepared.prepared,
+      uploadedTemplate(req),
+      options.data,
+      actorId,
+    );
+    respond(req, res, outcome, buildFilename(options.data));
+  } finally {
+    release();
+  }
 }
