@@ -192,6 +192,19 @@ signed-in user's own token. ConfigMap `<fullname>-backend-tenant-engine`:
 | `backend.tenantEngine.cstarV1.apiBaseUrl` | `PLUGIN_CSTAR_V1_API_BASE_URL` | cstar-v1 adapter        |
 | `backend.tenantEngine.cstarV1.timeoutMs`  | `PLUGIN_CSTAR_V1_TIMEOUT_MS`   | cstar-v1 adapter        |
 
+## Workflow Engine Configuration
+
+The workflow engine starts and tracks workflows. It has no secrets: `cs-workflow-v1` calls the
+Connected Services workflow API with the signed-in user's own token. `workflow-noop` (the default)
+starts nothing. ConfigMap `<fullname>-backend-workflow-engine`:
+
+| Helm value                                       | Env var                              | Used by                 |
+| ------------------------------------------------ | ------------------------------------ | ----------------------- |
+| `backend.config.workflowEngineDefaultCode`       | `WORKFLOW_ENGINE_DEFAULT_CODE`       | default engine resolver |
+| `backend.workflowEngine.csWorkflowV1.apiBaseUrl` | `PLUGIN_CS_WORKFLOW_V1_API_BASE_URL` | cs-workflow-v1 adapter  |
+| `backend.workflowEngine.csWorkflowV1.apiKey`     | `PLUGIN_CS_WORKFLOW_V1_API_KEY`      | cs-workflow-v1 adapter  |
+| `backend.workflowEngine.csWorkflowV1.timeoutMs`  | `PLUGIN_CS_WORKFLOW_V1_TIMEOUT_MS`   | cs-workflow-v1 adapter  |
+
 ## Database Migration
 
 On every `helm install` and `helm upgrade`, a Kubernetes Job runs **before** the

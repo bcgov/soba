@@ -40,6 +40,7 @@ import type {
   StoragePluginDefinition,
 } from '../storage-engine/StorageEngineAdapter';
 import type { TenantEnginePluginDefinition } from '../tenant/TenantEnginePluginDefinition';
+import type { WorkflowEnginePluginDefinition } from '../workflow/WorkflowEnginePluginDefinition';
 import { reportReadinessByKey } from './readiness';
 
 // --- Definition schemas -----------------------------------------------------
@@ -50,7 +51,7 @@ const AdapterPluginDefinitionSchema = z.object({
   createAdapter: z.any(),
 });
 
-// form-engine, document-generation and tenant-engine share this { code, metadata, createAdapter } shape.
+// form-engine, document-generation, tenant-engine and workflow-engine share this { code, metadata, createAdapter } shape.
 const MetadataPluginDefinitionSchema = z.object({
   code: z.string().min(1),
   metadata: z.object({
@@ -89,6 +90,7 @@ interface CachedPlugin {
   storageDefinition?: StoragePluginDefinition;
   idpDefinition?: IdpPluginDefinition;
   tenantEngineDefinition?: TenantEnginePluginDefinition;
+  workflowEngineDefinition?: WorkflowEnginePluginDefinition;
 }
 
 // Each CachedPlugin definition field, the module export it comes from, and the schema that
@@ -143,6 +145,11 @@ const DEFINITION_KINDS: ReadonlyArray<{
   {
     field: 'tenantEngineDefinition',
     exportKey: 'tenantEnginePluginDefinition',
+    schema: MetadataPluginDefinitionSchema,
+  },
+  {
+    field: 'workflowEngineDefinition',
+    exportKey: 'workflowEnginePluginDefinition',
     schema: MetadataPluginDefinitionSchema,
   },
 ];
@@ -287,6 +294,7 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
       p.storageDefinition?.code ??
       p.idpDefinition?.code ??
       p.tenantEngineDefinition?.code ??
+      p.workflowEngineDefinition?.code ??
       p.dir;
     return {
       code,
@@ -352,6 +360,24 @@ export function getTenantEnginePluginCatalog(): TenantEnginePluginCatalogEntry[]
 
 export function getTenantEnginePluginDefinitions(): TenantEnginePluginDefinition[] {
   return definitionsOf('tenantEngineDefinition');
+}
+
+export interface WorkflowEnginePluginCatalogEntry {
+  code: string;
+  name: string;
+  version?: string;
+}
+
+export function getWorkflowEnginePluginCatalog(): WorkflowEnginePluginCatalogEntry[] {
+  return getWorkflowEnginePluginDefinitions().map((d) => ({
+    code: d.code,
+    name: d.metadata.name,
+    version: d.metadata.version,
+  }));
+}
+
+export function getWorkflowEnginePluginDefinitions(): WorkflowEnginePluginDefinition[] {
+  return definitionsOf('workflowEngineDefinition');
 }
 
 export function getCachePluginDefinitions(): CachePluginDefinition[] {
