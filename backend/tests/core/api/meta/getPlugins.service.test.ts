@@ -69,4 +69,24 @@ describe('MetaApiService.getPlugins feature-gated enablement', () => {
       expect(Object.fromEntries(plugins.map((p) => [p.code, p.enabled]))).toEqual(expected);
     },
   );
+
+  it.each([
+    [undefined, { 'cs-workflow-v1': false, 'workflow-noop': true }],
+    ['cs-workflow-v1', { 'cs-workflow-v1': true, 'workflow-noop': false }],
+  ])(
+    'enables the default workflow engine (WORKFLOW_ENGINE_DEFAULT_CODE=%s)',
+    async (code, expected) => {
+      if (code === undefined) delete process.env.WORKFLOW_ENGINE_DEFAULT_CODE;
+      else process.env.WORKFLOW_ENGINE_DEFAULT_CODE = code;
+      getPluginCatalog.mockReturnValue([
+        { code: 'cs-workflow-v1', hasApi: false },
+        { code: 'workflow-noop', hasApi: false },
+      ]);
+      getFeatureGated.mockReturnValue([]);
+      listFeatures.mockResolvedValue([]);
+
+      const { plugins } = await metaApiService.getPlugins();
+      expect(Object.fromEntries(plugins.map((p) => [p.code, p.enabled]))).toEqual(expected);
+    },
+  );
 });

@@ -109,6 +109,11 @@ describe('dev data access coverage expectations', () => {
     expect(staffTemplates.filter((persona) => !designRead.includes(persona))).toEqual([]);
   });
 
+  it.each(COVERAGE_FORM_KEYS)('%s: only a submission reader prints with an upload', (key) => {
+    const { printUpload, submissionsRead } = DESIGN_EXPECTATIONS[key];
+    expect(printUpload.filter((persona) => !submissionsRead.includes(persona))).toEqual([]);
+  });
+
   it('gives the anonymous caller no design or workspace access', () => {
     for (const key of COVERAGE_FORM_KEYS) {
       for (const check of DESIGN_CHECKS) {

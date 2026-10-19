@@ -25,7 +25,7 @@ import {
 } from '@soba/lib';
 
 import { db } from '../../../core/db/client';
-import { FormCreatePermissions } from '../../../core/db/codes';
+import { FormCreatePermissions, PrintUploadPermissions } from '../../../core/db/codes';
 import type { IdpAttributes } from '../../../core/auth/jwtClaims';
 import {
   forms,
@@ -766,6 +766,7 @@ const NO_DESIGN_ACCESS: Record<DesignCheck, boolean> = {
   designUpdate: false,
   submissionsRead: false,
   staffTemplates: false,
+  printUpload: false,
 };
 
 const designAnswers = (
@@ -779,6 +780,7 @@ const designAnswers = (
     designUpdate: grants(Permissions.design_update),
     submissionsRead: grants(Permissions.submission_read),
     staffTemplates: grants(Permissions.form_read, Permissions.document_template_read),
+    printUpload: grants(...PrintUploadPermissions),
   };
 };
 

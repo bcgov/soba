@@ -34,6 +34,9 @@ backend:
   tenantEngine:
     cstarV1:
       apiBaseUrl: https://test.connect.digital.gov.bc.ca/api/v1
+  workflowEngine:
+    csWorkflowV1:
+      apiBaseUrl: https://test-workflow.apps.gold.devops.gov.bc.ca/api/v1
 
 frontend:
   replicas: 2

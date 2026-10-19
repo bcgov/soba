@@ -32,7 +32,7 @@ export default defineConfig([
   },
   { files: ['**/*.css'], plugins: { css }, language: 'css/css', extends: ['css/recommended'] },
   {
-    files: ['src/**/*.ts', 'scripts/**/*.ts', 'tests/**/*.ts', 'temporal-worker.ts'],
+    files: ['src/**/*.ts', 'tests/**/*.ts', 'temporal-worker.ts'],
     ignores: TEST_FILES,
     plugins: { sonarjs, unicorn },
     languageOptions: typeInformation,

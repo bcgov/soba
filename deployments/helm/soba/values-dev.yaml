@@ -25,6 +25,7 @@ backend:
     eventStreamDefaultCode: eventstream-redis
     documentGenerationDefaultCode: cdogs-v2
     tenantEngineDefaultCode: cstar-v1
+    workflowEngineDefaultCode: cs-workflow-v1
   documentGeneration:
     cdogsV2:
       endpoint: https://cdogs-dev.api.gov.bc.ca/api
@@ -33,7 +34,10 @@ backend:
       endpoint: http://common-document-generation-service-master.a12c97-prod:3000
   tenantEngine:
     cstarV1:
-      apiBaseUrl: https://dev.connect.digital.gov.bc.ca/api/v1
+      apiBaseUrl: https://test.connect.digital.gov.bc.ca/api/v1
+  workflowEngine:
+    csWorkflowV1:
+      apiBaseUrl: https://test-workflow.apps.gold.devops.gov.bc.ca/api/v1
 
 frontend:
   replicas: 1

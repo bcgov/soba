@@ -33,6 +33,12 @@ export const documentGenerationAudits = sobaSchema.table(
     errorDetail: text('error_detail'),
     // Correlation id (X-Request-Id) to pivot an audit row back to the request's app logs.
     requestId: text('request_id'),
+    // No foreign keys: templates are hard-deleted, and replacing one keeps its id with a new file.
+    // Both null when the template was uploaded for that render only.
+    templateId: uuid('template_id'),
+    templateFileId: uuid('template_file_id'),
+    // The submission's head revision when it was rendered.
+    revisionId: uuid('revision_id'),
     createdBy: uuid('created_by')
       .notNull()
       .references(() => appUsers.id),

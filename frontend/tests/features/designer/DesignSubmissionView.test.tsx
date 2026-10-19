@@ -155,6 +155,35 @@ describe('DesignSubmissionView', () => {
     expect(mockPush).toHaveBeenCalledWith('/en/build/f1?tab=submissions');
   });
 
+  it('prints every review panel open, then reopens only the ones the user had open', async () => {
+    signIn();
+    await renderView();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Notes' })).toBeInTheDocument());
+    const expanded = (name: string) =>
+      screen.getByRole('button', { name }).getAttribute('aria-expanded');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Submission' }));
+    expect(expanded('Submission')).toBe('false');
+
+    act(() => {
+      window.dispatchEvent(new Event('beforeprint'));
+    });
+    expect([expanded('Status'), expanded('Notes'), expanded('Submission')]).toEqual([
+      'true',
+      'true',
+      'true',
+    ]);
+
+    act(() => {
+      window.dispatchEvent(new Event('afterprint'));
+    });
+    expect([expanded('Status'), expanded('Notes'), expanded('Submission')]).toEqual([
+      'true',
+      'true',
+      'false',
+    ]);
+  });
+
   it('says there are no answers when the submission has no engine document', async () => {
     signIn();
     getSobaSubmissionData.mockResolvedValue(null);
