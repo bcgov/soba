@@ -1,5 +1,5 @@
 import { PageLayout } from '@/src/components/PageLayout';
-import StartSubmission from '@/src/features/submit-mode/ui/StartSubmission';
+import FormioV5NewSubmissionLoader from '@/src/features/formio-v5/ui/FormioV5NewSubmissionLoader';
 import { getDictionary, resolveLocale } from '../../dictionaries';
 import { pageMetadata } from '@/src/shared/config/pageMetadata';
 import { assertFeatureAllowed } from '@/src/shared/featureFlags/assertFeatureAllowed';
@@ -16,15 +16,15 @@ export async function generateMetadata({ params }: PageProps) {
   );
 }
 
-export default async function Page({ params }: PageProps) {
+export default async function Page({ params }: Readonly<PageProps>) {
   await assertFeatureAllowed(FEATURE_CODES.SUBMIT_MODE);
 
-  const { lang } = await params;
+  const { lang, formId } = await params;
   const locale = resolveLocale(lang);
   const dict = await getDictionary(locale);
   return (
     <PageLayout headingId="formio-v5-render-heading" heading={dict.formioV5.formRender.pageTitle}>
-      <StartSubmission />
+      <FormioV5NewSubmissionLoader formId={decodeURIComponent(formId)} />
     </PageLayout>
   );
 }

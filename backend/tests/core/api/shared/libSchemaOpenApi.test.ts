@@ -47,6 +47,7 @@ describe('OpenAPI components for lib-backed schemas', () => {
       'Submissions_SubmissionSort',
     ],
     ['Workspaces_ListWorkspacesResponse', 'Workspaces_WorkspaceItem', 'Workspaces_WorkspaceSort'],
+    ['Submit_ListMyFormsResponse', 'Submit_MyFormListItem', 'Submit_MyFormSort'],
     [
       'Submit_ListMySubmissionsResponse',
       'Submit_MySubmissionListItem',
@@ -69,6 +70,7 @@ describe('OpenAPI components for lib-backed schemas', () => {
     ['Meta_PluginsResponse', 'plugins', 'Meta_PluginCatalogEntry'],
     ['Meta_FeaturesResponse', 'features', 'Meta_Feature'],
     ['Meta_FormEnginesResponse', 'items', 'Meta_FormEngine'],
+    ['Meta_LoginProvidersResponse', 'items', 'Meta_LoginProvider'],
     ['Meta_RolesResponse', 'roles', 'Meta_RoleWithSource'],
     ['Me_TenantsResponse', 'tenants', 'Me_Tenant'],
   ])('%s references its %s item component', (response, property, item) => {
@@ -88,6 +90,7 @@ describe('OpenAPI components for lib-backed schemas', () => {
   it.each([
     ['Workspaces_WorkspaceLookupResponse', 'Workspaces_WorkspaceLookupItem'],
     ['Forms_FormVersionLookupResponse', 'Forms_FormVersionSummary'],
+    ['Submit_MyWorkspaceLookupResponse', 'Submit_MyWorkspaceLookupItem'],
   ])('%s references its item component', (response, item) => {
     expect(at(schemas, response, 'properties', 'items', 'items')).toEqual(ref(item));
     expect(at(schemas, response, 'required')).toEqual(
@@ -101,18 +104,98 @@ describe('OpenAPI components for lib-backed schemas', () => {
     );
   });
 
-  it('names the submitter settings response and body', () => {
+  it('names the submitter settings values', () => {
     expect(
       at(schemas, 'FormSettings_Submitter', 'properties', 'allowSubmitterDrafts', 'type'),
     ).toBe('boolean');
-    expect(at(schemas, 'FormSettings_SetSubmitterBody', 'required')).toEqual([
-      'allowSubmitterDrafts',
-    ]);
   });
+
+  it.each(['Audience', 'Submitter'])(
+    'builds the %s form view and save body on its values component',
+    (name) => {
+      const values = `FormSettings_${name}`;
+      const view = `FormSettings_Form${name}`;
+      expect(at(schemas, view, 'properties', 'workspace')).toEqual(ref(values));
+      expect(at(schemas, view, 'properties', 'effective')).toEqual(ref(values));
+      expect(at(schemas, view, 'properties', 'own', 'allOf', 0)).toEqual(ref(values));
+      expect(
+        at(schemas, `FormSettings_SetForm${name}Body`, 'oneOf', 1, 'properties', 'values'),
+      ).toEqual(ref(values));
+      expect(at(schemas, `FormSettings_Workspace${name}`, 'properties', 'values')).toEqual(
+        ref(values),
+      );
+      // The form's own values may be null; the workspace's never are.
+      expect(JSON.stringify(at(schemas, values))).not.toContain('nullable');
+    },
+  );
 
   it('builds the form-with-version response on the named form response', () => {
     expect(at(schemas, 'Forms_FormWithVersionResponse', 'allOf', 0)).toEqual(
       ref('Forms_FormResponse'),
     );
+  });
+
+  // The My Forms row is the lib's submitter form; clients read these fields as-is.
+  it('keeps the My Forms row shape', () => {
+    const text = { type: 'string' };
+    const textList = { type: 'array', items: text };
+    expect(at(schemas, 'Submit_MyFormListItem')).toEqual({
+      type: 'object',
+      properties: {
+        id: text,
+        name: text,
+        workspaceId: text,
+        workspaceName: text,
+        publishedVersionId: { ...text, nullable: true },
+        permissions: textList,
+        audienceMode: { ...text, nullable: true, enum: ['public', 'protected', 'members', null] },
+        audienceIdps: textList,
+        allowSubmitterDrafts: { type: 'boolean' },
+      },
+      required: [
+        'id',
+        'name',
+        'workspaceId',
+        'workspaceName',
+        'publishedVersionId',
+        'permissions',
+        'audienceMode',
+        'audienceIdps',
+        'allowSubmitterDrafts',
+      ],
+    });
+  });
+
+  // The fill bundle's form is the same submitter form My Forms lists, and is never null.
+  it('builds the fill bundle on the named submitter form and role', () => {
+    expect(at(schemas, 'Submit_SubmitterForm')).toEqual(at(schemas, 'Submit_MyFormListItem'));
+    expect(at(schemas, 'Submit_FillBundle', 'properties', 'form')).toEqual(
+      ref('Submit_SubmitterForm'),
+    );
+    expect(at(schemas, 'Submit_FillBundle', 'properties', 'role')).toEqual(
+      ref('Submit_MySubmissionRole'),
+    );
+    expect(at(schemas, 'Submit_MySubmissionRole', 'nullable')).toBeUndefined();
+    expect(at(schemas, 'Submit_FillBundle', 'required')).toEqual(
+      expect.arrayContaining(['formId', 'currentRevisionNo', 'role', 'form']),
+    );
+  });
+
+  // A row's head revision is nullable, like its column; its forms are the named submitter form.
+  it('builds My Submissions rows with their revision fields and the page forms', () => {
+    const row = 'Submit_MySubmissionListItem';
+    expect(at(schemas, row, 'properties', 'headRevisionId')).toEqual({
+      type: 'string',
+      nullable: true,
+    });
+    expect(at(schemas, row, 'properties', 'currentRevisionNo', 'type')).toBe('integer');
+    expect(at(schemas, row, 'required')).toEqual(
+      expect.arrayContaining(['formVersionId', 'headRevisionId', 'currentRevisionNo']),
+    );
+    const response = 'Submit_ListMySubmissionsResponse';
+    expect(at(schemas, response, 'properties', 'forms', 'items')).toEqual(
+      ref('Submit_SubmitterForm'),
+    );
+    expect(at(schemas, response, 'required')).toEqual(expect.arrayContaining(['forms']));
   });
 });

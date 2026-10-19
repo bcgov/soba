@@ -14,6 +14,13 @@ export interface UpsertSchemaInput {
   schema: Record<string, unknown>;
   /** Optional human-readable title; defaults to the schema's own title. */
   title?: string;
+  /**
+   * The document the version refers to, written when it still exists. When given, every other
+   * document with the version's identity is deleted before the write.
+   */
+  engineRef?: string;
+  /** Abandons the engine calls when it fires. */
+  signal?: AbortSignal;
 }
 
 /** Input for creating a new (immutable) submission document in the engine for a save/revision. */
@@ -63,4 +70,9 @@ export interface FormEngineAdapter {
    * Returns the schema unchanged if the engine has nothing to do.
    */
   normalizeSchema?(schema: Record<string, unknown>): Record<string, unknown>;
+  /**
+   * The parts of a stored schema that decide what a filler sees and how their answers validate,
+   * without the document's identity and metadata; what a schema hash covers. Pure, no engine call.
+   */
+  renderedSchema?(schema: Record<string, unknown>): Record<string, unknown>;
 }

@@ -3,8 +3,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+// Set per test: whether the user is signed in, and the query string the page was opened with.
+const session = vi.hoisted(() => ({ authenticated: true, search: '' }));
+
 vi.mock('@/lib/hooks/useKeycloak', () => ({
-  useKeycloak: () => ({ authenticated: true, token: 'token', initializing: false }),
+  useKeycloak: () => ({
+    authenticated: session.authenticated,
+    token: session.authenticated ? 'token' : null,
+    initializing: false,
+  }),
 }));
 
 vi.mock('@/app/[lang]/Providers', () => ({
@@ -25,13 +32,6 @@ vi.mock('@/app/[lang]/Providers', () => ({
         formSettingsDrawerLabel: 'Form Settings',
         formKindList: { team: 'Team', public: 'Public' },
       },
-      submitterAudienceLabel: 'Who can submit',
-      submitterAudiencePublic: 'Public',
-      submitterAudienceProtected: 'Protected',
-      submitterAudienceNotSet: 'Not set',
-      submitterAudiencePeople: 'people',
-      submitterAudienceInheritedSummary: 'Inherited: {summary}',
-      submitterAudienceLoadError: 'load error',
     },
     general: { notAuthenticated: 'Not authed', lookupTruncated: 'Showing the first {limit}.' },
     workspaces: { workspace: 'Workspace' },
@@ -156,9 +156,17 @@ vi.mock('@bcgov/design-system-react-components', async (importOriginal) => {
     }) => {
       return (
         <div data-testid={testId}>
+          {/* As react-aria's hidden select does, input and change both report a selection that
+              differs from the selected key. */}
           <select
             value={selectedKey || ''}
-            onChange={(e) => onSelectionChange?.(e.target.value)}
+            onChange={(e) => {
+              if (e.target.value !== (selectedKey || '')) onSelectionChange?.(e.target.value);
+            }}
+            onInput={(e) => {
+              const value = e.currentTarget.value;
+              if (value !== (selectedKey || '')) onSelectionChange?.(value);
+            }}
             aria-label={ariaLabel}
           >
             <option value="">Select...</option>
@@ -195,7 +203,7 @@ vi.mock('@/src/features/designer/ui/FormDesigner', () => {
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {} }),
   useParams: () => ({ lang: 'en' }),
-  useSearchParams: () => new URLSearchParams(''),
+  useSearchParams: () => new URLSearchParams(session.search),
   usePathname: () => '',
 }));
 
@@ -233,6 +241,8 @@ describe('FormForm', () => {
     store = makeStore();
     store.dispatch(setToken('token'));
     store.dispatch(setAuthenticated(true));
+    session.authenticated = true;
+    session.search = '';
     mockWorkspaceState.creatable = [{ id: 'ws1', disclaimerAccepted: true }];
     mockWorkspaceState.formCreate = 'allowed';
     mockWorkspaceState.versions = [];
@@ -263,7 +273,10 @@ describe('FormForm', () => {
     api.lookupWorkspaces.mockImplementation(() =>
       Promise.resolve({ items: mockWorkspaceState.creatable, limit: 500, truncated: false }),
     );
-    api.createFormVersion.mockResolvedValue({ id: 'v-new', versionNo: 3, state: 'draft' });
+    api.createFormVersion.mockResolvedValue({
+      value: { id: 'v-new', versionNo: 3, state: 'draft' },
+      created: true,
+    });
     api.saveFormVersionSchema.mockResolvedValue({});
     api.publishSobaFormVersion.mockResolvedValue({});
     builder.onUpdateModel = null;
@@ -463,9 +476,16 @@ describe('FormForm', () => {
       .querySelector('select') as HTMLSelectElement;
     await userEvent.selectOptions(picker, 'create');
     await waitFor(() => expect(api.createFormVersion).toHaveBeenCalled());
-    expect(api.createFormVersion).toHaveBeenCalledWith(expect.any(String), 'f1', 'v1');
-    const newVersionCall = api.saveFormVersionSchema.mock.calls.find((c) => c[1] === 'v-new');
-    expect(newVersionCall?.[2]).toEqual({ components: [{ key: 'edited' }] });
+    // One request carries the schema; nothing is saved to the new version afterwards.
+    expect(api.createFormVersion).toHaveBeenCalledWith(expect.any(String), {
+      id: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      ),
+      formId: 'f1',
+      fromFormVersionId: 'v1',
+      schema: { components: [{ key: 'edited' }] },
+    });
+    expect(api.saveFormVersionSchema).toHaveBeenCalledTimes(1);
   });
 
   // Once the form is read again the new version is current, so the next save goes to it and not to
@@ -476,7 +496,7 @@ describe('FormForm', () => {
     api.createFormVersion.mockImplementation(() => {
       const created = { id: 'v-new', versionNo: 2, state: 'draft' };
       mockWorkspaceState.versions = [...mockWorkspaceState.versions, created];
-      return Promise.resolve(created);
+      return Promise.resolve({ value: created, created: true });
     });
     await act(async () => {
       await renderForm({ formId: 'f1' });
@@ -490,12 +510,69 @@ describe('FormForm', () => {
     await waitFor(() =>
       expect(screen.getAllByText('Current Draft (v2)').length).toBeGreaterThan(0),
     );
-    // The create copies the schema into the new version: that is the first write.
-    expect(api.saveFormVersionSchema).toHaveBeenCalledTimes(1);
+    // The create carries the schema itself, so the save is the first schema write.
+    expect(api.saveFormVersionSchema).not.toHaveBeenCalled();
 
     await userEvent.click(screen.getByTestId('save-form-button'));
-    await waitFor(() => expect(api.saveFormVersionSchema).toHaveBeenCalledTimes(2));
-    expect(api.saveFormVersionSchema.mock.calls[1][1]).toBe('v-new');
+    await waitFor(() => expect(api.saveFormVersionSchema).toHaveBeenCalledTimes(1));
+    expect(api.saveFormVersionSchema.mock.calls[0][1]).toBe('v-new');
+  });
+
+  // A change to the native select fires input and then change in one task, before React re-renders.
+  it('creates one version when one pick reports the selection twice', async () => {
+    mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+    await waitFor(() => expect(screen.getByTestId('form-designer')).toBeInTheDocument());
+
+    const picker = screen
+      .getByTestId('form-version-select')
+      .querySelector('select') as HTMLSelectElement;
+    act(() => {
+      picker.value = 'create';
+      picker.dispatchEvent(new Event('input', { bubbles: true }));
+      picker.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await waitFor(() => expect(api.createFormVersion).toHaveBeenCalled());
+    expect(api.createFormVersion).toHaveBeenCalledTimes(1);
+  });
+
+  // A new version's 409 is the backend's reason, not a form that changed since it was opened.
+  it("reports a refused new version's own reason", async () => {
+    mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
+    api.createFormVersion.mockRejectedValue(new ApiError('The version to copy has no schema', 409));
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+    await waitFor(() => expect(screen.getByTestId('form-designer')).toBeInTheDocument());
+
+    const picker = screen
+      .getByTestId('form-version-select')
+      .querySelector('select') as HTMLSelectElement;
+    await userEvent.selectOptions(picker, 'create');
+
+    const notices = () => store.getState().notification.notifications.map((n) => n.text);
+    await waitFor(() => expect(notices()).toContain('The version to copy has no schema'));
+    expect(screen.queryByTestId('page-notice-stale-edits')).not.toBeInTheDocument();
+  });
+
+  // The builder draws no Submit of its own, so Save writes the button the designer shows.
+  it('starts a version with no saved schema from a Submit button, and saves it', async () => {
+    mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
+    api.getFormVersionSchema.mockResolvedValue(null);
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+    await waitFor(() => expect(screen.getByTestId('form-designer')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByTestId('save-form-button'));
+
+    await waitFor(() => expect(api.saveFormVersionSchema).toHaveBeenCalledTimes(1));
+    expect(api.saveFormVersionSchema.mock.calls[0][1]).toBe('v1');
+    expect(api.saveFormVersionSchema.mock.calls[0][2]).toEqual({
+      components: [expect.objectContaining({ type: 'button', key: 'submit', action: 'submit' })],
+    });
   });
 
   // A form with no current version has nothing to save to. Writing anyway would file the schema
@@ -533,7 +610,34 @@ describe('FormForm', () => {
     expect(await screen.findByTestId('page-notice-load-error')).toHaveTextContent(
       'Failed to load form.',
     );
-    expect(screen.queryByText('Loading')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('loading-indicator')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+  });
+
+  // The form loaded but its draft did not. An empty builder there reads as an empty form.
+  it('shows the load error in place of the builder when the schema read fails', async () => {
+    mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
+    api.getFormVersionSchema.mockRejectedValue(new Error('boom'));
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+
+    expect(await screen.findByTestId('designer-load-error')).toHaveTextContent(
+      'Failed to load form.',
+    );
+    expect(screen.queryByTestId('form-designer')).not.toBeInTheDocument();
+  });
+
+  // Nothing is read without a token, so no tab can be picked from the form's permissions.
+  it('tells a signed-out user so instead of spinning', async () => {
+    session.authenticated = false;
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+
+    expect(await screen.findByText('Not authed')).toBeInTheDocument();
+    expect(screen.queryByTestId('loading-indicator')).not.toBeInTheDocument();
+    expect(api.getSobaForm).not.toHaveBeenCalled();
   });
 
   describe('Tab Permissions', () => {
@@ -546,6 +650,38 @@ describe('FormForm', () => {
       'share-tab',
     ];
 
+    const withPermissions = (permissions: string[]) =>
+      api.getSobaForm.mockImplementation(() =>
+        Promise.resolve({
+          id: 'f1',
+          name: 'Test',
+          description: '',
+          permissions,
+          currentVersion: newestFirst(mockWorkspaceState.versions)[0] ?? null,
+        }),
+      );
+
+    // The forms list and the submission view link to a tab by name.
+    it('opens the tab named in the URL', async () => {
+      session.search = 'tab=submissions';
+      await act(async () => {
+        await renderForm({ formId: 'f1' });
+      });
+
+      expect(await screen.findByTestId('submission-tab')).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('opens the first visible tab when the URL names one the user cannot see', async () => {
+      session.search = 'tab=submissions';
+      withPermissions(['design_update']);
+      await act(async () => {
+        await renderForm({ formId: 'f1' });
+      });
+
+      expect(await screen.findByTestId('designer-tab')).toHaveAttribute('aria-selected', 'true');
+      expect(screen.queryByTestId('submission-tab')).not.toBeInTheDocument();
+    });
+
     it.each([
       ['design_update', ['designer-tab', 'version-tab', 'share-tab']],
       ['form_update', ['settings-tab', 'share-tab']],
@@ -553,15 +689,7 @@ describe('FormForm', () => {
       ['submission_read', ['submission-tab', 'share-tab']],
       ['*', allTabs],
     ])('shows expected tabs when user has %s permission', async (permission, expectedTabs) => {
-      api.getSobaForm.mockImplementation(() =>
-        Promise.resolve({
-          id: 'f1',
-          name: 'Test',
-          description: '',
-          permissions: [permission],
-          currentVersion: newestFirst(mockWorkspaceState.versions)[0] ?? null,
-        }),
-      );
+      withPermissions([permission]);
       await act(async () => {
         await renderForm({ formId: 'f1' });
       });

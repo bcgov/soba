@@ -1,6 +1,5 @@
 import express from 'express';
 import { validateRequest } from '../shared/validation';
-import { SortLocaleQuerySchema } from '../shared/offsetPagination';
 import { sortLocale } from '../../middleware/sortLocale';
 import {
   workspaceFromBody,
@@ -24,11 +23,8 @@ import {
   saveFormVersion,
   publishFormVersion,
   unpublishFormVersion,
-  restoreFormVersion,
   provisionFormVersionSchema,
   getFormVersionSchema,
-  getFormSubmitterAudience,
-  setFormSubmitterAudience,
 } from './controller';
 import {
   CreateFormBodySchema,
@@ -42,7 +38,6 @@ import {
   ProvisionSchemaBodySchema,
   SaveFormVersionBodySchema,
   SaveFormVersionParamsSchema,
-  SetFormSubmitterAudienceBodySchema,
   UpdateFormBodySchema,
 } from './schema';
 
@@ -53,7 +48,6 @@ const router = express.Router();
 
 const FORMS_PATH = '/forms';
 const FORMS_ID_PATH = `${FORMS_PATH}/:id`;
-const FORM_SUBMITTER_AUDIENCE_PATH = `${FORMS_ID_PATH}/submitter-audience`;
 const FORM_VERSIONS_PATH = '/form-versions';
 const FORM_VERSIONS_ID_PATH = `${FORM_VERSIONS_PATH}/:id`;
 
@@ -99,26 +93,6 @@ router.patch(
   updateForm,
 );
 router.get(
-  FORM_SUBMITTER_AUDIENCE_PATH,
-  validateRequest({ query: SortLocaleQuerySchema, params: FormIdParamsSchema }),
-  sortLocale,
-  formResource,
-  requireFormPermissions([Permissions.form_read]),
-  getFormSubmitterAudience,
-);
-router.put(
-  FORM_SUBMITTER_AUDIENCE_PATH,
-  validateRequest({
-    query: SortLocaleQuerySchema,
-    params: FormIdParamsSchema,
-    body: SetFormSubmitterAudienceBodySchema,
-  }),
-  sortLocale,
-  formResource,
-  requireFormPermissions([Permissions.form_update]),
-  setFormSubmitterAudience,
-);
-router.get(
   FORM_VERSIONS_PATH,
   validateRequest({ query: ListFormVersionsQuerySchema }),
   workspaceListScope({ anchorOrder: ['formVersionId', 'formId', 'workspaceId'], allowEmpty: true }),
@@ -144,7 +118,8 @@ router.post(
   FORM_VERSIONS_PATH,
   validateRequest({ body: CreateFormVersionBodySchema }),
   formFromBodyResource,
-  requireFormPermissions([Permissions.design_create]),
+  // Creating a draft writes its schema, so it needs design_update too.
+  requireFormPermissions([Permissions.design_create, Permissions.design_update]),
   createFormVersion,
 );
 router.post(
@@ -167,13 +142,6 @@ router.post(
   formVersionResource,
   requireFormPermissions([Permissions.design_update]),
   unpublishFormVersion,
-);
-router.post(
-  `${FORM_VERSIONS_ID_PATH}/restore`,
-  validateRequest({ params: FormVersionIdParamsSchema }),
-  formVersionResource,
-  requireFormPermissions([Permissions.design_update]),
-  restoreFormVersion,
 );
 router.get(
   `${FORM_VERSIONS_ID_PATH}/schema`,

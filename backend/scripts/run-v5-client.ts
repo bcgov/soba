@@ -33,7 +33,9 @@ async function main() {
     password: '',
   });
   const health = await anonClient.healthCheck();
-  console.log('healthCheck():', health.ok ? 'OK' : `unhealthy (${health.message ?? 'unknown'})`);
+  // The message comes from the server; drop line breaks so it cannot forge log lines.
+  const reason = (health.message ?? 'unknown').replace(/[\r\n]+/g, ' ');
+  console.log('healthCheck():', health.ok ? 'OK' : `unhealthy (${reason})`);
   console.log('');
 
   // --- Login (admin from config) ---
@@ -58,8 +60,7 @@ async function main() {
     const roles = await client.loadRoles();
     const authenticated = roles.find(
       (r) =>
-        (r.name && r.name.toLowerCase() === 'authenticated') ||
-        (r.title && r.title.toLowerCase() === 'authenticated'),
+        r.name?.toLowerCase() === 'authenticated' || r.title?.toLowerCase() === 'authenticated',
     );
     if (authenticated) authenticatedRoleId = authenticated._id;
     console.log('Roles:', roles.length, 'total');

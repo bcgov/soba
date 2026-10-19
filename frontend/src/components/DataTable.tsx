@@ -83,7 +83,7 @@ export function DataTable<T>({
   sort,
   onSortChange,
   keyExtractor,
-}: DataTableProps<T>) {
+}: Readonly<DataTableProps<T>>) {
   const scrollerRef = useScrollableRegion<HTMLElement>();
 
   const dict = useDictionary();

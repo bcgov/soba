@@ -1,5 +1,5 @@
 import type { NextConfig } from 'next';
-import { join } from 'path';
+import { join } from 'node:path';
 
 const basePath = process.env.BASE_PATH || '';
 
@@ -13,10 +13,10 @@ const nextConfig: NextConfig = {
   env: { NEXT_PUBLIC_BASE_PATH: basePath },
   // Not permanent: port 3000 serves a different base path depending on which app runs there, and
   // browsers cache permanent redirects.
-  async redirects() {
-    return basePath
-      ? [{ source: '/', destination: basePath, basePath: false, permanent: false }]
-      : [];
+  redirects() {
+    return Promise.resolve(
+      basePath ? [{ source: '/', destination: basePath, basePath: false, permanent: false }] : [],
+    );
   },
   // React Aria ships ESM that needs transpiling for the App Router server
   // graph; without this, SSR fails with "createContext is not a function".

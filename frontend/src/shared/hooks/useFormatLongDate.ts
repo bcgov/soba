@@ -4,11 +4,8 @@ import { useCallback } from 'react';
 import { useLocale } from 'react-aria-components';
 
 const LONG_DATE: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric', year: 'numeric' };
-const LONG_DATE_TIME: Intl.DateTimeFormatOptions = {
-  ...LONG_DATE,
-  hour: 'numeric',
-  minute: '2-digit',
-};
+const TIME: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
+const LONG_DATE_TIME: Intl.DateTimeFormatOptions = { ...LONG_DATE, ...TIME };
 
 function useDateFormatter(options: Intl.DateTimeFormatOptions) {
   const { locale } = useLocale();
@@ -16,7 +13,7 @@ function useDateFormatter(options: Intl.DateTimeFormatOptions) {
     (dateStr?: string | null): string => {
       if (!dateStr) return '';
       const date = new Date(dateStr);
-      if (isNaN(date.getTime())) return '';
+      if (Number.isNaN(date.getTime())) return '';
       return new Intl.DateTimeFormat(locale, options).format(date);
     },
     [locale, options],
@@ -40,4 +37,9 @@ export function useFormatLongDate() {
 /** As useFormatLongDate, with the time: "May 25, 2026 at 2:05 PM" / "25 mai 2026 à 14 h 05". */
 export function useFormatLongDateTime() {
   return useDateFormatter(LONG_DATE_TIME);
+}
+
+/** As useFormatLongDate, the time of day only: "2:05 PM" / "14:05". */
+export function useFormatTime() {
+  return useDateFormatter(TIME);
 }

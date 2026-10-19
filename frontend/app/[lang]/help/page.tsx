@@ -10,7 +10,7 @@ export async function generateMetadata({ params }: PageProps) {
   return pageMetadata(params, (dict) => `${dict.general.help} | ${dict.general.title}`);
 }
 
-export default async function Page({ params }: PageProps) {
+export default async function Page({ params }: Readonly<PageProps>) {
   const param = await params;
   const locale = resolveLocale(param.lang);
   const dict = await getDictionary(locale);

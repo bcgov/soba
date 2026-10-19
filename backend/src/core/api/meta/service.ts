@@ -151,17 +151,17 @@ export class MetaApiService {
     };
   }
 
-  async getFormEngines(): Promise<FormEnginesMetaResponse> {
+  getFormEngines(): Promise<FormEnginesMetaResponse> {
     const plugins = getFormEnginePlugins();
     const defaultCode = env.getFormEngineDefaultCode();
-    return {
+    return Promise.resolve({
       items: plugins.map((plugin) => ({
         code: plugin.code,
         name: plugin.name,
         engineVersion: plugin.version ?? null,
         isDefault: plugin.code === (defaultCode ?? plugins[0]?.code ?? null),
       })),
-    };
+    });
   }
 
   async getRoles(filters?: {

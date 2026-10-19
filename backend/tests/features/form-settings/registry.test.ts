@@ -23,4 +23,19 @@ describe('form settings registry', () => {
       expect(module.tables.length).toBeGreaterThan(0);
     }
   });
+
+  // Every form has a row in every group, created with the form.
+  it('gives every group a way to create its row for a new form', () => {
+    for (const module of formSettingsModules) {
+      expect(typeof module.createForForm).toBe('function');
+    }
+  });
+
+  it('leaves a workspace level router unbuilt until it is mounted', () => {
+    for (const module of formSettingsModules) {
+      if (!module.workspace) continue;
+      expect(typeof module.workspace.router).toBe('function');
+      expect(typeof module.workspace.createForWorkspace).toBe('function');
+    }
+  });
 });

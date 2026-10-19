@@ -1,20 +1,7 @@
-import { GroupMemberKind, PUBLIC_PROVIDER_CODE, Permissions, SystemGroup } from '../codes';
+import { formAccessAllows } from '@soba/lib';
+import { PUBLIC_PROVIDER_CODE } from '../codes';
 import type { PermissionCode } from '../codes';
-import { getSystemGroupId } from './workspaceGroupRepo';
-import { hasAllPermissions, resolveFormPermissionsForForm } from './formAccessRepo';
-import { effectiveGroupMembers } from './formGroupOverrideRepo';
-
-/**
- * Permissions the Form submitters audience conveys to non-staff (idp/public) members. Anything else
- * (mutations, submission list) stays staff-only. Submit mode never reads a submission through this
- * set; reads go by participation (services/submitterAccess).
- */
-const AUDIENCE_PERMISSIONS = new Set<PermissionCode>([
-  Permissions.form_read,
-  Permissions.submission_create,
-  Permissions.submission_read,
-  Permissions.document_template_read,
-]);
+import { findSubmitterFormFacts } from './submitterFormRepo';
 
 /** The identity of a caller on the public read/submit paths (the public user for anonymous). */
 export interface CallerIdentity {
@@ -31,55 +18,17 @@ export interface FormAccessTarget {
 }
 
 /**
- * Provider codes of the form's effective Form submitters `idp` members (the form's override, else the
- * workspace group). `public` among them matches everyone, including anonymous. User members are not
- * included; they are resolved through the staff permission path. idp_group is not resolved yet.
- */
-const submitterAudienceCodes = async (target: FormAccessTarget): Promise<Set<string>> => {
-  const groupId = await getSystemGroupId(target.workspaceId, SystemGroup.form_submitters);
-  if (!groupId) return new Set();
-
-  const members = await effectiveGroupMembers({
-    workspaceId: target.workspaceId,
-    formId: target.formId,
-    groupId,
-    memberKind: GroupMemberKind.idp,
-  });
-  return new Set(
-    members.map((m) => m.identityProviderCode).filter((code): code is string => code != null),
-  );
-};
-
-/** True when the form's audience admits the caller: public, or the caller's provider. */
-const isSubmitterAudienceMember = async (
-  target: FormAccessTarget,
-  caller: CallerIdentity,
-): Promise<boolean> => {
-  const codes = await submitterAudienceCodes(target);
-  return codes.has(PUBLIC_PROVIDER_CODE) || (!!caller.idpCode && codes.has(caller.idpCode));
-};
-
-/** True when the form's effective Form submitters audience is public. */
-export const isPublicSubmitterAudience = async (target: FormAccessTarget): Promise<boolean> =>
-  (await submitterAudienceCodes(target)).has(PUBLIC_PROVIDER_CODE);
-
-/**
- * Authorizes a caller for `required` on a form. Grants when the roles of the groups the caller is an
- * effective member of for this form satisfy `required` (staff, incl. user members of the Form
- * submitters group, where a form's override of a group replaces its members), or, for a code in
- * AUDIENCE_PERMISSIONS, when the caller is in the form's Form submitters audience via a `public`/`idp`
- * member.
+ * Authorizes a caller for `required` on a form, by formAccessAllows over the form's facts: the
+ * roles of the groups the caller is an effective member of, or, for an audience permission, the
+ * form's audience.
  */
 export const hasFormSubmitAccess = async (
   target: FormAccessTarget,
   caller: CallerIdentity,
   required: PermissionCode,
 ): Promise<boolean> => {
-  // Staff permissions apply only to real (non-public) users. The anonymous public user belongs to no
-  // workspace, so skip the always-empty permission join and go straight to the audience check.
-  if (caller.actorId && caller.idpCode !== PUBLIC_PROVIDER_CODE) {
-    const perms = await resolveFormPermissionsForForm(caller.actorId, target);
-    if (hasAllPermissions(perms, [required])) return true;
-  }
-  return AUDIENCE_PERMISSIONS.has(required) && (await isSubmitterAudienceMember(target, caller));
+  // The anonymous public user belongs to no workspace, so its permissions are not read.
+  const userId = caller.actorId && caller.idpCode !== PUBLIC_PROVIDER_CODE ? caller.actorId : null;
+  const facts = await findSubmitterFormFacts({ userId, ...target });
+  return !!facts && formAccessAllows(facts, caller, required);
 };

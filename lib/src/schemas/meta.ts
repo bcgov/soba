@@ -102,6 +102,18 @@ export const FormEnginesMetaResponseSchema = z.object({
 });
 export type FormEnginesMetaResponse = z.infer<typeof FormEnginesMetaResponseSchema>;
 
+/** A provider people can sign in through, and so one a form's audience can name. */
+export const LoginProviderMetaSchema = z.object({
+  code: z.string(),
+  name: z.string(),
+});
+export type LoginProviderMeta = z.infer<typeof LoginProviderMetaSchema>;
+
+export const LoginProvidersMetaResponseSchema = z.object({
+  items: z.array(LoginProviderMetaSchema),
+});
+export type LoginProvidersMetaResponse = z.infer<typeof LoginProvidersMetaResponseSchema>;
+
 export const RoleWithSourceMetaSchema = z.object({
   roleCode: z.string(),
   name: z.string(),

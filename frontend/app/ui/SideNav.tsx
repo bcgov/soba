@@ -61,7 +61,7 @@ export function SideNav({ designMode, submitMode }: Readonly<SideNavProps>) {
   if (authenticated && submitMode) {
     navItems.push(
       {
-        href: `/${locale}/my-forms`,
+        href: navLink(`/${locale}/my-forms`),
         title: dict.general.myForms,
         testId: 'my-forms-nav',
         // The house marks the landing list: the design forms list when both modes are on.

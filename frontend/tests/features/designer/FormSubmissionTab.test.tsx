@@ -4,8 +4,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { SWRConfig } from 'swr';
 
-const { mockGetSubmissions, mockPush, dict } = vi.hoisted(() => ({
+const { mockGetSubmissions, mockDelete, mockPush, dict } = vi.hoisted(() => ({
   mockGetSubmissions: vi.fn(),
+  mockDelete: vi.fn(),
   mockPush: vi.fn(),
   dict: {
     locale: 'en',
@@ -15,9 +16,10 @@ const { mockGetSubmissions, mockPush, dict } = vi.hoisted(() => ({
       sortBy: 'Sort by',
       sessionExpired: 'Your session has ended.',
       noAccess: 'You do not have access to this.',
+      cancel: 'Cancel',
     },
     dataTable: { itemName: 'items', pageOf: 'of {totalPages} page(s)' },
-    modal: { close: 'Close' },
+    modal: { close: 'Close', dialogActions: 'Dialog actions' },
     form: { status: 'Status' },
     workspaces: { cancel: 'Cancel' },
     submission: {
@@ -28,6 +30,12 @@ const { mockGetSubmissions, mockPush, dict } = vi.hoisted(() => ({
       actions: 'Actions',
       view: 'View',
       delete: 'Delete',
+      deleteTitle: 'Delete submission',
+      deleteMessage: 'Submission {confirmation} from {submitter} will be deleted.',
+      deleteDraftMessage:
+        'The unsubmitted submission from {submitter}, last updated {updated}, will be deleted.',
+      deleteSuccess: 'Submission deleted.',
+      deleteFailure: 'Could not delete the submission.',
       emptyList: 'No submissions',
       submissions: 'Submissions',
       error: 'Could not load submissions.',
@@ -37,7 +45,7 @@ const { mockGetSubmissions, mockPush, dict } = vi.hoisted(() => ({
 
 vi.mock('@/src/shared/api/sobaApi', () => ({
   getSobaSubmissions: (...args: unknown[]) => mockGetSubmissions(...args),
-  deleteSobaSubmission: vi.fn(),
+  deleteSobaSubmission: (...args: unknown[]) => mockDelete(...args),
 }));
 
 vi.mock('@/app/[lang]/Providers', () => ({
@@ -129,5 +137,48 @@ describe('FormSubmissionTab', () => {
     });
 
     expect(mockPush).toHaveBeenCalledWith('/en/build/f1/submissions/sub-1');
+  });
+
+  const openDelete = async (id: string) => {
+    const link = await waitFor(() => screen.getByTestId(`${id}-delete-link`));
+    await act(async () => {
+      fireEvent.click(link);
+    });
+    return screen.findByTestId('confirm-modal-message');
+  };
+
+  it('names a submitted submission by its confirmation code before deleting', async () => {
+    await renderTab();
+    const message = await openDelete('sub-1');
+    expect(message).toHaveTextContent('Submission K7M2Q9XA from Ada Lovelace will be deleted.');
+  });
+
+  it('names an unsubmitted one by its submitter and last change', async () => {
+    await renderTab();
+    const message = await openDelete('sub-2');
+    expect(message).toHaveTextContent('The unsubmitted submission from Ada Lovelace, last updated');
+  });
+
+  it('deletes nothing when the delete is cancelled', async () => {
+    await renderTab();
+    await openDelete('sub-1');
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('confirm-modal-cancel'));
+    });
+
+    await waitFor(() => expect(screen.queryByTestId('confirm-modal-message')).toBeNull());
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it('deletes the submission once confirmed', async () => {
+    mockDelete.mockResolvedValue(undefined);
+    await renderTab();
+    await openDelete('sub-1');
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('confirm-modal-confirm'));
+    });
+
+    await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('token', 'sub-1'));
+    await waitFor(() => expect(screen.queryByTestId('confirm-modal-message')).toBeNull());
   });
 });

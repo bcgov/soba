@@ -26,7 +26,7 @@ export function parseBooleanEnvValue(value: string): boolean {
 export function parseNumberEnvValue(value: string): number {
   const parsed = Number(value);
   if (Number.isNaN(parsed)) {
-    throw new Error('Value must be a number');
+    throw new TypeError('Value must be a number');
   }
   return parsed;
 }
@@ -183,7 +183,7 @@ export function createEnvReader(source: EnvSource) {
     /** Renders one process runs at once. Unset, or not a whole number of at least 1, is 2. */
     getDocumentGenerationMaxConcurrent: () =>
       positiveInteger(getNumberEnvFrom(source, 'DOCUMENT_GENERATION_MAX_CONCURRENT')) ?? 2,
-    /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
+    /** Login provider a new workspace's audience is protected by (must be a seeded identity_provider code). */
     getDefaultSubmitterProvider: () =>
       getOptionalEnvFrom(source, 'DEFAULT_SUBMITTER_PROVIDER') ?? 'azureidir',
     getStorageProfiles: () => {
@@ -269,7 +269,7 @@ export const env = {
   /** Renders one process runs at once. Unset, or not a whole number of at least 1, is 2. */
   getDocumentGenerationMaxConcurrent: () =>
     positiveInteger(getNumberEnv('DOCUMENT_GENERATION_MAX_CONCURRENT')) ?? 2,
-  /** Login provider new workspaces default their Form submitters audience to (must be a seeded identity_provider code). */
+  /** Login provider a new workspace's audience is protected by (must be a seeded identity_provider code). */
   getDefaultSubmitterProvider: () => getOptionalEnv('DEFAULT_SUBMITTER_PROVIDER') ?? 'azureidir',
   getStorageProfiles: () => {
     const raw = getOptionalEnv('STORAGE_PROFILES');

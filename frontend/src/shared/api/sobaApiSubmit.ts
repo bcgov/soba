@@ -1,14 +1,22 @@
 // Submit-mode API service: submission open/save/submit, reads of an existing submission, and the
-// caller's own list and delete. All calls hit /submit/*. The token is optional except on the list and
-// delete; the backend attributes anonymous callers to the seeded public user. Opening needs the form's
-// Form submitters audience; reading an existing submission needs participation in it, and writing it
-// needs both.
+// caller's own lists and delete. All calls hit /submit/*. The token is optional except on the lists
+// and delete; the backend attributes anonymous callers to the seeded public user. Opening needs a
+// submit role on the form or its audience; reading an existing submission needs participation in
+// it, and writing it needs both.
 import { sobaFetch } from './sobaFetch';
 import { parseJson } from './sobaHelpers';
-import { sortLocaleHeaders } from './sortLocaleRequest';
+import { sortLocaleHeaders, sortLocaleRequest } from './sortLocaleRequest';
 import { toListRequestQuery, type ListQueryArgs } from '@/src/types/list';
 import { FormType } from '@formio/react';
-import type { SubmitFillBundle, SubmissionDataDocument } from '../../types/forms';
+import type { SortLocale } from '@soba/lib/sort';
+import type {
+  ListMyFormsResponse,
+  SubmitFillBundle,
+  SubmitFormVersionSchemaResponse,
+  SubmissionDataDocument,
+  SubmitterForm,
+} from '../../types/forms';
+import type { MyWorkspaceLookupResponse } from '../../types/workspaces';
 import type {
   SubmissionDataBody,
   SubmissionResponse,
@@ -29,6 +37,24 @@ export async function getSubmitFillBundle(
 ): Promise<SubmitFillBundle> {
   const response = await sobaFetch(`/submit/submissions/${submissionId}/fill`, { token });
   return parseJson<SubmitFillBundle>(response);
+}
+
+/** A form the caller may start a submission on, with its facts; refused as an open would be. */
+export async function getSubmitForm(
+  token: string | undefined,
+  formId: string,
+): Promise<SubmitterForm> {
+  const response = await sobaFetch(`/submit/forms/${formId}`, { token });
+  return parseJson<SubmitterForm>(response);
+}
+
+/** The published version's schema, with its hash, to render a new submission before it is opened. */
+export async function getSubmitFormVersionSchema(
+  token: string | undefined,
+  formVersionId: string,
+): Promise<SubmitFormVersionSchemaResponse> {
+  const response = await sobaFetch(`/submit/form-versions/${formVersionId}/schema`, { token });
+  return parseJson<SubmitFormVersionSchemaResponse>(response);
 }
 
 /** A submission's own form-version schema, for its read-only confirmation view. */
@@ -107,6 +133,31 @@ export async function getMySubmissions(
     token,
     query: { ...toListRequestQuery(args), workflowState: args.workflowState },
     headers: sortLocaleHeaders(args.locale),
+  });
+  return parseJson(response);
+}
+
+/** A page of the forms the caller holds the submitter role on or has submitted to; signed in. */
+export async function getMyForms(
+  token: string,
+  args: ListQueryArgs & { workspaceId?: string },
+): Promise<ListMyFormsResponse> {
+  const response = await sobaFetch('/submit/forms/mine', {
+    token,
+    query: { ...toListRequestQuery(args), workspaceId: args.workspaceId },
+    headers: sortLocaleHeaders(args.locale),
+  });
+  return parseJson(response);
+}
+
+/** The workspaces the caller's forms belong to, for a filter; signed-in callers only. */
+export async function getMyWorkspaces(
+  token: string,
+  locale?: SortLocale,
+): Promise<MyWorkspaceLookupResponse> {
+  const response = await sobaFetch('/submit/workspaces/mine', {
+    token,
+    ...sortLocaleRequest(locale),
   });
   return parseJson(response);
 }

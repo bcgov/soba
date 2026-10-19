@@ -14,8 +14,6 @@ import {
   ListFormVersionsResponseSchema as SobaListFormVersionsResponseSchema,
   FormVersionSummarySchema as SobaFormVersionSummarySchema,
   FormVersionLookupResponseSchema as SobaFormVersionLookupResponseSchema,
-  FormSubmitterAudienceSchema as SobaFormSubmitterAudienceSchema,
-  SetFormSubmitterAudienceBodySchema as SobaSetFormSubmitterAudienceBodySchema,
 } from '@soba/lib';
 import { LOOKUP_NOTE } from '../shared/lookup';
 
@@ -26,9 +24,8 @@ import {
   OffsetPageSchema,
   OFFSET_DRIFT_NOTE,
   sortLocaleQueryField,
-  SortLocaleQuerySchema,
 } from '../shared/offsetPagination';
-import { FORM_NAME_TAKEN } from '../../messages';
+import { FORM_NAME_TAKEN, SOURCE_VERSION_HAS_NO_SCHEMA } from '../../messages';
 import {
   workspaceIdQueryField,
   formIdQueryField,
@@ -40,8 +37,13 @@ extendZodWithOpenApi(z);
 
 // @soba/lib builds its schemas before zod is extended, so they only get `.openapi()` once cloned.
 // Composites are rebuilt on the named children so the spec references them instead of inlining.
-export const CreateFormBodySchema =
-  SobaCreateFormBodySchema.clone().openapi('Forms_CreateFormBody');
+export const CreateFormBodySchema = SobaCreateFormBodySchema.clone().openapi(
+  'Forms_CreateFormBody',
+  {
+    description:
+      'A new form and its first version. `id` and `versionId` are caller-minted UUIDv7s sent together, so a retry returns the form the first create made; `schema` defaults to a form holding a Submit button.',
+  },
+);
 export const UpdateFormBodySchema =
   SobaUpdateFormBodySchema.clone().openapi('Forms_UpdateFormBody');
 export const FormListItemSchema = SobaFormListItemSchema.clone().openapi('Forms_FormListItem');
@@ -66,11 +68,20 @@ export const FormVersionListItemSchema = SobaFormVersionListItemSchema.clone().o
   'Forms_FormVersionListItem',
 );
 
+// Ids are lowercased, as Postgres returns them, so a retry matches the stored ones.
 export const CreateFormVersionBodySchema = z
   .object({
-    formId: z.string().min(1),
-    fromFormVersionId: z.uuid().optional().openapi({
-      description: 'The version whose document templates the draft gets.',
+    id: z.uuidv7().toLowerCase().optional().openapi({
+      description:
+        'Minted by the caller, so a retried create returns the draft the first one made.',
+    }),
+    formId: z.string().min(1).toLowerCase(),
+    fromFormVersionId: z.uuid().toLowerCase().optional().openapi({
+      description:
+        'The version whose document templates the draft gets, and whose schema it starts from when no schema is sent.',
+    }),
+    schema: z.record(z.string(), z.unknown()).optional().openapi({
+      description: "The draft's schema; the source version's, else the default form, when absent.",
     }),
   })
   .openapi('Forms_CreateFormVersionBody');
@@ -80,12 +91,6 @@ export const FormIdParamsSchema = z
     id: z.string().min(1),
   })
   .openapi('Forms_FormIdParams');
-
-export const SetFormSubmitterAudienceBodySchema =
-  SobaSetFormSubmitterAudienceBodySchema.clone().openapi('Forms_SetFormSubmitterAudienceBody');
-export const FormSubmitterAudienceSchema = SobaFormSubmitterAudienceSchema.clone().openapi(
-  'Forms_FormSubmitterAudience',
-);
 
 export const FormVersionIdParamsSchema = z
   .object({
@@ -101,10 +106,7 @@ export const SaveFormVersionParamsSchema = z
 
 export const SaveFormVersionBodySchema = z
   .object({
-    eventType: z.string().min(1).optional(),
     note: z.string().optional(),
-    formioFormDefinition: z.record(z.string(), z.unknown()).optional(),
-    engine_schema_ref: z.string().min(1).optional(),
   })
   .openapi('Forms_SaveFormVersionBody');
 
@@ -188,7 +190,6 @@ const FORM_VERSIONS_PATH = '/design/form-versions';
 const FORM_VERSION_PATH = `${FORM_VERSIONS_PATH}/{id}`;
 const FORM_NOT_FOUND = 'Form not found';
 const FORM_VERSION_NOT_FOUND = 'Form version not found';
-const AUDIENCE_NOT_FOUND = `${FORM_NOT_FOUND}, or the workspace has no Form submitters group`;
 const VALIDATION_ERROR = 'Validation or business rule error';
 const VERSION_CONFLICT = "Not the form's current version";
 const SCHEMA_WRITE_CONFLICT = `${VERSION_CONFLICT}, not a draft, or its schema is being saved`;
@@ -265,6 +266,14 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
           },
         },
       },
+      200: {
+        description: 'A retry with the same id: the form the first create made',
+        content: {
+          'application/json': {
+            schema: FormWithVersionResponseSchema,
+          },
+        },
+      },
       400: {
         description: VALIDATION_ERROR,
       },
@@ -273,7 +282,7 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
           'Caller lacks form_create and design_create in the workspace (form_admin via *)',
       },
       409: {
-        description: FORM_NAME_TAKEN,
+        description: `${FORM_NAME_TAKEN}, or the id belongs to another form or version`,
       },
     },
   });
@@ -339,43 +348,6 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
       409: {
         description: FORM_NAME_TAKEN,
       },
-    },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: `${FORM_PATH}/submitter-audience`,
-    tags: [TAG],
-    security: [{ bearerAuth: [] }],
-    request: { query: SortLocaleQuerySchema, params: FormIdParamsSchema },
-    responses: {
-      200: {
-        description: "The form's submit audience: inherited from the workspace or overridden",
-        content: { 'application/json': { schema: FormSubmitterAudienceSchema } },
-      },
-      403: { description: 'Requires form_read' },
-      404: { description: AUDIENCE_NOT_FOUND },
-    },
-  });
-
-  registry.registerPath({
-    method: 'put',
-    path: `${FORM_PATH}/submitter-audience`,
-    tags: [TAG],
-    security: [{ bearerAuth: [] }],
-    request: {
-      query: SortLocaleQuerySchema,
-      params: FormIdParamsSchema,
-      body: { content: { 'application/json': { schema: SetFormSubmitterAudienceBodySchema } } },
-    },
-    responses: {
-      200: {
-        description: 'Updated form submit audience',
-        content: { 'application/json': { schema: FormSubmitterAudienceSchema } },
-      },
-      400: { description: 'Protected needs a provider, or an invalid provider was given' },
-      403: { description: 'Requires form_update' },
-      404: { description: AUDIENCE_NOT_FOUND },
     },
   });
 
@@ -468,8 +440,21 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
         description: 'Created form version draft',
         content: { 'application/json': { schema: FormVersionResponseSchema } },
       },
+      200: {
+        description: 'A retry with the same id: the draft the first create made',
+        content: { 'application/json': { schema: FormVersionResponseSchema } },
+      },
       400: {
         description: VALIDATION_ERROR,
+      },
+      403: {
+        description: 'Caller lacks design_create and design_update on the form',
+      },
+      404: {
+        description: 'Form not found',
+      },
+      409: {
+        description: `The id belongs to another form or a deleted version, or no schema is sent and ${SOURCE_VERSION_HAS_NO_SCHEMA.toLowerCase()}`,
       },
     },
   });
@@ -555,23 +540,21 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
     },
   });
 
-  for (const action of ['unpublish', 'restore'] as const) {
-    registry.registerPath({
-      method: 'post',
-      path: `${FORM_VERSION_PATH}/${action}`,
-      tags: [TAG],
-      security: [{ bearerAuth: [] }],
-      request: { params: FormVersionIdParamsSchema },
-      responses: {
-        200: {
-          description: `Form version ${action} action`,
-          content: { 'application/json': { schema: FormVersionResponseSchema } },
-        },
-        400: { description: 'Invalid state transition' },
-        404: { description: FORM_VERSION_NOT_FOUND },
+  registry.registerPath({
+    method: 'post',
+    path: `${FORM_VERSION_PATH}/unpublish`,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: { params: FormVersionIdParamsSchema },
+    responses: {
+      200: {
+        description: 'Form version unpublish action',
+        content: { 'application/json': { schema: FormVersionResponseSchema } },
       },
-    });
-  }
+      400: { description: 'Invalid state transition' },
+      404: { description: FORM_VERSION_NOT_FOUND },
+    },
+  });
 
   registry.registerPath({
     method: 'get',

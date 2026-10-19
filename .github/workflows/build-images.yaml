@@ -102,7 +102,6 @@ env:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   prepare:
@@ -182,6 +181,9 @@ jobs:
 
   build:
     needs: prepare
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
@@ -233,6 +235,9 @@ jobs:
 
   merge:
     needs: [prepare, build]
+    permissions:
+      contents: read
+      packages: write
     runs-on: ubuntu-24.04
     outputs:
       short_sha: ${{ steps.vars.outputs.short_sha }}

@@ -11,13 +11,15 @@ export const newConfirmationCode = (): string =>
   Array.from({ length: LENGTH }, () => ALPHABET[randomInt(ALPHABET.length)]).join('');
 
 /** Runs `write` with a new code, and again with another when the code is already taken. */
-export async function withNewConfirmationCode<T>(write: (code: string) => Promise<T>): Promise<T> {
-  for (let attempt = 1; attempt < MAX_ATTEMPTS; attempt++) {
+export function withNewConfirmationCode<T>(write: (code: string) => Promise<T>): Promise<T> {
+  const tryAttempt = async (attempt: number): Promise<T> => {
+    if (attempt >= MAX_ATTEMPTS) return write(newConfirmationCode());
     try {
       return await write(newConfirmationCode());
     } catch (err) {
       if (!isUniqueViolationOn(err, SUBMISSION_CONFIRMATION_CODE_UNIQUE)) throw err;
+      return tryAttempt(attempt + 1);
     }
-  }
-  return write(newConfirmationCode());
+  };
+  return tryAttempt(1);
 }

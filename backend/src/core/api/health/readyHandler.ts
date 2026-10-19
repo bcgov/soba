@@ -12,23 +12,7 @@ import {
   getTempStorageAdapter,
   getVirusScanAdapter,
 } from '../../integrations/plugins/PluginRegistry';
-
-interface Readiness {
-  ok: boolean;
-  message?: string;
-}
-
-/** Resolve a non-gating readiness report, turning any throw/rejection into { ok: false }. An
- *  undefined result (adapter with no readinessCheck) counts as reachable. */
-async function reportReadiness(
-  check: () => Promise<Readiness | undefined> | Readiness | undefined,
-): Promise<Readiness> {
-  try {
-    return (await check()) ?? { ok: true };
-  } catch (err) {
-    return { ok: false, message: err instanceof Error ? err.message : String(err) };
-  }
-}
+import { reportReadiness } from '../../integrations/plugins/readiness';
 
 export async function readinessHandler(_req: Request, res: Response): Promise<void> {
   let dbOk = false;

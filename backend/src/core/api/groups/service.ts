@@ -1,20 +1,16 @@
 import type { SortLocale } from '@soba/lib';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
-import { GroupMemberKind, PUBLIC_PROVIDER_CODE, SystemGroup } from '../../db/codes';
+import { GroupMemberKind, SystemGroup } from '../../db/codes';
 import { GROUP_NAME_TAKEN } from '../../messages';
 import { listRoles } from '../../db/repos/roleRepo';
-import { getIdentityProvider } from '../../db/repos/identityProviderRepo';
 import {
   activeGroupMemberKind,
-  addGroupIdpMember,
   addGroupMember,
   countActiveUserMembers,
-  countGroupMembers,
   createWorkspaceGroup,
   getWorkspaceGroup,
   getWorkspaceGroupMeta,
   groupNameExistsInWorkspace,
-  hasIdpMember,
   isUserInGroup,
   listWorkspaceGroups,
   membershipInWorkspace,
@@ -31,10 +27,9 @@ export interface GroupsContextInput {
   locale: SortLocale;
 }
 
-export type AddMemberInput = { kind: 'user'; membershipId: string } | { kind: 'idp'; code: string };
+export type AddMemberInput = { kind: 'user'; membershipId: string };
 
 const GROUP_NOT_FOUND = 'Group not found';
-const PUBLIC_EXCLUSIVE = 'Public access must be the only member of Form submitters';
 
 /** Rejects role codes that don't exist in the catalog (enabled or feature-disabled). */
 async function assertRolesExist(roleCodes: string[]): Promise<void> {
@@ -140,12 +135,8 @@ export class GroupsApiService {
   }
 
   async addMember(ctx: GroupsContextInput, groupId: string, input: AddMemberInput) {
-    const systemCode = await requireGroup(ctx.workspaceId, groupId);
-    if (input.kind === 'idp') {
-      await addIdpMember(ctx, groupId, systemCode, input.code);
-    } else {
-      await addUserMember(ctx, groupId, systemCode, input.membershipId);
-    }
+    await requireGroup(ctx.workspaceId, groupId);
+    await addUserMember(ctx, groupId, input.membershipId);
     return loadGroup(ctx, groupId);
   }
 
@@ -167,59 +158,13 @@ export class GroupsApiService {
   }
 }
 
-/** idp members are Form-submitters-only; `public` is exclusive, other providers must be login-enabled. */
-async function addIdpMember(
-  ctx: GroupsContextInput,
-  groupId: string,
-  systemCode: string | null,
-  code: string,
-): Promise<void> {
-  if (systemCode !== SystemGroup.form_submitters) {
-    throw new ValidationError('Identity providers can only be assigned to Form submitters');
-  }
-  const provider = await getIdentityProvider(code);
-  if (!provider?.isActive) {
-    throw new ValidationError('Unknown identity provider');
-  }
-  const isPublic = code === PUBLIC_PROVIDER_CODE;
-  if (isPublic) {
-    // public is exclusive: only allowed as the group's sole member.
-    if ((await countGroupMembers(groupId)) > 0) {
-      throw new ConflictError(PUBLIC_EXCLUSIVE);
-    }
-  } else {
-    if (!provider.isLoginProvider) {
-      throw new ValidationError('This identity provider cannot be assigned');
-    }
-    if (await hasIdpMember(groupId, PUBLIC_PROVIDER_CODE)) {
-      throw new ConflictError(PUBLIC_EXCLUSIVE);
-    }
-    if (await hasIdpMember(groupId, code)) {
-      throw new ConflictError('Provider already assigned');
-    }
-  }
-  await addGroupIdpMember({
-    workspaceId: ctx.workspaceId,
-    groupId,
-    code,
-    displayLabel: ctx.actorDisplayLabel,
-  });
-}
-
 async function addUserMember(
   ctx: GroupsContextInput,
   groupId: string,
-  systemCode: string | null,
   membershipId: string,
 ): Promise<void> {
   if (!(await membershipInWorkspace(ctx.workspaceId, membershipId))) {
     throw new ValidationError('Membership is not an active member of the workspace');
-  }
-  if (
-    systemCode === SystemGroup.form_submitters &&
-    (await hasIdpMember(groupId, PUBLIC_PROVIDER_CODE))
-  ) {
-    throw new ConflictError(PUBLIC_EXCLUSIVE);
   }
   if (await isUserInGroup(groupId, membershipId)) {
     throw new ConflictError('Member already in group');

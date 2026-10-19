@@ -266,6 +266,12 @@ dependencies, but templates within this chart that are conditionally rendered.
 | **Internal** (default) | `formio.internal.enabled=true`                                      | Deploys a Form.io pod + service inside the release |
 | **External**           | `formio.internal.enabled=false` + `formio.external.url=https://...` | No Form.io pods; backend connects to external URL  |
 
+The backend's Form.io plugin settings are in ConfigMap `<fullname>-backend-formio`:
+
+| Helm value                 | Env var                       | Used by          |
+| -------------------------- | ----------------------------- | ---------------- |
+| `backend.formio.timeoutMs` | `PLUGIN_FORMIO_V5_TIMEOUT_MS` | formio-v5 client |
+
 ### MongoDB
 
 | Mode                   | Configuration                                                           | What happens                                      |

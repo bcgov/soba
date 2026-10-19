@@ -118,15 +118,15 @@ Each type needs a feature, `TEMPLATE_TYPE_FEATURES`: `cdogs` needs `document-gen
 or replacing a file of a type whose feature is not available to the form returns 400. Listing,
 downloading, renaming and deleting do not check it.
 
-| route                                   | body                              | permission                 |
-| --------------------------------------- | --------------------------------- | -------------------------- |
-| `GET /api/v1/templates?formId=`         |                                   | `document_template_read`   |
-| `POST /api/v1/templates?formVersionId=` | multipart `file`, `type`, `name`? | `document_template_create` |
-| `GET /api/v1/templates/:id`             |                                   | `document_template_read`   |
-| `GET /api/v1/templates/:id/content`     |                                   | `document_template_read`   |
-| `PUT /api/v1/templates/:id/content`     | multipart `file`                  | `document_template_create` |
-| `PATCH /api/v1/templates/:id`           | `name`                            | `document_template_create` |
-| `DELETE /api/v1/templates/:id`          |                                   | `document_template_delete` |
+| route                                   | body                              | permission                            |
+| --------------------------------------- | --------------------------------- | ------------------------------------- |
+| `GET /api/v1/templates?formId=`         |                                   | `form_read`, `document_template_read` |
+| `POST /api/v1/templates?formVersionId=` | multipart `file`, `type`, `name`? | `document_template_create`            |
+| `GET /api/v1/templates/:id`             |                                   | `form_read`, `document_template_read` |
+| `GET /api/v1/templates/:id/content`     |                                   | `form_read`, `document_template_read` |
+| `PUT /api/v1/templates/:id/content`     | multipart `file`                  | `document_template_create`            |
+| `PATCH /api/v1/templates/:id`           | `name`                            | `document_template_create`            |
+| `DELETE /api/v1/templates/:id`          |                                   | `document_template_delete`            |
 
 The routes need sign-in and `design-mode`. Templates can be changed on any version, published ones
 included. Templates of a deleted form or form version return 404.

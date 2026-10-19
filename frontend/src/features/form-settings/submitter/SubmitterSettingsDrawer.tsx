@@ -4,21 +4,22 @@ import { useId, useMemo, useRef, useState } from 'react';
 import { Checkbox, InlineAlert } from '@bcgov/design-system-react-components';
 
 import FormSettingsDrawers from '@/src/features/form-settings/ui/FormSettingsDrawers';
+import InheritCheckbox from '@/src/features/form-settings/ui/InheritCheckbox';
+import { useInheritableEdit } from '@/src/features/form-settings/ui/useInheritableEdit';
 import type { FormSettingsSectionProps } from '@/src/features/form-settings/types';
 import { useFormSettings } from '@/src/features/form-settings/data/useFormSettings';
 import {
+  AUDIENCE_SETTINGS_KEY,
   SUBMITTER_SETTINGS_KEY,
-  type SetSubmitterSettingsBody,
+  type FormAudienceSettings,
+  type FormSubmitterSettings,
+  type SetFormSubmitterSettingsBody,
   type SubmitterSettings,
 } from '@/src/types/formSettings';
-import { useSubmitterAudience } from '@/src/features/designer/data/useSubmitterAudience';
-import { FormSubmitterAudience } from '@/src/features/designer/ui/FormSubmitterAudience';
-import { useForm } from '@/src/features/designer/data/useForm';
 import { messageForDataError } from '@/src/shared/api/dataError';
+import { isConflict } from '@/src/shared/api/sobaHelpers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { Permissions } from '@/src/types/permissions';
-import { hasPermission } from '@/src/shared/util/permissions';
 
 export default function SubmitterSettingsDrawer({
   dict,
@@ -31,19 +32,21 @@ export default function SubmitterSettingsDrawer({
     settings,
     error: settingsError,
     save,
-  } = useFormSettings<SubmitterSettings, SetSubmitterSettingsBody>(SUBMITTER_SETTINGS_KEY, formId);
+  } = useFormSettings<FormSubmitterSettings, SetFormSubmitterSettingsBody>(
+    SUBMITTER_SETTINGS_KEY,
+    formId,
+  );
   const { addNotification } = useNotificationStore();
   const noteId = useId();
-  const { form } = useForm(formId);
-  const canUpdateForm = hasPermission(form?.permissions, Permissions.form_update);
 
-  // Drafts are not offered to a Public audience. This is the form's effective audience: its own
-  // override when it has one, otherwise the workspace audience it inherits.
-  const { view: audience, error: audienceError } = useSubmitterAudience(null, formId);
+  // Drafts are not offered to a Public audience: the form's own, or its workspace's while it
+  // inherits.
+  const { settings: audience, error: audienceError } = useFormSettings<FormAudienceSettings>(
+    AUDIENCE_SETTINGS_KEY,
+    formId,
+  );
 
-  // An edit layered over the loaded value. Null means no edit, so a refresh shows through until the
-  // user changes it.
-  const [editedAllowDrafts, setEditedAllowDrafts] = useState<boolean | null>(null);
+  const edit = useInheritableEdit<SubmitterSettings>(settings);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
 
@@ -60,25 +63,32 @@ export default function SubmitterSettingsDrawer({
     [readError, dict.general.sessionExpired, dict.general.noAccess, t.submitterSettingsLoadError],
   );
 
-  // The setting changes only once the stored value and the audience are both known. On a Public
-  // audience the stored value stands, including over an edit made before the audience changed.
-  const isPublic = audience?.mode === 'public';
+  // The settings change only once they and the audience are both known. On a Public audience the
+  // stored settings stand, including over an edit made before the audience changed.
+  const isPublic = audience?.effective.mode === 'public';
   const canEdit = !!settings && !!audience && !isPublic;
-  const storedAllowDrafts = settings?.allowSubmitterDrafts ?? false;
-  const allowSubmitterDrafts = canEdit
-    ? (editedAllowDrafts ?? storedAllowDrafts)
-    : storedAllowDrafts;
+  const shown = canEdit ? edit : null;
+  const inherit = shown ? shown.inherit : (settings?.inherit ?? true);
+  const allowSubmitterDrafts = shown
+    ? (shown.values?.allowSubmitterDrafts ?? false)
+    : (settings?.effective.allowSubmitterDrafts ?? false);
 
   const saveChanges = async () => {
-    if (!token || !canEdit || savingRef.current) return;
+    const body = edit.body();
+    if (!token || !canEdit || !body || savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
     try {
-      await save(token, { allowSubmitterDrafts });
-      setEditedAllowDrafts(null);
+      await save(token, body);
+      edit.reset();
       addNotification({ type: 'success', text: t.formSettingsDrawerSaveSuccessMessage });
-    } catch {
-      addNotification({ type: 'error', text: t.formSettingsDrawerSaveErrorMessage });
+    } catch (err) {
+      // Someone else saved first: the hook has read their change, so the stale edit goes.
+      if (isConflict(err)) edit.reset();
+      addNotification({
+        type: 'error',
+        text: isConflict(err) ? t.settingsConflictMessage : t.formSettingsDrawerSaveErrorMessage,
+      });
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -91,7 +101,8 @@ export default function SubmitterSettingsDrawer({
       id={drawerName}
       label={t.submitterSettingsDrawerLabel}
       onSave={saveChanges}
-      onCancel={() => setEditedAllowDrafts(null)}
+      onCancel={edit.reset}
+      canSave={canEdit && edit.changed && !saving}
     >
       {readErrorMessage && (
         <InlineAlert
@@ -100,11 +111,17 @@ export default function SubmitterSettingsDrawer({
           data-testid="form-settings-submitter-settings-error"
         />
       )}
-      <FormSubmitterAudience workspaceId={null} formId={formId} canManage={!!canUpdateForm} />
+      <InheritCheckbox
+        label={t.inheritWorkspaceLabel}
+        isSelected={inherit}
+        onChange={edit.setInherit}
+        isDisabled={saving || !canEdit}
+        testId="form-settings-submitter-inherit"
+      />
       <Checkbox
         isSelected={allowSubmitterDrafts}
-        onChange={setEditedAllowDrafts}
-        isDisabled={saving || !canEdit}
+        onChange={(allow) => edit.setValues({ allowSubmitterDrafts: allow })}
+        isDisabled={saving || !canEdit || inherit}
         aria-describedby={isPublic ? noteId : undefined}
         data-testid="form-settings-allow-drafts"
       >

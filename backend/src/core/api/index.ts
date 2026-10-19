@@ -3,13 +3,21 @@ import { coreErrorHandler, notFoundHandler } from '../middleware/errorHandler';
 import { registerAdminOpenApi } from './admin';
 import { registerHealthOpenApi } from './health';
 import { designFormsRouter, registerFormsOpenApi } from './forms';
-import { designSubmissionsRouter, registerSubmissionsOpenApi } from './submissions';
+import {
+  designSubmissionsRouter,
+  registerSubmissionsOpenApi,
+  registerSubmissionReviewOpenApi,
+} from './submissions';
 import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
 import { groupsDomain } from './groups';
 import { filesDomain } from '../../features/files';
 import { documentGenerationDomain } from '../../features/document-generation';
 import { templatesDomain } from '../../features/templates';
-import { formSettingsRouter, registerFormSettingsOpenApi } from '../../features/form-settings';
+import {
+  formSettingsRouter,
+  registerFormSettingsOpenApi,
+  workspaceSettingsRouter,
+} from '../../features/form-settings';
 import { meDomain } from './me';
 import { membersDomain } from './members';
 import { workspacesDomain } from './workspaces';
@@ -25,6 +33,7 @@ registerOpenApiPaths((registry) => {
   registerFormsOpenApi(registry);
   registerFormSettingsOpenApi(registry);
   registerSubmissionsOpenApi(registry);
+  registerSubmissionReviewOpenApi(registry);
   registerSubmitOpenApi(registry);
   groupsDomain.registerOpenApi(registry);
   meDomain.registerOpenApi(registry);
@@ -49,9 +58,8 @@ designRouter.use(coreErrorHandler);
 
 // Submit feature: submission open/save/submit + reads of an existing submission, plus file
 // attachments at /files (upload/download/delete) and document templates/preview/print, each
-// authorized through isSubmitterAllowed (services/submitterAccess). The files feature flag is
-// enforced inside filesDomain.router. Same routes as /files, mounted under submit for the Form.io
-// file component.
+// authorized by the submitter rules in @soba/lib. The files feature flag is enforced inside
+// filesDomain.router. Same routes as /files, mounted under submit for the Form.io file component.
 const submitRouter = express.Router();
 submitRouter.use('/', submitRoutes);
 submitRouter.use('/files', filesDomain.router);
@@ -69,6 +77,8 @@ filesApiRouter.use(coreErrorHandler);
 
 // Core: workspace/account management, and staff document templates.
 const coreRouter = express.Router();
+// The workspace level of settings groups whose values a workspace shares with its forms.
+coreRouter.use('/workspaces/:id/settings', workspaceSettingsRouter);
 for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain, templatesDomain]) {
   coreRouter.use(domain.path, domain.router);
 }

@@ -20,7 +20,7 @@ interface NotificationItemProps {
   onRemove: (id: string) => void;
 }
 
-function NotificationItem({ id, text, type, onRemove }: NotificationItemProps) {
+function NotificationItem({ id, text, type, onRemove }: Readonly<NotificationItemProps>) {
   useEffect(() => {
     const timer = setTimeout(() => onRemove(id), AUTO_DISMISS_MS);
     return () => clearTimeout(timer);

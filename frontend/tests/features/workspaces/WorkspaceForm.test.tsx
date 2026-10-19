@@ -41,7 +41,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
       createHeading: 'Create Workspace',
       manageHeading: 'Manage Workspace',
       settingsTab: 'Settings',
-      teamTab: 'Team',
+      formSettingsTab: 'Form Settings',
       nameLabel: 'Name',
       save: 'Save',
       create: 'Create',
@@ -191,13 +191,13 @@ describe('WorkspaceForm', () => {
     expect(mockSelectWorkspace).toHaveBeenCalledWith('token', 'ws2');
   });
 
-  it('manage mode shows Settings and Team tabs', async () => {
+  it('manage mode shows the Settings and Form Settings tabs', async () => {
     await act(async () => {
       renderForm('ws2');
     });
     await waitFor(() => expect(mockSelectWorkspace).toHaveBeenCalled());
     expect(screen.getByRole('tab', { name: 'Settings' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Team' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Form Settings' })).toBeInTheDocument();
   });
 
   it('save on create posts the workspace', async () => {

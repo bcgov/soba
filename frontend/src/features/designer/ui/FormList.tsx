@@ -4,13 +4,18 @@ import { useMemo, useCallback, useEffect, useState } from 'react';
 import { Button as DSButton } from '@bcgov/design-system-react-components';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { Tag } from '@/src/components/Tag';
-import { ListPageToolbar, ListPageAuthGate } from '@/src/components/ListPageLayout';
+import {
+  ListPageAuthGate,
+  ListPageFilters,
+  ListPageToolbar,
+} from '@/src/components/ListPageLayout';
 import { ListPageSearchField } from '@/src/components/ListPageSearchField';
 import { RowActionButton } from '@/src/components/RowActionButton';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useRouter, usePathname } from 'next/navigation';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
+import { isUuid } from '@/src/shared/util/uuid';
 import type { SobaFormSummary } from '@/src/types/forms';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import { usePageNotices } from '@/src/components/PageHeader';
@@ -30,8 +35,6 @@ import type { WorkspaceLookupItem } from '@/src/types/workspaces';
 import { Modal } from '@/src/components/Modal';
 import { FormCreateContent } from './FormCreateContent';
 
-const WORKSPACE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /**
  * Resolves the URL's workspace filter, which can name a workspace that does not exist or that this
  * user cannot see. A workspace in the options is taken from there; any other is read, because the
@@ -42,7 +45,7 @@ function useWorkspaceFilter(
   options: Pick<ReturnType<typeof useWorkspaceOptions>, 'workspaces' | 'loaded' | 'error'>,
 ) {
   // Not a workspace id at all. Reading one fails as a server error rather than a refusal.
-  const paramIsId = !!workspaceParam && WORKSPACE_ID_PATTERN.test(workspaceParam);
+  const paramIsId = !!workspaceParam && isUuid(workspaceParam);
   const listed = paramIsId ? options.workspaces.find((w) => w.id === workspaceParam) : undefined;
   const optionsSettled = options.loaded || !!options.error;
   const { workspace: read, error } = useWorkspace(
@@ -313,7 +316,7 @@ function FormList() {
           {dict.general.create}
         </DSButton>
       </ListPageToolbar>
-      <div className={`d-flex align-items-end gap-2`}>
+      <ListPageFilters>
         <WorkspaceSelector
           className={`${styles.workspaceField}`}
           workspaces={pickerWorkspaces}
@@ -327,7 +330,7 @@ function FormList() {
         <DSButton variant="secondary" data-testid="clear-filters-button" onPress={listQuery.clear}>
           {dict.general.clearFilters || 'Clear'}
         </DSButton>
-      </div>
+      </ListPageFilters>
 
       <DataTable<SobaFormSummary>
         {...table}

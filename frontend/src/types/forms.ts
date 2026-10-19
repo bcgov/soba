@@ -15,8 +15,12 @@ export type {
   FormWithPermissionsResponse,
   ListFormsResponse,
   ListFormVersionsResponse,
+  ListMyFormsResponse,
+  MyFormListItem,
   SubmitFillBundle,
+  SubmitFormVersionSchemaResponse,
   SubmissionDataDocument,
+  SubmitterForm,
 } from '@soba/lib';
 
 export type {
@@ -30,6 +34,9 @@ export type {
 };
 
 export type SobaFormType = Partial<CreateFormBody> & Partial<UpdateFormBody>;
+
+/** A new form as the dialog fills it in; the API call adds the workspace and the form engine. */
+export type CreateFormFields = Omit<CreateFormBody, 'workspaceId' | 'formEngineCode'>;
 
 export type CreateSobaFormioFormResponse = FormWithVersionResponse;
 

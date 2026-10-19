@@ -5,6 +5,7 @@ import { parseJson } from './sobaHelpers';
 import { FormType } from '@formio/react';
 import type {
   SobaFormType,
+  CreateFormFields,
   CreateSobaFormioFormResponse,
   SobaResponseFormType,
   SobaFormDetail,
@@ -15,26 +16,32 @@ import type {
   SubmissionDataDocument,
 } from '../../types/forms';
 import type { ListSubmissionsResponse, SubmissionListItem } from '@/src/types/submissions';
+import type { SubmissionReview, UpdateSubmissionStatusBody } from '@/src/types/submissionReview';
 import { toListRequestQuery, type ListQueryArgs } from '@/src/types/list';
 import { sortLocaleHeaders } from './sortLocaleRequest';
 
+/** What a create returned; `created` is false when a retry got back what an earlier attempt made. */
+export interface CreateResult<T> {
+  value: T;
+  created: boolean;
+}
+
+const createResult = async <T>(response: Response): Promise<CreateResult<T>> => ({
+  value: await parseJson<T>(response),
+  created: response.status === 201,
+});
+
 export async function createSobaFormioForm(
   token: string,
-  data: SobaFormType,
+  data: CreateFormFields,
   workspaceId?: string,
-): Promise<CreateSobaFormioFormResponse> {
-  data.formEngineCode = 'formio-v5';
-
-  if (workspaceId) {
-    data.workspaceId = workspaceId;
-  }
-
+): Promise<CreateResult<CreateSobaFormioFormResponse>> {
   const response = await sobaFetch('/design/forms', {
     token,
     method: 'POST',
-    json: data,
+    json: { ...data, formEngineCode: 'formio-v5', workspaceId },
   });
-  return parseJson(response);
+  return createResult(response);
 }
 
 export async function updateSobaForm(
@@ -110,6 +117,55 @@ export async function getSobaSubmissionData(
   return parseJson<SubmissionDataDocument>(response);
 }
 
+const reviewPath = (submissionId: string) => `/design/submissions/${submissionId}/review`;
+
+/** Status history, notes and edit history of a submission. The backend serves sample data for now. */
+export async function getSobaSubmissionReview(
+  token: string,
+  submissionId: string,
+): Promise<SubmissionReview> {
+  const response = await sobaFetch(reviewPath(submissionId), { token });
+  return parseJson(response);
+}
+
+export async function updateSobaSubmissionStatus(
+  token: string,
+  submissionId: string,
+  body: UpdateSubmissionStatusBody,
+): Promise<SubmissionReview> {
+  const response = await sobaFetch(`${reviewPath(submissionId)}/status`, {
+    token,
+    method: 'POST',
+    json: body,
+  });
+  return parseJson(response);
+}
+
+export async function addSobaSubmissionNote(
+  token: string,
+  submissionId: string,
+  text: string,
+): Promise<SubmissionReview> {
+  const response = await sobaFetch(`${reviewPath(submissionId)}/notes`, {
+    token,
+    method: 'POST',
+    json: { text },
+  });
+  return parseJson(response);
+}
+
+/** Records that staff changed the answers. The answers themselves are not written yet. */
+export async function recordSobaSubmissionEdit(
+  token: string,
+  submissionId: string,
+): Promise<SubmissionReview> {
+  const response = await sobaFetch(`${reviewPath(submissionId)}/edits`, {
+    token,
+    method: 'POST',
+  });
+  return parseJson(response);
+}
+
 const FORM_VERSIONS_PATH = '/design/form-versions';
 
 /** One form's versions for a select, newest first. */
@@ -140,20 +196,16 @@ export async function getSobaFormVersionPage(
 }
 
 /**
- * Create a new form version draft for a form. `fromFormVersionId`: the version whose document
- * templates the draft gets.
+ * Create a form version draft with its schema in one request. `fromFormVersionId`: the version whose
+ * document templates the draft gets, and whose schema it starts from when none is sent. A retry with
+ * the same `id` returns the draft the first request made.
  */
 export async function createFormVersion(
   token: string,
-  formId: string,
-  fromFormVersionId?: string,
-): Promise<SobaFormVersionType> {
-  const response = await sobaFetch(FORM_VERSIONS_PATH, {
-    token,
-    method: 'POST',
-    json: { formId, fromFormVersionId },
-  });
-  return parseJson(response);
+  draft: { id: string; formId: string; fromFormVersionId?: string; schema?: FormType },
+): Promise<CreateResult<SobaFormVersionType>> {
+  const response = await sobaFetch(FORM_VERSIONS_PATH, { token, method: 'POST', json: draft });
+  return createResult(response);
 }
 
 /** Save a form version's schema; the server provisions it in the engine (Form.io). */

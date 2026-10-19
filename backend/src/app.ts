@@ -33,6 +33,7 @@ import { initializePassport } from './core/auth/passport';
 import { Features } from './core/db/codes';
 
 const app = express();
+app.disable('x-powered-by');
 const port = Number(process.env.PORT) || 4000;
 
 // The app serves the base path itself, so Routes and probes address the same URLs the browser uses.

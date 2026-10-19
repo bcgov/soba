@@ -25,6 +25,7 @@ import {
   formVersionRevisions,
   formVersions,
   forms,
+  settingsAudit,
   sobaAdmins,
   submissionFiles,
   submissionParticipants,
@@ -38,6 +39,7 @@ import {
   workspaceMemberships,
   workspaces,
 } from '../../core/db/schema';
+import { mapInOrder } from '../../core/inOrder';
 import { createFormEngineAdapter } from '../../core/integrations/form-engine/FormEngineRegistry';
 import { getStorageAdapter } from '../../core/integrations/plugins/PluginRegistry';
 import { log } from '../../core/logging';
@@ -268,6 +270,7 @@ export const WORKSPACE_SCOPED_TABLES: readonly string[] = [
   'form_version',
   'form_group_override_member',
   'form_group_override',
+  'settings_audit',
   ...FORM_SETTINGS_TABLES.map((table) => getTableConfig(table).name),
   'form',
   'workspace_group_role',
@@ -363,12 +366,13 @@ async function purgeWorkspaceScoped(
     'form_group_override',
     tx.delete(formGroupOverrides).where(inArray(formGroupOverrides.workspaceId, ids)),
   );
-  for (const table of FORM_SETTINGS_TABLES) {
-    await record(
-      getTableConfig(table).name,
-      tx.delete(table).where(inArray(table.workspaceId, ids)),
-    );
-  }
+  await record(
+    'settings_audit',
+    tx.delete(settingsAudit).where(inArray(settingsAudit.workspaceId, ids)),
+  );
+  await mapInOrder(FORM_SETTINGS_TABLES, (table) =>
+    record(getTableConfig(table).name, tx.delete(table).where(inArray(table.workspaceId, ids))),
+  );
   await record('form', tx.delete(forms).where(inArray(forms.workspaceId, ids)));
   await record(
     'workspace_group_role',
@@ -472,29 +476,29 @@ async function purgeEngine(
   };
 
   // Called on the adapter, not detached: these are prototype methods that read this.pluginConfig.
-  for (const ref of targets.submissionRefs) {
+  // One engine request at a time, submissions before the forms that hold them.
+  await mapInOrder(targets.submissionRefs, async (ref) => {
     const adapter = adapterFor(ref.engineCode);
     if (typeof adapter?.deleteSubmission !== 'function' || !ref.submissionRef) {
       engineSkipped += 1;
-      continue;
+      return;
     }
     const { formRef, submissionRef } = ref;
-    if (await attempt(() => adapter.deleteSubmission!(formRef, submissionRef), submissionRef)) {
-      engineSubmissionsDeleted += 1;
-    }
-  }
+    const deleteSubmission = () => adapter.deleteSubmission!(formRef, submissionRef);
+    const deleted = await attempt(deleteSubmission, submissionRef);
+    if (deleted) engineSubmissionsDeleted += 1;
+  });
 
-  for (const ref of targets.schemaRefs) {
+  await mapInOrder(targets.schemaRefs, async (ref) => {
     const adapter = adapterFor(ref.engineCode);
     if (typeof adapter?.deleteSchema !== 'function') {
       engineSkipped += 1;
-      continue;
+      return;
     }
     const { formRef } = ref;
-    if (await attempt(() => adapter.deleteSchema!(formRef), formRef)) {
-      engineFormsDeleted += 1;
-    }
-  }
+    const deleted = await attempt(() => adapter.deleteSchema!(formRef), formRef);
+    if (deleted) engineFormsDeleted += 1;
+  });
 
   return { engineFormsDeleted, engineSubmissionsDeleted, engineFailures, engineSkipped };
 }
@@ -508,7 +512,8 @@ async function purgeStoredFiles(
 ): Promise<Pick<PurgeResult, 'storedFilesDeleted' | 'storedFilesSkipped'>> {
   let storedFilesDeleted = 0;
   let storedFilesSkipped = 0;
-  for (const { profile, backendRef } of targets.storedFiles) {
+  // One storage request at a time.
+  await mapInOrder(targets.storedFiles, async ({ profile, backendRef }) => {
     try {
       await getStorageAdapter(profile).deleteFile(backendRef);
       storedFilesDeleted += 1;
@@ -516,7 +521,7 @@ async function purgeStoredFiles(
       storedFilesSkipped += 1;
       log.warn({ err, profile }, 'Dev data purge cannot resolve a storage profile');
     }
-  }
+  });
   return { storedFilesDeleted, storedFilesSkipped };
 }
 

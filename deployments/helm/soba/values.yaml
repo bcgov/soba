@@ -197,6 +197,8 @@ backend:
     routesAllowed: "true"
     proxyPath: /formio-v5
     # apiBaseUrl is auto-constructed from the formio service/external URL
+    # -- outbound deadline in ms; empty uses the backend default (30000)
+    timeoutMs: ""
 
   # -- configmap-document-generation: PLUGIN_CDOGS_* + default backend code
   documentGeneration:

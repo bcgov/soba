@@ -18,10 +18,7 @@ export interface NewFileRecord {
 }
 
 /** Insert a file row and its owner's link in one transaction. */
-export const createFileRecord = async (
-  input: NewFileRecord,
-  link: FileLinkWrite,
-): Promise<FileRecord> =>
+export const createFileRecord = (input: NewFileRecord, link: FileLinkWrite): Promise<FileRecord> =>
   db.transaction(async (tx) => {
     const [row] = await tx
       .insert(files)
@@ -73,7 +70,7 @@ export const releaseFileRow = async (
  * Delete the owner's link, then the file row when no link remains, in one transaction. True when
  * this call deletes the file row.
  */
-export const releaseFileRecord = async (
+export const releaseFileRecord = (
   record: FileRecord,
   unlink: FileLinkWrite,
   isLinked: FileLinkCheck,

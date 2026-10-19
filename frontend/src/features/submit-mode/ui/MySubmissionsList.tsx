@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button as DSButton, Select } from '@bcgov/design-system-react-components';
 import { usePathname, useRouter } from 'next/navigation';
 import { DataTable, type Column } from '@/src/components/DataTable';
-import { ListPageAuthGate, ListPageToolbar } from '@/src/components/ListPageLayout';
+import {
+  ListPageAuthGate,
+  ListPageFilters,
+  ListPageToolbar,
+} from '@/src/components/ListPageLayout';
 import { ListPageSearchField } from '@/src/components/ListPageSearchField';
 import { RowActionButton } from '@/src/components/RowActionButton';
 import { ConfirmModal } from '@/src/components/ConfirmModal';
@@ -13,8 +17,11 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
+import { canContinueSubmission, canDeleteOwnSubmission } from '@/src/shared/util/permissions';
+import { fillTemplate } from '@/src/shared/util/stringUtils';
 import { useFormatLongDateTime } from '@/src/shared/hooks/useFormatLongDate';
-import { isConflict } from '@/src/shared/api/dataError';
+import { isConflict, apiErrorMessage } from '@/src/shared/api/dataError';
+import { useAccessCaller } from '@/src/shared/api/useAccessCaller';
 import { useDataErrorNotice } from '@/src/shared/api/useDataErrorNotice';
 import { MY_SUBMISSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { useListQuery } from '@/src/shared/list/useListQuery';
@@ -25,7 +32,7 @@ import {
 } from '@/src/features/submit-mode/data/useMySubmissions';
 import {
   MY_SUBMISSION_STATES,
-  type MySubmissionListItem,
+  type MySubmissionRow,
   type MySubmissionState,
 } from '@/src/types/submissions';
 import styles from './MySubmissionsList.module.css';
@@ -35,25 +42,18 @@ const ALL_STATES = 'all';
 const toState = (raw: string | undefined): MySubmissionState | undefined =>
   MY_SUBMISSION_STATES.find((state) => state === raw);
 
-const isDraft = (item: MySubmissionListItem) => item.workflowState === 'draft';
-
-// Only an owner deletes, and only before the submission is submitted.
-const canDelete = (item: MySubmissionListItem) => isDraft(item) && item.role === 'owner';
-
-// A function replacement keeps `$` in a form name literal.
-const fill = (template: string, values: Record<string, string>) =>
-  template.replaceAll(/\{(\w+)\}/g, (match, name: string) => values[name] ?? match);
-
-/** The caller's own drafts and submitted submissions: continue a draft, view a submission. */
+/** The caller's own drafts and submitted submissions: continue one still writable, view any other. */
 export function MySubmissionsList() {
   const dict = useDictionary();
   const dictMine = dict.mySubmissions;
-  const { authenticated, initializing, token } = useKeycloak();
+  const { authenticated, initializing } = useKeycloak();
   const { addNotification } = useNotificationStore();
   const notifyError = useDataErrorNotice();
   const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
   const formatDateTime = useFormatLongDateTime();
+  // Continue and Delete read the caller's provider, so rows wait for it.
+  const { caller, pending: callerPending } = useAccessCaller();
 
   const listQuery = useListQuery(MY_SUBMISSIONS_LIST_QUERY);
   const rawState = listQuery.filters.state;
@@ -70,7 +70,7 @@ export function MySubmissionsList() {
   const { table } = useDataTable(listQuery, submissions, dictMine.loadError);
   const { remove } = useMySubmissionDeleter();
 
-  const [confirmDelete, setConfirmDelete] = useState<MySubmissionListItem | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<MySubmissionRow | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const { setFilters } = listQuery;
@@ -80,44 +80,65 @@ export function MySubmissionsList() {
   }, [rawState, state, setFilters]);
 
   const labelValues = useCallback(
-    (item: MySubmissionListItem) => ({
+    (item: MySubmissionRow) => ({
       form: item.formName,
       updated: formatDateTime(item.updatedAt),
     }),
     [formatDateTime],
   );
 
+  // Continue when the caller may still write it; any other row, a missing form included, opens the
+  // read-only view.
+  const continues = useCallback(
+    (item: MySubmissionRow) => !!item.form && canContinueSubmission(item, item.form, caller),
+    [caller],
+  );
+
   const openSubmission = useCallback(
-    (item: MySubmissionListItem) =>
+    (item: MySubmissionRow) =>
       router.push(
-        isDraft(item) ? `/${locale}/submit/${item.id}` : `/${locale}/submission/${item.id}`,
+        continues(item) ? `/${locale}/submit/${item.id}` : `/${locale}/submission/${item.id}`,
       ),
-    [router, locale],
+    [router, locale, continues],
   );
 
   const handleDelete = useCallback(() => {
     const item = confirmDelete;
-    if (!token || !item) return;
+    if (!item) return;
     setDeleting(true);
-    remove(token, item.id)
-      .then(() => addNotification({ text: dictMine.deleteSuccess, type: 'success' }))
-      .catch((cause: unknown) =>
-        notifyError(cause, {
-          failed: isConflict(cause) ? dictMine.deleteSubmitted : dictMine.deleteError,
-        }),
-      )
+    remove(item.id)
+      .then((outcome) => {
+        switch (outcome.status) {
+          case 'applied':
+            addNotification({ text: dictMine.deleteSuccess, type: 'success' });
+            break;
+          case 'held':
+          case 'queued':
+            // Not deleted yet; the re-read list shows the row as it stands.
+            break;
+        }
+      })
+      .catch((cause: unknown) => {
+        // The only delete the server answers with 409 is one already submitted, coded or not.
+        const message =
+          apiErrorMessage(cause, dict.apiErrors) ??
+          (isConflict(cause) ? dict.apiErrors.delete_closed : null);
+        notifyError(
+          cause,
+          message ? { failed: message, forbidden: message } : { failed: dictMine.deleteError },
+        );
+      })
       .finally(() => {
         setDeleting(false);
         setConfirmDelete(null);
       });
   }, [
-    token,
     confirmDelete,
     remove,
     addNotification,
     notifyError,
     dictMine.deleteSuccess,
-    dictMine.deleteSubmitted,
+    dict.apiErrors,
     dictMine.deleteError,
   ]);
 
@@ -135,7 +156,7 @@ export function MySubmissionsList() {
     [dictMine.allStates, dictMine.states],
   );
 
-  const columns: Column<MySubmissionListItem>[] = useMemo(
+  const columns: Column<MySubmissionRow>[] = useMemo(
     () => [
       {
         key: 'formName',
@@ -193,20 +214,23 @@ export function MySubmissionsList() {
         label: dictMine.columns.actions,
         align: 'start',
         render: (item) => {
-          const draft = isDraft(item);
+          const toFill = continues(item);
           const values = labelValues(item);
           return (
             <div className="d-flex gap-2 justify-content-start">
               <RowActionButton
-                aria-label={fill(draft ? dictMine.continueLabel : dictMine.viewLabel, values)}
-                data-testid={`${item.id}-${draft ? 'continue' : 'view'}`}
+                aria-label={fillTemplate(
+                  toFill ? dictMine.continueLabel : dictMine.viewLabel,
+                  values,
+                )}
+                data-testid={`${item.id}-${toFill ? 'continue' : 'view'}`}
                 onPress={() => openSubmission(item)}
               >
-                {draft ? dictMine.continue : dictMine.view}
+                {toFill ? dictMine.continue : dictMine.view}
               </RowActionButton>
-              {canDelete(item) ? (
+              {canDeleteOwnSubmission(item, caller) ? (
                 <RowActionButton
-                  aria-label={fill(dictMine.deleteLabel, values)}
+                  aria-label={fillTemplate(dictMine.deleteLabel, values)}
                   data-testid={`${item.id}-delete`}
                   onPress={() => setConfirmDelete(item)}
                 >
@@ -218,7 +242,7 @@ export function MySubmissionsList() {
         },
       },
     ],
-    [dictMine, formatDateTime, labelValues, openSubmission],
+    [dictMine, caller, continues, formatDateTime, labelValues, openSubmission],
   );
 
   // Loading, including Keycloak init, shows inside the table so the heading stays put.
@@ -238,17 +262,20 @@ export function MySubmissionsList() {
           testIdPrefix="my-submissions"
         />
       </ListPageToolbar>
-      <div className="d-flex align-items-end gap-2">
-        <Select
-          size="medium"
-          id="my-submissions-state"
-          data-testid="my-submissions-state-select"
-          className={styles.stateField}
-          label={dictMine.statusFilter}
-          selectedKey={state ?? ALL_STATES}
-          onSelectionChange={handleStateChange}
-          items={stateOptions}
-        />
+      <ListPageFilters>
+        {/* The design system replaces its own root class when given one, so the width sits
+            on a wrapper. */}
+        <div className={styles.stateField}>
+          <Select
+            size="medium"
+            id="my-submissions-state"
+            data-testid="my-submissions-state-select"
+            label={dictMine.statusFilter}
+            selectedKey={state ?? ALL_STATES}
+            onSelectionChange={handleStateChange}
+            items={stateOptions}
+          />
+        </div>
         <DSButton
           variant="secondary"
           data-testid="my-submissions-clear-filters"
@@ -256,11 +283,11 @@ export function MySubmissionsList() {
         >
           {dict.general.clearFilters}
         </DSButton>
-      </div>
+      </ListPageFilters>
 
-      <DataTable<MySubmissionListItem>
+      <DataTable<MySubmissionRow>
         {...table}
-        loading={table.loading || initializing}
+        loading={table.loading || initializing || callerPending}
         columns={columns}
         emptyMessage={filtered ? dictMine.noMatches : dictMine.empty}
         loadingMessage={dict.general.loading}
@@ -272,7 +299,9 @@ export function MySubmissionsList() {
       <ConfirmModal
         show={confirmDelete !== null}
         title={dictMine.deleteTitle}
-        message={confirmDelete ? fill(dictMine.deleteMessage, labelValues(confirmDelete)) : ''}
+        message={
+          confirmDelete ? fillTemplate(dictMine.deleteMessage, labelValues(confirmDelete)) : ''
+        }
         confirmLabel={dictMine.delete}
         pending={deleting}
         onConfirm={handleDelete}

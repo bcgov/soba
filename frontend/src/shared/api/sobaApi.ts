@@ -4,7 +4,6 @@ import { getSobaApiBaseUrl } from '../config/runtimeConfig';
 import { parseJson } from './sobaHelpers';
 import { sobaFetch } from './sobaFetch';
 
-import type { SobaFormType } from '../../types/forms';
 import type {
   WorkspaceItem,
   WorkspacesResponse,
@@ -14,10 +13,13 @@ import type {
 } from '../../types/workspaces';
 import type { CurrentUserResponse } from '../../types/user';
 import type { SortLocale } from '@soba/lib/sort';
+import type { LoginProvidersMetaResponse } from '@soba/lib';
 import type { ListQueryArgs } from '../../types/list';
 import { sortLocaleHeaders } from './sortLocaleRequest';
 
-export type { SobaFormType, WorkspaceItem, WorkspacesResponse, CurrentUserResponse };
+export type { SobaFormType } from '../../types/forms';
+export type { WorkspaceItem, WorkspacesResponse } from '../../types/workspaces';
+export type { CurrentUserResponse } from '../../types/user';
 // Design-mode (staff, /design/*)
 export {
   createSobaFormioForm,
@@ -35,16 +37,24 @@ export {
   getFormVersionSchema,
   updateSobaForm,
   deleteSobaSubmission,
+  getSobaSubmissionReview,
+  updateSobaSubmissionStatus,
+  addSobaSubmissionNote,
+  recordSobaSubmissionEdit,
 } from './sobaApiDesign';
 // Submit-mode (public-capable, /submit/*)
 export {
   getSubmitFillBundle,
+  getSubmitForm,
+  getSubmitFormVersionSchema,
   getSubmitSubmissionSchema,
   openSobaFormSubmission,
   saveSobaFormSubmission,
   submitSobaFormSubmission,
   deleteSubmitSubmission,
+  getMyForms,
   getMySubmissions,
+  getMyWorkspaces,
   getSubmitSubmission,
   getSubmitSubmissionData,
 } from './sobaApiSubmit';
@@ -125,6 +135,19 @@ export async function fetchFormEnginesMeta(): Promise<unknown> {
     method: 'GET',
     cache: 'no-store',
     headers: { Accept: 'application/json' },
+  });
+  return parseJson(response);
+}
+
+/** The providers people sign in through, by name in the sort locale. */
+export async function fetchLoginProviders(
+  locale?: SortLocale,
+): Promise<LoginProvidersMetaResponse> {
+  const q = locale ? `?locale=${locale}` : '';
+  const response = await fetch(`${getSobaApiBaseUrl()}/meta/login-providers${q}`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: { Accept: 'application/json', ...sortLocaleHeaders(locale) },
   });
   return parseJson(response);
 }
