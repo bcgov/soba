@@ -33,9 +33,16 @@ jest.mock('../../../src/core/db/repos/documentTemplateRepo', () => ({
 jest.mock('../../../src/core/services/fileStore', () => ({
   fileStore: { open: jest.fn() },
 }));
+jest.mock('../../../src/core/services/scanUpload', () => ({
+  scanUpload: jest.fn(),
+}));
 
 import type { PrintOptions } from '@soba/lib';
-import { documentGenerationService } from '../../../src/features/document-generation/service';
+import {
+  documentGenerationService,
+  staffDocumentService,
+} from '../../../src/features/document-generation/service';
+import { scanUpload } from '../../../src/core/services/scanUpload';
 import * as submissionRepo from '../../../src/core/db/repos/submissionRepo';
 import { findSubmitterSubmission } from '../../../src/core/db/repos/submitterSubmissionRepo';
 import { storedSubmission } from '../../core/api/submit/storedSubmission';
@@ -65,6 +72,7 @@ const isFeatureAvailable = availability.isFeatureAvailable as unknown as jest.Mo
 const createAudit = auditRepo.createDocumentGenerationAudit as unknown as jest.Mock;
 const getLiveTemplate = templateRepo.getLiveDocumentTemplate as unknown as jest.Mock;
 const openFile = fileStore.open as unknown as jest.Mock;
+const scanMock = jest.mocked(scanUpload);
 
 const caller = { actorId: 'user-1', idpCode: 'idir' };
 const scope = { workspaceId: 'ws-1', formId: 'form-1', formVersionId: 'fv-1' };
@@ -109,6 +117,7 @@ beforeEach(() => {
   createAdapter.mockReturnValue({ render: renderMock });
   getContentMock.mockResolvedValue({ data: { field: 'saved' } });
   createAudit.mockResolvedValue(undefined);
+  scanMock.mockResolvedValue('clean');
 });
 
 const print = (options?: PrintOptions) =>
@@ -310,5 +319,64 @@ describe('documentGenerationService audit', () => {
     await print();
 
     expect(createAudit).not.toHaveBeenCalled();
+  });
+});
+
+describe('staffDocumentService.printUpload', () => {
+  const prepared = { scope, submissionId: 's1', backendCode: 'cdogs-v2' };
+  const template = {
+    content: Buffer.from('uploaded'),
+    fileType: 'docx' as const,
+    filename: 't.docx',
+  };
+  const options: PrintOptions = { convertTo: 'pdf' };
+  const printUpload = () => staffDocumentService.printUpload(prepared, template, options, 'user-1');
+
+  it.each(['infected', 'scan-unavailable'] as const)(
+    'never reads, renders or audits a template the scan calls %s',
+    async (verdict) => {
+      scanMock.mockResolvedValue(verdict);
+      const outcome = await printUpload();
+      expect(outcome.status).toBe(verdict);
+      expect(getContentMock).not.toHaveBeenCalled();
+      expect(createAdapter).not.toHaveBeenCalled();
+      expect(renderMock).not.toHaveBeenCalled();
+      expect(createAudit).not.toHaveBeenCalled();
+    },
+  );
+
+  it('renders a clean template with the saved answers and audits it with no stored template', async () => {
+    const outcome = await printUpload();
+    expect(outcome).toMatchObject({ status: 'ok', code: 'cdogs-v2' });
+    expect(scanMock).toHaveBeenCalledWith(Buffer.from('uploaded'), 't.docx');
+    expect(renderMock).toHaveBeenCalledWith({
+      template: { content: Buffer.from('uploaded'), fileType: 'docx' },
+      options,
+      data: { data: { field: 'saved' } },
+    });
+    expect(createAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: 'ws-1',
+        formId: 'form-1',
+        submissionId: 's1',
+        mode: 'print',
+        backendCode: 'cdogs-v2',
+        outcome: 'success',
+        templateId: null,
+        templateFileId: null,
+        revisionId: 'rev-1',
+        createdBy: 'user-1',
+      }),
+    );
+  });
+
+  it.each([
+    ['gone once the scan ends', 'notfound', () => getSubmissionRecordById.mockResolvedValue(null)],
+    ['without saved answers', 'no-content', () => getContentMock.mockResolvedValue(null)],
+  ] as const)('does not render a submission %s', async (_label, status, arrange) => {
+    arrange();
+    const outcome = await printUpload();
+    expect(outcome.status).toBe(status);
+    expect(renderMock).not.toHaveBeenCalled();
   });
 });

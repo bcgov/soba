@@ -58,3 +58,11 @@ a {
   outline: var(--layout-border-width-medium) solid var(--app-focus-ring);
   outline-offset: 2px;
 }
+
+/* A collapsed accordion keeps its panel on the page with `hidden`; paper shows it open. */
+@media print {
+  .bcds-react-aria-Disclosure--Panel[hidden] {
+    display: flex !important;
+    content-visibility: visible;
+  }
+}
