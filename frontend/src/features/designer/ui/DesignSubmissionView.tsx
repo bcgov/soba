@@ -7,6 +7,9 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { usePageHeading } from '@/src/components/PageHeader';
 import { SubmissionLoadAlert } from '@/src/features/submissions/ui/SubmissionLoadAlert';
 import { useDesignSubmission } from '@/src/features/designer/data/useDesignSubmission';
+import { useStaffPrint } from '@/src/features/templates/data/useSubmissionPrint';
+import { printBaseName } from '@/src/features/templates/printFileName';
+import { PrintSubmissionButton } from '@/src/features/templates/ui/PrintSubmissionButton';
 import { SubmissionReview } from './SubmissionReview';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 
@@ -25,6 +28,7 @@ export function DesignSubmissionView({
   const locale = getLocaleFromPath(usePathname());
 
   const { data, error } = useDesignSubmission(submissionId, formId);
+  const print = useStaffPrint(formId, submissionId);
 
   usePageHeading({ heading: dict.submission.review.heading });
 
@@ -45,13 +49,18 @@ export function DesignSubmissionView({
 
   return (
     <div className="mt-3" data-testid="design-submission-view">
-      <div className="mb-3">
+      <div className="mb-3 d-flex align-items-center gap-2 d-print-none">
         <Link
           data-testid="design-submission-back"
           onPress={() => router.push(`/${locale}/build/${formId}?tab=submissions`)}
         >
           {dict.submission.backToSubmissions}
         </Link>
+        {data ? (
+          <div className="ms-auto">
+            <PrintSubmissionButton print={print} baseName={printBaseName(data.submission)} />
+          </div>
+        ) : null}
       </div>
       {renderContent()}
     </div>

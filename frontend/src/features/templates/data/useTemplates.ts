@@ -6,6 +6,7 @@ import { listReadConfig, sessionReadConfig } from '@/src/shared/api/swrConfig';
 import { classifyDataError } from '@/src/shared/api/dataError';
 import type { TemplateResponse, TemplateType } from '@/src/types/templates';
 import { rereadAfter } from '../templateUpload';
+import { saveBlob } from './saveBlob';
 import {
   deleteTemplate,
   downloadTemplate,
@@ -15,16 +16,6 @@ import {
 } from './api';
 
 const EMPTY_TEMPLATES: TemplateResponse[] = [];
-
-/** Hand a downloaded template to the browser under its own file name. */
-function saveBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
 
 /** A form's document templates and the writes that change them. Each write re-reads the list. */
 export function useTemplates(formId: string, currentVersionId: string | null) {

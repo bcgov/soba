@@ -13,6 +13,7 @@ export const Permissions = {
   submission_update: 'submission_update',
   submission_delete: 'submission_delete',
   submission_review: 'submission_review',
+  submission_print_upload: 'submission_print_upload',
   team_read: 'team_read',
   team_update: 'team_update',
   document_template_create: 'document_template_create',
@@ -28,6 +29,26 @@ export type PermissionCode = (typeof Permissions)[keyof typeof Permissions];
  * existing forms.
  */
 export const FormCreatePermissions = [Permissions.form_create, Permissions.design_create] as const;
+
+/**
+ * Printing a submission with a template uploaded for that print only. submission_reviewer and
+ * submission_approver hold both.
+ */
+export const PrintUploadPermissions = [
+  Permissions.submission_read,
+  Permissions.submission_print_upload,
+] as const;
+
+/** What Print does for one caller on one submission (printChoiceOf). */
+export const PrintChoice = {
+  /** The browser's print. */
+  browser: 'browser',
+  /** Downloads a document rendered from the form version's stored template. */
+  template: 'template',
+  /** Staff pick the browser's print, the stored template or an uploaded one. */
+  options: 'options',
+} as const;
+export type PrintChoiceCode = (typeof PrintChoice)[keyof typeof PrintChoice];
 
 /** Provider code of the shared public user that anonymous callers resolve to. */
 export const PUBLIC_PROVIDER_CODE = 'public';

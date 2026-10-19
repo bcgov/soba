@@ -18,6 +18,9 @@ export interface NewDocumentGenerationAudit {
   durationMs: number;
   errorDetail?: string | null;
   requestId?: string | null;
+  templateId?: string | null;
+  templateFileId?: string | null;
+  revisionId?: string | null;
   createdBy: string;
 }
 
@@ -52,6 +55,9 @@ export const createDocumentGenerationAudit = async (
     durationMs: input.durationMs,
     errorDetail: input.errorDetail ?? null,
     requestId: input.requestId ?? null,
+    templateId: input.templateId ?? null,
+    templateFileId: input.templateFileId ?? null,
+    revisionId: input.revisionId ?? null,
     createdBy: input.createdBy,
   });
 };

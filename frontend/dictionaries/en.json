@@ -373,6 +373,19 @@
       "actionsColumn": "Actions",
       "types": {
         "cdogs": "CDOGS"
+      },
+      "print": {
+        "button": "Print",
+        "modalTitle": "Print Submission",
+        "methodLabel": "Print with",
+        "browserOption": "Browser print",
+        "print": "Print",
+        "printing": "Printing…",
+        "uploadOption": "Upload CDOGS template",
+        "storedOption": "Use default CDOGS template",
+        "fileNameColumn": "File Name",
+        "uploadDateColumn": "Upload Date",
+        "failed": "Failed to generate the document."
       }
     },
     "descriptionLabel": "Description",
@@ -531,9 +544,9 @@
     "scan_unavailable": "Virus scanning is not available right now, so the file was not uploaded. Please try again later.",
     "template_not_found": "This document template could not be found.",
     "template_unavailable": "This document template is not available right now. Please try again later.",
-    "render_unavailable": "Documents cannot be printed or previewed right now. Please try again later.",
-    "render_busy": "Printing and previews are busy. Please try again shortly.",
-    "render_failed": "The document could not be printed or previewed from this template.",
+    "render_unavailable": "Documents cannot be printed right now. Please try again later.",
+    "render_busy": "Printing is busy. Please try again shortly.",
+    "render_failed": "The document could not be printed from this template.",
     "no_saved_data": "This submission has no saved answers to print.",
     "request_invalid": "The request was not valid. Reload the page and try again.",
     "request_too_large": "The request is too large.",

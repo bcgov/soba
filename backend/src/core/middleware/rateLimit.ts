@@ -29,7 +29,7 @@ export const apiRateLimit = rateLimit({
 });
 
 /**
- * Limiter for document rendering (print, preview).
+ * Limiter for document rendering (print).
  * Env: RATE_LIMIT_RENDER_WINDOW_MS (default 60 000), RATE_LIMIT_RENDER_MAX (default 30).
  */
 export const renderRateLimit = rateLimit({

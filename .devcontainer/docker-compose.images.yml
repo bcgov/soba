@@ -49,7 +49,7 @@ services:
       - "3100:3000"
     environment:
       NEXT_PUBLIC_SOBA_API_BASE_URL: http://localhost:4000/chefs/api/v1
-      NEXT_PUBLIC_SOBA_FEATURES_ALLOWED: submit-mode,files,meta
+      NEXT_PUBLIC_SOBA_FEATURES_ALLOWED: submit-mode,files,meta,templates
       SOBA_API_INTERNAL_URL: http://backend:4000/chefs/api/v1
     depends_on:
       - backend

@@ -79,6 +79,51 @@ export const TemplateResponseSchema = z.object({
 
 export const TemplateListResponseSchema = z.object({ items: z.array(TemplateResponseSchema) });
 
+/** Formats a print can convert the document to. Without one it keeps the template's format. */
+export const PRINT_CONVERT_TO = ['pdf'] as const;
+
+export const PRINT_REPORT_NAME_MAX_LENGTH = 255;
+
+// No lone surrogate: the name goes into the download's Content-Disposition, which cannot encode one.
+const WELL_FORMED = /^(?:[^\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF])*$/;
+
+/** The render options a print accepts. */
+export const PrintOptionsSchema = z.strictObject({
+  convertTo: z.enum(PRINT_CONVERT_TO).optional(),
+  reportName: z
+    .string()
+    .trim()
+    .min(1)
+    .max(PRINT_REPORT_NAME_MAX_LENGTH)
+    .regex(WELL_FORMED)
+    .optional(),
+});
+
+/** A print with a template stored on the submission's form version. */
+export const PrintBodySchema = z.strictObject({
+  templateId: z.uuid(),
+  options: PrintOptionsSchema.optional(),
+});
+
+/** What a submitter's Print reads: the stored template, if any, and whether a backend can render. */
+export const SubmissionPrintFactsSchema = z.object({
+  items: z.array(z.object({ id: z.uuid() })),
+  renderAvailable: z.boolean(),
+});
+
+/** What a staff Print reads: the stored templates, and whether a backend can render. */
+export const StaffPrintFactsSchema = z.object({
+  items: z.array(
+    z.object({
+      id: z.uuid(),
+      name: z.string(),
+      filename: z.string(),
+      createdAt: z.iso.datetime(),
+    }),
+  ),
+  renderAvailable: z.boolean(),
+});
+
 export type TemplateIdParams = z.infer<typeof TemplateIdParamsSchema>;
 export type TemplatesFormQuery = z.infer<typeof TemplatesFormQuerySchema>;
 export type TemplateVersionQuery = z.infer<typeof TemplateVersionQuerySchema>;
@@ -86,3 +131,7 @@ export type TemplateNameBody = z.infer<typeof TemplateNameBodySchema>;
 export type TemplateUploadBody = z.infer<typeof TemplateUploadBodySchema>;
 export type TemplateResponse = z.infer<typeof TemplateResponseSchema>;
 export type TemplateListResponse = z.infer<typeof TemplateListResponseSchema>;
+export type PrintOptions = z.infer<typeof PrintOptionsSchema>;
+export type PrintBody = z.infer<typeof PrintBodySchema>;
+export type SubmissionPrintFacts = z.infer<typeof SubmissionPrintFactsSchema>;
+export type StaffPrintFacts = z.infer<typeof StaffPrintFactsSchema>;

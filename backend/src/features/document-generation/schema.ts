@@ -1,5 +1,11 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
+import {
+  PrintBodySchema as LibPrintBodySchema,
+  PrintOptionsSchema as LibPrintOptionsSchema,
+  StaffPrintFactsSchema as LibStaffPrintFactsSchema,
+  SubmissionPrintFactsSchema as LibSubmissionPrintFactsSchema,
+} from '@soba/lib';
 
 extendZodWithOpenApi(z);
 
@@ -8,49 +14,45 @@ const SUBMISSION_AUTH_REQUIRED =
 // Optional auth: anonymous (the public user) or a bearer token. `{}` marks the no-auth case
 // explicit rather than leaving security unset.
 const PUBLIC_SECURITY = [{}, { bearerAuth: [] }];
-const BASE = '/submit/submissions/{id}';
-
-// Backend-specific render options (passed straight through to the backend).
-const payloadObject = z.record(z.string(), z.unknown());
-
-const templateId = z
-  .uuid()
-  .openapi({ description: "A document template on the submission's form version." });
+const STAFF_SECURITY = [{ bearerAuth: [] }];
+const SUBMIT_BASE = '/submit/submissions/{id}';
+const DESIGN_BASE = '/design/submissions/{id}';
 
 export const SubmissionIdParamSchema = z
   .object({ id: z.uuid() })
   .openapi('DocumentGeneration_SubmissionIdParam');
 
-export const PreviewBodySchema = z
-  .object({
-    templateId,
-    options: payloadObject.optional(),
-    data: payloadObject,
-  })
-  .openapi('DocumentGeneration_PreviewBody');
+export const PrintOptionsSchema = LibPrintOptionsSchema.clone().openapi(
+  'DocumentGeneration_PrintOptions',
+);
 
-export const PrintBodySchema = z
-  .object({
-    templateId,
-    options: payloadObject.optional(),
-  })
-  .openapi('DocumentGeneration_PrintBody');
+export const PrintBodySchema = LibPrintBodySchema.extend({
+  options: PrintOptionsSchema.optional(),
+}).openapi('DocumentGeneration_PrintBody');
 
-const SubmissionTemplatesSchema = z
-  .object({ items: z.array(z.object({ id: z.uuid(), name: z.string() })) })
-  .openapi('DocumentGeneration_SubmissionTemplates');
+const SubmissionPrintFactsSchema = LibSubmissionPrintFactsSchema.clone().openapi(
+  'DocumentGeneration_SubmissionPrintFacts',
+);
 
-const accessResponses = {
+const StaffPrintFactsSchema = LibStaffPrintFactsSchema.clone().openapi(
+  'DocumentGeneration_StaffPrintFacts',
+);
+
+const submitAccessResponses = {
   401: { description: SUBMISSION_AUTH_REQUIRED },
   403: { description: 'Not authorized to generate documents from this submission' },
 } as const;
 
-const documentResponses = {
+const staffAccessResponses = {
+  401: { description: 'Authentication required' },
+  403: { description: 'Not a member of the workspace, or insufficient form permissions' },
+} as const;
+
+const renderResponses = {
   200: { description: 'Rendered document bytes (attachment)', content: {} },
   400: { description: 'Invalid submission id or request body' },
-  ...accessResponses,
   404: { description: 'Submission or template not found' },
-  422: { description: 'Template could not be rendered' },
+  422: { description: 'Template could not be rendered, or the submission has no saved data' },
   429: { description: 'Too many render requests' },
   503: {
     description:
@@ -58,53 +60,98 @@ const documentResponses = {
   },
 } as const;
 
+const printBody = {
+  required: true,
+  content: { 'application/json': { schema: PrintBodySchema } },
+};
+
 export function registerDocumentGenerationOpenApi(registry: OpenAPIRegistry) {
   const tag = 'feature.document-generation';
 
   registry.registerPath({
     method: 'get',
-    path: `${BASE}/templates`,
+    path: `${SUBMIT_BASE}/templates`,
     tags: [tag],
     security: PUBLIC_SECURITY,
-    summary: "The document templates on the submission's form version, by name",
+    summary: "The document template on the submission's form version, and whether it can render",
     request: { params: SubmissionIdParamSchema },
     responses: {
       200: {
         description: 'Templates the caller may render from the submission',
-        content: { 'application/json': { schema: SubmissionTemplatesSchema } },
+        content: { 'application/json': { schema: SubmissionPrintFactsSchema } },
       },
       400: { description: 'Invalid submission id' },
-      ...accessResponses,
+      ...submitAccessResponses,
       404: { description: 'Submission not found' },
     },
   });
 
   registry.registerPath({
     method: 'post',
-    path: `${BASE}/preview`,
+    path: `${SUBMIT_BASE}/print`,
     tags: [tag],
     security: PUBLIC_SECURITY,
-    summary: 'Render a document from a stored template and live (on-screen) submission data',
-    request: {
-      params: SubmissionIdParamSchema,
-      body: { required: true, content: { 'application/json': { schema: PreviewBodySchema } } },
+    summary: "Render a document from a stored template and the submission's persisted data",
+    request: { params: SubmissionIdParamSchema, body: printBody },
+    responses: { ...renderResponses, ...submitAccessResponses },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: `${DESIGN_BASE}/templates`,
+    tags: [tag],
+    security: STAFF_SECURITY,
+    summary: "The document templates on the submission's form version, and whether they can render",
+    request: { params: SubmissionIdParamSchema },
+    responses: {
+      200: {
+        description: 'Templates staff may render from the submission',
+        content: { 'application/json': { schema: StaffPrintFactsSchema } },
+      },
+      400: { description: 'Invalid submission id' },
+      ...staffAccessResponses,
+      404: { description: 'Submission not found' },
     },
-    responses: documentResponses,
   });
 
   registry.registerPath({
     method: 'post',
-    path: `${BASE}/print`,
+    path: `${DESIGN_BASE}/print`,
     tags: [tag],
-    security: PUBLIC_SECURITY,
+    security: STAFF_SECURITY,
     summary: "Render a document from a stored template and the submission's persisted data",
+    request: { params: SubmissionIdParamSchema, body: printBody },
+    responses: { ...renderResponses, ...staffAccessResponses },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/design/print-upload/{id}',
+    tags: [tag],
+    security: STAFF_SECURITY,
+    summary: "Render a document from an uploaded template and the submission's persisted data",
     request: {
       params: SubmissionIdParamSchema,
-      body: { required: true, content: { 'application/json': { schema: PrintBodySchema } } },
+      body: {
+        required: true,
+        content: {
+          'multipart/form-data': {
+            schema: LibPrintOptionsSchema.extend({
+              file: z.string().openapi({ format: 'binary' }),
+            }),
+          },
+        },
+      },
     },
     responses: {
-      ...documentResponses,
-      422: { description: 'Template could not be rendered, or the submission has no saved data' },
+      ...renderResponses,
+      ...staffAccessResponses,
+      413: { description: 'Template file too large' },
+      415: { description: 'Template file type not accepted' },
+      422: {
+        description:
+          'Template could not be rendered, failed the virus scan, or the submission has no saved data',
+      },
     },
   });
 }

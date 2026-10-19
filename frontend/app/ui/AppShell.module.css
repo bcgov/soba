@@ -54,3 +54,24 @@
     padding: var(--app-page-inset-top) var(--app-page-inset) var(--layout-padding-xlarge);
   }
 }
+
+/* Paper gets the page content only: no header or nav, and nothing sticky. The footer hides itself.
+   Last in the file so it wins over the min-width padding above. */
+@media print {
+  .header,
+  .aside {
+    display: none;
+  }
+
+  .shell,
+  .row {
+    display: block;
+    min-height: 0;
+  }
+
+  .main {
+    border-left: 0;
+    padding: 0;
+    overflow: visible;
+  }
+}

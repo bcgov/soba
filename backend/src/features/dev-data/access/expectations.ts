@@ -35,6 +35,8 @@ export interface DesignExpectation {
   submissionsRead: PersonaKey[];
   /** form_read and document_template_read on the form: the staff template list and downloads. */
   staffTemplates: PersonaKey[];
+  /** submission_read and submission_print_upload on the form: print with an uploaded template. */
+  printUpload: PersonaKey[];
 }
 
 /** Workspace access, as the core routes answer it. */
@@ -55,7 +57,7 @@ export interface SubmissionExpectation {
   upload: PersonaKey[];
   /** Deletes a file: the write rule before it is submitted, then submission_update with no grant. */
   fileDelete: PersonaKey[];
-  /** Prints or previews it: a grant and document_template_read. */
+  /** Prints it: a grant and document_template_read. */
   render: PersonaKey[];
   /** Deletes it: an owner grant, signed in, before it is submitted. */
   delete: PersonaKey[];
@@ -68,6 +70,7 @@ export const DESIGN_CHECKS = [
   'designUpdate',
   'submissionsRead',
   'staffTemplates',
+  'printUpload',
 ] as const;
 export const WORKSPACE_CHECKS = ['peopleRead', 'formCreate'] as const;
 export const SUBMISSION_CHECKS = [
@@ -215,12 +218,16 @@ export const FORM_EXPECTATIONS: Record<CoverageFormKey, FormExpectation> = {
 /** form_read in the roles workspace without an override: the staff groups. */
 const ROLES_READERS: PersonaKey[] = ['admin', 'designer', 'reviewer', 'viewer'];
 
+/** submission_read in the roles workspace: admin, the reviewers and the approvers. */
+const ROLES_SUBMISSION_READERS: PersonaKey[] = ['admin', 'reviewer', 'viewer'];
+
 const rolesDesign = (changes: Partial<DesignExpectation> = {}): DesignExpectation => ({
   designListed: ROLES_READERS,
   designRead: ROLES_READERS,
   designUpdate: ['admin', 'designer'],
-  submissionsRead: ['admin', 'reviewer', 'viewer'],
+  submissionsRead: ROLES_SUBMISSION_READERS,
   staffTemplates: ['admin'],
+  printUpload: ROLES_SUBMISSION_READERS,
   ...changes,
 });
 
@@ -230,6 +237,7 @@ const everyCheck = (personas: PersonaKey[]): DesignExpectation => ({
   designUpdate: personas,
   submissionsRead: personas,
   staffTemplates: personas,
+  printUpload: personas,
 });
 
 const DESIGNERS_OVERRIDE_READERS: PersonaKey[] = ['admin', 'reviewer', 'viewer', 'overrideAdded'];
