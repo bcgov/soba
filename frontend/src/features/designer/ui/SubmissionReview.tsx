@@ -1,6 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
+import type { Key } from 'react-aria-components';
 import { usePathname, useRouter } from 'next/navigation';
 import type { FormType, Submission } from '@formio/react';
 import {
@@ -41,6 +43,27 @@ type SubmissionReviewProps = {
   content: SubmissionDataDocument | null;
 };
 
+/** The panels the user has open, and every panel while the page prints, so none prints collapsed. */
+function usePanelsOpenForPrint(panels: readonly string[]) {
+  const [open, setOpen] = useState<Set<Key>>(() => new Set(panels));
+  const [printing, setPrinting] = useState(false);
+  const all = useMemo(() => new Set<Key>(panels), [panels]);
+
+  useEffect(() => {
+    // Synchronous, so the panels are open before the browser lays out the printout.
+    const start = () => flushSync(() => setPrinting(true));
+    const end = () => setPrinting(false);
+    window.addEventListener('beforeprint', start);
+    window.addEventListener('afterprint', end);
+    return () => {
+      window.removeEventListener('beforeprint', start);
+      window.removeEventListener('afterprint', end);
+    };
+  }, []);
+
+  return { expandedKeys: printing ? all : open, onExpandedChange: setOpen };
+}
+
 function MetaLine({
   label,
   value,
@@ -69,6 +92,7 @@ export function SubmissionReview({ submission, schema, content }: Readonly<Submi
   const submissionDeleter = useSubmissionDeleter();
   const { review, updateStatus, addNote, saveData } = useSubmissionReview(submission.id);
   const [open, setOpen] = useState<'delete' | 'confirmChange' | 'dataHistory' | null>(null);
+  const panels = usePanelsOpenForPrint(PANELS);
   // A count, so one write settling does not clear pending while another is still running.
   const [inFlight, setInFlight] = useState(0);
   const pending = inFlight > 0;
@@ -190,7 +214,11 @@ export function SubmissionReview({ submission, schema, content }: Readonly<Submi
       {review.isLoading ? <CenteredProgress label={dict.general.loading} /> : null}
 
       {/* The answers are already loaded, so they show whatever happens to the review read. */}
-      <AccordionGroup allowsMultipleExpanded defaultExpandedKeys={PANELS}>
+      <AccordionGroup
+        allowsMultipleExpanded
+        expandedKeys={panels.expandedKeys}
+        onExpandedChange={panels.onExpandedChange}
+      >
         {review.data ? (
           <>
             <Accordion
