@@ -71,6 +71,8 @@ jobs:
     name: Set variables
     runs-on: ubuntu-24.04
     needs: [qa, changes]
+    permissions:
+      pull-requests: read
     if: ${{ needs.changes.outputs.deploy == 'true' && !startsWith(github.head_ref, 'release/') && github.head_ref != 'main' }}
     environment:
       name: ${{ format('{0}-pr', fromJSON(vars.DEPLOY_CLUSTERS)[0]) }}
@@ -87,19 +89,32 @@ jobs:
         id: vars
         env:
           PR_NUMBER: ${{ github.event.number || github.event.inputs.pr-number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           # The concurrency group is keyed on the raw input, so it must already be the bare number.
           if [[ ! "${PR_NUMBER}" =~ ^[1-9][0-9]*$ ]]; then
             echo "::error::pr-number must be digits only, e.g. 42 (got '${PR_NUMBER}')."
             exit 1
           fi
+          # Resolve one immutable commit for every build and deployment in this run.
+          SOURCE_SHA="${PR_HEAD_SHA}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            SOURCE_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.head.sha')
+          fi
+          if [[ ! "${SOURCE_SHA}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "::error::Could not resolve a valid commit SHA for PR ${PR_NUMBER}."
+            exit 1
+          fi
+          echo "Source commit: ${SOURCE_SHA}"
           FRONTEND_HOST="${DEV_HOST_PREFIX}.${{ vars.OC_DOMAIN }}"
           echo "PR_NUM=$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "JOB_NAME=pr-$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "FRONTEND_HOST=$FRONTEND_HOST" >> "$GITHUB_OUTPUT"
           echo "URL=https://${FRONTEND_HOST}/designer-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
           echo "URL_FORMS=https://${FRONTEND_HOST}/forms-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
-          echo "ref=refs/pull/$PR_NUMBER/head" >> "$GITHUB_OUTPUT"
+          echo "ref=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build & Push
