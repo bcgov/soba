@@ -101,6 +101,7 @@ backend:
   # the render. dev-data must stay off in production.
   features:
     dev-data: ""
+    notifications: ""
 
   # -- configmap-app: general application config
   config:

@@ -41,7 +41,6 @@ describe('form settings sections', () => {
       'form-profile',
       'form-audience',
       'submitter-settings',
-      'notification-settings',
       'document-templates',
     ]);
   });

@@ -4,8 +4,10 @@ import { createPluginConfigReaderFrom } from '../../../src/core/config/pluginCon
 import { createEnvReader } from '../../../src/core/config/env';
 import {
   SendEmailSchema,
+  providerDetailOf,
   type SendEmail,
 } from '../../../src/core/integrations/notification/NotificationAdapter';
+import { upstreamStatusOf } from '../../../src/core/http/httpErrorMapper';
 
 const email = SendEmailSchema.parse({
   recipients: { to: ['recipient@example.com'] },
@@ -31,6 +33,37 @@ const makeAdapter = () =>
   );
 
 afterEach(() => jest.restoreAllMocks());
+
+// Notify test's answer for a recipient missing from the tenant safelist.
+const safelistRefusal = {
+  message: 'Request validation failed',
+  errors: [
+    "Recipient(s) not on this tenant's safelist: recipient@example.com. This environment only sends to safelisted recipients.",
+  ],
+};
+
+test('keeps Notify error text out of the message but on the error for the audit', async () => {
+  jest
+    .spyOn(global, 'fetch')
+    .mockResolvedValue(new Response(JSON.stringify(safelistRefusal), { status: 400 }));
+  const err: unknown = await makeAdapter()
+    .sendEmail(email)
+    .catch((e: unknown) => e);
+  expect(err).toEqual(new Error('Notify email send failed (upstream HTTP 400)'));
+  expect(upstreamStatusOf(err)).toBe(400);
+  expect(providerDetailOf(err)).toBe(
+    "Request validation failed: Recipient(s) not on this tenant's safelist: recipient@example.com. This environment only sends to safelisted recipients.",
+  );
+  expect(Object.keys(err as object)).not.toContain('providerDetail');
+});
+
+test('keeps a non-JSON error body as the provider detail', async () => {
+  jest.spyOn(global, 'fetch').mockResolvedValue(new Response('gateway exploded', { status: 502 }));
+  const err: unknown = await makeAdapter()
+    .sendEmail(email)
+    .catch((e: unknown) => e);
+  expect(providerDetailOf(err)).toBe('gateway exploded');
+});
 
 test('sends inline email with only the configured API key', async () => {
   const fetchMock = jest

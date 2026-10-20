@@ -17,7 +17,6 @@ import {
   listSubmissionsForWorkspace,
   markSubmissionDeleted,
   updateSubmissionDraft,
-  type AppendSubmissionRevisionResult,
   type LabelledSubmissionRecord,
   type ListParticipantSubmissionsInput,
   type SubmissionRecord,
@@ -45,7 +44,6 @@ import {
 import { withNewConfirmationCode } from './confirmationCode';
 import { isUniqueViolationOn } from '../db/pgError';
 import { SUBMISSION_REVISION_PKEY } from '../db/schema';
-import { enqueueSubmissionNotification } from '../../features/notifications/submissionNotification';
 
 export interface SubmissionWriteOutcome {
   record: LabelledSubmissionRecord;
@@ -110,20 +108,6 @@ interface ListInput {
   sort: SubmissionListSort;
   locale: SortLocale;
 }
-
-/** Only a submit that lands as a new current revision notifies; replays and pending writes do not. */
-const notifyIfSubmitted = (
-  eventType: SubmissionWriteEventCode,
-  result: AppendSubmissionRevisionResult,
-): void => {
-  if (eventType !== SubmissionEventType.submitted || result.outcome !== 'appended') return;
-  enqueueSubmissionNotification({
-    workspaceId: result.record.workspaceId,
-    formId: result.record.formId,
-    submissionId: result.record.id,
-    confirmationCode: result.record.confirmationCode,
-  });
-};
 
 export class SubmissionService {
   /**
@@ -327,7 +311,6 @@ export class SubmissionService {
         throw err;
       });
 
-      notifyIfSubmitted(eventType, result);
       if (result.outcome === 'not_found') {
         throw new NotFoundError('Submission not found', ApiErrorCodes.submission_not_found);
       }

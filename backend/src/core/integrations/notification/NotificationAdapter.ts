@@ -24,6 +24,21 @@ export interface EmailReceipt {
   status: string;
 }
 
+/**
+ * Attaches the provider's error text to a send error. It is not enumerable, so logging the error
+ * leaves it out; the text can name recipients.
+ */
+export const withProviderDetail = <E extends Error>(error: E, detail: string | undefined): E => {
+  if (detail) Object.defineProperty(error, 'providerDetail', { value: detail, enumerable: false });
+  return error;
+};
+
+/** The provider's error text on a failed send, for the audit; undefined when there is none. */
+export const providerDetailOf = (err: unknown): string | undefined => {
+  const detail = (err as { providerDetail?: unknown } | null)?.providerDetail;
+  return typeof detail === 'string' ? detail : undefined;
+};
+
 /** Result of a notification readiness check; no config or credentials are exposed. */
 export interface NotificationReadinessResult {
   ok: boolean;

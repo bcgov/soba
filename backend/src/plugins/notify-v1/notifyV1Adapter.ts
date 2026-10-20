@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { PluginConfigReader } from '../../core/config/pluginConfig';
 import {
   SendEmailSchema,
+  withProviderDetail,
   type EmailReceipt,
   type NotificationAdapter,
   type NotificationReadinessResult,
@@ -12,7 +13,7 @@ import { ServiceUnavailableError, ValidationError } from '../../core/errors';
 import { log } from '../../core/logging';
 
 const EMAIL_PATH = 'notifysimple/email';
-// A keyed read with no side effects, so the readiness check exercises the URL and the API key.
+// Keyed and side-effect free: the readiness check exercises the URL and the API key.
 const CHANNELS_PATH = 'code-tables/channels';
 
 // Only Notify's channel list counts: a wrong base URL can reach the Notify web app, which answers 200.
@@ -23,6 +24,26 @@ const NotifyAcceptanceSchema = z.object({
   notifyId: z.string().min(1),
   status: z.string().min(1),
 });
+
+// Notify's error body, e.g. a safelist refusal: { message, errors: [text naming the recipient] }.
+const NotifyErrorSchema = z.object({
+  message: z.string().optional(),
+  errors: z.array(z.string()).optional(),
+});
+
+/** Notify's message and errors from an error body, or the body itself when it is not that shape. */
+function notifyErrorText(body: string): string | undefined {
+  let json: unknown;
+  try {
+    json = JSON.parse(body);
+  } catch {
+    return body.trim() || undefined;
+  }
+  const parsed = NotifyErrorSchema.safeParse(json);
+  if (!parsed.success) return body.trim() || undefined;
+  const parts = [parsed.data.message, ...(parsed.data.errors ?? [])].filter((part) => !!part);
+  return parts.length > 0 ? parts.join(': ') : undefined;
+}
 
 // Only expose known transport codes; arbitrary error messages can include private data.
 const NETWORK_CODES = new Set([
@@ -98,19 +119,31 @@ export class NotifyV1Adapter implements NotificationAdapter {
       const response = await this.http.postJsonForBinary(EMAIL_PATH, request.data);
       return this.receipt(JSON.parse(response.data.toString('utf8')));
     } catch (err) {
-      if (this.debugResponses && err instanceof HttpClientError) {
-        log.error(
-          {
-            upstreamStatus: err.status,
-            upstreamStatusText: err.statusText,
-            upstreamBody: err.body,
-          },
-          'Notify upstream error response (debug)',
-        );
-      }
-      // Upstream bodies can contain recipient addresses or credentials; keep them private.
-      throw new ServiceUnavailableError(failureMessage('Notify email send', err));
+      throw this.sendFailure(err);
     }
+  }
+
+  /**
+   * The error for a failed send. The message never carries the upstream body; Notify's error text
+   * goes to the audit as provider detail.
+   */
+  private sendFailure(err: unknown): ServiceUnavailableError {
+    const error = new ServiceUnavailableError(failureMessage('Notify email send', err));
+    if (!(err instanceof HttpClientError)) return error;
+    if (this.debugResponses) {
+      log.error(
+        {
+          upstreamStatus: err.status,
+          upstreamStatusText: err.statusText,
+          upstreamBody: err.body,
+        },
+        'Notify upstream error response (debug)',
+      );
+    }
+    return withProviderDetail(
+      Object.assign(error, { upstreamStatus: err.status }),
+      notifyErrorText(err.body),
+    );
   }
 
   private receipt(body: unknown): EmailReceipt {

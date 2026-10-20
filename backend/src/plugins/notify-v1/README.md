@@ -21,23 +21,27 @@ https://common-notify-test.apps.silver.devops.gov.bc.ca/settings
 The adapter authenticates to Notify using only the configured `X-API-KEY`. At
 startup the backend logs whether a keyed `GET code-tables/channels` returns
 Notify's channel list, which checks the endpoint and the key without sending.
-Backend code sends email through the plugin registry:
+
+Backend code sends email through the notification service, which checks the
+`notifications` feature, calls the active plugin and writes one
+`notification_audit` row per send:
 
 ```ts
-import { getNotificationAdapter } from '../../core/integrations/plugins/PluginRegistry';
+import { notificationService } from '../../features/notifications/service';
 
-const receipt = await getNotificationAdapter().sendEmail({
-  recipients: { to: ['recipient@example.com'] },
-  content: {
-    subject: 'SOBA notification',
-    body: 'Hello from SOBA',
-    bodyType: 'text',
+const { outcome } = await notificationService.sendEmail(
+  { workspaceId, formId, submissionId, actorId },
+  {
+    recipients: { to: ['recipient@example.com'] },
+    content: { subject: 'SOBA notification', body: 'Hello from SOBA', bodyType: 'text' },
   },
-});
+);
 ```
 
 The request is checked against `SendEmailSchema`. Optional `cc` and `bcc` arrays
 are supported. `bodyType` is `text` or `html`. The receipt's `id` is Notify's
-`notifyId` and `status` is Notify's status; acceptance does not mean delivery. Sends are never retried
-automatically, to avoid duplicate emails when a response is lost. Upstream
-failures throw `ServiceUnavailableError` without recipient or credential details.
+`notifyId` and `status` is Notify's status; acceptance does not mean delivery.
+Sends are never retried automatically. Upstream failures throw
+`ServiceUnavailableError` with the upstream status; its message carries no
+recipient or credential details. Notify's error text, such as a safelist
+refusal, goes to the audit row only.
