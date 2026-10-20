@@ -79,19 +79,24 @@ export default function FormTeamMemberForm({
       {
         key: 'select',
         label: '',
-        // Someone already on the team is changed through Edit, so they are marked and cannot be
-        // picked. Text inside the radio group needs a slot, so the mark is the radio's own label.
+        // Current members change through Edit. The mark sits beside the radio (wrapping label text
+        // squeezes the circle) as a plain span (design system text in a radio group needs a slot).
         render: (user) => {
           const name = `${user.firstName} ${user.lastName}`;
           return (
-            <Radio
-              value={user.id}
-              isDisabled={user.onTeam}
-              aria-label={(user.onTeam ? t.onTeamLabel : t.select).replace('{name}', name)}
-              data-testid={`${user.id}-select`}
-            >
-              {user.onTeam ? t.onTeam : undefined}
-            </Radio>
+            <span className="d-inline-flex align-items-center gap-2">
+              <Radio
+                value={user.id}
+                isDisabled={user.onTeam}
+                aria-label={(user.onTeam ? t.onTeamLabel : t.select).replace('{name}', name)}
+                data-testid={`${user.id}-select`}
+              />
+              {user.onTeam && (
+                <span className="text-muted small" aria-hidden data-testid={`${user.id}-on-team`}>
+                  {t.onTeam}
+                </span>
+              )}
+            </span>
           );
         },
       },

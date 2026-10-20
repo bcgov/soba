@@ -5,12 +5,8 @@ import type { ListResult, WriteOutcome } from '@/src/shared/api/dataContracts';
 import type { ListQueryArgs } from '@/src/types/list';
 import type { TeamGroup, TeamMember, UserSearchResult } from '@/src/types/formTeam';
 
-/**
- * Sample data behind the Access tab (CCP-5928). There is no team API yet, so these hooks answer
- * from memory: each form starts with the same sample team and changes last until the page
- * reloads. The hooks take a form id and return `WriteOutcome` as the API-backed ones will, so the
- * screens should not need to change when the bodies here are replaced.
- */
+// In-memory sample data until the team API exists (CCP-5928); changes last until reload.
+// Signatures (formId in, WriteOutcome out) match the API-backed hooks that will replace these.
 const GROUPS: TeamGroup[] = [
   { id: 'group-1', name: 'Group 1' },
   { id: 'group-2', name: 'Group 2' },
@@ -96,10 +92,7 @@ export function useFormTeamMembers(formId: string, query: ListQueryArgs): ListRe
   }, [team, q, offset, limit]);
 }
 
-/**
- * Users matching the search term, with the ones already on the form's team marked. Nothing is
- * searched until there is a term.
- */
+/** Users matching the term, with current team members marked. Empty until there is a term. */
 export function useUserSearch(formId: string, q: string): UserSearchResult[] {
   const team = useTeam(formId);
   return useMemo(() => {

@@ -6,10 +6,7 @@ import { Provider } from 'react-redux';
 import makeStore from '@/lib/store';
 import { resetFormTeam, useFormTeamWriter } from '@/src/features/designer/data/useFormTeam';
 
-/**
- * Shared by the Access tab tests. Each of them mocks the data module with `{ spy: true }`, which
- * keeps the sample data working and lets a test swap the writer for one that fails.
- */
+/** Access tab test helpers. Tests mock the data module with `{ spy: true }` so a write can fail. */
 export const renderWithStore = (ui: React.ReactElement) =>
   render(<Provider store={makeStore()}>{ui}</Provider>);
 

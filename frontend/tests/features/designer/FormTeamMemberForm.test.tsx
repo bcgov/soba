@@ -80,7 +80,9 @@ describe('FormTeamMemberForm', () => {
     renderForm();
     await searchFor('venn');
 
-    expect(screen.getByTestId('user-1-select')).toHaveTextContent('Already on the team');
+    expect(screen.getByTestId('user-1-on-team')).toHaveTextContent('Already on the team');
+    // The mark is beside the radio, not its label: wrapping label text squeezes the circle.
+    expect(screen.getByTestId('user-1-select')).toHaveTextContent('');
     expect(radio('Orla Venn (sample) is already on the team')).toBeDisabled();
     expect(radio(TOBIN)).toBeEnabled();
   });
