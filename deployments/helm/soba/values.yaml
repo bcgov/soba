@@ -101,6 +101,7 @@ backend:
   # the render. dev-data must stay off in production.
   features:
     dev-data: ""
+    notifications: ""
 
   # -- configmap-app: general application config
   config:
@@ -142,6 +143,9 @@ backend:
     tenantEngineDefaultCode: tenant-noop
     # Workflow engine. workflow-noop starts nothing and calls nothing.
     workflowEngineDefaultCode: workflow-noop
+    # Notification plugin. notification-noop sends nothing and calls nothing.
+    notificationDefaultCode: notification-noop
+    # notificationDefaultCode: notify-v1
     sobaSystemSubject: soba-system
 
   # -- Shared temp storage PVC (RWX so it survives horizontal scaling).
@@ -232,6 +236,14 @@ backend:
       apiBaseUrl: ""
       # -- outbound deadline in ms; empty uses the backend default (30000)
       timeoutMs: "5000"
+
+  # -- configmap-notification: PLUGIN_NOTIFY_V1_* + default notification code
+  notification:
+    notifyV1:
+      # -- Notify base URL including /api/v1
+      endpoint: ""
+      # -- outbound deadline in ms; empty uses the backend default (30000)
+      timeoutMs: ""
 
   # -- configmap-sso: IDP / SSO config
   sso:

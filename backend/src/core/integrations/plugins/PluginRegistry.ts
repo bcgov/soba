@@ -41,6 +41,11 @@ import type {
 } from '../storage-engine/StorageEngineAdapter';
 import type { TenantEnginePluginDefinition } from '../tenant/TenantEnginePluginDefinition';
 import type { WorkflowEnginePluginDefinition } from '../workflow/WorkflowEnginePluginDefinition';
+import type {
+  NotificationAdapter,
+  NotificationPluginDefinition,
+  NotificationReadinessResult,
+} from '../notification/NotificationAdapter';
 import { reportReadinessByKey } from './readiness';
 
 // --- Definition schemas -----------------------------------------------------
@@ -51,7 +56,7 @@ const AdapterPluginDefinitionSchema = z.object({
   createAdapter: z.any(),
 });
 
-// form-engine, document-generation, tenant-engine and workflow-engine share this { code, metadata, createAdapter } shape.
+// form-engine, document-generation, tenant-engine, workflow-engine and notification share this { code, metadata, createAdapter } shape.
 const MetadataPluginDefinitionSchema = z.object({
   code: z.string().min(1),
   metadata: z.object({
@@ -91,6 +96,7 @@ interface CachedPlugin {
   idpDefinition?: IdpPluginDefinition;
   tenantEngineDefinition?: TenantEnginePluginDefinition;
   workflowEngineDefinition?: WorkflowEnginePluginDefinition;
+  notificationDefinition?: NotificationPluginDefinition;
 }
 
 // Each CachedPlugin definition field, the module export it comes from, and the schema that
@@ -150,6 +156,11 @@ const DEFINITION_KINDS: ReadonlyArray<{
   {
     field: 'workflowEngineDefinition',
     exportKey: 'workflowEnginePluginDefinition',
+    schema: MetadataPluginDefinitionSchema,
+  },
+  {
+    field: 'notificationDefinition',
+    exportKey: 'notificationPluginDefinition',
     schema: MetadataPluginDefinitionSchema,
   },
 ];
@@ -295,6 +306,7 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
       p.idpDefinition?.code ??
       p.tenantEngineDefinition?.code ??
       p.workflowEngineDefinition?.code ??
+      p.notificationDefinition?.code ??
       p.dir;
     return {
       code,
@@ -408,6 +420,10 @@ export function getIdpPluginDefinitions(): IdpPluginDefinition[] {
   return definitionsOf('idpDefinition');
 }
 
+export function getNotificationPluginDefinitions(): NotificationPluginDefinition[] {
+  return definitionsOf('notificationDefinition');
+}
+
 // --- Selectable adapters (singleton by code) --------------------------------
 
 // Active plugin code per selectable kind. The adapter getters and /meta/plugins both resolve
@@ -433,6 +449,11 @@ const SELECTABLE_PLUGIN_DEFAULTS = {
     label: 'virus-scan',
     configured: () => env.getVirusScanDefaultCode(),
     fallback: 'virusscan-noop',
+  },
+  notification: {
+    label: 'notification',
+    configured: () => env.getNotificationDefaultCode(),
+    fallback: 'notification-noop',
   },
 } as const;
 
@@ -506,6 +527,20 @@ export const getVirusScanAdapter = lazyAdapter<VirusScanAdapter>(
   'virusScan',
   getVirusScanPluginDefinitions,
 );
+export const getNotificationAdapter = lazyAdapter<NotificationAdapter>(
+  'notification',
+  getNotificationPluginDefinitions,
+);
+
+/**
+ * Readiness of the active notification plugin, keyed by its code. Never throws: a plugin that cannot
+ * be created (missing config) yields { ok: false, message }; one with no readinessCheck is ok.
+ */
+export function checkNotificationReadiness(): Promise<Record<string, NotificationReadinessResult>> {
+  return reportReadinessByKey([resolveActivePluginCode('notification')], () =>
+    getNotificationAdapter().readinessCheck?.(),
+  );
+}
 
 // --- Storage (discovered above, but selected per profile) -------------------
 

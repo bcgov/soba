@@ -3,6 +3,7 @@ backend:
   # Development data generator: stated explicitly rather than left to the default.
   features:
     dev-data: "disabled"
+    notifications: "disabled"
   replicas: 3
   resources:
     requests:

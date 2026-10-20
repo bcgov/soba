@@ -205,6 +205,23 @@ starts nothing. ConfigMap `<fullname>-backend-workflow-engine`:
 | `backend.workflowEngine.csWorkflowV1.apiKey`     | `PLUGIN_CS_WORKFLOW_V1_API_KEY`      | cs-workflow-v1 adapter  |
 | `backend.workflowEngine.csWorkflowV1.timeoutMs`  | `PLUGIN_CS_WORKFLOW_V1_TIMEOUT_MS`   | cs-workflow-v1 adapter  |
 
+## Notification Configuration
+
+Notification sends email. `notification-noop` (the default) sends nothing; `notify-v1` calls BC Gov
+Notify with an API key. ConfigMap `<fullname>-backend-notification`:
+
+| Helm value                                | Env var                       | Used by                       |
+| ----------------------------------------- | ----------------------------- | ----------------------------- |
+| `backend.config.notificationDefaultCode`  | `NOTIFICATION_DEFAULT_CODE`   | default notification resolver |
+| `backend.notification.notifyV1.endpoint`  | `PLUGIN_NOTIFY_V1_ENDPOINT`   | notify-v1 adapter             |
+| `backend.notification.notifyV1.timeoutMs` | `PLUGIN_NOTIFY_V1_TIMEOUT_MS` | notify-v1 adapter             |
+
+### Secret values (Vault template in backend Deployment)
+
+| Vault key                  | Env var                    |
+| -------------------------- | -------------------------- |
+| `PLUGIN_NOTIFY_V1_API_KEY` | `PLUGIN_NOTIFY_V1_API_KEY` |
+
 ## Database Migration
 
 On every `helm install` and `helm upgrade`, a Kubernetes Job runs **before** the

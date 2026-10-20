@@ -178,6 +178,7 @@ export function createEnvReader(source: EnvSource) {
     getFormEngineDefaultCode: () => getOptionalEnvFrom(source, 'FORM_ENGINE_DEFAULT_CODE'),
     getTenantEngineDefaultCode: () => getOptionalEnvFrom(source, 'TENANT_ENGINE_DEFAULT_CODE'),
     getWorkflowEngineDefaultCode: () => getOptionalEnvFrom(source, 'WORKFLOW_ENGINE_DEFAULT_CODE'),
+    getNotificationDefaultCode: () => getOptionalEnvFrom(source, 'NOTIFICATION_DEFAULT_CODE'),
     getDocumentGenerationDefaultCode: () =>
       getOptionalEnvFrom(source, 'DOCUMENT_GENERATION_DEFAULT_CODE'),
     /** Renders one process runs at once. Unset, or not a whole number of at least 1, is 2. */
@@ -264,6 +265,7 @@ export const env = {
   getFormEngineDefaultCode: () => getOptionalEnv('FORM_ENGINE_DEFAULT_CODE'),
   getTenantEngineDefaultCode: () => getOptionalEnv('TENANT_ENGINE_DEFAULT_CODE'),
   getWorkflowEngineDefaultCode: () => getOptionalEnv('WORKFLOW_ENGINE_DEFAULT_CODE'),
+  getNotificationDefaultCode: () => getOptionalEnv('NOTIFICATION_DEFAULT_CODE'),
   /** Document generation backend the consumer defaults to (a discovered plugin code). */
   getDocumentGenerationDefaultCode: () => getOptionalEnv('DOCUMENT_GENERATION_DEFAULT_CODE'),
   /** Renders one process runs at once. Unset, or not a whole number of at least 1, is 2. */
