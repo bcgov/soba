@@ -208,8 +208,15 @@ jobs:
         run: |
           set -euo pipefail
           for attempt in {1..12}; do
-            if gwa status --json > "$RUNNER_TEMP/gateway-status.json" \
-              && PUBLIC_GATEWAY_HOST=$(jq -er --arg name "soba-${GATEWAY_QUALIFIER}" '
+            # Preserve the last successful response if a later status request fails.
+            if gwa status --json > "$RUNNER_TEMP/gateway-status-next.json"; then
+              mv "$RUNNER_TEMP/gateway-status-next.json" "$RUNNER_TEMP/gateway-status.json"
+            else
+              echo "::warning::APS status request failed (attempt ${attempt}/12)."
+              sleep 5
+              continue
+            fi
+            if PUBLIC_GATEWAY_HOST=$(jq -er --arg name "soba-${GATEWAY_QUALIFIER}" '
                 [.[] | select(.name == $name and .status == "UP") | .env_host
                   | select(type == "string" and length > 0)] | unique
                 | if length == 1 then .[0] else error("Expected one public hostname for the deployed service") end
@@ -223,7 +230,13 @@ jobs:
             sleep 5
           done
           echo 'Gateway health verification failed; inspect status and NetworkPolicy.' >&2
-          cat "$RUNNER_TEMP/gateway-status.json"
+          echo "Expected APS service: soba-${GATEWAY_QUALIFIER}"
+          if [[ -f "$RUNNER_TEMP/gateway-status.json" ]]; then
+            echo 'Last successful APS status response:'
+            cat "$RUNNER_TEMP/gateway-status.json"
+          else
+            echo 'No APS status request succeeded; no status response is available.'
+          fi
           exit 1
 
       - name: Remove local GWA credentials
