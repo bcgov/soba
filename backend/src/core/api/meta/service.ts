@@ -10,7 +10,7 @@ import packageJson from '../../../../package.json';
 import { env } from '../../config/env';
 import { authEnv } from '../../config/authEnv';
 import { getFormEnginePlugins } from '../../integrations/form-engine/FormEngineRegistry';
-import { resolveDefaultUserDirectoryCode } from '../../integrations/user-directory/UserDirectoryRegistry';
+import { getEnabledUserSearchPluginCodes } from '../../integrations/user-search/UserSearchRegistry';
 import { resolveDefaultTenantEngineCode } from '../../integrations/tenant/TenantEngineRegistry';
 import { resolveDefaultWorkflowEngineCode } from '../../integrations/workflow/WorkflowEngineRegistry';
 import {
@@ -56,7 +56,7 @@ export class MetaApiService {
       activeFormEngineCode,
       resolveDefaultTenantEngineCode(),
       resolveDefaultWorkflowEngineCode(),
-      resolveDefaultUserDirectoryCode(),
+      ...getEnabledUserSearchPluginCodes(),
       ...getActivePluginCodes(),
       ...getActiveStorageBackendCodes(),
     ]);

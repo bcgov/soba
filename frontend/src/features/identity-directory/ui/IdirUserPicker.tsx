@@ -1,25 +1,27 @@
 'use client';
 import { useEffect, useId, useRef, useState } from 'react';
-import type { IdirUser, IdirUserSearch } from '@soba/lib';
-import { idirSearchErrorMessage, searchIdirUsers } from '../data/api';
+import { IdentityProviders, type UserSearchUser } from '@soba/lib';
+import { idirSearchErrorMessage, searchUsers } from '../data/api';
 import { useCallToken } from '@/src/shared/api/callToken';
 
-const userLabel = (user: IdirUser) =>
-  `${[user.firstName, user.lastName].filter(Boolean).join(' ') || user.username} — ${user.email || user.username}`;
+type SearchField = 'email' | 'firstName' | 'lastName';
+
+const userLabel = (user: UserSearchUser) =>
+  `${user.displayName || user.username || user.subject} — ${user.email || user.username || user.subject}`;
 
 export function IdirUserPicker({
-  workspaceId,
+  formId,
   onSelect,
 }: Readonly<{
-  workspaceId: string;
-  onSelect?: (user: IdirUser | null) => void;
+  formId: string;
+  onSelect?: (user: UserSearchUser | null) => void;
 }>) {
   const id = useId();
   const { signedInToken } = useCallToken();
-  const [field, setField] = useState<keyof IdirUserSearch>('email');
+  const [field, setField] = useState<SearchField>('email');
   const [query, setQuery] = useState('');
-  const [users, setUsers] = useState<IdirUser[]>([]);
-  const [selected, setSelected] = useState<IdirUser | null>(null);
+  const [users, setUsers] = useState<UserSearchUser[]>([]);
+  const [selected, setSelected] = useState<UserSearchUser | null>(null);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState('');
@@ -44,8 +46,7 @@ export function IdirUserPicker({
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const result = await searchIdirUsers(signedInToken(), {
-          workspaceId,
+        const result = await searchUsers(signedInToken(), formId, IdentityProviders.azureidir, {
           [field]: query.trim(),
         });
         if (current !== request.current) return;
@@ -61,9 +62,9 @@ export function IdirUserPicker({
       clearTimeout(timer);
       request.current += 1;
     };
-  }, [query, field, workspaceId, selected, signedInToken]);
+  }, [query, field, formId, selected, signedInToken]);
 
-  function select(user: IdirUser) {
+  function select(user: UserSearchUser) {
     request.current += 1;
     setSelected(user);
     setQuery(userLabel(user));
@@ -87,7 +88,7 @@ export function IdirUserPicker({
             onChange={(e) => {
               reset();
               setQuery('');
-              setField(e.target.value as keyof IdirUserSearch);
+              setField(e.target.value as SearchField);
             }}
           >
             <option value="email">Email</option>
@@ -150,7 +151,7 @@ export function IdirUserPicker({
               style={{ zIndex: 10, maxHeight: '18rem', overflowY: 'auto' }}
             >
               {users.map((user, index) => (
-                <li key={`${user.username}-${index}`} role="none">
+                <li key={`${user.identityProvider}-${user.subject}`} role="none">
                   <button
                     type="button"
                     id={`${id}-option-${index}`}
@@ -184,7 +185,7 @@ export function IdirUserPicker({
       </div>
       {selected && (
         <p>
-          Selected: {selected.username}
+          Selected: {selected.username ?? selected.subject}
           {selected.email ? ` (${selected.email})` : ''}
         </p>
       )}

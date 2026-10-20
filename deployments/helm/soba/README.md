@@ -222,6 +222,30 @@ Notify with an API key. ConfigMap `<fullname>-backend-notification`:
 | -------------------------- | -------------------------- |
 | `PLUGIN_NOTIFY_V1_API_KEY` | `PLUGIN_NOTIFY_V1_API_KEY` |
 
+## User Search Configuration
+
+User search finds people to add to a workspace or a form's team, across every enabled plugin.
+`backend.features.user-search` turns it on; the migration leaves it disabled. With no plugins
+listed, nothing is searched. ConfigMap `<fullname>-backend-user-search`:
+
+| Helm value                             | Env var                      | Used by              |
+| -------------------------------------- | ---------------------------- | -------------------- |
+| `backend.config.userSearchPlugins`     | `USER_SEARCH_PLUGINS`        | user search registry |
+| `backend.userSearch.cssV1.apiBaseUrl`  | `PLUGIN_CSS_V1_API_BASE_URL` | css-v1 adapter       |
+| `backend.userSearch.cssV1.environment` | `PLUGIN_CSS_V1_ENVIRONMENT`  | css-v1 adapter       |
+| `backend.userSearch.cssV1.tokenUrl`    | `PLUGIN_CSS_V1_TOKEN_URL`    | css-v1 adapter       |
+| `backend.userSearch.cssV1.timeoutMs`   | `PLUGIN_CSS_V1_TIMEOUT_MS`   | css-v1 adapter       |
+
+### Secret values (Vault template in backend Deployment)
+
+Injected only when `css-v1` is in `backend.config.userSearchPlugins`; the pod fails to start if
+either key is missing.
+
+| Vault key                     | Env var                       |
+| ----------------------------- | ----------------------------- |
+| `PLUGIN_CSS_V1_CLIENT_ID`     | `PLUGIN_CSS_V1_CLIENT_ID`     |
+| `PLUGIN_CSS_V1_CLIENT_SECRET` | `PLUGIN_CSS_V1_CLIENT_SECRET` |
+
 ## Database Migration
 
 On every `helm install` and `helm upgrade`, a Kubernetes Job runs **before** the
@@ -499,14 +523,3 @@ removed from Secrets and PVCs. This allows `helm uninstall` to delete them norma
 | ----------------- | ------------------------------------------------- |
 | `false` (default) | Secrets and PVCs are **retained**                 |
 | `true`            | Secrets and PVCs are **deleted** with the release |
-
-### IDIR directory
-
-| Value                                            | Description                                                             |
-| ------------------------------------------------ | ----------------------------------------------------------------------- |
-| `backend.config.userDirectoryDefaultCode`        | `css-v1` (default)                                                      |
-| `backend.userDirectory.cssV1.apiBaseUrl`         | CSS API base URL including `/api/v1`                                    |
-| `backend.userDirectory.cssV1.environment`        | CSS directory environment: dev, test, prod                              |
-| `backend.userDirectory.cssV1.tokenUrl`           | CSS OAuth token endpoint                                                |
-| `backend.userDirectory.cssV1.timeoutMs`          | Total outbound timeout (default 10000 ms)                               |
-| `backend.userDirectory.cssV1.existingSecretName` | Secret with `PLUGIN_CSS_V1_CLIENT_ID` and `PLUGIN_CSS_V1_CLIENT_SECRET` |

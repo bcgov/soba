@@ -4,6 +4,7 @@ backend:
   features:
     dev-data: "enabled"
     notifications: "enabled"
+    user-search: "enabled"
   replicas: 1
   resources:
     requests:
@@ -28,6 +29,7 @@ backend:
     tenantEngineDefaultCode: cstar-v1
     workflowEngineDefaultCode: cs-workflow-v1
     notificationDefaultCode: notify-v1
+    userSearchPlugins: css-v1
   documentGeneration:
     cdogsV2:
       endpoint: https://cdogs-dev.api.gov.bc.ca/api
@@ -43,6 +45,11 @@ backend:
   notification:
     notifyV1:
       endpoint: https://gw-fe8c5-notify.test.api.gov.bc.ca/api/v1
+  userSearch:
+    cssV1:
+      apiBaseUrl: https://api.loginproxy.gov.bc.ca/api/v1
+      environment: test
+      tokenUrl: https://loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token
 
 frontend:
   replicas: 1

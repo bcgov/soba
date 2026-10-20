@@ -372,6 +372,13 @@
       "when": 1772618028000,
       "tag": "0053_notification_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1772618030000,
+      "tag": "0054_user_search_feature",
+      "breakpoints": true
     }
   ]
 }

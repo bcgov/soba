@@ -1,18 +1,19 @@
-import type { IdirUserSearchQuery, IdirUserSearchResponse } from '@soba/lib';
+import type { UserSearchQuery, UserSearchResponse } from '@soba/lib';
 import { isSessionExpired, sobaFetch } from '@/src/shared/api/sobaFetch';
 import { isForbidden, parseJson } from '@/src/shared/api/sobaHelpers';
 
 /**
- * Search the CSS IDIR directory using the signed-in user's Soba bearer token.
- * Requires workspace owner or admin membership in query.workspaceId; anonymous users cannot search.
- * Results can include users who have never signed in to Soba. Searching does not create accounts
- * or memberships, which the existing group-permission assignment flow requires.
+ * Find people to add to a form's team, across the enabled search plugins. Results can include
+ * people who have never signed in to Soba; searching creates no account or membership.
  */
-export async function searchIdirUsers(
+export async function searchUsers(
   token: string,
-  query: IdirUserSearchQuery,
-): Promise<IdirUserSearchResponse> {
-  return parseJson(await sobaFetch('/identity-search/idir', { token, query }));
+  formId: string,
+  identityProvider: string,
+  query: UserSearchQuery,
+): Promise<UserSearchResponse> {
+  const path = `/design/forms/${encodeURIComponent(formId)}/user-search/${encodeURIComponent(identityProvider)}`;
+  return parseJson(await sobaFetch(path, { token, query }));
 }
 
 export function idirSearchErrorMessage(error: unknown): string {

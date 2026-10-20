@@ -109,6 +109,12 @@ export function joinUrl(base: string, segment: string): string {
   return `${stripTrailingSlashes(base)}/${segment.replace(/^\/+/, '')}`;
 }
 
+/** The URL without its query string. */
+export function withoutQuery(url: string): string {
+  const index = url.indexOf('?');
+  return index < 0 ? url : url.slice(0, index);
+}
+
 /**
  * Minimal fetch wrapper for outbound service calls: joins the base URL, injects a bearer
  * token when a provider is supplied, and turns non-2xx responses into HttpClientError.
@@ -164,18 +170,10 @@ export class HttpClient {
     await this.send(path, { method: 'GET' }, deadline);
   }
 
-  /** GET JSON, including body decoding within the operation deadline. */
-  async getJson(path: string, deadline: number = this.deadline()): Promise<unknown> {
-    const res = await this.send(path, { method: 'GET' }, deadline);
-    return this.withTimeout(this.buildUrl(path), Math.max(0, deadline - Date.now()), () =>
-      res.json(),
-    );
-  }
-
   private async readBinary(path: string, res: Response, deadline: number): Promise<BinaryResponse> {
     // The fetch signal expires at the same deadline, so a stalled body aborts with it.
     const data = await this.withTimeout(
-      this.buildUrl(path),
+      withoutQuery(this.buildUrl(path)),
       Math.max(0, deadline - Date.now()),
       () => res.arrayBuffer(),
     );
@@ -226,19 +224,24 @@ export class HttpClient {
 
   private async send(path: string, init: RequestInit, deadline: number): Promise<Response> {
     const url = this.buildUrl(path);
+    // Query strings can carry search terms that identify people; logs and errors get the path.
+    const logUrl = withoutQuery(url);
     const headers = await this.buildHeaders(
       deadline,
       init.headers as Record<string, string> | undefined,
     );
-    log.debug({ method: init.method, url, timeoutMs: this.timeoutMs }, 'outbound http request');
+    log.debug(
+      { method: init.method, url: logUrl, timeoutMs: this.timeoutMs },
+      'outbound http request',
+    );
 
-    const armedMs = this.remainingMs(deadline, url);
-    const res = await this.withTimeout(url, armedMs, () =>
+    const armedMs = this.remainingMs(deadline, logUrl);
+    const res = await this.withTimeout(logUrl, armedMs, () =>
       fetch(url, { ...init, headers, signal: AbortSignal.timeout(armedMs) }),
     );
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new HttpClientError(res.status, res.statusText, text, url);
+      throw new HttpClientError(res.status, res.statusText, text, logUrl);
     }
     return res;
   }

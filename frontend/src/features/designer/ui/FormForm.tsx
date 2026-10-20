@@ -532,7 +532,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
           >
             <FormTeamTab
               dict={dict}
-              workspaceId={selectedWorkspaceId}
+              formId={formId}
               canSearch={isWorkspaceManageRole(formWorkspace?.role ?? '')}
             />
           </Tab>

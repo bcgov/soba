@@ -102,6 +102,7 @@ backend:
   features:
     dev-data: ""
     notifications: ""
+    user-search: ""
 
   # -- configmap-app: general application config
   config:
@@ -146,7 +147,9 @@ backend:
     # Notification plugin. notification-noop sends nothing and calls nothing.
     notificationDefaultCode: notification-noop
     # notificationDefaultCode: notify-v1
-    userDirectoryDefaultCode: css-v1
+    # User search plugins, comma-separated, in merge order. Empty enables none.
+    # css-v1 also injects the CSS credentials from Vault, so the secret must hold them.
+    userSearchPlugins: ""
     sobaSystemSubject: soba-system
 
   # -- Shared temp storage PVC (RWX so it survives horizontal scaling).
@@ -224,14 +227,16 @@ backend:
       # -- outbound deadline in ms; empty uses the backend default (30000)
       timeoutMs: ""
 
-  # -- configmap-user-directory: PLUGIN_CSS_V1_* + default directory code
-  userDirectory:
+  # -- configmap-user-search: PLUGIN_CSS_V1_* + enabled plugin codes
+  userSearch:
     cssV1:
       apiBaseUrl: ""
+      # -- CSS environment searched: dev, test or prod
       environment: ""
       tokenUrl: ""
-      timeoutMs: 10000
-      existingSecretName: ""
+      # -- outbound deadline in ms; empty uses the backend default (30000)
+      timeoutMs: ""
+
   # -- configmap-tenant-engine: PLUGIN_CSTAR_V1_* + default engine code
   tenantEngine:
     cstarV1:

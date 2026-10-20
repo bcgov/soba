@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, or, sql } from 'drizzle-orm';
 import { db } from '../client';
 import { identityProviders, sobaAdmins, userIdentities } from '../schema';
 import type { IdpAttributes } from '../../auth/jwtClaims';
@@ -22,6 +22,36 @@ export async function findUserIdByIdentity(
     )
     .limit(1);
   return row[0]?.userId ?? null;
+}
+
+export interface IdentityOwner {
+  identityProvider: string;
+  subject: string;
+  userId: string;
+}
+
+/** The user holding each of these identities, where one does. Subjects compare without case. */
+export async function findIdentityOwners(
+  identities: ReadonlyArray<{ identityProvider: string; subject: string }>,
+): Promise<IdentityOwner[]> {
+  if (identities.length === 0) return [];
+  return db
+    .select({
+      identityProvider: userIdentities.identityProviderCode,
+      subject: userIdentities.subject,
+      userId: userIdentities.userId,
+    })
+    .from(userIdentities)
+    .where(
+      or(
+        ...identities.map(({ identityProvider, subject }) =>
+          and(
+            eq(userIdentities.identityProviderCode, identityProvider),
+            sql`lower(${userIdentities.subject}) = ${subject.toLowerCase()}`,
+          ),
+        ),
+      ),
+    );
 }
 
 /** A user's platform admin row. */

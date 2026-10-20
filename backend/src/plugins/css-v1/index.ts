@@ -1,7 +1,10 @@
-import type { UserDirectoryPluginDefinition } from '../../core/integrations/user-directory/UserDirectoryPluginDefinition';
-import { CssAdapter } from './cssAdapter';
-export const userDirectoryPluginDefinition: UserDirectoryPluginDefinition = {
-  code: 'css-v1',
-  metadata: { code: 'css-v1', name: 'CSS user directory', version: 'v1' },
-  createAdapter: (config) => new CssAdapter(config),
+import type { UserSearchPluginDefinition } from '../../core/integrations/user-search/UserSearchPluginDefinition';
+import { CssUserSearchAdapter } from './cssUserSearchAdapter';
+
+const CODE = 'css-v1';
+
+export const userSearchPluginDefinition: UserSearchPluginDefinition = {
+  code: CODE,
+  metadata: { code: CODE, name: 'CSS user search', version: 'v1' },
+  createAdapter: (config) => new CssUserSearchAdapter(config),
 };

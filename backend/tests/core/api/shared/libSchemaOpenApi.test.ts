@@ -4,10 +4,10 @@ import { registerSubmissionsOpenApi } from '../../../../src/core/api/submissions
 import { registerWorkspacesOpenApi } from '../../../../src/core/api/workspaces/schema';
 import { registerAdminOpenApi } from '../../../../src/core/api/admin/schema';
 import { registerMetaOpenApi } from '../../../../src/core/api/meta/schema';
-import { registerIdentitySearchOpenApi } from '../../../../src/core/api/identity-search/schema';
 import { registerMeOpenApi } from '../../../../src/core/api/me/schema';
 import { registerSubmitOpenApi } from '../../../../src/core/api/submit/schema';
 import { registerFormSettingsOpenApi } from '../../../../src/features/form-settings';
+import { registerUserSearchOpenApi } from '../../../../src/features/user-search/schema';
 
 function componentSchemas(): unknown {
   const registry = new OpenAPIRegistry();
@@ -18,7 +18,7 @@ function componentSchemas(): unknown {
   registerAdminOpenApi(registry);
   registerMetaOpenApi(registry);
   registerMeOpenApi(registry);
-  registerIdentitySearchOpenApi(registry);
+  registerUserSearchOpenApi(registry);
   registerSubmitOpenApi(registry);
   const doc = new OpenApiGeneratorV3(registry.definitions).generateDocument({
     openapi: '3.0.3',
@@ -200,10 +200,20 @@ describe('OpenAPI components for lib-backed schemas', () => {
     );
     expect(at(schemas, response, 'required')).toEqual(expect.arrayContaining(['forms']));
   });
-});
 
-it('uses a named IDIR user component', () => {
-  expect(
-    at(componentSchemas(), 'IdentitySearch_IdirSearchResponse', 'properties', 'users', 'items'),
-  ).toEqual(ref('IdentitySearch_IdirUser'));
+  it('builds user search responses from the named person, status and provider components', () => {
+    expect(at(schemas, 'UserSearch_Response', 'properties', 'users', 'items')).toEqual(
+      ref('UserSearch_User'),
+    );
+    expect(at(schemas, 'UserSearch_Response', 'properties', 'plugins', 'items')).toEqual(
+      ref('UserSearch_PluginStatus'),
+    );
+    expect(
+      at(schemas, 'UserSearch_CapabilitiesResponse', 'properties', 'identityProviders', 'items'),
+    ).toEqual(ref('UserSearch_IdentityProvider'));
+    expect(at(schemas, 'UserSearch_User', 'properties', 'sobaUserId')).toEqual({
+      type: 'string',
+      nullable: true,
+    });
+  });
 });

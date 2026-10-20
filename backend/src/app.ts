@@ -19,7 +19,7 @@ import {
   logTenantEngineReadiness,
   logWorkflowEngineReadiness,
   logNotificationReadiness,
-  logUserDirectoryReadiness,
+  logUserSearchReadiness,
 } from './core/api/health';
 import { metaRouter } from './core/api/meta';
 import { buildOpenApiSpec } from './core/api/shared/openapi';
@@ -182,6 +182,6 @@ app.listen(port, () => {
     .then(logTenantEngineReadiness)
     .then(logWorkflowEngineReadiness)
     .then(logNotificationReadiness)
-    .then(logUserDirectoryReadiness)
+    .then(logUserSearchReadiness)
     .catch((err) => log.warn({ err }, 'Startup diagnostics failed'));
 });

@@ -27,7 +27,7 @@ import {
   type EventStreamSelfTestResult,
 } from '../../integrations/eventstream/eventStreamSelfTest';
 import { checkDocumentGenerationReadiness } from '../../integrations/document-generation/DocumentGenerationRegistry';
-import { checkUserDirectoryReadiness } from '../../integrations/user-directory/UserDirectoryRegistry';
+import { checkUserSearchReadiness } from '../../integrations/user-search/UserSearchRegistry';
 import { checkTenantEngineReadiness } from '../../integrations/tenant/TenantEngineRegistry';
 import { checkWorkflowEngineReadiness } from '../../integrations/workflow/WorkflowEngineRegistry';
 
@@ -296,12 +296,13 @@ export async function logNotificationReadiness(): Promise<void> {
   }
 }
 
-export async function logUserDirectoryReadiness(): Promise<void> {
+/** Log readiness of each enabled user search plugin at startup. Never throws. */
+export async function logUserSearchReadiness(): Promise<void> {
   let results: Record<string, { ok: boolean; message?: string }>;
   try {
-    results = await checkUserDirectoryReadiness();
+    results = await checkUserSearchReadiness();
   } catch (err) {
-    log.warn({ err }, 'User directory readiness could not run');
+    log.warn({ err }, 'User search readiness could not run');
     return;
   }
 
@@ -309,12 +310,14 @@ export async function logUserDirectoryReadiness(): Promise<void> {
     .filter(([, r]) => !r.ok)
     .map(([code]) => code);
 
-  if (notReady.length > 0) {
+  if (Object.keys(results).length === 0) {
+    log.info('User search readiness: no plugins enabled');
+  } else if (notReady.length > 0) {
     log.warn(
-      { userDirectories: results },
-      `User directory readiness: not ready: ${notReady.join(', ')}`,
+      { userSearchPlugins: results },
+      `User search readiness: not ready: ${notReady.join(', ')}`,
     );
   } else {
-    log.info({ userDirectories: results }, 'User directory readiness: all directories ready');
+    log.info({ userSearchPlugins: results }, 'User search readiness: all plugins ready');
   }
 }
