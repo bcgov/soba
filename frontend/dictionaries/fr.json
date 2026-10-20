@@ -302,6 +302,7 @@
     "ministryOrOrg": "Ministère / Organisation",
     "copy": "Copier Lien",
     "copiedNotification": "Copié dans le presse-papiers",
+    "copyFailedNotification": "Impossible de copier dans le presse-papiers",
     "newVersionFrom": "Nouvelle Version De",
     "emptyHistory": "Aucune version précédente",
     "loadVersionsError": "Échec du chargement de l'historique des versions.",
@@ -334,10 +335,11 @@
       "profileDrawerLabel": "Profil du Formulaire",
       "notificationSettingsDrawerLabel": "Notifications par courriel",
       "notificationRecipientsLabel": "Destinataires des notifications de soumission",
-      "notificationRecipientsHelp": "Saisissez une adresse courriel et sélectionnez Ajouter (100 maximum). Supprimez tous les destinataires pour désactiver les notifications. Sélectionnez Enregistrer pour appliquer vos modifications.",
+      "notificationRecipientsHelp": "Saisissez une adresse courriel et sélectionnez Ajouter (100 maximum). Supprimez tous les destinataires pour désactiver les notifications. Sélectionnez Sauvegarder pour appliquer vos modifications.",
       "notificationRecipientAdd": "Ajouter",
-      "notificationRecipientRemove": "Supprimer {email}",
-      "notificationRecipientsInvalid": "Saisissez des adresses courriel valides (100 maximum).",
+      "notificationRecipientsInvalid": "Saisissez une adresse courriel valide.",
+      "notificationRecipientsLimit": "Un formulaire peut avoir au plus 100 destinataires.",
+      "notificationRecipientsEmpty": "Aucun destinataire. Les notifications de soumission sont désactivées.",
       "notificationSettingsLoadError": "Impossible de charger les paramètres des notifications par courriel."
     },
     "templates": {
@@ -380,6 +382,19 @@
       "actionsColumn": "Actions",
       "types": {
         "cdogs": "CDOGS"
+      },
+      "print": {
+        "button": "Imprimer",
+        "modalTitle": "Imprimer la soumission",
+        "methodLabel": "Imprimer avec",
+        "browserOption": "Impression du navigateur",
+        "print": "Imprimer",
+        "printing": "Impression…",
+        "uploadOption": "Téléverser un modèle CDOGS",
+        "storedOption": "Utiliser le modèle CDOGS par défaut",
+        "fileNameColumn": "Nom du fichier",
+        "uploadDateColumn": "Date de téléversement",
+        "failed": "Échec de la génération du document."
       }
     },
     "descriptionLabel": "Description du Formulaire",
@@ -538,9 +553,9 @@
     "scan_unavailable": "L’analyse antivirus n’est pas disponible pour le moment. Le fichier n’a donc pas été téléversé. Veuillez réessayer plus tard.",
     "template_not_found": "Ce modèle de document est introuvable.",
     "template_unavailable": "Ce modèle de document n’est pas disponible pour le moment. Veuillez réessayer plus tard.",
-    "render_unavailable": "Les documents ne peuvent pas être imprimés ni prévisualisés pour le moment. Veuillez réessayer plus tard.",
-    "render_busy": "L’impression et l’aperçu des documents sont occupés. Veuillez réessayer dans un instant.",
-    "render_failed": "Le document n’a pas pu être imprimé ni prévisualisé à partir de ce modèle.",
+    "render_unavailable": "Les documents ne peuvent pas être imprimés pour le moment. Veuillez réessayer plus tard.",
+    "render_busy": "L’impression des documents est occupée. Veuillez réessayer dans un instant.",
+    "render_failed": "Le document n’a pas pu être imprimé à partir de ce modèle.",
     "no_saved_data": "Cette soumission n’a aucune réponse enregistrée à imprimer.",
     "request_invalid": "La demande n’est pas valide. Rechargez la page et réessayez.",
     "request_too_large": "La demande est trop volumineuse.",

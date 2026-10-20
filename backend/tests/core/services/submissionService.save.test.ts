@@ -1,4 +1,4 @@
-import { notifySubmission } from '../../../src/features/notifications/submissionNotification';
+import { enqueueSubmissionNotification } from '../../../src/features/notifications/submissionNotification';
 import { SubmissionService } from '../../../src/core/services/submissionService';
 import * as submissionRepo from '../../../src/core/db/repos/submissionRepo';
 import * as versionRepo from '../../../src/core/db/repos/formVersionRepo';
@@ -7,7 +7,7 @@ import * as registry from '../../../src/core/integrations/form-engine/FormEngine
 import { ConflictError, NotFoundError, ValidationError } from '../../../src/core/errors';
 
 jest.mock('../../../src/features/notifications/submissionNotification', () => ({
-  notifySubmission: jest.fn().mockResolvedValue(undefined),
+  enqueueSubmissionNotification: jest.fn(),
 }));
 
 jest.mock('../../../src/core/db/client', () => ({ db: {} }));
@@ -97,7 +97,9 @@ describe('SubmissionService save (versioned engine write)', () => {
 
     const result = await svc.submit(input);
 
-    expect(notifySubmission).toHaveBeenCalledWith(result.record);
+    expect(enqueueSubmissionNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ submissionId: 's1' }),
+    );
     expect(createAdapter).toHaveBeenCalledWith('formio-v5');
     expect(createSubmission).toHaveBeenCalledWith({
       engineFormRef: 'form-ref-1',
@@ -424,7 +426,23 @@ describe('SubmissionService save (versioned engine write)', () => {
 });
 
 describe('notification delivery gate', () => {
-  it.each(['replayed', 'pending'])('does not notify a %s submission write', async (outcome) => {
+  const landed = (outcome: string) =>
+    appendRevision.mockResolvedValue({
+      outcome,
+      record: {
+        id: 's1',
+        workspaceId: 'ws1',
+        formId: 'f1',
+        formVersionId: 'v1',
+        confirmationCode: 'ABC12345',
+      },
+      revisionId: 'rev-3',
+      revisionNo: 3,
+      status: outcome === 'pending' ? 'pending' : 'current',
+      reason: outcome === 'pending' ? 'conflict' : 'accepted',
+    });
+
+  beforeEach(() => {
     jest.clearAllMocks();
     getRecord.mockResolvedValue({
       id: 's1',
@@ -433,31 +451,35 @@ describe('notification delivery gate', () => {
       headRevisionId: 'rev-2',
       workflowState: 'draft',
     });
+    getRevisionById.mockResolvedValue(null);
+    getLabels.mockResolvedValue(LABELS);
     getVersion.mockResolvedValue({ id: 'v1', engineSchemaRef: 'form-ref-1' });
     getEngineCode.mockResolvedValue('formio-v5');
     createAdapter.mockReturnValue({
       createSubmission: jest.fn().mockResolvedValue({ engineRef: 'eng-new' }),
     });
-    appendRevision.mockResolvedValue({
-      outcome,
-      record: { id: 's1' },
-      revisionId: 'rev-3',
-      status: 'current',
-      reason: 'accepted',
-    });
-    await svc.submit(input);
-    expect(notifySubmission).not.toHaveBeenCalled();
   });
-  it('does not notify a saved draft', async () => {
-    jest.clearAllMocks();
-    appendRevision.mockResolvedValue({
-      outcome: 'appended',
-      record: { id: 's1' },
-      revisionId: 'rev-3',
-      status: 'current',
-      reason: 'accepted',
+
+  it('queues the notification for a submit that lands as a new revision', async () => {
+    landed('appended');
+    await svc.submit(input);
+    expect(enqueueSubmissionNotification).toHaveBeenCalledWith({
+      workspaceId: 'ws1',
+      formId: 'f1',
+      submissionId: 's1',
+      confirmationCode: 'ABC12345',
     });
+  });
+
+  it.each(['replayed', 'pending'])('does not notify a %s submission write', async (outcome) => {
+    landed(outcome);
+    await svc.submit(input);
+    expect(enqueueSubmissionNotification).not.toHaveBeenCalled();
+  });
+
+  it('does not notify a saved draft', async () => {
+    landed('appended');
     await svc.save(input);
-    expect(notifySubmission).not.toHaveBeenCalled();
+    expect(enqueueSubmissionNotification).not.toHaveBeenCalled();
   });
 });

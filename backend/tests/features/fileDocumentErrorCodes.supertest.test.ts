@@ -8,7 +8,7 @@ jest.mock('../../src/features/files/service', () => ({
   filesService: { upload: jest.fn(), getForCaller: jest.fn(), deleteForCaller: jest.fn() },
 }));
 jest.mock('../../src/features/document-generation/service', () => ({
-  documentGenerationService: { listTemplates: jest.fn(), preview: jest.fn(), print: jest.fn() },
+  documentGenerationService: { listTemplates: jest.fn(), print: jest.fn() },
 }));
 
 import express from 'express';

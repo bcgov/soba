@@ -1,4 +1,22 @@
-import { withRenderSlot } from '../../../src/features/document-generation/renderSlots';
+import {
+  takeRenderSlot,
+  withRenderSlot,
+} from '../../../src/features/document-generation/renderSlots';
+
+describe('takeRenderSlot', () => {
+  it('frees its slot once, however often it is released', () => {
+    const first = takeRenderSlot(2);
+    const second = takeRenderSlot(2);
+    expect(takeRenderSlot(2)).toBeNull();
+    first?.();
+    first?.();
+    const third = takeRenderSlot(2);
+    expect(third).not.toBeNull();
+    expect(takeRenderSlot(2)).toBeNull();
+    second?.();
+    third?.();
+  });
+});
 
 describe('withRenderSlot', () => {
   it('runs the render and returns its result', async () => {

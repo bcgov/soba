@@ -12,10 +12,10 @@ import { useRouter } from 'next/navigation';
 export default function GlobalError({
   error,
   reset,
-}: {
+}: Readonly<{
   error: Error & { digest?: string };
   reset: () => void;
-}) {
+}>) {
   const router = useRouter();
   const retry = () =>
     startTransition(() => {

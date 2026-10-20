@@ -33,7 +33,7 @@ export const listLoginIdentityProviders = async (
   locale: SortLocale,
   executor: DbOrTx = db,
 ): Promise<{ code: string; name: string }[]> => {
-  return executor
+  return await executor
     .select({ code: identityProviders.code, name: identityProviders.name })
     .from(identityProviders)
     .where(and(eq(identityProviders.isActive, true), eq(identityProviders.isLoginProvider, true)))

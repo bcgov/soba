@@ -44,13 +44,14 @@ export const createForm = asyncHandler(
   },
 );
 
-export const normalizeFormSchema = asyncHandler(
-  async (req: Request<unknown, unknown, NormalizeSchemaBody>, res: Response) => {
-    const ctx = req.coreContext!;
-    const schema = formsApiService.normalizeSchema(ctx, req.body.schema);
-    res.json({ schema });
-  },
-);
+export const normalizeFormSchema = (
+  req: Request<unknown, unknown, NormalizeSchemaBody>,
+  res: Response,
+): void => {
+  const ctx = req.coreContext!;
+  const schema = formsApiService.normalizeSchema(ctx, req.body.schema);
+  res.json({ schema });
+};
 
 export const updateForm = asyncHandler(
   async (req: Request<FormIdParams, unknown, UpdateFormBody>, res: Response) => {

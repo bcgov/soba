@@ -32,6 +32,9 @@ import { formVersionSchemaKey, useFormVersionSchema } from './useFormVersionSche
 
 const EMPTY_VERSIONS: FormVersionSummary[] = [];
 
+/** The design read of a form, with the caller's permissions on it. */
+export const designFormKey = (formId: string) => ['design-form', formId] as const;
+
 /**
  * What the designer is editing: the form, its current version, the selected version's schema, and
  * the unsaved edits layered over them. Edits are held apart from the loaded values so a
@@ -43,7 +46,7 @@ export function useForm(formId?: string) {
     mutate: refreshForm,
     error: formError,
   } = useAuthedSWR(
-    formId ? ['design-form', formId] : null,
+    formId ? designFormKey(formId) : null,
     (token) => getSobaForm(token, formId as string),
     sessionReadConfig,
   );
@@ -220,7 +223,7 @@ const mintFormIds = () => ({ id: uuidv7(), versionId: uuidv7() });
 export function useFormWriter(formId: string) {
   const { mutate } = useSWRConfig();
 
-  const refreshForm = useCallback(() => mutate(['design-form', formId]), [mutate, formId]);
+  const refreshForm = useCallback(() => mutate(designFormKey(formId)), [mutate, formId]);
   // The form carries the current version, so a new version changes it too: refresh both.
   const refreshVersions = useCallback(() => {
     const [prefix] = versionsKey(formId);

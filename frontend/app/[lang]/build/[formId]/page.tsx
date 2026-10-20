@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: PageProps) {
   return pageMetadata(params, (dict) => `Form Designer | ${dict.general.title}`);
 }
 
-export default async function Page({ params }: PageProps) {
+export default async function Page({ params }: Readonly<PageProps>) {
   await assertFeatureAllowed(FEATURE_CODES.DESIGN_MODE);
 
   const { lang, formId } = await params;

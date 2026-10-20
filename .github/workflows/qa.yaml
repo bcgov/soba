@@ -1,8 +1,11 @@
-# Reusable static analysis and unit tests (pnpm qa).
+# Static analysis and unit tests (pnpm qa), plus lint and format for integration/playwright.
 name: QA
 
 on:
   workflow_call:
+  # PRs to develop run this through PR Open.
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
@@ -54,6 +57,38 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Run check
+        run: ${{ matrix.command }}
+
+  # integration/playwright is its own npm project, outside the pnpm workspace.
+  integration:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Integration · lint
+            command: npm run lint
+          - name: Integration · format
+            command: npm run format:check
+    defaults:
+      run:
+        working-directory: integration/playwright
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: integration/playwright/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
 
       - name: Run check
         run: ${{ matrix.command }}

@@ -1,13 +1,22 @@
+import { z } from 'zod';
 import type { PluginConfigReader } from '../../core/config/pluginConfig';
-import type { NotificationAdapter } from '../../core/integrations/notification/NotificationAdapter';
-import { HttpClient, HttpClientError, HttpClientTimeoutError } from '../../core/http/httpClient';
-import { ServiceUnavailableError } from '../../core/errors';
-import { log } from '../../core/logging';
 import {
-  NotifyResponseSchema,
-  type NotifyResponse,
+  SendEmailSchema,
+  type EmailReceipt,
+  type NotificationAdapter,
   type SendEmail,
-} from '../../features/notifications/schema';
+} from '../../core/integrations/notification/NotificationAdapter';
+import { HttpClient, HttpClientError, HttpClientTimeoutError } from '../../core/http/httpClient';
+import { ServiceUnavailableError, ValidationError } from '../../core/errors';
+import { log } from '../../core/logging';
+
+const EMAIL_PATH = 'notifysimple/email';
+
+// Notify adds statuses over time, so any status is accepted.
+const NotifyAcceptanceSchema = z.object({
+  notifyId: z.string().min(1),
+  status: z.string().min(1),
+});
 
 // Only expose known transport codes; arbitrary error messages can include private data.
 const NETWORK_CODES = new Set([
@@ -49,42 +58,26 @@ function failureMessage(err: unknown): string {
 
 /** Notify v1 email client using the configured API key. */
 export class NotifyV1Adapter implements NotificationAdapter {
-  private readonly endpoint: string;
-  private readonly apiKey: string;
-  private readonly timeoutMs?: number;
+  private readonly http: HttpClient;
   private readonly debugResponses: boolean;
 
   constructor(config: PluginConfigReader) {
-    // ENDPOINT includes /api/v1.
-    this.endpoint = config.getRequired('ENDPOINT');
-    this.apiKey = config.getRequired('API_KEY');
-    this.timeoutMs = config.getOptionalNumber('TIMEOUT_MS');
+    this.http = new HttpClient({
+      // ENDPOINT includes /api/v1.
+      baseUrl: config.getRequired('ENDPOINT'),
+      defaultHeaders: { 'X-API-KEY': config.getRequired('API_KEY') },
+      timeoutMs: config.getOptionalNumber('TIMEOUT_MS'),
+    });
     this.debugResponses = config.getOptional('DEBUG_RESPONSES') === 'true';
   }
 
-  private client(): HttpClient {
-    return new HttpClient({
-      baseUrl: this.endpoint,
-      defaultHeaders: { 'X-API-KEY': this.apiKey },
-      timeoutMs: this.timeoutMs,
-    });
-  }
-
-  async sendEmail(email: SendEmail): Promise<NotifyResponse> {
+  async sendEmail(email: SendEmail): Promise<EmailReceipt> {
+    const request = SendEmailSchema.safeParse(email);
+    // The issues name the invalid addresses, so they stay out of the error.
+    if (!request.success) throw new ValidationError('Notify email request is not valid');
     try {
-      const response = await this.client().postJsonForBinary('notifysimple/email', email);
-      const body: unknown = JSON.parse(response.data.toString('utf8'));
-      const parsed = NotifyResponseSchema.safeParse(body);
-      if (!parsed.success) {
-        if (this.debugResponses) {
-          log.error(
-            { upstreamBody: body, validationIssues: parsed.error.issues },
-            'Notify unexpected response (debug)',
-          );
-        }
-        throw new ServiceUnavailableError('Notify returned an unexpected response');
-      }
-      return parsed.data;
+      const response = await this.http.postJsonForBinary(EMAIL_PATH, request.data);
+      return this.receipt(JSON.parse(response.data.toString('utf8')));
     } catch (err) {
       if (this.debugResponses && err instanceof HttpClientError) {
         log.error(
@@ -99,5 +92,19 @@ export class NotifyV1Adapter implements NotificationAdapter {
       // Upstream bodies can contain recipient addresses or credentials; keep them private.
       throw new ServiceUnavailableError(failureMessage(err));
     }
+  }
+
+  private receipt(body: unknown): EmailReceipt {
+    const parsed = NotifyAcceptanceSchema.safeParse(body);
+    if (!parsed.success) {
+      if (this.debugResponses) {
+        log.error(
+          { upstreamBody: body, validationIssues: parsed.error.issues },
+          'Notify unexpected response (debug)',
+        );
+      }
+      throw new ServiceUnavailableError('Notify returned an unexpected response');
+    }
+    return { id: parsed.data.notifyId, status: parsed.data.status };
   }
 }

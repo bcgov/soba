@@ -1,4 +1,3 @@
-import { notifySubmission } from '../../features/notifications/submissionNotification';
 import {
   SUBMISSION_IN_PROGRESS_STATES,
   ApiErrorCodes,
@@ -18,6 +17,7 @@ import {
   listSubmissionsForWorkspace,
   markSubmissionDeleted,
   updateSubmissionDraft,
+  type AppendSubmissionRevisionResult,
   type LabelledSubmissionRecord,
   type ListParticipantSubmissionsInput,
   type SubmissionRecord,
@@ -45,6 +45,7 @@ import {
 import { withNewConfirmationCode } from './confirmationCode';
 import { isUniqueViolationOn } from '../db/pgError';
 import { SUBMISSION_REVISION_PKEY } from '../db/schema';
+import { enqueueSubmissionNotification } from '../../features/notifications/submissionNotification';
 
 export interface SubmissionWriteOutcome {
   record: LabelledSubmissionRecord;
@@ -109,6 +110,20 @@ interface ListInput {
   sort: SubmissionListSort;
   locale: SortLocale;
 }
+
+/** Only a submit that lands as a new current revision notifies; replays and pending writes do not. */
+const notifyIfSubmitted = (
+  eventType: SubmissionWriteEventCode,
+  result: AppendSubmissionRevisionResult,
+): void => {
+  if (eventType !== SubmissionEventType.submitted || result.outcome !== 'appended') return;
+  enqueueSubmissionNotification({
+    workspaceId: result.record.workspaceId,
+    formId: result.record.formId,
+    submissionId: result.record.id,
+    confirmationCode: result.record.confirmationCode,
+  });
+};
 
 export class SubmissionService {
   /**
@@ -231,7 +246,7 @@ export class SubmissionService {
    */
   private async resolveSubmissionEngine(submission: SubmissionRecord) {
     const version = await getFormVersionById(submission.workspaceId, submission.formVersionId);
-    if (!version || !version.engineSchemaRef) {
+    if (!version?.engineSchemaRef) {
       throw new ValidationError(
         'Form version is not provisioned in the engine',
         ApiErrorCodes.form_not_ready,
@@ -301,11 +316,18 @@ export class SubmissionService {
           ? (submission.workflowState as SubmissionWorkflowStateCode)
           : decision.workflowState,
         afterEngineSubmissionRef: engineRef,
+      }).catch((err: unknown) => {
+        // Another write committed this revision id first.
+        if (isUniqueViolationOn(err, SUBMISSION_REVISION_PKEY)) {
+          throw new ConflictError(
+            'Revision id already used by another write',
+            ApiErrorCodes.revision_id_taken,
+          );
+        }
+        throw err;
       });
 
-      if (eventType === SubmissionEventType.submitted && result.outcome === 'appended') {
-        await notifySubmission(result.record);
-      }
+      notifyIfSubmitted(eventType, result);
       if (result.outcome === 'not_found') {
         throw new NotFoundError('Submission not found', ApiErrorCodes.submission_not_found);
       }
@@ -383,10 +405,10 @@ export class SubmissionService {
   }) {
     const submission =
       input.record ?? (await getSubmissionRecordById(input.workspaceId, input.submissionId));
-    if (!submission || !submission.engineSubmissionRef) return null;
+    if (!submission?.engineSubmissionRef) return null;
 
     const version = await getFormVersionById(input.workspaceId, submission.formVersionId);
-    if (!version || !version.engineSchemaRef) return null;
+    if (!version?.engineSchemaRef) return null;
 
     const engineCode = await getFormEngineCodeForForm(input.workspaceId, submission.formId);
     if (!engineCode) return null;

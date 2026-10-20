@@ -1,6 +1,6 @@
 import { v7 as uuidv7 } from 'uuid';
 import { SubmissionService } from '../../core/services/submissionService';
-import { inSequence } from './inSequence';
+import { mapInOrder } from '../../core/inOrder';
 
 const submissionService = new SubmissionService();
 
@@ -21,7 +21,7 @@ export async function seedSubmission(input: {
   if (!record.headRevisionId) throw new Error(`Submission ${record.id} has no head revision`);
 
   let baseRevisionId = record.headRevisionId;
-  await inSequence(events, async (event) => {
+  await mapInOrder(events, async (event) => {
     const write = {
       ...context,
       submissionId: record.id,

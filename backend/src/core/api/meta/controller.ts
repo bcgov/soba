@@ -53,11 +53,13 @@ export const getCodesMeta = asyncHandler(async (req: Request, res: Response) => 
   const codeSets = await codeService.getRegisteredCodeSets({ onlyEnabledFeatures });
   let codeSetNames = [...new Set(codeSets.map((r) => r.codeSet))];
   if (codeSetFilter) {
-    const wanted = codeSetFilter
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    codeSetNames = codeSetNames.filter((name) => wanted.includes(name));
+    const wanted = new Set(
+      codeSetFilter
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+    codeSetNames = codeSetNames.filter((name) => wanted.has(name));
   }
   if (sourceFilter) {
     codeSetNames = codeSetNames.filter((name) =>
@@ -69,12 +71,14 @@ export const getCodesMeta = asyncHandler(async (req: Request, res: Response) => 
     );
   }
 
+  const codesBySet = await Promise.all(
+    codeSetNames.map((codeSet) =>
+      codeService.getCodes(codeSet, { activeOnly: isActiveFilter === 'true', onlyEnabledFeatures }),
+    ),
+  );
   const result: CodesKeyedMetaResponse = {};
-  for (const codeSet of codeSetNames) {
-    const items = await codeService.getCodes(codeSet, {
-      activeOnly: isActiveFilter === 'true',
-      onlyEnabledFeatures,
-    });
+  for (const [index, codeSet] of codeSetNames.entries()) {
+    const items = codesBySet[index];
     let list = items;
     if (isActiveFilter === 'false') list = items.filter((r) => !r.isActive);
     if (sourceFilter) list = list.filter((r) => r.source === sourceFilter);

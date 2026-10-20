@@ -18,6 +18,7 @@ export const formNotificationSettings = sobaSchema.table(
       .array()
       .notNull()
       .default(sql`ARRAY[]::text[]`),
+    /** Moves on with every save; a save names the version it started from. */
     version: integer('version').notNull().default(1),
     ...auditColumns(),
   },

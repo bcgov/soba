@@ -60,7 +60,7 @@ describe('FormDesigner', () => {
   it('shows the loading indicator when initializing', () => {
     keycloakState = { authenticated: false, initializing: true };
     renderDesigner();
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
   });
 
   it('shows login required when not authenticated', () => {

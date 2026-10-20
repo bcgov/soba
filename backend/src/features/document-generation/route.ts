@@ -4,12 +4,8 @@ import { renderRateLimit } from '../../core/middleware/rateLimit';
 import { Features } from '../../core/db/codes';
 import { asyncHandler } from '../../core/api/shared/asyncHandler';
 import { validateRequest } from '../../core/api/shared/validation';
-import {
-  listSubmissionTemplatesHandler,
-  previewDocumentHandler,
-  printDocumentHandler,
-} from './controller';
-import { PreviewBodySchema, PrintBodySchema, SubmissionIdParamSchema } from './schema';
+import { listSubmissionTemplatesHandler, printDocumentHandler } from './controller';
+import { PrintBodySchema, SubmissionIdParamSchema } from './schema';
 
 const router = express.Router();
 
@@ -17,20 +13,12 @@ const router = express.Router();
 // surface's submit-mode).
 router.use(requireFeature(Features.document_generation), requireFeature(Features.templates));
 
-// Mounted under /submit/submissions, so these are /submit/submissions/:id/{templates,preview,print}.
+// Mounted under /submit/submissions, so these are /submit/submissions/:id/{templates,print}.
 // templates: what the caller may render from the submission.
 router.get(
   '/:id/templates',
   validateRequest({ params: SubmissionIdParamSchema }),
   asyncHandler(listSubmissionTemplatesHandler),
-);
-
-// preview: render the caller's live on-screen data (submission is the authorization anchor).
-router.post(
-  '/:id/preview',
-  renderRateLimit,
-  validateRequest({ params: SubmissionIdParamSchema, body: PreviewBodySchema }),
-  asyncHandler(previewDocumentHandler),
 );
 
 // print: render the submission's persisted data (read from the form engine).

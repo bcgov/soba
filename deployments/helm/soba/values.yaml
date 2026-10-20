@@ -47,7 +47,7 @@ backend:
     # Router tuning for the API host; see README.
     annotations:
       # Inactivity timeout. The router's 30s default is tight for the synchronous CDOGS
-      # call under /submit/submissions/:id/{preview,print}, which cannot be scoped below.
+      # call under /{submit,design}/submissions/:id/print, which cannot be scoped below.
       haproxy.router.openshift.io/timeout: "60s"
       # The router sets a session cookie on edge routes whether or not we ask; this just
       # names it. sobaFetch sends no credentials, so nothing returns it on this host.
@@ -67,6 +67,11 @@ backend:
           haproxy.router.openshift.io/timeout: "300s"
       - name: templates
         path: /api/v1/templates
+        annotations:
+          # Upload is silent through the clamd scan (clamav.timeoutMs, 60s).
+          haproxy.router.openshift.io/timeout: "300s"
+      - name: print-upload
+        path: /api/v1/design/print-upload
         annotations:
           # Upload is silent through the clamd scan (clamav.timeoutMs, 60s).
           haproxy.router.openshift.io/timeout: "300s"
@@ -135,6 +140,11 @@ backend:
     virusScanDefaultCode: virusscan-clamav
     # Tenant engine behind GET /me/tenants. tenant-noop returns no tenants and calls nothing.
     tenantEngineDefaultCode: tenant-noop
+    # Workflow engine. workflow-noop starts nothing and calls nothing.
+    workflowEngineDefaultCode: workflow-noop
+    # Notification plugin. notification-noop sends nothing and calls nothing.
+    notificationDefaultCode: notification-noop
+    # notificationDefaultCode: notify-v1
     sobaSystemSubject: soba-system
 
   # -- Shared temp storage PVC (RWX so it survives horizontal scaling).
@@ -219,6 +229,21 @@ backend:
       # -- outbound deadline in ms; empty uses the backend default (30000)
       timeoutMs: "5000"
 
+  # -- configmap-workflow-engine: PLUGIN_CS_WORKFLOW_V1_* + default engine code
+  workflowEngine:
+    csWorkflowV1:
+      apiBaseUrl: ""
+      # -- outbound deadline in ms; empty uses the backend default (30000)
+      timeoutMs: "5000"
+
+  # -- configmap-notification: PLUGIN_NOTIFY_V1_* + default notification code
+  notification:
+    notifyV1:
+      # -- Notify base URL including /api/v1
+      endpoint: ""
+      # -- outbound deadline in ms; empty uses the backend default (30000)
+      timeoutMs: ""
+
   # -- configmap-sso: IDP / SSO config
   sso:
     idpPluginDefaultCode: bcgov-sso
@@ -299,7 +324,7 @@ frontend:
       routePath: /designer
     forms:
       enabled: true
-      featuresAllowed: "submit-mode,files,meta"
+      featuresAllowed: "submit-mode,files,meta,templates"
       routePath: /forms
 
 # -- Database (external Postgres) -----------------------------------------

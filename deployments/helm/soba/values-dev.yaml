@@ -7,7 +7,7 @@ backend:
   resources:
     requests:
       cpu: 50m
-      memory: 256Mi
+      memory: 128Mi
     limits:
       cpu: 250m
       memory: 512Mi
@@ -25,6 +25,8 @@ backend:
     eventStreamDefaultCode: eventstream-redis
     documentGenerationDefaultCode: cdogs-v2
     tenantEngineDefaultCode: cstar-v1
+    workflowEngineDefaultCode: cs-workflow-v1
+    notificationDefaultCode: notify-v1
   documentGeneration:
     cdogsV2:
       endpoint: https://cdogs-dev.api.gov.bc.ca/api
@@ -33,14 +35,20 @@ backend:
       endpoint: http://common-document-generation-service-master.a12c97-prod:3000
   tenantEngine:
     cstarV1:
-      apiBaseUrl: https://dev.connect.digital.gov.bc.ca/api/v1
+      apiBaseUrl: https://test.connect.digital.gov.bc.ca/api/v1
+  workflowEngine:
+    csWorkflowV1:
+      apiBaseUrl: https://test-workflow.apps.gold.devops.gov.bc.ca/api/v1
+  notification:
+    notifyV1:
+      endpoint: https://common-notify-test.apps.silver.devops.gov.bc.ca/api/v1
 
 frontend:
   replicas: 1
   resources:
     requests:
-      cpu: 50m
-      memory: 256Mi
+      cpu: 25m
+      memory: 128Mi
     limits:
       cpu: 250m
       memory: 512Mi
@@ -52,7 +60,7 @@ formio:
   resources:
     requests:
       cpu: 50m
-      memory: 256Mi
+      memory: 192Mi
     limits:
       cpu: 250m
       memory: 512Mi

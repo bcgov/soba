@@ -5,6 +5,7 @@ import type { FormSettingsModule } from '../types';
 import { FormNotificationSettingsSchema, registerNotificationSettingsOpenApi } from './openapi';
 import { formNotificationSettingsService } from './service';
 import { createNotificationSettings } from './repo';
+
 export const notificationSettingsModule: FormSettingsModule = {
   key: NOTIFICATION_SETTINGS_KEY,
   weight: 20,

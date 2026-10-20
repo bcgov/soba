@@ -3,12 +3,16 @@ import { NotFoundError } from '../../../core/errors';
 import type { FormSettingsContext, FormSettingsService } from '../routes';
 import { assertSaved } from '../saved';
 import { findNotificationSettings, updateNotificationSettings } from './repo';
+
 const NOT_FOUND = 'Form notification settings not found';
+
 const read = async (ctx: FormSettingsContext, formId: string) => {
   const settings = await findNotificationSettings(ctx.workspaceId, formId);
   if (!settings) throw new NotFoundError(NOT_FOUND);
   return settings;
 };
+
+/** Who a form emails when it receives a submission. */
 export const formNotificationSettingsService: FormSettingsService<
   FormNotificationSettings,
   FormNotificationSettings

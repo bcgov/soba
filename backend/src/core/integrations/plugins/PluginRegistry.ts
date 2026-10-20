@@ -1,7 +1,3 @@
-import type {
-  NotificationAdapter,
-  NotificationPluginDefinition,
-} from '../notification/NotificationAdapter';
 /**
  * Plugin discovery + selection. Scans the plugins dir once (lazy, cached), validates each module's
  * exported definitions with Zod, and exposes per-kind definition lists, the discovered catalog, and
@@ -9,8 +5,8 @@ import type {
  * virus scan).
  * Storage is discovered here too but selected per profile (see getStorageAdapter).
  */
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import { z } from 'zod';
 import { env } from '../../config/env';
 import { log } from '../../logging';
@@ -44,6 +40,12 @@ import type {
   StoragePluginDefinition,
 } from '../storage-engine/StorageEngineAdapter';
 import type { TenantEnginePluginDefinition } from '../tenant/TenantEnginePluginDefinition';
+import type { WorkflowEnginePluginDefinition } from '../workflow/WorkflowEnginePluginDefinition';
+import type {
+  NotificationAdapter,
+  NotificationPluginDefinition,
+} from '../notification/NotificationAdapter';
+import { reportReadinessByKey } from './readiness';
 
 // --- Definition schemas -----------------------------------------------------
 
@@ -53,7 +55,7 @@ const AdapterPluginDefinitionSchema = z.object({
   createAdapter: z.any(),
 });
 
-// form-engine, document-generation and tenant-engine share this { code, metadata, createAdapter } shape.
+// form-engine, document-generation, tenant-engine, workflow-engine and notification share this { code, metadata, createAdapter } shape.
 const MetadataPluginDefinitionSchema = z.object({
   code: z.string().min(1),
   metadata: z.object({
@@ -92,6 +94,7 @@ interface CachedPlugin {
   storageDefinition?: StoragePluginDefinition;
   idpDefinition?: IdpPluginDefinition;
   tenantEngineDefinition?: TenantEnginePluginDefinition;
+  workflowEngineDefinition?: WorkflowEnginePluginDefinition;
   notificationDefinition?: NotificationPluginDefinition;
 }
 
@@ -110,11 +113,6 @@ const DEFINITION_KINDS: ReadonlyArray<{
   {
     field: 'documentGenerationDefinition',
     exportKey: 'documentGenerationPluginDefinition',
-    schema: MetadataPluginDefinitionSchema,
-  },
-  {
-    field: 'notificationDefinition',
-    exportKey: 'notificationPluginDefinition',
     schema: MetadataPluginDefinitionSchema,
   },
   { field: 'apiDefinition', exportKey: 'pluginApiDefinition', schema: FeatureApiDefinitionSchema },
@@ -152,6 +150,16 @@ const DEFINITION_KINDS: ReadonlyArray<{
   {
     field: 'tenantEngineDefinition',
     exportKey: 'tenantEnginePluginDefinition',
+    schema: MetadataPluginDefinitionSchema,
+  },
+  {
+    field: 'workflowEngineDefinition',
+    exportKey: 'workflowEnginePluginDefinition',
+    schema: MetadataPluginDefinitionSchema,
+  },
+  {
+    field: 'notificationDefinition',
+    exportKey: 'notificationPluginDefinition',
     schema: MetadataPluginDefinitionSchema,
   },
 ];
@@ -296,6 +304,7 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
       p.storageDefinition?.code ??
       p.idpDefinition?.code ??
       p.tenantEngineDefinition?.code ??
+      p.workflowEngineDefinition?.code ??
       p.notificationDefinition?.code ??
       p.dir;
     return {
@@ -364,6 +373,24 @@ export function getTenantEnginePluginDefinitions(): TenantEnginePluginDefinition
   return definitionsOf('tenantEngineDefinition');
 }
 
+export interface WorkflowEnginePluginCatalogEntry {
+  code: string;
+  name: string;
+  version?: string;
+}
+
+export function getWorkflowEnginePluginCatalog(): WorkflowEnginePluginCatalogEntry[] {
+  return getWorkflowEnginePluginDefinitions().map((d) => ({
+    code: d.code,
+    name: d.metadata.name,
+    version: d.metadata.version,
+  }));
+}
+
+export function getWorkflowEnginePluginDefinitions(): WorkflowEnginePluginDefinition[] {
+  return definitionsOf('workflowEngineDefinition');
+}
+
 export function getCachePluginDefinitions(): CachePluginDefinition[] {
   return definitionsOf('cacheDefinition');
 }
@@ -392,16 +419,15 @@ export function getIdpPluginDefinitions(): IdpPluginDefinition[] {
   return definitionsOf('idpDefinition');
 }
 
+export function getNotificationPluginDefinitions(): NotificationPluginDefinition[] {
+  return definitionsOf('notificationDefinition');
+}
+
 // --- Selectable adapters (singleton by code) --------------------------------
 
 // Active plugin code per selectable kind. The adapter getters and /meta/plugins both resolve
 // through this, so they can't drift. Storage is not here — it is selected per profile.
 const SELECTABLE_PLUGIN_DEFAULTS = {
-  notification: {
-    label: 'notification',
-    configured: () => env.getOptionalEnv('NOTIFICATION_DEFAULT_CODE'),
-    fallback: 'notify-v1',
-  },
   cache: { label: 'cache', configured: () => env.getCacheDefaultCode(), fallback: 'cache-memory' },
   messagebus: {
     label: 'messagebus',
@@ -422,6 +448,11 @@ const SELECTABLE_PLUGIN_DEFAULTS = {
     label: 'virus-scan',
     configured: () => env.getVirusScanDefaultCode(),
     fallback: 'virusscan-noop',
+  },
+  notification: {
+    label: 'notification',
+    configured: () => env.getNotificationDefaultCode(),
+    fallback: 'notification-noop',
   },
 } as const;
 
@@ -495,6 +526,10 @@ export const getVirusScanAdapter = lazyAdapter<VirusScanAdapter>(
   'virusScan',
   getVirusScanPluginDefinitions,
 );
+export const getNotificationAdapter = lazyAdapter<NotificationAdapter>(
+  'notification',
+  getNotificationPluginDefinitions,
+);
 
 // --- Storage (discovered above, but selected per profile) -------------------
 
@@ -532,25 +567,8 @@ export function getStorageAdapter(profile: string = 'default'): StorageEngineAda
  * that is unreachable or misconfigured yields { ok: false, message }; one with no readinessCheck
  * yields { ok: true }.
  */
-export async function checkStorageReadiness(): Promise<
-  Record<string, StorageEngineReadinessResult>
-> {
-  const results: Record<string, StorageEngineReadinessResult> = {};
-  for (const profile of Object.keys(getStorageProfilesConfig())) {
-    try {
-      const adapter = getStorageAdapter(profile);
-      results[profile] = (await adapter.readinessCheck?.()) ?? { ok: true };
-    } catch (err) {
-      results[profile] = { ok: false, message: err instanceof Error ? err.message : String(err) };
-    }
-  }
-  return results;
+export function checkStorageReadiness(): Promise<Record<string, StorageEngineReadinessResult>> {
+  return reportReadinessByKey(Object.keys(getStorageProfilesConfig()), (profile) =>
+    getStorageAdapter(profile).readinessCheck?.(),
+  );
 }
-
-export function getNotificationPluginDefinitions(): NotificationPluginDefinition[] {
-  return definitionsOf('notificationDefinition');
-}
-export const getNotificationAdapter = lazyAdapter<NotificationAdapter>(
-  'notification',
-  getNotificationPluginDefinitions,
-);

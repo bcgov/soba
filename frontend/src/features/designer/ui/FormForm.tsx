@@ -472,7 +472,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
 
   const selectVersionFromDrop = (key: string): void => {
     if (key === CREATE_NEW_VERSION_KEY) {
-      createNewVersion();
+      void createNewVersion();
     } else {
       selectVersion(key);
     }

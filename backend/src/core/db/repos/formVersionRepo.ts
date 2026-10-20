@@ -259,7 +259,7 @@ export const lookupFormVersions = async (
   if (input.q) {
     whereClauses.push(sql`${formVersions.versionNo}::text like ${prefixPattern(input.q)}`);
   }
-  return db
+  return await db
     .select(summaryColumns)
     .from(formVersions)
     .where(and(...whereClauses))

@@ -52,8 +52,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 # ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
 # Standalone with outputFileTracingRoot (monorepo) nests server at frontend/server.js
 # Standalone does not include .next/static — must copy so /_next/static/* is served

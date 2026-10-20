@@ -2,17 +2,22 @@ import { HttpClientTimeoutError } from '../../../src/core/http/httpClient';
 import { NotifyV1Adapter } from '../../../src/plugins/notify-v1/notifyV1Adapter';
 import { createPluginConfigReaderFrom } from '../../../src/core/config/pluginConfig';
 import { createEnvReader } from '../../../src/core/config/env';
-import { SendEmailSchema } from '../../../src/features/notifications/schema';
+import {
+  SendEmailSchema,
+  type SendEmail,
+} from '../../../src/core/integrations/notification/NotificationAdapter';
 
 const email = SendEmailSchema.parse({
   recipients: { to: ['recipient@example.com'] },
   content: { subject: 'Hello', body: 'SOBA message' },
 });
-const result = {
+// Notify's 202 acceptance body.
+const accepted = {
   notifyId: 'b4fe3ccc-b989-4a36-82f5-b512f5eb156a',
-  status: 'accepted',
+  status: 'queued',
   channels: ['email'],
-  createdAt: '2026-10-05T12:00:00Z',
+  createdAt: '2026-10-05T12:00:00.000Z',
+  message: 'Notification accepted for delivery',
 };
 const makeAdapter = () =>
   new NotifyV1Adapter(
@@ -30,8 +35,11 @@ afterEach(() => jest.restoreAllMocks());
 test('sends inline email with only the configured API key', async () => {
   const fetchMock = jest
     .spyOn(global, 'fetch')
-    .mockResolvedValue(new Response(JSON.stringify(result)));
-  await expect(makeAdapter().sendEmail(email)).resolves.toEqual(result);
+    .mockResolvedValue(new Response(JSON.stringify(accepted), { status: 202 }));
+  await expect(makeAdapter().sendEmail(email)).resolves.toEqual({
+    id: accepted.notifyId,
+    status: 'queued',
+  });
   expect(fetchMock).toHaveBeenCalledTimes(1);
   expect(fetchMock).toHaveBeenCalledWith(
     'https://notify.example/api/v1/notifysimple/email',
@@ -61,11 +69,14 @@ test('rejects malformed upstream success', async () => {
   await expect(makeAdapter().sendEmail(email)).rejects.toThrow('unexpected response');
 });
 
-test('rejects invalid recipients and caller supplied tenant overrides', () => {
-  expect(SendEmailSchema.safeParse({ ...email, recipients: { to: ['invalid'] } }).success).toBe(
-    false,
-  );
-  expect(SendEmailSchema.safeParse({ ...email, cstarTenantId: 'other' }).success).toBe(false);
+test.each([
+  ['an invalid recipient', { ...email, recipients: { to: ['not-an-address'] } }],
+  ['a caller supplied tenant override', { ...email, cstarTenantId: 'other' }],
+])('rejects %s without calling Notify or echoing it', async (_case, request) => {
+  const fetchMock = jest.spyOn(global, 'fetch');
+  const sent = makeAdapter().sendEmail(request as SendEmail);
+  await expect(sent).rejects.toThrow(new Error('Notify email request is not valid'));
+  expect(fetchMock).not.toHaveBeenCalled();
 });
 
 test.each([401, 403, 404, 429, 502])(

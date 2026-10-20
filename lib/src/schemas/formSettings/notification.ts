@@ -2,10 +2,11 @@ import { z } from 'zod';
 import { SettingsVersionSchema } from './inheritable';
 
 export const NOTIFICATION_SETTINGS_KEY = 'notification';
+export const NOTIFICATION_RECIPIENTS_MAX = 100;
 export const NotificationSettingsSchema = z.strictObject({
   recipients: z
     .array(z.string().trim().pipe(z.email()))
-    .max(100)
+    .max(NOTIFICATION_RECIPIENTS_MAX)
     .transform((addresses) => [...new Set(addresses.map((address) => address.toLowerCase()))]),
 });
 export const FormNotificationSettingsSchema = z.strictObject({

@@ -39,10 +39,19 @@ function buildQueryString(query?: FormioQuery): string {
   return s ? `?${s}` : '';
 }
 
+/** An id as one URL path segment: encoded, and refused when empty or a dot segment. */
+function idSegment(id: unknown): string {
+  const segment = encodeURIComponent(String(id));
+  if (segment === '' || segment === '.' || segment === '..') {
+    throw new Error('Formio id is not a valid path segment');
+  }
+  return segment;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type FormioForm = any;
+type FormioForm = Record<string, any>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type FormioSubmission = any;
+type FormioSubmission = Record<string, any>;
 
 export interface FormioCommunityEditionAPIv5Options {
   baseUrl: string;
@@ -80,39 +89,36 @@ export class FormioCommunityEditionAPIv5Client {
   async login(budget = this.budget()): Promise<void> {
     const body = JSON.stringify({ data: { email: this.username, password: this.password } });
     const loginPaths = ['/admin/login', '/user/login'];
-    let lastError: Error | null = null;
-    for (const path of loginPaths) {
-      const url = `${this._baseUrl}${path}`;
+    // In order, stopping at the first path that logs in.
+    const tryPath = async (index: number, lastError: Error | null): Promise<string> => {
+      if (index === loginPaths.length) throw lastError ?? new Error('Formio login failed');
+      const url = `${this._baseUrl}${loginPaths[index]}`;
+      const init = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: budget,
+      };
       let res: Response;
       let text: string;
       try {
-        res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body,
-          signal: budget,
-        });
+        res = await fetch(url, init);
         text = await res.text();
       } catch (err) {
         if (budget.aborted) throw timedOut('login');
-        lastError = new Error(
-          `Formio login request failed: ${err instanceof Error ? err.message : err}`,
-        );
-        continue;
+        const message = err instanceof Error ? err.message : err;
+        return tryPath(index + 1, new Error(`Formio login request failed: ${message}`));
       }
       if (!res.ok) {
-        lastError = new Error(`Formio login failed ${res.status}: ${text}`);
-        continue;
+        return tryPath(index + 1, new Error(`Formio login failed ${res.status}: ${text}`));
       }
       const jwt = res.headers.get('x-jwt-token');
       if (!jwt) {
-        lastError = new Error('Formio login response missing x-jwt-token header');
-        continue;
+        return tryPath(index + 1, new Error('Formio login response missing x-jwt-token header'));
       }
-      this.token = jwt;
-      return;
-    }
-    throw lastError ?? new Error('Formio login failed');
+      return jwt;
+    };
+    this.token = await tryPath(0, null);
   }
 
   getToken(): string | null {
@@ -210,22 +216,24 @@ export class FormioCommunityEditionAPIv5Client {
 
   async loadForm(formId: string, query?: FormioQuery): Promise<FormioForm | null> {
     const qs = buildQueryString(query);
-    return this.request<FormioForm | null>(`/form/${formId}${qs}`, 'GET');
+    return this.request<FormioForm | null>(`/form/${idSegment(formId)}${qs}`, 'GET');
   }
 
   async saveForm(data: FormioForm, signal?: AbortSignal): Promise<FormioForm> {
-    if (data._id) return this.request<FormioForm>(`/form/${data._id}`, 'PUT', data, signal);
+    if (data._id) {
+      return this.request<FormioForm>(`/form/${idSegment(data._id)}`, 'PUT', data, signal);
+    }
     return this.request<FormioForm>('/form', 'POST', data, signal);
   }
 
   async deleteForm(formId: string, signal?: AbortSignal): Promise<void> {
-    await this.request(`/form/${formId}`, 'DELETE', undefined, signal);
+    await this.request(`/form/${idSegment(formId)}`, 'DELETE', undefined, signal);
   }
 
   async loadSubmissions(formId: string, query?: FormioQuery): Promise<FormioSubmission[]> {
     const qs = buildQueryString(query);
     const result = await this.request<FormioSubmission[] | FormioSubmission>(
-      `/form/${formId}/submission${qs}`,
+      `/form/${idSegment(formId)}/submission${qs}`,
       'GET',
     );
     return Array.isArray(result) ? result : [];
@@ -238,7 +246,7 @@ export class FormioCommunityEditionAPIv5Client {
   ): Promise<FormioSubmission | null> {
     const qs = buildQueryString(query);
     return this.request<FormioSubmission | null>(
-      `/form/${formId}/submission/${submissionId}${qs}`,
+      `/form/${idSegment(formId)}/submission/${idSegment(submissionId)}${qs}`,
       'GET',
     );
   }
@@ -251,16 +259,23 @@ export class FormioCommunityEditionAPIv5Client {
     const qs = buildQueryString(query);
     if (data._id) {
       return this.request<FormioSubmission>(
-        `/form/${formId}/submission/${data._id}${qs}`,
+        `/form/${idSegment(formId)}/submission/${idSegment(data._id)}${qs}`,
         'PUT',
         data,
       );
     }
-    return this.request<FormioSubmission>(`/form/${formId}/submission${qs}`, 'POST', data);
+    return this.request<FormioSubmission>(
+      `/form/${idSegment(formId)}/submission${qs}`,
+      'POST',
+      data,
+    );
   }
 
   async deleteSubmission(formId: string, submissionId: string): Promise<void> {
-    await this.request(`/form/${formId}/submission/${submissionId}`, 'DELETE');
+    await this.request(
+      `/form/${idSegment(formId)}/submission/${idSegment(submissionId)}`,
+      'DELETE',
+    );
   }
 
   async loadRoles(query?: FormioQuery): Promise<{ _id: string; title?: string; name?: string }[]> {

@@ -13,7 +13,7 @@ function useDateFormatter(options: Intl.DateTimeFormatOptions) {
     (dateStr?: string | null): string => {
       if (!dateStr) return '';
       const date = new Date(dateStr);
-      if (isNaN(date.getTime())) return '';
+      if (Number.isNaN(date.getTime())) return '';
       return new Intl.DateTimeFormat(locale, options).format(date);
     },
     [locale, options],

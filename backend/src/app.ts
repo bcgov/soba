@@ -17,6 +17,7 @@ import {
   logEventStreamSelfTest,
   logDocumentGenerationReadiness,
   logTenantEngineReadiness,
+  logWorkflowEngineReadiness,
 } from './core/api/health';
 import { metaRouter } from './core/api/meta';
 import { buildOpenApiSpec } from './core/api/shared/openapi';
@@ -32,6 +33,7 @@ import { initializePassport } from './core/auth/passport';
 import { Features } from './core/db/codes';
 
 const app = express();
+app.disable('x-powered-by');
 const port = Number(process.env.PORT) || 4000;
 
 // The app serves the base path itself, so Routes and probes address the same URLs the browser uses.
@@ -176,5 +178,6 @@ app.listen(port, () => {
     .then(logEventStreamSelfTest)
     .then(logDocumentGenerationReadiness)
     .then(logTenantEngineReadiness)
+    .then(logWorkflowEngineReadiness)
     .catch((err) => log.warn({ err }, 'Startup diagnostics failed'));
 });

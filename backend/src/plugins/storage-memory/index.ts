@@ -51,9 +51,9 @@ function createMemoryStorageAdapter(_config: PluginConfigReader): StorageEngineA
   const store = new Map<string, StoredObject>();
 
   return {
-    async readinessCheck() {
+    readinessCheck() {
       // Always ready — there is no backing service to reach.
-      return { ok: true };
+      return Promise.resolve({ ok: true });
     },
 
     async uploadFile(input: UploadFileInput): Promise<UploadFileResult> {
@@ -83,25 +83,24 @@ function createMemoryStorageAdapter(_config: PluginConfigReader): StorageEngineA
       };
     },
 
-    async getFile(engineFileRef: string): Promise<GetFileResult | null> {
+    getFile(engineFileRef: string): Promise<GetFileResult | null> {
       const id = parseEngineRef(engineFileRef);
-      if (!id) return null;
-      const obj = store.get(id);
-      if (!obj) return null;
-      return {
+      const obj = id ? store.get(id) : undefined;
+      if (!obj) return Promise.resolve(null);
+      return Promise.resolve({
         engineFileRef,
         filename: obj.filename,
         contentType: obj.contentType,
         size: obj.buffer.length,
         createdAt: obj.createdAt,
         downloadStream: Readable.from(obj.buffer),
-      };
+      });
     },
 
-    async deleteFile(engineFileRef: string): Promise<void> {
+    deleteFile(engineFileRef: string): Promise<void> {
       const id = parseEngineRef(engineFileRef);
-      if (!id) return;
-      store.delete(id);
+      if (id) store.delete(id);
+      return Promise.resolve();
     },
   };
 }
