@@ -479,6 +479,53 @@
         "createdAt": "Created Date",
         "quickLinks": "Quick Links"
       }
+    },
+    "export": {
+      "button": "Export submissions",
+      "pageTitle": "Export submissions",
+      "back": "Back to submissions",
+      "loadError": "Could not load the form.",
+      "fieldsError": "Could not load the export columns.",
+      "fileType": "File type",
+      "csv": "CSV",
+      "json": "JSON",
+      "version": "Form version",
+      "allVersions": "All versions",
+      "versionOption": "Version {version}",
+      "dates": "Submission date",
+      "sinceLastExport": "Since my last export",
+      "lastExportedAt": "Your last export included submissions up to {date}.",
+      "neverExported": "You have not exported this form before, so every submission is included.",
+      "all": "All",
+      "range": "Date range",
+      "from": "From",
+      "to": "To",
+      "rangeInvalid": "Choose a From date on or before the To date, neither in the future.",
+      "includeDrafts": "Include drafts",
+      "fields": "Data fields",
+      "fieldSearch": "Search fields",
+      "selectAll": "Select all",
+      "selectNone": "Select none",
+      "fieldsSelected": "{selected} of {total} fields selected",
+      "noSubmissions": "No submissions match these options.",
+      "layout": "CSV format",
+      "layouts": {
+        "multiRowEmptySpacesCSVExport": "1 - Multiple rows per submission with indentation spaces",
+        "multiRowBackFilledCSVExport": "2 - Multiple rows per submission",
+        "singleRowCSVExport": "3 - Single row per submission",
+        "unFormattedCSVExport": "4 - Unformatted"
+      },
+      "export": "Export",
+      "exporting": "Exporting…",
+      "success": "Submissions exported.",
+      "failed": "Could not export the submissions.",
+      "file": {
+        "pageTitle": "Download file",
+        "loading": "Downloading the file…",
+        "saved": "{name} has been downloaded.",
+        "again": "Download again",
+        "loadError": "Could not download this file."
+      }
     }
   },
   "mySubmissions": {

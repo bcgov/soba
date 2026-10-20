@@ -20,6 +20,7 @@ import {
   type LabelledSubmissionRecord,
   type ListParticipantSubmissionsInput,
   type SubmissionRecord,
+  type SubmitClient,
 } from '../db/repos/submissionRepo';
 import { getFormVersionById, getPublishedVersionForForm } from '../db/repos/formVersionRepo';
 import { getFormEngineCodeForForm } from '../db/repos/formRepo';
@@ -77,6 +78,8 @@ interface SaveInput {
   revisionId: string;
   /** Head the client loaded. */
   baseRevisionId: string;
+  /** Recorded on submit. */
+  client?: SubmitClient;
 }
 
 /** Where a submission's answer document lives in its form's engine. */
@@ -300,6 +303,7 @@ export class SubmissionService {
           ? (submission.workflowState as SubmissionWorkflowStateCode)
           : decision.workflowState,
         afterEngineSubmissionRef: engineRef,
+        client: input.client,
       }).catch((err: unknown) => {
         // Another write committed this revision id first.
         if (isUniqueViolationOn(err, SUBMISSION_REVISION_PKEY)) {

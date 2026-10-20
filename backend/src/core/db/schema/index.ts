@@ -12,6 +12,7 @@ export * from './settingsAudit';
 export * from './submissionParticipant';
 export * from './file';
 export * from './submissionFile';
+export * from './submissionExport';
 export * from './documentTemplate';
 export * from './documentGenerationAudit';
 export * from './devData';

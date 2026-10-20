@@ -480,6 +480,53 @@
         "createdAt": "Date de création",
         "quickLinks": "Liens rapides"
       }
+    },
+    "export": {
+      "button": "Exporter les soumissions",
+      "pageTitle": "Exporter les soumissions",
+      "back": "Retour aux soumissions",
+      "loadError": "Impossible de charger le formulaire.",
+      "fieldsError": "Impossible de charger les colonnes de l'exportation.",
+      "fileType": "Type de fichier",
+      "csv": "CSV",
+      "json": "JSON",
+      "version": "Version du formulaire",
+      "allVersions": "Toutes les versions",
+      "versionOption": "Version {version}",
+      "dates": "Date de soumission",
+      "sinceLastExport": "Depuis ma dernière exportation",
+      "lastExportedAt": "Votre dernière exportation comprenait les soumissions jusqu'au {date}.",
+      "neverExported": "Vous n'avez jamais exporté ce formulaire; toutes les soumissions sont incluses.",
+      "all": "Toutes",
+      "range": "Plage de dates",
+      "from": "Du",
+      "to": "Au",
+      "rangeInvalid": "Choisissez une date de début égale ou antérieure à la date de fin, et aucune date future.",
+      "includeDrafts": "Inclure les brouillons",
+      "fields": "Champs de données",
+      "fieldSearch": "Rechercher des champs",
+      "selectAll": "Tout sélectionner",
+      "selectNone": "Tout désélectionner",
+      "fieldsSelected": "{selected} champs sélectionnés sur {total}",
+      "noSubmissions": "Aucune soumission ne correspond à ces options.",
+      "layout": "Format CSV",
+      "layouts": {
+        "multiRowEmptySpacesCSVExport": "1 - Plusieurs lignes par soumission avec espaces d'indentation",
+        "multiRowBackFilledCSVExport": "2 - Plusieurs lignes par soumission",
+        "singleRowCSVExport": "3 - Une ligne par soumission",
+        "unFormattedCSVExport": "4 - Non formaté"
+      },
+      "export": "Exporter",
+      "exporting": "Exportation…",
+      "success": "Soumissions exportées.",
+      "failed": "Impossible d'exporter les soumissions.",
+      "file": {
+        "pageTitle": "Télécharger le fichier",
+        "loading": "Téléchargement du fichier…",
+        "saved": "{name} a été téléchargé.",
+        "again": "Télécharger de nouveau",
+        "loadError": "Impossible de télécharger ce fichier."
+      }
     }
   },
   "mySubmissions": {

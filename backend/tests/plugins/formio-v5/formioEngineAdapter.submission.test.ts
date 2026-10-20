@@ -211,6 +211,47 @@ describe('FormioEngineAdapter submission methods', () => {
     expect(client.deleteSubmission).toHaveBeenCalledWith('form-ref-1', 'sub-1');
   });
 
+  it('readSubmissions reads in batches of 100 by _id__in and strips each document', async () => {
+    const refs = Array.from({ length: 150 }, (_, i) => `sub-${i}`);
+    const client = makeClient({
+      loadSubmissions: jest.fn((_form: string, query: { params: { _id__in: string } }) =>
+        Promise.resolve(
+          query.params._id__in.split(',').map((id) => ({
+            _id: id,
+            owner: 'o1',
+            created: 'c',
+            metadata: { soba_submission_id: 's' },
+            data: { a: id },
+          })),
+        ),
+      ),
+    });
+    mockedGetClient.mockResolvedValue(client);
+
+    const adapter = new FormioEngineAdapter(makeConfig());
+    const docs = await adapter.readSubmissions('form-ref-1', refs);
+
+    expect(client.loadSubmissions).toHaveBeenCalledTimes(2);
+    expect(client.loadSubmissions).toHaveBeenCalledWith('form-ref-1', {
+      params: { _id__in: refs.slice(0, 100).join(','), limit: 100 },
+    });
+    expect(client.loadSubmissions).toHaveBeenCalledWith('form-ref-1', {
+      params: { _id__in: refs.slice(100).join(','), limit: 50 },
+    });
+    expect(docs.size).toBe(150);
+    expect(docs.get('sub-7')).toEqual({ data: { a: 'sub-7' } });
+  });
+
+  it('readSubmissions makes no call for no refs', async () => {
+    const client = makeClient();
+    mockedGetClient.mockResolvedValue(client);
+
+    const docs = await new FormioEngineAdapter(makeConfig()).readSubmissions('form-ref-1', []);
+
+    expect(docs.size).toBe(0);
+    expect(client.loadSubmissions).not.toHaveBeenCalled();
+  });
+
   it('deleteSubmission throws when no admin client is available', async () => {
     mockedGetClient.mockResolvedValue(null);
     const adapter = new FormioEngineAdapter(makeConfig());

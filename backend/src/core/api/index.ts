@@ -9,8 +9,9 @@ import {
   registerSubmissionReviewOpenApi,
 } from './submissions';
 import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
+import { registerSubmissionExportOpenApi, submissionExportRouter } from './submissionExport';
 import { groupsDomain } from './groups';
-import { filesDomain } from '../../features/files';
+import { filesDesignRouter, filesDomain } from '../../features/files';
 import {
   documentGenerationDesignRouter,
   documentGenerationDomain,
@@ -37,6 +38,7 @@ registerOpenApiPaths((registry) => {
   registerFormSettingsOpenApi(registry);
   registerSubmissionsOpenApi(registry);
   registerSubmissionReviewOpenApi(registry);
+  registerSubmissionExportOpenApi(registry);
   registerSubmitOpenApi(registry);
   groupsDomain.registerOpenApi(registry);
   meDomain.registerOpenApi(registry);
@@ -54,10 +56,13 @@ registerOpenApiPaths((registry) => {
 // modules under /forms/:id/settings (features/form-settings).
 const designRouter = express.Router();
 designRouter.use('/forms/:id/settings', formSettingsRouter);
+designRouter.use(submissionExportRouter);
 designRouter.use('/', designFormsRouter);
 designRouter.use('/submissions', designSubmissionsRouter);
 // Staff print: /submissions/:id/{templates,print} and /print-upload/:id; it gates itself.
 designRouter.use(documentGenerationDesignRouter);
+// Staff attachment download; gates itself.
+designRouter.use(filesDesignRouter);
 designRouter.use(notFoundHandler);
 designRouter.use(coreErrorHandler);
 

@@ -71,7 +71,10 @@ export const saveSubmission = asyncHandler(
 export const submitSubmission = asyncHandler(
   async (req: Request<SubmissionIdParams, unknown, SubmitSubmissionBody>, res: Response) => {
     const ctx = req.coreContext!;
-    const result = await submissionsApiService.submit(ctx, req.params.id, req.body);
+    const result = await submissionsApiService.submit(ctx, req.params.id, req.body, {
+      ip: req.ip ?? null,
+      userAgent: req.get('user-agent') ?? null,
+    });
     res.json(result);
   },
 );

@@ -41,6 +41,9 @@ export {
   updateSobaSubmissionStatus,
   addSobaSubmissionNote,
   recordSobaSubmissionEdit,
+  getSobaExportFields,
+  exportSobaSubmissions,
+  downloadSobaSubmissionFile,
 } from './sobaApiDesign';
 // Submit-mode (public-capable, /submit/*)
 export {

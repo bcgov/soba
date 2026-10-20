@@ -1,4 +1,16 @@
-import { and, count, eq, getTableColumns, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  eq,
+  getTableColumns,
+  ilike,
+  inArray,
+  isNull,
+  ne,
+  or,
+  sql,
+} from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import {
   MY_SUBMISSION_STATES,
@@ -9,6 +21,7 @@ import {
 } from '@soba/lib';
 import { db, type DbOrTx, type Tx } from '../client';
 import {
+  appUsers,
   submissionParticipants,
   submissionRevisions,
   submissions,
@@ -83,6 +96,12 @@ export type OpenSubmissionResult =
   | { outcome: 'created'; record: SubmissionRecord }
   | { outcome: 'taken'; live: SubmissionRecord | null; owner: boolean };
 
+/** The submitter's client on submit. */
+export interface SubmitClient {
+  ip: string | null;
+  userAgent: string | null;
+}
+
 interface SaveSubmissionInput {
   workspaceId: string;
   submissionId: string;
@@ -104,6 +123,8 @@ interface SaveSubmissionInput {
   workflowState: SubmissionWorkflowStateCode;
   /** Engine ref of the newly-created submission document for this revision (the "after" ref). */
   afterEngineSubmissionRef: string;
+  /** Stamped with submittedAt. */
+  client?: SubmitClient;
 }
 
 /**
@@ -497,6 +518,76 @@ export const listSubmissionsForWorkspace = async (
   });
 };
 
+export interface ListExportSubmissionsInput {
+  workspaceId: string;
+  formId: string;
+  /** Absent means every version. */
+  formVersionId?: string;
+  includeDrafts: boolean;
+  /** Inclusive bounds on submitted date (draft: last update). */
+  from?: Date;
+  to?: Date;
+}
+
+export interface SubmissionExportRow {
+  id: string;
+  formVersionId: string;
+  versionNo: number;
+  engineSchemaRef: string | null;
+  engineSubmissionRef: string | null;
+  workflowState: string;
+  confirmationCode: string;
+  createdAt: Date;
+  submittedAt: Date | null;
+  submittedIp: string | null;
+  submittedUserAgent: string | null;
+  submittedBy: string | null;
+  submitterProfile: unknown;
+}
+
+/** A form's submissions for export, newest first. */
+export const listSubmissionsForExport = (
+  input: ListExportSubmissionsInput,
+): Promise<SubmissionExportRow[]> => {
+  // Millisecond precision, matching JavaScript dates.
+  const exportDate = sql`date_trunc('milliseconds', coalesce(${submissions.submittedAt}, ${submissions.updatedAt}))`;
+  const states: string[] = input.includeDrafts
+    ? [SubmissionWorkflowState.submitted, SubmissionWorkflowState.draft]
+    : [SubmissionWorkflowState.submitted];
+  return db
+    .select({
+      id: submissions.id,
+      formVersionId: submissions.formVersionId,
+      versionNo: formVersions.versionNo,
+      engineSchemaRef: formVersions.engineSchemaRef,
+      engineSubmissionRef: submissions.engineSubmissionRef,
+      workflowState: submissions.workflowState,
+      confirmationCode: submissions.confirmationCode,
+      createdAt: submissions.createdAt,
+      submittedAt: submissions.submittedAt,
+      submittedIp: submissions.submittedIp,
+      submittedUserAgent: submissions.submittedUserAgent,
+      submittedBy: submissions.submittedBy,
+      submitterProfile: appUsers.profile,
+    })
+    .from(submissions)
+    .innerJoin(forms, eq(submissions.formId, forms.id))
+    .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
+    .leftJoin(appUsers, eq(submissions.submittedBy, appUsers.id))
+    .where(
+      and(
+        eq(submissions.workspaceId, input.workspaceId),
+        eq(submissions.formId, input.formId),
+        liveSubmission,
+        inArray(submissions.workflowState, states),
+        input.formVersionId ? eq(submissions.formVersionId, input.formVersionId) : undefined,
+        input.from ? sql`${exportDate} >= ${input.from.toISOString()}` : undefined,
+        input.to ? sql`${exportDate} <= ${input.to.toISOString()}` : undefined,
+      ),
+    )
+    .orderBy(sql`${exportDate} desc`, desc(submissions.id));
+};
+
 /**
  * The draft and submitted submissions the user holds an active grant on, across every workspace,
  * with the forms of the page's rows and their facts for the user, read in one snapshot. An opened
@@ -861,6 +952,8 @@ export const appendSubmissionRevision = (
     // submittedBy is stamped at open; record the submit timestamp when the submit event lands.
     if (input.eventType === SubmissionEventType.submitted) {
       updates.submittedAt = new Date();
+      updates.submittedIp = input.client?.ip ?? null;
+      updates.submittedUserAgent = input.client?.userAgent ?? null;
     }
 
     const [updated] = await tx

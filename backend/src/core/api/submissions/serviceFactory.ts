@@ -7,6 +7,7 @@ import type {
   ParticipantSubmissionListRow,
   SubmissionListRow,
   SubmissionDetailRow,
+  SubmitClient,
 } from '../../db/repos/submissionRepo';
 import type {
   ListMySubmissionsResponse,
@@ -197,9 +198,14 @@ export function createSubmissionsApiService(submissionService: SubmissionService
         .save({ ...ctx, submissionId, ...body })
         .then((outcome) => toSubmissionWriteDto(outcome)),
 
-    submit: (ctx: SubmissionsContextInput, submissionId: string, body: SubmitSubmissionBody) =>
+    submit: (
+      ctx: SubmissionsContextInput,
+      submissionId: string,
+      body: SubmitSubmissionBody,
+      client: SubmitClient,
+    ) =>
       submissionService
-        .submit({ ...ctx, submissionId, ...body })
+        .submit({ ...ctx, submissionId, ...body, client })
         .then((outcome) => toSubmissionWriteDto(outcome)),
 
     delete: (ctx: SubmissionsContextInput, submissionId: string) =>
