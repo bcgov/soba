@@ -41,7 +41,7 @@ describe('SubmissionService refusals carry the route codes', () => {
 
   it('refuses an open whose id another submission holds with submission_id_taken', async () => {
     getPublished.mockResolvedValue({ id: 'v1' } as never);
-    openSubmission.mockResolvedValue({ outcome: 'conflict' } as never);
+    openSubmission.mockResolvedValue({ outcome: 'taken', live: null, owner: false });
     const refused = svc.open({ ...ctx, id: 's1', formId: 'f1' });
     await expect(refused).rejects.toBeInstanceOf(ConflictError);
     await expect(refused).rejects.toMatchObject({ code: 'submission_id_taken' });

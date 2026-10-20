@@ -13,7 +13,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
       sessionExpired: 'Your session has ended.',
       noAccess: 'You do not have access to this.',
     },
-    form: { nameLabel: 'Form' },
+    form: { nameLabel: 'Form', templates: { print: { button: 'Print' } } },
     submission: {
       success: {
         message: 'Submitted successfully.',

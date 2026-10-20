@@ -252,7 +252,9 @@ describe('FormioV5SubmissionFillClient', () => {
   });
 
   /** Renders under one SWR cache, so a re-render reads the same bundle; exposes SWR's mutate. */
-  const renderLive = async () => {
+  const renderLive = async (
+    session: Parameters<typeof answerInit>[1] = { authenticated: false },
+  ) => {
     const cache = new Map();
     function CaptureMutate() {
       h.swrMutate = useSWRConfig().mutate as typeof h.swrMutate;
@@ -272,7 +274,7 @@ describe('FormioV5SubmissionFillClient', () => {
     await act(async () => {
       view = render(tree());
     });
-    await answerInit(store, { authenticated: false });
+    await answerInit(store, session);
     return { rerender: () => act(async () => view!.rerender(tree())) };
   };
 
@@ -295,7 +297,7 @@ describe('FormioV5SubmissionFillClient', () => {
     await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
     await act(async () => {
       await h.swrMutate!(
-        ['submit-fill', 'sub-1', 'anonymous'],
+        (key: unknown) => Array.isArray(key) && key[0] === 'submit-fill',
         {
           workflowState: 'draft',
           formVersionId: 'ver-1',
@@ -342,6 +344,73 @@ describe('FormioV5SubmissionFillClient', () => {
     await waitFor(() => expect(h.mounts).toBe(2));
     expect(h.options?.readOnly).toBe(false);
     expect(screen.getByTestId('submission-fill-save-draft')).toBeInTheDocument();
+  });
+
+  it('keeps the form writable when a later decision is narrower', async () => {
+    const live = await renderLive();
+    await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+    h.access = { caller: { idpCode: 'public' }, pending: false };
+    await live.rerender();
+    expect(h.mounts).toBe(1);
+    expect(h.options?.readOnly).toBe(false);
+  });
+
+  describe('when the session ends', () => {
+    const renderSignedIn = async () => {
+      const live = await renderLive({ authenticated: true, token: 'token' });
+      await waitFor(() => expect(screen.getByTestId('submission-fill-save-draft')).toBeEnabled());
+      return live;
+    };
+    // What a rejected refresh leaves: no token, the public caller, and the Header's sweep of every
+    // read, which empties each one and reads it again.
+    const endSession = async () => {
+      h.access = { caller: { idpCode: 'public' }, pending: false };
+      await act(async () => {
+        store.dispatch(clear());
+      });
+      await act(async () => {
+        await h.swrMutate!(() => true, undefined, { revalidate: true });
+      });
+    };
+
+    it('keeps the form mounted and writable, and reads nothing anonymously', async () => {
+      await renderSignedIn();
+      await endSession();
+      expect(screen.getByTestId('fill-form')).toBeInTheDocument();
+      expect(h.mounts).toBe(1);
+      expect(h.options?.readOnly).toBe(false);
+      expect(screen.queryByTestId('submission-view-session-expired')).not.toBeInTheDocument();
+      expect(h.getSubmitFillBundle.mock.calls).toEqual([['token', 'sub-1']]);
+    });
+
+    it('says the draft was not saved because the session ended', async () => {
+      await renderSignedIn();
+      await endSession();
+      await userEvent.click(screen.getByTestId('submission-fill-save-draft'));
+      await waitFor(() =>
+        expect(screen.getByTestId('submission-fill-save-status')).toHaveTextContent(
+          'Draft not saved. Your session has ended.',
+        ),
+      );
+      expect(h.saveSobaFormSubmission).not.toHaveBeenCalled();
+    });
+
+    it('shows the ended session when the filler reloads after it', async () => {
+      h.saveSobaFormSubmission.mockResolvedValue({
+        headRevisionId: 'rev-head',
+        revision: { id: 'rev-x', revisionNo: 1, status: 'pending', reason: 'conflict' },
+      });
+      await renderSignedIn();
+      await userEvent.click(screen.getByTestId('submission-fill-save-draft'));
+      await waitFor(() => expect(screen.getByTestId('submission-fill-held')).toBeInTheDocument());
+      await endSession();
+      await userEvent.click(screen.getByTestId('submission-fill-reload-latest'));
+      await waitFor(() =>
+        expect(screen.getByTestId('submission-view-session-expired')).toBeInTheDocument(),
+      );
+      expect(screen.queryByTestId('fill-form')).not.toBeInTheDocument();
+      expect(h.getSubmitFillBundle).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('shows the translated no-access message when the read is refused', async () => {
@@ -1028,6 +1097,7 @@ describe('SubmissionFillForm', () => {
     canWrite: true,
     canSaveDraft: false,
     fileOption: {},
+    signedIn: false,
   });
   const tree = (current: FillView) => (
     <Provider store={store}>
@@ -1064,7 +1134,8 @@ describe('SubmissionFillForm', () => {
       errors: {},
     } as unknown as FillLabels;
     const writable: FillView = { ...view({ a: 1 }), canSaveDraft: true };
-    const renderForm = async () => {
+    // The page's session: the identity it pinned, which every write goes out as.
+    const renderForm = async (signedIn = false) => {
       let rendered: ReturnType<typeof render> | undefined;
       await act(async () => {
         rendered = render(
@@ -1072,7 +1143,7 @@ describe('SubmissionFillForm', () => {
             <SubmissionFillForm
               submissionId="sub-1"
               submissionPath="/en/submission/sub-1"
-              view={writable}
+              view={{ ...writable, signedIn }}
               labels={labels}
               onReload={async () => undefined}
             />
@@ -1099,7 +1170,7 @@ describe('SubmissionFillForm', () => {
 
     it('sends a save with the token the session holds when it is sent', async () => {
       await signIn('token');
-      await renderForm();
+      await renderForm(true);
       await act(() => store.dispatch(setToken('token-2')));
       await saveDraft();
       await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(1));
@@ -1108,7 +1179,7 @@ describe('SubmissionFillForm', () => {
 
     it('never sends a save anonymously for a form mounted signed in', async () => {
       await signIn('token');
-      await renderForm();
+      await renderForm(true);
       await act(() => store.dispatch(clear()));
       await saveDraft();
       await waitFor(() =>
@@ -1135,11 +1206,30 @@ describe('SubmissionFillForm', () => {
 
     it('tells the upload provider which submission is filled, and in which session', async () => {
       await signIn('token');
-      const rendered = await renderForm();
+      const rendered = await renderForm(true);
       expect(getActiveSubmission()).toEqual({ submissionId: 'sub-1', signedIn: true });
       rendered.unmount();
       expect(getActiveSubmission()).toBeNull();
     });
+  });
+
+  // A click that mounts a new form blurs the field Form.io had focused, and Form.io runs that blur a
+  // moment later, on the webform it has destroyed by then.
+  it('cancels the blur Form.io scheduled when the form unmounts', async () => {
+    const cancel = vi.fn();
+    const instance = h.instance as typeof h.instance & { pendingBlur?: { cancel: () => void } };
+    instance.pendingBlur = { cancel };
+    try {
+      let rendered: ReturnType<typeof render> | undefined;
+      await act(async () => {
+        rendered = render(tree(view({ a: 1 })));
+      });
+      expect(cancel).not.toHaveBeenCalled();
+      rendered!.unmount();
+      expect(cancel).toHaveBeenCalledTimes(1);
+    } finally {
+      delete instance.pendingBlur;
+    }
   });
 
   it('keeps Form.io on the bundle it mounted with when given a new one', async () => {

@@ -1,8 +1,9 @@
 # Test / UAT environment — two replicas, moderate resources
 backend:
-  # Development data generator: on in test, for integration runs.
+  # Development data generator: on in test, for integration runs. Notifications send through notify-v1.
   features:
     dev-data: "enabled"
+    notifications: "enabled"
   replicas: 2
   sso:
     jwksUri: https://test.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/certs
@@ -25,6 +26,7 @@ backend:
     nodeEnv: production
     documentGenerationDefaultCode: cdogs-v2
     tenantEngineDefaultCode: cstar-v1
+    notificationDefaultCode: notify-v1
   documentGeneration:
     cdogsV2:
       endpoint: https://cdogs-test.api.gov.bc.ca/api
@@ -34,6 +36,12 @@ backend:
   tenantEngine:
     cstarV1:
       apiBaseUrl: https://test.connect.digital.gov.bc.ca/api/v1
+  workflowEngine:
+    csWorkflowV1:
+      apiBaseUrl: https://test-workflow.apps.gold.devops.gov.bc.ca/api/v1
+  notification:
+    notifyV1:
+      endpoint: https://gw-fe8c5-notify.test.api.gov.bc.ca/api/v1
 
 frontend:
   replicas: 2
@@ -58,8 +66,10 @@ formio:
       memory: 512Mi
 
 mongodb:
+  # MongoDB runs as its own release from deployments/helm/action-mongodb.
+  # release-to-test.yaml supplies external.host and external.authSecretName.
   internal:
-    enabled: true
+    enabled: false
   replicas: 1
   persistence:
     size: 2Gi

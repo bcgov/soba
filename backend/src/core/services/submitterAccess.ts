@@ -30,7 +30,7 @@ export const SubmitterOperation = {
   upload: 'upload',
   /** Delete a file: a write while in progress, the form's update permission once submitted. */
   deleteFile: 'deleteFile',
-  /** Render a document from a submission with a stored template: print, preview, template list. */
+  /** Render a document from a submission with a stored template: print, template list. */
   render: 'render',
   /** Delete the caller's own submission; the lifecycle limits it to one not yet submitted. */
   delete: 'delete',

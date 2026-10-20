@@ -17,10 +17,9 @@ import { useDictionary } from '@/app/[lang]/Providers';
 
 export default function FormIdRouteError({
   reset,
-}: {
-  error: Error & { digest?: string };
+}: Readonly<{
   reset: () => void;
-}) {
+}>) {
   const params = useParams();
   const locale = typeof params?.lang === 'string' ? params.lang : 'en';
   const dict = useDictionary();

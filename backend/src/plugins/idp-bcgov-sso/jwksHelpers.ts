@@ -26,7 +26,7 @@ export function firstEmailLike(
   keys: readonly string[],
 ): string | null {
   const s = firstString(claims, keys);
-  return s && s.includes('@') ? s : null;
+  return s?.includes('@') ? s : null;
 }
 
 const DEFAULT_OMIT_CLAIMS = new Set([

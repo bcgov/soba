@@ -82,6 +82,9 @@ export const DocumentGenerationAuditItemSchema = z.object({
   durationMs: z.number().int(),
   errorDetail: z.string().nullable(),
   requestId: z.string().nullable(),
+  templateId: z.string().uuid().nullable(),
+  templateFileId: z.string().uuid().nullable(),
+  revisionId: z.string().uuid().nullable(),
   createdBy: z.string().uuid(),
   createdAt: z.string(),
 });

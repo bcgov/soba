@@ -41,6 +41,19 @@ describe('HttpClient', () => {
     expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
   });
 
+  it('GETs a path and returns the raw bytes', async () => {
+    const fetchMock = jest.fn().mockResolvedValue(binaryResponse([4, 5], 'application/json'));
+    global.fetch = fetchMock;
+
+    const res = await new HttpClient({ baseUrl: 'http://svc.test/api' }).getForBinary('items');
+
+    expect(res).toEqual({ data: Buffer.from([4, 5]), contentType: 'application/json' });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://svc.test/api/items');
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+  });
+
   it('adds a single slash when the path has none', async () => {
     const fetchMock = jest.fn().mockResolvedValue(binaryResponse([9]));
     global.fetch = fetchMock;

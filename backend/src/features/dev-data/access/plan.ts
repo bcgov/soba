@@ -89,6 +89,7 @@ export const COVERAGE_FORM_KEYS = [
   'rolesUnpublished',
   'rolesFormDeleted',
   'rolesVersionDeleted',
+  'rolesVersionReplaced',
   'rolesDraftsOff',
   'protectedInherit',
   'publicOwn',
@@ -108,6 +109,9 @@ export interface PlannedGroupOverride {
 /** Deleting the form, or its published version, once its submissions exist. */
 export type PlannedDelete = 'deleteForm' | 'deleteVersion';
 
+/** A delete, or a new version published over the submissions' own, once they exist. */
+export type PlannedChange = PlannedDelete | 'publishNewVersion';
+
 export interface PlannedCoverageForm {
   key: CoverageFormKey;
   name: string;
@@ -119,7 +123,7 @@ export interface PlannedCoverageForm {
   allowSubmitterDrafts?: boolean;
   /** Replaces the group's members on this form; cleared leaves the override inactive. */
   groupOverride?: PlannedGroupOverride;
-  afterSubmissions?: PlannedDelete;
+  afterSubmissions?: PlannedChange;
 }
 
 export interface PlannedCoverageWorkspace {
@@ -143,6 +147,8 @@ export const COVERAGE_SUBMISSION_KEYS = [
   'submitterOnDeletedVersion',
   'submitterOnDeletedForm',
   'ownerDraft',
+  'submitterDraft',
+  'submitterOnReplacedVersion',
   'anonymousSubmitted',
   'anonymousOpened',
 ] as const;
@@ -325,6 +331,12 @@ const ROLES_WORKSPACE: PlannedCoverageWorkspace = {
       'Its published version was deleted after a submission.',
       { afterSubmissions: 'deleteVersion' },
     ),
+    form(
+      'rolesVersionReplaced',
+      'Roles version replaced',
+      'A new version was published after a draft was saved.',
+      { afterSubmissions: 'publishNewVersion' },
+    ),
     form('rolesDraftsOff', 'Roles drafts off', 'Turns drafts off for itself.', {
       allowSubmitterDrafts: false,
     }),
@@ -409,6 +421,14 @@ const SUBMISSIONS: PlannedCoverageSubmission[] = [
   },
   { key: 'submitterOnDeletedForm', form: 'rolesFormDeleted', by: 'submitter', events: ['saved'] },
   { key: 'ownerDraft', form: 'protectedOwn', by: OWNER, events: ['saved'] },
+  // Listed submissions whose access comes from the form's roles, not its audience.
+  { key: 'submitterDraft', form: 'rolesInherit', by: 'submitter', events: ['saved'] },
+  {
+    key: 'submitterOnReplacedVersion',
+    form: 'rolesVersionReplaced',
+    by: 'submitter',
+    events: ['saved'],
+  },
   { key: 'anonymousSubmitted', form: 'publicInherit', by: ANONYMOUS, events: ['submitted'] },
   { key: 'anonymousOpened', form: 'publicInherit', by: ANONYMOUS, events: [] },
 ];

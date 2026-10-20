@@ -3,20 +3,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const { kc, search, me } = vi.hoisted(() => ({
+const { kc, search, access } = vi.hoisted(() => ({
   kc: { authenticated: true, initializing: false },
   search: { value: '' },
-  me: { idpCode: 'idir' as string | null },
+  access: { caller: { idpCode: 'idir' as string | null }, pending: false },
 }));
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
   useKeycloak: () => ({ ...kc, token: 'token' }),
 }));
 
-vi.mock('@/src/shared/api/useCurrentUser', () => ({
-  useCurrentUser: () => ({
-    data: me.idpCode ? { profile: { idpCode: me.idpCode } } : null,
-  }),
+vi.mock('@/src/shared/api/useAccessCaller', () => ({
+  useAccessCaller: () => access,
 }));
 
 vi.mock('@/app/[lang]/Providers', () => ({
@@ -132,8 +130,28 @@ const DRAFT_UPDATED = new Intl.DateTimeFormat('en-US', {
   minute: '2-digit',
 }).format(new Date(DRAFT.updatedAt));
 
-const page = (items: unknown[]) => ({
+// An IDIR audience: the IDIR caller writes what they hold a grant on, through the audience.
+const writableForm = (id: string) => ({
+  id,
+  name: 'Form ' + id,
+  workspaceId: 'w1',
+  workspaceName: 'Roads',
+  publishedVersionId: 'v1',
+  permissions: [],
+  audienceMode: 'protected',
+  audienceIdps: ['idir'],
+  allowSubmitterDrafts: true,
+});
+// Members only and no role: a grant still reads, but nothing writes.
+const readOnlyForm = (id: string) => ({
+  ...writableForm(id),
+  audienceMode: 'members',
+  audienceIdps: [],
+});
+
+const page = (items: unknown[], forms: unknown[] = [writableForm('f1'), writableForm('f2')]) => ({
   items,
+  forms,
   page: { offset: 0, limit: 10, total: items.length },
   filters: {},
   sort: 'updatedAt:desc',
@@ -191,7 +209,8 @@ describe('MySubmissionsList', () => {
     search.value = '';
     kc.authenticated = true;
     kc.initializing = false;
-    me.idpCode = 'idir';
+    access.caller = { idpCode: 'idir' };
+    access.pending = false;
     store = makeStore();
     store.dispatch(setToken('token'));
     store.dispatch(setAuthenticated(true));
@@ -265,10 +284,48 @@ describe('MySubmissionsList', () => {
     expect(screen.queryByTestId('s3-delete')).not.toBeInTheDocument();
   });
 
-  it('offers no delete until the caller is known', async () => {
-    me.idpCode = null;
-    await renderList();
+  it('shows rows only once the caller is known', async () => {
+    access.pending = true;
+    const view = await renderList();
+    await waitFor(() => expect(getMySubmissions).toHaveBeenCalled());
+    // The response has landed; the rows still wait for the caller.
+    await act(async () => undefined);
+    expect(screen.getByTestId('datatable-loading')).toBeInTheDocument();
+    expect(screen.queryByTestId('s1-continue')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('s1-view')).not.toBeInTheDocument();
+    access.pending = false;
+    await act(async () => view.rerender(listTree()));
     expect(await screen.findByTestId('s1-continue')).toBeInTheDocument();
+  });
+
+  // A grant still reads the draft, but the form no longer admits the caller to write it.
+  it('views a draft the caller can no longer write, from the action and the name', async () => {
+    getMySubmissions.mockResolvedValue(page([DRAFT], [readOnlyForm('f1')]));
+    await renderList();
+    await userEvent.click(await screen.findByTestId('s1-view'));
+    expect(mockPush).toHaveBeenCalledWith('/en/submission/s1');
+    expect(screen.queryByTestId('s1-continue')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('my-submission-link-s1'));
+    expect(mockPush).toHaveBeenLastCalledWith('/en/submission/s1');
+    // Delete does not need the write: an owner still deletes their own draft.
+    expect(screen.getByTestId('s1-delete')).toBeInTheDocument();
+  });
+
+  it('views a row whose form came without its facts', async () => {
+    getMySubmissions.mockResolvedValue(page([DRAFT], []));
+    await renderList();
+    expect(await screen.findByTestId('s1-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('s1-continue')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['whose provider is unknown', null],
+    ['who is the public user', 'public'],
+  ])('offers a caller %s no Continue and no Delete', async (_label, idpCode) => {
+    access.caller = { idpCode };
+    await renderList();
+    expect(await screen.findByTestId('s1-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('s1-continue')).not.toBeInTheDocument();
     expect(screen.queryByTestId('s1-delete')).not.toBeInTheDocument();
   });
 

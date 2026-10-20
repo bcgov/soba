@@ -244,11 +244,12 @@ Resolving too early scopes the request to nothing.
 
 ## Screens with their own loading
 
-`FormioV5SubmissionFillClient` and `StartSubmission`.
+`FormioV5SubmissionFillClient` and `FormioV5NewSubmissionClient`.
 
-The fill client holds answers the user has typed that no server has seen, and Form.io
-resets the live webform when the submission prop is not deep-equal to what is on screen. A
-revalidating cache over it discards work. `StartSubmission` is a fire-once idempotent POST.
+Both hold answers the user has typed that no server has seen, and Form.io resets the live
+webform when the submission prop is not deep-equal to what is on screen. A revalidating
+cache over them discards work, so their reads are session reads keyed per mount, and each
+keeps the load it mounted with.
 
 ## Testing
 

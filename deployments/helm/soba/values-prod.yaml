@@ -3,6 +3,7 @@ backend:
   # Development data generator: stated explicitly rather than left to the default.
   features:
     dev-data: "disabled"
+    notifications: "disabled"
   replicas: 3
   resources:
     requests:
@@ -36,6 +37,9 @@ backend:
   tenantEngine:
     cstarV1:
       apiBaseUrl: https://connect.digital.gov.bc.ca/api/v1
+  workflowEngine:
+    csWorkflowV1:
+      apiBaseUrl: https://workflow.apps.gold.devops.gov.bc.ca/api/v1
 
 frontend:
   replicas: 3

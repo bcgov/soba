@@ -7,6 +7,7 @@ import {
   getTenantEnginePluginDefinitions,
 } from '../plugins/PluginRegistry';
 import type { TenantEnginePluginCatalogEntry } from '../plugins/PluginRegistry';
+import { reportReadinessByKey } from '../plugins/readiness';
 
 let cachedDefinitions: Map<string, TenantEnginePluginDefinition> | null = null;
 
@@ -49,24 +50,10 @@ export const createDefaultTenantEngineAdapter = (): TenantEngineAdapter =>
  * Run readiness on each registered tenant engine. Only reachability (ok/message) is returned; no
  * config. An engine without a readinessCheck is reported ok.
  */
-export const checkTenantEngineReadiness = async (): Promise<
+export const checkTenantEngineReadiness = (): Promise<
   Record<string, TenantEngineReadinessResult>
-> => {
-  const catalog = getTenantEnginePluginCatalog();
-  const results: Record<string, TenantEngineReadinessResult> = {};
-  for (const entry of catalog) {
-    try {
-      const adapter = createTenantEngineAdapter(entry.code);
-      results[entry.code] =
-        typeof adapter.readinessCheck === 'function'
-          ? await adapter.readinessCheck()
-          : { ok: true };
-    } catch (err) {
-      results[entry.code] = {
-        ok: false,
-        message: err instanceof Error ? err.message : String(err),
-      };
-    }
-  }
-  return results;
-};
+> =>
+  reportReadinessByKey(
+    getTenantEnginePluginCatalog().map((entry) => entry.code),
+    (code) => createTenantEngineAdapter(code).readinessCheck?.(),
+  );

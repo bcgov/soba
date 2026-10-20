@@ -192,6 +192,36 @@ signed-in user's own token. ConfigMap `<fullname>-backend-tenant-engine`:
 | `backend.tenantEngine.cstarV1.apiBaseUrl` | `PLUGIN_CSTAR_V1_API_BASE_URL` | cstar-v1 adapter        |
 | `backend.tenantEngine.cstarV1.timeoutMs`  | `PLUGIN_CSTAR_V1_TIMEOUT_MS`   | cstar-v1 adapter        |
 
+## Workflow Engine Configuration
+
+The workflow engine starts and tracks workflows. It has no secrets: `cs-workflow-v1` calls the
+Connected Services workflow API with the signed-in user's own token. `workflow-noop` (the default)
+starts nothing. ConfigMap `<fullname>-backend-workflow-engine`:
+
+| Helm value                                       | Env var                              | Used by                 |
+| ------------------------------------------------ | ------------------------------------ | ----------------------- |
+| `backend.config.workflowEngineDefaultCode`       | `WORKFLOW_ENGINE_DEFAULT_CODE`       | default engine resolver |
+| `backend.workflowEngine.csWorkflowV1.apiBaseUrl` | `PLUGIN_CS_WORKFLOW_V1_API_BASE_URL` | cs-workflow-v1 adapter  |
+| `backend.workflowEngine.csWorkflowV1.apiKey`     | `PLUGIN_CS_WORKFLOW_V1_API_KEY`      | cs-workflow-v1 adapter  |
+| `backend.workflowEngine.csWorkflowV1.timeoutMs`  | `PLUGIN_CS_WORKFLOW_V1_TIMEOUT_MS`   | cs-workflow-v1 adapter  |
+
+## Notification Configuration
+
+Notification sends email. `notification-noop` (the default) sends nothing; `notify-v1` calls BC Gov
+Notify with an API key. ConfigMap `<fullname>-backend-notification`:
+
+| Helm value                                | Env var                       | Used by                       |
+| ----------------------------------------- | ----------------------------- | ----------------------------- |
+| `backend.config.notificationDefaultCode`  | `NOTIFICATION_DEFAULT_CODE`   | default notification resolver |
+| `backend.notification.notifyV1.endpoint`  | `PLUGIN_NOTIFY_V1_ENDPOINT`   | notify-v1 adapter             |
+| `backend.notification.notifyV1.timeoutMs` | `PLUGIN_NOTIFY_V1_TIMEOUT_MS` | notify-v1 adapter             |
+
+### Secret values (Vault template in backend Deployment)
+
+| Vault key                  | Env var                    |
+| -------------------------- | -------------------------- |
+| `PLUGIN_NOTIFY_V1_API_KEY` | `PLUGIN_NOTIFY_V1_API_KEY` |
+
 ## Database Migration
 
 On every `helm install` and `helm upgrade`, a Kubernetes Job runs **before** the
@@ -341,12 +371,16 @@ backend:
         path: /api/v1/templates
         annotations:
           haproxy.router.openshift.io/timeout: "300s"
+      - name: print-upload
+        path: /api/v1/design/print-upload
+        annotations:
+          haproxy.router.openshift.io/timeout: "300s"
 ```
 
-That is what the chart ships: uploads at 300s on the file and template paths, everything else at 60s. An upload writes nothing back until clamd finishes scanning (`clamav.timeoutMs`, 60s), so the router's 30s default would 504 a clean upload.
+That is what the chart ships: uploads at 300s on the file, template and print-upload paths, everything else at 60s. An upload writes nothing back until clamd finishes scanning (`clamav.timeoutMs`, 60s), so the router's 30s default would 504 a clean upload.
 
 Matching is by whole segment and prefix only — `/api/v1/submit/files` does not capture
-`/api/v1/submit/filestore`, and there is no suffix match. Document generation cannot be scoped this way: it sits at `/api/v1/submit/submissions/:id/{preview,print}`,and the only prefix reaching it would swallow ordinary submission reads and writes. It is a synchronous call to CDOGS, so the base timeout has to cover it.
+`/api/v1/submit/filestore`, and there is no suffix match. Document generation cannot be scoped this way: it sits at `/api/v1/{submit,design}/submissions/:id/print`, and the only prefix reaching it would swallow ordinary submission reads and writes. It is a synchronous call to CDOGS, so the base timeout has to cover it. Print with an uploaded template scans the upload before that call, so it has its own prefix, `/api/v1/design/print-upload`.
 
 `name` and `path` are required. `name` becomes the Route name and the `app.kubernetes.io/component` label, so it must be lowercase DNS-1123 and short enough to keep that label under 63 characters; duplicates are refused. `path` must start with `/` and needs `edge` or `reencrypt` termination, as `passthrough` cannot match on path. Host, Service and TLS come from the base Route. Each rule fails the render naming the entry.
 

@@ -150,16 +150,13 @@ export class HttpClient {
       },
       deadline,
     );
-    // The fetch signal expires at the same deadline, so a stalled body aborts with it.
-    const data = await this.withTimeout(
-      this.buildUrl(path),
-      Math.max(0, deadline - Date.now()),
-      () => res.arrayBuffer(),
-    );
-    return {
-      data: Buffer.from(data),
-      contentType: res.headers.get('content-type') ?? undefined,
-    };
+    return this.readBinary(path, res, deadline);
+  }
+
+  /** GET a path and return the raw response bytes. */
+  async getForBinary(path: string, deadline: number = this.deadline()): Promise<BinaryResponse> {
+    const res = await this.send(path, { method: 'GET' }, deadline);
+    return this.readBinary(path, res, deadline);
   }
 
   /** GET a path, resolving on 2xx and throwing HttpClientError on non-2xx (e.g. health/liveness). */
@@ -173,6 +170,19 @@ export class HttpClient {
     return this.withTimeout(this.buildUrl(path), Math.max(0, deadline - Date.now()), () =>
       res.json(),
     );
+  }
+
+  private async readBinary(path: string, res: Response, deadline: number): Promise<BinaryResponse> {
+    // The fetch signal expires at the same deadline, so a stalled body aborts with it.
+    const data = await this.withTimeout(
+      this.buildUrl(path),
+      Math.max(0, deadline - Date.now()),
+      () => res.arrayBuffer(),
+    );
+    return {
+      data: Buffer.from(data),
+      contentType: res.headers.get('content-type') ?? undefined,
+    };
   }
 
   private buildUrl(path: string): string {

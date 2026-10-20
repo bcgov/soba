@@ -12,9 +12,10 @@ export const hasPermission = (
 };
 
 export {
+  canContinueSubmission,
   canDeleteOwnSubmission,
   canSaveDraftOnSubmission,
+  canSaveSubmissionDraft,
   canStartSubmission,
   canWriteSubmission,
-  isSubmissionInProgress,
 } from '@soba/lib';

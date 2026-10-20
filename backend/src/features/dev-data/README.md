@@ -147,15 +147,15 @@ Personas are the owner, the public user as an anonymous caller, and thirteen gen
 `inactiveGroupMember`, `inactiveGroup` (in an inactive group carrying form admin), `outsider`,
 `bceidOutsider` (`bceidbusiness`), and `collaborator`.
 
-| Workspace                    | Audience, drafts           | Forms                                                                                                                    |
-| ---------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `[dev] Zz Coverage Roles`    | members only, on           | inherits; override; cleared override; designers override; never published; form deleted; version deleted; own drafts off |
-| `[dev] Zz Coverage Audience` | protected `azureidir`, off | inherits; own public; own protected `bceidbusiness`; own members only                                                    |
-| `[dev] Zz Coverage Public`   | public, on                 | inherits; own protected `azureidir`                                                                                      |
+| Workspace                    | Audience, drafts           | Forms                                                                                                                                      |
+| ---------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `[dev] Zz Coverage Roles`    | members only, on           | inherits; override; cleared override; designers override; never published; form deleted; version deleted; version replaced; own drafts off |
+| `[dev] Zz Coverage Audience` | protected `azureidir`, off | inherits; own public; own protected `bceidbusiness`; own members only                                                                      |
+| `[dev] Zz Coverage Public`   | public, on                 | inherits; own protected `azureidir`                                                                                                        |
 
-Nine submissions cover owner and collaborator grants, an inactive grant, the opened, draft and
-submitted states, a deleted submission, anonymous submissions, and submissions on a deleted form
-and a deleted version. The public user also holds a seat in Roles' form submitters group, which
+Eleven submissions cover owner and collaborator grants, an inactive grant, the opened, draft and
+submitted states, a deleted submission, anonymous submissions, submissions on a deleted form and
+a deleted version, and a draft on a version a newer one replaced. The public user also holds a seat in Roles' form submitters group, which
 grants it nothing.
 
 For browser checks the owner is in the form submitters group in Roles and the form admins group in
@@ -182,8 +182,11 @@ returns each persona's identity, user and admin row, compares IdP attributes as 
 nothing for an unknown subject or provider. The submit, file and document routes decide from one
 read of each submission (`findSubmitterSubmission`); it must hold the role, form facts and
 submission detail the separate participant, form and detail reads give, and find the same
-submissions live. Start from the
-open route's form read (`findLiveSubmitterForm`) must match the open rules.
+submissions live. Start from the form read the open route and the form route share
+(`findLiveSubmitterForm`) must match the open rules, and the version schema read
+(`findSubmitterFormVersion`) must admit exactly those callers, to the published version only. Each
+My Submissions row is read with its form's facts; that form must equal the My Forms row, and
+Continue over it must match the write rule on a submission still in progress.
 
 Write is the rule save and submit share; the request itself can still refuse the write or keep it
 as pending. The command only reads, and needs no running backend. Change the table with any access
@@ -199,7 +202,6 @@ them.
 | [`purge.ts`](./purge.ts)                 | Removes it all, engine documents and stored bytes included |
 | [`fixtures/`](./fixtures)                | Form definitions and answers matching their components     |
 | [`members.ts`](./members.ts)             | Writes workspace memberships directly                      |
-| [`inSequence.ts`](./inSequence.ts)       | Runs async steps one at a time, in order                   |
 | [`access/`](./access)                    | The access coverage set, its expectations, and its checks  |
 | [`ownerFile.ts`](./ownerFile.ts)         | Reads and writes `.devdata-owner`, creates the owner       |
 | [`resolveUser.ts`](./resolveUser.ts)     | Looks the owner up by username                             |

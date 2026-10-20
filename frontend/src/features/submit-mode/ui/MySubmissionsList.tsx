@@ -17,11 +17,11 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
-import { canDeleteOwnSubmission, isSubmissionInProgress } from '@/src/shared/util/permissions';
+import { canContinueSubmission, canDeleteOwnSubmission } from '@/src/shared/util/permissions';
 import { fillTemplate } from '@/src/shared/util/stringUtils';
 import { useFormatLongDateTime } from '@/src/shared/hooks/useFormatLongDate';
 import { isConflict, apiErrorMessage } from '@/src/shared/api/dataError';
-import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
+import { useAccessCaller } from '@/src/shared/api/useAccessCaller';
 import { useDataErrorNotice } from '@/src/shared/api/useDataErrorNotice';
 import { MY_SUBMISSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { useListQuery } from '@/src/shared/list/useListQuery';
@@ -32,7 +32,7 @@ import {
 } from '@/src/features/submit-mode/data/useMySubmissions';
 import {
   MY_SUBMISSION_STATES,
-  type MySubmissionListItem,
+  type MySubmissionRow,
   type MySubmissionState,
 } from '@/src/types/submissions';
 import styles from './MySubmissionsList.module.css';
@@ -42,7 +42,7 @@ const ALL_STATES = 'all';
 const toState = (raw: string | undefined): MySubmissionState | undefined =>
   MY_SUBMISSION_STATES.find((state) => state === raw);
 
-/** The caller's own drafts and submitted submissions: continue a draft, view a submission. */
+/** The caller's own drafts and submitted submissions: continue one still writable, view any other. */
 export function MySubmissionsList() {
   const dict = useDictionary();
   const dictMine = dict.mySubmissions;
@@ -52,7 +52,8 @@ export function MySubmissionsList() {
   const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
   const formatDateTime = useFormatLongDateTime();
-  const idpCode = useCurrentUser().data?.profile.idpCode ?? null;
+  // Continue and Delete read the caller's provider, so rows wait for it.
+  const { caller, pending: callerPending } = useAccessCaller();
 
   const listQuery = useListQuery(MY_SUBMISSIONS_LIST_QUERY);
   const rawState = listQuery.filters.state;
@@ -69,7 +70,7 @@ export function MySubmissionsList() {
   const { table } = useDataTable(listQuery, submissions, dictMine.loadError);
   const { remove } = useMySubmissionDeleter();
 
-  const [confirmDelete, setConfirmDelete] = useState<MySubmissionListItem | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<MySubmissionRow | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const { setFilters } = listQuery;
@@ -79,21 +80,26 @@ export function MySubmissionsList() {
   }, [rawState, state, setFilters]);
 
   const labelValues = useCallback(
-    (item: MySubmissionListItem) => ({
+    (item: MySubmissionRow) => ({
       form: item.formName,
       updated: formatDateTime(item.updatedAt),
     }),
     [formatDateTime],
   );
 
+  // Continue when the caller may still write it; any other row, a missing form included, opens the
+  // read-only view.
+  const continues = useCallback(
+    (item: MySubmissionRow) => !!item.form && canContinueSubmission(item, item.form, caller),
+    [caller],
+  );
+
   const openSubmission = useCallback(
-    (item: MySubmissionListItem) =>
+    (item: MySubmissionRow) =>
       router.push(
-        isSubmissionInProgress(item.workflowState)
-          ? `/${locale}/submit/${item.id}`
-          : `/${locale}/submission/${item.id}`,
+        continues(item) ? `/${locale}/submit/${item.id}` : `/${locale}/submission/${item.id}`,
       ),
-    [router, locale],
+    [router, locale, continues],
   );
 
   const handleDelete = useCallback(() => {
@@ -150,7 +156,7 @@ export function MySubmissionsList() {
     [dictMine.allStates, dictMine.states],
   );
 
-  const columns: Column<MySubmissionListItem>[] = useMemo(
+  const columns: Column<MySubmissionRow>[] = useMemo(
     () => [
       {
         key: 'formName',
@@ -208,21 +214,21 @@ export function MySubmissionsList() {
         label: dictMine.columns.actions,
         align: 'start',
         render: (item) => {
-          const inProgress = isSubmissionInProgress(item.workflowState);
+          const toFill = continues(item);
           const values = labelValues(item);
           return (
             <div className="d-flex gap-2 justify-content-start">
               <RowActionButton
                 aria-label={fillTemplate(
-                  inProgress ? dictMine.continueLabel : dictMine.viewLabel,
+                  toFill ? dictMine.continueLabel : dictMine.viewLabel,
                   values,
                 )}
-                data-testid={`${item.id}-${inProgress ? 'continue' : 'view'}`}
+                data-testid={`${item.id}-${toFill ? 'continue' : 'view'}`}
                 onPress={() => openSubmission(item)}
               >
-                {inProgress ? dictMine.continue : dictMine.view}
+                {toFill ? dictMine.continue : dictMine.view}
               </RowActionButton>
-              {canDeleteOwnSubmission(item, { idpCode }) ? (
+              {canDeleteOwnSubmission(item, caller) ? (
                 <RowActionButton
                   aria-label={fillTemplate(dictMine.deleteLabel, values)}
                   data-testid={`${item.id}-delete`}
@@ -236,7 +242,7 @@ export function MySubmissionsList() {
         },
       },
     ],
-    [dictMine, formatDateTime, idpCode, labelValues, openSubmission],
+    [dictMine, caller, continues, formatDateTime, labelValues, openSubmission],
   );
 
   // Loading, including Keycloak init, shows inside the table so the heading stays put.
@@ -279,9 +285,9 @@ export function MySubmissionsList() {
         </DSButton>
       </ListPageFilters>
 
-      <DataTable<MySubmissionListItem>
+      <DataTable<MySubmissionRow>
         {...table}
-        loading={table.loading || initializing}
+        loading={table.loading || initializing || callerPending}
         columns={columns}
         emptyMessage={filtered ? dictMine.noMatches : dictMine.empty}
         loadingMessage={dict.general.loading}

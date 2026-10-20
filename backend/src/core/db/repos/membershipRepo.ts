@@ -40,7 +40,7 @@ export const updateIdentityAttributes = async (
     );
 };
 
-export const findOrCreateUserByIdentity = async (
+export const findOrCreateUserByIdentity = (
   providerCode: string,
   subject: string,
   profile?: NormalizedProfile | null,
@@ -57,7 +57,7 @@ export const findOrCreateUserByIdentity = async (
 
     // Only identity providers present AND active in identity_provider may authenticate.
     // Unknown or deactivated IdPs are rejected.
-    if (!provider || !provider.isActive) {
+    if (!provider?.isActive) {
       throw new ForbiddenError(
         `Identity provider '${normalizedProvider}' is not enabled for sign-in`,
       );

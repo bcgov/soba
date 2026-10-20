@@ -12,7 +12,7 @@ import {
 } from '../../db/repos/submitterSubmissionRepo';
 import { resolveCaller } from '../../middleware/actor';
 import { actorIdOf, loadedSubmission } from '../../middleware/formSubmitAccess';
-import { decideRecordedWrite } from '../../services/submissionWriteGate';
+import { decideRecordedWrite, opensSameSubmission } from '../../services/submissionWriteGate';
 import { toSubmissionDto, toSubmissionWriteDto } from '../submissions/serviceFactory';
 
 /**
@@ -60,13 +60,12 @@ export const replayRecordedSubmit: RequestHandler = (req, res, next) =>
 
 /** The caller's own open of this id: they own it, on the form and version the body names. */
 const isOwnOpen = ({ submission, access }: SubmitterSubmission, body: OpenSubmissionBody) =>
-  access.role === SubmissionParticipantRole.owner &&
-  submission.formId === body.formId &&
-  (!body.formVersionId || body.formVersionId === submission.formVersionId);
+  access.role === SubmissionParticipantRole.owner && opensSameSubmission(submission, body);
 
 /**
  * Answers an open of an id the caller already owns with that submission, before the form's access
- * and published version are checked. Any other request goes on to requireSubmissionOpen.
+ * and published version are checked. Any other request goes on to loadSubmitterForm and
+ * requireSubmissionStart.
  */
 export const replayRecordedOpen = async (
   req: Request,

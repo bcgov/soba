@@ -12,6 +12,7 @@ import { authEnv } from '../../config/authEnv';
 import { getFormEnginePlugins } from '../../integrations/form-engine/FormEngineRegistry';
 import { resolveDefaultUserDirectoryCode } from '../../integrations/user-directory/UserDirectoryRegistry';
 import { resolveDefaultTenantEngineCode } from '../../integrations/tenant/TenantEngineRegistry';
+import { resolveDefaultWorkflowEngineCode } from '../../integrations/workflow/WorkflowEngineRegistry';
 import {
   getActivePluginCodes,
   getActiveStorageBackendCodes,
@@ -48,12 +49,13 @@ function resolveGitSha(): string {
 export class MetaApiService {
   async getPlugins(): Promise<PluginsMetaResponse> {
     const plugins = getPluginCatalog();
-    // Selectable adapter codes come from the registry; form and tenant engines have their own.
+    // Selectable adapter codes come from the registry; form, tenant and workflow engines have their own.
     const activeFormEngineCode =
       env.getFormEngineDefaultCode() ?? getFormEnginePlugins()[0]?.code ?? 'formio-v5';
     const activeCodes = new Set([
       activeFormEngineCode,
       resolveDefaultTenantEngineCode(),
+      resolveDefaultWorkflowEngineCode(),
       resolveDefaultUserDirectoryCode(),
       ...getActivePluginCodes(),
       ...getActiveStorageBackendCodes(),
@@ -151,17 +153,17 @@ export class MetaApiService {
     };
   }
 
-  async getFormEngines(): Promise<FormEnginesMetaResponse> {
+  getFormEngines(): Promise<FormEnginesMetaResponse> {
     const plugins = getFormEnginePlugins();
     const defaultCode = env.getFormEngineDefaultCode();
-    return {
+    return Promise.resolve({
       items: plugins.map((plugin) => ({
         code: plugin.code,
         name: plugin.name,
         engineVersion: plugin.version ?? null,
         isDefault: plugin.code === (defaultCode ?? plugins[0]?.code ?? null),
       })),
-    };
+    });
   }
 
   async getRoles(filters?: {

@@ -33,8 +33,16 @@ jest.mock('../../../src/core/db/repos/documentTemplateRepo', () => ({
 jest.mock('../../../src/core/services/fileStore', () => ({
   fileStore: { open: jest.fn() },
 }));
+jest.mock('../../../src/core/services/scanUpload', () => ({
+  scanUpload: jest.fn(),
+}));
 
-import { documentGenerationService } from '../../../src/features/document-generation/service';
+import type { PrintOptions } from '@soba/lib';
+import {
+  documentGenerationService,
+  staffDocumentService,
+} from '../../../src/features/document-generation/service';
+import { scanUpload } from '../../../src/core/services/scanUpload';
 import * as submissionRepo from '../../../src/core/db/repos/submissionRepo';
 import { findSubmitterSubmission } from '../../../src/core/db/repos/submitterSubmissionRepo';
 import { storedSubmission } from '../../core/api/submit/storedSubmission';
@@ -64,6 +72,7 @@ const isFeatureAvailable = availability.isFeatureAvailable as unknown as jest.Mo
 const createAudit = auditRepo.createDocumentGenerationAudit as unknown as jest.Mock;
 const getLiveTemplate = templateRepo.getLiveDocumentTemplate as unknown as jest.Mock;
 const openFile = fileStore.open as unknown as jest.Mock;
+const scanMock = jest.mocked(scanUpload);
 
 const caller = { actorId: 'user-1', idpCode: 'idir' };
 const scope = { workspaceId: 'ws-1', formId: 'form-1', formVersionId: 'fv-1' };
@@ -77,7 +86,7 @@ const storedTemplate = {
 beforeEach(() => {
   jest.clearAllMocks();
   isLive.mockReturnValue(true);
-  getSubmissionRecordById.mockResolvedValue({ id: 's1' });
+  getSubmissionRecordById.mockResolvedValue({ id: 's1', headRevisionId: 'rev-1' });
   readMock.mockImplementation(async () => {
     if (!isLive()) return null;
     const stored = storedSubmission({ role: (await holdsGrant()) ? 'owner' : null });
@@ -108,57 +117,36 @@ beforeEach(() => {
   createAdapter.mockReturnValue({ render: renderMock });
   getContentMock.mockResolvedValue({ data: { field: 'saved' } });
   createAudit.mockResolvedValue(undefined);
+  scanMock.mockResolvedValue('clean');
 });
 
-describe('documentGenerationService.preview', () => {
+const print = (options?: PrintOptions) =>
+  documentGenerationService.print(caller, { submissionId: 's1', templateId, options });
+
+describe('documentGenerationService backend selection', () => {
   it('is notfound when the submission does not exist', async () => {
     isLive.mockReturnValue(false);
-    const outcome = await documentGenerationService.preview(caller, {
-      submissionId: 's1',
-      templateId,
-      data: { field: 'live' },
-    });
+    const outcome = await print();
     expect(outcome.status).toBe('notfound');
   });
 
-  it('is denied to a caller who is not a participant, whatever their form permissions', async () => {
-    holdsGrant.mockResolvedValue(false);
-    const outcome = await documentGenerationService.preview(caller, {
-      submissionId: 's1',
-      templateId,
-      data: { field: 'live' },
-    });
-    expect(outcome.status).toBe('denied');
-  });
-
-  it('renders the caller live data via the default backend', async () => {
+  it('renders via the default backend with the stored template and the options', async () => {
     holdsGrant.mockResolvedValue(true);
-    const outcome = await documentGenerationService.preview(caller, {
-      submissionId: 's1',
-      templateId,
-      options: { reportName: 'r' },
-      data: { field: 'live' },
-    });
+    const outcome = await print({ reportName: 'r' });
     expect(outcome).toMatchObject({ status: 'ok', code: 'cdogs-v2' });
-    expect(readMock).toHaveBeenCalledWith({ submissionId: 's1', ...caller });
-    expect(getLiveTemplate).toHaveBeenCalledWith(templateId, scope.formVersionId, 'cdogs');
     expect(createAdapter).toHaveBeenCalledWith('cdogs-v2');
     // Service passes the stored template's bytes and type; CDOGS-specific shaping is in the plugin.
     expect(renderMock).toHaveBeenCalledWith({
       template: { content: Buffer.from('tpl bytes'), fileType: 'docx' },
       options: { reportName: 'r' },
-      data: { field: 'live' },
+      data: { data: { field: 'saved' } },
     });
   });
 
   it('uses the granted scoped v3 backend over the default', async () => {
     holdsGrant.mockResolvedValue(true);
     isFeatureAvailable.mockResolvedValue(true); // v3 now granted for this scope
-    const outcome = await documentGenerationService.preview(caller, {
-      submissionId: 's1',
-      templateId,
-      data: {},
-    });
+    const outcome = await print();
     expect(outcome).toMatchObject({ status: 'ok', code: 'cdogs-v3' });
     expect(createAdapter).toHaveBeenCalledWith('cdogs-v3');
   });
@@ -166,11 +154,7 @@ describe('documentGenerationService.preview', () => {
   it('is unavailable when no backend is available for the scope', async () => {
     holdsGrant.mockResolvedValue(true);
     isFeatureAvailable.mockResolvedValue(false); // neither v3 nor v2 available
-    const outcome = await documentGenerationService.preview(caller, {
-      submissionId: 's1',
-      templateId,
-      data: {},
-    });
+    const outcome = await print();
     expect(outcome.status).toBe('unavailable');
   });
 
@@ -186,11 +170,7 @@ describe('documentGenerationService.preview', () => {
     isFeatureAvailable.mockImplementation((code: string) =>
       Promise.resolve(code !== 'document-generation-v3'),
     );
-    const outcome = await documentGenerationService.preview(caller, {
-      submissionId: 's1',
-      templateId,
-      data: {},
-    });
+    const outcome = await print();
     expect(outcome).toMatchObject({ status: 'ok', code: 'cdogs-v2' });
   });
 
@@ -198,11 +178,7 @@ describe('documentGenerationService.preview', () => {
     holdsGrant.mockResolvedValue(true);
     resolveDefault.mockReturnValue('cdogs-v99'); // no such plugin installed
     isFeatureAvailable.mockResolvedValue(false); // and no scoped grant
-    const outcome = await documentGenerationService.preview(caller, {
-      submissionId: 's1',
-      templateId,
-      data: {},
-    });
+    const outcome = await print();
     expect(outcome.status).toBe('unavailable');
   });
 });
@@ -211,10 +187,7 @@ describe('documentGenerationService.print', () => {
   it('lets a participant print the persisted submission', async () => {
     holdsGrant.mockResolvedValue(true);
 
-    const outcome = await documentGenerationService.print(caller, {
-      submissionId: 's1',
-      templateId,
-    });
+    const outcome = await print();
 
     expect(outcome).toMatchObject({ status: 'ok' });
     expect(readMock).toHaveBeenCalledWith({ submissionId: 's1', ...caller });
@@ -228,10 +201,7 @@ describe('documentGenerationService.print', () => {
   it('denies a caller who is not a participant, whatever their form permissions', async () => {
     holdsGrant.mockResolvedValue(false);
 
-    const outcome = await documentGenerationService.print(caller, {
-      submissionId: 's1',
-      templateId,
-    });
+    const outcome = await print();
 
     expect(outcome.status).toBe('denied');
   });
@@ -240,10 +210,7 @@ describe('documentGenerationService.print', () => {
     holdsGrant.mockResolvedValue(true);
     getContentMock.mockResolvedValue(null);
 
-    const outcome = await documentGenerationService.print(caller, {
-      submissionId: 's1',
-      templateId,
-    });
+    const outcome = await print();
 
     expect(outcome.status).toBe('no-content');
   });
@@ -253,16 +220,19 @@ describe('documentGenerationService audit', () => {
   it('records a success audit for the backend call', async () => {
     holdsGrant.mockResolvedValue(true);
 
-    await documentGenerationService.preview(caller, { submissionId: 's1', templateId, data: {} });
+    await print();
 
     expect(createAudit).toHaveBeenCalledWith(
       expect.objectContaining({
         workspaceId: 'ws-1',
         formId: 'form-1',
         submissionId: 's1',
-        mode: 'preview',
+        mode: 'print',
         backendCode: 'cdogs-v2',
         outcome: 'success',
+        templateId,
+        templateFileId: 'file-1',
+        revisionId: 'rev-1',
         createdBy: 'user-1',
       }),
     );
@@ -274,11 +244,7 @@ describe('documentGenerationService audit', () => {
       httpErrorToAppError(new HttpClientError(500, 'Error', 'boom', 'http://cdogs.test'), 'CDOGS'),
     );
 
-    const outcome = await documentGenerationService.preview(caller, {
-      submissionId: 's1',
-      templateId,
-      data: {},
-    });
+    const outcome = await print();
 
     expect(outcome.status).toBe('error');
     expect(createAudit).toHaveBeenCalledWith(
@@ -299,11 +265,7 @@ describe('documentGenerationService audit', () => {
       throw new Error('PLUGIN_CDOGS_V3_ENDPOINT is required');
     });
 
-    const outcome = await documentGenerationService.preview(caller, {
-      submissionId: 's1',
-      templateId,
-      data: {},
-    });
+    const outcome = await print();
 
     expect(outcome.status).toBe('error');
     expect((outcome as { error: unknown }).error).toBeInstanceOf(ServiceUnavailableError);
@@ -320,11 +282,7 @@ describe('documentGenerationService audit', () => {
     holdsGrant.mockResolvedValue(true);
     createAudit.mockRejectedValue(new Error('audit db down'));
 
-    const outcome = await documentGenerationService.preview(caller, {
-      submissionId: 's1',
-      templateId,
-      data: {},
-    });
+    const outcome = await print();
 
     expect(outcome.status).toBe('ok');
   });
@@ -338,11 +296,7 @@ describe('documentGenerationService audit', () => {
       ...storedTemplate,
       file: { ...storedTemplate.file, ...file },
     });
-    const outcome = await documentGenerationService.preview(caller, {
-      submissionId: 's1',
-      templateId,
-      data: {},
-    });
+    const outcome = await print();
     expect(outcome).toMatchObject({ status: 'error', error: { code: 'render_failed' } });
     expect(renderMock).not.toHaveBeenCalled();
   });
@@ -350,20 +304,79 @@ describe('documentGenerationService audit', () => {
   it('does not audit when no backend call is made', async () => {
     // denied: never reaches the backend
     holdsGrant.mockResolvedValue(false);
-    await documentGenerationService.preview(caller, { submissionId: 's1', templateId, data: {} });
+    await print();
 
     // unavailable: no backend resolved
     holdsGrant.mockResolvedValue(true);
     isFeatureAvailable.mockResolvedValue(false);
-    await documentGenerationService.preview(caller, { submissionId: 's1', templateId, data: {} });
+    await print();
 
-    // print no-content: no persisted data, so no backend call
+    // no-content: no persisted data, so no backend call
     isFeatureAvailable.mockImplementation((code: string) =>
       Promise.resolve(code === 'document-generation-v2'),
     );
     getContentMock.mockResolvedValue(null);
-    await documentGenerationService.print(caller, { submissionId: 's1', templateId });
+    await print();
 
     expect(createAudit).not.toHaveBeenCalled();
+  });
+});
+
+describe('staffDocumentService.printUpload', () => {
+  const prepared = { scope, submissionId: 's1', backendCode: 'cdogs-v2' };
+  const template = {
+    content: Buffer.from('uploaded'),
+    fileType: 'docx' as const,
+    filename: 't.docx',
+  };
+  const options: PrintOptions = { convertTo: 'pdf' };
+  const printUpload = () => staffDocumentService.printUpload(prepared, template, options, 'user-1');
+
+  it.each(['infected', 'scan-unavailable'] as const)(
+    'never reads, renders or audits a template the scan calls %s',
+    async (verdict) => {
+      scanMock.mockResolvedValue(verdict);
+      const outcome = await printUpload();
+      expect(outcome.status).toBe(verdict);
+      expect(getContentMock).not.toHaveBeenCalled();
+      expect(createAdapter).not.toHaveBeenCalled();
+      expect(renderMock).not.toHaveBeenCalled();
+      expect(createAudit).not.toHaveBeenCalled();
+    },
+  );
+
+  it('renders a clean template with the saved answers and audits it with no stored template', async () => {
+    const outcome = await printUpload();
+    expect(outcome).toMatchObject({ status: 'ok', code: 'cdogs-v2' });
+    expect(scanMock).toHaveBeenCalledWith(Buffer.from('uploaded'), 't.docx');
+    expect(renderMock).toHaveBeenCalledWith({
+      template: { content: Buffer.from('uploaded'), fileType: 'docx' },
+      options,
+      data: { data: { field: 'saved' } },
+    });
+    expect(createAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: 'ws-1',
+        formId: 'form-1',
+        submissionId: 's1',
+        mode: 'print',
+        backendCode: 'cdogs-v2',
+        outcome: 'success',
+        templateId: null,
+        templateFileId: null,
+        revisionId: 'rev-1',
+        createdBy: 'user-1',
+      }),
+    );
+  });
+
+  it.each([
+    ['gone once the scan ends', 'notfound', () => getSubmissionRecordById.mockResolvedValue(null)],
+    ['without saved answers', 'no-content', () => getContentMock.mockResolvedValue(null)],
+  ] as const)('does not render a submission %s', async (_label, status, arrange) => {
+    arrange();
+    const outcome = await printUpload();
+    expect(outcome.status).toBe(status);
+    expect(renderMock).not.toHaveBeenCalled();
   });
 });

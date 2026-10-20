@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { useCallToken } from '@/src/shared/api/callToken';
 import type { WriteOutcome } from '@/src/shared/api/dataContracts';
 import type { SubmissionWriteResponse } from '@/src/types/submissions';
 import { useSubmissionWriter } from './useSubmissionWriter';
@@ -38,20 +37,34 @@ const required = (base: { current: string | null }) => {
   return base.current;
 };
 
+export interface FillWriterOptions {
+  /** The loaded head; null for a submission not opened yet. */
+  headRevisionId: string | null;
+  /** The page's session: a signed-in fill never writes anonymously. */
+  signedIn: boolean;
+  /** Opens a submission not opened yet and returns the head it recorded. */
+  open?: () => Promise<string>;
+}
+
 /**
- * The writes of one loaded bundle. Each write is based on the head it knows: the loaded head, then
- * each applied save, or the head re-read when the filler keeps their version. A submit waits for a
- * save in flight and is based on the revision that save produces. A write held as a conflict blocks
- * every later write until the filler reloads or keeps theirs; a record found submitted blocks every
- * later write. A blocked write sends nothing and returns held with BLOCKED_REASON. Writes go out as
- * the session was when the form mounted: signed in, or anonymous.
+ * The writes of one loaded bundle. Each write is based on the head it knows: the loaded head, the
+ * head the open recorded for a new submission, then each applied save, or the head re-read when the
+ * filler keeps their version. A new submission is opened by its first save, submit or upload, one
+ * open at a time, and a failed open is tried again by the next. A save opens it inside its own
+ * flight, so a submit waiting on that save waits for the open too. A submit waits for a save in
+ * flight and is based on the revision that save produces. A write held as a conflict blocks every
+ * later write until the filler reloads or keeps theirs; a record found submitted blocks every later
+ * write. A blocked write sends nothing and returns held with BLOCKED_REASON.
  */
-export function useFillWriter(submissionId: string, headRevisionId: string | null) {
-  const { isSignedIn } = useCallToken();
-  const [signedIn] = useState(isSignedIn);
+export function useFillWriter(
+  submissionId: string,
+  { headRevisionId, signedIn, open }: FillWriterOptions,
+) {
   const writer = useSubmissionWriter(submissionId, signedIn);
 
   const baseRef = useRef(headRevisionId);
+  // The open in flight, or settled; cleared when it fails so the next write tries again.
+  const openRef = useRef<Promise<void> | null>(null);
   const saveInFlightRef = useRef<Promise<unknown> | null>(null);
   const [busy, setBusy] = useState<FillBusy | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ state: 'idle' });
@@ -66,7 +79,23 @@ export function useFillWriter(submissionId: string, headRevisionId: string | nul
   const closedRef = useRef(false);
   const blocked = useCallback(() => heldRef.current !== null || closedRef.current, []);
 
-  const hasBase = useCallback(() => baseRef.current !== null, []);
+  /** A head to write on, or a way to get one by opening. */
+  const hasBase = useCallback(() => baseRef.current !== null || open !== undefined, [open]);
+
+  /** Opens a new submission once; every write and upload before it lands waits on the same open. */
+  const ensureOpened = useCallback((): Promise<void> => {
+    if (baseRef.current !== null || !open) return Promise.resolve();
+    openRef.current ??= open().then(
+      (head) => {
+        baseRef.current = head;
+      },
+      (err: unknown) => {
+        openRef.current = null;
+        throw err;
+      },
+    );
+    return openRef.current;
+  }, [open]);
 
   const settle = useCallback(
     (kind: FillWrite, outcome: WriteOutcome<SubmissionWriteResponse>) => {
@@ -87,7 +116,10 @@ export function useFillWriter(submissionId: string, headRevisionId: string | nul
       if (blocked()) return BLOCKED;
       setBusy('save');
       setSaveStatus({ state: 'saving' });
-      const run = (async () => settle('save', await writer.save(data, required(baseRef))))();
+      const run = (async () => {
+        await ensureOpened();
+        return settle('save', await writer.save(data, required(baseRef)));
+      })();
       const inFlight = run.catch(() => undefined);
       saveInFlightRef.current = inFlight;
       try {
@@ -102,7 +134,7 @@ export function useFillWriter(submissionId: string, headRevisionId: string | nul
         setBusy(null);
       }
     },
-    [writer, settle, blocked],
+    [writer, settle, blocked, ensureOpened],
   );
 
   const submit = useCallback(
@@ -111,12 +143,13 @@ export function useFillWriter(submissionId: string, headRevisionId: string | nul
       if (blocked()) return BLOCKED;
       setBusy('submit');
       try {
+        await ensureOpened();
         return settle('submit', await writer.submit(data, required(baseRef)));
       } finally {
         setBusy(null);
       }
     },
-    [writer, settle, blocked],
+    [writer, settle, blocked, ensureOpened],
   );
 
   /**
@@ -143,8 +176,8 @@ export function useFillWriter(submissionId: string, headRevisionId: string | nul
   }, [writer, hold]);
 
   /**
-   * Drops the held write once `reload` has mounted a new form on the latest bundle. Writes stay
-   * blocked until then, and a failed reload keeps the held notice.
+   * Drops the held write once `reload` has mounted a new form on the latest bundle; writes stay
+   * blocked until then. A reload whose read fails replaces the form with the load alert.
    */
   const discardMine = useCallback(
     async (reload: () => Promise<void>) => {
@@ -163,6 +196,7 @@ export function useFillWriter(submissionId: string, headRevisionId: string | nul
     signedIn,
     status: { busy, held, save: saveStatus },
     hasBase,
+    ensureOpened,
     save,
     submit,
     keepMine,

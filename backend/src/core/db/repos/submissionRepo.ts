@@ -32,6 +32,7 @@ import {
 import { listAllowsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
 import { liveSubmission } from './liveRows';
 import { isActiveOwner } from './submissionParticipantRepo';
+import { listSubmitterForms, type SubmitterFormListRow } from './submitterFormRepo';
 
 export type SubmissionRecord = typeof submissions.$inferSelect;
 
@@ -56,6 +57,10 @@ export interface SubmissionDetailRow extends SubmissionListRow {
   headRevisionId: string | null;
 }
 
+/** A submission row with its form's name and its version's number, as responses show them. */
+export type LabelledSubmissionRecord = SubmissionRecord &
+  Pick<SubmissionDetailRow, 'form' | 'formVersion'>;
+
 interface CreateSubmissionInput {
   /** Client-minted uuidv7; the submission's primary key (no longer server-generated). */
   id: string;
@@ -68,15 +73,15 @@ interface CreateSubmissionInput {
 }
 
 /**
- * created  - the id was free; a new opened submission, its revision 0 and the opener's owner grant
- *            were written.
- * existing - the id is already bound to this actor + form; the retry returns that row (idempotent).
- * conflict - the id is bound to a different actor or form (caller maps to 409).
+ * created - the id was free; a new opened submission, its revision 0 and the opener's owner grant
+ *           were written.
+ * taken   - the id is in use. `live` is that submission unless it, its form or its version is
+ *           deleted, and `owner` whether the opener holds its active owner grant. The caller decides
+ *           whether the open is a retry.
  */
 export type OpenSubmissionResult =
   | { outcome: 'created'; record: SubmissionRecord }
-  | { outcome: 'existing'; record: SubmissionRecord }
-  | { outcome: 'conflict' };
+  | { outcome: 'taken'; live: SubmissionRecord | null; owner: boolean };
 
 interface SaveSubmissionInput {
   workspaceId: string;
@@ -132,9 +137,12 @@ export interface ParticipantSubmissionListRow {
   id: string;
   formId: string;
   formName: string;
+  formVersionId: string;
   workflowState: string;
   /** The user's own grant on the submission. */
   role: string;
+  headRevisionId: string | null;
+  currentRevisionNo: number;
   submittedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -188,15 +196,11 @@ export const findLiveSubmissionRecord = async (
  * a full history and an owner from the moment a fill begins. `submittedBy` captures the actor who
  * started it (the seeded public user for anonymous fills, who then owns it).
  *
- * Idempotent on the id. `ON CONFLICT DO NOTHING` is the atomic gate: the row is only written when the
- * id is free, so concurrent double-opens are race-safe: the loser inserts nothing, falls through to
- * the select, and sees the winner's committed row. A taken id is a retry (the caller's own live
- * submission on the same form: return it) or a collision (another owner or form, or a submission,
- * form or version that is deleted: the caller answers 409, not 500).
+ * `ON CONFLICT DO NOTHING` is the atomic gate: the row is only written when the id is free, so
+ * concurrent double-opens are race-safe: the loser inserts nothing, falls through to the select, and
+ * sees the winner's committed row. A taken id reports what holds it.
  */
-export const openSubmission = async (
-  input: CreateSubmissionInput,
-): Promise<OpenSubmissionResult> => {
+export const openSubmission = (input: CreateSubmissionInput): Promise<OpenSubmissionResult> => {
   return db.transaction(async (tx) => {
     const [created] = await tx
       .insert(submissions)
@@ -250,18 +254,23 @@ export const openSubmission = async (
       return { outcome: 'created', record };
     }
 
-    // Only a live submission the caller owns, on the same form, is a valid idempotent retry; any other
-    // row on the id is a collision (409), not a resume, since save, submit and fill all 404 on it.
-    const existing = await findLiveSubmissionRecord(input.id, tx);
-
-    if (
-      existing?.formId === input.formId &&
-      (await isActiveOwner(existing.id, input.actorId, tx))
-    ) {
-      return { outcome: 'existing', record: existing };
-    }
-    return { outcome: 'conflict' };
+    const live = await findLiveSubmissionRecord(input.id, tx);
+    const owner = !!live && (await isActiveOwner(live.id, input.actorId, tx));
+    return { outcome: 'taken', live, owner };
   });
+};
+
+/** The form's name and the version's number for a form version, deleted or not. */
+export const getFormVersionLabels = async (
+  formVersionId: string,
+): Promise<Pick<SubmissionDetailRow, 'form' | 'formVersion'> | null> => {
+  const [row] = await db
+    .select({ form: { name: forms.name }, formVersion: { versionNo: formVersions.versionNo } })
+    .from(formVersions)
+    .innerJoin(forms, eq(forms.id, formVersions.formId))
+    .where(eq(formVersions.id, formVersionId))
+    .limit(1);
+  return row ?? null;
 };
 
 /** Look up a revision by id alone, to recognise a retried write and report its standing. */
@@ -489,13 +498,18 @@ export const listSubmissionsForWorkspace = async (
 };
 
 /**
- * The draft and submitted submissions the user holds an active grant on, across every workspace.
- * An opened submission holds no answers yet, and a submission on a deleted form or form version
- * can no longer be opened, so none of these is listed.
+ * The draft and submitted submissions the user holds an active grant on, across every workspace,
+ * with the forms of the page's rows and their facts for the user, read in one snapshot. An opened
+ * submission holds no answers yet, and a submission on a deleted form or form version can no longer
+ * be opened, so none of these is listed.
  */
 export const listSubmissionsForParticipant = async (
   input: ListParticipantSubmissionsInput,
-): Promise<{ items: ParticipantSubmissionListRow[]; total: number }> => {
+): Promise<{
+  items: ParticipantSubmissionListRow[];
+  total: number;
+  forms: SubmitterFormListRow[];
+}> => {
   const whereClauses = [
     eq(submissionParticipants.userId, input.userId),
     eq(submissionParticipants.status, SubmissionParticipantStatus.active),
@@ -518,8 +532,11 @@ export const listSubmissionsForParticipant = async (
         id: submissions.id,
         formId: submissions.formId,
         formName: forms.name,
+        formVersionId: submissions.formVersionId,
         workflowState: submissions.workflowState,
         role: submissionParticipants.role,
+        headRevisionId: submissions.headRevisionId,
+        currentRevisionNo: submissions.currentRevisionNo,
         submittedAt: submissions.submittedAt,
         createdAt: submissions.createdAt,
         updatedAt: submissions.updatedAt,
@@ -543,7 +560,11 @@ export const listSubmissionsForParticipant = async (
       .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
       .where(where);
 
-    return { items, total: totals[0]?.total ?? 0 };
+    const formIds = [...new Set(items.map((item) => item.formId))];
+    const pageForms = await listSubmitterForms({ userId: input.userId, formIds }, tx);
+    const byId = (a: SubmitterFormListRow, b: SubmitterFormListRow) => a.id.localeCompare(b.id);
+
+    return { items, total: totals[0]?.total ?? 0, forms: pageForms.toSorted(byId) };
   });
 };
 
@@ -732,7 +753,7 @@ const demoteHead = async (
  * orphaned. The caller's own write of the same event, already recorded under the revision id, is
  * answered as replayed; another write under the id fails on the revision's primary key.
  */
-export const appendSubmissionRevision = async (
+export const appendSubmissionRevision = (
   input: SaveSubmissionInput,
 ): Promise<AppendSubmissionRevisionResult> => {
   return db.transaction(async (tx) => {

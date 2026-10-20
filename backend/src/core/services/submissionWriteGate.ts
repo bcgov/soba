@@ -81,6 +81,16 @@ export const decideRecordedWrite = (request: {
   return { kind: 'replay', revision: replayedLanding(request.revisionId, recorded) };
 };
 
+/**
+ * Whether an open of a taken id asks for what the id holds: the same form, and the same version when
+ * the open names one. Only the opener's own live submission can be that retry.
+ */
+export const opensSameSubmission = (
+  held: { formId: string; formVersionId: string },
+  open: { formId: string; formVersionId?: string },
+): boolean =>
+  held.formId === open.formId && (!open.formVersionId || open.formVersionId === held.formVersionId);
+
 export interface SubmissionWriteRequest {
   submission: { id: string; workflowState: string; headRevisionId: string | null };
   eventType: SubmissionWriteEventCode;

@@ -9,6 +9,7 @@ import {
   clearSubmissionProvisioning,
   failSubmissionProvisioning,
   openSubmission,
+  getFormVersionLabels,
   getSubmissionById,
   getSubmissionRecordById,
   getSubmissionRevisionById,
@@ -16,6 +17,7 @@ import {
   listSubmissionsForWorkspace,
   markSubmissionDeleted,
   updateSubmissionDraft,
+  type LabelledSubmissionRecord,
   type ListParticipantSubmissionsInput,
   type SubmissionRecord,
 } from '../db/repos/submissionRepo';
@@ -34,6 +36,7 @@ import {
 import {
   decideRecordedWrite,
   decideSubmissionWrite,
+  opensSameSubmission,
   replayedLanding,
   type SubmissionWriteDecision,
   type WriteLanding,
@@ -43,6 +46,12 @@ import { isUniqueViolationOn } from '../db/pgError';
 import { SUBMISSION_REVISION_PKEY } from '../db/schema';
 
 export interface SubmissionWriteOutcome {
+  record: LabelledSubmissionRecord;
+  revision: WriteLanding;
+}
+
+/** A write as recorded, before its form's name and version number are read. */
+interface RecordedWrite {
   record: SubmissionRecord;
   revision: WriteLanding;
 }
@@ -103,12 +112,12 @@ interface ListInput {
 export class SubmissionService {
   /**
    * Open a new submission against the form's currently published version (the only submittable one),
-   * under the client-supplied id. Idempotent: a retry of the same id by its owner on the same form
-   * returns the existing live record ({ created: false }); another owner or form, or a submission,
-   * form or version that is deleted, is a 409. A formVersionId that is not the published version is a
-   * 409.
+   * under the client-supplied id. Idempotent: a retry of the same id by its owner on the same form,
+   * and the same version when it names one, returns the existing live record ({ created: false });
+   * another owner, form or version, or a submission, form or version that is deleted, is a 409. A
+   * formVersionId that is not the published version is a 409.
    */
-  async open(input: CreateInput) {
+  async open(input: CreateInput): Promise<{ created: boolean; record: LabelledSubmissionRecord }> {
     const version = await getPublishedVersionForForm(input.workspaceId, input.formId);
     if (!version)
       throw new NotFoundError('Form has no published version', ApiErrorCodes.not_published);
@@ -122,20 +131,41 @@ export class SubmissionService {
     const result = await withNewConfirmationCode((confirmationCode) =>
       openSubmission({ ...input, formVersionId: version.id, confirmationCode }),
     );
-    if (result.outcome === 'conflict') {
+    if (result.outcome === 'created') {
+      return { created: true, record: await this.labelled(result.record) };
+    }
+    // A retry asks for what the id holds: the opener's own live submission, by the rule the replay
+    // guard applies. Anything else holding the id is a collision.
+    const { live } = result;
+    const retried = !!live && result.owner && opensSameSubmission(live, input);
+    if (!retried) {
       throw new ConflictError('Submission id already in use', ApiErrorCodes.submission_id_taken);
     }
-    return { created: result.outcome === 'created', record: result.record };
+    return { created: false, record: await this.labelled(live) };
   }
 
   /** Save the current answer data as a draft (opened → draft; draft stays draft). */
-  async save(input: SaveInput) {
-    return this.record(input, SubmissionEventType.saved);
+  async save(input: SaveInput): Promise<SubmissionWriteOutcome> {
+    return this.labelledWrite(await this.record(input, SubmissionEventType.saved));
   }
 
   /** Submit the answer data (opened/draft → submitted). */
-  async submit(input: SaveInput) {
-    return this.record(input, SubmissionEventType.submitted);
+  async submit(input: SaveInput): Promise<SubmissionWriteOutcome> {
+    return this.labelledWrite(await this.record(input, SubmissionEventType.submitted));
+  }
+
+  /**
+   * The row with its form's name and its version's number, read after the write. Labelling keeps the
+   * row the write returned; it never reads the submission again.
+   */
+  private async labelled(record: SubmissionRecord): Promise<LabelledSubmissionRecord> {
+    const labels = await getFormVersionLabels(record.formVersionId);
+    if (!labels) throw new Error(`Form version ${record.formVersionId} has no row`);
+    return { ...record, ...labels };
+  }
+
+  private async labelledWrite(write: RecordedWrite): Promise<SubmissionWriteOutcome> {
+    return { record: await this.labelled(write.record), revision: write.revision };
   }
 
   /**
@@ -147,7 +177,7 @@ export class SubmissionService {
   private async record(
     input: SaveInput,
     eventType: SubmissionWriteEventCode,
-  ): Promise<SubmissionWriteOutcome> {
+  ): Promise<RecordedWrite> {
     const submission = await getSubmissionRecordById(input.workspaceId, input.submissionId);
     if (!submission) {
       throw new NotFoundError('Submission not found', ApiErrorCodes.submission_not_found);
@@ -200,7 +230,7 @@ export class SubmissionService {
    */
   private async resolveSubmissionEngine(submission: SubmissionRecord) {
     const version = await getFormVersionById(submission.workspaceId, submission.formVersionId);
-    if (!version || !version.engineSchemaRef) {
+    if (!version?.engineSchemaRef) {
       throw new ValidationError(
         'Form version is not provisioned in the engine',
         ApiErrorCodes.form_not_ready,
@@ -231,7 +261,7 @@ export class SubmissionService {
     submission: SubmissionRecord,
     eventType: SubmissionWriteEventCode,
     decision: SubmissionWriteDecision,
-  ): Promise<SubmissionWriteOutcome> {
+  ): Promise<RecordedWrite> {
     const { engineSchemaRef, createSubmission } = await this.resolveSubmissionEngine(submission);
     const pending = decision.kind === 'pending';
 
@@ -358,10 +388,10 @@ export class SubmissionService {
   }) {
     const submission =
       input.record ?? (await getSubmissionRecordById(input.workspaceId, input.submissionId));
-    if (!submission || !submission.engineSubmissionRef) return null;
+    if (!submission?.engineSubmissionRef) return null;
 
     const version = await getFormVersionById(input.workspaceId, submission.formVersionId);
-    if (!version || !version.engineSchemaRef) return null;
+    if (!version?.engineSchemaRef) return null;
 
     const engineCode = await getFormEngineCodeForForm(input.workspaceId, submission.formId);
     if (!engineCode) return null;

@@ -3,6 +3,7 @@ import {
   canDeleteOwnSubmission,
   canDeleteSubmissionFile,
   canReadSubmission,
+  canReadVersionSchema,
   canRenderSubmission,
   canSaveDraftOnSubmission,
   canStartSubmission,
@@ -15,6 +16,7 @@ import {
   startStatusOf,
   SubmissionWorkflowState,
   uploadStatusOf,
+  versionSchemaStatusOf,
   type AccessCaller,
   type SubmissionAccessFacts,
   type SubmitterFormFacts,
@@ -291,5 +293,59 @@ describe('submission rules', () => {
   ])('startStatusOf: %s', (_label, facts, caller, expected) => {
     expect(startStatusOf(facts, caller)).toEqual(expected);
     expect(canStartSubmission(facts, caller)).toBe(expected.status === 'allowed');
+  });
+});
+
+describe('versionSchemaStatusOf', () => {
+  const allowed = { status: 'allowed' };
+  const openDenied = { status: 'denied', code: 'open_denied' };
+  it.each([
+    ['the published version, to a role holder', 'v1', forms.roles, idir, allowed],
+    ['the published version, to an admitted audience', 'v1', forms.protectedIdir, idir, allowed],
+    [
+      'a version that is not the published one',
+      'v0',
+      forms.roles,
+      idir,
+      { status: 'closed', code: 'version_not_published' },
+    ],
+    [
+      'the published version, to a caller the audience refuses',
+      'v1',
+      forms.protectedIdir,
+      bceid,
+      openDenied,
+    ],
+    [
+      'another version, to a caller who may not start, refused before the version counts',
+      'v0',
+      forms.protectedIdir,
+      bceid,
+      openDenied,
+    ],
+    [
+      'the published version, to the public caller on a public form',
+      'v1',
+      forms.public,
+      anonymous,
+      allowed,
+    ],
+    [
+      "the published version, to the public caller holding the form's roles",
+      'v1',
+      forms.roles,
+      anonymous,
+      openDenied,
+    ],
+    [
+      'any version of a form with none published',
+      'v1',
+      forms.rolesUnpublished,
+      idir,
+      { status: 'closed', code: 'not_published' },
+    ],
+  ])('%s', (_label, versionId, facts, caller, expected) => {
+    expect(versionSchemaStatusOf(versionId, facts, caller)).toEqual(expected);
+    expect(canReadVersionSchema(versionId, facts, caller)).toBe(expected.status === 'allowed');
   });
 });

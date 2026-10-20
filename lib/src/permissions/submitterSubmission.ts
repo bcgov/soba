@@ -73,6 +73,29 @@ export const startStatusOf = (form: SubmitterFormFacts, caller: AccessCaller): S
 export const canStartSubmission = (form: SubmitterFormFacts, caller: AccessCaller): boolean =>
   isAllowed(startStatusOf(form, caller));
 
+/**
+ * Reading a version's schema to start from: a caller who may start, then the published version. A
+ * caller refused the start is refused before the version counts.
+ */
+export const versionSchemaStatusOf = (
+  formVersionId: string,
+  form: SubmitterFormFacts,
+  caller: AccessCaller,
+): SubmissionChange => {
+  const start = startStatusOf(form, caller);
+  if (!isAllowed(start)) return start;
+  if (form.publishedVersionId !== formVersionId) {
+    return closed(ApiErrorCodes.version_not_published);
+  }
+  return ALLOWED;
+};
+
+export const canReadVersionSchema = (
+  formVersionId: string,
+  form: SubmitterFormFacts,
+  caller: AccessCaller,
+): boolean => isAllowed(versionSchemaStatusOf(formVersionId, form, caller));
+
 /** Whether a new submission on the form could save a draft. */
 export const canSaveSubmissionDraft = (form: SubmitterFormFacts, caller: AccessCaller): boolean =>
   canStartSubmission(form, caller) && draftSaveStatusOf(form) === DraftSaveStatus.allowed;

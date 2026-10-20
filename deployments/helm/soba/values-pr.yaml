@@ -1,12 +1,15 @@
 # PR environment — minimal resources, single replica, internal Form.io + MongoDB
 backend:
-  # Development data generator: on for PR review environments.
+  # Development data generator: on for PR review environments. Notifications send through notify-v1.
   features:
     dev-data: "enabled"
+    notifications: "enabled"
   replicas: 1
   config:
     documentGenerationDefaultCode: cdogs-v2
     tenantEngineDefaultCode: cstar-v1
+    workflowEngineDefaultCode: cs-workflow-v1
+    notificationDefaultCode: notify-v1
     # Ephemeral PR namespaces stage temp bytes under os.tmpdir() — no RWX PVC.
     tempStorageDefaultCode: tempstorage-os
     # Virus scan inherits virusscan-clamav from values.yaml: PRs deploy into the dev
@@ -26,7 +29,13 @@ backend:
       endpoint: http://common-document-generation-service-master.a12c97-prod:3000
   tenantEngine:
     cstarV1:
-      apiBaseUrl: https://dev.connect.digital.gov.bc.ca/api/v1
+      apiBaseUrl: https://test.connect.digital.gov.bc.ca/api/v1
+  workflowEngine:
+    csWorkflowV1:
+      apiBaseUrl: https://test-workflow.apps.gold.devops.gov.bc.ca/api/v1
+  notification:
+    notifyV1:
+      endpoint: https://gw-fe8c5-notify.test.api.gov.bc.ca/api/v1
   sso:
     jwksUri: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/certs
     jwtIssuer: https://dev.loginproxy.gov.bc.ca/auth/realms/standard
@@ -61,7 +70,7 @@ frontend:
       cpu: 25m
       memory: 128Mi
     limits:
-      cpu: 100m
+      cpu: 250m
       memory: 256Mi
   autoscaling:
     enabled: false
@@ -75,8 +84,8 @@ formio:
       cpu: 25m
       memory: 128Mi
     limits:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 250m
+      memory: 512Mi
   # Formio depends on MongoDB; allow time for MongoDB to be ready after PR deploy
   readinessProbe:
     initialDelaySeconds: 45
@@ -89,16 +98,6 @@ mongodb:
   # workflow supplies external.host and external.authSecretName.
   internal:
     enabled: false
-  replicas: 1
-  resources:
-    requests:
-      cpu: 50m
-      memory: 256Mi
-    limits:
-      cpu: 250m
-      memory: 512Mi
-  persistence:
-    size: 1Gi
 
 temporal:
   allowed: "true"

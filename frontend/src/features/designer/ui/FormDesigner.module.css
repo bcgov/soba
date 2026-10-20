@@ -9,7 +9,7 @@
 :global(.formio-builder-components span),
 :global(.formcomponent),
 :global([ref='sidebar-component']) {
-  visibility: visible !important;
+  visibility: visible;
 }
 
 /* Ensure sidebar accordion works without Bootstrap JS */
@@ -20,20 +20,14 @@
   display: block;
 }
 
-/* Fix drag-copy cursor */
-:global(.drag-copy) {
-  cursor: grab !important;
-}
-
-/* Force the row to use flexbox so the sidebar's parent column stretches to provide a tall track */
-:global(.formbuilder > .row) {
-  display: flex !important;
-  align-items: stretch !important;
+/* Grab cursor on sidebar components; two classes outrank Bootstrap's `.btn` cursor. */
+:global(.formcomponent.drag-copy) {
+  cursor: grab;
 }
 
 :global(.builder-sidebar) {
-  position: -webkit-sticky !important;
-  position: sticky !important;
+  position: -webkit-sticky;
+  position: sticky;
   top: calc(var(--app-header-height, 0px) * 2 + var(--layout-margin-medium));
   align-self: flex-start;
   max-height: calc(100vh - (var(--app-header-height, 0px) * 2 + var(--layout-margin-medium)));

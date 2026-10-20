@@ -23,5 +23,7 @@ export {
   logEventStreamSelfTest,
   logDocumentGenerationReadiness,
   logTenantEngineReadiness,
+  logWorkflowEngineReadiness,
+  logNotificationReadiness,
   logUserDirectoryReadiness,
 } from './startupHealth';

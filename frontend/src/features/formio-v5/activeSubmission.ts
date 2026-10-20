@@ -3,7 +3,8 @@
  * tag uploads with it (the backend derives the workspace from that submission and authorizes against
  * it) and send them as the fill session is: signed in, or anonymous. Backed by sessionStorage:
  * survives a refresh, is independent per tab, and clears on tab close. The fill form sets it on mount
- * and clears it on unmount; the provider reads it per upload.
+ * and clears it on unmount; the provider reads it per upload. A submission not opened yet also
+ * registers, in memory only, how to open it, and an upload waits for that before naming it.
  */
 const STORAGE_KEY = 'soba.activeSubmission';
 
@@ -46,7 +47,27 @@ export function setActiveSubmission(active: ActiveSubmission): void {
   }
 }
 
+let activeOpener: (() => Promise<void>) | null = null;
+
+/** How to open the active submission if it is not open yet; null when the form has none. */
+export function setActiveOpener(open: (() => Promise<void>) | null): void {
+  activeOpener = open;
+}
+
+/**
+ * The active submission's id, once it is open: an upload must not name one that does not exist. The
+ * id and its opener are read together, so a form mounted while the open is in flight does not rename
+ * the upload.
+ */
+export async function openedActiveSubmissionId(): Promise<string> {
+  const submissionId = getActiveSubmission()?.submissionId ?? '';
+  const open = activeOpener;
+  await open?.();
+  return submissionId;
+}
+
 export function clearActiveSubmission(): void {
+  activeOpener = null;
   const storage = getStorage();
   if (!storage) return;
   try {

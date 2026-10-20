@@ -6,10 +6,17 @@ import {
   startStatusOf,
   SubmissionChangeStatus,
   ApiErrorCodes,
+  versionSchemaStatusOf,
   type ApiErrorCode,
+  type SubmissionChange,
 } from '@soba/lib';
 import type { CallerIdentity, FormAccessTarget } from '../db/repos/formSubmitAccessRepo';
-import { findLiveSubmitterForm } from '../db/repos/submitterFormRepo';
+import {
+  findLiveSubmitterForm,
+  findSubmitterFormVersion,
+  type SubmitterFormListRow,
+  type SubmitterFormVersionRow,
+} from '../db/repos/submitterFormRepo';
 import {
   findSubmitterSubmission,
   type SubmitterSubmission,
@@ -189,32 +196,110 @@ export const requireSubmissionDelete: RequestHandler = (req, _res, next) => {
   }
 };
 
+/** Stores the form read for the guards and handlers after it. */
+const storeForm = (req: Request, form: SubmitterFormListRow): void => {
+  req.submitterForm = form;
+  setSubmitContext(req, { workspaceId: form.workspaceId, formId: form.id });
+};
+
 /**
- * Authorizes POST /submissions from one read of the form named in the body. 404 when the form is
- * missing or deleted, or has no published version.
+ * Reads the form named by :formId, or by the body on POST /submissions, once, with its facts for
+ * the caller. 404 when it is missing or deleted.
  */
-export const requireSubmissionOpen = async (
+export const loadSubmitterForm = async (
   req: Request,
   _res: Response,
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { formId } = req.body as { formId: string };
-    const actorId = actorIdOf(req);
+    const formId = req.params.formId ?? (req.body as { formId: string }).formId;
     const caller = resolveCaller(req);
     const form = await findLiveSubmitterForm({
-      userId: permissionUserId(actorId, caller),
+      userId: permissionUserId(actorIdOf(req), caller),
       formId,
     });
     if (!form) throw new NotFoundError('Form not found', ApiErrorCodes.form_not_found);
-    const change = startStatusOf(form, caller);
-    if (change.status === SubmissionChangeStatus.denied) {
-      refuseSubmitter(req, SubmitterOperation.open, { formId }, change.code);
+    storeForm(req, form);
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Reads the form version named by :id once, with its form and the form's facts for the caller.
+ * 404 when it or its form is missing or deleted.
+ */
+export const loadSubmitterFormVersion = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const caller = resolveCaller(req);
+    const loaded = await findSubmitterFormVersion({
+      userId: permissionUserId(actorIdOf(req), caller),
+      formVersionId: req.params.id,
+    });
+    if (!loaded) {
+      throw new NotFoundError('Form version schema not found', ApiErrorCodes.schema_not_found);
     }
-    if (change.status === SubmissionChangeStatus.closed) {
-      throw new NotFoundError('Form has no published version', change.code);
-    }
-    setSubmitContext(req, { workspaceId: form.workspaceId, formId });
+    req.submitterFormVersion = loaded.version;
+    storeForm(req, loaded.form);
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** The form loadSubmitterForm or loadSubmitterFormVersion stored. */
+export const loadedForm = (req: Request): SubmitterFormListRow => {
+  if (!req.submitterForm) {
+    throw new Error('Submit-mode form guards and handlers must run after a form load');
+  }
+  return req.submitterForm;
+};
+
+/** The form version loadSubmitterFormVersion stored. */
+export const loadedFormVersion = (req: Request): SubmitterFormVersionRow => {
+  if (!req.submitterFormVersion) {
+    throw new Error('Submit-mode version handlers must run after loadSubmitterFormVersion');
+  }
+  return req.submitterFormVersion;
+};
+
+/**
+ * Throws the refusal of a start on the form: 401/403 when the caller may not start, 404 when it has
+ * no published version, 409 when a read names a version that is not the published one.
+ */
+const refuseStart = (req: Request, form: SubmitterFormListRow, change: SubmissionChange): void => {
+  if (change.status === SubmissionChangeStatus.denied) {
+    refuseSubmitter(req, SubmitterOperation.open, { formId: form.id }, change.code);
+  }
+  if (change.status !== SubmissionChangeStatus.closed) return;
+  if (change.code === ApiErrorCodes.version_not_published) {
+    throw new ConflictError('Form version is not the published version', change.code);
+  }
+  throw new NotFoundError('Form has no published version', change.code);
+};
+
+/** Authorizes starting a submission on the loaded form: opening one, or reading the form for it. */
+export const requireSubmissionStart: RequestHandler = (req, _res, next) => {
+  try {
+    const form = loadedForm(req);
+    refuseStart(req, form, startStatusOf(form, resolveCaller(req)));
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** Authorizes a read of the loaded version's schema: a start, on the published version. */
+export const requireVersionSchemaRead: RequestHandler = (req, _res, next) => {
+  try {
+    const form = loadedForm(req);
+    const change = versionSchemaStatusOf(loadedFormVersion(req).id, form, resolveCaller(req));
+    refuseStart(req, form, change);
     next();
   } catch (error) {
     next(error);

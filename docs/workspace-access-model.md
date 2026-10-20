@@ -15,14 +15,15 @@ They don't overlap: being a workspace admin grants no form permissions, and vice
 adds a third control per submission, who takes part in it; see
 [Submission participants](#submission-participants).
 
-> **Current status.** The design form routes (`api/forms/route.ts`) and the staff submission routes
-> (`api/submissions/route.ts`) are gated by `requireFormPermissions`, except schema normalize (no
-> workspace), and check the caller's permissions on the form in question (see
+> **Current status.** The design form routes (`api/forms/route.ts`), the staff submission routes
+> (`api/submissions/route.ts`) and staff print (`features/document-generation/designRoute.ts`) are
+> gated by `requireFormPermissions`, except schema normalize (no workspace), and check the caller's
+> permissions on the form in question (see
 > [Resolving a user's permissions](#resolving-a-users-permissions)). Creating a form requires
 > `form_create` and `design_create`; only `form_admin` satisfies that, via `*`. Creating a design on
 > an existing form requires `design_create` and `design_update` (`form_designer`), since the create
 > writes the design's schema. The submit routes decide with the submitter rules in `@soba/lib`; the
-> file and document generation routes make the same read and decide by the same rules (see
+> file and submit document generation routes make the same read and decide by the same rules (see
 > [Submission participants](#submission-participants)); rendering a document also needs
 > `document_template_read`. The template routes (`features/templates/route.ts`) are gated by
 > `requireFormPermissions`: `form_read` and `document_template_read` to list and download,
@@ -131,14 +132,14 @@ each role grants permissions. Users are members of groups.
 
 Six form roles are seeded (`role` + `role_permission`):
 
-| role                  | permissions                                                                                                |
-| --------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `form_admin`          | `*` (everything)                                                                                           |
-| `form_designer`       | `form_read`, `design_create`, `design_read`, `design_update`, `design_delete`                              |
-| `form_submitter`      | `submission_create`, `document_template_read`                                                              |
-| `submission_reviewer` | `form_read`, `submission_read`, `submission_update`, `submission_delete`, `submission_review`, `team_read` |
-| `submission_approver` | `form_read`, `submission_read`, `submission_review`, `team_read`                                           |
-| `team_manager`        | `form_read`, `team_read`, `team_update`                                                                    |
+| role                  | permissions                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `form_admin`          | `*` (everything)                                                                                                                      |
+| `form_designer`       | `form_read`, `design_create`, `design_read`, `design_update`, `design_delete`                                                         |
+| `form_submitter`      | `submission_create`, `document_template_read`                                                                                         |
+| `submission_reviewer` | `form_read`, `submission_read`, `submission_update`, `submission_delete`, `submission_review`, `submission_print_upload`, `team_read` |
+| `submission_approver` | `form_read`, `submission_read`, `submission_review`, `submission_print_upload`, `team_read`                                           |
+| `team_manager`        | `form_read`, `team_read`, `team_update`                                                                                               |
 
 `*` is a wildcard: a role holding it satisfies any permission check. Only `form_admin` has it, so adding
 new permissions later needs no change to that role.
@@ -149,8 +150,11 @@ new permissions later needs no change to that role.
 (via `*`). `form_designer` can create a new design on an existing form (`design_create` and
 `design_update`).
 
+`submission_print_upload`, with `submission_read`, lets staff print a submission with a template
+uploaded for that print only.
+
 The permission codes are: `form_create/read/update/delete`, `design_create/read/update/delete`,
-`submission_create/read/update/delete/review`, `team_read/update`, `document_template_create/read/delete`.
+`submission_create/read/update/delete/review/print_upload`, `team_read/update`, `document_template_create/read/delete`.
 
 ### Group membership is "who", not "what"
 
@@ -309,17 +313,19 @@ reads and deletes, and document generation make the same read and decide by the 
 | `write`: save, submit                                   | an active grant and `submission_create` on the form                                       |
 | `upload`: a file                                        | `write`, on an opened or draft submission                                                 |
 | `deleteFile`                                            | `write` on an opened or draft submission; once submitted, `submission_update` on the form |
-| `render`: print, preview, template list                 | an active grant and `document_template_read` on the form                                  |
+| `render`: print, template list                          | an active grant and `document_template_read` on the form                                  |
 | `delete`: the caller's own submission                   | a signed-in caller with an active owner grant                                             |
 
 Owners and collaborators have the same access, except that only an owner deletes. A submitter
 deletes only an opened or draft submission; a submitted one is a 409. `@soba/lib` holds those states
-and the rules over a My Submissions row (`isSubmissionInProgress`, `canDeleteOwnSubmission`), so the
-list's Continue and Delete give the server's answer. The public user's ownership
+and the rules the routes decide with; My Submissions applies them to each row and the form facts
+read with it (`canContinueSubmission`, `canDeleteOwnSubmission`), so a row offers Continue only when
+the caller can still write it and Delete only when they can delete it. The public user's ownership
 grants no delete, because every anonymous caller shares it. Design routes do not use these rules;
-staff read and delete submissions through form permissions. Files, print and preview have no design
-route, so staff download files through `/files` or `/submit/files`, and print and preview through
-the submit routes, all of which need a grant.
+staff read, delete and print submissions through form permissions. Files have no design route, so
+staff download them through `/files` or `/submit/files`, which need a grant. Staff print through
+`/design/submissions/:id/{templates,print}` with `submission_read`, and with a template uploaded for
+that print through `/design/print-upload/:id` with `submission_print_upload` as well.
 
 A repeated write gets its recorded answer before these rules run, so a retry keeps its answer after
 the form's settings change. A save or submit whose revision id the caller already recorded on the
