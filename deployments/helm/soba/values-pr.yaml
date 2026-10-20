@@ -4,6 +4,11 @@ backend:
   features:
     dev-data: "enabled"
   replicas: 1
+  # Files and templates in S3; credentials and bucket come from Vault.
+  storage:
+    defaultBackend: storage-s3
+    defaultPrefix: pr
+    s3VaultKeyInfix: PR
   config:
     documentGenerationDefaultCode: cdogs-v2
     tenantEngineDefaultCode: cstar-v1
@@ -74,13 +79,6 @@ formio:
   internal:
     enabled: true
   replicas: 1
-  resources:
-    requests:
-      cpu: 25m
-      memory: 128Mi
-    limits:
-      cpu: 250m
-      memory: 512Mi
   # Formio depends on MongoDB; allow time for MongoDB to be ready after PR deploy
   readinessProbe:
     initialDelaySeconds: 45
