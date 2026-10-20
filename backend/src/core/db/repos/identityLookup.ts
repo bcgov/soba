@@ -35,7 +35,7 @@ export async function findIdentityOwners(
   identities: ReadonlyArray<{ identityProvider: string; subject: string }>,
 ): Promise<IdentityOwner[]> {
   if (identities.length === 0) return [];
-  return db
+  return await db
     .select({
       identityProvider: userIdentities.identityProviderCode,
       subject: userIdentities.subject,
