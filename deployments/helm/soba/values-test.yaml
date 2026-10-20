@@ -28,7 +28,7 @@ backend:
     documentGenerationDefaultCode: cdogs-v2
     tenantEngineDefaultCode: cstar-v1
     notificationDefaultCode: notify-v1
-    userSearchPlugins: css-v1
+    userSearchPlugins: css-v1,user-search-soba
   documentGeneration:
     cdogsV2:
       endpoint: https://cdogs-test.api.gov.bc.ca/api

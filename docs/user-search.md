@@ -37,7 +37,19 @@ Searching creates no account or membership.
 ## Plugins
 
 `USER_SEARCH_PLUGINS` lists the enabled plugins, comma-separated, in merge order. Unset enables
-none.
+none. Where both are enabled, `css-v1` is listed first. Soba stores a profile at first sign-in and
+never refreshes it.
+
+### user-search-soba
+
+Searches active Soba users by the identities they signed in with. It needs no config and can
+search every active login provider by every filter.
+
+| Filter | Matches |
+| --- | --- |
+| `email` | The profile email, starting with the term, ignoring case |
+| `firstName`, `lastName` | The profile field, starting with the term, ignoring case. When the field is empty, a word of the display name starting with the term |
+| `guid` | The identity subject `<guid>@<identity provider>` |
 
 ### css-v1
 
@@ -68,3 +80,5 @@ CSS API reference: https://bcgov.github.io/sso-docs/css-application/css-app-api
 
 Search filters are names, email addresses and guids. The request log drops the query string on
 `/user-search` routes, and outbound HTTP logs and errors carry the URL without its query string.
+`user-search-soba` passes the filters to its query as parameters, and the database query log
+writes parameters at `debug`.

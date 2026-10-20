@@ -148,8 +148,9 @@ backend:
     notificationDefaultCode: notification-noop
     # notificationDefaultCode: notify-v1
     # User search plugins, comma-separated, in merge order. Empty enables none.
-    # css-v1 also injects the CSS credentials from Vault, so the secret must hold them.
-    userSearchPlugins: ""
+    # user-search-soba searches Soba's own users and needs no config. css-v1 injects the CSS
+    # credentials from Vault, so the secret must hold them.
+    userSearchPlugins: user-search-soba
     sobaSystemSubject: soba-system
 
   # -- Shared temp storage PVC (RWX so it survives horizontal scaling).

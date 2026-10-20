@@ -226,7 +226,8 @@ Notify with an API key. ConfigMap `<fullname>-backend-notification`:
 
 User search finds people to add to a workspace or a form's team, across every enabled plugin.
 `backend.features.user-search` turns it on; the migration leaves it disabled. With no plugins
-listed, nothing is searched. ConfigMap `<fullname>-backend-user-search`:
+listed, nothing is searched. `user-search-soba` searches Soba's own users and needs no config.
+ConfigMap `<fullname>-backend-user-search`:
 
 | Helm value                             | Env var                      | Used by              |
 | -------------------------------------- | ---------------------------- | -------------------- |

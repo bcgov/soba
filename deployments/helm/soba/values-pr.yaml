@@ -11,7 +11,7 @@ backend:
     tenantEngineDefaultCode: cstar-v1
     workflowEngineDefaultCode: cs-workflow-v1
     notificationDefaultCode: notify-v1
-    userSearchPlugins: css-v1
+    userSearchPlugins: css-v1,user-search-soba
     # Ephemeral PR namespaces stage temp bytes under os.tmpdir() — no RWX PVC.
     tempStorageDefaultCode: tempstorage-os
     # Virus scan inherits virusscan-clamav from values.yaml: PRs deploy into the dev

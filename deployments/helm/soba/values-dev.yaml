@@ -29,7 +29,7 @@ backend:
     tenantEngineDefaultCode: cstar-v1
     workflowEngineDefaultCode: cs-workflow-v1
     notificationDefaultCode: notify-v1
-    userSearchPlugins: css-v1
+    userSearchPlugins: css-v1,user-search-soba
   documentGeneration:
     cdogsV2:
       endpoint: https://cdogs-dev.api.gov.bc.ca/api
