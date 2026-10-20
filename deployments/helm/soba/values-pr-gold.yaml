@@ -1,9 +1,8 @@
 # Gold cluster settings; sizing is inherited from values-pr.yaml.
 gatewayNetworkPolicy:
-  # No confirmed Gold gateway settings; do not inherit Silver's namespace.
-  enabled: false
-  namespaceName: ""
-  environment: ""
+  # The PR workflow controls enabled through APS_PR_ENABLED.
+  namespaceName: "b8840c"
+  environment: test
 
 vault:
   enabled: true
