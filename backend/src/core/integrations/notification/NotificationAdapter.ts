@@ -24,7 +24,15 @@ export interface EmailReceipt {
   status: string;
 }
 
+/** Result of a notification readiness check; no config or credentials are exposed. */
+export interface NotificationReadinessResult {
+  ok: boolean;
+  message?: string;
+}
+
 export interface NotificationAdapter {
+  /** Optional: report whether the provider is reachable and accepts the configured credentials. */
+  readinessCheck?(): Promise<NotificationReadinessResult>;
   sendEmail(email: SendEmail): Promise<EmailReceipt>;
 }
 

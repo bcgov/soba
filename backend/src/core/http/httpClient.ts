@@ -150,6 +150,21 @@ export class HttpClient {
       },
       deadline,
     );
+    return this.readBinary(path, res, deadline);
+  }
+
+  /** GET a path and return the raw response bytes. */
+  async getForBinary(path: string, deadline: number = this.deadline()): Promise<BinaryResponse> {
+    const res = await this.send(path, { method: 'GET' }, deadline);
+    return this.readBinary(path, res, deadline);
+  }
+
+  /** GET a path, resolving on 2xx and throwing HttpClientError on non-2xx (e.g. health/liveness). */
+  async get(path: string, deadline: number = this.deadline()): Promise<void> {
+    await this.send(path, { method: 'GET' }, deadline);
+  }
+
+  private async readBinary(path: string, res: Response, deadline: number): Promise<BinaryResponse> {
     // The fetch signal expires at the same deadline, so a stalled body aborts with it.
     const data = await this.withTimeout(
       this.buildUrl(path),
@@ -160,11 +175,6 @@ export class HttpClient {
       data: Buffer.from(data),
       contentType: res.headers.get('content-type') ?? undefined,
     };
-  }
-
-  /** GET a path, resolving on 2xx and throwing HttpClientError on non-2xx (e.g. health/liveness). */
-  async get(path: string, deadline: number = this.deadline()): Promise<void> {
-    await this.send(path, { method: 'GET' }, deadline);
   }
 
   private buildUrl(path: string): string {

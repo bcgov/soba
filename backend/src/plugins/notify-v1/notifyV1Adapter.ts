@@ -4,6 +4,7 @@ import {
   SendEmailSchema,
   type EmailReceipt,
   type NotificationAdapter,
+  type NotificationReadinessResult,
   type SendEmail,
 } from '../../core/integrations/notification/NotificationAdapter';
 import { HttpClient, HttpClientError, HttpClientTimeoutError } from '../../core/http/httpClient';
@@ -11,6 +12,11 @@ import { ServiceUnavailableError, ValidationError } from '../../core/errors';
 import { log } from '../../core/logging';
 
 const EMAIL_PATH = 'notifysimple/email';
+// A keyed read with no side effects, so the readiness check exercises the URL and the API key.
+const CHANNELS_PATH = 'code-tables/channels';
+
+// Only Notify's channel list counts: a wrong base URL can reach the Notify web app, which answers 200.
+const ChannelsSchema = z.array(z.object({ code: z.string().min(1) })).min(1);
 
 // Notify adds statuses over time, so any status is accepted.
 const NotifyAcceptanceSchema = z.object({
@@ -34,12 +40,12 @@ const NETWORK_CODES = new Set([
   'UND_ERR_SOCKET',
 ]);
 
-function failureMessage(err: unknown): string {
+/** `action` failed, with the cause reduced to a status, timeout or known network code. */
+function failureMessage(action: string, err: unknown): string {
   if (err instanceof ServiceUnavailableError) return err.message;
-  if (err instanceof HttpClientError)
-    return `Notify email send failed (upstream HTTP ${err.status})`;
+  if (err instanceof HttpClientError) return `${action} failed (upstream HTTP ${err.status})`;
   if (err instanceof HttpClientTimeoutError)
-    return `Notify email send failed (timeout; budget ${err.budgetMs}ms)`;
+    return `${action} failed (timeout; budget ${err.budgetMs}ms)`;
   if (err instanceof SyntaxError) return 'Notify returned an invalid JSON response';
   if (err instanceof Error) {
     const cause = err.cause;
@@ -50,10 +56,10 @@ function failureMessage(err: unknown): string {
       code = err.code;
     }
     if (typeof code === 'string' && NETWORK_CODES.has(code))
-      return `Notify email send failed (network ${code})`;
-    if (err instanceof TypeError) return 'Notify email send failed (network or request error)';
+      return `${action} failed (network ${code})`;
+    if (err instanceof TypeError) return `${action} failed (network or request error)`;
   }
-  return 'Notify email send failed';
+  return `${action} failed`;
 }
 
 /** Notify v1 email client using the configured API key. */
@@ -69,6 +75,19 @@ export class NotifyV1Adapter implements NotificationAdapter {
       timeoutMs: config.getOptionalNumber('TIMEOUT_MS'),
     });
     this.debugResponses = config.getOptional('DEBUG_RESPONSES') === 'true';
+  }
+
+  async readinessCheck(): Promise<NotificationReadinessResult> {
+    try {
+      const response = await this.http.getForBinary(CHANNELS_PATH);
+      const body: unknown = JSON.parse(response.data.toString('utf8'));
+      if (!ChannelsSchema.safeParse(body).success) {
+        return { ok: false, message: 'Notify readiness check got an unexpected response' };
+      }
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: failureMessage('Notify readiness check', err) };
+    }
   }
 
   async sendEmail(email: SendEmail): Promise<EmailReceipt> {
@@ -90,7 +109,7 @@ export class NotifyV1Adapter implements NotificationAdapter {
         );
       }
       // Upstream bodies can contain recipient addresses or credentials; keep them private.
-      throw new ServiceUnavailableError(failureMessage(err));
+      throw new ServiceUnavailableError(failureMessage('Notify email send', err));
     }
   }
 

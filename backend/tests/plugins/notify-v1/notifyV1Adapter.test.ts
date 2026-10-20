@@ -117,3 +117,54 @@ test('identifies invalid JSON without exposing response content', async () => {
     new Error('Notify returned an invalid JSON response'),
   );
 });
+
+describe('readiness', () => {
+  // Notify's channel code table, as GET code-tables/channels returns it.
+  const channels = [
+    { code: 'email', displayName: 'Email', description: 'Email', createdAt: '', updatedAt: '' },
+  ];
+
+  test('reads the channel list with the API key', async () => {
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify(channels)));
+    await expect(makeAdapter().readinessCheck()).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://notify.example/api/v1/code-tables/channels',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({ 'X-API-KEY': 'configured-key' }),
+      }),
+    );
+  });
+
+  test('reports a rejected key without the response body', async () => {
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response('{"message":"Unauthorized"}', { status: 401 }));
+    await expect(makeAdapter().readinessCheck()).resolves.toEqual({
+      ok: false,
+      message: 'Notify readiness check failed (upstream HTTP 401)',
+    });
+  });
+
+  test.each([
+    ['an HTML page', '<!doctype html><html></html>', 'Notify returned an invalid JSON response'],
+    ['other JSON', '{"status":"ok"}', 'Notify readiness check got an unexpected response'],
+  ])('treats %s as a wrong endpoint', async (_case, body, message) => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(new Response(body));
+    await expect(makeAdapter().readinessCheck()).resolves.toEqual({ ok: false, message });
+  });
+
+  test('reports a network cause without its message', async () => {
+    jest.spyOn(global, 'fetch').mockRejectedValue(
+      new TypeError('fetch failed', {
+        cause: Object.assign(new Error('getaddrinfo notify.example'), { code: 'ENOTFOUND' }),
+      }),
+    );
+    await expect(makeAdapter().readinessCheck()).resolves.toEqual({
+      ok: false,
+      message: 'Notify readiness check failed (network ENOTFOUND)',
+    });
+  });
+});

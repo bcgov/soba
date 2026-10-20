@@ -18,7 +18,9 @@ Configure these backend environment variables (put the API key in a Secret):
 Notify test only delivers to addresses on its safelist. Add each recipient at
 https://common-notify-test.apps.silver.devops.gov.bc.ca/settings
 
-The adapter authenticates to Notify using only the configured `X-API-KEY`.
+The adapter authenticates to Notify using only the configured `X-API-KEY`. At
+startup the backend logs whether a keyed `GET code-tables/channels` returns
+Notify's channel list, which checks the endpoint and the key without sending.
 Backend code sends email through the plugin registry:
 
 ```ts

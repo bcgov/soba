@@ -6,6 +6,7 @@ import {
   getEventStreamAdapter,
   getTempStorageAdapter,
   getVirusScanAdapter,
+  checkNotificationReadiness,
   resolveActivePluginCode,
 } from '../../integrations/plugins/PluginRegistry';
 import {
@@ -281,5 +282,15 @@ export async function logWorkflowEngineReadiness(): Promise<void> {
     );
   } else {
     log.info({ workflowEngines: results }, 'Workflow engine readiness: all engines ready');
+  }
+}
+
+/** Log the active notification plugin's readiness (reachability / config) at startup. Never throws. */
+export async function logNotificationReadiness(): Promise<void> {
+  const notification = await checkNotificationReadiness();
+  if (Object.values(notification).every((result) => result.ok)) {
+    log.info({ notification }, 'Notification readiness: ready');
+  } else {
+    log.warn({ notification }, 'Notification readiness: not ready');
   }
 }

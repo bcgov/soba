@@ -44,6 +44,7 @@ import type { WorkflowEnginePluginDefinition } from '../workflow/WorkflowEngineP
 import type {
   NotificationAdapter,
   NotificationPluginDefinition,
+  NotificationReadinessResult,
 } from '../notification/NotificationAdapter';
 import { reportReadinessByKey } from './readiness';
 
@@ -530,6 +531,16 @@ export const getNotificationAdapter = lazyAdapter<NotificationAdapter>(
   'notification',
   getNotificationPluginDefinitions,
 );
+
+/**
+ * Readiness of the active notification plugin, keyed by its code. Never throws: a plugin that cannot
+ * be created (missing config) yields { ok: false, message }; one with no readinessCheck is ok.
+ */
+export function checkNotificationReadiness(): Promise<Record<string, NotificationReadinessResult>> {
+  return reportReadinessByKey([resolveActivePluginCode('notification')], () =>
+    getNotificationAdapter().readinessCheck?.(),
+  );
+}
 
 // --- Storage (discovered above, but selected per profile) -------------------
 
