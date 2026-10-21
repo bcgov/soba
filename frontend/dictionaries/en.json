@@ -392,6 +392,32 @@
     "submit": "Submit",
     "noFormName": "Form name is required"
   },
+  "team": {
+    "members": "Team members",
+    "name": "Name",
+    "email": "Email",
+    "groups": "Groups",
+    "actions": "Actions",
+    "edit": "Edit",
+    "remove": "Remove",
+    "addMember": "Add Team Member",
+    "editMember": "Edit Team Member",
+    "saveMember": "Save",
+    "emptyList": "No team members",
+    "loadError": "Could not load team members.",
+    "searchStep": "1. Search for a user:",
+    "groupsStep": "2. Assign groups to this user:",
+    "groupsRequired": "Select at least one group.",
+    "sampleNotice": "Team members on this tab are sample data. Changes are not saved yet.",
+    "addSuccess": "Team member added.",
+    "addFailure": "Could not add the team member.",
+    "editSuccess": "Team member updated.",
+    "editFailure": "Could not update the team member.",
+    "removeTitle": "Remove team member",
+    "removeMessage": "{name} will lose access to this form.",
+    "removeSuccess": "Team member removed.",
+    "removeFailure": "Could not remove the team member."
+  },
   "submission": {
     "success": {
       "pageTitle": "Submission Confirmation",
@@ -574,7 +600,6 @@
     "itemName": "forms"
   },
   "userSearch": {
-    "heading": "Find a person",
     "fieldLabel": "Search by",
     "fields": {
       "email": "Email",
@@ -592,7 +617,6 @@
     "someUnavailable": "Some directories could not be searched, so this list may be incomplete.",
     "existingUser": "Existing user",
     "selected": "Selected: {name}",
-    "notAddedYet": "Selecting a person does not add them to the team yet.",
     "unavailable": "User search is unavailable.",
     "errors": {
       "sessionExpired": "Your session has expired. Sign in again.",

@@ -9,10 +9,9 @@ import {
   ListBox,
   ListBoxItem,
   Popover,
-  Text,
   type Key,
 } from 'react-aria-components';
-import { Heading, Select } from '@bcgov/design-system-react-components';
+import { Select } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { messageForDataError } from '@/src/shared/api/dataError';
 import type { Dictionary } from '@/src/types/dictionary';
@@ -153,9 +152,6 @@ export function UserSearchPicker({
 
   return (
     <div>
-      <Heading level={2} isUnstyled className="h5 mb-3">
-        {text.heading}
-      </Heading>
       <div className={styles.controls}>
         {/* Sized here: a className on a BCDS field replaces its own root class. */}
         <div className={styles.select}>
@@ -196,9 +192,6 @@ export function UserSearchPicker({
             maxLength={MAX_LENGTH[field]}
             data-testid="user-search-input"
           />
-          <Text slot="description" className={styles.description}>
-            {text.notAddedYet}
-          </Text>
           <Popover className={styles.popover}>
             <ListBox<UserSearchUser> className={styles.listBox}>
               {(user) => (

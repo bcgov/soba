@@ -393,6 +393,32 @@
     "submit": "Soumettre",
     "noFormName": "Nom de formulaire est requise"
   },
+  "team": {
+    "members": "Membres de l’équipe",
+    "name": "Nom",
+    "email": "Courriel",
+    "groups": "Groupes",
+    "actions": "Actions",
+    "edit": "Modifier",
+    "remove": "Retirer",
+    "addMember": "Ajouter un membre de l’équipe",
+    "editMember": "Modifier le membre de l’équipe",
+    "saveMember": "Enregistrer",
+    "emptyList": "Aucun membre de l’équipe",
+    "loadError": "Impossible de charger les membres de l’équipe.",
+    "searchStep": "1. Rechercher un utilisateur :",
+    "groupsStep": "2. Attribuer des groupes à cet utilisateur :",
+    "groupsRequired": "Sélectionnez au moins un groupe.",
+    "sampleNotice": "Les membres de l’équipe dans cet onglet sont des données d’exemple. Les modifications ne sont pas encore enregistrées.",
+    "addSuccess": "Membre de l’équipe ajouté.",
+    "addFailure": "Impossible d’ajouter le membre de l’équipe.",
+    "editSuccess": "Membre de l’équipe mis à jour.",
+    "editFailure": "Impossible de mettre à jour le membre de l’équipe.",
+    "removeTitle": "Retirer le membre de l’équipe",
+    "removeMessage": "{name} perdra l’accès à ce formulaire.",
+    "removeSuccess": "Membre de l’équipe retiré.",
+    "removeFailure": "Impossible de retirer le membre de l’équipe."
+  },
   "submission": {
     "success": {
       "pageTitle": "Confirmation de soumission",
@@ -575,7 +601,6 @@
     "itemName": "formulaires"
   },
   "userSearch": {
-    "heading": "Trouver une personne",
     "fieldLabel": "Rechercher par",
     "fields": {
       "email": "Courriel",
@@ -593,7 +618,6 @@
     "someUnavailable": "Certains annuaires n'ont pas pu être consultés; la liste peut être incomplète.",
     "existingUser": "Utilisateur existant",
     "selected": "Sélection : {name}",
-    "notAddedYet": "La sélection d'une personne ne l'ajoute pas encore à l'équipe.",
     "unavailable": "La recherche de personnes n'est pas disponible.",
     "errors": {
       "sessionExpired": "Votre session a expiré. Reconnectez-vous.",

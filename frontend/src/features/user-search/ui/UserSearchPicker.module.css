@@ -43,12 +43,6 @@
   outline-offset: var(--layout-margin-hair);
 }
 
-.description {
-  font: var(--typography-regular-small-body);
-  color: var(--typography-color-secondary);
-  padding-top: var(--layout-padding-xsmall);
-}
-
 .popover {
   width: var(--trigger-width);
   max-height: 18rem;
