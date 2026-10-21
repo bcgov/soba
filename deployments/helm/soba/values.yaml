@@ -390,11 +390,9 @@ formio:
     requests:
       cpu: "1"
       memory: 3Gi
-      ephemeral-storage: 4Gi
     limits:
       cpu: "2"
       memory: 10Gi
-      ephemeral-storage: 8Gi
   service:
     port: 3001
   livenessProbe:

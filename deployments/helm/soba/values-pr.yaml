@@ -97,6 +97,10 @@ formio:
     timeoutSeconds: 10
   livenessProbe:
     initialDelaySeconds: 60
+  nodeOptions: "--max-old-space-size=384"
+  resources:
+    requests: { cpu: 25m, memory: 128Mi }
+    limits: { cpu: 250m, memory: 512Mi }
 
 mongodb:
   # MongoDB runs as its own release from deployments/helm/action-mongodb. The deploy
