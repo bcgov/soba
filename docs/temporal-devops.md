@@ -122,7 +122,7 @@ The SOBA Helm chart under `deployments/helm/soba` now includes:
   - `TEMPORAL_TASK_QUEUE`
 - a `templates/temporal/deployment-worker.yaml` that deploys the SOBA worker as its own Deployment, with:
   - secret wiring that matches the backend (DB via `existingSecretName`/`secretKeyRef`, Form.io gated behind Vault)
-  - HTTP health endpoints (`/readyz`, `/healthz`) on each worker's `healthPort` (for example `9090` and `9091`) backed by readiness and liveness probes
+  - HTTP health endpoints (`/readyz`, `/healthz`) on each worker's `healthPort` (default `9090`) backed by readiness and liveness probes
 
 Current enablement pattern:
 

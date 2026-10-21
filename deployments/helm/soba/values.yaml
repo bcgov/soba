@@ -508,20 +508,6 @@ temporalWorkers:
         cpu: 100m
         memory: 512Mi
 
-  - name: temporal-worker-document-generation
-    enabled: false
-    taskQueue: "document-generation"
-    replicas: 1
-    # Keep a different health port from the main worker in the same namespace.
-    healthPort: 9091
-    resources:
-      requests:
-        cpu: 25m
-        memory: 128Mi
-      limits:
-        cpu: 100m
-        memory: 512Mi
-
 # -- Vault Agent Injector
 vault:
   enabled: false
