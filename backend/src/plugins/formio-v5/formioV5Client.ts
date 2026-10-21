@@ -27,7 +27,9 @@ export const isFormioNotFound = (err: unknown): boolean =>
   err instanceof FormioApiError &&
   (err.status === 404 || (err.status === 400 && /resource not found/i.test(err.body)));
 
-export type FormioQuery = { params?: Record<string, unknown> } | undefined;
+export type FormioQuery =
+  | { params?: Record<string, string | number | boolean | null | undefined> }
+  | undefined;
 
 function buildQueryString(query?: FormioQuery): string {
   if (!query?.params || typeof query.params !== 'object') return '';

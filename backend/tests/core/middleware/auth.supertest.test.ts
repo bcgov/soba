@@ -3,6 +3,7 @@ import passport from 'passport';
 import request from 'supertest';
 import type { NextFunction, Request, Response } from 'express';
 import { checkJwt } from '../../../src/core/middleware/auth';
+import { globalRateLimit } from '../../../src/core/middleware/rateLimit';
 import { initializePassport, resetPassportForTests } from '../../../src/core/auth/passport';
 import { getIdpPlugins } from '../../../src/core/auth/idpRegistry';
 import { getToken } from '../../../src/core/auth/IdpPlugin';
@@ -58,6 +59,8 @@ const verifyingPlugin = createPlugin('verifying-idp', (req, _res, next) => {
 
 function createApp() {
   const app = express();
+  // Same global limiter as app.ts.
+  app.use(globalRateLimit);
   initializePassport();
   app.use(passport.initialize());
   const echoUser: express.RequestHandler = (req, res) => {
