@@ -7,7 +7,7 @@ import type { TeamGroup, TeamMember } from '@/src/types/formTeam';
 import type { UserSearchUser } from '@/src/types/userSearch';
 
 // In-memory sample data until the team API exists (CCP-5928); changes last until reload.
-// Signatures (formId in, WriteOutcome out) match the API-backed hooks that will replace these.
+// Shapes follow the dataContracts types; the API swap also adds the token and the groups' scope.
 const GROUPS: TeamGroup[] = [
   { id: 'group-1', name: 'Group 1' },
   { id: 'group-2', name: 'Group 2' },
