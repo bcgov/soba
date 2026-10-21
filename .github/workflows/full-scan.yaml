@@ -276,7 +276,7 @@ jobs:
             def severity:
               if .score >= 9 then "critical" elif .score >= 7 then "high"
               elif .score >= 4 then "medium" elif .score > 0 then "low" else .level end;
-            [.[].runs[] | . as $run | .results[]
+            [.[].runs[] as $run | $run.results[]
               | (try $run.tool.extensions[.rule.toolComponent.index].rules[.rule.index] catch null) as $rule
               | {
                   rule: .ruleId,
