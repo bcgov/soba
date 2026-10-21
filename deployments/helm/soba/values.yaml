@@ -336,7 +336,7 @@ frontend:
   apps:
     designer:
       enabled: true
-      featuresAllowed: "design-mode,files,meta,marketing,templates"
+      featuresAllowed: "design-mode,files,meta,marketing,templates,user-search"
       routePath: /designer
     forms:
       enabled: true

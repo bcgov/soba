@@ -573,6 +573,34 @@
     "selectedWorkspace": "Selected workspace",
     "itemName": "forms"
   },
+  "userSearch": {
+    "heading": "Find a person",
+    "fieldLabel": "Search by",
+    "fields": {
+      "email": "Email",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "guid": "GUID"
+    },
+    "inputLabel": "Person",
+    "placeholder": "Type to search",
+    "hint": "Type at least {min} characters.",
+    "searching": "Searching...",
+    "noResults": "No one found. Try another search.",
+    "resultCount": "{count} found.",
+    "truncated": "Showing the first {count}. Refine your search.",
+    "someUnavailable": "Some directories could not be searched, so this list may be incomplete.",
+    "existingUser": "Existing user",
+    "selected": "Selected: {name}",
+    "notAddedYet": "Selecting a person does not add them to the team yet.",
+    "unavailable": "User search is unavailable.",
+    "errors": {
+      "sessionExpired": "Your session has expired. Sign in again.",
+      "forbidden": "You do not have permission to search for people here.",
+      "offline": "You appear to be offline. Check your connection and try again.",
+      "failed": "The search could not be completed. Try again."
+    }
+  },
   "Basic": "Basic",
   "Text Field": "Text Field",
   "Text Area": "Text Area",
