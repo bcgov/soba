@@ -53,6 +53,17 @@ export type PrintChoiceCode = (typeof PrintChoice)[keyof typeof PrintChoice];
 /** Provider code of the shared public user that anonymous callers resolve to. */
 export const PUBLIC_PROVIDER_CODE = 'public';
 
+/**
+ * Seeded login identity providers (soba.identity_provider). Each code is the SSO token's
+ * identity_provider claim, lowercased.
+ */
+export const IdentityProviders = {
+  idir: 'idir',
+  azureidir: 'azureidir',
+  bceidbusiness: 'bceidbusiness',
+} as const;
+export type IdentityProviderCode = (typeof IdentityProviders)[keyof typeof IdentityProviders];
+
 /** Submission lifecycle state (submission.workflow_state). Backend-owned; clients never set it. */
 export const SubmissionWorkflowState = {
   opened: 'opened',

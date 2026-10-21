@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { pool } from '../../db/client';
 import { checkFormEngineReadiness } from '../../integrations/form-engine/FormEngineRegistry';
 import { checkDocumentGenerationReadiness } from '../../integrations/document-generation/DocumentGenerationRegistry';
+import { checkUserSearchReadiness } from '../../integrations/user-search/UserSearchRegistry';
 import { checkTenantEngineReadiness } from '../../integrations/tenant/TenantEngineRegistry';
 import { checkWorkflowEngineReadiness } from '../../integrations/workflow/WorkflowEngineRegistry';
 import {
@@ -34,6 +35,7 @@ export async function readinessHandler(_req: Request, res: Response): Promise<vo
   const documentGeneration = await checkDocumentGenerationReadiness();
   const tenantEngines = await checkTenantEngineReadiness();
   const workflowEngines = await checkWorkflowEngineReadiness();
+  const userSearchPlugins = await checkUserSearchReadiness();
   const tempStorage = await reportReadiness(async () => ({
     ok: await getTempStorageAdapter().ping(),
   }));
@@ -54,6 +56,7 @@ export async function readinessHandler(_req: Request, res: Response): Promise<vo
     documentGeneration,
     tenantEngines,
     workflowEngines,
+    userSearchPlugins,
     cache,
     messageBus,
     eventStream,

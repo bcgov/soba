@@ -102,6 +102,7 @@ backend:
   features:
     dev-data: ""
     notifications: ""
+    user-search: ""
 
   # -- configmap-app: general application config
   config:
@@ -146,6 +147,10 @@ backend:
     # Notification plugin. notification-noop sends nothing and calls nothing.
     notificationDefaultCode: notification-noop
     # notificationDefaultCode: notify-v1
+    # User search plugins, comma-separated, in merge order. Empty enables none.
+    # user-search-soba searches Soba's own users and needs no config. css-v1 injects the CSS
+    # credentials from Vault, so the secret must hold them.
+    userSearchPlugins: user-search-soba
     sobaSystemSubject: soba-system
 
   # -- Shared temp storage PVC (RWX so it survives horizontal scaling).
@@ -220,6 +225,16 @@ backend:
       timeoutMs: ""
     cdogsV3:
       endpoint: ""
+      # -- outbound deadline in ms; empty uses the backend default (30000)
+      timeoutMs: ""
+
+  # -- configmap-user-search: PLUGIN_CSS_V1_* + enabled plugin codes
+  userSearch:
+    cssV1:
+      apiBaseUrl: ""
+      # -- CSS environment searched: dev, test or prod
+      environment: ""
+      tokenUrl: ""
       # -- outbound deadline in ms; empty uses the backend default (30000)
       timeoutMs: ""
 
@@ -321,7 +336,7 @@ frontend:
   apps:
     designer:
       enabled: true
-      featuresAllowed: "design-mode,files,meta,marketing,templates"
+      featuresAllowed: "design-mode,files,meta,marketing,templates,user-search"
       routePath: /designer
     forms:
       enabled: true

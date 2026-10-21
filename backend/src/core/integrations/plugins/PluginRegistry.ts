@@ -47,6 +47,7 @@ import type {
   NotificationReadinessResult,
 } from '../notification/NotificationAdapter';
 import { reportReadinessByKey } from './readiness';
+import type { UserSearchPluginDefinition } from '../user-search/UserSearchPluginDefinition';
 
 // --- Definition schemas -----------------------------------------------------
 
@@ -56,7 +57,7 @@ const AdapterPluginDefinitionSchema = z.object({
   createAdapter: z.any(),
 });
 
-// form-engine, document-generation, tenant-engine, workflow-engine and notification share this { code, metadata, createAdapter } shape.
+// form-engine, document-generation, tenant-engine, workflow-engine, notification and user-search share this { code, metadata, createAdapter } shape.
 const MetadataPluginDefinitionSchema = z.object({
   code: z.string().min(1),
   metadata: z.object({
@@ -97,6 +98,7 @@ interface CachedPlugin {
   tenantEngineDefinition?: TenantEnginePluginDefinition;
   workflowEngineDefinition?: WorkflowEnginePluginDefinition;
   notificationDefinition?: NotificationPluginDefinition;
+  userSearchDefinition?: UserSearchPluginDefinition;
 }
 
 // Each CachedPlugin definition field, the module export it comes from, and the schema that
@@ -161,6 +163,11 @@ const DEFINITION_KINDS: ReadonlyArray<{
   {
     field: 'notificationDefinition',
     exportKey: 'notificationPluginDefinition',
+    schema: MetadataPluginDefinitionSchema,
+  },
+  {
+    field: 'userSearchDefinition',
+    exportKey: 'userSearchPluginDefinition',
     schema: MetadataPluginDefinitionSchema,
   },
 ];
@@ -307,6 +314,7 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
       p.tenantEngineDefinition?.code ??
       p.workflowEngineDefinition?.code ??
       p.notificationDefinition?.code ??
+      p.userSearchDefinition?.code ??
       p.dir;
     return {
       code,
@@ -390,6 +398,24 @@ export function getWorkflowEnginePluginCatalog(): WorkflowEnginePluginCatalogEnt
 
 export function getWorkflowEnginePluginDefinitions(): WorkflowEnginePluginDefinition[] {
   return definitionsOf('workflowEngineDefinition');
+}
+
+export interface UserSearchPluginCatalogEntry {
+  code: string;
+  name: string;
+  version?: string;
+}
+
+export function getUserSearchPluginCatalog(): UserSearchPluginCatalogEntry[] {
+  return getUserSearchPluginDefinitions().map((d) => ({
+    code: d.code,
+    name: d.metadata.name,
+    version: d.metadata.version,
+  }));
+}
+
+export function getUserSearchPluginDefinitions(): UserSearchPluginDefinition[] {
+  return definitionsOf('userSearchDefinition');
 }
 
 export function getCachePluginDefinitions(): CachePluginDefinition[] {

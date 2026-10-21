@@ -176,6 +176,8 @@ export function createEnvReader(source: EnvSource) {
     getTempStorageDefaultCode: () => getOptionalEnvFrom(source, 'TEMPSTORAGE_DEFAULT_CODE'),
     getVirusScanDefaultCode: () => getOptionalEnvFrom(source, 'VIRUSSCAN_DEFAULT_CODE'),
     getFormEngineDefaultCode: () => getOptionalEnvFrom(source, 'FORM_ENGINE_DEFAULT_CODE'),
+    /** User search plugin codes, in merge order. Unset enables none. */
+    getUserSearchPlugins: () => getCsvEnvFrom(source, 'USER_SEARCH_PLUGINS') ?? [],
     getTenantEngineDefaultCode: () => getOptionalEnvFrom(source, 'TENANT_ENGINE_DEFAULT_CODE'),
     getWorkflowEngineDefaultCode: () => getOptionalEnvFrom(source, 'WORKFLOW_ENGINE_DEFAULT_CODE'),
     getNotificationDefaultCode: () => getOptionalEnvFrom(source, 'NOTIFICATION_DEFAULT_CODE'),
@@ -263,6 +265,8 @@ export const env = {
   getTempStorageDefaultCode: () => getOptionalEnv('TEMPSTORAGE_DEFAULT_CODE'),
   getVirusScanDefaultCode: () => getOptionalEnv('VIRUSSCAN_DEFAULT_CODE'),
   getFormEngineDefaultCode: () => getOptionalEnv('FORM_ENGINE_DEFAULT_CODE'),
+  /** User search plugin codes, in merge order. Unset enables none. */
+  getUserSearchPlugins: () => getCsvEnv('USER_SEARCH_PLUGINS') ?? [],
   getTenantEngineDefaultCode: () => getOptionalEnv('TENANT_ENGINE_DEFAULT_CODE'),
   getWorkflowEngineDefaultCode: () => getOptionalEnv('WORKFLOW_ENGINE_DEFAULT_CODE'),
   getNotificationDefaultCode: () => getOptionalEnv('NOTIFICATION_DEFAULT_CODE'),

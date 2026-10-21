@@ -526,7 +526,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
             disabled={isSaving || draftUnavailable}
             title={dict.form.teamTab || 'Team'}
           >
-            <FormTeamTab dict={dict} />
+            <FormTeamTab dict={dict} formId={formId} />
           </Tab>
         )}
         {canSeeHistoryTab && (
