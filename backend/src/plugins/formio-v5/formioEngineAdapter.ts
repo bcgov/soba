@@ -283,10 +283,10 @@ export class FormioEngineAdapter implements FormEngineAdapter {
         .catch(rethrowEngineRejection('schema'))) as Record<string, unknown> | null;
     }
     const engineRef = saved?._id;
-    if (engineRef == null || engineRef === '') {
+    if (typeof engineRef !== 'string' || engineRef === '') {
       throw new Error('Form.io saveForm did not return an _id');
     }
-    return { engineRef: String(engineRef) };
+    return { engineRef };
   }
 
   /**
@@ -338,8 +338,9 @@ export class FormioEngineAdapter implements FormEngineAdapter {
     const existing = (await client.loadSubmissions(input.engineFormRef, {
       params: { [`metadata.${SOBA_REVISION_ID_FIELD}`]: input.revisionId },
     })) as Array<Record<string, unknown>>;
-    if (existing.length > 0 && existing[0]?._id != null && existing[0]._id !== '') {
-      return { engineRef: String(existing[0]._id) };
+    const existingRef = existing[0]?._id;
+    if (typeof existingRef === 'string' && existingRef !== '') {
+      return { engineRef: existingRef };
     }
 
     const body = buildSubmissionBody(input);
@@ -349,10 +350,10 @@ export class FormioEngineAdapter implements FormEngineAdapter {
       .saveSubmission(input.engineFormRef, body, query)
       .catch(rethrowEngineRejection('data'))) as Record<string, unknown> | null;
     const engineRef = saved?._id;
-    if (engineRef == null || engineRef === '') {
+    if (typeof engineRef !== 'string' || engineRef === '') {
       throw new Error('Form.io saveSubmission did not return an _id');
     }
-    return { engineRef: String(engineRef) };
+    return { engineRef };
   }
 
   /** Read a Form.io submission by form ref + submission ref, stripped of engine-managed fields and
