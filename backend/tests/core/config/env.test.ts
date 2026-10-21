@@ -256,4 +256,10 @@ describe('env', () => {
     const reader = createEnvReader({});
     expect(reader.getTenantEngineDefaultCode()).toBeUndefined();
   });
+
+  it('createEnvReader getUserSearchPlugins reads the list in order, and none when unset', () => {
+    const reader = createEnvReader({ USER_SEARCH_PLUGINS: ' other-v1 , css-v1 ' });
+    expect(reader.getUserSearchPlugins()).toEqual(['other-v1', 'css-v1']);
+    expect(createEnvReader({}).getUserSearchPlugins()).toEqual([]);
+  });
 });

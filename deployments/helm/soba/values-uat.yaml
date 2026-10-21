@@ -2,6 +2,8 @@
 backend:
   features:
     dev-data: "disabled"
+    notifications: "disabled"
+    user-search: "disabled"
   replicas: 3
   resources:
     requests:

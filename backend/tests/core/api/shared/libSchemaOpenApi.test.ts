@@ -7,6 +7,7 @@ import { registerMetaOpenApi } from '../../../../src/core/api/meta/schema';
 import { registerMeOpenApi } from '../../../../src/core/api/me/schema';
 import { registerSubmitOpenApi } from '../../../../src/core/api/submit/schema';
 import { registerFormSettingsOpenApi } from '../../../../src/features/form-settings';
+import { registerUserSearchOpenApi } from '../../../../src/features/user-search/schema';
 
 function componentSchemas(): unknown {
   const registry = new OpenAPIRegistry();
@@ -17,6 +18,7 @@ function componentSchemas(): unknown {
   registerAdminOpenApi(registry);
   registerMetaOpenApi(registry);
   registerMeOpenApi(registry);
+  registerUserSearchOpenApi(registry);
   registerSubmitOpenApi(registry);
   const doc = new OpenApiGeneratorV3(registry.definitions).generateDocument({
     openapi: '3.0.3',
@@ -197,5 +199,21 @@ describe('OpenAPI components for lib-backed schemas', () => {
       ref('Submit_SubmitterForm'),
     );
     expect(at(schemas, response, 'required')).toEqual(expect.arrayContaining(['forms']));
+  });
+
+  it('builds user search responses from the named person, status and provider components', () => {
+    expect(at(schemas, 'UserSearch_Response', 'properties', 'users', 'items')).toEqual(
+      ref('UserSearch_User'),
+    );
+    expect(at(schemas, 'UserSearch_Response', 'properties', 'plugins', 'items')).toEqual(
+      ref('UserSearch_PluginStatus'),
+    );
+    expect(
+      at(schemas, 'UserSearch_CapabilitiesResponse', 'properties', 'identityProviders', 'items'),
+    ).toEqual(ref('UserSearch_IdentityProvider'));
+    expect(at(schemas, 'UserSearch_User', 'properties', 'sobaUserId')).toEqual({
+      type: 'string',
+      nullable: true,
+    });
   });
 });
