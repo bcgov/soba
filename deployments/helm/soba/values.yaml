@@ -101,6 +101,8 @@ backend:
   # the render. dev-data must stay off in production.
   features:
     dev-data: ""
+    notifications: ""
+    user-search: ""
 
   # -- configmap-app: general application config
   config:
@@ -142,6 +144,13 @@ backend:
     tenantEngineDefaultCode: tenant-noop
     # Workflow engine. workflow-noop starts nothing and calls nothing.
     workflowEngineDefaultCode: workflow-noop
+    # Notification plugin. notification-noop sends nothing and calls nothing.
+    notificationDefaultCode: notification-noop
+    # notificationDefaultCode: notify-v1
+    # User search plugins, comma-separated, in merge order. Empty enables none.
+    # user-search-soba searches Soba's own users and needs no config. css-v1 injects the CSS
+    # credentials from Vault, so the secret must hold them.
+    userSearchPlugins: user-search-soba
     sobaSystemSubject: soba-system
 
   # -- Shared temp storage PVC (RWX so it survives horizontal scaling).
@@ -219,6 +228,16 @@ backend:
       # -- outbound deadline in ms; empty uses the backend default (30000)
       timeoutMs: ""
 
+  # -- configmap-user-search: PLUGIN_CSS_V1_* + enabled plugin codes
+  userSearch:
+    cssV1:
+      apiBaseUrl: ""
+      # -- CSS environment searched: dev, test or prod
+      environment: ""
+      tokenUrl: ""
+      # -- outbound deadline in ms; empty uses the backend default (30000)
+      timeoutMs: ""
+
   # -- configmap-tenant-engine: PLUGIN_CSTAR_V1_* + default engine code
   tenantEngine:
     cstarV1:
@@ -232,6 +251,14 @@ backend:
       apiBaseUrl: ""
       # -- outbound deadline in ms; empty uses the backend default (30000)
       timeoutMs: "5000"
+
+  # -- configmap-notification: PLUGIN_NOTIFY_V1_* + default notification code
+  notification:
+    notifyV1:
+      # -- Notify base URL including /api/v1
+      endpoint: ""
+      # -- outbound deadline in ms; empty uses the backend default (30000)
+      timeoutMs: ""
 
   # -- configmap-sso: IDP / SSO config
   sso:
@@ -309,7 +336,7 @@ frontend:
   apps:
     designer:
       enabled: true
-      featuresAllowed: "design-mode,files,meta,marketing,templates"
+      featuresAllowed: "design-mode,files,meta,marketing,templates,user-search"
       routePath: /designer
     forms:
       enabled: true

@@ -24,4 +24,6 @@ export {
   logDocumentGenerationReadiness,
   logTenantEngineReadiness,
   logWorkflowEngineReadiness,
+  logNotificationReadiness,
+  logUserSearchReadiness,
 } from './startupHealth';

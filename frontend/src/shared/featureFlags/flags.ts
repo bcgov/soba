@@ -14,6 +14,8 @@ export const FEATURE_CODES = {
   FILES: 'files',
   /** Document templates stored per form version, managed by staff. */
   TEMPLATES: 'templates',
+  /** Finding people to add to a workspace or a form's team. */
+  USER_SEARCH: 'user-search',
 } as const;
 
 export type FeatureCode = (typeof FEATURE_CODES)[keyof typeof FEATURE_CODES];

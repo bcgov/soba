@@ -1,27 +1,20 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   Button,
   Checkbox,
   CheckboxGroup,
   Form,
   Heading,
-  Radio,
-  RadioGroup,
 } from '@bcgov/design-system-react-components';
 
 import type { Dictionary } from '@/src/types/dictionary';
-import type { TeamMember, UserSearchResult } from '@/src/types/formTeam';
-import { DataTable, type Column } from '@/src/components/DataTable';
-import { ListPageSearchField } from '@/src/components/ListPageSearchField';
+import type { TeamMember } from '@/src/types/formTeam';
+import type { UserSearchUser } from '@/src/types/userSearch';
 import { SecondaryText } from '@/src/components/SecondaryText';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import {
-  useFormTeamWriter,
-  useTeamGroups,
-  useUserSearch,
-} from '@/src/features/designer/data/useFormTeam';
-import { DEFAULT_PAGE_SIZE } from '@/src/shared/list/useListQuery';
+import { useFormTeamWriter, useTeamGroups } from '@/src/features/designer/data/useFormTeam';
+import { UserSearchPicker } from '@/src/features/user-search/ui/UserSearchPicker';
 
 interface FormTeamMemberFormProps {
   dict: Dictionary;
@@ -41,20 +34,9 @@ export default function FormTeamMemberForm({
   const groups = useTeamGroups();
   const teamWriter = useFormTeamWriter(formId);
   const { addNotification } = useNotificationStore();
-  const [searchInput, setSearchInput] = useState('');
-  const [q, setQ] = useState('');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserSearchUser | null>(null);
   const [selectedGroups, setSelectedGroups] = useState(member?.groups ?? []);
   const [saving, setSaving] = useState(false);
-  const users = useUserSearch(formId, q);
-
-  const search = () => {
-    setQ(searchInput);
-    setPage(1);
-    setSelectedUser(null);
-  };
 
   const save = async () => {
     setSaving(true);
@@ -74,40 +56,6 @@ export default function FormTeamMemberForm({
     }
   };
 
-  const columns: Column<UserSearchResult>[] = useMemo(
-    () => [
-      {
-        key: 'select',
-        label: '',
-        // Current members change through Edit. The mark sits beside the radio (wrapping label text
-        // squeezes the circle) as a plain span (design system text in a radio group needs a slot).
-        render: (user) => {
-          const name = `${user.firstName} ${user.lastName}`;
-          return (
-            <span className="d-inline-flex align-items-center gap-2">
-              <Radio
-                value={user.id}
-                isDisabled={user.onTeam}
-                aria-label={(user.onTeam ? t.onTeamLabel : t.select).replace('{name}', name)}
-                data-testid={`${user.id}-select`}
-              />
-              {user.onTeam && (
-                <span className="text-muted small" aria-hidden data-testid={`${user.id}-on-team`}>
-                  {t.onTeam}
-                </span>
-              )}
-            </span>
-          );
-        },
-      },
-      { key: 'firstName', label: t.firstName },
-      { key: 'lastName', label: t.lastName },
-      { key: 'email', label: t.email },
-      { key: 'identityProvider', label: t.identityProvider },
-    ],
-    [t],
-  );
-
   return (
     <div data-testid="team-member-form">
       <Heading level={2}>{member ? t.editMember : t.addMember}</Heading>
@@ -120,35 +68,7 @@ export default function FormTeamMemberForm({
       {!member && (
         <>
           <p>{t.searchStep}</p>
-          <div className="mb-3">
-            <ListPageSearchField
-              value={searchInput}
-              onChange={setSearchInput}
-              onSubmit={search}
-              testIdPrefix="team-user"
-            />
-          </div>
-          {q.trim() && (
-            // One user is added at a time, so the rows are a single radio group.
-            <RadioGroup
-              aria-label={t.searchResults}
-              value={selectedUser?.id ?? null}
-              onChange={(id) => setSelectedUser(users.find((user) => user.id === id) ?? null)}
-            >
-              <DataTable<UserSearchResult>
-                data={users.slice((page - 1) * pageSize, page * pageSize)}
-                columns={columns}
-                emptyMessage={t.noUsersFound}
-                caption={t.searchResults}
-                totalItems={users.length}
-                pageSize={pageSize}
-                currentPage={page}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-                keyExtractor={(user) => user.id}
-              />
-            </RadioGroup>
-          )}
+          <UserSearchPicker scope={{ kind: 'form', id: formId }} onSelect={setSelectedUser} />
         </>
       )}
       <Form

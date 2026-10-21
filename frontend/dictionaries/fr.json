@@ -409,15 +409,7 @@
     "searchStep": "1. Rechercher un utilisateur :",
     "groupsStep": "2. Attribuer des groupes à cet utilisateur :",
     "groupsRequired": "Sélectionnez au moins un groupe.",
-    "firstName": "Prénom",
-    "lastName": "Nom de famille",
-    "identityProvider": "Fournisseur d’identité",
-    "select": "Sélectionner {name}",
-    "onTeam": "Déjà dans l’équipe",
-    "onTeamLabel": "{name} fait déjà partie de l’équipe",
     "sampleNotice": "Les membres de l’équipe dans cet onglet sont des données d’exemple. Les modifications ne sont pas encore enregistrées.",
-    "searchResults": "Résultats de la recherche",
-    "noUsersFound": "Aucun utilisateur trouvé",
     "addSuccess": "Membre de l’équipe ajouté.",
     "addFailure": "Impossible d’ajouter le membre de l’équipe.",
     "editSuccess": "Membre de l’équipe mis à jour.",
@@ -607,6 +599,32 @@
     "workspacesLoadError": "Impossible de charger vos espaces de travail.",
     "selectedWorkspace": "Espace de travail sélectionné",
     "itemName": "formulaires"
+  },
+  "userSearch": {
+    "fieldLabel": "Rechercher par",
+    "fields": {
+      "email": "Courriel",
+      "firstName": "Prénom",
+      "lastName": "Nom de famille",
+      "guid": "GUID"
+    },
+    "inputLabel": "Personne",
+    "placeholder": "Tapez pour rechercher",
+    "hint": "Tapez au moins {min} caractères.",
+    "searching": "Recherche en cours...",
+    "noResults": "Aucune personne trouvée. Essayez une autre recherche.",
+    "resultCount": "{count} résultat(s).",
+    "truncated": "Affichage des {count} premiers résultats. Précisez votre recherche.",
+    "someUnavailable": "Certains annuaires n'ont pas pu être consultés; la liste peut être incomplète.",
+    "existingUser": "Utilisateur existant",
+    "selected": "Sélection : {name}",
+    "unavailable": "La recherche de personnes n'est pas disponible.",
+    "errors": {
+      "sessionExpired": "Votre session a expiré. Reconnectez-vous.",
+      "forbidden": "Vous n'avez pas la permission de rechercher des personnes ici.",
+      "offline": "Vous semblez être hors ligne. Vérifiez votre connexion et réessayez.",
+      "failed": "La recherche n'a pas pu être effectuée. Réessayez."
+    }
   },
   "Basic": "Basique",
   "Text Field": "Champ de Texte",

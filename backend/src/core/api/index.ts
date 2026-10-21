@@ -21,6 +21,11 @@ import {
   registerFormSettingsOpenApi,
   workspaceSettingsRouter,
 } from '../../features/form-settings';
+import {
+  formUserSearchRouter,
+  registerUserSearchOpenApi,
+  workspaceUserSearchRouter,
+} from '../../features/user-search';
 import { meDomain } from './me';
 import { membersDomain } from './members';
 import { workspacesDomain } from './workspaces';
@@ -40,6 +45,7 @@ registerOpenApiPaths((registry) => {
   registerSubmitOpenApi(registry);
   groupsDomain.registerOpenApi(registry);
   meDomain.registerOpenApi(registry);
+  registerUserSearchOpenApi(registry);
   membersDomain.registerOpenApi(registry);
   workspacesDomain.registerOpenApi(registry);
   filesDomain.registerOpenApi(registry);
@@ -54,6 +60,7 @@ registerOpenApiPaths((registry) => {
 // modules under /forms/:id/settings (features/form-settings).
 const designRouter = express.Router();
 designRouter.use('/forms/:id/settings', formSettingsRouter);
+designRouter.use('/forms/:id/user-search', formUserSearchRouter);
 designRouter.use('/', designFormsRouter);
 designRouter.use('/submissions', designSubmissionsRouter);
 // Staff print: /submissions/:id/{templates,print} and /print-upload/:id; it gates itself.
@@ -84,6 +91,7 @@ filesApiRouter.use(coreErrorHandler);
 const coreRouter = express.Router();
 // The workspace level of settings groups whose values a workspace shares with its forms.
 coreRouter.use('/workspaces/:id/settings', workspaceSettingsRouter);
+coreRouter.use('/workspaces/:id/user-search', workspaceUserSearchRouter);
 for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain, templatesDomain]) {
   coreRouter.use(domain.path, domain.router);
 }

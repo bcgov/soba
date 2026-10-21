@@ -1,31 +1,62 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, renderHook, screen, waitFor } from '@testing-library/react';
+import { renderHook, screen, waitFor } from '@testing-library/react';
 
 import dict from '@/dictionaries/en.json';
+import type { UserSearchScope, UserSearchUser } from '@/src/types/userSearch';
 
-vi.mock('@/app/[lang]/Providers', () => ({ useDictionary: () => dict }));
 vi.mock('@/src/features/designer/data/useFormTeam', { spy: true });
+vi.mock('@/src/features/user-search/ui/UserSearchPicker', () => ({
+  UserSearchPicker: ({
+    scope,
+    onSelect,
+  }: {
+    scope: UserSearchScope;
+    onSelect?: (user: UserSearchUser | null) => void;
+  }) => (
+    <div data-testid="picker" data-scope={`${scope.kind}:${scope.id}`}>
+      {[tobin, dax].map((person) => (
+        <button
+          key={person.subject}
+          type="button"
+          data-testid={`pick-${person.subject}`}
+          onClick={() => onSelect?.(person)}
+        >
+          {person.displayName}
+        </button>
+      ))}
+      <button type="button" data-testid="pick-clear" onClick={() => onSelect?.(null)}>
+        Clear
+      </button>
+    </div>
+  ),
+}));
 
 import FormTeamMemberForm from '@/src/features/designer/ui/FormTeamMemberForm';
 import { useFormTeamMembers } from '@/src/features/designer/data/useFormTeam';
 import type { TeamMember } from '@/src/types/formTeam';
-import { click, clickTestId, failWrites, renderWithStore, resetTeam } from './formTeamTestKit';
+import {
+  click,
+  clickTestId,
+  failWrites,
+  foundPerson,
+  renderWithStore,
+  resetTeam,
+} from './formTeamTestKit';
 
 const onDone = vi.fn();
 const FORM_ID = 'f1';
-const TOBIN = 'Select Tobin Venn (sample)';
 const GROUPS_REQUIRED = 'Select at least one group.';
+/** Not on the team; never signed in, so their member id is their identity. */
+const tobin = foundPerson('tobin', 'Venn, Tobin');
+const TOBIN_ID = 'azureidir:tobin';
+/** On the sample team as user-4. */
+const dax = foundPerson('dax', 'Halloran, Dax', 'user-4');
 
 const checkbox = (name: string) => screen.getByRole('checkbox', { name });
-const radio = (name: string) => screen.getByRole('radio', { name });
 const tick = (name: string) => click(checkbox(name));
-const choose = (name: string) => click(radio(name));
+const pick = (person: UserSearchUser) => clickTestId(`pick-${person.subject}`);
 const save = () => clickTestId('team-save-button');
-const searchFor = async (term: string) => {
-  fireEvent.change(screen.getByLabelText('Search'), { target: { value: term } });
-  await clickTestId('search-team-user-button');
-};
 const memberById = (id: string) =>
   renderHook(() =>
     useFormTeamMembers(FORM_ID, { offset: 0, limit: 10, sort: 'name:asc' }),
@@ -35,11 +66,9 @@ const renderForm = (member?: TeamMember) =>
   renderWithStore(
     <FormTeamMemberForm dict={dict} formId={FORM_ID} member={member} onDone={onDone} />,
   );
-/** The add form with Tobin, who is not on the team yet (user-2), found and chosen. */
-const renderWithTobinChosen = async () => {
+const renderWithTobinPicked = async () => {
   renderForm();
-  await searchFor('tobin');
-  await choose(TOBIN);
+  await pick(tobin);
 };
 /** The edit form for Dax (user-4), who starts in Group 2. */
 const renderEditOfDax = () => renderForm(memberById('user-4'));
@@ -50,59 +79,35 @@ describe('FormTeamMemberForm', () => {
     resetTeam();
   });
 
-  it('shows no results until a search is run', async () => {
+  it('searches the form for a person to add', () => {
     renderForm();
-    expect(screen.queryByText('Identity Provider')).toBeNull();
-
-    await searchFor('venn');
-    expect(screen.getByText('orla.venn@example.gov.bc.ca')).toBeInTheDocument();
-    expect(screen.getByText('tobin.venn@example.gov.bc.ca')).toBeInTheDocument();
+    expect(screen.getByTestId('team-member-form')).toHaveTextContent('1. Search for a user:');
+    expect(screen.getByTestId('picker')).toHaveAttribute('data-scope', `form:${FORM_ID}`);
   });
 
-  it('says so when the search finds nobody', async () => {
-    renderForm();
-    await searchFor('nobody at all');
-    expect(screen.getByTestId('datatable-empty')).toHaveTextContent('No users found');
+  it('does not search when editing a member', () => {
+    renderEditOfDax();
+    expect(screen.queryByTestId('picker')).toBeNull();
   });
 
-  it('offers the results as one choice', async () => {
-    renderForm();
-    await searchFor('a');
-    await choose('Select Pell Arvidsen (sample)');
-    await choose(TOBIN);
-
-    expect(screen.getByRole('radiogroup', { name: 'Search results' })).toBeInTheDocument();
-    expect(radio('Select Pell Arvidsen (sample)')).not.toBeChecked();
-    expect(radio(TOBIN)).toBeChecked();
-  });
-
-  it('marks a user already on the team and does not offer them', async () => {
-    renderForm();
-    await searchFor('venn');
-
-    expect(screen.getByTestId('user-1-on-team')).toHaveTextContent('Already on the team');
-    // The mark is beside the radio, not its label: wrapping label text squeezes the circle.
-    expect(screen.getByTestId('user-1-select')).toHaveTextContent('');
-    expect(radio('Orla Venn (sample) is already on the team')).toBeDisabled();
-    expect(radio(TOBIN)).toBeEnabled();
-  });
-
-  it('holds the add until a user is chosen', async () => {
+  it('holds the add until a person is picked', async () => {
     renderForm();
     expect(screen.getByTestId('team-save-button')).toBeDisabled();
 
-    await searchFor('tobin');
-    await choose(TOBIN);
+    await pick(tobin);
     expect(screen.getByTestId('team-save-button')).toBeEnabled();
+
+    await clickTestId('pick-clear');
+    expect(screen.getByTestId('team-save-button')).toBeDisabled();
   });
 
   it('asks for a group instead of adding a user with none', async () => {
-    await renderWithTobinChosen();
+    await renderWithTobinPicked();
     await save();
 
     expect(await screen.findByText(GROUPS_REQUIRED)).toBeInTheDocument();
     expect(onDone).not.toHaveBeenCalled();
-    expect(memberById('user-2')).toBeUndefined();
+    expect(memberById(TOBIN_ID)).toBeUndefined();
   });
 
   it('asks for a group instead of saving a member with none', async () => {
@@ -115,13 +120,24 @@ describe('FormTeamMemberForm', () => {
     expect(memberById('user-4')?.groups).toEqual(['group-2']);
   });
 
-  it('adds the chosen user with the chosen groups', async () => {
-    await renderWithTobinChosen();
+  it('adds the picked person with the chosen groups', async () => {
+    await renderWithTobinPicked();
     await tick('Group 3');
     await save();
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());
-    expect(memberById('user-2')?.groups).toEqual(['group-3']);
+    expect(memberById(TOBIN_ID)?.groups).toEqual(['group-3']);
+  });
+
+  it('refuses a person already on the team and keeps their groups', async () => {
+    renderForm();
+    await pick(dax);
+    await tick('Group 1');
+    await save();
+
+    await waitFor(() => expect(screen.getByTestId('team-save-button')).toBeEnabled());
+    expect(onDone).not.toHaveBeenCalled();
+    expect(memberById('user-4')?.groups).toEqual(['group-2']);
   });
 
   it('saves the edited groups of a member', async () => {
@@ -138,23 +154,22 @@ describe('FormTeamMemberForm', () => {
     expect(screen.getByRole('group', { name: /Assign groups.*\(required\)/ })).toBeInTheDocument();
   });
 
-  it('keeps the chosen user and groups when the add fails', async () => {
+  it('keeps the picked person and groups when the add fails', async () => {
     failWrites();
-    await renderWithTobinChosen();
+    await renderWithTobinPicked();
     await tick('Group 3');
     await save();
 
     await waitFor(() => expect(screen.getByTestId('team-save-button')).toBeEnabled());
     expect(onDone).not.toHaveBeenCalled();
-    expect(radio(TOBIN)).toBeChecked();
     expect(checkbox('Group 3')).toBeChecked();
-    expect(memberById('user-2')).toBeUndefined();
+    expect(memberById(TOBIN_ID)).toBeUndefined();
   });
 
   it('changes nothing on cancel', async () => {
-    renderForm();
+    await renderWithTobinPicked();
     await clickTestId('team-cancel-button');
     expect(onDone).toHaveBeenCalled();
-    expect(memberById('user-2')).toBeUndefined();
+    expect(memberById(TOBIN_ID)).toBeUndefined();
   });
 });

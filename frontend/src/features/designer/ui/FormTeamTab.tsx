@@ -16,6 +16,7 @@ import {
   useFormTeamWriter,
   useTeamGroups,
 } from '@/src/features/designer/data/useFormTeam';
+import { useUserSearchAllowed } from '@/src/features/user-search/data/useUserSearch';
 import { FORM_TEAM_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { useListQuery } from '@/src/shared/list/useListQuery';
 import { useDataTable } from '@/src/shared/list/useDataTable';
@@ -38,6 +39,8 @@ export default function FormTeamTab({ dict, formId }: Readonly<FormTeamTabProps>
   const { table } = useDataTable(query, membersResult, t.loadError);
   const groups = useTeamGroups();
   const teamWriter = useFormTeamWriter(formId);
+  // People are added by finding them with user search.
+  const searchAllowed = useUserSearchAllowed();
   const { addNotification } = useNotificationStore();
   // The list, the add form, or the edit form for one member.
   const [view, setView] = useState<'list' | 'add' | TeamMember>('list');
@@ -134,9 +137,11 @@ export default function FormTeamTab({ dict, formId }: Readonly<FormTeamTabProps>
           onSubmit={query.commitSearch}
           testIdPrefix="team"
         />
-        <Button variant="primary" data-testid="team-add-button" onPress={() => setView('add')}>
-          {t.addMember}
-        </Button>
+        {searchAllowed && (
+          <Button variant="primary" data-testid="team-add-button" onPress={() => setView('add')}>
+            {t.addMember}
+          </Button>
+        )}
       </ListPageToolbar>
       <DataTable<TeamMember>
         {...table}

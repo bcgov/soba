@@ -4,8 +4,15 @@ import { screen, waitFor } from '@testing-library/react';
 
 import dict from '@/dictionaries/en.json';
 
+let allowed: boolean | null;
 vi.mock('@/app/[lang]/Providers', () => ({ useDictionary: () => dict }));
 vi.mock('@/src/features/designer/data/useFormTeam', { spy: true });
+vi.mock('@/src/features/user-search/data/useUserSearch', () => ({
+  useUserSearchAllowed: () => allowed,
+}));
+vi.mock('@/src/features/user-search/ui/UserSearchPicker', () => ({
+  UserSearchPicker: () => <div data-testid="picker" />,
+}));
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   usePathname: () => '/en/build/f1',
@@ -24,7 +31,10 @@ const confirmRemoveOf = async (memberId: string) => {
 };
 
 describe('FormTeamTab', () => {
-  beforeEach(resetTeam);
+  beforeEach(() => {
+    allowed = true;
+    resetTeam();
+  });
 
   it('lists each member with their groups', () => {
     renderTab();
@@ -45,10 +55,23 @@ describe('FormTeamTab', () => {
     renderTab();
     await clickTestId('team-add-button');
     expect(screen.getByTestId('team-member-form')).toHaveTextContent('1. Search for a user:');
+    expect(screen.getByTestId('picker')).toBeInTheDocument();
     expect(screen.queryByTestId('team-list')).toBeNull();
 
     await clickTestId('team-cancel-button');
     expect(screen.getByTestId('team-list')).toBeInTheDocument();
+  });
+
+  it('offers no add when user search is not allowed, or until that is known', () => {
+    allowed = false;
+    const { unmount } = renderTab();
+    expect(screen.getByTestId('team-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('team-add-button')).toBeNull();
+    unmount();
+
+    allowed = null;
+    renderTab();
+    expect(screen.queryByTestId('team-add-button')).toBeNull();
   });
 
   it('opens the edit form with the member and their groups', async () => {

@@ -6,6 +6,7 @@ import {
   getEventStreamAdapter,
   getTempStorageAdapter,
   getVirusScanAdapter,
+  checkNotificationReadiness,
   resolveActivePluginCode,
 } from '../../integrations/plugins/PluginRegistry';
 import {
@@ -26,6 +27,7 @@ import {
   type EventStreamSelfTestResult,
 } from '../../integrations/eventstream/eventStreamSelfTest';
 import { checkDocumentGenerationReadiness } from '../../integrations/document-generation/DocumentGenerationRegistry';
+import { checkUserSearchReadiness } from '../../integrations/user-search/UserSearchRegistry';
 import { checkTenantEngineReadiness } from '../../integrations/tenant/TenantEngineRegistry';
 import { checkWorkflowEngineReadiness } from '../../integrations/workflow/WorkflowEngineRegistry';
 
@@ -281,5 +283,41 @@ export async function logWorkflowEngineReadiness(): Promise<void> {
     );
   } else {
     log.info({ workflowEngines: results }, 'Workflow engine readiness: all engines ready');
+  }
+}
+
+/** Log the active notification plugin's readiness (reachability / config) at startup. Never throws. */
+export async function logNotificationReadiness(): Promise<void> {
+  const notification = await checkNotificationReadiness();
+  if (Object.values(notification).every((result) => result.ok)) {
+    log.info({ notification }, 'Notification readiness: ready');
+  } else {
+    log.warn({ notification }, 'Notification readiness: not ready');
+  }
+}
+
+/** Log readiness of each enabled user search plugin at startup. Never throws. */
+export async function logUserSearchReadiness(): Promise<void> {
+  let results: Record<string, { ok: boolean; message?: string }>;
+  try {
+    results = await checkUserSearchReadiness();
+  } catch (err) {
+    log.warn({ err }, 'User search readiness could not run');
+    return;
+  }
+
+  const notReady = Object.entries(results)
+    .filter(([, r]) => !r.ok)
+    .map(([code]) => code);
+
+  if (Object.keys(results).length === 0) {
+    log.info('User search readiness: no plugins enabled');
+  } else if (notReady.length > 0) {
+    log.warn(
+      { userSearchPlugins: results },
+      `User search readiness: not ready: ${notReady.join(', ')}`,
+    );
+  } else {
+    log.info({ userSearchPlugins: results }, 'User search readiness: all plugins ready');
   }
 }

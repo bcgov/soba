@@ -144,6 +144,10 @@ export const Features = {
   document_generation_v3: 'document-generation-v3',
   /** Backend-only: gates generating and purging development data. Off in production. */
   dev_data: 'dev-data',
+  /** Backend-only: gates sending notifications through the active notification plugin. */
+  notifications: 'notifications',
+  /** Finding people to add to a workspace or a form's team. */
+  user_search: 'user-search',
 } as const;
 export type FeatureCode = (typeof Features)[keyof typeof Features];
 
@@ -200,6 +204,26 @@ export const DocumentGenerationOutcome = {
 export type DocumentGenerationOutcomeCode =
   (typeof DocumentGenerationOutcome)[keyof typeof DocumentGenerationOutcome];
 
+/** Outcome of a notification send (notification_audit.outcome). */
+export const NotificationOutcome = {
+  /** The provider accepted the message; acceptance is not delivery. */
+  accepted: 'accepted',
+  /** The active plugin sends nothing (notification-noop). */
+  not_sent: 'not_sent',
+  /** The notifications feature is off, so no plugin was called. */
+  disabled: 'disabled',
+  error: 'error',
+} as const;
+export type NotificationOutcomeCode =
+  (typeof NotificationOutcome)[keyof typeof NotificationOutcome];
+
+/** Channel a notification was sent on (notification_audit.channel). */
+export const NotificationChannel = {
+  email: 'email',
+} as const;
+export type NotificationChannelCode =
+  (typeof NotificationChannel)[keyof typeof NotificationChannel];
+
 /** What a document template is for (document_template.type). The list lives in @soba/lib. */
 export const DocumentTemplateType = {
   cdogs: 'cdogs',
@@ -220,13 +244,7 @@ export const IdpGroups = {
 } as const;
 export type IdpGroupCode = (typeof IdpGroups)[keyof typeof IdpGroups];
 
-/** Seeded login identity providers (see identity_provider). `public` is the pseudo-provider below. */
-export const IdentityProviders = {
-  idir: 'idir',
-  azureidir: 'azureidir',
-  bceidbusiness: 'bceidbusiness',
-} as const;
-export type IdentityProviderCode = (typeof IdentityProviders)[keyof typeof IdentityProviders];
+export { IdentityProviders, type IdentityProviderCode } from '@soba/lib';
 
 export { PUBLIC_PROVIDER_CODE } from '@soba/lib';
 

@@ -15,15 +15,3 @@ export const TeamMemberSchema = z.object({
   groups: z.array(z.string()),
 });
 export type TeamMember = z.infer<typeof TeamMemberSchema>;
-
-/** A user found by the add-member search. */
-export const UserSearchResultSchema = z.object({
-  id: z.string(),
-  firstName: z.string(),
-  lastName: z.string(),
-  email: z.string(),
-  identityProvider: z.string(),
-  /** Already on the form's team. They cannot be added again; their groups change through Edit. */
-  onTeam: z.boolean(),
-});
-export type UserSearchResult = z.infer<typeof UserSearchResultSchema>;

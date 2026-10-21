@@ -176,8 +176,11 @@ export function createEnvReader(source: EnvSource) {
     getTempStorageDefaultCode: () => getOptionalEnvFrom(source, 'TEMPSTORAGE_DEFAULT_CODE'),
     getVirusScanDefaultCode: () => getOptionalEnvFrom(source, 'VIRUSSCAN_DEFAULT_CODE'),
     getFormEngineDefaultCode: () => getOptionalEnvFrom(source, 'FORM_ENGINE_DEFAULT_CODE'),
+    /** User search plugin codes, in merge order. Unset enables none. */
+    getUserSearchPlugins: () => getCsvEnvFrom(source, 'USER_SEARCH_PLUGINS') ?? [],
     getTenantEngineDefaultCode: () => getOptionalEnvFrom(source, 'TENANT_ENGINE_DEFAULT_CODE'),
     getWorkflowEngineDefaultCode: () => getOptionalEnvFrom(source, 'WORKFLOW_ENGINE_DEFAULT_CODE'),
+    getNotificationDefaultCode: () => getOptionalEnvFrom(source, 'NOTIFICATION_DEFAULT_CODE'),
     getDocumentGenerationDefaultCode: () =>
       getOptionalEnvFrom(source, 'DOCUMENT_GENERATION_DEFAULT_CODE'),
     /** Renders one process runs at once. Unset, or not a whole number of at least 1, is 2. */
@@ -262,8 +265,11 @@ export const env = {
   getTempStorageDefaultCode: () => getOptionalEnv('TEMPSTORAGE_DEFAULT_CODE'),
   getVirusScanDefaultCode: () => getOptionalEnv('VIRUSSCAN_DEFAULT_CODE'),
   getFormEngineDefaultCode: () => getOptionalEnv('FORM_ENGINE_DEFAULT_CODE'),
+  /** User search plugin codes, in merge order. Unset enables none. */
+  getUserSearchPlugins: () => getCsvEnv('USER_SEARCH_PLUGINS') ?? [],
   getTenantEngineDefaultCode: () => getOptionalEnv('TENANT_ENGINE_DEFAULT_CODE'),
   getWorkflowEngineDefaultCode: () => getOptionalEnv('WORKFLOW_ENGINE_DEFAULT_CODE'),
+  getNotificationDefaultCode: () => getOptionalEnv('NOTIFICATION_DEFAULT_CODE'),
   /** Document generation backend the consumer defaults to (a discovered plugin code). */
   getDocumentGenerationDefaultCode: () => getOptionalEnv('DOCUMENT_GENERATION_DEFAULT_CODE'),
   /** Renders one process runs at once. Unset, or not a whole number of at least 1, is 2. */

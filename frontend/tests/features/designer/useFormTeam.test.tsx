@@ -6,8 +6,8 @@ import {
   resetFormTeam,
   useFormTeamMembers,
   useFormTeamWriter,
-  useUserSearch,
 } from '@/src/features/designer/data/useFormTeam';
+import { foundPerson } from './formTeamTestKit';
 
 const FORM_ID = 'f1';
 const firstPage = { offset: 0, limit: 10, sort: 'name:asc' };
@@ -15,7 +15,6 @@ const firstPage = { offset: 0, limit: 10, sort: 'name:asc' };
 const ids = (rows: { id: string }[]) => rows.map((row) => row.id);
 const listOf = (formId: string) => renderHook(() => useFormTeamMembers(formId, firstPage));
 const writerFor = (formId: string) => renderHook(() => useFormTeamWriter(formId)).result.current;
-const search = (q: string) => renderHook(() => useUserSearch(FORM_ID, q)).result.current;
 
 describe('useFormTeam', () => {
   beforeEach(() => act(() => resetFormTeam()));
@@ -43,43 +42,38 @@ describe('useFormTeam', () => {
     expect(ids(byEmail.result.current.rows)).toEqual(['user-4']);
   });
 
-  it('finds no users until there is a search term', () => {
-    expect(search(' ')).toEqual([]);
-    expect(ids(search('venn'))).toEqual(['user-1', 'user-2']);
-  });
-
-  it('marks the users already on the team', () => {
-    const [orla, tobin] = search('venn');
-    expect(orla.onTeam).toBe(true);
-    expect(tobin.onTeam).toBe(false);
-  });
-
   it('adds, regroups and removes a member, saying each write applied', async () => {
     const list = listOf(FORM_ID);
     const writer = writerFor(FORM_ID);
-    const [, tobin] = search('venn');
-    const tobinRow = () => list.result.current.rows.find((member) => member.id === tobin.id);
+    const tobin = foundPerson('tobin', 'Venn, Tobin');
+    const tobinId = 'azureidir:tobin';
+    const tobinRow = () => list.result.current.rows.find((member) => member.id === tobinId);
     const applied = { status: 'applied', value: undefined };
 
     await expect(act(() => writer.add(tobin, ['group-3']))).resolves.toEqual(applied);
-    expect(tobinRow()?.groups).toEqual(['group-3']);
+    expect(tobinRow()).toEqual({
+      id: tobinId,
+      name: 'Venn, Tobin',
+      email: 'tobin@example.gov.bc.ca',
+      groups: ['group-3'],
+    });
 
-    await expect(act(() => writer.setGroups(tobin.id, ['group-1', 'group-2']))).resolves.toEqual(
+    await expect(act(() => writer.setGroups(tobinId, ['group-1', 'group-2']))).resolves.toEqual(
       applied,
     );
     expect(tobinRow()?.groups).toEqual(['group-1', 'group-2']);
 
-    await expect(act(() => writer.remove(tobin.id))).resolves.toEqual(applied);
+    await expect(act(() => writer.remove(tobinId))).resolves.toEqual(applied);
     expect(tobinRow()).toBeUndefined();
     expect(list.result.current.total).toBe(4);
   });
 
   it('refuses to add a user already on the team', async () => {
     const list = listOf(FORM_ID);
-    const [orla] = search('orla');
+    const orla = foundPerson('orla', 'Venn, Orla', 'user-1');
 
     await expect(writerFor(FORM_ID).add(orla, ['group-4'])).rejects.toThrow('already on the team');
-    expect(list.result.current.rows.find((member) => member.id === orla.id)?.groups).toEqual([
+    expect(list.result.current.rows.find((member) => member.id === 'user-1')?.groups).toEqual([
       'group-1',
     ]);
   });

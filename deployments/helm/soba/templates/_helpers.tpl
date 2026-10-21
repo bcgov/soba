@@ -167,6 +167,14 @@ cannot drift apart. Any other code (e.g. tempstorage-os) needs no PVC.
 {{- end }}
 
 {{/*
+Truthy ("true") only when css-v1 is an enabled user search plugin. Gates the CSS Vault secret,
+which must hold PLUGIN_CSS_V1_CLIENT_ID and PLUGIN_CSS_V1_CLIENT_SECRET when it is injected.
+*/}}
+{{- define "soba.userSearchUsesCss" -}}
+{{- if has "css-v1" (splitList "," (nospace .Values.backend.config.userSearchPlugins)) -}}true{{- end -}}
+{{- end }}
+
+{{/*
 Truthy ("true") only when the default storage profile is storage-local. Gates the
 file store PVC, its mount, and STORAGE_PROFILE_DEFAULT_BASE_PATH off one value so they
 cannot drift apart.

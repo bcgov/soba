@@ -3,7 +3,8 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import type { ListResult, WriteOutcome } from '@/src/shared/api/dataContracts';
 import type { ListQueryArgs } from '@/src/types/list';
-import type { TeamGroup, TeamMember, UserSearchResult } from '@/src/types/formTeam';
+import type { TeamGroup, TeamMember } from '@/src/types/formTeam';
+import type { UserSearchUser } from '@/src/types/userSearch';
 
 // In-memory sample data until the team API exists (CCP-5928); changes last until reload.
 // Signatures (formId in, WriteOutcome out) match the API-backed hooks that will replace these.
@@ -14,37 +15,28 @@ const GROUPS: TeamGroup[] = [
   { id: 'group-4', name: 'Group 4' },
 ];
 
-type SampleUser = Omit<UserSearchResult, 'onTeam'>;
-
-const USERS: SampleUser[] = [
-  ['Orla', 'Venn'],
-  ['Tobin', 'Venn'],
-  ['Mirela', 'Quist'],
-  ['Dax', 'Halloran'],
-  ['Suri', 'Okonjo'],
-  ['Pell', 'Arvidsen'],
-  ['Juno', 'Tamsin'],
-].map(([firstName, lastName], index) => ({
-  id: `user-${index + 1}`,
-  firstName,
-  lastName: `${lastName} (sample)`,
+const sampleMember = (
+  id: string,
+  firstName: string,
+  lastName: string,
+  groups: string[],
+): TeamMember => ({
+  id,
+  name: `${firstName} ${lastName} (sample)`,
   email: `${firstName}.${lastName}@example.gov.bc.ca`.toLowerCase(),
-  identityProvider: 'IDIR',
-}));
-
-const toMember = (user: SampleUser, groups: string[]): TeamMember => ({
-  id: user.id,
-  name: `${user.firstName} ${user.lastName}`,
-  email: user.email,
   groups,
 });
 
 const SAMPLE_TEAM: TeamMember[] = [
-  toMember(USERS[0], ['group-1']),
-  toMember(USERS[2], ['group-1']),
-  toMember(USERS[3], ['group-2']),
-  toMember(USERS[4], ['group-4']),
+  sampleMember('user-1', 'Orla', 'Venn', ['group-1']),
+  sampleMember('user-3', 'Mirela', 'Quist', ['group-1']),
+  sampleMember('user-4', 'Dax', 'Halloran', ['group-2']),
+  sampleMember('user-5', 'Suri', 'Okonjo', ['group-4']),
 ];
+
+/** A found person's member id: their Soba user, or their identity when they have not signed in. */
+const memberIdOf = (user: UserSearchUser) =>
+  user.sobaUserId ?? `${user.identityProvider}:${user.subject}`;
 
 /** Teams by form id. A form not in the map still has the sample team. */
 let teams = new Map<string, TeamMember[]>();
@@ -92,17 +84,6 @@ export function useFormTeamMembers(formId: string, query: ListQueryArgs): ListRe
   }, [team, q, offset, limit]);
 }
 
-/** Users matching the term, with current team members marked. Empty until there is a term. */
-export function useUserSearch(formId: string, q: string): UserSearchResult[] {
-  const team = useTeam(formId);
-  return useMemo(() => {
-    if (!q.trim()) return [];
-    return USERS.filter((user) => matches(q, user.firstName, user.lastName, user.email)).map(
-      (user) => ({ ...user, onTeam: team.some((member) => member.id === user.id) }),
-    );
-  }, [team, q]);
-}
-
 /** The groups a team member can be assigned to. */
 export function useTeamGroups(): TeamGroup[] {
   return GROUPS;
@@ -112,12 +93,14 @@ export function useFormTeamWriter(formId: string) {
   return useMemo(
     () => ({
       /** Refused for a user already on the team, as the API will be: their groups change by Edit. */
-      add: (user: UserSearchResult, groups: string[]) => {
+      add: (user: UserSearchUser, groups: string[]) => {
         const team = teamOf(formId);
-        if (team.some((member) => member.id === user.id)) {
-          return Promise.reject(new Error(`${user.id} is already on the team`));
+        const id = memberIdOf(user);
+        if (team.some((member) => member.id === id)) {
+          return Promise.reject(new Error(`${id} is already on the team`));
         }
-        return setTeam(formId, [...team, toMember(user, groups)]);
+        const name = user.displayName ?? user.email ?? user.username ?? user.subject;
+        return setTeam(formId, [...team, { id, name, email: user.email ?? '', groups }]);
       },
       setGroups: (memberId: string, groups: string[]) =>
         setTeam(
