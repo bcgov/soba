@@ -7,30 +7,34 @@ the people they return are merged into one list.
 
 | Route | Returns |
 | --- | --- |
-| `GET /api/v1/workspaces/{id}/user-search` | Identity providers searchable here, with the filters each accepts |
-| `GET /api/v1/workspaces/{id}/user-search/{identityProvider}` | People found |
+| `GET /api/v1/workspaces/{id}/user-search` | People found |
+| `GET /api/v1/workspaces/{id}/user-search/capabilities` | Identity providers searchable here, with the filters each accepts |
 | `GET /api/v1/design/forms/{id}/user-search` | Same as the workspace route, with access checked on the form |
-| `GET /api/v1/design/forms/{id}/user-search/{identityProvider}` | People found |
+| `GET /api/v1/design/forms/{id}/user-search/capabilities` | Same as the workspace route, with access checked on the form |
 
-- `identityProvider` is a `soba.identity_provider` code, e.g. `azureidir` or `bceidbusiness`. These
-  codes are the SSO token's `identity_provider` claim, lowercased. Plugins map them to their own
-  names.
 - Filters: `email`, `firstName`, `lastName` and `guid`, each at least 2 characters. Give at least
   one; every filter given must match. `locale` (or `Accept-Language`) sets the sort language.
+- `identityProvider` (optional) limits the search to one `soba.identity_provider` code, e.g.
+  `azureidir` or `bceidbusiness`. Without it, every identity provider searchable here is searched.
+  These codes are the SSO token's `identity_provider` claim, lowercased. Plugins map them to their
+  own names.
 - Access: a workspace owner or admin, or a `team_update` holder on the form (on the workspace for
   the workspace routes).
 - The `user-search` feature gates every route; with it off they answer 404.
 
-A search goes to every enabled plugin that accepts all the given filters for that identity
-provider. People are merged by identity provider and subject (the `user_identity` key), with
-earlier plugins in `USER_SEARCH_PLUGINS` winning per field. Each person carries `identityProvider`,
-`sources` (the plugins that returned them) and `sobaUserId`, set when the identity already belongs
-to a Soba user. Soba users sort first, then by display name.
+A search goes to every enabled plugin, once for each identity provider searched for which it
+accepts all the given filters. People are merged by identity provider and subject (the
+`user_identity` key), with earlier plugins in `USER_SEARCH_PLUGINS` winning per field. Each person
+carries `identityProvider`, `sources` (the plugins that returned them) and `sobaUserId`, set when
+the identity already belongs to a Soba user. Soba users sort first, then by display name.
 
-Each plugin returns at most 25 people and a search at most 50; `truncated` says more were found.
-`plugins` reports each plugin asked as `ok`, `rejected` (it refused the filters) or `unavailable`,
-and any enabled plugin that failed to load as `unavailable`. The search answers 503 when no plugin
-could answer, including when none is enabled, and 400 when every plugin refused the filters.
+Each plugin returns at most 25 people per identity provider and a search at most 50; `truncated`
+says more were found. `plugins` reports each plugin asked once: `unavailable` if any of its
+searches could not answer, `rejected` if it refused the filters for every identity provider asked,
+otherwise `ok`. An enabled plugin that failed to load is `unavailable`. The search answers 503
+when no plugin could answer, including when none is enabled. It answers 400 when the identity
+provider asked is not searchable here, no plugin accepts the filters, or every plugin asked
+refused them.
 
 Searching creates no account or membership.
 

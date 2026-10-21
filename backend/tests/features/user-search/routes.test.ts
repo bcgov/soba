@@ -44,8 +44,8 @@ app.use('/workspaces/:id/user-search', workspaceUserSearchRouter);
 app.use('/forms/:id/user-search', formUserSearchRouter);
 app.use(coreErrorHandler);
 
-const FORM_SEARCH = '/forms/form-1/user-search/azureidir';
-const WORKSPACE_SEARCH = '/workspaces/ws1/user-search/azureidir';
+const FORM_SEARCH = '/forms/form-1/user-search';
+const WORKSPACE_SEARCH = '/workspaces/ws1/user-search';
 
 describe('user search routes', () => {
   beforeEach(() => {
@@ -64,7 +64,8 @@ describe('user search routes', () => {
       (await request(app).get(`${FORM_SEARCH}?email=al`).set('x-test-role', 'owner')).status,
     ).toBe(404);
     expect(
-      (await request(app).get('/workspaces/ws1/user-search').set('x-test-role', 'owner')).status,
+      (await request(app).get(`${WORKSPACE_SEARCH}/capabilities`).set('x-test-role', 'owner'))
+        .status,
     ).toBe(404);
     expect(searchUsers).not.toHaveBeenCalled();
   });
@@ -104,7 +105,7 @@ describe('user search routes', () => {
 
     const search = await request(app).get(`${FORM_SEARCH}?email=al`).set('x-test-role', role);
     const capabilities = await request(app)
-      .get('/forms/form-1/user-search')
+      .get(`${FORM_SEARCH}/capabilities`)
       .set('x-test-role', role);
 
     expect(search.status).toBe(403);
@@ -120,6 +121,8 @@ describe('user search routes', () => {
     ['a blank filter', '?lastName=%20%20'],
     ['an unknown parameter', '?email=al&workspaceId=ws1'],
     ['a repeated filter', '?email=al&email=bo'],
+    ['a blank identity provider', '?email=al&identityProvider=%20'],
+    ['only an identity provider', '?identityProvider=azureidir'],
   ])('rejects %s before searching', async (_case, query) => {
     const res = await request(app).get(`${FORM_SEARCH}${query}`).set('x-test-role', 'owner');
 
@@ -127,19 +130,21 @@ describe('user search routes', () => {
     expect(searchUsers).not.toHaveBeenCalled();
   });
 
-  it('passes the identity provider and trimmed filters to the search', async () => {
-    const res = await request(app)
+  it('passes the trimmed filters, and the identity provider when given, to the search', async () => {
+    const everyProvider = await request(app)
       .get(`${FORM_SEARCH}?firstName=%20Alice%20&guid=F0E1`)
       .set('x-test-role', 'owner')
       .set('accept-language', 'fr-CA');
+    const oneProvider = await request(app)
+      .get(`${FORM_SEARCH}?identityProvider=%20azureidir&email=al`)
+      .set('x-test-role', 'owner');
 
-    expect(res.status).toBe(200);
-    expect(searchUsers).toHaveBeenCalledWith(
-      'azureidir',
-      { firstName: 'Alice', guid: 'F0E1' },
-      {},
-      'fr',
-    );
+    expect(everyProvider.status).toBe(200);
+    expect(oneProvider.status).toBe(200);
+    expect(jest.mocked(searchUsers).mock.calls).toEqual([
+      [{ firstName: 'Alice', guid: 'F0E1' }, {}, 'fr'],
+      [{ identityProvider: 'azureidir', email: 'al' }, {}, 'en'],
+    ]);
   });
 
   it('returns what can be searched', async () => {
@@ -148,7 +153,9 @@ describe('user search routes', () => {
     };
     jest.mocked(getUserSearchCapabilities).mockResolvedValue(capabilities);
 
-    const res = await request(app).get('/workspaces/ws1/user-search').set('x-test-role', 'admin');
+    const res = await request(app)
+      .get(`${WORKSPACE_SEARCH}/capabilities`)
+      .set('x-test-role', 'admin');
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual(capabilities);

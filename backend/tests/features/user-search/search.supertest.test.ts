@@ -83,7 +83,9 @@ describe('user search through css-v1', () => {
         { identityProvider: 'azureidir', subject: 'F0E1D2C3@azureidir', userId: 'user-a' },
       ]);
 
-    const res = await request(app).get(`${SEARCH}/azureidir?lastName=Smith&locale=fr`);
+    const res = await request(app).get(
+      `${SEARCH}?identityProvider=azureidir&lastName=Smith&locale=fr`,
+    );
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
@@ -112,18 +114,34 @@ describe('user search through css-v1', () => {
 
   it('answers 503 when CSS cannot answer, and 400 when CSS refuses the filters', async () => {
     css.answer(() => ({ status: 500, body: 'upstream-detail' }));
-    const unavailable = await request(app).get(`${SEARCH}/azureidir?guid=F0E1D2C3`);
+    const unavailable = await request(app).get(`${SEARCH}?guid=F0E1D2C3`);
     expect(unavailable.status).toBe(503);
     expect(JSON.stringify(unavailable.body)).not.toContain('upstream-detail');
 
     css.answer(() => ({ status: 400, body: 'upstream-detail' }));
-    const refused = await request(app).get(`${SEARCH}/azureidir?guid=F0E1D2C3`);
+    const refused = await request(app).get(`${SEARCH}?guid=F0E1D2C3`);
     expect(refused.status).toBe(400);
     expect(JSON.stringify(refused.body)).not.toContain('upstream-detail');
   });
 
+  it('searches every account type CSS can look up by the filter when none is given', async () => {
+    css.answer(() => json({ data: [] }));
+    const lookupPaths = () => new Set(lookups().map(({ path }) => path));
+
+    const byName = await request(app).get(`${SEARCH}?lastName=Smith`);
+    expect(byName.status).toBe(200);
+    expect(lookupPaths()).toEqual(new Set(['/api/v1/test/azure-idir/users']));
+
+    const byGuid = await request(app).get(`${SEARCH}?guid=F0E1D2C3`);
+    expect(byGuid.status).toBe(200);
+    expect(lookupPaths()).toEqual(
+      new Set(['/api/v1/test/azure-idir/users', '/api/v1/test/business-bceid/users']),
+    );
+    expect(lookups()).toHaveLength(3);
+  });
+
   it('refuses a BCeID Business name search without calling CSS', async () => {
-    const res = await request(app).get(`${SEARCH}/bceidbusiness?lastName=Smith`);
+    const res = await request(app).get(`${SEARCH}?identityProvider=bceidbusiness&lastName=Smith`);
 
     expect(res.status).toBe(400);
     expect(lookups()).toHaveLength(0);
@@ -132,14 +150,14 @@ describe('user search through css-v1', () => {
   it('answers 503 when the enabled plugin is missing its config', async () => {
     delete process.env.PLUGIN_CSS_V1_CLIENT_SECRET;
 
-    const res = await request(app).get(`${SEARCH}/azureidir?lastName=Smith`);
+    const res = await request(app).get(`${SEARCH}?lastName=Smith`);
 
     expect(res.status).toBe(503);
     expect(css.requests).toHaveLength(0);
   });
 
   it('lists what css-v1 can search', async () => {
-    const res = await request(app).get(SEARCH);
+    const res = await request(app).get(`${SEARCH}/capabilities`);
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({

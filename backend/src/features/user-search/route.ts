@@ -7,18 +7,14 @@ import { workspaceFromResource } from '../../core/middleware/workspaceContext';
 import { Features } from '../../core/db/codes';
 import { requireUserSearchAccess } from './access';
 import { getUserSearchCapabilitiesHandler, searchUsersHandler } from './controller';
-import {
-  UserSearchParamsSchema,
-  UserSearchQuerySchema,
-  UserSearchScopeParamsSchema,
-} from './schema';
+import { UserSearchQuerySchema, UserSearchScopeParamsSchema } from './schema';
 
-/** GET / lists what can be searched; GET /:identityProvider searches. */
+/** GET / searches; GET /capabilities lists what can be searched. */
 function userSearchRouter(resolveScope: RequestHandler): express.Router {
   const router = express.Router({ mergeParams: true });
   router.use(requireFeature(Features.user_search));
   router.get(
-    '/',
+    '/capabilities',
     validateRequest({ params: UserSearchScopeParamsSchema }),
     resolveScope,
     requireUserSearchAccess,
@@ -26,8 +22,8 @@ function userSearchRouter(resolveScope: RequestHandler): express.Router {
     asyncHandler(getUserSearchCapabilitiesHandler),
   );
   router.get(
-    '/:identityProvider',
-    validateRequest({ params: UserSearchParamsSchema, query: UserSearchQuerySchema }),
+    '/',
+    validateRequest({ params: UserSearchScopeParamsSchema, query: UserSearchQuerySchema }),
     resolveScope,
     requireUserSearchAccess,
     sortLocale,

@@ -146,7 +146,7 @@ export const Features = {
   dev_data: 'dev-data',
   /** Backend-only: gates sending notifications through the active notification plugin. */
   notifications: 'notifications',
-  /** Searching people to add to a workspace or a form's team, across the enabled providers. */
+  /** Finding people to add to a workspace or a form's team. */
   user_search: 'user-search',
 } as const;
 export type FeatureCode = (typeof Features)[keyof typeof Features];

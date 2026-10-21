@@ -6,9 +6,13 @@ export type UserSearchField = z.infer<typeof UserSearchFieldSchema>;
 
 const textFilter = z.string().trim().min(2).max(254);
 
-/** One search; every filter given must match. */
+/**
+ * One search; every filter given must match. Without identityProvider, every identity provider
+ * searchable here is searched.
+ */
 export const UserSearchQuerySchema = z
   .object({
+    identityProvider: z.string().trim().min(1).max(64).optional(),
     email: textFilter.optional(),
     firstName: textFilter.optional(),
     lastName: textFilter.optional(),

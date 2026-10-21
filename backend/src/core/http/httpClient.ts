@@ -109,7 +109,6 @@ export function joinUrl(base: string, segment: string): string {
   return `${stripTrailingSlashes(base)}/${segment.replace(/^\/+/, '')}`;
 }
 
-/** The URL without its query string. */
 export function withoutQuery(url: string): string {
   const index = url.indexOf('?');
   return index < 0 ? url : url.slice(0, index);

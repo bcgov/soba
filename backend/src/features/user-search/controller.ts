@@ -12,7 +12,6 @@ export async function getUserSearchCapabilitiesHandler(req: Request, res: Respon
 
 export async function searchUsersHandler(req: Request, res: Response): Promise<void> {
   res.setHeader('Cache-Control', 'no-store');
-  const { identityProvider } = req.params as { identityProvider: string };
   const query = req.query as unknown as UserSearchQuery;
-  res.json(await searchUsers(identityProvider, query, STAFF_POLICY, req.sortLocale!));
+  res.json(await searchUsers(query, STAFF_POLICY, req.sortLocale!));
 }

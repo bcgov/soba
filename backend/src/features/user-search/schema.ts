@@ -16,13 +16,6 @@ export const UserSearchScopeParamsSchema = z
   .object({ id: z.string().min(1) })
   .openapi('UserSearch_ScopeParams');
 
-export const UserSearchParamsSchema = z
-  .object({
-    id: z.string().min(1),
-    identityProvider: z.string().trim().min(1).max(64),
-  })
-  .openapi('UserSearch_SearchParams');
-
 export const UserSearchQuerySchema = LibQuerySchema.safeExtend({
   locale: sortLocaleQueryField,
 }).openapi('UserSearch_Query');
@@ -62,7 +55,7 @@ export function registerUserSearchOpenApi(registry: OpenAPIRegistry) {
   for (const scope of SCOPES) {
     registry.registerPath({
       method: 'get',
-      path: scope.path,
+      path: `${scope.path}/capabilities`,
       tags: [TAG],
       security: [{ bearerAuth: [] }],
       summary: `Identity providers and filters for finding people to add to ${scope.subject}`,
@@ -78,14 +71,16 @@ export function registerUserSearchOpenApi(registry: OpenAPIRegistry) {
     });
     registry.registerPath({
       method: 'get',
-      path: `${scope.path}/{identityProvider}`,
+      path: scope.path,
       tags: [TAG],
       security: [{ bearerAuth: [] }],
       summary: `Find people to add to ${scope.subject}`,
-      request: { params: UserSearchParamsSchema, query: UserSearchQuerySchema },
+      description:
+        'Searches the identityProvider given, or else every identity provider searchable here.',
+      request: { params: UserSearchScopeParamsSchema, query: UserSearchQuerySchema },
       responses: {
         200: {
-          description: 'People found, merged across the enabled plugins',
+          description: 'People found, merged across the enabled plugins and identity providers',
           content: { 'application/json': { schema: UserSearchResponseSchema } },
         },
         400: {

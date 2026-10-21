@@ -76,6 +76,15 @@ const found =
   () =>
     Promise.resolve({ hits, truncated: false });
 
+/** Answers each search with one person of the identity provider searched. */
+const onePerson =
+  (name: string) =>
+  ({ identityProvider }: UserSearchRequest) =>
+    found(hit(`${name}@${identityProvider}`, { identityProvider }))();
+
+const searchedProviders = (plugin: ReturnType<typeof adapter>) =>
+  plugin.search.mock.calls.map(([request]) => request.identityProvider);
+
 /** Enable these plugins, in order; an Error stands for one that cannot be built. */
 function enable(plugins: Record<string, UserSearchAdapter | Error>) {
   jest.mocked(getEnabledUserSearchPluginCodes).mockReturnValue(Object.keys(plugins));
@@ -131,16 +140,21 @@ describe('getUserSearchCapabilities', () => {
 });
 
 describe('searchUsers', () => {
-  it('asks only the plugins that accept every filter', async () => {
+  it('asks only the plugins that accept every filter for the identity provider asked', async () => {
     const cssAdapter = css(found());
     const otherAdapter = other(
       found(hit('b1@bceidbusiness', { identityProvider: 'bceidbusiness' })),
     );
     enable({ 'css-v1': cssAdapter, 'other-v1': otherAdapter });
 
-    const result = await searchUsers('bceidbusiness', { lastName: 'Smith' }, {}, 'en');
+    const result = await searchUsers(
+      { identityProvider: 'bceidbusiness', lastName: 'Smith' },
+      {},
+      'en',
+    );
 
     expect(cssAdapter.search).not.toHaveBeenCalled();
+    expect(otherAdapter.search).toHaveBeenCalledTimes(1);
     expect(otherAdapter.search).toHaveBeenCalledWith({
       identityProvider: 'bceidbusiness',
       filters: { lastName: 'Smith' },
@@ -148,6 +162,64 @@ describe('searchUsers', () => {
     });
     expect(result.plugins).toEqual([{ code: 'other-v1', status: 'ok', truncated: false }]);
     expect(result.users.map(({ subject }) => subject)).toEqual(['b1@bceidbusiness']);
+  });
+
+  it('searches every identity provider each plugin accepts when none is asked', async () => {
+    const cssAdapter = css(onePerson('c'));
+    const otherAdapter = other(onePerson('o'));
+    enable({ 'css-v1': cssAdapter, 'other-v1': otherAdapter });
+
+    const result = await searchUsers({ lastName: 'Smith' }, {}, 'en');
+
+    expect(searchedProviders(cssAdapter)).toEqual(['azureidir']);
+    expect(searchedProviders(otherAdapter)).toEqual(['azureidir', 'bceidbusiness']);
+    expect(new Set(result.users.map(({ subject }) => subject))).toEqual(
+      new Set(['c@azureidir', 'o@azureidir', 'o@bceidbusiness']),
+    );
+    expect(result.plugins).toEqual([
+      { code: 'css-v1', status: 'ok', truncated: false },
+      { code: 'other-v1', status: 'ok', truncated: false },
+    ]);
+  });
+
+  it('keeps a search without an identity provider to the ones the policy allows', async () => {
+    const cssAdapter = css(onePerson('c'));
+    enable({ 'css-v1': cssAdapter });
+
+    const result = await searchUsers(
+      { guid: 'F0E1D2C3' },
+      { identityProviders: ['bceidbusiness'] },
+      'en',
+    );
+
+    expect(searchedProviders(cssAdapter)).toEqual(['bceidbusiness']);
+    expect(result.users.map(({ subject }) => subject)).toEqual(['c@bceidbusiness']);
+  });
+
+  it('reports a plugin unavailable if any search failed, and rejected only if all were refused', async () => {
+    enable({
+      'css-v1': css((request) =>
+        request.identityProvider === 'bceidbusiness'
+          ? Promise.reject(new ServiceUnavailableError())
+          : found(hit('a1@azureidir'))(),
+      ),
+      'other-v1': other((request) =>
+        request.identityProvider === 'bceidbusiness'
+          ? Promise.reject(new ValidationError('refused'))
+          : Promise.resolve({ hits: [hit('a2@azureidir')], truncated: true }),
+      ),
+      'strict-v1': other(() => Promise.reject(new ValidationError('refused'))),
+    });
+
+    const result = await searchUsers({ guid: 'F0E1D2C3' }, {}, 'en');
+
+    expect(result.users).toHaveLength(2);
+    expect(result.truncated).toBe(true);
+    expect(result.plugins).toEqual([
+      { code: 'css-v1', status: 'unavailable', truncated: false },
+      { code: 'other-v1', status: 'ok', truncated: true },
+      { code: 'strict-v1', status: 'rejected', truncated: false },
+    ]);
   });
 
   it('merges people across plugins and marks the ones who are Soba users', async () => {
@@ -166,7 +238,7 @@ describe('searchUsers', () => {
         { identityProvider: 'azureidir', subject: 'a1@azureidir', userId: 'user-a' },
       ]);
 
-    const result = await searchUsers('azureidir', { firstName: 'Al' }, {}, 'en');
+    const result = await searchUsers({ identityProvider: 'azureidir', firstName: 'Al' }, {}, 'en');
 
     expect(result.users).toEqual([
       {
@@ -194,7 +266,11 @@ describe('searchUsers', () => {
       'broken-v1': new Error('missing config'),
     });
 
-    const result = await searchUsers('azureidir', { email: 'alice@example.com' }, {}, 'en');
+    const result = await searchUsers(
+      { identityProvider: 'azureidir', email: 'alice@example.com' },
+      {},
+      'en',
+    );
 
     expect(result.users).toHaveLength(1);
     expect(result.plugins).toEqual([
@@ -210,7 +286,7 @@ describe('searchUsers', () => {
       'other-v1': other(() => Promise.reject(new Error('socket hang up'))),
     });
 
-    await expect(searchUsers('azureidir', { guid: 'F0E1D2C3' }, {}, 'en')).rejects.toBeInstanceOf(
+    await expect(searchUsers({ guid: 'F0E1D2C3' }, {}, 'en')).rejects.toBeInstanceOf(
       ServiceUnavailableError,
     );
   });
@@ -218,27 +294,26 @@ describe('searchUsers', () => {
   it('is a validation error when every plugin refused the filters', async () => {
     enable({ 'css-v1': css(() => Promise.reject(new ValidationError('refused'))) });
 
-    await expect(searchUsers('azureidir', { guid: 'F0E1D2C3' }, {}, 'en')).rejects.toBeInstanceOf(
+    await expect(searchUsers({ guid: 'F0E1D2C3' }, {}, 'en')).rejects.toBeInstanceOf(
       ValidationError,
     );
   });
 
   it('refuses filters no plugin accepts, unless a plugin could not be built', async () => {
+    const bceidByName = { identityProvider: 'bceidbusiness', lastName: 'Smith' };
     enable({ 'css-v1': css(found()) });
-    await expect(
-      searchUsers('bceidbusiness', { lastName: 'Smith' }, {}, 'en'),
-    ).rejects.toBeInstanceOf(ValidationError);
+    await expect(searchUsers(bceidByName, {}, 'en')).rejects.toBeInstanceOf(ValidationError);
 
     enable({ 'css-v1': css(found()), 'other-v1': new Error('missing config') });
-    await expect(
-      searchUsers('bceidbusiness', { lastName: 'Smith' }, {}, 'en'),
-    ).rejects.toBeInstanceOf(ServiceUnavailableError);
+    await expect(searchUsers(bceidByName, {}, 'en')).rejects.toBeInstanceOf(
+      ServiceUnavailableError,
+    );
   });
 
   it('is unavailable with no plugins enabled', async () => {
     enable({});
 
-    await expect(searchUsers('azureidir', { lastName: 'Smith' }, {}, 'en')).rejects.toBeInstanceOf(
+    await expect(searchUsers({ lastName: 'Smith' }, {}, 'en')).rejects.toBeInstanceOf(
       ServiceUnavailableError,
     );
   });
@@ -252,7 +327,11 @@ describe('searchUsers', () => {
     };
     enable({ 'sync-v1': throwsAtOnce, 'other-v1': other(found(hit('a1@azureidir'))) });
 
-    const result = await searchUsers('azureidir', { lastName: 'Smith' }, {}, 'en');
+    const result = await searchUsers(
+      { identityProvider: 'azureidir', lastName: 'Smith' },
+      {},
+      'en',
+    );
 
     expect(result.plugins[0]).toEqual({
       code: 'sync-v1',
@@ -265,13 +344,12 @@ describe('searchUsers', () => {
   it('refuses an identity provider that is inactive or outside the policy', async () => {
     enable({ 'css-v1': css(found()) });
 
-    await expect(searchUsers('idir', { guid: 'F0E1D2C3' }, {}, 'en')).rejects.toBeInstanceOf(
-      ValidationError,
-    );
+    await expect(
+      searchUsers({ identityProvider: 'idir', guid: 'F0E1D2C3' }, {}, 'en'),
+    ).rejects.toBeInstanceOf(ValidationError);
     await expect(
       searchUsers(
-        'azureidir',
-        { guid: 'F0E1D2C3' },
+        { identityProvider: 'azureidir', guid: 'F0E1D2C3' },
         { identityProviders: ['bceidbusiness'] },
         'en',
       ),
@@ -285,7 +363,11 @@ describe('searchUsers', () => {
       'other-v1': other(found(...many.slice(30))),
     });
 
-    const result = await searchUsers('azureidir', { lastName: 'Smith' }, {}, 'en');
+    const result = await searchUsers(
+      { identityProvider: 'azureidir', lastName: 'Smith' },
+      {},
+      'en',
+    );
 
     expect(result.users).toHaveLength(RESULT_LIMIT);
     expect(result.truncated).toBe(true);

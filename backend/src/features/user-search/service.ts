@@ -3,6 +3,7 @@ import {
   type SortLocale,
   type UserSearchCapabilitiesResponse,
   type UserSearchField,
+  type UserSearchPluginOutcome,
   type UserSearchPluginStatus,
   type UserSearchQuery,
   type UserSearchResponse,
@@ -21,7 +22,7 @@ import type {
 } from '../../core/integrations/user-search/UserSearchAdapter';
 import { displayNameOf, identityKey, mergeHits, orderUsers, type PluginHits } from './merge';
 
-/** Most hits taken from each plugin. */
+/** Most hits taken from one plugin for one identity provider. */
 export const PLUGIN_LIMIT = 25;
 /** Most people one search returns. */
 export const RESULT_LIMIT = 50;
@@ -112,38 +113,97 @@ const filtersOf = (query: UserSearchQuery): Partial<Record<UserSearchField, stri
     USER_SEARCH_FIELDS.flatMap((field) => (query[field] ? [[field, query[field]]] : [])),
   );
 
-function failedStatus(code: string, reason: unknown): UserSearchPluginStatus {
-  if (reason instanceof ValidationError) return { code, status: 'rejected', truncated: false };
+/** One plugin searching one identity provider. */
+interface PlannedSearch {
+  plugin: LoadedPlugin;
+  identityProvider: string;
+}
+
+interface SearchAnswer {
+  outcome: UserSearchPluginOutcome;
+  truncated: boolean;
+}
+
+function failedOutcome(
+  { plugin, identityProvider }: PlannedSearch,
+  reason: unknown,
+): UserSearchPluginOutcome {
+  if (reason instanceof ValidationError) return 'rejected';
   if (!(reason instanceof ServiceUnavailableError)) {
-    log.warn({ plugin: code, failureType: errorName(reason) }, 'User search plugin failed');
+    log.warn(
+      { plugin: plugin.code, identityProvider, failureType: errorName(reason) },
+      'User search plugin failed',
+    );
   }
-  return { code, status: 'unavailable', truncated: false };
+  return 'unavailable';
+}
+
+/** Unavailable if any of the plugin's searches could not answer, rejected if all refused. */
+function pluginStatus(code: string, answers: readonly SearchAnswer[]): UserSearchPluginStatus {
+  let status: UserSearchPluginOutcome = 'ok';
+  if (answers.some(({ outcome }) => outcome === 'unavailable')) status = 'unavailable';
+  else if (answers.every(({ outcome }) => outcome === 'rejected')) status = 'rejected';
+  return { code, status, truncated: answers.some(({ truncated }) => truncated) };
+}
+
+/** Hits keep plugin order, so an earlier plugin's values win when merged. */
+async function runSearches(
+  searches: readonly PlannedSearch[],
+  filters: Partial<Record<UserSearchField, string>>,
+): Promise<{ plugins: UserSearchPluginStatus[]; results: PluginHits[] }> {
+  const settled = await Promise.allSettled(
+    searches.map(async ({ plugin, identityProvider }) =>
+      plugin.adapter.search({ identityProvider, filters, limit: PLUGIN_LIMIT }),
+    ),
+  );
+  const answers = new Map<string, SearchAnswer[]>();
+  const results: PluginHits[] = [];
+  settled.forEach((outcome, index) => {
+    const search = searches[index];
+    const { code } = search.plugin;
+    const pluginAnswers = answers.get(code) ?? [];
+    answers.set(code, pluginAnswers);
+    if (outcome.status === 'rejected') {
+      pluginAnswers.push({ outcome: failedOutcome(search, outcome.reason), truncated: false });
+      return;
+    }
+    pluginAnswers.push({ outcome: 'ok', truncated: outcome.value.truncated });
+    results.push({ code, hits: outcome.value.hits });
+  });
+  return {
+    plugins: [...answers].map(([code, pluginAnswers]) => pluginStatus(code, pluginAnswers)),
+    results,
+  };
 }
 
 /**
- * Search every enabled plugin that accepts these filters for this identity provider, and merge
- * the people they find.
- * - 400: the identity provider is not searchable here, no plugin accepts the filters, or every
- *   plugin asked refused them.
- * - 503: no plugin is enabled, one could not be built, or none asked could answer.
+ * Search every enabled plugin that accepts these filters, for the identity provider asked or else
+ * every one searchable here, and merge the people they find.
+ * - 400: the identity provider asked is not searchable here, no plugin accepts the filters, or
+ *   every plugin asked refused them.
+ * - 503: no plugin is enabled, none asked could answer, or no plugin accepts the filters while
+ *   one could not be built.
  */
 export async function searchUsers(
-  identityProvider: string,
   query: UserSearchQuery,
   policy: UserSearchPolicy,
   locale: SortLocale,
 ): Promise<UserSearchResponse> {
-  const allowed = await allowedIdentityProviders(policy, locale);
-  if (!allowed.some(({ code }) => code === identityProvider)) {
-    throw new ValidationError(`${identityProvider} users cannot be searched here`);
+  const allowed = (await allowedIdentityProviders(policy, locale)).map(({ code }) => code);
+  const asked = query.identityProvider;
+  if (asked && !allowed.includes(asked)) {
+    throw new ValidationError(`${asked} users cannot be searched here`);
   }
+  const identityProviders = asked ? [asked] : allowed;
   const filters = filtersOf(query);
   const fields = Object.keys(filters) as UserSearchField[];
   const { loaded, failed } = await loadPlugins();
-  const eligible = loaded.filter(({ capabilities }) =>
-    accepts(capabilities, identityProvider, fields),
+  const searches = loaded.flatMap((plugin) =>
+    identityProviders
+      .filter((identityProvider) => accepts(plugin.capabilities, identityProvider, fields))
+      .map((identityProvider) => ({ plugin, identityProvider })),
   );
-  if (eligible.length === 0) {
+  if (searches.length === 0) {
     // Unavailable rather than invalid when no plugin loaded or one failed to load.
     if (loaded.length === 0 || failed.length > 0) {
       throw new ServiceUnavailableError('User search is unavailable');
@@ -151,23 +211,8 @@ export async function searchUsers(
     throw new ValidationError('No user search plugin accepts these filters');
   }
 
-  const outcomes = await Promise.allSettled(
-    eligible.map(async ({ adapter }) =>
-      adapter.search({ identityProvider, filters, limit: PLUGIN_LIMIT }),
-    ),
-  );
-  const plugins: UserSearchPluginStatus[] = [];
-  const results: PluginHits[] = [];
-  outcomes.forEach((outcome, index) => {
-    const { code } = eligible[index];
-    if (outcome.status === 'rejected') {
-      plugins.push(failedStatus(code, outcome.reason));
-      return;
-    }
-    plugins.push({ code, status: 'ok', truncated: outcome.value.truncated });
-    results.push({ code, hits: outcome.value.hits });
-  });
-  plugins.push(...failed.map((code) => failedStatus(code, new ServiceUnavailableError())));
+  const { plugins, results } = await runSearches(searches, filters);
+  for (const code of failed) plugins.push({ code, status: 'unavailable', truncated: false });
   if (results.length === 0) {
     if (plugins.some(({ status }) => status === 'unavailable')) {
       throw new ServiceUnavailableError('User search is unavailable');
