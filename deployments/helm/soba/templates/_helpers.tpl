@@ -201,6 +201,9 @@ absolute.
 {{- if and (eq $storage.defaultBackend "storage-s3") $storage.defaultPrefix (not (regexMatch $prefix (toString $storage.defaultPrefix))) -}}
 {{- fail "backend.storage.defaultPrefix must be lowercase words joined by dashes, in slash-separated segments" -}}
 {{- end -}}
+{{- if and (eq $storage.defaultBackend "storage-s3") $storage.s3VaultKeyInfix (not .Values.vault.enabled) -}}
+{{- fail "backend.storage.s3VaultKeyInfix needs vault.enabled=true to inject the S3 secrets" -}}
+{{- end -}}
 {{- range $key := list "filesStoragePrefix" "templatesStoragePrefix" -}}
 {{- $value := index $storage $key -}}
 {{- if and $value (not (regexMatch $prefix (toString $value))) -}}

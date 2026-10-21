@@ -69,3 +69,7 @@ mongodb:
     enabled: false
   external:
     uri: ""
+
+# The prod deploy supplies vault.role, vault.secretPath and vault.serviceAccountName.
+vault:
+  enabled: true
