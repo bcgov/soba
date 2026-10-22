@@ -149,7 +149,7 @@ named `my-soba`:
 | `database.host`          | `""`       | ConfigMap `my-soba-backend-app` | `DB_HOST`           | Hostname (used when `uri` is empty)            |
 | `database.port`          | `"5432"`   | ConfigMap `my-soba-backend-app` | `DB_PORT`           | Port                                           |
 | `database.user`          | `postgres` | ConfigMap `my-soba-backend-app` | `DB_USER`           | Username                                       |
-| `database.password`      | `""`       | Secret `my-soba-db`             | `DB_PASSWORD`       | Password (random 24-char generated if omitted) |
+| `database.password`      | unset      | Secret `my-soba-db`             | `DB_PASSWORD`       | Password (random 24-char generated if omitted) |
 | `database.name`          | `soba`     | ConfigMap `my-soba-backend-app` | `DB_NAME`           | Database name                                  |
 | `database.adminDatabase` | `postgres` | ConfigMap `my-soba-backend-app` | `DB_ADMIN_DATABASE` | Admin database for migration CREATE DATABASE   |
 | `database.poolMax`       | `"10"`     | ConfigMap `my-soba-backend-app` | `DB_POOL_MAX`       | Max connection pool size                       |

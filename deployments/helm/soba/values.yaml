@@ -358,7 +358,7 @@ database:
   host: ""
   port: "5432"
   user: postgres
-  password: ""
+  # password: unset generates one in the db secret
   name: soba
   adminDatabase: postgres
   poolMax: "10"
@@ -404,7 +404,7 @@ formio:
     timeoutSeconds: 5
   admin:
     email: formio@soba.gov.bc.ca
-    password: ""
+    # password: unset generates one in the formio secret
   jwtSecret: ""
 
 # -- MongoDB (backing store for Form.io) -----------------------------------
@@ -505,20 +505,6 @@ temporalWorkers:
     replicas: 1
     # Port for the worker's HTTP health endpoints (/readyz, /healthz)
     healthPort: 9090
-    resources:
-      requests:
-        cpu: 25m
-        memory: 128Mi
-      limits:
-        cpu: 100m
-        memory: 512Mi
-
-  - name: temporal-worker-document-generation
-    enabled: false
-    taskQueue: "document-generation"
-    replicas: 1
-    # Keep a different health port from the main worker in the same namespace.
-    healthPort: 9091
     resources:
       requests:
         cpu: 25m

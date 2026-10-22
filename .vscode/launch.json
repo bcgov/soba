@@ -6,7 +6,6 @@
       "configurations": [
         "SOBA Backend",
         "SOBA Temporal Worker (soba)",
-        "SOBA Temporal Worker (document-generation)",
         "SOBA Frontend"
       ]
     },
@@ -15,18 +14,13 @@
       "configurations": [
         "SOBA Backend",
         "SOBA Temporal Worker (soba)",
-        "SOBA Temporal Worker (document-generation)",
         "SOBA Frontend (Designer)",
         "SOBA Frontend (Forms)"
       ]
     },
     {
       "name": "SOBA (Backend + Temporal)",
-      "configurations": [
-        "SOBA Backend",
-        "SOBA Temporal Worker (soba)",
-        "SOBA Temporal Worker (document-generation)"
-      ]
+      "configurations": ["SOBA Backend", "SOBA Temporal Worker (soba)"]
     }
   ],
   "configurations": [
@@ -54,20 +48,6 @@
       "env": {
         "TEMPORAL_TASK_QUEUE": "soba",
         "TEMPORAL_WORKER_HEALTH_PORT": "9090"
-      },
-      "skipFiles": ["<node_internals>/**"],
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "SOBA Temporal Worker (document-generation)",
-      "type": "node",
-      "request": "launch",
-      "cwd": "${workspaceFolder}/backend",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["exec", "tsx", "watch", "temporal-worker.ts"],
-      "env": {
-        "TEMPORAL_TASK_QUEUE": "document-generation",
-        "TEMPORAL_WORKER_HEALTH_PORT": "9091"
       },
       "skipFiles": ["<node_internals>/**"],
       "console": "integratedTerminal"
