@@ -58,7 +58,7 @@ export default defineConfig({
   projects: [
     {
       name: 'setup',
-      testMatch: /\.setup\.ts$/,
+      testMatch: /auth\.setup\.ts$/,
       use: {
         ...devices['Desktop Chrome'],
         baseURL: BASE_URL,
@@ -66,9 +66,20 @@ export default defineConfig({
       },
     },
 
-    // All E2E tests use the authenticated session
+    {
+      name: 'form-creation',
+      testMatch: /form_creation\.spec\.ts$/,
+      dependencies: ['setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: authFile,
+      },
+    },
+
+    // All E2E tests use the authenticated session and the shared form.
     {
       name: 'chromium',
+      testIgnore: [/\.setup\.ts$/, /form_creation\.spec\.ts$/],
       use: {
         ...devices['Desktop Chrome'],
         baseURL: BASE_URL,
@@ -79,7 +90,7 @@ export default defineConfig({
         trace: 'on-first-retry',
         ignoreHTTPSErrors: true,
       },
-      dependencies: ['setup'],
+      dependencies: ['form-creation'],
     },
   ],
 });
