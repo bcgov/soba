@@ -2,6 +2,20 @@
  * Single source of truth for all seeded code values. Seed and application code
  * import from here; no string literals for codes in logic. Compile-time safety.
  */
+export {
+  FormCreatePermissions,
+  Permissions,
+  PrintUploadPermissions,
+  type PermissionCode,
+} from '@soba/lib';
+export {
+  SubmissionParticipantRole,
+  SubmissionWorkflowState,
+  type SubmissionParticipantRoleCode,
+  type SubmissionWorkflowStateCode,
+} from '@soba/lib';
+
+import type { TemplateType } from '@soba/lib';
 
 export const Roles = {
   // Form roles. form_admin holds the `*` wildcard permission.
@@ -10,28 +24,9 @@ export const Roles = {
   form_submitter: 'form_submitter',
   submission_reviewer: 'submission_reviewer',
   submission_approver: 'submission_approver',
+  team_manager: 'team_manager',
 } as const;
 export type RoleCode = (typeof Roles)[keyof typeof Roles];
-
-/** Form permissions. `all` is the `*` wildcard, held only by form_admin. */
-export const Permissions = {
-  all: '*',
-  form_read: 'form_read',
-  form_update: 'form_update',
-  form_delete: 'form_delete',
-  design_create: 'design_create',
-  design_read: 'design_read',
-  design_update: 'design_update',
-  design_delete: 'design_delete',
-  submission_create: 'submission_create',
-  submission_read: 'submission_read',
-  submission_update: 'submission_update',
-  submission_delete: 'submission_delete',
-  submission_review: 'submission_review',
-  team_read: 'team_read',
-  team_update: 'team_update',
-} as const;
-export type PermissionCode = (typeof Permissions)[keyof typeof Permissions];
 
 export const RoleStatus = {
   active: 'active',
@@ -84,24 +79,42 @@ export const FormVersionState = {
 } as const;
 export type FormVersionStateCode = (typeof FormVersionState)[keyof typeof FormVersionState];
 
-/** Submission lifecycle state (submission.workflow_state). Backend-owned; clients never set it. */
-export const SubmissionWorkflowState = {
-  opened: 'opened',
-  draft: 'draft',
-  submitted: 'submitted',
-  deleted: 'deleted',
-} as const;
-export type SubmissionWorkflowStateCode =
-  (typeof SubmissionWorkflowState)[keyof typeof SubmissionWorkflowState];
-
 /** Submission lifecycle event (submission_revision.event_type). Mirrors the state flow. */
 export const SubmissionEventType = {
   opened: 'opened',
   saved: 'saved',
   submitted: 'submitted',
+  deleted: 'deleted',
 } as const;
 export type SubmissionEventTypeCode =
   (typeof SubmissionEventType)[keyof typeof SubmissionEventType];
+/** The events a submitter's save or submit records. Open and delete have their own paths. */
+export type SubmissionWriteEventCode = Extract<SubmissionEventTypeCode, 'saved' | 'submitted'>;
+
+/**
+ * Standing of a revision within its submission (submission_revision.status).
+ * current — the submission's live version. superseded — a former current, replaced by a later one.
+ * pending — a conflicting or post-submit write held for staff to resolve; not on the current chain.
+ */
+export const RevisionStatus = {
+  current: 'current',
+  superseded: 'superseded',
+  pending: 'pending',
+} as const;
+export type RevisionStatusCode = (typeof RevisionStatus)[keyof typeof RevisionStatus];
+
+/**
+ * Why a revision holds its status (submission_revision.reason).
+ * accepted — applied as the current version. replaced — superseded by a later current version.
+ * conflict — its base was no longer the head. closed — the submission was already submitted.
+ */
+export const RevisionReason = {
+  accepted: 'accepted',
+  replaced: 'replaced',
+  conflict: 'conflict',
+  closed: 'closed',
+} as const;
+export type RevisionReasonCode = (typeof RevisionReason)[keyof typeof RevisionReason];
 
 export const FeatureStatus = {
   enabled: 'enabled',
@@ -113,13 +126,16 @@ export type FeatureStatusCode = (typeof FeatureStatus)[keyof typeof FeatureStatu
 
 /**
  * Feature codes backed by the soba.feature table. Most gate a mounted API surface via
- * requireFeature and mirror the frontend FEATURE_CODES; antivirus is backend-only and gates
- * scan-on-upload behaviour inside the files surface rather than a surface of its own.
+ * requireFeature and mirror the frontend FEATURE_CODES. Templates, dev-data, antivirus and the
+ * per-backend document generation codes have no frontend code; antivirus gates the upload scan in
+ * the core file store rather than a surface of its own.
  */
 export const Features = {
   design_mode: 'design-mode',
   submit_mode: 'submit-mode',
   files: 'files',
+  /** Document templates stored per form version, managed by staff. */
+  templates: 'templates',
   antivirus: 'antivirus',
   /** Umbrella: gates the document-generation surface within submit. */
   document_generation: 'document-generation',
@@ -166,9 +182,11 @@ export const FeatureScopeStatus = {
 } as const;
 export type FeatureScopeStatusCode = (typeof FeatureScopeStatus)[keyof typeof FeatureScopeStatus];
 
-/** Which render operation an audit row records (document_generation_audit.mode). */
+/**
+ * Which render operation an audit row records (document_generation_audit.mode). Older rows may
+ * hold 'preview'.
+ */
 export const DocumentGenerationMode = {
-  preview: 'preview',
   print: 'print',
 } as const;
 export type DocumentGenerationModeCode =
@@ -181,6 +199,13 @@ export const DocumentGenerationOutcome = {
 } as const;
 export type DocumentGenerationOutcomeCode =
   (typeof DocumentGenerationOutcome)[keyof typeof DocumentGenerationOutcome];
+
+/** What a document template is for (document_template.type). The list lives in @soba/lib. */
+export const DocumentTemplateType = {
+  cdogs: 'cdogs',
+} as const satisfies Record<TemplateType, TemplateType>;
+export type DocumentTemplateTypeCode =
+  (typeof DocumentTemplateType)[keyof typeof DocumentTemplateType];
 
 /** Display name for the group that grants form admin on all forms in a workspace. */
 export const FORM_ADMINS_GROUP_NAME = 'Form administrators';
@@ -203,8 +228,7 @@ export const IdentityProviders = {
 } as const;
 export type IdentityProviderCode = (typeof IdentityProviders)[keyof typeof IdentityProviders];
 
-/** Pseudo identity provider that grants public (unauthenticated) submit access. */
-export const PUBLIC_PROVIDER_CODE = 'public';
+export { PUBLIC_PROVIDER_CODE } from '@soba/lib';
 
 /** Identity subject of the seeded public user (provider=public). */
 export const PUBLIC_SUBJECT = 'soba-public';
@@ -242,6 +266,22 @@ export const WorkspaceGroupMembershipStatus = {
 } as const;
 export type WorkspaceGroupMembershipStatusCode =
   (typeof WorkspaceGroupMembershipStatus)[keyof typeof WorkspaceGroupMembershipStatus];
+
+/** Status of a form_group_override row; an active row replaces the group's membership for that form. */
+export const FormGroupOverrideStatus = {
+  active: 'active',
+  inactive: 'inactive',
+} as const;
+export type FormGroupOverrideStatusCode =
+  (typeof FormGroupOverrideStatus)[keyof typeof FormGroupOverrideStatus];
+
+/** Status of a submission_participant row. */
+export const SubmissionParticipantStatus = {
+  active: 'active',
+  inactive: 'inactive',
+} as const;
+export type SubmissionParticipantStatusCode =
+  (typeof SubmissionParticipantStatus)[keyof typeof SubmissionParticipantStatus];
 
 /** Status of a role assigned to a workspace group (workspace_group_role.status). */
 export const WorkspaceGroupRoleStatus = {

@@ -1,11 +1,15 @@
+import type { SortLocale } from '@soba/lib';
 import {
   getWorkspaceForUser,
   listWorkspacesForUser,
+  lookupWorkspacesForUser,
   type WorkspaceListSort,
 } from '../../db/repos/membershipRepo';
 import { canCreateWorkspaceByIdp } from '../../db/repos/idpGroupRepo';
 import { createTeamWorkspace, updateWorkspace } from '../../db/repos/workspaceRepo';
+import { listWorkspacesForSubmitter } from '../../db/repos/submitterFormRepo';
 import { ForbiddenError } from '../../errors';
+import { LOOKUP_FETCH_LIMIT, toLookupResponse } from '../shared/lookup';
 
 export class WorkspacesApiService {
   async list(
@@ -18,6 +22,7 @@ export class WorkspacesApiService {
       q?: string;
       requiredPermission?: string;
       sort: WorkspaceListSort;
+      locale: SortLocale;
     },
   ) {
     const { items, total } = await listWorkspacesForUser({
@@ -25,10 +30,11 @@ export class WorkspacesApiService {
       offset: query.offset,
       limit: query.limit,
       sort: query.sort,
+      locale: query.locale,
       kind: query.kind,
       status: query.status,
       q: query.q,
-      requiredPermission: query.requiredPermission,
+      requiredPermissions: query.requiredPermission ? [query.requiredPermission] : undefined,
     });
     return {
       items: items.map((r) => ({
@@ -54,6 +60,42 @@ export class WorkspacesApiService {
       },
       sort: query.sort,
     };
+  }
+
+  async lookup(
+    actorId: string,
+    query: {
+      q?: string;
+      requiredPermissions?: string;
+      disclaimerAccepted?: 'true' | 'false';
+      locale: SortLocale;
+    },
+  ) {
+    const rows = await lookupWorkspacesForUser({
+      userId: actorId,
+      q: query.q,
+      requiredPermissions: query.requiredPermissions?.split(','),
+      disclaimerAccepted:
+        query.disclaimerAccepted === undefined ? undefined : query.disclaimerAccepted === 'true',
+      limit: LOOKUP_FETCH_LIMIT,
+      locale: query.locale,
+    });
+    return toLookupResponse(
+      rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        kind: r.kind,
+        role: r.role,
+        disclaimerAccepted: r.disclaimerAcceptedAt != null,
+      })),
+    );
+  }
+
+  /** The workspaces of the forms the caller holds the submitter role on or has submitted to. */
+  async listMine(actorId: string, locale: SortLocale) {
+    return toLookupResponse(
+      await listWorkspacesForSubmitter({ userId: actorId, limit: LOOKUP_FETCH_LIMIT, locale }),
+    );
   }
 
   async getCurrent(workspaceId: string, actorId: string) {

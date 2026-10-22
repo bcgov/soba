@@ -1,10 +1,23 @@
-import { SubmissionService } from '../../services/submissionService';
+import { SubmissionService, type SubmissionContentRefs } from '../../services/submissionService';
+import type { WriteLanding } from '../../services/submissionWriteGate';
+import { SubmissionWorkflowState } from '../../db/codes';
+import type { FormAccessGrant } from '../../db/repos/formAccessRepo';
+import { toSubmitterFormDto } from '../forms/serviceFactory';
 import type {
-  SubmissionRecord,
+  ParticipantSubmissionListRow,
   SubmissionListRow,
-  SubmissionListSort,
   SubmissionDetailRow,
 } from '../../db/repos/submissionRepo';
+import type {
+  ListMySubmissionsResponse,
+  MySubmissionRole,
+  MySubmissionState,
+  OpenSubmissionBody,
+  SubmissionDataBody,
+  SortLocale,
+  SubmissionListSort,
+  SubmitSubmissionBody,
+} from '@soba/lib';
 
 export interface SubmissionsContextInput {
   workspaceId: string;
@@ -12,13 +25,14 @@ export interface SubmissionsContextInput {
   actorDisplayLabel: string | null;
 }
 
-/** Scope for list/search: single workspace resolved from a scope anchor. */
+/** Scope for list/search: the workspaces searched and the access grant rows must pass. */
 export interface SubmissionsListScopeInput {
   workspaceIds: string[];
   actorId: string;
+  formAccess: FormAccessGrant;
 }
 
-interface ListSubmissionsQueryInput {
+export interface ListSubmissionsQueryInput {
   workspaceId?: string;
   formId?: string;
   formVersionId?: string;
@@ -29,26 +43,47 @@ interface ListSubmissionsQueryInput {
   createdBy?: string;
   q?: string;
   sort: SubmissionListSort;
+  locale: SortLocale;
 }
 
-const toSubmissionDto = (item: SubmissionRecord | SubmissionDetailRow) => {
-  const detail = item as Partial<SubmissionDetailRow>;
-  return {
-    id: item.id,
-    formId: item.formId,
-    formName: detail.form?.name ?? 'Untitled Form',
-    formVersionId: item.formVersionId,
-    versionNo: detail.formVersion?.versionNo ?? item.currentRevisionNo ?? 1,
-    workflowState: item.workflowState,
-    engineSyncStatus: item.engineSyncStatus,
-    currentRevisionNo: item.currentRevisionNo,
-    submittedAt: item.submittedAt?.toISOString() ?? null,
-    createdAt: item.createdAt.toISOString(),
-    updatedAt: item.updatedAt.toISOString(),
-    createdBy: detail.createdBy ?? null,
-    submittedBy: detail.submittedBy ?? null,
-  };
-};
+export interface ListMySubmissionsQueryInput {
+  offset: number;
+  limit: number;
+  workflowState?: MySubmissionState;
+  q?: string;
+  sort: SubmissionListSort;
+  locale: SortLocale;
+}
+
+// The code exists from open but is shown only once the submission is submitted.
+const confirmationCodeOf = (item: { workflowState: string; confirmationCode: string }) =>
+  item.workflowState === SubmissionWorkflowState.submitted ? item.confirmationCode : null;
+
+export const toSubmissionDto = (item: SubmissionDetailRow) => ({
+  id: item.id,
+  formId: item.formId,
+  formName: item.form.name ?? 'Untitled Form',
+  formVersionId: item.formVersionId,
+  versionNo: item.formVersion.versionNo ?? 1,
+  workflowState: item.workflowState,
+  engineSyncStatus: item.engineSyncStatus,
+  currentRevisionNo: item.currentRevisionNo,
+  headRevisionId: item.headRevisionId,
+  submittedAt: item.submittedAt?.toISOString() ?? null,
+  createdAt: item.createdAt.toISOString(),
+  updatedAt: item.updatedAt.toISOString(),
+  createdBy: item.createdBy,
+  submittedBy: item.submittedBy,
+  confirmationCode: confirmationCodeOf(item),
+});
+
+export const toSubmissionWriteDto = (outcome: {
+  record: SubmissionDetailRow;
+  revision: WriteLanding;
+}) => ({
+  ...toSubmissionDto(outcome.record),
+  revision: outcome.revision,
+});
 
 const toSubmissionListItemDto = (item: SubmissionListRow) => ({
   id: item.id,
@@ -63,6 +98,22 @@ const toSubmissionListItemDto = (item: SubmissionListRow) => ({
   updatedAt: item.updatedAt.toISOString(),
   createdBy: item.createdBy,
   submittedBy: item.submittedBy,
+  confirmationCode: confirmationCodeOf(item),
+});
+
+const toMySubmissionListItemDto = (item: ParticipantSubmissionListRow) => ({
+  id: item.id,
+  formId: item.formId,
+  formName: item.formName,
+  formVersionId: item.formVersionId,
+  workflowState: item.workflowState as MySubmissionState,
+  role: item.role as MySubmissionRole,
+  headRevisionId: item.headRevisionId,
+  currentRevisionNo: item.currentRevisionNo,
+  submittedAt: item.submittedAt?.toISOString() ?? null,
+  createdAt: item.createdAt.toISOString(),
+  updatedAt: item.updatedAt.toISOString(),
+  confirmationCode: confirmationCodeOf(item),
 });
 
 export function createSubmissionsApiService(submissionService: SubmissionService) {
@@ -75,10 +126,13 @@ export function createSubmissionsApiService(submissionService: SubmissionService
     getData: (ctx: SubmissionsContextInput, submissionId: string) =>
       submissionService.getContent({ workspaceId: ctx.workspaceId, submissionId }),
 
+    readContent: (refs: SubmissionContentRefs) => submissionService.readContent(refs),
+
     list: async (scope: SubmissionsListScopeInput, query: ListSubmissionsQueryInput) => {
       const result = await submissionService.list({
         workspaceIds: scope.workspaceIds,
         actorId: scope.actorId,
+        formAccess: scope.formAccess,
         offset: query.offset,
         limit: query.limit,
         formId: query.formId,
@@ -88,6 +142,7 @@ export function createSubmissionsApiService(submissionService: SubmissionService
         createdBy: query.createdBy,
         q: query.q,
         sort: query.sort,
+        locale: query.locale,
       });
 
       return {
@@ -110,19 +165,48 @@ export function createSubmissionsApiService(submissionService: SubmissionService
       };
     },
 
-    open: async (ctx: SubmissionsContextInput, formId: string, id: string) => {
-      const { created, record } = await submissionService.open({ ...ctx, formId, id });
+    listMine: async (
+      userId: string,
+      query: ListMySubmissionsQueryInput,
+    ): Promise<ListMySubmissionsResponse> => {
+      const result = await submissionService.listForParticipant({
+        userId,
+        offset: query.offset,
+        limit: query.limit,
+        workflowState: query.workflowState,
+        q: query.q,
+        sort: query.sort,
+        locale: query.locale,
+      });
+      return {
+        items: result.items.map((item) => toMySubmissionListItemDto(item)),
+        forms: result.forms.map(toSubmitterFormDto),
+        page: { offset: query.offset, limit: query.limit, total: result.total },
+        filters: { workflowState: query.workflowState, q: query.q },
+        sort: query.sort,
+      };
+    },
+
+    open: async (ctx: SubmissionsContextInput, body: OpenSubmissionBody) => {
+      const { created, record } = await submissionService.open({ ...ctx, ...body });
       return { created, submission: toSubmissionDto(record) };
     },
 
-    save: (ctx: SubmissionsContextInput, submissionId: string, data: Record<string, unknown>) =>
-      submissionService.save({ ...ctx, submissionId, data }).then((row) => toSubmissionDto(row)),
+    save: (ctx: SubmissionsContextInput, submissionId: string, body: SubmissionDataBody) =>
+      submissionService
+        .save({ ...ctx, submissionId, ...body })
+        .then((outcome) => toSubmissionWriteDto(outcome)),
 
-    submit: (ctx: SubmissionsContextInput, submissionId: string, data: Record<string, unknown>) =>
-      submissionService.submit({ ...ctx, submissionId, data }).then((row) => toSubmissionDto(row)),
+    submit: (ctx: SubmissionsContextInput, submissionId: string, body: SubmitSubmissionBody) =>
+      submissionService
+        .submit({ ...ctx, submissionId, ...body })
+        .then((outcome) => toSubmissionWriteDto(outcome)),
 
     delete: (ctx: SubmissionsContextInput, submissionId: string) =>
       submissionService.delete({ ...ctx, submissionId }),
+
+    deleteUnsubmitted: (ctx: SubmissionsContextInput, submissionId: string) =>
+      submissionService.deleteUnsubmitted({ ...ctx, submissionId }),
   };
 }
 

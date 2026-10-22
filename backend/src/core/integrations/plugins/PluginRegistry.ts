@@ -5,8 +5,8 @@
  * virus scan).
  * Storage is discovered here too but selected per profile (see getStorageAdapter).
  */
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import { z } from 'zod';
 import { env } from '../../config/env';
 import { log } from '../../logging';
@@ -39,6 +39,9 @@ import type {
   StorageEngineReadinessResult,
   StoragePluginDefinition,
 } from '../storage-engine/StorageEngineAdapter';
+import type { TenantEnginePluginDefinition } from '../tenant/TenantEnginePluginDefinition';
+import type { WorkflowEnginePluginDefinition } from '../workflow/WorkflowEnginePluginDefinition';
+import { reportReadinessByKey } from './readiness';
 
 // --- Definition schemas -----------------------------------------------------
 
@@ -48,7 +51,7 @@ const AdapterPluginDefinitionSchema = z.object({
   createAdapter: z.any(),
 });
 
-// form-engine and document-generation share this { code, metadata, createAdapter } shape.
+// form-engine, document-generation, tenant-engine and workflow-engine share this { code, metadata, createAdapter } shape.
 const MetadataPluginDefinitionSchema = z.object({
   code: z.string().min(1),
   metadata: z.object({
@@ -86,6 +89,8 @@ interface CachedPlugin {
   virusScanDefinition?: VirusScanPluginDefinition;
   storageDefinition?: StoragePluginDefinition;
   idpDefinition?: IdpPluginDefinition;
+  tenantEngineDefinition?: TenantEnginePluginDefinition;
+  workflowEngineDefinition?: WorkflowEnginePluginDefinition;
 }
 
 // Each CachedPlugin definition field, the module export it comes from, and the schema that
@@ -137,6 +142,16 @@ const DEFINITION_KINDS: ReadonlyArray<{
     schema: AdapterPluginDefinitionSchema,
   },
   { field: 'idpDefinition', exportKey: 'idpPluginDefinition', schema: IdpPluginDefinitionSchema },
+  {
+    field: 'tenantEngineDefinition',
+    exportKey: 'tenantEnginePluginDefinition',
+    schema: MetadataPluginDefinitionSchema,
+  },
+  {
+    field: 'workflowEngineDefinition',
+    exportKey: 'workflowEnginePluginDefinition',
+    schema: MetadataPluginDefinitionSchema,
+  },
 ];
 
 let cache: CachedPlugin[] | null = null;
@@ -278,6 +293,8 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
       p.virusScanDefinition?.code ??
       p.storageDefinition?.code ??
       p.idpDefinition?.code ??
+      p.tenantEngineDefinition?.code ??
+      p.workflowEngineDefinition?.code ??
       p.dir;
     return {
       code,
@@ -325,6 +342,42 @@ export function getDocumentGenerationPluginCatalog(): DocumentGenerationPluginCa
 
 export function getDocumentGenerationPluginDefinitions(): DocumentGenerationPluginDefinition[] {
   return definitionsOf('documentGenerationDefinition');
+}
+
+export interface TenantEnginePluginCatalogEntry {
+  code: string;
+  name: string;
+  version?: string;
+}
+
+export function getTenantEnginePluginCatalog(): TenantEnginePluginCatalogEntry[] {
+  return getTenantEnginePluginDefinitions().map((d) => ({
+    code: d.code,
+    name: d.metadata.name,
+    version: d.metadata.version,
+  }));
+}
+
+export function getTenantEnginePluginDefinitions(): TenantEnginePluginDefinition[] {
+  return definitionsOf('tenantEngineDefinition');
+}
+
+export interface WorkflowEnginePluginCatalogEntry {
+  code: string;
+  name: string;
+  version?: string;
+}
+
+export function getWorkflowEnginePluginCatalog(): WorkflowEnginePluginCatalogEntry[] {
+  return getWorkflowEnginePluginDefinitions().map((d) => ({
+    code: d.code,
+    name: d.metadata.name,
+    version: d.metadata.version,
+  }));
+}
+
+export function getWorkflowEnginePluginDefinitions(): WorkflowEnginePluginDefinition[] {
+  return definitionsOf('workflowEngineDefinition');
 }
 
 export function getCachePluginDefinitions(): CachePluginDefinition[] {
@@ -490,17 +543,8 @@ export function getStorageAdapter(profile: string = 'default'): StorageEngineAda
  * that is unreachable or misconfigured yields { ok: false, message }; one with no readinessCheck
  * yields { ok: true }.
  */
-export async function checkStorageReadiness(): Promise<
-  Record<string, StorageEngineReadinessResult>
-> {
-  const results: Record<string, StorageEngineReadinessResult> = {};
-  for (const profile of Object.keys(getStorageProfilesConfig())) {
-    try {
-      const adapter = getStorageAdapter(profile);
-      results[profile] = (await adapter.readinessCheck?.()) ?? { ok: true };
-    } catch (err) {
-      results[profile] = { ok: false, message: err instanceof Error ? err.message : String(err) };
-    }
-  }
-  return results;
+export function checkStorageReadiness(): Promise<Record<string, StorageEngineReadinessResult>> {
+  return reportReadinessByKey(Object.keys(getStorageProfilesConfig()), (profile) =>
+    getStorageAdapter(profile).readinessCheck?.(),
+  );
 }

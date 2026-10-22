@@ -1,27 +1,27 @@
 'use client';
 import { useMemo, useState, useCallback } from 'react';
 import { FaRegTrashCan, FaFile } from 'react-icons/fa6';
-import { Link, Button } from '@bcgov/design-system-react-components';
+import { Link } from '@bcgov/design-system-react-components';
 import { useRouter, usePathname } from 'next/navigation';
 
-import type { Dictionary } from '@/src/types/plugins';
+import type { Dictionary } from '@/src/types/dictionary';
 import { DataTable, type Column } from '@/src/components/DataTable';
-import { Modal } from '@/src/components/Modal';
+import { ConfirmModal } from '@/src/components/ConfirmModal';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import type { SubmissionListItem } from '@/src/types/submissions';
 import { Tag } from '@/src/components/Tag';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { deleteSobaSubmission } from '@/src/shared/api/sobaApi';
-import { useFormSubmissions } from '@/src/features/designer/useFormSubmissions';
-import { FORM_SUBMISSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
-import { PAGE_SIZE_OPTIONS, useListQuery } from '@/src/shared/list/useListQuery';
-import { loadErrorMessage } from '@/src/shared/api/loadErrorMessage';
-import { getLocaleFromPath } from '@/src/shared/util/locale';
 import {
-  capitalizeFirstLetter,
-  convertSubmissionIdToConfirmationId,
-} from '@/src/shared/util/stringUtils';
+  useFormSubmissions,
+  useSubmissionDeleter,
+} from '@/src/features/designer/data/useFormSubmissions';
+import { FORM_SUBMISSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
+import { submissionDeleteMessage } from '@/src/features/submissions/submissionDeleteMessage';
+import { useListQuery } from '@/src/shared/list/useListQuery';
+import { useDataTable } from '@/src/shared/list/useDataTable';
+import { getLocaleFromPath } from '@/src/shared/util/locale';
+import { capitalizeFirstLetter } from '@/src/shared/util/stringUtils';
 
 interface FormSubmissionTabProps {
   dict: Dictionary;
@@ -35,54 +35,49 @@ export default function FormSubmissionTab({
   formId,
   opened,
 }: Readonly<FormSubmissionTabProps>) {
-  const listQuery = useListQuery(FORM_SUBMISSIONS_LIST_QUERY);
-  const { submissions, total, isLoading, error, refresh } = useFormSubmissions(formId, opened, {
-    offset: listQuery.offset,
-    limit: listQuery.pageSize,
-    sort: listQuery.sort,
-    q: listQuery.q,
+  const query = useListQuery(FORM_SUBMISSIONS_LIST_QUERY);
+  const submissionsResult = useFormSubmissions(formId, opened, {
+    offset: query.offset,
+    limit: query.pageSize,
+    sort: query.sort,
+    q: query.q,
   });
+  const { table } = useDataTable(query, submissionsResult, dict.submission.error);
+  const submissionDeleter = useSubmissionDeleter();
   const formatLongDate = useFormatLongDate();
   const { token } = useKeycloak();
   const pathname = usePathname();
   const locale = getLocaleFromPath(pathname);
   const router = useRouter();
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
-  const [deleteId, setDeleteId] = useState<string>('');
+  const [pendingDelete, setPendingDelete] = useState<SubmissionListItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { addNotification } = useNotificationStore();
 
-  const deletePress = useCallback((submissionId: string) => {
-    setShowDeleteConfirm(true);
-    setDeleteId(submissionId);
-  }, []);
-
   const confirmDelete = useCallback(async () => {
-    setShowDeleteConfirm(false);
+    if (!token || !pendingDelete) return;
+    setDeleting(true);
     try {
-      await deleteSobaSubmission(token as string, deleteId);
-      await refresh();
-      addNotification({
-        text: dict.submission.deleteSuccess || 'Submission deleted successfully',
-        type: 'success',
-      });
+      await submissionDeleter.remove(token, pendingDelete.id);
+      addNotification({ text: dict.submission.deleteSuccess, type: 'success' });
     } catch (e: unknown) {
       addNotification({
         text: e instanceof Error && e.message ? e.message : dict.submission.deleteFailure,
         type: 'error',
         consoleError: e,
       });
+    } finally {
+      setDeleting(false);
+      setPendingDelete(null);
     }
-  }, [token, deleteId, refresh, addNotification, dict]);
+  }, [token, pendingDelete, submissionDeleter, addNotification, dict]);
 
   const columns: Column<SubmissionListItem>[] = useMemo(
     () => [
       {
-        key: 'id',
+        key: 'confirmationCode',
         label: dict.submission?.confirmationId || 'Confirmation Id',
         render: (sub) => (
-          <span data-testid={`${sub.id}-confirmation-id`}>
-            {convertSubmissionIdToConfirmationId(sub.id)}
-          </span>
+          <span data-testid={`${sub.id}-confirmation-id`}>{sub.confirmationCode ?? 'N/A'}</span>
         ),
       },
       {
@@ -125,7 +120,7 @@ export default function FormSubmissionTab({
               className="bcds-react-aria-Link medium false me-2"
               aria-label={dict.submission.view}
               data-testid={`${sub.id}-view-link`}
-              onPress={() => router.push(`/${locale}/submission/${sub.id}`)}
+              onPress={() => router.push(`/${locale}/build/${sub.formId}/submissions/${sub.id}`)}
             >
               <FaFile />
             </Link>
@@ -133,9 +128,7 @@ export default function FormSubmissionTab({
               className="bcds-react-aria-Link medium false danger"
               data-testid={`${sub.id}-delete-link`}
               aria-label={dict.submission.delete}
-              onPress={() => {
-                deletePress(sub.id);
-              }}
+              onPress={() => setPendingDelete(sub)}
             >
               <FaRegTrashCan />
             </Link>
@@ -143,78 +136,33 @@ export default function FormSubmissionTab({
         ),
       },
     ],
-    [dict, formatLongDate, deletePress, locale, router],
-  );
-
-  const loadError = useMemo(
-    () =>
-      error
-        ? loadErrorMessage(error, {
-            sessionExpired: dict.general.sessionExpired,
-            noAccess: dict.general.noAccess,
-            failed: dict.submission.error,
-          })
-        : null,
-    [error, dict.general.sessionExpired, dict.general.noAccess, dict.submission.error],
+    [dict, formatLongDate, locale, router],
   );
 
   return (
     <>
       <DataTable<SubmissionListItem>
-        data={submissions}
+        {...table}
         columns={columns}
-        loading={isLoading}
-        error={loadError}
         emptyMessage={dict.submission.emptyList}
         loadingMessage={dict.general.loading}
         itemName="submissions"
         caption={dict.submission?.submissions || 'Submissions'}
-        pageSize={listQuery.pageSize}
-        currentPage={listQuery.page}
-        totalItems={total}
-        onPageChange={listQuery.setPage}
-        onPageSizeChange={listQuery.setPageSize}
-        pageSizeOptions={PAGE_SIZE_OPTIONS}
-        sort={listQuery.sort}
-        onSortChange={listQuery.setSort}
         keyExtractor={(sub) => sub.id}
       />
-      <Modal
-        show={showDeleteConfirm}
-        title={`${dict.submission.deleteConfirm || 'Confirm Delete'}`}
-        onClose={() => setShowDeleteConfirm(false)}
-        size="sm"
-      >
-        <p className="text-center px-2 py-3 text-muted">
-          {dict.submission.deleteConfirmText}: {deleteId}
-        </p>
-        <div>
-          <Button
-            variant="secondary"
-            data-testid="cancel-delete-button"
-            className="bcds-react-aria-Button medium secondary me-2"
-            aria-label={dict.workspaces.cancel}
-            isIconButton
-            onPress={() => {
-              setShowDeleteConfirm(false);
-            }}
-          >
-            {dict.workspaces.cancel}
-          </Button>
-          <Button
-            variant="secondary"
-            data-testid="confirm-delete-button"
-            aria-label={dict.submission.confirm}
-            isIconButton
-            danger
-            onPress={() => {
-              confirmDelete();
-            }}
-          >
-            {dict.submission.confirm}
-          </Button>
-        </div>
-      </Modal>
+      <ConfirmModal
+        show={pendingDelete !== null}
+        title={dict.submission.deleteTitle}
+        message={
+          pendingDelete
+            ? submissionDeleteMessage(dict.submission, pendingDelete, formatLongDate)
+            : ''
+        }
+        confirmLabel={dict.submission.delete}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setPendingDelete(null)}
+        pending={deleting}
+      />
     </>
   );
 }

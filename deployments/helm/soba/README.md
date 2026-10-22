@@ -81,7 +81,8 @@ templates/
 │   ├── configmap-document-generation.yaml # Document generation plugin config
 │   ├── configmap-sso.yaml       # SSO / JWT config
 │   ├── configmap-ratelimit.yaml # Rate limiting config
-│   └── configmap-storage.yaml   # Files feature + storage profiles config
+│   ├── configmap-storage.yaml   # Files and templates features + storage profiles config
+│   └── pvc-filestore.yaml       # File store PVC when the default storage profile is storage-local
 ├── frontend/
 │   ├── deployment.yaml
 │   ├── service.yaml
@@ -165,12 +166,13 @@ and Vault/Kubernetes Secret (secret) values.
 
 ### Non-secret values (ConfigMap `<fullname>-backend-document-generation`)
 
-| Helm value                                     | Env var                            | Used by                  |
-| ---------------------------------------------- | ---------------------------------- | ------------------------ |
-| `backend.config.documentGenerationDefaultCode` | `DOCUMENT_GENERATION_DEFAULT_CODE` | default backend resolver |
-| `backend.documentGeneration.cdogsV2.endpoint`  | `PLUGIN_CDOGS_V2_ENDPOINT`         | cdogs-v2 adapter         |
-| `backend.documentGeneration.cdogsV2.tokenUrl`  | `PLUGIN_CDOGS_V2_TOKEN_URL`        | cdogs-v2 adapter         |
-| `backend.documentGeneration.cdogsV3.endpoint`  | `PLUGIN_CDOGS_V3_ENDPOINT`         | cdogs-v3 adapter         |
+| Helm value                                     | Env var                              | Used by                  |
+| ---------------------------------------------- | ------------------------------------ | ------------------------ |
+| `backend.config.documentGenerationDefaultCode` | `DOCUMENT_GENERATION_DEFAULT_CODE`   | default backend resolver |
+| `backend.documentGeneration.maxConcurrent`     | `DOCUMENT_GENERATION_MAX_CONCURRENT` | render concurrency cap   |
+| `backend.documentGeneration.cdogsV2.endpoint`  | `PLUGIN_CDOGS_V2_ENDPOINT`           | cdogs-v2 adapter         |
+| `backend.documentGeneration.cdogsV2.tokenUrl`  | `PLUGIN_CDOGS_V2_TOKEN_URL`          | cdogs-v2 adapter         |
+| `backend.documentGeneration.cdogsV3.endpoint`  | `PLUGIN_CDOGS_V3_ENDPOINT`           | cdogs-v3 adapter         |
 
 ### Secret values (Vault template in backend Deployment)
 
@@ -178,6 +180,30 @@ and Vault/Kubernetes Secret (secret) values.
 | ------------------------------- | ------------------------------- |
 | `PLUGIN_CDOGS_V2_CLIENT_ID`     | `PLUGIN_CDOGS_V2_CLIENT_ID`     |
 | `PLUGIN_CDOGS_V2_CLIENT_SECRET` | `PLUGIN_CDOGS_V2_CLIENT_SECRET` |
+
+## Tenant Engine Configuration
+
+The tenant engine serves `GET /me/tenants`. It has no secrets: `cstar-v1` calls CSTAR with the
+signed-in user's own token. ConfigMap `<fullname>-backend-tenant-engine`:
+
+| Helm value                                | Env var                        | Used by                 |
+| ----------------------------------------- | ------------------------------ | ----------------------- |
+| `backend.config.tenantEngineDefaultCode`  | `TENANT_ENGINE_DEFAULT_CODE`   | default engine resolver |
+| `backend.tenantEngine.cstarV1.apiBaseUrl` | `PLUGIN_CSTAR_V1_API_BASE_URL` | cstar-v1 adapter        |
+| `backend.tenantEngine.cstarV1.timeoutMs`  | `PLUGIN_CSTAR_V1_TIMEOUT_MS`   | cstar-v1 adapter        |
+
+## Workflow Engine Configuration
+
+The workflow engine starts and tracks workflows. It has no secrets: `cs-workflow-v1` calls the
+Connected Services workflow API with the signed-in user's own token. `workflow-noop` (the default)
+starts nothing. ConfigMap `<fullname>-backend-workflow-engine`:
+
+| Helm value                                       | Env var                              | Used by                 |
+| ------------------------------------------------ | ------------------------------------ | ----------------------- |
+| `backend.config.workflowEngineDefaultCode`       | `WORKFLOW_ENGINE_DEFAULT_CODE`       | default engine resolver |
+| `backend.workflowEngine.csWorkflowV1.apiBaseUrl` | `PLUGIN_CS_WORKFLOW_V1_API_BASE_URL` | cs-workflow-v1 adapter  |
+| `backend.workflowEngine.csWorkflowV1.apiKey`     | `PLUGIN_CS_WORKFLOW_V1_API_KEY`      | cs-workflow-v1 adapter  |
+| `backend.workflowEngine.csWorkflowV1.timeoutMs`  | `PLUGIN_CS_WORKFLOW_V1_TIMEOUT_MS`   | cs-workflow-v1 adapter  |
 
 ## Database Migration
 
@@ -240,6 +266,12 @@ dependencies, but templates within this chart that are conditionally rendered.
 | **Internal** (default) | `formio.internal.enabled=true`                                      | Deploys a Form.io pod + service inside the release |
 | **External**           | `formio.internal.enabled=false` + `formio.external.url=https://...` | No Form.io pods; backend connects to external URL  |
 
+The backend's Form.io plugin settings are in ConfigMap `<fullname>-backend-formio`:
+
+| Helm value                 | Env var                       | Used by          |
+| -------------------------- | ----------------------------- | ---------------- |
+| `backend.formio.timeoutMs` | `PLUGIN_FORMIO_V5_TIMEOUT_MS` | formio-v5 client |
+
 ### MongoDB
 
 | Mode                   | Configuration                                                           | What happens                                      |
@@ -261,15 +293,17 @@ them in pairs.
 
 Hostnames are derived from the release name and `global.domain`:
 
-- **Frontend:** one host per `frontend.apps` entry, `<fullname>-<name>.<domain>`
-  (e.g. `soba-dev-designer.apps.gov.bc.ca`, `soba-dev-forms.apps.gov.bc.ca`).
-  Override a single app with `frontend.apps.<name>.host` (PR slots pin the host this way).
-- **Backend API:** `<fullname>-api.<domain>` (e.g. `soba-pr-42-api.apps.gov.bc.ca`)
+- **Frontend:** one host for every `frontend.apps` entry, `<fullname>.<domain>`
+  (e.g. `soba-dev.apps.gov.bc.ca`), with each app at its own `routePath`
+  (`/designer`, `/forms`). Pin it with `frontend.host` (PR deployments point at the dev host).
+- **Backend API:** `<fullname>-api.<domain>` (e.g. `soba-pr-42-api.apps.gov.bc.ca`),
+  served under `backend.basePath` (e.g. `/chefs`).
 
-Each `frontend.apps` entry renders its own Deployment/Service/Route/ConfigMap from the
-same image, differing only by `featuresAllowed` (the mode). The backend `CORS_ORIGIN`
-defaults to the origins of all enabled frontend apps; set `backend.config.corsOrigin`
-to override.
+Each `frontend.apps` entry renders its own Deployment/Service/Route/ConfigMap, differing by
+`featuresAllowed` (the mode) and `routePath` (the URL). They share an image repository, but
+the tag carries the app name: Next bakes `basePath` at build time, so each path needs its own
+image. The backend `CORS_ORIGIN` defaults to the shared frontend origin; set
+`backend.config.corsOrigin` to override.
 
 ### Route annotations
 
@@ -312,12 +346,24 @@ backend:
         path: /api/v1/submit/files
         annotations:
           haproxy.router.openshift.io/timeout: "300s"
+      - name: files-api
+        path: /api/v1/files
+        annotations:
+          haproxy.router.openshift.io/timeout: "300s"
+      - name: templates
+        path: /api/v1/templates
+        annotations:
+          haproxy.router.openshift.io/timeout: "300s"
+      - name: print-upload
+        path: /api/v1/design/print-upload
+        annotations:
+          haproxy.router.openshift.io/timeout: "300s"
 ```
 
-That is what the chart ships: uploads at 300s, everything else at 60s. An upload writes nothing back until clamd finishes scanning (`clamav.timeoutMs`, 60s), so the router's 30s default would 504 a clean upload.
+That is what the chart ships: uploads at 300s on the file, template and print-upload paths, everything else at 60s. An upload writes nothing back until clamd finishes scanning (`clamav.timeoutMs`, 60s), so the router's 30s default would 504 a clean upload.
 
 Matching is by whole segment and prefix only — `/api/v1/submit/files` does not capture
-`/api/v1/submit/filestore`, and there is no suffix match. Document generation cannot be scoped this way: it sits at `/api/v1/submit/submissions/:id/{preview,print}`,and the only prefix reaching it would swallow ordinary submission reads and writes. It is a synchronous call to CDOGS, so the base timeout has to cover it.
+`/api/v1/submit/filestore`, and there is no suffix match. Document generation cannot be scoped this way: it sits at `/api/v1/{submit,design}/submissions/:id/print`, and the only prefix reaching it would swallow ordinary submission reads and writes. It is a synchronous call to CDOGS, so the base timeout has to cover it. Print with an uploaded template scans the upload before that call, so it has its own prefix, `/api/v1/design/print-upload`.
 
 `name` and `path` are required. `name` becomes the Route name and the `app.kubernetes.io/component` label, so it must be lowercase DNS-1123 and short enough to keep that label under 63 characters; duplicates are refused. `path` must start with `/` and needs `edge` or `reencrypt` termination, as `passthrough` cannot match on path. Host, Service and TLS come from the base Route. Each rule fails the render naming the entry.
 

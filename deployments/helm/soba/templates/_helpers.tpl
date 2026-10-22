@@ -84,16 +84,20 @@ If mongodb is internal, point at the in-cluster service; otherwise use mongodb.e
 {{- end }}
 
 {{/*
-Public host for a named frontend app (Route / Ingress).
-Per-app `host` override wins; otherwise <fullname>-<name>.<domain>.
-Usage: {{ include "soba.frontendHostFor" (dict "root" $root "name" $name "app" $app) }}
+Public host shared by every frontend app (Route / Ingress); apps are told apart by routePath.
+Usage: {{ include "soba.frontendHost" $root }}
 */}}
-{{- define "soba.frontendHostFor" -}}
-{{- if .app.host -}}
-{{- .app.host -}}
-{{- else -}}
-{{- printf "%s-%s.%s" (include "soba.fullname" .root) .name .root.Values.global.domain -}}
-{{- end -}}
+{{- define "soba.frontendHost" -}}
+{{- .Values.frontend.host | default (printf "%s.%s" (include "soba.fullname" .) .Values.global.domain) -}}
+{{- end }}
+
+{{/*
+Path a named frontend app is served under, e.g. /designer.
+Usage: {{ include "soba.frontendRoutePathFor" (dict "root" $root "name" "forms") }}
+*/}}
+{{- define "soba.frontendRoutePathFor" -}}
+{{- $app := index .root.Values.frontend.apps .name | default dict -}}
+{{- $app.routePath | default "" -}}
 {{- end }}
 
 {{/*
@@ -102,24 +106,14 @@ them from here and cannot drift.
 Usage: {{ include "soba.frontendAppUrlFor" (dict "root" $root "name" "forms") }}
 */}}
 {{- define "soba.frontendAppUrlFor" -}}
-{{- $app := index .root.Values.frontend.apps .name | default dict -}}
-{{- printf "https://%s" (include "soba.frontendHostFor" (dict "root" .root "name" .name "app" $app)) -}}
+{{- printf "https://%s%s" (include "soba.frontendHost" .root) (include "soba.frontendRoutePathFor" (dict "root" .root "name" .name)) -}}
 {{- end }}
 
 {{/*
-Comma-separated https:// origins for every enabled frontend app.
-Feeds the backend CORS allowlist so both modes can call the API.
+The https:// origin every frontend app shares. Feeds the backend CORS allowlist.
 */}}
 {{- define "soba.frontendOrigins" -}}
-{{- $root := . -}}
-{{- $origins := list -}}
-{{- range $name, $app := .Values.frontend.apps -}}
-{{- if ne $app.enabled false -}}
-{{- $host := include "soba.frontendHostFor" (dict "root" $root "name" $name "app" $app) -}}
-{{- $origins = append $origins (printf "https://%s" $host) -}}
-{{- end -}}
-{{- end -}}
-{{- join "," $origins -}}
+{{- printf "https://%s" (include "soba.frontendHost" .) -}}
 {{- end }}
 
 {{/*
@@ -130,11 +124,18 @@ Backend public URL host (browser and NEXT_PUBLIC_SOBA_API_BASE_URL).
 {{- end }}
 
 {{/*
+URL path the API is served under (e.g. /chefs). Blank serves at the host root.
+*/}}
+{{- define "soba.backendBasePath" -}}
+{{- .Values.backend.basePath | default "" -}}
+{{- end }}
+
+{{/*
 Cluster-internal API base URL for Next.js SSR (Server Components) — plain HTTP to backend Service.
 See frontend SOBA_API_INTERNAL_URL in runtimeConfig. Override with frontend.internalApiBaseUrl if needed.
 */}}
 {{- define "soba.sobaApiInternalBaseUrl" -}}
-{{- printf "http://%s-backend.%s.svc.cluster.local:%v/api/v1" (include "soba.fullname" .) .Release.Namespace (.Values.backend.service.port) }}
+{{- printf "http://%s-backend.%s.svc.cluster.local:%v%s/api/v1" (include "soba.fullname" .) .Release.Namespace (.Values.backend.service.port) (include "soba.backendBasePath" .) }}
 {{- end }}
 
 {{/*
@@ -163,6 +164,41 @@ cannot drift apart. Any other code (e.g. tempstorage-os) needs no PVC.
 */}}
 {{- define "soba.tempStorageUsesMount" -}}
 {{- if eq .Values.backend.config.tempStorageDefaultCode "tempstorage-mount" -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Truthy ("true") only when the default storage profile is storage-local. Gates the
+file store PVC, its mount, and STORAGE_PROFILE_DEFAULT_BASE_PATH off one value so they
+cannot drift apart.
+*/}}
+{{- define "soba.storageUsesLocal" -}}
+{{- if eq .Values.backend.storage.defaultBackend "storage-local" -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Fails the render on storage values the backend would refuse, or that would lose files:
+storage-memory keeps files in one process, so it cannot back more than one replica; key prefixes
+are lowercase words joined by dashes, in slash-separated segments; the storage-local base path is
+absolute.
+*/}}
+{{- define "soba.validateStorage" -}}
+{{- $storage := .Values.backend.storage -}}
+{{- $prefix := "^[a-z0-9]+(-[a-z0-9]+)*(/[a-z0-9]+(-[a-z0-9]+)*)*$" -}}
+{{- if and (eq $storage.defaultBackend "storage-memory") (or (gt (int .Values.backend.replicas) 1) .Values.backend.autoscaling.enabled) -}}
+{{- fail "backend.storage.defaultBackend storage-memory keeps files in one process; use storage-local or storage-s3 with more than one replica or with autoscaling" -}}
+{{- end -}}
+{{- if and (eq $storage.defaultBackend "storage-local") $storage.defaultBasePath (not (hasPrefix "/" $storage.defaultBasePath)) -}}
+{{- fail "backend.storage.defaultBasePath must be an absolute path" -}}
+{{- end -}}
+{{- if and (eq $storage.defaultBackend "storage-s3") $storage.defaultPrefix (not (regexMatch $prefix (toString $storage.defaultPrefix))) -}}
+{{- fail "backend.storage.defaultPrefix must be lowercase words joined by dashes, in slash-separated segments" -}}
+{{- end -}}
+{{- range $key := list "filesStoragePrefix" "templatesStoragePrefix" -}}
+{{- $value := index $storage $key -}}
+{{- if and $value (not (regexMatch $prefix (toString $value))) -}}
+{{- fail (printf "backend.storage.%s must be lowercase words joined by dashes, in slash-separated segments" $key) -}}
+{{- end -}}
+{{- end -}}
 {{- end }}
 
 {{/*
