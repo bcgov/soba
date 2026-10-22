@@ -45,10 +45,10 @@ jobs:
     environment: ${{ inputs.environment }}
     env:
       RELEASE: ${{ inputs.release }}
-      OPENSHIFT_NAMESPACE: ${{ secrets.OC_NAMESPACE }}
-      # PR, dev, and test applications use the APS test administration endpoint.
+      OPENSHIFT_NAMESPACE: ${{ vars.OC_NAMESPACE_GOLD_PR }}
       APP_ENVIRONMENT: ${{ inputs.environment }}
-      GATEWAY_ID: ${{ vars.APS_GATEWAY_ID }}
+      APS_HOST: ${{ vars.APS_HOST_GOLD_PR }}
+      GATEWAY_ID: ${{ vars.APS_GATEWAY_ID_GOLD_PR }}
       GATEWAY_HOSTNAME: ${{ inputs.gateway_hostname }}
       GATEWAY_QUALIFIER: proxy-proof-${{ inputs.release }}
       GWA_SHA256: ${{ vars.GWA_LINUX_AMD64_SHA256 }}
@@ -64,8 +64,11 @@ jobs:
           [[ "$RELEASE" =~ ^soba-[a-z0-9-]+$ && ${#RELEASE} -le 49 ]]
           [[ "$OPENSHIFT_NAMESPACE" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]
           case "$APP_ENVIRONMENT" in
-            pr|dev|test)
-              echo 'APS_HOST=api-gov-bc-ca.test.api.gov.bc.ca' >> "$GITHUB_ENV"
+            pr)
+              : "${APS_HOST:?Set APS_HOST_GOLD_PR in the pr environment.}"
+              ;;
+            dev|test)
+              echo 'APS_HOST=api.gov.bc.ca' >> "$GITHUB_ENV"
               ;;
             prod)
               echo 'APS_HOST=api.gov.bc.ca' >> "$GITHUB_ENV"
@@ -80,7 +83,7 @@ jobs:
             exit 1
           fi
           if [[ ! "$GATEWAY_ID" =~ ^gw-[a-z0-9-]+$ ]]; then
-            echo '::error::Set Actions variable APS_GATEWAY_ID to the gateway ID for the selected APS instance (gw-...)'
+            echo '::error::Set APS_GATEWAY_ID_GOLD_PR to the Gold PR gateway ID (gw-...)'
             exit 1
           fi
           if [[ -z "$GATEWAY_HOSTNAME" ]]; then
@@ -88,7 +91,7 @@ jobs:
               echo '::error::Production requires an explicit gateway_hostname'
               exit 1
             fi
-            # The test instance publishes this as <release>-api-gov-bc-ca.test.api.gov.bc.ca.
+            # Each release uses its own api.gov.bc.ca route host.
             export GATEWAY_HOSTNAME="${RELEASE}.api.gov.bc.ca"
           fi
           export GATEWAY_SERVICE_NAME="soba-${GATEWAY_QUALIFIER}"
@@ -105,9 +108,9 @@ jobs:
       - name: Login to OpenShift
         uses: redhat-actions/oc-login@2a1614bc977c054c8786c8e35fc9534bd0ddc156 # v2.0.1
         with:
-          openshift_server_url: ${{ vars.OC_SERVER }}
-          openshift_token: ${{ secrets.OC_TOKEN }}
-          namespace: ${{ secrets.OC_NAMESPACE }}
+          openshift_server_url: ${{ vars.OC_SERVER_GOLD }}
+          openshift_token: ${{ secrets.OC_TOKEN_GOLD_PR }}
+          namespace: ${{ vars.OC_NAMESPACE_GOLD_PR }}
 
       - name: Check existing backend and APS NetworkPolicy
         shell: bash
@@ -158,12 +161,12 @@ jobs:
         shell: bash
         env:
           GWA_CLIENT_ID: >-
-            ${{ inputs.environment == 'pr' && secrets.GWA_CLIENT_ID_PR ||
+            ${{ inputs.environment == 'pr' && secrets.GWA_CLIENT_ID_GOLD_PR ||
                 inputs.environment == 'dev' && secrets.GWA_CLIENT_ID_DEV ||
                 inputs.environment == 'test' && secrets.GWA_CLIENT_ID_TEST ||
                 inputs.environment == 'prod' && secrets.GWA_CLIENT_ID_PROD || '' }}
           GWA_CLIENT_SECRET: >-
-            ${{ inputs.environment == 'pr' && secrets.GWA_CLIENT_SECRET_PR ||
+            ${{ inputs.environment == 'pr' && secrets.GWA_CLIENT_SECRET_GOLD_PR ||
                 inputs.environment == 'dev' && secrets.GWA_CLIENT_SECRET_DEV ||
                 inputs.environment == 'test' && secrets.GWA_CLIENT_SECRET_TEST ||
                 inputs.environment == 'prod' && secrets.GWA_CLIENT_SECRET_PROD || '' }}
