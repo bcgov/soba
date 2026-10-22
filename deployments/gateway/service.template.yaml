@@ -13,7 +13,7 @@ services:
         hosts:
           - ${GATEWAY_HOSTNAME}
         protocols: [https]
-        paths: [/]
+        paths: [${GATEWAY_ROUTE_PATH}]
         preserve_host: false
-        strip_path: false
+        strip_path: ${GATEWAY_STRIP_PATH}
         path_handling: v0

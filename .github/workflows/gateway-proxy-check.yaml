@@ -11,7 +11,7 @@ on:
         required: true
         type: string
       gateway_hostname:
-        description: Optional route hostname; defaults to <release>.api.gov.bc.ca outside prod
+        description: Optional route hostname; PR defaults to APS_GATEWAY_ROUTE_HOST_GOLD_PR
         default: ""
         type: string
   workflow_dispatch:
@@ -50,6 +50,7 @@ jobs:
       APS_HOST: ${{ vars.APS_HOST_GOLD_PR }}
       GATEWAY_ID: ${{ vars.APS_GATEWAY_ID_GOLD_PR }}
       GATEWAY_HOSTNAME: ${{ inputs.gateway_hostname }}
+      APS_GATEWAY_ROUTE_HOST_GOLD_PR: ${{ vars.APS_GATEWAY_ROUTE_HOST_GOLD_PR }}
       GATEWAY_QUALIFIER: proxy-proof-${{ inputs.release }}
       GWA_SHA256: ${{ vars.GWA_LINUX_AMD64_SHA256 }}
     steps:
@@ -91,9 +92,18 @@ jobs:
               echo '::error::Production requires an explicit gateway_hostname'
               exit 1
             fi
-            # Each release uses its own api.gov.bc.ca route host.
-            export GATEWAY_HOSTNAME="${RELEASE}.api.gov.bc.ca"
+            if [[ "$APP_ENVIRONMENT" == pr ]]; then
+              export GATEWAY_HOSTNAME="${APS_GATEWAY_ROUTE_HOST_GOLD_PR:?Set APS_GATEWAY_ROUTE_HOST_GOLD_PR in the pr environment.}"
+            else
+              export GATEWAY_HOSTNAME="${RELEASE}.api.gov.bc.ca"
+            fi
           fi
+          export GATEWAY_ROUTE_PATH=/
+          if [[ "$APP_ENVIRONMENT" == pr ]]; then
+            [[ "$RELEASE" =~ ^soba-pr-([1-9][0-9]*)$ ]] || exit 1
+            export GATEWAY_ROUTE_PATH="/pr/${BASH_REMATCH[1]}/"
+          fi
+          echo "GATEWAY_ROUTE_PATH=$GATEWAY_ROUTE_PATH" >> "$GITHUB_ENV"
           export GATEWAY_SERVICE_NAME="soba-${GATEWAY_QUALIFIER}"
           export BACKEND_HOST="${RELEASE}-backend.${OPENSHIFT_NAMESPACE}.svc"
           node deployments/gateway/scripts/generate-gateway-config.mjs \
@@ -196,9 +206,9 @@ jobs:
                 | if length == 1 then .[0] else error("Expected one public hostname for the deployed service") end
               ' "$RUNNER_TEMP/gateway-status.json") \
               && GATEWAY_HOSTNAME="$PUBLIC_GATEWAY_HOST" node deployments/gateway/scripts/verify-health.mjs; then
-              printf 'Gateway health URL: https://%s/health\n' "$PUBLIC_GATEWAY_HOST" >> "$GITHUB_STEP_SUMMARY"
-              printf 'Verified gateway /health -> %s-backend.%s.svc:4000/chefs/api/v1/health\n' \
-                "$RELEASE" "$OPENSHIFT_NAMESPACE" >> "$GITHUB_STEP_SUMMARY"
+              printf 'Gateway health URL: https://%s%shealth\n' "$PUBLIC_GATEWAY_HOST" "$GATEWAY_ROUTE_PATH" >> "$GITHUB_STEP_SUMMARY"
+              printf 'Verified gateway %shealth -> %s-backend.%s.svc:4000/chefs/api/v1/health\n' \
+                "$GATEWAY_ROUTE_PATH" "$RELEASE" "$OPENSHIFT_NAMESPACE" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
             sleep 5
