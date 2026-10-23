@@ -205,7 +205,7 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
           data-testid="workspace-name"
         />
         {org !== '' && trimmedName.length >= NAME_CHECK_MIN_LENGTH && nameStatus && (
-          <span className={styles.nameStatus} data-testid="workspace-name-status">
+          <span className={styles.nameStatus} role="status" data-testid="workspace-name-status">
             {nameStatus === 'checking' && (
               <span className={styles.nameStatusChecking}>{dictWorkspaces.nameChecking}</span>
             )}
