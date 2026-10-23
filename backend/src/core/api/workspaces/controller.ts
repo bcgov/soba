@@ -11,6 +11,7 @@ import {
   UpdateWorkspaceBodySchema,
   WorkspaceIdParamsSchema,
   WorkspaceLookupQuerySchema,
+  WorkspaceNameAvailabilityQuerySchema,
 } from './schema';
 
 type ListWorkspacesQuery = z.infer<typeof ListWorkspacesQuerySchema>;
@@ -18,6 +19,7 @@ type WorkspaceLookupQuery = z.infer<typeof WorkspaceLookupQuerySchema>;
 type CreateWorkspaceBody = z.infer<typeof CreateWorkspaceBodySchema>;
 type UpdateWorkspaceBody = z.infer<typeof UpdateWorkspaceBodySchema>;
 type WorkspaceIdParams = z.infer<typeof WorkspaceIdParamsSchema>;
+type WorkspaceNameAvailabilityQuery = z.infer<typeof WorkspaceNameAvailabilityQuerySchema>;
 
 const MISSING_ACTOR_IDENTITY = 'Missing actor identity';
 
@@ -56,6 +58,16 @@ export const createWorkspace = asyncHandler(async (req: Request, res: Response) 
     req.body as CreateWorkspaceBody,
   );
   res.status(201).json(result);
+});
+
+export const checkWorkspaceNameAvailable = asyncHandler(async (req: Request, res: Response) => {
+  const actorId = getActorId(req);
+  if (!actorId) {
+    throw new ValidationError(MISSING_ACTOR_IDENTITY);
+  }
+  const { org, name, excludeId } = req.query as unknown as WorkspaceNameAvailabilityQuery;
+  const result = await workspacesApiService.checkNameAvailable(org, name, excludeId);
+  res.json(result);
 });
 
 export const getCurrentWorkspace = asyncHandler(async (req: Request, res: Response) => {

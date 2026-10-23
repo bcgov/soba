@@ -1,5 +1,6 @@
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
+import { ApiErrorCodes } from '@soba/lib';
 import {
   FORM_ADMINS_GROUP_NAME,
   FORM_SUBMITTERS_GROUP_NAME,
@@ -24,9 +25,13 @@ import { getWorkspaceForUser, isWorkspaceManageRole } from './membershipRepo';
 import { addUserToGroup, createGroupWithRole } from './workspaceGroupRepo';
 import { createWorkspaceSettings } from '../../../features/form-settings/create';
 
-/** True if a workspace of this kind already uses this name (optionally excluding one workspace). */
-const workspaceNameExistsForKind = async (
+/**
+ * True if a workspace of this kind and org already uses this name, case-insensitively (optionally
+ * excluding one workspace). Mirrors `workspace_kind_org_name_uq`.
+ */
+export const workspaceNameExistsForKindAndOrg = async (
   kind: string,
+  org: string,
   name: string,
   exceptId?: string,
 ): Promise<boolean> => {
@@ -36,7 +41,8 @@ const workspaceNameExistsForKind = async (
     .where(
       and(
         eq(workspaces.kind, kind),
-        eq(workspaces.name, name),
+        eq(workspaces.org, org),
+        sql`lower(${workspaces.name}) = lower(${name})`,
         ...(exceptId ? [ne(workspaces.id, exceptId)] : []),
       ),
     )
@@ -106,8 +112,8 @@ export const createTeamWorkspace = async (
   disclaimerAccepted = false,
   tx?: DbOrTx,
 ) => {
-  if (await workspaceNameExistsForKind(WorkspaceKind.team, name)) {
-    throw new ConflictError(WORKSPACE_NAME_TAKEN);
+  if (await workspaceNameExistsForKindAndOrg(WorkspaceKind.team, org, name)) {
+    throw new ConflictError(WORKSPACE_NAME_TAKEN, ApiErrorCodes.already_exists);
   }
   const run = async (d: DbOrTx) => {
     const workspaceId = uuidv7();
@@ -212,9 +218,13 @@ export const updateWorkspace = async (
     .limit(1);
   const displayLabel = userRow[0]?.displayLabel ?? null;
 
-  if (input.name !== undefined) {
-    if (await workspaceNameExistsForKind(membership.kind, input.name, workspaceId)) {
-      throw new ConflictError(WORKSPACE_NAME_TAKEN);
+  // Re-checked whenever either half of the key moves: a name edit can collide in its existing org,
+  // and an org move can collide with its existing name in the org it is moving to.
+  if (input.name !== undefined || input.org !== undefined) {
+    const name = input.name ?? membership.name;
+    const org = input.org ?? membership.org;
+    if (await workspaceNameExistsForKindAndOrg(membership.kind, org, name, workspaceId)) {
+      throw new ConflictError(WORKSPACE_NAME_TAKEN, ApiErrorCodes.already_exists);
     }
   }
 

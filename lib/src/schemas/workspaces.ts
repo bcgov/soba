@@ -42,6 +42,13 @@ export type WorkspaceItem = z.infer<typeof WorkspaceItemSchema>;
 export type CreateWorkspaceBody = z.infer<typeof CreateWorkspaceBodySchema>;
 export type UpdateWorkspaceBody = z.infer<typeof UpdateWorkspaceBodySchema>;
 
+export const WorkspaceNameAvailabilityResponseSchema = z.object({
+  available: z.boolean(),
+});
+export type WorkspaceNameAvailabilityResponse = z.infer<
+  typeof WorkspaceNameAvailabilityResponseSchema
+>;
+
 export const WorkspaceSortSchema = makeSortEnum(WORKSPACE_SORT_FIELDS);
 
 export const ListWorkspacesResponseSchema = z.object({

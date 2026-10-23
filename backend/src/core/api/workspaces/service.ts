@@ -6,8 +6,13 @@ import {
   type WorkspaceListSort,
 } from '../../db/repos/membershipRepo';
 import { canCreateWorkspaceByIdp } from '../../db/repos/idpGroupRepo';
-import { createTeamWorkspace, updateWorkspace } from '../../db/repos/workspaceRepo';
+import {
+  createTeamWorkspace,
+  updateWorkspace,
+  workspaceNameExistsForKindAndOrg,
+} from '../../db/repos/workspaceRepo';
 import { listWorkspacesForSubmitter } from '../../db/repos/submitterFormRepo';
+import { WorkspaceKind } from '../../db/codes';
 import { ForbiddenError } from '../../errors';
 import { LOOKUP_FETCH_LIMIT, toLookupResponse } from '../shared/lookup';
 
@@ -149,6 +154,17 @@ export class WorkspacesApiService {
       throw new Error('Created workspace could not be loaded');
     }
     return this.toWorkspaceItem(row);
+  }
+
+  /** Whether this (team) name is free in this org, case-insensitively, for the live name check. */
+  async checkNameAvailable(org: string, name: string, excludeWorkspaceId?: string) {
+    const exists = await workspaceNameExistsForKindAndOrg(
+      WorkspaceKind.team,
+      org,
+      name,
+      excludeWorkspaceId,
+    );
+    return { available: !exists };
   }
 
   async update(

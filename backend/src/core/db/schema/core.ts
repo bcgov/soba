@@ -135,9 +135,14 @@ export const workspaces = sobaSchema.table(
     ...auditColumns(),
   },
   (table) => ({
-    // Names are unique per kind (e.g. two 'team' workspaces can't share a name). Not status-scoped
-    // like the group/form name indexes because workspaces are never soft-deleted.
-    kindNameUnique: uniqueIndex('workspace_kind_name_uq').on(table.kind, table.name),
+    // Names are unique per kind and organization, case-insensitively (two ministries can each have
+    // a 'Health' workspace, but not twice within one). Not status-scoped like the group/form name
+    // indexes because workspaces are never soft-deleted.
+    kindOrgNameUnique: uniqueIndex('workspace_kind_org_name_uq').on(
+      table.kind,
+      table.org,
+      sql`lower(${table.name})`,
+    ),
     parentIdx: index('workspace_parent_idx').on(table.parentWorkspaceId),
   }),
 );

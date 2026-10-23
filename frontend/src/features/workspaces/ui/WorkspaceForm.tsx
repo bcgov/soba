@@ -19,13 +19,23 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { codeItems } from '@/src/shared/util/codeList';
 import { useSortLocale } from '@/src/shared/list/useSortLocale';
-import { useWorkspace, useWorkspaceWriter } from '@/src/shared/api/useWorkspaces';
+import {
+  useWorkspace,
+  useWorkspaceNameAvailable,
+  useWorkspaceWriter,
+} from '@/src/shared/api/useWorkspaces';
+import { apiErrorMessage } from '@/src/shared/api/dataError';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
+import { useDebouncedValue } from '@/src/shared/hooks/useDebouncedValue';
 import { isWorkspaceManageRole } from '../workspaceRoles';
 import WorkspaceFormSettings from '@/src/features/form-settings/ui/WorkspaceFormSettings';
 import type { UpdateWorkspaceBody, WorkspaceItem } from '@/src/types/workspaces';
 import styles from './WorkspaceForm.module.css';
+
+// How long to wait after the last keystroke, and how short a name can be, before checking it.
+const NAME_CHECK_DEBOUNCE_MS = 400;
+const NAME_CHECK_MIN_LENGTH = 3;
 
 /** Only the fields that differ from what the form was seeded with. */
 function changedFields(
@@ -69,9 +79,31 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(seed?.disclaimerAccepted ?? false);
   const [saving, setSaving] = useState(false);
 
+  const debouncedName = useDebouncedValue(name, NAME_CHECK_DEBOUNCE_MS);
+  const trimmedName = name.trim();
+  const trimmedDebouncedName = debouncedName.trim();
+  // Waits for the debounce to settle on the name currently shown, so a result for an earlier
+  // keystroke never flashes while the user is still typing.
+  const nameCheckReady =
+    org !== '' &&
+    trimmedDebouncedName.length >= NAME_CHECK_MIN_LENGTH &&
+    trimmedDebouncedName === trimmedName;
+  const { available: nameAvailable, isChecking: checkingName } = useWorkspaceNameAvailable(
+    org,
+    trimmedDebouncedName,
+    seed?.id,
+    nameCheckReady,
+  );
+  const nameStatus: 'checking' | 'available' | 'unavailable' | null = (() => {
+    if (!nameCheckReady || checkingName) return 'checking';
+    if (nameAvailable === true) return 'available';
+    if (nameAvailable === false) return 'unavailable';
+    return null;
+  })();
+
   const valid = useMemo(() => {
-    return name.trim().length > 0 && useCase !== '' && org !== '';
-  }, [name, useCase, org]);
+    return name.trim().length > 0 && useCase !== '' && org !== '' && nameAvailable !== false;
+  }, [name, useCase, org, nameAvailable]);
 
   const handleUseCaseChange = useCallback((newUseCase: Key | null) => {
     setUseCase(newUseCase?.toString() ?? '');
@@ -112,8 +144,13 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
 
       router.push(navLink(`/${locale}/workspaces`));
     } catch (error) {
+      const fallback = seed ? dictWorkspaces.saveError : dictWorkspaces.createError;
       addNotification({
-        text: seed ? dictWorkspaces.saveError : dictWorkspaces.createError,
+        text:
+          apiErrorMessage(error, {
+            ...dict.apiErrors,
+            already_exists: dictWorkspaces.nameTaken,
+          }) ?? fallback,
         type: 'error',
         consoleError: error,
       });
@@ -131,8 +168,10 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
     router,
     locale,
     addNotification,
+    dict.apiErrors,
     dictWorkspaces.createError,
     dictWorkspaces.saveError,
+    dictWorkspaces.nameTaken,
   ]);
 
   const saveLabel = isCreate ? dictWorkspaces.create : dictWorkspaces.save;
@@ -145,14 +184,6 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
       }}
       className={`${styles.fieldStack} ${first ? styles.fieldStackFill : ''}`}
     >
-      <TextField
-        label={dictWorkspaces.nameLabel}
-        value={name}
-        onChange={setName}
-        isRequired
-        isDisabled={saving}
-        data-testid="workspace-name"
-      />
       <Select
         items={codeItems(dict.ministries, seed?.org, sortLocale)}
         label={dictWorkspaces.yourOrgReq}
@@ -164,6 +195,31 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
         value={org}
         onChange={handleOrgChange}
       />
+      <div className={styles.nameField}>
+        <TextField
+          label={dictWorkspaces.nameLabel}
+          value={name}
+          onChange={setName}
+          isRequired
+          isDisabled={saving || org === ''}
+          data-testid="workspace-name"
+        />
+        {org !== '' && trimmedName.length >= NAME_CHECK_MIN_LENGTH && nameStatus && (
+          <output className={styles.nameStatus} data-testid="workspace-name-status">
+            {nameStatus === 'checking' && (
+              <span className={styles.nameStatusChecking}>{dictWorkspaces.nameChecking}</span>
+            )}
+            {nameStatus === 'available' && (
+              <span className={styles.nameStatusAvailable}>{dictWorkspaces.nameAvailable} ✓</span>
+            )}
+            {nameStatus === 'unavailable' && (
+              <span className={styles.nameStatusUnavailable}>
+                {dictWorkspaces.nameUnavailable} ✕
+              </span>
+            )}
+          </output>
+        )}
+      </div>
       <Select
         items={codeItems(dict.useCases, seed?.useCase, sortLocale)}
         label={dictWorkspaces.useCase}

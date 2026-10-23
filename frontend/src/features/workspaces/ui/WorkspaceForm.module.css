@@ -19,3 +19,25 @@
 .tabContent {
   padding-top: var(--layout-padding-medium);
 }
+
+.nameField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--layout-margin-small);
+}
+
+.nameStatus {
+  font-size: 0.8125rem;
+}
+
+.nameStatusChecking {
+  color: var(--typography-color-secondary);
+}
+
+.nameStatusAvailable {
+  color: var(--support-border-color-success);
+}
+
+.nameStatusUnavailable {
+  color: var(--typography-color-danger);
+}
