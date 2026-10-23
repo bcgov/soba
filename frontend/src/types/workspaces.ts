@@ -7,4 +7,5 @@ export type {
   ListWorkspacesResponse as WorkspacesResponse,
   MyWorkspaceLookupResponse,
   MyWorkspaceLookupItem,
+  WorkspaceNameAvailabilityResponse,
 } from '@soba/lib';

@@ -10,12 +10,14 @@ const {
   mockCreateWorkspace,
   mockUpdateWorkspace,
   mockSelectWorkspace,
+  mockCheckWorkspaceNameAvailable,
   mockRefreshWorkspaces,
   mockRefreshCurrentUser,
 } = vi.hoisted(() => ({
   mockCreateWorkspace: vi.fn(),
   mockUpdateWorkspace: vi.fn(),
   mockSelectWorkspace: vi.fn(),
+  mockCheckWorkspaceNameAvailable: vi.fn().mockResolvedValue({ available: true }),
   mockRefreshWorkspaces: vi.fn().mockResolvedValue([]),
   mockRefreshCurrentUser: vi.fn().mockResolvedValue(undefined),
 }));
@@ -48,6 +50,10 @@ vi.mock('@/app/[lang]/Providers', () => ({
       cancel: 'Cancel',
       saveError: 'Failed to save workspace.',
       createError: 'Failed to create workspace.',
+      nameTaken: 'A workspace with this name already exists.',
+      nameChecking: 'Checking…',
+      nameAvailable: 'Available',
+      nameUnavailable: 'Unavailable',
       loadError: 'Failed to load workspace.',
       manageForbidden: 'Only workspace owners or admins can manage this workspace.',
       createForbidden: 'Only BC Government identity provider users can create workspaces.',
@@ -120,6 +126,7 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
   createWorkspace: mockCreateWorkspace,
   updateWorkspace: mockUpdateWorkspace,
   selectWorkspace: mockSelectWorkspace,
+  checkWorkspaceNameAvailable: mockCheckWorkspaceNameAvailable,
 }));
 
 import makeStore from '@/lib/store';
@@ -204,8 +211,8 @@ describe('WorkspaceForm', () => {
     await act(async () => {
       renderForm();
     });
-    await userEvent.type(screen.getByRole('textbox'), 'New Team');
     await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    await userEvent.type(screen.getByRole('textbox'), 'New Team');
     await userEvent.selectOptions(screen.getByTestId('workspace-use-case'), 'testUseCase');
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
 
@@ -224,8 +231,8 @@ describe('WorkspaceForm', () => {
     await act(async () => {
       renderForm();
     });
-    await userEvent.type(screen.getByRole('textbox'), 'New Team');
     await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    await userEvent.type(screen.getByRole('textbox'), 'New Team');
     await userEvent.selectOptions(screen.getByTestId('workspace-use-case'), 'testUseCase');
     await userEvent.click(screen.getByTestId('workspace-disclaimer-switch'));
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
@@ -238,6 +245,49 @@ describe('WorkspaceForm', () => {
         org: 'testOrg',
       });
     });
+  });
+
+  it('disables the name field until an organization is selected', async () => {
+    await act(async () => {
+      renderForm();
+    });
+    expect(screen.getByRole('textbox')).toBeDisabled();
+    await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    expect(screen.getByRole('textbox')).not.toBeDisabled();
+  });
+
+  it('shows a live availability indicator as the name is typed', async () => {
+    await act(async () => {
+      renderForm();
+    });
+    await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    await userEvent.type(screen.getByRole('textbox'), 'New');
+
+    await waitFor(
+      () => expect(screen.getByTestId('workspace-name-status')).toHaveTextContent('Available'),
+      { timeout: 2000 },
+    );
+    expect(mockCheckWorkspaceNameAvailable).toHaveBeenCalledWith('token', {
+      org: 'testOrg',
+      name: 'New',
+      excludeId: undefined,
+    });
+  });
+
+  it('shows the name as unavailable and blocks save', async () => {
+    mockCheckWorkspaceNameAvailable.mockResolvedValueOnce({ available: false });
+    await act(async () => {
+      renderForm();
+    });
+    await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    await userEvent.type(screen.getByRole('textbox'), 'Taken');
+    await userEvent.selectOptions(screen.getByTestId('workspace-use-case'), 'testUseCase');
+
+    await waitFor(
+      () => expect(screen.getByTestId('workspace-name-status')).toHaveTextContent('Unavailable'),
+      { timeout: 2000 },
+    );
+    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
   });
 
   it('cancel navigates back without saving', async () => {
