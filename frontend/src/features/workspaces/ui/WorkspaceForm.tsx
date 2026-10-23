@@ -210,9 +210,7 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
               <span className={styles.nameStatusChecking}>{dictWorkspaces.nameChecking}</span>
             )}
             {nameStatus === 'available' && (
-              <span className={styles.nameStatusAvailable}>
-                {dictWorkspaces.nameAvailable} ✓
-              </span>
+              <span className={styles.nameStatusAvailable}>{dictWorkspaces.nameAvailable} ✓</span>
             )}
             {nameStatus === 'unavailable' && (
               <span className={styles.nameStatusUnavailable}>
