@@ -45,12 +45,13 @@ jobs:
     environment: ${{ inputs.environment }}
     env:
       RELEASE: ${{ inputs.release }}
-      OPENSHIFT_NAMESPACE: ${{ vars.OC_NAMESPACE_GOLD_PR }}
+      OPENSHIFT_NAMESPACE: ${{ case(inputs.environment == 'pr', vars.OC_NAMESPACE_GOLD_PR, inputs.environment == 'dev', vars.OC_NAMESPACE_GOLD_DEV, '') }}
       APP_ENVIRONMENT: ${{ inputs.environment }}
-      APS_HOST: ${{ vars.APS_HOST_GOLD_PR }}
-      GATEWAY_ID: ${{ vars.APS_GATEWAY_ID_GOLD_PR }}
+      APS_HOST: ${{ vars.APS_HOST_GOLD }}
+      GATEWAY_ID: ${{ case(inputs.environment == 'pr', vars.APS_GATEWAY_ID_GOLD_PR, inputs.environment == 'dev', vars.APS_GATEWAY_ID_GOLD_DEV, '') }}
       GATEWAY_HOSTNAME: ${{ inputs.gateway_hostname }}
       APS_GATEWAY_ROUTE_HOST_GOLD_PR: ${{ vars.APS_GATEWAY_ROUTE_HOST_GOLD_PR }}
+      APS_GATEWAY_ROUTE_HOST_GOLD_DEV: ${{ vars.APS_GATEWAY_ROUTE_HOST_GOLD_DEV }}
       GATEWAY_QUALIFIER: proxy-proof-${{ inputs.release }}
       GWA_SHA256: ${{ vars.GWA_LINUX_AMD64_SHA256 }}
     steps:
@@ -65,14 +66,8 @@ jobs:
           [[ "$RELEASE" =~ ^soba-[a-z0-9-]+$ && ${#RELEASE} -le 49 ]]
           [[ "$OPENSHIFT_NAMESPACE" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]
           case "$APP_ENVIRONMENT" in
-            pr)
-              : "${APS_HOST:?Set APS_HOST_GOLD_PR in the pr environment.}"
-              ;;
-            dev|test)
-              echo 'APS_HOST=api.gov.bc.ca' >> "$GITHUB_ENV"
-              ;;
-            prod)
-              echo 'APS_HOST=api.gov.bc.ca' >> "$GITHUB_ENV"
+            pr|dev|test|prod)
+              : "${APS_HOST:?Set APS_HOST_GOLD repository variable.}"
               ;;
             *)
               echo "::error::Unsupported application environment: $APP_ENVIRONMENT"
@@ -84,7 +79,7 @@ jobs:
             exit 1
           fi
           if [[ ! "$GATEWAY_ID" =~ ^gw-[a-z0-9-]+$ ]]; then
-            echo '::error::Set APS_GATEWAY_ID_GOLD_PR to the Gold PR gateway ID (gw-...)'
+            echo '::error::Set the Gold gateway ID for the selected environment (gw-...)'
             exit 1
           fi
           if [[ -z "$GATEWAY_HOSTNAME" ]]; then
@@ -94,6 +89,8 @@ jobs:
             fi
             if [[ "$APP_ENVIRONMENT" == pr ]]; then
               export GATEWAY_HOSTNAME="${APS_GATEWAY_ROUTE_HOST_GOLD_PR:?Set APS_GATEWAY_ROUTE_HOST_GOLD_PR in the pr environment.}"
+            elif [[ "$APP_ENVIRONMENT" == dev ]]; then
+              export GATEWAY_HOSTNAME="${APS_GATEWAY_ROUTE_HOST_GOLD_DEV:?Set APS_GATEWAY_ROUTE_HOST_GOLD_DEV in the dev environment.}"
             else
               export GATEWAY_HOSTNAME="${RELEASE}.api.gov.bc.ca"
             fi
@@ -119,8 +116,8 @@ jobs:
         uses: redhat-actions/oc-login@2a1614bc977c054c8786c8e35fc9534bd0ddc156 # v2.0.1
         with:
           openshift_server_url: ${{ vars.OC_SERVER_GOLD }}
-          openshift_token: ${{ secrets.OC_TOKEN_GOLD_PR }}
-          namespace: ${{ vars.OC_NAMESPACE_GOLD_PR }}
+          openshift_token: ${{ case(inputs.environment == 'pr', secrets.OC_TOKEN_GOLD_PR, inputs.environment == 'dev', secrets.OC_TOKEN_GOLD_DEV, '') }}
+          namespace: ${{ case(inputs.environment == 'pr', vars.OC_NAMESPACE_GOLD_PR, inputs.environment == 'dev', vars.OC_NAMESPACE_GOLD_DEV, '') }}
 
       - name: Check existing backend and APS NetworkPolicy
         shell: bash
@@ -171,15 +168,15 @@ jobs:
         shell: bash
         env:
           GWA_CLIENT_ID: >-
-            ${{ inputs.environment == 'pr' && secrets.GWA_CLIENT_ID_GOLD_PR ||
-                inputs.environment == 'dev' && secrets.GWA_CLIENT_ID_DEV ||
-                inputs.environment == 'test' && secrets.GWA_CLIENT_ID_TEST ||
-                inputs.environment == 'prod' && secrets.GWA_CLIENT_ID_PROD || '' }}
+            ${{ case(inputs.environment == 'pr', secrets.GWA_CLIENT_ID_GOLD_PR,
+                inputs.environment == 'dev', secrets.GWA_CLIENT_ID_GOLD_DEV,
+                inputs.environment == 'test', secrets.GWA_CLIENT_ID_TEST,
+                inputs.environment == 'prod', secrets.GWA_CLIENT_ID_PROD, '') }}
           GWA_CLIENT_SECRET: >-
-            ${{ inputs.environment == 'pr' && secrets.GWA_CLIENT_SECRET_GOLD_PR ||
-                inputs.environment == 'dev' && secrets.GWA_CLIENT_SECRET_DEV ||
-                inputs.environment == 'test' && secrets.GWA_CLIENT_SECRET_TEST ||
-                inputs.environment == 'prod' && secrets.GWA_CLIENT_SECRET_PROD || '' }}
+            ${{ case(inputs.environment == 'pr', secrets.GWA_CLIENT_SECRET_GOLD_PR,
+                inputs.environment == 'dev', secrets.GWA_CLIENT_SECRET_GOLD_DEV,
+                inputs.environment == 'test', secrets.GWA_CLIENT_SECRET_TEST,
+                inputs.environment == 'prod', secrets.GWA_CLIENT_SECRET_PROD, '') }}
         run: |
           set -euo pipefail
           : "${GWA_CLIENT_ID:?Missing GWA_CLIENT_ID_<ENV> for the selected environment}"
