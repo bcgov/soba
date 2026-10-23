@@ -1,0 +1,13 @@
+# Gold cluster settings; sizing is inherited from values-pr.yaml.
+gatewayNetworkPolicy:
+  # The PR workflow controls enabled through APS_PR_ENABLED.
+  namespaceName: "b8840c"
+  environment: test
+
+vault:
+  enabled: true
+  authPath: auth/k8s-gold
+  namespace: platform-services
+  role: b82f30-nonprod
+  secretPath: b82f30-nonprod/soba-dev
+  serviceAccountName: b82f30-vault

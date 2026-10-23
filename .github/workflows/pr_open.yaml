@@ -71,8 +71,13 @@ jobs:
     name: Set variables
     runs-on: ubuntu-24.04
     needs: [qa, changes]
+    permissions:
+      pull-requests: read
     if: ${{ needs.changes.outputs.deploy == 'true' && !startsWith(github.head_ref, 'release/') && github.head_ref != 'main' }}
+    environment:
+      name: ${{ format('{0}-pr', fromJSON(vars.DEPLOY_CLUSTERS)[0]) }}
     outputs:
+      clusters: ${{ vars.DEPLOY_CLUSTERS }}
       JOB_NAME: ${{ steps.vars.outputs.JOB_NAME }}
       URL: ${{ steps.vars.outputs.URL }}
       URL_FORMS: ${{ steps.vars.outputs.URL_FORMS }}
@@ -84,19 +89,32 @@ jobs:
         id: vars
         env:
           PR_NUMBER: ${{ github.event.number || github.event.inputs.pr-number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           # The concurrency group is keyed on the raw input, so it must already be the bare number.
           if [[ ! "${PR_NUMBER}" =~ ^[1-9][0-9]*$ ]]; then
             echo "::error::pr-number must be digits only, e.g. 42 (got '${PR_NUMBER}')."
             exit 1
           fi
+          # Resolve one immutable commit for every build and deployment in this run.
+          SOURCE_SHA="${PR_HEAD_SHA}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            SOURCE_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.head.sha')
+          fi
+          if [[ ! "${SOURCE_SHA}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "::error::Could not resolve a valid commit SHA for PR ${PR_NUMBER}."
+            exit 1
+          fi
+          echo "Source commit: ${SOURCE_SHA}"
           FRONTEND_HOST="${DEV_HOST_PREFIX}.${{ vars.OC_DOMAIN }}"
           echo "PR_NUM=$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "JOB_NAME=pr-$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "FRONTEND_HOST=$FRONTEND_HOST" >> "$GITHUB_OUTPUT"
           echo "URL=https://${FRONTEND_HOST}/designer-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
           echo "URL_FORMS=https://${FRONTEND_HOST}/forms-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
-          echo "ref=refs/pull/$PR_NUMBER/head" >> "$GITHUB_OUTPUT"
+          echo "ref=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build & Push
@@ -115,6 +133,12 @@ jobs:
   deploy-crunchy:
     name: Deploy Crunchy Postgres
     needs: [set-vars]
+    strategy:
+      fail-fast: false
+      matrix:
+        cluster: ${{ fromJSON(needs.set-vars.outputs.clusters) }}
+    environment:
+      name: ${{ matrix.cluster }}-pr
     runs-on: ubuntu-24.04
     outputs:
       cluster: ${{ steps.crunchy.outputs.cluster }}
@@ -128,6 +152,7 @@ jobs:
         id: crunchy
         uses: bcgov/action-crunchy@7ee9c0bdec27f5251a8239373f51db1e01c7c4d9 # v2.1.0
         with:
+          oc_server: ${{ vars.OC_SERVER }}
           oc_namespace: ${{ secrets.OC_NAMESPACE }}
           oc_token: ${{ secrets.OC_TOKEN }}
           values_file: deployments/helm/action-crunchy/values.yml
@@ -137,10 +162,14 @@ jobs:
   deploy-mongodb:
     name: Deploy MongoDB
     needs: [set-vars]
+    strategy:
+      fail-fast: false
+      matrix:
+        cluster: ${{ fromJSON(needs.set-vars.outputs.clusters) }}
     permissions:
       contents: read
     environment:
-      name: pr
+      name: ${{ matrix.cluster }}-pr
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:
@@ -203,12 +232,16 @@ jobs:
   deploy:
     name: Deploy SOBA
     needs: [set-vars, build, deploy-crunchy, deploy-mongodb]
+    strategy:
+      fail-fast: false
+      matrix:
+        cluster: ${{ fromJSON(needs.set-vars.outputs.clusters) }}
     permissions:
       contents: read
       pull-requests: write
     environment:
-      name: pr
-      url: ${{ needs.set-vars.outputs.URL }}
+      name: ${{ matrix.cluster }}-pr
+      url: ${{ steps.target.outputs.URL }}
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:
@@ -216,6 +249,17 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.set-vars.outputs.ref }}
+
+      - name: Set target URLs
+        id: target
+        env:
+          OC_DOMAIN: ${{ vars.OC_DOMAIN }}
+          PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
+        run: |
+          FRONTEND_HOST="${DEV_HOST_PREFIX}.${OC_DOMAIN}"
+          echo "FRONTEND_HOST=$FRONTEND_HOST" >> "$GITHUB_OUTPUT"
+          echo "URL=https://${FRONTEND_HOST}/designer-${PR_NUM}" >> "$GITHUB_OUTPUT"
+          echo "URL_FORMS=https://${FRONTEND_HOST}/forms-${PR_NUM}" >> "$GITHUB_OUTPUT"
 
       - name: Install OpenShift CLI
         uses: redhat-actions/openshift-tools-installer@e3b32c2ab7b064b2ce189121c4a49f509a99a7b4 # v3.0
@@ -237,6 +281,7 @@ jobs:
           temporal_namespace: soba-pr-${{ needs.set-vars.outputs.PR_NUM }}
           retention: "3d"
           chart_version: ${{ vars.TEMPORAL_CHART_VERSION || '0.74.0' }}
+          values_file: deployments/helm/temporal/values.yaml
 
       - name: Get DB config from Crunchy secret
         id: db
@@ -274,8 +319,14 @@ jobs:
           SHORT_SHA: ${{ needs.build.outputs.short_sha }}
           DOMAIN: ${{ vars.OC_DOMAIN }}
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
-          FRONTEND_HOST: ${{ needs.set-vars.outputs.FRONTEND_HOST }}
+          FRONTEND_HOST: ${{ steps.target.outputs.FRONTEND_HOST }}
           APS_PR_ENABLED: ${{ vars.APS_PR_ENABLED == 'true' }}
+          VAULT_AUTH_PATH: ${{ vars.VAULT_AUTH_PATH }}
+          VAULT_NAMESPACE: ${{ vars.VAULT_NAMESPACE }}
+          VAULT_ROLE: ${{ vars.VAULT_ROLE }}
+          VAULT_SECRET_PATH: ${{ vars.VAULT_SECRET_PATH }}
+          VAULT_SERVICE_ACCOUNT_NAME: ${{ vars.VAULT_SERVICE_ACCOUNT_NAME }}
+          DEPLOY_CLUSTER: ${{ matrix.cluster }}
         run: |
           # Pipeline performance fix: Revert if needed.
           set -euo pipefail
@@ -342,6 +393,11 @@ jobs:
 
           OVERRIDE
 
+          CLUSTER_VALUES=()
+          if [[ "${DEPLOY_CLUSTER}" == "gold" ]]; then
+            CLUSTER_VALUES=(-f deployments/helm/soba/values-pr-gold.yaml)
+          fi
+
           # Pipeline performance fix: Revert if needed.
           helm upgrade --install "${RELEASE}" ./deployments/helm/soba \
             --namespace "${NAMESPACE}" \
@@ -349,7 +405,13 @@ jobs:
             --wait-for-jobs \
             --timeout 660s \
             -f deployments/helm/soba/values-pr.yaml \
-            -f /tmp/values-override.yaml
+            -f /tmp/values-override.yaml \
+            "${CLUSTER_VALUES[@]}" \
+            --set-string "vault.authPath=${VAULT_AUTH_PATH:?Set VAULT_AUTH_PATH}" \
+            --set-string "vault.namespace=${VAULT_NAMESPACE:?Set VAULT_NAMESPACE}" \
+            --set-string "vault.role=${VAULT_ROLE:?Set VAULT_ROLE}" \
+            --set-string "vault.secretPath=${VAULT_SECRET_PATH:?Set VAULT_SECRET_PATH}" \
+            --set-string "vault.serviceAccountName=${VAULT_SERVICE_ACCOUNT_NAME:?Set VAULT_SERVICE_ACCOUNT_NAME}"
           # Pipeline performance fix: Revert if needed.
 
       # Pipeline performance fix: Revert if needed.
@@ -367,26 +429,47 @@ jobs:
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         if: success()
         with:
-          header: release
+          header: release-${{ matrix.cluster }}
           hide_and_recreate: true
           hide_classify: "OUTDATED"
           message: |
             Release ${{ github.sha }} deployed:
-            - Designer (design-mode): <${{ needs.set-vars.outputs.URL }}>
-            - Forms (submit-mode): <${{ needs.set-vars.outputs.URL_FORMS }}>
+            - Designer (design-mode): <${{ steps.target.outputs.URL }}>
+            - Forms (submit-mode): <${{ steps.target.outputs.URL_FORMS }}>
           number: ${{ needs.set-vars.outputs.PR_NUM }}
 
+  # Code created for Silver for APS Gateway. Roll back to this if necessary.
+  # gateway:
+  #   name: Verify PR through APS gateway
+  #   needs: [deploy, set-vars]
+  #   # Repository variable: opt in while establishing the first gateway proof.
+  #   if: ${{ vars.APS_PR_ENABLED == 'true' }}
+  #   permissions:
+  #     contents: read
+  #     pull-requests: read
+  #   uses: ./.github/workflows/gateway-proxy-check.yaml
+  #   with:
+  #     environment: pr
+  #     release: soba-${{ needs.set-vars.outputs.JOB_NAME }}
+  #   secrets: inherit
   gateway:
-    name: Verify PR through APS gateway
+    name: Verify PR through APS gateway (${{ matrix.cluster }})
     needs: [deploy, set-vars]
     # Repository variable: opt in while establishing the first gateway proof.
     if: ${{ vars.APS_PR_ENABLED == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        cluster: ${{ fromJSON(needs.set-vars.outputs.clusters) }}
     permissions:
       contents: read
       pull-requests: read
     uses: ./.github/workflows/gateway-proxy-check.yaml
     with:
       environment: pr
+      deployment_environment: ${{ matrix.cluster }}-pr
+      # Preserve Silver's existing route; other targets get their own route identity.
+      route_suffix: ${{ matrix.cluster != 'silver' && format('-{0}', matrix.cluster) || '' }}
       release: soba-${{ needs.set-vars.outputs.JOB_NAME }}
     secrets: inherit
 

@@ -7,11 +7,21 @@ on:
       environment:
         required: true
         type: string
+      deployment_environment:
+        description: GitHub environment holding target OpenShift settings; defaults to environment
+        default: ""
+        type: string
+      route_suffix:
+        description: Optional route identity suffix, such as -gold; does not change the Helm release
+        default: ""
+        type: string
       release:
         required: true
         type: string
       gateway_hostname:
-        description: Optional route hostname; defaults to <release>.api.gov.bc.ca outside prod
+        # Code created for Silver for APS Gateway. Roll back to this if necessary.
+        # description: Optional route hostname; defaults to <release>.api.gov.bc.ca outside prod
+        description: Optional route hostname; defaults to <release><route_suffix>.api.gov.bc.ca outside prod
         default: ""
         type: string
   workflow_dispatch:
@@ -35,14 +45,18 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: aps-gateway-${{ inputs.release }}
+  # Code created for Silver for APS Gateway. Roll back to this if necessary.
+  # group: aps-gateway-${{ inputs.release }}
+  group: aps-gateway-${{ inputs.release }}${{ inputs.route_suffix }}
   cancel-in-progress: false
 
 jobs:
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    environment: ${{ inputs.environment }}
+    # Code created for Silver for APS Gateway. Roll back to this if necessary.
+    # environment: ${{ inputs.environment }}
+    environment: ${{ inputs.deployment_environment || inputs.environment }}
     env:
       RELEASE: ${{ inputs.release }}
       OPENSHIFT_NAMESPACE: ${{ secrets.OC_NAMESPACE }}
@@ -50,7 +64,10 @@ jobs:
       APP_ENVIRONMENT: ${{ inputs.environment }}
       GATEWAY_ID: ${{ vars.APS_GATEWAY_ID }}
       GATEWAY_HOSTNAME: ${{ inputs.gateway_hostname }}
-      GATEWAY_QUALIFIER: proxy-proof-${{ inputs.release }}
+      GATEWAY_ROUTE_NAME: ${{ inputs.release }}${{ inputs.route_suffix }}
+      # Code created for Silver for APS Gateway. Roll back to this if necessary.
+      # GATEWAY_QUALIFIER: proxy-proof-${{ inputs.release }}
+      GATEWAY_QUALIFIER: proxy-proof-${{ inputs.release }}${{ inputs.route_suffix }}
       GWA_SHA256: ${{ vars.GWA_LINUX_AMD64_SHA256 }}
     steps:
       - name: Checkout
@@ -61,7 +78,9 @@ jobs:
         run: |
           set -euo pipefail
           # 49 leaves room for the -api-gov-bc-ca suffix in a 63-character DNS label.
-          [[ "$RELEASE" =~ ^soba-[a-z0-9-]+$ && ${#RELEASE} -le 49 ]]
+          # Code created for Silver for APS Gateway. Roll back to this if necessary.
+          # [[ "$RELEASE" =~ ^soba-[a-z0-9-]+$ && ${#RELEASE} -le 49 ]]
+          [[ "$RELEASE" =~ ^soba-[a-z0-9-]+$ && ${#GATEWAY_ROUTE_NAME} -le 49 ]]
           [[ "$OPENSHIFT_NAMESPACE" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]
           case "$APP_ENVIRONMENT" in
             pr|dev|test)
@@ -88,8 +107,11 @@ jobs:
               echo '::error::Production requires an explicit gateway_hostname'
               exit 1
             fi
+            # Code created for Silver for APS Gateway. Roll back to this if necessary.
             # The test instance publishes this as <release>-api-gov-bc-ca.test.api.gov.bc.ca.
-            export GATEWAY_HOSTNAME="${RELEASE}.api.gov.bc.ca"
+            # export GATEWAY_HOSTNAME="${RELEASE}.api.gov.bc.ca"
+            # The test instance appends -api-gov-bc-ca.test.api.gov.bc.ca to this route name.
+            export GATEWAY_HOSTNAME="${GATEWAY_ROUTE_NAME}.api.gov.bc.ca"
           fi
           export GATEWAY_SERVICE_NAME="soba-${GATEWAY_QUALIFIER}"
           export BACKEND_HOST="${RELEASE}-backend.${OPENSHIFT_NAMESPACE}.svc"
@@ -186,8 +208,15 @@ jobs:
         run: |
           set -euo pipefail
           for attempt in {1..12}; do
-            if gwa status --json > "$RUNNER_TEMP/gateway-status.json" \
-              && PUBLIC_GATEWAY_HOST=$(jq -er --arg name "soba-${GATEWAY_QUALIFIER}" '
+            # Preserve the last successful response if a later status request fails.
+            if gwa status --json > "$RUNNER_TEMP/gateway-status-next.json"; then
+              mv "$RUNNER_TEMP/gateway-status-next.json" "$RUNNER_TEMP/gateway-status.json"
+            else
+              echo "::warning::APS status request failed (attempt ${attempt}/12)."
+              sleep 5
+              continue
+            fi
+            if PUBLIC_GATEWAY_HOST=$(jq -er --arg name "soba-${GATEWAY_QUALIFIER}" '
                 [.[] | select(.name == $name and .status == "UP") | .env_host
                   | select(type == "string" and length > 0)] | unique
                 | if length == 1 then .[0] else error("Expected one public hostname for the deployed service") end
@@ -201,7 +230,13 @@ jobs:
             sleep 5
           done
           echo 'Gateway health verification failed; inspect status and NetworkPolicy.' >&2
-          cat "$RUNNER_TEMP/gateway-status.json"
+          echo "Expected APS service: soba-${GATEWAY_QUALIFIER}"
+          if [[ -f "$RUNNER_TEMP/gateway-status.json" ]]; then
+            echo 'Last successful APS status response:'
+            cat "$RUNNER_TEMP/gateway-status.json"
+          else
+            echo 'No APS status request succeeded; no status response is available.'
+          fi
           exit 1
 
       - name: Remove local GWA credentials
