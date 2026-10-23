@@ -1,4 +1,4 @@
-FROM node:lts-alpine AS builder
+FROM node:24-alpine AS builder
 
 # enable pnpm via corepack and ensure workspace installs work
 RUN corepack enable pnpm
@@ -18,7 +18,7 @@ COPY backend ./backend
 # OpenShift / arbitrary UID: run non-root; g=u lets assigned user (often gid 0) read /app
 RUN pnpm --filter ./backend run build && chgrp -R 0 /app && chmod -R g=u /app
 
-FROM node:lts-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 # copied out of the builder so /app ships once; the chmod -R there writes a second copy of it
 COPY --from=builder /app ./
