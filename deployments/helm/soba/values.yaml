@@ -196,15 +196,18 @@ backend:
       storageClassName: ""
 
     # storage-s3 only — non-credential keys, rendered only when set. ACCESS_KEY/SECRET_KEY are
-    # NOT here; supply them via a Secret. A full URL endpoint (https://host:port) also carries the
-    # port and SSL flag, so defaultPort/defaultUseSsl can stay empty in that case.
+    # NOT here; supply them via a Secret. A URL endpoint sets the SSL flag, but its port only when
+    # the URL has one; otherwise the backend uses defaultPort, or 9000 when that is empty.
     defaultEndpoint: ""
     defaultBucketName: ""
-    defaultPort: ""
+    defaultPort: "443"
     defaultUseSsl: ""
     # Root every object in the default profile is stored under. Required for storage-s3. Unique per
     # environment, not inside another environment's root, and fixed once files are stored.
     defaultPrefix: ""
+    # Vault key infix for the S3 secrets: S3_<infix>_ACCESS_KEY_ID, _ACCESS_SECRET_KEY, _BUCKET_NAME
+    # and _ENDPOINT (infix e.g. PR, DEV, TEST, UAT, PROD). Used only with storage-s3 and vault.enabled.
+    s3VaultKeyInfix: ""
 
   # -- configmap-formio: PLUGIN_FORMIO_V5_* (non-secret values)
   formio:
@@ -381,13 +384,15 @@ formio:
     tag: 4.11.0
     pullPolicy: IfNotPresent
   replicas: 1
+  # Node.js options for Form.io; the heap must stay below resources.limits.memory.
+  nodeOptions: "--max-old-space-size=8192"
   resources:
     requests:
-      cpu: 50m
-      memory: 256Mi
+      cpu: "1"
+      memory: 3Gi
     limits:
-      cpu: 250m
-      memory: 512Mi
+      cpu: "2"
+      memory: 10Gi
   service:
     port: 3001
   livenessProbe:

@@ -6,6 +6,11 @@ backend:
     notifications: "enabled"
     user-search: "enabled"
   replicas: 1
+  # Files and templates in S3; credentials and bucket come from Vault.
+  storage:
+    defaultBackend: storage-s3
+    defaultPrefix: pr
+    s3VaultKeyInfix: PR
   config:
     documentGenerationDefaultCode: cdogs-v2
     tenantEngineDefaultCode: cstar-v1
@@ -86,19 +91,16 @@ formio:
   internal:
     enabled: true
   replicas: 1
-  resources:
-    requests:
-      cpu: 25m
-      memory: 128Mi
-    limits:
-      cpu: 250m
-      memory: 512Mi
   # Formio depends on MongoDB; allow time for MongoDB to be ready after PR deploy
   readinessProbe:
     initialDelaySeconds: 45
     timeoutSeconds: 10
   livenessProbe:
     initialDelaySeconds: 60
+  nodeOptions: "--max-old-space-size=384"
+  resources:
+    requests: { cpu: 25m, memory: 128Mi }
+    limits: { cpu: 250m, memory: 512Mi }
 
 mongodb:
   # MongoDB runs as its own release from deployments/helm/action-mongodb. The deploy
