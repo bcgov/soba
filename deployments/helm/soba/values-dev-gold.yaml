@@ -1,0 +1,110 @@
+# Gold Dev environment — single replica, moderate resources
+backend:
+  # Development data generator: on in dev. Notifications send through notify-v1 below.
+  features:
+    dev-data: "enabled"
+    notifications: "enabled"
+    user-search: "enabled"
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+  # Files and templates on the file store PVC (storage-local).
+  storage:
+    defaultBackend: storage-local
+    defaultBasePath: /app/files
+    localVolume:
+      storageClassName: netapp-file-standard
+  config:
+    logLevel: debug
+    nodeEnv: development
+    cacheDefaultCode: cache-redis
+    messagebusDefaultCode: messagebus-redis
+    eventStreamDefaultCode: eventstream-redis
+    documentGenerationDefaultCode: cdogs-v2
+    tenantEngineDefaultCode: cstar-v1
+    workflowEngineDefaultCode: cs-workflow-v1
+    notificationDefaultCode: notify-v1
+    userSearchPlugins: css-v1,user-search-soba
+  documentGeneration:
+    cdogsV2:
+      endpoint: https://cdogs-dev.api.gov.bc.ca/api
+      tokenUrl: https://dev.loginproxy.gov.bc.ca/auth/realms/comsvcauth/protocol/openid-connect/token
+    cdogsV3:
+      endpoint: http://common-document-generation-service-master.a12c97-prod:3000
+  tenantEngine:
+    cstarV1:
+      apiBaseUrl: https://test.connect.digital.gov.bc.ca/api/v1
+  workflowEngine:
+    csWorkflowV1:
+      apiBaseUrl: https://test-workflow.apps.gold.devops.gov.bc.ca/api/v1
+  notification:
+    notifyV1:
+      endpoint: https://gw-fe8c5-notify.test.api.gov.bc.ca/api/v1
+  userSearch:
+    cssV1:
+      apiBaseUrl: https://api.loginproxy.gov.bc.ca/api/v1
+      environment: test
+      tokenUrl: https://loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token
+
+frontend:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+
+formio:
+  internal:
+    enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+
+mongodb:
+  # MongoDB runs as its own release from deployments/helm/action-mongodb. The deploy
+  # workflow supplies external.host and external.authSecretName.
+  internal:
+    enabled: false
+  replicas: 1
+  persistence:
+    size: 1Gi
+
+temporal:
+  allowed: "true"
+  address: ""
+  namespace: "soba-dev"
+  taskQueue: "soba"
+
+temporalWorkers:
+  - name: temporal-worker
+    enabled: true
+    taskQueue: "soba"
+    replicas: 1
+    healthPort: 9090
+    resources:
+      requests:
+        cpu: 25m
+        memory: 128Mi
+      limits:
+        cpu: 100m
+        memory: 512Mi
+
+gatewayNetworkPolicy:
+  enabled: true
+  environment: prod
+
+vault:
+  enabled: true

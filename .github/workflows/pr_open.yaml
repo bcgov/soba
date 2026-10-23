@@ -15,6 +15,7 @@ on:
     types: [opened, reopened, synchronize]
     branches:
       - develop
+      - develop-test-gold 
   # Manual trigger: build & deploy a specific PR on demand. Provide just the PR number
   # (e.g. 42). A manual run force-deploys, bypassing the changed-paths gate below.
   workflow_dispatch:
@@ -70,6 +71,7 @@ jobs:
   set-vars:
     name: Set variables
     runs-on: ubuntu-24.04
+    environment: pr
     needs: [qa, changes]
     if: ${{ needs.changes.outputs.deploy == 'true' && !startsWith(github.head_ref, 'release/') && github.head_ref != 'main' }}
     outputs:
@@ -79,6 +81,7 @@ jobs:
       ref: ${{ steps.vars.outputs.ref }}
       PR_NUM: ${{ steps.vars.outputs.PR_NUM }}
       FRONTEND_HOST: ${{ steps.vars.outputs.FRONTEND_HOST }}
+      APS_PR_ENABLED: ${{ steps.vars.outputs.APS_PR_ENABLED }}
     steps:
       - name: Setting variables
         id: vars
@@ -90,13 +93,14 @@ jobs:
             echo "::error::pr-number must be digits only, e.g. 42 (got '${PR_NUMBER}')."
             exit 1
           fi
-          FRONTEND_HOST="${DEV_HOST_PREFIX}.${{ vars.OC_DOMAIN }}"
+          FRONTEND_HOST="${DEV_HOST_PREFIX}.${{ vars.OC_DOMAIN_GOLD }}"
           echo "PR_NUM=$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "JOB_NAME=pr-$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "FRONTEND_HOST=$FRONTEND_HOST" >> "$GITHUB_OUTPUT"
           echo "URL=https://${FRONTEND_HOST}/designer-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
           echo "URL_FORMS=https://${FRONTEND_HOST}/forms-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
           echo "ref=refs/pull/$PR_NUMBER/head" >> "$GITHUB_OUTPUT"
+          echo "APS_PR_ENABLED=${{ vars.APS_PR_ENABLED_GOLD_PR == 'true' }}" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build & Push
@@ -116,6 +120,7 @@ jobs:
     name: Deploy Crunchy Postgres
     needs: [set-vars]
     runs-on: ubuntu-24.04
+    environment: pr
     outputs:
       cluster: ${{ steps.crunchy.outputs.cluster }}
     steps:
@@ -128,8 +133,9 @@ jobs:
         id: crunchy
         uses: bcgov/action-crunchy@7ee9c0bdec27f5251a8239373f51db1e01c7c4d9 # v2.1.0
         with:
-          oc_namespace: ${{ secrets.OC_NAMESPACE }}
-          oc_token: ${{ secrets.OC_TOKEN }}
+          oc_server: ${{ vars.OC_SERVER_GOLD }}
+          oc_namespace: ${{ vars.OC_NAMESPACE_GOLD_PR }}
+          oc_token: ${{ secrets.OC_TOKEN_GOLD_PR }}
           values_file: deployments/helm/action-crunchy/values.yml
           release_name: pg-soba
           ref: v2.0.0
@@ -157,10 +163,10 @@ jobs:
       - name: Login to OpenShift Cluster
         uses: redhat-actions/oc-login@2a1614bc977c054c8786c8e35fc9534bd0ddc156 # v2.0.1
         with:
-          openshift_server_url: ${{ vars.OC_SERVER }}
-          openshift_token: ${{ secrets.OC_TOKEN }}
+          openshift_server_url: ${{ vars.OC_SERVER_GOLD }}
+          openshift_token: ${{ secrets.OC_TOKEN_GOLD_PR }}
           insecure_skip_tls_verify: true
-          namespace: ${{ secrets.OC_NAMESPACE }}
+          namespace: ${{ vars.OC_NAMESPACE_GOLD_PR }}
 
       - name: Recover pending Helm release
         # Checkouts that predate the action skip recovery.
@@ -168,11 +174,11 @@ jobs:
         uses: ./.github/actions/recover-helm-release
         with:
           release: soba-pr-${{ needs.set-vars.outputs.PR_NUM }}-mongodb
-          namespace: ${{ secrets.OC_NAMESPACE }}
+          namespace: ${{ vars.OC_NAMESPACE_GOLD_PR }}
 
       - name: Deploy MongoDB
         env:
-          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          NAMESPACE: ${{ vars.OC_NAMESPACE_GOLD_PR }}
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
         run: |
           set -euo pipefail
@@ -225,15 +231,15 @@ jobs:
       - name: Login to OpenShift Cluster
         uses: redhat-actions/oc-login@2a1614bc977c054c8786c8e35fc9534bd0ddc156 # v2.0.1
         with:
-          openshift_server_url: ${{ vars.OC_SERVER }}
-          openshift_token: ${{ secrets.OC_TOKEN }}
+          openshift_server_url: ${{ vars.OC_SERVER_GOLD }}
+          openshift_token: ${{ secrets.OC_TOKEN_GOLD_PR }}
           insecure_skip_tls_verify: true
-          namespace: ${{ secrets.OC_NAMESPACE }}
+          namespace: ${{ vars.OC_NAMESPACE_GOLD_PR }}
 
       - name: Deploy shared Temporal and ensure PR namespace
         uses: ./.github/actions/temporal-deploy
         with:
-          namespace: ${{ secrets.OC_NAMESPACE }}
+          namespace: ${{ vars.OC_NAMESPACE_GOLD_PR }}
           temporal_namespace: soba-pr-${{ needs.set-vars.outputs.PR_NUM }}
           retention: "3d"
           chart_version: ${{ vars.TEMPORAL_CHART_VERSION || '0.74.0' }}
@@ -241,7 +247,7 @@ jobs:
       - name: Get DB config from Crunchy secret
         id: db
         env:
-          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          NAMESPACE: ${{ vars.OC_NAMESPACE_GOLD_PR }}
           CLUSTER: ${{ needs.deploy-crunchy.outputs.cluster }}
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
         run: |
@@ -253,7 +259,7 @@ jobs:
         uses: ./.github/actions/wait-for-postgres
         with:
           secret_name: ${{ steps.db.outputs.secret_name }}
-          namespace: ${{ secrets.OC_NAMESPACE }}
+          namespace: ${{ vars.OC_NAMESPACE_GOLD_PR }}
           label: PR database
       # Pipeline performance fix: Revert if needed.
 
@@ -263,19 +269,25 @@ jobs:
         uses: ./.github/actions/recover-helm-release
         with:
           release: soba-${{ needs.set-vars.outputs.JOB_NAME }}
-          namespace: ${{ secrets.OC_NAMESPACE }}
+          namespace: ${{ vars.OC_NAMESPACE_GOLD_PR }}
 
       - name: Generate values override and deploy
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
-          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          NAMESPACE: ${{ vars.OC_NAMESPACE_GOLD_PR }}
           RELEASE: soba-${{ needs.set-vars.outputs.JOB_NAME }}
           TAG: sha-${{ needs.build.outputs.short_sha }}
           SHORT_SHA: ${{ needs.build.outputs.short_sha }}
-          DOMAIN: ${{ vars.OC_DOMAIN }}
+          DOMAIN: ${{ vars.OC_DOMAIN_GOLD }}
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
           FRONTEND_HOST: ${{ needs.set-vars.outputs.FRONTEND_HOST }}
-          APS_PR_ENABLED: ${{ vars.APS_PR_ENABLED == 'true' }}
+          APS_PR_ENABLED: ${{ vars.APS_PR_ENABLED_GOLD_PR == 'true' }}
+          APS_NAMESPACE_LABEL: ${{ vars.APS_NAMESPACE_LABEL_GOLD }}
+          VAULT_AUTH_PATH: ${{ vars.VAULT_AUTH_PATH_GOLD }}
+          VAULT_NAMESPACE: ${{ vars.VAULT_NAMESPACE }}
+          VAULT_ROLE: ${{ vars.VAULT_ROLE_GOLD_PR }}
+          VAULT_SECRET_PATH: ${{ vars.VAULT_SECRET_PATH_GOLD_PR }}
+          VAULT_SERVICE_ACCOUNT_NAME: ${{ vars.VAULT_SERVICE_ACCOUNT_NAME_GOLD_PR }}
         run: |
           # Pipeline performance fix: Revert if needed.
           set -euo pipefail
@@ -339,6 +351,7 @@ jobs:
             prefix: "soba-pr-${PR_NUM}:"
           gatewayNetworkPolicy:
             enabled: ${APS_PR_ENABLED}
+            namespaceName: "${APS_NAMESPACE_LABEL}"
 
           OVERRIDE
 
@@ -348,8 +361,13 @@ jobs:
             --wait \
             --wait-for-jobs \
             --timeout 660s \
-            -f deployments/helm/soba/values-pr.yaml \
-            -f /tmp/values-override.yaml
+            -f deployments/helm/soba/values-pr-gold.yaml \
+            -f /tmp/values-override.yaml \
+            --set-string "vault.authPath=${VAULT_AUTH_PATH}" \
+            --set-string "vault.namespace=${VAULT_NAMESPACE}" \
+            --set-string "vault.role=${VAULT_ROLE}" \
+            --set-string "vault.secretPath=${VAULT_SECRET_PATH}" \
+            --set-string "vault.serviceAccountName=${VAULT_SERVICE_ACCOUNT_NAME}"
           # Pipeline performance fix: Revert if needed.
 
       # Pipeline performance fix: Revert if needed.
@@ -359,7 +377,7 @@ jobs:
       #   uses: ./.github/actions/openshift-diagnostics
       #   with:
       #     release: soba-${{ needs.set-vars.outputs.JOB_NAME }}
-      #     namespace: ${{ secrets.OC_NAMESPACE }}
+      #     namespace: ${{ vars.OC_NAMESPACE_GOLD_PR }}
       #     database_secret_name: ${{ steps.db.outputs.secret_name }}
       # Pipeline performance fix: Revert if needed.
 
@@ -379,8 +397,7 @@ jobs:
   gateway:
     name: Verify PR through APS gateway
     needs: [deploy, set-vars]
-    # Repository variable: opt in while establishing the first gateway proof.
-    if: ${{ vars.APS_PR_ENABLED == 'true' }}
+    if: ${{ needs.set-vars.outputs.APS_PR_ENABLED == 'true' }}
     permissions:
       contents: read
       pull-requests: read
