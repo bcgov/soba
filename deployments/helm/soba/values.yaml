@@ -378,7 +378,7 @@ formio:
     # Pull official images through Google's Docker Hub mirror to avoid the anonymous pull-rate
     # limit on the cluster (same image, matching digest).
     repository: mirror.gcr.io/formio/formio
-    tag: 4.6.0
+    tag: 4.11.0
     pullPolicy: IfNotPresent
   replicas: 1
   resources:
