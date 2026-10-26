@@ -174,8 +174,12 @@ describe('WorkspaceGroupTab', () => {
     expect(screen.getByText('Form Reviewers')).toBeInTheDocument();
 
     // Roles column
-    expect(screen.getByTestId('group-role-grp-system-1-form_admin')).toHaveTextContent('Form Administrator');
-    expect(screen.getByTestId('group-role-grp-custom-2-submission_reviewer')).toHaveTextContent('Submission Reviewer');
+    expect(screen.getByTestId('group-role-grp-system-1-form_admin')).toHaveTextContent(
+      'Form Administrator',
+    );
+    expect(screen.getByTestId('group-role-grp-custom-2-submission_reviewer')).toHaveTextContent(
+      'Submission Reviewer',
+    );
 
     // System group cannot be deleted (no delete button)
     expect(screen.queryByTestId('delete-group-button-grp-system-1')).not.toBeInTheDocument();
@@ -268,7 +272,9 @@ describe('WorkspaceGroupTab', () => {
     await user.click(deleteBtn);
 
     // Confirmation modal should appear
-    expect(screen.getByText('Are you sure you want to remove group "Form Reviewers"?')).toBeInTheDocument();
+    expect(
+      screen.getByText('Are you sure you want to remove group "Form Reviewers"?'),
+    ).toBeInTheDocument();
 
     const confirmBtn = screen.getByRole('button', { name: 'Remove Group' });
     await user.click(confirmBtn);

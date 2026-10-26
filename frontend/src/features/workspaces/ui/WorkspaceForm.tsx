@@ -356,7 +356,12 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
         tabAttrs={{ 'data-testid': 'workspace-groups-tab' }}
       >
         <div className={styles.tabContent}>
-          <WorkspaceGroupTab dict={dict} workspaceId={workspace.id} formId={workspace.id} opened={true} />
+          <WorkspaceGroupTab
+            dict={dict}
+            workspaceId={workspace.id}
+            formId={workspace.id}
+            opened={true}
+          />
         </div>
       </Tab>
     </Tabs>

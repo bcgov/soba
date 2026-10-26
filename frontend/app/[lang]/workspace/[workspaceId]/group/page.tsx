@@ -8,7 +8,10 @@ type PageProps = {
 };
 
 export async function generateMetadata({ params }: PageProps) {
-  return pageMetadata(params, (dict) => `${dict.workspaces.groups.addGroup} | ${dict.general.title}`);
+  return pageMetadata(
+    params,
+    (dict) => `${dict.workspaces.groups.addGroup} | ${dict.general.title}`,
+  );
 }
 
 export default async function Page({ params }: Readonly<PageProps>) {

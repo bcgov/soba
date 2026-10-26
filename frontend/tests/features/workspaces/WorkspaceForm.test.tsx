@@ -108,7 +108,9 @@ vi.mock('@/src/features/workspaces/ui/WorkspaceGroupTab', () => ({
 }));
 
 vi.mock('@/src/features/form-settings/ui/WorkspaceFormSettings', () => ({
-  default: () => <div data-testid="workspace-form-settings-tab-content">Workspace Form Settings</div>,
+  default: () => (
+    <div data-testid="workspace-form-settings-tab-content">Workspace Form Settings</div>
+  ),
 }));
 
 vi.mock('@/src/shared/api/useWorkspaces', async (importOriginal) => ({

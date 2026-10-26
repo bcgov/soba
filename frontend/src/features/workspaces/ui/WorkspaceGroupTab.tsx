@@ -108,11 +108,7 @@ export function WorkspaceGroupTab({ dict, workspaceId, formId }: Readonly<Worksp
         label: t.columns.name,
         width: '30%',
         sortField: 'name',
-        render: (group) => (
-          <span data-testid={`group-name-${group.id}`}>
-            {group.name}
-          </span>
-        ),
+        render: (group) => <span data-testid={`group-name-${group.id}`}>{group.name}</span>,
       },
       {
         key: 'roles',
@@ -131,7 +127,7 @@ export function WorkspaceGroupTab({ dict, workspaceId, formId }: Readonly<Worksp
                   <Tag
                     key={code}
                     text={label}
-                    color="#FF0000"
+                    color="blue"
                     data-testid={`group-role-${group.id}-${code}`}
                   />
                 );

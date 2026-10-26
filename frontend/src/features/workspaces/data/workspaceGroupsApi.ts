@@ -10,12 +10,7 @@ import type { ListResult } from '@/src/shared/api/dataContracts';
 import type { SortLocale } from '@soba/lib';
 import type { ListQueryArgs } from '@/src/types/list';
 import { toListRequestQuery } from '@/src/types/list';
-import type {
-  CreateGroupInput,
-  RoleMeta,
-  UpdateGroupInput,
-  WorkspaceGroup,
-} from '../types/groups';
+import type { CreateGroupInput, RoleMeta, UpdateGroupInput, WorkspaceGroup } from '../types/groups';
 
 export const workspaceGroupsKey = (workspaceId: string) =>
   ['workspace-groups', workspaceId] as const;
@@ -137,8 +132,7 @@ export function useWorkspaceGroups(
     const term = q.toLowerCase().trim();
     return rawItems.filter(
       (g) =>
-        g.name.toLowerCase().includes(term) ||
-        Boolean(g.description?.toLowerCase().includes(term)),
+        g.name.toLowerCase().includes(term) || Boolean(g.description?.toLowerCase().includes(term)),
     );
   }, [rawItems, q]);
 
