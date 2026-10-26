@@ -45,10 +45,10 @@ jobs:
     environment: ${{ inputs.environment }}
     env:
       RELEASE: ${{ inputs.release }}
-      OPENSHIFT_NAMESPACE: ${{ case(inputs.environment == 'pr', vars.OC_NAMESPACE, inputs.environment == 'dev', vars.OC_NAMESPACE, '') }}
+      OPENSHIFT_NAMESPACE: ${{ vars.OC_NAMESPACE }}
       APP_ENVIRONMENT: ${{ inputs.environment }}
       APS_HOST: ${{ vars.APS_HOST }}
-      GATEWAY_ID: ${{ case(inputs.environment == 'pr', vars.APS_GATEWAY_ID, inputs.environment == 'dev', vars.APS_GATEWAY_ID, '') }}
+      GATEWAY_ID: ${{ vars.APS_GATEWAY_ID }}
       GATEWAY_HOSTNAME: ${{ inputs.gateway_hostname }}
       APS_GATEWAY_HOST_PREFIX: ${{ vars.APS_GATEWAY_HOST_PREFIX }}
       GATEWAY_QUALIFIER: proxy-proof-${{ inputs.release }}
@@ -63,7 +63,8 @@ jobs:
           set -euo pipefail
           # 49 leaves room for the -api-gov-bc-ca suffix in a 63-character DNS label.
           [[ "$RELEASE" =~ ^soba-[a-z0-9-]+$ && ${#RELEASE} -le 49 ]]
-          [[ "$OPENSHIFT_NAMESPACE" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]
+          [[ "$OPENSHIFT_NAMESPACE" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] \
+            || { echo '::error::Set OC_NAMESPACE on the selected environment'; exit 1; }
           case "$APP_ENVIRONMENT" in
             pr|dev|test|prod)
               : "${APS_HOST:?Set APS_HOST repository variable.}"
@@ -115,8 +116,8 @@ jobs:
         uses: redhat-actions/oc-login@2a1614bc977c054c8786c8e35fc9534bd0ddc156 # v2.0.1
         with:
           openshift_server_url: ${{ vars.OC_SERVER }}
-          openshift_token: ${{ case(inputs.environment == 'pr', secrets.OC_TOKEN, inputs.environment == 'dev', secrets.OC_TOKEN, '') }}
-          namespace: ${{ case(inputs.environment == 'pr', vars.OC_NAMESPACE, inputs.environment == 'dev', vars.OC_NAMESPACE, '') }}
+          openshift_token: ${{ secrets.OC_TOKEN }}
+          namespace: ${{ vars.OC_NAMESPACE }}
 
       - name: Check existing backend and APS NetworkPolicy
         shell: bash
@@ -166,20 +167,12 @@ jobs:
       - name: Publish isolated reverse proxy
         shell: bash
         env:
-          GWA_CLIENT_ID: >-
-            ${{ case(inputs.environment == 'pr', secrets.GWA_CLIENT_ID,
-                inputs.environment == 'dev', secrets.GWA_CLIENT_ID,
-                inputs.environment == 'test', secrets.GWA_CLIENT_ID_TEST,
-                inputs.environment == 'prod', secrets.GWA_CLIENT_ID_PROD, '') }}
-          GWA_CLIENT_SECRET: >-
-            ${{ case(inputs.environment == 'pr', secrets.GWA_CLIENT_SECRET,
-                inputs.environment == 'dev', secrets.GWA_CLIENT_SECRET,
-                inputs.environment == 'test', secrets.GWA_CLIENT_SECRET_TEST,
-                inputs.environment == 'prod', secrets.GWA_CLIENT_SECRET_PROD, '') }}
+          GWA_CLIENT_ID: ${{ secrets.GWA_CLIENT_ID }}
+          GWA_CLIENT_SECRET: ${{ secrets.GWA_CLIENT_SECRET }}
         run: |
           set -euo pipefail
-          : "${GWA_CLIENT_ID:?Missing GWA_CLIENT_ID_<ENV> for the selected environment}"
-          : "${GWA_CLIENT_SECRET:?Missing GWA_CLIENT_SECRET_<ENV> for the selected environment}"
+          : "${GWA_CLIENT_ID:?Missing GWA_CLIENT_ID for the selected environment}"
+          : "${GWA_CLIENT_SECRET:?Missing GWA_CLIENT_SECRET for the selected environment}"
           gwa config set host "$APS_HOST"
           gwa config set gateway "$GATEWAY_ID"
           gwa login --client-id "$GWA_CLIENT_ID" --client-secret "$GWA_CLIENT_SECRET"

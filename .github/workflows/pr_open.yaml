@@ -289,6 +289,11 @@ jobs:
         run: |
           # Pipeline performance fix: Revert if needed.
           set -euo pipefail
+          : "${VAULT_AUTH_PATH:?Set the VAULT_AUTH_PATH variable.}"
+          : "${VAULT_NAMESPACE:?Set the VAULT_NAMESPACE variable.}"
+          : "${VAULT_ROLE:?Set the VAULT_ROLE_NONPROD variable.}"
+          : "${VAULT_SECRET_PATH:?Set VAULT_SECRET_PATH on this environment.}"
+          : "${VAULT_SERVICE_ACCOUNT_NAME:?Set the VAULT_SERVICE_ACCOUNT_NAME variable.}"
           REPO_LC=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
           MONGO_RELEASE="soba-pr-${PR_NUM}-mongodb"
 

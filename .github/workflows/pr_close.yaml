@@ -81,6 +81,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          : "${APS_HOST:?Set APS_HOST.}"
           [[ "$RELEASE" =~ ^soba-pr-[1-9][0-9]*$ ]]
           [[ "$GATEWAY_ID" =~ ^gw-[a-z0-9-]+$ ]]
           [[ "$GWA_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]

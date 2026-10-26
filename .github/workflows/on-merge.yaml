@@ -13,6 +13,7 @@ on:
       - "frontend/**"
       - "lib/**"
       - ".github/workflows/on-merge.yaml"
+      - ".github/workflows/gateway-proxy-check.yaml"
       - ".github/workflows/build-images.yaml"
       - ".github/actions/**"
       - ".gitignore"
@@ -186,6 +187,11 @@ jobs:
           VAULT_SERVICE_ACCOUNT_NAME: ${{ vars.VAULT_SERVICE_ACCOUNT_NAME }}
         run: |
           set -euo pipefail
+          : "${VAULT_AUTH_PATH:?Set the VAULT_AUTH_PATH variable.}"
+          : "${VAULT_NAMESPACE:?Set the VAULT_NAMESPACE variable.}"
+          : "${VAULT_ROLE:?Set the VAULT_ROLE_NONPROD variable.}"
+          : "${VAULT_SECRET_PATH:?Set VAULT_SECRET_PATH on this environment.}"
+          : "${VAULT_SERVICE_ACCOUNT_NAME:?Set the VAULT_SERVICE_ACCOUNT_NAME variable.}"
           REPO_LC=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
 
           # Version /meta reports, e.g. 2.0.0-beta.0+dev.a1b2c3d. Empty if unreadable: the
