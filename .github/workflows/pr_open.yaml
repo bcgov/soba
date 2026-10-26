@@ -361,7 +361,7 @@ jobs:
             --wait \
             --wait-for-jobs \
             --timeout 660s \
-            -f deployments/helm/soba/values-pr-gold.yaml \
+            -f deployments/helm/soba/values-pr.yaml \
             -f /tmp/values-override.yaml \
             --set-string "vault.authPath=${VAULT_AUTH_PATH}" \
             --set-string "vault.namespace=${VAULT_NAMESPACE}" \
