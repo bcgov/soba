@@ -17,7 +17,7 @@ try {
       !Number.isFinite(Date.parse(body.timestamp))) {
     throw new Error('Response does not match the CHEFS2 health response');
   }
-  console.log(`PASS ${url}: CHEFS2 status=OK, timestamp=${body.timestamp}`);
+  console.log(`PASS ${url} CHEFS2 status=OK, timestamp=${body.timestamp}`);
 } catch (error) {
   console.error(`FAIL ${url}: ${error.message}`);
   process.exitCode = 1;
