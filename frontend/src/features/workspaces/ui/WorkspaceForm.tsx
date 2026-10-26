@@ -310,8 +310,7 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
     <Tabs
       id="workspace-manage-tabs"
       activeKey={activeTab}
-      onSelect={(k) => {
-        // react-bootstrap passes null, not undefined, for a tab with no eventKey.
+      onSelect={(k = 'settings') => {
         const nextTab = k ?? 'settings';
         setSelectedTab(nextTab);
         const params = new URLSearchParams(window.location.search);
