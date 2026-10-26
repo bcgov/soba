@@ -1,11 +1,26 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
+import {
+  CreateWorkspaceGroupBodySchema as LibCreateGroupBodySchema,
+  ListWorkspaceGroupsResponseSchema as LibListGroupsResponseSchema,
+  SetWorkspaceGroupRolesBodySchema as LibSetGroupRolesBodySchema,
+  UpdateWorkspaceGroupBodySchema as LibUpdateGroupBodySchema,
+  WorkspaceGroupMemberSchema as LibGroupMemberSchema,
+  WorkspaceGroupSchema as LibGroupSchema,
+  WorkspaceGroupSortSchema as LibGroupSortSchema,
+} from '@soba/lib';
 import { GROUP_NAME_TAKEN } from '../../messages';
-import { SortLocaleQuerySchema } from '../shared/offsetPagination';
+import {
+  offsetQueryFields,
+  rejectedCursorField,
+  searchQueryField,
+  OffsetPageSchema,
+  OFFSET_DRIFT_NOTE,
+  SortLocaleQuerySchema,
+  sortLocaleQueryField,
+} from '../shared/offsetPagination';
 
 extendZodWithOpenApi(z);
-
-const RoleCodesSchema = z.array(z.string().trim().min(1)).max(20);
 
 export const WorkspaceGroupParamsSchema = z
   .object({
@@ -28,62 +43,43 @@ export const GroupMemberParamsSchema = z
   })
   .openapi('Groups_GroupMemberParams');
 
-export const CreateGroupBodySchema = z
-  .object({
-    name: z.string().trim().min(1),
-    description: z.string().trim().min(1).optional(),
-    roleCodes: RoleCodesSchema.default([]),
-  })
-  .openapi('Groups_CreateGroupBody');
+export const CreateGroupBodySchema =
+  LibCreateGroupBodySchema.clone().openapi('Groups_CreateGroupBody');
 
-export const UpdateGroupBodySchema = z
-  .object({
-    name: z.string().trim().min(1).optional(),
-    description: z.string().trim().min(1).nullable().optional(),
-  })
-  .refine((body) => body.name !== undefined || body.description !== undefined, {
-    message: 'Provide a name or description to update',
-  })
-  .openapi('Groups_UpdateGroupBody');
+export const UpdateGroupBodySchema =
+  LibUpdateGroupBodySchema.clone().openapi('Groups_UpdateGroupBody');
 
-export const SetGroupRolesBodySchema = z
-  .object({
-    roleCodes: RoleCodesSchema,
-  })
-  .openapi('Groups_SetGroupRolesBody');
+export const SetGroupRolesBodySchema = LibSetGroupRolesBodySchema.clone().openapi(
+  'Groups_SetGroupRolesBody',
+);
 
 export const AddGroupMemberBodySchema = z
   .object({ kind: z.literal('user'), membershipId: z.string().min(1) })
   .openapi('Groups_AddGroupMemberBody');
 
-export const GroupMemberSchema = z
-  .object({
-    id: z.string(),
-    kind: z.literal('user'),
-    membershipId: z.string(),
-    userId: z.string(),
-    displayLabel: z.string().nullable(),
-  })
-  .openapi('Groups_GroupMember');
+export const GroupMemberSchema = LibGroupMemberSchema.clone().openapi('Groups_GroupMember');
 
-export const GroupSchema = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-    description: z.string().nullable(),
-    status: z.string(),
-    /** True for the two protected bootstrap groups (can't be deleted; roles can't change). */
-    system: z.boolean(),
-    roles: z.array(z.string()),
-    members: z.array(GroupMemberSchema),
-  })
-  .openapi('Groups_Group');
+export const GroupSchema = LibGroupSchema.extend({
+  members: z.array(GroupMemberSchema),
+}).openapi('Groups_Group');
 
-export const ListGroupsResponseSchema = z
+export const GroupSortSchema = LibGroupSortSchema.clone().openapi('Groups_GroupSort');
+
+export const ListGroupsQuerySchema = z
   .object({
-    items: z.array(GroupSchema),
+    ...offsetQueryFields,
+    cursor: rejectedCursorField,
+    q: searchQueryField.openapi({ description: 'Matches anywhere in the group name.' }),
+    sort: GroupSortSchema.default('name:asc'),
+    locale: sortLocaleQueryField,
   })
-  .openapi('Groups_ListGroupsResponse');
+  .openapi('Groups_ListGroupsQuery');
+
+export const ListGroupsResponseSchema = LibListGroupsResponseSchema.extend({
+  items: z.array(GroupSchema),
+  page: OffsetPageSchema,
+  sort: GroupSortSchema,
+}).openapi('Groups_ListGroupsResponse');
 
 const TAG = 'core.groups';
 const GROUPS_PATH = '/workspaces/{id}/groups';
@@ -93,6 +89,7 @@ const GROUP_MEMBERS_PATH = '/workspaces/{id}/groups/{groupId}/members';
 const GROUP_MEMBER_PATH = '/workspaces/{id}/groups/{groupId}/members/{memberId}';
 
 const ERR_MANAGE = 'Workspace management requires an owner or admin role';
+const ERR_PEOPLE_READ = 'Actor is not a member of the workspace, or is a viewer';
 const ERR_WORKSPACE_NOT_FOUND = 'Workspace not found';
 const ERR_WORKSPACE_OR_GROUP_NOT_FOUND = 'Workspace or group not found';
 const OK_UPDATED_GROUP = 'Updated group';
@@ -112,11 +109,29 @@ export const registerGroupsOpenApi = (registry: OpenAPIRegistry) => {
     path: GROUPS_PATH,
     tags: [TAG],
     security: [{ bearerAuth: [] }],
-    request: { query: SortLocaleQuerySchema, params: WorkspaceGroupParamsSchema },
+    description: `List the workspace's groups with search and offset pagination. ${OFFSET_DRIFT_NOTE}`,
+    request: { query: ListGroupsQuerySchema, params: WorkspaceGroupParamsSchema },
     responses: {
-      200: jsonResponse('Workspace groups with roles and members', ListGroupsResponseSchema),
-      403: { description: 'Actor is not a member of the workspace, or is a viewer' },
+      200: jsonResponse(
+        'A page of workspace groups with roles and members',
+        ListGroupsResponseSchema,
+      ),
+      400: { description: 'Invalid query' },
+      403: { description: ERR_PEOPLE_READ },
       404: { description: ERR_WORKSPACE_NOT_FOUND },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: GROUP_PATH,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: { query: SortLocaleQuerySchema, params: GroupIdParamsSchema },
+    responses: {
+      200: jsonResponse('The group with roles and members', GroupSchema),
+      403: { description: ERR_PEOPLE_READ },
+      404: { description: ERR_WORKSPACE_OR_GROUP_NOT_FOUND },
     },
   });
 

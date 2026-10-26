@@ -1,108 +1,72 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useMemo, useState } from 'react';
+import { Button } from '@bcgov/design-system-react-components';
 import { ListPageToolbar } from '@/src/components/ListPageLayout';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { RowActionButton } from '@/src/components/RowActionButton';
-import { Button } from '@bcgov/design-system-react-components';
 import { ConfirmModal } from '@/src/components/ConfirmModal';
 import { Tag } from '@/src/components/Tag';
+import { ListPageSearchField } from '@/src/components/ListPageSearchField';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { getLocaleFromPath } from '@/src/shared/util/locale';
+import { useRolesMeta } from '@/src/shared/api/useRolesMeta';
 import { WORKSPACE_GROUPS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { useListQuery } from '@/src/shared/list/useListQuery';
 import { useDataTable } from '@/src/shared/list/useDataTable';
-import { ListPageSearchField } from '@/src/components/ListPageSearchField';
 import type { Dictionary } from '@/src/types/dictionary';
-import {
-  useRolesMeta,
-  useWorkspaceGroups,
-  useWorkspaceGroupsWriter,
-} from '../data/workspaceGroupsApi';
-import type { WorkspaceGroup } from '../types/groups';
+import type { WorkspaceGroup } from '@/src/types/workspaceGroups';
+import { useWorkspaceGroups } from '../data/useWorkspaceGroups';
+import { useWorkspaceGroupsWriter } from '../data/useWorkspaceGroupsWriter';
+import { groupRoleLabel } from '../groupRoleLabel';
+import WorkspaceGroupForm from './WorkspaceGroupForm';
 
 export interface WorkspaceGroupTabProps {
   dict: Dictionary;
-  workspaceId?: string;
-  formId?: string;
-  opened?: boolean;
+  workspaceId: string;
 }
 
-export function WorkspaceGroupTab({ dict, workspaceId, formId }: Readonly<WorkspaceGroupTabProps>) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const locale = getLocaleFromPath(pathname);
-  const actualWorkspaceId = workspaceId ?? formId;
+/** What opens under the table: nothing, the create form, or the edit form for one group's id. */
+type FormView = null | 'new' | { groupId: string };
+
+export function WorkspaceGroupTab({ dict, workspaceId }: Readonly<WorkspaceGroupTabProps>) {
   const t = dict.workspaces.groups;
   const { token } = useKeycloak();
   const { addNotification } = useNotificationStore();
 
   const query = useListQuery(WORKSPACE_GROUPS_LIST_QUERY);
-  const { searchInput, setSearchInput, commitSearch } = query;
-
-  const groupsResult = useWorkspaceGroups(actualWorkspaceId, {
+  const groupsResult = useWorkspaceGroups(workspaceId, {
     offset: query.offset,
     limit: query.pageSize,
     sort: query.sort,
     q: query.q,
   });
-  const { table, refresh } = useDataTable(query, groupsResult, t.loadError);
+  const { table } = useDataTable(query, groupsResult, t.loadError);
+  const writer = useWorkspaceGroupsWriter(workspaceId);
+  // Only for the catalog's own role names; a failed read falls back to the dictionary or the code.
+  const { data: roles } = useRolesMeta();
 
-  const { roles } = useRolesMeta();
-  const writer = useWorkspaceGroupsWriter(actualWorkspaceId);
-
-  const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<WorkspaceGroup | null>(null);
+  const [formView, setFormView] = useState<FormView>(null);
+  const [pendingDelete, setPendingDelete] = useState<WorkspaceGroup | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleOpenAdd = useCallback(() => {
-    if (!actualWorkspaceId) return;
-    router.push(`/${locale}/workspace/${actualWorkspaceId}/group`);
-  }, [actualWorkspaceId, router, locale]);
-
-  const handleOpenEdit = useCallback(
-    (group: WorkspaceGroup) => {
-      if (!actualWorkspaceId) return;
-      router.push(`/${locale}/workspace/${actualWorkspaceId}/group/${group.id}`);
-    },
-    [actualWorkspaceId, router, locale],
-  );
-
-  const handleOpenDelete = useCallback((group: WorkspaceGroup) => {
-    setConfirmDeleteGroup(group);
-  }, []);
-
-  const handleDeleteGroup = async () => {
-    if (!token || !confirmDeleteGroup) return;
+  const confirmDelete = async () => {
+    if (!token || !pendingDelete) return;
     setIsDeleting(true);
     try {
-      await writer.remove(token, confirmDeleteGroup.id);
+      await writer.remove(token, pendingDelete.id);
       addNotification({ text: t.deleteSuccess, type: 'success' });
-      setConfirmDeleteGroup(null);
-      await refresh();
+      setPendingDelete(null);
     } catch (err: unknown) {
-      addNotification({
-        text: t.deleteError,
-        type: 'error',
-        consoleError: err,
-      });
+      addNotification({ text: t.deleteError, type: 'error', consoleError: err });
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const roleNameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    const custom = t.roleNames as Record<string, string> | undefined;
-    for (const r of roles) {
-      map.set(r.roleCode, custom?.[r.roleCode] ?? r.name);
-    }
-    return map;
-  }, [roles, t.roleNames]);
-
-  const columns: Column<WorkspaceGroup>[] = useMemo(
-    () => [
+  const columns: Column<WorkspaceGroup>[] = useMemo(() => {
+    const catalogNames = new Map(roles?.map((role) => [role.roleCode, role.name]));
+    return [
       {
         key: 'name',
         label: t.columns.name,
@@ -114,27 +78,19 @@ export function WorkspaceGroupTab({ dict, workspaceId, formId }: Readonly<Worksp
         key: 'roles',
         label: t.columns.roles,
         width: '30%',
-        render: (group) => {
-          if (!group.roles || group.roles.length === 0) {
-            return <span>{t.noRolesSelected}</span>;
-          }
-          return (
-            <>
-              {group.roles.map((code) => {
-                const custom = (t.roleNames as Record<string, string> | undefined)?.[code];
-                const label = custom ?? roleNameMap.get(code) ?? code;
-                return (
-                  <Tag
-                    key={code}
-                    text={label}
-                    color="blue"
-                    data-testid={`group-role-${group.id}-${code}`}
-                  />
-                );
-              })}
-            </>
-          );
-        },
+        render: (group) =>
+          group.roles.length === 0 ? (
+            <span>{t.noRolesSelected}</span>
+          ) : (
+            group.roles.map((code) => (
+              <Tag
+                key={code}
+                text={groupRoleLabel(dict, code, catalogNames.get(code))}
+                color="blue"
+                data-testid={`group-role-${group.id}-${code}`}
+              />
+            ))
+          ),
       },
       {
         key: 'actions',
@@ -144,7 +100,7 @@ export function WorkspaceGroupTab({ dict, workspaceId, formId }: Readonly<Worksp
         render: (group) => (
           <div>
             <RowActionButton
-              onPress={() => handleOpenEdit(group)}
+              onPress={() => setFormView({ groupId: group.id })}
               aria-label={`${t.editGroup}: ${group.name}`}
               data-testid={`edit-group-button-${group.id}`}
             >
@@ -152,7 +108,7 @@ export function WorkspaceGroupTab({ dict, workspaceId, formId }: Readonly<Worksp
             </RowActionButton>
             {!group.system && (
               <RowActionButton
-                onPress={() => handleOpenDelete(group)}
+                onPress={() => setPendingDelete(group)}
                 aria-label={`${t.deleteGroup}: ${group.name}`}
                 data-testid={`delete-group-button-${group.id}`}
               >
@@ -162,23 +118,24 @@ export function WorkspaceGroupTab({ dict, workspaceId, formId }: Readonly<Worksp
           </div>
         ),
       },
-    ],
-    [t, roleNameMap, handleOpenEdit, handleOpenDelete],
-  );
+    ];
+  }, [dict, t, roles]);
+
+  const editingId = formView && formView !== 'new' ? formView.groupId : undefined;
 
   return (
     <div data-testid="workspace-groups-tab-content">
       <ListPageToolbar>
         <ListPageSearchField
-          value={searchInput}
-          onChange={setSearchInput}
-          onSubmit={commitSearch}
+          value={query.searchInput}
+          onChange={query.setSearchInput}
+          onSubmit={query.commitSearch}
           testIdPrefix="ws-groups"
         />
         <Button
           variant="primary"
           data-testid="create-ws-group-button"
-          onPress={() => handleOpenAdd()}
+          onPress={() => setFormView((view) => (view === 'new' ? null : 'new'))}
         >
           {t.addGroup}
         </Button>
@@ -193,15 +150,25 @@ export function WorkspaceGroupTab({ dict, workspaceId, formId }: Readonly<Worksp
         keyExtractor={(item) => item.id}
       />
 
-      {confirmDeleteGroup && (
+      {formView && (
+        <WorkspaceGroupForm
+          key={editingId ?? 'new'}
+          dict={dict}
+          workspaceId={workspaceId}
+          groupId={editingId}
+          onDone={() => setFormView(null)}
+        />
+      )}
+
+      {pendingDelete && (
         <ConfirmModal
-          show={Boolean(confirmDeleteGroup)}
+          show
           title={t.deleteConfirmTitle}
-          message={t.deleteConfirmMessage.replace('{name}', confirmDeleteGroup.name)}
+          message={t.deleteConfirmMessage.replace('{name}', pendingDelete.name)}
           confirmLabel={t.deleteGroup}
-          onConfirm={() => void handleDeleteGroup()}
+          onConfirm={() => void confirmDelete()}
           onCancel={() => {
-            if (!isDeleting) setConfirmDeleteGroup(null);
+            if (!isDeleting) setPendingDelete(null);
           }}
           pending={isDeleting}
         />

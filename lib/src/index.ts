@@ -7,6 +7,7 @@ export * from './schemas/pagination';
 export * from './sort';
 export * from './schemas/admin';
 export * from './schemas/workspaces';
+export * from './schemas/workspaceGroups';
 export * from './formio/normalizeSchema';
 export * from './formio/newFormSchema';
 export * from './schemas/me';

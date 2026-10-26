@@ -1,303 +1,238 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import WorkspaceGroupTab from '@/src/features/workspaces/ui/WorkspaceGroupTab';
+
+import en from '@/dictionaries/en.json';
 import type { Dictionary } from '@/src/types/dictionary';
-import type { WorkspaceGroup, RoleMeta } from '@/src/features/workspaces/types/groups';
-import * as workspaceGroupsApi from '@/src/features/workspaces/data/workspaceGroupsApi';
+import { ApiError } from '@/src/shared/api/sobaHelpers';
+import {
+  ADMINS,
+  REVIEWERS,
+  ROLES,
+  WORKSPACE_ID,
+  group,
+  groupsPage,
+  renderSignedIn,
+} from './workspaceGroupsTestKit';
 
-const mockPush = vi.fn();
-const mockAddNotification = vi.fn();
-const mockRemove = vi.fn();
-const mockRefresh = vi.fn();
+const { mockApi, mockFetchRolesMeta, mockAddNotification } = vi.hoisted(() => ({
+  mockApi: {
+    listWorkspaceGroups: vi.fn(),
+    getWorkspaceGroup: vi.fn(),
+    createWorkspaceGroup: vi.fn(),
+    renameWorkspaceGroup: vi.fn(),
+    setWorkspaceGroupRoles: vi.fn(),
+    deleteWorkspaceGroup: vi.fn(),
+  },
+  mockFetchRolesMeta: vi.fn(),
+  mockAddNotification: vi.fn(),
+}));
 
-const sampleGroups: WorkspaceGroup[] = [
-  {
-    id: 'grp-system-1',
-    name: 'Form administrators',
-    description: 'System group for administrators',
-    status: 'active',
-    system: true,
-    roles: ['form_admin'],
-  },
-  {
-    id: 'grp-custom-2',
-    name: 'Form Reviewers',
-    description: 'Group to review form submissions',
-    status: 'active',
-    system: false,
-    roles: ['submission_reviewer'],
-  },
-];
+vi.mock('@/src/features/workspaces/data/api', () => mockApi);
 
-const sampleRoles: RoleMeta[] = [
-  {
-    roleCode: 'form_admin',
-    name: 'Form Administrator',
-    description: 'Full form access',
-  },
-  {
-    roleCode: 'submission_reviewer',
-    name: 'Submission Reviewer',
-    description: 'Can review submissions',
-  },
-  {
-    roleCode: 'form_designer',
-    name: 'Form Designer',
-    description: 'Can design forms',
-  },
-];
-
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
-  usePathname: () => '/en/workspace/ws-1',
-  useSearchParams: () => new URLSearchParams(),
+vi.mock('@/src/shared/api/sobaApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/src/shared/api/sobaApi')>()),
+  fetchRolesMeta: mockFetchRolesMeta,
 }));
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
-  useKeycloak: () => ({ authenticated: true, token: 'mock-token', initializing: false }),
+  useKeycloak: () => ({ authenticated: true, token: 'token', initializing: false }),
 }));
 
 vi.mock('@/lib/hooks/useNotificationStore', () => ({
   useNotificationStore: () => ({ addNotification: mockAddNotification }),
 }));
 
-vi.mock('@/src/features/workspaces/data/workspaceGroupsApi', () => ({
-  useWorkspaceGroups: vi.fn(() => ({
-    rows: sampleGroups,
-    groups: sampleGroups,
-    total: sampleGroups.length,
-    isLoading: false,
-    isRefreshing: false,
-    error: null,
-    refresh: mockRefresh,
-    mutate: vi.fn(),
-  })),
-  useRolesMeta: () => ({
-    roles: sampleRoles,
-    isLoading: false,
-    error: null,
-  }),
-  useWorkspaceGroupsWriter: () => ({
-    remove: mockRemove,
-  }),
+const dict = { ...en, locale: 'en' } as unknown as Dictionary;
+const t = dict.workspaces.groups;
+
+vi.mock('@/app/[lang]/Providers', () => ({ useDictionary: () => dict }));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  usePathname: () => '/en/workspace/ws-1',
+  useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 
-const { mockDict } = vi.hoisted(() => {
-  const dict = {
-    locale: 'en',
-    general: {
-      loading: 'Loading…',
-      cancel: 'Cancel',
-      sortBy: 'Sort by',
-      sessionExpired: 'Your session has expired. Please log in again.',
-      noAccess: 'You do not have access to this resource.',
-    },
-    modal: {
-      dialogActions: 'Dialog actions',
-    },
-    dataTable: {
-      emptyMessage: 'No items found.',
-      loadingMessage: 'Loading...',
-      itemName: 'items',
-      itemsPerPage: 'Items per page',
-      itemsPerPageAria: 'Items per page',
-      pageAria: 'Page',
-      of: 'of',
-      pageOf: 'of {totalPages}',
-      previousPage: 'Previous page',
-      nextPage: 'Next page',
-    },
-    searchField: {
-      search: 'Search',
-      clearSearch: 'Clear search',
-      submitSearch: 'Submit search',
-    },
-    workspaces: {
-      groupsTab: 'Groups',
-      groups: {
-        addGroup: 'Add Group',
-        editGroup: 'Edit Group',
-        deleteGroup: 'Remove Group',
-        name: 'Group Name',
-        namePlaceholder: 'e.g., Form Reviewers',
-        description: 'Description',
-        descriptionPlaceholder: 'Optional description of what this group does',
-        roles: 'Roles',
-        rolesHelp: 'Roles granted to all members of this group across all forms in the workspace.',
-        noRolesSelected: 'No roles selected',
-        selectedCount: '{count} selected',
-        systemGroup: 'System Group',
-        customGroup: 'Custom Group',
-        systemGroupTooltip: 'System groups are protected and cannot be deleted.',
-        deleteConfirmTitle: 'Remove Group',
-        deleteConfirmMessage: 'Are you sure you want to remove group "{name}"?',
-        deleteSuccess: 'Group removed successfully.',
-        deleteError: 'Failed to remove group.',
-        loadError: 'Failed to load workspace groups.',
-        empty: 'No groups found in this workspace.',
-        columns: {
-          name: 'Name',
-          description: 'Description',
-          roles: 'Roles',
-          actions: 'Actions',
-        },
-        roleNames: {
-          form_admin: 'Form Administrator',
-          submission_reviewer: 'Submission Reviewer',
-          form_designer: 'Form Designer',
-        },
-      },
-    },
-  } as unknown as Dictionary;
+import WorkspaceGroupTab from '@/src/features/workspaces/ui/WorkspaceGroupTab';
 
-  return { mockDict: dict };
-});
+const renderTab = () =>
+  renderSignedIn(<WorkspaceGroupTab dict={dict} workspaceId={WORKSPACE_ID} />);
 
-vi.mock('@/app/[lang]/Providers', () => ({
-  useDictionary: () => mockDict,
-}));
+/** The query of the most recent list read. */
+const lastListQuery = () => mockApi.listWorkspaceGroups.mock.calls.at(-1)?.[2];
 
 describe('WorkspaceGroupTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(workspaceGroupsApi.useWorkspaceGroups).mockReturnValue({
-      rows: sampleGroups,
-      groups: sampleGroups,
-      total: sampleGroups.length,
-      isLoading: false,
-      isRefreshing: false,
-      error: null,
-      refresh: mockRefresh,
-      mutate: vi.fn(),
-    });
+    window.history.replaceState(null, '', '/en/workspace/ws-1');
+    window.sessionStorage.clear();
+    mockApi.listWorkspaceGroups.mockResolvedValue(groupsPage([ADMINS, REVIEWERS]));
+    mockFetchRolesMeta.mockResolvedValue(ROLES);
   });
 
-  it('renders search field, toolbar, and groups table with rows and roles', () => {
-    render(<WorkspaceGroupTab dict={mockDict} workspaceId="ws-1" />);
+  it('reads the first page by name in the app language and lists each group with its roles', async () => {
+    renderTab();
 
-    expect(screen.getByTestId('create-ws-group-button')).toBeInTheDocument();
-    expect(screen.getByTestId('search-ws-groups-text')).toBeInTheDocument();
-
-    // Group rows
-    expect(screen.getByText('Form administrators')).toBeInTheDocument();
-    expect(screen.getByText('Form Reviewers')).toBeInTheDocument();
-
-    // Roles column
-    expect(screen.getByTestId('group-role-grp-system-1-form_admin')).toHaveTextContent(
-      'Form Administrator',
+    expect(await screen.findByText('Form administrators')).toBeInTheDocument();
+    expect(mockApi.listWorkspaceGroups).toHaveBeenCalledWith('token', WORKSPACE_ID, {
+      offset: 0,
+      limit: 10,
+      sort: 'name:asc',
+      // Dropped from the request; see the api test.
+      q: '',
+      locale: 'en',
+    });
+    // The dictionary's name wins over the catalog's.
+    expect(screen.getByTestId('group-role-grp-reviewers-submission_reviewer')).toHaveTextContent(
+      t.roleNames.submission_reviewer,
     );
-    expect(screen.getByTestId('group-role-grp-custom-2-submission_reviewer')).toHaveTextContent(
-      'Submission Reviewer',
-    );
-
-    // System group cannot be deleted (no delete button)
-    expect(screen.queryByTestId('delete-group-button-grp-system-1')).not.toBeInTheDocument();
-    // Custom group can be deleted
-    expect(screen.getByTestId('delete-group-button-grp-custom-2')).toBeInTheDocument();
+    // A system group cannot be removed.
+    expect(screen.queryByTestId('delete-group-button-grp-admins')).not.toBeInTheDocument();
+    expect(screen.getByTestId('delete-group-button-grp-reviewers')).toBeInTheDocument();
   });
 
-  it('allows typing into the search field and submitting a search', async () => {
+  it('asks the server for the other order when the name header is pressed', async () => {
     const user = userEvent.setup();
+    const view = renderTab();
+    await screen.findByText('Form administrators');
 
-    render(<WorkspaceGroupTab dict={mockDict} workspaceId="ws-1" />);
+    await user.click(screen.getByTestId('datatable-sort-name'));
+    await view.rerender();
 
-    const searchInput = screen
-      .getByTestId('search-ws-groups-text')
-      .querySelector('input') as HTMLInputElement;
-    expect(searchInput).toBeInTheDocument();
-
-    await user.type(searchInput, 'Reviewers{enter}');
-    expect(searchInput).toHaveValue('Reviewers');
+    await waitFor(() => expect(lastListQuery()).toMatchObject({ sort: 'name:desc', offset: 0 }));
   });
 
-  it('renders empty message when no groups exist in the workspace', () => {
-    vi.mocked(workspaceGroupsApi.useWorkspaceGroups).mockReturnValue({
-      rows: [],
-      groups: [],
-      total: 0,
-      isLoading: false,
-      isRefreshing: false,
-      error: null,
-      refresh: mockRefresh,
-      mutate: vi.fn(),
-    });
-
-    render(<WorkspaceGroupTab dict={mockDict} workspaceId="ws-1" />);
-    expect(screen.getByText('No groups found in this workspace.')).toBeInTheDocument();
-  });
-
-  it('displays no roles selected message when group has no roles', () => {
-    const groupWithoutRoles: WorkspaceGroup = {
-      id: 'grp-no-roles',
-      name: 'Unassigned Group',
-      description: 'Group with no roles',
-      status: 'active',
-      system: false,
-      roles: [],
-    };
-
-    vi.mocked(workspaceGroupsApi.useWorkspaceGroups).mockReturnValue({
-      rows: [groupWithoutRoles],
-      groups: [groupWithoutRoles],
-      total: 1,
-      isLoading: false,
-      isRefreshing: false,
-      error: null,
-      refresh: mockRefresh,
-      mutate: vi.fn(),
-    });
-
-    render(<WorkspaceGroupTab dict={mockDict} workspaceId="ws-1" />);
-    expect(screen.getByText('No roles selected')).toBeInTheDocument();
-  });
-
-  it('navigates to add group page when clicking Add Group button', async () => {
+  it('sends a submitted search to the server, trimmed', async () => {
     const user = userEvent.setup();
+    const view = renderTab();
+    await screen.findByText('Form administrators');
 
-    render(<WorkspaceGroupTab dict={mockDict} workspaceId="ws-1" />);
+    await user.click(within(screen.getByTestId('search-ws-groups-text')).getByRole('textbox'));
+    await user.paste('  review  ');
+    await user.keyboard('{Enter}');
+    await view.rerender();
 
-    const addButton = screen.getByTestId('create-ws-group-button');
-    await user.click(addButton);
-
-    expect(mockPush).toHaveBeenCalledWith('/en/workspace/ws-1/group');
+    await waitFor(() => expect(lastListQuery()).toMatchObject({ q: 'review', offset: 0 }));
   });
 
-  it('navigates to edit group page when clicking Edit button', async () => {
+  it('reads the next page from the server', async () => {
     const user = userEvent.setup();
+    mockApi.listWorkspaceGroups.mockResolvedValue(groupsPage([ADMINS, REVIEWERS], { total: 25 }));
+    const view = renderTab();
+    await screen.findByText('Form administrators');
 
-    render(<WorkspaceGroupTab dict={mockDict} workspaceId="ws-1" />);
+    await user.click(screen.getByTestId('datatable-next-page-button'));
+    await view.rerender();
 
-    const editBtn = screen.getByTestId('edit-group-button-grp-custom-2');
-    await user.click(editBtn);
-
-    expect(mockPush).toHaveBeenCalledWith('/en/workspace/ws-1/group/grp-custom-2');
+    await waitFor(() => expect(lastListQuery()).toMatchObject({ offset: 10, limit: 10 }));
   });
 
-  it('confirms and deletes a group, then refreshes the list', async () => {
+  it('says the groups could not load rather than that there are none', async () => {
+    mockApi.listWorkspaceGroups.mockRejectedValue(new ApiError('Request failed (500)', 500));
+    renderTab();
+
+    expect(await screen.findByTestId('datatable-error')).toHaveTextContent(t.loadError);
+    expect(screen.queryByText(t.empty)).not.toBeInTheDocument();
+  });
+
+  it('shows a group without roles as having none', async () => {
+    mockApi.listWorkspaceGroups.mockResolvedValue(groupsPage([group({ id: 'grp-empty' })]));
+    renderTab();
+
+    expect(await screen.findByText(t.noRolesSelected)).toBeInTheDocument();
+  });
+
+  it('removes a group once confirmed, then re-reads the list', async () => {
     const user = userEvent.setup();
-    mockRemove.mockResolvedValueOnce(undefined);
+    mockApi.deleteWorkspaceGroup.mockResolvedValue(undefined);
+    renderTab();
+    await screen.findByText('Form Reviewers');
+    const readsBefore = mockApi.listWorkspaceGroups.mock.calls.length;
 
-    render(<WorkspaceGroupTab dict={mockDict} workspaceId="ws-1" />);
+    await user.click(screen.getByTestId('delete-group-button-grp-reviewers'));
+    await user.click(screen.getByRole('button', { name: t.deleteGroup }));
 
-    const deleteBtn = screen.getByTestId('delete-group-button-grp-custom-2');
-    await user.click(deleteBtn);
-
-    // Confirmation modal should appear
-    expect(
-      screen.getByText('Are you sure you want to remove group "Form Reviewers"?'),
-    ).toBeInTheDocument();
-
-    const confirmBtn = screen.getByRole('button', { name: 'Remove Group' });
-    await user.click(confirmBtn);
-
-    await waitFor(() => {
-      expect(mockRemove).toHaveBeenCalledWith('mock-token', 'grp-custom-2');
+    await waitFor(() =>
       expect(mockAddNotification).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'success', text: 'Group removed successfully.' }),
-      );
-      expect(mockRefresh).toHaveBeenCalled();
-    });
+        expect.objectContaining({ type: 'success', text: t.deleteSuccess }),
+      ),
+    );
+    expect(mockApi.deleteWorkspaceGroup).toHaveBeenCalledWith('token', WORKSPACE_ID, REVIEWERS.id);
+    expect(mockApi.listWorkspaceGroups.mock.calls.length).toBeGreaterThan(readsBefore);
+  });
+
+  it('reports a refused removal as a failure', async () => {
+    const user = userEvent.setup();
+    mockApi.deleteWorkspaceGroup.mockRejectedValue(new ApiError('Request failed (403)', 403));
+    renderTab();
+    await screen.findByText('Form Reviewers');
+
+    await user.click(screen.getByTestId('delete-group-button-grp-reviewers'));
+    await user.click(screen.getByRole('button', { name: t.deleteGroup }));
+
+    await waitFor(() =>
+      expect(mockAddNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error', text: t.deleteError }),
+      ),
+    );
+    expect(mockAddNotification).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'success' }),
+    );
+  });
+
+  it('opens the create form under the table and closes it on cancel', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await screen.findByText('Form administrators');
+
+    await user.click(screen.getByTestId('create-ws-group-button'));
+    expect(await screen.findByTestId('group-name-input')).toBeInTheDocument();
+    expect(screen.getByTestId('workspace-group-create-form')).toBeInTheDocument();
+
+    await user.click(screen.getByTestId('group-cancel-button'));
+    expect(screen.queryByTestId('workspace-group-create-form')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['Add Group', 'create-ws-group-button', 'workspace-group-create-form'],
+    ['Edit', 'edit-group-button-grp-reviewers', 'workspace-group-edit-form'],
+  ])('brings the form into view and focus when %s is pressed', async (_label, button, form) => {
+    const user = userEvent.setup();
+    const scrollIntoView = vi.fn();
+    // jsdom has no layout, so the method is not there to spy on.
+    Element.prototype.scrollIntoView = scrollIntoView;
+    mockApi.getWorkspaceGroup.mockResolvedValue(REVIEWERS);
+    renderTab();
+    await screen.findByText('Form Reviewers');
+
+    await user.click(screen.getByTestId(button));
+
+    const opened = await screen.findByTestId(form);
+    expect(opened).toHaveFocus();
+    expect(opened).toHaveAccessibleName(
+      button === 'create-ws-group-button' ? t.addGroup : t.editGroup,
+    );
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView.mock.contexts[0]).toBe(opened);
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
+  });
+
+  it('opens the edit form on the group read by its id, not the row', async () => {
+    const user = userEvent.setup();
+    mockApi.getWorkspaceGroup.mockResolvedValue({ ...REVIEWERS, name: 'Reviewers (renamed)' });
+    renderTab();
+    await screen.findByText('Form Reviewers');
+
+    await user.click(screen.getByTestId('edit-group-button-grp-reviewers'));
+
+    expect(await screen.findByDisplayValue('Reviewers (renamed)')).toBeInTheDocument();
+    expect(mockApi.getWorkspaceGroup).toHaveBeenCalledWith(
+      'token',
+      WORKSPACE_ID,
+      REVIEWERS.id,
+      'en',
+    );
   });
 });

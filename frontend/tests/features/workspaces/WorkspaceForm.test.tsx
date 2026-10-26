@@ -1,5 +1,5 @@
 import React, { act } from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
@@ -158,6 +158,11 @@ function renderForm(workspaceId?: string) {
 }
 
 describe('WorkspaceForm', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockSearchParams.value = '';
@@ -399,6 +404,21 @@ describe('WorkspaceForm', () => {
 
     await userEvent.click(groupsTabButton);
     expect(await screen.findByTestId('workspace-groups-tab-content')).toBeInTheDocument();
+  });
+
+  it('keeps the base path in the URL it writes for the selected tab', async () => {
+    vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/designer-230');
+    const replaceState = vi.spyOn(window.history, 'replaceState');
+    await act(async () => {
+      renderForm('ws2');
+    });
+    expect(await screen.findByDisplayValue('Team Workspace')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Groups' }));
+    expect(replaceState.mock.calls.at(-1)?.[2]).toBe('/designer-230/en/workspace?tab=groups');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Settings' }));
+    expect(replaceState.mock.calls.at(-1)?.[2]).toBe('/designer-230/en/workspace');
   });
 
   it('initializes to the groups tab if tab=groups is present in the URL query', async () => {

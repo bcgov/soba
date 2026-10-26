@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, useMemo, type Key } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { navLink } from '@/src/shared/list/listQueryMemory';
+import { withBasePath } from '@/src/shared/config/basePath';
 import { Tabs, Tab } from 'react-bootstrap';
 import {
   Button,
@@ -309,22 +310,20 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
     <Tabs
       id="workspace-manage-tabs"
       activeKey={activeTab}
-      onSelect={(k = 'settings') => {
-        const nextTab = k || 'settings';
+      onSelect={(k) => {
+        // react-bootstrap passes null, not undefined, for a tab with no eventKey.
+        const nextTab = k ?? 'settings';
         setSelectedTab(nextTab);
-        if (workspace?.id) {
-          const params = new URLSearchParams(window.location.search);
-          if (nextTab === 'settings') {
-            params.delete('tab');
-          } else {
-            params.set('tab', nextTab);
-          }
-          const qs = params.toString();
-          const targetUrl = qs
-            ? `/${locale}/workspace/${workspace.id}?${qs}`
-            : `/${locale}/workspace/${workspace.id}`;
-          window.history.replaceState(null, '', targetUrl);
+        const params = new URLSearchParams(window.location.search);
+        if (nextTab === 'settings') {
+          params.delete('tab');
+        } else {
+          params.set('tab', nextTab);
         }
+        const qs = params.toString();
+        // usePathname omits the base path and replaceState takes the URL as given.
+        const url = withBasePath(pathname);
+        window.history.replaceState(null, '', qs ? `${url}?${qs}` : url);
       }}
       className="mb-3"
       mountOnEnter
@@ -349,12 +348,7 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
         tabAttrs={{ 'data-testid': 'workspace-groups-tab' }}
       >
         <div className={styles.tabContent}>
-          <WorkspaceGroupTab
-            dict={dict}
-            workspaceId={workspace.id}
-            formId={workspace.id}
-            opened={true}
-          />
+          <WorkspaceGroupTab dict={dict} workspaceId={workspace.id} />
         </div>
       </Tab>
     </Tabs>

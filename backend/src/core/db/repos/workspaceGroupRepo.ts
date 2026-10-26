@@ -1,8 +1,9 @@
-import { and, asc, eq, inArray, ne } from 'drizzle-orm';
+import { and, asc, count, eq, ilike, inArray, ne } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
-import type { SortLocale } from '@soba/lib';
+import { WORKSPACE_GROUP_SORT_FIELDS, type SortLocale, type SortToken } from '@soba/lib';
 import { db, type DbOrTx } from '../client';
-import { collated } from '../listSort';
+import { collated, likePattern, orderByForSort, type SortColumns } from '../listSort';
+import { readListPage } from '../listRead';
 import {
   appUsers,
   workspaceGroupMemberships,
@@ -100,33 +101,100 @@ export interface WorkspaceGroupRow {
   members: WorkspaceGroupMember[];
 }
 
-/** Active workspace groups with their role codes and members. Filter to one group with `groupId`. */
+export type WorkspaceGroupListSortField = (typeof WORKSPACE_GROUP_SORT_FIELDS)[number];
+export type WorkspaceGroupListSort = SortToken<WorkspaceGroupListSortField>;
+
+const WORKSPACE_GROUP_SORT_COLUMNS: SortColumns<WorkspaceGroupListSortField> = {
+  name: { column: workspaceGroups.name, linguistic: true },
+};
+
+const groupColumns = {
+  id: workspaceGroups.id,
+  name: workspaceGroups.name,
+  description: workspaceGroups.description,
+  status: workspaceGroups.status,
+  systemCode: workspaceGroups.systemCode,
+};
+
+type GroupColumnsRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  systemCode: string | null;
+};
+
+const activeGroupsOf = (workspaceId: string) => [
+  eq(workspaceGroups.workspaceId, workspaceId),
+  eq(workspaceGroups.status, WorkspaceGroupStatus.active),
+];
+
+export interface ListWorkspaceGroupsInput {
+  workspaceId: string;
+  offset: number;
+  limit: number;
+  sort: WorkspaceGroupListSort;
+  locale: SortLocale;
+  q?: string;
+}
+
+/** One page of the workspace's active groups, with their role codes and members. */
 export const listWorkspaceGroups = async (
-  workspaceId: string,
-  locale: SortLocale,
-  groupId?: string,
-): Promise<WorkspaceGroupRow[]> => {
-  const groupWhere = and(
-    eq(workspaceGroups.workspaceId, workspaceId),
-    eq(workspaceGroups.status, WorkspaceGroupStatus.active),
-    ...(groupId ? [eq(workspaceGroups.id, groupId)] : []),
+  input: ListWorkspaceGroupsInput,
+): Promise<{ items: WorkspaceGroupRow[]; total: number }> => {
+  const where = and(
+    ...activeGroupsOf(input.workspaceId),
+    ...(input.q ? [ilike(workspaceGroups.name, likePattern(input.q))] : []),
   );
+
+  return readListPage(async (tx) => {
+    const groups = await tx
+      .select(groupColumns)
+      .from(workspaceGroups)
+      .where(where)
+      .orderBy(
+        ...orderByForSort(
+          WORKSPACE_GROUP_SORT_COLUMNS,
+          input.sort,
+          workspaceGroups.id,
+          input.locale,
+        ),
+      )
+      .limit(input.limit)
+      .offset(input.offset);
+    const totals = await tx.select({ total: count() }).from(workspaceGroups).where(where);
+    return {
+      items: await withRolesAndMembers(tx, groups, input.locale),
+      total: totals[0]?.total ?? 0,
+    };
+  });
+};
+
+/** Single group with roles and members, or null if it isn't in the workspace. */
+export const getWorkspaceGroup = async (
+  workspaceId: string,
+  groupId: string,
+  locale: SortLocale,
+): Promise<WorkspaceGroupRow | null> => {
   const groups = await db
-    .select({
-      id: workspaceGroups.id,
-      name: workspaceGroups.name,
-      description: workspaceGroups.description,
-      status: workspaceGroups.status,
-      systemCode: workspaceGroups.systemCode,
-    })
+    .select(groupColumns)
     .from(workspaceGroups)
-    .where(groupWhere)
-    .orderBy(asc(collated(workspaceGroups.name, locale)));
+    .where(and(...activeGroupsOf(workspaceId), eq(workspaceGroups.id, groupId)));
+  const [group] = await withRolesAndMembers(db, groups, locale);
+  return group ?? null;
+};
+
+/** The groups, in the order given, with their active role codes and active user members. */
+const withRolesAndMembers = async (
+  executor: DbOrTx,
+  groups: GroupColumnsRow[],
+  locale: SortLocale,
+): Promise<WorkspaceGroupRow[]> => {
   if (!groups.length) return [];
 
   const groupIds = groups.map((g) => g.id);
 
-  const roleRows = await db
+  const roleRows = await executor
     .select({ groupId: workspaceGroupRoles.groupId, roleCode: workspaceGroupRoles.roleCode })
     .from(workspaceGroupRoles)
     .where(
@@ -137,7 +205,7 @@ export const listWorkspaceGroups = async (
     )
     .orderBy(asc(workspaceGroupRoles.roleCode));
 
-  const userRows = await db
+  const userRows = await executor
     .select({
       id: workspaceGroupMemberships.id,
       groupId: workspaceGroupMemberships.groupId,
@@ -180,16 +248,6 @@ export const listWorkspaceGroups = async (
         }),
       ),
   }));
-};
-
-/** Single group with roles and members, or null if it isn't in the workspace. */
-export const getWorkspaceGroup = async (
-  workspaceId: string,
-  groupId: string,
-  locale: SortLocale,
-): Promise<WorkspaceGroupRow | null> => {
-  const groups = await listWorkspaceGroups(workspaceId, locale, groupId);
-  return groups[0] ?? null;
 };
 
 /** The active group's `systemCode` (null for user-created groups), or null if it isn't in the workspace. */

@@ -6,6 +6,7 @@ import {
   MY_FORM_SORT_FIELDS,
   SOBA_ADMIN_SORT_FIELDS,
   SUBMISSION_SORT_FIELDS,
+  WORKSPACE_GROUP_SORT_FIELDS,
   WORKSPACE_SORT_FIELDS,
   sortTokensFor,
 } from '@soba/lib/sort';
@@ -126,7 +127,7 @@ export const DOCGEN_AUDITS_LIST_QUERY: ListQuerySpec = {
 export const WORKSPACE_GROUPS_LIST_QUERY: ListQuerySpec = {
   resource: 'workspaceGroups',
   filters: [],
-  sortOptions: ['name:asc', 'name:desc'],
+  sortOptions: sortTokensFor(WORKSPACE_GROUP_SORT_FIELDS),
   defaultSort: 'name:asc',
 };
 

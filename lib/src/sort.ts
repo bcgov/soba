@@ -24,6 +24,8 @@ export const WORKSPACE_SORT_FIELDS = ['name', 'kind', 'status', 'updatedAt'] as 
 
 export const SOBA_ADMIN_SORT_FIELDS = ['displayLabel', 'source', 'syncedAt'] as const;
 
+export const WORKSPACE_GROUP_SORT_FIELDS = ['name'] as const;
+
 export const FEATURE_SCOPE_SORT_FIELDS = [
   'featureCode',
   'scopeType',
