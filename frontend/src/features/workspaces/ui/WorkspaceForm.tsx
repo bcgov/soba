@@ -310,7 +310,7 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
       id="workspace-manage-tabs"
       activeKey={activeTab}
       onSelect={(k = 'settings') => {
-        const nextTab = k;
+        const nextTab = k || 'settings';
         setSelectedTab(nextTab);
         if (workspace?.id) {
           const params = new URLSearchParams(window.location.search);
