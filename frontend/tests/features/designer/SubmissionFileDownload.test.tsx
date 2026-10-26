@@ -11,7 +11,7 @@ vi.mock('@/app/[lang]/Providers', async () => {
   return { useDictionary: () => dict };
 });
 
-vi.mock('@/src/features/templates/data/saveBlob', () => ({
+vi.mock('@/src/shared/util/saveBlob', () => ({
   saveBlob: (...args: unknown[]) => mockSaveBlob(...args),
 }));
 

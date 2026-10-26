@@ -5,7 +5,10 @@ import type { SubmissionExportTemplate } from '@soba/lib';
 import { mapOrder } from './schemaFields';
 
 /** Metadata under `form`, then answers. */
-export type ExportRecord = { form: Record<string, unknown> } & Record<string, unknown>;
+export type ExportRecord = { form: { submissionId: string } & Record<string, unknown> } & Record<
+  string,
+  unknown
+>;
 
 const isNested = (value: unknown): value is Record<string, unknown> | unknown[] =>
   value !== null && typeof value === 'object';

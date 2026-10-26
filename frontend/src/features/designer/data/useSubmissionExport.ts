@@ -6,11 +6,9 @@ import {
   downloadSobaSubmissionFile,
   exportSobaSubmissions,
   getSobaExportFields,
-  getSobaForm,
-  lookupFormVersions,
 } from '@/src/shared/api/sobaApi';
 import type { DownloadedFile } from '@/src/shared/api/sobaApiDesign';
-import { toResource, useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
+import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { listReadConfig, sessionReadConfig } from '@/src/shared/api/swrConfig';
 import { classifyDataError } from '@/src/shared/api/dataError';
 import type { Resource, WriteOutcome } from '@/src/shared/api/dataContracts';
@@ -20,8 +18,7 @@ import type {
   SubmissionExportFieldsResponse,
 } from '@/src/types/submissionExport';
 import type { FormVersionSummary } from '@/src/types/forms';
-import { designFormKey } from './useForm';
-import { versionsKey } from './useFormVersions';
+import { useDesignFormRead, useFormVersionLookup } from './useForm';
 
 const EXPORT_FIELDS_KEY = 'submission-export-fields';
 
@@ -29,16 +26,8 @@ const EXPORT_FIELDS_KEY = 'submission-export-fields';
 export function useExportForm(
   formId: string,
 ): Resource<{ name: string; versions: FormVersionSummary[] }> {
-  const form = useAuthedSWR(
-    designFormKey(formId),
-    (token) => getSobaForm(token, formId),
-    sessionReadConfig,
-  );
-  const versions = useAuthedSWR(
-    [...versionsKey(formId), 'lookup'],
-    (token) => lookupFormVersions(token, formId),
-    sessionReadConfig,
-  );
+  const form = useDesignFormRead(formId);
+  const versions = useFormVersionLookup(formId);
   const error = form.error ?? versions.error;
   return {
     data:
@@ -56,13 +45,19 @@ export function useExportFields(
   formId: string,
   filters: SubmissionExportFieldsBody | null,
 ): Resource<SubmissionExportFieldsResponse> {
-  return toResource(
-    useAuthedSWR(
-      filters ? [EXPORT_FIELDS_KEY, formId, JSON.stringify(filters)] : null,
-      (token) => getSobaExportFields(token, formId, filters as SubmissionExportFieldsBody),
-      listReadConfig,
-    ),
+  const { data, isLoading, error, mutate } = useAuthedSWR(
+    filters ? [EXPORT_FIELDS_KEY, formId, JSON.stringify(filters)] : null,
+    (token) => getSobaExportFields(token, formId, filters!),
+    listReadConfig,
   );
+  return {
+    data: data ?? null,
+    isLoading,
+    error: error ? classifyDataError(error) : null,
+    refresh: async () => {
+      await mutate();
+    },
+  };
 }
 
 /** Export the form's submissions; a failure throws. */
@@ -84,11 +79,17 @@ export function useSubmissionExporter(formId: string) {
 
 /** A submission's file, for staff. */
 export function useSubmissionFile(submissionId: string, fileId: string): Resource<DownloadedFile> {
-  return toResource(
-    useAuthedSWR(
-      ['design-submission-file', submissionId, fileId],
-      (token) => downloadSobaSubmissionFile(token, submissionId, fileId),
-      sessionReadConfig,
-    ),
+  const { data, isLoading, error, mutate } = useAuthedSWR(
+    ['design-submission-file', submissionId, fileId],
+    (token) => downloadSobaSubmissionFile(token, submissionId, fileId),
+    sessionReadConfig,
   );
+  return {
+    data: data ?? null,
+    isLoading,
+    error: error ? classifyDataError(error) : null,
+    refresh: async () => {
+      await mutate();
+    },
+  };
 }

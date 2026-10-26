@@ -402,10 +402,10 @@ export class FormioEngineAdapter implements FormEngineAdapter {
         (refs) =>
           client.loadSubmissions(engineFormRef, {
             params: { _id__in: refs.join(','), limit: refs.length },
-          }) as Promise<Array<Record<string, unknown>>>,
+          }) as Promise<Array<{ _id: string } & Record<string, unknown>>>,
       ),
     );
-    return new Map(docs.flat().map((doc) => [String(doc._id), answerDocument(doc)]));
+    return new Map(docs.flat().map((doc) => [doc._id, answerDocument(doc)]));
   }
 
   /** Delete a Form.io submission by form ref + submission ref (compensation / cleanup). */

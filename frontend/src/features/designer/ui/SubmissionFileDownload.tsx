@@ -9,7 +9,7 @@ import { SecondaryText } from '@/src/components/SecondaryText';
 import { LoadErrorAlert } from '@/src/shared/ui/LoadErrorAlert';
 import { useAuthErrorDefaults } from '@/src/shared/api/useDataErrorNotice';
 import { fillTemplate } from '@/src/shared/util/stringUtils';
-import { saveBlob } from '@/src/features/templates/data/saveBlob';
+import { saveBlob } from '@/src/shared/util/saveBlob';
 import { useSubmissionFile } from '@/src/features/designer/data/useSubmissionExport';
 
 type SubmissionFileDownloadProps = {

@@ -5,8 +5,6 @@ import useSWR, { type SWRConfiguration, type SWRResponse } from 'swr';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import type { RootState } from '@/lib/store';
 import { SessionExpiredError } from './sobaFetch';
-import { classifyDataError } from './dataError';
-import type { Resource } from './dataContracts';
 
 /** Key parts for a read. `null` from the caller means the request is not ready. */
 type AuthedKey = readonly unknown[] | null;
@@ -52,16 +50,4 @@ export function useMaybeAuthedSWR<T>(
 ): SWRResponse<T> {
   const store = useStore<RootState>();
   return useSWR<T>(key, () => fetcher(store.getState().keycloak.token), config);
-}
-
-/** An SWR read as a Resource, its error classified. */
-export function toResource<T>(read: SWRResponse<T>): Resource<T> {
-  return {
-    data: read.data ?? null,
-    isLoading: read.isLoading,
-    error: read.error ? classifyDataError(read.error) : null,
-    refresh: async () => {
-      await read.mutate();
-    },
-  };
 }

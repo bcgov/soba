@@ -27,7 +27,7 @@ import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { useFormatLongDateTime } from '@/src/shared/hooks/useFormatLongDate';
 import { useSortLocale } from '@/src/shared/list/useSortLocale';
 import { fillTemplate } from '@/src/shared/util/stringUtils';
-import { saveBlob } from '@/src/features/templates/data/saveBlob';
+import { saveBlob } from '@/src/shared/util/saveBlob';
 import {
   useExportFields,
   useExportForm,

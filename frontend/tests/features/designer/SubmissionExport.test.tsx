@@ -19,7 +19,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
-vi.mock('@/src/features/templates/data/saveBlob', () => ({
+vi.mock('@/src/shared/util/saveBlob', () => ({
   saveBlob: (...args: unknown[]) => mockSaveBlob(...args),
 }));
 
@@ -182,7 +182,7 @@ describe('SubmissionExport', () => {
 
     expect(screen.getByTestId('export-range')).toBeTruthy();
     expect(exportButton()).toBeDisabled();
-    expect(getSobaExportFields.mock.calls.length).toBe(reads);
+    expect(getSobaExportFields.mock.calls).toHaveLength(reads);
   });
 
   it('includes drafts when ticked', async () => {

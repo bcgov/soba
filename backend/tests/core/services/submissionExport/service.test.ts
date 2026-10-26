@@ -234,4 +234,14 @@ describe('submissionExportService', () => {
 
     await expect(submissionExportService.export(ctx, body(), '')).rejects.toThrow(/not found/i);
   });
+
+  it('answers form_not_ready, recording nothing, when the engine cannot read in bulk', async () => {
+    createAdapter.mockReturnValue({});
+    listRows.mockResolvedValue([row({})]);
+
+    await expect(submissionExportService.export(ctx, body(), '')).rejects.toMatchObject({
+      code: 'form_not_ready',
+    });
+    expect(recordExport).not.toHaveBeenCalled();
+  });
 });
