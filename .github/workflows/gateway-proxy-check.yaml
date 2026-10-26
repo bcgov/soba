@@ -11,7 +11,7 @@ on:
         required: true
         type: string
       gateway_hostname:
-        description: Optional route hostname; defaults to <release>.api.gov.bc.ca outside prod
+        description: Optional route hostname; PR and Dev use APS_GATEWAY_HOST_PREFIX with APS_HOST
         default: ""
         type: string
   workflow_dispatch:
@@ -45,11 +45,12 @@ jobs:
     environment: ${{ inputs.environment }}
     env:
       RELEASE: ${{ inputs.release }}
-      OPENSHIFT_NAMESPACE: ${{ secrets.OC_NAMESPACE }}
-      # PR, dev, and test applications use the APS test administration endpoint.
+      OPENSHIFT_NAMESPACE: ${{ vars.OC_NAMESPACE }}
       APP_ENVIRONMENT: ${{ inputs.environment }}
+      APS_HOST: ${{ vars.APS_HOST }}
       GATEWAY_ID: ${{ vars.APS_GATEWAY_ID }}
       GATEWAY_HOSTNAME: ${{ inputs.gateway_hostname }}
+      APS_GATEWAY_HOST_PREFIX: ${{ vars.APS_GATEWAY_HOST_PREFIX }}
       GATEWAY_QUALIFIER: proxy-proof-${{ inputs.release }}
       GWA_SHA256: ${{ vars.GWA_LINUX_AMD64_SHA256 }}
     steps:
@@ -62,13 +63,11 @@ jobs:
           set -euo pipefail
           # 49 leaves room for the -api-gov-bc-ca suffix in a 63-character DNS label.
           [[ "$RELEASE" =~ ^soba-[a-z0-9-]+$ && ${#RELEASE} -le 49 ]]
-          [[ "$OPENSHIFT_NAMESPACE" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]
+          [[ "$OPENSHIFT_NAMESPACE" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] \
+            || { echo '::error::Set OC_NAMESPACE on the selected environment'; exit 1; }
           case "$APP_ENVIRONMENT" in
-            pr|dev|test)
-              echo 'APS_HOST=api-gov-bc-ca.test.api.gov.bc.ca' >> "$GITHUB_ENV"
-              ;;
-            prod)
-              echo 'APS_HOST=api.gov.bc.ca' >> "$GITHUB_ENV"
+            pr|dev|test|prod)
+              : "${APS_HOST:?Set APS_HOST repository variable.}"
               ;;
             *)
               echo "::error::Unsupported application environment: $APP_ENVIRONMENT"
@@ -80,7 +79,7 @@ jobs:
             exit 1
           fi
           if [[ ! "$GATEWAY_ID" =~ ^gw-[a-z0-9-]+$ ]]; then
-            echo '::error::Set Actions variable APS_GATEWAY_ID to the gateway ID for the selected APS instance (gw-...)'
+            echo '::error::Set the Gold gateway ID for the selected environment (gw-...)'
             exit 1
           fi
           if [[ -z "$GATEWAY_HOSTNAME" ]]; then
@@ -88,9 +87,20 @@ jobs:
               echo '::error::Production requires an explicit gateway_hostname'
               exit 1
             fi
-            # The test instance publishes this as <release>-api-gov-bc-ca.test.api.gov.bc.ca.
-            export GATEWAY_HOSTNAME="${RELEASE}.api.gov.bc.ca"
+            if [[ "$APP_ENVIRONMENT" == pr ]]; then
+              export GATEWAY_HOSTNAME="${APS_GATEWAY_HOST_PREFIX:?Set APS_GATEWAY_HOST_PREFIX in the pr environment.}.${APS_HOST}"
+            elif [[ "$APP_ENVIRONMENT" == dev ]]; then
+              export GATEWAY_HOSTNAME="${APS_GATEWAY_HOST_PREFIX:?Set APS_GATEWAY_HOST_PREFIX in the dev environment.}.${APS_HOST}"
+            else
+              export GATEWAY_HOSTNAME="${RELEASE}.api.gov.bc.ca"
+            fi
           fi
+          export GATEWAY_ROUTE_PATH=/
+          if [[ "$APP_ENVIRONMENT" == pr ]]; then
+            [[ "$RELEASE" =~ ^soba-pr-([1-9][0-9]*)$ ]] || exit 1
+            export GATEWAY_ROUTE_PATH="/pr/${BASH_REMATCH[1]}/"
+          fi
+          echo "GATEWAY_ROUTE_PATH=$GATEWAY_ROUTE_PATH" >> "$GITHUB_ENV"
           export GATEWAY_SERVICE_NAME="soba-${GATEWAY_QUALIFIER}"
           export BACKEND_HOST="${RELEASE}-backend.${OPENSHIFT_NAMESPACE}.svc"
           node deployments/gateway/scripts/generate-gateway-config.mjs \
@@ -107,7 +117,7 @@ jobs:
         with:
           openshift_server_url: ${{ vars.OC_SERVER }}
           openshift_token: ${{ secrets.OC_TOKEN }}
-          namespace: ${{ secrets.OC_NAMESPACE }}
+          namespace: ${{ vars.OC_NAMESPACE }}
 
       - name: Check existing backend and APS NetworkPolicy
         shell: bash
@@ -157,20 +167,12 @@ jobs:
       - name: Publish isolated reverse proxy
         shell: bash
         env:
-          GWA_CLIENT_ID: >-
-            ${{ inputs.environment == 'pr' && secrets.GWA_CLIENT_ID_PR ||
-                inputs.environment == 'dev' && secrets.GWA_CLIENT_ID_DEV ||
-                inputs.environment == 'test' && secrets.GWA_CLIENT_ID_TEST ||
-                inputs.environment == 'prod' && secrets.GWA_CLIENT_ID_PROD || '' }}
-          GWA_CLIENT_SECRET: >-
-            ${{ inputs.environment == 'pr' && secrets.GWA_CLIENT_SECRET_PR ||
-                inputs.environment == 'dev' && secrets.GWA_CLIENT_SECRET_DEV ||
-                inputs.environment == 'test' && secrets.GWA_CLIENT_SECRET_TEST ||
-                inputs.environment == 'prod' && secrets.GWA_CLIENT_SECRET_PROD || '' }}
+          GWA_CLIENT_ID: ${{ secrets.GWA_CLIENT_ID }}
+          GWA_CLIENT_SECRET: ${{ secrets.GWA_CLIENT_SECRET }}
         run: |
           set -euo pipefail
-          : "${GWA_CLIENT_ID:?Missing GWA_CLIENT_ID_<ENV> for the selected environment}"
-          : "${GWA_CLIENT_SECRET:?Missing GWA_CLIENT_SECRET_<ENV> for the selected environment}"
+          : "${GWA_CLIENT_ID:?Missing GWA_CLIENT_ID for the selected environment}"
+          : "${GWA_CLIENT_SECRET:?Missing GWA_CLIENT_SECRET for the selected environment}"
           gwa config set host "$APS_HOST"
           gwa config set gateway "$GATEWAY_ID"
           gwa login --client-id "$GWA_CLIENT_ID" --client-secret "$GWA_CLIENT_SECRET"
@@ -193,9 +195,9 @@ jobs:
                 | if length == 1 then .[0] else error("Expected one public hostname for the deployed service") end
               ' "$RUNNER_TEMP/gateway-status.json") \
               && GATEWAY_HOSTNAME="$PUBLIC_GATEWAY_HOST" node deployments/gateway/scripts/verify-health.mjs; then
-              printf 'Gateway health URL: https://%s/health\n' "$PUBLIC_GATEWAY_HOST" >> "$GITHUB_STEP_SUMMARY"
-              printf 'Verified gateway /health -> %s-backend.%s.svc:4000/chefs/api/v1/health\n' \
-                "$RELEASE" "$OPENSHIFT_NAMESPACE" >> "$GITHUB_STEP_SUMMARY"
+              printf 'Gateway health URL: https://%s%shealth\n' "$PUBLIC_GATEWAY_HOST" "$GATEWAY_ROUTE_PATH" >> "$GITHUB_STEP_SUMMARY"
+              printf 'Verified gateway %shealth -> %s-backend.%s.svc:4000/chefs/api/v1/health\n' \
+                "$GATEWAY_ROUTE_PATH" "$RELEASE" "$OPENSHIFT_NAMESPACE" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
             sleep 5

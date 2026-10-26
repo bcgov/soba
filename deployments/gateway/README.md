@@ -14,15 +14,15 @@ applies to everything except the public endpoints.
 
 ## How it runs
 
-- `pr_open.yaml` calls `gateway-proxy-check.yaml` after the PR deploy when the repository
-  variable `APS_PR_ENABLED` is `true`. The same variable enables the APS NetworkPolicy in that
-  deploy.
+- `pr_open.yaml` calls `gateway-proxy-check.yaml` after the PR deploy when `APS_PR_ENABLED` is
+  `true` in the `pr` environment or repository. The same variable enables the APS NetworkPolicy
+  in that deploy.
 - The workflow renders `service.template.yaml` with `scripts/generate-gateway-config.mjs` and
   publishes it with `gwa publish-gateway --qualifier proxy-proof-<release>`, which replaces only
   that qualifier's configuration.
-- The route host is `<release>.api.gov.bc.ca`. The APS test instance serves it as
-  `<release>-api-gov-bc-ca.test.api.gov.bc.ca`, e.g.
-  `soba-pr-173-api-gov-bc-ca.test.api.gov.bc.ca`. Production requires an explicit hostname.
+- Gold PR routes use `soba-pr.api.gov.bc.ca/pr/<number>/`, e.g.
+  `https://soba-pr.api.gov.bc.ca/pr/173/health`. Dev uses
+  `https://soba-dev.api.gov.bc.ca/health`. Manual runs provide an explicit hostname.
 - The check passes when `gwa status` reports the service `UP` and its `env_host` returns HTTP
   200 from `/health` with `status: OK`. The job summary records the URL.
 - `pr_close.yaml` publishes `services: []` under the same qualifier and waits until the service
@@ -32,33 +32,33 @@ applies to everything except the public endpoints.
 ## NetworkPolicy
 
 `deployments/helm/soba/templates/backend/networkpolicy-aps.yaml` lets the APS namespace reach
-backend pods on port 4000. `deployments/helm/soba/values-pr.yaml` sets the Silver test-instance
-labels (`name: 264e6f`, `environment: test`). Any other release needs `gatewayNetworkPolicy` enabled in its values
-before a check; the workflow fails when `<release>-aps` is missing.
+backend pods on port 4000. PR and Dev values select the Gold APS namespace with labels
+`name: b8840c` and `environment: prod`. Any other release needs `gatewayNetworkPolicy` enabled
+in its values before a check; the workflow fails when `<release>-aps` is missing.
 
 ## Configuration
 
-`APS_PR_ENABLED` must be a repository variable because job-level `if` conditions cannot read
-environment variables. Everything else can be set on the repository or on the selected GitHub
-environment.
+PR Open and PR Close read `APS_PR_ENABLED` in jobs that select the `pr` GitHub environment, so
+it can be set there or at repository level. Other settings can be set on the repository or on
+the selected GitHub environment.
 
 | Kind | Name | Value |
 | --- | --- | --- |
-| Secret | `OC_NAMESPACE` | Namespace holding the release |
+| Variable | `OC_NAMESPACE` | Namespace holding the release |
 | Secret | `OC_TOKEN` | Can read deployments, services, endpoints, configmaps and networkpolicies |
-| Secret | `GWA_CLIENT_ID_<ENV>`, `GWA_CLIENT_SECRET_<ENV>` | Service account with `GatewayConfig.Publish` on that environment's gateway |
+| Secret | `GWA_CLIENT_ID`, `GWA_CLIENT_SECRET` | Service account with `GatewayConfig.Publish` on the selected environment's gateway |
 | Variable | `OC_SERVER` | OpenShift API URL |
-| Variable | `APS_GATEWAY_ID` | Gateway ID on the selected APS instance |
+| Variable | `APS_HOST` | APS host, `api.gov.bc.ca` for Gold |
+| Variable | `APS_GATEWAY_HOST_PREFIX` | PR or Dev host prefix (`soba-pr` or `soba-dev`) |
+| Variable | `APS_GATEWAY_ID` | Gateway ID on the selected Gold APS instance |
 | Variable | `GWA_LINUX_AMD64_SHA256` | SHA256 of `gwa_Linux_x86_64.tgz` from the [gwa-cli v3.2.0](https://github.com/bcgov/gwa-cli/releases/tag/v3.2.0) `checksums.txt` |
-
-`<ENV>` is the uppercase GitHub environment name.
 
 | Environment | Gateway | APS instance |
 | --- | --- | --- |
-| `pr` | `chefs-pr` (`gw-e1890`) | test |
-| `dev` | `chefs-dev` (`gw-e86a9`) | test |
-| `test` | `chefs-test` (`gw-68f56`) | test |
-| `prod` | not configured | prod |
+| `pr` | `gw-d3969` | Gold |
+| `dev` | `gw-93f93` | Gold |
+| `test` | Gold configuration planned separately | Not yet configured |
+| `prod` | not configured | Not configured |
 
 ## Manual check
 
@@ -78,10 +78,11 @@ manually with the PR number. The NetworkPolicy is removed with the Helm release.
 Needs Node.js 20+ and no credentials.
 
 ```bash
-export GATEWAY_ID=gw-e1890
+export GATEWAY_ID=gw-d3969
 export GATEWAY_QUALIFIER=proxy-proof-soba-pr-173
 export GATEWAY_SERVICE_NAME=soba-proxy-proof-soba-pr-173
-export GATEWAY_HOSTNAME=soba-pr-173.api.gov.bc.ca
+export GATEWAY_HOSTNAME=soba-pr.api.gov.bc.ca
+export GATEWAY_ROUTE_PATH=/pr/173/
 export BACKEND_HOST=soba-pr-173-backend.your-namespace.svc
 node deployments/gateway/scripts/generate-gateway-config.mjs
 ```
