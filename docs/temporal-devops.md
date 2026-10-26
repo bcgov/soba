@@ -85,7 +85,7 @@ Why this was done:
 
 What the dedicated worker image does:
 
-- Uses `node:lts-slim`
+- Uses `node:24-slim`
 - Installs backend dependencies
 - Builds the backend TypeScript output
 - Starts `backend/dist/temporal-worker.js`

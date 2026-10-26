@@ -355,7 +355,7 @@ database:
   host: ""
   port: "5432"
   user: postgres
-  password: ""
+  # password: unset generates one in the db secret
   name: soba
   adminDatabase: postgres
   poolMax: "10"
@@ -378,7 +378,7 @@ formio:
     # Pull official images through Google's Docker Hub mirror to avoid the anonymous pull-rate
     # limit on the cluster (same image, matching digest).
     repository: mirror.gcr.io/formio/formio
-    tag: 4.6.0
+    tag: 4.11.0
     pullPolicy: IfNotPresent
   replicas: 1
   resources:
@@ -399,7 +399,7 @@ formio:
     timeoutSeconds: 5
   admin:
     email: formio@soba.gov.bc.ca
-    password: ""
+    # password: unset generates one in the formio secret
   jwtSecret: ""
 
 # -- MongoDB (backing store for Form.io) -----------------------------------
