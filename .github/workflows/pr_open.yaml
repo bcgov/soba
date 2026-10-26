@@ -282,7 +282,6 @@ jobs:
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
           FRONTEND_HOST: ${{ needs.set-vars.outputs.FRONTEND_HOST }}
           APS_PR_ENABLED: ${{ vars.APS_PR_ENABLED == 'true' }}
-          APS_NAMESPACE_LABEL: ${{ vars.APS_NAMESPACE_LABEL }}
           VAULT_AUTH_PATH: ${{ vars.VAULT_AUTH_PATH }}
           VAULT_NAMESPACE: ${{ vars.VAULT_NAMESPACE }}
           VAULT_ROLE: ${{ vars.VAULT_ROLE_NONPROD }}
@@ -351,7 +350,6 @@ jobs:
             prefix: "soba-pr-${PR_NUM}:"
           gatewayNetworkPolicy:
             enabled: ${APS_PR_ENABLED}
-            namespaceName: "${APS_NAMESPACE_LABEL}"
 
           OVERRIDE
 

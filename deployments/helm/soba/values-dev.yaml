@@ -102,8 +102,10 @@ temporalWorkers:
         cpu: 100m
         memory: 512Mi
 
+gatewayNetworkPolicy:
+  enabled: true
+  namespaceName: "b8840c"
+  environment: prod
+
 vault:
   enabled: true
-  role: acf456-nonprod
-  secretPath: acf456-nonprod/soba-dev
-  serviceAccountName: acf456-vault

@@ -62,7 +62,6 @@ backend:
   autoscaling:
     enabled: false
 
-# Gold PR trial. The workflow supplies Vault connection settings.
 gatewayNetworkPolicy:
   namespaceName: "b8840c"
   environment: prod

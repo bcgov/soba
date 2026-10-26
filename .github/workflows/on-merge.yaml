@@ -179,7 +179,6 @@ jobs:
           TAG: sha-${{ needs.build.outputs.short_sha }}
           SHORT_SHA: ${{ needs.build.outputs.short_sha }}
           DOMAIN: ${{ vars.OC_DOMAIN }}
-          APS_NAMESPACE_LABEL: ${{ vars.APS_NAMESPACE_LABEL }}
           VAULT_AUTH_PATH: ${{ vars.VAULT_AUTH_PATH }}
           VAULT_NAMESPACE: ${{ vars.VAULT_NAMESPACE }}
           VAULT_ROLE: ${{ vars.VAULT_ROLE_NONPROD }}
@@ -229,8 +228,6 @@ jobs:
           temporal:
             address: "temporal-frontend.${NAMESPACE}.svc.cluster.local:7233"
             namespace: "soba-dev"
-          gatewayNetworkPolicy:
-            namespaceName: "${APS_NAMESPACE_LABEL}"
           OVERRIDE
 
           # Pipeline performance fix: Revert if needed.
@@ -239,7 +236,7 @@ jobs:
             --wait \
             --wait-for-jobs \
             --timeout 660s \
-            -f deployments/helm/soba/values-dev-gold.yaml \
+            -f deployments/helm/soba/values-dev.yaml \
             -f /tmp/values-override.yaml \
             --set-string "vault.authPath=${VAULT_AUTH_PATH}" \
             --set-string "vault.namespace=${VAULT_NAMESPACE}" \
