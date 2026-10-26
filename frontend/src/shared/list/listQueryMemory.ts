@@ -123,6 +123,13 @@ export const DOCGEN_AUDITS_LIST_QUERY: ListQuerySpec = {
   defaultSort: 'createdAt:desc',
 };
 
+export const WORKSPACE_GROUPS_LIST_QUERY: ListQuerySpec = {
+  resource: 'workspaceGroups',
+  filters: [],
+  sortOptions: ['name:asc', 'name:desc'],
+  defaultSort: 'name:asc',
+};
+
 const KEY_PREFIX = 'soba.listQuery.';
 const keyFor = (spec: ListQuerySpec) => `${KEY_PREFIX}${spec.resource}`;
 
@@ -134,7 +141,8 @@ const keyFor = (spec: ListQuerySpec) => `${KEY_PREFIX}${spec.resource}`;
 export const NAV_MARKER = 'from';
 const NAV_MARKER_VALUE = 'nav';
 
-export const navLink = (href: string) => `${href}?${NAV_MARKER}=${NAV_MARKER_VALUE}`;
+export const navLink = (href: string) =>
+  `${href}${href.includes('?') ? '&' : '?'}${NAV_MARKER}=${NAV_MARKER_VALUE}`;
 
 /**
  * A link to a list with its query already set. The names come from the spec, so a caller cannot

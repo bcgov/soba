@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, useMemo, type Key } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { navLink } from '@/src/shared/list/listQueryMemory';
 import { Tabs, Tab } from 'react-bootstrap';
 import {
@@ -26,6 +26,7 @@ import { isWorkspaceManageRole } from '../workspaceRoles';
 import WorkspaceFormSettings from '@/src/features/form-settings/ui/WorkspaceFormSettings';
 import type { UpdateWorkspaceBody, WorkspaceItem } from '@/src/types/workspaces';
 import styles from './WorkspaceForm.module.css';
+import WorkspaceGroupTab from './WorkspaceGroupTab';
 
 /** Only the fields that differ from what the form was seeded with. */
 function changedFields(
@@ -224,13 +225,24 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
   const dictWorkspaces = dict.workspaces;
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const locale = getLocaleFromPath(pathname);
   const { authenticated, initializing } = useKeycloak();
   const { addNotification } = useNotificationStore();
   const { data: currentUser, loaded: currentUserLoaded } = useCurrentUser();
   const { workspace, isLoading } = useWorkspace(workspaceId);
 
-  const [activeTab, setActiveTab] = useState('settings');
+  const tabParam = searchParams.get('tab');
+  const validTabs = useMemo(() => ['settings', 'form-settings', 'groups'], []);
+  const currentTabFromUrl = tabParam && validTabs.includes(tabParam) ? tabParam : 'settings';
+
+  const [activeTab, setActiveTab] = useState(currentTabFromUrl);
+  const [prevTabParam, setPrevTabParam] = useState(tabParam);
+
+  if (tabParam !== prevTabParam) {
+    setPrevTabParam(tabParam);
+    setActiveTab(currentTabFromUrl);
+  }
 
   useEffect(() => {
     if (!authenticated || initializing || !currentUserLoaded) {
@@ -303,7 +315,24 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
     <Tabs
       id="workspace-manage-tabs"
       activeKey={activeTab}
-      onSelect={(k) => setActiveTab(k || 'settings')}
+      onSelect={(k) => {
+        const nextTab = k || 'settings';
+        setActiveTab(nextTab);
+        setPrevTabParam(nextTab === 'settings' ? null : nextTab);
+        if (workspace?.id) {
+          const params = new URLSearchParams(window.location.search);
+          if (nextTab === 'settings') {
+            params.delete('tab');
+          } else {
+            params.set('tab', nextTab);
+          }
+          const qs = params.toString();
+          const targetUrl = qs
+            ? `/${locale}/workspace/${workspace.id}?${qs}`
+            : `/${locale}/workspace/${workspace.id}`;
+          window.history.replaceState(null, '', targetUrl);
+        }
+      }}
       className="mb-3"
       mountOnEnter
     >
@@ -319,6 +348,15 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
       >
         <div className={styles.tabContent}>
           <WorkspaceFormSettings key={workspace.id} dict={dict} workspaceId={workspace.id} />
+        </div>
+      </Tab>
+      <Tab
+        eventKey="groups"
+        title={dictWorkspaces.groupsTab}
+        tabAttrs={{ 'data-testid': 'workspace-groups-tab' }}
+      >
+        <div className={styles.tabContent}>
+          <WorkspaceGroupTab dict={dict} workspaceId={workspace.id} formId={workspace.id} opened={true} />
         </div>
       </Tab>
     </Tabs>

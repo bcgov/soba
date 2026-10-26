@@ -12,12 +12,14 @@ const {
   mockSelectWorkspace,
   mockRefreshWorkspaces,
   mockRefreshCurrentUser,
+  mockSearchParams,
 } = vi.hoisted(() => ({
   mockCreateWorkspace: vi.fn(),
   mockUpdateWorkspace: vi.fn(),
   mockSelectWorkspace: vi.fn(),
   mockRefreshWorkspaces: vi.fn().mockResolvedValue([]),
   mockRefreshCurrentUser: vi.fn().mockResolvedValue(undefined),
+  mockSearchParams: { value: '' },
 }));
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
@@ -42,6 +44,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
       manageHeading: 'Manage Workspace',
       settingsTab: 'Settings',
       formSettingsTab: 'Form Settings',
+      groupsTab: 'Groups',
       nameLabel: 'Name',
       save: 'Save',
       create: 'Create',
@@ -95,8 +98,17 @@ vi.mock('@bcgov/design-system-react-components', async (importOriginal) => {
 });
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, replace: vi.fn() }),
   usePathname: () => '/en/workspace',
+  useSearchParams: () => new URLSearchParams(mockSearchParams.value),
+}));
+
+vi.mock('@/src/features/workspaces/ui/WorkspaceGroupTab', () => ({
+  default: () => <div data-testid="workspace-groups-tab-content">Workspace Groups Content</div>,
+}));
+
+vi.mock('@/src/features/form-settings/ui/WorkspaceFormSettings', () => ({
+  default: () => <div data-testid="workspace-form-settings-tab-content">Workspace Form Settings</div>,
 }));
 
 vi.mock('@/src/shared/api/useWorkspaces', async (importOriginal) => ({
@@ -143,6 +155,7 @@ function renderForm(workspaceId?: string) {
 describe('WorkspaceForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSearchParams.value = '';
     store = makeStore();
     store.dispatch(setToken('token'));
     store.dispatch(setAuthenticated(true));
@@ -368,5 +381,27 @@ describe('WorkspaceForm', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(mockRefreshCurrentUser).toHaveBeenCalled());
+  });
+
+  it('switches to the groups tab when clicked without kicking back to settings', async () => {
+    await act(async () => {
+      renderForm('ws2');
+    });
+    expect(await screen.findByDisplayValue('Team Workspace')).toBeInTheDocument();
+
+    const groupsTabButton = screen.getByRole('tab', { name: 'Groups' });
+    expect(groupsTabButton).toBeInTheDocument();
+
+    await userEvent.click(groupsTabButton);
+    expect(await screen.findByTestId('workspace-groups-tab-content')).toBeInTheDocument();
+  });
+
+  it('initializes to the groups tab if tab=groups is present in the URL query', async () => {
+    mockSearchParams.value = 'tab=groups';
+    await act(async () => {
+      renderForm('ws2');
+    });
+
+    expect(await screen.findByTestId('workspace-groups-tab-content')).toBeInTheDocument();
   });
 });
