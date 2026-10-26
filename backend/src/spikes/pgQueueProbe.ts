@@ -21,17 +21,17 @@ const QUEUE_CLAIM = 'probe-claim';
 const QUEUE_EXPIRE = 'probe-expire';
 const QUEUE_CANCEL = 'probe-cancel';
 const QUEUE_CANCEL_HEARTBEAT = 'probe-cancel-heartbeat';
-const CHILD_URL_ENV = 'PG_QUEUE_PROBE_URL';
+const URL_ENV = 'QUEUE_PROBE_URL';
 const WAIT_MS = 20_000;
 
 const USAGE = `Job queue probe: pg-boss and a hand-built claim against one Postgres URL.
 
 Usage, from backend/:
-  pnpm exec tsx src/spikes/pgQueueProbe.ts [--url <postgres-url>]
-  node dist/src/spikes/pgQueueProbe.js [--url <postgres-url>]
+  pnpm exec tsx src/spikes/pgQueueProbe.ts
+  node dist/src/spikes/pgQueueProbe.js
 
-Defaults to DATABASE_URL. Drops and recreates the ${SCHEMA} schema, and drops it at the end.
-Exit code 1 when any check fails.`;
+Connects to ${URL_ENV}, or DATABASE_URL when it is unset. Drops and recreates the ${SCHEMA}
+schema, and drops it at the end. Exit code 1 when any check fails.`;
 
 const CLAIM_SQL = `
 update queue_probe.hb_job
@@ -246,7 +246,7 @@ async function firstJsonLine(input: Readable): Promise<string> {
 
 async function claimInChild(url: string): Promise<JobAttempt> {
   const child = spawn(process.execPath, [...process.execArgv, process.argv[1], '--claim'], {
-    env: { ...process.env, [CHILD_URL_ENV]: url },
+    env: { ...process.env, [URL_ENV]: url },
     stdio: ['ignore', 'pipe', 'inherit'],
   });
   try {
@@ -417,7 +417,6 @@ async function claimAndHold(url: string): Promise<void> {
 
 const { values } = parseArgs({
   options: {
-    url: { type: 'string' },
     claim: { type: 'boolean', default: false },
     help: { type: 'boolean', default: false },
   },
@@ -428,8 +427,8 @@ function main(): Promise<void> {
     console.log(USAGE);
     return Promise.resolve();
   }
-  if (values.claim) return claimAndHold(process.env[CHILD_URL_ENV] ?? '');
-  return probe(values.url ?? env.getDatabaseUrl());
+  const url = env.getOptionalEnv(URL_ENV) ?? env.getDatabaseUrl();
+  return values.claim ? claimAndHold(url) : probe(url);
 }
 
 main().catch((error: unknown) => {
