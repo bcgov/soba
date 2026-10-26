@@ -98,7 +98,6 @@ formio:
     timeoutSeconds: 10
   livenessProbe:
     initialDelaySeconds: 60
-  nodeOptions: "--max-old-space-size=384"
   resources:
     requests:
       cpu: 25m

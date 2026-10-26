@@ -384,8 +384,6 @@ formio:
     tag: 4.6.0
     pullPolicy: IfNotPresent
   replicas: 1
-  # Node.js options for Form.io; the heap must stay below resources.limits.memory.
-  nodeOptions: "--max-old-space-size=8192"
   resources:
     requests:
       cpu: 50m

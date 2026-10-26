@@ -52,7 +52,6 @@ formio:
   internal:
     enabled: true
   replicas: 2
-  nodeOptions: "--max-old-space-size=384"
   resources:
     requests:
       cpu: 100m
