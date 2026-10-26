@@ -95,12 +95,12 @@ jobs:
       - name: Remove only this PR configuration
         shell: bash
         env:
-          GWA_CLIENT_ID: ${{ secrets.GWA_CLIENT_ID_PR }}
-          GWA_CLIENT_SECRET: ${{ secrets.GWA_CLIENT_SECRET_PR }}
+          GWA_CLIENT_ID: ${{ secrets.GWA_CLIENT_ID }}
+          GWA_CLIENT_SECRET: ${{ secrets.GWA_CLIENT_SECRET }}
         run: |
           set -euo pipefail
-          : "${GWA_CLIENT_ID:?Missing GWA_CLIENT_ID_PR}"
-          : "${GWA_CLIENT_SECRET:?Missing GWA_CLIENT_SECRET_PR}"
+          : "${GWA_CLIENT_ID:?Missing GWA_CLIENT_ID}"
+          : "${GWA_CLIENT_SECRET:?Missing GWA_CLIENT_SECRET}"
           gwa config set host "$APS_HOST"
           gwa config set gateway "$GATEWAY_ID"
           gwa login --client-id "$GWA_CLIENT_ID" --client-secret "$GWA_CLIENT_SECRET"

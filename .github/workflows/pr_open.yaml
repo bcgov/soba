@@ -285,7 +285,7 @@ jobs:
           APS_NAMESPACE_LABEL: ${{ vars.APS_NAMESPACE_LABEL }}
           VAULT_AUTH_PATH: ${{ vars.VAULT_AUTH_PATH }}
           VAULT_NAMESPACE: ${{ vars.VAULT_NAMESPACE }}
-          VAULT_ROLE: ${{ vars.VAULT_ROLE }}
+          VAULT_ROLE: ${{ vars.VAULT_ROLE_NONPROD }}
           VAULT_SECRET_PATH: ${{ vars.VAULT_SECRET_PATH }}
           VAULT_SERVICE_ACCOUNT_NAME: ${{ vars.VAULT_SERVICE_ACCOUNT_NAME }}
         run: |

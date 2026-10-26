@@ -11,7 +11,7 @@ on:
         required: true
         type: string
       gateway_hostname:
-        description: Optional route hostname; PR defaults to APS_GATEWAY_ROUTE_HOST_PR
+        description: Optional route hostname; PR and Dev use APS_GATEWAY_HOST_PREFIX with APS_HOST
         default: ""
         type: string
   workflow_dispatch:
@@ -50,8 +50,7 @@ jobs:
       APS_HOST: ${{ vars.APS_HOST }}
       GATEWAY_ID: ${{ case(inputs.environment == 'pr', vars.APS_GATEWAY_ID, inputs.environment == 'dev', vars.APS_GATEWAY_ID, '') }}
       GATEWAY_HOSTNAME: ${{ inputs.gateway_hostname }}
-      APS_GATEWAY_ROUTE_HOST_PR: ${{ vars.APS_GATEWAY_ROUTE_HOST_PR }}
-      APS_GATEWAY_ROUTE_HOST_DEV: ${{ vars.APS_GATEWAY_ROUTE_HOST_DEV }}
+      APS_GATEWAY_HOST_PREFIX: ${{ vars.APS_GATEWAY_HOST_PREFIX }}
       GATEWAY_QUALIFIER: proxy-proof-${{ inputs.release }}
       GWA_SHA256: ${{ vars.GWA_LINUX_AMD64_SHA256 }}
     steps:
@@ -88,9 +87,9 @@ jobs:
               exit 1
             fi
             if [[ "$APP_ENVIRONMENT" == pr ]]; then
-              export GATEWAY_HOSTNAME="${APS_GATEWAY_ROUTE_HOST_PR:?Set APS_GATEWAY_ROUTE_HOST_PR in the pr environment.}"
+              export GATEWAY_HOSTNAME="${APS_GATEWAY_HOST_PREFIX:?Set APS_GATEWAY_HOST_PREFIX in the pr environment.}.${APS_HOST}"
             elif [[ "$APP_ENVIRONMENT" == dev ]]; then
-              export GATEWAY_HOSTNAME="${APS_GATEWAY_ROUTE_HOST_DEV:?Set APS_GATEWAY_ROUTE_HOST_DEV in the dev environment.}"
+              export GATEWAY_HOSTNAME="${APS_GATEWAY_HOST_PREFIX:?Set APS_GATEWAY_HOST_PREFIX in the dev environment.}.${APS_HOST}"
             else
               export GATEWAY_HOSTNAME="${RELEASE}.api.gov.bc.ca"
             fi
@@ -168,13 +167,13 @@ jobs:
         shell: bash
         env:
           GWA_CLIENT_ID: >-
-            ${{ case(inputs.environment == 'pr', secrets.GWA_CLIENT_ID_PR,
-                inputs.environment == 'dev', secrets.GWA_CLIENT_ID_DEV,
+            ${{ case(inputs.environment == 'pr', secrets.GWA_CLIENT_ID,
+                inputs.environment == 'dev', secrets.GWA_CLIENT_ID,
                 inputs.environment == 'test', secrets.GWA_CLIENT_ID_TEST,
                 inputs.environment == 'prod', secrets.GWA_CLIENT_ID_PROD, '') }}
           GWA_CLIENT_SECRET: >-
-            ${{ case(inputs.environment == 'pr', secrets.GWA_CLIENT_SECRET_PR,
-                inputs.environment == 'dev', secrets.GWA_CLIENT_SECRET_DEV,
+            ${{ case(inputs.environment == 'pr', secrets.GWA_CLIENT_SECRET,
+                inputs.environment == 'dev', secrets.GWA_CLIENT_SECRET,
                 inputs.environment == 'test', secrets.GWA_CLIENT_SECRET_TEST,
                 inputs.environment == 'prod', secrets.GWA_CLIENT_SECRET_PROD, '') }}
         run: |
