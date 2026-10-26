@@ -388,11 +388,11 @@ formio:
   nodeOptions: "--max-old-space-size=8192"
   resources:
     requests:
-      cpu: "1"
-      memory: 3Gi
+      cpu: 50m
+      memory: 256Mi
     limits:
-      cpu: "2"
-      memory: 10Gi
+      cpu: 250m
+      memory: 512Mi
   service:
     port: 3001
   livenessProbe:

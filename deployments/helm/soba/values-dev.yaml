@@ -68,10 +68,10 @@ formio:
   resources:
     requests:
       cpu: 50m
-      memory: 256Mi
+      memory: 192Mi
     limits:
-      cpu: 500m
-      memory: 1Gi
+      cpu: 250m
+      memory: 512Mi
 
 mongodb:
   # MongoDB runs as its own release from deployments/helm/action-mongodb. The deploy
