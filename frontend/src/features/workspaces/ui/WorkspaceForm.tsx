@@ -234,15 +234,9 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
 
   const tabParam = searchParams.get('tab');
   const validTabs = useMemo(() => ['settings', 'form-settings', 'groups'], []);
-  const currentTabFromUrl = tabParam && validTabs.includes(tabParam) ? tabParam : 'settings';
-
-  const [activeTab, setActiveTab] = useState(currentTabFromUrl);
-  const [prevTabParam, setPrevTabParam] = useState(tabParam);
-
-  if (tabParam !== prevTabParam) {
-    setPrevTabParam(tabParam);
-    setActiveTab(currentTabFromUrl);
-  }
+  const [selectedTab, setSelectedTab] = useState<string | null>(null);
+  const activeTab =
+    selectedTab ?? (tabParam && validTabs.includes(tabParam) ? tabParam : 'settings');
 
   useEffect(() => {
     if (!authenticated || initializing || !currentUserLoaded) {
@@ -317,8 +311,7 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
       activeKey={activeTab}
       onSelect={(k) => {
         const nextTab = k || 'settings';
-        setActiveTab(nextTab);
-        setPrevTabParam(nextTab === 'settings' ? null : nextTab);
+        setSelectedTab(nextTab);
         if (workspace?.id) {
           const params = new URLSearchParams(window.location.search);
           if (nextTab === 'settings') {

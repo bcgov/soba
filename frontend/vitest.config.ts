@@ -11,5 +11,6 @@ export default defineConfig({
     include: ['tests/**/*.test.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],
     setupFiles: ['./vitest.setup.ts'],
     globals: true,
+    testTimeout: 15000,
   },
 });

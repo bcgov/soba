@@ -84,69 +84,80 @@ vi.mock('@/src/features/workspaces/data/workspaceGroupsApi', () => ({
   }),
 }));
 
-const mockDict = {
-  general: {
-    loading: 'Loading…',
-    cancel: 'Cancel',
-    sortBy: 'Sort by',
-  },
-  modal: {
-    dialogActions: 'Dialog actions',
-  },
-  dataTable: {
-    emptyMessage: 'No items found.',
-    loadingMessage: 'Loading...',
-    itemName: 'items',
-    itemsPerPage: 'Items per page',
-    itemsPerPageAria: 'Items per page',
-    pageAria: 'Page',
-    of: 'of',
-    pageOf: 'of {totalPages}',
-    previousPage: 'Previous page',
-    nextPage: 'Next page',
-  },
-  searchField: {
-    search: 'Search',
-    clearSearch: 'Clear search',
-    submitSearch: 'Submit search',
-  },
-  workspaces: {
-    groupsTab: 'Groups',
-    groups: {
-      addGroup: 'Add Group',
-      editGroup: 'Edit Group',
-      deleteGroup: 'Remove Group',
-      name: 'Group Name',
-      namePlaceholder: 'e.g., Form Reviewers',
-      description: 'Description',
-      descriptionPlaceholder: 'Optional description of what this group does',
-      roles: 'Roles',
-      rolesHelp: 'Roles granted to all members of this group across all forms in the workspace.',
-      noRolesSelected: 'No roles selected',
-      selectedCount: '{count} selected',
-      systemGroup: 'System Group',
-      customGroup: 'Custom Group',
-      systemGroupTooltip: 'System groups are protected and cannot be deleted.',
-      deleteConfirmTitle: 'Remove Group',
-      deleteConfirmMessage: 'Are you sure you want to remove group "{name}"?',
-      deleteSuccess: 'Group removed successfully.',
-      deleteError: 'Failed to remove group.',
-      loadError: 'Failed to load workspace groups.',
-      empty: 'No groups found in this workspace.',
-      columns: {
-        name: 'Name',
+const { mockDict } = vi.hoisted(() => {
+  const dict = {
+    locale: 'en',
+    general: {
+      loading: 'Loading…',
+      cancel: 'Cancel',
+      sortBy: 'Sort by',
+      sessionExpired: 'Your session has expired. Please log in again.',
+      noAccess: 'You do not have access to this resource.',
+    },
+    modal: {
+      dialogActions: 'Dialog actions',
+    },
+    dataTable: {
+      emptyMessage: 'No items found.',
+      loadingMessage: 'Loading...',
+      itemName: 'items',
+      itemsPerPage: 'Items per page',
+      itemsPerPageAria: 'Items per page',
+      pageAria: 'Page',
+      of: 'of',
+      pageOf: 'of {totalPages}',
+      previousPage: 'Previous page',
+      nextPage: 'Next page',
+    },
+    searchField: {
+      search: 'Search',
+      clearSearch: 'Clear search',
+      submitSearch: 'Submit search',
+    },
+    workspaces: {
+      groupsTab: 'Groups',
+      groups: {
+        addGroup: 'Add Group',
+        editGroup: 'Edit Group',
+        deleteGroup: 'Remove Group',
+        name: 'Group Name',
+        namePlaceholder: 'e.g., Form Reviewers',
         description: 'Description',
+        descriptionPlaceholder: 'Optional description of what this group does',
         roles: 'Roles',
-        actions: 'Actions',
-      },
-      roleNames: {
-        form_admin: 'Form Administrator',
-        submission_reviewer: 'Submission Reviewer',
-        form_designer: 'Form Designer',
+        rolesHelp: 'Roles granted to all members of this group across all forms in the workspace.',
+        noRolesSelected: 'No roles selected',
+        selectedCount: '{count} selected',
+        systemGroup: 'System Group',
+        customGroup: 'Custom Group',
+        systemGroupTooltip: 'System groups are protected and cannot be deleted.',
+        deleteConfirmTitle: 'Remove Group',
+        deleteConfirmMessage: 'Are you sure you want to remove group "{name}"?',
+        deleteSuccess: 'Group removed successfully.',
+        deleteError: 'Failed to remove group.',
+        loadError: 'Failed to load workspace groups.',
+        empty: 'No groups found in this workspace.',
+        columns: {
+          name: 'Name',
+          description: 'Description',
+          roles: 'Roles',
+          actions: 'Actions',
+        },
+        roleNames: {
+          form_admin: 'Form Administrator',
+          submission_reviewer: 'Submission Reviewer',
+          form_designer: 'Form Designer',
+        },
       },
     },
-  },
-} as unknown as Dictionary;
+  } as unknown as Dictionary;
+
+  return { mockDict: dict };
+});
+
+vi.mock('@/app/[lang]/Providers', () => ({
+  useDictionary: () => mockDict,
+}));
 
 describe('WorkspaceGroupTab', () => {
   beforeEach(() => {
@@ -167,7 +178,7 @@ describe('WorkspaceGroupTab', () => {
     render(<WorkspaceGroupTab dict={mockDict} workspaceId="ws-1" />);
 
     expect(screen.getByTestId('create-ws-group-button')).toBeInTheDocument();
-    expect(screen.getByTestId('forms-search-field')).toBeInTheDocument();
+    expect(screen.getByTestId('search-ws-groups-text')).toBeInTheDocument();
 
     // Group rows
     expect(screen.getByText('Form administrators')).toBeInTheDocument();
@@ -192,7 +203,9 @@ describe('WorkspaceGroupTab', () => {
 
     render(<WorkspaceGroupTab dict={mockDict} workspaceId="ws-1" />);
 
-    const searchInput = screen.getByTestId('forms-search-field');
+    const searchInput = screen
+      .getByTestId('search-ws-groups-text')
+      .querySelector('input') as HTMLInputElement;
     expect(searchInput).toBeInTheDocument();
 
     await user.type(searchInput, 'Reviewers{enter}');

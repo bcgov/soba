@@ -105,6 +105,9 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/src/features/workspaces/ui/WorkspaceGroupTab', () => ({
   default: () => <div data-testid="workspace-groups-tab-content">Workspace Groups Content</div>,
+  WorkspaceGroupTab: () => (
+    <div data-testid="workspace-groups-tab-content">Workspace Groups Content</div>
+  ),
 }));
 
 vi.mock('@/src/features/form-settings/ui/WorkspaceFormSettings', () => ({

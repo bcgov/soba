@@ -11,7 +11,7 @@ import { Tag } from '@/src/components/Tag';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
-import { navLink, WORKSPACE_GROUPS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
+import { WORKSPACE_GROUPS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { useListQuery } from '@/src/shared/list/useListQuery';
 import { useDataTable } from '@/src/shared/list/useDataTable';
 import { ListPageSearchField } from '@/src/components/ListPageSearchField';
@@ -58,13 +58,13 @@ export function WorkspaceGroupTab({ dict, workspaceId, formId }: Readonly<Worksp
 
   const handleOpenAdd = useCallback(() => {
     if (!actualWorkspaceId) return;
-    router.push(navLink(`/${locale}/workspace/${actualWorkspaceId}/group`));
+    router.push(`/${locale}/workspace/${actualWorkspaceId}/group`);
   }, [actualWorkspaceId, router, locale]);
 
   const handleOpenEdit = useCallback(
     (group: WorkspaceGroup) => {
       if (!actualWorkspaceId) return;
-      router.push(navLink(`/${locale}/workspace/${actualWorkspaceId}/group/${group.id}`));
+      router.push(`/${locale}/workspace/${actualWorkspaceId}/group/${group.id}`);
     },
     [actualWorkspaceId, router, locale],
   );
@@ -173,7 +173,7 @@ export function WorkspaceGroupTab({ dict, workspaceId, formId }: Readonly<Worksp
           value={searchInput}
           onChange={setSearchInput}
           onSubmit={commitSearch}
-          testIdPrefix="forms"
+          testIdPrefix="ws-groups"
         />
         <Button
           variant="primary"
