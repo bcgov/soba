@@ -15,7 +15,6 @@ on:
     types: [opened, reopened, synchronize]
     branches:
       - develop
-      - develop-test-gold 
   # Manual trigger: build & deploy a specific PR on demand. Provide just the PR number
   # (e.g. 42). A manual run force-deploys, bypassing the changed-paths gate below.
   workflow_dispatch:

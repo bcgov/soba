@@ -1,4 +1,4 @@
-# Triggers when a PR is merged to the develop-test-gold branch.
+# Triggers on pushes to the develop branch.
 name: On Merge
 run-name: Deploy to Dev
 
@@ -7,7 +7,7 @@ env:
 
 on:
   push:
-    branches: [develop-test-gold]
+    branches: [develop]
     paths:
       - "backend/**"
       - "frontend/**"
@@ -34,9 +34,9 @@ jobs:
     name: Build & Push
     uses: ./.github/workflows/build-images.yaml
     with:
-      ref: develop-test-gold
+      ref: develop
       platforms: amd64
-      image_version: develop-test-gold
+      image_version: develop
     secrets: inherit
     permissions:
       contents: read
@@ -264,7 +264,7 @@ jobs:
     uses: ./.github/workflows/playwright.yaml
     with:
       DEP_ENV: dev
-      pr_branch: develop-test-gold
+      pr_branch: develop
       BASE_URL: https://soba-dev.${{ vars.OC_DOMAIN }}/designer/en
     secrets:
       keycloakUsername: ${{ secrets.keycloakUsername }}
