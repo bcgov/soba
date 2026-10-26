@@ -12,6 +12,7 @@ import { db, type DbOrTx } from '../../core/db/client';
 import {
   appUsers,
   documentGenerationAudits,
+  submissionExports,
   documentTemplates,
   enterpriseGroupBindings,
   enterpriseMembershipBindings,
@@ -262,6 +263,7 @@ async function purgeUserScoped(tx: DbOrTx, userIds: string[], record: RecordFn):
 export const WORKSPACE_SCOPED_TABLES: readonly string[] = [
   'document_generation_audit',
   'notification_audit',
+  'submission_export',
   'submission_revision',
   'submission_participant',
   'submission_file',
@@ -332,6 +334,10 @@ async function purgeWorkspaceScoped(
   await record(
     'notification_audit',
     tx.delete(notificationAudits).where(inArray(notificationAudits.workspaceId, ids)),
+  );
+  await record(
+    'submission_export',
+    tx.delete(submissionExports).where(inArray(submissionExports.workspaceId, ids)),
   );
   // submission.head_revision_id references the revisions, so the pointer is cleared first.
   await tx

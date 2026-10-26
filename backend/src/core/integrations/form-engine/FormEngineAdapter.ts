@@ -62,6 +62,11 @@ export interface FormEngineAdapter {
     engineFormRef: string,
     engineRef: string,
   ): Promise<Record<string, unknown> | null>;
+  /** readSubmission for many refs of one form, keyed by ref; missing refs are left out. */
+  readSubmissions?(
+    engineFormRef: string,
+    engineRefs: string[],
+  ): Promise<Map<string, Record<string, unknown>>>;
   /** Delete a submission document by form ref + submission ref (compensation / cleanup). */
   deleteSubmission?(engineFormRef: string, engineRef: string): Promise<void>;
   /**

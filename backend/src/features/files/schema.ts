@@ -26,6 +26,9 @@ export const FileUploadResponseSchema = z
 
 const FileGetParamsSchema = z.object({ id: z.string().min(1) }).openapi('Files_GetParams');
 const FileDeleteParamsSchema = z.object({ id: z.string().min(1) }).openapi('Files_DeleteParams');
+export const SubmissionFileParamsSchema = z
+  .object({ id: z.uuid(), fileId: z.uuid() })
+  .openapi('Files_SubmissionFileParams');
 
 function registerFilesPaths(
   registry: OpenAPIRegistry,
@@ -119,4 +122,20 @@ function registerFilesPaths(
 export function registerFilesOpenApi(registry: OpenAPIRegistry) {
   registerFilesPaths(registry, { basePath: FILES_PATH, deprecated: false });
   registerFilesPaths(registry, { basePath: SUBMIT_FILES_PATH, deprecated: true });
+  registry.registerPath({
+    method: 'get',
+    path: '/design/submissions/{id}/files/{fileId}',
+    tags: ['feature.files'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Staff download of a file attached to the submission (needs submission_read)',
+    request: { params: SubmissionFileParamsSchema },
+    responses: {
+      200: { description: 'File contents as an attachment (stream or redirect)', content: {} },
+      400: { description: 'Invalid submission or file id' },
+      401: { description: 'Authentication required' },
+      403: { description: 'Not a member of the workspace, or insufficient form permissions' },
+      404: { description: 'Submission, or file attached to it, not found' },
+      503: { description: 'File content unavailable' },
+    },
+  });
 }

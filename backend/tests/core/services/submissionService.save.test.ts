@@ -128,6 +128,17 @@ describe('SubmissionService save (versioned engine write)', () => {
     expect(getRecord).toHaveBeenCalledTimes(1);
   });
 
+  it("passes the submitter's IP and user agent to the revision write", async () => {
+    createAdapter.mockReturnValue({
+      createSubmission: jest.fn().mockResolvedValue({ engineRef: 'eng-new' }),
+    });
+    const client = { ip: '203.0.113.7', userAgent: 'Mozilla/5.0 (test)' };
+
+    await svc.submit({ ...input, client });
+
+    expect(appendRevision).toHaveBeenCalledWith(expect.objectContaining({ client }));
+  });
+
   it('writes a draft save without engine validation', async () => {
     const createSubmission = jest.fn().mockResolvedValue({ engineRef: 'eng-new' });
     createAdapter.mockReturnValue({ createSubmission });

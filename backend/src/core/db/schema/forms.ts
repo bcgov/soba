@@ -134,6 +134,9 @@ export const submissions = sobaSchema.table(
     currentRevisionNo: integer('current_revision_no').notNull().default(0),
     headRevisionId: uuid('head_revision_id').references((): AnyPgColumn => submissionRevisions.id),
     submittedAt: timestamp('submitted_at', { withTimezone: true }),
+    // Stamped on submit.
+    submittedIp: text('submitted_ip'),
+    submittedUserAgent: text('submitted_user_agent'),
     // 8 characters of Crockford base32, assigned at open; returned only once submitted.
     confirmationCode: text('confirmation_code').notNull(),
     ...auditColumns(),

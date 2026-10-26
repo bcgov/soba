@@ -126,6 +126,16 @@ export function stripEngineManagedFields(doc: Record<string, unknown>): Record<s
   return cleaned;
 }
 
+/** A submission without engine fields and SOBA `metadata`. */
+const answerDocument = (doc: Record<string, unknown>): Record<string, unknown> => {
+  const cleaned = stripEngineManagedFields(doc);
+  delete cleaned.metadata;
+  return cleaned;
+};
+
+/** Submissions read per Form.io list call. */
+const READ_BATCH_SIZE = 100;
+
 /**
  * Fields the renderer reads when filling: page or wizard display, form settings, the components
  * with their validation, the submit action, and the form properties (number separators, wizard
@@ -371,10 +381,31 @@ export class FormioEngineAdapter implements FormEngineAdapter {
       string,
       unknown
     > | null;
-    if (!doc) return null;
-    const cleaned = stripEngineManagedFields(doc);
-    delete cleaned.metadata;
-    return cleaned;
+    return doc ? answerDocument(doc) : null;
+  }
+
+  /** Many submissions of one form, in `_id__in` batches. */
+  async readSubmissions(
+    engineFormRef: string,
+    engineRefs: string[],
+  ): Promise<Map<string, Record<string, unknown>>> {
+    const client = await getAuthenticatedFormioClient(this.pluginConfig);
+    if (!client) {
+      throw new Error('Form.io admin client unavailable; cannot read submissions');
+    }
+    const batches: string[][] = [];
+    for (let start = 0; start < engineRefs.length; start += READ_BATCH_SIZE) {
+      batches.push(engineRefs.slice(start, start + READ_BATCH_SIZE));
+    }
+    const docs = await Promise.all(
+      batches.map(
+        (refs) =>
+          client.loadSubmissions(engineFormRef, {
+            params: { _id__in: refs.join(','), limit: refs.length },
+          }) as Promise<Array<Record<string, unknown>>>,
+      ),
+    );
+    return new Map(docs.flat().map((doc) => [String(doc._id), answerDocument(doc)]));
   }
 
   /** Delete a Form.io submission by form ref + submission ref (compensation / cleanup). */

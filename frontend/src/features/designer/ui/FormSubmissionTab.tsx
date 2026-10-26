@@ -1,7 +1,7 @@
 'use client';
 import { useMemo, useState, useCallback } from 'react';
 import { FaRegTrashCan, FaFile } from 'react-icons/fa6';
-import { Link } from '@bcgov/design-system-react-components';
+import { Button, Link } from '@bcgov/design-system-react-components';
 import { useRouter, usePathname } from 'next/navigation';
 
 import type { Dictionary } from '@/src/types/dictionary';
@@ -141,6 +141,17 @@ export default function FormSubmissionTab({
 
   return (
     <>
+      <div className="d-flex justify-content-end mb-2">
+        <Button
+          variant="secondary"
+          size="small"
+          isDisabled={!formId}
+          onPress={() => router.push(`/${locale}/build/${formId}/submissions/export`)}
+          data-testid="submissions-export-button"
+        >
+          {dict.submission.export.button}
+        </Button>
+      </div>
       <DataTable<SubmissionListItem>
         {...table}
         columns={columns}

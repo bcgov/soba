@@ -1,7 +1,7 @@
 // Design-mode API service: form authoring + submission management. All calls hit /design/* and
 // require a staff token. Submit-mode calls live in sobaApiSubmit.
 import { sobaFetch } from './sobaFetch';
-import { parseJson } from './sobaHelpers';
+import { parseBlob, parseJson } from './sobaHelpers';
 import { FormType } from '@formio/react';
 import type {
   SobaFormType,
@@ -17,6 +17,11 @@ import type {
 } from '../../types/forms';
 import type { ListSubmissionsResponse, SubmissionListItem } from '@/src/types/submissions';
 import type { SubmissionReview, UpdateSubmissionStatusBody } from '@/src/types/submissionReview';
+import type {
+  SubmissionExportBody,
+  SubmissionExportFieldsBody,
+  SubmissionExportFieldsResponse,
+} from '@/src/types/submissionExport';
 import { toListRequestQuery, type ListQueryArgs } from '@/src/types/list';
 import { sortLocaleHeaders } from './sortLocaleRequest';
 
@@ -236,4 +241,64 @@ export async function getFormVersionSchema(token: string, id: string): Promise<F
 export async function deleteSobaSubmission(token: string, id: string): Promise<void> {
   const response = await sobaFetch(`/design/submissions/${id}`, { token, method: 'DELETE' });
   if (!response.ok && response.status !== 404) await parseJson(response);
+}
+
+/** Export columns for the filters, and the caller's last export. */
+export async function getSobaExportFields(
+  token: string,
+  formId: string,
+  filters: SubmissionExportFieldsBody,
+): Promise<SubmissionExportFieldsResponse> {
+  const response = await sobaFetch(`/design/forms/${formId}/export/fields`, {
+    token,
+    method: 'POST',
+    json: filters,
+  });
+  return parseJson(response);
+}
+
+/** A downloaded file and the name the server gave it. */
+export interface DownloadedFile {
+  blob: Blob;
+  filename: string;
+}
+
+/** File name from Content-Disposition. */
+const dispositionFilename = (response: Response): string => {
+  const header = response.headers.get('Content-Disposition') ?? '';
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header)?.[1];
+  if (encoded) return decodeURIComponent(encoded);
+  return /filename="([^"]*)"/i.exec(header)?.[1] ?? 'download';
+};
+
+/** The file and its name; a refusal throws its ApiError. */
+const downloadedFile = async (response: Response): Promise<DownloadedFile> => ({
+  blob: await parseBlob(response),
+  filename: dispositionFilename(response),
+});
+
+/** The submissions export file. */
+export async function exportSobaSubmissions(
+  token: string,
+  formId: string,
+  body: SubmissionExportBody,
+): Promise<DownloadedFile> {
+  const response = await sobaFetch(`/design/forms/${formId}/export`, {
+    token,
+    method: 'POST',
+    json: body,
+  });
+  return downloadedFile(response);
+}
+
+/** A submission's file, for staff. */
+export async function downloadSobaSubmissionFile(
+  token: string,
+  submissionId: string,
+  fileId: string,
+): Promise<DownloadedFile> {
+  const response = await sobaFetch(`/design/submissions/${submissionId}/files/${fileId}`, {
+    token,
+  });
+  return downloadedFile(response);
 }
