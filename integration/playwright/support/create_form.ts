@@ -34,7 +34,7 @@ export async function createForm({ page, title }: { page: Page; title: string })
     if (collectionUseCase) {
       await page
         .getByRole('option', {
-          name: new RegExp(collectionUseCase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+          name: new RegExp(collectionUseCase.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)),
         })
         .click();
     }
