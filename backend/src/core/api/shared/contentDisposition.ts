@@ -1,3 +1,5 @@
+import type { Response } from 'express';
+
 /**
  * RFC 5987 Content-Disposition: a sanitized ASCII `filename` fallback plus a UTF-8 `filename*` so
  * modern clients render the real name. Both forms are injection-safe (ASCII strips CR/LF/quotes,
@@ -11,4 +13,17 @@ export function contentDisposition(type: 'inline' | 'attachment', filename: stri
     (c) => `%${(c.codePointAt(0) ?? 0).toString(16).toUpperCase()}`,
   );
   return `${type}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+}
+
+/** Send an in-memory body as a download that is never sniffed. */
+export function sendAttachment(
+  res: Response,
+  contentType: string,
+  filename: string,
+  body: string | Buffer,
+): void {
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Content-Disposition', contentDisposition('attachment', filename));
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.send(body);
 }

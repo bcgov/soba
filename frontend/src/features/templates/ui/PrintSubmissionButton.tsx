@@ -6,7 +6,7 @@ import { useDictionary } from '@/app/[lang]/Providers';
 import { useDataErrorNotice } from '@/src/shared/api/useDataErrorNotice';
 import { PrintChoice } from '@/src/types/templates';
 import type { SubmissionPrint } from '../data/useSubmissionPrint';
-import { saveBlob } from '../data/saveBlob';
+import { saveBlob } from '@/src/shared/util/saveBlob';
 import { printFailureMessages } from '../printError';
 import { printFileName } from '../printFileName';
 import { StaffPrintDialog } from './StaffPrintDialog';

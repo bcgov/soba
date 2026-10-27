@@ -35,7 +35,7 @@ vi.mock('@/src/shared/api/useDataErrorNotice', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/src/shared/api/useDataErrorNotice')>()),
   useDataErrorNotice: () => mocks.notify,
 }));
-vi.mock('@/src/features/templates/data/saveBlob', () => ({ saveBlob: mocks.saveBlob }));
+vi.mock('@/src/shared/util/saveBlob', () => ({ saveBlob: mocks.saveBlob }));
 
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 import type { SubmissionPrint } from '@/src/features/templates/data/useSubmissionPrint';

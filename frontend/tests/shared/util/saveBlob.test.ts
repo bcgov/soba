@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { saveBlob } from '@/src/features/templates/data/saveBlob';
+import { saveBlob } from '@/src/shared/util/saveBlob';
 
 describe('saveBlob', () => {
   afterEach(() => {
