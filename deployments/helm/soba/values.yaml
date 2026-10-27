@@ -381,13 +381,15 @@ formio:
     tag: 4.11.0
     pullPolicy: IfNotPresent
   replicas: 1
+  # Heap cap kept below the memory limit so Node GCs before the container is OOM-killed.
+  nodeOptions: "--max-old-space-size=2048"
   resources:
     requests:
-      cpu: 50m
-      memory: 256Mi
+      cpu: 100m
+      memory: 1Gi
     limits:
-      cpu: 250m
-      memory: 512Mi
+      cpu: "1"
+      memory: 3Gi
   service:
     port: 3001
   livenessProbe:

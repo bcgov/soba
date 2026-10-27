@@ -82,22 +82,11 @@ frontend:
     enabled: false
 
 formio:
+  # PRs use the shared formio of the soba-dev release in the same namespace.
   internal:
-    enabled: true
-  replicas: 1
-  resources:
-    requests:
-      cpu: 25m
-      memory: 128Mi
-    limits:
-      cpu: 250m
-      memory: 512Mi
-  # Formio depends on MongoDB; allow time for MongoDB to be ready after PR deploy
-  readinessProbe:
-    initialDelaySeconds: 45
-    timeoutSeconds: 10
-  livenessProbe:
-    initialDelaySeconds: 60
+    enabled: false
+  external:
+    url: http://soba-dev-formio:3001
 
 mongodb:
   # MongoDB runs as its own release from deployments/helm/action-mongodb. The deploy
