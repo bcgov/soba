@@ -196,11 +196,12 @@ backend:
       storageClassName: ""
 
     # storage-s3 only — non-credential keys, rendered only when set. ACCESS_KEY/SECRET_KEY are
-    # NOT here; supply them via a Secret. A URL endpoint sets the SSL flag, but its port only when
-    # the URL has one; otherwise the backend uses defaultPort, or 9000 when that is empty.
+    # NOT here; supply them via a Secret. A URL endpoint sets the SSL flag, and its port when it has
+    # one, else defaultPort, else the scheme's default (443 or 80); defaultUseSsl is ignored. A host
+    # endpoint takes defaultUseSsl, and defaultPort or 9000.
     defaultEndpoint: ""
     defaultBucketName: ""
-    defaultPort: "443"
+    defaultPort: ""
     defaultUseSsl: ""
     # Root every object in the default profile is stored under. Required for storage-s3. Unique per
     # environment, not inside another environment's root, and fixed once files are stored.

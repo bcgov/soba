@@ -74,7 +74,7 @@ spec:
           {{`export PLUGIN_CSS_V1_CLIENT_SECRET="{{ .Data.data.PLUGIN_CSS_V1_CLIENT_SECRET }}"`}}
           {{`{{- end }}`}}
         {{- end }}
-        {{- if and (eq .Values.backend.storage.defaultBackend "storage-s3") .Values.backend.storage.s3VaultKeyInfix }}
+        {{- if include "soba.storageUsesS3Vault" . }}
         {{- $s3 := upper .Values.backend.storage.s3VaultKeyInfix }}
         vault.hashicorp.com/error-on-missing-key-soba-s3: 'true'
         vault.hashicorp.com/agent-inject-secret-soba-s3: {{ .Values.vault.secretPath | quote }}
@@ -109,7 +109,7 @@ spec:
               . /vault/secrets/soba-cdogs
               . /vault/secrets/soba-workflow
               . /vault/secrets/soba-notify
-              {{- if and (eq .Values.backend.storage.defaultBackend "storage-s3") .Values.backend.storage.s3VaultKeyInfix }}
+              {{- if include "soba.storageUsesS3Vault" . }}
               . /vault/secrets/soba-s3
               {{- end }}
               {{- if include "soba.userSearchUsesCss" . }}

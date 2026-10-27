@@ -19,7 +19,6 @@ import {
   setActiveSubmission,
 } from '@/src/features/formio-v5/activeSubmission';
 import { isFormUpdated } from '@/src/features/formio-v5/data/useSubmissionOpener';
-import { NO_INLINE_IMAGE_EDITORS } from '@/src/features/formio-v5/editorOptions';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { apiErrorMessage, isNetworkError, isOutcomeUnknown } from '@/src/shared/api/dataError';
 import { useFormatTime } from '@/src/shared/hooks/useFormatLongDate';
@@ -168,12 +167,7 @@ export function SubmissionFillForm({
   // We own all submit messaging (success toast + redirect, inline error), so suppress Form.io's
   // built-in green "Submission Complete" alert.
   const formOptions = useMemo(
-    () => ({
-      noAlerts: true,
-      readOnly: !canWrite,
-      editors: NO_INLINE_IMAGE_EDITORS,
-      ...fileOption,
-    }),
+    () => ({ noAlerts: true, readOnly: !canWrite, ...fileOption }),
     [canWrite, fileOption],
   );
 
