@@ -159,6 +159,7 @@ export const ApiErrorCodes = {
   unauthenticated: 'unauthenticated',
   sign_in_required: 'sign_in_required',
   already_exists: 'already_exists',
+  workspace_name_taken: 'workspace_name_taken',
   route_not_found: 'route_not_found',
   rate_limited: 'rate_limited',
   internal_error: 'internal_error',
