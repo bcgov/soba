@@ -284,3 +284,15 @@ status list mirrors active rows in soba.feature_status; keep the two in step.
   value: {{ $status | quote }}
 {{- end }}
 {{- end }}
+
+{{/*
+An optional setting as a quoted string, or nothing when it is "" or unset. 0 renders. Helm reads
+unquoted numbers in values files as floats, so whole numbers are printed without an exponent.
+*/}}
+{{- define "soba.optionalSetting" -}}
+{{- if kindIs "float64" . -}}
+{{ printf "%.0f" . | quote }}
+{{- else if and (not (kindIs "invalid" .)) (ne (toString .) "") -}}
+{{ toString . | quote }}
+{{- end -}}
+{{- end }}

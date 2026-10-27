@@ -4,6 +4,7 @@ backend:
   features:
     dev-data: "enabled"
     notifications: "enabled"
+    post-submission: "disabled"
     user-search: "enabled"
   replicas: 2
   sso:

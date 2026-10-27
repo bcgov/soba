@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { pool } from '../../db/client';
+import { jobStats } from '../../db/repos/jobRepo';
 import { checkFormEngineReadiness } from '../../integrations/form-engine/FormEngineRegistry';
 import { checkDocumentGenerationReadiness } from '../../integrations/document-generation/DocumentGenerationRegistry';
 import { checkUserSearchReadiness } from '../../integrations/user-search/UserSearchRegistry';
@@ -45,6 +46,10 @@ export async function readinessHandler(_req: Request, res: Response): Promise<vo
   const cache = await reportReadiness(() => getCacheAdapter().readinessCheck?.());
   const messageBus = await reportReadiness(() => getMessageBusAdapter().readinessCheck?.());
   const eventStream = await reportReadiness(() => getEventStreamAdapter().readinessCheck?.());
+  // A job backlog or dead jobs are for operators to see; they never pull the pod.
+  const jobs = dbOk
+    ? await reportReadiness(async () => ({ ok: true, ...(await jobStats()) }))
+    : { ok: false, message: 'Database unreachable' };
 
   const body = {
     status: dbOk && allEnginesOk ? 'ready' : 'unhealthy',
@@ -60,6 +65,7 @@ export async function readinessHandler(_req: Request, res: Response): Promise<vo
     cache,
     messageBus,
     eventStream,
+    jobs,
   };
 
   if (!dbOk || !allEnginesOk) {

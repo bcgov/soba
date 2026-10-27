@@ -62,6 +62,36 @@ data:
   PLUGIN_VIRUSSCAN_CLAMAV_TIMEOUT_MS: {{ .Values.clamav.timeoutMs | quote }}
   {{- end }}
   SOBA_SYSTEM_SUBJECT: {{ .Values.backend.config.sobaSystemSubject | quote }}
+  {{- with include "soba.optionalSetting" .Values.backend.config.shutdownDelayMs }}
+  SHUTDOWN_DELAY_MS: {{ . }}
+  {{- end }}
+  {{- with include "soba.optionalSetting" .Values.backend.config.shutdownTimeoutMs }}
+  SHUTDOWN_TIMEOUT_MS: {{ . }}
+  {{- end }}
+  {{- $jobEnv := dict
+      "pools" "JOB_POOLS"
+      "lightPollMs" "JOB_LIGHT_POLL_MS"
+      "heavyPollMs" "JOB_HEAVY_POLL_MS"
+      "lightLeaseMs" "JOB_LIGHT_LEASE_MS"
+      "heavyLeaseMs" "JOB_HEAVY_LEASE_MS"
+      "lightConcurrency" "JOB_LIGHT_CONCURRENCY"
+      "heavyConcurrency" "JOB_HEAVY_CONCURRENCY"
+      "lightTimeoutMs" "JOB_LIGHT_TIMEOUT_MS"
+      "heavyTimeoutMs" "JOB_HEAVY_TIMEOUT_MS"
+      "maxAttempts" "JOB_MAX_ATTEMPTS"
+      "backoffBaseMs" "JOB_BACKOFF_BASE_MS"
+      "backoffMaxMs" "JOB_BACKOFF_MAX_MS"
+      "sweepIntervalMs" "JOB_SWEEP_INTERVAL_MS"
+      "retentionBatch" "JOB_RETENTION_BATCH"
+      "succeededRetentionDays" "JOB_SUCCEEDED_RETENTION_DAYS"
+      "deadRetentionDays" "JOB_DEAD_RETENTION_DAYS"
+      "drainMs" "JOB_DRAIN_MS"
+      "abortGraceMs" "JOB_ABORT_GRACE_MS" }}
+  {{- range $key, $name := $jobEnv }}
+  {{- with include "soba.optionalSetting" (index $.Values.backend.jobs $key) }}
+  {{ $name }}: {{ . }}
+  {{- end }}
+  {{- end }}
   {{- if not .Values.database.uri }}
   DB_HOST: {{ .Values.database.host | quote }}
   DB_PORT: {{ .Values.database.port | quote }}

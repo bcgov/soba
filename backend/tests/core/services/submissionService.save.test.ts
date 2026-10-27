@@ -3,6 +3,9 @@ import * as submissionRepo from '../../../src/core/db/repos/submissionRepo';
 import * as versionRepo from '../../../src/core/db/repos/formVersionRepo';
 import * as formRepo from '../../../src/core/db/repos/formRepo';
 import * as registry from '../../../src/core/integrations/form-engine/FormEngineRegistry';
+import * as featureRepo from '../../../src/core/db/repos/featureRepo';
+import * as jobs from '../../../src/core/jobs';
+import * as enqueue from '../../../src/core/jobs/enqueue';
 import { ConflictError, NotFoundError, ValidationError } from '../../../src/core/errors';
 
 jest.mock('../../../src/core/db/client', () => ({ db: {} }));
@@ -29,6 +32,17 @@ jest.mock('../../../src/core/db/repos/formRepo', () => ({
   getFormEngineCodeForForm: jest.fn(),
 }));
 
+jest.mock('../../../src/core/db/repos/featureRepo', () => ({
+  isFeatureEnabledCached: jest.fn(),
+}));
+
+jest.mock('../../../src/core/jobs', () => ({ nudgeJobs: jest.fn() }));
+
+jest.mock('../../../src/core/jobs/enqueue', () => ({
+  ...jest.requireActual('../../../src/core/jobs/enqueue'),
+  enqueueSubmittedJob: jest.fn(),
+}));
+
 jest.mock('../../../src/core/integrations/form-engine/FormEngineRegistry', () => ({
   createFormEngineAdapter: jest.fn(),
 }));
@@ -43,6 +57,9 @@ const getLabels = submissionRepo.getFormVersionLabels as unknown as jest.Mock;
 const getVersion = versionRepo.getFormVersionById as unknown as jest.Mock;
 const getEngineCode = formRepo.getFormEngineCodeForForm as unknown as jest.Mock;
 const createAdapter = registry.createFormEngineAdapter as unknown as jest.Mock;
+const isFlagOn = featureRepo.isFeatureEnabledCached as unknown as jest.Mock;
+const nudge = jobs.nudgeJobs as unknown as jest.Mock;
+const enqueueJob = enqueue.enqueueSubmittedJob as unknown as jest.Mock;
 
 const input = {
   workspaceId: 'ws1',
@@ -58,9 +75,18 @@ const svc = new SubmissionService();
 
 const LABELS = { form: { name: 'Permit application' }, formVersion: { versionNo: 4 } };
 
+const postSubmissionOn = () => {
+  isFlagOn.mockResolvedValue(true);
+  enqueueJob.mockResolvedValue(undefined);
+  createAdapter.mockReturnValue({
+    createSubmission: jest.fn().mockResolvedValue({ engineRef: 'eng-new' }),
+  });
+};
+
 describe('SubmissionService save (versioned engine write)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    isFlagOn.mockResolvedValue(false);
     getRecord.mockResolvedValue({
       id: 's1',
       formId: 'f1',
@@ -118,6 +144,7 @@ describe('SubmissionService save (versioned engine write)', () => {
         reason: 'accepted',
         workflowState: 'submitted',
       }),
+      undefined,
     );
     expect(result).toEqual({
       record: { id: 's1', formVersionId: 'v1', currentRevisionNo: 3, ...LABELS },
@@ -264,6 +291,7 @@ describe('SubmissionService save (versioned engine write)', () => {
     expect(updateDraft).not.toHaveBeenCalled();
     expect(appendRevision).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'pending', reason: 'closed' }),
+      undefined,
     );
     expect(result.revision).toEqual({
       id: 'rev-4',
@@ -414,5 +442,62 @@ describe('SubmissionService save (versioned engine write)', () => {
 
     expect(createSubmission).not.toHaveBeenCalled();
     expect(appendRevision).not.toHaveBeenCalled();
+  });
+
+  it('with post-submission on, a submit passes a hook that queues its job, and nudges once appended', async () => {
+    postSubmissionOn();
+
+    await svc.submit(input);
+
+    expect(isFlagOn).toHaveBeenCalledWith('post-submission', expect.any(Number));
+    const onAppended = appendRevision.mock.calls[0][1];
+    await onAppended('tx', { id: 's1' });
+    expect(enqueueJob).toHaveBeenCalledWith('tx', { id: 's1' }, 'rev-new', 'actor-1');
+    expect(nudge).toHaveBeenCalledWith('submission.submitted');
+  });
+
+  it.each([
+    ['pending', 'pending', 'conflict'],
+    ['replayed', 'current', 'accepted'],
+  ])(
+    'with post-submission on, a submit that lands %s does not nudge',
+    async (outcome, status, reason) => {
+      postSubmissionOn();
+      appendRevision.mockResolvedValue({
+        outcome,
+        record: { id: 's1', formVersionId: 'v1', currentRevisionNo: 2 },
+        revisionId: 'rev-new',
+        revisionNo: 3,
+        status,
+        reason,
+      });
+
+      await svc.submit(input);
+
+      expect(nudge).not.toHaveBeenCalled();
+    },
+  );
+
+  it('with post-submission on, a save does not read the flag, pass a hook or nudge', async () => {
+    postSubmissionOn();
+
+    await svc.save(input);
+
+    expect(isFlagOn).not.toHaveBeenCalled();
+    expect(appendRevision).toHaveBeenCalledWith(expect.anything(), undefined);
+    expect(nudge).not.toHaveBeenCalled();
+  });
+
+  it('with post-submission on, a failure to queue the job fails the provisioning and does not nudge', async () => {
+    postSubmissionOn();
+    enqueueJob.mockRejectedValue(new Error('job insert failed'));
+    appendRevision.mockImplementation(async (_append, onAppended) => {
+      await onAppended('tx', { id: 's1' });
+    });
+
+    await expect(svc.submit(input)).rejects.toThrow('job insert failed');
+
+    expect(failProvisioning).toHaveBeenCalledWith('ws1', 's1', 'Filler', 'job insert failed');
+    expect(nudge).not.toHaveBeenCalled();
   });
 });

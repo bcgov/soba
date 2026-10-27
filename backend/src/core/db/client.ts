@@ -31,6 +31,8 @@ const pool = new Pool({
 // Pipeline performance fix: Revert if needed.
 
 export const db = drizzle(pool, { schema, logger: drizzleQueryLogger });
+/** Same pool without the query logger, for polling that would flood debug logs. */
+export const quietDb = drizzle(pool, { schema });
 export type Db = typeof db;
 /** Type of the argument passed to db.transaction callback; use for optional tx in repos. */
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
