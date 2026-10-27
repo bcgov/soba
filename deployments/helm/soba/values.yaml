@@ -3,12 +3,15 @@ global:
   namespace: ""
   # Set true to remove "keep" policy on Secrets/PVCs (e.g. PR teardown)
   forceCleanup: false
-  # Optional shared subpath for frontend Route/Ingress + liveness (blank = root).
-  # Per-frontend host is set via frontend.apps.<name>.host, not here.
-  routePath: ""
-  # Owning PR number when a PR reuses a deployment slot; read on teardown so a
-  # closing PR does not uninstall a newer PR that has since taken the slot.
+  # PR number a deployment belongs to, for provenance when several PR releases share a namespace.
   prNumber: ""
+
+# Opt-in access from APS to backend pods only. namespaceName is the APS namespace label (Silver:
+# 264e6f, Gold: b8840c); environment is test or prod, matching the APS instance publishing the route.
+gatewayNetworkPolicy:
+  enabled: false
+  namespaceName: ""
+  environment: ""
 
 # -- Backend (Express API) ------------------------------------------------
 backend:
@@ -33,6 +36,9 @@ backend:
       memory: 256Mi
   service:
     port: 4000
+  # URL path the API is served under. The app serves it, so Routes, probes and the advertised API
+  # URLs all use it as-is. Every environment shares this path; the host keeps deployments apart.
+  basePath: /chefs
   route:
     enabled: true
     tls:
@@ -41,15 +47,31 @@ backend:
     # Router tuning for the API host; see README.
     annotations:
       # Inactivity timeout. The router's 30s default is tight for the synchronous CDOGS
-      # call under /submit/submissions/:id/{preview,print}, which cannot be scoped below.
+      # call under /{submit,design}/submissions/:id/print, which cannot be scoped below.
       haproxy.router.openshift.io/timeout: "60s"
       # The router sets a session cookie on edge routes whether or not we ask; this just
       # names it. sobaFetch sends no credentials, so nothing returns it on this host.
       router.openshift.io/cookie_name: "soba-affinity"
-    # Path-scoped Routes on the same host, annotations merged over the ones above.
+    # Path-scoped Routes on the same host, annotations merged over the ones above. Paths are
+    # relative to backend.basePath, which the template prepends.
     extraPaths:
       - name: files
         path: /api/v1/submit/files
+        annotations:
+          # Upload is silent through the clamd scan (clamav.timeoutMs, 60s).
+          haproxy.router.openshift.io/timeout: "300s"
+      - name: files-api
+        path: /api/v1/files
+        annotations:
+          # Upload is silent through the clamd scan (clamav.timeoutMs, 60s).
+          haproxy.router.openshift.io/timeout: "300s"
+      - name: templates
+        path: /api/v1/templates
+        annotations:
+          # Upload is silent through the clamd scan (clamav.timeoutMs, 60s).
+          haproxy.router.openshift.io/timeout: "300s"
+      - name: print-upload
+        path: /api/v1/design/print-upload
         annotations:
           # Upload is silent through the clamd scan (clamav.timeoutMs, 60s).
           haproxy.router.openshift.io/timeout: "300s"
@@ -116,6 +138,10 @@ backend:
     # Virus scan plugin. Deployments scan for real against the shared clamav
     # (see the clamav block below); local dev overrides to virusscan-noop via .env.
     virusScanDefaultCode: virusscan-clamav
+    # Tenant engine behind GET /me/tenants. tenant-noop returns no tenants and calls nothing.
+    tenantEngineDefaultCode: tenant-noop
+    # Workflow engine. workflow-noop starts nothing and calls nothing.
+    workflowEngineDefaultCode: workflow-noop
     sobaSystemSubject: soba-system
 
   # -- Shared temp storage PVC (RWX so it survives horizontal scaling).
@@ -127,21 +153,38 @@ backend:
     size: 1Gi
     storageClassName: ""
 
-  # -- configmap-storage: files feature + storage profiles (STORAGE_* + FILES_*)
+  # -- configmap-storage: files and templates features + storage profiles (STORAGE_* + FILES_* +
+  # TEMPLATES_*)
   storage:
     # Active storage profiles (comma-separated). Each needs a *Backend below.
     profiles: "default"
     # Backend for the 'default' profile. 'storage-memory' is in-process and ephemeral — no PVC,
-    # no external service, lost on restart, per-replica. Fine for ephemeral (PR/dev) namespaces.
-    # For durable, multi-replica environments override to 'storage-s3' and set the endpoint/
-    # bucket below (credentials come from a Secret).
+    # no external service, lost on restart, per-replica. Fine for ephemeral (PR) namespaces, and
+    # refused with more than one replica or with autoscaling.
+    # 'storage-local' keeps files on the RWX PVC below (localVolume, defaultBasePath).
+    # For durable, multi-replica environments override to 'storage-s3' and set the endpoint, bucket
+    # and prefix below (credentials come from a Secret).
     defaultBackend: storage-memory
     # Profile the /files API reads/writes, and the max upload size it accepts (MB).
     filesStorageProfile: "default"
     filesMaxFileSizeMb: "10"
+    # Profile the /templates API reads/writes, and the max upload size it accepts (MB).
+    templatesStorageProfile: "default"
+    templatesMaxFileSizeMb: "10"
+    # Key prefixes the features store under within their profiles. Empty uses the defaults in code
+    # (attachments, templates).
+    filesStoragePrefix: ""
+    templatesStoragePrefix: ""
 
-    # storage-local only: writable filesystem path for the default profile. Rendered only when set.
+    # storage-local only: where the file store PVC is mounted and the default profile writes.
+    # Required for storage-local.
     defaultBasePath: ""
+    # storage-local only: the file store PVC, created only when defaultBackend is storage-local.
+    # ReadWriteMany, shared by every replica.
+    localVolume:
+      accessMode: ReadWriteMany
+      size: 1Gi
+      storageClassName: ""
 
     # storage-s3 only — non-credential keys, rendered only when set. ACCESS_KEY/SECRET_KEY are
     # NOT here; supply them via a Secret. A full URL endpoint (https://host:port) also carries the
@@ -150,15 +193,22 @@ backend:
     defaultBucketName: ""
     defaultPort: ""
     defaultUseSsl: ""
+    # Root every object in the default profile is stored under. Required for storage-s3. Unique per
+    # environment, not inside another environment's root, and fixed once files are stored.
+    defaultPrefix: ""
 
   # -- configmap-formio: PLUGIN_FORMIO_V5_* (non-secret values)
   formio:
     routesAllowed: "true"
     proxyPath: /formio-v5
     # apiBaseUrl is auto-constructed from the formio service/external URL
+    # -- outbound deadline in ms; empty uses the backend default (30000)
+    timeoutMs: ""
 
   # -- configmap-document-generation: PLUGIN_CDOGS_* + default backend code
   documentGeneration:
+    # -- renders one pod runs at once; empty uses the backend default (2)
+    maxConcurrent: ""
     cdogsV2:
       endpoint: ""
       tokenUrl: ""
@@ -168,6 +218,20 @@ backend:
       endpoint: ""
       # -- outbound deadline in ms; empty uses the backend default (30000)
       timeoutMs: ""
+
+  # -- configmap-tenant-engine: PLUGIN_CSTAR_V1_* + default engine code
+  tenantEngine:
+    cstarV1:
+      apiBaseUrl: ""
+      # -- outbound deadline in ms; empty uses the backend default (30000)
+      timeoutMs: "5000"
+
+  # -- configmap-workflow-engine: PLUGIN_CS_WORKFLOW_V1_* + default engine code
+  workflowEngine:
+    csWorkflowV1:
+      apiBaseUrl: ""
+      # -- outbound deadline in ms; empty uses the backend default (30000)
+      timeoutMs: "5000"
 
   # -- configmap-sso: IDP / SSO config
   sso:
@@ -185,6 +249,8 @@ backend:
     apiMax: "60"
     publicWindowMs: "60000"
     publicMax: "200"
+    renderWindowMs: "60000"
+    renderMax: "30"
 
 # -- Frontend (Next.js) ---------------------------------------------------
 frontend:
@@ -192,6 +258,8 @@ frontend:
     repository: ghcr.io/bcgov/soba/frontend
     tag: latest
     pullPolicy: IfNotPresent
+  # Host shared by every app; they are told apart by routePath. Blank = <fullname>.<domain>.
+  host: ""
   replicas: 1
   livenessProbe:
     initialDelaySeconds: 15
@@ -234,18 +302,19 @@ frontend:
     targetCPUUtilizationPercentage: 80
   # Optional: override SOBA_API_INTERNAL_URL (Next SSR → API). Default: in-cluster http://<release>-backend.<namespace>.svc.cluster.local:<port>/api/v1
   internalApiBaseUrl: ""
-  # Named frontend apps: one Deployment/Service/Route/ConfigMap each, same image, mode set by
-  # featuresAllowed (codes from GET /meta/features, or * / all). Host defaults to <fullname>-<name>.<domain>.
+  # Named frontend apps: one Deployment/Service/Route/ConfigMap each, mode set by featuresAllowed
+  # (codes from GET /meta/features, or * / all) and URL by routePath. They share one host and one
+  # image repository; the tag carries the app name, because basePath is baked per build.
   # All other frontend.* settings (image, probes, resources, route.tls, autoscaling) are shared.
   apps:
     designer:
       enabled: true
-      featuresAllowed: "workspaces,design-mode,meta,marketing"
-      host: ""
+      featuresAllowed: "design-mode,files,meta,marketing,templates"
+      routePath: /designer
     forms:
       enabled: true
-      featuresAllowed: "submit-mode,files,meta"
-      host: ""
+      featuresAllowed: "submit-mode,files,meta,templates"
+      routePath: /forms
 
 # -- Database (external Postgres) -----------------------------------------
 database:
@@ -312,6 +381,13 @@ mongodb:
     enabled: true
   external:
     uri: ""
+    host: ""
+    authSecretName: ""
+    port: 27017
+    username: formio
+    database: formio-ce
+    authSource: formio-ce
+    replicaSet: rs0
   image:
     # Google's Docker Hub mirror — avoids the anonymous pull-rate limit on the cluster (same
     # image, matching digest).

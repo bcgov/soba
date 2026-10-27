@@ -10,29 +10,45 @@ import {
   CreateWorkspaceBodySchema,
   UpdateWorkspaceBodySchema,
   WorkspaceIdParamsSchema,
+  WorkspaceLookupQuerySchema,
 } from './schema';
 
 type ListWorkspacesQuery = z.infer<typeof ListWorkspacesQuerySchema>;
+type WorkspaceLookupQuery = z.infer<typeof WorkspaceLookupQuerySchema>;
 type CreateWorkspaceBody = z.infer<typeof CreateWorkspaceBodySchema>;
 type UpdateWorkspaceBody = z.infer<typeof UpdateWorkspaceBodySchema>;
 type WorkspaceIdParams = z.infer<typeof WorkspaceIdParamsSchema>;
 
+const MISSING_ACTOR_IDENTITY = 'Missing actor identity';
+
 export const listWorkspaces = asyncHandler(async (req: Request, res: Response) => {
   const actorId = getActorId(req);
   if (!actorId) {
-    throw new ValidationError('Missing actor identity (actorId or x-soba-user-id)');
+    throw new ValidationError(MISSING_ACTOR_IDENTITY);
   }
-  const result = await workspacesApiService.list(
-    actorId,
-    req.query as unknown as ListWorkspacesQuery,
-  );
+  const result = await workspacesApiService.list(actorId, {
+    ...(req.query as unknown as ListWorkspacesQuery),
+    locale: req.sortLocale!,
+  });
+  res.json(result);
+});
+
+export const lookupWorkspaces = asyncHandler(async (req: Request, res: Response) => {
+  const actorId = getActorId(req);
+  if (!actorId) {
+    throw new ValidationError(MISSING_ACTOR_IDENTITY);
+  }
+  const result = await workspacesApiService.lookup(actorId, {
+    ...(req.query as unknown as WorkspaceLookupQuery),
+    locale: req.sortLocale!,
+  });
   res.json(result);
 });
 
 export const createWorkspace = asyncHandler(async (req: Request, res: Response) => {
   const actorId = getActorId(req);
   if (!actorId) {
-    throw new ValidationError('Missing actor identity (actorId or x-soba-user-id)');
+    throw new ValidationError(MISSING_ACTOR_IDENTITY);
   }
   const result = await workspacesApiService.create(
     actorId,

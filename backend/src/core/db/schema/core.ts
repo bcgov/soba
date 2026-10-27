@@ -99,8 +99,9 @@ export const userIdentities = sobaSchema.table(
 
 /**
  * SOBA platform admins (super powers, cross-workspace tasks).
- * One row per user; source is either 'idp' (refreshed on login from IdP claims) or 'direct' (manually added).
- * IdP-sourced rows are refreshed on each login: if the IdP no longer reports admin, the row is removed.
+ * One row per user; source is either 'idp' (from IdP claims) or 'direct' (manually added).
+ * IdP-sourced rows are checked against the claim on each request and written only when it differs: if
+ * the IdP no longer reports admin, the row is removed.
  */
 export const sobaAdmins = sobaSchema.table(
   'soba_admin',
@@ -108,11 +109,11 @@ export const sobaAdmins = sobaSchema.table(
     userId: uuid('user_id')
       .primaryKey()
       .references(() => appUsers.id),
-    /** 'idp' = granted from IdP on login (e.g. role: soba_admin); 'direct' = manually added. */
+    /** 'idp' = granted from IdP claims (e.g. role: soba_admin); 'direct' = manually added. */
     source: text('source').notNull(),
-    /** When source='idp', which IdP plugin granted admin (plugin code, e.g. bcgov-sso); used for refresh/revoke on login. Not an FK so plugin code is not required in identity_provider (token provider may be azureidir/idir etc.). */
+    /** When source='idp', which IdP plugin granted admin (plugin code, e.g. bcgov-sso); used to repoint or revoke on each request. Not an FK so plugin code is not required in identity_provider (token provider may be azureidir/idir etc.). */
     identityProviderCode: text('identity_provider_code'),
-    /** When source='idp', last time we synced this row from IdP. */
+    /** When source='idp', when the IdP last granted or moved this row. */
     syncedAt: timestamp('synced_at', { withTimezone: true }),
     ...auditColumns(),
   },

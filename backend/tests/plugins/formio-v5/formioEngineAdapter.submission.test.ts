@@ -3,10 +3,14 @@ import {
   buildSubmissionBody,
 } from '../../../src/plugins/formio-v5/formioEngineAdapter';
 import type { PluginConfigReader } from '../../../src/core/config/pluginConfig';
-import { getAuthenticatedFormioClient } from '../../../src/plugins/formio-v5/formioV5Client';
-import { ValidationError } from '../../../src/core/errors';
+import {
+  FormioApiError,
+  getAuthenticatedFormioClient,
+} from '../../../src/plugins/formio-v5/formioV5Client';
+import { InternalError, ValidationError } from '../../../src/core/errors';
 
 jest.mock('../../../src/plugins/formio-v5/formioV5Client', () => ({
+  ...jest.requireActual('../../../src/plugins/formio-v5/formioV5Client'),
   getAuthenticatedFormioClient: jest.fn(),
 }));
 
@@ -20,6 +24,7 @@ function makeConfig(): PluginConfigReader {
 }
 
 interface FakeClient {
+  loadForm: jest.Mock;
   loadSubmissions: jest.Mock;
   loadSubmission: jest.Mock;
   saveSubmission: jest.Mock;
@@ -28,6 +33,7 @@ interface FakeClient {
 
 function makeClient(overrides: Partial<FakeClient> = {}): FakeClient {
   return {
+    loadForm: jest.fn().mockResolvedValue({ _id: 'form-ref-1', components: [] }),
     loadSubmissions: jest.fn().mockResolvedValue([]),
     loadSubmission: jest.fn().mockResolvedValue({ _id: 'sub-1', data: { a: 1 } }),
     saveSubmission: jest.fn().mockResolvedValue({ _id: 'sub-new' }),
@@ -39,9 +45,10 @@ function makeClient(overrides: Partial<FakeClient> = {}): FakeClient {
 const createInput = {
   engineFormRef: 'form-ref-1',
   submissionId: 's1',
-  revisionNo: 3,
+  revisionId: 'rev-3',
   workspaceId: 'ws1',
   data: { firstName: 'Ada' },
+  validate: true,
 };
 
 describe('FormioEngineAdapter submission methods', () => {
@@ -54,8 +61,7 @@ describe('FormioEngineAdapter submission methods', () => {
     expect(body.metadata).toEqual({
       soba_workspace_id: 'ws1',
       soba_submission_id: 's1',
-      soba_revision_no: 3,
-      soba_revision_key: 'soba-s1-r3',
+      soba_revision_id: 'rev-3',
     });
   });
 
@@ -77,10 +83,22 @@ describe('FormioEngineAdapter submission methods', () => {
 
     expect(res).toEqual({ engineRef: 'sub-new' });
     expect(client.loadSubmissions).toHaveBeenCalledWith('form-ref-1', {
-      params: { 'metadata.soba_revision_key': 'soba-s1-r3' },
+      params: { 'metadata.soba_revision_id': 'rev-3' },
     });
     const body = client.saveSubmission.mock.calls[0][1] as Record<string, unknown>;
     expect(body._id).toBeUndefined(); // POST (new doc), not PUT
+  });
+
+  it.each([
+    [true, undefined],
+    [false, { params: { noValidate: true } }],
+  ])('with validate %s saves with query %j', async (validate, query) => {
+    const client = makeClient();
+    mockedGetClient.mockResolvedValue(client);
+
+    await new FormioEngineAdapter(makeConfig()).createSubmission({ ...createInput, validate });
+
+    expect(client.saveSubmission).toHaveBeenCalledWith('form-ref-1', expect.any(Object), query);
   });
 
   it('is idempotent: a retry for the same revision returns the existing doc without re-saving', async () => {
@@ -96,14 +114,18 @@ describe('FormioEngineAdapter submission methods', () => {
     expect(client.saveSubmission).not.toHaveBeenCalled();
   });
 
-  it('maps a Form.io 4xx rejection to a ValidationError', async () => {
-    const client = makeClient({
-      saveSubmission: jest.fn().mockRejectedValue({ status: 400, message: 'invalid submission' }),
-    });
+  it('maps a Form.io 4xx rejection to a coded ValidationError about the data', async () => {
+    const rejected = Object.assign(new Error('invalid submission'), { status: 400 });
+    const client = makeClient({ saveSubmission: jest.fn().mockRejectedValue(rejected) });
     mockedGetClient.mockResolvedValue(client);
 
     const adapter = new FormioEngineAdapter(makeConfig());
-    await expect(adapter.createSubmission(createInput)).rejects.toBeInstanceOf(ValidationError);
+    const created = adapter.createSubmission(createInput);
+    await expect(created).rejects.toBeInstanceOf(ValidationError);
+    await expect(created).rejects.toMatchObject({
+      code: 'engine_data_rejected',
+      message: 'Form engine rejected the submission data: invalid submission',
+    });
   });
 
   it('throws when no admin client is available', async () => {
@@ -119,7 +141,7 @@ describe('FormioEngineAdapter submission methods', () => {
         owner: 'o',
         created: 'c',
         data: { firstName: 'Ada' },
-        metadata: { soba_revision_key: 'soba-s1-r3', headers: { host: 'x' } },
+        metadata: { soba_revision_id: 'rev-3', headers: { host: 'x' } },
       }),
     });
     mockedGetClient.mockResolvedValue(client);
@@ -136,6 +158,47 @@ describe('FormioEngineAdapter submission methods', () => {
     mockedGetClient.mockResolvedValue(client);
     const adapter = new FormioEngineAdapter(makeConfig());
     expect(await adapter.readSubmission('form-ref-1', 'missing')).toBeNull();
+  });
+
+  const resourceNotFound = () =>
+    new FormioApiError(400, 'Error: Resource not found', 'http://formio.test/form/x');
+
+  it.each([
+    ['400 Resource not found', resourceNotFound()],
+    ['404', new FormioApiError(404, 'Not Found', 'http://formio.test/form/x')],
+  ])(
+    'fails a read of a missing document with engine_document_missing on %s',
+    async (_label, missing) => {
+      const client = makeClient({
+        loadForm: jest.fn().mockRejectedValue(missing),
+        loadSubmission: jest.fn().mockRejectedValue(missing),
+      });
+      mockedGetClient.mockResolvedValue(client);
+      const adapter = new FormioEngineAdapter(makeConfig());
+      const engineDocumentMissing = { statusCode: 500, code: 'engine_document_missing' };
+      await expect(adapter.readSchema('missing')).rejects.toBeInstanceOf(InternalError);
+      await expect(adapter.readSchema('missing')).rejects.toMatchObject(engineDocumentMissing);
+      await expect(adapter.readSubmission('form-ref-1', 'missing')).rejects.toMatchObject(
+        engineDocumentMissing,
+      );
+    },
+  );
+
+  it.each([
+    [
+      'a 400 for another reason',
+      new FormioApiError(400, 'Error: Invalid id', 'http://formio.test'),
+    ],
+    ['a 500', new FormioApiError(500, 'boom', 'http://formio.test')],
+  ])('still throws a read failure that is %s', async (_label, failure) => {
+    const client = makeClient({
+      loadForm: jest.fn().mockRejectedValue(failure),
+      loadSubmission: jest.fn().mockRejectedValue(failure),
+    });
+    mockedGetClient.mockResolvedValue(client);
+    const adapter = new FormioEngineAdapter(makeConfig());
+    await expect(adapter.readSchema('form-ref-1')).rejects.toBe(failure);
+    await expect(adapter.readSubmission('form-ref-1', 'sub-1')).rejects.toBe(failure);
   });
 
   it('deleteSubmission deletes the document under its form', async () => {

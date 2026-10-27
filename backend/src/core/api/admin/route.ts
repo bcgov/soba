@@ -1,6 +1,7 @@
 import express from 'express';
-import { coreErrorHandler } from '../../middleware/errorHandler';
+import { coreErrorHandler, notFoundHandler } from '../../middleware/errorHandler';
 import { validateRequest } from '../shared/validation';
+import { sortLocale } from '../../middleware/sortLocale';
 import { requireFeature } from '../../middleware/requireFeature';
 import { Features } from '../../db/codes';
 import {
@@ -28,6 +29,7 @@ const router = express.Router();
 router.get(
   '/soba-admins',
   validateRequest({ query: ListSobaAdminsQuerySchema }),
+  sortLocale,
   listSobaAdminsHandler,
 );
 router.post('/soba-admins', validateRequest({ body: AddSobaAdminBodySchema }), addSobaAdminHandler);
@@ -63,6 +65,7 @@ router.get(
   listDocumentGenerationAuditsHandler,
 );
 
+router.use(notFoundHandler);
 router.use(coreErrorHandler);
 
 export { router as adminRouter };

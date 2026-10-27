@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { pool } from '../../db/client';
 import { checkFormEngineReadiness } from '../../integrations/form-engine/FormEngineRegistry';
 import { checkDocumentGenerationReadiness } from '../../integrations/document-generation/DocumentGenerationRegistry';
+import { checkTenantEngineReadiness } from '../../integrations/tenant/TenantEngineRegistry';
+import { checkWorkflowEngineReadiness } from '../../integrations/workflow/WorkflowEngineRegistry';
 import {
   checkStorageReadiness,
   getCacheAdapter,
@@ -10,23 +12,7 @@ import {
   getTempStorageAdapter,
   getVirusScanAdapter,
 } from '../../integrations/plugins/PluginRegistry';
-
-interface Readiness {
-  ok: boolean;
-  message?: string;
-}
-
-/** Resolve a non-gating readiness report, turning any throw/rejection into { ok: false }. An
- *  undefined result (adapter with no readinessCheck) counts as reachable. */
-async function reportReadiness(
-  check: () => Promise<Readiness | undefined> | Readiness | undefined,
-): Promise<Readiness> {
-  try {
-    return (await check()) ?? { ok: true };
-  } catch (err) {
-    return { ok: false, message: err instanceof Error ? err.message : String(err) };
-  }
-}
+import { reportReadiness } from '../../integrations/plugins/readiness';
 
 export async function readinessHandler(_req: Request, res: Response): Promise<void> {
   let dbOk = false;
@@ -41,10 +27,13 @@ export async function readinessHandler(_req: Request, res: Response): Promise<vo
   const allEnginesOk = Object.values(formEngines).every((r) => r.ok);
 
   // Everything below is reported but non-gating — an outage degrades a feature (uploads, rendering,
-  // caching, cross-pod fan-out), it doesn't pull the pod from rotation the way DB or a form engine
-  // does. Adapters without a readinessCheck (e.g. cache-memory, messagebus-memory) report reachable.
+  // caching, cross-pod fan-out, tenant lookup, workflows), it doesn't pull the pod from rotation the way DB or a
+  // form engine does. Adapters without a readinessCheck (e.g. cache-memory, messagebus-memory) report
+  // reachable.
   const storage = await checkStorageReadiness();
   const documentGeneration = await checkDocumentGenerationReadiness();
+  const tenantEngines = await checkTenantEngineReadiness();
+  const workflowEngines = await checkWorkflowEngineReadiness();
   const tempStorage = await reportReadiness(async () => ({
     ok: await getTempStorageAdapter().ping(),
   }));
@@ -63,6 +52,8 @@ export async function readinessHandler(_req: Request, res: Response): Promise<vo
     tempStorage,
     virusScanner,
     documentGeneration,
+    tenantEngines,
+    workflowEngines,
     cache,
     messageBus,
     eventStream,

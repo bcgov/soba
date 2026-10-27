@@ -13,6 +13,7 @@ import {
 import { getFeatureGateCached } from '../../../../src/core/db/repos/featureRepo';
 import {
   addDirectSobaAdmin,
+  listSobaAdmins,
   removeDirectSobaAdmin,
 } from '../../../../src/core/db/repos/sobaAdminRepo';
 import { findAppUserById } from '../../../../src/core/db/repos/appUserRepo';
@@ -267,5 +268,21 @@ describe('adminRouter feature-scope routes', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Invalid request body');
     expect(upsertFeatureScopeMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('adminRouter soba-admins list', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.mocked(listSobaAdmins).mockResolvedValue({ items: [], total: 0 });
+  });
+
+  it('sorts in the language the request asks for', async () => {
+    const res = await request(createAdminApp(true))
+      .get('/soba-admins')
+      .set('Accept-Language', 'fr-CA');
+
+    expect(res.status).toBe(200);
+    expect(listSobaAdmins).toHaveBeenCalledWith(expect.objectContaining({ locale: 'fr' }));
   });
 });

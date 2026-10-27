@@ -10,6 +10,7 @@ const payload = {
       version: null,
       status: 'enabled',
       platformAllowed: true,
+      availability: 'scoped',
     },
   ],
 };
@@ -34,6 +35,7 @@ describe('isFeaturesMetaPayload', () => {
             version: null,
             status: 'enabled',
             platformAllowed: true,
+            availability: 'scoped',
           },
         ],
       }),
