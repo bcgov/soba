@@ -4,7 +4,10 @@ import type { ClaimedJob } from '../db/repos/jobRepo';
 
 export interface JobContext {
   job: ClaimedJob;
-  /** Aborted when the job is cancelled, its lease is lost, or the pod shuts down. */
+  /**
+   * Aborted when the job is cancelled, times out, loses its lease, or the pod shuts down. The
+   * handler must then stop and throw: returning records the job as succeeded.
+   */
   signal: AbortSignal;
   log: Logger;
 }
@@ -16,7 +19,11 @@ export interface JobTypeDefinition {
   maxAttempts?: number;
   /** Run time before the handler is aborted; the pool's JOB_*_TIMEOUT_MS when unset. */
   timeoutMs?: number;
-  /** Throwing retries the job until its attempts run out. */
+  /**
+   * Returning means the work is done, even after an abort; throwing retries the job until its
+   * attempts run out. A job runs at least once, and after a lost lease two pods can run it at the
+   * same time, so its side effects must be safe to repeat.
+   */
   run: (context: JobContext) => Promise<void>;
 }
 

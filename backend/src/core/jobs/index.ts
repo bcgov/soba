@@ -4,7 +4,7 @@ import { JobRunner } from './runner';
 import { getJobSettings } from './settings';
 import { JobSweeper } from './sweeper';
 
-export { getJobSettings } from './settings';
+export { assertJobShutdownFits, getJobSettings } from './settings';
 
 let runner: JobRunner | undefined;
 let sweeper: JobSweeper | undefined;

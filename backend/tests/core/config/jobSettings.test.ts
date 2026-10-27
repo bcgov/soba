@@ -15,7 +15,7 @@ describe('resolveJobSettings', () => {
       retentionBatch: 1000,
       succeededRetentionDays: 30,
       deadRetentionDays: 90,
-      drainMs: 20_000,
+      drainMs: 15_000,
       abortGraceMs: 2_000,
     });
   });

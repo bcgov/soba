@@ -34,15 +34,15 @@ import { globalRateLimit, apiRateLimit, publicRateLimit } from './core/middlewar
 import { initializePassport } from './core/auth/passport';
 import { Features } from './core/db/codes';
 import { pool } from './core/db/client';
-import { getJobSettings, startJobs, stopJobs } from './core/jobs';
+import { assertJobShutdownFits, getJobSettings, startJobs, stopJobs } from './core/jobs';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const app = express();
 app.disable('x-powered-by');
 const port = Number(process.env.PORT) || 4000;
 // Read before listening, so an invalid value stops startup before the port opens.
-getJobSettings();
 const shutdownSettings = env.getShutdownSettings();
+assertJobShutdownFits(getJobSettings(), shutdownSettings.timeoutMs);
 
 // The app serves the base path itself, so Routes and probes address the same URLs the browser uses.
 const apiBasePath = env.getApiBasePath();

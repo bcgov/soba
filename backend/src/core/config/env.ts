@@ -245,7 +245,7 @@ export function resolveJobSettings(source: EnvSource): JobSettings {
     retentionBatch: setting('JOB_RETENTION_BATCH', 1000),
     succeededRetentionDays: retentionDays('JOB_SUCCEEDED_RETENTION_DAYS', 30),
     deadRetentionDays: retentionDays('JOB_DEAD_RETENTION_DAYS', 90),
-    drainMs: setting('JOB_DRAIN_MS', 20_000),
+    drainMs: setting('JOB_DRAIN_MS', 15_000),
     abortGraceMs: setting('JOB_ABORT_GRACE_MS', 2_000),
   };
 }

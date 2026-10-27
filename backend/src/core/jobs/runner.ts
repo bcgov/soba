@@ -10,12 +10,9 @@ import {
   type ClaimedJob,
 } from '../db/repos/jobRepo';
 import type { JobRegistry } from './registry';
+import { OUTCOME_WRITE_RETRIES, OUTCOME_WRITE_RETRY_MS } from './settings';
 import { decideOutcome, errorText, type JobOutcome, type JobStopReason } from './settlement';
 import { jitteredMs, withRetries } from './timing';
-
-/** A failed write of a job's outcome is tried this many more times before the lease is left. */
-const OUTCOME_WRITE_RETRIES = 3;
-const OUTCOME_WRITE_RETRY_MS = 1000;
 
 interface RunningJob {
   job: ClaimedJob;
