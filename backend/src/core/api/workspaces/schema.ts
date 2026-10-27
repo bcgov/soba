@@ -8,6 +8,7 @@ import {
   ListWorkspacesResponseSchema as SobaListWorkspacesResponseSchema,
   WorkspaceLookupItemSchema as SobaWorkspaceLookupItemSchema,
   WorkspaceLookupResponseSchema as SobaWorkspaceLookupResponseSchema,
+  WorkspaceNameAvailabilityResponseSchema as SobaWorkspaceNameAvailabilityResponseSchema,
 } from '@soba/lib';
 
 import {
@@ -105,9 +106,24 @@ export const UpdateWorkspaceBodySchema = SobaUpdateWorkspaceBodySchema.clone().o
   'Workspaces_UpdateWorkspaceBody',
 );
 
+export const WorkspaceNameAvailabilityQuerySchema = z
+  .object({
+    org: z.string().trim().min(1),
+    name: z.string().trim().min(1),
+    // The workspace being edited, so its own (unchanged) name doesn't report itself as taken.
+    excludeId: z.string().uuid().optional(),
+  })
+  .openapi('Workspaces_WorkspaceNameAvailabilityQuery');
+
+export const WorkspaceNameAvailabilityResponseSchema =
+  SobaWorkspaceNameAvailabilityResponseSchema.clone().openapi(
+    'Workspaces_WorkspaceNameAvailabilityResponse',
+  );
+
 const TAG = 'core.workspaces';
 const WORKSPACES_PATH = '/workspaces';
 const WORKSPACE_PATH = `${WORKSPACES_PATH}/{id}`;
+const INVALID_QUERY = 'Invalid query';
 
 export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
@@ -127,7 +143,7 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
           },
         },
       },
-      400: { description: 'Invalid query' },
+      400: { description: INVALID_QUERY },
     },
   });
 
@@ -148,7 +164,7 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
           },
         },
       },
-      400: { description: 'Invalid query' },
+      400: { description: INVALID_QUERY },
     },
   });
 
@@ -171,6 +187,28 @@ export const registerWorkspacesOpenApi = (registry: OpenAPIRegistry) => {
       },
       403: { description: 'Actor is not a member of the workspace' },
       404: { description: 'Workspace not found' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: `${WORKSPACES_PATH}/name-availability`,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    request: {
+      query: WorkspaceNameAvailabilityQuerySchema,
+    },
+    responses: {
+      200: {
+        description:
+          'Whether a team workspace name is free in this org, case-insensitively (for a live check as the name is typed).',
+        content: {
+          'application/json': {
+            schema: WorkspaceNameAvailabilityResponseSchema,
+          },
+        },
+      },
+      400: { description: INVALID_QUERY },
     },
   });
 

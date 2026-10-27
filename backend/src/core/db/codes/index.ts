@@ -58,7 +58,7 @@ export const WorkspaceStatus = {
 } as const;
 export type WorkspaceStatusCode = (typeof WorkspaceStatus)[keyof typeof WorkspaceStatus];
 
-/** Kind of a workspace (workspace.kind); names are unique per kind. */
+/** Kind of a workspace (workspace.kind); names are unique per kind and org, ignoring case. */
 export const WorkspaceKind = {
   team: 'team',
 } as const;

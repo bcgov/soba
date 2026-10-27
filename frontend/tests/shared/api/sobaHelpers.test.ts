@@ -92,7 +92,13 @@ describe('apiErrorMessage', () => {
     ],
     ['an error that is not from the API', new TypeError('x is undefined'), 'Try again.'],
     ['a coded error', new ApiError('No', 403, 'drafts_disabled'), 'Drafts are off.'],
+    [
+      'a server failure whose code has no message',
+      new ApiError('Internal server error', 500, 'internal_error'),
+      'Try again.',
+    ],
     ['an uncoded client error', new ApiError('Engine says no', 400), null],
+    ['a client error whose code has no message', new ApiError('No', 400, 'request_invalid'), null],
     ['an ended session', new SessionExpiredError(), null],
   ])('with a fallback, answers %s', (_label, cause, expected) => {
     expect(apiErrorMessage(cause, messages, 'Try again.')).toBe(expected);
