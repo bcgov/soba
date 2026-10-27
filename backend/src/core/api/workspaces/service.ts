@@ -15,6 +15,7 @@ import {
 import { listWorkspacesForSubmitter } from '../../db/repos/submitterFormRepo';
 import { WorkspaceKind } from '../../db/codes';
 import { ForbiddenError } from '../../errors';
+import { WORKSPACE_CREATE_FORBIDDEN, WORKSPACE_MANAGE_FORBIDDEN } from '../../messages';
 import { LOOKUP_FETCH_LIMIT, toLookupResponse } from '../shared/lookup';
 
 export class WorkspacesApiService {
@@ -132,17 +133,18 @@ export class WorkspacesApiService {
     };
   }
 
+  private async assertCanCreate(idpCode: string | null) {
+    if (!(await canCreateWorkspaceByIdp(idpCode))) {
+      throw new ForbiddenError(WORKSPACE_CREATE_FORBIDDEN);
+    }
+  }
+
   async create(
     actorId: string,
     idpCode: string | null,
     body: { name: string; org: string; useCase: string; disclaimerAccepted?: boolean },
   ) {
-    const canCreate = await canCreateWorkspaceByIdp(idpCode);
-    if (!canCreate) {
-      throw new ForbiddenError(
-        'Only users authenticated through a BC Government identity provider can create workspaces',
-      );
-    }
+    await this.assertCanCreate(idpCode);
     const workspaceId = await createTeamWorkspace(
       actorId,
       body.name,
@@ -173,15 +175,10 @@ export class WorkspacesApiService {
     if (excludeWorkspaceId) {
       const membership = await getWorkspaceForUser(excludeWorkspaceId, actorId);
       if (!membership || !isWorkspaceManageRole(membership.role)) {
-        throw new ForbiddenError('Only workspace owners or admins can manage this workspace');
+        throw new ForbiddenError(WORKSPACE_MANAGE_FORBIDDEN);
       }
     } else {
-      const canCreate = await canCreateWorkspaceByIdp(idpCode);
-      if (!canCreate) {
-        throw new ForbiddenError(
-          'Only users authenticated through a BC Government identity provider can create workspaces',
-        );
-      }
+      await this.assertCanCreate(idpCode);
     }
     const exists = await workspaceNameExistsForKindAndOrg(
       WorkspaceKind.team,
@@ -199,7 +196,7 @@ export class WorkspacesApiService {
   ) {
     const updated = await updateWorkspace(workspaceId, actorId, body);
     if (!updated) {
-      throw new ForbiddenError('Only workspace owners or admins can manage this workspace');
+      throw new ForbiddenError(WORKSPACE_MANAGE_FORBIDDEN);
     }
     const row = await getWorkspaceForUser(workspaceId, actorId);
     if (!row) return null;

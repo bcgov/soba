@@ -122,6 +122,9 @@ export const sobaAdmins = sobaSchema.table(
   }),
 );
 
+/** Constraint name a workspace-name unique violation is matched on. */
+export const WORKSPACE_KIND_ORG_NAME_UNIQUE = 'workspace_kind_org_name_uq';
+
 export const workspaces = sobaSchema.table(
   'workspace',
   {
@@ -138,7 +141,7 @@ export const workspaces = sobaSchema.table(
     // Names are unique per kind and organization, case-insensitively (two ministries can each have
     // a 'Health' workspace, but not twice within one). Not status-scoped like the group/form name
     // indexes because workspaces are never soft-deleted.
-    kindOrgNameUnique: uniqueIndex('workspace_kind_org_name_uq').on(
+    kindOrgNameUnique: uniqueIndex(WORKSPACE_KIND_ORG_NAME_UNIQUE).on(
       table.kind,
       table.org,
       sql`lower(${table.name})`,

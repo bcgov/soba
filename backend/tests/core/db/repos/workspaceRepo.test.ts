@@ -21,6 +21,7 @@ jest.mock('../../../../src/core/db/repos/membershipRepo', () => ({
 import { createTeamWorkspace, updateWorkspace } from '../../../../src/core/db/repos/workspaceRepo';
 import { WORKSPACE_NAME_TAKEN } from '../../../../src/core/messages';
 import { WorkspaceKind, WorkspaceMembershipRole } from '../../../../src/core/db/codes';
+import { WORKSPACE_KIND_ORG_NAME_UNIQUE } from '../../../../src/core/db/schema';
 
 const dialect = new PgDialect();
 
@@ -41,6 +42,13 @@ function mockSelectResolvesTo(rows: unknown[]) {
 function renderWhere(whereMock: jest.Mock) {
   const [condition] = whereMock.mock.calls[0];
   return dialect.sqlToQuery(condition);
+}
+
+/** A unique violation as Drizzle surfaces it: the pg error sits on the wrapper's cause. */
+function uniqueViolationOn(constraint: string) {
+  return Object.assign(new Error('Failed query'), {
+    cause: { code: '23505', severity: 'ERROR', constraint },
+  });
 }
 
 const membership = {
@@ -86,6 +94,43 @@ describe('workspaceRepo', () => {
     await createTeamWorkspace('user-1', 'New Name', 'HLTH', 'internal');
 
     expect(transactionMock).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  // Both saves passed the pre-check; the loser's insert hits the index instead.
+  it('createTeamWorkspace reports a name race lost at the unique index as the same conflict', async () => {
+    mockSelectResolvesTo([]); // uniqueness check: free, at the time
+    transactionMock.mockRejectedValue(uniqueViolationOn(WORKSPACE_KIND_ORG_NAME_UNIQUE));
+
+    await expect(createTeamWorkspace('user-1', 'Health', 'HLTH', 'internal')).rejects.toMatchObject(
+      {
+        message: WORKSPACE_NAME_TAKEN,
+        code: ApiErrorCodes.workspace_name_taken,
+      },
+    );
+  });
+
+  it('createTeamWorkspace passes any other unique violation through unchanged', async () => {
+    mockSelectResolvesTo([]);
+    const otherViolation = uniqueViolationOn('workspace_group_workspace_name_uq');
+    transactionMock.mockRejectedValue(otherViolation);
+
+    await expect(createTeamWorkspace('user-1', 'Health', 'HLTH', 'internal')).rejects.toBe(
+      otherViolation,
+    );
+  });
+
+  it('updateWorkspace reports a name race lost at the unique index as the same conflict', async () => {
+    getWorkspaceForUserMock.mockResolvedValue(membership);
+    mockSelectResolvesTo([{ displayLabel: 'Actor' }]); // actor display-label lookup
+    mockSelectResolvesTo([]); // uniqueness check: free, at the time
+    transactionMock.mockRejectedValue(uniqueViolationOn(WORKSPACE_KIND_ORG_NAME_UNIQUE));
+
+    await expect(
+      updateWorkspace('workspace-1', 'user-1', { name: 'Health' }),
+    ).rejects.toMatchObject({
+      message: WORKSPACE_NAME_TAKEN,
+      code: ApiErrorCodes.workspace_name_taken,
+    });
   });
 
   it('updateWorkspace throws a conflict when the new name is already taken in the same org', async () => {

@@ -113,6 +113,13 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
   })();
   const nameErrorMessage =
     nameStatus === 'unavailable' ? `${dictWorkspaces.nameUnavailable} ✕` : undefined;
+  // The description and error text aren't live regions, so the result is also announced. Only the
+  // result: announcing "Checking" on every pause in typing would be noise.
+  const nameAnnouncement = (() => {
+    if (nameStatus === 'available') return dictWorkspaces.nameAvailable;
+    if (nameStatus === 'unavailable') return dictWorkspaces.nameUnavailable;
+    return '';
+  })();
 
   const valid = useMemo(() => {
     return trimmedName.length > 0 && useCase !== '' && org !== '' && nameAvailable !== false;
@@ -164,7 +171,9 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
       addNotification({
         // Only workspace_name_taken gets its own wording; everything else falls back.
         text:
-          apiErrorMessage(error, { workspace_name_taken: dictWorkspaces.nameTaken }) ?? fallback,
+          apiErrorMessage(error, {
+            workspace_name_taken: dict.apiErrors.workspace_name_taken,
+          }) ?? fallback,
         type: 'error',
         consoleError: error,
       });
@@ -184,7 +193,7 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
     addNotification,
     dictWorkspaces.createError,
     dictWorkspaces.saveError,
-    dictWorkspaces.nameTaken,
+    dict.apiErrors.workspace_name_taken,
     revalidateNameAvailability,
   ]);
 
@@ -220,6 +229,14 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
         errorMessage={nameErrorMessage}
         data-testid="workspace-name"
       />
+      <p
+        role="status"
+        aria-live="polite"
+        className="visually-hidden"
+        data-testid="workspace-name-status"
+      >
+        {nameAnnouncement}
+      </p>
       <Select
         items={codeItems(dict.useCases, seed?.useCase, sortLocale)}
         label={dictWorkspaces.useCase}

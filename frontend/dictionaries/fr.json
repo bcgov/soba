@@ -79,7 +79,6 @@
     "createAction": "Créer",
     "saveError": "Échec de l'enregistrement de l'espace de travail.",
     "createError": "Échec de la création de l'espace de travail.",
-    "nameTaken": "Un espace de travail portant ce nom existe déjà.",
     "nameChecking": "Vérification…",
     "nameAvailable": "Disponible",
     "nameUnavailable": "Indisponible",

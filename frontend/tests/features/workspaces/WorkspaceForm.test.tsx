@@ -41,10 +41,11 @@ vi.mock('@/app/[lang]/Providers', () => ({
     useCases: {
       testUseCase: 'Test Use Case',
     },
-    // A code genuinely unrelated to workspace saves, so a test can tell "the specific
-    // already_exists wording" apart from "the generic apiErrors text for some other code".
+    // internal_error is unrelated to workspace saves, so a test can tell "the specific
+    // workspace_name_taken wording" apart from "the generic apiErrors text for some other code".
     apiErrors: {
       internal_error: 'Something went wrong. Please try again.',
+      workspace_name_taken: 'A workspace with this name already exists.',
     },
     workspaces: {
       createHeading: 'Create Workspace',
@@ -57,7 +58,6 @@ vi.mock('@/app/[lang]/Providers', () => ({
       cancel: 'Cancel',
       saveError: 'Failed to save workspace.',
       createError: 'Failed to create workspace.',
-      nameTaken: 'A workspace with this name already exists.',
       nameChecking: 'Checking…',
       nameAvailable: 'Available',
       nameUnavailable: 'Unavailable',
@@ -272,6 +272,8 @@ describe('WorkspaceForm', () => {
     await userEvent.type(screen.getByRole('textbox'), 'New');
 
     expect(await screen.findByText('Available ✓')).toBeInTheDocument();
+    // Announced too: the description under the field isn't a live region.
+    expect(screen.getByTestId('workspace-name-status')).toHaveTextContent('Available');
     expect(mockCheckWorkspaceNameAvailable).toHaveBeenCalledWith('token', {
       org: 'testOrg',
       name: 'New',
@@ -304,12 +306,13 @@ describe('WorkspaceForm', () => {
     await userEvent.selectOptions(screen.getByTestId('workspace-use-case'), 'testUseCase');
 
     expect(await screen.findByText('Unavailable ✕')).toBeInTheDocument();
+    expect(screen.getByTestId('workspace-name-status')).toHaveTextContent('Unavailable');
     expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
   });
 
-  it('re-checks the name after a 409 so the indicator stops claiming it is available', async () => {
+  it('re-checks the name after a 409 and says the name is taken', async () => {
     mockCreateWorkspace.mockRejectedValueOnce(
-      new ApiError('A workspace with this name already exists.', 409, 'already_exists'),
+      new ApiError('A workspace with this name already exists', 409, 'workspace_name_taken'),
     );
     await act(async () => {
       renderForm();
@@ -326,10 +329,13 @@ describe('WorkspaceForm', () => {
 
     expect(await screen.findByText('Unavailable ✕')).toBeInTheDocument();
     expect(mockCheckWorkspaceNameAvailable).toHaveBeenCalledTimes(2);
+    expect(mockAddNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'A workspace with this name already exists.' }),
+    );
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('shows the plain create-failed message for an error other than already_exists, not the generic apiErrors text', async () => {
+  it('shows the plain create-failed message for an error other than workspace_name_taken, not the generic apiErrors text', async () => {
     mockCreateWorkspace.mockRejectedValueOnce(
       new ApiError('Internal error', 500, 'internal_error'),
     );

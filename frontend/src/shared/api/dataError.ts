@@ -30,16 +30,18 @@ export const isOutcomeUnknown = (cause: unknown): boolean =>
   (cause instanceof ApiError && cause.status >= 500) || isNetworkError(cause);
 
 /**
- * The message for an error the server sent a code with. Without a code, `failed` stands in for a
- * server failure, no response, or an error that is not from the API. An uncoded client error (4xx)
- * and an ended session are null, so the caller can show the server's text or the session message.
+ * The message for an error the server sent a code with. Without a code, or with one `messages`
+ * leaves out, `failed` stands in for a server failure, no response, or an error that is not from
+ * the API. Any other client error (4xx) and an ended session are null, so the caller can show the
+ * server's text or the session message.
  */
 export function apiErrorMessage(
   cause: unknown,
   messages: Partial<Record<ApiErrorCode, string>>,
   failed?: string,
 ): string | null {
-  if (cause instanceof ApiError && cause.code) return messages[cause.code] ?? null;
+  const coded = cause instanceof ApiError && cause.code ? messages[cause.code] : undefined;
+  if (coded !== undefined) return coded;
   if (failed === undefined || isSessionExpired(cause)) return null;
   if (cause instanceof ApiError) return cause.status >= 500 ? failed : null;
   return failed;

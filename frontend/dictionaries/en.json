@@ -78,7 +78,6 @@
     "createAction": "Create",
     "saveError": "Failed to save workspace.",
     "createError": "Failed to create workspace.",
-    "nameTaken": "A workspace with this name already exists.",
     "nameChecking": "Checking…",
     "nameAvailable": "Available",
     "nameUnavailable": "Unavailable",
