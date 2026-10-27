@@ -11,6 +11,7 @@ import { env } from '../../config/env';
 import { authEnv } from '../../config/authEnv';
 import { getFormEnginePlugins } from '../../integrations/form-engine/FormEngineRegistry';
 import { getEnabledUserSearchPluginCodes } from '../../integrations/user-search/UserSearchRegistry';
+import { resolveDefaultCredentialIssuerCode } from '../../integrations/credential-issuer/CredentialIssuerRegistry';
 import { resolveDefaultTenantEngineCode } from '../../integrations/tenant/TenantEngineRegistry';
 import { resolveDefaultWorkflowEngineCode } from '../../integrations/workflow/WorkflowEngineRegistry';
 import {
@@ -49,12 +50,13 @@ function resolveGitSha(): string {
 export class MetaApiService {
   async getPlugins(): Promise<PluginsMetaResponse> {
     const plugins = getPluginCatalog();
-    // Selectable adapter codes come from the registry; form, tenant and workflow engines have their own.
+    // Selectable adapter codes come from the registry; other kinds resolve their own defaults.
     const activeFormEngineCode =
       env.getFormEngineDefaultCode() ?? getFormEnginePlugins()[0]?.code ?? 'formio-v5';
     const activeCodes = new Set([
       activeFormEngineCode,
       resolveDefaultTenantEngineCode(),
+      resolveDefaultCredentialIssuerCode(),
       resolveDefaultWorkflowEngineCode(),
       ...getEnabledUserSearchPluginCodes(),
       ...getActivePluginCodes(),

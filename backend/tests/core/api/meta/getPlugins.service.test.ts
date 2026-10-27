@@ -89,4 +89,24 @@ describe('MetaApiService.getPlugins feature-gated enablement', () => {
       expect(Object.fromEntries(plugins.map((p) => [p.code, p.enabled]))).toEqual(expected);
     },
   );
+  it.each([
+    [undefined, { 'aps-credential-issuer-v3': false, 'credential-issuer-noop': true }],
+    [
+      'aps-credential-issuer-v3',
+      { 'aps-credential-issuer-v3': true, 'credential-issuer-noop': false },
+    ],
+  ])('marks the selected credential issuer active (%s)', async (code, expected) => {
+    if (code === undefined) delete process.env.CREDENTIAL_ISSUER_DEFAULT_CODE;
+    else process.env.CREDENTIAL_ISSUER_DEFAULT_CODE = code;
+    getPluginCatalog.mockReturnValue([
+      { code: 'aps-credential-issuer-v3', hasApi: false },
+      { code: 'credential-issuer-noop', hasApi: false },
+    ]);
+    getFeatureGated.mockReturnValue([]);
+    listFeatures.mockResolvedValue([]);
+    const { plugins } = await metaApiService.getPlugins();
+    expect(Object.fromEntries(plugins.map((plugin) => [plugin.code, plugin.enabled]))).toEqual(
+      expected,
+    );
+  });
 });

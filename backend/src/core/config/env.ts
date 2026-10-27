@@ -178,6 +178,8 @@ export function createEnvReader(source: EnvSource) {
     getFormEngineDefaultCode: () => getOptionalEnvFrom(source, 'FORM_ENGINE_DEFAULT_CODE'),
     /** User search plugin codes, in merge order. Unset enables none. */
     getUserSearchPlugins: () => getCsvEnvFrom(source, 'USER_SEARCH_PLUGINS') ?? [],
+    getCredentialIssuerDefaultCode: () =>
+      getOptionalEnvFrom(source, 'CREDENTIAL_ISSUER_DEFAULT_CODE'),
     getTenantEngineDefaultCode: () => getOptionalEnvFrom(source, 'TENANT_ENGINE_DEFAULT_CODE'),
     getWorkflowEngineDefaultCode: () => getOptionalEnvFrom(source, 'WORKFLOW_ENGINE_DEFAULT_CODE'),
     getNotificationDefaultCode: () => getOptionalEnvFrom(source, 'NOTIFICATION_DEFAULT_CODE'),
@@ -267,6 +269,7 @@ export const env = {
   getFormEngineDefaultCode: () => getOptionalEnv('FORM_ENGINE_DEFAULT_CODE'),
   /** User search plugin codes, in merge order. Unset enables none. */
   getUserSearchPlugins: () => getCsvEnv('USER_SEARCH_PLUGINS') ?? [],
+  getCredentialIssuerDefaultCode: () => getOptionalEnv('CREDENTIAL_ISSUER_DEFAULT_CODE'),
   getTenantEngineDefaultCode: () => getOptionalEnv('TENANT_ENGINE_DEFAULT_CODE'),
   getWorkflowEngineDefaultCode: () => getOptionalEnv('WORKFLOW_ENGINE_DEFAULT_CODE'),
   getNotificationDefaultCode: () => getOptionalEnv('NOTIFICATION_DEFAULT_CODE'),

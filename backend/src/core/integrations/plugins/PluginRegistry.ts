@@ -39,6 +39,7 @@ import type {
   StorageEngineReadinessResult,
   StoragePluginDefinition,
 } from '../storage-engine/StorageEngineAdapter';
+import type { CredentialIssuerPluginDefinition } from '../credential-issuer/CredentialIssuerPluginDefinition';
 import type { TenantEnginePluginDefinition } from '../tenant/TenantEnginePluginDefinition';
 import type { WorkflowEnginePluginDefinition } from '../workflow/WorkflowEnginePluginDefinition';
 import type {
@@ -57,7 +58,7 @@ const AdapterPluginDefinitionSchema = z.object({
   createAdapter: z.any(),
 });
 
-// form-engine, document-generation, tenant-engine, workflow-engine, notification and user-search share this { code, metadata, createAdapter } shape.
+// Registry-backed integrations share this { code, metadata, createAdapter } shape.
 const MetadataPluginDefinitionSchema = z.object({
   code: z.string().min(1),
   metadata: z.object({
@@ -95,6 +96,7 @@ interface CachedPlugin {
   virusScanDefinition?: VirusScanPluginDefinition;
   storageDefinition?: StoragePluginDefinition;
   idpDefinition?: IdpPluginDefinition;
+  credentialIssuerDefinition?: CredentialIssuerPluginDefinition;
   tenantEngineDefinition?: TenantEnginePluginDefinition;
   workflowEngineDefinition?: WorkflowEnginePluginDefinition;
   notificationDefinition?: NotificationPluginDefinition;
@@ -150,6 +152,11 @@ const DEFINITION_KINDS: ReadonlyArray<{
     schema: AdapterPluginDefinitionSchema,
   },
   { field: 'idpDefinition', exportKey: 'idpPluginDefinition', schema: IdpPluginDefinitionSchema },
+  {
+    field: 'credentialIssuerDefinition',
+    exportKey: 'credentialIssuerPluginDefinition',
+    schema: MetadataPluginDefinitionSchema,
+  },
   {
     field: 'tenantEngineDefinition',
     exportKey: 'tenantEnginePluginDefinition',
@@ -311,6 +318,7 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
       p.virusScanDefinition?.code ??
       p.storageDefinition?.code ??
       p.idpDefinition?.code ??
+      p.credentialIssuerDefinition?.code ??
       p.tenantEngineDefinition?.code ??
       p.workflowEngineDefinition?.code ??
       p.notificationDefinition?.code ??
@@ -448,6 +456,23 @@ export function getIdpPluginDefinitions(): IdpPluginDefinition[] {
 
 export function getNotificationPluginDefinitions(): NotificationPluginDefinition[] {
   return definitionsOf('notificationDefinition');
+}
+
+export interface CredentialIssuerPluginCatalogEntry {
+  code: string;
+  name: string;
+  version?: string;
+}
+
+export function getCredentialIssuerPluginDefinitions(): CredentialIssuerPluginDefinition[] {
+  return definitionsOf('credentialIssuerDefinition');
+}
+
+export function getCredentialIssuerPluginCatalog(): CredentialIssuerPluginCatalogEntry[] {
+  return getCredentialIssuerPluginDefinitions().map((definition) => ({
+    ...definition.metadata,
+    code: definition.code,
+  }));
 }
 
 // --- Selectable adapters (singleton by code) --------------------------------

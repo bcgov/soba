@@ -524,3 +524,18 @@ removed from Secrets and PVCs. This allows `helm uninstall` to delete them norma
 | ----------------- | ------------------------------------------------- |
 | `false` (default) | Secrets and PVCs are **retained**                 |
 | `true`            | Secrets and PVCs are **deleted** with the release |
+
+### Credential issuer
+
+| Value | Purpose |
+| --- | --- |
+| `backend.config.credentialIssuerDefaultCode` | `credential-issuer-noop` (default) or `aps-credential-issuer-v3` |
+| `backend.credentialIssuer.apsCredentialIssuerV3.apiBaseUrl` | Directory API URL including `/ds/api/v3` |
+| `backend.credentialIssuer.apsCredentialIssuerV3.gatewayId` | Gateway ID |
+| `backend.credentialIssuer.apsCredentialIssuerV3.environmentAppId` | Target product environment appId |
+| `backend.credentialIssuer.apsCredentialIssuerV3.tokenUrl` | Service-account token endpoint |
+| `backend.credentialIssuer.apsCredentialIssuerV3.timeoutMs` | Shared operation deadline in milliseconds |
+
+When APS is selected with Vault enabled, the backend sources `PLUGIN_APS_CREDENTIAL_ISSUER_V3_CLIENT_ID` and
+`PLUGIN_APS_CREDENTIAL_ISSUER_V3_CLIENT_SECRET` from Vault. See [credential issuer](../../../docs/credential-issuer.md)
+for permissions, readiness limitations, and lifecycle behavior.
