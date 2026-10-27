@@ -19,9 +19,10 @@ const CODE = 'storage-s3';
  *
  * Config is read per storage profile, so keys use the STORAGE_PROFILE_<PROFILE>_ prefix
  * (e.g. STORAGE_PROFILE_DEFAULT_ENDPOINT), not a plugin-code prefix:
- * - ENDPOINT (http://host:port or host)
- * - PORT (optional)
- * - USE_SSL (true/false)
+ * - ENDPOINT (http(s)://host[:port] or host)
+ * - PORT (optional): for a URL without a port, else the scheme's default (443 or 80); for a host,
+ *   else 9000
+ * - USE_SSL (true/false): for a host only; a URL takes SSL from its scheme
  * - ACCESS_KEY
  * - SECRET_KEY
  * - BUCKET_NAME or BUCKET
@@ -31,18 +32,22 @@ const CODE = 'storage-s3';
  */
 function createMinioAdapter(config: PluginConfigReader): StorageEngineAdapter {
   const endpointRaw = config.getRequired('ENDPOINT');
+  const portRaw = config.getOptional('PORT');
   let endPointHost: string;
-  let port = Number(config.getOptional('PORT') ?? '9000');
-  let useSSL = (config.getOptional('USE_SSL') ?? 'false') === 'true';
+  let port: number;
+  let useSSL: boolean;
 
   try {
     const parsed = new URL(endpointRaw);
     endPointHost = parsed.hostname;
-    if (parsed.port) port = Number(parsed.port);
     useSSL = parsed.protocol === 'https:';
+    // URL leaves out the scheme's default port, so an https URL without one is 443, not 9000.
+    port = Number(parsed.port || portRaw || (useSSL ? '443' : '80'));
   } catch {
     // Not a full URL, treat as host string
     endPointHost = endpointRaw;
+    useSSL = (config.getOptional('USE_SSL') ?? 'false') === 'true';
+    port = Number(portRaw ?? '9000');
   }
 
   const accessKey = config.getRequired('ACCESS_KEY');

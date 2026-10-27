@@ -18,12 +18,11 @@ backend:
     minReplicas: 3
     maxReplicas: 6
     targetCPUUtilizationPercentage: 75
-  # Files and templates on the file store PVC (storage-local).
+  # Files and templates in S3; credentials and bucket come from Vault.
   storage:
-    defaultBackend: storage-local
-    defaultBasePath: /app/files
-    localVolume:
-      storageClassName: netapp-file-standard
+    defaultBackend: storage-s3
+    defaultPrefix: prod
+    s3VaultKeyInfix: PROD
   config:
     nodeEnv: production
     logLevel: warn
@@ -70,3 +69,7 @@ mongodb:
     enabled: false
   external:
     uri: ""
+
+# The prod deploy supplies vault.role, vault.secretPath and vault.serviceAccountName.
+vault:
+  enabled: true

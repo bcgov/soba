@@ -13,12 +13,11 @@ backend:
     limits:
       cpu: 250m
       memory: 512Mi
-  # Files and templates on the file store PVC (storage-local).
+  # Files and templates in S3; credentials and bucket come from Vault.
   storage:
-    defaultBackend: storage-local
-    defaultBasePath: /app/files
-    localVolume:
-      storageClassName: netapp-file-standard
+    defaultBackend: storage-s3
+    defaultPrefix: dev
+    s3VaultKeyInfix: DEV
   config:
     logLevel: debug
     nodeEnv: development
