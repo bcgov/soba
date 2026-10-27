@@ -15,5 +15,6 @@ export * from './submissionFile';
 export * from './documentTemplate';
 export * from './documentGenerationAudit';
 export * from './notificationAudit';
+export * from './job';
 export * from './devData';
 export * from './plugins.enterprise';

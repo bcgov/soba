@@ -3,6 +3,7 @@ backend:
   features:
     dev-data: "disabled"
     notifications: "disabled"
+    post-submission: "disabled"
     user-search: "disabled"
   replicas: 3
   resources:

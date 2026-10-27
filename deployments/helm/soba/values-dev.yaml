@@ -4,6 +4,7 @@ backend:
   features:
     dev-data: "enabled"
     notifications: "enabled"
+    post-submission: "enabled"
     user-search: "enabled"
   replicas: 1
   resources:
