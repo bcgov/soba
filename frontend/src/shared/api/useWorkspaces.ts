@@ -104,13 +104,24 @@ export function useWorkspaceNameAvailable(
   name: string,
   excludeId: string | undefined,
   enabled: boolean,
-): { available: boolean | undefined; isChecking: boolean } {
-  const { data, isLoading } = useAuthedSWR<WorkspaceNameAvailabilityResponse>(
-    enabled ? (['workspaces', 'name-availability', org, name, excludeId ?? ''] as const) : null,
+): { available: boolean | undefined; isChecking: boolean; revalidate: () => void } {
+  const { data, isLoading, mutate } = useAuthedSWR<WorkspaceNameAvailabilityResponse>(
+    // Not under 'workspaces': useRefreshWorkspaces() would otherwise refetch this too.
+    enabled ? (['workspace-name-availability', org, name, excludeId ?? ''] as const) : null,
     (token) => checkWorkspaceNameAvailable(token, { org, name, excludeId }),
     workspaceReadConfig,
   );
-  return { available: enabled ? data?.available : undefined, isChecking: enabled && isLoading };
+  // Re-fetches after a 409, so a stale "Available" doesn't sit next to the error it caused.
+  const revalidate = useCallback(() => {
+    void mutate();
+  }, [mutate]);
+
+  // SWR already reports data: undefined, isLoading: false for a null key; no `enabled` guard needed.
+  return {
+    available: data?.available,
+    isChecking: isLoading,
+    revalidate,
+  };
 }
 
 /**

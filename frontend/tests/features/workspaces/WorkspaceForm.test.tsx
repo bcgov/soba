@@ -13,6 +13,7 @@ const {
   mockCheckWorkspaceNameAvailable,
   mockRefreshWorkspaces,
   mockRefreshCurrentUser,
+  mockAddNotification,
 } = vi.hoisted(() => ({
   mockCreateWorkspace: vi.fn(),
   mockUpdateWorkspace: vi.fn(),
@@ -20,6 +21,7 @@ const {
   mockCheckWorkspaceNameAvailable: vi.fn().mockResolvedValue({ available: true }),
   mockRefreshWorkspaces: vi.fn().mockResolvedValue([]),
   mockRefreshCurrentUser: vi.fn().mockResolvedValue(undefined),
+  mockAddNotification: vi.fn(),
 }));
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
@@ -38,6 +40,11 @@ vi.mock('@/app/[lang]/Providers', () => ({
     },
     useCases: {
       testUseCase: 'Test Use Case',
+    },
+    // A code genuinely unrelated to workspace saves, so a test can tell "the specific
+    // already_exists wording" apart from "the generic apiErrors text for some other code".
+    apiErrors: {
+      internal_error: 'Something went wrong. Please try again.',
     },
     workspaces: {
       createHeading: 'Create Workspace',
@@ -119,7 +126,7 @@ vi.mock('@/src/shared/api/useCurrentUser', () => ({
 }));
 
 vi.mock('@/lib/hooks/useNotificationStore', () => ({
-  useNotificationStore: () => ({ addNotification: vi.fn() }),
+  useNotificationStore: () => ({ addNotification: mockAddNotification }),
 }));
 
 vi.mock('@/src/shared/api/sobaApi', () => ({
@@ -129,6 +136,7 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
   checkWorkspaceNameAvailable: mockCheckWorkspaceNameAvailable,
 }));
 
+import { ApiError } from '@/src/shared/api/sobaHelpers';
 import makeStore from '@/lib/store';
 import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import WorkspaceForm from '@/src/features/workspaces/ui/WorkspaceForm';
@@ -263,15 +271,27 @@ describe('WorkspaceForm', () => {
     await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
     await userEvent.type(screen.getByRole('textbox'), 'New');
 
-    await waitFor(
-      () => expect(screen.getByTestId('workspace-name-status')).toHaveTextContent('Available'),
-      { timeout: 2000 },
-    );
+    expect(await screen.findByText('Available ✓')).toBeInTheDocument();
     expect(mockCheckWorkspaceNameAvailable).toHaveBeenCalledWith('token', {
       org: 'testOrg',
       name: 'New',
       excludeId: undefined,
     });
+  });
+
+  it('does not re-check the name after a successful create, even though it refreshes the workspace list', async () => {
+    await act(async () => {
+      renderForm();
+    });
+    await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    await userEvent.type(screen.getByRole('textbox'), 'New Team');
+    await userEvent.selectOptions(screen.getByTestId('workspace-use-case'), 'testUseCase');
+    expect(await screen.findByText('Available ✓')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalled());
+    expect(mockCheckWorkspaceNameAvailable).toHaveBeenCalledTimes(1);
   });
 
   it('shows the name as unavailable and blocks save', async () => {
@@ -283,11 +303,80 @@ describe('WorkspaceForm', () => {
     await userEvent.type(screen.getByRole('textbox'), 'Taken');
     await userEvent.selectOptions(screen.getByTestId('workspace-use-case'), 'testUseCase');
 
-    await waitFor(
-      () => expect(screen.getByTestId('workspace-name-status')).toHaveTextContent('Unavailable'),
-      { timeout: 2000 },
-    );
+    expect(await screen.findByText('Unavailable ✕')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+  });
+
+  it('re-checks the name after a 409 so the indicator stops claiming it is available', async () => {
+    mockCreateWorkspace.mockRejectedValueOnce(
+      new ApiError('A workspace with this name already exists.', 409, 'already_exists'),
+    );
+    await act(async () => {
+      renderForm();
+    });
+    await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    await userEvent.type(screen.getByRole('textbox'), 'Taken Name');
+    await userEvent.selectOptions(screen.getByTestId('workspace-use-case'), 'testUseCase');
+
+    expect(await screen.findByText('Available ✓')).toBeInTheDocument();
+
+    // Someone else claims the name between the last check and this save landing.
+    mockCheckWorkspaceNameAvailable.mockResolvedValueOnce({ available: false });
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    expect(await screen.findByText('Unavailable ✕')).toBeInTheDocument();
+    expect(mockCheckWorkspaceNameAvailable).toHaveBeenCalledTimes(2);
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('shows the plain create-failed message for an error other than already_exists, not the generic apiErrors text', async () => {
+    mockCreateWorkspace.mockRejectedValueOnce(
+      new ApiError('Internal error', 500, 'internal_error'),
+    );
+    await act(async () => {
+      renderForm();
+    });
+    await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    await userEvent.type(screen.getByRole('textbox'), 'New Team');
+    await userEvent.selectOptions(screen.getByTestId('workspace-use-case'), 'testUseCase');
+    expect(await screen.findByText('Available ✓')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => expect(mockAddNotification).toHaveBeenCalled());
+    expect(mockAddNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'Failed to create workspace.' }),
+    );
+  });
+
+  it('manage mode does not check the workspace against its own unchanged name', async () => {
+    await act(async () => {
+      renderForm('ws2');
+    });
+    expect(await screen.findByDisplayValue('Team Workspace')).toBeInTheDocument();
+
+    expect(screen.queryByText(/Checking|Available|Unavailable/)).not.toBeInTheDocument();
+    expect(mockCheckWorkspaceNameAvailable).not.toHaveBeenCalled();
+  });
+
+  it('manage mode checks again once the name is actually edited, and stops once reverted', async () => {
+    await act(async () => {
+      renderForm('ws2');
+    });
+    const nameInput = await screen.findByDisplayValue('Team Workspace');
+
+    await userEvent.type(nameInput, ' Two');
+    expect(await screen.findByText('Available ✓')).toBeInTheDocument();
+    expect(mockCheckWorkspaceNameAvailable).toHaveBeenCalledWith('token', {
+      org: 'testOrg',
+      name: 'Team Workspace Two',
+      excludeId: 'ws2',
+    });
+
+    await userEvent.type(nameInput, '{backspace}{backspace}{backspace}{backspace}');
+    await waitFor(() =>
+      expect(screen.queryByText(/Checking|Available|Unavailable/)).not.toBeInTheDocument(),
+    );
   });
 
   it('cancel navigates back without saving', async () => {

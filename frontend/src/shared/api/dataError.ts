@@ -36,10 +36,10 @@ export const isOutcomeUnknown = (cause: unknown): boolean =>
  */
 export function apiErrorMessage(
   cause: unknown,
-  messages: Record<ApiErrorCode, string>,
+  messages: Partial<Record<ApiErrorCode, string>>,
   failed?: string,
 ): string | null {
-  if (cause instanceof ApiError && cause.code) return messages[cause.code];
+  if (cause instanceof ApiError && cause.code) return messages[cause.code] ?? null;
   if (failed === undefined || isSessionExpired(cause)) return null;
   if (cause instanceof ApiError) return cause.status >= 500 ? failed : null;
   return failed;

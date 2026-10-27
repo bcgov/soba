@@ -113,7 +113,7 @@ export const createTeamWorkspace = async (
   tx?: DbOrTx,
 ) => {
   if (await workspaceNameExistsForKindAndOrg(WorkspaceKind.team, org, name)) {
-    throw new ConflictError(WORKSPACE_NAME_TAKEN, ApiErrorCodes.already_exists);
+    throw new ConflictError(WORKSPACE_NAME_TAKEN, ApiErrorCodes.workspace_name_taken);
   }
   const run = async (d: DbOrTx) => {
     const workspaceId = uuidv7();
@@ -224,7 +224,7 @@ export const updateWorkspace = async (
     const name = input.name ?? membership.name;
     const org = input.org ?? membership.org;
     if (await workspaceNameExistsForKindAndOrg(membership.kind, org, name, workspaceId)) {
-      throw new ConflictError(WORKSPACE_NAME_TAKEN, ApiErrorCodes.already_exists);
+      throw new ConflictError(WORKSPACE_NAME_TAKEN, ApiErrorCodes.workspace_name_taken);
     }
   }
 

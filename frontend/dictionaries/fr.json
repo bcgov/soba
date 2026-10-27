@@ -584,6 +584,7 @@
     "unauthenticated": "Votre session n’est pas valide. Veuillez vous reconnecter.",
     "sign_in_required": "Connectez-vous pour voir vos formulaires et vos soumissions.",
     "already_exists": "Cet élément existe déjà. Rechargez la page et réessayez.",
+    "workspace_name_taken": "Un espace de travail portant ce nom existe déjà.",
     "route_not_found": "Cette page ou cette fonctionnalité n’est pas disponible.",
     "rate_limited": "Trop de demandes. Veuillez patienter un moment et réessayer.",
     "internal_error": "Une erreur s’est produite sur le serveur. Veuillez réessayer."

@@ -66,7 +66,13 @@ export const checkWorkspaceNameAvailable = asyncHandler(async (req: Request, res
     throw new ValidationError(MISSING_ACTOR_IDENTITY);
   }
   const { org, name, excludeId } = req.query as unknown as WorkspaceNameAvailabilityQuery;
-  const result = await workspacesApiService.checkNameAvailable(org, name, excludeId);
+  const result = await workspacesApiService.checkNameAvailable(
+    actorId,
+    getActorIdpCode(req),
+    org,
+    name,
+    excludeId,
+  );
   res.json(result);
 });
 

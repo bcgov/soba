@@ -1,6 +1,7 @@
 import type { SortLocale } from '@soba/lib';
 import {
   getWorkspaceForUser,
+  isWorkspaceManageRole,
   listWorkspacesForUser,
   lookupWorkspacesForUser,
   type WorkspaceListSort,
@@ -156,8 +157,32 @@ export class WorkspacesApiService {
     return this.toWorkspaceItem(row);
   }
 
-  /** Whether this (team) name is free in this org, case-insensitively, for the live name check. */
-  async checkNameAvailable(org: string, name: string, excludeWorkspaceId?: string) {
+  /**
+   * Whether this (team) name is free in this org, case-insensitively, for the live name check.
+   * Mirrors the authorization of the save this check is previewing: create's idp eligibility
+   * when checking a brand-new name, or update's manage-role membership when excludeWorkspaceId
+   * names the workspace being edited.
+   */
+  async checkNameAvailable(
+    actorId: string,
+    idpCode: string | null,
+    org: string,
+    name: string,
+    excludeWorkspaceId?: string,
+  ) {
+    if (excludeWorkspaceId) {
+      const membership = await getWorkspaceForUser(excludeWorkspaceId, actorId);
+      if (!membership || !isWorkspaceManageRole(membership.role)) {
+        throw new ForbiddenError('Only workspace owners or admins can manage this workspace');
+      }
+    } else {
+      const canCreate = await canCreateWorkspaceByIdp(idpCode);
+      if (!canCreate) {
+        throw new ForbiddenError(
+          'Only users authenticated through a BC Government identity provider can create workspaces',
+        );
+      }
+    }
     const exists = await workspaceNameExistsForKindAndOrg(
       WorkspaceKind.team,
       org,

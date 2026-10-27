@@ -24,7 +24,7 @@ import {
   useWorkspaceNameAvailable,
   useWorkspaceWriter,
 } from '@/src/shared/api/useWorkspaces';
-import { apiErrorMessage } from '@/src/shared/api/dataError';
+import { apiErrorMessage, isConflict } from '@/src/shared/api/dataError';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { useDebouncedValue } from '@/src/shared/hooks/useDebouncedValue';
@@ -82,28 +82,41 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
   const debouncedName = useDebouncedValue(name, NAME_CHECK_DEBOUNCE_MS);
   const trimmedName = name.trim();
   const trimmedDebouncedName = debouncedName.trim();
+  // The workspace can't collide with itself: while editing, an untouched name and org need no
+  // check at all, so mounting the form never flashes "Available" for the name it already has.
+  const unchangedFromSeed = seed !== null && trimmedName === seed.name.trim() && org === seed.org;
   // Waits for the debounce to settle on the name currently shown, so a result for an earlier
   // keystroke never flashes while the user is still typing.
   const nameCheckReady =
+    !unchangedFromSeed &&
     org !== '' &&
     trimmedDebouncedName.length >= NAME_CHECK_MIN_LENGTH &&
     trimmedDebouncedName === trimmedName;
-  const { available: nameAvailable, isChecking: checkingName } = useWorkspaceNameAvailable(
-    org,
-    trimmedDebouncedName,
-    seed?.id,
-    nameCheckReady,
-  );
+  const {
+    available: nameAvailable,
+    isChecking: checkingName,
+    revalidate: revalidateNameAvailability,
+  } = useWorkspaceNameAvailable(org, trimmedDebouncedName, seed?.id, nameCheckReady);
   const nameStatus: 'checking' | 'available' | 'unavailable' | null = (() => {
+    if (unchangedFromSeed) return null;
+    // Nothing worth reporting yet: too short to check, or no org to scope it to.
+    if (org === '' || trimmedName.length < NAME_CHECK_MIN_LENGTH) return null;
     if (!nameCheckReady || checkingName) return 'checking';
     if (nameAvailable === true) return 'available';
     if (nameAvailable === false) return 'unavailable';
     return null;
   })();
+  const nameDescription = (() => {
+    if (nameStatus === 'checking') return dictWorkspaces.nameChecking;
+    if (nameStatus === 'available') return `${dictWorkspaces.nameAvailable} ✓`;
+    return undefined;
+  })();
+  const nameErrorMessage =
+    nameStatus === 'unavailable' ? `${dictWorkspaces.nameUnavailable} ✕` : undefined;
 
   const valid = useMemo(() => {
-    return name.trim().length > 0 && useCase !== '' && org !== '' && nameAvailable !== false;
-  }, [name, useCase, org, nameAvailable]);
+    return trimmedName.length > 0 && useCase !== '' && org !== '' && nameAvailable !== false;
+  }, [trimmedName, useCase, org, nameAvailable]);
 
   const handleUseCaseChange = useCallback((newUseCase: Key | null) => {
     setUseCase(newUseCase?.toString() ?? '');
@@ -119,7 +132,6 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
 
   const handleSave = useCallback(async () => {
     if (!token) return;
-    const trimmedName = name.trim();
 
     setSaving(true);
     try {
@@ -144,13 +156,15 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
 
       router.push(navLink(`/${locale}/workspaces`));
     } catch (error) {
+      // Someone else just took this name: refresh the indicator so it stops saying "Available".
+      if (isConflict(error)) {
+        revalidateNameAvailability();
+      }
       const fallback = seed ? dictWorkspaces.saveError : dictWorkspaces.createError;
       addNotification({
+        // Only workspace_name_taken gets its own wording; everything else falls back.
         text:
-          apiErrorMessage(error, {
-            ...dict.apiErrors,
-            already_exists: dictWorkspaces.nameTaken,
-          }) ?? fallback,
+          apiErrorMessage(error, { workspace_name_taken: dictWorkspaces.nameTaken }) ?? fallback,
         type: 'error',
         consoleError: error,
       });
@@ -158,7 +172,7 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
       setSaving(false);
     }
   }, [
-    name,
+    trimmedName,
     org,
     useCase,
     token,
@@ -168,10 +182,10 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
     router,
     locale,
     addNotification,
-    dict.apiErrors,
     dictWorkspaces.createError,
     dictWorkspaces.saveError,
     dictWorkspaces.nameTaken,
+    revalidateNameAvailability,
   ]);
 
   const saveLabel = isCreate ? dictWorkspaces.create : dictWorkspaces.save;
@@ -195,31 +209,17 @@ function WorkspaceSettings({ workspace, first }: Readonly<WorkspaceSettingsProps
         value={org}
         onChange={handleOrgChange}
       />
-      <div className={styles.nameField}>
-        <TextField
-          label={dictWorkspaces.nameLabel}
-          value={name}
-          onChange={setName}
-          isRequired
-          isDisabled={saving || org === ''}
-          data-testid="workspace-name"
-        />
-        {org !== '' && trimmedName.length >= NAME_CHECK_MIN_LENGTH && nameStatus && (
-          <output className={styles.nameStatus} data-testid="workspace-name-status">
-            {nameStatus === 'checking' && (
-              <span className={styles.nameStatusChecking}>{dictWorkspaces.nameChecking}</span>
-            )}
-            {nameStatus === 'available' && (
-              <span className={styles.nameStatusAvailable}>{dictWorkspaces.nameAvailable} ✓</span>
-            )}
-            {nameStatus === 'unavailable' && (
-              <span className={styles.nameStatusUnavailable}>
-                {dictWorkspaces.nameUnavailable} ✕
-              </span>
-            )}
-          </output>
-        )}
-      </div>
+      <TextField
+        label={dictWorkspaces.nameLabel}
+        value={name}
+        onChange={setName}
+        isRequired
+        isDisabled={saving || org === ''}
+        isInvalid={nameStatus === 'unavailable'}
+        description={nameDescription}
+        errorMessage={nameErrorMessage}
+        data-testid="workspace-name"
+      />
       <Select
         items={codeItems(dict.useCases, seed?.useCase, sortLocale)}
         label={dictWorkspaces.useCase}

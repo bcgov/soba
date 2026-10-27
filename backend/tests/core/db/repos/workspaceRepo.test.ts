@@ -1,3 +1,6 @@
+import { PgDialect } from 'drizzle-orm/pg-core';
+import { ApiErrorCodes } from '@soba/lib';
+
 const selectMock = jest.fn();
 const transactionMock = jest.fn();
 
@@ -16,16 +19,28 @@ jest.mock('../../../../src/core/db/repos/membershipRepo', () => ({
 }));
 
 import { createTeamWorkspace, updateWorkspace } from '../../../../src/core/db/repos/workspaceRepo';
-import { ConflictError } from '../../../../src/core/errors';
 import { WORKSPACE_NAME_TAKEN } from '../../../../src/core/messages';
 import { WorkspaceKind, WorkspaceMembershipRole } from '../../../../src/core/db/codes';
 
-/** Chains select().from().where().limit() the way the repo queries, resolving to `rows`. */
+const dialect = new PgDialect();
+
+/**
+ * Chains select().from().where().limit() the way the repo queries, resolving to `rows`.
+ * Returns the `where` mock so a test can inspect what condition the repo actually filtered on,
+ * instead of only knowing that *some* query ran.
+ */
 function mockSelectResolvesTo(rows: unknown[]) {
   const limitMock = jest.fn().mockResolvedValue(rows);
   const whereMock = jest.fn(() => ({ limit: limitMock }));
   const fromMock = jest.fn(() => ({ where: whereMock }));
   selectMock.mockReturnValueOnce({ from: fromMock });
+  return whereMock;
+}
+
+/** Renders a captured `where(...)` condition to real SQL text and bound params. */
+function renderWhere(whereMock: jest.Mock) {
+  const [condition] = whereMock.mock.calls[0];
+  return dialect.sqlToQuery(condition);
 }
 
 const membership = {
@@ -47,13 +62,22 @@ describe('workspaceRepo', () => {
     getWorkspaceForUserMock.mockReset();
   });
 
-  it('createTeamWorkspace throws a conflict when the name is already taken', async () => {
-    mockSelectResolvesTo([{ id: 'other-workspace' }]);
+  it('createTeamWorkspace throws a conflict, scoped to this kind/org and case-insensitive, when the name is taken', async () => {
+    const whereMock = mockSelectResolvesTo([{ id: 'other-workspace' }]);
 
-    await expect(createTeamWorkspace('user-1', 'Health', 'HLTH', 'internal')).rejects.toThrow(
-      new ConflictError(WORKSPACE_NAME_TAKEN),
+    await expect(createTeamWorkspace('user-1', 'Health', 'HLTH', 'internal')).rejects.toMatchObject(
+      {
+        message: WORKSPACE_NAME_TAKEN,
+        code: ApiErrorCodes.workspace_name_taken,
+      },
     );
     expect(transactionMock).not.toHaveBeenCalled();
+
+    const { sql: whereSql, params } = renderWhere(whereMock);
+    expect(whereSql).toContain('"kind" = $1');
+    expect(whereSql).toContain('"org" = $2');
+    expect(whereSql).toContain('lower("soba"."workspace"."name") = lower($3)');
+    expect(params).toEqual([WorkspaceKind.team, 'HLTH', 'Health']);
   });
 
   it('createTeamWorkspace succeeds when the name is available', async () => {
@@ -64,15 +88,41 @@ describe('workspaceRepo', () => {
     expect(transactionMock).toHaveBeenCalledWith(expect.any(Function));
   });
 
-  it('updateWorkspace throws a conflict when the new name is already taken', async () => {
+  it('updateWorkspace throws a conflict when the new name is already taken in the same org', async () => {
     getWorkspaceForUserMock.mockResolvedValue(membership);
     mockSelectResolvesTo([{ displayLabel: 'Actor' }]); // actor display-label lookup
-    mockSelectResolvesTo([{ id: 'other-workspace' }]); // uniqueness check: taken
+    const whereMock = mockSelectResolvesTo([{ id: 'other-workspace' }]); // uniqueness check: taken
 
-    await expect(updateWorkspace('workspace-1', 'user-1', { name: 'Taken Name' })).rejects.toThrow(
-      new ConflictError(WORKSPACE_NAME_TAKEN),
-    );
+    await expect(
+      updateWorkspace('workspace-1', 'user-1', { name: 'Taken Name' }),
+    ).rejects.toMatchObject({
+      message: WORKSPACE_NAME_TAKEN,
+      code: ApiErrorCodes.workspace_name_taken,
+    });
     expect(transactionMock).not.toHaveBeenCalled();
+
+    const { sql: whereSql, params } = renderWhere(whereMock);
+    expect(whereSql).toContain('"org" = $2');
+    expect(whereSql).toContain('lower("soba"."workspace"."name") = lower($3)');
+    expect(whereSql).toContain('"id" <> $4');
+    expect(params).toEqual([WorkspaceKind.team, 'HLTH', 'Taken Name', 'workspace-1']);
+  });
+
+  it('updateWorkspace throws a conflict when moving to an org where the name is already taken there', async () => {
+    getWorkspaceForUserMock.mockResolvedValue(membership); // org HLTH, name "Existing Name"
+    mockSelectResolvesTo([{ displayLabel: 'Actor' }]); // actor display-label lookup
+    const whereMock = mockSelectResolvesTo([{ id: 'other-workspace' }]); // taken in the destination org
+
+    await expect(updateWorkspace('workspace-1', 'user-1', { org: 'EDU' })).rejects.toMatchObject({
+      message: WORKSPACE_NAME_TAKEN,
+      code: ApiErrorCodes.workspace_name_taken,
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+
+    // Checked against the destination org, not the org being left, and the membership's
+    // existing name, since this move alone didn't change it.
+    const { params } = renderWhere(whereMock);
+    expect(params).toEqual([WorkspaceKind.team, 'EDU', 'Existing Name', 'workspace-1']);
   });
 
   it('updateWorkspace succeeds when the new name is available', async () => {
