@@ -27,6 +27,9 @@ export interface JobTypeDefinition {
   run: (context: JobContext) => Promise<void>;
 }
 
+/** A job type without its handler, for code that queues the job but must not load what runs it. */
+export type JobTypeSpec = Omit<JobTypeDefinition, 'run'>;
+
 export class JobRegistry {
   private readonly definitions = new Map<string, JobTypeDefinition>();
 

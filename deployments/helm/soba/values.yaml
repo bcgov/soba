@@ -152,6 +152,8 @@ backend:
     # user-search-soba searches Soba's own users and needs no config. css-v1 injects the CSS
     # credentials from Vault, so the secret must hold them.
     userSearchPlugins: user-search-soba
+    # Post-submission action plugins this environment runs, comma-separated. Empty runs none.
+    postSubmissionActionPlugins: ""
     sobaSystemSubject: soba-system
     # On SIGTERM the backend keeps serving for shutdownDelayMs, or until running jobs drain if that
     # takes longer (see jobs.drainMs), then closes the server and exits by shutdownTimeoutMs; keep

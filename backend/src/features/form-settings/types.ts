@@ -36,7 +36,7 @@ export interface WorkspaceSettingsScope {
 /**
  * A self-contained group of form settings, served at /design/forms/:id/settings/<key>. The shared
  * settings router resolves the form and checks the group's feature before the group's routes run.
- * Every form has a row in each group: it is created with the form.
+ * A group either creates the form's row with the form or reads a missing row as its default.
  */
 export interface FormSettingsModule {
   /** URL segment of the group. */
@@ -50,7 +50,7 @@ export interface FormSettingsModule {
   registerOpenApi: RegisterOpenApiPaths;
   /** Cleared by dev-data purge before forms are deleted, in this order. */
   tables: WorkspaceScopedTable[];
-  /** Creates the form's row, in the transaction that creates the form. */
+  /** Creates the form's row, in the transaction that creates the form, for a group that keeps one. */
   createForForm: (input: FormSettingsRowInput, executor: DbOrTx) => Promise<void>;
   /** Set when the group's values are shared by the workspace's forms. */
   workspace?: WorkspaceSettingsScope;

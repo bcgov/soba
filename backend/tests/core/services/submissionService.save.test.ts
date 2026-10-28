@@ -6,6 +6,7 @@ import * as registry from '../../../src/core/integrations/form-engine/FormEngine
 import * as featureRepo from '../../../src/core/db/repos/featureRepo';
 import * as jobs from '../../../src/core/jobs';
 import * as enqueue from '../../../src/core/jobs/enqueue';
+import * as resolve from '../../../src/features/post-submission/resolve';
 import { ConflictError, NotFoundError, ValidationError } from '../../../src/core/errors';
 
 jest.mock('../../../src/core/db/client', () => ({ db: {} }));
@@ -43,6 +44,8 @@ jest.mock('../../../src/core/jobs/enqueue', () => ({
   enqueueSubmittedJob: jest.fn(),
 }));
 
+jest.mock('../../../src/features/post-submission/resolve', () => ({ availableActions: jest.fn() }));
+
 jest.mock('../../../src/core/integrations/form-engine/FormEngineRegistry', () => ({
   createFormEngineAdapter: jest.fn(),
 }));
@@ -60,6 +63,8 @@ const createAdapter = registry.createFormEngineAdapter as unknown as jest.Mock;
 const isFlagOn = featureRepo.isFeatureEnabledCached as unknown as jest.Mock;
 const nudge = jobs.nudgeJobs as unknown as jest.Mock;
 const enqueueJob = enqueue.enqueueSubmittedJob as unknown as jest.Mock;
+const availableActions = resolve.availableActions as unknown as jest.Mock;
+const ACTIONS = [{ code: 'post-submission-email' }];
 
 const input = {
   workspaceId: 'ws1',
@@ -77,6 +82,7 @@ const LABELS = { form: { name: 'Permit application' }, formVersion: { versionNo:
 
 const postSubmissionOn = () => {
   isFlagOn.mockResolvedValue(true);
+  availableActions.mockResolvedValue(ACTIONS);
   enqueueJob.mockResolvedValue(undefined);
   createAdapter.mockReturnValue({
     createSubmission: jest.fn().mockResolvedValue({ engineRef: 'eng-new' }),
@@ -450,9 +456,14 @@ describe('SubmissionService save (versioned engine write)', () => {
     await svc.submit(input);
 
     expect(isFlagOn).toHaveBeenCalledWith('post-submission', expect.any(Number));
+    // The actions' feature checks run before the transaction, for the submission's form.
+    expect(availableActions).toHaveBeenCalledWith('ws1', 'f1');
+    expect(availableActions.mock.invocationCallOrder[0]).toBeLessThan(
+      appendRevision.mock.invocationCallOrder[0],
+    );
     const onAppended = appendRevision.mock.calls[0][1];
     await onAppended('tx', { id: 's1' });
-    expect(enqueueJob).toHaveBeenCalledWith('tx', { id: 's1' }, 'rev-new', 'actor-1');
+    expect(enqueueJob).toHaveBeenCalledWith('tx', { id: 's1' }, 'rev-new', 'actor-1', ACTIONS);
     expect(nudge).toHaveBeenCalledWith('submission.submitted');
   });
 
@@ -484,6 +495,7 @@ describe('SubmissionService save (versioned engine write)', () => {
     await svc.save(input);
 
     expect(isFlagOn).not.toHaveBeenCalled();
+    expect(availableActions).not.toHaveBeenCalled();
     expect(appendRevision).toHaveBeenCalledWith(expect.anything(), undefined);
     expect(nudge).not.toHaveBeenCalled();
   });

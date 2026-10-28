@@ -19,6 +19,8 @@ backend:
     workflowEngineDefaultCode: cs-workflow-v1
     notificationDefaultCode: notify-v1
     userSearchPlugins: css-v1,user-search-soba
+    # Only logs that it ran, so a PR can exercise post-submission actions end to end.
+    postSubmissionActionPlugins: post-submission-log
     # Ephemeral PR namespaces stage temp bytes under os.tmpdir() — no RWX PVC.
     tempStorageDefaultCode: tempstorage-os
     # Virus scan inherits virusscan-clamav from values.yaml: PRs deploy into the dev
