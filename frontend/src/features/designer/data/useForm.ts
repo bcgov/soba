@@ -44,7 +44,7 @@ export function useDesignFormRead(formId?: string) {
   );
 }
 
-/** Every version of a form, for pickers; no id waits. */
+/** A form's versions for pickers, capped (see `truncated`); no id waits. */
 export function useFormVersionLookup(formId?: string) {
   return useAuthedSWR(
     formId ? [...versionsKey(formId), 'lookup'] : null,

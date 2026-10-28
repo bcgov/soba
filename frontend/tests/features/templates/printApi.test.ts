@@ -5,14 +5,13 @@ import {
 } from '@/src/features/templates/data/printApi';
 
 const documentResponse = (): Response =>
-  ({ ok: true, status: 200, blob: async () => new Blob(['%PDF']) }) as unknown as Response;
+  new Response('%PDF', { headers: { 'Content-Type': 'application/pdf' } });
 
-const refusal = {
-  ok: false,
-  status: 403,
-  headers: { get: () => 'application/json' },
-  json: async () => ({ error: 'Denied', code: 'read_denied' }),
-};
+const refusal = (): Response =>
+  new Response(JSON.stringify({ error: 'Denied', code: 'read_denied' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
 
 describe('printApi', () => {
   afterEach(() => {
@@ -42,7 +41,7 @@ describe('printApi', () => {
   });
 
   it('throws a refused render with its status and code', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(refusal));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(refusal()));
 
     await expect(
       printWithStoredTemplate('submit', undefined, 's1', 't1', {}),

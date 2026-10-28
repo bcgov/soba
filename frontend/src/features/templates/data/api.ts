@@ -1,5 +1,5 @@
 import { sobaFetch } from '@/src/shared/api/sobaFetch';
-import { ApiError, parseJson } from '@/src/shared/api/sobaHelpers';
+import { ApiError, parseBlob, parseJson } from '@/src/shared/api/sobaHelpers';
 import type { TemplateListResponse, TemplateResponse, TemplateType } from '@/src/types/templates';
 
 const TEMPLATES_PATH = '/templates';
@@ -55,6 +55,5 @@ export async function deleteTemplate(token: string, templateId: string): Promise
 /** The template's file. The caller owns the blob. */
 export async function downloadTemplate(token: string, templateId: string): Promise<Blob> {
   const response = await sobaFetch(`${templatePath(templateId)}/content`, { token });
-  if (!response.ok) throw new ApiError(`Request failed (${response.status})`, response.status);
-  return response.blob();
+  return parseBlob(response);
 }
