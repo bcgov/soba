@@ -1,5 +1,5 @@
 import { sobaFetch } from '@/src/shared/api/sobaFetch';
-import { parseJson } from '@/src/shared/api/sobaHelpers';
+import { parseBlob, parseJson } from '@/src/shared/api/sobaHelpers';
 import type { PrintOptions, StaffPrintFacts, SubmissionPrintFacts } from '@/src/types/templates';
 
 /** Which API a print goes through: the submitter's, or the staff design surface. */
@@ -7,12 +7,6 @@ export type PrintSurface = 'submit' | 'design';
 
 const submissionPath = (surface: PrintSurface, submissionId: string) =>
   `/${surface}/submissions/${submissionId}`;
-
-/** The rendered document. A refused render throws its ApiError, with the server's code. */
-async function documentBlob(response: Response): Promise<Blob> {
-  if (!response.ok) await parseJson(response);
-  return response.blob();
-}
 
 /** The submission's stored template and whether it can render, signed in or not. */
 export async function getSubmitterPrintFacts(
@@ -49,7 +43,7 @@ export async function printWithStoredTemplate(
     method: 'POST',
     json: { templateId, options },
   });
-  return documentBlob(response);
+  return parseBlob(response);
 }
 
 /** The submission rendered with a template sent along with the request; nothing is stored. */
@@ -68,5 +62,5 @@ export async function printWithUploadedTemplate(
     method: 'POST',
     form,
   });
-  return documentBlob(response);
+  return parseBlob(response);
 }

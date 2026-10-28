@@ -54,3 +54,9 @@ export async function parseJson<T>(response: Response): Promise<T> {
     throw err;
   }
 }
+
+/** The response body as a Blob; a refusal throws its ApiError, with the server's code. */
+export async function parseBlob(response: Response): Promise<Blob> {
+  if (!response.ok) await parseJson(response);
+  return response.blob();
+}
