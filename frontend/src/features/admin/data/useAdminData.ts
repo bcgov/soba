@@ -147,7 +147,8 @@ export function useFeatureScope(
   useEffect(() => {
     if (!featureScopeId) return;
     return () => {
-      mutate(scopeKey(featureScopeId), undefined, { revalidate: false }).catch(() => undefined);
+      // Clears the record and SWR's request marker, so the next mount reads it again.
+      mutate(scopeKey(featureScopeId), undefined).catch(() => undefined);
     };
   }, [featureScopeId, mutate]);
 

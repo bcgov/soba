@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { act } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import en from '@/dictionaries/en.json';
 import type { Dictionary } from '@/src/types/dictionary';
+import type { WorkspaceGroup } from '@/src/types/workspaceGroups';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 import { ADMINS, REVIEWERS, ROLES, WORKSPACE_ID, renderSignedIn } from './workspaceGroupsTestKit';
 
@@ -238,7 +239,8 @@ describe('WorkspaceGroupForm', () => {
   });
 
   it('reads the group again on the next edit rather than reusing the last read', async () => {
-    const view = renderForm(REVIEWERS.id);
+    // The reopen lands inside the app's dedupe window.
+    const view = renderSignedIn(editForm(REVIEWERS.id), { shipped: true });
     await screen.findByDisplayValue(REVIEWERS.name);
     // Closed, as the tab closes it: the providers and their cache stay.
     await view.show(null);
@@ -250,4 +252,40 @@ describe('WorkspaceGroupForm', () => {
     expect(roleBox('submission_reviewer')).not.toBeChecked();
     expect(mockApi.getWorkspaceGroup).toHaveBeenCalledTimes(2);
   });
+
+  it('reads the group again when reopened before the first read returns', async () => {
+    const firstRead = pendingRead();
+    mockApi.getWorkspaceGroup
+      .mockReturnValueOnce(firstRead.promise)
+      .mockResolvedValueOnce({ ...REVIEWERS, roles: ['form_admin'] });
+    const view = renderForm(REVIEWERS.id);
+    await waitFor(() => expect(mockApi.getWorkspaceGroup).toHaveBeenCalledTimes(1));
+
+    await view.show(null);
+    await view.show(editForm(REVIEWERS.id));
+    await act(async () => firstRead.finish(REVIEWERS));
+
+    await waitFor(() => expect(roleBox('form_admin')).toBeChecked());
+    expect(mockApi.getWorkspaceGroup).toHaveBeenCalledTimes(2);
+  });
+
+  // StrictMode runs each effect's cleanup and setup again on mount, while the first read is out.
+  it('reads the group under StrictMode', async () => {
+    const firstRead = pendingRead();
+    mockApi.getWorkspaceGroup.mockReturnValueOnce(firstRead.promise);
+    const view = renderSignedIn(<></>, { strict: true });
+    await view.show(editForm(REVIEWERS.id));
+    await act(async () => firstRead.finish(REVIEWERS));
+
+    expect(await screen.findByDisplayValue(REVIEWERS.name)).toBeInTheDocument();
+  });
 });
+
+/** A group read that stays out until the test finishes it. */
+function pendingRead() {
+  let finish: (group: WorkspaceGroup) => void = () => undefined;
+  const promise = new Promise<WorkspaceGroup>((resolve) => {
+    finish = resolve;
+  });
+  return { promise, finish };
+}

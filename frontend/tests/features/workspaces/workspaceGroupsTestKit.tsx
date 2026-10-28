@@ -5,6 +5,7 @@ import { SWRConfig, type Cache } from 'swr';
 
 import makeStore from '@/lib/store';
 import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
+import { swrConfig } from '@/src/shared/api/swrConfig';
 import type {
   ListWorkspaceGroupsResponse,
   RoleWithSourceMeta,
@@ -21,17 +22,31 @@ import type {
  *
  * `show` swaps what is under the providers, which stay mounted as they do in the app. A test that
  * closes and reopens a form uses it: unmounting the providers drops SWR's cache with them.
+ *
+ * `shipped` runs SWR with the app's config, dedupe window included, which the test defaults leave
+ * out. `strict` renders under StrictMode at the root, as `next dev` does. Open the form with `show`
+ * after the first render, as the app does: StrictMode re-runs the effects of whatever mounts, and
+ * `SWRConfig` mounting with the form resets SWR's request state.
  */
-export function renderSignedIn(ui: React.ReactElement, cache: Cache = new Map()) {
+export function renderSignedIn(
+  ui: React.ReactElement,
+  {
+    cache = new Map(),
+    shipped = false,
+    strict = false,
+  }: { cache?: Cache; shipped?: boolean; strict?: boolean } = {},
+) {
   const store = makeStore();
   store.dispatch(setToken('token'));
   store.dispatch(setAuthenticated(true));
+  const swr = shipped ? swrConfig : { dedupingInterval: 0, shouldRetryOnError: false };
+  const Root = strict ? React.StrictMode : React.Fragment;
   const tree = (children: React.ReactNode) => (
-    <Provider store={store}>
-      <SWRConfig value={{ provider: () => cache, dedupingInterval: 0, shouldRetryOnError: false }}>
-        {children}
-      </SWRConfig>
-    </Provider>
+    <Root>
+      <Provider store={store}>
+        <SWRConfig value={{ ...swr, provider: () => cache }}>{children}</SWRConfig>
+      </Provider>
+    </Root>
   );
   const view = render(tree(ui));
   return {

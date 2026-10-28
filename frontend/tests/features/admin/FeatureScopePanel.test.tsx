@@ -88,6 +88,18 @@ let store: ReturnType<typeof makeStore>;
 const FEATURE_SCOPE_ID = '11111111-1111-4111-8111-111111111111';
 const SCOPE_ID = '22222222-2222-4222-8222-222222222222';
 
+const FEATURE_SCOPE = {
+  id: FEATURE_SCOPE_ID,
+  featureCode: 'document-generation-v3',
+  scopeType: 'workspace',
+  scopeId: SCOPE_ID,
+  status: 'inactive',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-02T00:00:00.000Z',
+  createdBy: null,
+  updatedBy: null,
+};
+
 const renderPanel = async (props: React.ComponentProps<typeof FeatureScopePanel>) => {
   await act(async () => {
     render(
@@ -108,17 +120,7 @@ describe('FeatureScopePanel', () => {
     store = makeStore();
     store.dispatch(setToken('token'));
     store.dispatch(setAuthenticated(true));
-    mockFetchFeatureScope.mockResolvedValue({
-      id: FEATURE_SCOPE_ID,
-      featureCode: 'document-generation-v3',
-      scopeType: 'workspace',
-      scopeId: SCOPE_ID,
-      status: 'inactive',
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: '2026-01-02T00:00:00.000Z',
-      createdBy: null,
-      updatedBy: null,
-    });
+    mockFetchFeatureScope.mockResolvedValue(FEATURE_SCOPE);
     mockUpsertFeatureScope.mockResolvedValue(undefined);
   });
 
@@ -151,6 +153,41 @@ describe('FeatureScopePanel', () => {
     expect(mockFetchFeatureScope).toHaveBeenCalledWith('token', FEATURE_SCOPE_ID);
     // The page heading belongs to PageLayout.
     expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
+  });
+
+  // StrictMode runs each effect's cleanup and setup again on mount, while the first read is out. It
+  // sits at the root, as in `next dev`, and the panel opens into providers already mounted, as in
+  // the app: `SWRConfig` mounting with the panel would reset SWR's request state.
+  it('loads an existing feature scope under StrictMode', async () => {
+    let finishFirstRead: (scope: unknown) => void = () => undefined;
+    mockFetchFeatureScope.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishFirstRead = resolve;
+      }),
+    );
+    const tree = (showPanel: boolean) => (
+      <React.StrictMode>
+        <Provider store={store}>
+          <SWRConfig
+            value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}
+          >
+            {showPanel && (
+              <FeatureScopePanel
+                scopedFeatureCodes={['document-generation-v3']}
+                featureScopeId={FEATURE_SCOPE_ID}
+              />
+            )}
+          </SWRConfig>
+        </Provider>
+      </React.StrictMode>
+    );
+    const view = render(tree(false));
+    await act(async () => {
+      view.rerender(tree(true));
+    });
+    await act(async () => finishFirstRead(FEATURE_SCOPE));
+
+    expect(await screen.findByDisplayValue(SCOPE_ID)).toBeInTheDocument();
   });
 
   it('saves status changes in manage mode', async () => {

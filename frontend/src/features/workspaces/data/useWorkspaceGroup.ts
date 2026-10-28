@@ -22,9 +22,8 @@ export function useWorkspaceGroup(workspaceId: string, groupId: string | null) {
   useEffect(() => {
     if (!groupId) return;
     return () => {
-      mutate(groupKey(workspaceId, groupId, locale), undefined, { revalidate: false }).catch(
-        () => undefined,
-      );
+      // Clears the record and SWR's request marker, so the next mount reads it again.
+      mutate(groupKey(workspaceId, groupId, locale), undefined).catch(() => undefined);
     };
   }, [workspaceId, groupId, locale, mutate]);
 
