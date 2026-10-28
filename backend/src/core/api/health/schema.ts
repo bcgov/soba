@@ -31,6 +31,16 @@ export const AdapterReadinessResultSchema = z
   })
   .openapi('Health_AdapterReadinessResult');
 
+export const JobsReadinessResultSchema = z
+  .object({
+    ok: z.boolean(),
+    message: z.string().optional(),
+    /** Seconds the oldest due job has waited; null when none is waiting. */
+    oldestQueuedSeconds: z.number().int().nullable().optional(),
+    dead: z.number().int().optional(),
+  })
+  .openapi('Health_JobsReadinessResult');
+
 export const HealthReadinessResponseSchema = z
   .object({
     status: z.enum(['ready', 'unhealthy']),
@@ -47,6 +57,7 @@ export const HealthReadinessResponseSchema = z
     cache: AdapterReadinessResultSchema,
     messageBus: AdapterReadinessResultSchema,
     eventStream: AdapterReadinessResultSchema,
+    jobs: JobsReadinessResultSchema,
   })
   .openapi('Health_ReadinessResponse');
 

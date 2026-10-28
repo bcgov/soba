@@ -32,7 +32,8 @@ needs `STORAGE_PROFILE_<NAME>_BACKEND` (a plugin code) and reads its settings fr
 | -------------------------- | ------------- | ------------------------------------------------------------------------- |
 | `BASE_PATH`                | storage-local | directory, default `./data/storage`                                       |
 | `ENDPOINT`                 | storage-s3    | URL or host; a URL sets SSL from its scheme, and the port when it has one |
-| `PORT`, `USE_SSL`          | storage-s3    | default `9000`, `false`                                                   |
+| `PORT`                     | storage-s3    | default `443` (https URL), `80` (http URL) or `9000` (host)               |
+| `USE_SSL`                  | storage-s3    | host only; default `false`                                                |
 | `ACCESS_KEY`, `SECRET_KEY` | storage-s3    | required                                                                  |
 | `BUCKET_NAME`              | storage-s3    | required (or `BUCKET`)                                                    |
 | `PREFIX`                   | storage-s3    | optional; lowercase words joined by dashes, in slash-separated segments   |
@@ -54,14 +55,20 @@ Each feature chooses a profile, a key prefix and an upload limit:
 
 ### Helm
 
-`backend.storage` configures the `default` profile. Dev, test, UAT and prod use `storage-local` on
-the `<fullname>-backend-filestore` PVC (ReadWriteMany, `netapp-file-standard`, 1Gi) mounted at
-`/app/files`. The PVC is kept on uninstall unless `global.forceCleanup` is set. PR deployments use
-`storage-memory`.
+`backend.storage` configures the `default` profile. Dev, test, UAT and prod use `storage-s3`, each
+under its own `defaultPrefix` (`dev`, `test`, `uat`, `prod`). Their endpoint, bucket and credentials
+come from Vault: `s3VaultKeyInfix` (`DEV`, `TEST`, `UAT`, `PROD`) picks the keys
+`S3_<infix>_ENDPOINT`, `S3_<infix>_BUCKET_NAME`, `S3_<infix>_ACCESS_KEY_ID` and
+`S3_<infix>_ACCESS_SECRET_KEY` in `vault.secretPath`, and every key must be there.
+
+PR deployments use `storage-local` on the `<fullname>-backend-filestore` PVC (ReadWriteMany,
+`netapp-file-standard`, 1Gi) mounted at `/app/files`, and write nothing to S3. The chart keeps the
+PVC on uninstall unless `global.forceCleanup` is set; the PR close workflow deletes it.
 
 The chart fails on `storage-memory` with more than one replica or with autoscaling, `storage-local`
-without an absolute `defaultBasePath`, `storage-s3` without a valid `defaultPrefix`, and a malformed
-feature prefix. It does not set the S3 `ACCESS_KEY` or `SECRET_KEY`.
+without an absolute `defaultBasePath`, `storage-s3` without a valid `defaultPrefix`,
+`s3VaultKeyInfix` without `vault.enabled`, and a malformed feature prefix. Without
+`s3VaultKeyInfix` it does not set the S3 `ACCESS_KEY` or `SECRET_KEY`.
 
 ## File store
 

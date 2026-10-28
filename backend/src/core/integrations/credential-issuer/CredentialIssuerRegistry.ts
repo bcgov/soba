@@ -1,11 +1,11 @@
 import { createPluginConfigReader } from '../../config/pluginConfig';
-import { env } from '../../config/env';
 import type {
   CredentialIssuerAdapter,
   CredentialIssuerReadinessResult,
 } from './CredentialIssuerAdapter';
 import type { CredentialIssuerPluginDefinition } from './CredentialIssuerPluginDefinition';
 import {
+  resolveActivePluginCode,
   getCredentialIssuerPluginCatalog,
   getCredentialIssuerPluginDefinitions,
 } from '../plugins/PluginRegistry';
@@ -38,12 +38,9 @@ export const createCredentialIssuerAdapter = (code: string): CredentialIssuerAda
   return definition.createAdapter(createPluginConfigReader(code));
 };
 
-// Safe default: the noop issuer is always installed and needs no external service.
-const DEFAULT_CREDENTIAL_ISSUER_CODE = 'credential-issuer-noop';
-
 /** Issuer code the consumer defaults to: CREDENTIAL_ISSUER_DEFAULT_CODE, else credential-issuer-noop. */
 export const resolveDefaultCredentialIssuerCode = (): string =>
-  env.getCredentialIssuerDefaultCode() ?? DEFAULT_CREDENTIAL_ISSUER_CODE;
+  resolveActivePluginCode('credentialIssuer');
 
 /** Adapter for the default issuer (see resolveDefaultCredentialIssuerCode). */
 export const createDefaultCredentialIssuerAdapter = (): CredentialIssuerAdapter =>

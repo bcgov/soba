@@ -84,6 +84,18 @@ spec:
           {{`export PLUGIN_CSS_V1_CLIENT_SECRET="{{ .Data.data.PLUGIN_CSS_V1_CLIENT_SECRET }}"`}}
           {{`{{- end }}`}}
         {{- end }}
+        {{- if include "soba.storageUsesS3Vault" . }}
+        {{- $s3 := upper .Values.backend.storage.s3VaultKeyInfix }}
+        vault.hashicorp.com/error-on-missing-key-soba-s3: 'true'
+        vault.hashicorp.com/agent-inject-secret-soba-s3: {{ .Values.vault.secretPath | quote }}
+        vault.hashicorp.com/agent-inject-template-soba-s3: |
+          {{`{{- with secret "`}}{{ .Values.vault.secretPath }}{{`" }}`}}
+          {{`export STORAGE_PROFILE_DEFAULT_ACCESS_KEY="{{ .Data.data.S3_`}}{{ $s3 }}{{`_ACCESS_KEY_ID }}"`}}
+          {{`export STORAGE_PROFILE_DEFAULT_SECRET_KEY="{{ .Data.data.S3_`}}{{ $s3 }}{{`_ACCESS_SECRET_KEY }}"`}}
+          {{`export STORAGE_PROFILE_DEFAULT_BUCKET_NAME="{{ .Data.data.S3_`}}{{ $s3 }}{{`_BUCKET_NAME }}"`}}
+          {{`export STORAGE_PROFILE_DEFAULT_ENDPOINT="{{ .Data.data.S3_`}}{{ $s3 }}{{`_ENDPOINT }}"`}}
+          {{`{{- end }}`}}
+        {{- end }}
         {{- end }}
       labels:
         {{- include "soba.selectorLabels" (dict "root" . "component" "backend") | nindent 8 }}
@@ -107,8 +119,13 @@ spec:
               . /vault/secrets/soba-cdogs
               . /vault/secrets/soba-workflow
               . /vault/secrets/soba-notify
+<<<<<<< HEAD
               {{- if eq .Values.backend.config.credentialIssuerDefaultCode "aps-credential-issuer-v3" }}
               . /vault/secrets/soba-aps-credential-issuer
+=======
+              {{- if include "soba.storageUsesS3Vault" . }}
+              . /vault/secrets/soba-s3
+>>>>>>> develop
               {{- end }}
               {{- if include "soba.userSearchUsesCss" . }}
               . /vault/secrets/soba-css

@@ -247,6 +247,22 @@ either key is missing.
 | `PLUGIN_CSS_V1_CLIENT_ID`     | `PLUGIN_CSS_V1_CLIENT_ID`     |
 | `PLUGIN_CSS_V1_CLIENT_SECRET` | `PLUGIN_CSS_V1_CLIENT_SECRET` |
 
+## Post-Submission Action Configuration
+
+Actions that run after a submit are plugins, run as jobs while `backend.features.post-submission`
+is on. The list names the action codes this environment runs, comma-separated; with none listed, a
+submit queues no actions. Set in ConfigMap `<fullname>-backend-app` only when non-empty:
+
+| Helm value                                   | Env var                          | Used by                 |
+| -------------------------------------------- | -------------------------------- | ----------------------- |
+| `backend.config.postSubmissionActionPlugins` | `POST_SUBMISSION_ACTION_PLUGINS` | post-submission actions |
+
+`post-submission-log` only logs that it ran; PR environments list it so a review can exercise the
+whole path.
+
+To retire an action, take its code off the list first and remove its plugin in a later release.
+Jobs already queued for a plugin that no pod has stay queued.
+
 ## Database Migration
 
 On every `helm install` and `helm upgrade`, a Kubernetes Job runs **before** the

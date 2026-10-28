@@ -34,10 +34,16 @@ import { adminRouter } from './core/api/admin';
 import { globalRateLimit, apiRateLimit, publicRateLimit } from './core/middleware/rateLimit';
 import { initializePassport } from './core/auth/passport';
 import { Features } from './core/db/codes';
+import { pool } from './core/db/client';
+import { assertJobShutdownFits, getJobSettings, startJobs, stopJobs } from './core/jobs';
+import { setTimeout as delay } from 'node:timers/promises';
 
 const app = express();
 app.disable('x-powered-by');
 const port = Number(process.env.PORT) || 4000;
+// Read before listening, so an invalid value stops startup before the port opens.
+const shutdownSettings = env.getShutdownSettings();
+assertJobShutdownFits(getJobSettings(), shutdownSettings.timeoutMs);
 
 // The app serves the base path itself, so Routes and probes address the same URLs the browser uses.
 const apiBasePath = env.getApiBasePath();
@@ -171,8 +177,9 @@ app.use(
 app.use(notFoundHandler);
 app.use(coreErrorHandler);
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   log.info({ port }, 'Express is listening');
+  startJobs();
   void logStartupHealth()
     .then(logTempStorageSelfTest)
     .then(logVirusScanSelfTest)
@@ -187,3 +194,31 @@ app.listen(port, () => {
     .then(logUserSearchReadiness)
     .catch((err) => log.warn({ err }, 'Startup diagnostics failed'));
 });
+
+let shuttingDown = false;
+
+/**
+ * Node is PID 1 in the pod, so SIGTERM is ignored unless handled. On SIGTERM, keep serving for the
+ * shutdown delay while routing moves off the pod, and drain jobs alongside; then stop serving, close
+ * the pool and exit. SIGINT skips the delay. A second signal, or the shutdown timeout, exits at once.
+ */
+const shutdown = (signal: NodeJS.Signals): void => {
+  if (shuttingDown) process.exit(1);
+  shuttingDown = true;
+  log.info({ signal }, 'Shutting down');
+  setTimeout(() => {
+    log.error({ timeoutMs: shutdownSettings.timeoutMs }, 'Shutdown timed out');
+    process.exit(1);
+  }, shutdownSettings.timeoutMs).unref();
+  const serveMs = signal === 'SIGTERM' ? shutdownSettings.delayMs : 0;
+  Promise.all([stopJobs(), delay(serveMs)])
+    .then(() => new Promise<void>((resolve) => server.close(() => resolve())))
+    .then(() => pool.end())
+    .then(() => process.exit(0))
+    .catch((err: unknown) => {
+      log.error({ err }, 'Shutdown failed');
+      process.exit(1);
+    });
+};
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

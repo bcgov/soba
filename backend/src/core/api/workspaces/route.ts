@@ -8,6 +8,7 @@ import {
   createWorkspace,
   getWorkspaceById,
   updateWorkspace,
+  checkWorkspaceNameAvailable,
 } from './controller';
 import {
   ListWorkspacesQuerySchema,
@@ -15,6 +16,7 @@ import {
   UpdateWorkspaceBodySchema,
   WorkspaceIdParamsSchema,
   WorkspaceLookupQuerySchema,
+  WorkspaceNameAvailabilityQuerySchema,
 } from './schema';
 
 const router = express.Router();
@@ -33,6 +35,12 @@ router.get(
   validateRequest({ query: WorkspaceLookupQuerySchema }),
   sortLocale,
   lookupWorkspaces,
+);
+// Same reason: registered before `:id` so `name-availability` isn't taken as an id.
+router.get(
+  '/workspaces/name-availability',
+  validateRequest({ query: WorkspaceNameAvailabilityQuerySchema }),
+  checkWorkspaceNameAvailable,
 );
 
 router.get(

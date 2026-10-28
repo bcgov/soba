@@ -85,7 +85,7 @@ and nullable `rotatedAt`. The response never exposes the upstream consumer ID or
 All credential route responses use `Cache-Control: no-store`. Clients must keep returned keys
 out of shared caches, persistent state, notifications and telemetry.
 
-Run `pnpm --filter @soba/backend db:migrate` to apply migration `0055_workspace_credentials`.
+Run `pnpm --filter @soba/backend db:migrate` to apply migration `0058_workspace_credentials`.
 There is one credential record per workspace. The service reserves that slot before issuance and
 atomically reserves an active record before regeneration. The database stores metadata and
 secret-free audit events only; API keys are never persisted. Existing credentials retain their
@@ -119,7 +119,7 @@ close, logout, user change, workspace change, or unmount; it never enters SWR, R
 storage. Routine access-token refreshes preserve the open dialog. Metadata is cached separately.
 The copy button writes to the user's clipboard only when pressed.
 
-Migration `0056_credential_notes` adds optional notes. The UI's Done button saves these through
+Migration `0059_credential_notes` adds optional notes. The UI's Done button saves these through
 `PATCH /workspaces/:id/credentials/:credentialId` with `{ notes }` (maximum 1000 characters).
 This endpoint is workspace owner/admin only and returns metadata, without the API key. Notes
 must describe the storage location, not contain the key itself. Closing without Done discards

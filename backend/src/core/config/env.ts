@@ -142,6 +142,129 @@ export function resolveApiBasePath(source: EnvSource): string {
 const positiveInteger = (value: number | undefined): number | undefined =>
   value !== undefined && Number.isInteger(value) && value >= 1 ? value : undefined;
 
+/** Worker pool a job type runs in. A pod runs the pools listed in JOB_POOLS. */
+export const JobPool = {
+  light: 'light',
+  heavy: 'heavy',
+} as const;
+export type JobPoolCode = (typeof JobPool)[keyof typeof JobPool];
+
+/** Background job runner settings. */
+export interface JobSettings {
+  /** Pools this pod runs. */
+  pools: JobPoolCode[];
+  pollMs: Record<JobPoolCode, number>;
+  leaseMs: Record<JobPoolCode, number>;
+  /** Jobs one pod runs at once, per pool. */
+  concurrency: Record<JobPoolCode, number>;
+  /** Run time for a job type that does not set its own. */
+  timeoutMs: Record<JobPoolCode, number>;
+  /** Attempts for a job type that does not set its own. */
+  maxAttempts: number;
+  backoffBaseMs: number;
+  backoffMaxMs: number;
+  sweepIntervalMs: number;
+  /** Finished jobs deleted per sweep. */
+  retentionBatch: number;
+  succeededRetentionDays: number;
+  /** Applies to dead and cancelled jobs. */
+  deadRetentionDays: number;
+  /** How long shutdown waits for running jobs before aborting them. */
+  drainMs: number;
+  /** How long an aborted handler has to stop before its lease is left to expire. */
+  abortGraceMs: number;
+}
+
+/** Largest delay a Node timer accepts; a longer one fires after 1 ms. */
+export const MAX_TIMER_MS = 2_147_483_647;
+
+/** A heartbeat runs every third of the lease, so a shorter lease would beat continuously. */
+const MIN_LEASE_MS = 1000;
+
+/** Past this, now() minus the retention overflows a Postgres timestamp. */
+const MAX_RETENTION_DAYS = 36_500;
+
+/** Unset uses the fallback; a value that is not a whole number from `min` to `max` throws. */
+function wholeNumberSetting(
+  source: EnvSource,
+  key: string,
+  fallback: number,
+  { min = 1, max = MAX_TIMER_MS }: { min?: number; max?: number } = {},
+): number {
+  const raw = getOptionalEnvFrom(source, key);
+  if (raw === undefined) return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new Error(`${key} must be a whole number from ${min} to ${max}, got '${raw}'`);
+  }
+  return value;
+}
+
+const isJobPool = (value: string): value is JobPoolCode =>
+  (Object.values(JobPool) as string[]).includes(value);
+
+function resolveJobPools(source: EnvSource): JobPoolCode[] {
+  const raw = getCsvEnvFrom(source, 'JOB_POOLS');
+  if (!raw) return [JobPool.light, JobPool.heavy];
+  const unknown = raw.filter((pool) => !isJobPool(pool));
+  if (unknown.length > 0) {
+    throw new Error(`JOB_POOLS has unknown pools: ${unknown.join(', ')}`);
+  }
+  return [...new Set(raw.filter(isJobPool))];
+}
+
+/** Job runner settings from `source`. A set value that is not valid stops startup. */
+export function resolveJobSettings(source: EnvSource): JobSettings {
+  const setting = (key: string, fallback: number) => wholeNumberSetting(source, key, fallback);
+  const lease = (key: string, fallback: number) =>
+    wholeNumberSetting(source, key, fallback, { min: MIN_LEASE_MS });
+  const retentionDays = (key: string, fallback: number) =>
+    wholeNumberSetting(source, key, fallback, { max: MAX_RETENTION_DAYS });
+  return {
+    pools: resolveJobPools(source),
+    pollMs: {
+      light: setting('JOB_LIGHT_POLL_MS', 2_000),
+      heavy: setting('JOB_HEAVY_POLL_MS', 10_000),
+    },
+    leaseMs: {
+      light: lease('JOB_LIGHT_LEASE_MS', 60_000),
+      heavy: lease('JOB_HEAVY_LEASE_MS', 90_000),
+    },
+    concurrency: {
+      light: setting('JOB_LIGHT_CONCURRENCY', 4),
+      heavy: setting('JOB_HEAVY_CONCURRENCY', 1),
+    },
+    timeoutMs: {
+      light: setting('JOB_LIGHT_TIMEOUT_MS', 300_000),
+      heavy: setting('JOB_HEAVY_TIMEOUT_MS', 1_800_000),
+    },
+    maxAttempts: setting('JOB_MAX_ATTEMPTS', 3),
+    backoffBaseMs: setting('JOB_BACKOFF_BASE_MS', 30_000),
+    backoffMaxMs: setting('JOB_BACKOFF_MAX_MS', 1_800_000),
+    sweepIntervalMs: setting('JOB_SWEEP_INTERVAL_MS', 60_000),
+    retentionBatch: setting('JOB_RETENTION_BATCH', 1000),
+    succeededRetentionDays: retentionDays('JOB_SUCCEEDED_RETENTION_DAYS', 30),
+    deadRetentionDays: retentionDays('JOB_DEAD_RETENTION_DAYS', 90),
+    drainMs: setting('JOB_DRAIN_MS', 15_000),
+    abortGraceMs: setting('JOB_ABORT_GRACE_MS', 2_000),
+  };
+}
+
+export interface ShutdownSettings {
+  /** How long SIGTERM keeps serving while routing moves off the pod; 0 stops serving at once. */
+  delayMs: number;
+  /** Shutdown exits by this deadline whatever is still running. */
+  timeoutMs: number;
+}
+
+/** Shutdown settings from `source`. A set value that is not valid stops startup. */
+export function resolveShutdownSettings(source: EnvSource): ShutdownSettings {
+  return {
+    delayMs: wholeNumberSetting(source, 'SHUTDOWN_DELAY_MS', 5_000, { min: 0 }),
+    timeoutMs: wholeNumberSetting(source, 'SHUTDOWN_TIMEOUT_MS', 28_000),
+  };
+}
+
 /** Build an env reader that reads from the given source. Use in tests with a simulated .env object. */
 export function createEnvReader(source: EnvSource) {
   return {
@@ -180,6 +303,8 @@ export function createEnvReader(source: EnvSource) {
     getUserSearchPlugins: () => getCsvEnvFrom(source, 'USER_SEARCH_PLUGINS') ?? [],
     getCredentialIssuerDefaultCode: () =>
       getOptionalEnvFrom(source, 'CREDENTIAL_ISSUER_DEFAULT_CODE'),
+    getPostSubmissionActionPlugins: () =>
+      getCsvEnvFrom(source, 'POST_SUBMISSION_ACTION_PLUGINS') ?? [],
     getTenantEngineDefaultCode: () => getOptionalEnvFrom(source, 'TENANT_ENGINE_DEFAULT_CODE'),
     getWorkflowEngineDefaultCode: () => getOptionalEnvFrom(source, 'WORKFLOW_ENGINE_DEFAULT_CODE'),
     getNotificationDefaultCode: () => getOptionalEnvFrom(source, 'NOTIFICATION_DEFAULT_CODE'),
@@ -226,6 +351,8 @@ export function createEnvReader(source: EnvSource) {
     getTemporalTaskQueue: () => getOptionalEnvFrom(source, 'TEMPORAL_TASK_QUEUE') ?? 'soba',
     getTemporalWorkerHealthPort: () =>
       getNumberEnvFrom(source, 'TEMPORAL_WORKER_HEALTH_PORT') ?? 9090,
+    getJobSettings: () => resolveJobSettings(source),
+    getShutdownSettings: () => resolveShutdownSettings(source),
   };
 }
 
@@ -270,6 +397,8 @@ export const env = {
   /** User search plugin codes, in merge order. Unset enables none. */
   getUserSearchPlugins: () => getCsvEnv('USER_SEARCH_PLUGINS') ?? [],
   getCredentialIssuerDefaultCode: () => getOptionalEnv('CREDENTIAL_ISSUER_DEFAULT_CODE'),
+  /** Post-submission action plugins this environment runs, by code. Empty runs none. */
+  getPostSubmissionActionPlugins: () => getCsvEnv('POST_SUBMISSION_ACTION_PLUGINS') ?? [],
   getTenantEngineDefaultCode: () => getOptionalEnv('TENANT_ENGINE_DEFAULT_CODE'),
   getWorkflowEngineDefaultCode: () => getOptionalEnv('WORKFLOW_ENGINE_DEFAULT_CODE'),
   getNotificationDefaultCode: () => getOptionalEnv('NOTIFICATION_DEFAULT_CODE'),
@@ -330,4 +459,6 @@ export const env = {
   getTemplatesStorageProfile: () => getOptionalEnv('TEMPLATES_STORAGE_PROFILE') ?? 'default',
   // Key prefix the templates feature stores under within its profile. Defaults to 'templates'.
   getTemplatesStoragePrefix: () => getOptionalEnv('TEMPLATES_STORAGE_PREFIX') ?? 'templates',
+  getJobSettings: () => resolveJobSettings(process.env),
+  getShutdownSettings: () => resolveShutdownSettings(process.env),
 };
