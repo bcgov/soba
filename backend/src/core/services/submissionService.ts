@@ -40,6 +40,7 @@ import {
 import { isFeatureEnabledCached } from '../db/repos/featureRepo';
 import { nudgeJobs } from '../jobs';
 import { enqueueSubmittedJob, queuesSubmittedJob } from '../jobs/enqueue';
+import { availableActions } from '../../features/post-submission/resolve';
 import {
   decideRecordedWrite,
   decideSubmissionWrite,
@@ -118,18 +119,20 @@ interface ListInput {
 
 /**
  * Record the revision. A submit with post-submission on queues its job in the same transaction and
- * nudges the runner once that commits.
+ * nudges the runner once that commits. The actions' feature checks run first, outside it.
  */
 const appendWithJobs = async (
   append: SaveSubmissionInput,
+  formId: string,
 ): Promise<AppendSubmissionRevisionResult> => {
   const queueJob = await queuesSubmittedJob(append.eventType, () =>
     isFeatureEnabledCached(Features.post_submission, Date.now()),
   );
+  const plugins = queueJob ? await availableActions(append.workspaceId, formId) : [];
   const result = await appendSubmissionRevision(
     append,
     queueJob
-      ? (tx, record) => enqueueSubmittedJob(tx, record, append.revisionId, append.actorId)
+      ? (tx, record) => enqueueSubmittedJob(tx, record, append.revisionId, append.actorId, plugins)
       : undefined,
   );
   if (queueJob && result.outcome === 'appended') nudgeJobs(JobType.submission_submitted);
@@ -313,21 +316,24 @@ export class SubmissionService {
         validate: eventType === SubmissionEventType.submitted,
       });
 
-      const result = await appendWithJobs({
-        workspaceId: input.workspaceId,
-        submissionId: input.submissionId,
-        revisionId,
-        parentRevisionId: decision.parentRevisionId,
-        actorId: input.actorId,
-        actorDisplayLabel: input.actorDisplayLabel,
-        eventType,
-        status: pending ? RevisionStatus.pending : RevisionStatus.current,
-        reason: pending ? decision.reason : RevisionReason.accepted,
-        workflowState: pending
-          ? (submission.workflowState as SubmissionWorkflowStateCode)
-          : decision.workflowState,
-        afterEngineSubmissionRef: engineRef,
-      }).catch((err: unknown) => {
+      const result = await appendWithJobs(
+        {
+          workspaceId: input.workspaceId,
+          submissionId: input.submissionId,
+          revisionId,
+          parentRevisionId: decision.parentRevisionId,
+          actorId: input.actorId,
+          actorDisplayLabel: input.actorDisplayLabel,
+          eventType,
+          status: pending ? RevisionStatus.pending : RevisionStatus.current,
+          reason: pending ? decision.reason : RevisionReason.accepted,
+          workflowState: pending
+            ? (submission.workflowState as SubmissionWorkflowStateCode)
+            : decision.workflowState,
+          afterEngineSubmissionRef: engineRef,
+        },
+        submission.formId,
+      ).catch((err: unknown) => {
         // Another write committed this revision id first.
         if (isUniqueViolationOn(err, SUBMISSION_REVISION_PKEY)) {
           throw new ConflictError(

@@ -62,6 +62,9 @@ data:
   PLUGIN_VIRUSSCAN_CLAMAV_TIMEOUT_MS: {{ .Values.clamav.timeoutMs | quote }}
   {{- end }}
   SOBA_SYSTEM_SUBJECT: {{ .Values.backend.config.sobaSystemSubject | quote }}
+  {{- with include "soba.optionalSetting" .Values.backend.config.postSubmissionActionPlugins }}
+  POST_SUBMISSION_ACTION_PLUGINS: {{ . }}
+  {{- end }}
   {{- with include "soba.optionalSetting" .Values.backend.config.shutdownDelayMs }}
   SHUTDOWN_DELAY_MS: {{ . }}
   {{- end }}

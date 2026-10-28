@@ -7,6 +7,9 @@ export type JobStopReason = 'cancel' | 'timeout' | 'lease_lost' | 'drain';
 /** What the runner records for a claimed job: a finish, or a release back to the queue. */
 export type JobOutcome = JobFinish | { kind: 'release' };
 
+/** Thrown by a handler that decides its job should not run; the job ends cancelled, not retried. */
+export class JobCancelledError extends Error {}
+
 const MAX_ERROR_LENGTH = 2000;
 
 export const errorText = (err: unknown): string =>

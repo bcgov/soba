@@ -11,7 +11,13 @@ import {
 } from '../db/repos/jobRepo';
 import type { JobRegistry } from './registry';
 import { OUTCOME_WRITE_RETRIES, OUTCOME_WRITE_RETRY_MS } from './settings';
-import { decideOutcome, errorText, type JobOutcome, type JobStopReason } from './settlement';
+import {
+  decideOutcome,
+  errorText,
+  JobCancelledError,
+  type JobOutcome,
+  type JobStopReason,
+} from './settlement';
 import { jitteredMs, withRetries } from './timing';
 
 interface RunningJob {
@@ -233,6 +239,7 @@ export class JobRunner {
       await definition.run({ job, signal: controller.signal, log });
       return undefined;
     } catch (err) {
+      if (err instanceof JobCancelledError && !entry.stopReason) entry.stopReason = 'cancel';
       return entry.stopReason === 'timeout' ? `Timed out after ${timeoutMs} ms` : errorText(err);
     } finally {
       clearTimeout(timer);

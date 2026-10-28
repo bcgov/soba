@@ -48,6 +48,7 @@ import type {
 } from '../notification/NotificationAdapter';
 import { reportReadinessByKey } from './readiness';
 import type { UserSearchPluginDefinition } from '../user-search/UserSearchPluginDefinition';
+import type { PostSubmissionActionPluginDefinition } from '../post-submission-action/PostSubmissionActionPluginDefinition';
 
 // --- Definition schemas -----------------------------------------------------
 
@@ -81,6 +82,32 @@ const IdpPluginDefinitionSchema = z.object({
   createClaimMapper: z.any(),
 });
 
+const hasParsers = (value: unknown): boolean =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as { parse?: unknown }).parse === 'function' &&
+  typeof (value as { safeParse?: unknown }).safeParse === 'function';
+
+// The code is also a job type and a URL segment, so it is lowercase words joined by dashes.
+const PostSubmissionActionPluginDefinitionSchema = z.object({
+  code: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  metadata: z.object({
+    code: z.string(),
+    name: z.string(),
+    description: z.string().optional(),
+    version: z.string().optional(),
+  }),
+  featureCode: z.string().min(1).optional(),
+  scopes: z.array(z.enum(['workspace', 'form'])).min(1),
+  optionsSchema: z.custom(hasParsers, 'Expected a schema with parse and safeParse'),
+  job: z.object({
+    pool: z.enum(['light', 'heavy']),
+    maxAttempts: z.number().int().positive().optional(),
+    timeoutMs: z.number().int().positive().optional(),
+    run: z.custom((value) => typeof value === 'function', 'Expected a function'),
+  }),
+});
+
 // --- Discovery --------------------------------------------------------------
 
 interface CachedPlugin {
@@ -99,6 +126,7 @@ interface CachedPlugin {
   workflowEngineDefinition?: WorkflowEnginePluginDefinition;
   notificationDefinition?: NotificationPluginDefinition;
   userSearchDefinition?: UserSearchPluginDefinition;
+  postSubmissionActionDefinition?: PostSubmissionActionPluginDefinition;
 }
 
 // Each CachedPlugin definition field, the module export it comes from, and the schema that
@@ -169,6 +197,11 @@ const DEFINITION_KINDS: ReadonlyArray<{
     field: 'userSearchDefinition',
     exportKey: 'userSearchPluginDefinition',
     schema: MetadataPluginDefinitionSchema,
+  },
+  {
+    field: 'postSubmissionActionDefinition',
+    exportKey: 'postSubmissionActionPluginDefinition',
+    schema: PostSubmissionActionPluginDefinitionSchema,
   },
 ];
 
@@ -279,6 +312,9 @@ export interface FeatureGatedPlugin {
 export function getFeatureGatedPluginCodes(): FeatureGatedPlugin[] {
   const gated: FeatureGatedPlugin[] = [];
   for (const { field } of DEFINITION_KINDS) {
+    // An action plugin is on where POST_SUBMISSION_ACTION_PLUGINS lists it; its feature only narrows
+    // which forms it runs for.
+    if (field === 'postSubmissionActionDefinition') continue;
     for (const def of definitionsOf(field)) {
       const d = def as { code?: unknown; featureCode?: unknown };
       if (typeof d.code === 'string' && typeof d.featureCode === 'string' && d.featureCode) {
@@ -315,6 +351,7 @@ export function getPluginCatalog(): PluginCatalogEntry[] {
       p.workflowEngineDefinition?.code ??
       p.notificationDefinition?.code ??
       p.userSearchDefinition?.code ??
+      p.postSubmissionActionDefinition?.code ??
       p.dir;
     return {
       code,
@@ -448,6 +485,30 @@ export function getIdpPluginDefinitions(): IdpPluginDefinition[] {
 
 export function getNotificationPluginDefinitions(): NotificationPluginDefinition[] {
   return definitionsOf('notificationDefinition');
+}
+
+let postSubmissionActions: PostSubmissionActionPluginDefinition[] | null = null;
+
+/** One definition per code, since each code is a job type: a later folder with a taken code is skipped. */
+function uniquePostSubmissionActions(): PostSubmissionActionPluginDefinition[] {
+  const byCode = new Map<string, PostSubmissionActionPluginDefinition>();
+  for (const plugin of discoverAndCache()) {
+    const definition = plugin.postSubmissionActionDefinition;
+    if (definition && byCode.has(definition.code)) {
+      log.warn(
+        { plugin: plugin.dir, code: definition.code },
+        '[PluginRegistry] duplicate post-submission action code, skipping',
+      );
+    } else if (definition) {
+      byCode.set(definition.code, definition);
+    }
+  }
+  return [...byCode.values()];
+}
+
+export function getPostSubmissionActionPluginDefinitions(): PostSubmissionActionPluginDefinition[] {
+  postSubmissionActions ??= uniquePostSubmissionActions();
+  return postSubmissionActions;
 }
 
 // --- Selectable adapters (singleton by code) --------------------------------

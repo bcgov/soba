@@ -1,5 +1,5 @@
 import { log } from '../logging';
-import { jobRegistry } from './catalog';
+import { getJobRegistry } from './catalog';
 import { JobRunner } from './runner';
 import { getJobSettings } from './settings';
 import { JobSweeper } from './sweeper';
@@ -13,7 +13,7 @@ let sweeper: JobSweeper | undefined;
 export const startJobs = (): void => {
   if (runner) return;
   const settings = getJobSettings();
-  runner = new JobRunner(jobRegistry, settings, log.child({ component: 'job-runner' }));
+  runner = new JobRunner(getJobRegistry(), settings, log.child({ component: 'job-runner' }));
   sweeper = new JobSweeper(settings, log.child({ component: 'job-sweeper' }));
   runner.start();
   sweeper.start();
@@ -26,6 +26,7 @@ export const stopJobs = async (): Promise<void> => {
 
 /** Claim queued jobs of `type` now, when this process runs its pool. */
 export const nudgeJobs = (type: string): void => {
-  const definition = jobRegistry.get(type);
-  if (definition) runner?.nudge(definition.pool);
+  if (!runner) return;
+  const definition = getJobRegistry().get(type);
+  if (definition) runner.nudge(definition.pool);
 };
