@@ -1,0 +1,31 @@
+{
+  "fields": [
+    "form.confirmationId",
+    "form.submittedAt",
+    "form.submitter",
+    "applicantName",
+    "applicantEmail",
+    "householdSize",
+    "mailingAddress",
+    "dependants.name",
+    "dependants.age"
+  ],
+  "exports": [
+    {
+      "id": "5b1e9c2a-7d40-4f83-9a6e-2c8f0d1b7e01",
+      "format": "csv",
+      "layout": "multiRowEmptySpacesCSVExport",
+      "from": "2026-09-01T07:00:00.000Z",
+      "to": "2026-10-01T07:00:00.000Z",
+      "fields": ["form.confirmationId", "form.submittedAt", "applicantName", "householdSize"],
+      "status": "queued",
+      "createdAt": "2026-10-20T17:12:44.000Z"
+    },
+    {
+      "id": "a3d7f018-2e6b-4c95-8b1d-6f4a9e0c3d02",
+      "format": "json",
+      "status": "queued",
+      "createdAt": "2026-10-14T22:03:09.000Z"
+    }
+  ]
+}

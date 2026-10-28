@@ -1,0 +1,144 @@
+import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { SWRConfig } from 'swr';
+
+const getSobaExportFields = vi.fn();
+const listSobaSubmissionExports = vi.fn();
+const startSobaSubmissionExport = vi.fn();
+
+vi.mock('@/src/shared/api/sobaApi', () => ({
+  getSobaForm: vi.fn(),
+  lookupFormVersions: vi.fn(),
+  getSobaExportFields: (...args: unknown[]) => getSobaExportFields(...args),
+  listSobaSubmissionExports: (...args: unknown[]) => listSobaSubmissionExports(...args),
+  startSobaSubmissionExport: (...args: unknown[]) => startSobaSubmissionExport(...args),
+}));
+
+import makeStore from '@/lib/store';
+import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
+import { ApiError } from '@/src/shared/api/sobaHelpers';
+import {
+  useExportFields,
+  useSubmissionExportStarter,
+  useSubmissionExports,
+} from '@/src/features/designer/data/useSubmissionExport';
+import type { SubmissionExport, SubmissionExportFieldsBody } from '@/src/types/submissionExport';
+
+const FILTERS: SubmissionExportFieldsBody = { layout: 'multiRowEmptySpacesCSVExport' };
+
+const QUEUED: SubmissionExport = {
+  id: 'e1',
+  formId: 'f1',
+  format: 'csv',
+  status: 'queued',
+  createdAt: '2026-10-20T17:12:44.000Z',
+};
+
+function wrapper({ children }: { children: React.ReactNode }) {
+  const store = makeStore();
+  store.dispatch(setToken('token'));
+  store.dispatch(setAuthenticated(true));
+  return (
+    <Provider store={store}>
+      <SWRConfig
+        value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}
+      >
+        {children}
+      </SWRConfig>
+    </Provider>
+  );
+}
+
+describe('useExportFields', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('reads the fields for the filters once', async () => {
+    getSobaExportFields.mockResolvedValue({ fields: ['applicantName'] });
+
+    const { result } = renderHook(() => useExportFields('f1', FILTERS), { wrapper });
+
+    await waitFor(() => expect(result.current.data?.fields).toEqual(['applicantName']));
+    expect(getSobaExportFields).toHaveBeenCalledTimes(1);
+    expect(getSobaExportFields).toHaveBeenCalledWith('token', 'f1', FILTERS);
+  });
+
+  it('waits while the filters are incomplete', async () => {
+    const { result } = renderHook(() => useExportFields('f1', null), { wrapper });
+
+    await act(async () => {});
+    expect(result.current.data).toBeNull();
+    expect(getSobaExportFields).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [403, 'forbidden'],
+    [500, 'failed'],
+  ])('classifies a %s read as %s', async (status, kind) => {
+    getSobaExportFields.mockRejectedValue(new ApiError('no', status));
+
+    const { result } = renderHook(() => useExportFields('f1', FILTERS), { wrapper });
+
+    await waitFor(() => expect(result.current.error?.kind).toBe(kind));
+    expect(result.current.data).toBeNull();
+  });
+});
+
+describe('useSubmissionExports', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('reads my exports once', async () => {
+    listSobaSubmissionExports.mockResolvedValue({ items: [QUEUED] });
+
+    const { result } = renderHook(() => useSubmissionExports('f1'), { wrapper });
+
+    await waitFor(() => expect(result.current.rows).toEqual([QUEUED]));
+    expect(result.current.total).toBe(1);
+    expect(listSobaSubmissionExports).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [403, 'forbidden'],
+    [500, 'failed'],
+  ])('classifies a %s read as %s', async (status, kind) => {
+    listSobaSubmissionExports.mockRejectedValue(new ApiError('no', status));
+
+    const { result } = renderHook(() => useSubmissionExports('f1'), { wrapper });
+
+    await waitFor(() => expect(result.current.error?.kind).toBe(kind));
+    expect(result.current.rows).toEqual([]);
+  });
+});
+
+describe('useSubmissionExportStarter', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('returns the queued export and re-reads the list', async () => {
+    listSobaSubmissionExports.mockResolvedValue({ items: [] });
+    startSobaSubmissionExport.mockResolvedValue(QUEUED);
+
+    const { result } = renderHook(
+      () => ({ list: useSubmissionExports('f1'), starter: useSubmissionExportStarter('f1') }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.list.total).toBe(0));
+    listSobaSubmissionExports.mockResolvedValue({ items: [QUEUED] });
+
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.starter.start('token', { format: 'csv' });
+    });
+
+    expect(outcome).toEqual({ status: 'applied', value: QUEUED });
+    await waitFor(() => expect(result.current.list.rows).toEqual([QUEUED]));
+  });
+
+  it('throws a failed start to the caller', async () => {
+    startSobaSubmissionExport.mockRejectedValue(new ApiError('boom', 500));
+
+    const { result } = renderHook(() => useSubmissionExportStarter('f1'), { wrapper });
+
+    await expect(result.current.start('token', { format: 'json' })).rejects.toThrow('boom');
+  });
+});

@@ -5,6 +5,7 @@ export * from './schemas/postSubmission';
 export * from './schemas/submissions';
 export * from './schemas/submissionReview';
 export * from './schemas/formTeam';
+export * from './schemas/submissionExport';
 export * from './schemas/pagination';
 export * from './sort';
 export * from './schemas/admin';

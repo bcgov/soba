@@ -17,6 +17,13 @@ import type {
 } from '../../types/forms';
 import type { ListSubmissionsResponse, SubmissionListItem } from '@/src/types/submissions';
 import type { SubmissionReview, UpdateSubmissionStatusBody } from '@/src/types/submissionReview';
+import type {
+  StartSubmissionExportBody,
+  SubmissionExport,
+  SubmissionExportFieldsBody,
+  SubmissionExportFieldsResponse,
+  SubmissionExportList,
+} from '@/src/types/submissionExport';
 import { toListRequestQuery, type ListQueryArgs } from '@/src/types/list';
 import { sortLocaleHeaders } from './sortLocaleRequest';
 
@@ -248,4 +255,41 @@ export async function downloadSobaSubmissionFile(
     token,
   });
   return parseDownload(response);
+}
+
+/** The fields an export with these filters can include. */
+export async function getSobaExportFields(
+  token: string,
+  formId: string,
+  filters: SubmissionExportFieldsBody,
+): Promise<SubmissionExportFieldsResponse> {
+  const response = await sobaFetch(`/design/forms/${formId}/exports/fields`, {
+    token,
+    method: 'POST',
+    json: filters,
+  });
+  return parseJson(response);
+}
+
+/** Start an export; answers with the queued export. */
+export async function startSobaSubmissionExport(
+  token: string,
+  formId: string,
+  body: StartSubmissionExportBody,
+): Promise<SubmissionExport> {
+  const response = await sobaFetch(`/design/forms/${formId}/exports`, {
+    token,
+    method: 'POST',
+    json: body,
+  });
+  return parseJson(response);
+}
+
+/** The caller's exports of a form, newest first. */
+export async function listSobaSubmissionExports(
+  token: string,
+  formId: string,
+): Promise<SubmissionExportList> {
+  const response = await sobaFetch(`/design/forms/${formId}/exports`, { token });
+  return parseJson(response);
 }

@@ -39,6 +39,7 @@ const { mockGetSubmissions, mockDelete, mockPush, dict } = vi.hoisted(() => ({
       emptyList: 'No submissions',
       submissions: 'Submissions',
       error: 'Could not load submissions.',
+      export: { button: 'Export submissions' },
     },
   },
 }));
@@ -137,6 +138,16 @@ describe('FormSubmissionTab', () => {
     });
 
     expect(mockPush).toHaveBeenCalledWith('/en/build/f1/submissions/sub-1');
+  });
+
+  it('opens the exports page from the Export submissions button', async () => {
+    await renderTab();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('submissions-export-button'));
+    });
+
+    expect(mockPush).toHaveBeenCalledWith('/en/build/f1/submissions/exports');
   });
 
   const openDelete = async (id: string) => {

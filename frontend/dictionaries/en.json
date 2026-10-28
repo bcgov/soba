@@ -642,6 +642,51 @@
         "createdAt": "Created Date",
         "quickLinks": "Quick Links"
       }
+    },
+    "export": {
+      "button": "Export submissions",
+      "pageTitle": "Export submissions",
+      "sampleNotice": "The field list and your exports on this page are sample data. Exports are not run yet.",
+      "back": "Back to submissions",
+      "loadError": "Could not load the form.",
+      "fieldsError": "Could not load the fields.",
+      "fileType": "File type",
+      "csv": "CSV",
+      "json": "JSON",
+      "version": "Form version",
+      "allVersions": "All versions",
+      "versionOption": "Version {version}",
+      "dates": "Submission date",
+      "all": "All",
+      "range": "Date range",
+      "from": "From",
+      "to": "To",
+      "rangeInvalid": "Choose a From date on or before the To date, neither in the future.",
+      "fields": "Data fields",
+      "fieldSearch": "Search fields",
+      "selectAll": "Select all",
+      "selectNone": "Select none",
+      "fieldsSelected": "{selected} of {total} fields selected",
+      "noFields": "This form has no fields to export.",
+      "layout": "CSV format",
+      "layouts": {
+        "multiRowEmptySpacesCSVExport": "1 - Multiple rows per submission with indentation spaces",
+        "multiRowBackFilledCSVExport": "2 - Multiple rows per submission",
+        "singleRowCSVExport": "3 - Single row per submission",
+        "unFormattedCSVExport": "4 - Unformatted"
+      },
+      "start": "Export",
+      "starting": "Starting…",
+      "started": "Export started.",
+      "failed": "Could not start the export.",
+      "myExports": "My exports",
+      "listError": "Could not load your exports.",
+      "noExports": "You have not exported this form yet.",
+      "startedAt": "Started",
+      "status": "Status",
+      "statuses": {
+        "queued": "Queued"
+      }
     }
   },
   "mySubmissions": {
