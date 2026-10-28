@@ -1,5 +1,6 @@
 import type { Logger } from 'pino';
 import type { ClaimedJob } from '../../../src/core/db/repos/jobRepo';
+import type { PostSubmissionActionServices } from '../../../src/core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
 import { findPostSubmissionAction } from '../../../src/core/integrations/post-submission-action/PostSubmissionActionRegistry';
 import { postSubmissionActionPluginDefinition as plugin } from '../../../src/plugins/post-submission-log';
 
@@ -33,6 +34,16 @@ describe('post-submission-log', () => {
       job: { id: 'job-1', submissionId: 's1', revisionId: 'r1' } as ClaimedJob,
       options: { note: 'private words' },
       source,
+      submission: {
+        id: 's1',
+        formId: 'f1',
+        formName: 'Form',
+        workspaceId: 'w1',
+        workspaceName: 'Workspace',
+        confirmationCode: 'ABCDEFGH',
+      },
+      // The log plugin uses no services.
+      services: {} as PostSubmissionActionServices,
       signal: new AbortController().signal,
       log: { info } as unknown as Logger,
     });

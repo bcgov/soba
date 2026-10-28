@@ -2,6 +2,8 @@ import type { Logger } from 'pino';
 import type { z } from 'zod';
 import type { JobPoolCode } from '../../config/env';
 import type { ClaimedJob } from '../../db/repos/jobRepo';
+import type { SendEmail } from '../notification/NotificationAdapter';
+import type { SendOutcome } from '../notification/sendOutcome';
 
 /** Where an action is configured: a workspace default its forms inherit, or one form. */
 export type PostSubmissionActionScope = 'workspace' | 'form';
@@ -13,11 +15,50 @@ export interface PostSubmissionActionSource {
   version: number;
 }
 
+/** The submission an action job runs for, with names as they are when the job runs. */
+export interface PostSubmissionActionSubmission {
+  id: string;
+  formId: string;
+  formName: string;
+  workspaceId: string;
+  workspaceName: string;
+  confirmationCode: string;
+}
+
+/** One email send, as the notification service reported and audited it. */
+export interface PostSubmissionActionEmailResult extends SendOutcome {
+  /** False when the audit row could not be written. */
+  audited: boolean;
+}
+
+/** Where a send count looks: the job's form, its workspace, or the whole environment. */
+export type PostSubmissionActionSendScope = 'form' | 'workspace' | 'environment';
+
+/** The notification service, bound to the job: sends are attributed to the system user. */
+export interface PostSubmissionActionNotifications {
+  enabled(): Promise<boolean>;
+  sendEmail(email: SendEmail): Promise<PostSubmissionActionEmailResult>;
+  /** Addresses this job has already handed to the provider, or that the provider refused. */
+  handledRecipients(): Promise<Set<string>>;
+  /**
+   * Sends the provider accepted or refused in the last `seconds`, by the database clock. Failures
+   * that will be retried are not counted, so an outage does not use up the hour.
+   */
+  sentSince(scope: PostSubmissionActionSendScope, seconds: number): Promise<number>;
+}
+
+/** Services the framework passes to an action, so plugins do not import feature code. */
+export interface PostSubmissionActionServices {
+  notifications: PostSubmissionActionNotifications;
+}
+
 export interface PostSubmissionActionContext<TOptions> {
   job: ClaimedJob;
   /** The options saved when the submission was received, parsed by the plugin's schema. */
   options: TOptions;
   source: PostSubmissionActionSource;
+  submission: PostSubmissionActionSubmission;
+  services: PostSubmissionActionServices;
   signal: AbortSignal;
   log: Logger;
 }

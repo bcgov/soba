@@ -253,12 +253,25 @@ Actions that run after a submit are plugins, run as jobs while `backend.features
 is on. The list names the action codes this environment runs, comma-separated; with none listed, a
 submit queues no actions. Set in ConfigMap `<fullname>-backend-app` only when non-empty:
 
-| Helm value                                   | Env var                          | Used by                 |
-| -------------------------------------------- | -------------------------------- | ----------------------- |
-| `backend.config.postSubmissionActionPlugins` | `POST_SUBMISSION_ACTION_PLUGINS` | post-submission actions |
+| Helm value                                                 | Env var                                                           | Used by                         |
+| ---------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------- |
+| `backend.config.postSubmissionActionPlugins`               | `POST_SUBMISSION_ACTION_PLUGINS`                                  | post-submission actions         |
+| `backend.config.postSubmissionEmailFormHourlyLimit`        | `PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_FORM_HOURLY_LIMIT`        | post-submission-email-addresses |
+| `backend.config.postSubmissionEmailWorkspaceHourlyLimit`   | `PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_WORKSPACE_HOURLY_LIMIT`   | post-submission-email-addresses |
+| `backend.config.postSubmissionEmailEnvironmentHourlyLimit` | `PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_ENVIRONMENT_HOURLY_LIMIT` | post-submission-email-addresses |
 
 `post-submission-log` only logs that it ran; PR environments list it so a review can exercise the
 whole path.
+
+`post-submission-email-addresses` emails a notice to a list of up to 100 addresses through the
+active notification plugin. The hourly limits (defaults 500 per form, 2000 per workspace, 5000 for
+the environment) are checked before a list starts; a list that would pass one is not sent and its
+job ends cancelled with the counts. Its feature, `backend.features.post-submission-email`, is
+scoped: it applies only where granted, and only while its status is `enabled`. Dev and PR list the
+plugin and enable the feature; a workspace still needs a feature grant before the action can be
+configured there. A pilot elsewhere needs notify-v1 configured, `backend.features.notifications`
+and `backend.features.post-submission` on, the plugin listed, the feature `enabled`, and grants.
+A limit outside 100 to 1000000 fails the render.
 
 To retire an action, take its code off the list first and remove its plugin in a later release.
 Jobs already queued for a plugin that no pod has stay queued.

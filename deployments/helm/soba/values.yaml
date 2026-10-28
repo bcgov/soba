@@ -103,6 +103,7 @@ backend:
     dev-data: ""
     notifications: ""
     post-submission: ""
+    post-submission-email: ""
     user-search: ""
 
   # -- configmap-app: general application config
@@ -154,6 +155,11 @@ backend:
     userSearchPlugins: user-search-soba
     # Post-submission action plugins this environment runs, comma-separated. Empty runs none.
     postSubmissionActionPlugins: ""
+    # post-submission-email-addresses: emails allowed per hour, per form, per workspace and for the
+    # whole environment, each from 100 to 1000000. "" uses the defaults (500, 2000 and 5000).
+    postSubmissionEmailFormHourlyLimit: ""
+    postSubmissionEmailWorkspaceHourlyLimit: ""
+    postSubmissionEmailEnvironmentHourlyLimit: ""
     sobaSystemSubject: soba-system
     # On SIGTERM the backend keeps serving for shutdownDelayMs, or until running jobs drain if that
     # takes longer (see jobs.drainMs), then closes the server and exits by shutdownTimeoutMs; keep

@@ -8,6 +8,7 @@ import {
   type NotificationAdapter,
 } from '../../../src/core/integrations/notification/NotificationAdapter';
 import type { NewNotificationAudit } from '../../../src/core/db/repos/notificationAuditRepo';
+import { log } from '../../../src/core/logging';
 
 jest.mock('../../../src/core/db/client', () => ({ db: {} }));
 
@@ -49,6 +50,8 @@ describe('notification service', () => {
     await expect(service.sendEmail(context, email)).resolves.toEqual({
       outcome: 'disabled',
       providerMessageId: null,
+      httpStatus: null,
+      audited: true,
     });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(audits).toEqual([
@@ -74,11 +77,14 @@ describe('notification service', () => {
       );
     const { service, audits } = serviceWith(new NotifyV1Adapter(config));
 
-    await expect(service.sendEmail(context, email)).resolves.toEqual({
+    await expect(service.sendEmail({ ...context, jobId: 'j1' }, email)).resolves.toEqual({
       outcome: 'accepted',
       providerMessageId: 'n-1',
+      httpStatus: null,
+      audited: true,
     });
     expect(audits[0]).toMatchObject({
+      jobId: 'j1',
       outcome: 'accepted',
       providerMessageId: 'n-1',
       providerStatus: 'queued',
@@ -101,6 +107,8 @@ describe('notification service', () => {
     await expect(service.sendEmail(context, email)).resolves.toEqual({
       outcome: 'error',
       providerMessageId: null,
+      httpStatus: 400,
+      audited: true,
     });
     expect(audits[0]).toMatchObject({
       outcome: 'error',
@@ -124,11 +132,13 @@ describe('notification service', () => {
     await expect(service.sendEmail(context, email)).resolves.toEqual({
       outcome: 'not_sent',
       providerMessageId: null,
+      httpStatus: null,
+      audited: true,
     });
     expect(audits[0]).toMatchObject({ outcome: 'not_sent', providerStatus: 'not_sent' });
   });
 
-  it('still answers when the audit write fails', async () => {
+  it('still answers when the audit write fails, and says the row is missing', async () => {
     jest
       .spyOn(global, 'fetch')
       .mockResolvedValue(
@@ -144,6 +154,34 @@ describe('notification service', () => {
     await expect(service.sendEmail(context, email)).resolves.toEqual({
       outcome: 'accepted',
       providerMessageId: 'n-2',
+      httpStatus: null,
+      audited: false,
     });
+  });
+
+  it('logs a failed audit write without the values it tried to insert', async () => {
+    const errorLog = jest.spyOn(log, 'error').mockImplementation(() => undefined);
+    const service = createNotificationService({
+      isEnabled: () => Promise.resolve(true),
+      adapter: () => noopDefinition.createAdapter(config),
+      pluginCode: () => 'notification-noop',
+      writeAudit: () =>
+        Promise.reject(
+          new Error('Failed query: insert ... params: staff@example.com,New form submission'),
+        ),
+    });
+
+    await service.sendEmail(context, email);
+
+    expect(errorLog).toHaveBeenCalledWith(
+      {
+        pluginCode: 'notification-noop',
+        workspaceId: 'w1',
+        submissionId: 's1',
+        errorName: 'Error',
+      },
+      'Failed to write notification audit',
+    );
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain('staff@example.com');
   });
 });

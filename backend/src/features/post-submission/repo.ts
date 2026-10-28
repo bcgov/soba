@@ -12,6 +12,7 @@ import {
   submissions,
   workspaces,
 } from '../../core/db/schema';
+import type { PostSubmissionActionSubmission } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
 import type { ActionSettingRow, ActionValues } from './rules';
 
 const ROW = {
@@ -95,15 +96,23 @@ export const saveActionSetting = async (input: {
 };
 
 /**
- * Whether a submission's actions may still run: the submission is not deleted, its form is not
- * deleted (an archived form still runs them), and its workspace is active.
+ * The submission an action runs for, while its actions may still run: the submission is not
+ * deleted, its form is not deleted (an archived form still runs them), and its workspace is active.
+ * Null otherwise.
  */
-export const isSubmissionLive = async (
+export const findLiveSubmission = async (
   executor: DbOrTx,
   scope: { workspaceId: string; submissionId: string },
-): Promise<boolean> => {
-  const rows = await executor
-    .select({ id: submissions.id })
+): Promise<PostSubmissionActionSubmission | null> => {
+  const [row] = await executor
+    .select({
+      id: submissions.id,
+      formId: submissions.formId,
+      formName: forms.name,
+      workspaceId: submissions.workspaceId,
+      workspaceName: workspaces.name,
+      confirmationCode: submissions.confirmationCode,
+    })
     .from(submissions)
     .innerJoin(forms, eq(forms.id, submissions.formId))
     .innerJoin(workspaces, eq(workspaces.id, submissions.workspaceId))
@@ -118,5 +127,11 @@ export const isSubmissionLive = async (
       ),
     )
     .limit(1);
-  return rows.length > 0;
+  return row ?? null;
 };
+
+/** Whether a submission's actions may still run; see findLiveSubmission. */
+export const isSubmissionLive = async (
+  executor: DbOrTx,
+  scope: { workspaceId: string; submissionId: string },
+): Promise<boolean> => (await findLiveSubmission(executor, scope)) !== null;
