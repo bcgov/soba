@@ -25,9 +25,10 @@ export const availableActions = async (
 ): Promise<PostSubmissionActionPluginDefinition[]> => {
   const plugins = getPostSubmissionActions();
   const available = await Promise.all(
-    plugins.map(
-      (plugin) =>
-        !plugin.featureCode || isFeatureAvailable(plugin.featureCode, { workspaceId, formId }),
+    plugins.map((plugin) =>
+      plugin.featureCode
+        ? isFeatureAvailable(plugin.featureCode, { workspaceId, formId })
+        : Promise.resolve(true),
     ),
   );
   return plugins.filter((_plugin, index) => available[index]);
