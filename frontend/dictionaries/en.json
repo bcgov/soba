@@ -629,6 +629,47 @@
       "failed": "The search could not be completed. Try again."
     }
   },
+  "postSubmission": {
+    "tab": "After Submission",
+    "formIntro": "Choose what happens each time this form receives a submission. Each action says where its setting comes from.",
+    "workspaceIntro": "Choose what happens each time a form in this workspace receives a submission. Each form uses these settings unless it sets its own.",
+    "loadError": "The After Submission settings could not be loaded.",
+    "notAvailable": "After Submission is not available here.",
+    "empty": "No actions are available here yet. An administrator gives access to each action.",
+    "workspaceOnlyNote": "This action is set for the whole workspace, on the workspace's After Submission tab.",
+    "formOnlyNote": "This form sets this action on its own: it is not available to the form's workspace.",
+    "formOnlyUnsaved": "Nothing is saved for this form yet, so the action is off. If the workspace is given this action later, the form will use the workspace's setting unless you save one here.",
+    "notAccepted": "These settings were not accepted. Check them and try again.",
+    "settingsLoadError": "This action's settings could not be loaded.",
+    "unknownAction": "This action cannot be changed here yet.",
+    "status": "Status: {status}",
+    "on": "On",
+    "off": "Off",
+    "email": {
+      "label": "Email a notice",
+      "description": "Sends a short email to each address on the list when a submission is received.",
+      "enabled": "Send these emails",
+      "recipients": "Recipients",
+      "recipientsHelp": "Type an address and press Enter, or paste several at once. To remove an address, select it and press Delete or Backspace.",
+      "noticeHelp": "Each address gets its own email with the form name, the confirmation ID and a link to the submission, which needs sign-in. Emails over the hourly limit are not sent.",
+      "count": "Addresses: {count} / {max}",
+      "invalid": "Not a valid email address. Fix or remove the text in the field.",
+      "tooMany": "A list can have up to {max} addresses. The rest are still in the field.",
+      "duplicate": "Already on the list: {addresses}",
+      "required": "Add at least one address, or turn these emails off.",
+      "added": "Added: {addresses}",
+      "removed": "Removed: {address}",
+      "none": "No addresses yet."
+    },
+    "log": {
+      "label": "Log each submission",
+      "description": "Writes a line to the server log when a submission is received. Used for testing.",
+      "enabled": "Log each submission",
+      "note": "Note",
+      "noteHelp": "Up to {max} characters.",
+      "noteValue": "Note: {note}"
+    }
+  },
   "Basic": "Basic",
   "Text Field": "Text Field",
   "Text Area": "Text Area",

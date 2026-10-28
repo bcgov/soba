@@ -1,6 +1,5 @@
-import { z } from 'zod';
+import type { PostSubmissionEmailAddressesOptions } from '@soba/lib';
 import { NotificationOutcome } from '../../core/db/codes';
-import { EmailAddressSchema } from '../../core/integrations/notification/NotificationAdapter';
 import { isRefusedSend } from '../../core/integrations/notification/sendOutcome';
 import type { PostSubmissionActionContext } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
 import { JobCancelledError } from '../../core/jobs/settlement';
@@ -9,17 +8,7 @@ import { buildNotice, type Notice } from './notice';
 
 const HOUR_SECONDS = 3600;
 
-/** Up to 100 addresses, checked as every send is, then trimmed, lower-cased and de-duplicated. */
-export const EmailAddressesOptionsSchema = z.strictObject({
-  to: z
-    .array(z.string().trim().toLowerCase().pipe(EmailAddressSchema))
-    .min(1)
-    .max(100)
-    .transform((addresses) => [...new Set(addresses)]),
-});
-export type EmailAddressesOptions = z.infer<typeof EmailAddressesOptionsSchema>;
-
-type SendContext = PostSubmissionActionContext<EmailAddressesOptions>;
+type SendContext = PostSubmissionActionContext<PostSubmissionEmailAddressesOptions>;
 
 const NOTIFICATIONS_OFF = 'Notifications are off';
 

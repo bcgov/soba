@@ -1,10 +1,14 @@
+import {
+  PostSubmissionEmailAddressesOptionsSchema,
+  type PostSubmissionEmailAddressesOptions,
+} from '@soba/lib';
 import { env, JobPool } from '../../core/config/env';
 import { createPluginConfigReader } from '../../core/config/pluginConfig';
 import { Features } from '../../core/db/codes';
 import type { PostSubmissionActionPluginDefinition } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
 import { readHourlyLimits } from './limits';
 import { designerLink } from './notice';
-import { EmailAddressesOptionsSchema, sendNotices, type EmailAddressesOptions } from './send';
+import { sendNotices } from './send';
 
 const CODE = 'post-submission-email-addresses';
 
@@ -12,7 +16,7 @@ const CODE = 'post-submission-email-addresses';
 const limits = readHourlyLimits(createPluginConfigReader(CODE));
 
 /** Emails a fixed notice to a list of addresses when a form receives a submission. */
-export const postSubmissionActionPluginDefinition: PostSubmissionActionPluginDefinition<EmailAddressesOptions> =
+export const postSubmissionActionPluginDefinition: PostSubmissionActionPluginDefinition<PostSubmissionEmailAddressesOptions> =
   {
     code: CODE,
     metadata: {
@@ -22,7 +26,7 @@ export const postSubmissionActionPluginDefinition: PostSubmissionActionPluginDef
     },
     featureCode: Features.post_submission_email,
     scopes: ['workspace', 'form'],
-    optionsSchema: EmailAddressesOptionsSchema,
+    optionsSchema: PostSubmissionEmailAddressesOptionsSchema,
     job: {
       pool: JobPool.light,
       // About an hour of retries at the default backoff, to ride out a provider outage.

@@ -37,7 +37,6 @@ import {
   type SubmissionWriteEventCode,
   type SubmissionWorkflowStateCode,
 } from '../db/codes';
-import { isFeatureEnabledCached } from '../db/repos/featureRepo';
 import { nudgeJobs } from '../jobs';
 import { enqueueSubmittedJob, queuesSubmittedJob } from '../jobs/enqueue';
 import { availableActions } from '../../features/post-submission/resolve';
@@ -50,6 +49,7 @@ import {
   type WriteLanding,
 } from './submissionWriteGate';
 import { withNewConfirmationCode } from './confirmationCode';
+import { isFeatureAvailable } from './featureAvailabilityService';
 import { isUniqueViolationOn } from '../db/pgError';
 import { SUBMISSION_REVISION_PKEY } from '../db/schema';
 
@@ -118,21 +118,21 @@ interface ListInput {
 }
 
 /**
- * Record the revision. A submit with post-submission on queues its job in the same transaction and
- * nudges the runner once that commits. The actions' feature checks run first, outside it.
+ * Record the revision. A submit to a form with post-submission available queues its job in the same
+ * transaction and nudges the runner once that commits. The feature checks run first, outside it.
  */
 const appendWithJobs = async (
   append: SaveSubmissionInput,
   formId: string,
 ): Promise<AppendSubmissionRevisionResult> => {
   const queueJob = await queuesSubmittedJob(append.eventType, () =>
-    isFeatureEnabledCached(Features.post_submission, Date.now()),
+    isFeatureAvailable(Features.post_submission, { workspaceId: append.workspaceId, formId }),
   );
-  const plugins = queueJob ? await availableActions(append.workspaceId, formId) : [];
+  const actions = queueJob ? await availableActions(append.workspaceId, formId) : [];
   const result = await appendSubmissionRevision(
     append,
     queueJob
-      ? (tx, record) => enqueueSubmittedJob(tx, record, append.revisionId, append.actorId, plugins)
+      ? (tx, record) => enqueueSubmittedJob(tx, record, append.revisionId, append.actorId, actions)
       : undefined,
   );
   if (queueJob && result.outcome === 'appended') nudgeJobs(JobType.submission_submitted);

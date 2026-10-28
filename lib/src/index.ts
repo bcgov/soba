@@ -1,5 +1,7 @@
 export * from './schemas/forms';
 export * from './schemas/formSettings';
+export * from './schemas/email';
+export * from './schemas/postSubmission';
 export * from './schemas/submissions';
 export * from './schemas/submissionReview';
 export * from './schemas/formTeam';

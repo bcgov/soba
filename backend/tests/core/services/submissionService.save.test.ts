@@ -3,7 +3,7 @@ import * as submissionRepo from '../../../src/core/db/repos/submissionRepo';
 import * as versionRepo from '../../../src/core/db/repos/formVersionRepo';
 import * as formRepo from '../../../src/core/db/repos/formRepo';
 import * as registry from '../../../src/core/integrations/form-engine/FormEngineRegistry';
-import * as featureRepo from '../../../src/core/db/repos/featureRepo';
+import * as featureAvailability from '../../../src/core/services/featureAvailabilityService';
 import * as jobs from '../../../src/core/jobs';
 import * as enqueue from '../../../src/core/jobs/enqueue';
 import * as resolve from '../../../src/features/post-submission/resolve';
@@ -33,8 +33,8 @@ jest.mock('../../../src/core/db/repos/formRepo', () => ({
   getFormEngineCodeForForm: jest.fn(),
 }));
 
-jest.mock('../../../src/core/db/repos/featureRepo', () => ({
-  isFeatureEnabledCached: jest.fn(),
+jest.mock('../../../src/core/services/featureAvailabilityService', () => ({
+  isFeatureAvailable: jest.fn(),
 }));
 
 jest.mock('../../../src/core/jobs', () => ({ nudgeJobs: jest.fn() }));
@@ -60,11 +60,13 @@ const getLabels = submissionRepo.getFormVersionLabels as unknown as jest.Mock;
 const getVersion = versionRepo.getFormVersionById as unknown as jest.Mock;
 const getEngineCode = formRepo.getFormEngineCodeForForm as unknown as jest.Mock;
 const createAdapter = registry.createFormEngineAdapter as unknown as jest.Mock;
-const isFlagOn = featureRepo.isFeatureEnabledCached as unknown as jest.Mock;
+const isAvailable = featureAvailability.isFeatureAvailable as unknown as jest.Mock;
 const nudge = jobs.nudgeJobs as unknown as jest.Mock;
 const enqueueJob = enqueue.enqueueSubmittedJob as unknown as jest.Mock;
 const availableActions = resolve.availableActions as unknown as jest.Mock;
-const ACTIONS = [{ code: 'post-submission-email' }];
+const ACTIONS = [
+  { plugin: { code: 'post-submission-email-addresses' }, scopes: ['workspace', 'form'] },
+];
 
 const input = {
   workspaceId: 'ws1',
@@ -81,7 +83,7 @@ const svc = new SubmissionService();
 const LABELS = { form: { name: 'Permit application' }, formVersion: { versionNo: 4 } };
 
 const postSubmissionOn = () => {
-  isFlagOn.mockResolvedValue(true);
+  isAvailable.mockResolvedValue(true);
   availableActions.mockResolvedValue(ACTIONS);
   enqueueJob.mockResolvedValue(undefined);
   createAdapter.mockReturnValue({
@@ -92,7 +94,7 @@ const postSubmissionOn = () => {
 describe('SubmissionService save (versioned engine write)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    isFlagOn.mockResolvedValue(false);
+    isAvailable.mockResolvedValue(false);
     getRecord.mockResolvedValue({
       id: 's1',
       formId: 'f1',
@@ -455,7 +457,11 @@ describe('SubmissionService save (versioned engine write)', () => {
 
     await svc.submit(input);
 
-    expect(isFlagOn).toHaveBeenCalledWith('post-submission', expect.any(Number));
+    // Available for this form: a grant to the form or to its workspace.
+    expect(isAvailable).toHaveBeenCalledWith('post-submission', {
+      workspaceId: 'ws1',
+      formId: 'f1',
+    });
     // The actions' feature checks run before the transaction, for the submission's form.
     expect(availableActions).toHaveBeenCalledWith('ws1', 'f1');
     expect(availableActions.mock.invocationCallOrder[0]).toBeLessThan(
@@ -489,12 +495,12 @@ describe('SubmissionService save (versioned engine write)', () => {
     },
   );
 
-  it('with post-submission on, a save does not read the flag, pass a hook or nudge', async () => {
+  it('with post-submission on, a save does not check it, pass a hook or nudge', async () => {
     postSubmissionOn();
 
     await svc.save(input);
 
-    expect(isFlagOn).not.toHaveBeenCalled();
+    expect(isAvailable).not.toHaveBeenCalled();
     expect(availableActions).not.toHaveBeenCalled();
     expect(appendRevision).toHaveBeenCalledWith(expect.anything(), undefined);
     expect(nudge).not.toHaveBeenCalled();

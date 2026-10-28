@@ -1,8 +1,6 @@
 import { z } from 'zod';
+import { EmailAddressSchema } from '@soba/lib';
 import type { PluginConfigReader } from '../../config/pluginConfig';
-
-/** The address rule every send is checked against. */
-export const EmailAddressSchema = z.email();
 
 const addresses = z.array(EmailAddressSchema).max(100);
 

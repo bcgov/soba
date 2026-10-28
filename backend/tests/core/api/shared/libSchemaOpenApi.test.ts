@@ -141,6 +141,25 @@ describe('OpenAPI components for lib-backed schemas', () => {
     expect(at(schemas, values, 'nullable')).toBeUndefined();
   });
 
+  it('builds the post-submission lists on the named settings; only a form says if its workspace can set each', () => {
+    const formItem = at(schemas, 'PostSubmission_FormActionList', 'properties', 'actions', 'items');
+    const workspaceItem = at(
+      schemas,
+      'PostSubmission_WorkspaceActionList',
+      'properties',
+      'actions',
+      'items',
+    );
+    expect(at(formItem, 'properties', 'settings')).toEqual(
+      ref('PostSubmission_FormActionSettings'),
+    );
+    expect(at(formItem, 'properties', 'workspaceConfigurable', 'type')).toBe('boolean');
+    expect(at(workspaceItem, 'properties', 'settings')).toEqual(
+      ref('PostSubmission_WorkspaceActionSettings'),
+    );
+    expect(at(workspaceItem, 'properties', 'workspaceConfigurable')).toBeUndefined();
+  });
+
   it('builds the form-with-version response on the named form response', () => {
     expect(at(schemas, 'Forms_FormWithVersionResponse', 'allOf', 0)).toEqual(
       ref('Forms_FormResponse'),

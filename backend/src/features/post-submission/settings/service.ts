@@ -5,9 +5,9 @@ import {
   findPostSubmissionAction,
   getPostSubmissionActions,
 } from '../../../core/integrations/post-submission-action/PostSubmissionActionRegistry';
-import { isFeatureAvailable } from '../../../core/services/featureAvailabilityService';
 import { assertSaved } from '../../form-settings/saved';
 import { findActionSettingRows, saveActionSetting } from '../repo';
+import { formAction, isWorkspaceConfigurable, type ScopedAction } from '../resolve';
 import {
   rowsFor,
   toFormActionSettings,
@@ -31,26 +31,22 @@ type ActionSettings = FormActionSettings | WorkspaceActionSettings;
 
 const NOT_FOUND = 'Post-submission action not found';
 
-/** An action is configurable where its plugin allows the scope and its feature is available. */
-const isConfigurable = async (
+/** The action where it can be set at this scope, with the scopes its settings come from; else null. */
+const configurable = async (
   plugin: PostSubmissionActionPluginDefinition,
   ctx: ActionScopeContext,
-): Promise<boolean> => {
-  if (ctx.formId === null && !plugin.scopes.includes('workspace')) return false;
-  if (!plugin.featureCode) return true;
-  return isFeatureAvailable(plugin.featureCode, {
-    workspaceId: ctx.workspaceId,
-    formId: ctx.formId ?? undefined,
-  });
+): Promise<ScopedAction | null> => {
+  if (ctx.formId !== null) return formAction(plugin, ctx.workspaceId, ctx.formId);
+  return (await isWorkspaceConfigurable(plugin, ctx.workspaceId))
+    ? { plugin, scopes: plugin.scopes }
+    : null;
 };
 
-const requireAction = async (
-  code: string,
-  ctx: ActionScopeContext,
-): Promise<PostSubmissionActionPluginDefinition> => {
+const requireAction = async (code: string, ctx: ActionScopeContext): Promise<ScopedAction> => {
   const plugin = findPostSubmissionAction(code);
-  if (!plugin || !(await isConfigurable(plugin, ctx))) throw new NotFoundError(NOT_FOUND);
-  return plugin;
+  const action = plugin && (await configurable(plugin, ctx));
+  if (!action) throw new NotFoundError(NOT_FOUND);
+  return action;
 };
 
 /** The options the plugin's schema accepts. An action that is off may keep none. */
@@ -70,36 +66,40 @@ export const checkedOptions = (
 };
 
 const viewOf = (
-  plugin: PostSubmissionActionPluginDefinition,
+  action: ScopedAction,
   rows: readonly ActionSettingRow[],
   ctx: ActionScopeContext,
 ): ActionSettings => {
-  const { workspaceRow, formRow } = rowsFor(rows, plugin.code);
+  const { workspaceRow, formRow } = rowsFor(rows, action.plugin.code);
   return ctx.formId === null
     ? toWorkspaceActionSettings(workspaceRow)
-    : toFormActionSettings(workspaceRow, formRow, plugin.scopes);
+    : toFormActionSettings(workspaceRow, formRow, action.scopes);
 };
 
-const read = async (
-  plugin: PostSubmissionActionPluginDefinition,
-  ctx: ActionScopeContext,
-): Promise<ActionSettings> =>
-  viewOf(plugin, await findActionSettingRows(db, ctx.workspaceId, ctx.formId), ctx);
+const read = async (action: ScopedAction, ctx: ActionScopeContext): Promise<ActionSettings> =>
+  viewOf(action, await findActionSettingRows(db, ctx.workspaceId, ctx.formId), ctx);
 
-/** The actions configurable at this scope, each with its settings. */
+/**
+ * The actions configurable at this scope, each with its settings. A form's list also says whether
+ * the workspace can set each action, which decides whether the form can inherit it.
+ */
 export const listActions = async (ctx: ActionScopeContext) => {
-  const plugins = getPostSubmissionActions();
-  const configurable = await Promise.all(plugins.map((plugin) => isConfigurable(plugin, ctx)));
+  const actions = await Promise.all(
+    getPostSubmissionActions().map((plugin) => configurable(plugin, ctx)),
+  );
   const rows = await findActionSettingRows(db, ctx.workspaceId, ctx.formId);
   return {
-    actions: plugins
-      .filter((_plugin, index) => configurable[index])
-      .map((plugin) => ({
-        code: plugin.code,
-        name: plugin.metadata.name,
-        description: plugin.metadata.description,
-        scopes: plugin.scopes,
-        settings: viewOf(plugin, rows, ctx),
+    actions: actions
+      .filter((action) => action !== null)
+      .map((action) => ({
+        code: action.plugin.code,
+        name: action.plugin.metadata.name,
+        description: action.plugin.metadata.description,
+        scopes: action.plugin.scopes,
+        ...(ctx.formId === null
+          ? {}
+          : { workspaceConfigurable: action.scopes.includes('workspace') }),
+        settings: viewOf(action, rows, ctx),
       })),
   };
 };
@@ -108,7 +108,7 @@ export const getAction = async (code: string, ctx: ActionScopeContext) =>
   read(await requireAction(code, ctx), ctx);
 
 const save = async (
-  plugin: PostSubmissionActionPluginDefinition,
+  action: ScopedAction,
   ctx: ActionScopeContext,
   values: ActionValues | null,
   version: number,
@@ -116,14 +116,14 @@ const save = async (
   const status = await saveActionSetting({
     workspaceId: ctx.workspaceId,
     formId: ctx.formId,
-    code: plugin.code,
-    values: values && { enabled: values.enabled, options: checkedOptions(plugin, values) },
+    code: action.plugin.code,
+    values: values && { enabled: values.enabled, options: checkedOptions(action.plugin, values) },
     version,
     actorDisplayLabel: ctx.actorDisplayLabel,
     audit: { actorId: ctx.actorId },
   });
   assertSaved(status, NOT_FOUND);
-  return read(plugin, ctx);
+  return read(action, ctx);
 };
 
 /** A form's own values; null when it inherits. An action without a form scope takes none. */
@@ -144,8 +144,8 @@ export const setFormAction = async (
   ctx: ActionScopeContext,
   body: SetFormActionBody,
 ) => {
-  const plugin = await requireAction(code, ctx);
-  return save(plugin, ctx, formOwnValues(plugin, body), body.version);
+  const action = await requireAction(code, ctx);
+  return save(action, ctx, formOwnValues(action.plugin, body), body.version);
 };
 
 /** The workspace's default for the action, which its forms inherit unless they set their own. */
