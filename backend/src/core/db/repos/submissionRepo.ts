@@ -83,7 +83,7 @@ export type OpenSubmissionResult =
   | { outcome: 'created'; record: SubmissionRecord }
   | { outcome: 'taken'; live: SubmissionRecord | null; owner: boolean };
 
-interface SaveSubmissionInput {
+export interface SaveSubmissionInput {
   workspaceId: string;
   submissionId: string;
   /** Minted before the engine write; the engine document is keyed on it. */
@@ -122,6 +122,9 @@ export type AppendSubmissionRevisionResult =
       status: RevisionStatusCode;
       reason: RevisionReasonCode;
     };
+
+/** Runs in the append transaction when the write lands as the new head; a throw rolls it back. */
+export type OnRevisionAppended = (tx: Tx, record: SubmissionRecord) => Promise<void>;
 
 export type SubmissionListSortField = (typeof SUBMISSION_SORT_FIELDS)[number];
 
@@ -752,9 +755,12 @@ const demoteHead = async (
  * live version. The new engine document stays referenced by the pending revision, so no document is
  * orphaned. The caller's own write of the same event, already recorded under the revision id, is
  * answered as replayed; another write under the id fails on the revision's primary key.
+ *
+ * `onAppended` runs only on the 'appended' outcome, inside the transaction.
  */
 export const appendSubmissionRevision = (
   input: SaveSubmissionInput,
+  onAppended?: OnRevisionAppended,
 ): Promise<AppendSubmissionRevisionResult> => {
   return db.transaction(async (tx) => {
     const submission = await lockLiveSubmission(tx, input.workspaceId, input.submissionId);
@@ -872,6 +878,7 @@ export const appendSubmissionRevision = (
       .returning();
 
     if (!updated) throw new Error(`Submission ${input.submissionId} missing after head move`);
+    await onAppended?.(tx, updated);
     return toAppendResult('appended', updated, input.revisionId, nextRevision, status, reason);
   });
 };

@@ -3,6 +3,7 @@
 import { useSWRConfig, type SWRConfiguration } from 'swr';
 import { useCallback } from 'react';
 import {
+  checkWorkspaceNameAvailable,
   createWorkspace,
   fetchWorkspaces,
   lookupWorkspaces,
@@ -24,6 +25,7 @@ import type {
   WorkspaceItem,
   WorkspaceLookupItem,
   WorkspaceLookupResponse,
+  WorkspaceNameAvailabilityResponse,
 } from '@/src/types/workspaces';
 import { useSortLocale } from '@/src/shared/list/useSortLocale';
 import type { SortLocale } from '@soba/lib/sort';
@@ -90,6 +92,36 @@ export function useWorkspace(workspaceId: string | undefined) {
     workspaceReadConfig,
   );
   return { workspace: data ?? null, isLoading, error: error ? classifyDataError(error) : null };
+}
+
+/**
+ * Live name-availability check for the create/edit workspace form, as the user types. `enabled`
+ * is the caller's own debounce + minimum-length gate: while false, this makes no request and
+ * reports the idle state instead of a stale answer for a value the user has since changed.
+ */
+export function useWorkspaceNameAvailable(
+  org: string,
+  name: string,
+  excludeId: string | undefined,
+  enabled: boolean,
+): { available: boolean | undefined; isChecking: boolean; revalidate: () => void } {
+  const { data, isLoading, mutate } = useAuthedSWR<WorkspaceNameAvailabilityResponse>(
+    // Not under 'workspaces': useRefreshWorkspaces() would otherwise refetch this too.
+    enabled ? (['workspace-name-availability', org, name, excludeId ?? ''] as const) : null,
+    (token) => checkWorkspaceNameAvailable(token, { org, name, excludeId }),
+    workspaceReadConfig,
+  );
+  // Re-fetches after a 409, so a stale "Available" doesn't sit next to the error it caused.
+  const revalidate = useCallback(() => {
+    void mutate();
+  }, [mutate]);
+
+  // SWR already reports data: undefined, isLoading: false for a null key; no `enabled` guard needed.
+  return {
+    available: data?.available,
+    isChecking: isLoading,
+    revalidate,
+  };
 }
 
 /**

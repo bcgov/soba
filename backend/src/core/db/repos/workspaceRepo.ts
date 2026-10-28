@@ -1,5 +1,6 @@
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
+import { ApiErrorCodes } from '@soba/lib';
 import {
   FORM_ADMINS_GROUP_NAME,
   FORM_SUBMITTERS_GROUP_NAME,
@@ -12,8 +13,10 @@ import {
   WorkspaceStatus,
 } from '../codes';
 import { db, type DbOrTx } from '../client';
+import { isUniqueViolationOn } from '../pgError';
 import {
   appUsers,
+  WORKSPACE_KIND_ORG_NAME_UNIQUE,
   workspaceDisclaimerAcceptances,
   workspaceMemberships,
   workspaces,
@@ -24,9 +27,23 @@ import { getWorkspaceForUser, isWorkspaceManageRole } from './membershipRepo';
 import { addUserToGroup, createGroupWithRole } from './workspaceGroupRepo';
 import { createWorkspaceSettings } from '../../../features/form-settings/create';
 
-/** True if a workspace of this kind already uses this name (optionally excluding one workspace). */
-const workspaceNameExistsForKind = async (
+const workspaceNameTaken = () =>
+  new ConflictError(WORKSPACE_NAME_TAKEN, ApiErrorCodes.workspace_name_taken);
+
+/**
+ * Two saves can both pass the pre-check and race to the write; the loser hits the name's unique
+ * index. That is the same conflict the pre-check reports, so it gets the same code.
+ */
+const nameConflictOr = (err: unknown): unknown =>
+  isUniqueViolationOn(err, WORKSPACE_KIND_ORG_NAME_UNIQUE) ? workspaceNameTaken() : err;
+
+/**
+ * True if a workspace of this kind and org already uses this name, case-insensitively (optionally
+ * excluding one workspace). Mirrors `workspace_kind_org_name_uq`.
+ */
+export const workspaceNameExistsForKindAndOrg = async (
   kind: string,
+  org: string,
   name: string,
   exceptId?: string,
 ): Promise<boolean> => {
@@ -36,7 +53,8 @@ const workspaceNameExistsForKind = async (
     .where(
       and(
         eq(workspaces.kind, kind),
-        eq(workspaces.name, name),
+        eq(workspaces.org, org),
+        sql`lower(${workspaces.name}) = lower(${name})`,
         ...(exceptId ? [ne(workspaces.id, exceptId)] : []),
       ),
     )
@@ -106,8 +124,8 @@ export const createTeamWorkspace = async (
   disclaimerAccepted = false,
   tx?: DbOrTx,
 ) => {
-  if (await workspaceNameExistsForKind(WorkspaceKind.team, name)) {
-    throw new ConflictError(WORKSPACE_NAME_TAKEN);
+  if (await workspaceNameExistsForKindAndOrg(WorkspaceKind.team, org, name)) {
+    throw workspaceNameTaken();
   }
   const run = async (d: DbOrTx) => {
     const workspaceId = uuidv7();
@@ -154,7 +172,11 @@ export const createTeamWorkspace = async (
 
   // Joins the caller's transaction when given one, so the caller can commit this alongside its own
   // writes. Opens its own otherwise.
-  return tx ? run(tx) : db.transaction(run);
+  try {
+    return await (tx ? run(tx) : db.transaction(run));
+  } catch (err) {
+    throw nameConflictOr(err);
+  }
 };
 
 /** True once the workspace's disclaimer has been accepted (gates form creation). */
@@ -212,31 +234,39 @@ export const updateWorkspace = async (
     .limit(1);
   const displayLabel = userRow[0]?.displayLabel ?? null;
 
-  if (input.name !== undefined) {
-    if (await workspaceNameExistsForKind(membership.kind, input.name, workspaceId)) {
-      throw new ConflictError(WORKSPACE_NAME_TAKEN);
+  // Re-checked whenever either half of the key moves: a name edit can collide in its existing org,
+  // and an org move can collide with its existing name in the org it is moving to.
+  if (input.name !== undefined || input.org !== undefined) {
+    const name = input.name ?? membership.name;
+    const org = input.org ?? membership.org;
+    if (await workspaceNameExistsForKindAndOrg(membership.kind, org, name, workspaceId)) {
+      throw workspaceNameTaken();
     }
   }
 
-  await db.transaction(async (tx) => {
-    if (input.name !== undefined || input.org !== undefined || input.useCase !== undefined) {
-      const updates: Record<string, unknown> = { updatedBy: displayLabel, updatedAt: new Date() };
-      if (input.name !== undefined) updates.name = input.name;
-      if (input.org !== undefined) updates.org = input.org;
-      if (input.useCase !== undefined) updates.useCase = input.useCase;
+  try {
+    await db.transaction(async (tx) => {
+      if (input.name !== undefined || input.org !== undefined || input.useCase !== undefined) {
+        const updates: Record<string, unknown> = { updatedBy: displayLabel, updatedAt: new Date() };
+        if (input.name !== undefined) updates.name = input.name;
+        if (input.org !== undefined) updates.org = input.org;
+        if (input.useCase !== undefined) updates.useCase = input.useCase;
 
-      await tx.update(workspaces).set(updates).where(eq(workspaces.id, workspaceId));
-    }
-    if (input.disclaimerAccepted !== undefined) {
-      await setWorkspaceDisclaimer(
-        tx,
-        workspaceId,
-        actorId,
-        displayLabel,
-        input.disclaimerAccepted,
-      );
-    }
-  });
+        await tx.update(workspaces).set(updates).where(eq(workspaces.id, workspaceId));
+      }
+      if (input.disclaimerAccepted !== undefined) {
+        await setWorkspaceDisclaimer(
+          tx,
+          workspaceId,
+          actorId,
+          displayLabel,
+          input.disclaimerAccepted,
+        );
+      }
+    });
+  } catch (err) {
+    throw nameConflictOr(err);
+  }
 
   return true;
 };

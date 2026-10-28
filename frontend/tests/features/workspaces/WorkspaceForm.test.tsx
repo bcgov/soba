@@ -10,14 +10,18 @@ const {
   mockCreateWorkspace,
   mockUpdateWorkspace,
   mockSelectWorkspace,
+  mockCheckWorkspaceNameAvailable,
   mockRefreshWorkspaces,
   mockRefreshCurrentUser,
+  mockAddNotification,
 } = vi.hoisted(() => ({
   mockCreateWorkspace: vi.fn(),
   mockUpdateWorkspace: vi.fn(),
   mockSelectWorkspace: vi.fn(),
+  mockCheckWorkspaceNameAvailable: vi.fn().mockResolvedValue({ available: true }),
   mockRefreshWorkspaces: vi.fn().mockResolvedValue([]),
   mockRefreshCurrentUser: vi.fn().mockResolvedValue(undefined),
+  mockAddNotification: vi.fn(),
 }));
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
@@ -37,6 +41,12 @@ vi.mock('@/app/[lang]/Providers', () => ({
     useCases: {
       testUseCase: 'Test Use Case',
     },
+    // internal_error is unrelated to workspace saves, so a test can tell "the specific
+    // workspace_name_taken wording" apart from "the generic apiErrors text for some other code".
+    apiErrors: {
+      internal_error: 'Something went wrong. Please try again.',
+      workspace_name_taken: 'A workspace with this name already exists.',
+    },
     workspaces: {
       createHeading: 'Create Workspace',
       manageHeading: 'Manage Workspace',
@@ -48,6 +58,9 @@ vi.mock('@/app/[lang]/Providers', () => ({
       cancel: 'Cancel',
       saveError: 'Failed to save workspace.',
       createError: 'Failed to create workspace.',
+      nameChecking: 'Checking…',
+      nameAvailable: 'Available',
+      nameUnavailable: 'Unavailable',
       loadError: 'Failed to load workspace.',
       manageForbidden: 'Only workspace owners or admins can manage this workspace.',
       createForbidden: 'Only BC Government identity provider users can create workspaces.',
@@ -113,15 +126,17 @@ vi.mock('@/src/shared/api/useCurrentUser', () => ({
 }));
 
 vi.mock('@/lib/hooks/useNotificationStore', () => ({
-  useNotificationStore: () => ({ addNotification: vi.fn() }),
+  useNotificationStore: () => ({ addNotification: mockAddNotification }),
 }));
 
 vi.mock('@/src/shared/api/sobaApi', () => ({
   createWorkspace: mockCreateWorkspace,
   updateWorkspace: mockUpdateWorkspace,
   selectWorkspace: mockSelectWorkspace,
+  checkWorkspaceNameAvailable: mockCheckWorkspaceNameAvailable,
 }));
 
+import { ApiError } from '@/src/shared/api/sobaHelpers';
 import makeStore from '@/lib/store';
 import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import WorkspaceForm from '@/src/features/workspaces/ui/WorkspaceForm';
@@ -204,8 +219,8 @@ describe('WorkspaceForm', () => {
     await act(async () => {
       renderForm();
     });
-    await userEvent.type(screen.getByRole('textbox'), 'New Team');
     await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    await userEvent.type(screen.getByRole('textbox'), 'New Team');
     await userEvent.selectOptions(screen.getByTestId('workspace-use-case'), 'testUseCase');
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
 
@@ -224,8 +239,8 @@ describe('WorkspaceForm', () => {
     await act(async () => {
       renderForm();
     });
-    await userEvent.type(screen.getByRole('textbox'), 'New Team');
     await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    await userEvent.type(screen.getByRole('textbox'), 'New Team');
     await userEvent.selectOptions(screen.getByTestId('workspace-use-case'), 'testUseCase');
     await userEvent.click(screen.getByTestId('workspace-disclaimer-switch'));
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
@@ -238,6 +253,136 @@ describe('WorkspaceForm', () => {
         org: 'testOrg',
       });
     });
+  });
+
+  it('disables the name field until an organization is selected', async () => {
+    await act(async () => {
+      renderForm();
+    });
+    expect(screen.getByRole('textbox')).toBeDisabled();
+    await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    expect(screen.getByRole('textbox')).not.toBeDisabled();
+  });
+
+  it('shows a live availability indicator as the name is typed', async () => {
+    await act(async () => {
+      renderForm();
+    });
+    await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    await userEvent.type(screen.getByRole('textbox'), 'New');
+
+    expect(await screen.findByText('Available ✓')).toBeInTheDocument();
+    // Announced too: the description under the field isn't a live region.
+    expect(screen.getByTestId('workspace-name-status')).toHaveTextContent('Available');
+    expect(mockCheckWorkspaceNameAvailable).toHaveBeenCalledWith('token', {
+      org: 'testOrg',
+      name: 'New',
+      excludeId: undefined,
+    });
+  });
+
+  it('does not re-check the name after a successful create, even though it refreshes the workspace list', async () => {
+    await act(async () => {
+      renderForm();
+    });
+    await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    await userEvent.type(screen.getByRole('textbox'), 'New Team');
+    await userEvent.selectOptions(screen.getByTestId('workspace-use-case'), 'testUseCase');
+    expect(await screen.findByText('Available ✓')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalled());
+    expect(mockCheckWorkspaceNameAvailable).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the name as unavailable and blocks save', async () => {
+    mockCheckWorkspaceNameAvailable.mockResolvedValueOnce({ available: false });
+    await act(async () => {
+      renderForm();
+    });
+    await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    await userEvent.type(screen.getByRole('textbox'), 'Taken');
+    await userEvent.selectOptions(screen.getByTestId('workspace-use-case'), 'testUseCase');
+
+    expect(await screen.findByText('Unavailable ✕')).toBeInTheDocument();
+    expect(screen.getByTestId('workspace-name-status')).toHaveTextContent('Unavailable');
+    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+  });
+
+  it('re-checks the name after a 409 and says the name is taken', async () => {
+    mockCreateWorkspace.mockRejectedValueOnce(
+      new ApiError('A workspace with this name already exists', 409, 'workspace_name_taken'),
+    );
+    await act(async () => {
+      renderForm();
+    });
+    await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    await userEvent.type(screen.getByRole('textbox'), 'Taken Name');
+    await userEvent.selectOptions(screen.getByTestId('workspace-use-case'), 'testUseCase');
+
+    expect(await screen.findByText('Available ✓')).toBeInTheDocument();
+
+    // Someone else claims the name between the last check and this save landing.
+    mockCheckWorkspaceNameAvailable.mockResolvedValueOnce({ available: false });
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    expect(await screen.findByText('Unavailable ✕')).toBeInTheDocument();
+    expect(mockCheckWorkspaceNameAvailable).toHaveBeenCalledTimes(2);
+    expect(mockAddNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'A workspace with this name already exists.' }),
+    );
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('shows the plain create-failed message for an error other than workspace_name_taken, not the generic apiErrors text', async () => {
+    mockCreateWorkspace.mockRejectedValueOnce(
+      new ApiError('Internal error', 500, 'internal_error'),
+    );
+    await act(async () => {
+      renderForm();
+    });
+    await userEvent.selectOptions(screen.getByTestId('workspace-your-org'), 'testOrg');
+    await userEvent.type(screen.getByRole('textbox'), 'New Team');
+    await userEvent.selectOptions(screen.getByTestId('workspace-use-case'), 'testUseCase');
+    expect(await screen.findByText('Available ✓')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => expect(mockAddNotification).toHaveBeenCalled());
+    expect(mockAddNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'Failed to create workspace.' }),
+    );
+  });
+
+  it('manage mode does not check the workspace against its own unchanged name', async () => {
+    await act(async () => {
+      renderForm('ws2');
+    });
+    expect(await screen.findByDisplayValue('Team Workspace')).toBeInTheDocument();
+
+    expect(screen.queryByText(/Checking|Available|Unavailable/)).not.toBeInTheDocument();
+    expect(mockCheckWorkspaceNameAvailable).not.toHaveBeenCalled();
+  });
+
+  it('manage mode checks again once the name is actually edited, and stops once reverted', async () => {
+    await act(async () => {
+      renderForm('ws2');
+    });
+    const nameInput = await screen.findByDisplayValue('Team Workspace');
+
+    await userEvent.type(nameInput, ' Two');
+    expect(await screen.findByText('Available ✓')).toBeInTheDocument();
+    expect(mockCheckWorkspaceNameAvailable).toHaveBeenCalledWith('token', {
+      org: 'testOrg',
+      name: 'Team Workspace Two',
+      excludeId: 'ws2',
+    });
+
+    await userEvent.type(nameInput, '{backspace}{backspace}{backspace}{backspace}');
+    await waitFor(() =>
+      expect(screen.queryByText(/Checking|Available|Unavailable/)).not.toBeInTheDocument(),
+    );
   });
 
   it('cancel navigates back without saving', async () => {

@@ -58,7 +58,7 @@ export const WorkspaceStatus = {
 } as const;
 export type WorkspaceStatusCode = (typeof WorkspaceStatus)[keyof typeof WorkspaceStatus];
 
-/** Kind of a workspace (workspace.kind); names are unique per kind. */
+/** Kind of a workspace (workspace.kind); names are unique per kind and org, ignoring case. */
 export const WorkspaceKind = {
   team: 'team',
 } as const;
@@ -126,9 +126,9 @@ export type FeatureStatusCode = (typeof FeatureStatus)[keyof typeof FeatureStatu
 
 /**
  * Feature codes backed by the soba.feature table. Most gate a mounted API surface via
- * requireFeature and mirror the frontend FEATURE_CODES. Templates, dev-data, antivirus and the
- * per-backend document generation codes have no frontend code; antivirus gates the upload scan in
- * the core file store rather than a surface of its own.
+ * requireFeature and mirror the frontend FEATURE_CODES. Templates, dev-data, antivirus,
+ * post-submission and the per-backend document generation codes have no frontend code; antivirus
+ * gates the upload scan in the core file store rather than a surface of its own.
  */
 export const Features = {
   design_mode: 'design-mode',
@@ -148,6 +148,8 @@ export const Features = {
   notifications: 'notifications',
   /** Finding people to add to a workspace or a form's team. */
   user_search: 'user-search',
+  /** Backend-only: gates queuing work after a submission is received. */
+  post_submission: 'post-submission',
 } as const;
 export type FeatureCode = (typeof Features)[keyof typeof Features];
 
@@ -223,6 +225,23 @@ export const NotificationChannel = {
 } as const;
 export type NotificationChannelCode =
   (typeof NotificationChannel)[keyof typeof NotificationChannel];
+
+/** Lifecycle of a background job (job.status). */
+export const JobStatus = {
+  queued: 'queued',
+  running: 'running',
+  succeeded: 'succeeded',
+  /** Out of attempts; last_error says why. */
+  dead: 'dead',
+  cancelled: 'cancelled',
+} as const;
+export type JobStatusCode = (typeof JobStatus)[keyof typeof JobStatus];
+
+/** Kind of background job (job.type); each has one registered handler. */
+export const JobType = {
+  submission_submitted: 'submission.submitted',
+} as const;
+export type JobTypeCode = (typeof JobType)[keyof typeof JobType];
 
 /** What a document template is for (document_template.type). The list lives in @soba/lib. */
 export const DocumentTemplateType = {

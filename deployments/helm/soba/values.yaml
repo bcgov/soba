@@ -102,6 +102,7 @@ backend:
   features:
     dev-data: ""
     notifications: ""
+    post-submission: ""
     user-search: ""
 
   # -- configmap-app: general application config
@@ -151,7 +152,39 @@ backend:
     # user-search-soba searches Soba's own users and needs no config. css-v1 injects the CSS
     # credentials from Vault, so the secret must hold them.
     userSearchPlugins: user-search-soba
+    # Post-submission action plugins this environment runs, comma-separated. Empty runs none.
+    postSubmissionActionPlugins: ""
     sobaSystemSubject: soba-system
+    # On SIGTERM the backend keeps serving for shutdownDelayMs, or until running jobs drain if that
+    # takes longer (see jobs.drainMs), then closes the server and exits by shutdownTimeoutMs; keep
+    # that under the pod's 30 s grace period. "" uses the defaults in code (5000 and 28000).
+    shutdownDelayMs: ""
+    shutdownTimeoutMs: ""
+
+  # -- configmap-app: background job runner (JOB_*). "" uses the default in code.
+  jobs:
+    # Pools this pod runs, comma-separated (light, heavy). Default: both.
+    pools: ""
+    lightPollMs: ""
+    heavyPollMs: ""
+    lightLeaseMs: ""
+    heavyLeaseMs: ""
+    lightConcurrency: ""
+    heavyConcurrency: ""
+    lightTimeoutMs: ""
+    heavyTimeoutMs: ""
+    maxAttempts: ""
+    backoffBaseMs: ""
+    backoffMaxMs: ""
+    sweepIntervalMs: ""
+    retentionBatch: ""
+    succeededRetentionDays: ""
+    deadRetentionDays: ""
+    # Shutdown waits drainMs for running jobs, then abortGraceMs for aborted ones to stop, then up to
+    # 3 s for their outcomes to be written; only then does the server close. Startup fails unless
+    # that total is under config.shutdownTimeoutMs; the defaults (15 + 2 + 3 s of 28 s) leave 8 s.
+    drainMs: ""
+    abortGraceMs: ""
 
   # -- Shared temp storage PVC (RWX so it survives horizontal scaling).
   # Only provisioned/mounted when config.tempStorageDefaultCode is
@@ -196,8 +229,9 @@ backend:
       storageClassName: ""
 
     # storage-s3 only — non-credential keys, rendered only when set. ACCESS_KEY/SECRET_KEY are
-    # NOT here; supply them via a Secret. A full URL endpoint (https://host:port) also carries the
-    # port and SSL flag, so defaultPort/defaultUseSsl can stay empty in that case.
+    # NOT here; supply them via a Secret. A URL endpoint sets the SSL flag, and its port when it has
+    # one, else defaultPort, else the scheme's default (443 or 80); defaultUseSsl is ignored. A host
+    # endpoint takes defaultUseSsl, and defaultPort or 9000.
     defaultEndpoint: ""
     defaultBucketName: ""
     defaultPort: ""
@@ -205,6 +239,9 @@ backend:
     # Root every object in the default profile is stored under. Required for storage-s3. Unique per
     # environment, not inside another environment's root, and fixed once files are stored.
     defaultPrefix: ""
+    # Vault key infix for the S3 secrets: S3_<infix>_ACCESS_KEY_ID, _ACCESS_SECRET_KEY, _BUCKET_NAME
+    # and _ENDPOINT (infix e.g. PR, DEV, TEST, UAT, PROD). Used only with storage-s3 and vault.enabled.
+    s3VaultKeyInfix: ""
 
   # -- configmap-formio: PLUGIN_FORMIO_V5_* (non-secret values)
   formio:

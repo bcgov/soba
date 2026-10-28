@@ -131,6 +131,16 @@ describe('OpenAPI components for lib-backed schemas', () => {
     },
   );
 
+  it("builds the post-submission form view on the action's values component", () => {
+    const values = 'PostSubmission_ActionValues';
+    const view = 'PostSubmission_FormActionSettings';
+    expect(at(schemas, view, 'properties', 'workspace')).toEqual(ref(values));
+    expect(at(schemas, view, 'properties', 'effective')).toEqual(ref(values));
+    expect(at(schemas, view, 'properties', 'own', 'allOf', 0)).toEqual(ref(values));
+    // Only the form's own values may be null; the options' values are unknown, so nullable.
+    expect(at(schemas, values, 'nullable')).toBeUndefined();
+  });
+
   it('builds the form-with-version response on the named form response', () => {
     expect(at(schemas, 'Forms_FormWithVersionResponse', 'allOf', 0)).toEqual(
       ref('Forms_FormResponse'),
