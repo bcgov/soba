@@ -31,7 +31,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
 }));
 
 const mocks = vi.hoisted(() => ({ saveBlob: vi.fn() }));
-vi.mock('@/src/features/templates/data/saveBlob', () => ({ saveBlob: mocks.saveBlob }));
+vi.mock('@/src/shared/util/saveBlob', () => ({ saveBlob: mocks.saveBlob }));
 
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 import type {
