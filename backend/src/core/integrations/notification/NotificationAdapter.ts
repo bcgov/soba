@@ -1,7 +1,10 @@
 import { z } from 'zod';
 import type { PluginConfigReader } from '../../config/pluginConfig';
 
-const addresses = z.array(z.email()).max(100);
+/** The address rule every send is checked against. */
+export const EmailAddressSchema = z.email();
+
+const addresses = z.array(EmailAddressSchema).max(100);
 
 export const SendEmailSchema = z.strictObject({
   recipients: z.strictObject({

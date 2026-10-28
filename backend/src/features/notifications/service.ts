@@ -30,11 +30,17 @@ export interface NotificationContext {
   submissionId?: string | null;
   /** App user the send is attributed to; the system user when no person triggered it. */
   actorId: string;
+  /** The job sending it, when a job is. */
+  jobId?: string | null;
 }
 
 export interface NotificationSendResult {
   outcome: NotificationOutcomeCode;
   providerMessageId: string | null;
+  /** The provider's HTTP status on error; null otherwise or when no response came back. */
+  httpStatus: number | null;
+  /** Whether the audit row was written. */
+  audited: boolean;
 }
 
 /** What the notification service needs; the defaults are the feature flag, registry and table. */
@@ -85,9 +91,12 @@ async function attempt(deps: NotificationServiceDeps, email: SendEmail): Promise
 
 /**
  * Builds the email sender. Never throws: the outcome is returned and recorded on one audit row per
- * call. A failed audit write is logged and swallowed.
+ * call. A failed audit write is logged, and the result says so in `audited`.
  */
 export const createNotificationService = (deps: NotificationServiceDeps) => ({
+  /** Whether the notifications feature is on. */
+  enabled: (): Promise<boolean> => deps.isEnabled(),
+
   async sendEmail(context: NotificationContext, email: SendEmail): Promise<NotificationSendResult> {
     const startedAt = Date.now();
     const result = await attempt(deps, email);
@@ -104,6 +113,7 @@ export const createNotificationService = (deps: NotificationServiceDeps) => ({
         'Notification send failed',
       );
     }
+    let audited = false;
     try {
       await deps.writeAudit({
         workspaceId: context.workspaceId,
@@ -120,12 +130,28 @@ export const createNotificationService = (deps: NotificationServiceDeps) => ({
         errorDetail: result.errorDetail,
         durationMs: Date.now() - startedAt,
         requestId: getCorrelationId() ?? null,
+        jobId: context.jobId ?? null,
         createdBy: context.actorId,
       });
+      audited = true;
     } catch (err) {
-      log.error({ err }, 'Failed to write notification audit');
+      // The database error carries the insert's values, recipients among them; log its name only.
+      log.error(
+        {
+          pluginCode,
+          workspaceId: context.workspaceId,
+          submissionId: context.submissionId,
+          errorName: err instanceof Error ? err.name : 'Error',
+        },
+        'Failed to write notification audit',
+      );
     }
-    return { outcome: result.outcome, providerMessageId: result.providerMessageId ?? null };
+    return {
+      outcome: result.outcome,
+      providerMessageId: result.providerMessageId ?? null,
+      httpStatus: result.httpStatus ?? null,
+      audited,
+    };
   },
 });
 

@@ -5,6 +5,7 @@ backend:
     dev-data: "enabled"
     notifications: "enabled"
     post-submission: "enabled"
+    post-submission-email: "enabled"
     user-search: "enabled"
   replicas: 1
   resources:
@@ -30,6 +31,8 @@ backend:
     workflowEngineDefaultCode: cs-workflow-v1
     notificationDefaultCode: notify-v1
     userSearchPlugins: css-v1,user-search-soba
+    # Emails go through Notify test, which only delivers to its safelist.
+    postSubmissionActionPlugins: post-submission-email-addresses
   documentGeneration:
     cdogsV2:
       endpoint: https://cdogs-dev.api.gov.bc.ca/api
@@ -45,6 +48,8 @@ backend:
   notification:
     notifyV1:
       endpoint: https://gw-fe8c5-notify.test.api.gov.bc.ca/api/v1
+      # Keeps one slow send well inside an email job's lease and timeout.
+      timeoutMs: "10000"
   userSearch:
     cssV1:
       apiBaseUrl: https://api.loginproxy.gov.bc.ca/api/v1

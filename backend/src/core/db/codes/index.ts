@@ -150,6 +150,8 @@ export const Features = {
   user_search: 'user-search',
   /** Backend-only: gates queuing work after a submission is received. */
   post_submission: 'post-submission',
+  /** Scoped: emailing a notice to a list of addresses when a form receives a submission. */
+  post_submission_email: 'post-submission-email',
 } as const;
 export type FeatureCode = (typeof Features)[keyof typeof Features];
 

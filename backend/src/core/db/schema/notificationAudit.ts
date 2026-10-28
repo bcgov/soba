@@ -1,4 +1,5 @@
 import { index, integer, jsonb, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import type { NotificationOutcomeCode } from '../codes';
 import { idColumn } from './audit';
 import { sobaSchema, appUsers, workspaces } from './core';
 import { forms, submissions } from './forms';
@@ -27,7 +28,7 @@ export const notificationAudits = sobaSchema.table(
     submissionId: uuid('submission_id').references(() => submissions.id),
     pluginCode: text('plugin_code').notNull(),
     channel: text('channel').notNull(),
-    outcome: text('outcome').notNull(),
+    outcome: text('outcome').$type<NotificationOutcomeCode>().notNull(),
     recipients: jsonb('recipients').$type<NotificationAuditRecipients>().notNull(),
     subject: text('subject'),
     providerMessageId: text('provider_message_id'),
@@ -39,6 +40,8 @@ export const notificationAudits = sobaSchema.table(
     durationMs: integer('duration_ms').notNull(),
     // Correlation id (X-Request-Id) to pivot an audit row back to the request's app logs.
     requestId: text('request_id'),
+    // The job that sent it, if any. No foreign key, so job retention never waits on the audit.
+    jobId: uuid('job_id'),
     createdBy: uuid('created_by')
       .notNull()
       .references(() => appUsers.id),
@@ -51,5 +54,7 @@ export const notificationAudits = sobaSchema.table(
     ),
     formCreatedIdx: index('notification_audit_form_created_idx').on(table.formId, table.createdAt),
     submissionIdx: index('notification_audit_submission_idx').on(table.submissionId),
+    jobIdx: index('notification_audit_job_idx').on(table.jobId),
+    createdIdx: index('notification_audit_created_idx').on(table.createdAt),
   }),
 );

@@ -400,6 +400,13 @@
       "when": 1772618036000,
       "tag": "0057_post_submission_action_setting",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1772618038000,
+      "tag": "0058_post_submission_email",
+      "breakpoints": true
     }
   ]
 }
