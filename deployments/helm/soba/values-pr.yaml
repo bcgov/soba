@@ -91,10 +91,11 @@ frontend:
     enabled: false
 
 formio:
+  internal:
+    enabled: false
   # PRs use the shared formio of the soba-dev release in the same namespace.
   external:
     url: http://soba-dev-formio:3001
-    enabled: true
   replicas: 1
   # Formio depends on MongoDB; allow time for MongoDB to be ready after PR deploy
   readinessProbe:
