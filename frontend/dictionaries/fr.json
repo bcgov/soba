@@ -104,7 +104,48 @@
     "disclaimerTitle": "Avis de non-responsabilité et déclaration de responsabilité",
     "unavailableFilter": "Cet espace de travail n'est pas disponible pour vous. Affichage de tous les formulaires.",
     "clearFilter": "Effacer le filtre",
-    "listLoadError": "Échec du chargement des espaces de travail."
+    "listLoadError": "Échec du chargement des espaces de travail.",
+    "groupsTab": "Groupes",
+    "groups": {
+      "addGroup": "Ajouter un groupe",
+      "editGroup": "Modifier",
+      "deleteGroup": "Supprimer",
+      "name": "Nom du groupe",
+      "roles": "Attribuez des rôles à ce groupe",
+      "rolesHelp": "Rôles accordés à tous les membres de ce groupe sur l'ensemble des formulaires de l'espace de travail.",
+      "noRolesSelected": "Aucun rôle sélectionné",
+      "systemGroup": "Groupe système",
+      "systemGroupTooltip": "Les groupes système sont protégés et ne peuvent pas être supprimés.",
+      "deleteConfirmTitle": "Supprimer le groupe",
+      "deleteConfirmMessage": "Êtes-vous sûr de vouloir supprimer le groupe \"{name}\" ? Les utilisateurs de ce groupe perdront l'accès à tous les formulaires de cet espace de travail.",
+      "deleteSuccess": "Groupe supprimé avec succès.",
+      "deleteError": "Échec de la suppression du groupe.",
+      "createSuccess": "Groupe créé avec succès.",
+      "createError": "Échec de la création du groupe.",
+      "updateSuccess": "Groupe mis à jour avec succès.",
+      "updateError": "Échec de la mise à jour du groupe.",
+      "loadError": "Échec du chargement des groupes.",
+      "groupLoadError": "Échec du chargement de ce groupe. Il a peut-être été supprimé.",
+      "rolesLoadError": "Échec du chargement des rôles disponibles. Rechargez la page pour réessayer.",
+      "empty": "Aucun groupe trouvé dans cet espace de travail.",
+      "save": "Enregistrer le groupe",
+      "create": "Créer le groupe",
+      "saving": "Enregistrement en cours…",
+      "cancel": "Annuler",
+      "columns": {
+        "name": "Nom",
+        "roles": "Rôles",
+        "actions": "Actions"
+      },
+      "roleNames": {
+        "form_admin": "Administrateur de formulaire",
+        "form_designer": "Concepteur de formulaire",
+        "form_submitter": "Soumetteur de formulaire",
+        "submission_reviewer": "Réviseur de soumission",
+        "submission_approver": "Approbateur de soumission",
+        "team_manager": "Gestionnaire d'équipe"
+      }
+    }
   },
   "admin": {
     "heading": "Administration",
@@ -578,6 +619,7 @@
     "render_busy": "L’impression des documents est occupée. Veuillez réessayer dans un instant.",
     "render_failed": "Le document n’a pas pu être imprimé à partir de ce modèle.",
     "no_saved_data": "Cette soumission n’a aucune réponse enregistrée à imprimer.",
+    "group_name_taken": "Un groupe portant ce nom existe déjà dans cet espace de travail. Choisissez un autre nom.",
     "request_invalid": "La demande n’est pas valide. Rechargez la page et réessayez.",
     "request_too_large": "La demande est trop volumineuse.",
     "unauthenticated": "Votre session n’est pas valide. Veuillez vous reconnecter.",

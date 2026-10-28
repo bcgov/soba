@@ -153,6 +153,8 @@ export const ApiErrorCodes = {
   render_busy: 'render_busy',
   render_failed: 'render_failed',
   no_saved_data: 'no_saved_data',
+  // Workspace groups.
+  group_name_taken: 'group_name_taken',
   // Any route.
   request_invalid: 'request_invalid',
   request_too_large: 'request_too_large',
