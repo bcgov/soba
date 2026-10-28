@@ -149,13 +149,17 @@ A paged list should be re-read after a write (`mutate` / `refresh`). Patching `i
 cache leaves `page.total` and the sort order stale. How lists are declared and linked is in
 `docs/server-paged-lists.md`.
 
-To forget a key rather than patch it, go through the cache: `mutate(key, undefined)` reads
-as "revalidate", not "forget", and leaves the old value in place.
+To forget a key rather than patch it, call `mutate(key, undefined)`. It clears the value and
+SWR's request marker, so the next mount reads the key again.
 
 ```ts
-const { cache } = useSWRConfig();
-cache.delete(unstable_serialize(key));
+const { mutate } = useSWRConfig();
+mutate(key, undefined).catch(() => undefined);
 ```
+
+Do not add `{ revalidate: false }`: the marker stays, so a mount inside the dedupe window, or
+while a read is still out, skips its own read and never gets data. `cache.delete` also leaves
+the marker; it suits only a key no later mount reuses, as in `useFillRead`.
 
 ## Editing a loaded record
 

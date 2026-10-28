@@ -11,7 +11,7 @@ import {
   removeSobaAdmin,
   upsertFeatureScope,
 } from '@/src/shared/api/sobaApiAdmin';
-import { unstable_serialize, useSWRConfig } from 'swr';
+import { useSWRConfig } from 'swr';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { listReadConfig } from '@/src/shared/api/swrConfig';
 import { classifyDataError } from '@/src/shared/api/dataError';
@@ -143,18 +143,14 @@ export function useFeatureScope(
     reportOnce(onError),
   );
 
-  const { cache } = useSWRConfig();
+  const { mutate } = useSWRConfig();
   useEffect(() => {
     if (!featureScopeId) return;
-    // The record is read once to seed the form, which cannot re-seed itself. A cached copy would
-    // seed the next visit from a status the save that just happened, or a toggle in the list, has
-    // already moved on from, and saving there would write that stale status back. Dropping the
-    // entry is what makes the next visit read the record again. `mutate(key, undefined)` reads as
-    // "revalidate", not "forget", so the eviction goes through the cache itself.
     return () => {
-      cache.delete(unstable_serialize(scopeKey(featureScopeId)));
+      // Clears the record and SWR's request marker, so the next mount reads it again.
+      mutate(scopeKey(featureScopeId), undefined).catch(() => undefined);
     };
-  }, [featureScopeId, cache]);
+  }, [featureScopeId, mutate]);
 
   return { featureScope: data ?? null, isLoading, error: error ? classifyDataError(error) : null };
 }
