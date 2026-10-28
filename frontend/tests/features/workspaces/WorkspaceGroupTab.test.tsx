@@ -163,6 +163,40 @@ describe('WorkspaceGroupTab', () => {
     expect(mockApi.listWorkspaceGroups.mock.calls.length).toBeGreaterThan(readsBefore);
   });
 
+  it('closes the edit form of a group once that group is removed', async () => {
+    const user = userEvent.setup();
+    mockApi.getWorkspaceGroup.mockResolvedValue(REVIEWERS);
+    mockApi.deleteWorkspaceGroup.mockResolvedValue(undefined);
+    renderTab();
+    await screen.findByText('Form Reviewers');
+
+    await user.click(screen.getByTestId('edit-group-button-grp-reviewers'));
+    await screen.findByDisplayValue(REVIEWERS.name);
+    await user.click(screen.getByTestId('delete-group-button-grp-reviewers'));
+    await user.click(screen.getByRole('button', { name: t.deleteGroup }));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('workspace-group-edit-form')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('leaves an open create form alone when another group is removed', async () => {
+    const user = userEvent.setup();
+    mockApi.deleteWorkspaceGroup.mockResolvedValue(undefined);
+    renderTab();
+    await screen.findByText('Form Reviewers');
+
+    await user.click(screen.getByTestId('create-ws-group-button'));
+    await user.click(await screen.findByRole('textbox', { name: new RegExp(t.name) }));
+    await user.paste('Approvers');
+    await user.click(screen.getByTestId('delete-group-button-grp-reviewers'));
+    await user.click(screen.getByRole('button', { name: t.deleteGroup }));
+
+    await waitFor(() => expect(mockApi.deleteWorkspaceGroup).toHaveBeenCalled());
+    expect(screen.getByTestId('workspace-group-create-form')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Approvers')).toBeInTheDocument();
+  });
+
   it('reports a refused removal as a failure', async () => {
     const user = userEvent.setup();
     mockApi.deleteWorkspaceGroup.mockRejectedValue(new ApiError('Request failed (403)', 403));

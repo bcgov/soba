@@ -18,20 +18,27 @@ import type {
  * `rerender` renders the same tree again, keeping the store and cache. The mocked
  * `useSearchParams` cannot subscribe to `history.replaceState` the way Next's does, so a test
  * that changes the list query calls it to pick up the URL the list wrote.
+ *
+ * `show` swaps what is under the providers, which stay mounted as they do in the app. A test that
+ * closes and reopens a form uses it: unmounting the providers drops SWR's cache with them.
  */
 export function renderSignedIn(ui: React.ReactElement, cache: Cache = new Map()) {
   const store = makeStore();
   store.dispatch(setToken('token'));
   store.dispatch(setAuthenticated(true));
-  const tree = () => (
+  const tree = (children: React.ReactNode) => (
     <Provider store={store}>
       <SWRConfig value={{ provider: () => cache, dedupingInterval: 0, shouldRetryOnError: false }}>
-        {ui}
+        {children}
       </SWRConfig>
     </Provider>
   );
-  const view = render(tree());
-  return { ...view, rerender: () => act(() => view.rerender(tree())) };
+  const view = render(tree(ui));
+  return {
+    ...view,
+    rerender: () => act(() => view.rerender(tree(ui))),
+    show: (next: React.ReactNode) => act(() => view.rerender(tree(next))),
+  };
 }
 
 export const WORKSPACE_ID = 'ws-1';

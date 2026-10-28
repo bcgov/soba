@@ -45,11 +45,11 @@ import WorkspaceGroupForm from '@/src/features/workspaces/ui/WorkspaceGroupForm'
 
 const onDone = vi.fn();
 
-const renderForm = (groupId?: string, cache?: Map<string, unknown>) =>
-  renderSignedIn(
-    <WorkspaceGroupForm dict={dict} workspaceId={WORKSPACE_ID} groupId={groupId} onDone={onDone} />,
-    cache as never,
-  );
+const editForm = (groupId?: string) => (
+  <WorkspaceGroupForm dict={dict} workspaceId={WORKSPACE_ID} groupId={groupId} onDone={onDone} />
+);
+
+const renderForm = (groupId?: string) => renderSignedIn(editForm(groupId));
 
 const nameInput = () => screen.getByRole('textbox', { name: new RegExp(t.name) });
 const roleBox = (code: keyof typeof en.workspaces.groups.roleNames) =>
@@ -238,13 +238,13 @@ describe('WorkspaceGroupForm', () => {
   });
 
   it('reads the group again on the next edit rather than reusing the last read', async () => {
-    const cache = new Map<string, unknown>();
-    const first = renderForm(REVIEWERS.id, cache);
+    const view = renderForm(REVIEWERS.id);
     await screen.findByDisplayValue(REVIEWERS.name);
-    first.unmount();
+    // Closed, as the tab closes it: the providers and their cache stay.
+    await view.show(null);
 
     mockApi.getWorkspaceGroup.mockResolvedValue({ ...REVIEWERS, roles: ['form_admin'] });
-    renderForm(REVIEWERS.id, cache);
+    await view.show(editForm(REVIEWERS.id));
 
     await waitFor(() => expect(roleBox('form_admin')).toBeChecked());
     expect(roleBox('submission_reviewer')).not.toBeChecked();

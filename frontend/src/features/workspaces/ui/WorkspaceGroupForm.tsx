@@ -169,7 +169,7 @@ function GroupFields({ dict, workspaceId, group, roles, onDone }: Readonly<Group
     setSaving(true);
     try {
       const fields = { name: trimmedName, roleCodes };
-      if (group) await writer.update(token, seed, fields);
+      if (seed) await writer.update(token, seed, fields);
       else await writer.create(token, fields);
       addNotification({ text: group ? t.updateSuccess : t.createSuccess, type: 'success' });
       onDone();

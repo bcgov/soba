@@ -52,7 +52,7 @@ export function useWorkspaceGroupsWriter(workspaceId: string) {
       group: WorkspaceGroup,
       fields: WorkspaceGroupFields,
     ): Promise<WriteOutcome<void>> => {
-      try{
+      try {
         if (fields.name !== group.name) {
           await renameWorkspaceGroup(token, workspaceId, group.id, { name: fields.name });
         }
@@ -60,7 +60,7 @@ export function useWorkspaceGroupsWriter(workspaceId: string) {
         if (!group.system && !sameRoles(fields.roleCodes, group.roles)) {
           await setWorkspaceGroupRoles(token, workspaceId, group.id, fields.roleCodes);
         }
-      }finally{
+      } finally {
         await refresh();
       }
       return { status: 'applied', value: undefined };

@@ -56,7 +56,10 @@ export function WorkspaceGroupTab({ dict, workspaceId }: Readonly<WorkspaceGroup
     try {
       await writer.remove(token, pendingDelete.id);
       addNotification({ text: t.deleteSuccess, type: 'success' });
-      setFormView(false);
+      // Close the edit form only if it was for the group just removed; another open form, such as
+      // a half-filled create, is left as it was.
+      const removedId = pendingDelete.id;
+      setFormView((view) => (view && view !== 'new' && view.groupId === removedId ? null : view));
       setPendingDelete(null);
     } catch (err: unknown) {
       addNotification({ text: t.deleteError, type: 'error', consoleError: err });
