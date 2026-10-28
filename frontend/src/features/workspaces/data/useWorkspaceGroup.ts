@@ -13,7 +13,7 @@ const groupKey = (workspaceId: string, groupId: string, locale: string) =>
 /** One group, read to seed the edit form. Null `groupId` reads nothing (the create form). */
 export function useWorkspaceGroup(workspaceId: string, groupId: string | null) {
   const locale = useSortLocale();
-  const { data, isLoading, error } = useAuthedSWR(
+  const { data, isLoading, error, mutate } = useAuthedSWR(
     groupId ? groupKey(workspaceId, groupId, locale) : null,
     (token) => getWorkspaceGroup(token, workspaceId, groupId as string, locale),
   );
@@ -22,7 +22,7 @@ export function useWorkspaceGroup(workspaceId: string, groupId: string | null) {
   useEffect(() => {
     if (!groupId) return;
     return () => {
-      await mutate(unstable_serialize(groupKey(workspaceId, groupId, locale)), undefined)
+      mutate(unstable_serialize(groupKey(workspaceId, groupId, locale)), undefined)
     };
   }, [workspaceId, groupId, locale, cache]);
 
