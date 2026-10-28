@@ -92,10 +92,7 @@ frontend:
 
 formio:
   internal:
-    enabled: false
-  # PRs use the shared formio of the soba-dev release in the same namespace.
-  external:
-    url: http://soba-dev-formio:3001
+    enabled: true
   replicas: 1
   # Formio depends on MongoDB; allow time for MongoDB to be ready after PR deploy
   readinessProbe:
@@ -103,6 +100,7 @@ formio:
     timeoutSeconds: 10
   livenessProbe:
     initialDelaySeconds: 60
+  nodeOptions: "--max-old-space-size=384"
   resources:
     requests:
       cpu: 25m
