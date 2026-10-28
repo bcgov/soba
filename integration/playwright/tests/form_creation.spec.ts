@@ -19,8 +19,8 @@ async function createForm({ page, title }: { page: Page; title: string }): Promi
     );
 
   if (workspaceSetupVisible) {
-    await page.getByTestId('workspace-name').locator('input').fill('Test Workspace');
-
+    // The name field is disabled until an org is picked, since the live availability check needs
+    // one to scope against.
     await page.getByTestId('workspace-your-org').click();
     await page
       .getByRole('option', {
@@ -28,6 +28,8 @@ async function createForm({ page, title }: { page: Page; title: string }): Promi
         exact: true,
       })
       .click();
+
+    await page.getByTestId('workspace-name').locator('input').fill('Test Workspace');
 
     await page.getByTestId('workspace-use-case').click();
 

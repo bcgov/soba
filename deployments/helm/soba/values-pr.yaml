@@ -4,14 +4,23 @@ backend:
   features:
     dev-data: "enabled"
     notifications: "enabled"
+    post-submission: "enabled"
     user-search: "enabled"
   replicas: 1
+  # Files and templates on a per-PR PVC, which pr_close deletes with the release. PRs write nothing to S3.
+  storage:
+    defaultBackend: storage-local
+    defaultBasePath: /app/files
+    localVolume:
+      storageClassName: netapp-file-standard
   config:
     documentGenerationDefaultCode: cdogs-v2
     tenantEngineDefaultCode: cstar-v1
     workflowEngineDefaultCode: cs-workflow-v1
     notificationDefaultCode: notify-v1
     userSearchPlugins: css-v1,user-search-soba
+    # Only logs that it ran, so a PR can exercise post-submission actions end to end.
+    postSubmissionActionPlugins: post-submission-log
     # Ephemeral PR namespaces stage temp bytes under os.tmpdir() — no RWX PVC.
     tempStorageDefaultCode: tempstorage-os
     # Virus scan inherits virusscan-clamav from values.yaml: PRs deploy into the dev
@@ -62,10 +71,9 @@ backend:
   autoscaling:
     enabled: false
 
-# PR routes publish to the APS test instance on Silver. The PR deploy sets enabled from APS_PR_ENABLED.
 gatewayNetworkPolicy:
-  namespaceName: "264e6f"
-  environment: test
+  namespaceName: "b8840c"
+  environment: prod
 
 frontend:
   replicas: 1
@@ -86,6 +94,12 @@ formio:
   internal:
     enabled: true
   replicas: 1
+  # Formio depends on MongoDB; allow time for MongoDB to be ready after PR deploy
+  readinessProbe:
+    initialDelaySeconds: 45
+    timeoutSeconds: 10
+  livenessProbe:
+    initialDelaySeconds: 60
   resources:
     requests:
       cpu: 25m
@@ -93,12 +107,6 @@ formio:
     limits:
       cpu: 250m
       memory: 512Mi
-  # Formio depends on MongoDB; allow time for MongoDB to be ready after PR deploy
-  readinessProbe:
-    initialDelaySeconds: 45
-    timeoutSeconds: 10
-  livenessProbe:
-    initialDelaySeconds: 60
 
 mongodb:
   # MongoDB runs as its own release from deployments/helm/action-mongodb. The deploy
@@ -128,6 +136,3 @@ temporalWorkers:
 
 vault:
   enabled: true
-  role: acf456-nonprod
-  secretPath: acf456-nonprod/soba-dev
-  serviceAccountName: acf456-vault

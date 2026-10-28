@@ -3,6 +3,7 @@ jest.mock('../../../../src/core/integrations/plugins/PluginRegistry', () => ({
   getActivePluginCodes: jest.fn(() => new Set<string>()),
   getActiveStorageBackendCodes: jest.fn(() => new Set<string>()),
   getFeatureGatedPluginCodes: jest.fn(),
+  getPostSubmissionActionPluginDefinitions: jest.fn(() => [{ code: 'post-submission-log' }]),
 }));
 jest.mock('../../../../src/core/integrations/form-engine/FormEngineRegistry', () => ({
   getFormEnginePlugins: jest.fn(() => []),
@@ -87,6 +88,23 @@ describe('MetaApiService.getPlugins feature-gated enablement', () => {
 
       const { plugins } = await metaApiService.getPlugins();
       expect(Object.fromEntries(plugins.map((p) => [p.code, p.enabled]))).toEqual(expected);
+    },
+  );
+
+  it.each([
+    [undefined, false],
+    ['post-submission-log', true],
+  ])(
+    'enables an installed action plugin that POST_SUBMISSION_ACTION_PLUGINS lists (%s)',
+    async (codes, expected) => {
+      if (codes === undefined) delete process.env.POST_SUBMISSION_ACTION_PLUGINS;
+      else process.env.POST_SUBMISSION_ACTION_PLUGINS = codes;
+      getPluginCatalog.mockReturnValue([{ code: 'post-submission-log', hasApi: false }]);
+      getFeatureGated.mockReturnValue([]);
+      listFeatures.mockResolvedValue([]);
+
+      const { plugins } = await metaApiService.getPlugins();
+      expect(plugins).toEqual([{ code: 'post-submission-log', hasApi: false, enabled: expected }]);
     },
   );
 });

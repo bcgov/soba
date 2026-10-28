@@ -11,6 +11,7 @@ import { env } from '../../config/env';
 import { authEnv } from '../../config/authEnv';
 import { getFormEnginePlugins } from '../../integrations/form-engine/FormEngineRegistry';
 import { getEnabledUserSearchPluginCodes } from '../../integrations/user-search/UserSearchRegistry';
+import { getPostSubmissionActions } from '../../integrations/post-submission-action/PostSubmissionActionRegistry';
 import { resolveDefaultTenantEngineCode } from '../../integrations/tenant/TenantEngineRegistry';
 import { resolveDefaultWorkflowEngineCode } from '../../integrations/workflow/WorkflowEngineRegistry';
 import {
@@ -57,6 +58,7 @@ export class MetaApiService {
       resolveDefaultTenantEngineCode(),
       resolveDefaultWorkflowEngineCode(),
       ...getEnabledUserSearchPluginCodes(),
+      ...getPostSubmissionActions().map((plugin) => plugin.code),
       ...getActivePluginCodes(),
       ...getActiveStorageBackendCodes(),
     ]);

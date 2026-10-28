@@ -78,6 +78,9 @@
     "createAction": "Create",
     "saveError": "Failed to save workspace.",
     "createError": "Failed to create workspace.",
+    "nameChecking": "Checking…",
+    "nameAvailable": "Available",
+    "nameUnavailable": "Unavailable",
     "loadError": "Failed to load workspace.",
     "manageForbidden": "Only workspace owners or admins can manage this workspace.",
     "createForbidden": "Only BC Government identity provider users can create workspaces.",
@@ -621,6 +624,7 @@
     "unauthenticated": "Your session is not valid. Please sign in again.",
     "sign_in_required": "Sign in to see your forms and submissions.",
     "already_exists": "This already exists. Reload the page and try again.",
+    "workspace_name_taken": "A workspace with this name already exists.",
     "route_not_found": "This page or feature is not available.",
     "rate_limited": "Too many requests. Please wait a moment and try again.",
     "internal_error": "Something went wrong on the server. Please try again."

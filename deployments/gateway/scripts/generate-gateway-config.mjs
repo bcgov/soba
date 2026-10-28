@@ -14,6 +14,7 @@ Required environment variables:
   GATEWAY_QUALIFIER      Qualifier passed to gwa publish-gateway, e.g. proxy-proof-soba-pr-173
   GATEWAY_SERVICE_NAME   Gateway service and route name
   GATEWAY_HOSTNAME       Route hostname, without scheme or path
+  GATEWAY_ROUTE_PATH     Route path prefix, ending in /
   BACKEND_HOST           Backend Service DNS name, without scheme, port, or path
 
 Writes YAML to stdout unless --output is supplied. Uses only Node.js built-ins.
@@ -68,6 +69,8 @@ async function main() {
     CONFIG_TAG: `ns.${gateway}.${qualifier}`,
     BACKEND_HOST: hostname('BACKEND_HOST', env.BACKEND_HOST),
     GATEWAY_HOSTNAME: hostname('GATEWAY_HOSTNAME', env.GATEWAY_HOSTNAME),
+    GATEWAY_ROUTE_PATH: required('GATEWAY_ROUTE_PATH', env.GATEWAY_ROUTE_PATH),
+    GATEWAY_STRIP_PATH: env.GATEWAY_ROUTE_PATH !== '/',
   };
   const template = await readFile(new URL('../service.template.yaml', import.meta.url), 'utf8');
   const rendered = template.replace(/\$\{([^}]+)\}/g, (_, name) => {

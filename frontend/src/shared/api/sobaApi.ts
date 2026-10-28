@@ -10,6 +10,7 @@ import type {
   WorkspaceLookupResponse,
   CreateWorkspaceBody,
   UpdateWorkspaceBody,
+  WorkspaceNameAvailabilityResponse,
 } from '../../types/workspaces';
 import type { CurrentUserResponse } from '../../types/user';
 import type { SortLocale } from '@soba/lib/sort';
@@ -245,5 +246,17 @@ export async function updateWorkspace(
   body: UpdateWorkspaceBody,
 ): Promise<WorkspaceItem> {
   const response = await sobaFetch(`/workspaces/${id}`, { token, method: 'PATCH', json: body });
+  return parseJson(response);
+}
+
+/** Whether a team workspace name is free in `org`, case-insensitively; `excludeId` is the workspace being edited. */
+export async function checkWorkspaceNameAvailable(
+  token: string,
+  params: { org: string; name: string; excludeId?: string },
+): Promise<WorkspaceNameAvailabilityResponse> {
+  const response = await sobaFetch('/workspaces/name-availability', {
+    token,
+    query: { org: params.org, name: params.name, excludeId: params.excludeId },
+  });
   return parseJson(response);
 }

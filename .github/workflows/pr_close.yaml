@@ -40,10 +40,12 @@ jobs:
   set-vars:
     name: Set variables
     runs-on: ubuntu-24.04
+    environment: pr
     outputs:
       PR_NUM: ${{ steps.vars.outputs.PR_NUM }}
       JOB_NAME: ${{ steps.vars.outputs.JOB_NAME }}
       RELEASE: ${{ steps.vars.outputs.RELEASE }}
+      APS_PR_ENABLED: ${{ steps.vars.outputs.APS_PR_ENABLED }}
     steps:
       - name: Setting variables
         id: vars
@@ -56,11 +58,12 @@ jobs:
           echo "PR_NUM=$PR_NUM" >> "$GITHUB_OUTPUT"
           echo "JOB_NAME=pr-$PR_NUM" >> "$GITHUB_OUTPUT"
           echo "RELEASE=soba-pr-$PR_NUM" >> "$GITHUB_OUTPUT"
+          echo "APS_PR_ENABLED=${{ vars.APS_PR_ENABLED == 'true' }}" >> "$GITHUB_OUTPUT"
 
   gateway-cleanup:
     name: Remove PR gateway configuration
     needs: [set-vars]
-    if: ${{ vars.APS_PR_ENABLED == 'true' }}
+    if: ${{ needs.set-vars.outputs.APS_PR_ENABLED == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: pr
@@ -71,12 +74,14 @@ jobs:
     env:
       RELEASE: ${{ needs.set-vars.outputs.RELEASE }}
       GATEWAY_ID: ${{ vars.APS_GATEWAY_ID }}
+      APS_HOST: ${{ vars.APS_HOST }}
       GWA_SHA256: ${{ vars.GWA_LINUX_AMD64_SHA256 }}
     steps:
       - name: Validate settings and install pinned GWA
         shell: bash
         run: |
           set -euo pipefail
+          : "${APS_HOST:?Set APS_HOST.}"
           [[ "$RELEASE" =~ ^soba-pr-[1-9][0-9]*$ ]]
           [[ "$GATEWAY_ID" =~ ^gw-[a-z0-9-]+$ ]]
           [[ "$GWA_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]
@@ -91,13 +96,13 @@ jobs:
       - name: Remove only this PR configuration
         shell: bash
         env:
-          GWA_CLIENT_ID: ${{ secrets.GWA_CLIENT_ID_PR }}
-          GWA_CLIENT_SECRET: ${{ secrets.GWA_CLIENT_SECRET_PR }}
+          GWA_CLIENT_ID: ${{ secrets.GWA_CLIENT_ID }}
+          GWA_CLIENT_SECRET: ${{ secrets.GWA_CLIENT_SECRET }}
         run: |
           set -euo pipefail
-          : "${GWA_CLIENT_ID:?Missing GWA_CLIENT_ID_PR}"
-          : "${GWA_CLIENT_SECRET:?Missing GWA_CLIENT_SECRET_PR}"
-          gwa config set host api-gov-bc-ca.test.api.gov.bc.ca
+          : "${GWA_CLIENT_ID:?Missing GWA_CLIENT_ID}"
+          : "${GWA_CLIENT_SECRET:?Missing GWA_CLIENT_SECRET}"
+          gwa config set host "$APS_HOST"
           gwa config set gateway "$GATEWAY_ID"
           gwa login --client-id "$GWA_CLIENT_ID" --client-secret "$GWA_CLIENT_SECRET"
           QUALIFIER="proxy-proof-${RELEASE}"
@@ -133,6 +138,7 @@ jobs:
     name: Uninstall SOBA and remove secrets/PVCs
     needs: [set-vars]
     runs-on: ubuntu-24.04
+    environment: pr
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -149,12 +155,12 @@ jobs:
           openshift_server_url: ${{ vars.OC_SERVER }}
           openshift_token: ${{ secrets.OC_TOKEN }}
           insecure_skip_tls_verify: true
-          namespace: ${{ secrets.OC_NAMESPACE }}
+          namespace: ${{ vars.OC_NAMESPACE }}
 
       - name: Uninstall SOBA and delete orphaned resources
         env:
           RELEASE: ${{ needs.set-vars.outputs.RELEASE }}
-          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          NAMESPACE: ${{ vars.OC_NAMESPACE }}
         run: |
           set -euo pipefail
 
@@ -175,7 +181,7 @@ jobs:
 
       - name: Delete Temporal PR namespace
         env:
-          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          NAMESPACE: ${{ vars.OC_NAMESPACE }}
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
         run: |
           TEMPORAL_NS="soba-pr-${PR_NUM}"
@@ -188,6 +194,7 @@ jobs:
     name: Remove PR MongoDB
     needs: [set-vars, soba-cleanup]
     runs-on: ubuntu-24.04
+    environment: pr
     steps:
       - name: Install OpenShift CLI
         uses: redhat-actions/openshift-tools-installer@e3b32c2ab7b064b2ce189121c4a49f509a99a7b4 # v3.0
@@ -201,11 +208,11 @@ jobs:
           openshift_server_url: ${{ vars.OC_SERVER }}
           openshift_token: ${{ secrets.OC_TOKEN }}
           insecure_skip_tls_verify: true
-          namespace: ${{ secrets.OC_NAMESPACE }}
+          namespace: ${{ vars.OC_NAMESPACE }}
 
       - name: Uninstall MongoDB and delete orphaned resources
         env:
-          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          NAMESPACE: ${{ vars.OC_NAMESPACE }}
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
         run: |
           set -euo pipefail
@@ -230,6 +237,7 @@ jobs:
     name: Remove Crunchy PR user and database
     needs: [set-vars, mongo-cleanup]
     runs-on: ubuntu-24.04
+    environment: pr
     steps:
       - name: Checkout action-crunchy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -249,7 +257,7 @@ jobs:
           openshift_server_url: ${{ vars.OC_SERVER }}
           openshift_token: ${{ secrets.OC_TOKEN }}
           insecure_skip_tls_verify: true
-          namespace: ${{ secrets.OC_NAMESPACE }}
+          namespace: ${{ vars.OC_NAMESPACE }}
 
       - name: Remove PR user from Crunchy
         run: |

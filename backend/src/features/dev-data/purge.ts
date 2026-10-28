@@ -25,6 +25,7 @@ import {
   formVersionRevisions,
   formVersions,
   forms,
+  jobs,
   notificationAudits,
   settingsAudit,
   sobaAdmins,
@@ -260,6 +261,7 @@ async function purgeUserScoped(tx: DbOrTx, userIds: string[], record: RecordFn):
  * checks this list, not the function body: adding a name here without a delete below defeats it.
  */
 export const WORKSPACE_SCOPED_TABLES: readonly string[] = [
+  'job',
   'document_generation_audit',
   'notification_audit',
   'submission_revision',
@@ -325,6 +327,8 @@ async function purgeWorkspaceScoped(
   // First: these reference workspace_group and workspace_membership, and every FK is NO ACTION.
   await purgeEnterpriseBindings(tx, ids, record);
 
+  // Jobs reference submissions, revisions and forms.
+  await record('job', tx.delete(jobs).where(inArray(jobs.workspaceId, ids)));
   await record(
     'document_generation_audit',
     tx.delete(documentGenerationAudits).where(inArray(documentGenerationAudits.workspaceId, ids)),
