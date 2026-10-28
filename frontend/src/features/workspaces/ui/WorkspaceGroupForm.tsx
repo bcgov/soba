@@ -157,6 +157,7 @@ function GroupFields({ dict, workspaceId, group, roles, onDone }: Readonly<Group
   const [name, setName] = useState(group?.name ?? '');
   const [roleCodes, setRoleCodes] = useState<string[]>(group?.roles ?? []);
   const [saving, setSaving] = useState(false);
+  const [seed] = useState(group);
 
   // A system group is protected: shown for reference, with nothing to save.
   const isSystem = group?.system === true;
@@ -168,7 +169,7 @@ function GroupFields({ dict, workspaceId, group, roles, onDone }: Readonly<Group
     setSaving(true);
     try {
       const fields = { name: trimmedName, roleCodes };
-      if (group) await writer.update(token, group, fields);
+      if (group) await writer.update(token, seed, fields);
       else await writer.create(token, fields);
       addNotification({ text: group ? t.updateSuccess : t.createSuccess, type: 'success' });
       onDone();

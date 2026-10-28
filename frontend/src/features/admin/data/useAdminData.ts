@@ -152,7 +152,7 @@ export function useFeatureScope(
     // entry is what makes the next visit read the record again. `mutate(key, undefined)` reads as
     // "revalidate", not "forget", so the eviction goes through the cache itself.
     return () => {
-      cache.delete(unstable_serialize(scopeKey(featureScopeId)));
+      await mutate(unstable_serialize(scopeKey(featureScopeId)), undefined);
     };
   }, [featureScopeId, cache]);
 

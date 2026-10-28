@@ -52,14 +52,17 @@ export function useWorkspaceGroupsWriter(workspaceId: string) {
       group: WorkspaceGroup,
       fields: WorkspaceGroupFields,
     ): Promise<WriteOutcome<void>> => {
-      if (fields.name !== group.name) {
-        await renameWorkspaceGroup(token, workspaceId, group.id, { name: fields.name });
+      try{
+        if (fields.name !== group.name) {
+          await renameWorkspaceGroup(token, workspaceId, group.id, { name: fields.name });
+        }
+        // A system group's roles are fixed; the API refuses the call.
+        if (!group.system && !sameRoles(fields.roleCodes, group.roles)) {
+          await setWorkspaceGroupRoles(token, workspaceId, group.id, fields.roleCodes);
+        }
+      }finally{
+        await refresh();
       }
-      // A system group's roles are fixed; the API refuses the call.
-      if (!group.system && !sameRoles(fields.roleCodes, group.roles)) {
-        await setWorkspaceGroupRoles(token, workspaceId, group.id, fields.roleCodes);
-      }
-      await refresh();
       return { status: 'applied', value: undefined };
     },
     [workspaceId, refresh],

@@ -21,12 +21,8 @@ export function useWorkspaceGroup(workspaceId: string, groupId: string | null) {
   const { cache } = useSWRConfig();
   useEffect(() => {
     if (!groupId) return;
-    // The record seeds a form that cannot re-seed itself. A cached copy would seed the next edit
-    // from roles a save since has moved on from, and saving there would write them back. Dropping
-    // the entry makes the next edit read the group again; `mutate(key, undefined)` would only
-    // revalidate, so the eviction goes through the cache.
     return () => {
-      cache.delete(unstable_serialize(groupKey(workspaceId, groupId, locale)));
+      await mutate(unstable_serialize(groupKey(workspaceId, groupId, locale)), undefined)
     };
   }, [workspaceId, groupId, locale, cache]);
 

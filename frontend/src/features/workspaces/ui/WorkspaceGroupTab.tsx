@@ -56,6 +56,7 @@ export function WorkspaceGroupTab({ dict, workspaceId }: Readonly<WorkspaceGroup
     try {
       await writer.remove(token, pendingDelete.id);
       addNotification({ text: t.deleteSuccess, type: 'success' });
+      setFormView(false);
       setPendingDelete(null);
     } catch (err: unknown) {
       addNotification({ text: t.deleteError, type: 'error', consoleError: err });
@@ -164,7 +165,7 @@ export function WorkspaceGroupTab({ dict, workspaceId }: Readonly<WorkspaceGroup
         <ConfirmModal
           show
           title={t.deleteConfirmTitle}
-          message={t.deleteConfirmMessage.replace('{name}', pendingDelete.name)}
+          message={t.deleteConfirmMessage.replace('{name}', () => pendingDelete.name)}
           confirmLabel={t.deleteGroup}
           onConfirm={() => void confirmDelete()}
           onCancel={() => {
