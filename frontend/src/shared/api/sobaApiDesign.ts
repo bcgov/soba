@@ -1,7 +1,7 @@
 // Design-mode API service: form authoring + submission management. All calls hit /design/* and
 // require a staff token. Submit-mode calls live in sobaApiSubmit.
 import { sobaFetch } from './sobaFetch';
-import { parseJson } from './sobaHelpers';
+import { parseDownload, parseJson, type DownloadedFile } from './sobaHelpers';
 import { FormType } from '@formio/react';
 import type {
   SobaFormType,
@@ -236,4 +236,16 @@ export async function getFormVersionSchema(token: string, id: string): Promise<F
 export async function deleteSobaSubmission(token: string, id: string): Promise<void> {
   const response = await sobaFetch(`/design/submissions/${id}`, { token, method: 'DELETE' });
   if (!response.ok && response.status !== 404) await parseJson(response);
+}
+
+/** A submission's file, for staff. */
+export async function downloadSobaSubmissionFile(
+  token: string,
+  submissionId: string,
+  fileId: string,
+): Promise<DownloadedFile> {
+  const response = await sobaFetch(`/design/submissions/${submissionId}/files/${fileId}`, {
+    token,
+  });
+  return parseDownload(response);
 }

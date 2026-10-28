@@ -13,6 +13,9 @@ import {
   UnsupportedMediaTypeError,
 } from '../../core/errors';
 
+const FILE_NOT_FOUND = 'File not found';
+const FILE_UNAVAILABLE = 'File content unavailable';
+
 export async function uploadFileHandler(req: Request, res: Response): Promise<void> {
   // requireUploadAccess has checked submissionId, then resolved + authorized its workspace into
   // coreContext.
@@ -56,15 +59,31 @@ export async function uploadFileHandler(req: Request, res: Response): Promise<vo
 export async function downloadFileHandler(req: Request, res: Response): Promise<void> {
   const result = await filesService.getForCaller(req.params.id, resolveCaller(req));
   if (result === 'notfound') {
-    throw new NotFoundError('File not found', ApiErrorCodes.file_not_found);
+    throw new NotFoundError(FILE_NOT_FOUND, ApiErrorCodes.file_not_found);
   }
   if (result === 'denied') {
     throw accessDenial(req, 'Not authorized to access this file', ApiErrorCodes.read_denied);
   }
   if (result === 'unavailable') {
-    throw new ServiceUnavailableError('File content unavailable', ApiErrorCodes.file_unavailable);
+    throw new ServiceUnavailableError(FILE_UNAVAILABLE, ApiErrorCodes.file_unavailable);
   }
   await sendStoredFile(res, result.record, result.file, 'inline');
+}
+
+/** Staff download of a submission's file. */
+export async function downloadSubmissionFileHandler(req: Request, res: Response): Promise<void> {
+  const result = await filesService.getForSubmission(
+    req.coreContext!.workspaceId,
+    req.params.id,
+    req.params.fileId,
+  );
+  if (result === 'notfound') {
+    throw new NotFoundError(FILE_NOT_FOUND, ApiErrorCodes.file_not_found);
+  }
+  if (result === 'unavailable') {
+    throw new ServiceUnavailableError(FILE_UNAVAILABLE, ApiErrorCodes.file_unavailable);
+  }
+  await sendStoredFile(res, result.record, result.file, 'attachment');
 }
 
 export async function deleteFileHandler(req: Request, res: Response): Promise<void> {
@@ -74,7 +93,7 @@ export async function deleteFileHandler(req: Request, res: Response): Promise<vo
     return;
   }
   if (outcome === 'notfound') {
-    throw new NotFoundError('File not found', ApiErrorCodes.file_not_found);
+    throw new NotFoundError(FILE_NOT_FOUND, ApiErrorCodes.file_not_found);
   }
   throw accessDenial(req, 'Not authorized to access this file', ApiErrorCodes.write_denied);
 }

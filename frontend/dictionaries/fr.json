@@ -672,6 +672,13 @@
       "failed": "La recherche n'a pas pu être effectuée. Réessayez."
     }
   },
+  "fileDownload": {
+    "pageTitle": "Télécharger le fichier",
+    "loading": "Téléchargement du fichier…",
+    "saved": "{name} a été téléchargé.",
+    "again": "Télécharger de nouveau",
+    "loadError": "Impossible de télécharger ce fichier."
+  },
   "Basic": "Basique",
   "Text Field": "Champ de Texte",
   "Text Area": "Zone de Texte",

@@ -37,6 +37,18 @@ async function findAttachment(id: string, caller: CallerIdentity) {
   return { record: attachment.file, loaded };
 }
 
+type OpenedFile = { record: FileRecord; file: GetFileResult };
+
+/** The file's stored bytes, or 'unavailable'. */
+async function openRecord(record: FileRecord): Promise<OpenedFile | 'unavailable'> {
+  const file = await fileStore.open(record);
+  if (!file) {
+    log.warn({ fileId: record.id, profile: record.profile }, 'File content unavailable');
+    return 'unavailable';
+  }
+  return { record, file };
+}
+
 export const filesService = {
   /** Store a file attached to a submission. The returned record's id is the public reference. */
   upload(params: UploadFileParams): Promise<StoreFileOutcome> {
@@ -69,17 +81,25 @@ export const filesService = {
   async getForCaller(
     id: string,
     caller: CallerIdentity,
-  ): Promise<{ record: FileRecord; file: GetFileResult } | 'notfound' | 'denied' | 'unavailable'> {
+  ): Promise<OpenedFile | 'notfound' | 'denied' | 'unavailable'> {
     const attachment = await findAttachment(id, caller);
     if (!attachment) return 'notfound';
     const { record, loaded } = attachment;
     if (!allowsSubmitterOperation(SubmitterOperation.read, loaded, caller)) return 'denied';
-    const file = await fileStore.open(record);
-    if (!file) {
-      log.warn({ fileId: record.id, profile: record.profile }, 'File content unavailable');
-      return 'unavailable';
+    return openRecord(record);
+  },
+
+  /** A file attached to the submission, for staff; the route checks access. */
+  async getForSubmission(
+    workspaceId: string,
+    submissionId: string,
+    fileId: string,
+  ): Promise<OpenedFile | 'notfound' | 'unavailable'> {
+    const attachment = await getSubmissionFileByFileId(fileId);
+    if (attachment?.submissionId !== submissionId || attachment.file.workspaceId !== workspaceId) {
+      return 'notfound';
     }
-    return { record, file };
+    return openRecord(attachment.file);
   },
 
   /**

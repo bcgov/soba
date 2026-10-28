@@ -671,6 +671,13 @@
       "failed": "The search could not be completed. Try again."
     }
   },
+  "fileDownload": {
+    "pageTitle": "Download file",
+    "loading": "Downloading the file…",
+    "saved": "{name} has been downloaded.",
+    "again": "Download again",
+    "loadError": "Could not download this file."
+  },
   "Basic": "Basic",
   "Text Field": "Text Field",
   "Text Area": "Text Area",

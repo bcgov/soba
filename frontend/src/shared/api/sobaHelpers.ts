@@ -66,3 +66,23 @@ export async function parseBlob(response: Response): Promise<Blob> {
     throw err;
   }
 }
+
+/** A downloaded file and the name the server gave it. */
+export interface DownloadedFile {
+  blob: Blob;
+  filename: string;
+}
+
+/** File name from Content-Disposition. */
+const dispositionFilename = (response: Response): string => {
+  const header = response.headers.get('Content-Disposition') ?? '';
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header)?.[1];
+  if (encoded) return decodeURIComponent(encoded);
+  return /filename="([^"]*)"/i.exec(header)?.[1] ?? 'download';
+};
+
+/** The file and its name; a refusal throws its ApiError. */
+export const parseDownload = async (response: Response): Promise<DownloadedFile> => ({
+  blob: await parseBlob(response),
+  filename: dispositionFilename(response),
+});

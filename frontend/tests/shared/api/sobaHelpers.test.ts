@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { ApiErrorCode } from '@soba/lib';
-import { ApiError, parseBlob, parseJson } from '@/src/shared/api/sobaHelpers';
+import { ApiError, parseBlob, parseDownload, parseJson } from '@/src/shared/api/sobaHelpers';
 import { apiErrorMessage, classifyDataError } from '@/src/shared/api/dataError';
 import { isNetworkError, NetworkError, SessionExpiredError } from '@/src/shared/api/sobaFetch';
 
@@ -118,5 +118,31 @@ describe('apiErrorMessage', () => {
     ['an ended session', new SessionExpiredError(), null],
   ])('with a fallback, answers %s', (_label, cause, expected) => {
     expect(apiErrorMessage(cause, messages, 'Try again.')).toBe(expected);
+  });
+});
+
+describe('parseDownload', () => {
+  const fileResponse = (disposition: string | null) =>
+    new Response('x', disposition ? { headers: { 'Content-Disposition': disposition } } : {});
+
+  it('names the file from filename*', async () => {
+    const file = await parseDownload(
+      fileResponse(`attachment; filename="r_sum_.csv"; filename*=UTF-8''r%C3%A9sum%C3%A9.csv`),
+    );
+    expect(file.filename).toBe('résumé.csv');
+    expect(file.blob.size).toBe(1);
+  });
+
+  it('falls back to the plain filename, then to a generic name', async () => {
+    expect((await parseDownload(fileResponse('attachment; filename="plan.pdf"'))).filename).toBe(
+      'plan.pdf',
+    );
+    expect((await parseDownload(fileResponse(null))).filename).toBe('download');
+  });
+
+  it('throws a refused download with its status', async () => {
+    await expect(
+      parseDownload(errorResponse(404, { error: 'File not found', code: 'file_not_found' })),
+    ).rejects.toMatchObject({ status: 404, code: 'file_not_found' });
   });
 });
