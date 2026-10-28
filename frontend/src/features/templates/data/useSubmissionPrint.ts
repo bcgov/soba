@@ -6,7 +6,6 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useCallToken } from '@/src/shared/api/callToken';
 import { classifyDataError } from '@/src/shared/api/dataError';
 import type { DataError } from '@/src/shared/api/dataContracts';
-import { getSobaForm } from '@/src/shared/api/sobaApi';
 import { isSessionExpired } from '@/src/shared/api/sobaFetch';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 import { sessionReadConfig } from '@/src/shared/api/swrConfig';
@@ -19,7 +18,7 @@ import {
   type PrintOptions,
   type StaffPrintFacts,
 } from '@/src/types/templates';
-import { designFormKey } from '@/src/features/designer/data/useForm';
+import { useDesignFormRead } from '@/src/features/designer/data/useForm';
 import {
   getStaffPrintFacts,
   getSubmitterPrintFacts,
@@ -141,11 +140,7 @@ export function useStaffPrint(formId: string, submissionId: string): SubmissionP
   const { signedInToken } = useCallToken();
 
   // The build page reads the same key, so its cached form usually answers this.
-  const { data: form, error: formError } = useAuthedSWR(
-    designFormKey(formId),
-    (token) => getSobaForm(token, formId),
-    sessionReadConfig,
-  );
+  const { data: form, error: formError } = useDesignFormRead(formId);
   const { data, error } = useAuthedSWR(
     allowed ? ['staff-print-facts', submissionId] : null,
     (token) => getStaffPrintFacts(token, submissionId),

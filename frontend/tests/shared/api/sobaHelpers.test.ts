@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { ApiErrorCode } from '@soba/lib';
-import { ApiError, parseJson } from '@/src/shared/api/sobaHelpers';
+import { ApiError, parseBlob, parseJson } from '@/src/shared/api/sobaHelpers';
 import { apiErrorMessage, classifyDataError } from '@/src/shared/api/dataError';
 import { isNetworkError, NetworkError, SessionExpiredError } from '@/src/shared/api/sobaFetch';
 
@@ -53,6 +53,22 @@ describe('parseJson', () => {
   it('keeps invalid JSON a SyntaxError', async () => {
     const response = new Response('not json', { status: 200 });
     expect(await errorFrom(response)).toBeInstanceOf(SyntaxError);
+  });
+});
+
+describe('parseBlob', () => {
+  it('reports a body cut off mid-read as a NetworkError', async () => {
+    const cutOff = new TypeError('network error');
+    const response = { ok: true, status: 200, blob: () => Promise.reject(cutOff) } as Response;
+    const err = await parseBlob(response).catch((e: unknown) => e);
+    expect(isNetworkError(err)).toBe(true);
+    expect((err as Error).cause).toBe(cutOff);
+  });
+
+  it('throws a refusal as its ApiError', async () => {
+    await expect(parseBlob(errorResponse(403, { error: 'No' }))).rejects.toMatchObject({
+      status: 403,
+    });
   });
 });
 
