@@ -271,6 +271,53 @@ describe('adminRouter feature-scope routes', () => {
   });
 });
 
+describe('adminRouter job routes', () => {
+  it.each([
+    ['get', '/jobs'],
+    ['get', '/jobs/types'],
+    ['get', `/jobs/${SCOPE_ID}`],
+    ['post', `/jobs/${SCOPE_ID}/rerun`],
+    ['post', `/jobs/${SCOPE_ID}/cancel`],
+  ] as const)('blocks %s %s without the SOBA admin role', async (method, url) => {
+    const res = await request(createAdminApp(false))[method](url);
+
+    expect(res.status).toBe(403);
+  });
+
+  it.each([
+    ['get', '/jobs/not-a-uuid'],
+    ['post', '/jobs/not-a-uuid/rerun'],
+    ['post', '/jobs/not-a-uuid/cancel'],
+  ] as const)('rejects %s %s before reading a job', async (method, url) => {
+    const res = await request(createAdminApp(true))[method](url);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid request params');
+  });
+
+  it.each([
+    ['status', '/jobs?status=failed'],
+    ['workspaceId', '/jobs?workspaceId=ws1'],
+    ['sort', '/jobs?sort=type:asc'],
+    ['cursor', '/jobs?cursor=abc'],
+  ])('rejects a list query with a bad %s', async (_field, url) => {
+    const res = await request(createAdminApp(true)).get(url);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid request query');
+  });
+
+  it('lists the job types this environment runs, not a job called "types"', async () => {
+    const res = await request(createAdminApp(true)).get('/jobs/types');
+
+    expect(res.status).toBe(200);
+    expect(res.body.items).toContainEqual({
+      type: 'submission.submitted',
+      name: 'Submission received',
+    });
+  });
+});
+
 describe('adminRouter soba-admins list', () => {
   beforeEach(() => {
     jest.clearAllMocks();

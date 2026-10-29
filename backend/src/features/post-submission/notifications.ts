@@ -9,7 +9,8 @@ import type {
   PostSubmissionActionSendScope,
 } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
 import {
-  isHandledSend,
+  hasRunStarted,
+  isHandledForRun,
   REFUSED_HTTP_STATUSES,
 } from '../../core/integrations/notification/sendOutcome';
 import { getSystemUser } from '../../core/services/systemUser';
@@ -48,9 +49,16 @@ export const actionNotifications = (job: ClaimedJob): PostSubmissionActionNotifi
     return { outcome, httpStatus, audited };
   },
 
-  async handledRecipients() {
+  async handled() {
     const sends = await listJobNotificationSends(job.id);
-    return new Set(sends.filter(isHandledSend).flatMap((send) => send.recipients.to));
+    return {
+      recipients: new Set(
+        sends
+          .filter((send) => isHandledForRun(send, job.lastRequeuedAt))
+          .flatMap((send) => send.recipients.to),
+      ),
+      runStarted: hasRunStarted(sends, job.lastRequeuedAt),
+    };
   },
 
   sentSince: (scope, seconds) =>

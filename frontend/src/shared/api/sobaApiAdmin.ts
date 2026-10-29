@@ -9,6 +9,10 @@ import type {
   DocumentGenerationAuditsResponse,
   FeatureScopeItem,
   FeatureScopesResponse,
+  JobDetail,
+  JobsQuery,
+  JobsResponse,
+  JobTypesResponse,
   SobaAdminsResponse,
   UpsertFeatureScopeBody,
 } from '../../types/admin';
@@ -111,4 +115,48 @@ export async function fetchDocumentGenerationAudits(
     },
   });
   return parseJson(response);
+}
+
+export async function fetchJobs(token: string, query: JobsQuery): Promise<JobsResponse> {
+  const response = await sobaFetch('/admin/jobs', {
+    token,
+    query: {
+      ...toListRequestQuery(query),
+      status: query.status,
+      type: query.type,
+      workspaceId: query.workspaceId,
+      formId: query.formId,
+      submissionId: query.submissionId,
+    },
+  });
+  return parseJson(response);
+}
+
+export async function fetchJobTypes(token: string): Promise<JobTypesResponse> {
+  const response = await sobaFetch('/admin/jobs/types', { token });
+  return parseJson(response);
+}
+
+export async function fetchJob(token: string, jobId: string): Promise<JobDetail> {
+  const response = await sobaFetch(`/admin/jobs/${jobId}`, { token });
+  return parseJson(response);
+}
+
+/** Queues a dead or cancelled job again; a 409 says why it cannot run again. */
+export async function rerunJob(token: string, jobId: string): Promise<JobDetail> {
+  const response = await sobaFetch(`/admin/jobs/${jobId}/rerun`, { token, method: 'POST' });
+  return parseJson(response);
+}
+
+/**
+ * Stops a queued or running job. `stopped` is false while a running job has yet to reach its next
+ * heartbeat (202).
+ */
+export async function stopJob(
+  token: string,
+  jobId: string,
+): Promise<{ stopped: boolean; job: JobDetail }> {
+  const response = await sobaFetch(`/admin/jobs/${jobId}/cancel`, { token, method: 'POST' });
+  const job = await parseJson<JobDetail>(response);
+  return { stopped: response.status === 200, job };
 }

@@ -53,6 +53,12 @@ export const jobs = sobaSchema.table(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp('started_at', { withTimezone: true }),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
+    // An administrator's re-runs of a dead or cancelled job, which run the same row again.
+    requeueCount: integer('requeue_count').notNull().default(0),
+    lastRequeuedAt: timestamp('last_requeued_at', { withTimezone: true }),
+    lastRequeuedBy: uuid('last_requeued_by').references(() => appUsers.id),
+    // Set in the transaction that queued this job's children; kept after they are deleted.
+    childrenQueuedAt: timestamp('children_queued_at', { withTimezone: true }),
   },
   (table) => ({
     dedupeKeyUq: uniqueIndex('job_dedupe_key_uq').on(table.dedupeKey),
@@ -72,5 +78,6 @@ export const jobs = sobaSchema.table(
     formIdx: index('job_form_idx').on(table.formId),
     submissionIdx: index('job_submission_idx').on(table.submissionId),
     revisionIdx: index('job_revision_idx').on(table.revisionId),
+    createdIdx: index('job_created_idx').on(table.createdAt.desc(), table.id.desc()),
   }),
 );
