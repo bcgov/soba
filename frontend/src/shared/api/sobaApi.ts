@@ -42,6 +42,7 @@ export {
   updateSobaSubmissionStatus,
   addSobaSubmissionNote,
   recordSobaSubmissionEdit,
+  downloadSobaSubmissionFile,
 } from './sobaApiDesign';
 // Submit-mode (public-capable, /submit/*)
 export {

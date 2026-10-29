@@ -484,6 +484,7 @@
     "submittedAt": "Date de Soumission",
     "submitter": "Soumissionnaire",
     "backToSubmissions": "Retour aux soumissions",
+    "backToSubmission": "Retour à la soumission",
     "delete": "Supprimer",
     "deleteTitle": "Supprimer la soumission",
     "deleteMessage": "La soumission {confirmation} de {submitter} sera supprimée. Cette action est irréversible.",
@@ -712,6 +713,13 @@
       "noteHelp": "Jusqu'à {max} caractères.",
       "noteValue": "Note : {note}"
     }
+  },
+  "fileDownload": {
+    "pageTitle": "Télécharger le fichier",
+    "loading": "Téléchargement du fichier…",
+    "saved": "{name} est prêt. S'il n'a pas été enregistré, utilisez « Télécharger de nouveau ».",
+    "again": "Télécharger de nouveau",
+    "loadError": "Impossible de télécharger ce fichier."
   },
   "Basic": "Basique",
   "Text Field": "Champ de Texte",

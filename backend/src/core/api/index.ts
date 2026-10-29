@@ -10,7 +10,7 @@ import {
 } from './submissions';
 import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
 import { groupsDomain } from './groups';
-import { filesDomain } from '../../features/files';
+import { filesDesignRouter, filesDomain } from '../../features/files';
 import {
   documentGenerationDesignRouter,
   documentGenerationDomain,
@@ -65,6 +65,8 @@ designRouter.use('/', designFormsRouter);
 designRouter.use('/submissions', designSubmissionsRouter);
 // Staff print: /submissions/:id/{templates,print} and /print-upload/:id; it gates itself.
 designRouter.use(documentGenerationDesignRouter);
+// Staff attachment download; gates itself.
+designRouter.use(filesDesignRouter);
 designRouter.use(notFoundHandler);
 designRouter.use(coreErrorHandler);
 

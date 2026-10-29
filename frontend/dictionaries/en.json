@@ -483,6 +483,7 @@
     "submittedAt": "Submission Date",
     "submitter": "Submitter",
     "backToSubmissions": "Back to submissions",
+    "backToSubmission": "Back to submission",
     "delete": "Delete",
     "deleteTitle": "Delete submission",
     "deleteMessage": "Submission {confirmation} from {submitter} will be deleted. This cannot be undone.",
@@ -711,6 +712,13 @@
       "noteHelp": "Up to {max} characters.",
       "noteValue": "Note: {note}"
     }
+  },
+  "fileDownload": {
+    "pageTitle": "Download file",
+    "loading": "Downloading the file…",
+    "saved": "{name} is ready. If it did not save, use Download again.",
+    "again": "Download again",
+    "loadError": "Could not download this file."
   },
   "Basic": "Basic",
   "Text Field": "Text Field",
