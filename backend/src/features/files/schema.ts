@@ -27,7 +27,7 @@ export const FileUploadResponseSchema = z
 const FileGetParamsSchema = z.object({ id: z.string().min(1) }).openapi('Files_GetParams');
 const FileDeleteParamsSchema = z.object({ id: z.string().min(1) }).openapi('Files_DeleteParams');
 export const SubmissionFileParamsSchema = z
-  .object({ id: z.uuid(), fileId: z.uuid() })
+  .object({ id: z.uuid().toLowerCase(), fileId: z.uuid().toLowerCase() })
   .openapi('Files_SubmissionFileParams');
 
 function registerFilesPaths(

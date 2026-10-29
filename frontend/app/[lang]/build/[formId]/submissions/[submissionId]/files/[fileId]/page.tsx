@@ -19,12 +19,17 @@ export async function generateMetadata({ params }: PageProps) {
 export default async function Page({ params }: Readonly<PageProps>) {
   await assertFeatureAllowed(FEATURE_CODES.DESIGN_MODE);
 
-  const { lang, submissionId, fileId } = await params;
+  const { lang, formId, submissionId, fileId } = await params;
   const dict = await getDictionary(resolveLocale(lang));
 
   return (
     <PageLayout headingId="submission-file-heading" heading={dict.fileDownload.pageTitle}>
-      <SubmissionFileDownload key={fileId} submissionId={submissionId} fileId={fileId} />
+      <SubmissionFileDownload
+        key={fileId}
+        formId={formId}
+        submissionId={submissionId}
+        fileId={fileId}
+      />
     </PageLayout>
   );
 }

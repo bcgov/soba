@@ -137,7 +137,31 @@ describe('parseDownload', () => {
     expect((await parseDownload(fileResponse('attachment; filename="plan.pdf"'))).filename).toBe(
       'plan.pdf',
     );
+    expect((await parseDownload(fileResponse('attachment; filename=""'))).filename).toBe(
+      'download',
+    );
     expect((await parseDownload(fileResponse(null))).filename).toBe('download');
+  });
+
+  // Headers as the backend's contentDisposition builds them for these stored names.
+  it.each([
+    [
+      "report; filename*=UTF-8''invoice.exe; .pdf",
+      `attachment; filename="report; filename*=UTF-8''invoice.exe; .pdf"; filename*=UTF-8''report%3B%20filename%2A%3DUTF-8%27%27invoice.exe%3B%20.pdf`,
+    ],
+    [
+      "x; filename*=UTF-8''%ZZ; .pdf",
+      `attachment; filename="x; filename*=UTF-8''%ZZ; .pdf"; filename*=UTF-8''x%3B%20filename%2A%3DUTF-8%27%27%25ZZ%3B%20.pdf`,
+    ],
+  ])('names %s from the trailing filename*', async (name, disposition) => {
+    expect((await parseDownload(fileResponse(disposition))).filename).toBe(name);
+  });
+
+  it('falls back to the plain filename when filename* does not decode', async () => {
+    const file = await parseDownload(
+      fileResponse(`attachment; filename="plan.pdf"; filename*=UTF-8''%ZZ`),
+    );
+    expect(file.filename).toBe('plan.pdf');
   });
 
   it('throws a refused download with its status', async () => {

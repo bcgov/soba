@@ -4,9 +4,9 @@ import { useEffect, useRef } from 'react';
 import { Button } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useDictionary } from '@/app/[lang]/Providers';
-import { usePageHeading } from '@/src/components/PageHeader';
 import { SecondaryText } from '@/src/components/SecondaryText';
 import { LoadErrorAlert } from '@/src/shared/ui/LoadErrorAlert';
+import { isOutcomeUnknown } from '@/src/shared/api/dataError';
 import { useAuthErrorDefaults } from '@/src/shared/api/useDataErrorNotice';
 import { useDownload } from '@/src/shared/api/useDownload';
 import type { DownloadedFile } from '@/src/shared/api/sobaHelpers';
@@ -22,10 +22,8 @@ export function FileDownload({ load }: Readonly<FileDownloadProps>) {
   const dict = useDictionary();
   const text = dict.fileDownload;
   const authDefaults = useAuthErrorDefaults();
-  const { data, error } = useDownload(load);
+  const { data, error, refresh } = useDownload(load);
   const saved = useRef(false);
-
-  usePageHeading({ heading: text.pageTitle });
 
   useEffect(() => {
     if (!data || saved.current) return;
@@ -34,12 +32,29 @@ export function FileDownload({ load }: Readonly<FileDownloadProps>) {
   }, [data]);
 
   if (error) {
+    // Only a server failure or no response can succeed on a second read.
+    const retryable = isOutcomeUnknown(error.cause);
     return (
-      <LoadErrorAlert
-        error={error}
-        messages={{ ...authDefaults, failed: text.loadError }}
-        testIds={{ failed: 'file-download-loaderror' }}
-      />
+      <div className="mt-3 d-flex flex-column gap-2 align-items-start">
+        <LoadErrorAlert
+          error={error}
+          messages={{
+            ...authDefaults,
+            notFound: dict.apiErrors.file_not_found,
+            failed: text.loadError,
+          }}
+          testIds={{ notFound: 'file-download-notfound', failed: 'file-download-loaderror' }}
+        />
+        {retryable ? (
+          <Button
+            variant="secondary"
+            onPress={() => void refresh()}
+            data-testid="file-download-retry"
+          >
+            {dict.general.tryAgain}
+          </Button>
+        ) : null}
+      </div>
     );
   }
   if (!data) return <CenteredProgress label={text.loading} />;

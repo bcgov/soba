@@ -89,7 +89,10 @@ export const filesService = {
     return openRecord(record);
   },
 
-  /** A file attached to the submission, for staff; the route checks access. */
+  /**
+   * A file attached to the submission, for staff. The route's workspaceFromResource has checked the
+   * submission is live and in this workspace, and requireFormPermissions the caller's access.
+   */
   async getForSubmission(
     workspaceId: string,
     submissionId: string,

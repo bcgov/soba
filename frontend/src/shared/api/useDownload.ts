@@ -11,7 +11,7 @@ import type { DownloadedFile } from './sobaHelpers';
 
 /**
  * Reads a file once the session is ready. It is held in component state, not SWR's cache, so it is
- * freed on unmount.
+ * freed on unmount. Remount to read another file.
  */
 export function useDownload(
   load: (token: string) => Promise<DownloadedFile>,
@@ -23,6 +23,8 @@ export function useDownload(
   const started = useRef(false);
 
   const read = useCallback(async () => {
+    // A retry reads as loading until it settles.
+    setError(null);
     try {
       const current = store.getState().keycloak.token;
       if (!current) throw new SessionExpiredError();
