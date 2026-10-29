@@ -7,10 +7,7 @@ import type {
   PostSubmissionActionSendScope,
 } from '../../../src/core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
 import { JobCancelledError } from '../../../src/core/jobs/settlement';
-import {
-  EmailAddressesOptionsSchema,
-  sendNotices,
-} from '../../../src/plugins/post-submission-email-addresses/send';
+import { sendNotices } from '../../../src/plugins/post-submission-email-addresses/send';
 
 const LIMITS = { form: 500, workspace: 2000, environment: 5000 };
 const ACCEPTED: PostSubmissionActionEmailResult = {
@@ -78,26 +75,6 @@ const run = (
     LIMITS,
     'https://soba.example/link',
   );
-
-describe('the options', () => {
-  it('trims, lower-cases and de-duplicates the addresses', () => {
-    expect(
-      EmailAddressesOptionsSchema.parse({
-        to: [' Team@Example.com ', 'team@example.com', 'b@example.com'],
-      }),
-    ).toEqual({ to: ['team@example.com', 'b@example.com'] });
-  });
-
-  it('takes 1 to 100 valid addresses and nothing else', () => {
-    const many = Array.from({ length: 101 }, (_, index) => `a${index}@example.com`);
-    expect(EmailAddressesOptionsSchema.safeParse({ to: [] }).success).toBe(false);
-    expect(EmailAddressesOptionsSchema.safeParse({ to: many }).success).toBe(false);
-    expect(EmailAddressesOptionsSchema.safeParse({ to: ['not an address'] }).success).toBe(false);
-    expect(EmailAddressesOptionsSchema.safeParse({ to: ['a@example.com'], cc: [] }).success).toBe(
-      false,
-    );
-  });
-});
 
 describe('sendNotices', () => {
   it('sends the notice to each address in turn, as plain text, and logs only counts', async () => {

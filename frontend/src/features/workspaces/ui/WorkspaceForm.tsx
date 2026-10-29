@@ -31,6 +31,8 @@ import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { useDebouncedValue } from '@/src/shared/hooks/useDebouncedValue';
 import { isWorkspaceManageRole } from '../workspaceRoles';
 import WorkspaceFormSettings from '@/src/features/form-settings/ui/WorkspaceFormSettings';
+import WorkspacePostSubmissionTab from '@/src/features/post-submission/ui/WorkspacePostSubmissionTab';
+import { usePostSubmissionAvailable } from '@/src/features/post-submission/data/usePostSubmissionAvailable';
 import type { UpdateWorkspaceBody, WorkspaceItem } from '@/src/types/workspaces';
 import styles from './WorkspaceForm.module.css';
 import WorkspaceGroupTab from './WorkspaceGroupTab';
@@ -305,9 +307,22 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
   const { addNotification } = useNotificationStore();
   const { data: currentUser, loaded: currentUserLoaded } = useCurrentUser();
   const { workspace, isLoading } = useWorkspace(workspaceId);
+  // Asked only for a workspace this person manages, the role this page needs.
+  const postSubmissionAvailable = usePostSubmissionAvailable(
+    workspace && isWorkspaceManageRole(workspace.role) ? { workspaceId: workspace.id } : null,
+  );
 
   const tabParam = searchParams.get('tab');
-  const validTabs = useMemo(() => ['settings', 'form-settings', 'groups'], []);
+  // A link to After Submission opens it once the check says it is available.
+  const validTabs = useMemo(
+    () => [
+      'settings',
+      'form-settings',
+      ...(postSubmissionAvailable ? ['post-submission'] : []),
+      'groups',
+    ],
+    [postSubmissionAvailable],
+  );
   const [selectedTab, setSelectedTab] = useState<string | null>(null);
   const activeTab =
     selectedTab ?? (tabParam && validTabs.includes(tabParam) ? tabParam : 'settings');
@@ -414,6 +429,17 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
           <WorkspaceFormSettings key={workspace.id} dict={dict} workspaceId={workspace.id} />
         </div>
       </Tab>
+      {postSubmissionAvailable && (
+        <Tab
+          eventKey="post-submission"
+          title={dict.postSubmission.tab}
+          tabAttrs={{ 'data-testid': 'workspace-post-submission-tab' }}
+        >
+          <div className={styles.tabContent}>
+            <WorkspacePostSubmissionTab key={workspace.id} dict={dict} workspaceId={workspace.id} />
+          </div>
+        </Tab>
+      )}
       <Tab
         eventKey="groups"
         title={dictWorkspaces.groupsTab}

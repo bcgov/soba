@@ -26,16 +26,20 @@ export interface WorkspaceSettings<T> {
 
 /**
  * The schemas of a settings group whose values a workspace shares with its forms. A body that mixes
- * the two choices, such as inherit with values, is refused rather than half applied.
+ * the two choices, such as inherit with values, is refused rather than half applied. `version`
+ * replaces the row version rule for a group whose rows a first save creates.
  */
-export const inheritableSettingsSchemas = <T extends z.ZodType>(values: T) => {
+export const inheritableSettingsSchemas = <T extends z.ZodType>(
+  values: T,
+  version: z.ZodType<number> = SettingsVersionSchema,
+) => {
   const choice = <E extends z.ZodRawShape>(extra: E) =>
     z.discriminatedUnion('inherit', [
       z.strictObject({ inherit: z.literal(true), ...extra }),
       z.strictObject({ inherit: z.literal(false), values, ...extra }),
     ]);
   return {
-    workspace: z.strictObject({ values, version: SettingsVersionSchema }),
+    workspace: z.strictObject({ values, version }),
     // workspace precedes own: the OpenAPI generator marks a named values component itself nullable
     // when it first meets it through own.
     form: z.object({
@@ -43,10 +47,10 @@ export const inheritableSettingsSchemas = <T extends z.ZodType>(values: T) => {
       workspace: values,
       own: values.nullable(),
       effective: values,
-      version: SettingsVersionSchema,
+      version,
     }),
     /** A new form's choice, which has no version yet. */
     formChoice: choice({}),
-    formBody: choice({ version: SettingsVersionSchema }),
+    formBody: choice({ version }),
   };
 };

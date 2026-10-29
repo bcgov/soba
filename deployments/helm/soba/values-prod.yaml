@@ -4,7 +4,8 @@ backend:
   features:
     dev-data: "disabled"
     notifications: "disabled"
-    post-submission: "disabled"
+    post-submission: "enabled"
+    post-submission-email: "enabled"
     user-search: "disabled"
   replicas: 3
   resources:
@@ -29,6 +30,14 @@ backend:
     logLevel: warn
     documentGenerationDefaultCode: cdogs-v2
     tenantEngineDefaultCode: cstar-v1
+    # Email jobs end cancelled while notifications are disabled. Sending needs the notifications
+    # feature enabled, notificationDefaultCode notify-v1, notification.notifyV1.endpoint, and
+    # PLUGIN_NOTIFY_V1_API_KEY in the Vault secret.
+    postSubmissionActionPlugins: post-submission-email-addresses
+  notification:
+    notifyV1:
+      # Keeps one slow send well inside an email job's lease and timeout.
+      timeoutMs: "10000"
   documentGeneration:
     cdogsV2:
       endpoint: https://cdogs.api.gov.bc.ca/api
