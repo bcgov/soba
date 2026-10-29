@@ -65,14 +65,14 @@ formio:
   internal:
     enabled: true
   replicas: 1
-  nodeOptions: "--max-old-space-size=384"
+  nodeOptions: "--max-old-space-size=4096"
   resources:
     requests:
-      cpu: 25m
-      memory: 128Mi
-    limits:
       cpu: 250m
-      memory: 512Mi
+      memory: 2Gi
+    limits:
+      cpu: 1
+      memory: 5Gi
 
 mongodb:
   # MongoDB runs as its own release from deployments/helm/action-mongodb. The deploy
