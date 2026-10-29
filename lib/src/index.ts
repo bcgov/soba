@@ -8,6 +8,7 @@ export * from './schemas/formTeam';
 export * from './schemas/pagination';
 export * from './sort';
 export * from './schemas/admin';
+export * from './schemas/jobs';
 export * from './schemas/workspaces';
 export * from './schemas/workspaceGroups';
 export * from './formio/normalizeSchema';

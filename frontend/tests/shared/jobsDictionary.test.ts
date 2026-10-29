@@ -11,26 +11,34 @@ const entries = (node: unknown, path = ''): [string, string][] =>
         entries(value, path ? `${path}.${key}` : key),
       );
 
+const keys = (section: unknown) => entries(section).map(([path]) => path);
+const allFilled = (section: unknown) =>
+  entries(section).every(([, text]) => text.trim().length > 0);
+
 // The type checks the French dictionary against nothing, so a missing French key shows in the page
-// as undefined. These hold the Jobs tab's copy in both languages.
-describe('Jobs tab copy', () => {
-  it('has the same keys in English and French', () => {
-    const keys = (section: unknown) => entries(section).map(([path]) => path);
-    expect(keys(fr.admin.jobs)).toEqual(keys(en.admin.jobs));
+// as undefined. These hold the Jobs pages' copy in both languages: the text every reader shares,
+// and the Administration tab's own.
+describe('Jobs copy', () => {
+  it.each([
+    ['shared', en.jobs, fr.jobs],
+    ['administration', en.admin.jobs, fr.admin.jobs],
+  ])('%s text has the same keys in English and French', (_section, english, french) => {
+    expect(keys(french)).toEqual(keys(english));
   });
 
   it.each([
-    ['en', en.admin.jobs],
-    ['fr', fr.admin.jobs],
-  ])('%s has text for every key and every job status', (_language, section) => {
-    expect(entries(section).every(([, text]) => text.trim().length > 0)).toBe(true);
-    expect(Object.keys(section.statuses).sort()).toEqual([...JOB_STATUSES].sort());
+    ['en', en],
+    ['fr', fr],
+  ])('%s has text for every key and every job status', (_language, dict) => {
+    expect(allFilled(dict.jobs)).toBe(true);
+    expect(allFilled(dict.admin.jobs)).toBe(true);
+    expect(Object.keys(dict.jobs.statuses).sort()).toEqual([...JOB_STATUSES].sort());
   });
 
   it.each([
-    ['en', en.admin.jobs],
-    ['fr', fr.admin.jobs],
-  ])('%s keeps the placeholders the tab fills in', (_language, section) => {
+    ['en', en.jobs],
+    ['fr', fr.jobs],
+  ])('%s keeps the placeholders the pages fill in', (_language, section) => {
     expect(section.attemptsValue).toContain('{attempts}');
     expect(section.attemptsValue).toContain('{max}');
     expect(section.viewLabel).toContain('{type}');

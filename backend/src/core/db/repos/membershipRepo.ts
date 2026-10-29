@@ -164,6 +164,10 @@ export const getWorkspaceForUser = async (workspaceId: string, userId: string) =
   return row[0] ?? null;
 };
 
+/** The owner membership role alone. */
+export const isWorkspaceOwnerRole = (role: string | null): boolean =>
+  role === WorkspaceMembershipRole.owner;
+
 /** Owner or admin membership roles may manage or mutate workspace settings. */
 export const isWorkspaceManageRole = (role: string | null): boolean =>
   role === WorkspaceMembershipRole.owner || role === WorkspaceMembershipRole.admin;
