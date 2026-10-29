@@ -245,12 +245,22 @@ type JobStatusLineProps = Readonly<{
   ref: Ref<HTMLDivElement>;
 }>;
 
-/** Announced as it changes while the page follows the job. A div, not a p: the tag renders a div. */
+/**
+ * Announced as it changes while the page follows the job. A div, not a p or an output, which take
+ * text only: the status tag renders a div.
+ */
 function JobStatusLine({ job, refreshFailed, ref }: JobStatusLineProps) {
   const dict = useDictionary();
   const dictDetail = dict.admin.jobs.detail;
   return (
-    <div ref={ref} tabIndex={-1} role="status" className="mb-3" data-testid="job-status-line">
+    <div
+      ref={ref}
+      tabIndex={-1}
+      aria-live="polite"
+      aria-atomic="true"
+      className="mb-3"
+      data-testid="job-status-line"
+    >
       <div className="d-flex align-items-center gap-2">
         <span>{dictDetail.facts.status}</span>
         <StatusTag

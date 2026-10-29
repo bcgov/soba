@@ -68,9 +68,9 @@ describe('rerunRefusal', () => {
     expect(rerunRefusal(facts({ lastError: LEASE_EXPIRED, finishedAt: ago(MINUTE / 2) }))).toBe(
       'Its last run may still be finishing; try again in a minute',
     );
-    expect(rerunRefusal(facts({ lastError: LEASE_EXPIRED, finishedAt: ago(2 * MINUTE) }))).toBe(
-      null,
-    );
+    expect(
+      rerunRefusal(facts({ lastError: LEASE_EXPIRED, finishedAt: ago(2 * MINUTE) })),
+    ).toBeNull();
     expect(rerunRefusal(facts({ finishedAt: ago(MINUTE / 2) }))).toBeNull();
   });
 });
