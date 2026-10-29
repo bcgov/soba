@@ -14,7 +14,7 @@ import type {
 } from '../../types/workspaces';
 import type { CurrentUserResponse } from '../../types/user';
 import type { SortLocale } from '@soba/lib/sort';
-import type { LoginProvidersMetaResponse } from '@soba/lib';
+import type { LoginProvidersMetaResponse, RolesMetaResponse } from '@soba/lib';
 import type { ListQueryArgs } from '../../types/list';
 import { sortLocaleHeaders } from './sortLocaleRequest';
 
@@ -42,6 +42,10 @@ export {
   updateSobaSubmissionStatus,
   addSobaSubmissionNote,
   recordSobaSubmissionEdit,
+  downloadSobaSubmissionFile,
+  getSobaExportFields,
+  startSobaSubmissionExport,
+  listSobaSubmissionExports,
 } from './sobaApiDesign';
 // Submit-mode (public-capable, /submit/*)
 export {
@@ -172,7 +176,7 @@ export async function fetchCodesMeta(onlyEnabledFeatures = true): Promise<unknow
   return parseJson(response);
 }
 
-export async function fetchRolesMeta(onlyEnabledFeatures = true): Promise<unknown> {
+export async function fetchRolesMeta(onlyEnabledFeatures = true): Promise<RolesMetaResponse> {
   const q = onlyEnabledFeatures ? '?only_enabled_features=true' : '';
   const response = await fetch(`${getSobaApiBaseUrl()}/meta/roles${q}`, {
     method: 'GET',

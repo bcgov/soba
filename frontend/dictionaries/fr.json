@@ -104,7 +104,48 @@
     "disclaimerTitle": "Avis de non-responsabilité et déclaration de responsabilité",
     "unavailableFilter": "Cet espace de travail n'est pas disponible pour vous. Affichage de tous les formulaires.",
     "clearFilter": "Effacer le filtre",
-    "listLoadError": "Échec du chargement des espaces de travail."
+    "listLoadError": "Échec du chargement des espaces de travail.",
+    "groupsTab": "Groupes",
+    "groups": {
+      "addGroup": "Ajouter un groupe",
+      "editGroup": "Modifier",
+      "deleteGroup": "Supprimer",
+      "name": "Nom du groupe",
+      "roles": "Attribuez des rôles à ce groupe",
+      "rolesHelp": "Rôles accordés à tous les membres de ce groupe sur l'ensemble des formulaires de l'espace de travail.",
+      "noRolesSelected": "Aucun rôle sélectionné",
+      "systemGroup": "Groupe système",
+      "systemGroupTooltip": "Les groupes système sont protégés et ne peuvent pas être supprimés.",
+      "deleteConfirmTitle": "Supprimer le groupe",
+      "deleteConfirmMessage": "Êtes-vous sûr de vouloir supprimer le groupe \"{name}\" ? Les utilisateurs de ce groupe perdront l'accès à tous les formulaires de cet espace de travail.",
+      "deleteSuccess": "Groupe supprimé avec succès.",
+      "deleteError": "Échec de la suppression du groupe.",
+      "createSuccess": "Groupe créé avec succès.",
+      "createError": "Échec de la création du groupe.",
+      "updateSuccess": "Groupe mis à jour avec succès.",
+      "updateError": "Échec de la mise à jour du groupe.",
+      "loadError": "Échec du chargement des groupes.",
+      "groupLoadError": "Échec du chargement de ce groupe. Il a peut-être été supprimé.",
+      "rolesLoadError": "Échec du chargement des rôles disponibles. Rechargez la page pour réessayer.",
+      "empty": "Aucun groupe trouvé dans cet espace de travail.",
+      "save": "Enregistrer le groupe",
+      "create": "Créer le groupe",
+      "saving": "Enregistrement en cours…",
+      "cancel": "Annuler",
+      "columns": {
+        "name": "Nom",
+        "roles": "Rôles",
+        "actions": "Actions"
+      },
+      "roleNames": {
+        "form_admin": "Administrateur de formulaire",
+        "form_designer": "Concepteur de formulaire",
+        "form_submitter": "Soumetteur de formulaire",
+        "submission_reviewer": "Réviseur de soumission",
+        "submission_approver": "Approbateur de soumission",
+        "team_manager": "Gestionnaire d'équipe"
+      }
+    }
   },
   "admin": {
     "heading": "Administration",
@@ -192,6 +233,113 @@
         "duration": "Durée",
         "detail": "Détail",
         "submission": "Soumission"
+      }
+    },
+    "jobs": {
+      "intro": "Travaux en arrière-plan mis en file d'attente lors de la soumission des formulaires, dans tous les espaces de travail. Une tâche échouée ou annulée peut être relancée; une tâche en file d'attente ou en cours peut être arrêtée.",
+      "workspaceIdLabel": "Identifiant d'espace de travail",
+      "formIdLabel": "Identifiant de formulaire",
+      "submissionIdLabel": "Identifiant de soumission",
+      "invalidId": "Saisissez l'identifiant complet.",
+      "columns": {
+        "workspace": "Espace de travail"
+      },
+      "detail": {
+        "formJobs": "Tâches de ce formulaire",
+        "submissionJobs": "Tâches de cette soumission",
+        "facts": {
+          "workspace": "Espace de travail",
+          "revision": "Révision",
+          "options": "Options"
+        }
+      }
+    }
+  },
+  "jobs": {
+    "heading": "Tâches",
+    "formIntro": "Travaux en arrière-plan lancés par les soumissions de ce formulaire, comme ses courriels après soumission. Une tâche échouée ou annulée peut être relancée; une tâche en file d'attente ou en cours peut être arrêtée.",
+    "workspaceIntro": "Travaux en arrière-plan lancés par les soumissions des formulaires de cet espace de travail. Une tâche échouée ou annulée peut être relancée; une tâche en file d'attente ou en cours peut être arrêtée.",
+    "statusFilter": "Statut",
+    "typeFilter": "Type",
+    "formFilter": "Formulaire",
+    "allStatuses": "Tous les statuts",
+    "allTypes": "Tous les types",
+    "allForms": "Tous les formulaires",
+    "empty": "Aucune tâche trouvée.",
+    "loadError": "Échec du chargement des tâches.",
+    "itemName": "tâches",
+    "viewLabel": "Voir la tâche {type} créée le {created}",
+    "attemptsValue": "{attempts} sur {max}",
+    "platformAdministrator": "un administrateur de la plateforme",
+    "formerMember": "un ancien membre",
+    "columns": {
+      "created": "Créée",
+      "type": "Type",
+      "status": "Statut",
+      "attempts": "Tentatives",
+      "form": "Formulaire",
+      "submission": "Soumission",
+      "finished": "Terminée",
+      "lastError": "Dernière erreur"
+    },
+    "statuses": {
+      "queued": "En file d'attente",
+      "running": "En cours",
+      "succeeded": "Réussie",
+      "dead": "Échouée",
+      "cancelled": "Annulée"
+    },
+    "types": {
+      "submissionSubmitted": "Soumission reçue"
+    },
+    "detail": {
+      "heading": "Tâche",
+      "back": "Retour aux tâches",
+      "none": "Aucune",
+      "loadError": "Échec du chargement de la tâche.",
+      "notFound": "Cette tâche est introuvable. Les tâches terminées sont supprimées après un certain temps.",
+      "refreshError": "Impossible de relire la tâche; nouvelle tentative en cours.",
+      "actionsQueued": "Ses actions ont déjà été mises en file d'attente; elle ne peut donc pas être relancée. Relancez plutôt leurs tâches.",
+      "byValue": "{at}, par {by}",
+      "rerunsValue": "{count}, la dernière le {at} par {by}",
+      "parentGone": "N'est plus conservée",
+      "stopPending": "Arrêt demandé; elle s'arrête à sa prochaine vérification.",
+      "rerun": "Relancer",
+      "stop": "Arrêter la tâche",
+      "rerunTitle": "Relancer cette tâche",
+      "rerunMessage": "Elle s'exécute avec les options enregistrées lors de sa mise en file d'attente; les modifications apportées à sa liste depuis ne s'appliquent donc pas. Les adresses déjà jointes ne reçoivent pas de nouveau courriel. Si son action a été désactivée depuis, ou si sa soumission n'existe plus, elle se termine de nouveau annulée.",
+      "rerunEmails": "Adresses qu'elle tentera de joindre : {count}.",
+      "stopTitle": "Arrêter cette tâche",
+      "stopMessage": "Une tâche en file d'attente est annulée immédiatement. Une tâche en cours s'arrête à sa prochaine vérification; les courriels déjà envoyés le restent.",
+      "rerunSuccess": "La tâche est remise en file d'attente.",
+      "stopSuccess": "La tâche est annulée.",
+      "stopRequested": "Arrêt demandé. La tâche s'arrête à sa prochaine vérification.",
+      "refused": "La tâche n'a pas été modifiée : {reason}",
+      "rerunError": "Échec de la relance de la tâche.",
+      "stopError": "Échec de l'arrêt de la tâche.",
+      "facts": {
+        "type": "Type",
+        "status": "Statut",
+        "attempts": "Tentatives",
+        "form": "Formulaire",
+        "submission": "Soumission",
+        "created": "Mise en file d'attente",
+        "started": "Dernier démarrage",
+        "nextAttempt": "Prochaine tentative",
+        "finished": "Terminée",
+        "stopRequested": "Arrêt demandé",
+        "reruns": "Relances",
+        "lastError": "Dernière erreur",
+        "recordedActions": "Actions enregistrées",
+        "parent": "Mise en file d'attente par",
+        "children": "Tâches qu'elle a mises en file d'attente"
+      },
+      "emails": {
+        "heading": "Courriels",
+        "addresses": "Adresses",
+        "sent": "Envoyés",
+        "refused": "Refusés par le fournisseur",
+        "pending": "Pas encore envoyés"
       }
     }
   },
@@ -443,6 +591,7 @@
     "submittedAt": "Date de Soumission",
     "submitter": "Soumissionnaire",
     "backToSubmissions": "Retour aux soumissions",
+    "backToSubmission": "Retour à la soumission",
     "delete": "Supprimer",
     "deleteTitle": "Supprimer la soumission",
     "deleteMessage": "La soumission {confirmation} de {submitter} sera supprimée. Cette action est irréversible.",
@@ -508,6 +657,51 @@
         "createdBy": "Créé par",
         "createdAt": "Date de création",
         "quickLinks": "Liens rapides"
+      }
+    },
+    "export": {
+      "button": "Exporter les soumissions",
+      "pageTitle": "Exporter les soumissions",
+      "sampleNotice": "La liste des champs et vos exportations sur cette page sont des données d’exemple. Les exportations ne sont pas encore exécutées.",
+      "back": "Retour aux soumissions",
+      "loadError": "Impossible de charger le formulaire.",
+      "fieldsError": "Impossible de charger les champs.",
+      "fileType": "Type de fichier",
+      "csv": "CSV",
+      "json": "JSON",
+      "version": "Version du formulaire",
+      "allVersions": "Toutes les versions",
+      "versionOption": "Version {version}",
+      "dates": "Date de soumission",
+      "all": "Toutes",
+      "range": "Plage de dates",
+      "from": "Du",
+      "to": "Au",
+      "rangeInvalid": "Choisissez une date de début égale ou antérieure à la date de fin, et aucune date future.",
+      "fields": "Champs de données",
+      "fieldSearch": "Rechercher des champs",
+      "selectAll": "Tout sélectionner",
+      "selectNone": "Tout désélectionner",
+      "fieldsSelected": "{selected} champs sélectionnés sur {total}",
+      "noFields": "Ce formulaire n’a aucun champ à exporter.",
+      "layout": "Format CSV",
+      "layouts": {
+        "multiRowEmptySpacesCSVExport": "1 - Plusieurs lignes par soumission avec espaces d'indentation",
+        "multiRowBackFilledCSVExport": "2 - Plusieurs lignes par soumission",
+        "singleRowCSVExport": "3 - Une ligne par soumission",
+        "unFormattedCSVExport": "4 - Non formaté"
+      },
+      "start": "Exporter",
+      "starting": "Démarrage…",
+      "started": "Exportation démarrée.",
+      "failed": "Impossible de démarrer l'exportation.",
+      "myExports": "Mes exportations",
+      "listError": "Impossible de charger vos exportations.",
+      "noExports": "Vous n’avez pas encore exporté ce formulaire.",
+      "startedAt": "Démarrée le",
+      "status": "État",
+      "statuses": {
+        "queued": "En file d’attente"
       }
     }
   },
@@ -578,6 +772,7 @@
     "render_busy": "L’impression des documents est occupée. Veuillez réessayer dans un instant.",
     "render_failed": "Le document n’a pas pu être imprimé à partir de ce modèle.",
     "no_saved_data": "Cette soumission n’a aucune réponse enregistrée à imprimer.",
+    "group_name_taken": "Un groupe portant ce nom existe déjà dans cet espace de travail. Choisissez un autre nom.",
     "request_invalid": "La demande n’est pas valide. Rechargez la page et réessayez.",
     "request_too_large": "La demande est trop volumineuse.",
     "unauthenticated": "Votre session n’est pas valide. Veuillez vous reconnecter.",
@@ -629,6 +824,54 @@
       "offline": "Vous semblez être hors ligne. Vérifiez votre connexion et réessayez.",
       "failed": "La recherche n'a pas pu être effectuée. Réessayez."
     }
+  },
+  "postSubmission": {
+    "tab": "Après la soumission",
+    "formIntro": "Choisissez ce qui se passe chaque fois que ce formulaire reçoit une soumission. Chaque action indique d'où vient son paramètre.",
+    "workspaceIntro": "Choisissez ce qui se passe chaque fois qu'un formulaire de cet espace de travail reçoit une soumission. Chaque formulaire utilise ces paramètres, sauf s'il définit les siens.",
+    "loadError": "Les paramètres Après la soumission n'ont pas pu être chargés.",
+    "notAvailable": "Après la soumission n'est pas offert ici.",
+    "empty": "Aucune action n'est encore offerte ici. Un administrateur donne accès à chaque action.",
+    "workspaceOnlyNote": "Cette action est définie pour tout l'espace de travail, dans l'onglet Après la soumission de l'espace de travail.",
+    "formOnlyNote": "Ce formulaire définit cette action lui-même : elle n'est pas offerte à son espace de travail.",
+    "formOnlyUnsaved": "Rien n'est encore enregistré pour ce formulaire, donc l'action est désactivée. Si l'espace de travail reçoit cette action plus tard, le formulaire utilisera le paramètre de l'espace de travail, sauf si vous en enregistrez un ici.",
+    "notAccepted": "Ces paramètres n'ont pas été acceptés. Vérifiez-les et réessayez.",
+    "settingsLoadError": "Les paramètres de cette action n'ont pas pu être chargés.",
+    "unknownAction": "Cette action ne peut pas encore être modifiée ici.",
+    "status": "État : {status}",
+    "on": "Activée",
+    "off": "Désactivée",
+    "email": {
+      "label": "Envoyer un avis par courriel",
+      "description": "Envoie un court courriel à chaque adresse de la liste lorsqu'une soumission est reçue.",
+      "enabled": "Envoyer ces courriels",
+      "recipients": "Destinataires",
+      "recipientsHelp": "Tapez une adresse et appuyez sur Entrée, ou collez-en plusieurs à la fois. Pour retirer une adresse, sélectionnez-la et appuyez sur Suppr ou Retour arrière.",
+      "noticeHelp": "Chaque adresse reçoit son propre courriel avec le nom du formulaire, le numéro de confirmation et un lien vers la soumission, qui exige une connexion. Les courriels au-delà de la limite horaire ne sont pas envoyés.",
+      "count": "Adresses : {count} / {max}",
+      "invalid": "Adresse courriel non valide. Corrigez ou supprimez le texte dans le champ.",
+      "tooMany": "Une liste peut contenir jusqu'à {max} adresses. Les autres sont toujours dans le champ.",
+      "duplicate": "Déjà dans la liste : {addresses}",
+      "required": "Ajoutez au moins une adresse, ou désactivez ces courriels.",
+      "added": "Ajout : {addresses}",
+      "removed": "Retrait : {address}",
+      "none": "Aucune adresse pour l'instant."
+    },
+    "log": {
+      "label": "Consigner chaque soumission",
+      "description": "Écrit une ligne dans le journal du serveur lorsqu'une soumission est reçue. Sert aux essais.",
+      "enabled": "Consigner chaque soumission",
+      "note": "Note",
+      "noteHelp": "Jusqu'à {max} caractères.",
+      "noteValue": "Note : {note}"
+    }
+  },
+  "fileDownload": {
+    "pageTitle": "Télécharger le fichier",
+    "loading": "Téléchargement du fichier…",
+    "saved": "{name} est prêt. S'il n'a pas été enregistré, utilisez « Télécharger de nouveau ».",
+    "again": "Télécharger de nouveau",
+    "loadError": "Impossible de télécharger ce fichier."
   },
   "Basic": "Basique",
   "Text Field": "Champ de Texte",

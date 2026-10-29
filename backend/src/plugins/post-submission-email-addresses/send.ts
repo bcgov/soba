@@ -1,6 +1,5 @@
-import { z } from 'zod';
+import type { PostSubmissionEmailAddressesOptions } from '@soba/lib';
 import { NotificationOutcome } from '../../core/db/codes';
-import { EmailAddressSchema } from '../../core/integrations/notification/NotificationAdapter';
 import { isRefusedSend } from '../../core/integrations/notification/sendOutcome';
 import type { PostSubmissionActionContext } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
 import { JobCancelledError } from '../../core/jobs/settlement';
@@ -9,17 +8,7 @@ import { buildNotice, type Notice } from './notice';
 
 const HOUR_SECONDS = 3600;
 
-/** Up to 100 addresses, checked as every send is, then trimmed, lower-cased and de-duplicated. */
-export const EmailAddressesOptionsSchema = z.strictObject({
-  to: z
-    .array(z.string().trim().toLowerCase().pipe(EmailAddressSchema))
-    .min(1)
-    .max(100)
-    .transform((addresses) => [...new Set(addresses)]),
-});
-export type EmailAddressesOptions = z.infer<typeof EmailAddressesOptionsSchema>;
-
-type SendContext = PostSubmissionActionContext<EmailAddressesOptions>;
+type SendContext = PostSubmissionActionContext<PostSubmissionEmailAddressesOptions>;
 
 const NOTIFICATIONS_OFF = 'Notifications are off';
 
@@ -28,9 +17,16 @@ interface Tally {
   refused: number;
 }
 
+/**
+ * The reason a job gives when a limit stops it. Its readers are the form's and workspace's staff, so
+ * the environment's reason carries no numbers: those describe every workspace's email.
+ */
+export const LIMIT_REACHED_ENVIRONMENT =
+  'Hourly email limit for this environment reached; try again later';
+
 /** Ends the job cancelled, before anything is sent, when this list would pass an hourly limit. */
 const checkBudgets = async (
-  notifications: SendContext['services']['notifications'],
+  { services: { notifications }, log }: Pick<SendContext, 'services' | 'log'>,
   toSend: number,
   limits: HourlyLimits,
 ): Promise<void> => {
@@ -41,8 +37,11 @@ const checkBudgets = async (
   ]);
   const over = exceededLimit({ form, workspace, environment }, toSend, limits);
   if (over) {
+    log.warn({ ...over, toSend }, 'Post-submission email over an hourly limit');
     throw new JobCancelledError(
-      `Hourly email limit for the ${over.scope} reached: ${over.sent} sent in the last hour, ${toSend} to send, limit ${over.limit}`,
+      over.scope === 'environment'
+        ? LIMIT_REACHED_ENVIRONMENT
+        : `Hourly email limit for the ${over.scope} reached: ${toSend} to send, limit ${over.limit}`,
     );
   }
 };
@@ -51,8 +50,8 @@ const checkBudgets = async (
  * Sends the notice to each address not yet handled for this job, one email per address. A refused
  * address is recorded and skipped; a fresh list refused at every address ends cancelled. Any other
  * failure, a missing audit row or an abort stops the run and throws, so the job retries and the
- * retry skips what was handled. Budgets are checked only before a list starts, so a retry finishes
- * a started list.
+ * retry skips what was handled. Budgets are checked until the run has handled an address, so a retry
+ * finishes a started list; a run starts when the job is created, or when it is run again.
  */
 export const sendNotices = async (
   { options, submission, services, signal, log }: SendContext,
@@ -60,11 +59,11 @@ export const sendNotices = async (
   link: string | null,
 ): Promise<void> => {
   const { notifications } = services;
-  const handled = await notifications.handledRecipients();
+  const { recipients: handled, runStarted } = await notifications.handled();
   const remaining = options.to.filter((address) => !handled.has(address));
   if (remaining.length === 0) return;
   if (!(await notifications.enabled())) throw new JobCancelledError(NOTIFICATIONS_OFF);
-  if (handled.size === 0) await checkBudgets(notifications, remaining.length, limits);
+  if (!runStarted) await checkBudgets({ services, log }, remaining.length, limits);
 
   const notice: Notice = buildNotice(submission, link);
   // One send at a time, so a failure stops the rest of the list.

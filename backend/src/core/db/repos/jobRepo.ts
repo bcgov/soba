@@ -45,6 +45,9 @@ export interface JobStats {
   dead: number;
 }
 
+/** The error the sweeper records for a job whose worker stopped renewing its lease. */
+export const LEASE_EXPIRED = 'Lease expired';
+
 const afterMs = (ms: number): SQL => sql`now() + ${ms}::int * interval '1 millisecond'`;
 const daysAgo = (days: number): SQL => sql`now() - ${days}::int * interval '1 day'`;
 
@@ -76,6 +79,23 @@ export const insertJob = async (dbOrTx: DbOrTx, input: NewJob): Promise<string |
     .onConflictDoNothing({ target: jobs.dedupeKey })
     .returning({ id: jobs.id });
   return row?.id ?? null;
+};
+
+/**
+ * Record, in the caller's transaction, that a held job queued its children. False when the job is no
+ * longer this worker's, and the caller then rolls the children back.
+ */
+export const markChildrenQueued = async (
+  dbOrTx: DbOrTx,
+  id: string,
+  claimToken: string,
+): Promise<boolean> => {
+  const rows = await dbOrTx
+    .update(jobs)
+    .set({ childrenQueuedAt: sql`now()` })
+    .where(held(id, claimToken))
+    .returning({ id: jobs.id });
+  return rows.length > 0;
 };
 
 /**
@@ -195,18 +215,23 @@ export const releaseJob = async (id: string, claimToken: string): Promise<boolea
 
 /**
  * Cancel a job. A queued job is cancelled now; a running job is asked to stop and ends at its next
- * heartbeat. not_active: missing, or already finished.
+ * heartbeat. The first request's time and asker, and whether they asked through the administration
+ * routes, are kept. not_active: missing, or already finished.
  */
 export const cancelJob = async (
   workspaceId: string,
   id: string,
+  actor: { id: string; admin: boolean },
 ): Promise<'cancelled' | 'requested' | 'not_active'> => {
+  const firstAsk = sql`${jobs.cancelRequestedAt} is null`;
   const [row] = await quietDb
     .update(jobs)
     .set({
       status: sql`case when ${jobs.status} = ${JobStatus.queued} then ${JobStatus.cancelled} else ${jobs.status} end`,
       finishedAt: sql`case when ${jobs.status} = ${JobStatus.queued} then now() else ${jobs.finishedAt} end`,
       cancelRequestedAt: sql`coalesce(${jobs.cancelRequestedAt}, now())`,
+      cancelRequestedBy: sql`case when ${firstAsk} then ${actor.id}::uuid else ${jobs.cancelRequestedBy} end`,
+      cancelRequestedByAdmin: sql`case when ${firstAsk} then ${actor.admin} else ${jobs.cancelRequestedByAdmin} end`,
     })
     .where(
       and(
@@ -238,27 +263,29 @@ export const sweepJobs = async (retention: {
       status: sql`case when ${jobs.cancelRequestedAt} is not null then ${JobStatus.cancelled} when ${jobs.attempts} >= ${jobs.maxAttempts} then ${JobStatus.dead} else ${JobStatus.queued} end`,
       finishedAt: sql`case when ${ends} then now() end`,
       runAfter: sql`now()`,
-      lastError: 'Lease expired',
+      lastError: LEASE_EXPIRED,
     })
     .where(and(eq(jobs.status, JobStatus.running), lt(jobs.leaseUntil, sql`now()`)))
     .returning({ status: jobs.status });
+  const isPastRetention = or(
+    and(
+      eq(jobs.status, JobStatus.succeeded),
+      lt(jobs.finishedAt, daysAgo(retention.succeededRetentionDays)),
+    ),
+    and(
+      inArray(jobs.status, [JobStatus.dead, JobStatus.cancelled]),
+      lt(jobs.finishedAt, daysAgo(retention.deadRetentionDays)),
+    ),
+  );
   const pastRetention = quietDb
     .select({ id: jobs.id })
     .from(jobs)
-    .where(
-      or(
-        and(
-          eq(jobs.status, JobStatus.succeeded),
-          lt(jobs.finishedAt, daysAgo(retention.succeededRetentionDays)),
-        ),
-        and(
-          inArray(jobs.status, [JobStatus.dead, JobStatus.cancelled]),
-          lt(jobs.finishedAt, daysAgo(retention.deadRetentionDays)),
-        ),
-      ),
-    )
+    .where(isPastRetention)
     .limit(retention.retentionBatch);
-  const deleted = await quietDb.delete(jobs).where(inArray(jobs.id, pastRetention));
+  // Checked again on each row it deletes, so a job re-run while the delete waited is kept.
+  const deleted = await quietDb
+    .delete(jobs)
+    .where(and(inArray(jobs.id, pastRetention), isPastRetention));
   const count = (status: string) => expired.filter((row) => row.status === status).length;
   return {
     requeued: count(JobStatus.queued),

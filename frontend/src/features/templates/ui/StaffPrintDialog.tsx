@@ -13,7 +13,7 @@ import {
   templateFileTypeFor,
   type PrintOptions,
 } from '@/src/types/templates';
-import { saveBlob } from '../data/saveBlob';
+import { saveBlob } from '@/src/shared/util/saveBlob';
 import type {
   StaffPrintOptions,
   StaffPrintTemplate,

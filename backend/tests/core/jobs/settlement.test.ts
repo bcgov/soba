@@ -1,3 +1,4 @@
+import { DrizzleQueryError } from 'drizzle-orm/errors';
 import { decideOutcome, errorText } from '../../../src/core/jobs/settlement';
 
 const backoff = { backoffBaseMs: 30_000, backoffMaxMs: 1_800_000 };
@@ -69,5 +70,33 @@ describe('errorText', () => {
 
   it('keeps at most 2000 characters', () => {
     expect(errorText(new Error('x'.repeat(5000)))).toHaveLength(2000);
+  });
+
+  // pg's DatabaseError, which Drizzle wraps with the query and its values.
+  const pgError = (fields: Record<string, string>) =>
+    Object.assign(new Error('duplicate key value violates unique constraint'), {
+      severity: 'ERROR',
+      ...fields,
+    });
+  const query = 'insert into "soba"."notification_audit" values ($1)';
+  const values = ['a@example.com'];
+
+  it('names a database error by its code and constraint, never its query or values', () => {
+    const err = new DrizzleQueryError(
+      query,
+      values,
+      pgError({ code: '23505', constraint: 'notification_audit_pkey' }),
+    );
+    expect(errorText(err)).toBe('Database error 23505 on notification_audit_pkey');
+    expect(errorText(new DrizzleQueryError(query, values, pgError({ code: '57014' })))).toBe(
+      'Database error 57014',
+    );
+  });
+
+  it('names a failed query by its cause alone when it has no database error', () => {
+    expect(errorText(new DrizzleQueryError(query, values, new TypeError('a@example.com')))).toBe(
+      'Database query failed: TypeError',
+    );
+    expect(errorText(new DrizzleQueryError(query, values))).toBe('Database query failed');
   });
 });

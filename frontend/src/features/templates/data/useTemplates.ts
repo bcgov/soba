@@ -4,9 +4,9 @@ import { useCallback } from 'react';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { listReadConfig, sessionReadConfig } from '@/src/shared/api/swrConfig';
 import { classifyDataError } from '@/src/shared/api/dataError';
+import { saveBlob } from '@/src/shared/util/saveBlob';
 import type { TemplateResponse, TemplateType } from '@/src/types/templates';
 import { rereadAfter } from '../templateUpload';
-import { saveBlob } from './saveBlob';
 import {
   deleteTemplate,
   downloadTemplate,

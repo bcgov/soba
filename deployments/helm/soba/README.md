@@ -250,8 +250,9 @@ either key is missing.
 ## Post-Submission Action Configuration
 
 Actions that run after a submit are plugins, run as jobs while `backend.features.post-submission`
-is on. The list names the action codes this environment runs, comma-separated; with none listed, a
-submit queues no actions. Set in ConfigMap `<fullname>-backend-app` only when non-empty:
+is on; the After Submission tab shows on every workspace and form then. The list names the action
+codes this environment runs, comma-separated; with none listed, a submit queues no actions. Set in
+ConfigMap `<fullname>-backend-app` only when non-empty:
 
 | Helm value                                                 | Env var                                                           | Used by                         |
 | ---------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------- |
@@ -260,17 +261,17 @@ submit queues no actions. Set in ConfigMap `<fullname>-backend-app` only when no
 | `backend.config.postSubmissionEmailWorkspaceHourlyLimit`   | `PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_WORKSPACE_HOURLY_LIMIT`   | post-submission-email-addresses |
 | `backend.config.postSubmissionEmailEnvironmentHourlyLimit` | `PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_ENVIRONMENT_HOURLY_LIMIT` | post-submission-email-addresses |
 
-`post-submission-log` only logs that it ran; PR environments list it so a review can exercise the
-whole path.
+`post-submission-log` only logs that it ran. No environment lists it; a local run can.
 
 `post-submission-email-addresses` emails a notice to a list of up to 100 addresses through the
 active notification plugin. The hourly limits (defaults 500 per form, 2000 per workspace, 5000 for
 the environment) are checked before a list starts; a list that would pass one is not sent and its
-job ends cancelled with the counts. Its feature, `backend.features.post-submission-email`, is
-scoped: it applies only where granted, and only while its status is `enabled`. Dev and PR list the
-plugin and enable the feature; a workspace still needs a feature grant before the action can be
-configured there. A pilot elsewhere needs notify-v1 configured, `backend.features.notifications`
-and `backend.features.post-submission` on, the plugin listed, the feature `enabled`, and grants.
+job ends cancelled with the counts. Its feature, `backend.features.post-submission-email`, applies
+to every workspace and form while its status is `enabled`. Every environment lists the plugin and
+enables both features. Dev, PR and test send through Notify test, which delivers only to its
+safelist. UAT and prod keep `backend.features.notifications` disabled, so email jobs there end
+cancelled; sending needs that feature enabled, `notificationDefaultCode: notify-v1`,
+`notification.notifyV1.endpoint`, and `PLUGIN_NOTIFY_V1_API_KEY` in the Vault secret.
 A limit outside 100 to 1000000 fails the render.
 
 To retire an action, take its code off the list first and remove its plugin in a later release.
@@ -464,7 +465,7 @@ being lost on uninstall.
 | File               | Purpose        | Replicas    | Form.io  | MongoDB          |
 | ------------------ | -------------- | ----------- | -------- | ---------------- |
 | `values.yaml`      | Base defaults  | 1           | Internal | Internal         |
-| `values-pr.yaml`   | PR review apps | 1           | Internal | Internal (256Mi) |
+| `values-pr.yaml`   | PR review apps | 1           | Dev's    | None             |
 | `values-dev.yaml`  | Development    | 1           | Internal | Internal         |
 | `values-test.yaml` | Test / UAT     | 2           | Internal | Internal (2Gi)   |
 | `values-prod.yaml` | Production     | 3 (HPA 3–6) | External | External         |

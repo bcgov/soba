@@ -4,7 +4,7 @@ import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 
 // Set per test: whether the user is signed in, and the query string the page was opened with.
-const session = vi.hoisted(() => ({ authenticated: true, search: '' }));
+const session = vi.hoisted(() => ({ authenticated: true, search: '', path: '' }));
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
   useKeycloak: () => ({
@@ -50,6 +50,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
     },
     submission: {
       error: 'Error',
+      export: { button: 'Export submissions' },
     },
     team: {
       loadError: 'Error',
@@ -58,7 +59,24 @@ vi.mock('@/app/[lang]/Providers', () => ({
       emptyMessage: 'Empty',
       pageOf: 'of {totalPages} page(s)',
     },
+    postSubmission: { tab: 'After Submission' },
+    jobs: { heading: 'Jobs' },
   }),
+}));
+
+// Whether post-submission is available, as the server would answer for the scope asked about.
+const availability = vi.hoisted(() => ({ check: vi.fn() }));
+
+vi.mock('@/src/shared/featureFlags/featureAvailability', () => ({
+  fetchFeatureAvailability: availability.check,
+}));
+
+vi.mock('@/src/features/post-submission/ui/FormPostSubmissionTab', () => ({
+  default: () => <div data-testid="post-submission-content" />,
+}));
+
+vi.mock('@/src/features/jobs/ui/ScopedJobsTabs', () => ({
+  FormJobsTab: () => <div data-testid="jobs-content" />,
 }));
 
 type Workspace = {
@@ -208,7 +226,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {} }),
   useParams: () => ({ lang: 'en' }),
   useSearchParams: () => new URLSearchParams(session.search),
-  usePathname: () => '',
+  usePathname: () => session.path,
 }));
 
 import { Provider } from 'react-redux';
@@ -247,6 +265,8 @@ describe('FormForm', () => {
     store.dispatch(setAuthenticated(true));
     session.authenticated = true;
     session.search = '';
+    session.path = '';
+    availability.check.mockResolvedValue(false);
     mockWorkspaceState.creatable = [{ id: 'ws1', disclaimerAccepted: true }];
     mockWorkspaceState.formCreate = 'allowed';
     mockWorkspaceState.versions = [];
@@ -649,6 +669,7 @@ describe('FormForm', () => {
       'designer-tab',
       'version-tab',
       'settings-tab',
+      'jobs-tab',
       'team-tab',
       'submission-tab',
       'share-tab',
@@ -688,7 +709,7 @@ describe('FormForm', () => {
 
     it.each([
       ['design_update', ['designer-tab', 'version-tab', 'share-tab']],
-      ['form_update', ['settings-tab', 'share-tab']],
+      ['form_update', ['settings-tab', 'jobs-tab', 'share-tab']],
       ['team_update', ['team-tab', 'share-tab']],
       ['submission_read', ['submission-tab', 'share-tab']],
       ['*', allTabs],
@@ -705,6 +726,155 @@ describe('FormForm', () => {
           expect(screen.queryByTestId(tab)).not.toBeInTheDocument();
         }
       }
+    });
+
+    describe('After Submission', () => {
+      const inWorkspace = (permissions: string[], available: boolean) => {
+        availability.check.mockResolvedValue(available);
+        api.getSobaForm.mockImplementation(() =>
+          Promise.resolve({
+            id: 'f1',
+            name: 'Test',
+            description: '',
+            workspaceId: 'ws1',
+            permissions,
+            currentVersion: newestFirst(mockWorkspaceState.versions)[0] ?? null,
+          }),
+        );
+      };
+      const tabOrder = () =>
+        screen.getAllByRole('tab').map((tab) => tab.getAttribute('data-testid'));
+
+      it('shows the tab right after Settings where post-submission is available for the form', async () => {
+        inWorkspace(['*'], true);
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        await screen.findByTestId('post-submission-tab');
+        const order = tabOrder();
+        expect(order.indexOf('post-submission-tab')).toBe(order.indexOf('settings-tab') + 1);
+        // A grant to the form's workspace counts, so the check names both.
+        expect(availability.check).toHaveBeenCalledWith('post-submission', {
+          workspaceId: 'ws1',
+          formId: 'f1',
+        });
+      });
+
+      it('hides the tab while the check runs and once it answers no', async () => {
+        inWorkspace(['*'], false);
+        let answer: (available: boolean) => void = () => undefined;
+        availability.check.mockReturnValue(
+          new Promise<boolean>((resolve) => {
+            answer = resolve;
+          }),
+        );
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        await waitFor(() => expect(availability.check).toHaveBeenCalled());
+        expect(screen.getByTestId('settings-tab')).toBeInTheDocument();
+        expect(screen.queryByTestId('post-submission-tab')).not.toBeInTheDocument();
+
+        await act(async () => answer(false));
+        expect(screen.getByTestId('settings-tab')).toBeInTheDocument();
+        expect(screen.queryByTestId('post-submission-tab')).not.toBeInTheDocument();
+      });
+
+      it('hides the tab, and asks nothing, without the Settings permission', async () => {
+        inWorkspace(['design_update'], true);
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        expect(await screen.findByTestId('designer-tab')).toBeInTheDocument();
+        expect(screen.queryByTestId('post-submission-tab')).not.toBeInTheDocument();
+        expect(availability.check).not.toHaveBeenCalled();
+      });
+
+      it('opens the tab a link names once the check answers, without opening the builder first', async () => {
+        session.search = 'tab=post-submission';
+        inWorkspace(['*'], true);
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        expect(await screen.findByTestId('post-submission-tab')).toHaveAttribute(
+          'aria-selected',
+          'true',
+        );
+        expect(screen.getByTestId('post-submission-content')).toBeInTheDocument();
+        expect(screen.queryByTestId('form-designer')).not.toBeInTheDocument();
+      });
+
+      it('opens the first visible tab when a link names the tab and it is not available', async () => {
+        session.search = 'tab=post-submission';
+        inWorkspace(['*'], false);
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        expect(await screen.findByTestId('designer-tab')).toHaveAttribute('aria-selected', 'true');
+        expect(screen.queryByTestId('post-submission-tab')).not.toBeInTheDocument();
+      });
+    });
+
+    describe('Jobs', () => {
+      it('sits last before Share', async () => {
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        await screen.findByTestId('jobs-tab');
+        const order = screen.getAllByRole('tab').map((tab) => tab.getAttribute('data-testid'));
+        expect(order.slice(-3)).toEqual(['submission-tab', 'jobs-tab', 'share-tab']);
+      });
+
+      it('opens the tab a link names, which a job page links back to', async () => {
+        session.search = 'tab=jobs';
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        expect(await screen.findByTestId('jobs-tab')).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByTestId('jobs-content')).toBeInTheDocument();
+        expect(screen.queryByTestId('form-designer')).not.toBeInTheDocument();
+      });
+
+      it('stays open when the form schema cannot be read, as jobs do not depend on it', async () => {
+        mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
+        api.getFormVersionSchema.mockRejectedValue(new Error('boom'));
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        await screen.findByTestId('designer-load-error');
+        expect(screen.getByTestId('jobs-tab')).not.toHaveAttribute('aria-disabled', 'true');
+        expect(screen.getByTestId('settings-tab')).toHaveAttribute('aria-disabled', 'true');
+      });
+    });
+
+    // Back from a page a tab opened, such as a job's, returns to that tab.
+    it('writes the chosen tab into the URL under the base path, keeping the lists params', async () => {
+      vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/chefs');
+      session.path = '/en/build/f1';
+      window.history.replaceState(null, '', '/chefs/en/build/f1?formSubmissions.page=2');
+      const replaceState = vi.spyOn(window.history, 'replaceState');
+      await act(async () => {
+        await renderForm({ formId: 'f1' });
+      });
+
+      await userEvent.click(await screen.findByTestId('jobs-tab'));
+
+      expect(replaceState).toHaveBeenLastCalledWith(
+        null,
+        '',
+        '/chefs/en/build/f1?formSubmissions.page=2&tab=jobs',
+      );
+      replaceState.mockRestore();
+      vi.unstubAllEnvs();
+      window.history.replaceState(null, '', '/');
     });
   });
 });

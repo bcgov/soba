@@ -63,6 +63,7 @@ Add `get<Kind>DefaultCode()` to both `createEnvReader` and `env` in `core/config
 - If the caller's payload can make the service return 400, 415, or 422, map the failure with `httpErrorToAppError` (`cdogs-v2`). That helper puts up to 500 characters of the upstream body on the client error. If the caller sent nothing the service could reject, do what `cstar-v1` does: `log.warn` the status and the error message, and throw `ServiceUnavailableError` with the status only.
 - Parse the success body with Zod and return the lib type.
 - `encodeURIComponent` any path segment that comes from the caller.
+- A `post-submission-action` plugin keeps its options schema in `lib/src/schemas/postSubmission.ts`, beside the rules its After Submission drawer uses, such as the email action's address rule and list limit. The drawer is an entry in `frontend/src/features/post-submission/actions/registry.ts` with its text under `postSubmission` in `en.json` and `fr.json`; until it has one, the tab shows the action read-only.
 
 ## 5. The consumer
 

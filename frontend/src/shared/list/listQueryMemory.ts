@@ -3,9 +3,11 @@ import {
   FEATURE_SCOPE_SORT_FIELDS,
   FORM_SORT_FIELDS,
   FORM_VERSION_SORT_FIELDS,
+  JOB_SORT_FIELDS,
   MY_FORM_SORT_FIELDS,
   SOBA_ADMIN_SORT_FIELDS,
   SUBMISSION_SORT_FIELDS,
+  WORKSPACE_GROUP_SORT_FIELDS,
   WORKSPACE_SORT_FIELDS,
   sortTokensFor,
 } from '@soba/lib/sort';
@@ -25,6 +27,11 @@ export type ListQuerySpec = {
   /** Sort tokens the endpoint accepts. Anything else in the URL falls back to the default. */
   sortOptions: readonly string[];
   defaultSort: string;
+  /**
+   * The record the list belongs to, such as a form, so each one remembers its own query. It changes
+   * only the remembered key, not the URL names.
+   */
+  memoryScope?: string;
 };
 
 export type ListQueryParams = Record<string, string>;
@@ -46,12 +53,13 @@ export const urlParamName = (spec: ListQuerySpec, name: string): string =>
   `${spec.resource}.${name}`;
 
 const UPDATED_DESC = 'updatedAt:desc';
+const CREATED_DESC = 'createdAt:desc';
 
 export const FORMS_LIST_QUERY: ListQuerySpec = {
   resource: 'forms',
   filters: ['workspace'],
   sortOptions: sortTokensFor(FORM_SORT_FIELDS),
-  defaultSort: 'createdAt:desc',
+  defaultSort: CREATED_DESC,
 };
 
 export const WORKSPACES_LIST_QUERY: ListQuerySpec = {
@@ -120,11 +128,47 @@ export const DOCGEN_AUDITS_LIST_QUERY: ListQuerySpec = {
   resource: 'docgenAudits',
   filters: [],
   sortOptions: sortTokensFor(DOCGEN_AUDIT_SORT_FIELDS),
-  defaultSort: 'createdAt:desc',
+  defaultSort: CREATED_DESC,
+};
+
+export const JOBS_LIST_QUERY: ListQuerySpec = {
+  resource: 'jobs',
+  filters: ['status', 'type', 'workspaceId', 'formId', 'submissionId'],
+  sortOptions: sortTokensFor(JOB_SORT_FIELDS),
+  defaultSort: CREATED_DESC,
+};
+
+/** A form's jobs, in the designer. Scope it to the form with `scopedListQuery`. */
+export const FORM_JOBS_LIST_QUERY: ListQuerySpec = {
+  resource: 'formJobs',
+  filters: ['status', 'type'],
+  sortOptions: sortTokensFor(JOB_SORT_FIELDS),
+  defaultSort: CREATED_DESC,
+};
+
+/** A workspace's jobs, on the workspace page. Scope it to the workspace with `scopedListQuery`. */
+export const WORKSPACE_JOBS_LIST_QUERY: ListQuerySpec = {
+  resource: 'workspaceJobs',
+  filters: ['status', 'type', 'formId'],
+  sortOptions: sortTokensFor(JOB_SORT_FIELDS),
+  defaultSort: CREATED_DESC,
+};
+
+export const scopedListQuery = (spec: ListQuerySpec, memoryScope: string): ListQuerySpec => ({
+  ...spec,
+  memoryScope,
+});
+
+export const WORKSPACE_GROUPS_LIST_QUERY: ListQuerySpec = {
+  resource: 'workspaceGroups',
+  filters: [],
+  sortOptions: sortTokensFor(WORKSPACE_GROUP_SORT_FIELDS),
+  defaultSort: 'name:asc',
 };
 
 const KEY_PREFIX = 'soba.listQuery.';
-const keyFor = (spec: ListQuerySpec) => `${KEY_PREFIX}${spec.resource}`;
+const keyFor = (spec: ListQuerySpec) =>
+  [`${KEY_PREFIX}${spec.resource}`, spec.memoryScope].filter(Boolean).join('.');
 
 /**
  * Marks a link inside the app, whose destination is "the list as I left it". A bare URL is someone
@@ -134,7 +178,8 @@ const keyFor = (spec: ListQuerySpec) => `${KEY_PREFIX}${spec.resource}`;
 export const NAV_MARKER = 'from';
 const NAV_MARKER_VALUE = 'nav';
 
-export const navLink = (href: string) => `${href}?${NAV_MARKER}=${NAV_MARKER_VALUE}`;
+export const navLink = (href: string) =>
+  `${href}${href.includes('?') ? '&' : '?'}${NAV_MARKER}=${NAV_MARKER_VALUE}`;
 
 /**
  * A link to a list with its query already set. The names come from the spec, so a caller cannot

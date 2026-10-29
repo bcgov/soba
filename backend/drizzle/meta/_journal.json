@@ -407,6 +407,27 @@
       "when": 1772618038000,
       "tag": "0058_post_submission_email",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1772618040000,
+      "tag": "0059_post_submission_fixed",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1772618042000,
+      "tag": "0060_job_requeue",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1772618044000,
+      "tag": "0061_job_cancel_requested_by",
+      "breakpoints": true
     }
   ]
 }

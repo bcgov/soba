@@ -9,8 +9,9 @@ import {
   registerSubmissionReviewOpenApi,
 } from './submissions';
 import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
+import { registerSubmissionExportOpenApi, submissionExportRouter } from './submissionExport';
 import { groupsDomain } from './groups';
-import { filesDomain } from '../../features/files';
+import { filesDesignRouter, filesDomain } from '../../features/files';
 import {
   documentGenerationDesignRouter,
   documentGenerationDomain,
@@ -26,6 +27,7 @@ import {
   registerUserSearchOpenApi,
   workspaceUserSearchRouter,
 } from '../../features/user-search';
+import { formJobsRouter, registerJobsOpenApi, workspaceJobsRouter } from '../../features/jobs';
 import { meDomain } from './me';
 import { membersDomain } from './members';
 import { workspacesDomain } from './workspaces';
@@ -42,10 +44,12 @@ registerOpenApiPaths((registry) => {
   registerFormSettingsOpenApi(registry);
   registerSubmissionsOpenApi(registry);
   registerSubmissionReviewOpenApi(registry);
+  registerSubmissionExportOpenApi(registry);
   registerSubmitOpenApi(registry);
   groupsDomain.registerOpenApi(registry);
   meDomain.registerOpenApi(registry);
   registerUserSearchOpenApi(registry);
+  registerJobsOpenApi(registry);
   membersDomain.registerOpenApi(registry);
   workspacesDomain.registerOpenApi(registry);
   filesDomain.registerOpenApi(registry);
@@ -61,10 +65,15 @@ registerOpenApiPaths((registry) => {
 const designRouter = express.Router();
 designRouter.use('/forms/:id/settings', formSettingsRouter);
 designRouter.use('/forms/:id/user-search', formUserSearchRouter);
+designRouter.use('/forms/:id/jobs', formJobsRouter);
+// Submission exports at /forms/:id/exports; gates itself.
+designRouter.use(submissionExportRouter);
 designRouter.use('/', designFormsRouter);
 designRouter.use('/submissions', designSubmissionsRouter);
 // Staff print: /submissions/:id/{templates,print} and /print-upload/:id; it gates itself.
 designRouter.use(documentGenerationDesignRouter);
+// Staff attachment download; gates itself.
+designRouter.use(filesDesignRouter);
 designRouter.use(notFoundHandler);
 designRouter.use(coreErrorHandler);
 
@@ -92,6 +101,7 @@ const coreRouter = express.Router();
 // The workspace level of settings groups whose values a workspace shares with its forms.
 coreRouter.use('/workspaces/:id/settings', workspaceSettingsRouter);
 coreRouter.use('/workspaces/:id/user-search', workspaceUserSearchRouter);
+coreRouter.use('/workspaces/:id/jobs', workspaceJobsRouter);
 for (const domain of [workspacesDomain, groupsDomain, meDomain, membersDomain, templatesDomain]) {
   coreRouter.use(domain.path, domain.router);
 }

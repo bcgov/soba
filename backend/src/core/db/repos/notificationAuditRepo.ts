@@ -45,11 +45,12 @@ export const createNotificationAudit = async (input: NewNotificationAudit): Prom
   });
 };
 
-/** One audited send of a job: its outcome and who it went to. */
+/** One audited send of a job: its outcome, who it went to, and when. */
 export interface JobNotificationSend {
   outcome: NotificationOutcomeCode;
   httpStatus: number | null;
   recipients: NotificationAuditRecipients;
+  createdAt: Date;
 }
 
 export const listJobNotificationSends = (jobId: string): Promise<JobNotificationSend[]> =>
@@ -58,6 +59,7 @@ export const listJobNotificationSends = (jobId: string): Promise<JobNotification
       outcome: notificationAudits.outcome,
       httpStatus: notificationAudits.httpStatus,
       recipients: notificationAudits.recipients,
+      createdAt: notificationAudits.createdAt,
     })
     .from(notificationAudits)
     .where(eq(notificationAudits.jobId, jobId));

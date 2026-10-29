@@ -16,6 +16,8 @@ export const FEATURE_CODES = {
   TEMPLATES: 'templates',
   /** Finding people to add to a workspace or a form's team. */
   USER_SEARCH: 'user-search',
+  /** What happens after a submission is received, set on the After Submission tab. */
+  POST_SUBMISSION: 'post-submission',
 } as const;
 
 export type FeatureCode = (typeof FEATURE_CODES)[keyof typeof FEATURE_CODES];

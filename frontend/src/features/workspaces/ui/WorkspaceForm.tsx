@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState, useMemo, type Key } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { navLink } from '@/src/shared/list/listQueryMemory';
+import { withBasePath } from '@/src/shared/config/basePath';
 import { Tabs, Tab } from 'react-bootstrap';
 import {
   Button,
@@ -28,10 +29,14 @@ import { apiErrorMessage, isConflict } from '@/src/shared/api/dataError';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { useDebouncedValue } from '@/src/shared/hooks/useDebouncedValue';
-import { isWorkspaceManageRole } from '../workspaceRoles';
+import { isWorkspaceManageRole, isWorkspaceOwnerRole } from '../workspaceRoles';
 import WorkspaceFormSettings from '@/src/features/form-settings/ui/WorkspaceFormSettings';
+import WorkspacePostSubmissionTab from '@/src/features/post-submission/ui/WorkspacePostSubmissionTab';
+import { WorkspaceJobsTab } from '@/src/features/jobs/ui/ScopedJobsTabs';
+import { usePostSubmissionAvailable } from '@/src/features/post-submission/data/usePostSubmissionAvailable';
 import type { UpdateWorkspaceBody, WorkspaceItem } from '@/src/types/workspaces';
 import styles from './WorkspaceForm.module.css';
+import WorkspaceGroupTab from './WorkspaceGroupTab';
 
 // How long to wait after the last keystroke, and how short a name can be, before checking it.
 const NAME_CHECK_DEBOUNCE_MS = 400;
@@ -297,13 +302,34 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
   const dictWorkspaces = dict.workspaces;
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const locale = getLocaleFromPath(pathname);
   const { authenticated, initializing } = useKeycloak();
   const { addNotification } = useNotificationStore();
   const { data: currentUser, loaded: currentUserLoaded } = useCurrentUser();
   const { workspace, isLoading } = useWorkspace(workspaceId);
+  // Asked only for a workspace this person manages, the role this page needs.
+  const postSubmissionAvailable = usePostSubmissionAvailable(
+    workspace && isWorkspaceManageRole(workspace.role) ? { workspaceId: workspace.id } : null,
+  );
 
-  const [activeTab, setActiveTab] = useState('settings');
+  const canSeeJobs = !!workspace && isWorkspaceOwnerRole(workspace.role);
+
+  const tabParam = searchParams.get('tab');
+  // A link to After Submission opens it once the check says it is available.
+  const validTabs = useMemo(
+    () => [
+      'settings',
+      'form-settings',
+      ...(postSubmissionAvailable ? ['post-submission'] : []),
+      'groups',
+      ...(canSeeJobs ? ['jobs'] : []),
+    ],
+    [postSubmissionAvailable, canSeeJobs],
+  );
+  const [selectedTab, setSelectedTab] = useState<string | null>(null);
+  const activeTab =
+    selectedTab ?? (tabParam && validTabs.includes(tabParam) ? tabParam : 'settings');
 
   useEffect(() => {
     if (!authenticated || initializing || !currentUserLoaded) {
@@ -376,7 +402,20 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
     <Tabs
       id="workspace-manage-tabs"
       activeKey={activeTab}
-      onSelect={(k) => setActiveTab(k || 'settings')}
+      onSelect={(k = 'settings') => {
+        const nextTab = k ?? 'settings';
+        setSelectedTab(nextTab);
+        const params = new URLSearchParams(window.location.search);
+        if (nextTab === 'settings') {
+          params.delete('tab');
+        } else {
+          params.set('tab', nextTab);
+        }
+        const qs = params.toString();
+        // usePathname omits the base path and replaceState takes the URL as given.
+        const url = withBasePath(pathname);
+        window.history.replaceState(null, '', qs ? `${url}?${qs}` : url);
+      }}
       className="mb-3"
       mountOnEnter
     >
@@ -394,6 +433,35 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
           <WorkspaceFormSettings key={workspace.id} dict={dict} workspaceId={workspace.id} />
         </div>
       </Tab>
+      {postSubmissionAvailable && (
+        <Tab
+          eventKey="post-submission"
+          title={dict.postSubmission.tab}
+          tabAttrs={{ 'data-testid': 'workspace-post-submission-tab' }}
+        >
+          <div className={styles.tabContent}>
+            <WorkspacePostSubmissionTab key={workspace.id} dict={dict} workspaceId={workspace.id} />
+          </div>
+        </Tab>
+      )}
+      <Tab
+        eventKey="groups"
+        title={dictWorkspaces.groupsTab}
+        tabAttrs={{ 'data-testid': 'workspace-groups-tab' }}
+      >
+        <div className={styles.tabContent}>
+          <WorkspaceGroupTab dict={dict} workspaceId={workspace.id} />
+        </div>
+      </Tab>
+      {canSeeJobs && (
+        <Tab
+          eventKey="jobs"
+          title={dict.jobs.heading}
+          tabAttrs={{ 'data-testid': 'workspace-jobs-tab' }}
+        >
+          <WorkspaceJobsTab key={workspace.id} workspaceId={workspace.id} />
+        </Tab>
+      )}
     </Tabs>
   );
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { ApiErrorCode } from '@soba/lib';
-import { ApiError, parseJson } from '@/src/shared/api/sobaHelpers';
+import { ApiError, parseBlob, parseDownload, parseJson } from '@/src/shared/api/sobaHelpers';
 import { apiErrorMessage, classifyDataError } from '@/src/shared/api/dataError';
 import { isNetworkError, NetworkError, SessionExpiredError } from '@/src/shared/api/sobaFetch';
 
@@ -56,6 +56,22 @@ describe('parseJson', () => {
   });
 });
 
+describe('parseBlob', () => {
+  it('reports a body cut off mid-read as a NetworkError', async () => {
+    const cutOff = new TypeError('network error');
+    const response = { ok: true, status: 200, blob: () => Promise.reject(cutOff) } as Response;
+    const err = await parseBlob(response).catch((e: unknown) => e);
+    expect(isNetworkError(err)).toBe(true);
+    expect((err as Error).cause).toBe(cutOff);
+  });
+
+  it('throws a refusal as its ApiError', async () => {
+    await expect(parseBlob(errorResponse(403, { error: 'No' }))).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+});
+
 describe('classifyDataError', () => {
   it.each([
     ['a request that never reached the server', new NetworkError(new TypeError('x')), 'offline'],
@@ -102,5 +118,55 @@ describe('apiErrorMessage', () => {
     ['an ended session', new SessionExpiredError(), null],
   ])('with a fallback, answers %s', (_label, cause, expected) => {
     expect(apiErrorMessage(cause, messages, 'Try again.')).toBe(expected);
+  });
+});
+
+describe('parseDownload', () => {
+  const fileResponse = (disposition: string | null) =>
+    new Response('x', disposition ? { headers: { 'Content-Disposition': disposition } } : {});
+
+  it('names the file from filename*', async () => {
+    const file = await parseDownload(
+      fileResponse(`attachment; filename="r_sum_.csv"; filename*=UTF-8''r%C3%A9sum%C3%A9.csv`),
+    );
+    expect(file.filename).toBe('résumé.csv');
+    expect(file.blob.size).toBe(1);
+  });
+
+  it('falls back to the plain filename, then to a generic name', async () => {
+    expect((await parseDownload(fileResponse('attachment; filename="plan.pdf"'))).filename).toBe(
+      'plan.pdf',
+    );
+    expect((await parseDownload(fileResponse('attachment; filename=""'))).filename).toBe(
+      'download',
+    );
+    expect((await parseDownload(fileResponse(null))).filename).toBe('download');
+  });
+
+  // Headers as the backend's contentDisposition builds them for these stored names.
+  it.each([
+    [
+      "report; filename*=UTF-8''invoice.exe; .pdf",
+      `attachment; filename="report; filename*=UTF-8''invoice.exe; .pdf"; filename*=UTF-8''report%3B%20filename%2A%3DUTF-8%27%27invoice.exe%3B%20.pdf`,
+    ],
+    [
+      "x; filename*=UTF-8''%ZZ; .pdf",
+      `attachment; filename="x; filename*=UTF-8''%ZZ; .pdf"; filename*=UTF-8''x%3B%20filename%2A%3DUTF-8%27%27%25ZZ%3B%20.pdf`,
+    ],
+  ])('names %s from the trailing filename*', async (name, disposition) => {
+    expect((await parseDownload(fileResponse(disposition))).filename).toBe(name);
+  });
+
+  it('falls back to the plain filename when filename* does not decode', async () => {
+    const file = await parseDownload(
+      fileResponse(`attachment; filename="plan.pdf"; filename*=UTF-8''%ZZ`),
+    );
+    expect(file.filename).toBe('plan.pdf');
+  });
+
+  it('throws a refused download with its status', async () => {
+    await expect(
+      parseDownload(errorResponse(404, { error: 'File not found', code: 'file_not_found' })),
+    ).rejects.toMatchObject({ status: 404, code: 'file_not_found' });
   });
 });

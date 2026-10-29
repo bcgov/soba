@@ -1,4 +1,4 @@
-import type { SortLocale } from '@soba/lib';
+import { ApiErrorCodes, type SortLocale } from '@soba/lib';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { GroupMemberKind, SystemGroup } from '../../db/codes';
 import { GROUP_NAME_TAKEN } from '../../messages';
@@ -18,6 +18,7 @@ import {
   renameGroup,
   replaceGroupRoles,
   softDeleteWorkspaceGroup,
+  type WorkspaceGroupListSort,
   type WorkspaceGroupRow,
 } from '../../db/repos/workspaceGroupRepo';
 
@@ -59,7 +60,7 @@ async function assertNameFree(
   exceptGroupId?: string,
 ): Promise<void> {
   if (await groupNameExistsInWorkspace(workspaceId, name, exceptGroupId)) {
-    throw new ConflictError(GROUP_NAME_TAKEN);
+    throw new ConflictError(GROUP_NAME_TAKEN, ApiErrorCodes.group_name_taken);
   }
 }
 
@@ -72,9 +73,28 @@ async function loadGroup(ctx: GroupsContextInput, groupId: string): Promise<Work
 }
 
 export class GroupsApiService {
-  async list(ctx: GroupsContextInput) {
-    const items = await listWorkspaceGroups(ctx.workspaceId, ctx.locale);
-    return { items };
+  async list(
+    ctx: GroupsContextInput,
+    query: { offset: number; limit: number; sort: WorkspaceGroupListSort; q?: string },
+  ) {
+    const { items, total } = await listWorkspaceGroups({
+      workspaceId: ctx.workspaceId,
+      offset: query.offset,
+      limit: query.limit,
+      sort: query.sort,
+      locale: ctx.locale,
+      q: query.q,
+    });
+    return {
+      items,
+      page: { offset: query.offset, limit: query.limit, total },
+      filters: { q: query.q },
+      sort: query.sort,
+    };
+  }
+
+  get(ctx: GroupsContextInput, groupId: string) {
+    return loadGroup(ctx, groupId);
   }
 
   async create(

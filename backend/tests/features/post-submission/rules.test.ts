@@ -1,5 +1,6 @@
 import {
   effectiveAction,
+  formActionScopes,
   rowsFor,
   toFormActionSettings,
   toWorkspaceActionSettings,
@@ -69,6 +70,17 @@ describe('effectiveAction', () => {
   });
 });
 
+describe('formActionScopes', () => {
+  it("keeps the action's scopes when the workspace can set it", () => {
+    expect(formActionScopes(both, true)).toEqual(['workspace', 'form']);
+  });
+
+  it('drops the workspace scope when only the form can set it', () => {
+    expect(formActionScopes(both, false)).toEqual(['form']);
+    expect(formActionScopes(['workspace'], false)).toEqual([]);
+  });
+});
+
 describe('settings views', () => {
   it("shows a form's choice, its own values, the workspace's and the effective ones", () => {
     expect(toFormActionSettings(workspaceRow, formOverride, both)).toEqual({
@@ -97,6 +109,16 @@ describe('settings views', () => {
     expect(toWorkspaceActionSettings(undefined)).toEqual({
       values: { enabled: false, options: {} },
       version: 0,
+    });
+  });
+
+  it('shows a form whose workspace cannot set the action no workspace values to inherit', () => {
+    expect(
+      toFormActionSettings(workspaceRow, undefined, formActionScopes(both, false)),
+    ).toMatchObject({
+      inherit: true,
+      workspace: { enabled: false, options: {} },
+      effective: { enabled: false, options: {} },
     });
   });
 

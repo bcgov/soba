@@ -1,12 +1,12 @@
 import type { Logger } from 'pino';
 import type { z } from 'zod';
+import type { PostSubmissionActionScope } from '@soba/lib';
 import type { JobPoolCode } from '../../config/env';
 import type { ClaimedJob } from '../../db/repos/jobRepo';
 import type { SendEmail } from '../notification/NotificationAdapter';
 import type { SendOutcome } from '../notification/sendOutcome';
 
-/** Where an action is configured: a workspace default its forms inherit, or one form. */
-export type PostSubmissionActionScope = 'workspace' | 'form';
+export type { PostSubmissionActionScope };
 
 /** The saved settings an action job runs with. */
 export interface PostSubmissionActionSource {
@@ -38,8 +38,12 @@ export type PostSubmissionActionSendScope = 'form' | 'workspace' | 'environment'
 export interface PostSubmissionActionNotifications {
   enabled(): Promise<boolean>;
   sendEmail(email: SendEmail): Promise<PostSubmissionActionEmailResult>;
-  /** Addresses this job has already handed to the provider, or that the provider refused. */
-  handledRecipients(): Promise<Set<string>>;
+  /**
+   * Addresses this job has already handed to the provider, or that the provider refused since its
+   * last re-run, and whether its current run has handled any address yet. A run starts when the job
+   * is created, or at its last re-run.
+   */
+  handled(): Promise<{ recipients: Set<string>; runStarted: boolean }>;
   /**
    * Sends the provider accepted or refused in the last `seconds`, by the database clock. Failures
    * that will be retried are not counted, so an outage does not use up the hour.

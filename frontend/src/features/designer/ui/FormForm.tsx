@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { Tabs, Tab } from 'react-bootstrap';
 import { Button, Select } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
@@ -20,6 +20,10 @@ import FormTeamTab from './FormTeamTab';
 import FormHistoryTab from './FormHistoryTab';
 import FormSubmissionTab from './FormSubmissionTab';
 import FormShareTab from './FormShareTab';
+import FormPostSubmissionTab from '@/src/features/post-submission/ui/FormPostSubmissionTab';
+import { usePostSubmissionAvailable } from '@/src/features/post-submission/data/usePostSubmissionAvailable';
+import { FormJobsTab } from '@/src/features/jobs/ui/ScopedJobsTabs';
+import { withBasePath } from '@/src/shared/config/basePath';
 import { useWorkspace } from '@/src/shared/api/useWorkspaces';
 import { lookupTruncatedNote, withSelectedOption } from '@/src/shared/list/lookupOptions';
 import { useForm, useFormWriter } from '@/src/features/designer/data/useForm';
@@ -93,6 +97,8 @@ function draftNotices(args: {
 
 const DESIGNER_TAB = 'designer';
 const SETTINGS_TAB = 'settings';
+const POST_SUBMISSION_TAB = 'post-submission';
+const JOBS_TAB = 'jobs';
 const ACCESS_TAB = 'team';
 const HISTORY_TAB = 'version';
 const SUBMISSIONS_TAB = 'submissions';
@@ -101,11 +107,14 @@ const SHARE_TAB = 'share';
 function useActiveTab(permissions: {
   canSeeDesignTab?: boolean;
   canSeeSettingsTab?: boolean;
+  /** Undefined until the feature check answers. */
+  canSeePostSubmissionTab?: boolean;
   canSeeAccessTab?: boolean;
   canSeeHistoryTab?: boolean;
   canSeeSubmissionsTab?: boolean;
 }) {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const requestedTab = searchParams.get('tab') ?? '';
   const [selectedTab, setSelectedTab] = useState('');
   const [openedTabs, setOpenedTabs] = useState<string[]>([]);
@@ -113,6 +122,11 @@ function useActiveTab(permissions: {
   const openTab = (key: string) => {
     setSelectedTab(key);
     setOpenedTabs((opened) => (opened.includes(key) ? opened : [...opened, key]));
+    // Kept in the URL, so Back from a page a tab opened returns to that tab. The other params, such
+    // as a list's, stay. usePathname omits the base path and replaceState takes the URL as given.
+    const params = new URLSearchParams(window.location.search);
+    params.set('tab', key);
+    window.history.replaceState(null, '', `${withBasePath(pathname)}?${params.toString()}`);
   };
 
   const permsLoaded =
@@ -121,15 +135,22 @@ function useActiveTab(permissions: {
     permissions.canSeeAccessTab !== undefined &&
     permissions.canSeeHistoryTab !== undefined &&
     permissions.canSeeSubmissionsTab !== undefined;
+  // A link to the After Submission tab waits for the feature check rather than open another tab
+  // first; no other link waits on it.
+  const waitsForRequested =
+    requestedTab === POST_SUBMISSION_TAB && permissions.canSeePostSubmissionTab === undefined;
 
   let activeTab = selectedTab;
-  if (!selectedTab && permsLoaded) {
+  if (!selectedTab && permsLoaded && !waitsForRequested) {
     const validTabs = [
       permissions.canSeeDesignTab && DESIGNER_TAB,
       permissions.canSeeSettingsTab && SETTINGS_TAB,
+      permissions.canSeePostSubmissionTab && POST_SUBMISSION_TAB,
       permissions.canSeeAccessTab && ACCESS_TAB,
       permissions.canSeeHistoryTab && HISTORY_TAB,
       permissions.canSeeSubmissionsTab && SUBMISSIONS_TAB,
+      // The Jobs tab takes the Settings tab's permission.
+      permissions.canSeeSettingsTab && JOBS_TAB,
       SHARE_TAB,
     ].filter(Boolean) as string[];
 
@@ -235,9 +256,16 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     return hasPermission(permissions, Permissions.submission_read);
   }, [permissions]);
 
+  // The tab needs the Settings tab's permission and post-submission available for this form.
+  const postSubmissionAvailable = usePostSubmissionAvailable(
+    canSeeSettingsTab && form?.workspaceId ? { workspaceId: form.workspaceId, formId } : null,
+  );
+  const canSeePostSubmissionTab = canSeeSettingsTab && postSubmissionAvailable;
+
   const { activeTab, openedTabs, openTab } = useActiveTab({
     canSeeDesignTab,
     canSeeSettingsTab,
+    canSeePostSubmissionTab,
     canSeeAccessTab,
     canSeeHistoryTab,
     canSeeSubmissionsTab,
@@ -519,6 +547,16 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
             <FormSettingsTab dict={dict} formId={formId} />
           </Tab>
         )}
+        {canSeePostSubmissionTab && (
+          <Tab
+            eventKey={POST_SUBMISSION_TAB}
+            tabAttrs={{ 'data-testid': 'post-submission-tab' }}
+            disabled={isSaving || draftUnavailable}
+            title={dict.postSubmission.tab}
+          >
+            <FormPostSubmissionTab dict={dict} formId={formId} />
+          </Tab>
+        )}
         {canSeeAccessTab && (
           <Tab
             eventKey={ACCESS_TAB}
@@ -557,6 +595,17 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
               formId={formId}
               opened={openedTabs.includes(SUBMISSIONS_TAB)}
             />
+          </Tab>
+        )}
+        {canSeeSettingsTab && (
+          <Tab
+            eventKey={JOBS_TAB}
+            tabAttrs={{ 'data-testid': 'jobs-tab' }}
+            // Not held back by the draft: jobs do not depend on the form's schema.
+            disabled={isSaving}
+            title={dict.jobs.heading}
+          >
+            <FormJobsTab formId={formId} />
           </Tab>
         )}
         <Tab

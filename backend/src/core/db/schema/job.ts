@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
+  boolean,
   index,
   integer,
   jsonb,
@@ -49,10 +50,20 @@ export const jobs = sobaSchema.table(
     claimToken: uuid('claim_token'),
     leaseUntil: timestamp('lease_until', { withTimezone: true }),
     cancelRequestedAt: timestamp('cancel_requested_at', { withTimezone: true }),
+    // Who asked first, and whether through the administration routes.
+    cancelRequestedBy: uuid('cancel_requested_by').references(() => appUsers.id),
+    cancelRequestedByAdmin: boolean('cancel_requested_by_admin').notNull().default(false),
     lastError: text('last_error'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp('started_at', { withTimezone: true }),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
+    // Re-runs of a dead or cancelled job by a person, which run the same row again.
+    requeueCount: integer('requeue_count').notNull().default(0),
+    lastRequeuedAt: timestamp('last_requeued_at', { withTimezone: true }),
+    lastRequeuedBy: uuid('last_requeued_by').references(() => appUsers.id),
+    lastRequeuedByAdmin: boolean('last_requeued_by_admin').notNull().default(false),
+    // Set in the transaction that queued this job's children; kept after they are deleted.
+    childrenQueuedAt: timestamp('children_queued_at', { withTimezone: true }),
   },
   (table) => ({
     dedupeKeyUq: uniqueIndex('job_dedupe_key_uq').on(table.dedupeKey),
@@ -72,5 +83,6 @@ export const jobs = sobaSchema.table(
     formIdx: index('job_form_idx').on(table.formId),
     submissionIdx: index('job_submission_idx').on(table.submissionId),
     revisionIdx: index('job_revision_idx').on(table.revisionId),
+    createdIdx: index('job_created_idx').on(table.createdAt.desc(), table.id.desc()),
   }),
 );

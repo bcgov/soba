@@ -9,6 +9,7 @@ import {
 } from '../../middleware/requireWorkspaceRole';
 import {
   listGroups,
+  getGroup,
   createGroup,
   updateGroup,
   deleteGroup,
@@ -21,6 +22,7 @@ import {
   CreateGroupBodySchema,
   GroupIdParamsSchema,
   GroupMemberParamsSchema,
+  ListGroupsQuerySchema,
   SetGroupRolesBodySchema,
   UpdateGroupBodySchema,
   WorkspaceGroupParamsSchema,
@@ -40,11 +42,19 @@ const workspaceResource = workspaceFromResource({ kind: 'workspace', idFrom: 'pa
 
 router.get(
   GROUPS_PATH,
-  validateRequest({ query: SortLocaleQuerySchema, params: WorkspaceGroupParamsSchema }),
+  validateRequest({ query: ListGroupsQuerySchema, params: WorkspaceGroupParamsSchema }),
   sortLocale,
   workspaceResource,
   requireWorkspacePeopleRead,
   listGroups,
+);
+router.get(
+  GROUP_PATH,
+  validateRequest({ query: SortLocaleQuerySchema, params: GroupIdParamsSchema }),
+  sortLocale,
+  workspaceResource,
+  requireWorkspacePeopleRead,
+  getGroup,
 );
 router.post(
   GROUPS_PATH,

@@ -1,5 +1,5 @@
 import React, { act } from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
@@ -13,6 +13,7 @@ const {
   mockCheckWorkspaceNameAvailable,
   mockRefreshWorkspaces,
   mockRefreshCurrentUser,
+  mockSearchParams,
   mockAddNotification,
 } = vi.hoisted(() => ({
   mockCreateWorkspace: vi.fn(),
@@ -21,6 +22,7 @@ const {
   mockCheckWorkspaceNameAvailable: vi.fn().mockResolvedValue({ available: true }),
   mockRefreshWorkspaces: vi.fn().mockResolvedValue([]),
   mockRefreshCurrentUser: vi.fn().mockResolvedValue(undefined),
+  mockSearchParams: { value: '' },
   mockAddNotification: vi.fn(),
 }));
 
@@ -52,6 +54,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
       manageHeading: 'Manage Workspace',
       settingsTab: 'Settings',
       formSettingsTab: 'Form Settings',
+      groupsTab: 'Groups',
       nameLabel: 'Name',
       save: 'Save',
       create: 'Create',
@@ -66,7 +69,24 @@ vi.mock('@/app/[lang]/Providers', () => ({
       createForbidden: 'Only BC Government identity provider users can create workspaces.',
       disclaimerLabel: 'I agree to the disclaimer and statement of responsibility',
     },
+    postSubmission: { tab: 'After Submission' },
+    jobs: { heading: 'Jobs' },
   }),
+}));
+
+// Whether post-submission is available, as the server would answer for the workspace.
+const availability = vi.hoisted(() => ({ check: vi.fn() }));
+
+vi.mock('@/src/shared/featureFlags/featureAvailability', () => ({
+  fetchFeatureAvailability: availability.check,
+}));
+
+vi.mock('@/src/features/post-submission/ui/WorkspacePostSubmissionTab', () => ({
+  default: () => <div data-testid="workspace-post-submission-content" />,
+}));
+
+vi.mock('@/src/features/jobs/ui/ScopedJobsTabs', () => ({
+  WorkspaceJobsTab: () => <div data-testid="workspace-jobs-content" />,
 }));
 
 vi.mock('@bcgov/design-system-react-components', async (importOriginal) => {
@@ -108,8 +128,22 @@ vi.mock('@bcgov/design-system-react-components', async (importOriginal) => {
 });
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, replace: vi.fn() }),
   usePathname: () => '/en/workspace',
+  useSearchParams: () => new URLSearchParams(mockSearchParams.value),
+}));
+
+vi.mock('@/src/features/workspaces/ui/WorkspaceGroupTab', () => ({
+  default: () => <div data-testid="workspace-groups-tab-content">Workspace Groups Content</div>,
+  WorkspaceGroupTab: () => (
+    <div data-testid="workspace-groups-tab-content">Workspace Groups Content</div>
+  ),
+}));
+
+vi.mock('@/src/features/form-settings/ui/WorkspaceFormSettings', () => ({
+  default: () => (
+    <div data-testid="workspace-form-settings-tab-content">Workspace Form Settings</div>
+  ),
 }));
 
 vi.mock('@/src/shared/api/useWorkspaces', async (importOriginal) => ({
@@ -156,11 +190,18 @@ function renderForm(workspaceId?: string) {
 }
 
 describe('WorkspaceForm', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSearchParams.value = '';
     store = makeStore();
     store.dispatch(setToken('token'));
     store.dispatch(setAuthenticated(true));
+    availability.check.mockResolvedValue(false);
     mockCreateWorkspace.mockResolvedValue({
       id: 'ws-new',
       name: 'New Team',
@@ -213,6 +254,78 @@ describe('WorkspaceForm', () => {
     await waitFor(() => expect(mockSelectWorkspace).toHaveBeenCalled());
     expect(screen.getByRole('tab', { name: 'Settings' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Form Settings' })).toBeInTheDocument();
+  });
+
+  it('manage mode shows the After Submission tab after Form Settings where post-submission is available', async () => {
+    availability.check.mockResolvedValue(true);
+    await act(async () => {
+      renderForm('ws2');
+    });
+
+    expect(await screen.findByTestId('workspace-post-submission-tab')).toBeInTheDocument();
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Settings',
+      'Form Settings',
+      'After Submission',
+      'Groups',
+      'Jobs',
+    ]);
+    expect(availability.check).toHaveBeenCalledWith('post-submission', { workspaceId: 'ws2' });
+  });
+
+  it('manage mode shows the Jobs tab to the owner, and opens it when a link names it', async () => {
+    mockSearchParams.value = 'tab=jobs';
+    await act(async () => {
+      renderForm('ws2');
+    });
+
+    expect(await screen.findByTestId('workspace-jobs-tab')).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.getByTestId('workspace-jobs-content')).toBeInTheDocument();
+  });
+
+  it('manage mode hides the Jobs tab from a workspace admin', async () => {
+    mockSearchParams.value = 'tab=jobs';
+    mockSelectWorkspace.mockResolvedValue({
+      id: 'ws2',
+      name: 'Team Workspace',
+      kind: 'team',
+      role: 'admin',
+      status: 'active',
+      disclaimerAccepted: false,
+      useCase: 'testUseCase',
+      org: 'testOrg',
+    });
+    await act(async () => {
+      renderForm('ws2');
+    });
+
+    expect(await screen.findByRole('tab', { name: 'Settings' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.queryByTestId('workspace-jobs-tab')).not.toBeInTheDocument();
+  });
+
+  it('manage mode hides the After Submission tab while the check runs and once it answers no', async () => {
+    let answer: (available: boolean) => void = () => undefined;
+    availability.check.mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        answer = resolve;
+      }),
+    );
+    await act(async () => {
+      renderForm('ws2');
+    });
+
+    await waitFor(() => expect(availability.check).toHaveBeenCalled());
+    expect(screen.queryByTestId('workspace-post-submission-tab')).not.toBeInTheDocument();
+
+    await act(async () => answer(false));
+    expect(screen.getByRole('tab', { name: 'Form Settings' })).toBeInTheDocument();
+    expect(screen.queryByTestId('workspace-post-submission-tab')).not.toBeInTheDocument();
   });
 
   it('save on create posts the workspace', async () => {
@@ -457,6 +570,7 @@ describe('WorkspaceForm', () => {
 
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/en/workspaces?from=nav'));
     expect(mockUpdateWorkspace).not.toHaveBeenCalled();
+    expect(availability.check).not.toHaveBeenCalled();
   });
 
   // The record's own key too, not just the lists: the manage form seeds from it once and cannot
@@ -513,5 +627,67 @@ describe('WorkspaceForm', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(mockRefreshCurrentUser).toHaveBeenCalled());
+  });
+
+  it('switches to the groups tab when clicked without kicking back to settings', async () => {
+    await act(async () => {
+      renderForm('ws2');
+    });
+    expect(await screen.findByDisplayValue('Team Workspace')).toBeInTheDocument();
+
+    const groupsTabButton = screen.getByRole('tab', { name: 'Groups' });
+    expect(groupsTabButton).toBeInTheDocument();
+
+    await userEvent.click(groupsTabButton);
+    expect(await screen.findByTestId('workspace-groups-tab-content')).toBeInTheDocument();
+  });
+
+  it('keeps the base path in the URL it writes for the selected tab', async () => {
+    vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/designer-230');
+    const replaceState = vi.spyOn(window.history, 'replaceState');
+    await act(async () => {
+      renderForm('ws2');
+    });
+    expect(await screen.findByDisplayValue('Team Workspace')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Groups' }));
+    expect(replaceState.mock.calls.at(-1)?.[2]).toBe('/designer-230/en/workspace?tab=groups');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Settings' }));
+    expect(replaceState.mock.calls.at(-1)?.[2]).toBe('/designer-230/en/workspace');
+  });
+
+  it('initializes to the groups tab if tab=groups is present in the URL query', async () => {
+    mockSearchParams.value = 'tab=groups';
+    await act(async () => {
+      renderForm('ws2');
+    });
+
+    expect(await screen.findByTestId('workspace-groups-tab-content')).toBeInTheDocument();
+  });
+
+  it('opens After Submission from the URL query once the check says it is available', async () => {
+    mockSearchParams.value = 'tab=post-submission';
+    availability.check.mockResolvedValue(true);
+    await act(async () => {
+      renderForm('ws2');
+    });
+
+    expect(await screen.findByTestId('workspace-post-submission-content')).toBeInTheDocument();
+    expect(screen.getByTestId('workspace-post-submission-tab')).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
+  it('stays on Settings when the URL names After Submission and it is not available', async () => {
+    mockSearchParams.value = 'tab=post-submission';
+    await act(async () => {
+      renderForm('ws2');
+    });
+
+    await waitFor(() => expect(availability.check).toHaveBeenCalled());
+    expect(screen.getByRole('tab', { name: 'Settings' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByTestId('workspace-post-submission-tab')).not.toBeInTheDocument();
   });
 });

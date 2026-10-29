@@ -16,7 +16,7 @@ import { RENDER_BUSY, takeRenderSlot } from './renderSlots';
 import { env } from '../../core/config/env';
 import { resolveCaller } from '../../core/middleware/actor';
 import { accessDenial } from '../../core/middleware/formSubmitAccess';
-import { contentDisposition } from '../../core/api/shared/contentDisposition';
+import { sendAttachment } from '../../core/api/shared/contentDisposition';
 import { checkedFileName, getUploadedFile, parseUpload } from '../../core/middleware/parseUpload';
 import { templateFileType } from '../../core/integrations/document-generation/templateFileType';
 import {
@@ -104,10 +104,7 @@ function respond(
   filename: string,
 ): void {
   if (outcome.status !== 'ok') throwRefusal(req, outcome);
-  res.setHeader('Content-Type', outcome.contentType ?? 'application/octet-stream');
-  res.setHeader('Content-Disposition', contentDisposition('attachment', filename));
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.send(outcome.data);
+  sendAttachment(res, outcome.contentType ?? 'application/octet-stream', filename, outcome.data);
 }
 
 function uploadedTemplate(req: Request): UploadedTemplate {

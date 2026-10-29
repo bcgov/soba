@@ -1,5 +1,10 @@
 import { db } from '../../core/db/client';
-import { insertJob, type ClaimedJob, type NewJob } from '../../core/db/repos/jobRepo';
+import {
+  insertJob,
+  markChildrenQueued,
+  type ClaimedJob,
+  type NewJob,
+} from '../../core/db/repos/jobRepo';
 import { findInstalledPostSubmissionAction } from '../../core/integrations/post-submission-action/PostSubmissionActionRegistry';
 import type { JobContext } from '../../core/jobs/registry';
 import { getJobSettings } from '../../core/jobs/settings';
@@ -48,11 +53,16 @@ export const fanOutSubmitted = async ({ job, log }: JobContext): Promise<void> =
     return;
   }
 
-  const jobIds = await db.transaction((tx) =>
-    Promise.all(
+  // The mark outlives the children, so a re-run is refused once they were queued, even after
+  // retention deletes them and frees their dedupe keys.
+  const jobIds = await db.transaction(async (tx) => {
+    if (!(await markChildrenQueued(tx, job.id, job.claimToken))) {
+      throw new Error('The job is no longer held; its actions were not queued');
+    }
+    return Promise.all(
       actions.map((action) => insertJob(tx, childJob(job, action, childAttempts(action.code)))),
-    ),
-  );
+    );
+  });
   log.info(
     {
       // A null job id means the action was already queued for this revision.
