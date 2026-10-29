@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
+import { PostSubmissionActionScopeSchema } from '@soba/lib';
 import { env } from '../../config/env';
 import { log } from '../../logging';
 import {
@@ -98,7 +99,7 @@ const PostSubmissionActionPluginDefinitionSchema = z.object({
     version: z.string().optional(),
   }),
   featureCode: z.string().min(1).optional(),
-  scopes: z.array(z.enum(['workspace', 'form'])).min(1),
+  scopes: z.array(PostSubmissionActionScopeSchema).min(1),
   optionsSchema: z.custom(hasParsers, 'Expected a schema with parse and safeParse'),
   job: z.object({
     pool: z.enum(['light', 'heavy']),

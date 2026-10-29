@@ -1,12 +1,12 @@
 import type { Logger } from 'pino';
 import type { z } from 'zod';
+import type { PostSubmissionActionScope } from '@soba/lib';
 import type { JobPoolCode } from '../../config/env';
 import type { ClaimedJob } from '../../db/repos/jobRepo';
 import type { SendEmail } from '../notification/NotificationAdapter';
 import type { SendOutcome } from '../notification/sendOutcome';
 
-/** Where an action is configured: a workspace default its forms inherit, or one form. */
-export type PostSubmissionActionScope = 'workspace' | 'form';
+export type { PostSubmissionActionScope };
 
 /** The saved settings an action job runs with. */
 export interface PostSubmissionActionSource {

@@ -672,6 +672,47 @@
       "failed": "La recherche n'a pas pu être effectuée. Réessayez."
     }
   },
+  "postSubmission": {
+    "tab": "Après la soumission",
+    "formIntro": "Choisissez ce qui se passe chaque fois que ce formulaire reçoit une soumission. Chaque action indique d'où vient son paramètre.",
+    "workspaceIntro": "Choisissez ce qui se passe chaque fois qu'un formulaire de cet espace de travail reçoit une soumission. Chaque formulaire utilise ces paramètres, sauf s'il définit les siens.",
+    "loadError": "Les paramètres Après la soumission n'ont pas pu être chargés.",
+    "notAvailable": "Après la soumission n'est pas offert ici.",
+    "empty": "Aucune action n'est encore offerte ici. Un administrateur donne accès à chaque action.",
+    "workspaceOnlyNote": "Cette action est définie pour tout l'espace de travail, dans l'onglet Après la soumission de l'espace de travail.",
+    "formOnlyNote": "Ce formulaire définit cette action lui-même : elle n'est pas offerte à son espace de travail.",
+    "formOnlyUnsaved": "Rien n'est encore enregistré pour ce formulaire, donc l'action est désactivée. Si l'espace de travail reçoit cette action plus tard, le formulaire utilisera le paramètre de l'espace de travail, sauf si vous en enregistrez un ici.",
+    "notAccepted": "Ces paramètres n'ont pas été acceptés. Vérifiez-les et réessayez.",
+    "settingsLoadError": "Les paramètres de cette action n'ont pas pu être chargés.",
+    "unknownAction": "Cette action ne peut pas encore être modifiée ici.",
+    "status": "État : {status}",
+    "on": "Activée",
+    "off": "Désactivée",
+    "email": {
+      "label": "Envoyer un avis par courriel",
+      "description": "Envoie un court courriel à chaque adresse de la liste lorsqu'une soumission est reçue.",
+      "enabled": "Envoyer ces courriels",
+      "recipients": "Destinataires",
+      "recipientsHelp": "Tapez une adresse et appuyez sur Entrée, ou collez-en plusieurs à la fois. Pour retirer une adresse, sélectionnez-la et appuyez sur Suppr ou Retour arrière.",
+      "noticeHelp": "Chaque adresse reçoit son propre courriel avec le nom du formulaire, le numéro de confirmation et un lien vers la soumission, qui exige une connexion. Les courriels au-delà de la limite horaire ne sont pas envoyés.",
+      "count": "Adresses : {count} / {max}",
+      "invalid": "Adresse courriel non valide. Corrigez ou supprimez le texte dans le champ.",
+      "tooMany": "Une liste peut contenir jusqu'à {max} adresses. Les autres sont toujours dans le champ.",
+      "duplicate": "Déjà dans la liste : {addresses}",
+      "required": "Ajoutez au moins une adresse, ou désactivez ces courriels.",
+      "added": "Ajout : {addresses}",
+      "removed": "Retrait : {address}",
+      "none": "Aucune adresse pour l'instant."
+    },
+    "log": {
+      "label": "Consigner chaque soumission",
+      "description": "Écrit une ligne dans le journal du serveur lorsqu'une soumission est reçue. Sert aux essais.",
+      "enabled": "Consigner chaque soumission",
+      "note": "Note",
+      "noteHelp": "Jusqu'à {max} caractères.",
+      "noteValue": "Note : {note}"
+    }
+  },
   "Basic": "Basique",
   "Text Field": "Champ de Texte",
   "Text Area": "Zone de Texte",

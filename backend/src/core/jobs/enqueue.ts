@@ -2,20 +2,19 @@ import type { Tx } from '../db/client';
 import { JobType, SubmissionEventType, type SubmissionWriteEventCode } from '../db/codes';
 import { insertJob } from '../db/repos/jobRepo';
 import type { SubmissionRecord } from '../db/repos/submissionRepo';
-import type { PostSubmissionActionPluginDefinition } from '../integrations/post-submission-action/PostSubmissionActionPluginDefinition';
-import { resolveSubmittedActions } from '../../features/post-submission/resolve';
+import { resolveSubmittedActions, type ScopedAction } from '../../features/post-submission/resolve';
 import { getJobSettings } from './settings';
 import { submissionSubmittedJob } from './submissionSubmitted';
 
-/** A submit queues the submitted job when the post-submission flag is on. A save never reads it. */
+/** A submit queues the submitted job where post-submission is available. A save never checks. */
 export const queuesSubmittedJob = async (
   eventType: SubmissionWriteEventCode,
-  isFlagOn: () => Promise<boolean>,
-): Promise<boolean> => eventType === SubmissionEventType.submitted && (await isFlagOn());
+  isAvailable: () => Promise<boolean>,
+): Promise<boolean> => eventType === SubmissionEventType.submitted && (await isAvailable());
 
 /**
  * Queue the submitted job in the transaction that lands the submit. One job per revision. Its params
- * record which of `plugins` the form's settings turn on now, so later settings changes do not alter
+ * record which of `actions` the form's settings turn on now, so later settings changes do not alter
  * them.
  */
 export const enqueueSubmittedJob = async (
@@ -23,13 +22,13 @@ export const enqueueSubmittedJob = async (
   submission: SubmissionRecord,
   revisionId: string,
   actorId: string,
-  plugins: readonly PostSubmissionActionPluginDefinition[],
+  actions: readonly ScopedAction[],
 ): Promise<void> => {
-  const actions = await resolveSubmittedActions(
+  const submitted = await resolveSubmittedActions(
     tx,
     submission.workspaceId,
     submission.formId,
-    plugins,
+    actions,
   );
   await insertJob(tx, {
     type: JobType.submission_submitted,
@@ -38,7 +37,7 @@ export const enqueueSubmittedJob = async (
     submissionId: submission.id,
     revisionId,
     createdBy: actorId,
-    params: { actions },
+    params: { actions: submitted },
     dedupeKey: `${JobType.submission_submitted}:${revisionId}`,
     maxAttempts: submissionSubmittedJob.maxAttempts ?? getJobSettings().maxAttempts,
   });

@@ -14,13 +14,14 @@ import { isFeatureAvailable } from '../../core/services/featureAvailabilityServi
 import { actionNotifications } from './notifications';
 import { ActionJobParamsSchema } from './params';
 import { findActionSettingRows, findLiveSubmission } from './repo';
-import { effectiveAction, rowsFor } from './rules';
+import { actionFeatureAvailable, isWorkspaceConfigurable } from './resolve';
+import { effectiveAction, formActionScopes, rowsFor } from './rules';
 
 const GONE = 'The submission, its form or its workspace is gone';
 
 /** What an action job checks before it runs. */
 export interface ActionRunFacts {
-  postSubmissionOn: boolean;
+  postSubmissionAvailable: boolean;
   enabledHere: boolean;
   featureAvailable: boolean;
   live: boolean;
@@ -29,7 +30,7 @@ export interface ActionRunFacts {
 
 /** Why an action job should end cancelled instead of running; null to run it. */
 export const cancelReason = (facts: ActionRunFacts): string | null => {
-  if (!facts.postSubmissionOn) return 'The post-submission feature is off';
+  if (!facts.postSubmissionAvailable) return 'Post-submission is not available for the form';
   if (!facts.enabledHere) return 'The action is not enabled in this environment';
   if (!facts.featureAvailable) return "The action's feature is not available for the form";
   if (!facts.live) return GONE;
@@ -42,24 +43,27 @@ const runFacts = async (
   job: ClaimedJob,
 ): Promise<{ facts: ActionRunFacts; submission: PostSubmissionActionSubmission | null }> => {
   const scope = { workspaceId: job.workspaceId, formId: job.formId ?? undefined };
-  const [postSubmissionOn, featureAvailable, submission, rows] = await Promise.all([
-    isFeatureAvailable(Features.post_submission, scope),
-    plugin.featureCode ? isFeatureAvailable(plugin.featureCode, scope) : Promise.resolve(true),
-    job.submissionId === null
-      ? Promise.resolve(null)
-      : findLiveSubmission(db, { workspaceId: job.workspaceId, submissionId: job.submissionId }),
-    job.formId === null
-      ? Promise.resolve([])
-      : findActionSettingRows(db, job.workspaceId, job.formId),
-  ]);
+  const [postSubmissionAvailable, featureAvailable, workspaceConfigurable, submission, rows] =
+    await Promise.all([
+      isFeatureAvailable(Features.post_submission, scope),
+      actionFeatureAvailable(plugin, scope),
+      isWorkspaceConfigurable(plugin, job.workspaceId),
+      job.submissionId === null
+        ? Promise.resolve(null)
+        : findLiveSubmission(db, { workspaceId: job.workspaceId, submissionId: job.submissionId }),
+      job.formId === null
+        ? Promise.resolve([])
+        : findActionSettingRows(db, job.workspaceId, job.formId),
+    ]);
   const { workspaceRow, formRow } = rowsFor(rows, plugin.code);
+  const scopes = formActionScopes(plugin.scopes, workspaceConfigurable);
   return {
     facts: {
-      postSubmissionOn,
+      postSubmissionAvailable,
       enabledHere: getEnabledPostSubmissionActionCodes().includes(plugin.code),
       featureAvailable,
       live: submission !== null,
-      stillEnabled: effectiveAction(workspaceRow, formRow, plugin.scopes).values.enabled,
+      stillEnabled: effectiveAction(workspaceRow, formRow, scopes).values.enabled,
     },
     submission,
   };

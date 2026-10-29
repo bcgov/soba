@@ -1,13 +1,11 @@
+import type { InheritableSettings, PostSubmissionActionValues, WorkspaceSettings } from '@soba/lib';
 import type {
   PostSubmissionActionScope,
   PostSubmissionActionSource,
 } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
 
 /** An action's settings at one scope. */
-export interface ActionValues {
-  enabled: boolean;
-  options: Record<string, unknown>;
-}
+export type ActionValues = PostSubmissionActionValues;
 
 /** A saved settings row: a workspace's default when `formId` is null, else a form's own. */
 export interface ActionSettingRow extends ActionValues {
@@ -54,15 +52,19 @@ export const effectiveAction = (
   return { values: ACTION_OFF, source: null };
 };
 
-/** A form's view of one action, as the settings API returns it. */
-export interface FormActionSettings {
-  inherit: boolean;
-  own: ActionValues | null;
-  workspace: ActionValues;
-  effective: ActionValues;
-  /** The form row's version; 0 until its first save. */
-  version: number;
-}
+/**
+ * Where an action is set for a form. Its workspace scope counts only when the workspace can set the
+ * action itself, so a form granted the feature on its own never follows a workspace row that nobody
+ * can see or change.
+ */
+export const formActionScopes = (
+  scopes: readonly PostSubmissionActionScope[],
+  workspaceConfigurable: boolean,
+): PostSubmissionActionScope[] =>
+  scopes.filter((scope) => scope === 'form' || workspaceConfigurable);
+
+/** A form's view of one action, as the settings API returns it; version 0 until its first save. */
+export type FormActionSettings = InheritableSettings<ActionValues>;
 
 export const toFormActionSettings = (
   workspaceRow: ActionSettingRow | undefined,
@@ -80,10 +82,7 @@ export const toFormActionSettings = (
 };
 
 /** A workspace's view of one action. */
-export interface WorkspaceActionSettings {
-  values: ActionValues;
-  version: number;
-}
+export type WorkspaceActionSettings = WorkspaceSettings<ActionValues>;
 
 export const toWorkspaceActionSettings = (
   workspaceRow: ActionSettingRow | undefined,

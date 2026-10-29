@@ -20,9 +20,8 @@ backend:
     workflowEngineDefaultCode: cs-workflow-v1
     notificationDefaultCode: notify-v1
     userSearchPlugins: css-v1,user-search-soba
-    # post-submission-log only logs that it ran, so a PR can exercise post-submission actions end to
-    # end. Emails go through Notify test, which only delivers to its safelist.
-    postSubmissionActionPlugins: post-submission-log,post-submission-email-addresses
+    # Emails go through Notify test, which only delivers to its safelist.
+    postSubmissionActionPlugins: post-submission-email-addresses
     # Ephemeral PR namespaces stage temp bytes under os.tmpdir() — no RWX PVC.
     tempStorageDefaultCode: tempstorage-os
     # Virus scan inherits virusscan-clamav from values.yaml: PRs deploy into the dev
