@@ -84,9 +84,9 @@ export function FormTeamMemberPicker({
         </Popover>
       </ComboBox>
       {result.error && <p role="alert">{t.workspaceMembersError}</p>}
-      <p role="status" className="mt-2">
+      <output className="d-block mt-2">
         {status}
-      </p>
+      </output>
     </div>
   );
 }

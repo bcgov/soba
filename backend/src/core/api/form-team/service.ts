@@ -148,7 +148,7 @@ export const formTeamService = {
     };
   },
 
-  async add(ctx: FormTeamContext, input: AddFormTeamMemberInput) {
+  add(ctx: FormTeamContext, input: AddFormTeamMemberInput) {
     return db.transaction(async (tx) => {
       await lockFormTeam(ctx.workspaceId, ctx.formId, tx);
       const target = input.userId
@@ -174,7 +174,7 @@ export const formTeamService = {
     });
   },
 
-  async setGroups(ctx: FormTeamContext, userId: string, selected: string[]) {
+  setGroups(ctx: FormTeamContext, userId: string, selected: string[]) {
     return db.transaction(async (tx) => {
       await lockFormTeam(ctx.workspaceId, ctx.formId, tx);
       const groups = await readTeamGroups(ctx.workspaceId, ctx.formId, tx);

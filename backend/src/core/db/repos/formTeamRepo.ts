@@ -135,7 +135,7 @@ export async function readTeamGroups(
   });
 }
 
-export async function readTeamPeople(workspaceId: string, ex: DbOrTx = db) {
+export function readTeamPeople(workspaceId: string, ex: DbOrTx = db) {
   return ex
     .select({
       membershipId: workspaceMemberships.id,
