@@ -16,6 +16,10 @@ crunchy:
   instances:
     name: db
     replicas: 1
+    metadata:
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9187'
     dataVolumeClaimSpec:
       # Test data and WAL volume sizes.
       storage: 5Gi
@@ -36,11 +40,11 @@ crunchy:
   patroni:
     postgresql:
       pg_hba:
-        - "host all all 0.0.0.0/0 md5"
-        - "host all all ::1/128 md5"
+        - "host all all 0.0.0.0/0 scram-sha-256"
+        - "host all all ::1/128 scram-sha-256"
       parameters:
         shared_buffers: 16MB
-        wal_buffers: "64kB"
+        wal_buffers: "-1"
         min_wal_size: 32MB
         max_wal_size: 64MB
         max_slot_wal_keep_size: 128MB
@@ -55,8 +59,13 @@ crunchy:
         cpu: 5m
         memory: 32Mi
       maxConnections: 10
+      poolMode: transaction
   pgmonitor:
-    enabled: false
+    enabled: true
+    exporter:
+      requests:
+        cpu: 10m
+        memory: 32Mi
   users:
     - name: '{{ .Values.global.config.dbName }}'
       databases:
