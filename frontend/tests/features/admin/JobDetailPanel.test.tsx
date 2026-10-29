@@ -44,7 +44,7 @@ import makeStore from '@/lib/store';
 import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import { JobDetailPanel } from '@/src/features/admin/ui/JobDetailPanel';
 
-const dictDetail = en.admin.jobs.detail;
+const dictDetail = en.jobs.detail;
 let store: ReturnType<typeof makeStore>;
 
 /** The job the server holds, read and changed by the handlers below. */
@@ -116,7 +116,7 @@ describe('JobDetailPanel', () => {
       `/en/admin/jobs/${PARENT_ID}`,
     );
     expect(screen.getByTestId(`job-related-${PARENT_ID}`)).toHaveTextContent(
-      en.admin.jobs.types.submissionSubmitted,
+      en.jobs.types.submissionSubmitted,
     );
     expect(screen.getByTestId('job-form-jobs').getAttribute('href')).toContain('jobs.formId=');
     expect(screen.getByTestId('job-rerun')).toBeInTheDocument();
@@ -149,7 +149,7 @@ describe('JobDetailPanel', () => {
     expect(server.calls('POST', `/admin/jobs/${JOB_ID}/rerun`)).toHaveLength(1);
     expect(await screen.findByTestId('job-stop')).toBeInTheDocument();
     expect(screen.queryByTestId('job-rerun')).not.toBeInTheDocument();
-    expect(screen.getByTestId('job-status')).toHaveTextContent(en.admin.jobs.statuses.queued);
+    expect(screen.getByTestId('job-status')).toHaveTextContent(en.jobs.statuses.queued);
     expect(screen.getByTestId('job-status-line')).toHaveFocus();
   });
 
@@ -240,9 +240,7 @@ describe('JobDetailPanel', () => {
       await vi.advanceTimersByTimeAsync(5000);
     });
 
-    expect(await screen.findByTestId('job-status')).toHaveTextContent(
-      en.admin.jobs.statuses.succeeded,
-    );
+    expect(await screen.findByTestId('job-status')).toHaveTextContent(en.jobs.statuses.succeeded);
     const reads = server.calls('GET', `/admin/jobs/${JOB_ID}`).length;
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_000);
@@ -277,9 +275,7 @@ describe('JobDetailPanel', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);
     });
-    expect(await screen.findByTestId('job-status')).toHaveTextContent(
-      en.admin.jobs.statuses.succeeded,
-    );
+    expect(await screen.findByTestId('job-status')).toHaveTextContent(en.jobs.statuses.succeeded);
     expect(screen.queryByTestId('job-refresh-error')).not.toBeInTheDocument();
   });
 
@@ -302,9 +298,7 @@ describe('JobDetailPanel', () => {
       await vi.advanceTimersByTimeAsync(5000);
     });
 
-    expect(await screen.findByTestId('job-status')).toHaveTextContent(
-      en.admin.jobs.statuses.succeeded,
-    );
+    expect(await screen.findByTestId('job-status')).toHaveTextContent(en.jobs.statuses.succeeded);
   });
 
   it('says a parent that was deleted is no longer kept', async () => {

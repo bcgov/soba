@@ -215,18 +215,23 @@ export const releaseJob = async (id: string, claimToken: string): Promise<boolea
 
 /**
  * Cancel a job. A queued job is cancelled now; a running job is asked to stop and ends at its next
- * heartbeat. not_active: missing, or already finished.
+ * heartbeat. The first request's time and asker, and whether they asked through the administration
+ * routes, are kept. not_active: missing, or already finished.
  */
 export const cancelJob = async (
   workspaceId: string,
   id: string,
+  actor: { id: string; admin: boolean },
 ): Promise<'cancelled' | 'requested' | 'not_active'> => {
+  const firstAsk = sql`${jobs.cancelRequestedAt} is null`;
   const [row] = await quietDb
     .update(jobs)
     .set({
       status: sql`case when ${jobs.status} = ${JobStatus.queued} then ${JobStatus.cancelled} else ${jobs.status} end`,
       finishedAt: sql`case when ${jobs.status} = ${JobStatus.queued} then now() else ${jobs.finishedAt} end`,
       cancelRequestedAt: sql`coalesce(${jobs.cancelRequestedAt}, now())`,
+      cancelRequestedBy: sql`case when ${firstAsk} then ${actor.id}::uuid else ${jobs.cancelRequestedBy} end`,
+      cancelRequestedByAdmin: sql`case when ${firstAsk} then ${actor.admin} else ${jobs.cancelRequestedByAdmin} end`,
     })
     .where(
       and(

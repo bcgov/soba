@@ -179,6 +179,7 @@ export const JobDetailSchema = JobListItemSchema.extend({
     createdBy: true,
     lastRequeuedAt: true,
     lastRequeuedBy: true,
+    cancelRequestedBy: true,
     optionNames: true,
     recordedActions: true,
     parentJobId: true,

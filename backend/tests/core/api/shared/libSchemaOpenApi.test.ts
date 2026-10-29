@@ -8,6 +8,7 @@ import { registerMeOpenApi } from '../../../../src/core/api/me/schema';
 import { registerSubmitOpenApi } from '../../../../src/core/api/submit/schema';
 import { registerFormSettingsOpenApi } from '../../../../src/features/form-settings';
 import { registerUserSearchOpenApi } from '../../../../src/features/user-search/schema';
+import { registerJobsOpenApi } from '../../../../src/features/jobs/schema';
 
 function componentSchemas(): unknown {
   const registry = new OpenAPIRegistry();
@@ -19,6 +20,7 @@ function componentSchemas(): unknown {
   registerMetaOpenApi(registry);
   registerMeOpenApi(registry);
   registerUserSearchOpenApi(registry);
+  registerJobsOpenApi(registry);
   registerSubmitOpenApi(registry);
   const doc = new OpenApiGeneratorV3(registry.definitions).generateDocument({
     openapi: '3.0.3',
@@ -63,6 +65,7 @@ describe('OpenAPI components for lib-backed schemas', () => {
       'Admin_DocgenAuditSort',
     ],
     ['Admin_ListJobsResponse', 'Admin_JobListItem', 'Admin_JobSort'],
+    ['StaffJobs_ListResponse', 'StaffJobs_ListItem', 'StaffJobs_Sort'],
   ])('%s references its item, page and sort components', (list, item, sort) => {
     expect(at(schemas, list, 'properties', 'items', 'items')).toEqual(ref(item));
     expect(at(schemas, list, 'properties', 'page')).toEqual(ref('Core_OffsetPage'));
@@ -77,6 +80,7 @@ describe('OpenAPI components for lib-backed schemas', () => {
     ['Meta_RolesResponse', 'roles', 'Meta_RoleWithSource'],
     ['Me_TenantsResponse', 'tenants', 'Me_Tenant'],
     ['Admin_ListJobTypesResponse', 'items', 'Admin_JobTypeItem'],
+    ['StaffJobs_ListFormsResponse', 'items', 'StaffJobs_FormItem'],
   ])('%s references its %s item component', (response, property, item) => {
     expect(at(schemas, response, 'properties', property, 'items')).toEqual(ref(item));
   });
@@ -173,6 +177,28 @@ describe('OpenAPI components for lib-backed schemas', () => {
       ref('Admin_JobStatus'),
     );
     expect(at(schemas, 'Admin_JobSummary', 'properties', 'status')).toEqual(ref('Admin_JobStatus'));
+  });
+
+  it('builds the staff job detail on its own list item, summary, counts and status', () => {
+    const own = at(schemas, 'StaffJobs_Detail', 'allOf', 1, 'properties');
+    expect(at(schemas, 'StaffJobs_Detail', 'allOf', 0)).toEqual(ref('StaffJobs_ListItem'));
+    expect(at(own, 'parent')).toEqual(ref('StaffJobs_Summary'));
+    expect(at(own, 'children', 'items')).toEqual(ref('StaffJobs_Summary'));
+    expect(at(own, 'emailCounts')).toEqual(ref('StaffJobs_EmailCounts'));
+    expect(at(own, 'optionNames')).toBeUndefined();
+    expect(at(own, 'revisionId')).toBeUndefined();
+    expect(at(schemas, 'StaffJobs_ListItem', 'properties', 'workspaceId')).toBeUndefined();
+    expect(at(schemas, 'StaffJobs_ListItem', 'properties', 'status')).toEqual(
+      ref('StaffJobs_Status'),
+    );
+    // Inline: a nullable use of a named component would mark the component itself nullable.
+    expect(at(own, 'lastRequeuedBy', 'nullable')).toBe(true);
+    expect(at(own, 'lastRequeuedBy', 'properties', 'standing', 'enum')).toEqual([
+      'member',
+      'platformAdministrator',
+      'formerMember',
+    ]);
+    expect(at(own, 'cancelRequestedBy', 'nullable')).toBe(true);
   });
 
   it('builds the form-with-version response on the named form response', () => {
