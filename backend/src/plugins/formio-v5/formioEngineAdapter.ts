@@ -2,6 +2,7 @@ import {
   FormEngineAdapter,
   type CreateSubmissionInput,
   type FormEngineReadinessResult,
+  type ReadSubmissionsResult,
   type UpsertSchemaInput,
 } from '../../core/integrations/form-engine/FormEngineAdapter';
 import { PluginConfigReader } from '../../core/config/pluginConfig';
@@ -124,6 +125,28 @@ export function stripEngineManagedFields(doc: Record<string, unknown>): Record<s
     delete cleaned[key];
   }
   return cleaned;
+}
+
+/** A submission without engine fields and SOBA `metadata`. */
+const answerDocument = (doc: Record<string, unknown>): Record<string, unknown> => {
+  const cleaned = stripEngineManagedFields(doc);
+  delete cleaned.metadata;
+  return cleaned;
+};
+
+/** Submissions read per Form.io list call. */
+const READ_BATCH_SIZE = 100;
+
+/** Read one batch of submissions by `_id__in` into `found`, keyed by ref. */
+async function readBatch(
+  client: FormioCommunityEditionAPIv5Client,
+  engineFormRef: string,
+  refs: string[],
+  found: Map<string, Record<string, unknown>>,
+): Promise<void> {
+  const query = { params: { _id__in: refs.join(','), limit: refs.length } };
+  const docs = await client.loadSubmissions(engineFormRef, query);
+  docs.forEach((doc) => found.set(doc._id, answerDocument(doc)));
 }
 
 /**
@@ -371,10 +394,30 @@ export class FormioEngineAdapter implements FormEngineAdapter {
       string,
       unknown
     > | null;
-    if (!doc) return null;
-    const cleaned = stripEngineManagedFields(doc);
-    delete cleaned.metadata;
-    return cleaned;
+    return doc ? answerDocument(doc) : null;
+  }
+
+  /** Many submissions of one form, in `_id__in` batches run one after another. */
+  async readSubmissions(
+    engineFormRef: string,
+    engineRefs: string[],
+  ): Promise<ReadSubmissionsResult> {
+    const found = new Map<string, Record<string, unknown>>();
+    if (engineRefs.length === 0) return { found, missing: [] };
+    const client = await getAuthenticatedFormioClient(this.pluginConfig);
+    if (!client) {
+      throw new Error('Form.io admin client unavailable; cannot read submissions');
+    }
+    const batches: string[][] = [];
+    for (let start = 0; start < engineRefs.length; start += READ_BATCH_SIZE) {
+      batches.push(engineRefs.slice(start, start + READ_BATCH_SIZE));
+    }
+    // Chained, not Promise.all, so Form.io sees one batch at a time.
+    await batches.reduce(
+      (previous, refs) => previous.then(() => readBatch(client, engineFormRef, refs, found)),
+      Promise.resolve(),
+    );
+    return { found, missing: engineRefs.filter((ref) => !found.has(ref)) };
   }
 
   /** Delete a Form.io submission by form ref + submission ref (compensation / cleanup). */
