@@ -26,12 +26,14 @@ const submission = {
 
 /**
  * The notifications service the framework passes in, kept in memory: what it answers per address,
- * what this job already handled, and what each scope sent in the last hour.
+ * what this job already handled, whether its current run has handled any (by default, when any is
+ * handled), and what each scope sent in the last hour.
  */
 function fakeNotifications(
   setup: {
     enabled?: boolean;
     handled?: string[];
+    runStarted?: boolean;
     sent?: Partial<Record<PostSubmissionActionSendScope, number>>;
     answers?: Record<string, PostSubmissionActionEmailResult>;
   } = {},
@@ -44,7 +46,11 @@ function fakeNotifications(
       emails.push(email);
       return Promise.resolve(setup.answers?.[email.recipients.to[0]] ?? ACCEPTED);
     },
-    handledRecipients: () => Promise.resolve(new Set(setup.handled ?? [])),
+    handled: () =>
+      Promise.resolve({
+        recipients: new Set(setup.handled ?? []),
+        runStarted: setup.runStarted ?? (setup.handled ?? []).length > 0,
+      }),
     sentSince: (scope) => {
       counted.push(scope);
       return Promise.resolve(setup.sent?.[scope] ?? 0);
@@ -103,6 +109,23 @@ describe('sendNotices', () => {
     expect(fake.counted).toEqual([]);
   });
 
+  // A re-run whose first attempt failed before sending, on any attempt.
+  it('checks the budgets for what is left until a re-run has handled an address', async () => {
+    const fake = fakeNotifications({
+      handled: ['a@example.com'],
+      runStarted: false,
+      sent: { form: 499 },
+    });
+    const outcome = run(['a@example.com', 'b@example.com', 'c@example.com'], fake.notifications);
+
+    await expect(outcome).rejects.toThrow(
+      new JobCancelledError(
+        'Hourly email limit for the form reached: 499 sent or refused in the last hour, 2 to send, limit 500',
+      ),
+    );
+    expect(fake.emails).toEqual([]);
+  });
+
   it('does nothing when every address was handled', async () => {
     const fake = fakeNotifications({ handled: ['a@example.com'], enabled: false });
     await run(['a@example.com'], fake.notifications);
@@ -121,17 +144,17 @@ describe('sendNotices', () => {
     [
       'form',
       { form: 499 },
-      'Hourly email limit for the form reached: 499 sent in the last hour, 2 to send, limit 500',
+      'Hourly email limit for the form reached: 499 sent or refused in the last hour, 2 to send, limit 500',
     ],
     [
       'workspace',
       { workspace: 1999 },
-      'Hourly email limit for the workspace reached: 1999 sent in the last hour, 2 to send, limit 2000',
+      'Hourly email limit for the workspace reached: 1999 sent or refused in the last hour, 2 to send, limit 2000',
     ],
     [
       'environment',
       { environment: 4999 },
-      'Hourly email limit for the environment reached: 4999 sent in the last hour, 2 to send, limit 5000',
+      'Hourly email limit for the environment reached: 4999 sent or refused in the last hour, 2 to send, limit 5000',
     ],
   ])(
     'ends cancelled, sending nothing, when the %s limit would be passed',

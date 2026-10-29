@@ -7,18 +7,25 @@ import { Features } from '../../db/codes';
 import {
   addSobaAdminHandler,
   getFeatureScopeHandler,
+  getJobHandler,
   listFeatureScopesHandler,
   listDocumentGenerationAuditsHandler,
+  listJobsHandler,
+  listJobTypesHandler,
   listSobaAdminsHandler,
   removeFeatureScopeHandler,
   removeSobaAdminHandler,
+  rerunJobHandler,
+  stopJobHandler,
   upsertFeatureScopeHandler,
 } from './controller';
 import {
   AddSobaAdminBodySchema,
   FeatureScopeIdParamsSchema,
+  JobIdParamsSchema,
   ListFeatureScopesQuerySchema,
   ListDocumentGenerationAuditsQuerySchema,
+  ListJobsQuerySchema,
   ListSobaAdminsQuerySchema,
   SobaAdminUserIdParamsSchema,
   UpsertFeatureScopeBodySchema,
@@ -64,6 +71,12 @@ router.get(
   validateRequest({ query: ListDocumentGenerationAuditsQuerySchema }),
   listDocumentGenerationAuditsHandler,
 );
+router.get('/jobs', validateRequest({ query: ListJobsQuerySchema }), listJobsHandler);
+// Before /jobs/:jobId, which would take "types" as an id.
+router.get('/jobs/types', listJobTypesHandler);
+router.get('/jobs/:jobId', validateRequest({ params: JobIdParamsSchema }), getJobHandler);
+router.post('/jobs/:jobId/rerun', validateRequest({ params: JobIdParamsSchema }), rerunJobHandler);
+router.post('/jobs/:jobId/cancel', validateRequest({ params: JobIdParamsSchema }), stopJobHandler);
 
 router.use(notFoundHandler);
 router.use(coreErrorHandler);

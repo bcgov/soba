@@ -3,6 +3,7 @@ import {
   FEATURE_SCOPE_SORT_FIELDS,
   FORM_SORT_FIELDS,
   FORM_VERSION_SORT_FIELDS,
+  JOB_SORT_FIELDS,
   MY_FORM_SORT_FIELDS,
   SOBA_ADMIN_SORT_FIELDS,
   SUBMISSION_SORT_FIELDS,
@@ -47,12 +48,13 @@ export const urlParamName = (spec: ListQuerySpec, name: string): string =>
   `${spec.resource}.${name}`;
 
 const UPDATED_DESC = 'updatedAt:desc';
+const CREATED_DESC = 'createdAt:desc';
 
 export const FORMS_LIST_QUERY: ListQuerySpec = {
   resource: 'forms',
   filters: ['workspace'],
   sortOptions: sortTokensFor(FORM_SORT_FIELDS),
-  defaultSort: 'createdAt:desc',
+  defaultSort: CREATED_DESC,
 };
 
 export const WORKSPACES_LIST_QUERY: ListQuerySpec = {
@@ -121,7 +123,14 @@ export const DOCGEN_AUDITS_LIST_QUERY: ListQuerySpec = {
   resource: 'docgenAudits',
   filters: [],
   sortOptions: sortTokensFor(DOCGEN_AUDIT_SORT_FIELDS),
-  defaultSort: 'createdAt:desc',
+  defaultSort: CREATED_DESC,
+};
+
+export const JOBS_LIST_QUERY: ListQuerySpec = {
+  resource: 'jobs',
+  filters: ['status', 'type', 'workspaceId', 'formId', 'submissionId'],
+  sortOptions: sortTokensFor(JOB_SORT_FIELDS),
+  defaultSort: CREATED_DESC,
 };
 
 export const WORKSPACE_GROUPS_LIST_QUERY: ListQuerySpec = {

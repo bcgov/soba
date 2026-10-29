@@ -62,6 +62,7 @@ describe('OpenAPI components for lib-backed schemas', () => {
       'Admin_DocumentGenerationAuditItem',
       'Admin_DocgenAuditSort',
     ],
+    ['Admin_ListJobsResponse', 'Admin_JobListItem', 'Admin_JobSort'],
   ])('%s references its item, page and sort components', (list, item, sort) => {
     expect(at(schemas, list, 'properties', 'items', 'items')).toEqual(ref(item));
     expect(at(schemas, list, 'properties', 'page')).toEqual(ref('Core_OffsetPage'));
@@ -75,6 +76,7 @@ describe('OpenAPI components for lib-backed schemas', () => {
     ['Meta_LoginProvidersResponse', 'items', 'Meta_LoginProvider'],
     ['Meta_RolesResponse', 'roles', 'Meta_RoleWithSource'],
     ['Me_TenantsResponse', 'tenants', 'Me_Tenant'],
+    ['Admin_ListJobTypesResponse', 'items', 'Admin_JobTypeItem'],
   ])('%s references its %s item component', (response, property, item) => {
     expect(at(schemas, response, 'properties', property, 'items')).toEqual(ref(item));
   });
@@ -158,6 +160,19 @@ describe('OpenAPI components for lib-backed schemas', () => {
       ref('PostSubmission_WorkspaceActionSettings'),
     );
     expect(at(workspaceItem, 'properties', 'workspaceConfigurable')).toBeUndefined();
+  });
+
+  it('builds the job detail on the named list item, summary, counts and status', () => {
+    const own = at(schemas, 'Admin_JobDetail', 'allOf', 1, 'properties');
+    expect(at(schemas, 'Admin_JobDetail', 'allOf', 0)).toEqual(ref('Admin_JobListItem'));
+    expect(at(own, 'parent')).toEqual(ref('Admin_JobSummary'));
+    expect(at(own, 'children', 'items')).toEqual(ref('Admin_JobSummary'));
+    expect(at(own, 'emailCounts')).toEqual(ref('Admin_JobEmailCounts'));
+    expect(at(own, 'params')).toBeUndefined();
+    expect(at(schemas, 'Admin_JobListItem', 'properties', 'status')).toEqual(
+      ref('Admin_JobStatus'),
+    );
+    expect(at(schemas, 'Admin_JobSummary', 'properties', 'status')).toEqual(ref('Admin_JobStatus'));
   });
 
   it('builds the form-with-version response on the named form response', () => {

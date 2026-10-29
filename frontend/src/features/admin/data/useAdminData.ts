@@ -1,25 +1,39 @@
 'use client';
 
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useId, useMemo } from 'react';
 import {
   addSobaAdmin,
   fetchDocumentGenerationAudits,
   fetchFeatureScope,
   fetchFeatureScopes,
+  fetchJob,
+  fetchJobs,
+  fetchJobTypes,
   fetchSobaAdmins,
   removeFeatureScope,
   removeSobaAdmin,
+  rerunJob,
+  stopJob,
   upsertFeatureScope,
 } from '@/src/shared/api/sobaApiAdmin';
 import { useSWRConfig } from 'swr';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
-import { listReadConfig } from '@/src/shared/api/swrConfig';
-import { classifyDataError } from '@/src/shared/api/dataError';
-import type { ListResult, WriteOutcome } from '@/src/shared/api/dataContracts';
+import { listReadConfig, sessionReadConfig } from '@/src/shared/api/swrConfig';
+import {
+  classifyDataError,
+  isForbidden,
+  isNotFound,
+  isSessionExpired,
+} from '@/src/shared/api/dataError';
+import type { ListResult, Resource, WriteOutcome } from '@/src/shared/api/dataContracts';
 import type { ListQueryArgs } from '@/src/types/list';
 import type {
   DocumentGenerationAuditItem,
   FeatureScopeItem,
+  JobDetail,
+  JobFilters,
+  JobListItem,
+  JobTypeItem,
   SobaAdminItem,
   UpsertFeatureScopeBody,
 } from '@/src/types/admin';
@@ -179,6 +193,126 @@ export function useSobaAdminWriter() {
     [refresh],
   );
   return { add, remove };
+}
+
+const JOBS_KEY = 'admin-jobs';
+const JOB_KEY = 'admin-job';
+const JOB_POLL_MS = 5000;
+
+const isActiveJob = (job: JobDetail | undefined): boolean =>
+  job?.status === 'queued' || job?.status === 'running';
+
+/** Background jobs across every workspace, newest first unless sorted otherwise. */
+export function useJobs(filters: JobFilters, query: ListQueryArgs): ListResult<JobListItem> {
+  const { data, isLoading, isValidating, error, mutate } = useAuthedSWR(
+    [
+      JOBS_KEY,
+      filters.status ?? '',
+      filters.type ?? '',
+      filters.workspaceId ?? '',
+      filters.formId ?? '',
+      filters.submissionId ?? '',
+      query.offset,
+      query.limit,
+      query.sort,
+    ],
+    (token) => fetchJobs(token, { ...query, ...filters }),
+    { ...listReadConfig, shouldRetryOnError: false },
+  );
+
+  const rows: JobListItem[] = useMemo(() => data?.items ?? [], [data]);
+  const refresh = useCallback(async () => {
+    await mutate();
+  }, [mutate]);
+
+  return {
+    rows,
+    total: data?.page?.total,
+    isLoading,
+    isRefreshing: isValidating && data !== undefined,
+    error: error ? classifyDataError(error) : null,
+    refresh,
+  };
+}
+
+/** The job types this environment runs. They change only with a deployment. */
+export function useJobTypes(enabled = true): JobTypeItem[] {
+  const { data } = useAuthedSWR(
+    enabled ? ['admin-job-types'] : null,
+    (token) => fetchJobTypes(token),
+    sessionReadConfig,
+  );
+  return useMemo(() => data?.items ?? [], [data]);
+}
+
+/**
+ * One job, read anew on each mount, and again every few seconds while it is queued or running so
+ * its page follows it to the end. Null `jobId` waits, such as until the admin check settles.
+ */
+export function useJob(jobId: string | null): Resource<JobDetail> {
+  const readId = useId();
+  const { data, isLoading, error, mutate } = useAuthedSWR(
+    jobId ? [JOB_KEY, jobId, readId] : null,
+    (token) => fetchJob(token, jobId as string),
+    {
+      // SWR polls only while the last read succeeded, so a failed read, such as during a backend
+      // restart, is tried again on the same beat until one succeeds. An ended session, a refusal
+      // or a job that is gone is not.
+      shouldRetryOnError: (err: unknown) =>
+        !isSessionExpired(err) && !isForbidden(err) && !isNotFound(err),
+      onErrorRetry: (_err, _key, _config, revalidate, { retryCount }) => {
+        setTimeout(() => void revalidate({ retryCount }), JOB_POLL_MS);
+      },
+      refreshInterval: (latest) => (isActiveJob(latest) ? JOB_POLL_MS : 0),
+    },
+  );
+  const refresh = useCallback(async () => {
+    await mutate();
+  }, [mutate]);
+  return {
+    data: data ?? null,
+    isLoading,
+    error: error ? classifyDataError(error) : null,
+    refresh,
+  };
+}
+
+/** Run a job again or stop it; the page shows the job the server returns, and lists read again. */
+export function useJobWriter() {
+  const { mutate } = useSWRConfig();
+  const settle = useCallback(
+    async (job: JobDetail) => {
+      await mutate((key) => Array.isArray(key) && key[0] === JOB_KEY && key[1] === job.id, job, {
+        revalidate: false,
+      });
+      // Clears pages the list is not showing, so going back to it reads them again rather than
+      // show the old status first.
+      await mutate((key) => Array.isArray(key) && key[0] === JOBS_KEY, undefined, {
+        revalidate: true,
+      });
+    },
+    [mutate],
+  );
+  const rerun = useCallback(
+    async (token: string, jobId: string): Promise<WriteOutcome<JobDetail>> => {
+      const job = await rerunJob(token, jobId);
+      await settle(job);
+      return { status: 'applied', value: job };
+    },
+    [settle],
+  );
+  const stop = useCallback(
+    async (
+      token: string,
+      jobId: string,
+    ): Promise<WriteOutcome<{ stopped: boolean; job: JobDetail }>> => {
+      const result = await stopJob(token, jobId);
+      await settle(result.job);
+      return { status: 'applied', value: result };
+    },
+    [settle],
+  );
+  return { rerun, stop };
 }
 
 /** Create, update or remove a feature scope. */
