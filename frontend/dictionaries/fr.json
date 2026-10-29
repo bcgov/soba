@@ -658,6 +658,51 @@
         "createdAt": "Date de création",
         "quickLinks": "Liens rapides"
       }
+    },
+    "export": {
+      "button": "Exporter les soumissions",
+      "pageTitle": "Exporter les soumissions",
+      "sampleNotice": "La liste des champs et vos exportations sur cette page sont des données d’exemple. Les exportations ne sont pas encore exécutées.",
+      "back": "Retour aux soumissions",
+      "loadError": "Impossible de charger le formulaire.",
+      "fieldsError": "Impossible de charger les champs.",
+      "fileType": "Type de fichier",
+      "csv": "CSV",
+      "json": "JSON",
+      "version": "Version du formulaire",
+      "allVersions": "Toutes les versions",
+      "versionOption": "Version {version}",
+      "dates": "Date de soumission",
+      "all": "Toutes",
+      "range": "Plage de dates",
+      "from": "Du",
+      "to": "Au",
+      "rangeInvalid": "Choisissez une date de début égale ou antérieure à la date de fin, et aucune date future.",
+      "fields": "Champs de données",
+      "fieldSearch": "Rechercher des champs",
+      "selectAll": "Tout sélectionner",
+      "selectNone": "Tout désélectionner",
+      "fieldsSelected": "{selected} champs sélectionnés sur {total}",
+      "noFields": "Ce formulaire n’a aucun champ à exporter.",
+      "layout": "Format CSV",
+      "layouts": {
+        "multiRowEmptySpacesCSVExport": "1 - Plusieurs lignes par soumission avec espaces d'indentation",
+        "multiRowBackFilledCSVExport": "2 - Plusieurs lignes par soumission",
+        "singleRowCSVExport": "3 - Une ligne par soumission",
+        "unFormattedCSVExport": "4 - Non formaté"
+      },
+      "start": "Exporter",
+      "starting": "Démarrage…",
+      "started": "Exportation démarrée.",
+      "failed": "Impossible de démarrer l'exportation.",
+      "myExports": "Mes exportations",
+      "listError": "Impossible de charger vos exportations.",
+      "noExports": "Vous n’avez pas encore exporté ce formulaire.",
+      "startedAt": "Démarrée le",
+      "status": "État",
+      "statuses": {
+        "queued": "En file d’attente"
+      }
     }
   },
   "mySubmissions": {

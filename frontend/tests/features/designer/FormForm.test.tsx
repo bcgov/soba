@@ -50,6 +50,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
     },
     submission: {
       error: 'Error',
+      export: { button: 'Export submissions' },
     },
     team: {
       loadError: 'Error',

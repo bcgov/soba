@@ -9,6 +9,7 @@ import {
   registerSubmissionReviewOpenApi,
 } from './submissions';
 import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
+import { registerSubmissionExportOpenApi, submissionExportRouter } from './submissionExport';
 import { groupsDomain } from './groups';
 import { filesDesignRouter, filesDomain } from '../../features/files';
 import {
@@ -43,6 +44,7 @@ registerOpenApiPaths((registry) => {
   registerFormSettingsOpenApi(registry);
   registerSubmissionsOpenApi(registry);
   registerSubmissionReviewOpenApi(registry);
+  registerSubmissionExportOpenApi(registry);
   registerSubmitOpenApi(registry);
   groupsDomain.registerOpenApi(registry);
   meDomain.registerOpenApi(registry);
@@ -64,6 +66,8 @@ const designRouter = express.Router();
 designRouter.use('/forms/:id/settings', formSettingsRouter);
 designRouter.use('/forms/:id/user-search', formUserSearchRouter);
 designRouter.use('/forms/:id/jobs', formJobsRouter);
+// Submission exports at /forms/:id/exports; gates itself.
+designRouter.use(submissionExportRouter);
 designRouter.use('/', designFormsRouter);
 designRouter.use('/submissions', designSubmissionsRouter);
 // Staff print: /submissions/:id/{templates,print} and /print-upload/:id; it gates itself.
