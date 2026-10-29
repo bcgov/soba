@@ -229,7 +229,8 @@ jobs:
             internal:
               enabled: false
             external:
-              host: "soba-dev-mongodb-0.soba-dev-mongodb-headless"
+              # Both members, so Form.io can connect while either is down. The chart appends :port.
+              host: "soba-dev-mongodb-0.soba-dev-mongodb-headless:27017,soba-dev-mongodb-1.soba-dev-mongodb-headless"
               authSecretName: soba-dev-mongodb-auth
           temporal:
             address: "temporal-frontend.${NAMESPACE}.svc.cluster.local:7233"
