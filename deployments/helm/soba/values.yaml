@@ -422,8 +422,8 @@ formio:
   nodeOptions: "--max-old-space-size=384"
   resources:
     requests:
-      cpu: 25m
-      memory: 128Mi
+      cpu: 50m
+      memory: 256Mi
     limits:
       cpu: 250m
       memory: 512Mi

@@ -18,14 +18,6 @@ spec:
             matchLabels:
               app.kubernetes.io/name: {{ include "soba.name" . }}
               app.kubernetes.io/instance: {{ .Release.Name }}
-    {{- if .Values.formio.internal.enabled }}
-    # Formio is a namespace-level service: any pod in the namespace may reach it
-    - from:
-        - podSelector: {}
-      ports:
-        - port: {{ .Values.formio.service.port }}
-          protocol: TCP
-    {{- end }}
     # Allow ingress from OpenShift router (for Routes)
     - from:
         - namespaceSelector:

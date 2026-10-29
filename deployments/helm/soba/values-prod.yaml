@@ -64,14 +64,6 @@ formio:
     enabled: false
   external:
     url: ""
-  nodeOptions: "--max-old-space-size=8192"
-  resources:
-    requests:
-      cpu: 500m
-      memory: 4Gi
-    limits:
-      cpu: 1
-      memory: 10Gi
 
 mongodb:
   internal:

@@ -1,4 +1,4 @@
-# PR environment — minimal resources, single replica, internal Form.io + MongoDB
+# PR environment - minimal resources, single replica, the dev release's Form.io and MongoDB
 backend:
   # Development data generator: on for PR review environments. Notifications send through notify-v1.
   features:
@@ -95,25 +95,9 @@ formio:
     enabled: false
   external:
     url: http://soba-dev-formio.b82f30-dev:3001
-  replicas: 1
-  # Formio depends on MongoDB; allow time for MongoDB to be ready after PR deploy
-  readinessProbe:
-    initialDelaySeconds: 45
-    timeoutSeconds: 10
-  livenessProbe:
-    initialDelaySeconds: 60
-  nodeOptions: "--max-old-space-size=384"
-  resources:
-    requests:
-      cpu: 25m
-      memory: 128Mi
-    limits:
-      cpu: 250m
-      memory: 512Mi
 
 mongodb:
-  # MongoDB runs as its own release from deployments/helm/action-mongodb. The deploy
-  # workflow supplies external.host and external.authSecretName.
+  # Must stay false: the in-chart MongoDB is gated on this alone, not on formio.internal.enabled.
   internal:
     enabled: false
 

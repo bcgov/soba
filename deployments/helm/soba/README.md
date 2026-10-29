@@ -451,7 +451,7 @@ being lost on uninstall.
 | File               | Purpose        | Replicas    | Form.io  | MongoDB          |
 | ------------------ | -------------- | ----------- | -------- | ---------------- |
 | `values.yaml`      | Base defaults  | 1           | Internal | Internal         |
-| `values-pr.yaml`   | PR review apps | 1           | Internal | Internal (256Mi) |
+| `values-pr.yaml`   | PR review apps | 1           | Dev's    | None             |
 | `values-dev.yaml`  | Development    | 1           | Internal | Internal         |
 | `values-test.yaml` | Test / UAT     | 2           | Internal | Internal (2Gi)   |
 | `values-prod.yaml` | Production     | 3 (HPA 3–6) | External | External         |
