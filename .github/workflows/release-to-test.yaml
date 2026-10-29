@@ -111,7 +111,7 @@ jobs:
           oc_namespace: ${{ vars.OC_NAMESPACE }}
           oc_token: ${{ secrets.OC_TOKEN }}
           values_file: deployments/helm/action-crunchy/values-test.yaml
-          release_name: pg-soba
+          release_name: pg-soba-test
           ref: v2.0.0
 
   deploy-mongodb:
