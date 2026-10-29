@@ -81,8 +81,10 @@ mongodb:
   persistence:
     size: 2Gi
 
+gatewayNetworkPolicy:
+  enabled: true
+  namespaceName: "b8840c"
+  environment: prod
+
 vault:
   enabled: true
-  role: acf456-nonprod
-  secretPath: acf456-nonprod/soba-test
-  serviceAccountName: acf456-vault
