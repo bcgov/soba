@@ -3,26 +3,29 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, screen, waitFor } from '@testing-library/react';
 
 import dict from '@/dictionaries/en.json';
-import type { UserSearchScope, UserSearchUser } from '@/src/types/userSearch';
+import type { TeamCandidate } from '@/src/types/formTeam';
 
-vi.mock('@/src/features/designer/data/useFormTeam', { spy: true });
-vi.mock('@/src/features/user-search/ui/UserSearchPicker', () => ({
-  UserSearchPicker: ({
-    scope,
+vi.mock('@/src/features/designer/data/useFormTeam', async () => {
+  const sample = await import('./sampleFormTeam');
+  return { ...sample, useFormTeamWriter: vi.fn(sample.useFormTeamWriter) };
+});
+vi.mock('@/src/features/designer/ui/FormTeamMemberPicker', () => ({
+  FormTeamMemberPicker: ({
+    formId,
     onSelect,
   }: {
-    scope: UserSearchScope;
-    onSelect?: (user: UserSearchUser | null) => void;
+    formId: string;
+    onSelect?: (user: TeamCandidate | null) => void;
   }) => (
-    <div data-testid="picker" data-scope={`${scope.kind}:${scope.id}`}>
+    <div data-testid="picker" data-scope={`form:${formId}`}>
       {[tobin, dax].map((person) => (
         <button
-          key={person.subject}
+          key={person.membershipId}
           type="button"
-          data-testid={`pick-${person.subject}`}
+          data-testid={`pick-${person.membershipId}`}
           onClick={() => onSelect?.(person)}
         >
-          {person.displayName}
+          {person.name}
         </button>
       ))}
       <button type="button" data-testid="pick-clear" onClick={() => onSelect?.(null)}>
@@ -39,7 +42,7 @@ import {
   click,
   clickTestId,
   failWrites,
-  foundPerson,
+  workspacePerson,
   renderWithStore,
   resetTeam,
 } from './formTeamTestKit';
@@ -47,15 +50,15 @@ import {
 const onDone = vi.fn();
 const FORM_ID = 'f1';
 const GROUPS_REQUIRED = 'Select at least one group.';
-/** Not on the team; never signed in, so their member id is their identity. */
-const tobin = foundPerson('tobin', 'Venn, Tobin');
-const TOBIN_ID = 'azureidir:tobin';
+/** Not on the team; an active workspace member. */
+const tobin = workspacePerson('tobin', 'Venn, Tobin');
+const TOBIN_ID = 'tobin';
 /** On the sample team as user-4. */
-const dax = foundPerson('dax', 'Halloran, Dax', 'user-4');
+const dax = workspacePerson('dax', 'Halloran, Dax', 'user-4');
 
 const checkbox = (name: string) => screen.getByRole('checkbox', { name });
 const tick = (name: string) => click(checkbox(name));
-const pick = (person: UserSearchUser) => clickTestId(`pick-${person.subject}`);
+const pick = (person: TeamCandidate) => clickTestId(`pick-${person.membershipId}`);
 const save = () => clickTestId('team-save-button');
 const memberById = (id: string) =>
   renderHook(() =>
@@ -79,9 +82,9 @@ describe('FormTeamMemberForm', () => {
     resetTeam();
   });
 
-  it('searches the form for a person to add', () => {
+  it('searches workspace members within the form scope', () => {
     renderForm();
-    expect(screen.getByTestId('team-member-form')).toHaveTextContent('1. Search for a user:');
+    expect(screen.getByTestId('team-member-form')).toHaveTextContent(dict.team.searchStep);
     expect(screen.getByTestId('picker')).toHaveAttribute('data-scope', `form:${FORM_ID}`);
   });
 

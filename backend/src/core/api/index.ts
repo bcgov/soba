@@ -1,4 +1,5 @@
 import express from 'express';
+import { formTeamRouter, registerFormTeamOpenApi } from './form-team';
 import { coreErrorHandler, notFoundHandler } from '../middleware/errorHandler';
 import { registerAdminOpenApi } from './admin';
 import { registerHealthOpenApi } from './health';
@@ -39,6 +40,7 @@ import { registerOpenApiPaths } from './shared/openapi';
 //  - coreRouter     (/api/v1):        workspace/account management, and staff document templates.
 registerOpenApiPaths((registry) => {
   registerFormsOpenApi(registry);
+  registerFormTeamOpenApi(registry);
   registerFormSettingsOpenApi(registry);
   registerSubmissionsOpenApi(registry);
   registerSubmissionReviewOpenApi(registry);
@@ -60,6 +62,7 @@ registerOpenApiPaths((registry) => {
 // modules under /forms/:id/settings (features/form-settings).
 const designRouter = express.Router();
 designRouter.use('/forms/:id/settings', formSettingsRouter);
+designRouter.use('/forms/:id/team', formTeamRouter);
 designRouter.use('/forms/:id/user-search', formUserSearchRouter);
 designRouter.use('/', designFormsRouter);
 designRouter.use('/submissions', designSubmissionsRouter);

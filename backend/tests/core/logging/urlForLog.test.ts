@@ -1,6 +1,13 @@
 import { urlForLog } from '../../../src/core/logging/httpLogger';
 
 describe('urlForLog', () => {
+  it('omits search filters from form team and workspace candidate URLs', () => {
+    expect(urlForLog('/api/v1/design/forms/f1/team/candidates?q=jane%40example.com')).toBe(
+      '/api/v1/design/forms/f1/team/candidates',
+    );
+    expect(urlForLog('/api/v1/design/forms/f1/team?q=Jane')).toBe('/api/v1/design/forms/f1/team');
+  });
+
   it('drops the query string on user search routes', () => {
     expect(
       urlForLog('/api/v1/design/forms/f1/user-search?email=alice%40example.com&identityProvider=x'),

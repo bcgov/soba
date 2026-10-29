@@ -1,1 +1,1 @@
-export type { TeamGroup, TeamMember } from '@soba/lib';
+export type { TeamGroup, TeamMember, TeamCandidate } from '@soba/lib';

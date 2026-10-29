@@ -3,8 +3,8 @@ import rTracer from 'cls-rtracer';
 import { v7 as uuidv7 } from 'uuid';
 import { log } from './logger';
 
-// User search filters are names, email addresses and guids. Express routes paths without regard to case.
-const UNLOGGED_QUERY_PATH = /\/user-search(\/|$)/i;
+// People searches include names and email addresses. Express routes paths without regard to case.
+const UNLOGGED_QUERY_PATH = /\/(?:user-search|team)(\/|$)/i;
 
 /** The request URL to log, without the query string on paths whose filters identify people. */
 export function urlForLog(url: string | undefined): string | undefined {

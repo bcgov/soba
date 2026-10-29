@@ -1,89 +1,139 @@
-import { act } from 'react';
-import { describe, it, expect, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
-
+import React, { act } from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, waitFor } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { SWRConfig } from 'swr';
+import makeStore from '@/lib/store';
+import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import {
-  resetFormTeam,
   useFormTeamMembers,
   useFormTeamWriter,
+  useTeamGroups,
+  useFormTeamCandidates,
 } from '@/src/features/designer/data/useFormTeam';
-import { foundPerson } from './formTeamTestKit';
+import * as api from '@/src/features/designer/data/formTeamApi';
+import { workspacePerson } from './formTeamTestKit';
 
-const FORM_ID = 'f1';
-const firstPage = { offset: 0, limit: 10, sort: 'name:asc' };
+vi.mock('@/src/features/designer/data/formTeamApi', () => ({
+  fetchFormTeam: vi.fn(),
+  fetchTeamGroups: vi.fn(),
+  fetchTeamCandidates: vi.fn(),
+  addTeamMember: vi.fn(),
+  setTeamMemberGroups: vi.fn(),
+  removeTeamMember: vi.fn(),
+}));
+let store: ReturnType<typeof makeStore>;
+function wrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <Provider store={store}>
+      <SWRConfig
+        value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}
+      >
+        {children}
+      </SWRConfig>
+    </Provider>
+  );
+}
+const query = { offset: 0, limit: 10, sort: 'name:asc' };
+const member = { id: 'user-1', name: 'Jane Doe', email: 'jane@example.com', groups: ['group-1'] };
 
-const ids = (rows: { id: string }[]) => rows.map((row) => row.id);
-const listOf = (formId: string) => renderHook(() => useFormTeamMembers(formId, firstPage));
-const writerFor = (formId: string) => renderHook(() => useFormTeamWriter(formId)).result.current;
-
-describe('useFormTeam', () => {
-  beforeEach(() => act(() => resetFormTeam()));
-
-  it('lists the team by name', () => {
-    const { result } = listOf(FORM_ID);
-    expect(result.current.total).toBe(4);
-    expect(ids(result.current.rows)).toEqual(['user-4', 'user-3', 'user-1', 'user-5']);
-  });
-
-  it('pages the team', () => {
-    const { result } = renderHook(() =>
-      useFormTeamMembers(FORM_ID, { ...firstPage, offset: 2, limit: 2 }),
-    );
-    expect(result.current.total).toBe(4);
-    expect(ids(result.current.rows)).toEqual(['user-1', 'user-5']);
-  });
-
-  it('searches the team by name or email', () => {
-    const byName = renderHook(() => useFormTeamMembers(FORM_ID, { ...firstPage, q: 'quist' }));
-    expect(ids(byName.result.current.rows)).toEqual(['user-3']);
-    const byEmail = renderHook(() =>
-      useFormTeamMembers(FORM_ID, { ...firstPage, q: 'dax.halloran@' }),
-    );
-    expect(ids(byEmail.result.current.rows)).toEqual(['user-4']);
-  });
-
-  it('adds, regroups and removes a member, saying each write applied', async () => {
-    const list = listOf(FORM_ID);
-    const writer = writerFor(FORM_ID);
-    const tobin = foundPerson('tobin', 'Venn, Tobin');
-    const tobinId = 'azureidir:tobin';
-    const tobinRow = () => list.result.current.rows.find((member) => member.id === tobinId);
-    const applied = { status: 'applied', value: undefined };
-
-    await expect(act(() => writer.add(tobin, ['group-3']))).resolves.toEqual(applied);
-    expect(tobinRow()).toEqual({
-      id: tobinId,
-      name: 'Venn, Tobin',
-      email: 'tobin@example.gov.bc.ca',
-      groups: ['group-3'],
+describe('live form team hooks', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store = makeStore();
+    store.dispatch(setToken('token'));
+    store.dispatch(setAuthenticated(true));
+    vi.mocked(api.fetchFormTeam).mockResolvedValue({
+      items: [member],
+      page: { offset: 0, limit: 10, total: 1 },
     });
+    vi.mocked(api.fetchTeamGroups).mockResolvedValue({
+      items: [{ id: 'group-1', name: 'Designers' }],
+    });
+    vi.mocked(api.addTeamMember).mockResolvedValue(member);
+    vi.mocked(api.fetchTeamCandidates).mockResolvedValue({
+      items: [],
+      page: { offset: 0, limit: 25, total: 0 },
+    });
+    vi.mocked(api.setTeamMemberGroups).mockResolvedValue(member);
+  });
 
-    await expect(act(() => writer.setGroups(tobinId, ['group-1', 'group-2']))).resolves.toEqual(
-      applied,
+  it('loads actual groups and a server-paged form team', async () => {
+    const { result } = renderHook(
+      () => ({ team: useFormTeamMembers('f1', query), groups: useTeamGroups('f1') }),
+      { wrapper },
     );
-    expect(tobinRow()?.groups).toEqual(['group-1', 'group-2']);
-
-    await expect(act(() => writer.remove(tobinId))).resolves.toEqual(applied);
-    expect(tobinRow()).toBeUndefined();
-    expect(list.result.current.total).toBe(4);
+    await waitFor(() => expect(result.current.team.total).toBe(1));
+    expect(result.current.team.rows).toEqual([member]);
+    await waitFor(() =>
+      expect(result.current.groups.groups).toEqual([{ id: 'group-1', name: 'Designers' }]),
+    );
+    expect(api.fetchFormTeam).toHaveBeenCalledWith('token', 'f1', { ...query, locale: 'en' });
   });
 
-  it('refuses to add a user already on the team', async () => {
-    const list = listOf(FORM_ID);
-    const orla = foundPerson('orla', 'Venn, Orla', 'user-1');
-
-    await expect(writerFor(FORM_ID).add(orla, ['group-4'])).rejects.toThrow('already on the team');
-    expect(list.result.current.rows.find((member) => member.id === 'user-1')?.groups).toEqual([
-      'group-1',
-    ]);
+  it('refreshes the list after persisting a selected workspace membership and groups', async () => {
+    const person = workspacePerson('jane', 'Jane Doe');
+    const { result } = renderHook(
+      () => ({ team: useFormTeamMembers('f1', query), writer: useFormTeamWriter('f1') }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.team.total).toBe(1));
+    vi.mocked(api.fetchFormTeam).mockResolvedValue({
+      items: [],
+      page: { offset: 0, limit: 10, total: 0 },
+    });
+    await act(async () => {
+      await result.current.writer.add(person, ['group-1']);
+    });
+    expect(api.addTeamMember).toHaveBeenCalledWith('token', 'f1', person.membershipId, ['group-1']);
+    expect(result.current.team.total).toBe(0);
   });
 
-  it('keeps each form its own team', async () => {
-    const other = listOf('f2');
-    const writer = writerFor(FORM_ID);
-    await act(() => writer.remove('user-4'));
+  it('debounces workspace member searches and hides results for the previous term', async () => {
+    const candidate = {
+      id: 'user-2',
+      membershipId: 'membership-2',
+      name: 'Jane',
+      email: 'jane@example.com',
+    };
+    vi.mocked(api.fetchTeamCandidates).mockResolvedValue({
+      items: [candidate],
+      page: { offset: 0, limit: 25, total: 1 },
+    });
+    const { result, rerender } = renderHook(({ term }) => useFormTeamCandidates('f1', term), {
+      initialProps: { term: '' },
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.members).toEqual([candidate]));
+    rerender({ term: 'Jane' });
+    expect(result.current.members).toEqual([]);
+    expect(result.current.isLoading).toBe(true);
+    await waitFor(() =>
+      expect(api.fetchTeamCandidates).toHaveBeenCalledWith('token', 'f1', 'Jane', 'en'),
+    );
+    await waitFor(() => expect(result.current.members).toEqual([candidate]));
+  });
 
-    expect(listOf(FORM_ID).result.current.total).toBe(3);
-    expect(other.result.current.total).toBe(4);
+  it('sends edits and removal to the current form only', async () => {
+    const { result } = renderHook(() => useFormTeamWriter('f1'), { wrapper });
+    await act(async () => {
+      await result.current.setGroups('user-1', ['group-2']);
+      await result.current.remove('user-1');
+    });
+    expect(api.setTeamMemberGroups).toHaveBeenCalledWith('token', 'f1', 'user-1', ['group-2']);
+    expect(api.removeTeamMember).toHaveBeenCalledWith('token', 'f1', 'user-1');
+  });
+
+  it('propagates a refused add and sends nothing when the session has ended', async () => {
+    vi.mocked(api.addTeamMember).mockRejectedValueOnce(new Error('refused'));
+    const { result } = renderHook(() => useFormTeamWriter('f1'), { wrapper });
+    await expect(
+      result.current.add(workspacePerson('jane', 'Jane Doe'), ['group-1']),
+    ).rejects.toThrow('refused');
+    store.dispatch(setToken(''));
+    await expect(
+      result.current.add(workspacePerson('jane', 'Jane Doe'), ['group-1']),
+    ).rejects.toThrow();
+    expect(api.addTeamMember).toHaveBeenCalledTimes(1);
   });
 });

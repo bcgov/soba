@@ -8,6 +8,7 @@ import {
 } from '../../../../src/core/api/shared/openapi';
 import { registerAdminOpenApi } from '../../../../src/core/api/admin/schema';
 import { registerFormsOpenApi } from '../../../../src/core/api/forms/schema';
+import { registerFormTeamOpenApi } from '../../../../src/core/api/form-team/schema';
 import { registerGroupsOpenApi } from '../../../../src/core/api/groups/schema';
 import { registerHealthOpenApi } from '../../../../src/core/api/health/schema';
 import { registerMeOpenApi } from '../../../../src/core/api/me/schema';
@@ -24,6 +25,7 @@ import { registerTemplatesOpenApi } from '../../../../src/features/templates/sch
 // The same registrations the API index makes.
 const REGISTRARS: RegisterOpenApiPaths[] = [
   registerFormsOpenApi,
+  registerFormTeamOpenApi,
   registerFormSettingsOpenApi,
   registerSubmissionsOpenApi,
   registerSubmitOpenApi,

@@ -4,10 +4,11 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 
 import makeStore from '@/lib/store';
-import { resetFormTeam, useFormTeamWriter } from '@/src/features/designer/data/useFormTeam';
-import type { UserSearchUser } from '@/src/types/userSearch';
+import { useFormTeamWriter } from '@/src/features/designer/data/useFormTeam';
+import { resetFormTeam, useFormTeamWriter as sampleWriter } from './sampleFormTeam';
+import type { TeamCandidate } from '@/src/types/formTeam';
 
-/** Access tab test helpers. Tests mock the data module with `{ spy: true }` so a write can fail. */
+/** Access tab test helpers. Tests use the sample data module and spy on the writer so a write can fail. */
 export const renderWithStore = (ui: React.ReactElement) =>
   render(<Provider store={makeStore()}>{ui}</Provider>);
 
@@ -20,28 +21,18 @@ export const click = (element: HTMLElement) =>
 
 export const clickTestId = (testId: string) => click(screen.getByTestId(testId));
 
-/** Puts the sample team and the real writer back. Call before each test. */
+/** Puts the sample team and its fixture writer back. Call before each test. */
 export const resetTeam = () => {
-  vi.mocked(useFormTeamWriter).mockReset();
+  vi.mocked(useFormTeamWriter).mockReset().mockImplementation(sampleWriter);
   act(() => resetFormTeam());
 };
 
-/** A person user search found. A sample member's id as `sobaUserId` puts them on the team. */
-export const foundPerson = (
-  subject: string,
-  displayName: string,
-  sobaUserId: string | null = null,
-): UserSearchUser => ({
-  identityProvider: 'azureidir',
-  subject,
-  guid: null,
-  username: null,
-  displayName,
-  firstName: null,
-  lastName: null,
-  email: `${subject}@example.gov.bc.ca`,
-  sobaUserId,
-  sources: ['user-search-soba'],
+/** An existing active workspace member. */
+export const workspacePerson = (id: string, name: string, userId = id): TeamCandidate => ({
+  id: userId,
+  membershipId: `membership-${id}`,
+  name,
+  email: `${id}@example.gov.bc.ca`,
 });
 
 /** The sample writer cannot fail, so a failed save is forced. */

@@ -6,15 +6,15 @@ import {
   CheckboxGroup,
   Form,
   Heading,
+  InlineAlert,
 } from '@bcgov/design-system-react-components';
 
 import type { Dictionary } from '@/src/types/dictionary';
-import type { TeamMember } from '@/src/types/formTeam';
-import type { UserSearchUser } from '@/src/types/userSearch';
+import type { TeamMember, TeamCandidate } from '@/src/types/formTeam';
 import { SecondaryText } from '@/src/components/SecondaryText';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { useFormTeamWriter, useTeamGroups } from '@/src/features/designer/data/useFormTeam';
-import { UserSearchPicker } from '@/src/features/user-search/ui/UserSearchPicker';
+import { FormTeamMemberPicker } from './FormTeamMemberPicker';
 
 interface FormTeamMemberFormProps {
   dict: Dictionary;
@@ -31,14 +31,15 @@ export default function FormTeamMemberForm({
   onDone,
 }: Readonly<FormTeamMemberFormProps>) {
   const t = dict.team;
-  const groups = useTeamGroups();
+  const { groups, isLoading: groupsLoading, error: groupsError } = useTeamGroups(formId);
   const teamWriter = useFormTeamWriter(formId);
   const { addNotification } = useNotificationStore();
-  const [selectedUser, setSelectedUser] = useState<UserSearchUser | null>(null);
+  const [selectedUser, setSelectedUser] = useState<TeamCandidate | null>(null);
   const [selectedGroups, setSelectedGroups] = useState(member?.groups ?? []);
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
+    if (saving || groupsLoading || groupsError || (!member && !selectedUser)) return;
     setSaving(true);
     try {
       if (member) await teamWriter.setGroups(member.id, selectedGroups);
@@ -68,9 +69,10 @@ export default function FormTeamMemberForm({
       {!member && (
         <>
           <p>{t.searchStep}</p>
-          <UserSearchPicker scope={{ kind: 'form', id: formId }} onSelect={setSelectedUser} />
+          <FormTeamMemberPicker dict={dict} formId={formId} onSelect={setSelectedUser} />
         </>
       )}
+      {groupsError && <InlineAlert variant="danger">{t.groupsLoadError}</InlineAlert>}
       <Form
         className="d-flex flex-column gap-4 my-4"
         onSubmit={(event) => {
@@ -95,7 +97,7 @@ export default function FormTeamMemberForm({
           <Button
             variant="primary"
             data-testid="team-save-button"
-            isDisabled={saving || !(member || selectedUser)}
+            isDisabled={saving || groupsLoading || !!groupsError || !(member || selectedUser)}
             type="submit"
           >
             {member ? t.saveMember : t.addMember}

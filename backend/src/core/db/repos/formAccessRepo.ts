@@ -59,7 +59,7 @@ export interface FormAccessGrant {
   includedFormIds: string[];
 }
 
-const activeMembershipOf = (userId: string) =>
+const activeMembershipOf = (userId: string | SQLWrapper) =>
   and(
     eq(workspaceMemberships.userId, userId),
     eq(workspaceMemberships.status, WorkspaceMembershipStatus.active),
@@ -81,7 +81,7 @@ const activeGroup = (groupId: SQLWrapper) =>
  * The groups the user is an effective member of, per form: a form's active override of a group
  * replaces that group's workspace members with its own. User members only.
  */
-export const effectiveGroups = (userId: string, scope: GroupScope) => {
+export const effectiveGroups = (userId: string | SQLWrapper, scope: GroupScope) => {
   const activeMembership = and(
     activeMembershipOf(userId),
     scope.workspaceId ? eq(workspaceMemberships.workspaceId, scope.workspaceId) : undefined,

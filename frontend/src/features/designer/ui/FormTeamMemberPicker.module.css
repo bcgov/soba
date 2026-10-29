@@ -1,0 +1,52 @@
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--layout-margin-small);
+}
+
+.input {
+  font: var(--typography-regular-body);
+  color: var(--typography-color-primary);
+  background: var(--surface-color-forms-default);
+  border: var(--layout-border-width-small) solid var(--surface-color-border-default);
+  border-radius: var(--layout-border-radius-medium);
+  padding: var(--layout-padding-small) 12px;
+  min-height: var(--layout-margin-xxlarge);
+}
+
+.input[data-focused] {
+  outline: var(--layout-border-width-medium) solid var(--surface-color-border-active);
+  outline-offset: var(--layout-margin-hair);
+}
+
+.popover {
+  width: var(--trigger-width);
+  max-height: 18rem;
+  overflow-y: auto;
+  background: var(--surface-color-menus-default);
+  border: var(--layout-border-width-small) solid var(--surface-color-border-default);
+  border-radius: var(--layout-border-radius-medium);
+  box-shadow: var(--surface-shadow-medium);
+}
+
+.list {
+  outline: none;
+}
+
+.option {
+  display: flex;
+  flex-direction: column;
+  padding: var(--layout-padding-small) 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+.option[data-focused],
+.option[data-hovered] {
+  background: var(--surface-color-menus-hover);
+}
+
+.email {
+  font: var(--typography-regular-small-body);
+  color: var(--typography-color-secondary);
+}

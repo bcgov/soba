@@ -16,7 +16,6 @@ import {
   useFormTeamWriter,
   useTeamGroups,
 } from '@/src/features/designer/data/useFormTeam';
-import { useUserSearchAllowed } from '@/src/features/user-search/data/useUserSearch';
 import { FORM_TEAM_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { useListQuery } from '@/src/shared/list/useListQuery';
 import { useDataTable } from '@/src/shared/list/useDataTable';
@@ -37,10 +36,8 @@ export default function FormTeamTab({ dict, formId }: Readonly<FormTeamTabProps>
     q: query.q,
   });
   const { table } = useDataTable(query, membersResult, t.loadError);
-  const groups = useTeamGroups();
+  const { groups, error: groupsError } = useTeamGroups(formId);
   const teamWriter = useFormTeamWriter(formId);
-  // People are added by finding them with user search.
-  const searchAllowed = useUserSearchAllowed();
   const { addNotification } = useNotificationStore();
   // The list, the add form, or the edit form for one member.
   const [view, setView] = useState<'list' | 'add' | TeamMember>('list');
@@ -104,32 +101,20 @@ export default function FormTeamTab({ dict, formId }: Readonly<FormTeamTabProps>
     [t, groups],
   );
 
-  // Until the team API exists nothing on this tab is saved, so the tab says so.
-  const sampleNotice = (
-    <div className="mb-3">
-      <InlineAlert variant="info" data-testid="team-sample-notice">
-        {t.sampleNotice}
-      </InlineAlert>
-    </div>
-  );
-
   if (view !== 'list') {
     return (
-      <>
-        {sampleNotice}
-        <FormTeamMemberForm
-          dict={dict}
-          formId={formId}
-          member={view === 'add' ? undefined : view}
-          onDone={() => setView('list')}
-        />
-      </>
+      <FormTeamMemberForm
+        dict={dict}
+        formId={formId}
+        member={view === 'add' ? undefined : view}
+        onDone={() => setView('list')}
+      />
     );
   }
 
   return (
     <div data-testid="team-list">
-      {sampleNotice}
+      {groupsError && <InlineAlert variant="danger">{t.groupsLoadError}</InlineAlert>}
       <ListPageToolbar align="between">
         <ListPageSearchField
           value={query.searchInput}
@@ -137,11 +122,9 @@ export default function FormTeamTab({ dict, formId }: Readonly<FormTeamTabProps>
           onSubmit={query.commitSearch}
           testIdPrefix="team"
         />
-        {searchAllowed && (
-          <Button variant="primary" data-testid="team-add-button" onPress={() => setView('add')}>
-            {t.addMember}
-          </Button>
-        )}
+        <Button variant="primary" data-testid="team-add-button" onPress={() => setView('add')}>
+          {t.addMember}
+        </Button>
       </ListPageToolbar>
       <DataTable<TeamMember>
         {...table}

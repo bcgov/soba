@@ -16,6 +16,16 @@ const SORT_COLUMNS = {
 };
 
 describe('orderByForSort', () => {
+  it('sorts a computed display name with the same collation and tiebreak as a column', () => {
+    const name = sql<string>`coalesce(${appUsers.profile}->>'displayName', ${appUsers.displayLabel})`;
+    const rendered = toSql(
+      orderByForSort({ name: { column: name, linguistic: true } }, 'name:asc', appUsers.id, 'fr'),
+    );
+    expect(rendered).toContain('coalesce(');
+    expect(rendered).toContain('collate "fr-ca-x-icu" asc');
+    expect(rendered).toContain('"id" desc');
+  });
+
   it('orders ascending or descending on the named column', () => {
     expect(toSql(orderByForSort(SORT_COLUMNS, 'formName:asc', submissions.id, 'en'))).toContain(
       '"name" asc',

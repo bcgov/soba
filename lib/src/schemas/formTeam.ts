@@ -15,3 +15,9 @@ export const TeamMemberSchema = z.object({
   groups: z.array(z.string()),
 });
 export type TeamMember = z.infer<typeof TeamMemberSchema>;
+
+/** An active Soba user who is not yet on the form team. */
+export const TeamCandidateSchema = TeamMemberSchema.omit({ groups: true }).extend({
+  membershipId: z.string().uuid().nullable(),
+});
+export type TeamCandidate = z.infer<typeof TeamCandidateSchema>;

@@ -4,14 +4,13 @@ import { screen, waitFor } from '@testing-library/react';
 
 import dict from '@/dictionaries/en.json';
 
-let allowed: boolean | null;
 vi.mock('@/app/[lang]/Providers', () => ({ useDictionary: () => dict }));
-vi.mock('@/src/features/designer/data/useFormTeam', { spy: true });
-vi.mock('@/src/features/user-search/data/useUserSearch', () => ({
-  useUserSearchAllowed: () => allowed,
-}));
-vi.mock('@/src/features/user-search/ui/UserSearchPicker', () => ({
-  UserSearchPicker: () => <div data-testid="picker" />,
+vi.mock('@/src/features/designer/data/useFormTeam', async () => {
+  const sample = await import('./sampleFormTeam');
+  return { ...sample, useFormTeamWriter: vi.fn(sample.useFormTeamWriter) };
+});
+vi.mock('@/src/features/designer/ui/FormTeamMemberPicker', () => ({
+  FormTeamMemberPicker: () => <div data-testid="picker" />,
 }));
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -32,7 +31,6 @@ const confirmRemoveOf = async (memberId: string) => {
 
 describe('FormTeamTab', () => {
   beforeEach(() => {
-    allowed = true;
     resetTeam();
   });
 
@@ -44,17 +42,10 @@ describe('FormTeamTab', () => {
     expect(screen.queryByTestId('user-4-group-1-tag')).toBeNull();
   });
 
-  it('says the team is sample data, on the list and on the form', async () => {
-    renderTab();
-    expect(screen.getByTestId('team-sample-notice')).toHaveTextContent('sample data');
-    await clickTestId('team-add-button');
-    expect(screen.getByTestId('team-sample-notice')).toBeInTheDocument();
-  });
-
   it('opens the add form and comes back on cancel', async () => {
     renderTab();
     await clickTestId('team-add-button');
-    expect(screen.getByTestId('team-member-form')).toHaveTextContent('1. Search for a user:');
+    expect(screen.getByTestId('team-member-form')).toHaveTextContent(dict.team.searchStep);
     expect(screen.getByTestId('picker')).toBeInTheDocument();
     expect(screen.queryByTestId('team-list')).toBeNull();
 
@@ -62,16 +53,9 @@ describe('FormTeamTab', () => {
     expect(screen.getByTestId('team-list')).toBeInTheDocument();
   });
 
-  it('offers no add when user search is not allowed, or until that is known', () => {
-    allowed = false;
-    const { unmount } = renderTab();
-    expect(screen.getByTestId('team-list')).toBeInTheDocument();
-    expect(screen.queryByTestId('team-add-button')).toBeNull();
-    unmount();
-
-    allowed = null;
+  it('offers adding an existing workspace member without directory search', () => {
     renderTab();
-    expect(screen.queryByTestId('team-add-button')).toBeNull();
+    expect(screen.getByTestId('team-add-button')).toBeInTheDocument();
   });
 
   it('opens the edit form with the member and their groups', async () => {
@@ -80,7 +64,7 @@ describe('FormTeamTab', () => {
     const form = screen.getByTestId('team-member-form');
     expect(form).toHaveTextContent('Edit Team Member');
     expect(form).toHaveTextContent('Dax Halloran (sample)');
-    expect(form).not.toHaveTextContent('1. Search for a user:');
+    expect(form).not.toHaveTextContent(dict.team.searchStep);
     expect(screen.getByRole('checkbox', { name: 'Group 2' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Group 1' })).not.toBeChecked();
   });
