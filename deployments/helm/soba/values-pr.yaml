@@ -92,7 +92,9 @@ frontend:
 
 formio:
   internal:
-    enabled: true
+    enabled: false
+  external:
+    url: http://soba-dev-formio.b82f30-dev:3001
   replicas: 1
   # Formio depends on MongoDB; allow time for MongoDB to be ready after PR deploy
   readinessProbe:
