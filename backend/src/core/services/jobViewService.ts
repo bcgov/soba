@@ -31,6 +31,7 @@ import { isHandledSend, isRefusedSend } from '../integrations/notification/sendO
 import { getPostSubmissionActionPluginDefinitions } from '../integrations/plugins/PluginRegistry';
 import { nudgeJobs } from '../jobs';
 import { getJobRegistry } from '../jobs/catalog';
+import { listJobOutputs, toJobResult, type JobOutput } from '../jobs/outputs';
 import { getJobSettings } from '../jobs/settings';
 import { log } from '../logging';
 
@@ -67,6 +68,10 @@ export interface RerunFacts {
  * handled nobody yet, so their emails would go to every address again.
  */
 export const rerunRefusal = (facts: RerunFacts): string | null => {
+  // An export is the person's own request, under their limit; they start a new one.
+  if (facts.type === JobType.submission_export) {
+    return "Start a new export from the form's Exports page";
+  }
   if (facts.status !== JobStatus.dead && facts.status !== JobStatus.cancelled) {
     return 'Only a dead or cancelled job can be run again';
   }
@@ -201,27 +206,36 @@ export interface LoadedJob {
   parent: JobSummaryRow | null;
   children: JobSummaryRow[];
   emailCounts: JobEmailCounts | null;
+  output: JobOutput | null;
 }
 
 const loadJob = async (scope: JobScope, id: string): Promise<LoadedJob> => {
   const row = await getJob(scope, id);
   if (!row) throw new NotFoundError(NOT_FOUND);
   const addresses = addressesOf(row.params);
-  const [parent, children, sends] = await Promise.all([
+  const [parent, children, sends, outputs] = await Promise.all([
     row.parentJobId ? getJobSummary(scope, row.parentJobId) : Promise.resolve(null),
     listChildJobs(scope, row.id),
     addresses ? listJobNotificationSends(row.id) : Promise.resolve(null),
+    listJobOutputs([row.id]),
   ]);
   return {
     row,
     parent,
     children,
     emailCounts: addresses && sends ? countEmails(addresses, sends) : null,
+    output: outputs.get(row.id) ?? null,
   };
 };
 
 /** One job for the admin page, built from named fields only: its options are never returned. */
-export const toJobDetail = ({ row, parent, children, emailCounts }: LoadedJob): JobDetail => ({
+export const toJobDetail = ({
+  row,
+  parent,
+  children,
+  emailCounts,
+  output,
+}: LoadedJob): JobDetail => ({
   ...toJobListItem(row),
   revisionId: row.revisionId,
   startedAt: iso(row.startedAt),
@@ -236,6 +250,8 @@ export const toJobDetail = ({ row, parent, children, emailCounts }: LoadedJob): 
   ...(parent ? { parent: toJobSummary(parent) } : {}),
   children: children.map(toJobSummary),
   ...(emailCounts ? { emailCounts } : {}),
+  ...(output?.progress ? { progress: output.progress } : {}),
+  ...(output?.result ? { result: toJobResult(output.result) } : {}),
 });
 
 /** One job for a form's or a workspace's staff: no ids beyond the links, no option names. */
@@ -267,6 +283,7 @@ export const getStaffJobDetail = async (scope: JobScope, id: string): Promise<St
 
 const TYPE_NAMES: Record<string, string> = {
   [JobType.submission_submitted]: 'Submission received',
+  [JobType.submission_export]: 'Submission export',
 };
 
 /** The job types this environment runs, named for the admin filter. */

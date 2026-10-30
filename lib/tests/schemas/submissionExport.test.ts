@@ -1,5 +1,9 @@
 import {
+  isActiveExportStatus,
   StartSubmissionExportBodySchema,
+  SUBMISSION_EXPORT_MAX_FIELD_LENGTH,
+  SUBMISSION_EXPORT_MAX_FIELDS,
+  SUBMISSION_EXPORT_STATUSES,
   SubmissionExportFieldsBodySchema,
   SubmissionExportSchema,
 } from '../../src/schemas/submissionExport';
@@ -59,15 +63,56 @@ describe('SubmissionExportSchema', () => {
     format: 'csv',
     status: 'queued',
     createdAt: FROM,
+    finishedAt: null,
+    cancelRequestedAt: null,
   };
 
   it('accepts a queued export', () => {
     expect(SubmissionExportSchema.safeParse(record).success).toBe(true);
   });
 
-  it('refuses any other status', () => {
+  it('accepts a ready export with its progress and file', () => {
+    expect(
+      SubmissionExportSchema.safeParse({
+        ...record,
+        status: 'ready',
+        finishedAt: TO,
+        progress: { done: 12, total: 12 },
+        unreadCount: 0,
+        result: { state: 'ready', expiresAt: TO, filename: 'Permit.csv', size: 300 },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('refuses an unknown status or end reason', () => {
     expect(SubmissionExportSchema.safeParse({ ...record, status: 'completed' }).success).toBe(
       false,
     );
+    expect(
+      SubmissionExportSchema.safeParse({ ...record, status: 'failed', endReason: 'crashed' })
+        .success,
+    ).toBe(false);
+  });
+});
+
+describe('isActiveExportStatus', () => {
+  it('counts a queued or running export as active, and nothing else', () => {
+    expect(SUBMISSION_EXPORT_STATUSES.filter(isActiveExportStatus)).toEqual(['queued', 'running']);
+  });
+});
+
+describe('the start body limits', () => {
+  it('refuses more fields than allowed, or a field name too long', () => {
+    const many = Array.from(
+      { length: SUBMISSION_EXPORT_MAX_FIELDS + 1 },
+      (_, index) => `f${index}`,
+    );
+    expect(StartSubmissionExportBodySchema.safeParse({ fields: many }).success).toBe(false);
+    expect(
+      StartSubmissionExportBodySchema.safeParse({
+        fields: ['x'.repeat(SUBMISSION_EXPORT_MAX_FIELD_LENGTH + 1)],
+      }).success,
+    ).toBe(false);
+    expect(StartSubmissionExportBodySchema.safeParse({ fields: [''] }).success).toBe(false);
   });
 });

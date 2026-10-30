@@ -22,26 +22,23 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { usePageHeading, usePageNotices } from '@/src/components/PageHeader';
 import { SecondaryText } from '@/src/components/SecondaryText';
-import { StatusTag } from '@/src/components/StatusTag';
-import { DataTable, type Column } from '@/src/components/DataTable';
 import { LoadErrorAlert } from '@/src/shared/ui/LoadErrorAlert';
+import { apiErrorMessage } from '@/src/shared/api/dataError';
 import { useAuthErrorDefaults, useDataErrorNotice } from '@/src/shared/api/useDataErrorNotice';
-import { useFormatLongDateTime } from '@/src/shared/hooks/useFormatLongDate';
 import { useSortLocale } from '@/src/shared/list/useSortLocale';
 import { fillTemplate } from '@/src/shared/util/stringUtils';
 import {
   useExportFields,
   useExportForm,
   useSubmissionExportStarter,
-  useSubmissionExports,
 } from '@/src/features/designer/data/useSubmissionExport';
 import {
   SUBMISSION_EXPORT_LAYOUTS,
-  type SubmissionExport as SubmissionExportRecord,
   type SubmissionExportFieldsBody,
   type SubmissionExportFormat,
   type SubmissionExportLayout,
 } from '@/src/types/submissionExport';
+import { SubmissionExportList } from './SubmissionExportList';
 
 const ALL_VERSIONS = 'all';
 
@@ -57,7 +54,7 @@ const localToday = () => {
 /** Start of a local day, as an ISO instant. */
 const dayStart = (day: DateValue) => new Date(`${day.toString()}T00:00:00`).toISOString();
 
-/** The CHEFS 1 export screen plus versions; exports are started and listed, not downloaded yet. */
+/** The CHEFS 1 export screen plus versions, and the reader's exports with their files. */
 export function SubmissionExport({ formId }: Readonly<{ formId: string }>) {
   const dict = useDictionary();
   const text = dict.submission.export;
@@ -65,14 +62,13 @@ export function SubmissionExport({ formId }: Readonly<{ formId: string }>) {
   const notifyError = useDataErrorNotice();
   const router = useRouter();
   const locale = useSortLocale();
-  const formatDateTime = useFormatLongDateTime();
   const { token } = useKeycloak();
   const { addNotification } = useNotificationStore();
 
   const form = useExportForm(formId);
-  const exports = useSubmissionExports(formId);
   const starter = useSubmissionExportStarter(formId);
   usePageHeading({ heading: text.pageTitle, eyebrow: form.data?.name });
+  // Placeholder: says the fields and rows are sample data.
   usePageNotices([{ id: 'submission-export-sample', variant: 'info', body: text.sampleNotice }]);
 
   const [format, setFormat] = useState<SubmissionExportFormat>('csv');
@@ -138,7 +134,11 @@ export function SubmissionExport({ formId }: Readonly<{ formId: string }>) {
       });
       addNotification({ text: text.started, type: 'success' });
     } catch (cause: unknown) {
-      notifyError(cause, { failed: text.failed });
+      const limited = apiErrorMessage(cause, {
+        export_limit_reached: dict.apiErrors.export_limit_reached,
+      });
+      if (limited) addNotification({ text: limited, type: 'error' });
+      else notifyError(cause, { failed: text.failed });
     } finally {
       setStarting(false);
     }
@@ -157,31 +157,6 @@ export function SubmissionExport({ formId }: Readonly<{ formId: string }>) {
     const versionNo = form.data?.versions.find((version) => version.id === id)?.versionNo;
     return fillTemplate(text.versionOption, { version: String(versionNo ?? id) });
   };
-
-  const exportColumns: Column<SubmissionExportRecord>[] = [
-    {
-      key: 'createdAt',
-      label: text.startedAt,
-      render: (item) => formatDateTime(item.createdAt),
-    },
-    {
-      key: 'format',
-      label: text.fileType,
-      render: (item) => text[item.format],
-    },
-    {
-      key: 'formVersionId',
-      label: text.version,
-      render: (item) => versionLabel(item.formVersionId),
-    },
-    {
-      key: 'status',
-      label: text.status,
-      render: (item) => (
-        <StatusTag label={text.statuses[item.status]} data-testid={`export-status-${item.id}`} />
-      ),
-    },
-  ];
 
   const renderFields = () => {
     if (fields.error) {
@@ -371,29 +346,6 @@ export function SubmissionExport({ formId }: Readonly<{ formId: string }>) {
     );
   };
 
-  const renderExports = () => {
-    if (exports.error) {
-      return (
-        <LoadErrorAlert
-          error={exports.error}
-          messages={{ ...authDefaults, failed: text.listError }}
-          testIds={{ failed: 'export-list-loaderror' }}
-        />
-      );
-    }
-    return (
-      <DataTable<SubmissionExportRecord>
-        data={exports.rows}
-        columns={exportColumns}
-        caption={text.myExports}
-        loading={exports.isLoading}
-        emptyMessage={text.noExports}
-        totalItems={exports.total}
-        keyExtractor={(item) => item.id}
-      />
-    );
-  };
-
   return (
     <div className="mt-3" data-testid="submission-export">
       <div className="mb-3">
@@ -403,7 +355,7 @@ export function SubmissionExport({ formId }: Readonly<{ formId: string }>) {
       </div>
       {renderForm()}
       <div className="mt-4" data-testid="export-list">
-        {renderExports()}
+        <SubmissionExportList formId={formId} versionLabel={versionLabel} />
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ backend:
     notifications: "enabled"
     post-submission: "enabled"
     post-submission-email: "enabled"
+    submission-export: "enabled"
     user-search: "enabled"
   replicas: 1
   resources:
@@ -33,6 +34,8 @@ backend:
     userSearchPlugins: css-v1,user-search-soba
     # Emails go through Notify test, which only delivers to its safelist.
     postSubmissionActionPlugins: post-submission-email-addresses
+    # The placeholder export source pauses after each sample row, so a running export can be seen.
+    submissionExportStubRowDelayMs: "2000"
   documentGeneration:
     cdogsV2:
       endpoint: https://cdogs-dev.api.gov.bc.ca/api

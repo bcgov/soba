@@ -123,6 +123,64 @@ describe('JobDetailPanel', () => {
     expect(screen.queryByTestId('job-stop')).not.toBeInTheDocument();
   });
 
+  it("shows an export's progress and the file it produced, with no way to download it", async () => {
+    current = jobDetail({
+      type: 'submission-export',
+      status: 'succeeded',
+      lastError: null,
+      emailCounts: undefined,
+      progress: { done: 40, total: 40 },
+      result: {
+        state: 'ready',
+        filename: 'Permit 2026-10-29.csv',
+        size: 2100,
+        contentType: 'text/csv',
+        expiresAt: '2026-11-05T19:00:00.000Z',
+      },
+    });
+    stubJobsServer(readJob);
+    await renderPanel();
+
+    expect(await screen.findByTestId('job-fact-type')).toHaveTextContent(
+      en.jobs.types.submissionExport,
+    );
+    expect(screen.getByTestId('job-fact-progress')).toHaveTextContent('40 of 40');
+    expect(screen.getByTestId('job-fact-result')).toHaveTextContent(
+      'Permit 2026-10-29.csv, 2.1 kB',
+    );
+    expect(screen.getByTestId('job-fact-result')).toHaveTextContent('kept until');
+    expect(screen.queryByRole('link', { name: /Permit 2026-10-29/ })).not.toBeInTheDocument();
+  });
+
+  it.each(['cancelled', 'dead'] as const)(
+    'offers no Run again for a %s export, and says how to export again',
+    async (status) => {
+      current = jobDetail({ type: 'submission-export', status, emailCounts: undefined });
+      stubJobsServer(readJob);
+      await renderPanel();
+
+      expect(await screen.findByTestId('job-export-ended')).toHaveTextContent(
+        en.jobs.detail.exportEnded,
+      );
+      expect(screen.queryByTestId('job-rerun')).not.toBeInTheDocument();
+    },
+  );
+
+  it('says when the file a job produced expired', async () => {
+    current = jobDetail({
+      type: 'submission-export',
+      status: 'succeeded',
+      lastError: null,
+      emailCounts: undefined,
+      result: { state: 'expired', expiresAt: '2026-11-05T19:00:00.000Z' },
+    });
+    stubJobsServer(readJob);
+    await renderPanel();
+
+    expect(await screen.findByTestId('job-fact-result')).toHaveTextContent('Expired on');
+    expect(screen.queryByTestId('job-fact-progress')).not.toBeInTheDocument();
+  });
+
   it('runs the job again after confirming, then offers Stop job', async () => {
     const server = stubJobsServer(
       readJob,

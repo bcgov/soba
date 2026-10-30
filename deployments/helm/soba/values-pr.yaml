@@ -6,8 +6,13 @@ backend:
     notifications: "enabled"
     post-submission: "enabled"
     post-submission-email: "enabled"
+    submission-export: "enabled"
     user-search: "enabled"
   replicas: 1
+  # The PR file store PVC is 1 Gi, shared with attachments and templates.
+  jobs:
+    resultMaxBytes: "52428800"
+    resultRetentionDays: "1"
   # Files and templates on a per-PR PVC, which pr_close deletes with the release. PRs write nothing to S3.
   storage:
     defaultBackend: storage-local
@@ -22,6 +27,8 @@ backend:
     userSearchPlugins: css-v1,user-search-soba
     # Emails go through Notify test, which only delivers to its safelist.
     postSubmissionActionPlugins: post-submission-email-addresses
+    # The placeholder export source pauses after each sample row, so a running export can be seen.
+    submissionExportStubRowDelayMs: "2000"
     # Ephemeral PR namespaces stage temp bytes under os.tmpdir() — no RWX PVC.
     tempStorageDefaultCode: tempstorage-os
     # Virus scan inherits virusscan-clamav from values.yaml: PRs deploy into the dev

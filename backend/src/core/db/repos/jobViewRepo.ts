@@ -316,6 +316,10 @@ export const requeueJob = async (
       lastRequeuedAt: sql`now()`,
       lastRequeuedBy: actorId,
       lastRequeuedByAdmin: scope.kind === 'all',
+      progressDone: null,
+      progressTotal: null,
+      // A result left from an earlier run stays hidden until the new run replaces it.
+      resultExpiresAt: sql`case when ${jobs.resultFileId} is null then null else ${jobs.resultExpiresAt} end`,
     })
     .where(
       scoped(scope, eq(jobs.id, id), inArray(jobs.status, [JobStatus.dead, JobStatus.cancelled])),

@@ -12,6 +12,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { idColumn } from './audit';
 import { appUsers, sobaSchema, workspaces } from './core';
+import { files } from './file';
 import { forms, submissionRevisions, submissions } from './forms';
 
 /**
@@ -64,6 +65,13 @@ export const jobs = sobaSchema.table(
     lastRequeuedByAdmin: boolean('last_requeued_by_admin').notNull().default(false),
     // Set in the transaction that queued this job's children; kept after they are deleted.
     childrenQueuedAt: timestamp('children_queued_at', { withTimezone: true }),
+    // What the running attempt last reported; cleared at each claim.
+    progressDone: integer('progress_done'),
+    progressTotal: integer('progress_total'),
+    // The file the job produced, until it expires or the job ends without succeeding. The expiry is
+    // kept once the file is gone, so a succeeded job reads as expired.
+    resultFileId: uuid('result_file_id').references(() => files.id),
+    resultExpiresAt: timestamp('result_expires_at', { withTimezone: true }),
   },
   (table) => ({
     dedupeKeyUq: uniqueIndex('job_dedupe_key_uq').on(table.dedupeKey),
@@ -84,5 +92,13 @@ export const jobs = sobaSchema.table(
     submissionIdx: index('job_submission_idx').on(table.submissionId),
     revisionIdx: index('job_revision_idx').on(table.revisionId),
     createdIdx: index('job_created_idx').on(table.createdAt.desc(), table.id.desc()),
+    // Serves the result sweep and the foreign key check when any file row is deleted.
+    resultFileIdx: index('job_result_file_idx')
+      .on(table.resultFileId)
+      .where(sql`${table.resultFileId} is not null`),
+    // Serves the per-form count of exports still to finish, taken at every start.
+    activeExportIdx: index('job_active_export_idx')
+      .on(table.formId)
+      .where(sql`${table.type} = 'submission-export' and ${table.status} in ('queued', 'running')`),
   }),
 );

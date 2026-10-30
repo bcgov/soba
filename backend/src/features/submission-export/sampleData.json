@@ -1,0 +1,92 @@
+{
+  "fields": [
+    "form.confirmationId",
+    "form.submittedAt",
+    "form.submitter",
+    "applicantName",
+    "applicantEmail",
+    "householdSize",
+    "mailingAddress",
+    "dependants.name",
+    "dependants.age"
+  ],
+  "rows": [
+    {
+      "submissionId": "0199f6a0-1000-7000-8000-000000000001",
+      "confirmationCode": "SAMPLE01",
+      "versionId": "0199f6a0-2000-7000-8000-000000000001",
+      "submittedAt": "2026-10-01T16:05:00.000Z",
+      "submitter": "Sample Submitter",
+      "answers": {
+        "applicantName": "Alex Sample",
+        "applicantEmail": "alex.sample@example.com",
+        "householdSize": 3,
+        "mailingAddress": "100 Sample Road, Victoria BC",
+        "dependants": [
+          { "name": "Sam Sample", "age": 7 },
+          { "name": "Riley Sample", "age": 4 }
+        ]
+      }
+    },
+    {
+      "submissionId": "0199f6a0-1000-7000-8000-000000000002",
+      "confirmationCode": "SAMPLE02",
+      "versionId": "0199f6a0-2000-7000-8000-000000000001",
+      "submittedAt": "2026-10-03T19:42:00.000Z",
+      "submitter": "Sample Submitter",
+      "answers": {
+        "applicantName": "Jordan Example",
+        "applicantEmail": "jordan.example@example.com",
+        "householdSize": 1,
+        "mailingAddress": "2 Example Street, Kamloops BC",
+        "dependants": []
+      }
+    },
+    {
+      "submissionId": "0199f6a0-1000-7000-8000-000000000003",
+      "confirmationCode": "SAMPLE03",
+      "versionId": "0199f6a0-2000-7000-8000-000000000002",
+      "submittedAt": "2026-10-08T21:17:00.000Z",
+      "submitter": "public",
+      "answers": {
+        "applicantName": "Morgan \"Mo\" Test",
+        "applicantEmail": "morgan.test@example.com",
+        "householdSize": 2,
+        "mailingAddress": "33 Test Avenue, Unit 4, Nanaimo BC",
+        "dependants": [{ "name": "Casey Test", "age": 12 }]
+      }
+    },
+    {
+      "submissionId": "0199f6a0-1000-7000-8000-000000000004",
+      "confirmationCode": "SAMPLE04",
+      "versionId": "0199f6a0-2000-7000-8000-000000000002",
+      "submittedAt": "2026-10-15T15:30:00.000Z",
+      "submitter": "Sample Submitter",
+      "answers": {
+        "applicantName": "Taylor Demo",
+        "applicantEmail": "taylor.demo@example.com",
+        "householdSize": 4,
+        "mailingAddress": "4 Demo Crescent, Prince George BC",
+        "dependants": [
+          { "name": "Jamie Demo", "age": 15 },
+          { "name": "Drew Demo", "age": 11 },
+          { "name": "Avery Demo", "age": 2 }
+        ]
+      }
+    },
+    {
+      "submissionId": "0199f6a0-1000-7000-8000-000000000005",
+      "confirmationCode": "SAMPLE05",
+      "versionId": "0199f6a0-2000-7000-8000-000000000002",
+      "submittedAt": "2026-10-22T18:02:00.000Z",
+      "submitter": "Sample Submitter",
+      "answers": {
+        "applicantName": "Quinn Placeholder",
+        "applicantEmail": "quinn.placeholder@example.com",
+        "householdSize": 1,
+        "mailingAddress": "5 Placeholder Lane, Kelowna BC",
+        "dependants": []
+      }
+    }
+  ]
+}

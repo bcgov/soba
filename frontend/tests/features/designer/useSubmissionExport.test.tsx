@@ -34,6 +34,8 @@ const QUEUED: SubmissionExport = {
   format: 'csv',
   status: 'queued',
   createdAt: '2026-10-20T17:12:44.000Z',
+  finishedAt: null,
+  cancelRequestedAt: null,
 };
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -85,17 +87,25 @@ describe('useExportFields', () => {
   });
 });
 
+const QUERY = { offset: 10, limit: 10, sort: 'createdAt:desc' };
+const listPage = (items: SubmissionExport[], total = items.length) => ({
+  items,
+  page: { offset: 0, limit: 10, total },
+  sort: 'createdAt:desc',
+});
+
 describe('useSubmissionExports', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('reads my exports once', async () => {
-    listSobaSubmissionExports.mockResolvedValue({ items: [QUEUED] });
+  it('reads one page of my exports once, and gives the total the server counts', async () => {
+    listSobaSubmissionExports.mockResolvedValue(listPage([QUEUED], 11));
 
-    const { result } = renderHook(() => useSubmissionExports('f1'), { wrapper });
+    const { result } = renderHook(() => useSubmissionExports('f1', QUERY), { wrapper });
 
     await waitFor(() => expect(result.current.rows).toEqual([QUEUED]));
-    expect(result.current.total).toBe(1);
+    expect(result.current.total).toBe(11);
     expect(listSobaSubmissionExports).toHaveBeenCalledTimes(1);
+    expect(listSobaSubmissionExports).toHaveBeenCalledWith('token', 'f1', QUERY);
   });
 
   it.each([
@@ -104,7 +114,7 @@ describe('useSubmissionExports', () => {
   ])('classifies a %s read as %s', async (status, kind) => {
     listSobaSubmissionExports.mockRejectedValue(new ApiError('no', status));
 
-    const { result } = renderHook(() => useSubmissionExports('f1'), { wrapper });
+    const { result } = renderHook(() => useSubmissionExports('f1', QUERY), { wrapper });
 
     await waitFor(() => expect(result.current.error?.kind).toBe(kind));
     expect(result.current.rows).toEqual([]);
@@ -115,15 +125,18 @@ describe('useSubmissionExportStarter', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('returns the queued export and re-reads the list', async () => {
-    listSobaSubmissionExports.mockResolvedValue({ items: [] });
+    listSobaSubmissionExports.mockResolvedValue(listPage([]));
     startSobaSubmissionExport.mockResolvedValue(QUEUED);
 
     const { result } = renderHook(
-      () => ({ list: useSubmissionExports('f1'), starter: useSubmissionExportStarter('f1') }),
+      () => ({
+        list: useSubmissionExports('f1', QUERY),
+        starter: useSubmissionExportStarter('f1'),
+      }),
       { wrapper },
     );
     await waitFor(() => expect(result.current.list.total).toBe(0));
-    listSobaSubmissionExports.mockResolvedValue({ items: [QUEUED] });
+    listSobaSubmissionExports.mockResolvedValue(listPage([QUEUED]));
 
     let outcome: unknown;
     await act(async () => {

@@ -6,6 +6,7 @@ import {
   JOB_SORT_FIELDS,
   MY_FORM_SORT_FIELDS,
   SOBA_ADMIN_SORT_FIELDS,
+  SUBMISSION_EXPORT_SORT_FIELDS,
   SUBMISSION_SORT_FIELDS,
   WORKSPACE_GROUP_SORT_FIELDS,
   WORKSPACE_SORT_FIELDS,
@@ -151,6 +152,14 @@ export const WORKSPACE_JOBS_LIST_QUERY: ListQuerySpec = {
   resource: 'workspaceJobs',
   filters: ['status', 'type', 'formId'],
   sortOptions: sortTokensFor(JOB_SORT_FIELDS),
+  defaultSort: CREATED_DESC,
+};
+
+/** The reader's exports of a form. Scope it to the form with `scopedListQuery`. */
+export const SUBMISSION_EXPORTS_LIST_QUERY: ListQuerySpec = {
+  resource: 'submissionExports',
+  filters: [],
+  sortOptions: sortTokensFor(SUBMISSION_EXPORT_SORT_FIELDS),
   defaultSort: CREATED_DESC,
 };
 
