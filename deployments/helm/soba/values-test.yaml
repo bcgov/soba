@@ -6,6 +6,7 @@ backend:
     notifications: "enabled"
     post-submission: "enabled"
     post-submission-email: "enabled"
+    submission-export: "enabled"
     user-search: "enabled"
   replicas: 2
   sso:
@@ -45,8 +46,6 @@ backend:
     cdogsV2:
       endpoint: https://cdogs-test.api.gov.bc.ca/api
       tokenUrl: https://test.loginproxy.gov.bc.ca/auth/realms/comsvcauth/protocol/openid-connect/token
-    cdogsV3:
-      endpoint: http://common-document-generation-service-master.a12c97-prod:3000
   tenantEngine:
     cstarV1:
       apiBaseUrl: https://test.connect.digital.gov.bc.ca/api/v1
@@ -96,8 +95,10 @@ mongodb:
   persistence:
     size: 2Gi
 
+gatewayNetworkPolicy:
+  enabled: true
+  namespaceName: "b8840c"
+  environment: prod
+
 vault:
   enabled: true
-  role: acf456-nonprod
-  secretPath: acf456-nonprod/soba-test
-  serviceAccountName: acf456-vault

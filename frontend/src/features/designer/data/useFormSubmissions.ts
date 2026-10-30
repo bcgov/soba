@@ -12,6 +12,7 @@ import type { SubmissionListItem } from '@/src/types/submissions';
 import { useSortLocale } from '@/src/shared/list/useSortLocale';
 import { designSubmissionKey } from './useDesignSubmission';
 import { submissionReviewKey } from './useSubmissionReview';
+import { clearJobLists } from '@/src/features/jobs/data/jobReads';
 
 const EMPTY: SubmissionListItem[] = [];
 
@@ -70,6 +71,8 @@ export function useSubmissionDeleter() {
         // Dropped, not re-read: an open review page would read a 404 before it navigates away.
         mutate(designSubmissionKey(submissionId), undefined, { revalidate: false }),
         mutate(submissionReviewKey(submissionId), undefined, { revalidate: false }),
+        // Its jobs stay listed, no longer linked to it.
+        clearJobLists(mutate),
       ]);
       return { status: 'applied', value: undefined };
     },

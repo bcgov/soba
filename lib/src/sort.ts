@@ -39,6 +39,8 @@ export const DOCGEN_AUDIT_SORT_FIELDS = ['createdAt', 'outcome', 'durationMs'] a
 export const CREDENTIAL_SORT_FIELDS = ['label', 'status', 'createdAt'] as const;
 export const JOB_SORT_FIELDS = ['createdAt', 'finishedAt'] as const;
 
+export const SUBMISSION_EXPORT_SORT_FIELDS = ['createdAt'] as const;
+
 export type SortDirection = 'asc' | 'desc';
 
 export const SORT_LOCALES = ['en', 'fr'] as const;

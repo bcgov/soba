@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import { SubmissionWorkflowState, type SubmissionWorkflowStateCode } from '../permissions/codes';
+import { SUBMISSION_EXPORT_SORT_FIELDS } from '../sort';
+import { JobProgressSchema, JobResultSchema } from './jobs';
+import { OffsetPageSchema, makeSortEnum } from './pagination';
 
 const SUBMISSION_EXPORT_FORMATS = ['csv', 'json'] as const;
 export type SubmissionExportFormat = (typeof SUBMISSION_EXPORT_FORMATS)[number];
@@ -12,9 +16,44 @@ export const SUBMISSION_EXPORT_LAYOUTS = [
 ] as const;
 export type SubmissionExportLayout = (typeof SUBMISSION_EXPORT_LAYOUTS)[number];
 
-/** Only `queued` until exports run as jobs. */
-const SUBMISSION_EXPORT_STATUSES = ['queued'] as const;
+/** The submission workflow states an export includes; a deleted submission never is. */
+export const SUBMISSION_EXPORT_STATES: readonly SubmissionWorkflowStateCode[] = [
+  SubmissionWorkflowState.submitted,
+];
+
+/**
+ * Where an export stands. `ready` has a file to download until it expires; `failed` and `cancelled`
+ * say why in `endReason`.
+ */
+export const SUBMISSION_EXPORT_STATUSES = [
+  'queued',
+  'running',
+  'ready',
+  'expired',
+  'failed',
+  'cancelled',
+] as const;
 export type SubmissionExportStatus = (typeof SUBMISSION_EXPORT_STATUSES)[number];
+
+/** Still to finish: counts toward the person's limit, and the page keeps reading it. */
+export const isActiveExportStatus = (status: SubmissionExportStatus): boolean =>
+  status === 'queued' || status === 'running';
+
+/**
+ * Why a failed or cancelled export ended: its file was over the size limit, its starter can no
+ * longer read the form's submissions, something went wrong, or someone stopped it.
+ */
+export const SUBMISSION_EXPORT_END_REASONS = [
+  'too_large',
+  'access_lost',
+  'error',
+  'cancelled',
+] as const;
+export type SubmissionExportEndReason = (typeof SUBMISSION_EXPORT_END_REASONS)[number];
+
+/** Most fields an export may name, and the longest field name. */
+export const SUBMISSION_EXPORT_MAX_FIELDS = 1000;
+export const SUBMISSION_EXPORT_MAX_FIELD_LENGTH = 500;
 
 const FiltersSchema = z.object({
   // Absent means every version.
@@ -40,7 +79,10 @@ export const SubmissionExportFieldsResponseSchema = z.object({
 const StartFieldsSchema = FiltersSchema.extend({
   format: z.enum(SUBMISSION_EXPORT_FORMATS).default('csv'),
   // CSV only; absent means all.
-  fields: z.array(z.string()).optional(),
+  fields: z
+    .array(z.string().min(1).max(SUBMISSION_EXPORT_MAX_FIELD_LENGTH))
+    .max(SUBMISSION_EXPORT_MAX_FIELDS)
+    .optional(),
 });
 
 export const StartSubmissionExportBodySchema = StartFieldsSchema.refine(
@@ -53,10 +95,26 @@ export const SubmissionExportSchema = StartFieldsSchema.extend({
   formId: z.string(),
   status: z.enum(SUBMISSION_EXPORT_STATUSES),
   createdAt: z.string(),
+  finishedAt: z.string().nullable(),
+  /** Set once someone asked to stop it; a running export stops at its next check. */
+  cancelRequestedAt: z.string().nullable(),
+  /** Present once it has started counting rows. */
+  progress: JobProgressSchema.optional(),
+  /** Present when it failed or was cancelled. */
+  endReason: z.enum(SUBMISSION_EXPORT_END_REASONS).optional(),
+  /** Submissions it could not read, and left out; present once it finished. */
+  unreadCount: z.number().int().optional(),
+  /** The file, while ready or once expired. */
+  result: JobResultSchema.optional(),
 });
 
+export const SubmissionExportSortSchema = makeSortEnum(SUBMISSION_EXPORT_SORT_FIELDS);
+
+/** One page of the caller's exports of a form. */
 export const SubmissionExportListSchema = z.object({
   items: z.array(SubmissionExportSchema),
+  page: OffsetPageSchema,
+  sort: SubmissionExportSortSchema,
 });
 
 export type SubmissionExportFieldsBody = z.infer<typeof SubmissionExportFieldsBodySchema>;
@@ -64,3 +122,4 @@ export type SubmissionExportFieldsResponse = z.infer<typeof SubmissionExportFiel
 export type StartSubmissionExportBody = z.infer<typeof StartSubmissionExportBodySchema>;
 export type SubmissionExport = z.infer<typeof SubmissionExportSchema>;
 export type SubmissionExportList = z.infer<typeof SubmissionExportListSchema>;
+export type SubmissionExportSort = z.infer<typeof SubmissionExportSortSchema>;

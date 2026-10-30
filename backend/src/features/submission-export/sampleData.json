@@ -1,0 +1,13 @@
+{
+  "fields": [
+    "form.confirmationId",
+    "form.submittedAt",
+    "form.submitter",
+    "applicantName",
+    "applicantEmail",
+    "householdSize",
+    "mailingAddress",
+    "dependants.name",
+    "dependants.age"
+  ]
+}

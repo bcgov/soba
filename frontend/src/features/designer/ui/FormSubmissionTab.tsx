@@ -22,6 +22,8 @@ import { useListQuery } from '@/src/shared/list/useListQuery';
 import { useDataTable } from '@/src/shared/list/useDataTable';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { capitalizeFirstLetter } from '@/src/shared/util/stringUtils';
+import { FEATURE_CODES } from '@/src/shared/featureFlags/flags';
+import { useFeatureAllowed } from '@/src/shared/api/useFeatureAllowed';
 
 interface FormSubmissionTabProps {
   dict: Dictionary;
@@ -52,6 +54,7 @@ export default function FormSubmissionTab({
   const [pendingDelete, setPendingDelete] = useState<SubmissionListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { addNotification } = useNotificationStore();
+  const exportsAllowed = useFeatureAllowed(FEATURE_CODES.SUBMISSION_EXPORT);
 
   const confirmDelete = useCallback(async () => {
     if (!token || !pendingDelete) return;
@@ -141,17 +144,19 @@ export default function FormSubmissionTab({
 
   return (
     <>
-      <div className="d-flex justify-content-end mb-2">
-        <Button
-          variant="secondary"
-          size="small"
-          isDisabled={!formId}
-          onPress={() => router.push(`/${locale}/build/${formId}/submissions/exports`)}
-          data-testid="submissions-export-button"
-        >
-          {dict.submission.export.button}
-        </Button>
-      </div>
+      {exportsAllowed ? (
+        <div className="d-flex justify-content-end mb-2">
+          <Button
+            variant="secondary"
+            size="small"
+            isDisabled={!formId}
+            onPress={() => router.push(`/${locale}/build/${formId}/submissions/exports`)}
+            data-testid="submissions-export-button"
+          >
+            {dict.submission.export.button}
+          </Button>
+        </div>
+      ) : null}
       <DataTable<SubmissionListItem>
         {...table}
         columns={columns}
