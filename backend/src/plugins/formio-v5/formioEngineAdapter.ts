@@ -7,10 +7,12 @@ import {
 } from '../../core/integrations/form-engine/FormEngineAdapter';
 import { PluginConfigReader } from '../../core/config/pluginConfig';
 import { InternalError, ValidationError } from '../../core/errors';
+import { mapInOrder } from '../../core/inOrder';
 import {
   getAuthenticatedFormioClient,
   isFormioNotFound,
   type FormioCommunityEditionAPIv5Client,
+  type FormioQuery,
 } from './formioV5Client';
 import { ApiErrorCodes, normalizeSchema as normalizeFormioSchema } from '@soba/lib';
 
@@ -137,17 +139,10 @@ const answerDocument = (doc: Record<string, unknown>): Record<string, unknown> =
 /** Submissions read per Form.io list call. */
 const READ_BATCH_SIZE = 100;
 
-/** Read one batch of submissions by `_id__in` into `found`, keyed by ref. */
-async function readBatch(
-  client: FormioCommunityEditionAPIv5Client,
-  engineFormRef: string,
-  refs: string[],
-  found: Map<string, Record<string, unknown>>,
-): Promise<void> {
-  const query = { params: { _id__in: refs.join(','), limit: refs.length } };
-  const docs = await client.loadSubmissions(engineFormRef, query);
-  docs.forEach((doc) => found.set(doc._id, answerDocument(doc)));
-}
+/** Without `full`, Form.io's list shortens signature answers to "YES" and drops base64 file urls. */
+const batchQuery = (refs: string[]): FormioQuery => ({
+  params: { _id__in: refs.join(','), limit: refs.length, full: true },
+});
 
 /**
  * Fields the renderer reads when filling: page or wizard display, form settings, the components
@@ -397,13 +392,16 @@ export class FormioEngineAdapter implements FormEngineAdapter {
     return doc ? answerDocument(doc) : null;
   }
 
-  /** Many submissions of one form, in `_id__in` batches run one after another. */
+  /**
+   * Many submissions of one form, in `_id__in` batches run one after another. A form Form.io no
+   * longer has fails with engine_document_missing; a ref that is not a Form.io id fails the read.
+   */
   async readSubmissions(
     engineFormRef: string,
     engineRefs: string[],
+    signal?: AbortSignal,
   ): Promise<ReadSubmissionsResult> {
-    const found = new Map<string, Record<string, unknown>>();
-    if (engineRefs.length === 0) return { found, missing: [] };
+    if (engineRefs.length === 0) return { found: new Map(), missing: [] };
     const client = await getAuthenticatedFormioClient(this.pluginConfig);
     if (!client) {
       throw new Error('Form.io admin client unavailable; cannot read submissions');
@@ -412,10 +410,11 @@ export class FormioEngineAdapter implements FormEngineAdapter {
     for (let start = 0; start < engineRefs.length; start += READ_BATCH_SIZE) {
       batches.push(engineRefs.slice(start, start + READ_BATCH_SIZE));
     }
-    // Chained, not Promise.all, so Form.io sees one batch at a time.
-    await batches.reduce(
-      (previous, refs) => previous.then(() => readBatch(client, engineFormRef, refs, found)),
-      Promise.resolve(),
+    const pages = await mapInOrder(batches, (refs) =>
+      missingAsError(client.loadSubmissions(engineFormRef, batchQuery(refs), signal)),
+    );
+    const found = new Map<string, Record<string, unknown>>(
+      pages.flat().map((doc) => [doc._id, answerDocument(doc)]),
     );
     return { found, missing: engineRefs.filter((ref) => !found.has(ref)) };
   }

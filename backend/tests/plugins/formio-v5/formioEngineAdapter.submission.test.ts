@@ -172,6 +172,7 @@ describe('FormioEngineAdapter submission methods', () => {
       const client = makeClient({
         loadForm: jest.fn().mockRejectedValue(missing),
         loadSubmission: jest.fn().mockRejectedValue(missing),
+        loadSubmissions: jest.fn().mockRejectedValue(missing),
       });
       mockedGetClient.mockResolvedValue(client);
       const adapter = new FormioEngineAdapter(makeConfig());
@@ -179,6 +180,9 @@ describe('FormioEngineAdapter submission methods', () => {
       await expect(adapter.readSchema('missing')).rejects.toBeInstanceOf(InternalError);
       await expect(adapter.readSchema('missing')).rejects.toMatchObject(engineDocumentMissing);
       await expect(adapter.readSubmission('form-ref-1', 'missing')).rejects.toMatchObject(
+        engineDocumentMissing,
+      );
+      await expect(adapter.readSubmissions('missing', ['sub-1'])).rejects.toMatchObject(
         engineDocumentMissing,
       );
     },
@@ -194,11 +198,13 @@ describe('FormioEngineAdapter submission methods', () => {
     const client = makeClient({
       loadForm: jest.fn().mockRejectedValue(failure),
       loadSubmission: jest.fn().mockRejectedValue(failure),
+      loadSubmissions: jest.fn().mockRejectedValue(failure),
     });
     mockedGetClient.mockResolvedValue(client);
     const adapter = new FormioEngineAdapter(makeConfig());
     await expect(adapter.readSchema('form-ref-1')).rejects.toBe(failure);
     await expect(adapter.readSubmission('form-ref-1', 'sub-1')).rejects.toBe(failure);
+    await expect(adapter.readSubmissions('form-ref-1', ['sub-1'])).rejects.toBe(failure);
   });
 
   it('deleteSubmission deletes the document under its form', async () => {
@@ -228,8 +234,13 @@ describe('FormioEngineAdapter submission methods', () => {
 
   const refsOf = (count: number) => Array.from({ length: count }, (_, i) => `sub-${i}`);
 
-  const readSubmissions = (refs: string[]) =>
-    new FormioEngineAdapter(makeConfig()).readSubmissions('form-ref-1', refs);
+  /** The query readSubmissions sends for one batch of refs. */
+  const queryFor = (refs: string[]) => ({
+    params: { _id__in: refs.join(','), limit: refs.length, full: true },
+  });
+
+  const readSubmissions = (refs: string[], signal?: AbortSignal) =>
+    new FormioEngineAdapter(makeConfig()).readSubmissions('form-ref-1', refs, signal);
 
   it('readSubmissions reads one batch by _id__in and strips each document', async () => {
     const refs = refsOf(3);
@@ -238,10 +249,9 @@ describe('FormioEngineAdapter submission methods', () => {
 
     const { found, missing } = await readSubmissions(refs);
 
-    expect(client.loadSubmissions).toHaveBeenCalledTimes(1);
-    expect(client.loadSubmissions).toHaveBeenCalledWith('form-ref-1', {
-      params: { _id__in: 'sub-0,sub-1,sub-2', limit: 3 },
-    });
+    expect(client.loadSubmissions.mock.calls).toEqual([
+      ['form-ref-1', { params: { _id__in: 'sub-0,sub-1,sub-2', limit: 3, full: true } }],
+    ]);
     expect([...found.keys()]).toEqual(refs);
     expect(found.get('sub-1')).toEqual({ data: { a: 'sub-1' } });
     expect(missing).toEqual([]);
@@ -255,11 +265,23 @@ describe('FormioEngineAdapter submission methods', () => {
     const { found } = await readSubmissions(refs);
 
     expect(client.loadSubmissions.mock.calls).toEqual([
-      ['form-ref-1', { params: { _id__in: refs.slice(0, 100).join(','), limit: 100 } }],
-      ['form-ref-1', { params: { _id__in: refs.slice(100, 200).join(','), limit: 100 } }],
-      ['form-ref-1', { params: { _id__in: refs.slice(200).join(','), limit: 50 } }],
+      ['form-ref-1', queryFor(refs.slice(0, 100))],
+      ['form-ref-1', queryFor(refs.slice(100, 200))],
+      ['form-ref-1', queryFor(refs.slice(200))],
     ]);
     expect(found.size).toBe(250);
+  });
+
+  it("readSubmissions gives every batch the caller's signal", async () => {
+    const client = makeClient({ loadSubmissions: jest.fn(loadDocs) });
+    mockedGetClient.mockResolvedValue(client);
+    const signal = new AbortController().signal;
+
+    await readSubmissions(refsOf(150), signal);
+
+    expect(client.loadSubmissions).toHaveBeenCalledTimes(2);
+    expect(client.loadSubmissions.mock.calls[0][2]).toBe(signal);
+    expect(client.loadSubmissions.mock.calls[1][2]).toBe(signal);
   });
 
   it('readSubmissions starts the next batch only after the previous one resolves', async () => {
@@ -299,13 +321,23 @@ describe('FormioEngineAdapter submission methods', () => {
     expect(mockedGetClient).not.toHaveBeenCalled();
   });
 
-  it('readSubmissions rejects when a request fails', async () => {
+  it('readSubmissions stops at a failed batch and rejects with its error', async () => {
     const failure = new FormioApiError(500, 'boom', 'http://formio.test');
-    mockedGetClient.mockResolvedValue(
-      makeClient({ loadSubmissions: jest.fn().mockRejectedValue(failure) }),
-    );
+    const client = makeClient({
+      loadSubmissions: jest
+        .fn(loadDocs)
+        .mockImplementationOnce(loadDocs)
+        .mockRejectedValueOnce(failure),
+    });
+    mockedGetClient.mockResolvedValue(client);
 
-    await expect(readSubmissions(refsOf(3))).rejects.toBe(failure);
+    await expect(readSubmissions(refsOf(250))).rejects.toBe(failure);
+    expect(client.loadSubmissions).toHaveBeenCalledTimes(2);
+  });
+
+  it('readSubmissions throws when no admin client is available', async () => {
+    mockedGetClient.mockResolvedValue(null);
+    await expect(readSubmissions(refsOf(1))).rejects.toThrow(/admin client/i);
   });
 
   it('deleteSubmission throws when no admin client is available', async () => {

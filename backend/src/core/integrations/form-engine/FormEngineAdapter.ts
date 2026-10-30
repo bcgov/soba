@@ -68,8 +68,15 @@ export interface FormEngineAdapter {
     engineFormRef: string,
     engineRef: string,
   ): Promise<Record<string, unknown> | null>;
-  /** readSubmission for many refs of one form; refs the engine did not return are listed in `missing`. */
-  readSubmissions?(engineFormRef: string, engineRefs: string[]): Promise<ReadSubmissionsResult>;
+  /**
+   * Read many submission documents of one form, stripped like readSubmission. Refs the engine has
+   * no document for are listed in `missing`; `signal` abandons the read.
+   */
+  readSubmissions?(
+    engineFormRef: string,
+    engineRefs: string[],
+    signal?: AbortSignal,
+  ): Promise<ReadSubmissionsResult>;
   /** Delete a submission document by form ref + submission ref (compensation / cleanup). */
   deleteSubmission?(engineFormRef: string, engineRef: string): Promise<void>;
   /**
