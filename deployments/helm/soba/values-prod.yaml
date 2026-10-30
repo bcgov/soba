@@ -6,6 +6,7 @@ backend:
     notifications: "disabled"
     post-submission: "enabled"
     post-submission-email: "enabled"
+    submission-export: "disabled"
     user-search: "disabled"
   replicas: 3
   resources:

@@ -9,7 +9,10 @@ import {
   registerSubmissionReviewOpenApi,
 } from './submissions';
 import { submitRouter as submitRoutes, registerSubmitOpenApi } from './submit';
-import { registerSubmissionExportOpenApi, submissionExportRouter } from './submissionExport';
+import {
+  registerSubmissionExportOpenApi,
+  submissionExportRouter,
+} from '../../features/submission-export';
 import { groupsDomain } from './groups';
 import { filesDesignRouter, filesDomain } from '../../features/files';
 import {

@@ -1,7 +1,11 @@
 export {
+  isActiveExportStatus,
+  SUBMISSION_EXPORT_END_REASONS,
   SUBMISSION_EXPORT_LAYOUTS,
+  SUBMISSION_EXPORT_STATUSES,
   type StartSubmissionExportBody,
   type SubmissionExport,
+  type SubmissionExportEndReason,
   type SubmissionExportFieldsBody,
   type SubmissionExportFieldsResponse,
   type SubmissionExportFormat,

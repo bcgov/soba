@@ -53,6 +53,12 @@ vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => dict,
 }));
 
+// Whether this app offers submission export, which the real hook reads from the features list.
+const exportsAllowed = vi.hoisted(() => ({ value: true as boolean | null }));
+vi.mock('@/src/shared/api/useFeatureAllowed', () => ({
+  useFeatureAllowed: () => exportsAllowed.value,
+}));
+
 vi.mock('next/navigation', async () => {
   const actual = await vi.importActual<unknown>('next/navigation');
   return {
@@ -71,6 +77,7 @@ import type { Dictionary } from '@/src/types/dictionary';
 describe('FormSubmissionTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    exportsAllowed.value = true;
     mockGetSubmissions.mockResolvedValue({
       items: [
         {
@@ -149,6 +156,17 @@ describe('FormSubmissionTab', () => {
 
     expect(mockPush).toHaveBeenCalledWith('/en/build/f1/submissions/exports');
   });
+
+  it.each([false, null])(
+    'offers no Export submissions button while export is %s',
+    async (allowed) => {
+      exportsAllowed.value = allowed;
+      await renderTab();
+
+      await waitFor(() => expect(screen.getByTestId('sub-1-confirmation-id')).toBeInTheDocument());
+      expect(screen.queryByTestId('submissions-export-button')).not.toBeInTheDocument();
+    },
+  );
 
   const openDelete = async (id: string) => {
     const link = await waitFor(() => screen.getByTestId(`${id}-delete-link`));

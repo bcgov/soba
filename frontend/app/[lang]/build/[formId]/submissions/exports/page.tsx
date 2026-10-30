@@ -18,6 +18,7 @@ export async function generateMetadata({ params }: PageProps) {
 
 export default async function Page({ params }: Readonly<PageProps>) {
   await assertFeatureAllowed(FEATURE_CODES.DESIGN_MODE);
+  await assertFeatureAllowed(FEATURE_CODES.SUBMISSION_EXPORT);
 
   const { lang, formId } = await params;
   const dict = await getDictionary(resolveLocale(lang));

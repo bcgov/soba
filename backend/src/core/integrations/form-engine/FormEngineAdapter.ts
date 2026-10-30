@@ -45,6 +45,14 @@ export interface ReadSubmissionsResult {
   missing: string[];
 }
 
+export interface ReadSubmissionsOptions {
+  /**
+   * Whole answers, signature images and base64 file data included. Off by default: the engine may
+   * shorten or leave out such answers, which keeps large reads small.
+   */
+  full?: boolean;
+}
+
 export interface FormEngineAdapter {
   /** Optional: report whether the engine is reachable (readiness). No config in result. */
   readinessCheck?(): Promise<FormEngineReadinessResult>;
@@ -76,6 +84,7 @@ export interface FormEngineAdapter {
     engineFormRef: string,
     engineRefs: string[],
     signal?: AbortSignal,
+    options?: ReadSubmissionsOptions,
   ): Promise<ReadSubmissionsResult>;
   /** Delete a submission document by form ref + submission ref (compensation / cleanup). */
   deleteSubmission?(engineFormRef: string, engineRef: string): Promise<void>;

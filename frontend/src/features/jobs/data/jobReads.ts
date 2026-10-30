@@ -11,20 +11,32 @@ const JOB_LIST_KEYS: ReadonlySet<unknown> = new Set([ADMIN_JOBS_KEY, SCOPED_JOBS
 export const JOB_POLL_MS = 5000;
 
 /**
- * How a job page reads its job: again every few seconds while it is queued or running, so the page
- * follows it to the end. SWR polls only while the last read succeeded, so a failed read, such as
- * during a backend restart, is tried again on the same beat until one succeeds. An ended session, a
- * refusal or a job that is gone is not.
+ * Reads again every few seconds while `isActive` holds for the last read, so a page follows its work
+ * to the end. SWR polls only while the last read succeeded, so a failed read, such as during a
+ * backend restart, is tried again on the same beat until one succeeds. An ended session, a refusal
+ * or something that is gone is not.
  */
-export const jobPollConfig = <T extends { status: JobStatus }>(): SWRConfiguration<T> => ({
+export const pollWhileActive = <T>(isActive: (latest: T) => boolean): SWRConfiguration<T> => ({
   shouldRetryOnError: (err: unknown) =>
     !isSessionExpired(err) && !isForbidden(err) && !isNotFound(err),
   onErrorRetry: (_err, _key, _config, revalidate, { retryCount }) => {
     setTimeout(() => void revalidate({ retryCount }), JOB_POLL_MS);
   },
-  refreshInterval: (latest) =>
-    latest?.status === 'queued' || latest?.status === 'running' ? JOB_POLL_MS : 0,
+  refreshInterval: (latest) => (latest !== undefined && isActive(latest) ? JOB_POLL_MS : 0),
 });
+
+/**
+ * The same, for a caller that tracks whether anything is active itself: the option changes only
+ * when `active` does, so other renders do not restart the timer.
+ */
+export const pollEvery = (active: boolean): SWRConfiguration => ({
+  ...pollWhileActive<unknown>(() => active),
+  refreshInterval: active ? JOB_POLL_MS : 0,
+});
+
+/** How a job page reads its job: again every few seconds while it is queued or running. */
+export const jobPollConfig = <T extends { status: JobStatus }>(): SWRConfiguration<T> =>
+  pollWhileActive<T>((latest) => latest.status === 'queued' || latest.status === 'running');
 
 /**
  * Drops every jobs list page, admin and staff, so a list that is not showing reads again when it

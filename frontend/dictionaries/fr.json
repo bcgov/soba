@@ -290,16 +290,21 @@
       "cancelled": "Annulée"
     },
     "types": {
-      "submissionSubmitted": "Soumission reçue"
+      "submissionSubmitted": "Soumission reçue",
+      "submissionExport": "Exportation des soumissions"
     },
     "detail": {
       "heading": "Tâche",
+      "progressValue": "{done} sur {total}",
+      "resultValue": "{filename}, {size}, conservé jusqu'au {expires}",
+      "resultExpired": "Expiré le {expires}",
       "back": "Retour aux tâches",
       "none": "Aucune",
       "loadError": "Échec du chargement de la tâche.",
       "notFound": "Cette tâche est introuvable. Les tâches terminées sont supprimées après un certain temps.",
       "refreshError": "Impossible de relire la tâche; nouvelle tentative en cours.",
       "actionsQueued": "Ses actions ont déjà été mises en file d'attente; elle ne peut donc pas être relancée. Relancez plutôt leurs tâches.",
+      "exportEnded": "Une exportation n'est pas relancée. La personne qui l'a démarrée peut en démarrer une nouvelle à partir de la page Exportations du formulaire.",
       "byValue": "{at}, par {by}",
       "rerunsValue": "{count}, la dernière le {at} par {by}",
       "parentGone": "N'est plus conservée",
@@ -327,6 +332,8 @@
         "started": "Dernier démarrage",
         "nextAttempt": "Prochaine tentative",
         "finished": "Terminée",
+        "progress": "Progression",
+        "result": "Fichier produit",
         "stopRequested": "Arrêt demandé",
         "reruns": "Relances",
         "lastError": "Dernière erreur",
@@ -662,7 +669,7 @@
     "export": {
       "button": "Exporter les soumissions",
       "pageTitle": "Exporter les soumissions",
-      "sampleNotice": "La liste des champs et vos exportations sur cette page sont des données d’exemple. Les exportations ne sont pas encore exécutées.",
+      "sampleNotice": "La liste des champs contient pour l’instant des données d’exemple, et les formats CSV ne sont pas encore appliqués.",
       "back": "Retour aux soumissions",
       "loadError": "Impossible de charger le formulaire.",
       "fieldsError": "Impossible de charger les champs.",
@@ -698,11 +705,45 @@
       "myExports": "Mes exportations",
       "listError": "Impossible de charger vos exportations.",
       "noExports": "Vous n’avez pas encore exporté ce formulaire.",
+      "listNote": "Vos exportations les plus récentes. Un fichier peut être téléchargé jusqu’à la date indiquée; une exportation quitte cette liste 30 jours après la fin, ou 90 jours si elle a échoué ou a été arrêtée.",
+      "itemName": "exportations",
       "startedAt": "Démarrée le",
       "status": "État",
+      "actions": "Actions",
       "statuses": {
-        "queued": "En file d’attente"
-      }
+        "queued": "En file d’attente",
+        "running": "En cours",
+        "ready": "Prête",
+        "expired": "Expirée",
+        "failed": "Échouée",
+        "cancelled": "Annulée"
+      },
+      "endReasons": {
+        "too_large": "Le fichier dépassait la taille maximale. Réduisez les dates ou les champs et exportez de nouveau.",
+        "access_lost": "Vous ne pouvez plus consulter les soumissions de ce formulaire.",
+        "error": "Un problème est survenu. Exportez de nouveau.",
+        "cancelled": "Arrêtée."
+      },
+      "progressValue": "{done} soumissions sur {total}",
+      "stopping": "Arrêt en cours…",
+      "unread": "{count} soumissions n’ont pas pu être lues et ont été omises.",
+      "unreadOne": "1 soumission n’a pas pu être lue et a été omise.",
+      "readyUntil": "Prête jusqu’au {expires}",
+      "expiredOn": "Expirée le {expires}. Exportez de nouveau.",
+      "download": "Télécharger",
+      "downloadLabel": "Télécharger l’exportation démarrée le {started}",
+      "stop": "Arrêter l’exportation",
+      "stopLabel": "Arrêter l’exportation démarrée le {started}",
+      "stopTitle": "Arrêter cette exportation",
+      "stopMessage": "Elle ne produira aucun fichier. Vous pourrez ensuite démarrer une nouvelle exportation.",
+      "keepRunning": "Poursuivre",
+      "stopped": "L’exportation est arrêtée.",
+      "stopRequested": "Arrêt demandé. L’exportation s’arrête à sa prochaine vérification.",
+      "stopFinished": "L’exportation était déjà terminée.",
+      "stopError": "Impossible d’arrêter l’exportation.",
+      "filePageTitle": "Télécharger l’exportation",
+      "backToExports": "Retour aux exportations",
+      "fileNotFound": "Cette exportation n’est plus disponible. Démarrez-en une nouvelle."
     }
   },
   "mySubmissions": {
@@ -773,6 +814,7 @@
     "render_failed": "Le document n’a pas pu être imprimé à partir de ce modèle.",
     "no_saved_data": "Cette soumission n’a aucune réponse enregistrée à imprimer.",
     "group_name_taken": "Un groupe portant ce nom existe déjà dans cet espace de travail. Choisissez un autre nom.",
+    "export_limit_reached": "Ce formulaire a autant d’exportations en cours que permis, les vôtres et celles d’autres personnes. Démarrez-en une autre lorsqu’une sera terminée.",
     "request_invalid": "La demande n’est pas valide. Rechargez la page et réessayez.",
     "request_too_large": "La demande est trop volumineuse.",
     "unauthenticated": "Votre session n’est pas valide. Veuillez vous reconnecter.",

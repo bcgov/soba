@@ -20,6 +20,7 @@ import { registerDocumentGenerationOpenApi } from '../../../../src/features/docu
 import { registerFilesOpenApi } from '../../../../src/features/files/schema';
 import { registerFormSettingsOpenApi } from '../../../../src/features/form-settings';
 import { registerJobsOpenApi } from '../../../../src/features/jobs/schema';
+import { registerSubmissionExportOpenApi } from '../../../../src/features/submission-export/schema';
 import { registerTemplatesOpenApi } from '../../../../src/features/templates/schema';
 
 // The same registrations the API index makes.
@@ -31,6 +32,7 @@ const REGISTRARS: RegisterOpenApiPaths[] = [
   registerGroupsOpenApi,
   registerMeOpenApi,
   registerJobsOpenApi,
+  registerSubmissionExportOpenApi,
   registerMembersOpenApi,
   registerWorkspacesOpenApi,
   registerFilesOpenApi,

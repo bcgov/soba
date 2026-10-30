@@ -13,10 +13,19 @@ import { isConflict } from '@/src/shared/api/dataError';
 import type { WriteOutcome } from '@/src/shared/api/dataContracts';
 import { useDataErrorNotice } from '@/src/shared/api/useDataErrorNotice';
 import { useFormatLongDateTime } from '@/src/shared/hooks/useFormatLongDate';
+import { useSortLocale } from '@/src/shared/list/useSortLocale';
+import { formatFileSize } from '@/src/shared/util/fileSize';
 import { fillTemplate } from '@/src/shared/util/stringUtils';
-import type { JobEmailCounts, JobSummary, JobTypeItem, JobViewModel } from '@/src/types/jobs';
+import type {
+  JobEmailCounts,
+  JobResult,
+  JobSummary,
+  JobTypeItem,
+  JobViewModel,
+} from '@/src/types/jobs';
 import {
   canRerunJob,
+  isExportJob,
   isActiveJobStatus,
   jobStatusVariant,
   jobTypeLabel,
@@ -42,6 +51,25 @@ export const Fact = ({ name, testId, children }: FactProps) => (
 export const TypeLabel = ({ label }: Readonly<{ label: JobTypeLabel }>) => (
   <span lang={label.lang}>{label.text}</span>
 );
+
+/** The file a job produced: its name and size and how long it is kept, or when it expired. */
+function ResultFacts({ result }: Readonly<{ result: JobResult }>) {
+  const dict = useDictionary();
+  const detail = dict.jobs.detail;
+  const formatDateTime = useFormatLongDateTime();
+  const locale = useSortLocale();
+  const expires = formatDateTime(result.expiresAt);
+  if (result.state === 'expired') return <>{fillTemplate(detail.resultExpired, { expires })}</>;
+  return (
+    <>
+      {fillTemplate(detail.resultValue, {
+        filename: result.filename ?? '—',
+        size: result.size == null ? '—' : formatFileSize(result.size, locale),
+        expires,
+      })}
+    </>
+  );
+}
 
 type JobLinkProps = Readonly<{
   job: JobSummary;
@@ -121,6 +149,21 @@ export function JobFacts({
       <Fact name={facts.finished} testId="finished">
         {when(job.finishedAt)}
       </Fact>
+      {job.progress ? (
+        <Fact name={facts.progress} testId="progress">
+          {job.progress.total === null
+            ? String(job.progress.done)
+            : fillTemplate(dictJobs.detail.progressValue, {
+                done: String(job.progress.done),
+                total: String(job.progress.total),
+              })}
+        </Fact>
+      ) : null}
+      {job.result ? (
+        <Fact name={facts.result} testId="result">
+          <ResultFacts result={job.result} />
+        </Fact>
+      ) : null}
       {job.cancelRequestedAt ? (
         <Fact name={facts.stopRequested} testId="stop-requested">
           {stopBy ? by(job.cancelRequestedAt, stopBy) : formatDateTime(job.cancelRequestedAt)}
@@ -318,7 +361,8 @@ export function JobView({ job, refreshFailed, refresh, back, facts, rerun, stop 
         count: String(counts.pending + counts.refused),
       })}`
     : dictDetail.rerunMessage;
-  const rerunnable = canRerunJob(job.status);
+  const endedExport = canRerunJob(job.status) && isExportJob(job.type);
+  const rerunnable = canRerunJob(job.status) && !endedExport;
   const actionsQueued = rerunnable && queuedItsActions(job);
   const canStop = isActiveJobStatus(job.status) && job.cancelRequestedAt === null;
   const stopping = action === 'stop';
@@ -350,6 +394,7 @@ export function JobView({ job, refreshFailed, refresh, back, facts, rerun, stop 
         ) : null}
       </div>
       {actionsQueued ? <p data-testid="job-actions-queued">{dictDetail.actionsQueued}</p> : null}
+      {endedExport ? <p data-testid="job-export-ended">{dictDetail.exportEnded}</p> : null}
 
       {facts}
       {counts ? <JobEmails counts={counts} /> : null}

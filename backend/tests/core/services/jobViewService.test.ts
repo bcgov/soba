@@ -68,6 +68,15 @@ describe('rerunRefusal', () => {
     expect(received({ finishedAt: ago(60 * DAY) })).toBeNull();
   });
 
+  it.each(['dead', 'cancelled'])(
+    'refuses a %s export: its starter starts a new one, under their limit',
+    (status) => {
+      expect(rerunRefusal(facts({ type: JobType.submission_export, status }))).toBe(
+        "Start a new export from the form's Exports page",
+      );
+    },
+  );
+
   it('refuses a job whose lease expired within the last lease, as it may still be running', () => {
     expect(rerunRefusal(facts({ lastError: LEASE_EXPIRED, finishedAt: ago(MINUTE / 2) }))).toBe(
       'Its last run may still be finishing; try again in a minute',
@@ -193,6 +202,7 @@ const loaded = (overrides: Partial<JobRow> = {}): LoadedJob => ({
   },
   children: [],
   emailCounts: { addresses: 2, sent: 1, refused: 1, pending: 0 },
+  output: null,
 });
 
 describe('toJobListItem', () => {
@@ -211,6 +221,40 @@ describe('toJobDetail', () => {
     expect(detail.cancelRequestedBy).toEqual({ id: ADMIN_ID, displayLabel: 'Platform Admin' });
     expect(detail.lastRequeuedBy).toEqual({ id: MEMBER_ID, displayLabel: 'Form Admin' });
     expect(detail.optionNames).toEqual(['to']);
+  });
+
+  it("gives the result's facts and progress, and leaves both out when there are none", () => {
+    const expiresAt = new Date('2026-11-05T12:00:00Z');
+    const detail = toJobDetail({
+      ...loaded(),
+      output: {
+        progress: { done: 40, total: 40 },
+        result: {
+          state: 'ready',
+          filename: 'Permit 2026-10-29.csv',
+          size: 512,
+          contentType: 'text/csv',
+          expiresAt,
+        },
+      },
+    });
+    expect(detail.progress).toEqual({ done: 40, total: 40 });
+    expect(detail.result).toEqual({
+      state: 'ready',
+      filename: 'Permit 2026-10-29.csv',
+      size: 512,
+      contentType: 'text/csv',
+      expiresAt: expiresAt.toISOString(),
+    });
+    expect(
+      toJobDetail({
+        ...loaded(),
+        output: { progress: null, result: { state: 'expired', expiresAt } },
+      }).result,
+    ).toEqual({ state: 'expired', expiresAt: expiresAt.toISOString() });
+    const none = toJobDetail(loaded());
+    expect(none).not.toHaveProperty('progress');
+    expect(none).not.toHaveProperty('result');
   });
 });
 

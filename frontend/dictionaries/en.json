@@ -289,16 +289,21 @@
       "cancelled": "Cancelled"
     },
     "types": {
-      "submissionSubmitted": "Submission received"
+      "submissionSubmitted": "Submission received",
+      "submissionExport": "Submission export"
     },
     "detail": {
       "heading": "Job",
+      "progressValue": "{done} of {total}",
+      "resultValue": "{filename}, {size}, kept until {expires}",
+      "resultExpired": "Expired on {expires}",
       "back": "Back to jobs",
       "none": "None",
       "loadError": "Failed to load the job.",
       "notFound": "This job was not found. Finished jobs are deleted after a while.",
       "refreshError": "Could not read the job again; trying again.",
       "actionsQueued": "Its actions were queued already, so it cannot run again. Run their jobs again instead.",
+      "exportEnded": "An export does not run again. Its starter can start a new one from the form's Exports page.",
       "byValue": "{at}, by {by}",
       "rerunsValue": "{count}, last on {at} by {by}",
       "parentGone": "No longer kept",
@@ -326,6 +331,8 @@
         "started": "Last started",
         "nextAttempt": "Next attempt",
         "finished": "Finished",
+        "progress": "Progress",
+        "result": "File produced",
         "stopRequested": "Stop requested",
         "reruns": "Runs again",
         "lastError": "Last error",
@@ -661,7 +668,7 @@
     "export": {
       "button": "Export submissions",
       "pageTitle": "Export submissions",
-      "sampleNotice": "The field list and your exports on this page are sample data. Exports are not run yet.",
+      "sampleNotice": "The field list is sample data for now, and the CSV formats are not applied yet.",
       "back": "Back to submissions",
       "loadError": "Could not load the form.",
       "fieldsError": "Could not load the fields.",
@@ -697,11 +704,45 @@
       "myExports": "My exports",
       "listError": "Could not load your exports.",
       "noExports": "You have not exported this form yet.",
+      "listNote": "Your latest exports. A file can be downloaded until the date shown; an export leaves this list 30 days after it finishes, or 90 days if it failed or was stopped.",
+      "itemName": "exports",
       "startedAt": "Started",
       "status": "Status",
+      "actions": "Actions",
       "statuses": {
-        "queued": "Queued"
-      }
+        "queued": "Queued",
+        "running": "Running",
+        "ready": "Ready",
+        "expired": "Expired",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      },
+      "endReasons": {
+        "too_large": "The file was over the size limit. Narrow the dates or fields and export again.",
+        "access_lost": "You can no longer read this form's submissions.",
+        "error": "Something went wrong. Export again.",
+        "cancelled": "Stopped."
+      },
+      "progressValue": "{done} of {total} submissions",
+      "stopping": "Stopping…",
+      "unread": "{count} submissions could not be read and were left out.",
+      "unreadOne": "1 submission could not be read and was left out.",
+      "readyUntil": "Ready until {expires}",
+      "expiredOn": "Expired on {expires}. Export again.",
+      "download": "Download",
+      "downloadLabel": "Download the export started {started}",
+      "stop": "Stop export",
+      "stopLabel": "Stop export started {started}",
+      "stopTitle": "Stop this export",
+      "stopMessage": "It will not produce a file. You can start a new export afterwards.",
+      "keepRunning": "Keep running",
+      "stopped": "The export is stopped.",
+      "stopRequested": "Stop requested. The export stops at its next check.",
+      "stopFinished": "The export had already finished.",
+      "stopError": "Could not stop the export.",
+      "filePageTitle": "Download export",
+      "backToExports": "Back to exports",
+      "fileNotFound": "This export is no longer available. Start a new one."
     }
   },
   "mySubmissions": {
@@ -772,6 +813,7 @@
     "render_failed": "The document could not be printed from this template.",
     "no_saved_data": "This submission has no saved answers to print.",
     "group_name_taken": "A group with this name already exists in this workspace. Choose a different name.",
+    "export_limit_reached": "This form has as many exports running as allowed, yours and others'. Start another when one finishes.",
     "request_invalid": "The request was not valid. Reload the page and try again.",
     "request_too_large": "The request is too large.",
     "unauthenticated": "Your session is not valid. Please sign in again.",

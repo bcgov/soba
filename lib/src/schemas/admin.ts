@@ -5,7 +5,14 @@ import {
   FEATURE_SCOPE_SORT_FIELDS,
   SOBA_ADMIN_SORT_FIELDS,
 } from '../sort';
-import { JobEmailCountsSchema, JobSortSchema, JobStatusSchema, JobSummarySchema } from './jobs';
+import {
+  JobEmailCountsSchema,
+  JobProgressSchema,
+  JobResultSchema,
+  JobSortSchema,
+  JobStatusSchema,
+  JobSummarySchema,
+} from './jobs';
 
 export const SobaAdminSortSchema = makeSortEnum(SOBA_ADMIN_SORT_FIELDS);
 
@@ -161,6 +168,10 @@ export const JobDetailSchema = JobListItemSchema.extend({
   children: z.array(JobSummarySchema),
   /** Present for a job that sends emails to a list of addresses. */
   emailCounts: JobEmailCountsSchema.optional(),
+  /** Present once the job has reported progress. */
+  progress: JobProgressSchema.optional(),
+  /** Present for a succeeded job that produced a file. Never downloadable here. */
+  result: JobResultSchema.optional(),
 });
 export type JobDetail = z.infer<typeof JobDetailSchema>;
 

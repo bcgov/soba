@@ -110,8 +110,8 @@ export type SubmissionChangeStatusCode =
  * `not_published` are 404; `*_invalid` and `form_not_ready` are 400;
  * `*_unavailable` and `render_busy` are 503; `render_failed`, `no_saved_data` and `file_infected`
  * are 422; `file_type_blocked` is 415; `file_too_large` and `request_too_large` are 413;
- * `engine_*_rejected` are 400; `unauthenticated` is 401; `rate_limited` is 429;
- * `engine_document_missing` and `internal_error` are 500.
+ * `engine_*_rejected` are 400; `unauthenticated` is 401; `rate_limited` and `*_limit_reached` are
+ * 429; `engine_document_missing` and `internal_error` are 500.
  */
 export const ApiErrorCodes = {
   open_denied: 'open_denied',
@@ -155,6 +155,8 @@ export const ApiErrorCodes = {
   no_saved_data: 'no_saved_data',
   // Workspace groups.
   group_name_taken: 'group_name_taken',
+  // Submission exports: the form already has as many running as allowed.
+  export_limit_reached: 'export_limit_reached',
   // Any route.
   request_invalid: 'request_invalid',
   request_too_large: 'request_too_large',

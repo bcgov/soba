@@ -1,10 +1,18 @@
 /** Background jobs as a form's or a workspace's staff and platform administrators read them. */
-import type { JobEmailCounts, JobSummary, StaffJobListItem } from '@soba/lib';
+import type {
+  JobEmailCounts,
+  JobProgress,
+  JobResult,
+  JobSummary,
+  StaffJobListItem,
+} from '@soba/lib';
 import type { ListQueryArgs } from './list';
 
 export type {
   JobEmailCounts,
   JobFormItem,
+  JobProgress,
+  JobResult,
   JobSummary,
   JobTypeItem,
   ListJobFormsResponse as JobFormsResponse,
@@ -51,4 +59,6 @@ export type JobViewModel = {
   parent?: JobSummary;
   children: JobSummary[];
   emailCounts?: JobEmailCounts;
+  progress?: JobProgress;
+  result?: JobResult;
 };

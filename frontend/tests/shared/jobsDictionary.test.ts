@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { JOB_STATUSES } from '@soba/lib';
+import { JOB_STATUSES, SUBMISSION_EXPORT_END_REASONS, SUBMISSION_EXPORT_STATUSES } from '@soba/lib';
 import en from '@/dictionaries/en.json';
 import fr from '@/dictionaries/fr.json';
 
@@ -14,6 +14,27 @@ const entries = (node: unknown, path = ''): [string, string][] =>
 const keys = (section: unknown) => entries(section).map(([path]) => path);
 const allFilled = (section: unknown) =>
   entries(section).every(([, text]) => text.trim().length > 0);
+
+// Same for the exports page, whose statuses and end reasons come from the lib's lists.
+describe('Submission export copy', () => {
+  it('has the same keys in English and French, all filled', () => {
+    expect(keys(fr.submission.export)).toEqual(keys(en.submission.export));
+    expect(allFilled(en.submission.export)).toBe(true);
+    expect(allFilled(fr.submission.export)).toBe(true);
+  });
+
+  it.each([
+    ['en', en],
+    ['fr', fr],
+  ])('%s names every export status and end reason', (_language, dict) => {
+    expect(Object.keys(dict.submission.export.statuses).sort()).toEqual(
+      [...SUBMISSION_EXPORT_STATUSES].sort(),
+    );
+    expect(Object.keys(dict.submission.export.endReasons).sort()).toEqual(
+      [...SUBMISSION_EXPORT_END_REASONS].sort(),
+    );
+  });
+});
 
 // The type checks the French dictionary against nothing, so a missing French key shows in the page
 // as undefined. These hold the Jobs pages' copy in both languages: the text every reader shares,

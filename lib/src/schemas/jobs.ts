@@ -18,6 +18,28 @@ export const JobSummarySchema = z.object({
 });
 export type JobSummary = z.infer<typeof JobSummarySchema>;
 
+/** How far a job has got; `total` is null when the job does not know it. */
+export const JobProgressSchema = z.object({
+  done: z.number().int().min(0),
+  total: z.number().int().min(0).nullable(),
+});
+export type JobProgress = z.infer<typeof JobProgressSchema>;
+
+export const JOB_RESULT_STATES = ['ready', 'expired'] as const;
+
+/**
+ * The file a succeeded job produced: ready to download until `expiresAt`, then expired. The file's
+ * name, size and type are given only while it is ready.
+ */
+export const JobResultSchema = z.object({
+  state: z.enum(JOB_RESULT_STATES),
+  expiresAt: z.string(),
+  filename: z.string().optional(),
+  size: z.number().int().nullable().optional(),
+  contentType: z.string().nullable().optional(),
+});
+export type JobResult = z.infer<typeof JobResultSchema>;
+
 /**
  * Where a job's emails stand, by address: sent, refused by the provider, or not sent yet. A re-run
  * sends to those not sent yet and tries the refused ones again. Counts only, never addresses.

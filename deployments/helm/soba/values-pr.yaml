@@ -6,8 +6,13 @@ backend:
     notifications: "enabled"
     post-submission: "enabled"
     post-submission-email: "enabled"
+    submission-export: "enabled"
     user-search: "enabled"
   replicas: 1
+  # The PR file store PVC is 1 Gi, shared with attachments and templates.
+  jobs:
+    resultMaxBytes: "52428800"
+    resultRetentionDays: "1"
   # Files and templates on a per-PR PVC, which pr_close deletes with the release. PRs write nothing to S3.
   storage:
     defaultBackend: storage-local
