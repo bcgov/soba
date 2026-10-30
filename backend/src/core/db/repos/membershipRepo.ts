@@ -1,38 +1,46 @@
-import { and, count, eq, exists, ilike, or, sql, inArray } from 'drizzle-orm';
+import { and, count, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
-import { db } from '../client';
+import { WORKSPACE_SORT_FIELDS, type SortLocale, type SortToken } from '@soba/lib';
+import { db, type DbOrTx } from '../client';
 import {
   appUsers,
   identityProviders,
   userIdentities,
   workspaceDisclaimerAcceptances,
   workspaceMemberships,
-  workspaceGroupMemberships,
-  workspaceGroupRoles,
-  rolePermissions,
   workspaces,
 } from '../schema';
-import { getCacheAdapter } from '../../integrations/plugins/PluginRegistry';
-import { membershipKey } from '../../integrations/cache/cacheKeys';
 import { profileHelpers } from '../../auth/jwtClaims';
 import { ForbiddenError } from '../../errors';
 import type { NormalizedProfile, IdpAttributes } from '../../auth/jwtClaims';
-import {
-  GroupMemberKind,
-  Permissions,
-  WorkspaceGroupMembershipStatus,
-  WorkspaceGroupRoleStatus,
-  WorkspaceMembershipRole,
-} from '../codes';
-import { likePattern, orderByForSort, type SortColumns, type SortToken } from '../listSort';
+import { AppUserStatus, WorkspaceMembershipRole, WorkspaceMembershipStatus } from '../codes';
+import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
+import { membershipHoldsPermission } from './formAccessRepo';
 
-/** Second int for `pg_advisory_xact_lock`; must not collide with workspaceRepo / sobaAdminRepo lock ids. */
+/** Second int for `pg_advisory_xact_lock`; must not collide with the other advisory lock ids. */
 const ADV_LOCK_FIND_OR_CREATE_IDENTITY = 2_147_483_622;
 
 export { findUserIdByIdentity } from './identityLookup';
 
-export const findOrCreateUserByIdentity = async (
+/** Stores the identity's IdP attributes; writes nothing when the stored ones already match. */
+export const updateIdentityAttributes = async (
+  identityId: string,
+  idpAttributes: IdpAttributes,
+  executor: DbOrTx = db,
+): Promise<void> => {
+  await executor
+    .update(userIdentities)
+    .set({ idpAttributes, updatedAt: new Date() })
+    .where(
+      and(
+        eq(userIdentities.id, identityId),
+        sql`${userIdentities.idpAttributes} is distinct from ${JSON.stringify(idpAttributes)}::jsonb`,
+      ),
+    );
+};
+
+export const findOrCreateUserByIdentity = (
   providerCode: string,
   subject: string,
   profile?: NormalizedProfile | null,
@@ -48,14 +56,14 @@ export const findOrCreateUserByIdentity = async (
     const provider = providerRow[0];
 
     // Only identity providers present AND active in identity_provider may authenticate.
-    // Unknown or deactivated IdPs are rejected; we no longer implicitly create providers.
-    if (!provider || !provider.isActive) {
+    // Unknown or deactivated IdPs are rejected.
+    if (!provider?.isActive) {
       throw new ForbiddenError(
         `Identity provider '${normalizedProvider}' is not enabled for sign-in`,
       );
     }
 
-    // Advisory lock shape shared with findOrCreateUserByIdentity: hashtext(single ::text param), fixed namespace int.
+    // Serialises first sign-ins of one identity: hashtext(provider, subject) under a fixed namespace int.
     const identityLockPayload = `${provider.code}\u001f${subject}`;
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext(${identityLockPayload}::text), ${ADV_LOCK_FIND_OR_CREATE_IDENTITY})`,
@@ -75,11 +83,7 @@ export const findOrCreateUserByIdentity = async (
     const existingRow = existing[0];
 
     if (existingRow) {
-      const updates: { idpAttributes?: IdpAttributes; updatedAt: Date } = { updatedAt: new Date() };
-      if (idpAttributes != null) updates.idpAttributes = idpAttributes;
-      if (updates.idpAttributes != null) {
-        await tx.update(userIdentities).set(updates).where(eq(userIdentities.id, existingRow.id));
-      }
+      if (idpAttributes != null) await updateIdentityAttributes(existingRow.id, idpAttributes, tx);
       return existingRow.userId;
     }
 
@@ -90,7 +94,7 @@ export const findOrCreateUserByIdentity = async (
         id: uuidv7(),
         displayLabel,
         profile: profile ?? { displayName: subject },
-        status: 'active',
+        status: AppUserStatus.active,
         createdBy: displayLabel,
         updatedBy: displayLabel,
       })
@@ -161,8 +165,12 @@ export const getWorkspaceForUser = async (workspaceId: string, userId: string) =
 };
 
 /** Owner or admin membership roles may manage or mutate workspace settings. */
-export const isWorkspaceManageRole = (role: string): boolean =>
+export const isWorkspaceManageRole = (role: string | null): boolean =>
   role === WorkspaceMembershipRole.owner || role === WorkspaceMembershipRole.admin;
+
+/** Owner, admin and member roles may read the workspace's members and groups; a viewer may not. */
+export const isWorkspacePeopleReadRole = (role: string | null): boolean =>
+  isWorkspaceManageRole(role) || role === WorkspaceMembershipRole.member;
 
 /**
  * All workspace ids the user is an active member of. Used to scope cross-workspace list/search
@@ -177,40 +185,61 @@ export const getActiveWorkspaceIdsForUser = async (userId: string): Promise<stri
   return rows.map((row) => row.workspaceId);
 };
 
+/** A user's display label and their active membership role in one workspace, null for none. */
+export interface ActorMembership {
+  displayLabel: string | null;
+  role: string | null;
+}
+
 /**
- * Invalidate cached membership for a workspace/user after insert/update/delete.
- * Call from code that mutates workspace memberships (e.g. workspaceRepo, seed).
- * The cached row includes `role`, which gates management — a role change that skips this
- * leaves a demoted admin with authority until the cache TTL expires.
+ * The user's display label and their active membership role in the workspace, read together.
+ * Returns null when the user row is gone.
  */
-export const invalidateMembershipCache = (workspaceId: string, userId: string): void => {
-  try {
-    getCacheAdapter().delete(membershipKey(workspaceId, userId));
-  } catch {
-    // Cache adapter may not be available (e.g. during seed before full app init).
-  }
+export const findActorMembership = async (
+  workspaceId: string,
+  userId: string,
+): Promise<ActorMembership | null> => {
+  const rows = await db
+    .select({ displayLabel: appUsers.displayLabel, role: workspaceMemberships.role })
+    .from(appUsers)
+    .leftJoin(
+      workspaceMemberships,
+      and(
+        eq(workspaceMemberships.userId, appUsers.id),
+        eq(workspaceMemberships.workspaceId, workspaceId),
+        eq(workspaceMemberships.status, WorkspaceMembershipStatus.active),
+      ),
+    )
+    .where(eq(appUsers.id, userId))
+    .limit(1);
+  return rows[0] ?? null;
 };
 
-export const WORKSPACE_SORT_FIELDS = ['name', 'kind', 'status', 'updatedAt'] as const;
 export type WorkspaceListSortField = (typeof WORKSPACE_SORT_FIELDS)[number];
 export type WorkspaceListSort = SortToken<WorkspaceListSortField>;
 
 const WORKSPACE_SORT_COLUMNS: SortColumns<WorkspaceListSortField> = {
-  name: { column: workspaces.name, caseInsensitive: true },
+  name: { column: workspaces.name, linguistic: true },
   kind: { column: workspaces.kind },
   status: { column: workspaces.status },
   updatedAt: { column: workspaces.updatedAt },
 };
 
-export interface ListWorkspacesForUserInput {
+export interface WorkspaceMembershipFilter {
   userId: string;
-  offset: number;
-  limit: number;
-  sort: WorkspaceListSort;
   kind?: string;
   status?: string;
   q?: string;
-  requiredPermission?: string;
+  /** Every code must be held, through one of the actor's groups or the `*` wildcard. */
+  requiredPermissions?: readonly string[];
+  disclaimerAccepted?: boolean;
+}
+
+export interface ListWorkspacesForUserInput extends WorkspaceMembershipFilter {
+  offset: number;
+  limit: number;
+  sort: WorkspaceListSort;
+  locale: SortLocale;
 }
 
 export interface WorkspaceListRow {
@@ -225,50 +254,97 @@ export interface WorkspaceListRow {
   updatedAt: Date;
 }
 
+/** Expects workspace_membership joined to workspace and left joined to the disclaimer acceptance. */
+const workspaceMembershipWhere = (filter: WorkspaceMembershipFilter) => {
+  const whereClauses = [
+    eq(workspaceMemberships.userId, filter.userId),
+    eq(workspaceMemberships.status, 'active'),
+  ];
+  if (filter.kind) {
+    whereClauses.push(eq(workspaces.kind, filter.kind));
+  }
+  if (filter.status) {
+    whereClauses.push(eq(workspaces.status, filter.status));
+  }
+  if (filter.q) {
+    const pattern = likePattern(filter.q);
+    whereClauses.push(or(ilike(workspaces.name, pattern), ilike(workspaces.org, pattern)));
+  }
+  for (const code of new Set(filter.requiredPermissions)) {
+    whereClauses.push(membershipHoldsPermission(code));
+  }
+  if (filter.disclaimerAccepted !== undefined) {
+    const acceptedAt = workspaceDisclaimerAcceptances.acceptedAt;
+    whereClauses.push(filter.disclaimerAccepted ? isNotNull(acceptedAt) : isNull(acceptedAt));
+  }
+  return and(...whereClauses);
+};
+
+export interface WorkspaceLookupRow {
+  id: string;
+  name: string;
+  kind: string;
+  role: string;
+  disclaimerAcceptedAt: Date | null;
+}
+
+/** Workspaces for a select, in name order. */
+export const lookupWorkspacesForUser = (
+  input: WorkspaceMembershipFilter & { limit: number; locale: SortLocale },
+): Promise<WorkspaceLookupRow[]> =>
+  db
+    .select({
+      id: workspaces.id,
+      name: workspaces.name,
+      kind: workspaces.kind,
+      role: workspaceMemberships.role,
+      disclaimerAcceptedAt: workspaceDisclaimerAcceptances.acceptedAt,
+    })
+    .from(workspaceMemberships)
+    .innerJoin(workspaces, eq(workspaces.id, workspaceMemberships.workspaceId))
+    .leftJoin(
+      workspaceDisclaimerAcceptances,
+      eq(workspaceDisclaimerAcceptances.workspaceId, workspaces.id),
+    )
+    .where(workspaceMembershipWhere(input))
+    .orderBy(...orderByForSort(WORKSPACE_SORT_COLUMNS, 'name:asc', workspaces.id, input.locale))
+    .limit(input.limit);
+
+export const hasActiveMembership = async (userId: string): Promise<boolean> => {
+  const rows = await db
+    .select({ id: workspaceMemberships.id })
+    .from(workspaceMemberships)
+    .where(and(eq(workspaceMemberships.userId, userId), eq(workspaceMemberships.status, 'active')))
+    .limit(1);
+  return rows.length > 0;
+};
+
+/**
+ * A workspace where the user holds every required code, preferring one whose disclaimer is
+ * accepted. Null when there is none.
+ */
+export const findPermittedWorkspace = async (
+  userId: string,
+  requiredPermissions: readonly string[],
+): Promise<{ disclaimerAccepted: boolean } | null> => {
+  const rows = await db
+    .select({ acceptedAt: workspaceDisclaimerAcceptances.acceptedAt })
+    .from(workspaceMemberships)
+    .innerJoin(workspaces, eq(workspaces.id, workspaceMemberships.workspaceId))
+    .leftJoin(
+      workspaceDisclaimerAcceptances,
+      eq(workspaceDisclaimerAcceptances.workspaceId, workspaces.id),
+    )
+    .where(workspaceMembershipWhere({ userId, requiredPermissions }))
+    .orderBy(sql`${workspaceDisclaimerAcceptances.acceptedAt} is null`)
+    .limit(1);
+  return rows[0] ? { disclaimerAccepted: rows[0].acceptedAt != null } : null;
+};
+
 export const listWorkspacesForUser = async (
   input: ListWorkspacesForUserInput,
 ): Promise<{ items: WorkspaceListRow[]; total: number }> => {
-  const whereClauses = [
-    eq(workspaceMemberships.userId, input.userId),
-    eq(workspaceMemberships.status, 'active'),
-  ];
-  if (input.kind) {
-    whereClauses.push(eq(workspaces.kind, input.kind));
-  }
-  if (input.status) {
-    whereClauses.push(eq(workspaces.status, input.status));
-  }
-  if (input.q) {
-    const pattern = likePattern(input.q);
-    whereClauses.push(or(ilike(workspaces.name, pattern), ilike(workspaces.org, pattern)));
-  }
-  if (input.requiredPermission) {
-    // Correlated to the actor's own membership row above, not just any member of the workspace.
-    whereClauses.push(
-      exists(
-        db
-          .select({ permissionCode: rolePermissions.permissionCode })
-          .from(workspaceGroupMemberships)
-          .innerJoin(
-            workspaceGroupRoles,
-            eq(workspaceGroupRoles.groupId, workspaceGroupMemberships.groupId),
-          )
-          .innerJoin(rolePermissions, eq(rolePermissions.roleCode, workspaceGroupRoles.roleCode))
-          .where(
-            and(
-              eq(workspaceGroupMemberships.workspaceMembershipId, workspaceMemberships.id),
-              eq(workspaceGroupMemberships.workspaceId, workspaceMemberships.workspaceId),
-              eq(workspaceGroupMemberships.memberKind, GroupMemberKind.user),
-              eq(workspaceGroupMemberships.status, WorkspaceGroupMembershipStatus.active),
-              eq(workspaceGroupRoles.status, WorkspaceGroupRoleStatus.active),
-              inArray(rolePermissions.permissionCode, [input.requiredPermission, Permissions.all]),
-            ),
-          ),
-      ),
-    );
-  }
-
-  const where = and(...whereClauses);
+  const where = workspaceMembershipWhere(input);
 
   return readListPage(async (tx) => {
     const items = await tx
@@ -290,7 +366,7 @@ export const listWorkspacesForUser = async (
         eq(workspaceDisclaimerAcceptances.workspaceId, workspaces.id),
       )
       .where(where)
-      .orderBy(...orderByForSort(WORKSPACE_SORT_COLUMNS, input.sort, workspaces.id))
+      .orderBy(...orderByForSort(WORKSPACE_SORT_COLUMNS, input.sort, workspaces.id, input.locale))
       .limit(input.limit)
       .offset(input.offset);
 
@@ -325,7 +401,7 @@ export type MemberListSort = SortToken<MemberListSortField>;
 
 const MEMBER_SORT_COLUMNS: SortColumns<MemberListSortField> = {
   // A user who has never signed in has no label yet.
-  displayLabel: { column: appUsers.displayLabel, nullable: true, caseInsensitive: true },
+  displayLabel: { column: appUsers.displayLabel, nullable: true, linguistic: true },
   role: { column: workspaceMemberships.role },
   status: { column: workspaceMemberships.status },
 };
@@ -335,6 +411,7 @@ export interface ListMembersForWorkspaceInput {
   offset: number;
   limit: number;
   sort: MemberListSort;
+  locale: SortLocale;
   role?: string;
   status?: string;
   q?: string;
@@ -369,7 +446,9 @@ export const listMembersForWorkspace = async (
       .from(workspaceMemberships)
       .innerJoin(appUsers, eq(appUsers.id, workspaceMemberships.userId))
       .where(where)
-      .orderBy(...orderByForSort(MEMBER_SORT_COLUMNS, input.sort, workspaceMemberships.id))
+      .orderBy(
+        ...orderByForSort(MEMBER_SORT_COLUMNS, input.sort, workspaceMemberships.id, input.locale),
+      )
       .limit(input.limit)
       .offset(input.offset);
     const totals = await tx

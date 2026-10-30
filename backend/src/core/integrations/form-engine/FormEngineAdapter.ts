@@ -14,20 +14,29 @@ export interface UpsertSchemaInput {
   schema: Record<string, unknown>;
   /** Optional human-readable title; defaults to the schema's own title. */
   title?: string;
+  /**
+   * The document the version refers to, written when it still exists. When given, every other
+   * document with the version's identity is deleted before the write.
+   */
+  engineRef?: string;
+  /** Abandons the engine calls when it fires. */
+  signal?: AbortSignal;
 }
 
 /** Input for creating a new (immutable) submission document in the engine for a save/revision. */
 export interface CreateSubmissionInput {
   /** Engine ref of the form the submission belongs to (the form version's engineSchemaRef). */
   engineFormRef: string;
-  /** SOBA submission id; part of the deterministic per-revision idempotency key. */
+  /** SOBA submission id; recorded on the engine document for correlation. */
   submissionId: string;
-  /** Target revision number for this save; part of the idempotency key. */
-  revisionNo: number;
+  /** SOBA revision id this document is written for; the idempotency key. */
+  revisionId: string;
   /** SOBA workspace id; recorded on the engine document for tenancy/filtering. */
   workspaceId: string;
   /** The submission answer data to store. */
   data: Record<string, unknown>;
+  /** False stores the answers without the engine's validation, for a draft that may be incomplete. */
+  validate: boolean;
 }
 
 export interface FormEngineAdapter {
@@ -44,8 +53,8 @@ export interface FormEngineAdapter {
   deleteSchema?(engineRef: string): Promise<void>;
   /**
    * Create a new submission document under `engineFormRef`. Each save makes a new (immutable)
-   * document; idempotent per `(submissionId, revisionNo)` via a planted correlation key, so a
-   * retried save converges on one document. Returns the engine ref.
+   * document; idempotent per revision id via a planted correlation key, so a retried write for the
+   * same revision converges on one document. Returns the engine ref.
    */
   createSubmission?(input: CreateSubmissionInput): Promise<{ engineRef: string }>;
   /** Read a submission document by form ref + submission ref, stripped of engine-managed fields. Null if not found. */
@@ -61,4 +70,9 @@ export interface FormEngineAdapter {
    * Returns the schema unchanged if the engine has nothing to do.
    */
   normalizeSchema?(schema: Record<string, unknown>): Record<string, unknown>;
+  /**
+   * The parts of a stored schema that decide what a filler sees and how their answers validate,
+   * without the document's identity and metadata; what a schema hash covers. Pure, no engine call.
+   */
+  renderedSchema?(schema: Record<string, unknown>): Record<string, unknown>;
 }

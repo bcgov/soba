@@ -1,4 +1,18 @@
 import {
+  DOCGEN_AUDIT_SORT_FIELDS,
+  FEATURE_SCOPE_SORT_FIELDS,
+  FORM_SORT_FIELDS,
+  FORM_VERSION_SORT_FIELDS,
+  JOB_SORT_FIELDS,
+  MY_FORM_SORT_FIELDS,
+  SOBA_ADMIN_SORT_FIELDS,
+  STAFF_SUBMISSION_SORT_FIELDS,
+  SUBMISSION_SORT_FIELDS,
+  WORKSPACE_GROUP_SORT_FIELDS,
+  WORKSPACE_SORT_FIELDS,
+  sortTokensFor,
+} from '@soba/lib/sort';
+import {
   readSessionValue,
   removeSessionValues,
   writeSessionValue,
@@ -34,70 +48,98 @@ export const listQueryParams = (spec: ListQuerySpec): string[] => [
 export const urlParamName = (spec: ListQuerySpec, name: string): string =>
   `${spec.resource}.${name}`;
 
-/** Both directions of every field the endpoint declares. */
-const sortOptionsFor = (fields: readonly string[]): string[] =>
-  fields.flatMap((field) => [`${field}:asc`, `${field}:desc`]);
-
-const SUBMISSION_SORT_FIELDS = ['formName', 'submittedAt', 'createdAt', 'updatedAt'] as const;
 const UPDATED_DESC = 'updatedAt:desc';
+const CREATED_DESC = 'createdAt:desc';
 
 export const FORMS_LIST_QUERY: ListQuerySpec = {
   resource: 'forms',
   filters: ['workspace'],
-  sortOptions: sortOptionsFor(['name', 'status', 'createdAt', 'updatedAt']),
-  defaultSort: 'createdAt:desc',
+  sortOptions: sortTokensFor(FORM_SORT_FIELDS),
+  defaultSort: CREATED_DESC,
 };
 
 export const WORKSPACES_LIST_QUERY: ListQuerySpec = {
   resource: 'workspaces',
   filters: [],
-  sortOptions: sortOptionsFor(['name', 'kind', 'status', 'updatedAt']),
+  sortOptions: sortTokensFor(WORKSPACE_SORT_FIELDS),
   defaultSort: 'name:asc',
 };
 
 /** The submissions tab inside the designer. Same shape, its own remembered query. */
 export const FORM_SUBMISSIONS_LIST_QUERY: ListQuerySpec = {
   resource: 'formSubmissions',
-  filters: [],
-  sortOptions: sortOptionsFor(SUBMISSION_SORT_FIELDS),
+  // The review status, and `mine` for the submissions assigned to the caller.
+  filters: ['reviewStatus', 'mine'],
+  sortOptions: sortTokensFor(STAFF_SUBMISSION_SORT_FIELDS),
   // A column carries this one, so the header can report the order and reverse it.
   defaultSort: 'submittedAt:desc',
+};
+
+/** The caller's own submissions in submit mode. */
+export const MY_SUBMISSIONS_LIST_QUERY: ListQuerySpec = {
+  resource: 'mySubmissions',
+  filters: ['state'],
+  sortOptions: sortTokensFor(SUBMISSION_SORT_FIELDS),
+  defaultSort: UPDATED_DESC,
+};
+
+/** The forms the caller holds the submitter role on or has submitted to, in submit mode. */
+export const MY_FORMS_LIST_QUERY: ListQuerySpec = {
+  resource: 'myForms',
+  filters: ['workspace'],
+  sortOptions: sortTokensFor(MY_FORM_SORT_FIELDS),
+  defaultSort: 'name:asc',
 };
 
 /** The version history tab inside the designer. */
 export const FORM_VERSIONS_LIST_QUERY: ListQuerySpec = {
   resource: 'formVersions',
   filters: [],
-  sortOptions: sortOptionsFor(['versionNo', 'state', 'createdAt', 'updatedAt']),
+  sortOptions: sortTokensFor(FORM_VERSION_SORT_FIELDS),
   defaultSort: 'versionNo:desc',
 };
 
-export const SUBMISSIONS_LIST_QUERY: ListQuerySpec = {
-  resource: 'submissions',
+/** The access tab inside the designer. Its columns do not sort. */
+export const FORM_TEAM_LIST_QUERY: ListQuerySpec = {
+  resource: 'formTeam',
   filters: [],
-  sortOptions: sortOptionsFor(['formName', 'submittedAt', 'createdAt', 'updatedAt']),
-  defaultSort: 'updatedAt:desc',
+  sortOptions: ['name:asc'],
+  defaultSort: 'name:asc',
 };
 
 export const SOBA_ADMINS_LIST_QUERY: ListQuerySpec = {
   resource: 'sobaAdmins',
   filters: [],
-  sortOptions: sortOptionsFor(['displayLabel', 'source', 'syncedAt']),
+  sortOptions: sortTokensFor(SOBA_ADMIN_SORT_FIELDS),
   defaultSort: 'displayLabel:asc',
 };
 
 export const FEATURE_SCOPES_LIST_QUERY: ListQuerySpec = {
   resource: 'featureScopes',
   filters: [],
-  sortOptions: sortOptionsFor(['featureCode', 'scopeType', 'status', 'createdAt', 'updatedAt']),
+  sortOptions: sortTokensFor(FEATURE_SCOPE_SORT_FIELDS),
   defaultSort: UPDATED_DESC,
 };
 
 export const DOCGEN_AUDITS_LIST_QUERY: ListQuerySpec = {
   resource: 'docgenAudits',
   filters: [],
-  sortOptions: sortOptionsFor(['createdAt', 'outcome', 'durationMs']),
-  defaultSort: 'createdAt:desc',
+  sortOptions: sortTokensFor(DOCGEN_AUDIT_SORT_FIELDS),
+  defaultSort: CREATED_DESC,
+};
+
+export const JOBS_LIST_QUERY: ListQuerySpec = {
+  resource: 'jobs',
+  filters: ['status', 'type', 'workspaceId', 'formId', 'submissionId'],
+  sortOptions: sortTokensFor(JOB_SORT_FIELDS),
+  defaultSort: CREATED_DESC,
+};
+
+export const WORKSPACE_GROUPS_LIST_QUERY: ListQuerySpec = {
+  resource: 'workspaceGroups',
+  filters: [],
+  sortOptions: sortTokensFor(WORKSPACE_GROUP_SORT_FIELDS),
+  defaultSort: 'name:asc',
 };
 
 const KEY_PREFIX = 'soba.listQuery.';
@@ -111,7 +153,8 @@ const keyFor = (spec: ListQuerySpec) => `${KEY_PREFIX}${spec.resource}`;
 export const NAV_MARKER = 'from';
 const NAV_MARKER_VALUE = 'nav';
 
-export const navLink = (href: string) => `${href}?${NAV_MARKER}=${NAV_MARKER_VALUE}`;
+export const navLink = (href: string) =>
+  `${href}${href.includes('?') ? '&' : '?'}${NAV_MARKER}=${NAV_MARKER_VALUE}`;
 
 /**
  * A link to a list with its query already set. The names come from the spec, so a caller cannot
