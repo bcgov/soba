@@ -38,8 +38,8 @@ export interface JobOutputRow {
   resultStoredThisRun: boolean;
 }
 
-export const readJobOutputs = async (jobIds: string[]): Promise<JobOutputRow[]> => {
-  if (jobIds.length === 0) return [];
+export const readJobOutputs = (jobIds: string[]): Promise<JobOutputRow[]> => {
+  if (jobIds.length === 0) return Promise.resolve([]);
   return quietDb
     .select(jobOutputColumns)
     .from(jobs)
