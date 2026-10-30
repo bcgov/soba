@@ -52,6 +52,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
     },
     submission: {
       error: 'Error',
+      export: { button: 'Export submissions' },
     },
     team: {
       loadError: 'Error',
@@ -60,7 +61,19 @@ vi.mock('@/app/[lang]/Providers', () => ({
       emptyMessage: 'Empty',
       pageOf: 'of {totalPages} page(s)',
     },
+    postSubmission: { tab: 'After Submission' },
   }),
+}));
+
+// Whether post-submission is available, as the server would answer for the scope asked about.
+const availability = vi.hoisted(() => ({ check: vi.fn() }));
+
+vi.mock('@/src/shared/featureFlags/featureAvailability', () => ({
+  fetchFeatureAvailability: availability.check,
+}));
+
+vi.mock('@/src/features/post-submission/ui/FormPostSubmissionTab', () => ({
+  default: () => <div data-testid="post-submission-content" />,
 }));
 
 type Workspace = {
@@ -249,6 +262,7 @@ describe('FormForm', () => {
     store.dispatch(setAuthenticated(true));
     session.authenticated = true;
     session.search = '';
+    availability.check.mockResolvedValue(false);
     mockWorkspaceState.creatable = [{ id: 'ws1', disclaimerAccepted: true }];
     mockWorkspaceState.formCreate = 'allowed';
     mockWorkspaceState.versions = [];
@@ -707,6 +721,98 @@ describe('FormForm', () => {
           expect(screen.queryByTestId(tab)).not.toBeInTheDocument();
         }
       }
+    });
+
+    describe('After Submission', () => {
+      const inWorkspace = (permissions: string[], available: boolean) => {
+        availability.check.mockResolvedValue(available);
+        api.getSobaForm.mockImplementation(() =>
+          Promise.resolve({
+            id: 'f1',
+            name: 'Test',
+            description: '',
+            workspaceId: 'ws1',
+            permissions,
+            currentVersion: newestFirst(mockWorkspaceState.versions)[0] ?? null,
+          }),
+        );
+      };
+      const tabOrder = () =>
+        screen.getAllByRole('tab').map((tab) => tab.getAttribute('data-testid'));
+
+      it('shows the tab right after Settings where post-submission is available for the form', async () => {
+        inWorkspace(['*'], true);
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        await screen.findByTestId('post-submission-tab');
+        const order = tabOrder();
+        expect(order.indexOf('post-submission-tab')).toBe(order.indexOf('settings-tab') + 1);
+        // A grant to the form's workspace counts, so the check names both.
+        expect(availability.check).toHaveBeenCalledWith('post-submission', {
+          workspaceId: 'ws1',
+          formId: 'f1',
+        });
+      });
+
+      it('hides the tab while the check runs and once it answers no', async () => {
+        inWorkspace(['*'], false);
+        let answer: (available: boolean) => void = () => undefined;
+        availability.check.mockReturnValue(
+          new Promise<boolean>((resolve) => {
+            answer = resolve;
+          }),
+        );
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        await waitFor(() => expect(availability.check).toHaveBeenCalled());
+        expect(screen.getByTestId('settings-tab')).toBeInTheDocument();
+        expect(screen.queryByTestId('post-submission-tab')).not.toBeInTheDocument();
+
+        await act(async () => answer(false));
+        expect(screen.getByTestId('settings-tab')).toBeInTheDocument();
+        expect(screen.queryByTestId('post-submission-tab')).not.toBeInTheDocument();
+      });
+
+      it('hides the tab, and asks nothing, without the Settings permission', async () => {
+        inWorkspace(['design_update'], true);
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        expect(await screen.findByTestId('designer-tab')).toBeInTheDocument();
+        expect(screen.queryByTestId('post-submission-tab')).not.toBeInTheDocument();
+        expect(availability.check).not.toHaveBeenCalled();
+      });
+
+      it('opens the tab a link names once the check answers, without opening the builder first', async () => {
+        session.search = 'tab=post-submission';
+        inWorkspace(['*'], true);
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        expect(await screen.findByTestId('post-submission-tab')).toHaveAttribute(
+          'aria-selected',
+          'true',
+        );
+        expect(screen.getByTestId('post-submission-content')).toBeInTheDocument();
+        expect(screen.queryByTestId('form-designer')).not.toBeInTheDocument();
+      });
+
+      it('opens the first visible tab when a link names the tab and it is not available', async () => {
+        session.search = 'tab=post-submission';
+        inWorkspace(['*'], false);
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        expect(await screen.findByTestId('designer-tab')).toHaveAttribute('aria-selected', 'true');
+        expect(screen.queryByTestId('post-submission-tab')).not.toBeInTheDocument();
+      });
     });
   });
 });

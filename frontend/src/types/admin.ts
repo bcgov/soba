@@ -1,5 +1,5 @@
 /** Platform-administration payloads served by the backend `/admin/*` routes. */
-import type { FeatureScopeItem } from '@soba/lib';
+import type { FeatureScopeItem, JobListItem } from '@soba/lib';
 import type { ListQueryArgs } from './list';
 
 export type {
@@ -11,7 +11,27 @@ export type {
   UpsertFeatureScopeBody,
   DocumentGenerationAuditItem,
   ListDocumentGenerationAuditsResponse as DocumentGenerationAuditsResponse,
+  JobListItem,
+  ListJobsResponse as JobsResponse,
+  JobDetail,
+  JobSummary,
+  JobEmailCounts,
+  JobTypeItem,
+  ListJobTypesResponse as JobTypesResponse,
 } from '@soba/lib';
+
+export type JobStatus = JobListItem['status'];
+
+/** The filters the jobs list sends; ids are sent only once they are uuids. */
+export type JobFilters = {
+  status?: JobStatus;
+  type?: string;
+  workspaceId?: string;
+  formId?: string;
+  submissionId?: string;
+};
+
+export type JobsQuery = ListQueryArgs & JobFilters;
 
 export type FeatureScopeType = FeatureScopeItem['scopeType'];
 

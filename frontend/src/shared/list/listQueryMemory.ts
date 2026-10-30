@@ -4,9 +4,11 @@ import {
   FEATURE_SCOPE_SORT_FIELDS,
   FORM_SORT_FIELDS,
   FORM_VERSION_SORT_FIELDS,
+  JOB_SORT_FIELDS,
   MY_FORM_SORT_FIELDS,
   SOBA_ADMIN_SORT_FIELDS,
   SUBMISSION_SORT_FIELDS,
+  WORKSPACE_GROUP_SORT_FIELDS,
   WORKSPACE_SORT_FIELDS,
   sortTokensFor,
 } from '@soba/lib/sort';
@@ -125,6 +127,20 @@ export const DOCGEN_AUDITS_LIST_QUERY: ListQuerySpec = {
   defaultSort: CREATED_DESC,
 };
 
+export const JOBS_LIST_QUERY: ListQuerySpec = {
+  resource: 'jobs',
+  filters: ['status', 'type', 'workspaceId', 'formId', 'submissionId'],
+  sortOptions: sortTokensFor(JOB_SORT_FIELDS),
+  defaultSort: CREATED_DESC,
+};
+
+export const WORKSPACE_GROUPS_LIST_QUERY: ListQuerySpec = {
+  resource: 'workspaceGroups',
+  filters: [],
+  sortOptions: sortTokensFor(WORKSPACE_GROUP_SORT_FIELDS),
+  defaultSort: 'name:asc',
+};
+
 const KEY_PREFIX = 'soba.listQuery.';
 const keyFor = (spec: ListQuerySpec) => `${KEY_PREFIX}${spec.resource}`;
 
@@ -136,7 +152,8 @@ const keyFor = (spec: ListQuerySpec) => `${KEY_PREFIX}${spec.resource}`;
 export const NAV_MARKER = 'from';
 const NAV_MARKER_VALUE = 'nav';
 
-export const navLink = (href: string) => `${href}?${NAV_MARKER}=${NAV_MARKER_VALUE}`;
+export const navLink = (href: string) =>
+  `${href}${href.includes('?') ? '&' : '?'}${NAV_MARKER}=${NAV_MARKER_VALUE}`;
 
 /**
  * A link to a list with its query already set. The names come from the spec, so a caller cannot

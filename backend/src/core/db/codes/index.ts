@@ -126,9 +126,9 @@ export type FeatureStatusCode = (typeof FeatureStatus)[keyof typeof FeatureStatu
 
 /**
  * Feature codes backed by the soba.feature table. Most gate a mounted API surface via
- * requireFeature and mirror the frontend FEATURE_CODES. Templates, dev-data, antivirus,
- * post-submission and the per-backend document generation codes have no frontend code; antivirus
- * gates the upload scan in the core file store rather than a surface of its own.
+ * requireFeature and mirror the frontend FEATURE_CODES. Dev-data, antivirus, notifications,
+ * post-submission-email and the per-backend document generation codes have no frontend code;
+ * antivirus gates the upload scan in the core file store rather than a surface of its own.
  */
 export const Features = {
   design_mode: 'design-mode',
@@ -148,8 +148,10 @@ export const Features = {
   notifications: 'notifications',
   /** Finding people to add to a workspace or a form's team. */
   user_search: 'user-search',
-  /** Backend-only: gates queuing work after a submission is received. */
+  /** Queuing work after a submission is received, and the After Submission tab. */
   post_submission: 'post-submission',
+  /** Emailing a notice to a list of addresses when a form receives a submission. */
+  post_submission_email: 'post-submission-email',
 } as const;
 export type FeatureCode = (typeof Features)[keyof typeof Features];
 

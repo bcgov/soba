@@ -3,7 +3,7 @@ import { cancelReason, type ActionRunFacts } from '../../../src/features/post-su
 jest.mock('../../../src/core/db/client', () => ({ db: {}, quietDb: {} }));
 
 const ready: ActionRunFacts = {
-  postSubmissionOn: true,
+  postSubmissionAvailable: true,
   enabledHere: true,
   featureAvailable: true,
   live: true,
@@ -16,7 +16,7 @@ describe('cancelReason', () => {
   });
 
   it.each([
-    ['postSubmissionOn', 'The post-submission feature is off'],
+    ['postSubmissionAvailable', 'Post-submission is not available for the form'],
     ['enabledHere', 'The action is not enabled in this environment'],
     ['featureAvailable', "The action's feature is not available for the form"],
     ['live', 'The submission, its form or its workspace is gone'],

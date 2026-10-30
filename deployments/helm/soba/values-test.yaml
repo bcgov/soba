@@ -4,7 +4,8 @@ backend:
   features:
     dev-data: "enabled"
     notifications: "enabled"
-    post-submission: "disabled"
+    post-submission: "enabled"
+    post-submission-email: "enabled"
     user-search: "enabled"
   replicas: 2
   sso:
@@ -31,6 +32,8 @@ backend:
     credentialIssuerDefaultCode: credential-issuer-noop
     notificationDefaultCode: notify-v1
     userSearchPlugins: css-v1,user-search-soba
+    # Emails go through Notify test, which only delivers to its safelist.
+    postSubmissionActionPlugins: post-submission-email-addresses
   credentialIssuer:
     apsCredentialIssuerV3:
       apiBaseUrl: https://api.gov.bc.ca/ds/api/v3
@@ -53,6 +56,8 @@ backend:
   notification:
     notifyV1:
       endpoint: https://gw-fe8c5-notify.test.api.gov.bc.ca/api/v1
+      # Keeps one slow send well inside an email job's lease and timeout.
+      timeoutMs: "10000"
   userSearch:
     cssV1:
       apiBaseUrl: https://api.loginproxy.gov.bc.ca/api/v1
@@ -73,13 +78,14 @@ formio:
   internal:
     enabled: true
   replicas: 2
+  nodeOptions: "--max-old-space-size=2048"
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 250m
+      memory: 1Gi
     limits:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 1
+      memory: 3Gi
 
 mongodb:
   # MongoDB runs as its own release from deployments/helm/action-mongodb.

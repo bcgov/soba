@@ -16,9 +16,10 @@ adds a third control per submission, who takes part in it; see
 [Submission participants](#submission-participants).
 
 > **Current status.** The design form routes (`api/forms/route.ts`), the staff submission routes
-> (`api/submissions/route.ts`) and staff print (`features/document-generation/designRoute.ts`) are
-> gated by `requireFormPermissions`, except schema normalize (no workspace), and check the caller's
-> permissions on the form in question (see
+> (`api/submissions/route.ts`), staff print (`features/document-generation/designRoute.ts`) and
+> staff file download (`features/files/designRoute.ts`) are gated by `requireFormPermissions`,
+> except schema normalize (no workspace), and check the caller's permissions on the form in
+> question (see
 > [Resolving a user's permissions](#resolving-a-users-permissions)). Creating a form requires
 > `form_create` and `design_create`; only `form_admin` satisfies that, via `*`. Creating a design on
 > an existing form requires `design_create` and `design_update` (`form_designer`), since the create
@@ -322,8 +323,8 @@ and the rules the routes decide with; My Submissions applies them to each row an
 read with it (`canContinueSubmission`, `canDeleteOwnSubmission`), so a row offers Continue only when
 the caller can still write it and Delete only when they can delete it. The public user's ownership
 grants no delete, because every anonymous caller shares it. Design routes do not use these rules;
-staff read, delete and print submissions through form permissions. Files have no design route, so
-staff download them through `/files` or `/submit/files`, which need a grant. Staff print through
+staff read, delete and print submissions through form permissions. Staff download a submission's
+files through `/design/submissions/:id/files/:fileId` with `submission_read`. Staff print through
 `/design/submissions/:id/{templates,print}` with `submission_read`, and with a template uploaded for
 that print through `/design/print-upload/:id` with `submission_print_upload` as well.
 

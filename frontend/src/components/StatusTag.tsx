@@ -2,13 +2,14 @@
 
 import { Tag, type TagColor } from './Tag';
 
-export type StatusTagVariant = 'primary' | 'info' | 'neutral' | 'success';
+export type StatusTagVariant = 'primary' | 'info' | 'neutral' | 'success' | 'warning';
 
 const VARIANT_COLORS: Record<StatusTagVariant, TagColor> = {
   primary: 'bcBlue',
   info: 'blue',
   neutral: 'grey',
   success: 'green',
+  warning: 'yellow',
 };
 
 type StatusTagProps = {

@@ -1,10 +1,11 @@
-# PR environment — minimal resources, single replica, internal Form.io + MongoDB
+# PR environment - minimal resources, single replica, the dev release's Form.io and MongoDB
 backend:
   # Development data generator: on for PR review environments. Notifications send through notify-v1.
   features:
     dev-data: "enabled"
     notifications: "enabled"
     post-submission: "enabled"
+    post-submission-email: "enabled"
     user-search: "enabled"
   replicas: 1
   # Files and templates on a per-PR PVC, which pr_close deletes with the release. PRs write nothing to S3.
@@ -21,8 +22,8 @@ backend:
     workflowEngineDefaultCode: cs-workflow-v1
     notificationDefaultCode: notify-v1
     userSearchPlugins: css-v1,user-search-soba
-    # Only logs that it ran, so a PR can exercise post-submission actions end to end.
-    postSubmissionActionPlugins: post-submission-log
+    # Emails go through Notify test, which only delivers to its safelist.
+    postSubmissionActionPlugins: post-submission-email-addresses
     # Ephemeral PR namespaces stage temp bytes under os.tmpdir() — no RWX PVC.
     tempStorageDefaultCode: tempstorage-os
     # Virus scan inherits virusscan-clamav from values.yaml: PRs deploy into the dev
@@ -55,6 +56,8 @@ backend:
   notification:
     notifyV1:
       endpoint: https://gw-fe8c5-notify.test.api.gov.bc.ca/api/v1
+      # Keeps one slow send well inside an email job's lease and timeout.
+      timeoutMs: "10000"
   userSearch:
     cssV1:
       apiBaseUrl: https://api.loginproxy.gov.bc.ca/api/v1
@@ -100,25 +103,12 @@ frontend:
 
 formio:
   internal:
-    enabled: true
-  replicas: 1
-  # Formio depends on MongoDB; allow time for MongoDB to be ready after PR deploy
-  readinessProbe:
-    initialDelaySeconds: 45
-    timeoutSeconds: 10
-  livenessProbe:
-    initialDelaySeconds: 60
-  resources:
-    requests:
-      cpu: 25m
-      memory: 128Mi
-    limits:
-      cpu: 250m
-      memory: 512Mi
+    enabled: false
+  external:
+    url: http://soba-dev-formio.b82f30-dev:3001
 
 mongodb:
-  # MongoDB runs as its own release from deployments/helm/action-mongodb. The deploy
-  # workflow supplies external.host and external.authSecretName.
+  # Must stay false: the in-chart MongoDB is gated on this alone, not on formio.internal.enabled.
   internal:
     enabled: false
 

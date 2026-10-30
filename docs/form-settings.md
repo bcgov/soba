@@ -86,6 +86,27 @@ form-level drawer, inheritance, editing or rotation UI in this first version.
 A section's `weight` orders the Settings tab. A module's `weight` orders mounting. The two are
 unrelated, and one group's numbers need not match.
 
+## After Submission tab: `frontend/src/features/post-submission/`
+
+Post-submission actions are set on their own tab, after Settings in the designer and after Form
+Settings on the workspace page, with those tabs' permissions. The tab shows only where the
+`post-submission` feature is available (`data/usePostSubmissionAvailable.ts`). The feature is fixed,
+so that is everywhere while it is enabled; if it is made scoped, a form's check names its workspace
+too, since a workspace grant covers its forms.
+
+| file                               | role                                                                                                                                                                |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data/usePostSubmissionActions.ts` | the actions configurable for a form or a workspace, read anew on each mount; a form's list says whether its workspace can set each                                  |
+| `actions/registry.ts`              | the fields for each action, by plugin code; an action not listed shows as a read-only card                                                                          |
+| `actions/<action>/`                | the action's `Editor` and `View`, its save-time `problem` check and `saved` shape                                                                                   |
+| `ui/FormActionDrawer.tsx`          | a form's drawer: inherit or its own values when the workspace can set the action, its own only when not, read-only for an action set for the workspace only         |
+| `ui/WorkspaceActionDrawer.tsx`     | a workspace's drawer                                                                                                                                                |
+| `ui/useActionDrawer.ts`            | one save at a time, with the success, conflict and refusal messages, and the state of text in the fields: waiting text counts as a change, invalid text blocks Save |
+
+Each action reads and saves under the key `post-submission/<code>` through `useFormSettings` and
+`useWorkspaceSettings`, so a workspace save refreshes its forms' views. Its text lives under
+`postSubmission` in `en.json` and `fr.json`.
+
 ## Feature flags
 
 - No flag: omit `featureCode`.

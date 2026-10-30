@@ -296,3 +296,18 @@ unquoted numbers in values files as floats, so whole numbers are printed without
 {{ toString . | quote }}
 {{- end -}}
 {{- end }}
+
+{{/*
+An hourly email limit for post-submission-email-addresses, from (dict "name" <values key> "value"
+<value>): nothing when "" or unset, else a whole number from 100 to 1000000 as a quoted string.
+Anything else fails the render, so a bad value cannot quietly keep the plugin from loading.
+*/}}
+{{- define "soba.hourlyEmailLimit" -}}
+{{- $raw := include "soba.optionalSetting" .value | trimAll "\"" -}}
+{{- if $raw -}}
+{{- if or (not (regexMatch "^[0-9]+$" $raw)) (lt (atoi $raw) 100) (gt (atoi $raw) 1000000) -}}
+{{- fail (printf "backend.config.%s must be a whole number from 100 to 1000000, got %q" .name $raw) -}}
+{{- end -}}
+{{ $raw | quote }}
+{{- end -}}
+{{- end }}

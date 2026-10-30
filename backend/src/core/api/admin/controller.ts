@@ -6,9 +6,19 @@ import type {
   FeatureScopeItem,
   ListDocumentGenerationAuditsResponse,
   ListFeatureScopesResponse,
+  ListJobsResponse,
+  ListJobTypesResponse,
   ListSobaAdminsResponse,
   SobaAdminItem,
 } from '@soba/lib';
+import { listJobsForAdmin } from '../../db/repos/jobAdminRepo';
+import {
+  getJobDetail,
+  listJobTypes,
+  rerunJob,
+  stopJob,
+  toJobListItem,
+} from '../../services/jobAdminService';
 import {
   listSobaAdmins,
   addDirectSobaAdmin,
@@ -36,10 +46,12 @@ import { asyncHandler } from '../shared/asyncHandler';
 import {
   AddSobaAdminBodySchema,
   FeatureScopeIdParamsSchema,
+  JobIdParamsSchema,
   ListFeatureScopesQuerySchema,
   ListDocumentGenerationAuditsQuerySchema,
   ListSobaAdminsQuerySchema,
   UpsertFeatureScopeBodySchema,
+  type ListJobsQuery,
 } from './schema';
 import type { Request } from 'express';
 
@@ -210,3 +222,47 @@ export const listDocumentGenerationAuditsHandler = asyncHandler(
     res.json(body);
   },
 );
+
+type JobIdParams = z.infer<typeof JobIdParamsSchema>;
+
+export const listJobsHandler = asyncHandler(async (req: Request, res: Response) => {
+  const query = req.query as unknown as ListJobsQuery;
+  const filters = {
+    status: query.status,
+    type: query.type,
+    workspaceId: query.workspaceId,
+    formId: query.formId,
+    submissionId: query.submissionId,
+  };
+  const { items, total } = await listJobsForAdmin({
+    ...filters,
+    offset: query.offset,
+    limit: query.limit,
+    sort: query.sort,
+  });
+  const body: ListJobsResponse = {
+    items: items.map(toJobListItem),
+    page: { offset: query.offset, limit: query.limit, total },
+    filters,
+    sort: query.sort,
+  };
+  res.json(body);
+});
+
+export const listJobTypesHandler = (_req: Request, res: Response) => {
+  const body: ListJobTypesResponse = { items: listJobTypes() };
+  res.json(body);
+};
+
+export const getJobHandler = asyncHandler(async (req: Request<JobIdParams>, res: Response) => {
+  res.json(await getJobDetail(req.params.jobId));
+});
+
+export const rerunJobHandler = asyncHandler(async (req: Request<JobIdParams>, res: Response) => {
+  res.json(await rerunJob(req.params.jobId, req.actorId!));
+});
+
+export const stopJobHandler = asyncHandler(async (req: Request<JobIdParams>, res: Response) => {
+  const { stopped, job } = await stopJob(req.params.jobId, req.actorId!);
+  res.status(stopped ? 200 : 202).json(job);
+});

@@ -1,3 +1,5 @@
+import { DrizzleQueryError } from 'drizzle-orm/errors';
+import { pgErrorFields } from '../db/pgError';
 import type { JobFinish } from '../db/repos/jobRepo';
 import { backoffDelayMs } from './timing';
 
@@ -12,8 +14,21 @@ export class JobCancelledError extends Error {}
 
 const MAX_ERROR_LENGTH = 2000;
 
-export const errorText = (err: unknown): string =>
-  (err instanceof Error ? err.message : String(err)).slice(0, MAX_ERROR_LENGTH);
+/**
+ * The text recorded and logged for a failed job. A database error's message carries the query and
+ * its values, which can hold submitted data or addresses, so it is named by its code instead.
+ */
+export const errorText = (err: unknown): string => {
+  const pg = pgErrorFields(err);
+  if (pg) {
+    const on = pg.constraint ? ` on ${pg.constraint}` : '';
+    return `Database error ${pg.code}${on}`;
+  }
+  if (err instanceof DrizzleQueryError) {
+    return err.cause ? `Database query failed: ${err.cause.name}` : 'Database query failed';
+  }
+  return (err instanceof Error ? err.message : String(err)).slice(0, MAX_ERROR_LENGTH);
+};
 
 /**
  * What to record when a handler returns; `error` is undefined when it succeeded. A success is

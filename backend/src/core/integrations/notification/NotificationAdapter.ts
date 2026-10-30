@@ -1,7 +1,8 @@
 import { z } from 'zod';
+import { EmailAddressSchema } from '@soba/lib';
 import type { PluginConfigReader } from '../../config/pluginConfig';
 
-const addresses = z.array(z.email()).max(100);
+const addresses = z.array(EmailAddressSchema).max(100);
 
 export const SendEmailSchema = z.strictObject({
   recipients: z.strictObject({

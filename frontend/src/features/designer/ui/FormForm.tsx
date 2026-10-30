@@ -20,6 +20,8 @@ import FormTeamTab from './FormTeamTab';
 import FormHistoryTab from './FormHistoryTab';
 import FormSubmissionTab from './FormSubmissionTab';
 import FormShareTab from './FormShareTab';
+import FormPostSubmissionTab from '@/src/features/post-submission/ui/FormPostSubmissionTab';
+import { usePostSubmissionAvailable } from '@/src/features/post-submission/data/usePostSubmissionAvailable';
 import { useWorkspace } from '@/src/shared/api/useWorkspaces';
 import { lookupTruncatedNote, withSelectedOption } from '@/src/shared/list/lookupOptions';
 import { useForm, useFormWriter } from '@/src/features/designer/data/useForm';
@@ -93,6 +95,7 @@ function draftNotices(args: {
 
 const DESIGNER_TAB = 'designer';
 const SETTINGS_TAB = 'settings';
+const POST_SUBMISSION_TAB = 'post-submission';
 const ACCESS_TAB = 'team';
 const HISTORY_TAB = 'version';
 const SUBMISSIONS_TAB = 'submissions';
@@ -101,6 +104,8 @@ const SHARE_TAB = 'share';
 function useActiveTab(permissions: {
   canSeeDesignTab?: boolean;
   canSeeSettingsTab?: boolean;
+  /** Undefined until the feature check answers. */
+  canSeePostSubmissionTab?: boolean;
   canSeeAccessTab?: boolean;
   canSeeHistoryTab?: boolean;
   canSeeSubmissionsTab?: boolean;
@@ -121,12 +126,17 @@ function useActiveTab(permissions: {
     permissions.canSeeAccessTab !== undefined &&
     permissions.canSeeHistoryTab !== undefined &&
     permissions.canSeeSubmissionsTab !== undefined;
+  // A link to the After Submission tab waits for the feature check rather than open another tab
+  // first; no other link waits on it.
+  const waitsForRequested =
+    requestedTab === POST_SUBMISSION_TAB && permissions.canSeePostSubmissionTab === undefined;
 
   let activeTab = selectedTab;
-  if (!selectedTab && permsLoaded) {
+  if (!selectedTab && permsLoaded && !waitsForRequested) {
     const validTabs = [
       permissions.canSeeDesignTab && DESIGNER_TAB,
       permissions.canSeeSettingsTab && SETTINGS_TAB,
+      permissions.canSeePostSubmissionTab && POST_SUBMISSION_TAB,
       permissions.canSeeAccessTab && ACCESS_TAB,
       permissions.canSeeHistoryTab && HISTORY_TAB,
       permissions.canSeeSubmissionsTab && SUBMISSIONS_TAB,
@@ -235,9 +245,16 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     return hasPermission(permissions, Permissions.submission_read);
   }, [permissions]);
 
+  // The tab needs the Settings tab's permission and post-submission available for this form.
+  const postSubmissionAvailable = usePostSubmissionAvailable(
+    canSeeSettingsTab && form?.workspaceId ? { workspaceId: form.workspaceId, formId } : null,
+  );
+  const canSeePostSubmissionTab = canSeeSettingsTab && postSubmissionAvailable;
+
   const { activeTab, openedTabs, openTab } = useActiveTab({
     canSeeDesignTab,
     canSeeSettingsTab,
+    canSeePostSubmissionTab,
     canSeeAccessTab,
     canSeeHistoryTab,
     canSeeSubmissionsTab,
@@ -517,6 +534,16 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
             title={dict.form.settingsTab || 'Settings'}
           >
             <FormSettingsTab dict={dict} formId={formId} />
+          </Tab>
+        )}
+        {canSeePostSubmissionTab && (
+          <Tab
+            eventKey={POST_SUBMISSION_TAB}
+            tabAttrs={{ 'data-testid': 'post-submission-tab' }}
+            disabled={isSaving || draftUnavailable}
+            title={dict.postSubmission.tab}
+          >
+            <FormPostSubmissionTab dict={dict} formId={formId} />
           </Tab>
         )}
         {canSeeAccessTab && (

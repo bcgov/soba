@@ -65,6 +65,15 @@ data:
   {{- with include "soba.optionalSetting" .Values.backend.config.postSubmissionActionPlugins }}
   POST_SUBMISSION_ACTION_PLUGINS: {{ . }}
   {{- end }}
+  {{- with include "soba.hourlyEmailLimit" (dict "name" "postSubmissionEmailFormHourlyLimit" "value" .Values.backend.config.postSubmissionEmailFormHourlyLimit) }}
+  PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_FORM_HOURLY_LIMIT: {{ . }}
+  {{- end }}
+  {{- with include "soba.hourlyEmailLimit" (dict "name" "postSubmissionEmailWorkspaceHourlyLimit" "value" .Values.backend.config.postSubmissionEmailWorkspaceHourlyLimit) }}
+  PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_WORKSPACE_HOURLY_LIMIT: {{ . }}
+  {{- end }}
+  {{- with include "soba.hourlyEmailLimit" (dict "name" "postSubmissionEmailEnvironmentHourlyLimit" "value" .Values.backend.config.postSubmissionEmailEnvironmentHourlyLimit) }}
+  PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_ENVIRONMENT_HOURLY_LIMIT: {{ . }}
+  {{- end }}
   {{- with include "soba.optionalSetting" .Values.backend.config.shutdownDelayMs }}
   SHUTDOWN_DELAY_MS: {{ . }}
   {{- end }}

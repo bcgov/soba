@@ -24,6 +24,8 @@ export const WORKSPACE_SORT_FIELDS = ['name', 'kind', 'status', 'updatedAt'] as 
 
 export const SOBA_ADMIN_SORT_FIELDS = ['displayLabel', 'source', 'syncedAt'] as const;
 
+export const WORKSPACE_GROUP_SORT_FIELDS = ['name'] as const;
+
 export const FEATURE_SCOPE_SORT_FIELDS = [
   'featureCode',
   'scopeType',
@@ -35,6 +37,7 @@ export const FEATURE_SCOPE_SORT_FIELDS = [
 export const DOCGEN_AUDIT_SORT_FIELDS = ['createdAt', 'outcome', 'durationMs'] as const;
 
 export const CREDENTIAL_SORT_FIELDS = ['label', 'status', 'createdAt'] as const;
+export const JOB_SORT_FIELDS = ['createdAt', 'finishedAt'] as const;
 
 export type SortDirection = 'asc' | 'desc';
 

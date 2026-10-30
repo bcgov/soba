@@ -35,30 +35,36 @@ const EMPTY_VERSIONS: FormVersionSummary[] = [];
 /** The design read of a form, with the caller's permissions on it. */
 export const designFormKey = (formId: string) => ['design-form', formId] as const;
 
+/** The design read of a form; no id waits. */
+export function useDesignFormRead(formId?: string) {
+  return useAuthedSWR(
+    formId ? designFormKey(formId) : null,
+    (token) => getSobaForm(token, formId as string),
+    sessionReadConfig,
+  );
+}
+
+/** A form's versions for pickers, capped (see `truncated`); no id waits. */
+export function useFormVersionLookup(formId?: string) {
+  return useAuthedSWR(
+    formId ? [...versionsKey(formId), 'lookup'] : null,
+    (token) => lookupFormVersions(token, formId as string),
+    sessionReadConfig,
+  );
+}
+
 /**
  * What the designer is editing: the form, its current version, the selected version's schema, and
  * the unsaved edits layered over them. Edits are held apart from the loaded values so a
  * revalidation can never overwrite what the user has typed.
  */
 export function useForm(formId?: string) {
-  const {
-    data: form,
-    mutate: refreshForm,
-    error: formError,
-  } = useAuthedSWR(
-    formId ? designFormKey(formId) : null,
-    (token) => getSobaForm(token, formId as string),
-    sessionReadConfig,
-  );
+  const { data: form, mutate: refreshForm, error: formError } = useDesignFormRead(formId);
 
   // Save and publish target this version, so it comes from the form and never from the options.
   const currentVersion: FormVersionSummary | null = form?.currentVersion ?? null;
 
-  const { data: versionOptions, error: versionsError } = useAuthedSWR(
-    formId ? [...versionsKey(formId), 'lookup'] : null,
-    (token) => lookupFormVersions(token, formId as string),
-    sessionReadConfig,
-  );
+  const { data: versionOptions, error: versionsError } = useFormVersionLookup(formId);
   const versions = Array.isArray(versionOptions?.items) ? versionOptions.items : EMPTY_VERSIONS;
 
   const [selectedVersionId, setSelectedVersionId] = useState<string>('current');

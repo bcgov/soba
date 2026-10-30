@@ -54,8 +54,8 @@ app.set('trust proxy', env.getTrustProxySetting());
 
 initializePassport();
 
-// The browser can only read the echoed workspace header if it's explicitly exposed.
-const corsExposedHeaders = [];
+// Downloads read their file name from Content-Disposition.
+const corsExposedHeaders = ['Content-Disposition'];
 // CORS is always restricted to an explicit allowlist of trusted origins (never `*`).
 // Production origins come from CORS_ORIGIN; in development we fall back to CORS_DEV_ORIGIN
 // (configurable per developer via .env) when CORS_ORIGIN is unset.

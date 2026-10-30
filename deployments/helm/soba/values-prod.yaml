@@ -4,7 +4,8 @@ backend:
   features:
     dev-data: "disabled"
     notifications: "disabled"
-    post-submission: "disabled"
+    post-submission: "enabled"
+    post-submission-email: "enabled"
     user-search: "disabled"
   replicas: 3
   resources:
@@ -31,6 +32,14 @@ backend:
     tenantEngineDefaultCode: cstar-v1
     # Switch to aps-credential-issuer-v3 after filling the environment appId below and adding Vault credentials.
     credentialIssuerDefaultCode: credential-issuer-noop
+    # Email jobs end cancelled while notifications are disabled. Sending needs the notifications
+    # feature enabled, notificationDefaultCode notify-v1, notification.notifyV1.endpoint, and
+    # PLUGIN_NOTIFY_V1_API_KEY in the Vault secret.
+    postSubmissionActionPlugins: post-submission-email-addresses
+  notification:
+    notifyV1:
+      # Keeps one slow send well inside an email job's lease and timeout.
+      timeoutMs: "10000"
   credentialIssuer:
     apsCredentialIssuerV3:
       apiBaseUrl: https://api.gov.bc.ca/ds/api/v3

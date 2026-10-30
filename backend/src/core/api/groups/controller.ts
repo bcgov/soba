@@ -9,10 +9,12 @@ import {
   CreateGroupBodySchema,
   GroupIdParamsSchema,
   GroupMemberParamsSchema,
+  ListGroupsQuerySchema,
   SetGroupRolesBodySchema,
   UpdateGroupBodySchema,
 } from './schema';
 
+type ListGroupsQuery = z.infer<typeof ListGroupsQuerySchema>;
 type CreateGroupBody = z.infer<typeof CreateGroupBodySchema>;
 type UpdateGroupBody = z.infer<typeof UpdateGroupBodySchema>;
 type SetGroupRolesBody = z.infer<typeof SetGroupRolesBodySchema>;
@@ -21,7 +23,15 @@ type GroupIdParams = z.infer<typeof GroupIdParamsSchema>;
 type GroupMemberParams = z.infer<typeof GroupMemberParamsSchema>;
 
 export const listGroups = asyncHandler(async (req: Request, res: Response) => {
-  const result = await groupsApiService.list(withSortLocale(req));
+  const result = await groupsApiService.list(
+    withSortLocale(req),
+    req.query as unknown as ListGroupsQuery,
+  );
+  res.json(result);
+});
+
+export const getGroup = asyncHandler(async (req: Request<GroupIdParams>, res: Response) => {
+  const result = await groupsApiService.get(withSortLocale(req), req.params.groupId);
   res.json(result);
 });
 

@@ -18,10 +18,13 @@ describe.each([
   });
 });
 
-describe.each(['user-search', 'credentials'])('%s feature schema module', (name) => {
-  it('loads when it is the first module to require @soba/lib', async () => {
-    await jest.isolateModulesAsync(async () => {
-      await expect(import(`../../../../src/features/${name}/schema`)).resolves.toBeDefined();
+describe.each(['user-search', 'credentials', 'post-submission/settings'])(
+  '%s feature schema module',
+  (name) => {
+    it('loads when it is the first module to require @soba/lib', async () => {
+      await jest.isolateModulesAsync(async () => {
+        await expect(import(`../../../../src/features/${name}/schema`)).resolves.toBeDefined();
+      });
     });
-  });
-});
+  },
+);

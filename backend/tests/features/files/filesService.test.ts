@@ -213,6 +213,25 @@ describe('filesService', () => {
     expect(await filesService.getForCaller(record.id, owner)).toBe('notfound');
   });
 
+  it('gives staff a file attached to the submission, with no participant check', async () => {
+    const record = await uploadFor('sub1', 'staff.txt');
+
+    const got = await filesService.getForSubmission('ws1', 'sub1', record.id);
+    if (typeof got === 'string' || !got.file.downloadStream) {
+      throw new Error('expected a file with a download stream');
+    }
+    expect(await readAll(got.file.downloadStream)).toBe('abc');
+    expect(readMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses staff a file of another submission or another workspace', async () => {
+    const record = await uploadFor('sub1', 'other.txt');
+
+    expect(await filesService.getForSubmission('ws1', 'sub2', record.id)).toBe('notfound');
+    expect(await filesService.getForSubmission('ws2', 'sub1', record.id)).toBe('notfound');
+    expect(await filesService.getForSubmission('ws1', 'sub1', 'no-such-file')).toBe('notfound');
+  });
+
   it('lets only a participant delete an un-submitted attachment', async () => {
     const record = await uploadFor('sub1', 'd.txt');
     submissionMock.mockResolvedValue({
