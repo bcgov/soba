@@ -83,9 +83,6 @@ data:
   {{- with include "soba.optionalSetting" .Values.backend.config.submissionExportActiveLimit }}
   SUBMISSION_EXPORT_ACTIVE_LIMIT: {{ . }}
   {{- end }}
-  {{- with include "soba.optionalSetting" .Values.backend.config.submissionExportStubRowDelayMs }}
-  SUBMISSION_EXPORT_STUB_ROW_DELAY_MS: {{ . }}
-  {{- end }}
   {{- $jobEnv := dict
       "pools" "JOB_POOLS"
       "lightPollMs" "JOB_LIGHT_POLL_MS"

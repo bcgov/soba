@@ -1,19 +1,34 @@
-import { and, count, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
-import { DEFAULT_SORT_LOCALE, type SUBMISSION_EXPORT_SORT_FIELDS, type SortToken } from '@soba/lib';
+import {
+  DEFAULT_SORT_LOCALE,
+  SUBMISSION_EXPORT_STATES,
+  type SUBMISSION_EXPORT_SORT_FIELDS,
+  type SortToken,
+} from '@soba/lib';
 import { quietDb, type DbOrTx } from '../client';
 import { readListPage } from '../listRead';
 import { orderByForSort, type SortColumns } from '../listSort';
 import {
   JobStatus,
   JobType,
+  PUBLIC_PROVIDER_CODE,
   SubmissionExportAuditAction,
   type SubmissionExportAuditActionCode,
 } from '../codes';
-import { files, formVersions, forms, jobs, submissionExportAudits } from '../schema';
+import {
+  appUsers,
+  files,
+  formVersions,
+  forms,
+  jobs,
+  submissionExportAudits,
+  submissions,
+  userIdentities,
+} from '../schema';
 import { jobOutputColumns, onResultFile, type JobOutputRow } from './jobOutputRepo';
 import { insertJob } from './jobRepo';
-import { liveForm } from './liveRows';
+import { liveForm, liveSubmission } from './liveRows';
 
 /** First int for `pg_advisory_xact_lock` on a form's exports; no other lock uses it. */
 const ADV_LOCK_SUBMISSION_EXPORT_START = 1_703_221_419;
@@ -209,4 +224,105 @@ export const getLiveForm = async (
     .from(forms)
     .where(and(eq(forms.id, formId), liveForm));
   return row ?? null;
+};
+
+/** Which of a form's submissions an export reads. */
+export interface ExportSubmissionRange {
+  workspaceId: string;
+  formId: string;
+  /** Absent means every version. */
+  formVersionId?: string;
+  /** Submitted in [from, to). */
+  from?: Date;
+  to: Date;
+}
+
+/** Where an export page ended: its last submission's time, as Postgres wrote it, and id. */
+export interface ExportSubmissionCursor {
+  submittedAt: string;
+  submissionId: string;
+}
+
+/** Shown as the submitter of an anonymous submission. */
+export const PUBLIC_SUBMITTER = 'public';
+
+/**
+ * The form's live submissions in an exported state, submitted in the range. Expects `forms` and
+ * `formVersions` joined.
+ */
+export const exportSubmissionsWhere = (range: ExportSubmissionRange) =>
+  and(
+    eq(submissions.workspaceId, range.workspaceId),
+    eq(submissions.formId, range.formId),
+    range.formVersionId ? eq(submissions.formVersionId, range.formVersionId) : undefined,
+    inArray(submissions.workflowState, [...SUBMISSION_EXPORT_STATES]),
+    range.from ? gte(submissions.submittedAt, range.from) : undefined,
+    lt(submissions.submittedAt, range.to),
+    liveSubmission,
+  );
+
+/**
+ * After the cursor in submission order. The time is compared as Postgres wrote it, as a JS date
+ * would drop its microseconds and read the same row again.
+ */
+export const afterExportSubmission = (cursor: ExportSubmissionCursor) =>
+  sql`(${submissions.submittedAt}, ${submissions.id}) > (${cursor.submittedAt}::timestamptz, ${cursor.submissionId}::uuid)`;
+
+export interface ExportSubmissionRow {
+  submissionId: string;
+  confirmationCode: string;
+  versionId: string;
+  submittedAt: Date;
+  /** `submittedAt` as Postgres wrote it, for the next page's cursor. */
+  submittedAtText: string;
+  /** The submitter's display label, or `public` for an anonymous submission. */
+  submitter: string;
+  engineSchemaRef: string | null;
+  engineSubmissionRef: string | null;
+}
+
+const exportSubmissionColumns = {
+  submissionId: submissions.id,
+  confirmationCode: submissions.confirmationCode,
+  versionId: submissions.formVersionId,
+  // The range only matches submitted rows, so the time is always there.
+  submittedAt: sql<Date>`${submissions.submittedAt}`.mapWith(submissions.submittedAt),
+  submittedAtText: sql<string>`${submissions.submittedAt}::text`,
+  submitter: sql<string>`case when ${appUsers.id} is null or ${userIdentities.id} is not null then ${PUBLIC_SUBMITTER} else coalesce(${appUsers.displayLabel}, '') end`,
+  engineSchemaRef: formVersions.engineSchemaRef,
+  engineSubmissionRef: submissions.engineSubmissionRef,
+};
+
+/** One page of the range's submissions in submission order, after the cursor when given. */
+export const readExportSubmissionPage = (
+  range: ExportSubmissionRange,
+  after: ExportSubmissionCursor | null,
+  limit: number,
+): Promise<ExportSubmissionRow[]> =>
+  quietDb
+    .select(exportSubmissionColumns)
+    .from(submissions)
+    .innerJoin(forms, eq(forms.id, submissions.formId))
+    .innerJoin(formVersions, eq(formVersions.id, submissions.formVersionId))
+    .leftJoin(appUsers, eq(appUsers.id, submissions.submittedBy))
+    .leftJoin(
+      userIdentities,
+      and(
+        eq(userIdentities.userId, submissions.submittedBy),
+        eq(userIdentities.identityProviderCode, PUBLIC_PROVIDER_CODE),
+      ),
+    )
+    .where(and(exportSubmissionsWhere(range), after ? afterExportSubmission(after) : undefined))
+    .orderBy(asc(submissions.submittedAt), asc(submissions.id))
+    .limit(limit);
+
+/** How many submissions the range covers. */
+export const countExportSubmissions = async (range: ExportSubmissionRange): Promise<number> => {
+  const [row] = await quietDb
+    .select({ total: count() })
+    .from(submissions)
+    .innerJoin(forms, eq(forms.id, submissions.formId))
+    .innerJoin(formVersions, eq(formVersions.id, submissions.formVersionId))
+    .where(exportSubmissionsWhere(range));
+  return row?.total ?? 0;
 };

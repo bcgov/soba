@@ -1,5 +1,3 @@
-import { setTimeout as delay } from 'node:timers/promises';
-import { env } from '../../core/config/env';
 import sampleData from './sampleData.json';
 
 /** Which submissions an export covers, fixed when it was started. */
@@ -39,31 +37,6 @@ export interface ExportSource {
   /** The submissions in the bounds, oldest first; stops with the signal's reason once aborted. */
   rows(bounds: ExportBounds, options: ExportRowsOptions): AsyncIterable<ExportRow>;
 }
-
-const sampleRows = sampleData.rows as ExportRow[];
-
-/** The rows from `index` on, pausing after each; stops with the signal's reason once aborted. */
-async function* paced(
-  rows: readonly ExportRow[],
-  pauseMs: number,
-  signal: AbortSignal,
-  index = 0,
-): AsyncGenerator<ExportRow> {
-  if (index >= rows.length) return;
-  signal.throwIfAborted();
-  yield rows[index];
-  if (pauseMs > 0) await delay(pauseMs, undefined, { signal });
-  yield* paced(rows, pauseMs, signal, index + 1);
-}
-
-/**
- * Placeholder until the submissions query and the form engine read are in: the same sample rows for
- * every form and filter, with an optional pause after each so a running export can be watched.
- */
-export const sampleExportSource: ExportSource = {
-  count: () => Promise.resolve(sampleRows.length),
-  rows: (_bounds, { signal }) => paced(sampleRows, env.getSubmissionExportStubRowDelayMs(), signal),
-};
 
 /** Placeholder field list for the export page: the sample fields until it is read from the form. */
 export const sampleExportFields = (): string[] => [...sampleData.fields];

@@ -167,11 +167,8 @@ backend:
     # that under the pod's 30 s grace period. "" uses the defaults in code (5000 and 28000).
     shutdownDelayMs: ""
     shutdownTimeoutMs: ""
-    # Queued or running submission exports one form may have (default 2), and a pause after each
-    # sample row the placeholder export source yields, so a running export can be watched
-    # (default 0; dev and PR set it).
+    # Queued or running submission exports one form may have (default 2).
     submissionExportActiveLimit: ""
-    submissionExportStubRowDelayMs: ""
 
   # -- configmap-app: background job runner (JOB_*). "" uses the default in code.
   jobs:

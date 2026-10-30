@@ -20,8 +20,8 @@ import {
 extendZodWithOpenApi(z);
 
 const EXPORTS_PATH = '/design/forms/{id}/exports';
-// Placeholder: added to the route descriptions while the fields and rows are sample data.
-const SAMPLE_NOTE = 'The field list and the exported rows are sample data for now.';
+// Placeholder: added to the route descriptions while the field list is sample data.
+const SAMPLE_NOTE = 'The field list is sample data for now.';
 
 export const FormIdParamSchema = z.object({ id: z.uuid() }).openapi('SubmissionExport_FormIdParam');
 

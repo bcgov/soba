@@ -668,7 +668,7 @@
     "export": {
       "button": "Export submissions",
       "pageTitle": "Export submissions",
-      "sampleNotice": "The field list and the exported rows are sample data for now, and the CSV formats are not applied yet.",
+      "sampleNotice": "The field list is sample data for now, and the CSV formats are not applied yet.",
       "back": "Back to submissions",
       "loadError": "Could not load the form.",
       "fieldsError": "Could not load the fields.",

@@ -493,9 +493,6 @@ export const env = {
   // stops the start with an error naming the variable.
   getSubmissionExportActiveLimit: () =>
     wholeNumberSetting(process.env, 'SUBMISSION_EXPORT_ACTIVE_LIMIT', 2),
-  // Pause after each sample row the placeholder export source yields, so a running export can be
-  // watched and stopped. 0 in production use.
-  getSubmissionExportStubRowDelayMs: () => getNumberEnv('SUBMISSION_EXPORT_STUB_ROW_DELAY_MS') ?? 0,
   getJobSettings: () => resolveJobSettings(process.env),
   getShutdownSettings: () => resolveShutdownSettings(process.env),
 };

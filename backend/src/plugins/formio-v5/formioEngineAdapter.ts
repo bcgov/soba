@@ -2,6 +2,7 @@ import {
   FormEngineAdapter,
   type CreateSubmissionInput,
   type FormEngineReadinessResult,
+  type ReadSubmissionsOptions,
   type ReadSubmissionsResult,
   type UpsertSchemaInput,
 } from '../../core/integrations/form-engine/FormEngineAdapter';
@@ -140,8 +141,8 @@ const answerDocument = (doc: Record<string, unknown>): Record<string, unknown> =
 const READ_BATCH_SIZE = 100;
 
 /** Without `full`, Form.io's list shortens signature answers to "YES" and drops base64 file urls. */
-const batchQuery = (refs: string[]): FormioQuery => ({
-  params: { _id__in: refs.join(','), limit: refs.length, full: true },
+const batchQuery = (refs: string[], full: boolean): FormioQuery => ({
+  params: { _id__in: refs.join(','), limit: refs.length, ...(full ? { full: true } : {}) },
 });
 
 /**
@@ -400,6 +401,7 @@ export class FormioEngineAdapter implements FormEngineAdapter {
     engineFormRef: string,
     engineRefs: string[],
     signal?: AbortSignal,
+    { full = false }: ReadSubmissionsOptions = {},
   ): Promise<ReadSubmissionsResult> {
     if (engineRefs.length === 0) return { found: new Map(), missing: [] };
     const client = await getAuthenticatedFormioClient(this.pluginConfig);
@@ -411,7 +413,7 @@ export class FormioEngineAdapter implements FormEngineAdapter {
       batches.push(engineRefs.slice(start, start + READ_BATCH_SIZE));
     }
     const pages = await mapInOrder(batches, (refs) =>
-      missingAsError(client.loadSubmissions(engineFormRef, batchQuery(refs), signal)),
+      missingAsError(client.loadSubmissions(engineFormRef, batchQuery(refs, full), signal)),
     );
     const found = new Map<string, Record<string, unknown>>(
       pages.flat().map((doc) => [doc._id, answerDocument(doc)]),

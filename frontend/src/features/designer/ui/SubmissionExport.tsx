@@ -68,7 +68,7 @@ export function SubmissionExport({ formId }: Readonly<{ formId: string }>) {
   const form = useExportForm(formId);
   const starter = useSubmissionExportStarter(formId);
   usePageHeading({ heading: text.pageTitle, eyebrow: form.data?.name });
-  // Placeholder: says the fields and rows are sample data.
+  // Placeholder: says the field list is sample data.
   usePageNotices([{ id: 'submission-export-sample', variant: 'info', body: text.sampleNotice }]);
 
   const [format, setFormat] = useState<SubmissionExportFormat>('csv');

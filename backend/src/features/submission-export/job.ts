@@ -12,8 +12,10 @@ import { getLiveForm, insertExportAudit } from '../../core/db/repos/submissionEx
 import { getTempStorageAdapter } from '../../core/integrations/plugins/PluginRegistry';
 import type { JobContext, JobTypeDefinition } from '../../core/jobs/registry';
 import { JobCancelledError, JobFailedError } from '../../core/jobs/settlement';
+import { engineExportSource, formAnswerReader } from './engineSource';
 import { exportFormat } from './formats';
-import { sampleExportFields, sampleExportSource, type ExportBounds } from './source';
+import { sampleExportFields, type ExportBounds } from './source';
+import { submissionExportQuery } from './submissionQuery';
 
 export const SUBMISSION_EXPORT_MAX_ATTEMPTS = 3;
 
@@ -119,8 +121,10 @@ const runExport = async ({
     from: params.from ? new Date(params.from) : undefined,
     to: new Date(params.to),
   };
-  // Placeholder: sample rows for every form and filter.
-  const source = sampleExportSource;
+  const source = engineExportSource(
+    submissionExportQuery,
+    await formAnswerReader(job.workspaceId, job.formId),
+  );
   const temp = getTempStorageAdapter();
   const staged = temp.reserve({ prefix: 'export' });
   try {
@@ -128,17 +132,20 @@ const runExport = async ({
     reportProgress(0, total);
     let done = 0;
     let unread = 0;
+    // A submission that could not be read is passed over, so it counts toward progress too.
+    const progress = () => reportProgress(done + unread, total);
     const rows = counting(
       source.rows(bounds, {
         pageSize: PAGE_SIZE,
         signal,
         onUnread: (count) => {
           unread += count;
+          progress();
         },
       }),
       () => {
         done += 1;
-        reportProgress(done, total);
+        progress();
       },
     );
     const text = format.serialize(rows, {

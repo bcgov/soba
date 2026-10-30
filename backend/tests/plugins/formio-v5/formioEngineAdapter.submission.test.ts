@@ -236,11 +236,11 @@ describe('FormioEngineAdapter submission methods', () => {
 
   /** The query readSubmissions sends for one batch of refs. */
   const queryFor = (refs: string[]) => ({
-    params: { _id__in: refs.join(','), limit: refs.length, full: true },
+    params: { _id__in: refs.join(','), limit: refs.length },
   });
 
-  const readSubmissions = (refs: string[], signal?: AbortSignal) =>
-    new FormioEngineAdapter(makeConfig()).readSubmissions('form-ref-1', refs, signal);
+  const readSubmissions = (refs: string[], signal?: AbortSignal, full?: boolean) =>
+    new FormioEngineAdapter(makeConfig()).readSubmissions('form-ref-1', refs, signal, { full });
 
   it('readSubmissions reads one batch by _id__in and strips each document', async () => {
     const refs = refsOf(3);
@@ -250,11 +250,22 @@ describe('FormioEngineAdapter submission methods', () => {
     const { found, missing } = await readSubmissions(refs);
 
     expect(client.loadSubmissions.mock.calls).toEqual([
-      ['form-ref-1', { params: { _id__in: 'sub-0,sub-1,sub-2', limit: 3, full: true } }],
+      ['form-ref-1', { params: { _id__in: 'sub-0,sub-1,sub-2', limit: 3 } }],
     ]);
     expect([...found.keys()]).toEqual(refs);
     expect(found.get('sub-1')).toEqual({ data: { a: 'sub-1' } });
     expect(missing).toEqual([]);
+  });
+
+  it('readSubmissions asks Form.io for whole documents only when told to', async () => {
+    const client = makeClient({ loadSubmissions: jest.fn(loadDocs) });
+    mockedGetClient.mockResolvedValue(client);
+
+    await readSubmissions(refsOf(1), undefined, true);
+
+    expect(client.loadSubmissions.mock.calls).toEqual([
+      ['form-ref-1', { params: { _id__in: 'sub-0', limit: 1, full: true } }],
+    ]);
   });
 
   it('readSubmissions splits 250 refs into batches of 100, 100 and 50', async () => {

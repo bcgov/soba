@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SubmissionWorkflowState, type SubmissionWorkflowStateCode } from '../permissions/codes';
 import { SUBMISSION_EXPORT_SORT_FIELDS } from '../sort';
 import { JobProgressSchema, JobResultSchema } from './jobs';
 import { OffsetPageSchema, makeSortEnum } from './pagination';
@@ -14,6 +15,11 @@ export const SUBMISSION_EXPORT_LAYOUTS = [
   'unFormattedCSVExport',
 ] as const;
 export type SubmissionExportLayout = (typeof SUBMISSION_EXPORT_LAYOUTS)[number];
+
+/** The submission workflow states an export includes; a deleted submission never is. */
+export const SUBMISSION_EXPORT_STATES: readonly SubmissionWorkflowStateCode[] = [
+  SubmissionWorkflowState.submitted,
+];
 
 /**
  * Where an export stands. `ready` has a file to download until it expires; `failed` and `cancelled`
