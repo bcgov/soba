@@ -1,16 +1,22 @@
 import { and, count, eq, getTableColumns, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { v7 as uuidv7 } from 'uuid';
 import {
   MY_SUBMISSION_STATES,
+  STAFF_SUBMISSION_SORT_FIELDS,
   SUBMISSION_SORT_FIELDS,
   type MySubmissionState,
   type SortLocale,
+  type StaffSubmissionListSort,
   type SubmissionListSort,
+  type SubmissionReviewStatus,
 } from '@soba/lib';
 import { db, type DbOrTx, type Tx } from '../client';
 import {
+  appUsers,
   submissionParticipants,
   submissionRevisions,
+  submissionStatuses,
   submissions,
   forms,
   formVersions,
@@ -32,6 +38,8 @@ import {
 import { listAllowsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
 import { liveSubmission } from './liveRows';
 import { isActiveOwner } from './submissionParticipantRepo';
+import { recordSubmittedStatus } from './submissionReviewRepo';
+import { demoteHead, nextRevisionNo } from './submissionRevisionChain';
 import { listSubmitterForms, type SubmitterFormListRow } from './submitterFormRepo';
 
 export type SubmissionRecord = typeof submissions.$inferSelect;
@@ -50,6 +58,12 @@ export interface SubmissionListRow {
   createdBy: string | null;
   submittedBy: string | null;
   confirmationCode: string;
+}
+
+/** A row of the staff list: the submission, where its review stands and who has it. */
+export interface StaffSubmissionListRow extends SubmissionListRow {
+  reviewStatus: string | null;
+  assignee: { id: string; profile: unknown; label: string | null } | null;
 }
 
 export interface SubmissionDetailRow extends SubmissionListRow {
@@ -136,6 +150,16 @@ const SUBMISSION_SORT_COLUMNS: SortColumns<SubmissionListSortField> = {
   updatedAt: { column: submissions.updatedAt },
 };
 
+/** The status head and its assignee, joined by the staff list. */
+const reviewAssignees = alias(appUsers, 'review_assignee');
+
+const STAFF_SUBMISSION_SORT_COLUMNS: SortColumns<(typeof STAFF_SUBMISSION_SORT_FIELDS)[number]> = {
+  ...SUBMISSION_SORT_COLUMNS,
+  // Only a submitted submission has a review status, and only an assigned one an assignee.
+  reviewStatus: { column: submissionStatuses.status, nullable: true },
+  assignee: { column: reviewAssignees.displayLabel, nullable: true, linguistic: true },
+};
+
 export interface ParticipantSubmissionListRow {
   id: string;
   formId: string;
@@ -150,6 +174,8 @@ export interface ParticipantSubmissionListRow {
   createdAt: Date;
   updatedAt: Date;
   confirmationCode: string;
+  /** The review status; null until the submission is submitted. */
+  reviewStatus: string | null;
 }
 
 export interface ListParticipantSubmissionsInput {
@@ -172,9 +198,11 @@ export interface ListSubmissionsInput {
   formVersionId?: string;
   submissionId?: string;
   workflowState?: string;
+  reviewStatus?: SubmissionReviewStatus;
+  assigneeId?: string;
   createdBy?: string;
   q?: string;
-  sort: SubmissionListSort;
+  sort: StaffSubmissionListSort;
   locale: SortLocale;
 }
 
@@ -415,7 +443,7 @@ const submittedCodeMatches = (pattern: string) =>
 
 export const listSubmissionsForWorkspace = async (
   input: ListSubmissionsInput,
-): Promise<{ items: SubmissionListRow[]; total: number }> => {
+): Promise<{ items: StaffSubmissionListRow[]; total: number }> => {
   if (listAllowsNothing(input.workspaceIds, input.formAccess)) {
     return { items: [], total: 0 };
   }
@@ -444,6 +472,14 @@ export const listSubmissionsForWorkspace = async (
 
   if (input.workflowState) {
     whereClauses.push(eq(submissions.workflowState, input.workflowState));
+  }
+
+  if (input.reviewStatus) {
+    whereClauses.push(eq(submissionStatuses.status, input.reviewStatus));
+  }
+
+  if (input.assigneeId) {
+    whereClauses.push(eq(submissionStatuses.assigneeId, input.assigneeId));
   }
 
   if (input.createdBy) {
@@ -479,32 +515,49 @@ export const listSubmissionsForWorkspace = async (
         createdBy: submissions.createdBy,
         submittedBy: submissions.submittedBy,
         confirmationCode: submissions.confirmationCode,
+        reviewStatus: submissionStatuses.status,
+        assigneeId: reviewAssignees.id,
+        assigneeProfile: reviewAssignees.profile,
+        assigneeLabel: reviewAssignees.displayLabel,
       })
       .from(submissions)
       .innerJoin(forms, eq(submissions.formId, forms.id))
       .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
+      .leftJoin(submissionStatuses, eq(submissionStatuses.id, submissions.statusId))
+      .leftJoin(reviewAssignees, eq(reviewAssignees.id, submissionStatuses.assigneeId))
       .where(where)
-      .orderBy(...orderByForSort(SUBMISSION_SORT_COLUMNS, input.sort, submissions.id, input.locale))
+      .orderBy(
+        ...orderByForSort(STAFF_SUBMISSION_SORT_COLUMNS, input.sort, submissions.id, input.locale),
+      )
       .limit(input.limit)
       .offset(input.offset);
 
-    // Both parent ids are not-null with validated foreign keys, so the joins never multiply a row.
+    // Every join is on a unique key, so none multiplies a row; the status join serves the filters.
     const totals = await tx
       .select({ total: count() })
       .from(submissions)
+      .leftJoin(submissionStatuses, eq(submissionStatuses.id, submissions.statusId))
       .innerJoin(forms, eq(submissions.formId, forms.id))
       .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
       .where(where);
 
-    return { items, total: totals[0]?.total ?? 0 };
+    return {
+      items: items.map(({ assigneeId, assigneeProfile, assigneeLabel, ...row }) => ({
+        ...row,
+        assignee: assigneeId
+          ? { id: assigneeId, profile: assigneeProfile, label: assigneeLabel }
+          : null,
+      })),
+      total: totals[0]?.total ?? 0,
+    };
   });
 };
 
 /**
- * The draft and submitted submissions the user holds an active grant on, across every workspace,
- * with the forms of the page's rows and their facts for the user, read in one snapshot. An opened
- * submission holds no answers yet, and a submission on a deleted form or form version can no longer
- * be opened, so none of these is listed.
+ * The draft, submitted and revising submissions the user holds an active grant on, across every
+ * workspace, with the forms of the page's rows and their facts for the user, read in one snapshot.
+ * An opened submission holds no answers yet, and a submission on a deleted form or form version
+ * can no longer be opened, so none of these is listed.
  */
 export const listSubmissionsForParticipant = async (
   input: ListParticipantSubmissionsInput,
@@ -544,11 +597,13 @@ export const listSubmissionsForParticipant = async (
         createdAt: submissions.createdAt,
         updatedAt: submissions.updatedAt,
         confirmationCode: submissions.confirmationCode,
+        reviewStatus: submissionStatuses.status,
       })
       .from(submissionParticipants)
       .innerJoin(submissions, eq(submissionParticipants.submissionId, submissions.id))
       .innerJoin(forms, eq(submissions.formId, forms.id))
       .innerJoin(formVersions, eq(submissions.formVersionId, formVersions.id))
+      .leftJoin(submissionStatuses, eq(submissionStatuses.id, submissions.statusId))
       .where(where)
       .orderBy(...orderByForSort(SUBMISSION_SORT_COLUMNS, input.sort, submissions.id, input.locale))
       .limit(input.limit)
@@ -704,44 +759,6 @@ const lockLiveSubmission = async (
   return submission ?? null;
 };
 
-/** Append order over all revisions; the current version's number lives in current_revision_no. */
-const nextRevisionNo = async (
-  tx: Tx,
-  workspaceId: string,
-  submissionId: string,
-): Promise<number> => {
-  const [{ next }] = await tx
-    .select({
-      next: sql<number>`coalesce(max(${submissionRevisions.revisionNo}), -1) + 1`,
-    })
-    .from(submissionRevisions)
-    .where(
-      and(
-        eq(submissionRevisions.submissionId, submissionId),
-        eq(submissionRevisions.workspaceId, workspaceId),
-      ),
-    );
-  return Number(next);
-};
-
-/** The outgoing head is the single current revision; demote it before the new head commits. */
-const demoteHead = async (
-  tx: Tx,
-  workspaceId: string,
-  headRevisionId: string | null,
-): Promise<void> => {
-  if (!headRevisionId) return;
-  await tx
-    .update(submissionRevisions)
-    .set({ status: RevisionStatus.superseded, reason: RevisionReason.replaced })
-    .where(
-      and(
-        eq(submissionRevisions.id, headRevisionId),
-        eq(submissionRevisions.workspaceId, workspaceId),
-      ),
-    );
-};
-
 /**
  * Record a submission revision in one transaction. `revisionNo` is the next append-order number over
  * every revision (current and pending), so it is not the current version's number. A 'current' write
@@ -864,8 +881,9 @@ export const appendSubmissionRevision = (
       updatedAt: new Date(),
     };
 
-    // submittedBy is stamped at open; record the submit timestamp when the submit event lands.
-    if (input.eventType === SubmissionEventType.submitted) {
+    // submittedBy is stamped at open; record the submit timestamp when the first submit lands. A
+    // resubmit after a revision keeps the original time.
+    if (input.eventType === SubmissionEventType.submitted && !submission.submittedAt) {
       updates.submittedAt = new Date();
     }
 
@@ -878,10 +896,98 @@ export const appendSubmissionRevision = (
       .returning();
 
     if (!updated) throw new Error(`Submission ${input.submissionId} missing after head move`);
+    // The submit starts the review, in the same transaction, so no submitted row lacks a status.
+    if (input.eventType === SubmissionEventType.submitted) {
+      await recordSubmittedStatus(tx, {
+        workspaceId: input.workspaceId,
+        submissionId: input.submissionId,
+        actorId: input.actorId,
+        actorDisplayLabel: input.actorDisplayLabel,
+      });
+    }
     await onAppended?.(tx, updated);
     return toAppendResult('appended', updated, input.revisionId, nextRevision, status, reason);
   });
 };
+
+/**
+ * edited   - the answers changed; `record` is the submission after it.
+ * replayed - a retry of an edit already made by the same person; nothing was written.
+ * taken    - the revision id is already used by another write.
+ * closed   - the submission is not submitted, so its answers are not staff's to change.
+ * stale    - the answers changed since the editor loaded them.
+ * missing  - the submission is not live in the workspace.
+ */
+export type StaffEditResult =
+  | { outcome: 'edited' | 'replayed'; record: SubmissionRecord }
+  | { outcome: 'taken' | 'closed' | 'stale' | 'missing' };
+
+/**
+ * Make staff's changed answers current, in one transaction under the submission's lock. The answers
+ * are a new engine document, so the edit is a new current revision on top of the one the editor
+ * loaded; the workflow and review status stay as they are.
+ */
+export const appendStaffEdit = (input: {
+  workspaceId: string;
+  submissionId: string;
+  revisionId: string;
+  baseRevisionId: string;
+  actorId: string;
+  actorDisplayLabel: string | null;
+  afterEngineSubmissionRef: string;
+}): Promise<StaffEditResult> =>
+  db.transaction(async (tx) => {
+    const submission = await lockLiveSubmission(tx, input.workspaceId, input.submissionId);
+    if (!submission) return { outcome: 'missing' };
+
+    const [recorded] = await tx
+      .select({
+        submissionId: submissionRevisions.submissionId,
+        eventType: submissionRevisions.eventType,
+        changedBy: submissionRevisions.changedBy,
+      })
+      .from(submissionRevisions)
+      .where(eq(submissionRevisions.id, input.revisionId))
+      .limit(1);
+    if (recorded) {
+      const sameEdit =
+        recorded.submissionId === input.submissionId &&
+        recorded.eventType === SubmissionEventType.edited &&
+        recorded.changedBy === input.actorId;
+      return sameEdit ? { outcome: 'replayed', record: submission } : { outcome: 'taken' };
+    }
+    if (submission.workflowState !== SubmissionWorkflowState.submitted)
+      return { outcome: 'closed' };
+    if (submission.headRevisionId !== input.baseRevisionId) return { outcome: 'stale' };
+
+    const revisionNo = await nextRevisionNo(tx, input.workspaceId, input.submissionId);
+    await demoteHead(tx, input.workspaceId, submission.headRevisionId);
+    await tx.insert(submissionRevisions).values({
+      id: input.revisionId,
+      workspaceId: input.workspaceId,
+      submissionId: input.submissionId,
+      revisionNo,
+      parentRevisionId: submission.headRevisionId,
+      eventType: SubmissionEventType.edited,
+      status: RevisionStatus.current,
+      reason: RevisionReason.accepted,
+      beforeEngineSubmissionRef: submission.engineSubmissionRef,
+      afterEngineSubmissionRef: input.afterEngineSubmissionRef,
+      changedBy: input.actorId,
+    });
+    const [updated] = await tx
+      .update(submissions)
+      .set({
+        headRevisionId: input.revisionId,
+        currentRevisionNo: revisionNo,
+        engineSubmissionRef: input.afterEngineSubmissionRef,
+        updatedBy: input.actorDisplayLabel,
+        updatedAt: new Date(),
+      })
+      .where(eq(submissions.id, input.submissionId))
+      .returning();
+    return { outcome: 'edited', record: updated };
+  });
 
 /**
  * deleted       - the submission is now soft-deleted.

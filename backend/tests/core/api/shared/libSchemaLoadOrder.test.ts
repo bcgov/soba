@@ -25,3 +25,13 @@ describe.each(['user-search', 'post-submission/settings'])('%s feature schema mo
     });
   });
 });
+
+describe('submissions review schema module', () => {
+  it('loads when it is the first module to require @soba/lib', async () => {
+    await jest.isolateModulesAsync(async () => {
+      await expect(
+        import('../../../../src/core/api/submissions/reviewSchema'),
+      ).resolves.toBeDefined();
+    });
+  });
+});

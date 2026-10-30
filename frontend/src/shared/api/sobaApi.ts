@@ -39,10 +39,11 @@ export {
   updateSobaForm,
   deleteSobaSubmission,
   getSobaSubmissionReview,
-  updateSobaSubmissionStatus,
   addSobaSubmissionNote,
-  recordSobaSubmissionEdit,
+  updateSobaSubmissionStatus,
+  getSobaSubmissionReviewers,
   downloadSobaSubmissionFile,
+  updateSobaSubmissionData,
 } from './sobaApiDesign';
 // Submit-mode (public-capable, /submit/*)
 export {
@@ -54,6 +55,7 @@ export {
   saveSobaFormSubmission,
   submitSobaFormSubmission,
   deleteSubmitSubmission,
+  reviseSubmitSubmission,
   getMyForms,
   getMySubmissions,
   getMyWorkspaces,

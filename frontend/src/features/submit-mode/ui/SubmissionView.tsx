@@ -12,6 +12,7 @@ import { useSubmitterPrint } from '@/src/features/templates/data/useSubmissionPr
 import { printBaseName } from '@/src/features/templates/printFileName';
 import { PrintSubmissionButton } from '@/src/features/templates/ui/PrintSubmissionButton';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
+import { SubmissionWorkflowState } from '@/src/types/submissions';
 
 /** A submitter's view of one submission; `success` is the confirmation shown right after submit. */
 export function SubmissionView({ success = false }: Readonly<{ success?: boolean }>) {
@@ -54,7 +55,7 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
           </>
         );
       }
-      if (data.submission.workflowState !== 'submitted') {
+      if (data.submission.workflowState !== SubmissionWorkflowState.submitted) {
         return (
           <InlineAlert
             variant="info"

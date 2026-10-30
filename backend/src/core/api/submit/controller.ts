@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   ApiErrorCodes,
   type MySubmissionRole,
+  type ReviseSubmissionBody,
   type SubmitFillBundle,
   type SubmitFormVersionSchemaResponse,
 } from '@soba/lib';
@@ -13,6 +14,7 @@ import type { SubmitterSubmissionRow } from '../../db/repos/submitterSubmissionR
 import { loadedForm, loadedFormVersion, loadedSubmission } from '../../middleware/formSubmitAccess';
 import { toSubmitterFormDto } from '../forms/serviceFactory';
 import { toSubmissionDto } from '../submissions/serviceFactory';
+import { submissionReviewService } from '../submissions/reviewService';
 import { workspacesApiService } from '../workspaces/service';
 import type { Request, RequestHandler } from 'express';
 import { ListMyFormsQuerySchema, ListMySubmissionsQuerySchema } from './schema';
@@ -41,6 +43,25 @@ const readContent = (submission: SubmitterSubmissionRow) =>
     engineSchemaRef: submission.engineSchemaRef,
     engineSubmissionRef: submission.engineSubmissionRef,
   });
+
+/**
+ * The owner sends their own submission back to revise; answers with the submission as it now
+ * stands. Runs after requireSubmissionRevise.
+ */
+export const reviseOwnSubmission = asyncHandler(
+  async (req: Request<{ id: string }, unknown, ReviseSubmissionBody>, res: Response) => {
+    const { submission } = loadedSubmission(req);
+    const ctx = req.coreContext!;
+    await submissionReviewService.reviseOwn(
+      { ...ctx, submissionId: submission.id, fromStatusId: submission.statusId },
+      req.body,
+    );
+    const revised = await submissionsApiService.get(ctx, submission.id);
+    if (!revised)
+      throw new NotFoundError('Submission not found', ApiErrorCodes.submission_not_found);
+    res.json(revised);
+  },
+);
 
 export const getSubmitSubmission: RequestHandler = (req, res) => {
   res.json(toSubmissionDto(loadedSubmission(req).submission));

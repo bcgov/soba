@@ -1,13 +1,14 @@
 import React, { act } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { SWRConfig } from 'swr';
 
-const { mockGetSubmissions, mockDelete, mockPush, dict } = vi.hoisted(() => ({
+const { mockGetSubmissions, mockDelete, mockPush, search, dict } = vi.hoisted(() => ({
   mockGetSubmissions: vi.fn(),
   mockDelete: vi.fn(),
   mockPush: vi.fn(),
+  search: { value: '' },
   dict: {
     locale: 'en',
     general: {
@@ -39,6 +40,19 @@ const { mockGetSubmissions, mockDelete, mockPush, dict } = vi.hoisted(() => ({
       emptyList: 'No submissions',
       submissions: 'Submissions',
       error: 'Could not load submissions.',
+      review: {
+        assignedTo: 'Assigned To',
+        listStatusFilter: 'Review status',
+        listAllStatuses: 'All',
+        assignedToMeFilter: 'Assigned to me',
+        notSubmitted: 'Not submitted',
+        statuses: {
+          SUBMITTED: 'Submitted',
+          ASSIGNED: 'Assigned',
+          REVISING: 'Revising',
+          COMPLETED: 'Completed',
+        },
+      },
     },
   },
 }));
@@ -46,6 +60,7 @@ const { mockGetSubmissions, mockDelete, mockPush, dict } = vi.hoisted(() => ({
 vi.mock('@/src/shared/api/sobaApi', () => ({
   getSobaSubmissions: (...args: unknown[]) => mockGetSubmissions(...args),
   deleteSobaSubmission: (...args: unknown[]) => mockDelete(...args),
+  fetchCurrentUser: async () => ({ actor: { id: 'u-me', displayLabel: 'Me' } }),
 }));
 
 vi.mock('@/app/[lang]/Providers', () => ({
@@ -58,7 +73,7 @@ vi.mock('next/navigation', async () => {
     ...(actual as Record<string, unknown>),
     useRouter: () => ({ push: mockPush, replace: vi.fn() }),
     usePathname: () => '/en/build/f1',
-    useSearchParams: () => new URLSearchParams(''),
+    useSearchParams: () => new URLSearchParams(search.value),
   };
 });
 
@@ -70,6 +85,8 @@ import type { Dictionary } from '@/src/types/dictionary';
 describe('FormSubmissionTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
+    search.value = '';
     mockGetSubmissions.mockResolvedValue({
       items: [
         {
@@ -180,5 +197,94 @@ describe('FormSubmissionTab', () => {
 
     await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('token', 'sub-1'));
     await waitFor(() => expect(screen.queryByTestId('confirm-modal-message')).toBeNull());
+  });
+
+  const withReview = (allowStatusUpdates: boolean) => {
+    const page = {
+      items: [
+        {
+          id: 'sub-1',
+          formId: 'f1',
+          formVersionId: 'v1',
+          versionNo: 1,
+          workflowState: 'submitted',
+          engineSyncStatus: 'ready',
+          submittedAt: '2026-01-02T03:04:05.000Z',
+          createdAt: '2026-01-02T03:04:05.000Z',
+          updatedAt: '2026-01-02T03:04:05.000Z',
+          createdBy: 'Ada Lovelace',
+          confirmationCode: 'K7M2Q9XA',
+          reviewStatus: 'ASSIGNED',
+          assignee: { id: 'u-me', displayName: 'Grace Hopper', email: 'grace@example.com' },
+        },
+        {
+          id: 'sub-2',
+          formId: 'f1',
+          formVersionId: 'v1',
+          versionNo: 1,
+          workflowState: 'draft',
+          engineSyncStatus: 'ready',
+          submittedAt: null,
+          createdAt: '2026-01-02T03:04:05.000Z',
+          updatedAt: '2026-01-02T03:04:05.000Z',
+          createdBy: 'Ada Lovelace',
+          confirmationCode: null,
+          reviewStatus: null,
+          assignee: null,
+        },
+      ],
+      page: { offset: 0, limit: 10, total: 2 },
+    };
+    mockGetSubmissions.mockResolvedValue({ ...page, allowStatusUpdates });
+  };
+
+  it('shows the review status and assignee, sortable, when status updates are on', async () => {
+    withReview(true);
+    await renderTab();
+
+    expect(await screen.findByTestId('sub-1-review-status')).toHaveTextContent('Assigned');
+    expect(screen.getByTestId('sub-1-assignee')).toHaveTextContent(
+      'Grace Hopper (grace@example.com)',
+    );
+    expect(screen.getByTestId('sub-2-review-status')).toHaveTextContent('Not submitted');
+    expect(screen.getByTestId('form-submissions-review-status-select')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Assigned To/ })).toBeInTheDocument();
+  });
+
+  it('hides the review columns and filters when status updates are off', async () => {
+    withReview(false);
+    await renderTab();
+
+    await waitFor(() => expect(screen.getByTestId('sub-1-status-tag')).toBeInTheDocument());
+    expect(screen.queryByTestId('sub-1-assignee')).toBeNull();
+    expect(screen.queryByTestId('form-submissions-review-status-select')).toBeNull();
+    expect(screen.queryByTestId('form-submissions-mine')).toBeNull();
+  });
+
+  it('reads only the submissions at the status and assigned to the caller the URL names', async () => {
+    withReview(true);
+    search.value = 'formSubmissions.reviewStatus=ASSIGNED&formSubmissions.mine=true';
+    await renderTab();
+
+    await waitFor(() =>
+      expect(mockGetSubmissions).toHaveBeenLastCalledWith(
+        'token',
+        expect.objectContaining({ formId: 'f1', reviewStatus: 'ASSIGNED', assigneeId: 'u-me' }),
+      ),
+    );
+  });
+
+  it('puts Assigned to me in the URL when it is ticked', async () => {
+    withReview(true);
+    const replaceState = vi.spyOn(window.history, 'replaceState');
+    await renderTab();
+
+    const mine = await screen.findByTestId('form-submissions-mine');
+    await act(async () => {
+      fireEvent.click(within(mine).getByRole('checkbox'));
+    });
+
+    expect(String(replaceState.mock.calls.at(-1)?.[2])).toContain('formSubmissions.mine=true');
+    replaceState.mockRestore();
   });
 });

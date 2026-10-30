@@ -31,6 +31,7 @@ import {
   ListMyFormsResponseSchema as LibListMyFormsResponseSchema,
   MyWorkspaceLookupItemSchema as LibMyWorkspaceLookupItemSchema,
   MyWorkspaceLookupResponseSchema as LibMyWorkspaceLookupResponseSchema,
+  ReviseSubmissionBodySchema as LibReviseSubmissionBodySchema,
 } from '@soba/lib';
 
 extendZodWithOpenApi(z);
@@ -128,6 +129,11 @@ export const ListMySubmissionsResponseSchema = LibListMySubmissionsResponseSchem
 
 const TAG = 'core.submit';
 const SUBMISSION_PATH = '/submit/submissions/{id}';
+
+/** The owner's revise of their own submission: the status change's id, chosen by the client. */
+export const ReviseSubmissionBodySchema = LibReviseSubmissionBodySchema.clone().openapi(
+  'Submit_ReviseSubmissionBody',
+);
 const SUBMISSION_NOT_FOUND = 'Submission not found';
 const AUTHZ = "Not in the form's audience";
 const AUTH_REQUIRED = 'Authentication required (form is not public)';
@@ -144,6 +150,38 @@ const INVALID_QUERY = 'Invalid query';
 const PUBLIC_SECURITY = [{}, { bearerAuth: [] }];
 
 export const registerSubmitOpenApi = (registry: OpenAPIRegistry) => {
+  registry.registerPath({
+    method: 'post',
+    path: `${SUBMISSION_PATH}/revise`,
+    tags: [TAG],
+    security: PUBLIC_SECURITY,
+    request: {
+      params: SubmissionIdParamsSchema,
+      body: {
+        required: true,
+        content: { 'application/json': { schema: ReviseSubmissionBodySchema } },
+      },
+    },
+    responses: {
+      200: {
+        description:
+          'The submission, sent back to its submitters to revise (a retry under the same id answers the same)',
+        content: { 'application/json': { schema: SubmissionResponseSchema } },
+      },
+      400: { description: 'Invalid body' },
+      401: { description: SUBMISSION_AUTH_REQUIRED },
+      403: {
+        description:
+          "Not the submission's signed-in owner, may no longer submit to the form (revise_denied), or the form's review settings do not let submitters revise (revise_disabled)",
+      },
+      404: { description: 'Submission not found' },
+      409: {
+        description:
+          'A reviewer has taken it up or it is not submitted (revise_closed), or the id is used by another status change (status_id_taken)',
+      },
+    },
+  });
+
   registry.registerPath({
     method: 'get',
     path: `${SUBMISSION_PATH}/schema`,

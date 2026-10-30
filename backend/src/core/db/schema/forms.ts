@@ -133,6 +133,8 @@ export const submissions = sobaSchema.table(
     engineSyncError: text('engine_sync_error'),
     currentRevisionNo: integer('current_revision_no').notNull().default(0),
     headRevisionId: uuid('head_revision_id').references((): AnyPgColumn => submissionRevisions.id),
+    /** The latest review status (submission_status); null until the submission is first submitted. */
+    statusId: uuid('status_id').references((): AnyPgColumn => submissionStatuses.id),
     submittedAt: timestamp('submitted_at', { withTimezone: true }),
     // 8 characters of Crockford base32, assigned at open; returned only once submitted.
     confirmationCode: text('confirmation_code').notNull(),
@@ -149,6 +151,8 @@ export const submissions = sobaSchema.table(
     ),
     workspaceIdx: index('submission_workspace_idx').on(table.workspaceId),
     formVersionIdx: index('submission_form_version_idx').on(table.formVersionId),
+    // A form's submissions list, filtered and sorted by its review.
+    formIdx: index('submission_form_idx').on(table.formId),
     // Workspace slice ordered by server updatedAt (id as tiebreak), excluding soft-deleted rows.
     // Matches the submission list default sort. A multi-workspace scope or a deep offset does not
     // use it.
@@ -156,6 +160,7 @@ export const submissions = sobaSchema.table(
       .on(table.workspaceId, table.updatedAt.desc(), table.id.desc())
       .where(sql`${table.deletedAt} is null`),
     headRevisionIdx: index('submission_head_revision_idx').on(table.headRevisionId),
+    statusIdx: index('submission_status_id_idx').on(table.statusId),
   }),
 );
 
@@ -192,5 +197,36 @@ export const submissionRevisions = sobaSchema.table(
     ),
     workspaceIdx: index('submission_revision_workspace_idx').on(table.workspaceId),
     parentRevisionIdx: index('submission_revision_parent_idx').on(table.parentRevisionId),
+  }),
+);
+
+/**
+ * A submission's review status changes, append-only. `submission.status_id` points at the latest;
+ * the rows before it are the history. The status codes are the lib's SUBMISSION_REVIEW_STATUSES.
+ */
+export const submissionStatuses = sobaSchema.table(
+  'submission_status',
+  {
+    id: idColumn(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id),
+    submissionId: uuid('submission_id')
+      .notNull()
+      .references(() => submissions.id),
+    status: text('status').notNull(),
+    assigneeId: uuid('assignee_id').references(() => appUsers.id),
+    changedBy: uuid('changed_by').references(() => appUsers.id),
+    /** The changer's label when the change was made, as the audit columns keep it. */
+    changedByLabel: text('changed_by_label'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    submissionIdx: index('submission_status_submission_idx').on(
+      table.submissionId,
+      table.createdAt.desc(),
+    ),
+    workspaceIdx: index('submission_status_workspace_idx').on(table.workspaceId),
+    assigneeIdx: index('submission_status_assignee_idx').on(table.assigneeId),
   }),
 );

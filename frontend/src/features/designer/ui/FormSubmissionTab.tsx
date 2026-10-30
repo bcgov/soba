@@ -1,15 +1,23 @@
 'use client';
 import { useMemo, useState, useCallback } from 'react';
 import { FaRegTrashCan, FaFile } from 'react-icons/fa6';
-import { Link } from '@bcgov/design-system-react-components';
+import { Checkbox, Link, Select } from '@bcgov/design-system-react-components';
 import { useRouter, usePathname } from 'next/navigation';
 
 import type { Dictionary } from '@/src/types/dictionary';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { ConfirmModal } from '@/src/components/ConfirmModal';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
-import type { SubmissionListItem } from '@/src/types/submissions';
+import { SubmissionWorkflowState, type SubmissionListItem } from '@/src/types/submissions';
+import {
+  SUBMISSION_REVIEW_STATUSES,
+  type SubmissionReviewStatus,
+} from '@/src/types/submissionReview';
 import { Tag } from '@/src/components/Tag';
+import { StatusTag, workflowStateToVariant } from '@/src/components/StatusTag';
+import { ListPageFilters } from '@/src/components/ListPageLayout';
+import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
+import { reviewerLabel } from './SubmissionStatusPanel';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import {
@@ -22,6 +30,11 @@ import { useListQuery } from '@/src/shared/list/useListQuery';
 import { useDataTable } from '@/src/shared/list/useDataTable';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { capitalizeFirstLetter } from '@/src/shared/util/stringUtils';
+
+const ALL_STATUSES = 'all';
+
+const toReviewStatus = (raw: string | undefined): SubmissionReviewStatus | undefined =>
+  SUBMISSION_REVIEW_STATUSES.find((status) => status === raw);
 
 interface FormSubmissionTabProps {
   dict: Dictionary;
@@ -36,12 +49,30 @@ export default function FormSubmissionTab({
   opened,
 }: Readonly<FormSubmissionTabProps>) {
   const query = useListQuery(FORM_SUBMISSIONS_LIST_QUERY);
-  const submissionsResult = useFormSubmissions(formId, opened, {
-    offset: query.offset,
-    limit: query.pageSize,
-    sort: query.sort,
-    q: query.q,
-  });
+  const dictReview = dict.submission.review;
+  const currentUserId = useCurrentUser().data?.actor?.id;
+  const reviewStatus = toReviewStatus(query.filters.reviewStatus);
+  const mine = query.filters.mine === 'true';
+  const submissionsResult = useFormSubmissions(
+    formId,
+    opened,
+    { offset: query.offset, limit: query.pageSize, sort: query.sort, q: query.q },
+    { reviewStatus, assigneeId: mine ? currentUserId : undefined },
+  );
+  // The review columns and filters show only when the form's settings let reviewers change status.
+  const showReview = submissionsResult.allowStatusUpdates;
+  const { setFilters } = query;
+  const setReviewFilter = useCallback(
+    (next: { reviewStatus?: string; mine?: boolean }) => {
+      const status = 'reviewStatus' in next ? next.reviewStatus : reviewStatus;
+      const assignedToMe = 'mine' in next ? next.mine : mine;
+      setFilters({
+        ...(status ? { reviewStatus: status } : {}),
+        ...(assignedToMe ? { mine: 'true' } : {}),
+      });
+    },
+    [setFilters, reviewStatus, mine],
+  );
   const { table } = useDataTable(query, submissionsResult, dict.submission.error);
   const submissionDeleter = useSubmissionDeleter();
   const formatLongDate = useFormatLongDate();
@@ -90,17 +121,47 @@ export default function FormSubmissionTab({
         label: dict.submission?.submitter || 'Submitter',
         render: (sub) => sub.createdBy || dict.submission.anon,
       },
-      {
-        key: 'workflowState',
-        label: dict.form?.status || 'Status',
-        render: (sub) => (
-          <Tag
-            data-testid={`${sub.id}-status-tag`}
-            text={capitalizeFirstLetter(sub.workflowState)}
-            color={sub.workflowState === 'submitted' ? 'green' : 'grey'}
-          />
-        ),
-      },
+      showReview
+        ? {
+            key: 'reviewStatus',
+            label: dict.form?.status || 'Status',
+            sortField: 'reviewStatus',
+            render: (sub: SubmissionListItem) =>
+              sub.reviewStatus ? (
+                <StatusTag
+                  data-testid={`${sub.id}-review-status`}
+                  label={dictReview.statuses[sub.reviewStatus]}
+                  variant={workflowStateToVariant(sub.reviewStatus)}
+                />
+              ) : (
+                <span data-testid={`${sub.id}-review-status`}>{dictReview.notSubmitted}</span>
+              ),
+          }
+        : {
+            key: 'workflowState',
+            label: dict.form?.status || 'Status',
+            render: (sub: SubmissionListItem) => (
+              <Tag
+                data-testid={`${sub.id}-status-tag`}
+                text={capitalizeFirstLetter(sub.workflowState)}
+                color={sub.workflowState === SubmissionWorkflowState.submitted ? 'green' : 'grey'}
+              />
+            ),
+          },
+      ...(showReview
+        ? [
+            {
+              key: 'assignee',
+              label: dictReview.assignedTo,
+              sortField: 'assignee',
+              render: (sub: SubmissionListItem) => (
+                <span data-testid={`${sub.id}-assignee`}>
+                  {sub.assignee ? reviewerLabel(sub.assignee) : ''}
+                </span>
+              ),
+            },
+          ]
+        : []),
       {
         key: 'submittedAt',
         label: dict.submission?.submittedAt || 'Submission Date',
@@ -136,11 +197,44 @@ export default function FormSubmissionTab({
         ),
       },
     ],
-    [dict, formatLongDate, locale, router],
+    [dict, dictReview, showReview, formatLongDate, locale, router],
+  );
+
+  const statusOptions = useMemo(
+    () => [
+      { id: ALL_STATUSES, label: dictReview.listAllStatuses },
+      ...SUBMISSION_REVIEW_STATUSES.map((id) => ({ id, label: dictReview.statuses[id] })),
+    ],
+    [dictReview],
   );
 
   return (
     <>
+      {showReview ? (
+        <ListPageFilters>
+          <Select
+            size="medium"
+            label={dictReview.listStatusFilter}
+            selectedKey={reviewStatus ?? ALL_STATUSES}
+            onSelectionChange={(key) =>
+              setReviewFilter({
+                reviewStatus: key && key !== ALL_STATUSES ? String(key) : undefined,
+              })
+            }
+            items={statusOptions}
+            data-testid="form-submissions-review-status-select"
+          />
+          {currentUserId ? (
+            <Checkbox
+              isSelected={mine}
+              onChange={(selected) => setReviewFilter({ mine: selected })}
+              data-testid="form-submissions-mine"
+            >
+              {dictReview.assignedToMeFilter}
+            </Checkbox>
+          ) : null}
+        </ListPageFilters>
+      ) : null}
       <DataTable<SubmissionListItem>
         {...table}
         columns={columns}

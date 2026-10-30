@@ -13,7 +13,7 @@ import {
 import { profileHelpers } from '../../auth/jwtClaims';
 import { ForbiddenError } from '../../errors';
 import type { NormalizedProfile, IdpAttributes } from '../../auth/jwtClaims';
-import { WorkspaceMembershipRole, WorkspaceMembershipStatus } from '../codes';
+import { AppUserStatus, WorkspaceMembershipRole, WorkspaceMembershipStatus } from '../codes';
 import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 import { membershipHoldsPermission } from './formAccessRepo';
@@ -94,7 +94,7 @@ export const findOrCreateUserByIdentity = (
         id: uuidv7(),
         displayLabel,
         profile: profile ?? { displayName: subject },
-        status: 'active',
+        status: AppUserStatus.active,
         createdBy: displayLabel,
         updatedBy: displayLabel,
       })

@@ -30,8 +30,10 @@ import {
   settingsAudit,
   sobaAdmins,
   submissionFiles,
+  submissionNotes,
   submissionParticipants,
   submissionRevisions,
+  submissionStatuses,
   submissions,
   userIdentities,
   workspaceDisclaimerAcceptances,
@@ -265,6 +267,8 @@ export const WORKSPACE_SCOPED_TABLES: readonly string[] = [
   'document_generation_audit',
   'notification_audit',
   'submission_revision',
+  'submission_status',
+  'submission_note',
   'submission_participant',
   'submission_file',
   'submission',
@@ -337,14 +341,23 @@ async function purgeWorkspaceScoped(
     'notification_audit',
     tx.delete(notificationAudits).where(inArray(notificationAudits.workspaceId, ids)),
   );
-  // submission.head_revision_id references the revisions, so the pointer is cleared first.
+  // submission.head_revision_id and status_id reference the revisions and statuses, so the pointers
+  // are cleared first.
   await tx
     .update(submissions)
-    .set({ headRevisionId: null })
+    .set({ headRevisionId: null, statusId: null })
     .where(inArray(submissions.workspaceId, ids));
   await record(
     'submission_revision',
     tx.delete(submissionRevisions).where(inArray(submissionRevisions.workspaceId, ids)),
+  );
+  await record(
+    'submission_status',
+    tx.delete(submissionStatuses).where(inArray(submissionStatuses.workspaceId, ids)),
+  );
+  await record(
+    'submission_note',
+    tx.delete(submissionNotes).where(inArray(submissionNotes.workspaceId, ids)),
   );
   await record(
     'submission_participant',

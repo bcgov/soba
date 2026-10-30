@@ -2,9 +2,11 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { act } from 'react';
-import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { SWRConfig } from 'swr';
+import userEvent from '@testing-library/user-event';
+import { ApiErrorCodes } from '@soba/lib';
+import { SubmissionReviewStatuses } from '@/src/types/submissionReview';
 
 const { mockPush } = vi.hoisted(() => ({ mockPush: vi.fn() }));
 
@@ -22,22 +24,44 @@ vi.mock('@/src/features/formio-v5/ui/ReadOnlyFormView', () => ({
   ReadOnlyFormView: () => <div data-testid="submission-view-form">rendered</div>,
 }));
 
+// Stands in for Form.io: a button that changes one answer, as typing into the form would.
+vi.mock('@/src/features/formio-v5/ui/EditableFormView', () => ({
+  EditableFormView: ({
+    submission,
+    onDataChange,
+  }: {
+    submission: { data: Record<string, unknown> };
+    onDataChange: (data: Record<string, unknown>) => void;
+  }) => (
+    <button
+      type="button"
+      data-testid="submission-edit-form"
+      onClick={() => onDataChange({ ...submission.data, field: 'changed' })}
+    >
+      edit
+    </button>
+  ),
+}));
+
 const getSobaSubmission = vi.fn();
 const getSobaSubmissionData = vi.fn();
 const getFormVersionSchema = vi.fn();
 const deleteSobaSubmission = vi.fn();
 const getSobaSubmissionReview = vi.fn();
 const addSobaSubmissionNote = vi.fn();
-const recordSobaSubmissionEdit = vi.fn();
 const updateSobaSubmissionStatus = vi.fn();
+const getSobaSubmissionReviewers = vi.fn();
+const getSobaForm = vi.fn();
+const updateSobaSubmissionData = vi.fn();
 
 const SUBMISSION_ID = '01a0a276-8dee-71e4-8951-5effdc491be0';
+const REVIEWER_PERMISSIONS = ['form_read', 'submission_read', 'submission_review'];
 const REVIEW = {
-  assignees: ['Grace Hopper'],
+  allowStatusUpdates: false,
   statusHistory: [
     {
       id: 's1',
-      status: 'SUBMITTED',
+      status: SubmissionReviewStatuses.submitted,
       assignee: null,
       changedAt: '2026-01-02T03:04:05Z',
       updatedBy: 'Ada Lovelace',
@@ -49,13 +73,15 @@ const REVIEW = {
 vi.mock('@/src/shared/api/sobaApi', () => ({
   getSobaSubmissionReview: (...args: unknown[]) => getSobaSubmissionReview(...args),
   addSobaSubmissionNote: (...args: unknown[]) => addSobaSubmissionNote(...args),
-  recordSobaSubmissionEdit: (...args: unknown[]) => recordSobaSubmissionEdit(...args),
   updateSobaSubmissionStatus: (...args: unknown[]) => updateSobaSubmissionStatus(...args),
-  fetchCurrentUser: async () => ({ actor: { displayLabel: 'Rev Iewer' } }),
+  getSobaSubmissionReviewers: (...args: unknown[]) => getSobaSubmissionReviewers(...args),
+  getSobaForm: (...args: unknown[]) => getSobaForm(...args),
+  fetchCurrentUser: async () => ({ actor: { id: 'u-rev', displayLabel: 'Rev Iewer' } }),
   deleteSobaSubmission: (...args: unknown[]) => deleteSobaSubmission(...args),
   getSobaSubmission: (...args: unknown[]) => getSobaSubmission(...args),
   getSobaSubmissionData: (...args: unknown[]) => getSobaSubmissionData(...args),
   getFormVersionSchema: (...args: unknown[]) => getFormVersionSchema(...args),
+  updateSobaSubmissionData: (...args: unknown[]) => updateSobaSubmissionData(...args),
 }));
 
 import makeStore from '@/lib/store';
@@ -101,10 +127,15 @@ describe('DesignSubmissionView', () => {
       submittedAt: new Date('2026-01-02T03:04:05Z').toISOString(),
       createdBy: 'Ada Lovelace',
       confirmationCode: 'K7M2Q9XA',
+      headRevisionId: 'rev-2',
     });
     getFormVersionSchema.mockResolvedValue({ components: [] });
     getSobaSubmissionData.mockResolvedValue({ data: { field: 'value' } });
     getSobaSubmissionReview.mockResolvedValue(REVIEW);
+    getSobaForm.mockResolvedValue({ id: 'f1', permissions: REVIEWER_PERMISSIONS });
+    getSobaSubmissionReviewers.mockResolvedValue({
+      items: [{ id: 'u-rev', displayName: 'Rev Iewer', email: null }],
+    });
   });
 
   it('reads the submission, its version schema and its answers through the design API', async () => {
@@ -274,11 +305,10 @@ describe('DesignSubmissionView', () => {
     await waitFor(() =>
       expect(screen.getByTestId('submission-notes-list')).toHaveTextContent('Needs a second look'),
     );
-    expect(addSobaSubmissionNote).toHaveBeenCalledWith(
-      'token',
-      SUBMISSION_ID,
-      'Needs a second look',
-    );
+    expect(addSobaSubmissionNote).toHaveBeenCalledWith('token', SUBMISSION_ID, {
+      id: expect.any(String),
+      text: 'Needs a second look',
+    });
     expect(screen.getByTestId('submission-notes-list')).toHaveTextContent('Rev Iewer');
   });
 
@@ -292,28 +322,167 @@ describe('DesignSubmissionView', () => {
       ),
     );
     expect(screen.getByTestId('submission-status-assignee')).toHaveTextContent('Unassigned');
-    expect(screen.getByTestId('submission-status-update')).toBeDisabled();
   });
 
-  it('records an edit of the answers once the change is confirmed', async () => {
+  it('shows real review data, without the sample-data notice', async () => {
     signIn();
-    recordSobaSubmissionEdit.mockResolvedValue({
-      ...REVIEW,
-      editHistory: [{ id: 'e1', editedAt: '2026-01-03T03:04:05Z', editedBy: 'Rev Iewer' }],
-    });
     await renderView();
-    await waitFor(() => expect(screen.getByTestId('submission-data-update')).toBeInTheDocument());
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('submission-data-update'));
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('confirm-modal-confirm'));
-    });
 
     await waitFor(() =>
-      expect(screen.getByTestId('submission-view-modified-by')).toHaveTextContent('Rev Iewer'),
+      expect(screen.getByTestId('submission-status-current')).toBeInTheDocument(),
     );
+    expect(screen.queryByText(/sample data/i)).not.toBeInTheDocument();
+    expect(getSobaSubmissionReview).toHaveBeenCalledWith('token', SUBMISSION_ID);
+  });
+
+  // Notes are for reviewers; anyone else who reads the submission sees them without the box.
+  it('lists the notes without a note box for a caller who cannot review', async () => {
+    signIn();
+    getSobaForm.mockResolvedValue({ id: 'f1', permissions: ['form_read', 'submission_read'] });
+    getSobaSubmissionReview.mockResolvedValue({
+      ...REVIEW,
+      notes: [
+        { id: 'n1', text: 'Checked', createdAt: '2026-01-03T03:04:05Z', createdBy: 'Rev Iewer' },
+      ],
+    });
+    await renderView();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('submission-notes-list')).toHaveTextContent('Checked'),
+    );
+    expect(screen.queryByTestId('submission-note-add')).not.toBeInTheDocument();
+    expect(getSobaForm).toHaveBeenCalledWith('token', 'f1');
+  });
+
+  // A note whose answer was lost is sent again under the same id, so it is added once.
+  it('retries a failed note under the same id', async () => {
+    signIn();
+    addSobaSubmissionNote
+      .mockRejectedValueOnce(new ApiError('Request failed (500)', 500))
+      .mockResolvedValueOnce(REVIEW);
+    await renderView();
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Note' })).toBeInTheDocument());
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Note' }), {
+      target: { value: 'Needs a second look' },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('submission-note-add'));
+    });
+    await waitFor(() => expect(addSobaSubmissionNote).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('submission-note-add'));
+    });
+
+    await waitFor(() => expect(addSobaSubmissionNote).toHaveBeenCalledTimes(2));
+    const [first, second] = addSobaSubmissionNote.mock.calls.map((call) => call[2]);
+    expect(second).toEqual(first);
+  });
+
+  describe('status changes', () => {
+    const UPDATES_ON = { ...REVIEW, allowStatusUpdates: true };
+
+    /** Picks `option` in the status select and saves it. */
+    async function changeStatusTo(option: string) {
+      const user = userEvent.setup();
+      const select = await screen.findByTestId('submission-status-select');
+      await user.click(within(select).getByRole('button'));
+      await user.click(await screen.findByRole('option', { name: option }));
+      await user.click(screen.getByTestId('submission-status-update'));
+    }
+
+    it("offers no status change, and says why, when the form's settings turn it off", async () => {
+      signIn();
+      await renderView();
+
+      await waitFor(() =>
+        expect(screen.getByTestId('submission-status-updates-off')).toBeInTheDocument(),
+      );
+      expect(screen.queryByTestId('submission-status-select')).not.toBeInTheDocument();
+      expect(getSobaSubmissionReviewers).not.toHaveBeenCalled();
+    });
+
+    it('offers no status change to a caller who cannot review', async () => {
+      signIn();
+      getSobaForm.mockResolvedValue({ id: 'f1', permissions: ['form_read', 'submission_read'] });
+      getSobaSubmissionReview.mockResolvedValue(UPDATES_ON);
+      await renderView();
+
+      await waitFor(() =>
+        expect(screen.getByTestId('submission-status-current')).toBeInTheDocument(),
+      );
+      expect(screen.queryByTestId('submission-status-select')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('submission-status-updates-off')).not.toBeInTheDocument();
+      expect(getSobaSubmissionReviewers).not.toHaveBeenCalled();
+    });
+
+    it('completes the submission from the status it showed, and shows the new status', async () => {
+      signIn();
+      getSobaSubmissionReview.mockResolvedValue(UPDATES_ON);
+      updateSobaSubmissionStatus.mockResolvedValue({
+        ...UPDATES_ON,
+        statusHistory: [
+          { ...UPDATES_ON.statusHistory[0], id: 's2', status: SubmissionReviewStatuses.completed },
+          ...UPDATES_ON.statusHistory,
+        ],
+      });
+      await renderView();
+
+      await changeStatusTo('Completed');
+
+      await waitFor(() =>
+        expect(screen.getByTestId('submission-status-current')).toHaveTextContent('Completed'),
+      );
+      expect(updateSobaSubmissionStatus).toHaveBeenCalledWith('token', SUBMISSION_ID, {
+        id: expect.any(String),
+        fromStatusId: 's1',
+        status: SubmissionReviewStatuses.completed,
+        assigneeId: null,
+      });
+      expect(getSobaSubmissionReviewers).toHaveBeenCalledWith('token', SUBMISSION_ID);
+    });
+
+    // A change whose answer was lost is sent again under the same id, so it is made once.
+    it('retries a failed change under the same id', async () => {
+      signIn();
+      getSobaSubmissionReview.mockResolvedValue(UPDATES_ON);
+      updateSobaSubmissionStatus
+        .mockRejectedValueOnce(new ApiError('Request failed (500)', 500))
+        .mockResolvedValueOnce(UPDATES_ON);
+      await renderView();
+
+      await changeStatusTo('Completed');
+      await waitFor(() => expect(updateSobaSubmissionStatus).toHaveBeenCalledTimes(1));
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('submission-status-update'));
+      });
+
+      await waitFor(() => expect(updateSobaSubmissionStatus).toHaveBeenCalledTimes(2));
+      const [first, second] = updateSobaSubmissionStatus.mock.calls.map((call) => call[2]);
+      expect(second).toEqual(first);
+    });
+
+    it('reads the review again when someone else changed the status first', async () => {
+      signIn();
+      getSobaSubmissionReview.mockResolvedValue(UPDATES_ON);
+      updateSobaSubmissionStatus.mockRejectedValue(
+        new ApiError('Conflict', 409, ApiErrorCodes.status_changed),
+      );
+      await renderView();
+      await waitFor(() => expect(getSobaSubmissionReview).toHaveBeenCalledTimes(1));
+
+      await changeStatusTo('Completed');
+
+      await waitFor(() => expect(getSobaSubmissionReview).toHaveBeenCalledTimes(2));
+    });
+  });
+
+  it('does not offer to change the answers yet', async () => {
+    signIn();
+    await renderView();
+
+    await waitFor(() => expect(screen.getByTestId('submission-data-history')).toBeInTheDocument());
+    expect(screen.queryByTestId('submission-data-update')).not.toBeInTheDocument();
   });
 
   it('deletes the submission and returns to the submissions tab', async () => {
@@ -335,35 +504,6 @@ describe('DesignSubmissionView', () => {
 
   const notifications = () =>
     store.getState().notification.notifications.map((notification) => notification.text);
-
-  it('saves a status change and shows it as the current status', async () => {
-    signIn();
-    updateSobaSubmissionStatus.mockResolvedValue({
-      ...REVIEW,
-      statusHistory: [
-        { ...REVIEW.statusHistory[0], id: 's2', status: 'COMPLETED' },
-        ...REVIEW.statusHistory,
-      ],
-    });
-    const user = userEvent.setup();
-    await renderView();
-    await waitFor(() => expect(screen.getByTestId('submission-status-select')).toBeInTheDocument());
-
-    await user.click(within(screen.getByTestId('submission-status-select')).getByRole('button'));
-    await user.click(await screen.findByRole('option', { name: 'Completed' }));
-    await user.click(screen.getByTestId('submission-status-update'));
-
-    await waitFor(() =>
-      expect(screen.getByTestId('submission-status-current')).toHaveTextContent(
-        'Current Status: Completed',
-      ),
-    );
-    expect(updateSobaSubmissionStatus).toHaveBeenCalledWith('token', SUBMISSION_ID, {
-      status: 'COMPLETED',
-      assignee: null,
-    });
-    expect(notifications()).toContain('Status updated');
-  });
 
   it('says a note could not be saved, and keeps the list and what was typed', async () => {
     signIn();
@@ -391,22 +531,6 @@ describe('DesignSubmissionView', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Note' }), { target: { value: '   ' } });
 
     expect(screen.getByTestId('submission-note-add')).toBeDisabled();
-  });
-
-  it('records no edit when the change is cancelled', async () => {
-    signIn();
-    await renderView();
-    await waitFor(() => expect(screen.getByTestId('submission-data-update')).toBeInTheDocument());
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('submission-data-update'));
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('confirm-modal-cancel'));
-    });
-
-    expect(recordSobaSubmissionEdit).not.toHaveBeenCalled();
-    expect(screen.queryByTestId('confirm-modal-confirm')).not.toBeInTheDocument();
   });
 
   it('lists the edits in the submitted data history', async () => {
@@ -522,8 +646,6 @@ describe('DesignSubmissionView', () => {
     expect(screen.getByTestId('submission-view-form')).toBeInTheDocument();
     expect(screen.queryByTestId('submission-status-current')).not.toBeInTheDocument();
     expect(screen.queryByTestId('submission-note-add')).not.toBeInTheDocument();
-    // Nothing would record the edit, so it is not offered.
-    expect(screen.queryByTestId('submission-data-update')).not.toBeInTheDocument();
   });
 
   it('says so when the caller may not read the review', async () => {
@@ -557,6 +679,121 @@ describe('DesignSubmissionView', () => {
     expect(screen.queryByTestId('submission-view-submitted')).not.toBeInTheDocument();
     expect(screen.queryByTestId('submission-view-confirmation')).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('submission-note-add')).toBeInTheDocument());
-    expect(screen.queryByTestId('submission-data-update')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('submission-data-history')).not.toBeInTheDocument();
+  });
+});
+
+describe('DesignSubmissionView staff edits', () => {
+  const EDITOR_PERMISSIONS = [...REVIEWER_PERMISSIONS, 'submission_update'];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store = makeStore();
+    getSobaSubmission.mockResolvedValue({
+      id: SUBMISSION_ID,
+      formId: 'f1',
+      formName: 'Form One',
+      formVersionId: 'v3',
+      versionNo: 3,
+      workflowState: 'submitted',
+      submittedAt: '2026-01-02T03:04:05Z',
+      createdBy: 'Ada Lovelace',
+      confirmationCode: 'K7M2Q9XA',
+      headRevisionId: 'rev-2',
+    });
+    getFormVersionSchema.mockResolvedValue({ components: [] });
+    getSobaSubmissionData.mockResolvedValue({ data: { field: 'value' } });
+    getSobaSubmissionReview.mockResolvedValue(REVIEW);
+    getSobaForm.mockResolvedValue({ id: 'f1', permissions: EDITOR_PERMISSIONS });
+    updateSobaSubmissionData.mockResolvedValue({ id: SUBMISSION_ID });
+    signIn();
+  });
+
+  it('offers no Edit without submission_update', async () => {
+    getSobaForm.mockResolvedValue({ id: 'f1', permissions: REVIEWER_PERMISSIONS });
+    await renderView({ submissionId: SUBMISSION_ID });
+
+    await screen.findByTestId('submission-data-history');
+    expect(screen.queryByTestId('submission-edit')).toBeNull();
+  });
+
+  it('offers no Edit while the submission is sent back to revise', async () => {
+    getSobaSubmission.mockResolvedValue({
+      ...(await getSobaSubmission()),
+      workflowState: 'revising',
+    });
+    await renderView({ submissionId: SUBMISSION_ID });
+
+    await screen.findByTestId('submission-data-history');
+    expect(screen.queryByTestId('submission-edit')).toBeNull();
+  });
+
+  it('saves the changed answers after confirmation, from the revision on screen', async () => {
+    const user = userEvent.setup();
+    await renderView({ submissionId: SUBMISSION_ID });
+
+    await user.click(await screen.findByTestId('submission-edit'));
+    expect(screen.getByTestId('submission-edit-notice')).toBeInTheDocument();
+    await user.click(screen.getByTestId('submission-edit-form'));
+    await user.click(screen.getByTestId('submission-edit-update'));
+    expect(
+      await screen.findByText('Are you sure you want to change the submitted data?'),
+    ).toBeVisible();
+    await user.click(screen.getByTestId('confirm-modal-confirm'));
+
+    await waitFor(() =>
+      expect(updateSobaSubmissionData).toHaveBeenCalledWith('token', SUBMISSION_ID, {
+        data: { field: 'changed' },
+        revisionId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        baseRevisionId: 'rev-2',
+      }),
+    );
+    // The answers and the edit history are read again, and the form goes back to read-only.
+    await waitFor(() => expect(screen.queryByTestId('submission-edit-form')).toBeNull());
+    expect(getSobaSubmissionReview.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('retries a failed save under the same revision id', async () => {
+    const user = userEvent.setup();
+    updateSobaSubmissionData.mockRejectedValueOnce(new Error('network'));
+    await renderView({ submissionId: SUBMISSION_ID });
+
+    await user.click(await screen.findByTestId('submission-edit'));
+    await user.click(screen.getByTestId('submission-edit-form'));
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await user.click(screen.getByTestId('submission-edit-update'));
+      await user.click(await screen.findByTestId('confirm-modal-confirm'));
+      await waitFor(() => expect(updateSobaSubmissionData).toHaveBeenCalledTimes(attempt + 1));
+    }
+
+    const [first, second] = updateSobaSubmissionData.mock.calls;
+    expect(second[2].revisionId).toBe(first[2].revisionId);
+  });
+
+  it('re-reads the answers when someone else changed them first', async () => {
+    const user = userEvent.setup();
+    updateSobaSubmissionData.mockRejectedValue(
+      new ApiError('changed', 409, ApiErrorCodes.data_changed),
+    );
+    await renderView({ submissionId: SUBMISSION_ID });
+    const readsBefore = getSobaSubmission.mock.calls.length;
+
+    await user.click(await screen.findByTestId('submission-edit'));
+    await user.click(screen.getByTestId('submission-edit-form'));
+    await user.click(screen.getByTestId('submission-edit-update'));
+    await user.click(await screen.findByTestId('confirm-modal-confirm'));
+
+    await waitFor(() => expect(getSobaSubmission.mock.calls.length).toBeGreaterThan(readsBefore));
+  });
+
+  it('leaves the answers untouched on Cancel', async () => {
+    const user = userEvent.setup();
+    await renderView({ submissionId: SUBMISSION_ID });
+
+    await user.click(await screen.findByTestId('submission-edit'));
+    await user.click(screen.getByTestId('submission-edit-cancel'));
+
+    expect(screen.getByTestId('submission-view-form')).toBeInTheDocument();
+    expect(updateSobaSubmissionData).not.toHaveBeenCalled();
   });
 });

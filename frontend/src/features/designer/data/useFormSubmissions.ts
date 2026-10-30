@@ -9,25 +9,44 @@ import { classifyDataError } from '@/src/shared/api/dataError';
 import type { ListResult, WriteOutcome } from '@/src/shared/api/dataContracts';
 import type { ListQueryArgs } from '@/src/types/list';
 import type { SubmissionListItem } from '@/src/types/submissions';
+import type { SubmissionReviewStatus } from '@/src/types/submissionReview';
 import { useSortLocale } from '@/src/shared/list/useSortLocale';
 import { designSubmissionKey } from './useDesignSubmission';
 import { submissionReviewKey } from './useSubmissionReview';
 
 const EMPTY: SubmissionListItem[] = [];
 
+/** Narrows a form's submissions by their review. */
+export interface FormSubmissionFilters {
+  reviewStatus?: SubmissionReviewStatus;
+  assigneeId?: string;
+}
+
 /**
  * One page of submissions for one form, read once its tab has been opened. The endpoint requires
  * submission_read, which a designer need not hold, so the read waits to be asked for.
+ * `allowStatusUpdates` says whether the form's review shows, once the page is read.
  */
 export function useFormSubmissions(
   formId: string | undefined,
   opened: boolean,
   query: ListQueryArgs,
-): ListResult<SubmissionListItem> {
+  filters: FormSubmissionFilters = {},
+): ListResult<SubmissionListItem> & { allowStatusUpdates: boolean } {
   const locale = useSortLocale();
   const { data, isLoading, isValidating, error, mutate } = useAuthedSWR(
     formId && opened
-      ? ['form-submissions', formId, query.offset, query.limit, query.sort, query.q ?? '', locale]
+      ? [
+          'form-submissions',
+          formId,
+          query.offset,
+          query.limit,
+          query.sort,
+          query.q ?? '',
+          filters.reviewStatus ?? '',
+          filters.assigneeId ?? '',
+          locale,
+        ]
       : null,
     (token) =>
       getSobaSubmissions(token, {
@@ -37,6 +56,8 @@ export function useFormSubmissions(
         q: query.q,
         locale,
         formId: formId as string,
+        reviewStatus: filters.reviewStatus,
+        assigneeId: filters.assigneeId,
       }),
     listReadConfig,
   );
@@ -56,6 +77,7 @@ export function useFormSubmissions(
     isRefreshing: isValidating && data !== undefined,
     error: error ? classifyDataError(error) : null,
     refresh,
+    allowStatusUpdates: data?.allowStatusUpdates === true,
   };
 }
 
