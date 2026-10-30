@@ -55,11 +55,6 @@ backend:
     # Path-scoped Routes on the same host, annotations merged over the ones above. Paths are
     # relative to backend.basePath, which the template prepends.
     extraPaths:
-      - name: files
-        path: /api/v1/submit/files
-        annotations:
-          # Upload is silent through the clamd scan (clamav.timeoutMs, 60s).
-          haproxy.router.openshift.io/timeout: "300s"
       - name: files-api
         path: /api/v1/files
         annotations:

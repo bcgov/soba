@@ -57,7 +57,7 @@ export function ensureBcgovFormioRegistered(): Promise<{ filesEnabled: boolean }
           // A getter so getSobaApiBaseUrl() is read per request (after runtime config has loaded).
           filesUrl: () => {
             const apiUrl = getSobaApiBaseUrl();
-            return `${apiUrl}/submit/files`;
+            return `${apiUrl}/files`;
           },
           getToken: () => uploadToken(() => getKeycloakInstance()?.token),
           // The submission currently being filled (set by the fill form), opened first if it is new;
