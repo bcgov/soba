@@ -155,6 +155,10 @@ export const ApiErrorCodes = {
   no_saved_data: 'no_saved_data',
   // Workspace groups.
   group_name_taken: 'group_name_taken',
+  // Workspace access.
+  member_exists: 'member_exists',
+  member_protected: 'member_protected',
+  last_form_admin: 'last_form_admin',
   // Submission exports: the form already has as many running as allowed.
   export_limit_reached: 'export_limit_reached',
   // Any route.
