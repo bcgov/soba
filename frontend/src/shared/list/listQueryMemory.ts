@@ -27,6 +27,11 @@ export type ListQuerySpec = {
   /** Sort tokens the endpoint accepts. Anything else in the URL falls back to the default. */
   sortOptions: readonly string[];
   defaultSort: string;
+  /**
+   * The record the list belongs to, such as a form, so each one remembers its own query. It changes
+   * only the remembered key, not the URL names.
+   */
+  memoryScope?: string;
 };
 
 export type ListQueryParams = Record<string, string>;
@@ -133,6 +138,27 @@ export const JOBS_LIST_QUERY: ListQuerySpec = {
   defaultSort: CREATED_DESC,
 };
 
+/** A form's jobs, in the designer. Scope it to the form with `scopedListQuery`. */
+export const FORM_JOBS_LIST_QUERY: ListQuerySpec = {
+  resource: 'formJobs',
+  filters: ['status', 'type'],
+  sortOptions: sortTokensFor(JOB_SORT_FIELDS),
+  defaultSort: CREATED_DESC,
+};
+
+/** A workspace's jobs, on the workspace page. Scope it to the workspace with `scopedListQuery`. */
+export const WORKSPACE_JOBS_LIST_QUERY: ListQuerySpec = {
+  resource: 'workspaceJobs',
+  filters: ['status', 'type', 'formId'],
+  sortOptions: sortTokensFor(JOB_SORT_FIELDS),
+  defaultSort: CREATED_DESC,
+};
+
+export const scopedListQuery = (spec: ListQuerySpec, memoryScope: string): ListQuerySpec => ({
+  ...spec,
+  memoryScope,
+});
+
 export const WORKSPACE_GROUPS_LIST_QUERY: ListQuerySpec = {
   resource: 'workspaceGroups',
   filters: [],
@@ -141,7 +167,8 @@ export const WORKSPACE_GROUPS_LIST_QUERY: ListQuerySpec = {
 };
 
 const KEY_PREFIX = 'soba.listQuery.';
-const keyFor = (spec: ListQuerySpec) => `${KEY_PREFIX}${spec.resource}`;
+const keyFor = (spec: ListQuerySpec) =>
+  [`${KEY_PREFIX}${spec.resource}`, spec.memoryScope].filter(Boolean).join('.');
 
 /**
  * Marks a link inside the app, whose destination is "the list as I left it". A bare URL is someone
