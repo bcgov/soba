@@ -361,6 +361,7 @@ async function purgeWorkspaceScoped(
   await record(
     'workspace_credential',
     tx.delete(workspaceCredentials).where(inArray(workspaceCredentials.workspaceId, ids)),
+  );
   await record(
     'submission_export_audit',
     tx.delete(submissionExportAudits).where(inArray(submissionExportAudits.workspaceId, ids)),
