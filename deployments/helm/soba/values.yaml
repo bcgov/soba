@@ -284,7 +284,8 @@ backend:
       # -- outbound deadline in ms; empty uses the backend default (30000)
       timeoutMs: ""
     cdogsV3:
-      endpoint: ""
+      # -- gold cluster-local service; does not resolve from other clusters
+      endpoint: http://common-document-generation-service-master.b82f30-prod:3000
       # -- outbound deadline in ms; empty uses the backend default (30000)
       timeoutMs: ""
 
