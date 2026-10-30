@@ -1,5 +1,5 @@
 import express from 'express';
-import { credentialsRouter } from '../../features/credentials/route';
+import { credentialsRouter, formCredentialsRouter } from '../../features/credentials/route';
 import { registerCredentialsOpenApi } from '../../features/credentials/schema';
 import { coreErrorHandler, notFoundHandler } from '../middleware/errorHandler';
 import { registerAdminOpenApi } from './admin';
@@ -62,6 +62,7 @@ registerOpenApiPaths((registry) => {
 // Design feature: form authoring + submission management. Form settings groups are self-contained
 // modules under /forms/:id/settings (features/form-settings).
 const designRouter = express.Router();
+designRouter.use(formCredentialsRouter);
 designRouter.use('/forms/:id/settings', formSettingsRouter);
 designRouter.use('/forms/:id/user-search', formUserSearchRouter);
 designRouter.use('/', designFormsRouter);

@@ -32,7 +32,6 @@ import { isWorkspaceManageRole } from '../workspaceRoles';
 import WorkspaceFormSettings from '@/src/features/form-settings/ui/WorkspaceFormSettings';
 import type { UpdateWorkspaceBody, WorkspaceItem } from '@/src/types/workspaces';
 import styles from './WorkspaceForm.module.css';
-import WorkspaceApiKey from '@/src/features/credentials/ui/WorkspaceApiKey';
 
 // How long to wait after the last keystroke, and how short a name can be, before checking it.
 const NAME_CHECK_DEBOUNCE_MS = 400;
@@ -384,13 +383,6 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
       <Tab eventKey="settings" title={dictWorkspaces.settingsTab}>
         <div className={styles.tabContent}>
           <WorkspaceSettings key={workspace.id} workspace={workspace} first={first} />
-          {isWorkspaceManageRole(workspace.role) && (
-            <WorkspaceApiKey
-              workspaceId={workspace.id}
-              helpUrl="https://developer.gov.bc.ca/docs/default/component/aps-infra-platform-docs/concepts/protect-api/#kong-api-key"
-              revokeUrl="https://api.gov.bc.ca/manager/consumers"
-            />
-          )}
         </div>
       </Tab>
       <Tab

@@ -1,5 +1,6 @@
 import {
   DOCGEN_AUDIT_SORT_FIELDS,
+  CREDENTIAL_SORT_FIELDS,
   FEATURE_SCOPE_SORT_FIELDS,
   FORM_SORT_FIELDS,
   FORM_VERSION_SORT_FIELDS,
@@ -46,12 +47,13 @@ export const urlParamName = (spec: ListQuerySpec, name: string): string =>
   `${spec.resource}.${name}`;
 
 const UPDATED_DESC = 'updatedAt:desc';
+const CREATED_DESC = 'createdAt:desc';
 
 export const FORMS_LIST_QUERY: ListQuerySpec = {
   resource: 'forms',
   filters: ['workspace'],
   sortOptions: sortTokensFor(FORM_SORT_FIELDS),
-  defaultSort: 'createdAt:desc',
+  defaultSort: CREATED_DESC,
 };
 
 export const WORKSPACES_LIST_QUERY: ListQuerySpec = {
@@ -120,7 +122,7 @@ export const DOCGEN_AUDITS_LIST_QUERY: ListQuerySpec = {
   resource: 'docgenAudits',
   filters: [],
   sortOptions: sortTokensFor(DOCGEN_AUDIT_SORT_FIELDS),
-  defaultSort: 'createdAt:desc',
+  defaultSort: CREATED_DESC,
 };
 
 const KEY_PREFIX = 'soba.listQuery.';
@@ -182,3 +184,10 @@ export function recallListQuery(spec: ListQuerySpec): ListQueryParams | null {
 export function forgetListQueries(): void {
   removeSessionValues((key) => key.startsWith(KEY_PREFIX));
 }
+
+export const CREDENTIALS_LIST_QUERY: ListQuerySpec = {
+  resource: 'credentials',
+  filters: [],
+  sortOptions: sortTokensFor(CREDENTIAL_SORT_FIELDS),
+  defaultSort: CREATED_DESC,
+};

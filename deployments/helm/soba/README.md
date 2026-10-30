@@ -555,3 +555,22 @@ removed from Secrets and PVCs. This allows `helm uninstall` to delete them norma
 When APS is selected with Vault enabled, the backend sources `PLUGIN_APS_CREDENTIAL_ISSUER_V3_CLIENT_ID` and
 `PLUGIN_APS_CREDENTIAL_ISSUER_V3_CLIENT_SECRET` from Vault. See [credential issuer](../../../docs/credential-issuer.md)
 for permissions, readiness limitations, and lifecycle behavior.
+
+
+The dev, PR, test and prod values files each declare their own issuer configuration. They use
+`https://api.gov.bc.ca/ds/api/v3` for the Directory API and
+`https://authz.apps.gov.bc.ca/auth/realms/aps/protocol/openid-connect/token` for service-account tokens.
+The gateway service's public route is the URL consumers call; it is not the Directory API URL.
+
+Dev selects APS with its supplied gateway ID and the product environment from the local setup.
+PR, test and prod have their own gateway IDs and remain on `credential-issuer-noop` until their
+`environmentAppId` values are filled in. Follow
+[Obtain the product environment appId](../../../docs/credential-issuer.md#obtain-the-product-environment-appid)
+to log in to the Portal, query products for the deployment's gateway in the API console, and copy
+the appropriate service's `environments[].appId` into its values file.
+
+Before selecting `aps-credential-issuer-v3` for an environment, add
+`PLUGIN_APS_CREDENTIAL_ISSUER_V3_CLIENT_ID` and `PLUGIN_APS_CREDENTIAL_ISSUER_V3_CLIENT_SECRET`
+to that deployment's Vault secret. The service account needs `CredentialIssuer.Generate` on
+that environment's gateway. Set `backend.config.credentialIssuerDefaultCode` to
+`aps-credential-issuer-v3` after the IDs and credentials are in place. The base chart retains the no-op default.

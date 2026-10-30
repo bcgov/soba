@@ -27,6 +27,9 @@ describe('dev-data credential purge', () => {
     const auditIndex = calls.findIndex(({ sql }) =>
       sql.startsWith('delete from "soba"."credential_audit"'),
     );
+    const assignmentIndex = calls.findIndex(({ sql }) =>
+      sql.startsWith('delete from "soba"."credential_type_assignment"'),
+    );
     const credentialIndex = calls.findIndex(({ sql }) =>
       sql.startsWith('delete from "soba"."workspace_credential"'),
     );
@@ -34,12 +37,16 @@ describe('dev-data credential purge', () => {
       sql.startsWith('delete from "soba"."workspace"'),
     );
     expect(auditIndex).toBeGreaterThan(-1);
-    expect(credentialIndex).toBeGreaterThan(auditIndex);
+    expect(assignmentIndex).toBeGreaterThan(auditIndex);
+    expect(credentialIndex).toBeGreaterThan(assignmentIndex);
     expect(workspaceIndex).toBeGreaterThan(credentialIndex);
     expect(calls[auditIndex].sql).toContain('select "id" from "soba"."workspace_credential"');
     expect(calls[auditIndex].sql).toContain('"workspace_id" in ($1)');
     expect(calls[auditIndex].params).toEqual(['01900000-0000-7000-8000-000000000001']);
     expect(calls[credentialIndex].params).toEqual(['01900000-0000-7000-8000-000000000001']);
+    expect(calls[assignmentIndex].sql).toContain('select "id" from "soba"."workspace_credential"');
+    expect(calls[assignmentIndex].params).toEqual(['01900000-0000-7000-8000-000000000001']);
+    expect(result.rowsDeleted.credential_type_assignment).toBe(1);
     expect(result.rowsDeleted.credential_audit).toBe(1);
     expect(result.rowsDeleted.workspace_credential).toBe(1);
   });

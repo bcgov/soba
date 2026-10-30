@@ -12,6 +12,7 @@ import { db, type DbOrTx } from '../../core/db/client';
 import {
   appUsers,
   credentialAudit,
+  credentialTypeAssignments,
   documentGenerationAudits,
   documentTemplates,
   enterpriseGroupBindings,
@@ -348,6 +349,12 @@ async function purgeWorkspaceScoped(
   await record(
     'credential_audit',
     tx.delete(credentialAudit).where(inArray(credentialAudit.credentialId, credentialIds)),
+  );
+  await record(
+    'credential_type_assignment',
+    tx
+      .delete(credentialTypeAssignments)
+      .where(inArray(credentialTypeAssignments.credentialId, credentialIds)),
   );
   await record(
     'workspace_credential',

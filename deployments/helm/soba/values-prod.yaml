@@ -29,6 +29,15 @@ backend:
     logLevel: warn
     documentGenerationDefaultCode: cdogs-v2
     tenantEngineDefaultCode: cstar-v1
+    # Switch to aps-credential-issuer-v3 after filling the environment appId below and adding Vault credentials.
+    credentialIssuerDefaultCode: credential-issuer-noop
+  credentialIssuer:
+    apsCredentialIssuerV3:
+      apiBaseUrl: https://api.gov.bc.ca/ds/api/v3
+      # Prod gateway and its target product environment; these are separate IDs.
+      gatewayId: "gw-6cd63"
+      environmentAppId: ""
+      tokenUrl: https://authz.apps.gov.bc.ca/auth/realms/aps/protocol/openid-connect/token
   documentGeneration:
     cdogsV2:
       endpoint: https://cdogs.api.gov.bc.ca/api

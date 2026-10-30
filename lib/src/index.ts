@@ -17,3 +17,4 @@ export * from './permissions';
 export * from './schemas/tenants';
 export * from './schemas/templates';
 export * from './schemas/userSearch';
+export * from './schemas/credentials';

@@ -1,28 +1,46 @@
+import type { CreateCredential } from '@soba/lib';
+import type { CredentialListQuery, CredentialNotesInput } from './schema';
 import { asyncHandler } from '../../core/api/shared/asyncHandler';
-import { workspaceCredentialService } from './service';
+import { credentialService } from './service';
 
-export const getCredential = asyncHandler(async (req, res) => {
-  res.json(await workspaceCredentialService.get(req.coreContext!.workspaceId));
+export const listCredentials = asyncHandler(async (req, res) => {
+  res.json(
+    await credentialService.list(req.coreContext!.workspaceId, {
+      ...req.query,
+      locale: req.sortLocale,
+    } as CredentialListQuery),
+  );
 });
 export const issueCredential = asyncHandler(async (req, res) => {
   const { workspaceId, actorId } = req.coreContext!;
-  res.status(201).json(await workspaceCredentialService.issue(workspaceId, actorId));
+  const body = req.body as CreateCredential;
+  res.status(201).json(await credentialService.issue(workspaceId, actorId, body));
 });
 export const regenerateCredential = asyncHandler(async (req, res) => {
   const { workspaceId, actorId } = req.coreContext!;
-  res.json(
-    await workspaceCredentialService.regenerate(workspaceId, req.params.credentialId, actorId),
-  );
+  res.json(await credentialService.regenerate(workspaceId, req.params.credentialId, actorId));
 });
 
 export const updateCredentialNotes = asyncHandler(async (req, res) => {
+  const body = req.body as CredentialNotesInput;
   const { workspaceId, actorId } = req.coreContext!;
   res.json(
-    await workspaceCredentialService.updateNotes(
+    await credentialService.updateNotes(workspaceId, req.params.credentialId, actorId, body.notes),
+  );
+});
+
+export const listFormCredentials = asyncHandler(async (req, res) => {
+  const { workspaceId } = req.coreContext!;
+  res.json(
+    await credentialService.list(
       workspaceId,
-      req.params.credentialId,
-      actorId,
-      req.body.notes,
+      { ...req.query, locale: req.sortLocale } as CredentialListQuery,
+      req.params.id,
     ),
   );
+});
+export const issueFormCredential = asyncHandler(async (req, res) => {
+  const { workspaceId, actorId } = req.coreContext!;
+  const body = req.body as CreateCredential;
+  res.status(201).json(await credentialService.issue(workspaceId, actorId, body, req.params.id));
 });

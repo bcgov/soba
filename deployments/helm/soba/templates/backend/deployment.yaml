@@ -119,13 +119,11 @@ spec:
               . /vault/secrets/soba-cdogs
               . /vault/secrets/soba-workflow
               . /vault/secrets/soba-notify
-<<<<<<< HEAD
               {{- if eq .Values.backend.config.credentialIssuerDefaultCode "aps-credential-issuer-v3" }}
               . /vault/secrets/soba-aps-credential-issuer
-=======
+              {{- end }}
               {{- if include "soba.storageUsesS3Vault" . }}
               . /vault/secrets/soba-s3
->>>>>>> develop
               {{- end }}
               {{- if include "soba.userSearchUsesCss" . }}
               . /vault/secrets/soba-css
