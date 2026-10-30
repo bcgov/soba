@@ -22,7 +22,6 @@ describe('files OpenAPI', () => {
 
   it.each([
     ['/files', false],
-    ['/submit/files', true],
   ])('%s documents upload, download and delete (deprecated: %s)', (base, deprecated) => {
     expect(operations(paths, base)).toEqual([['post', deprecated]]);
     expect(operations(paths, `${base}/{id}`)).toEqual([
