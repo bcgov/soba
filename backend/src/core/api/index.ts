@@ -1,4 +1,6 @@
 import express from 'express';
+import { credentialsRouter, formCredentialsRouter } from '../../features/credentials/route';
+import { registerCredentialsOpenApi } from '../../features/credentials/schema';
 import { coreErrorHandler, notFoundHandler } from '../middleware/errorHandler';
 import { registerAdminOpenApi } from './admin';
 import { registerHealthOpenApi } from './health';
@@ -44,6 +46,7 @@ import { registerOpenApiPaths } from './shared/openapi';
 //  - coreRouter     (/api/v1):        workspace/account management, and staff document templates.
 registerOpenApiPaths((registry) => {
   registerFormsOpenApi(registry);
+  registerCredentialsOpenApi(registry);
   registerFormSettingsOpenApi(registry);
   registerSubmissionsOpenApi(registry);
   registerSubmissionReviewOpenApi(registry);
@@ -66,6 +69,7 @@ registerOpenApiPaths((registry) => {
 // Design feature: form authoring + submission management. Form settings groups are self-contained
 // modules under /forms/:id/settings (features/form-settings).
 const designRouter = express.Router();
+designRouter.use(formCredentialsRouter);
 designRouter.use('/forms/:id/settings', formSettingsRouter);
 designRouter.use('/forms/:id/user-search', formUserSearchRouter);
 designRouter.use('/forms/:id/jobs', formJobsRouter);
@@ -101,6 +105,7 @@ filesApiRouter.use(coreErrorHandler);
 
 // Core: workspace/account management, and staff document templates.
 const coreRouter = express.Router();
+coreRouter.use(credentialsRouter);
 // The workspace level of settings groups whose values a workspace shares with its forms.
 coreRouter.use('/workspaces/:id/settings', workspaceSettingsRouter);
 coreRouter.use('/workspaces/:id/user-search', workspaceUserSearchRouter);

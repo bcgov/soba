@@ -42,6 +42,7 @@ describe('form settings sections', () => {
       'form-audience',
       'submitter-settings',
       'document-templates',
+      'form-api-keys',
     ]);
   });
 

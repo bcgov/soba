@@ -1,5 +1,6 @@
 import {
   DOCGEN_AUDIT_SORT_FIELDS,
+  CREDENTIAL_SORT_FIELDS,
   FEATURE_SCOPE_SORT_FIELDS,
   FORM_SORT_FIELDS,
   FORM_VERSION_SORT_FIELDS,
@@ -236,3 +237,10 @@ export function recallListQuery(spec: ListQuerySpec): ListQueryParams | null {
 export function forgetListQueries(): void {
   removeSessionValues((key) => key.startsWith(KEY_PREFIX));
 }
+
+export const CREDENTIALS_LIST_QUERY: ListQuerySpec = {
+  resource: 'credentials',
+  filters: [],
+  sortOptions: sortTokensFor(CREDENTIAL_SORT_FIELDS),
+  defaultSort: CREATED_DESC,
+};

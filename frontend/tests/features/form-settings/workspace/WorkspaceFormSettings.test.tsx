@@ -1,4 +1,11 @@
 import React from 'react';
+import en from '@/dictionaries/en.json';
+
+vi.mock('@/src/features/credentials/ui/ApiKeys', () => ({
+  default: ({ scope }: { scope: { id: string } }) => (
+    <div data-testid="workspace-api-key">{scope.id}</div>
+  ),
+}));
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -55,6 +62,7 @@ const REQUIRED = 'Select at least one login.';
 const CONFLICT = 'Someone else changed these settings.';
 
 const mockDict = {
+  apiKeys: en.apiKeys,
   form: {
     save: 'Save',
     settings: {
@@ -178,6 +186,16 @@ describe('WorkspaceFormSettings', () => {
     mockSetSettings.mockImplementation((_token: string, _ws: string, _key: string, body: unknown) =>
       Promise.resolve(body),
     );
+  });
+
+  it('registers API keys as a workspace form settings drawer', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await user.click(screen.getByRole('button', { name: en.apiKeys.heading }));
+    expect(screen.getAllByTestId('workspace-api-key')).toHaveLength(1);
+    for (const section of screen.getAllByTestId('workspace-api-key')) {
+      expect(section).toHaveTextContent('ws1');
+    }
   });
 
   it("shows the intro and the workspace's audience and drafts setting", async () => {

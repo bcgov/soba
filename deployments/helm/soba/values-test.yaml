@@ -29,10 +29,19 @@ backend:
     nodeEnv: production
     documentGenerationDefaultCode: cdogs-v2
     tenantEngineDefaultCode: cstar-v1
+    # Switch to aps-credential-issuer-v3 after filling the environment appId below and adding Vault credentials.
+    credentialIssuerDefaultCode: credential-issuer-noop
     notificationDefaultCode: notify-v1
     userSearchPlugins: css-v1,user-search-soba
     # Emails go through Notify test, which only delivers to its safelist.
     postSubmissionActionPlugins: post-submission-email-addresses
+  credentialIssuer:
+    apsCredentialIssuerV3:
+      apiBaseUrl: https://api.gov.bc.ca/ds/api/v3
+      # Test gateway and its target product environment; these are separate IDs.
+      gatewayId: "gw-7f49d"
+      environmentAppId: ""
+      tokenUrl: https://authz.apps.gov.bc.ca/auth/realms/aps/protocol/openid-connect/token
   documentGeneration:
     cdogsV2:
       endpoint: https://cdogs-test.api.gov.bc.ca/api

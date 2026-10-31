@@ -75,8 +75,13 @@ Form Settings (10) and Form Profile (20) save through the form update; Form Audi
 Submitter Settings (30) use their group endpoints. The audience's login providers come from
 `GET /meta/login-providers` through `useLoginProviders`.
 
-A workspace's Form Settings tab holds one section per shared group: Form Audience (10) and Submitter
-Settings (20). Only workspace owners and admins reach the page, so the sections are editable there.
+A workspace's Form Settings tab holds Form Audience (10), Submitter Settings (20), and API Keys
+(30). API Keys uses the section registry and accordion, with the credential feature owning its
+list, create form, API, service and persistence. It is a collection of independently generated
+keys, so it does not use the singleton settings GET/PUT or generic Save/Cancel footer. Owners and
+admins can create a key with a label, optional notes and one or both types (API, Web Component).
+The secret is shown once after generation; only metadata enters the list cache. There is no
+form-level drawer, inheritance, editing or rotation UI in this first version.
 
 A section's `weight` orders the Settings tab. A module's `weight` orders mounting. The two are
 unrelated, and one group's numbers need not match.
@@ -123,3 +128,8 @@ Each action reads and saves under the key `post-submission/<code>` through `useF
 
 A new flag in an existing group is a migration (`ADD COLUMN ... NOT NULL DEFAULT`), the schema and
 lib field, and the section control.
+
+The form Settings tab also includes API Keys (50). Workspace and form key drawers share the
+credential UI, with separate collections. A key has one workspace owner and optionally one form
+within that workspace, plus one or more types through a join table. These are collection/create
+drawers rather than inherited settings; see [credential issuer](credential-issuer.md).

@@ -7,6 +7,11 @@ are the reference copy.
 
 For what the pieces are and how they fit, see [Form settings](form-settings.md).
 
+A collection drawer such as API Keys reuses the frontend section registry, but owns its list/create
+API and persistence in its feature. The singleton settings GET/PUT, one-row-per-workspace lifecycle,
+and generic Save/Cancel footer do not apply to independently generated keys. See
+[the credential feature](credential-issuer.md) for that pattern.
+
 ## Before you start
 
 - **Adding a flag to an existing group?** See the [last section](#adding-a-flag-to-an-existing-group).

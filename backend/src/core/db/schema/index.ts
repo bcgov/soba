@@ -20,3 +20,5 @@ export * from './submissionExportAudit';
 export * from './postSubmissionActionSetting';
 export * from './devData';
 export * from './plugins.enterprise';
+
+export * from './workspaceCredential';

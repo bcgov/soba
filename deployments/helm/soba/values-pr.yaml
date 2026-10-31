@@ -22,6 +22,8 @@ backend:
   config:
     documentGenerationDefaultCode: cdogs-v2
     tenantEngineDefaultCode: cstar-v1
+    # APS service-account credentials are read from this deployment's Vault secret.
+    credentialIssuerDefaultCode: aps-credential-issuer-v3
     workflowEngineDefaultCode: cs-workflow-v1
     notificationDefaultCode: notify-v1
     userSearchPlugins: css-v1,user-search-soba
@@ -38,6 +40,12 @@ backend:
     cacheDefaultCode: cache-redis
     messagebusDefaultCode: messagebus-redis
     eventStreamDefaultCode: eventstream-redis
+  credentialIssuer:
+    apsCredentialIssuerV3:
+      apiBaseUrl: https://api.gov.bc.ca/ds/api/v3
+      gatewayId: "gw-d3969"
+      environmentAppId: "94521B49"
+      tokenUrl: https://authz.apps.gov.bc.ca/auth/realms/aps/protocol/openid-connect/token
   documentGeneration:
     cdogsV2:
       endpoint: https://cdogs-dev.api.gov.bc.ca/api

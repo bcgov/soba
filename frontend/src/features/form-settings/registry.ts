@@ -1,3 +1,4 @@
+import { workspaceApiKeySection, formApiKeySection } from './credentials';
 import { audienceSection, workspaceAudienceSection } from './audience';
 import { formSection } from './form';
 import { profileSection } from './profile';
@@ -12,10 +13,12 @@ export const formSettingsSections: FormSettingsSection[] = [
   audienceSection,
   submitterSection,
   templatesSection,
+  formApiKeySection,
 ].sort((a, b) => a.weight - b.weight);
 
 /** Every section of a workspace's Form Settings tab, lowest weight first. */
 export const workspaceSettingsSections: WorkspaceSettingsSection[] = [
   workspaceAudienceSection,
   workspaceSubmitterSection,
+  workspaceApiKeySection,
 ].sort((a, b) => a.weight - b.weight);
