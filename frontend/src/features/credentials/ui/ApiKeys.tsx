@@ -44,9 +44,9 @@ function ApiKeySection({ scope }: Readonly<{ scope: CredentialScope }>) {
   return (
     <section aria-label={t.heading} data-testid="api-keys-section">
       {resource.data && !resource.data.available && (
-        <p role="status" data-testid="api-key-unavailable">
+        <output className="d-block mb-3" data-testid="api-key-unavailable">
           {t.unavailable}
-        </p>
+        </output>
       )}
       <ListPageSearchField
         value={listQuery.searchInput}

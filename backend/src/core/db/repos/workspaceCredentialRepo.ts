@@ -92,7 +92,7 @@ export const listWorkspaceCredentials = (
     return { items, total: totals?.total ?? 0 };
   });
 
-export const reserveWorkspaceCredential = async (
+export const reserveWorkspaceCredential = (
   workspaceId: string,
   issuerCode: string,
   actorId: string,
@@ -125,7 +125,7 @@ export const reserveWorkspaceCredential = async (
     return { ...row, types: [...input.types].sort((a, b) => a.localeCompare(b)) };
   });
 
-export const reserveCredentialRotation = async (
+export const reserveCredentialRotation = (
   workspaceId: string,
   id: string,
   actorId: string,
@@ -151,7 +151,7 @@ export const reserveCredentialRotation = async (
   });
 
 // Explicitly select metadata; never spread an upstream result into persistence or audit events.
-export const completeCredentialOperation = async (
+export const completeCredentialOperation = (
   record: CredentialRecord,
   actorId: string,
   credential: IssuedApiKey,
@@ -203,7 +203,7 @@ export const markCredentialUnknown = async (
   });
 };
 
-export const updateCredentialNotes = async (
+export const updateCredentialNotes = (
   workspaceId: string,
   id: string,
   actorId: string,

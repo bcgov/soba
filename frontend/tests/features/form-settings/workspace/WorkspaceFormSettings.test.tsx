@@ -171,16 +171,6 @@ function deferred<T>() {
 }
 
 describe('WorkspaceFormSettings', () => {
-  it('registers API keys as a workspace form settings drawer', async () => {
-    const user = userEvent.setup();
-    renderTab();
-    await user.click(screen.getByRole('button', { name: en.apiKeys.heading }));
-    expect(screen.getAllByTestId('workspace-api-key')).toHaveLength(1);
-    for (const section of screen.getAllByTestId('workspace-api-key')) {
-      expect(section).toHaveTextContent('ws1');
-    }
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
     store = makeStore();
@@ -196,6 +186,16 @@ describe('WorkspaceFormSettings', () => {
     mockSetSettings.mockImplementation((_token: string, _ws: string, _key: string, body: unknown) =>
       Promise.resolve(body),
     );
+  });
+
+  it('registers API keys as a workspace form settings drawer', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await user.click(screen.getByRole('button', { name: en.apiKeys.heading }));
+    expect(screen.getAllByTestId('workspace-api-key')).toHaveLength(1);
+    for (const section of screen.getAllByTestId('workspace-api-key')) {
+      expect(section).toHaveTextContent('ws1');
+    }
   });
 
   it("shows the intro and the workspace's audience and drafts setting", async () => {

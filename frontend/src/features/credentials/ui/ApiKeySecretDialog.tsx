@@ -60,9 +60,9 @@ export function ApiKeySecretDialog({
         {t.copy}
       </Button>
       {copied && (
-        <p role="status" data-testid="api-key-copied">
+        <output className="d-block mb-3" data-testid="api-key-copied">
           {t.copied}
-        </p>
+        </output>
       )}
       {error && (
         <p role="alert" data-testid="api-key-copy-error">
