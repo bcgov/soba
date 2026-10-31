@@ -35,6 +35,7 @@ vi.mock('@/src/features/workspaces/data/accessApi', () => mockAccessApi);
 
 vi.mock('@/src/features/user-search/data/useUserSearch', () => ({
   useUserSearchAllowed: () => search.allowed,
+  useUserFromSearchWriter: () => ({ create: vi.fn() }),
 }));
 vi.mock('@/src/features/user-search/ui/UserSearchPicker', () => ({
   UserSearchPicker: () => <div data-testid="picker" />,

@@ -18,22 +18,30 @@ import {
 } from './workspaceGroupsTestKit';
 import { REVIEWER, foundPerson } from './workspaceAccessTestKit';
 
-const { mockGroupsApi, mockAccessApi, mockAddNotification, picked } = vi.hoisted(() => ({
-  mockGroupsApi: { listWorkspaceGroups: vi.fn() },
-  mockAccessApi: {
-    listWorkspaceAccess: vi.fn(),
-    getWorkspaceAccess: vi.fn(),
-    addWorkspaceAccess: vi.fn(),
-    setWorkspaceAccessGroups: vi.fn(),
-    removeWorkspaceAccess: vi.fn(),
-  },
-  mockAddNotification: vi.fn(),
-  /** The person the stub picker reports when pressed. */
-  picked: { person: null as unknown },
-}));
+const { mockGroupsApi, mockAccessApi, mockUserSearchApi, mockAddNotification, picked } = vi.hoisted(
+  () => ({
+    mockGroupsApi: { listWorkspaceGroups: vi.fn() },
+    mockUserSearchApi: {
+      fetchUserSearchCapabilities: vi.fn(),
+      searchUsers: vi.fn(),
+      createUserFromSearch: vi.fn(),
+    },
+    mockAccessApi: {
+      listWorkspaceAccess: vi.fn(),
+      getWorkspaceAccess: vi.fn(),
+      addWorkspaceAccess: vi.fn(),
+      setWorkspaceAccessGroups: vi.fn(),
+      removeWorkspaceAccess: vi.fn(),
+    },
+    mockAddNotification: vi.fn(),
+    /** The person the stub picker reports when pressed. */
+    picked: { person: null as unknown },
+  }),
+);
 
 vi.mock('@/src/features/workspaces/data/api', () => mockGroupsApi);
 vi.mock('@/src/features/workspaces/data/accessApi', () => mockAccessApi);
+vi.mock('@/src/features/user-search/data/api', () => mockUserSearchApi);
 
 // The picker has its own tests; here it only reports a pick.
 vi.mock('@/src/features/user-search/ui/UserSearchPicker', () => ({
@@ -133,15 +141,113 @@ describe('WorkspaceAccessForm', () => {
     expect(saveButton()).toBeDisabled();
   });
 
-  it('says a person who has not signed in cannot be added yet', async () => {
+  it('makes a SOBA user for a person who has not signed in, then adds them', async () => {
     const user = userEvent.setup();
+    mockUserSearchApi.createUserFromSearch.mockResolvedValue({
+      userId: 'user-made',
+      created: true,
+    });
+    mockAccessApi.addWorkspaceAccess.mockResolvedValue(REVIEWER);
     renderForm();
 
     await pick(user, foundPerson({ sobaUserId: null }));
     await user.click(await screen.findByRole('checkbox', { name: REVIEWERS.name }));
-
     expect(screen.getByTestId('member-not-signed-in')).toHaveTextContent(t.notSignedIn);
+    await user.click(saveButton());
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(mockUserSearchApi.createUserFromSearch).toHaveBeenCalledWith(
+      'token',
+      { kind: 'workspace', id: WORKSPACE_ID },
+      { identityProvider: 'idir', guid: 'FOUNDGUID' },
+    );
+    expect(mockAccessApi.addWorkspaceAccess).toHaveBeenCalledWith('token', WORKSPACE_ID, {
+      userId: 'user-made',
+      groupIds: [REVIEWERS.id],
+    });
+  });
+
+  it('will not add a person who has not signed in when the directory gave no guid', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await pick(user, foundPerson({ sobaUserId: null, guid: null }));
+    await user.click(await screen.findByRole('checkbox', { name: REVIEWERS.name }));
+
+    expect(screen.getByTestId('member-not-signed-in')).toHaveTextContent(t.notSignedInNoId);
     expect(saveButton()).toBeDisabled();
+  });
+
+  it('says why when the directory account cannot be confirmed, and adds no one', async () => {
+    const user = userEvent.setup();
+    mockUserSearchApi.createUserFromSearch.mockRejectedValue(
+      new ApiError('The directory identity could not be confirmed', 422, 'identity_unconfirmed'),
+    );
+    renderForm();
+
+    await pick(user, foundPerson({ sobaUserId: null }));
+    await user.click(await screen.findByRole('checkbox', { name: REVIEWERS.name }));
+    await user.click(saveButton());
+
+    await waitFor(() =>
+      expect(mockAddNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error', text: dict.apiErrors.identity_unconfirmed }),
+      ),
+    );
+    expect(mockAccessApi.addWorkspaceAccess).not.toHaveBeenCalled();
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it('says when the directory no longer has the person', async () => {
+    const user = userEvent.setup();
+    mockUserSearchApi.createUserFromSearch.mockRejectedValue(
+      new ApiError('No one with that guid was found', 404, 'person_not_found'),
+    );
+    renderForm();
+
+    await pick(user, foundPerson({ sobaUserId: null }));
+    await user.click(await screen.findByRole('checkbox', { name: REVIEWERS.name }));
+    await user.click(saveButton());
+
+    await waitFor(() =>
+      expect(mockAddNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error', text: dict.apiErrors.person_not_found }),
+      ),
+    );
+    expect(mockAccessApi.addWorkspaceAccess).not.toHaveBeenCalled();
+  });
+
+  it('keeps the user it made when the add fails, so trying again only adds', async () => {
+    const user = userEvent.setup();
+    mockUserSearchApi.createUserFromSearch.mockResolvedValue({
+      userId: 'user-made',
+      created: true,
+    });
+    mockAccessApi.addWorkspaceAccess
+      .mockRejectedValueOnce(new ApiError('Request failed (500)', 500))
+      .mockResolvedValueOnce(REVIEWER);
+    renderForm();
+
+    await pick(user, foundPerson({ sobaUserId: null }));
+    await user.click(await screen.findByRole('checkbox', { name: REVIEWERS.name }));
+    await user.click(saveButton());
+    await waitFor(() =>
+      expect(mockAddNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error', text: t.addError }),
+      ),
+    );
+    expect(onDone).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('member-not-signed-in')).not.toBeInTheDocument();
+
+    await user.click(saveButton());
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(mockUserSearchApi.createUserFromSearch).toHaveBeenCalledTimes(1);
+    expect(mockAccessApi.addWorkspaceAccess).toHaveBeenCalledTimes(2);
+    expect(mockAccessApi.addWorkspaceAccess).toHaveBeenLastCalledWith('token', WORKSPACE_ID, {
+      userId: 'user-made',
+      groupIds: [REVIEWERS.id],
+    });
   });
 
   it('says why when the person already has access', async () => {

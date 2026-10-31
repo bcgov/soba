@@ -442,6 +442,13 @@
       "when": 1772790844000,
       "tag": "0063_submission_form_submitted",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1772877244000,
+      "tag": "0064_user_identity_first_sign_in",
+      "breakpoints": true
     }
   ]
 }

@@ -15,9 +15,10 @@ import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { apiErrorMessage, messageForDataError } from '@/src/shared/api/dataError';
 import { useAuthErrorDefaults } from '@/src/shared/api/useDataErrorNotice';
 import { lookupTruncatedNote } from '@/src/shared/list/lookupOptions';
+import { useUserFromSearchWriter } from '@/src/features/user-search/data/useUserSearch';
 import { UserSearchPicker } from '@/src/features/user-search/ui/UserSearchPicker';
 import type { Dictionary } from '@/src/types/dictionary';
-import type { UserSearchUser } from '@/src/types/userSearch';
+import type { UserSearchScope, UserSearchUser } from '@/src/types/userSearch';
 import type { WorkspaceAccessGroup, WorkspaceAccessMember } from '@/src/types/workspaceAccess';
 import type { WorkspaceGroup } from '@/src/types/workspaceGroups';
 import { useWorkspaceAccessMember } from '../data/useWorkspaceAccessMember';
@@ -143,6 +144,8 @@ function MemberFields({
   const { token } = useKeycloak();
   const { addNotification } = useNotificationStore();
   const writer = useWorkspaceAccessWriter(workspaceId);
+  const scope: UserSearchScope = { kind: 'workspace', id: workspaceId };
+  const userWriter = useUserFromSearchWriter(scope);
 
   const [picked, setPicked] = useState<UserSearchUser | null>(null);
   const [groupIds, setGroupIds] = useState<string[]>(
@@ -154,18 +157,39 @@ function MemberFields({
   // A group deleted while the form is open drops out of the choices and of what is saved.
   const chosen = groupIds.filter((id) => choices.some((group) => group.id === id));
 
-  // A person found by search can be added once they have a SOBA user, which signing in creates.
+  // Someone who has never signed in has no SOBA user; adding them makes one from the directory,
+  // which needs the directory's guid for them.
   const userId = picked?.sobaUserId ?? null;
   const notSignedIn = picked !== null && userId === null;
-  const hasPerson = member !== null || userId !== null;
+  const directoryGuid = (notSignedIn && picked.guid) || null;
+  const hasPerson = member !== null || userId !== null || directoryGuid !== null;
   const canSave = Boolean(token) && hasPerson && chosen.length > 0 && !saving;
+
+  /**
+   * The SOBA user to add: the picked person's own, or one made for them. A made user is kept on
+   * the pick, so trying again after the add fails goes straight to the add.
+   */
+  const userIdToAdd = async (activeToken: string): Promise<string> => {
+    if (userId) return userId;
+    if (!picked || !directoryGuid) throw new Error('No person to add');
+    const made = await userWriter.create(activeToken, {
+      identityProvider: picked.identityProvider,
+      guid: directoryGuid,
+    });
+    if (made.status !== 'applied') throw new Error('The SOBA user was not made');
+    setPicked({ ...picked, sobaUserId: made.value.userId });
+    return made.value.userId;
+  };
 
   const save = async () => {
     if (!token || !canSave) return;
     setSaving(true);
     try {
-      if (member) await writer.setGroups(token, member.membershipId, chosen);
-      else if (userId) await writer.add(token, userId, chosen);
+      if (member) {
+        await writer.setGroups(token, member.membershipId, chosen);
+      } else {
+        await writer.add(token, await userIdToAdd(token), chosen);
+      }
       addNotification({ text: member ? t.updateSuccess : t.addSuccess, type: 'success' });
       onDone();
     } catch (err: unknown) {
@@ -199,7 +223,7 @@ function MemberFields({
         // Outside the form: Enter in the search box picks a person rather than submitting.
         <div className="mb-4">
           <p>{t.searchStep}</p>
-          <UserSearchPicker scope={{ kind: 'workspace', id: workspaceId }} onSelect={setPicked} />
+          <UserSearchPicker scope={scope} onSelect={setPicked} />
         </div>
       )}
       <Form
@@ -212,7 +236,7 @@ function MemberFields({
         {notSignedIn && (
           <InlineAlert
             title={t.notSignedInTitle}
-            description={t.notSignedIn}
+            description={directoryGuid ? t.notSignedIn : t.notSignedInNoId}
             variant="info"
             data-testid="member-not-signed-in"
           />
