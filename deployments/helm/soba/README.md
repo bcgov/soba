@@ -601,8 +601,8 @@ The dev, PR, test and prod values files each declare their own issuer configurat
 `https://authz.apps.gov.bc.ca/auth/realms/aps/protocol/openid-connect/token` for service-account tokens.
 The gateway service's public route is the URL consumers call; it is not the Directory API URL.
 
-Dev selects APS with its supplied gateway ID and the product environment from the local setup.
-PR, test and prod have their own gateway IDs and remain on `credential-issuer-noop` until their
+Dev and PR select APS with their respective gateway IDs and product environment appIds.
+Test and prod have their own gateway IDs and remain on `credential-issuer-noop` until their
 `environmentAppId` values are filled in. Follow
 [Obtain the product environment appId](../../../docs/credential-issuer.md#obtain-the-product-environment-appid)
 to log in to the Portal, query products for the deployment's gateway in the API console, and copy
