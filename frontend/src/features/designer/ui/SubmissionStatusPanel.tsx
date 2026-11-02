@@ -54,6 +54,12 @@ const moveHintOf = (
   return null;
 };
 
+/** The chosen move, unless someone else's change means the current status no longer has it. */
+const availableChoice = (
+  chosen: SubmissionReviewStatus | null,
+  moves: readonly SubmissionReviewStatus[],
+): SubmissionReviewStatus | null => (chosen && moves.includes(chosen) ? chosen : null);
+
 function ReviewStatusTag({ status }: Readonly<{ status: SubmissionReviewStatus }>) {
   const dictReview = useDictionary().submission.review;
   return <StatusTag label={dictReview.statuses[status]} variant={workflowStateToVariant(status)} />;
@@ -70,7 +76,7 @@ export function SubmissionStatusPanel({
 }: Readonly<SubmissionStatusPanelProps>) {
   const dictReview = useDictionary().submission.review;
   const formatLongDate = useFormatLongDate();
-  const [status, setStatus] = useState<SubmissionReviewStatus | null>(null);
+  const [chosenStatus, setChosenStatus] = useState<SubmissionReviewStatus | null>(null);
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [comment, setComment] = useState('');
   const [attachComment, setAttachComment] = useState(false);
@@ -81,6 +87,7 @@ export function SubmissionStatusPanel({
 
   const current = review.statusHistory[0];
   const moves = nextSubmissionStatuses(current?.status);
+  const status = availableChoice(chosenStatus, moves);
   const assigning = status === SubmissionReviewStatuses.assigned;
   const moveHint = moveHintOf(current?.status, status);
   const meIsReviewer = reviewers.some((reviewer) => reviewer.id === currentUserId);
@@ -96,7 +103,7 @@ export function SubmissionStatusPanel({
     });
     setSaving(false);
     if (!saved) return;
-    setStatus(null);
+    setChosenStatus(null);
     setAssigneeId(null);
     setComment('');
     setAttachComment(false);
@@ -172,7 +179,7 @@ export function SubmissionStatusPanel({
             value={status}
             isRequired
             isDisabled={saving}
-            onChange={(key) => setStatus(key as SubmissionReviewStatus)}
+            onChange={(key) => setChosenStatus(key as SubmissionReviewStatus)}
             items={moves.map((id) => ({ id, label: dictReview.statuses[id] }))}
             data-testid="submission-status-select"
           />

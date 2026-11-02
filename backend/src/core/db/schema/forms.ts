@@ -159,8 +159,7 @@ export const submissions = sobaSchema.table(
       .where(sql`${table.deletedAt} is null`),
     headRevisionIdx: index('submission_head_revision_idx').on(table.headRevisionId),
     statusIdx: index('submission_status_id_idx').on(table.statusId),
-    // A form's live submissions in submission order, the order an export reads them in. It also
-    // serves a form's submissions list.
+    // A form's live submissions in submission order, the order an export reads them in.
     formSubmittedIdx: index('submission_form_submitted_idx')
       .on(table.formId, table.submittedAt, table.id)
       .where(sql`${table.deletedAt} is null`),

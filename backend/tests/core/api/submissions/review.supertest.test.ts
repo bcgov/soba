@@ -238,6 +238,7 @@ describe('submission review routes', () => {
       submissionId: 'sub1',
       actorId: 'a1',
       actorDisplayLabel: 'Rev Iewer',
+      allowStatusUpdates: true,
     });
     expect(response.body.statusHistory).toEqual([SUBMITTED]);
   });
@@ -251,17 +252,30 @@ describe('submission review routes', () => {
     expect(mockAccess.resolveFormPermissions).not.toHaveBeenCalled();
   });
 
-  it("refuses any change when the form's settings turn status updates off", async () => {
+  // Under the lock, so a revision can still be ended when its form's settings turn updates off.
+  it("passes the form's setting to the change, and answers its refusal as 403", async () => {
     mockFindEffectiveReviewSettings.mockResolvedValue(SETTINGS_OFF);
+    mockRepo.changeStatus.mockResolvedValue('updates_off');
     const response = await request(app).post(STATUS_PATH).send(ASSIGN);
 
     expect(response.status).toBe(403);
     expect(response.body.code).toBe(ApiErrorCodes.status_updates_disabled);
-    expect(mockRepo.changeStatus).not.toHaveBeenCalled();
+    expect(mockRepo.changeStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ allowStatusUpdates: false }),
+    );
   });
 
   it('refuses an assignee who cannot review the form', async () => {
     mockAccess.resolveFormPermissions.mockResolvedValue(new Set([Permissions.submission_read]));
+    const response = await request(app).post(STATUS_PATH).send(ASSIGN);
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe(ApiErrorCodes.assignee_invalid);
+    expect(mockRepo.changeStatus).not.toHaveBeenCalled();
+  });
+
+  it('refuses an assignee who is not an active user, as the picker leaves them out', async () => {
+    mockRepo.listReviewUsers.mockResolvedValue([]);
     const response = await request(app).post(STATUS_PATH).send(ASSIGN);
 
     expect(response.status).toBe(400);

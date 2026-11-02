@@ -110,15 +110,15 @@ export type SubmissionChangeStatusCode =
 /**
  * Why an API request failed; an error response carries it as `code`. A `*_denied` refusal and
  * `sign_in_required` are 401 for an anonymous caller and 403 otherwise; `drafts_*`,
- * `status_updates_disabled` and `revise_disabled` are 403; `*_closed`, `*_taken`,
- * `version_not_published`, `already_exists`, `member_exists`, `member_protected`,
- * `last_form_admin`, `status_changed`, `status_move_not_allowed`, `revision_needs_submitter` and
- * `data_changed` are 409; `*_not_found` and `not_published` are 404; `*_invalid` and
- * `form_not_ready` are 400; `*_unavailable` and `render_busy` are 503; `render_failed`,
- * `no_saved_data`, `file_infected` and `identity_unconfirmed` are 422; `file_type_blocked` is 415;
- * `file_too_large` and `request_too_large` are 413; `engine_*_rejected` are 400; `unauthenticated`
- * is 401; `rate_limited` and `*_limit_reached` are 429; `engine_document_missing` and
- * `internal_error` are 500.
+ * `status_updates_disabled` and `revise_disabled` are 403; `status_changed`,
+ * `status_move_not_allowed`, `revision_needs_submitter`, `data_changed`, `*_closed`, `*_taken`,
+ * `version_not_published`, `already_exists`, `member_exists`, `member_protected` and
+ * `last_form_admin` are 409; `*_not_found` and `not_published` are 404;
+ * `*_invalid` and `form_not_ready` are 400; `*_unavailable` and `render_busy` are 503;
+ * `render_failed`, `no_saved_data`, `file_infected` and `identity_unconfirmed` are 422;
+ * `file_type_blocked` is 415; `file_too_large` and `request_too_large` are 413;
+ * `engine_*_rejected` are 400; `unauthenticated` is 401; `rate_limited` and `*_limit_reached` are
+ * 429; `engine_document_missing` and `internal_error` are 500.
  */
 export const ApiErrorCodes = {
   open_denied: 'open_denied',

@@ -19,8 +19,12 @@ import {
   useSubmissionReview,
   useSubmissionReviewers,
 } from '@/src/features/designer/data/useSubmissionReview';
-import { useSubmissionDataEditor } from '@/src/features/designer/data/useSubmissionDataEditor';
+import {
+  isEditConflict,
+  useSubmissionDataEditor,
+} from '@/src/features/designer/data/useSubmissionDataEditor';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
+import { navLink } from '@/src/shared/list/listQueryMemory';
 import type { SubmissionEdit } from '@/src/types/submissionReview';
 import { useFormatLongDate, useFormatLongDateTime } from '@/src/shared/hooks/useFormatLongDate';
 import { useAuthErrorDefaults, useDataErrorNotice } from '@/src/shared/api/useDataErrorNotice';
@@ -41,6 +45,8 @@ type SubmissionReviewProps = {
   schema: FormType | null;
   /** null = no engine document (no saved answers); `{}` data = empty answers on a real document. */
   content: SubmissionDataDocument | null;
+  /** Told whether there are changed answers a move away from the page would lose. */
+  onUnsavedEditChange?: (unsaved: boolean) => void;
 };
 
 /** The panels the user has open, and every panel while the page prints, so none prints collapsed. */
@@ -64,6 +70,18 @@ function usePanelsOpenForPrint(panels: readonly string[]) {
   return { expandedKeys: printing ? all : open, onExpandedChange: setOpen };
 }
 
+/** Staff's edit of the answers: the copy the form edits, the revision it started from, its changes. */
+type AnswersEdit = {
+  answers: Submission;
+  baseRevisionId: string;
+  changed: Record<string, unknown> | null;
+};
+
+// Form.io writes to the submission object it is given, so each view gets its own copy of the answers.
+const answersCopy = (content: SubmissionDataDocument): Submission => ({
+  data: structuredClone(content.data ?? {}) as Submission['data'],
+});
+
 function MetaLine({
   label,
   value,
@@ -77,7 +95,12 @@ function MetaLine({
 }
 
 /** Staff review of one submission: its details, status, notes and answers. */
-export function SubmissionReview({ submission, schema, content }: Readonly<SubmissionReviewProps>) {
+export function SubmissionReview({
+  submission,
+  schema,
+  content,
+  onUnsavedEditChange,
+}: Readonly<SubmissionReviewProps>) {
   const dict = useDictionary();
   const dictSub = dict.submission;
   const dictReview = dictSub.review;
@@ -98,19 +121,20 @@ export function SubmissionReview({ submission, schema, content }: Readonly<Submi
   const currentUserId = useCurrentUser().data?.actor.id ?? null;
   const dataEditor = useSubmissionDataEditor(submission.id, submission.formId);
   const [open, setOpen] = useState<'delete' | 'dataHistory' | 'confirmChange' | null>(null);
-  // The answers being edited; null while the answers only show.
-  const [editedData, setEditedData] = useState<Record<string, unknown> | null>(null);
-  const editing = editedData !== null;
-  const answers = useMemo(
-    () => (content === null ? null : { data: (content.data ?? {}) as Submission['data'] }),
-    [content],
-  );
+  const [edit, setEdit] = useState<AnswersEdit | null>(null);
+  const answers = useMemo(() => (content === null ? null : answersCopy(content)), [content]);
   // Staff change only a submitted submission's answers, from the revision on screen.
-  const baseRevisionId = submission.headRevisionId;
+  const headRevisionId = submission.headRevisionId;
   const canEditData =
     dataEditor.canEdit &&
     submission.workflowState === SubmissionWorkflowState.submitted &&
-    !!baseRevisionId;
+    !!headRevisionId;
+  // Once the answers are no longer staff's to change, the edit is over and does not come back.
+  if (edit && !canEditData) setEdit(null);
+  const unsavedEdit = !!edit?.changed;
+  useEffect(() => {
+    onUnsavedEditChange?.(unsavedEdit);
+  }, [onUnsavedEditChange, unsavedEdit]);
   const panels = usePanelsOpenForPrint(PANELS);
   // A count, so one write settling does not clear pending while another is still running.
   const [inFlight, setInFlight] = useState(0);
@@ -142,7 +166,7 @@ export function SubmissionReview({ submission, schema, content }: Readonly<Submi
     await run(
       async (current) => {
         await submissionDeleter.remove(current, submission.id);
-        router.push(`/${locale}/build/${submission.formId}?tab=submissions`);
+        router.push(navLink(`/${locale}/build/${submission.formId}?tab=submissions`));
       },
       dictSub.deleteSuccess,
       dictSub.deleteFailure,
@@ -150,15 +174,30 @@ export function SubmissionReview({ submission, schema, content }: Readonly<Submi
     setOpen(null);
   };
 
+  const startEdit = () => {
+    if (content && headRevisionId) {
+      setEdit({ answers: answersCopy(content), baseRevisionId: headRevisionId, changed: null });
+    }
+  };
+
   const saveData = async () => {
-    if (!editedData || !baseRevisionId) return;
+    if (!edit?.changed) return;
+    const { changed, baseRevisionId } = edit;
     const saved = await run(
-      (current) => dataEditor.save(current, editedData, baseRevisionId),
+      async (current) => {
+        try {
+          await dataEditor.save(current, changed, baseRevisionId);
+        } catch (e: unknown) {
+          // The page has re-read where it now stands, which this edit no longer starts from.
+          if (isEditConflict(e)) setEdit(null);
+          throw e;
+        }
+      },
       dictReview.dataUpdated,
       dictReview.saveFailure,
     );
     setOpen(null);
-    if (saved) setEditedData(null);
+    if (saved) setEdit(null);
   };
 
   const editColumns: Column<SubmissionEdit>[] = useMemo(
@@ -234,6 +273,13 @@ export function SubmissionReview({ submission, schema, content }: Readonly<Submi
           testIds={{ failed: 'submission-review-loaderror' }}
         />
       ) : null}
+      {reviewers.error ? (
+        <LoadErrorAlert
+          error={reviewers.error}
+          messages={{ ...authDefaults, failed: dictReview.reviewersLoadError }}
+          testIds={{ failed: 'submission-reviewers-loaderror' }}
+        />
+      ) : null}
       {review.isLoading ? <CenteredProgress label={dict.general.loading} /> : null}
 
       {/* The answers are already loaded, so they show whatever happens to the review read. */}
@@ -252,7 +298,7 @@ export function SubmissionReview({ submission, schema, content }: Readonly<Submi
               <SubmissionStatusPanel
                 review={review.data}
                 canUpdate={canUpdateStatus}
-                updatesOff={canReview && !review.data.allowStatusUpdates}
+                updatesOff={canReview && !canUpdateStatus}
                 reviewers={reviewers.data?.items}
                 currentUserId={currentUserId}
                 onUpdate={(change) =>
@@ -292,14 +338,15 @@ export function SubmissionReview({ submission, schema, content }: Readonly<Submi
             schema={schema}
             answers={answers}
             versionNo={submission.versionNo ?? 1}
-            editing={editing}
+            editAnswers={edit?.answers ?? null}
+            changed={unsavedEdit}
             pending={pending}
             canEdit={canEditData}
             hasHistory={!!submission.submittedAt && !!review.data}
-            onEdit={() => setEditedData({ ...(content?.data ?? {}) })}
-            onDataChange={setEditedData}
+            onEdit={startEdit}
+            onDataChange={(changed) => setEdit((current) => current && { ...current, changed })}
             onUpdate={() => setOpen('confirmChange')}
-            onCancel={() => setEditedData(null)}
+            onCancel={() => setEdit(null)}
             onHistory={() => setOpen('dataHistory')}
           />
         </Accordion>

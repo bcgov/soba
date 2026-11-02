@@ -45,7 +45,6 @@ const { mockGetSubmissions, mockDelete, mockPush, search, dict } = vi.hoisted(()
         listStatusFilter: 'Review status',
         listAllStatuses: 'All',
         assignedToMeFilter: 'Assigned to me',
-        notSubmitted: 'Not submitted',
         statuses: {
           SUBMITTED: 'Submitted',
           ASSIGNED: 'Assigned',
@@ -275,7 +274,6 @@ describe('FormSubmissionTab', () => {
     expect(screen.getByTestId('sub-1-assignee')).toHaveTextContent(
       'Grace Hopper (grace@example.com)',
     );
-    expect(screen.getByTestId('sub-2-review-status')).toHaveTextContent('Not submitted');
     expect(screen.getByTestId('form-submissions-review-status-select')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /Assigned To/ })).toBeInTheDocument();
   });
@@ -288,6 +286,14 @@ describe('FormSubmissionTab', () => {
     expect(screen.queryByTestId('sub-1-assignee')).toBeNull();
     expect(screen.queryByTestId('form-submissions-review-status-select')).toBeNull();
     expect(screen.queryByTestId('form-submissions-mine')).toBeNull();
+  });
+
+  it('keeps a filter from the URL clearable when status updates are off', async () => {
+    withReview(false);
+    search.value = 'formSubmissions.reviewStatus=COMPLETED';
+    await renderTab();
+
+    expect(await screen.findByTestId('form-submissions-review-status-select')).toBeInTheDocument();
   });
 
   it('reads only the submissions at the status and assigned to the caller the URL names', async () => {
@@ -314,6 +320,9 @@ describe('FormSubmissionTab', () => {
     });
 
     expect(String(replaceState.mock.calls.at(-1)?.[2])).toContain('formSubmissions.mine=true');
+    // Remembered for this form alone, so Back from another form's submission does not recall it.
+    expect(sessionStorage.getItem('soba.listQuery.formSubmissions.f1')).toContain('mine');
+    expect(sessionStorage.getItem('soba.listQuery.formSubmissions')).toBeNull();
     replaceState.mockRestore();
   });
 });
