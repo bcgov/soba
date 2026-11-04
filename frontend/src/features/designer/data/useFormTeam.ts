@@ -1,124 +1,103 @@
 'use client';
 
-import { useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useSWRConfig } from 'swr';
+import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
+import { useCallToken } from '@/src/shared/api/callToken';
+import { listReadConfig } from '@/src/shared/api/swrConfig';
+import { classifyDataError } from '@/src/shared/api/dataError';
 import type { ListResult, WriteOutcome } from '@/src/shared/api/dataContracts';
+import { useSortLocale } from '@/src/shared/list/useSortLocale';
 import type { ListQueryArgs } from '@/src/types/list';
 import type { TeamGroup, TeamMember } from '@/src/types/formTeam';
-import type { UserSearchUser } from '@/src/types/userSearch';
+import {
+  addFormTeamMember,
+  listFormTeam,
+  listFormTeamGroups,
+  removeFormTeamMember,
+  setFormTeamGroups,
+} from './formTeamApi';
 
-// In-memory sample data until the team API exists (CCP-5928); changes last until reload.
-// Shapes follow the dataContracts types; the API swap also adds the token and the groups' scope.
-const GROUPS: TeamGroup[] = [
-  { id: 'group-1', name: 'Group 1' },
-  { id: 'group-2', name: 'Group 2' },
-  { id: 'group-3', name: 'Group 3' },
-  { id: 'group-4', name: 'Group 4' },
-];
+/** Every team read of a form starts with this, so a write can re-read them all. */
+export const FORM_TEAM_KEY = 'form-team';
+const FORM_TEAM_GROUPS_KEY = 'form-team-groups';
+const NO_GROUPS: TeamGroup[] = [];
 
-const sampleMember = (
-  id: string,
-  firstName: string,
-  lastName: string,
-  groups: string[],
-): TeamMember => ({
-  id,
-  name: `${firstName} ${lastName} (sample)`,
-  email: `${firstName}.${lastName}@example.gov.bc.ca`.toLowerCase(),
-  groups,
-});
-
-const SAMPLE_TEAM: TeamMember[] = [
-  sampleMember('user-1', 'Orla', 'Venn', ['group-1']),
-  sampleMember('user-3', 'Mirela', 'Quist', ['group-1']),
-  sampleMember('user-4', 'Dax', 'Halloran', ['group-2']),
-  sampleMember('user-5', 'Suri', 'Okonjo', ['group-4']),
-];
-
-/** A found person's member id: their Soba user, or their identity when they have not signed in. */
-const memberIdOf = (user: UserSearchUser) =>
-  user.sobaUserId ?? `${user.identityProvider}:${user.subject}`;
-
-/** Teams by form id. A form not in the map still has the sample team. */
-let teams = new Map<string, TeamMember[]>();
-
-const listeners = new Set<() => void>();
-const subscribe = (listener: () => void) => {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-};
-const teamOf = (formId: string) => teams.get(formId) ?? SAMPLE_TEAM;
-// Resolves once stored, as a real write would, so callers already wait and handle a failure.
-const setTeam = (formId: string, next: TeamMember[]): Promise<WriteOutcome<void>> => {
-  teams = new Map(teams).set(formId, next);
-  listeners.forEach((listener) => listener());
-  return Promise.resolve({ status: 'applied', value: undefined });
-};
-const useTeam = (formId: string) =>
-  useSyncExternalStore(
-    subscribe,
-    () => teamOf(formId),
-    () => teamOf(formId),
-  );
-
-const matches = (q: string, ...fields: string[]) =>
-  fields.some((field) => field.toLowerCase().includes(q.trim().toLowerCase()));
-
-const settled = <T>(rows: T[], total: number): ListResult<T> => ({
-  rows,
-  total,
-  isLoading: false,
-  isRefreshing: false,
-  error: null,
-  refresh: () => Promise.resolve(),
-});
-
-/** One page of the form's team members, by name. */
+/** One page of the form's team members, by name, with their groups on the form. */
 export function useFormTeamMembers(formId: string, query: ListQueryArgs): ListResult<TeamMember> {
-  const team = useTeam(formId);
-  const { q = '', offset, limit } = query;
-  return useMemo(() => {
-    const found = team
-      .filter((member) => matches(q, member.name, member.email))
-      .sort((a, b) => a.name.localeCompare(b.name));
-    return settled(found.slice(offset, offset + limit), found.length);
-  }, [team, q, offset, limit]);
-}
-
-/** The groups a team member can be assigned to. */
-export function useTeamGroups(): TeamGroup[] {
-  return GROUPS;
-}
-
-export function useFormTeamWriter(formId: string) {
-  return useMemo(
-    () => ({
-      /** Refused for a user already on the team, as the API will be: their groups change by Edit. */
-      add: (user: UserSearchUser, groups: string[]) => {
-        const team = teamOf(formId);
-        const id = memberIdOf(user);
-        if (team.some((member) => member.id === id)) {
-          return Promise.reject(new Error(`${id} is already on the team`));
-        }
-        const name = user.displayName ?? user.email ?? user.username ?? user.subject;
-        return setTeam(formId, [...team, { id, name, email: user.email ?? '', groups }]);
-      },
-      setGroups: (memberId: string, groups: string[]) =>
-        setTeam(
-          formId,
-          teamOf(formId).map((member) => (member.id === memberId ? { ...member, groups } : member)),
-        ),
-      remove: (memberId: string) =>
-        setTeam(
-          formId,
-          teamOf(formId).filter((member) => member.id !== memberId),
-        ),
-    }),
-    [formId],
+  const locale = useSortLocale();
+  const { data, isLoading, isValidating, error, mutate } = useAuthedSWR(
+    [FORM_TEAM_KEY, formId, query.offset, query.limit, query.q ?? '', locale],
+    (token) => listFormTeam(token, formId, { ...query, locale }),
+    listReadConfig,
   );
+
+  const rows = useMemo(() => (Array.isArray(data?.items) ? data.items : []), [data]);
+  const refresh = useCallback(async () => {
+    await mutate();
+  }, [mutate]);
+
+  return {
+    rows,
+    total: data?.page?.total,
+    isLoading,
+    isRefreshing: isValidating && data !== undefined,
+    error: error ? classifyDataError(error) : null,
+    refresh,
+  };
 }
 
-/** Puts every form back to the sample team. For tests. */
-export const resetFormTeam = () => {
-  teams = new Map();
-  listeners.forEach((listener) => listener());
-};
+/** The groups a team member can be put in: the workspace's groups. */
+export function useTeamGroups(formId: string): TeamGroup[] {
+  const locale = useSortLocale();
+  const { data } = useAuthedSWR([FORM_TEAM_GROUPS_KEY, formId, locale], (token) =>
+    listFormTeamGroups(token, formId, locale),
+  );
+  return data?.items ?? NO_GROUPS;
+}
+
+/**
+ * Add, regroup or remove the form's team members, on this form only. Each write re-reads the
+ * team. Signed in only: a session left with no token throws and sends nothing.
+ */
+export function useFormTeamWriter(formId: string) {
+  const { mutate } = useSWRConfig();
+  const { signedInToken } = useCallToken();
+  const refresh = useCallback(
+    () => mutate((key) => Array.isArray(key) && key[0] === FORM_TEAM_KEY && key[1] === formId),
+    [mutate, formId],
+  );
+
+  const add = useCallback(
+    async (userId: string, groupIds: string[]): Promise<WriteOutcome<void>> => {
+      await addFormTeamMember(signedInToken(), formId, { userId, groupIds });
+      await refresh();
+      return { status: 'applied', value: undefined };
+    },
+    [formId, refresh, signedInToken],
+  );
+
+  const setGroups = useCallback(
+    async (membershipId: string, groupIds: string[]): Promise<WriteOutcome<void>> => {
+      await setFormTeamGroups(signedInToken(), formId, membershipId, groupIds);
+      await refresh();
+      return { status: 'applied', value: undefined };
+    },
+    [formId, refresh, signedInToken],
+  );
+
+  const remove = useCallback(
+    async (membershipId: string): Promise<WriteOutcome<void>> => {
+      try {
+        await removeFormTeamMember(signedInToken(), formId, membershipId);
+      } finally {
+        // A refused remove still re-reads: the team may have changed under it.
+        await refresh();
+      }
+      return { status: 'applied', value: undefined };
+    },
+    [formId, refresh, signedInToken],
+  );
+
+  return useMemo(() => ({ add, setGroups, remove }), [add, setGroups, remove]);
+}

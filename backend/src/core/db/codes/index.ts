@@ -330,13 +330,35 @@ export const WorkspaceGroupMembershipStatus = {
 export type WorkspaceGroupMembershipStatusCode =
   (typeof WorkspaceGroupMembershipStatus)[keyof typeof WorkspaceGroupMembershipStatus];
 
-/** Status of a form_group_override row; an active row replaces the group's membership for that form. */
+/** Status of a form_group_override row; an active row overrides the group on that form. */
 export const FormGroupOverrideStatus = {
   active: 'active',
   inactive: 'inactive',
 } as const;
 export type FormGroupOverrideStatusCode =
   (typeof FormGroupOverrideStatus)[keyof typeof FormGroupOverrideStatus];
+
+/**
+ * How an override's members apply (form_group_override.mode): `replace` makes them the group's
+ * members on the form; `adjust` adds and removes them on top of the workspace group's members.
+ */
+export const FormGroupOverrideMode = {
+  replace: 'replace',
+  adjust: 'adjust',
+} as const;
+export type FormGroupOverrideModeCode =
+  (typeof FormGroupOverrideMode)[keyof typeof FormGroupOverrideMode];
+
+/**
+ * What an override member row does (form_group_override_member.effect): `include` puts the person in
+ * the group on the form; `exclude`, in an `adjust` override only, takes a workspace member out.
+ */
+export const OverrideMemberEffect = {
+  include: 'include',
+  exclude: 'exclude',
+} as const;
+export type OverrideMemberEffectCode =
+  (typeof OverrideMemberEffect)[keyof typeof OverrideMemberEffect];
 
 /** Status of a submission_participant row. */
 export const SubmissionParticipantStatus = {

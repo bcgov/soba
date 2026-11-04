@@ -15,6 +15,7 @@ import {
 } from '../../features/submission-export';
 import { groupsDomain } from './groups';
 import { accessDomain } from './access';
+import { formTeamRouter, registerFormTeamOpenApi } from './formTeam';
 import { filesDesignRouter, filesDomain } from '../../features/files';
 import {
   documentGenerationDesignRouter,
@@ -52,6 +53,7 @@ registerOpenApiPaths((registry) => {
   registerSubmitOpenApi(registry);
   groupsDomain.registerOpenApi(registry);
   accessDomain.registerOpenApi(registry);
+  registerFormTeamOpenApi(registry);
   meDomain.registerOpenApi(registry);
   registerUserSearchOpenApi(registry);
   registerJobsOpenApi(registry);
@@ -71,6 +73,7 @@ const designRouter = express.Router();
 designRouter.use('/forms/:id/settings', formSettingsRouter);
 designRouter.use('/forms/:id/user-search', formUserSearchRouter);
 designRouter.use('/forms/:id/jobs', formJobsRouter);
+designRouter.use('/forms/:id/team', formTeamRouter);
 // Submission exports at /forms/:id/exports; gates itself.
 designRouter.use(submissionExportRouter);
 designRouter.use('/', designFormsRouter);

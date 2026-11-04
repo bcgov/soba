@@ -184,17 +184,38 @@ the submit role.
 A form can override a workspace group's membership for itself. A new form overrides nothing and
 inherits every group, so a change to a workspace group reaches every form that has not overridden it.
 
-- `form_group_override` - one active row per (form, group) marks an explicit override.
+- `form_group_override` - one active row per (form, group) marks an explicit override. Its `mode`
+  says how its members apply.
 - `form_group_override_member` - the override's members, with the same `member_kind` references and
-  constraints as `workspace_group_membership`.
+  constraints as `workspace_group_membership`, and an `effect`: `include` or `exclude`.
 
-An override replaces the group's whole membership for that form; roles stay on the workspace group.
+Roles stay on the workspace group. An override's `mode` is one of:
+
+- `replace` - its `include` members are the group's whole membership for that form.
+- `adjust` - the workspace group's members stay, less the members it excludes, plus the members it
+  includes. A later change to the workspace group still reaches the form.
+
 Returning to inherit sets the override `inactive` and deletes its members.
 `effectiveGroups` in `formAccessRepo.ts` resolves, per form, the groups a user is an effective
-member of: each active group's override members where the form has an active override, otherwise the
-workspace group's members.
+member of by these rules; with no active override, the workspace group's members.
 
-No API writes overrides yet.
+The form's **Access** tab writes overrides through the form team API (`core/api/formTeam`,
+`formTeamRepo.ts`). A team member is a workspace membership in at least one group on the form, by the
+same rule. A change records only the difference, in an `adjust` override of the group: an `include`
+for someone the workspace group does not have, an `exclude` for someone it does. So the change reaches
+this form only, and the group on this form still follows the workspace group. Under a `replace`
+override (the dev data writes some) the change is to its members. Each member lists the groups they
+hold through this form alone (`formOnlyGroups`), which the tab marks "this form only". Someone outside
+the workspace joins it as a `viewer` with no workspace groups. A change that would leave the form's Form administrators
+empty is refused (`last_form_admin`).
+
+| method   | path                                          | effect                                                                                       |
+| -------- | --------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `GET`    | `/design/forms/:id/team`                      | the team by name, each member's groups on the form (`team_read`)                             |
+| `GET`    | `/design/forms/:id/team/groups`               | the workspace's active groups (`team_read`)                                                  |
+| `POST`   | `/design/forms/:id/team`                      | `{userId, groupIds}`: adds the person on this form (`team_update`); 409 `team_member_exists` |
+| `PUT`    | `/design/forms/:id/team/:membershipId/groups` | `{groupIds}`: their groups on this form (`team_update`)                                      |
+| `DELETE` | `/design/forms/:id/team/:membershipId`        | takes them out of every group on this form (`team_update`)                                   |
 
 The submit surface reads overrides: `hasFormSubmitAccess({workspaceId, formId}, ...)` reads the
 form's facts with `findSubmitterFormFacts` in `submitterFormRepo.ts`, whose permissions follow the
@@ -257,7 +278,8 @@ everything.
         |
         v
    workspace_group_membership     (member_kind = user, active; on a form, a group the form
-        |                          overrides takes its form_group_override_member rows instead)
+        |                          overrides: `replace` takes its form_group_override_member rows
+        |                          instead, `adjust` takes out its excludes and adds its includes)
         v
    workspace_group_role
         |
@@ -339,8 +361,8 @@ form version are left out. Anonymous callers get a 401, since the public user's 
 
 `GET /submit/forms/mine` lists the forms the caller holds the `form_submitter` role on, plus the forms
 of the submissions `GET /submit/submissions/mine` returns, across every workspace. The role resolves
-like any form permission, so a form's active override of a group replaces that group's workspace
-members. Only that role lists a form, not every role granting `submission_create`: form
+like any form permission, so a form's active override of a group replaces or adjusts that group's
+workspace members. Only that role lists a form, not every role granting `submission_create`: form
 administrators find their forms in design mode. A role form needs a published version; a form
 reached through a submission is listed without one. Each row carries the facts the access rules
 read: the caller's permission codes on the form, its effective audience, its effective drafts

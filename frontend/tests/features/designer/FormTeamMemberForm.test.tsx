@@ -1,11 +1,19 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 
 import dict from '@/dictionaries/en.json';
 import type { UserSearchScope, UserSearchUser } from '@/src/types/userSearch';
 
-vi.mock('@/src/features/designer/data/useFormTeam', { spy: true });
+const { createUser } = vi.hoisted(() => ({ createUser: vi.fn() }));
+
+vi.mock('@/src/features/designer/data/formTeamApi', async () => {
+  const { formTeamApiMock } = await import('./formTeamTestKit');
+  return formTeamApiMock;
+});
+vi.mock('@/src/features/user-search/data/useUserSearch', () => ({
+  useUserFromSearchWriter: () => ({ create: createUser }),
+}));
 vi.mock('@/src/features/user-search/ui/UserSearchPicker', () => ({
   UserSearchPicker: ({
     scope,
@@ -15,7 +23,7 @@ vi.mock('@/src/features/user-search/ui/UserSearchPicker', () => ({
     onSelect?: (user: UserSearchUser | null) => void;
   }) => (
     <div data-testid="picker" data-scope={`${scope.kind}:${scope.id}`}>
-      {[tobin, dax].map((person) => (
+      {[tobin, dax, noId].map((person) => (
         <button
           key={person.subject}
           type="button"
@@ -33,50 +41,50 @@ vi.mock('@/src/features/user-search/ui/UserSearchPicker', () => ({
 }));
 
 import FormTeamMemberForm from '@/src/features/designer/ui/FormTeamMemberForm';
-import { useFormTeamMembers } from '@/src/features/designer/data/useFormTeam';
 import type { TeamMember } from '@/src/types/formTeam';
 import {
   click,
   clickTestId,
   failWrites,
   foundPerson,
+  formTeamApiMock,
   renderWithStore,
   resetTeam,
+  serverMember,
 } from './formTeamTestKit';
 
 const onDone = vi.fn();
 const FORM_ID = 'f1';
 const GROUPS_REQUIRED = 'Select at least one group.';
-/** Not on the team; never signed in, so their member id is their identity. */
+/** Never signed in: adding them makes their CHEFS user first. */
 const tobin = foundPerson('tobin', 'Venn, Tobin');
-const TOBIN_ID = 'azureidir:tobin';
-/** On the sample team as user-4. */
-const dax = foundPerson('dax', 'Halloran, Dax', 'user-4');
+/** Signed in before, and already on the team as m-dax. */
+const dax = foundPerson('dax', 'Halloran, Dax', 'dax');
+/** Never signed in, and the directory gave no id to make their user with. */
+const noId = foundPerson('noid', 'Nobody, Noid', null, null);
+const DAX: TeamMember = {
+  id: 'm-dax',
+  name: 'Dax Halloran',
+  email: 'dax.halloran@example.gov.bc.ca',
+  groups: ['group-2'],
+  formOnlyGroups: [],
+};
 
 const checkbox = (name: string) => screen.getByRole('checkbox', { name });
-const tick = (name: string) => click(checkbox(name));
+const tick = async (name: string) => click(await screen.findByRole('checkbox', { name }));
 const pick = (person: UserSearchUser) => clickTestId(`pick-${person.subject}`);
 const save = () => clickTestId('team-save-button');
-const memberById = (id: string) =>
-  renderHook(() =>
-    useFormTeamMembers(FORM_ID, { offset: 0, limit: 10, sort: 'name:asc' }),
-  ).result.current.rows.find((member) => member.id === id);
 
 const renderForm = (member?: TeamMember) =>
   renderWithStore(
     <FormTeamMemberForm dict={dict} formId={FORM_ID} member={member} onDone={onDone} />,
   );
-const renderWithTobinPicked = async () => {
-  renderForm();
-  await pick(tobin);
-};
-/** The edit form for Dax (user-4), who starts in Group 2. */
-const renderEditOfDax = () => renderForm(memberById('user-4'));
 
 describe('FormTeamMemberForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetTeam();
+    createUser.mockResolvedValue({ status: 'applied', value: { userId: 'tobin' } });
   });
 
   it('searches the form for a person to add', () => {
@@ -86,50 +94,60 @@ describe('FormTeamMemberForm', () => {
   });
 
   it('does not search when editing a member', () => {
-    renderEditOfDax();
+    renderForm(DAX);
     expect(screen.queryByTestId('picker')).toBeNull();
   });
 
-  it('holds the add until a person is picked', async () => {
+  it('says the groups apply to this form only', async () => {
+    renderForm();
+    await screen.findByRole('checkbox', { name: 'Group 1' });
+    expect(screen.getByTestId('team-member-form')).toHaveTextContent(
+      'These groups apply to this form only.',
+    );
+  });
+
+  it('holds the add until a person and a group are picked', async () => {
     renderForm();
     expect(screen.getByTestId('team-save-button')).toBeDisabled();
 
     await pick(tobin);
+    expect(screen.getByTestId('team-save-button')).toBeDisabled();
+    await tick('Group 3');
     expect(screen.getByTestId('team-save-button')).toBeEnabled();
 
     await clickTestId('pick-clear');
     expect(screen.getByTestId('team-save-button')).toBeDisabled();
   });
 
-  it('asks for a group instead of adding a user with none', async () => {
-    await renderWithTobinPicked();
-    await save();
-
-    expect(await screen.findByText(GROUPS_REQUIRED)).toBeInTheDocument();
-    expect(onDone).not.toHaveBeenCalled();
-    expect(memberById(TOBIN_ID)).toBeUndefined();
-  });
-
-  it('asks for a group instead of saving a member with none', async () => {
-    renderEditOfDax();
-    await tick('Group 2');
-    await save();
-
-    expect(await screen.findByText(GROUPS_REQUIRED)).toBeInTheDocument();
-    expect(onDone).not.toHaveBeenCalled();
-    expect(memberById('user-4')?.groups).toEqual(['group-2']);
-  });
-
-  it('adds the picked person with the chosen groups', async () => {
-    await renderWithTobinPicked();
+  it('makes the CHEFS user of someone who never signed in, then adds them', async () => {
+    renderForm();
+    await pick(tobin);
+    expect(screen.getByTestId('team-not-signed-in')).toBeInTheDocument();
     await tick('Group 3');
     await save();
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());
-    expect(memberById(TOBIN_ID)?.groups).toEqual(['group-3']);
+    expect(createUser).toHaveBeenCalledWith('token', {
+      identityProvider: 'azureidir',
+      guid: 'guid-tobin',
+    });
+    expect(formTeamApiMock.addFormTeamMember).toHaveBeenCalledWith('token', FORM_ID, {
+      userId: 'tobin',
+      groupIds: ['group-3'],
+    });
+    expect(serverMember('m-tobin')?.groups).toEqual(['group-3']);
   });
 
-  it('refuses a person already on the team and keeps their groups', async () => {
+  it('cannot add someone the directory gave no id for until they sign in', async () => {
+    renderForm();
+    await pick(noId);
+    await tick('Group 1');
+
+    expect(screen.getByTestId('team-not-signed-in')).toHaveTextContent('They can be added once');
+    expect(screen.getByTestId('team-save-button')).toBeDisabled();
+  });
+
+  it('says why when the person is already on the team, and keeps their groups', async () => {
     renderForm();
     await pick(dax);
     await tick('Group 1');
@@ -137,39 +155,51 @@ describe('FormTeamMemberForm', () => {
 
     await waitFor(() => expect(screen.getByTestId('team-save-button')).toBeEnabled());
     expect(onDone).not.toHaveBeenCalled();
-    expect(memberById('user-4')?.groups).toEqual(['group-2']);
+    expect(createUser).not.toHaveBeenCalled();
+    expect(serverMember('m-dax')?.groups).toEqual(['group-2']);
   });
 
   it('saves the edited groups of a member', async () => {
-    renderEditOfDax();
+    renderForm(DAX);
     await tick('Group 1');
     await save();
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());
-    expect(memberById('user-4')?.groups).toEqual(['group-2', 'group-1']);
+    expect(serverMember('m-dax')?.groups).toEqual(['group-2', 'group-1']);
   });
 
-  it('marks the groups as required', () => {
+  it('asks for a group instead of saving a member with none', async () => {
+    renderForm(DAX);
+    await tick('Group 2');
+    expect(screen.getByTestId('team-save-button')).toBeDisabled();
+    expect(serverMember('m-dax')?.groups).toEqual(['group-2']);
+  });
+
+  it('marks the groups as required', async () => {
     renderForm();
+    await screen.findByRole('checkbox', { name: 'Group 1' });
     expect(screen.getByRole('group', { name: /Assign groups.*\(required\)/ })).toBeInTheDocument();
+    expect(screen.queryByText(GROUPS_REQUIRED)).toBeNull();
   });
 
   it('keeps the picked person and groups when the add fails', async () => {
     failWrites();
-    await renderWithTobinPicked();
+    renderForm();
+    await pick(tobin);
     await tick('Group 3');
     await save();
 
     await waitFor(() => expect(screen.getByTestId('team-save-button')).toBeEnabled());
     expect(onDone).not.toHaveBeenCalled();
     expect(checkbox('Group 3')).toBeChecked();
-    expect(memberById(TOBIN_ID)).toBeUndefined();
+    expect(serverMember('m-tobin')).toBeUndefined();
   });
 
   it('changes nothing on cancel', async () => {
-    await renderWithTobinPicked();
+    renderForm();
+    await pick(tobin);
     await clickTestId('team-cancel-button');
     expect(onDone).toHaveBeenCalled();
-    expect(memberById(TOBIN_ID)).toBeUndefined();
+    expect(formTeamApiMock.addFormTeamMember).not.toHaveBeenCalled();
   });
 });

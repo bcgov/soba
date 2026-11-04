@@ -2,7 +2,12 @@ import { and, eq, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { db, type DbOrTx } from '../client';
 import { formGroupOverrideMembers, formGroupOverrides } from '../schema';
-import { FormGroupOverrideStatus, GroupMemberKind, WorkspaceGroupMembershipStatus } from '../codes';
+import {
+  FormGroupOverrideMode,
+  FormGroupOverrideStatus,
+  GroupMemberKind,
+  WorkspaceGroupMembershipStatus,
+} from '../codes';
 
 /** A member to write into a form's group override. */
 export type OverrideMemberInput =
@@ -43,8 +48,8 @@ const memberRefs = (member: OverrideMemberInput) => {
 };
 
 /**
- * Sets a form's override of a group to exactly `members`, creating the override when the form has
- * none. The upsert creates or locks the active override in one statement, so concurrent writes for
+ * Sets a form's override of a group to exactly `members`, as a `replace` override, creating it when
+ * the form has none and turning an `adjust` one into it. The upsert creates or locks the active override in one statement, so concurrent writes for
  * the same form and group apply in turn, and a concurrent clear that commits first leaves this write
  * creating a new override.
  */
@@ -65,6 +70,7 @@ export const replaceOverrideMembers = async (args: {
         workspaceId: args.workspaceId,
         formId: args.formId,
         groupId: args.groupId,
+        mode: FormGroupOverrideMode.replace,
         status: FormGroupOverrideStatus.active,
         createdBy: args.displayLabel,
         updatedBy: args.displayLabel,
@@ -72,7 +78,11 @@ export const replaceOverrideMembers = async (args: {
       .onConflictDoUpdate({
         target: [formGroupOverrides.formId, formGroupOverrides.groupId],
         targetWhere: sql`${formGroupOverrides.status} = 'active'`,
-        set: { updatedBy: args.displayLabel, updatedAt: new Date() },
+        set: {
+          mode: FormGroupOverrideMode.replace,
+          updatedBy: args.displayLabel,
+          updatedAt: new Date(),
+        },
       })
       .returning({ id: formGroupOverrides.id });
 
