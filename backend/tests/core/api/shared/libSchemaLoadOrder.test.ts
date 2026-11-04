@@ -3,6 +3,7 @@
 describe.each([
   'admin',
   'forms',
+  'formTeam',
   'groups',
   'me',
   'members',

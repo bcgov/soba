@@ -14,3 +14,5 @@ export const MEMBER_NOT_FOUND = 'Member not found';
 export const USER_NOT_ADDABLE = 'User not found, not active, or without a sign-in identity';
 export const MEMBER_PROTECTED = 'The workspace owner and your own access cannot be removed';
 export const LAST_FORM_ADMIN = 'Form administrators must keep at least one member';
+export const FORM_TEAM_MEMBER_EXISTS = 'This person is already on the form team';
+export const FORM_TEAM_MEMBER_NOT_FOUND = 'Team member not found';

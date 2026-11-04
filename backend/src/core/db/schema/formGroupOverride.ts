@@ -12,9 +12,11 @@ import {
 import { forms } from './forms';
 
 /**
- * A form's explicit override of a workspace group. An active row replaces the group's membership for
- * that form with the rows in form_group_override_member; roles stay on the workspace group. No active
- * row means the form inherits the workspace group's members.
+ * A form's explicit override of a workspace group; roles stay on the workspace group. No active row
+ * means the form inherits the workspace group's members. An active row's `mode` says how its
+ * form_group_override_member rows apply: 'replace' makes them the group's members on that form;
+ * 'adjust' keeps the workspace group's members and applies each row's `effect` on top ('include'
+ * adds the person on that form, 'exclude' takes them out of it).
  */
 export const formGroupOverrides = sobaSchema.table(
   'form_group_override',
@@ -29,6 +31,7 @@ export const formGroupOverrides = sobaSchema.table(
     groupId: uuid('group_id')
       .notNull()
       .references(() => workspaceGroups.id),
+    mode: text('mode').notNull().default('replace'),
     status: text('status').notNull(),
     ...auditColumns(),
   },
@@ -65,6 +68,7 @@ export const formGroupOverrideMembers = sobaSchema.table(
     ),
     identityProviderCode: text('identity_provider_code').references(() => identityProviders.code),
     idpGroupCode: text('idp_group_code').references(() => idpGroups.code),
+    effect: text('effect').notNull().default('include'),
     status: text('status').notNull(),
     ...auditColumns(),
   },

@@ -6,9 +6,13 @@ import dict from '@/dictionaries/en.json';
 
 let allowed: boolean | null;
 vi.mock('@/app/[lang]/Providers', () => ({ useDictionary: () => dict }));
-vi.mock('@/src/features/designer/data/useFormTeam', { spy: true });
+vi.mock('@/src/features/designer/data/formTeamApi', async () => {
+  const { formTeamApiMock } = await import('./formTeamTestKit');
+  return formTeamApiMock;
+});
 vi.mock('@/src/features/user-search/data/useUserSearch', () => ({
   useUserSearchAllowed: () => allowed,
+  useUserFromSearchWriter: () => ({ create: vi.fn() }),
 }));
 vi.mock('@/src/features/user-search/ui/UserSearchPicker', () => ({
   UserSearchPicker: () => <div data-testid="picker" />,
@@ -20,7 +24,14 @@ vi.mock('next/navigation', () => ({
 }));
 
 import FormTeamTab from '@/src/features/designer/ui/FormTeamTab';
-import { clickTestId, failWrites, renderWithStore, resetTeam } from './formTeamTestKit';
+import {
+  clickTestId,
+  failWrites,
+  formTeamApiMock,
+  renderWithStore,
+  resetTeam,
+  serverMember,
+} from './formTeamTestKit';
 
 const renderTab = () => renderWithStore(<FormTeamTab dict={dict} formId="f1" />);
 
@@ -32,23 +43,41 @@ const confirmRemoveOf = async (memberId: string) => {
 
 describe('FormTeamTab', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     allowed = true;
     resetTeam();
   });
 
-  it('lists each member with their groups', () => {
+  it("lists each member with their groups, read from the form's team", async () => {
     renderTab();
-    expect(screen.getByTestId('team-list')).toHaveTextContent('Dax Halloran (sample)');
+    expect(await screen.findByTestId('m-dax-group-2-tag')).toBeInTheDocument();
+    expect(screen.getByTestId('team-list')).toHaveTextContent('Dax Halloran');
     expect(screen.getByTestId('team-list')).toHaveTextContent('dax.halloran@example.gov.bc.ca');
-    expect(screen.getByTestId('user-4-group-2-tag')).toBeInTheDocument();
-    expect(screen.queryByTestId('user-4-group-1-tag')).toBeNull();
+    expect(screen.queryByTestId('m-dax-group-1-tag')).toBeNull();
+    expect(formTeamApiMock.listFormTeam).toHaveBeenCalledWith(
+      'token',
+      'f1',
+      expect.objectContaining({ offset: 0 }),
+    );
   });
 
-  it('says the team is sample data, on the list and on the form', async () => {
+  it('marks the groups someone has on this form only', async () => {
+    await formTeamApiMock.addFormTeamMember('token', 'f1', {
+      userId: 'tobin',
+      groupIds: ['group-3'],
+    });
     renderTab();
-    expect(screen.getByTestId('team-sample-notice')).toHaveTextContent('sample data');
-    await clickTestId('team-add-button');
-    expect(screen.getByTestId('team-sample-notice')).toBeInTheDocument();
+    expect(await screen.findByTestId('m-tobin-group-3-tag')).toHaveTextContent(
+      'Group 3 (this form only)',
+    );
+    expect(screen.getByTestId('m-dax-group-2-tag')).toHaveTextContent(/^Group 2$/);
+  });
+
+  // The team is real now: nothing on the tab says it is sample data.
+  it('shows no sample data notice', async () => {
+    renderTab();
+    await screen.findByTestId('m-dax-edit-link');
+    expect(screen.queryByTestId('team-sample-notice')).toBeNull();
   });
 
   it('opens the add form and comes back on cancel', async () => {
@@ -76,41 +105,50 @@ describe('FormTeamTab', () => {
 
   it('opens the edit form with the member and their groups', async () => {
     renderTab();
-    await clickTestId('user-4-edit-link');
+    await screen.findByTestId('m-dax-edit-link');
+    await clickTestId('m-dax-edit-link');
     const form = screen.getByTestId('team-member-form');
     expect(form).toHaveTextContent('Edit Team Member');
-    expect(form).toHaveTextContent('Dax Halloran (sample)');
+    expect(form).toHaveTextContent('Dax Halloran');
     expect(form).not.toHaveTextContent('1. Search for a user:');
-    expect(screen.getByRole('checkbox', { name: 'Group 2' })).toBeChecked();
+    expect(await screen.findByRole('checkbox', { name: 'Group 2' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Group 1' })).not.toBeChecked();
   });
 
   it('keeps the member when the remove is cancelled', async () => {
     renderTab();
-    await clickTestId('user-4-remove-link');
+    await screen.findByTestId('m-dax-remove-link');
+    await clickTestId('m-dax-remove-link');
     expect(await screen.findByTestId('confirm-modal-message')).toHaveTextContent(
-      'Dax Halloran (sample) will lose access to this form.',
+      'Dax Halloran will lose access to this form.',
     );
     await clickTestId('confirm-modal-cancel');
 
     await waitFor(() => expect(screen.queryByTestId('confirm-modal-message')).toBeNull());
-    expect(screen.getByTestId('user-4-edit-link')).toBeInTheDocument();
+    expect(screen.getByTestId('m-dax-edit-link')).toBeInTheDocument();
+    expect(formTeamApiMock.removeFormTeamMember).not.toHaveBeenCalled();
   });
 
-  it('removes the member once confirmed', async () => {
+  // The ticket: what the tab shows is what was saved, so it survives a reload.
+  it('removes the member on the server once confirmed, and lists the saved team', async () => {
     renderTab();
-    await confirmRemoveOf('user-4');
+    await screen.findByTestId('m-dax-remove-link');
+    await confirmRemoveOf('m-dax');
 
-    await waitFor(() => expect(screen.queryByTestId('user-4-edit-link')).toBeNull());
-    expect(screen.getByTestId('user-1-edit-link')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId('m-dax-edit-link')).toBeNull());
+    expect(formTeamApiMock.removeFormTeamMember).toHaveBeenCalledWith('token', 'f1', 'm-dax');
+    expect(serverMember('m-dax')).toBeUndefined();
+    expect(screen.getByTestId('m-orla-edit-link')).toBeInTheDocument();
   });
 
   it('keeps the member when the remove fails', async () => {
     failWrites();
     renderTab();
-    await confirmRemoveOf('user-4');
+    await screen.findByTestId('m-dax-remove-link');
+    await confirmRemoveOf('m-dax');
 
     await waitFor(() => expect(screen.queryByTestId('confirm-modal-message')).toBeNull());
-    expect(screen.getByTestId('user-4-edit-link')).toBeInTheDocument();
+    expect(screen.getByTestId('m-dax-edit-link')).toBeInTheDocument();
+    expect(serverMember('m-dax')).toBeDefined();
   });
 });

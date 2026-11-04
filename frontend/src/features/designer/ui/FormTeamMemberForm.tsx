@@ -6,14 +6,18 @@ import {
   CheckboxGroup,
   Form,
   Heading,
+  InlineAlert,
 } from '@bcgov/design-system-react-components';
 
 import type { Dictionary } from '@/src/types/dictionary';
 import type { TeamMember } from '@/src/types/formTeam';
-import type { UserSearchUser } from '@/src/types/userSearch';
+import type { UserSearchScope, UserSearchUser } from '@/src/types/userSearch';
 import { SecondaryText } from '@/src/components/SecondaryText';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
+import { useCallToken } from '@/src/shared/api/callToken';
+import { apiErrorMessage } from '@/src/shared/api/dataError';
 import { useFormTeamWriter, useTeamGroups } from '@/src/features/designer/data/useFormTeam';
+import { useUserFromSearchWriter } from '@/src/features/user-search/data/useUserSearch';
 import { UserSearchPicker } from '@/src/features/user-search/ui/UserSearchPicker';
 
 interface FormTeamMemberFormProps {
@@ -31,23 +35,48 @@ export default function FormTeamMemberForm({
   onDone,
 }: Readonly<FormTeamMemberFormProps>) {
   const t = dict.team;
-  const groups = useTeamGroups();
+  const tAccess = dict.workspaces.access;
+  const groups = useTeamGroups(formId);
   const teamWriter = useFormTeamWriter(formId);
+  const scope: UserSearchScope = { kind: 'form', id: formId };
+  const userWriter = useUserFromSearchWriter(scope);
+  const { signedInToken } = useCallToken();
   const { addNotification } = useNotificationStore();
   const [selectedUser, setSelectedUser] = useState<UserSearchUser | null>(null);
   const [selectedGroups, setSelectedGroups] = useState(member?.groups ?? []);
   const [saving, setSaving] = useState(false);
 
+  // Someone who has never signed in has no CHEFS user; adding them makes one from the directory,
+  // which needs the directory's guid for them.
+  const userId = selectedUser?.sobaUserId ?? null;
+  const notSignedIn = selectedUser !== null && userId === null;
+  const directoryGuid = (notSignedIn && selectedUser.guid) || null;
+  const hasPerson = member !== undefined || userId !== null || directoryGuid !== null;
+
+  /** The CHEFS user to add; one made for them is kept, so trying again goes straight to the add. */
+  const userIdToAdd = async (): Promise<string> => {
+    if (userId) return userId;
+    if (!selectedUser || !directoryGuid) throw new Error('No person to add');
+    const made = await userWriter.create(signedInToken(), {
+      identityProvider: selectedUser.identityProvider,
+      guid: directoryGuid,
+    });
+    if (made.status !== 'applied') throw new Error('The CHEFS user was not made');
+    setSelectedUser({ ...selectedUser, sobaUserId: made.value.userId });
+    return made.value.userId;
+  };
+
   const save = async () => {
     setSaving(true);
     try {
       if (member) await teamWriter.setGroups(member.id, selectedGroups);
-      if (selectedUser) await teamWriter.add(selectedUser, selectedGroups);
+      else await teamWriter.add(await userIdToAdd(), selectedGroups);
       addNotification({ text: member ? t.editSuccess : t.addSuccess, type: 'success' });
       onDone();
     } catch (e: unknown) {
+      // A coded refusal, such as someone already on the team, says why.
       addNotification({
-        text: member ? t.editFailure : t.addFailure,
+        text: apiErrorMessage(e, dict.apiErrors) ?? (member ? t.editFailure : t.addFailure),
         type: 'error',
         consoleError: e,
       });
@@ -68,7 +97,17 @@ export default function FormTeamMemberForm({
       {!member && (
         <>
           <p>{t.searchStep}</p>
-          <UserSearchPicker scope={{ kind: 'form', id: formId }} onSelect={setSelectedUser} />
+          <UserSearchPicker scope={scope} onSelect={setSelectedUser} />
+          {notSignedIn ? (
+            <div className="mt-3">
+              <InlineAlert
+                variant={directoryGuid ? 'info' : 'warning'}
+                title={tAccess.notSignedInTitle}
+                description={directoryGuid ? tAccess.notSignedIn : tAccess.notSignedInNoId}
+                data-testid="team-not-signed-in"
+              />
+            </div>
+          ) : null}
         </>
       )}
       <Form
@@ -80,6 +119,7 @@ export default function FormTeamMemberForm({
       >
         <CheckboxGroup
           label={member ? t.groups : t.groupsStep}
+          description={t.formOnlyHelp}
           value={selectedGroups}
           onChange={setSelectedGroups}
           isRequired
@@ -95,7 +135,7 @@ export default function FormTeamMemberForm({
           <Button
             variant="primary"
             data-testid="team-save-button"
-            isDisabled={saving || !(member || selectedUser)}
+            isDisabled={saving || !hasPerson || selectedGroups.length === 0}
             type="submit"
           >
             {member ? t.saveMember : t.addMember}

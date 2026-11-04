@@ -1,6 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { Button, InlineAlert } from '@bcgov/design-system-react-components';
+import { Button } from '@bcgov/design-system-react-components';
 
 import type { Dictionary } from '@/src/types/dictionary';
 import type { TeamMember } from '@/src/types/formTeam';
@@ -11,6 +11,7 @@ import { ListPageToolbar } from '@/src/components/ListPageLayout';
 import { RowActionButton } from '@/src/components/RowActionButton';
 import { Tag } from '@/src/components/Tag';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
+import { apiErrorMessage } from '@/src/shared/api/dataError';
 import {
   useFormTeamMembers,
   useFormTeamWriter,
@@ -37,7 +38,7 @@ export default function FormTeamTab({ dict, formId }: Readonly<FormTeamTabProps>
     q: query.q,
   });
   const { table } = useDataTable(query, membersResult, t.loadError);
-  const groups = useTeamGroups();
+  const groups = useTeamGroups(formId);
   const teamWriter = useFormTeamWriter(formId);
   // People are added by finding them with user search.
   const searchAllowed = useUserSearchAllowed();
@@ -54,7 +55,11 @@ export default function FormTeamTab({ dict, formId }: Readonly<FormTeamTabProps>
       await teamWriter.remove(pendingRemove.id);
       addNotification({ text: t.removeSuccess, type: 'success' });
     } catch (e: unknown) {
-      addNotification({ text: t.removeFailure, type: 'error', consoleError: e });
+      addNotification({
+        text: apiErrorMessage(e, dict.apiErrors) ?? t.removeFailure,
+        type: 'error',
+        consoleError: e,
+      });
     } finally {
       setRemoving(false);
       setPendingRemove(null);
@@ -76,8 +81,12 @@ export default function FormTeamTab({ dict, formId }: Readonly<FormTeamTabProps>
                 <Tag
                   key={group.id}
                   data-testid={`${member.id}-${group.id}-tag`}
-                  text={group.name}
-                  color="blue"
+                  text={
+                    member.formOnlyGroups.includes(group.id)
+                      ? t.formOnlyTag.replace('{group}', group.name)
+                      : group.name
+                  }
+                  color={member.formOnlyGroups.includes(group.id) ? 'yellow' : 'blue'}
                 />
               ))}
           </span>
@@ -104,32 +113,19 @@ export default function FormTeamTab({ dict, formId }: Readonly<FormTeamTabProps>
     [t, groups],
   );
 
-  // Until the team API exists nothing on this tab is saved, so the tab says so.
-  const sampleNotice = (
-    <div className="mb-3">
-      <InlineAlert variant="info" data-testid="team-sample-notice">
-        {t.sampleNotice}
-      </InlineAlert>
-    </div>
-  );
-
   if (view !== 'list') {
     return (
-      <>
-        {sampleNotice}
-        <FormTeamMemberForm
-          dict={dict}
-          formId={formId}
-          member={view === 'add' ? undefined : view}
-          onDone={() => setView('list')}
-        />
-      </>
+      <FormTeamMemberForm
+        dict={dict}
+        formId={formId}
+        member={view === 'add' ? undefined : view}
+        onDone={() => setView('list')}
+      />
     );
   }
 
   return (
     <div data-testid="team-list">
-      {sampleNotice}
       <ListPageToolbar align="between">
         <ListPageSearchField
           value={query.searchInput}

@@ -248,7 +248,7 @@ const lockActiveGroups = async (
  * Locks the user, who must be active and hold an identity at a sign-in provider. That leaves out
  * the public and system users.
  */
-const lockAddableUser = async (tx: Tx, userId: string): Promise<void> => {
+export const lockAddableUser = async (tx: Tx, userId: string): Promise<void> => {
   const users = await tx
     .select({ id: appUsers.id })
     .from(appUsers)

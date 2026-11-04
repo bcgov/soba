@@ -24,8 +24,10 @@ import {
   workspaceMemberships,
 } from '../schema';
 import {
+  FormGroupOverrideMode,
   FormGroupOverrideStatus,
   GroupMemberKind,
+  OverrideMemberEffect,
   Permissions,
   WorkspaceGroupMembershipStatus,
   WorkspaceGroupRoleStatus,
@@ -78,9 +80,10 @@ const activeGroup = (groupId: SQLWrapper) =>
   and(eq(workspaceGroups.id, groupId), eq(workspaceGroups.status, WorkspaceGroupStatus.active));
 
 /**
- * The groups the user is an effective member of, per form: a form's active override of a group
- * replaces that group's workspace members with its own. User members only. With no user, every
- * active member's groups, each row naming its member.
+ * The groups the user is an effective member of, per form. A form's active `replace` override of a
+ * group replaces that group's workspace members with its own; an `adjust` override keeps them, less
+ * those it excludes, plus those it includes. User members only. With no user, every active member's
+ * groups, each row naming its member.
  */
 export const effectiveGroups = (userId: string | null, scope: GroupScope) => {
   const activeMembership = and(
@@ -133,6 +136,29 @@ export const effectiveGroups = (userId: string | null, scope: GroupScope) => {
                 eq(formGroupOverrides.formId, forms.id),
                 eq(formGroupOverrides.groupId, workspaceGroups.id),
                 eq(formGroupOverrides.status, FormGroupOverrideStatus.active),
+                or(
+                  eq(formGroupOverrides.mode, FormGroupOverrideMode.replace),
+                  exists(
+                    db
+                      .select({ id: formGroupOverrideMembers.id })
+                      .from(formGroupOverrideMembers)
+                      .where(
+                        and(
+                          eq(formGroupOverrideMembers.overrideId, formGroupOverrides.id),
+                          eq(formGroupOverrideMembers.memberKind, GroupMemberKind.user),
+                          eq(
+                            formGroupOverrideMembers.workspaceMembershipId,
+                            workspaceMemberships.id,
+                          ),
+                          eq(formGroupOverrideMembers.effect, OverrideMemberEffect.exclude),
+                          eq(
+                            formGroupOverrideMembers.status,
+                            WorkspaceGroupMembershipStatus.active,
+                          ),
+                        ),
+                      ),
+                  ),
+                ),
               ),
             ),
         ),
@@ -147,6 +173,7 @@ export const effectiveGroups = (userId: string | null, scope: GroupScope) => {
       and(
         eq(formGroupOverrideMembers.workspaceMembershipId, workspaceMemberships.id),
         eq(formGroupOverrideMembers.memberKind, GroupMemberKind.user),
+        eq(formGroupOverrideMembers.effect, OverrideMemberEffect.include),
         eq(formGroupOverrideMembers.status, WorkspaceGroupMembershipStatus.active),
       ),
     )
