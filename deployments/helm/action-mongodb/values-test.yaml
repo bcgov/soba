@@ -18,7 +18,7 @@ mongodb:
   # PVC and deleting the StatefulSet with --cascade=orphan before the upgrade.
   persistence:
     storageClass: netapp-block-standard
-    size: 2Gi
+    size: 5Gi
 
   resources:
     requests:
