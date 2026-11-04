@@ -1,0 +1,23 @@
+# Prod MongoDB runs independently from the SOBA application release.
+# Create soba-prod-mongodb-auth before deploying this chart; do not put
+# credentials in this file or in the workflow.
+mongodb:
+  enabled: true
+  fullnameOverride: soba-prod-mongodb
+
+  replicaCount: 3
+
+  auth:
+    existingSecret: soba-prod-mongodb-auth
+
+  networkPolicy:
+    ingressPodMatchLabels:
+      app.kubernetes.io/name: soba
+      app.kubernetes.io/instance: soba-prod
+      app.kubernetes.io/component: formio
+    extraEgress:
+      - ports:
+          - port: 5353
+            protocol: UDP
+          - port: 5353
+            protocol: TCP
