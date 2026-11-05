@@ -544,6 +544,8 @@ describe('FormioV5SubmissionFillClient', () => {
       await submit({ a: 1 });
       expect(h.replace).toHaveBeenCalledWith('/en/submission/sub-1/success');
       expect(h.push).not.toHaveBeenCalled();
+      // Lets components such as BCGovFile clean up after a saved submit
+      expect(h.instance.emit).toHaveBeenCalledWith('submitDone', { data: { a: 1 } });
     });
 
     it('stays on the form with the held notice when the submit conflicts', async () => {

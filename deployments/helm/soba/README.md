@@ -439,10 +439,6 @@ backend:
     annotations:
       haproxy.router.openshift.io/timeout: "60s"
     extraPaths:
-      - name: files
-        path: /api/v1/submit/files
-        annotations:
-          haproxy.router.openshift.io/timeout: "300s"
       - name: files-api
         path: /api/v1/files
         annotations:
