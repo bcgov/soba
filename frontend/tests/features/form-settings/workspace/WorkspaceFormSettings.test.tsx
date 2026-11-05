@@ -1,11 +1,12 @@
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import en from '@/dictionaries/en.json';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { SWRConfig } from 'swr';
 import type { Dictionary } from '@/src/types/dictionary';
-import type { Audience, SubmitterSettings } from '@/src/types/formSettings';
+import type { Audience, ReviewSettings, SubmitterSettings } from '@/src/types/formSettings';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 
 const {
@@ -15,7 +16,9 @@ const {
   mockGetInheriting,
   mockGetProviders,
   mockAddNotification,
+  mockLoadFeaturesMeta,
 } = vi.hoisted(() => ({
+  mockLoadFeaturesMeta: vi.fn(),
   mockGetForm: vi.fn(),
   mockGetInheriting: vi.fn(),
   mockGetSettings: vi.fn(),
@@ -33,6 +36,18 @@ vi.mock('@/src/features/form-settings/data/api', () => ({
 
 vi.mock('@/src/shared/api/sobaApi', () => ({
   fetchLoginProviders: mockGetProviders,
+}));
+
+vi.mock('@/src/shared/config/featuresMeta', () => ({
+  loadFeaturesMeta: mockLoadFeaturesMeta,
+}));
+
+vi.mock('@/src/features/credentials/ui/ApiKeysTab', () => ({
+  default: ({ owner }: { owner: { kind: string; id: string } }) => (
+    <div data-testid="workspace-api-key">
+      {owner.kind}:{owner.id}
+    </div>
+  ),
 }));
 
 // The confirmation dialog reads the dictionary from context.
@@ -53,8 +68,11 @@ const DRAFTS = 'Allow Submitters to Save and Edit Drafts';
 const PUBLIC_NOTE = 'Drafts are not available for Public forms.';
 const REQUIRED = 'Select at least one login.';
 const CONFLICT = 'Someone else changed these settings.';
+const STATUS_UPDATES = 'Reviewers can update the status of submissions';
+const REVISION = 'Submitters can revise their own submissions';
 
 const mockDict = {
+  apiKeys: en.apiKeys,
   form: {
     save: 'Save',
     settings: {
@@ -75,6 +93,10 @@ const mockDict = {
       allowSubmitterDraftsLabel: DRAFTS,
       allowSubmitterDraftsPublicNote: PUBLIC_NOTE,
       submitterSettingsLoadError: 'Could not load submitter settings.',
+      reviewSettingsDrawerLabel: 'Review Settings',
+      allowStatusUpdatesLabel: STATUS_UPDATES,
+      allowSubmitterRevisionLabel: REVISION,
+      reviewSettingsLoadError: 'Could not load review settings.',
       formSettingsDrawerSaveSuccessMessage: 'Changes saved.',
       formSettingsDrawerSaveErrorMessage: 'Save failed.',
       settingsConflictMessage: CONFLICT,
@@ -97,6 +119,7 @@ const IDIR: Audience = { mode: 'protected', idps: ['azureidir'] };
 
 let audience: Audience;
 let submitter: SubmitterSettings;
+let review: ReviewSettings;
 let store: ReturnType<typeof makeStore>;
 
 // One cache for everything rendered, as the app has.
@@ -121,6 +144,9 @@ const radio = (mode: string) => input(`audience-mode-${mode}`);
 const drafts = () => input('workspace-settings-allow-drafts');
 const audienceSave = () => screen.getByTestId('form-settings-workspace-audience-save');
 const submitterSave = () => screen.getByTestId('form-settings-workspace-submitter-save');
+const statusUpdates = () => input('workspace-settings-allow-status-updates');
+const revision = () => input('workspace-settings-allow-submitter-revision');
+const reviewSave = () => screen.getByTestId('form-settings-workspace-review-save');
 
 // A form's audience read, as a form drawer elsewhere in the app would hold it.
 function FormAudienceProbe() {
@@ -163,6 +189,10 @@ function deferred<T>() {
 }
 
 describe('WorkspaceFormSettings', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     store = makeStore();
@@ -170,14 +200,26 @@ describe('WorkspaceFormSettings', () => {
     store.dispatch(setAuthenticated(true));
     audience = IDIR;
     submitter = { allowSubmitterDrafts: false };
+    review = { allowStatusUpdates: false, allowSubmitterRevision: false };
+    vi.stubEnv('NEXT_PUBLIC_SOBA_FEATURES_ALLOWED', '*');
+    mockLoadFeaturesMeta.mockResolvedValue({
+      features: [{ code: 'api-keys', platformAllowed: true, availability: 'fixed' }],
+    });
     mockGetProviders.mockResolvedValue({ items: PROVIDERS });
     mockGetInheriting.mockResolvedValue({ count: 3 });
     mockGetSettings.mockImplementation((_token: string, _ws: string, key: string) =>
-      Promise.resolve({ values: key === 'audience' ? audience : submitter, version: 1 }),
+      Promise.resolve({ values: { audience, submitter, review }[key], version: 1 }),
     );
     mockSetSettings.mockImplementation((_token: string, _ws: string, _key: string, body: unknown) =>
       Promise.resolve(body),
     );
+  });
+
+  it('shows the API keys drawer for the workspace while the api-keys feature is on', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await user.click(await screen.findByRole('button', { name: en.apiKeys.heading }));
+    expect(screen.getByTestId('workspace-api-key')).toHaveTextContent('workspace:ws1');
   });
 
   it("shows the intro and the workspace's audience and drafts setting", async () => {
@@ -484,5 +526,48 @@ describe('WorkspaceFormSettings', () => {
 
     expect(await screen.findByText('members')).toBeInTheDocument();
     expect(mockGetForm).toHaveBeenCalledTimes(2);
+  });
+  it("shows the workspace's review settings", async () => {
+    review = { allowStatusUpdates: true, allowSubmitterRevision: false };
+    renderTab();
+    await waitFor(() => expect(statusUpdates()).toBeEnabled());
+
+    expect(statusUpdates()).toBeChecked();
+    expect(revision()).not.toBeChecked();
+    expect(reviewSave()).toBeDisabled();
+    expect(mockGetSettings).toHaveBeenCalledWith('token', 'ws1', 'review');
+  });
+
+  it('saves both review settings from the version read', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await waitFor(() => expect(statusUpdates()).toBeEnabled());
+
+    await user.click(screen.getByText(STATUS_UPDATES));
+    await user.click(screen.getByText(REVISION));
+    await user.click(reviewSave());
+
+    await waitFor(() =>
+      expect(mockSetSettings).toHaveBeenCalledWith('token', 'ws1', 'review', {
+        values: { allowStatusUpdates: true, allowSubmitterRevision: true },
+        version: 1,
+      }),
+    );
+    expect(mockAddNotification).toHaveBeenCalledWith({ type: 'success', text: 'Changes saved.' });
+  });
+
+  it('drops a stale review edit when someone else saved first', async () => {
+    const user = userEvent.setup();
+    mockSetSettings.mockRejectedValue(new ApiError('Changed', 409));
+    renderTab();
+    await waitFor(() => expect(statusUpdates()).toBeEnabled());
+
+    await user.click(screen.getByText(STATUS_UPDATES));
+    await user.click(reviewSave());
+
+    await waitFor(() =>
+      expect(mockAddNotification).toHaveBeenCalledWith({ type: 'error', text: CONFLICT }),
+    );
+    expect(statusUpdates()).not.toBeChecked();
   });
 });

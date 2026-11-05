@@ -7,9 +7,11 @@ export * from './codes';
 export * from './forms';
 export * from './formGroupOverride';
 export * from './formSubmitterSetting';
+export * from './formReviewSetting';
 export * from './audienceSetting';
 export * from './settingsAudit';
 export * from './submissionParticipant';
+export * from './submissionNote';
 export * from './file';
 export * from './submissionFile';
 export * from './documentTemplate';
@@ -20,3 +22,5 @@ export * from './submissionExportAudit';
 export * from './postSubmissionActionSetting';
 export * from './devData';
 export * from './plugins.enterprise';
+
+export * from './workspaceCredential';

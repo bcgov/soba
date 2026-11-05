@@ -442,6 +442,34 @@
       "when": 1772790844000,
       "tag": "0063_submission_form_submitted",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1772877244000,
+      "tag": "0064_user_identity_first_sign_in",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1773050044000,
+      "tag": "0065_review_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1773136444000,
+      "tag": "0066_submission_review",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1773222844000,
+      "tag": "0067_workspace_credentials",
+      "breakpoints": true
     }
   ]
 }

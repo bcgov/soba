@@ -64,11 +64,15 @@ export const IdentityProviders = {
 } as const;
 export type IdentityProviderCode = (typeof IdentityProviders)[keyof typeof IdentityProviders];
 
-/** Submission lifecycle state (submission.workflow_state). Backend-owned; clients never set it. */
+/**
+ * Submission lifecycle state (submission.workflow_state). Backend-owned; clients never set it.
+ * `revising` is a submitted submission a reviewer sent back to its submitter to revise.
+ */
 export const SubmissionWorkflowState = {
   opened: 'opened',
   draft: 'draft',
   submitted: 'submitted',
+  revising: 'revising',
   deleted: 'deleted',
 } as const;
 export type SubmissionWorkflowStateCode =
@@ -105,11 +109,14 @@ export type SubmissionChangeStatusCode =
 
 /**
  * Why an API request failed; an error response carries it as `code`. A `*_denied` refusal and
- * `sign_in_required` are 401 for an anonymous caller and 403 otherwise; `drafts_*` is 403;
- * `*_closed`, `*_taken`, `version_not_published` and `already_exists` are 409; `*_not_found` and
- * `not_published` are 404; `*_invalid` and `form_not_ready` are 400;
- * `*_unavailable` and `render_busy` are 503; `render_failed`, `no_saved_data` and `file_infected`
- * are 422; `file_type_blocked` is 415; `file_too_large` and `request_too_large` are 413;
+ * `sign_in_required` are 401 for an anonymous caller and 403 otherwise; `drafts_*`,
+ * `status_updates_disabled` and `revise_disabled` are 403; `status_changed`,
+ * `status_move_not_allowed`, `revision_needs_submitter`, `data_changed`, `*_closed`, `*_taken`,
+ * `version_not_published`, `already_exists`, `member_exists`, `member_protected` and
+ * `last_form_admin` are 409; `*_not_found` and `not_published` are 404;
+ * `*_invalid` and `form_not_ready` are 400; `*_unavailable` and `render_busy` are 503;
+ * `render_failed`, `no_saved_data`, `file_infected` and `identity_unconfirmed` are 422;
+ * `file_type_blocked` is 415; `file_too_large` and `request_too_large` are 413;
  * `engine_*_rejected` are 400; `unauthenticated` is 401; `rate_limited` and `*_limit_reached` are
  * 429; `engine_document_missing` and `internal_error` are 500.
  */
@@ -119,10 +126,14 @@ export const ApiErrorCodes = {
   write_denied: 'write_denied',
   render_denied: 'render_denied',
   delete_denied: 'delete_denied',
+  revise_denied: 'revise_denied',
+  revise_disabled: 'revise_disabled',
   drafts_disabled: 'drafts_disabled',
   drafts_public: 'drafts_public',
   upload_closed: 'upload_closed',
   delete_closed: 'delete_closed',
+  revise_closed: 'revise_closed',
+  edit_closed: 'edit_closed',
   not_published: 'not_published',
   // Opening a submission.
   form_not_found: 'form_not_found',
@@ -155,6 +166,22 @@ export const ApiErrorCodes = {
   no_saved_data: 'no_saved_data',
   // Workspace groups.
   group_name_taken: 'group_name_taken',
+  // Submission review.
+  note_id_taken: 'note_id_taken',
+  status_id_taken: 'status_id_taken',
+  status_changed: 'status_changed',
+  status_move_not_allowed: 'status_move_not_allowed',
+  status_updates_disabled: 'status_updates_disabled',
+  assignee_invalid: 'assignee_invalid',
+  revision_needs_submitter: 'revision_needs_submitter',
+  data_changed: 'data_changed',
+  // Workspace access.
+  member_exists: 'member_exists',
+  member_protected: 'member_protected',
+  last_form_admin: 'last_form_admin',
+  // A Soba user made from a user search result.
+  person_not_found: 'person_not_found',
+  identity_unconfirmed: 'identity_unconfirmed',
   // Submission exports: the form already has as many running as allowed.
   export_limit_reached: 'export_limit_reached',
   // Any route.

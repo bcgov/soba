@@ -1,6 +1,8 @@
 import { OpenAPIRegistry, OpenApiGeneratorV3 } from '@asteasolutions/zod-to-openapi';
+import { SUBMISSION_REVIEW_STATUSES, SUBMITTER_REVIEW_LABELS } from '@soba/lib';
 import { registerFormsOpenApi } from '../../../../src/core/api/forms/schema';
 import { registerSubmissionsOpenApi } from '../../../../src/core/api/submissions/schema';
+import { registerSubmissionReviewOpenApi } from '../../../../src/core/api/submissions/reviewSchema';
 import { registerWorkspacesOpenApi } from '../../../../src/core/api/workspaces/schema';
 import { registerAdminOpenApi } from '../../../../src/core/api/admin/schema';
 import { registerMetaOpenApi } from '../../../../src/core/api/meta/schema';
@@ -16,6 +18,7 @@ function componentSchemas(): unknown {
   registerFormsOpenApi(registry);
   registerFormSettingsOpenApi(registry);
   registerSubmissionsOpenApi(registry);
+  registerSubmissionReviewOpenApi(registry);
   registerWorkspacesOpenApi(registry);
   registerAdminOpenApi(registry);
   registerMetaOpenApi(registry);
@@ -45,12 +48,13 @@ describe('OpenAPI components for lib-backed schemas', () => {
   const schemas = componentSchemas();
 
   it.each([
+    ['Credentials_CredentialState', 'Credentials_CredentialMetadata', 'Credentials_CredentialSort'],
     ['Forms_ListFormsResponse', 'Forms_FormListItem', 'Forms_FormSort'],
     ['Forms_ListFormVersionsResponse', 'Forms_FormVersionListItem', 'Forms_FormVersionSort'],
     [
       'Submissions_ListSubmissionsResponse',
       'Submissions_SubmissionListItem',
-      'Submissions_SubmissionSort',
+      'Submissions_StaffSubmissionSort',
     ],
     ['Workspaces_ListWorkspacesResponse', 'Workspaces_WorkspaceItem', 'Workspaces_WorkspaceSort'],
     ['Submit_ListMyFormsResponse', 'Submit_MyFormListItem', 'Submit_MyFormSort'],
@@ -75,6 +79,15 @@ describe('OpenAPI components for lib-backed schemas', () => {
     expect(at(schemas, list, 'properties', 'sort')).toEqual(ref(sort));
   });
 
+  // Staff sort by the review too; a submitter's own list does not.
+  it('sorts the staff list by review status and assignee, and My Submissions not', () => {
+    const tokens = (name: string) => at(schemas, name, 'enum') as string[];
+    expect(tokens('Submissions_StaffSubmissionSort')).toEqual(
+      expect.arrayContaining(['reviewStatus:asc', 'assignee:desc']),
+    );
+    expect(tokens('Submissions_SubmissionSort')).not.toContain('reviewStatus:asc');
+  });
+
   it.each([
     ['Meta_PluginsResponse', 'plugins', 'Meta_PluginCatalogEntry'],
     ['Meta_FeaturesResponse', 'features', 'Meta_Feature'],
@@ -89,6 +102,7 @@ describe('OpenAPI components for lib-backed schemas', () => {
   });
 
   it.each([
+    ['Credentials_CredentialSecret', 'credential', 'Credentials_CredentialMetadata'],
     ['Me_Response', 'actor', 'Me_Actor'],
     ['Me_Response', 'profile', 'Me_Profile'],
     ['Me_Response', 'preferences', 'Me_Preferences'],
@@ -114,6 +128,7 @@ describe('OpenAPI components for lib-backed schemas', () => {
     'SubmissionExport_Result',
     'Admin_JobProgress',
     'Admin_JobResult',
+    'Submissions_SubmissionReviewUser',
   ])('keeps %s free of nullable at its top', (name) => {
     expect(at(schemas, name, 'nullable')).toBeUndefined();
   });
@@ -141,7 +156,39 @@ describe('OpenAPI components for lib-backed schemas', () => {
     ).toBe('boolean');
   });
 
-  it.each(['Audience', 'Submitter'])(
+  it('builds the submission review on its named parts', () => {
+    const review = 'Submissions_SubmissionReview';
+    expect(at(schemas, review, 'properties', 'statusHistory', 'items')).toEqual(
+      ref('Submissions_SubmissionStatusChange'),
+    );
+    expect(at(schemas, review, 'properties', 'notes', 'items')).toEqual(
+      ref('Submissions_SubmissionNote'),
+    );
+    expect(at(schemas, review, 'properties', 'editHistory', 'items')).toEqual(
+      ref('Submissions_SubmissionEdit'),
+    );
+    expect(
+      JSON.stringify(at(schemas, 'Submissions_SubmissionStatusChange', 'properties', 'assignee')),
+    ).toContain('Submissions_SubmissionReviewUser');
+    expect(at(schemas, 'Submissions_AddSubmissionNoteBody', 'properties', 'text')).toMatchObject({
+      minLength: 1,
+      maxLength: 4000,
+    });
+    expect(at(schemas, 'Submissions_SubmissionReviewers', 'properties', 'items', 'items')).toEqual(
+      ref('Submissions_SubmissionReviewUser'),
+    );
+    expect(
+      at(schemas, 'Submissions_UpdateSubmissionStatusBody', 'properties', 'status', 'enum'),
+    ).toEqual([...SUBMISSION_REVIEW_STATUSES]);
+  });
+
+  it('names the review settings values', () => {
+    for (const flag of ['allowStatusUpdates', 'allowSubmitterRevision']) {
+      expect(at(schemas, 'FormSettings_Review', 'properties', flag, 'type')).toBe('boolean');
+    }
+  });
+
+  it.each(['Audience', 'Submitter', 'Review'])(
     'builds the %s form view and save body on its values component',
     (name) => {
       const values = `FormSettings_${name}`;
@@ -246,6 +293,7 @@ describe('OpenAPI components for lib-backed schemas', () => {
         audienceMode: { ...text, nullable: true, enum: ['public', 'protected', 'members', null] },
         audienceIdps: textList,
         allowSubmitterDrafts: { type: 'boolean' },
+        allowSubmitterRevision: { type: 'boolean' },
       },
       required: [
         'id',
@@ -257,6 +305,7 @@ describe('OpenAPI components for lib-backed schemas', () => {
         'audienceMode',
         'audienceIdps',
         'allowSubmitterDrafts',
+        'allowSubmitterRevision',
       ],
     });
   });
@@ -285,8 +334,19 @@ describe('OpenAPI components for lib-backed schemas', () => {
     });
     expect(at(schemas, row, 'properties', 'currentRevisionNo', 'type')).toBe('integer');
     expect(at(schemas, row, 'required')).toEqual(
-      expect.arrayContaining(['formVersionId', 'headRevisionId', 'currentRevisionNo']),
+      expect.arrayContaining([
+        'formVersionId',
+        'headRevisionId',
+        'currentRevisionNo',
+        'reviewStatus',
+      ]),
     );
+    // A submitter is told the review in its own labels, never its statuses.
+    expect(at(schemas, row, 'properties', 'reviewStatus')).toEqual({
+      type: 'string',
+      nullable: true,
+      enum: [...SUBMITTER_REVIEW_LABELS, null],
+    });
     const response = 'Submit_ListMySubmissionsResponse';
     expect(at(schemas, response, 'properties', 'forms', 'items')).toEqual(
       ref('Submit_SubmitterForm'),

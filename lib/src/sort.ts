@@ -20,11 +20,20 @@ export const SUBMISSION_SORT_FIELDS = [
   'updatedAt',
 ] as const;
 
+/** The staff submissions list also sorts by where each review stands and who has it. */
+export const STAFF_SUBMISSION_SORT_FIELDS = [
+  ...SUBMISSION_SORT_FIELDS,
+  'reviewStatus',
+  'assignee',
+] as const;
+
 export const WORKSPACE_SORT_FIELDS = ['name', 'kind', 'status', 'updatedAt'] as const;
 
 export const SOBA_ADMIN_SORT_FIELDS = ['displayLabel', 'source', 'syncedAt'] as const;
 
 export const WORKSPACE_GROUP_SORT_FIELDS = ['name'] as const;
+
+export const WORKSPACE_ACCESS_SORT_FIELDS = ['displayLabel'] as const;
 
 export const FEATURE_SCOPE_SORT_FIELDS = [
   'featureCode',
@@ -36,6 +45,7 @@ export const FEATURE_SCOPE_SORT_FIELDS = [
 
 export const DOCGEN_AUDIT_SORT_FIELDS = ['createdAt', 'outcome', 'durationMs'] as const;
 
+export const CREDENTIAL_SORT_FIELDS = ['label', 'status', 'createdAt'] as const;
 export const JOB_SORT_FIELDS = ['createdAt', 'finishedAt'] as const;
 
 export const SUBMISSION_EXPORT_SORT_FIELDS = ['createdAt'] as const;

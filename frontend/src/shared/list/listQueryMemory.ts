@@ -1,13 +1,16 @@
 import {
   DOCGEN_AUDIT_SORT_FIELDS,
+  CREDENTIAL_SORT_FIELDS,
   FEATURE_SCOPE_SORT_FIELDS,
   FORM_SORT_FIELDS,
   FORM_VERSION_SORT_FIELDS,
   JOB_SORT_FIELDS,
   MY_FORM_SORT_FIELDS,
   SOBA_ADMIN_SORT_FIELDS,
+  STAFF_SUBMISSION_SORT_FIELDS,
   SUBMISSION_EXPORT_SORT_FIELDS,
   SUBMISSION_SORT_FIELDS,
+  WORKSPACE_ACCESS_SORT_FIELDS,
   WORKSPACE_GROUP_SORT_FIELDS,
   WORKSPACE_SORT_FIELDS,
   sortTokensFor,
@@ -73,8 +76,9 @@ export const WORKSPACES_LIST_QUERY: ListQuerySpec = {
 /** The submissions tab inside the designer. Same shape, its own remembered query. */
 export const FORM_SUBMISSIONS_LIST_QUERY: ListQuerySpec = {
   resource: 'formSubmissions',
-  filters: [],
-  sortOptions: sortTokensFor(SUBMISSION_SORT_FIELDS),
+  // The review status, and `mine` for the submissions assigned to the caller.
+  filters: ['reviewStatus', 'mine'],
+  sortOptions: sortTokensFor(STAFF_SUBMISSION_SORT_FIELDS),
   // A column carries this one, so the header can report the order and reverse it.
   defaultSort: 'submittedAt:desc',
 };
@@ -163,6 +167,14 @@ export const SUBMISSION_EXPORTS_LIST_QUERY: ListQuerySpec = {
   defaultSort: CREATED_DESC,
 };
 
+/** A workspace's or form's API keys. Scope it to the owner with `scopedListQuery`. */
+export const CREDENTIALS_LIST_QUERY: ListQuerySpec = {
+  resource: 'credentials',
+  filters: [],
+  sortOptions: sortTokensFor(CREDENTIAL_SORT_FIELDS),
+  defaultSort: CREATED_DESC,
+};
+
 export const scopedListQuery = (spec: ListQuerySpec, memoryScope: string): ListQuerySpec => ({
   ...spec,
   memoryScope,
@@ -173,6 +185,13 @@ export const WORKSPACE_GROUPS_LIST_QUERY: ListQuerySpec = {
   filters: [],
   sortOptions: sortTokensFor(WORKSPACE_GROUP_SORT_FIELDS),
   defaultSort: 'name:asc',
+};
+
+export const WORKSPACE_ACCESS_LIST_QUERY: ListQuerySpec = {
+  resource: 'workspaceAccess',
+  filters: ['include'],
+  sortOptions: sortTokensFor(WORKSPACE_ACCESS_SORT_FIELDS),
+  defaultSort: 'displayLabel:asc',
 };
 
 const KEY_PREFIX = 'soba.listQuery.';
