@@ -242,9 +242,12 @@ export function SubmissionFillForm({
       switch (outcome.status) {
         case 'applied':
           addNotification({ text: labels.submitSuccess, type: 'success' });
-          // Straight to the confirmation; navigating away unmounts the form, so there's no need to
-          // emit `submitDone` and no flash of Form.io's own success screen. replace, so Back does
-          // not return to the fill page of a submitted record.
+          // `submitDone` lets components clean up after a saved submit (BCGovFile drops its
+          // in-browser records of uploaded files). Emitting it only notifies listeners; Form.io's
+          // own success screen comes from its submit flow, which this host replaces.
+          formInstanceRef.current?.emit('submitDone', submission);
+          // Straight to the confirmation. replace, so Back does not return to the fill page of a
+          // submitted record.
           router.replace(`${submissionPath}/success`);
           break;
         case 'held':

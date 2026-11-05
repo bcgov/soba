@@ -1,7 +1,7 @@
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 import { getKeycloakInstance } from '@/lib/slices/keycloakSlice';
-import { openedActiveSubmissionId } from './activeSubmission';
+import { getActiveSubmission, openedActiveSubmissionId } from './activeSubmission';
 import { uploadToken } from './data/uploadToken';
 import { getSobaApiBaseUrl, loadFrontendRuntimeConfig } from '@/src/shared/config/runtimeConfig';
 
@@ -11,6 +11,8 @@ interface ChefsProviderConfig {
   getToken: () => string | Promise<string>;
   getWorkspaceId?: () => string | Promise<string>;
   getSubmissionId?: () => string | Promise<string>;
+  /** Whether an empty token means a deliberately anonymous session rather than one still loading. */
+  isAnonymous?: () => boolean | Promise<boolean>;
 }
 
 interface BcgovFormioModule {
@@ -64,6 +66,10 @@ export function ensureBcgovFormioRegistered(): Promise<{ filesEnabled: boolean }
           // uploads are tagged with it, and the backend derives the workspace from it, so no
           // workspace id is passed.
           getSubmissionId: openedActiveSubmissionId,
+          // Files saved in the browser are tied to the signed-in user. An empty token counts as
+          // anonymous only for a fill known not to be signed in; while that isn't known yet (no
+          // active submission), the user is unknown, so nothing is stored or retried as anonymous.
+          isAnonymous: () => getActiveSubmission()?.signedIn === false,
         }),
       );
     }
