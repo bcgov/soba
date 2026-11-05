@@ -20,13 +20,14 @@ const operations = (paths: Record<string, Operations>, path: string) =>
 describe('files OpenAPI', () => {
   const paths = filesPaths();
 
-  it.each([
-    ['/files', false],
-  ])('%s documents upload, download and delete (deprecated: %s)', (base, deprecated) => {
-    expect(operations(paths, base)).toEqual([['post', deprecated]]);
-    expect(operations(paths, `${base}/{id}`)).toEqual([
-      ['get', deprecated],
-      ['delete', deprecated],
-    ]);
-  });
+  it.each([['/files', false]])(
+    '%s documents upload, download and delete (deprecated: %s)',
+    (base, deprecated) => {
+      expect(operations(paths, base)).toEqual([['post', deprecated]]);
+      expect(operations(paths, `${base}/{id}`)).toEqual([
+        ['get', deprecated],
+        ['delete', deprecated],
+      ]);
+    },
+  );
 });
