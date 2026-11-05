@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import en from '@/dictionaries/en.json';
 
@@ -20,6 +20,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
     ...en,
     form: {
       loading: 'Loading',
+      previewSubmissionDisabled: 'Submission during a preview is disabled.',
       apiKey: 'API Key',
       nameLabel: 'Form Name',
       descriptionLabel: 'Description',
@@ -145,8 +146,31 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
 }));
 
 // Mock DynamicForm and FormDesigner components used in FormForm
+const preview = vi.hoisted(() => ({
+  cancel: vi.fn(),
+  beforeSubmit: null as
+    | ((submission: unknown, next: (error: { silent: boolean }) => void) => void)
+    | null,
+}));
 vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => ({
-  DynamicForm: () => <div data-testid="dynamic-form">preview</div>,
+  DynamicForm: ({
+    options,
+  }: {
+    options: {
+      hooks: {
+        beforeSubmit: NonNullable<typeof preview.beforeSubmit>;
+      };
+    };
+  }) => {
+    preview.beforeSubmit = options.hooks.beforeSubmit;
+    return (
+      <div data-testid="dynamic-form">
+        <button onClick={() => options.hooks.beforeSubmit({ data: {} }, preview.cancel)}>
+          Submit preview
+        </button>
+      </div>
+    );
+  },
 }));
 
 vi.mock('@bcgov/design-system-react-components', async (importOriginal) => {
@@ -316,6 +340,83 @@ describe('FormForm', () => {
     // The designer area includes a form name heading; assert it renders with loaded value
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Test' })).toBeInTheDocument());
   });
+
+  it('warns and cancels every preview submission before it completes', async () => {
+    mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+    await userEvent.click(screen.getByTestId('preview-form-button'));
+    const submit = await screen.findByRole('button', { name: 'Submit preview' });
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+
+    await userEvent.click(submit);
+    const firstWarning = within(dialog).getByRole('alert');
+    expect(firstWarning).toHaveTextContent(en.form.previewSubmissionDisabled);
+    expect(firstWarning).toHaveAttribute('aria-atomic', 'true');
+    expect(screen.getByTestId('close-preview-button').parentElement?.previousElementSibling).toBe(
+      firstWarning,
+    );
+    expect(submit).toHaveFocus();
+    await userEvent.click(submit);
+
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(en.form.previewSubmissionDisabled);
+    expect(within(dialog).getByRole('alert')).not.toBe(firstWarning);
+    expect(submit).toHaveFocus();
+    expect(store.getState().notification.notifications).toEqual([]);
+    expect(preview.cancel).toHaveBeenCalledTimes(2);
+    expect(preview.cancel).toHaveBeenNthCalledWith(1, { silent: true });
+    expect(preview.cancel).toHaveBeenNthCalledWith(2, { silent: true });
+    expect(screen.getByTestId('dynamic-form')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('close-preview-button'));
+    await userEvent.click(screen.getByTestId('preview-form-button'));
+    expect(within(screen.getByRole('dialog')).queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('prevents real Form.io completion and clears loading without losing preview data', async () => {
+    mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+    await userEvent.click(screen.getByTestId('preview-form-button'));
+    await screen.findByRole('button', { name: 'Submit preview' });
+
+    const { Formio } = await import('@formio/js');
+    const host = document.createElement('div');
+    const instance = await Formio.createForm(
+      host,
+      {
+        components: [
+          { type: 'textfield', key: 'name', input: true },
+          { type: 'button', key: 'submit', action: 'submit', label: 'Submit' },
+        ],
+      },
+      { hooks: { beforeSubmit: preview.beforeSubmit! } },
+    );
+    try {
+      await instance.setSubmission({ data: { name: 'Preview answer' } });
+      const onSubmit = vi.fn();
+      const onSubmitDone = vi.fn();
+      instance.on('submit', onSubmit);
+      instance.on('submitDone', onSubmitDone);
+
+      await act(async () => {
+        await expect(instance.submit()).rejects.toBe(false);
+        await expect(instance.submit()).rejects.toBe(false);
+      });
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(onSubmitDone).not.toHaveBeenCalled();
+      expect(instance.submitting).toBe(false);
+      expect(instance.submissionInProcess).toBe(false);
+      expect(instance.data).toMatchObject({ name: 'Preview answer' });
+      expect(host).not.toHaveTextContent('Submission Complete');
+    } finally {
+      instance.destroy();
+    }
+  }, 15000);
 
   // The form's current version is what the builder is fed.
   it('reads the schema of the current version', async () => {
