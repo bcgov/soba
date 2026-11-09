@@ -39,7 +39,24 @@ const h = vi.hoisted(() => ({
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
     general: { sessionExpired: 'Your session has ended.', noAccess: 'You do not have access.' },
-    form: { loading: 'Loading...' },
+    form: {
+      loading: 'Loading...',
+      templates: {
+        print: {
+          button: 'Print',
+          modalTitle: 'Print Submission',
+          methodLabel: 'Print with',
+          browserOption: 'Browser print',
+          print: 'Print',
+          printing: 'Printing…',
+          uploadOption: 'Upload CDOGS template',
+          storedOption: 'Use default CDOGS template',
+          fileNameColumn: 'File Name',
+          uploadDateColumn: 'Upload Date',
+          failed: 'Failed to generate the document.',
+        },
+      },
+    },
     apiErrors: {
       open_denied: 'You are not able to submit this form.',
       not_published: 'This form is not accepting submissions.',
@@ -94,6 +111,14 @@ vi.mock('@/src/features/formio-v5/useBcgovFileOption', () => ({
 
 vi.mock('@/src/shared/api/useAccessCaller', () => ({
   useAccessCaller: () => h.access,
+}));
+
+vi.mock('@/src/features/templates/data/useSubmissionPrint', () => ({
+  useSubmitterPrint: () => ({
+    choice: null,
+    printTemplate: vi.fn(),
+    staff: null,
+  }),
 }));
 
 vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => {

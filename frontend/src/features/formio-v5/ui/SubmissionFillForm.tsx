@@ -22,6 +22,9 @@ import { isFormUpdated } from '@/src/features/formio-v5/data/useSubmissionOpener
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { apiErrorMessage, isNetworkError, isOutcomeUnknown } from '@/src/shared/api/dataError';
 import { useFormatTime } from '@/src/shared/hooks/useFormatLongDate';
+import { useSubmitterPrint } from '@/src/features/templates/data/useSubmissionPrint';
+import { printBaseName } from '@/src/features/templates/printFileName';
+import { PrintSubmissionButton } from '@/src/features/templates/ui/PrintSubmissionButton';
 import type {
   SubmitFillBundle,
   SubmitFormVersionSchemaResponse,
@@ -115,6 +118,7 @@ export function SubmissionFillForm({
   const [{ snapshot, canWrite, canSaveDraft, fileOption, signedIn, open }] = useState(view);
   const { addNotification } = useNotificationStore();
   const router = useRouter();
+  const print = useSubmitterPrint(submissionId);
   const writer = useFillWriter(submissionId, {
     headRevisionId: snapshot.headRevisionId,
     signedIn,
@@ -360,7 +364,7 @@ export function SubmissionFillForm({
         </div>
       ) : null}
       {canSaveDraft ? (
-        <div className="mb-3 d-flex gap-2" data-testid="submission-fill-actions">
+        <div className="mb-3 d-flex gap-2 align-items-center" data-testid="submission-fill-actions">
           <Button
             variant="secondary"
             onPress={() => {
@@ -374,8 +378,29 @@ export function SubmissionFillForm({
           <output className="align-self-center" data-testid="submission-fill-save-status">
             {saveStatusText(saveStatus)}
           </output>
+          <div className="ms-auto">
+            <PrintSubmissionButton
+              print={print}
+              baseName={printBaseName({
+                id: submissionId,
+                formName: snapshot.form.name,
+                confirmationCode: null,
+              })}
+            />
+          </div>
         </div>
-      ) : null}
+      ) : (
+        <div className="mb-3 d-flex justify-content-end d-print-none">
+          <PrintSubmissionButton
+            print={print}
+            baseName={printBaseName({
+              id: submissionId,
+              formName: snapshot.form.name,
+              confirmationCode: null,
+            })}
+          />
+        </div>
+      )}
       <FormioV5FormRenderErrorBoundary
         fallback={
           <InlineAlert variant="danger" role="alert">

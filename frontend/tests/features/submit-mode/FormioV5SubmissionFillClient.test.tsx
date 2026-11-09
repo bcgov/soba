@@ -35,7 +35,24 @@ vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
     general: { sessionExpired: 'Your session has ended.', noAccess: 'You do not have access.' },
     submission: { notFound: 'Submission not found.', loadError: 'Could not load this submission.' },
-    form: { loading: 'Loading...' },
+    form: {
+      loading: 'Loading...',
+      templates: {
+        print: {
+          button: 'Print',
+          modalTitle: 'Print Submission',
+          methodLabel: 'Print with',
+          browserOption: 'Browser print',
+          print: 'Print',
+          printing: 'Printing…',
+          uploadOption: 'Upload CDOGS template',
+          storedOption: 'Use default CDOGS template',
+          fileNameColumn: 'File Name',
+          uploadDateColumn: 'Upload Date',
+          failed: 'Failed to generate the document.',
+        },
+      },
+    },
     apiErrors: {
       drafts_disabled: 'Drafts are off for this form.',
       submission_not_found: 'This submission is gone.',
@@ -85,6 +102,14 @@ vi.mock('@/src/features/formio-v5/useBcgovFileOption', () => ({
 
 vi.mock('@/src/shared/api/useAccessCaller', () => ({
   useAccessCaller: () => h.access,
+}));
+
+vi.mock('@/src/features/templates/data/useSubmissionPrint', () => ({
+  useSubmitterPrint: () => ({
+    choice: null,
+    printTemplate: vi.fn(),
+    staff: null,
+  }),
 }));
 
 vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => {
