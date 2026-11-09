@@ -364,7 +364,10 @@ export function SubmissionFillForm({
         </div>
       ) : null}
       {canSaveDraft ? (
-        <div className="mb-3 d-flex gap-2 align-items-center" data-testid="submission-fill-actions">
+        <div
+          className="mb-3 d-flex gap-2 align-items-center d-print-none"
+          data-testid="submission-fill-actions"
+        >
           <Button
             variant="secondary"
             onPress={() => {
