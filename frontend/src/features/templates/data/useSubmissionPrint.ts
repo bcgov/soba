@@ -97,12 +97,12 @@ export function printChoiceFrom(read: {
 const NO_STORED_TEMPLATE = 'The form version has no stored template';
 
 /** Print on the submit surface, signed in or not. */
-export function useSubmitterPrint(submissionId: string): SubmissionPrint {
+export function useSubmitterPrint(submissionId: string, opened = true): SubmissionPrint {
   const allowed = useTemplatePrintAllowed();
   const { token, initializing, initStarted } = useKeycloak();
   const { isSignedIn, tokenFor } = useCallToken();
   // Keycloak has to answer first, or the read goes out as anonymous.
-  const ready = allowed === true && initStarted && !initializing && !!submissionId;
+  const ready = allowed === true && initStarted && !initializing && !!submissionId && opened;
 
   const { data, error } = useMaybeAuthedSWR(
     ready ? ['submission-print-facts', submissionId, token ? 'user' : 'anonymous'] : null,

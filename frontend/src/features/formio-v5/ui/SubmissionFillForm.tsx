@@ -118,13 +118,13 @@ export function SubmissionFillForm({
   const [{ snapshot, canWrite, canSaveDraft, fileOption, signedIn, open }] = useState(view);
   const { addNotification } = useNotificationStore();
   const router = useRouter();
-  const print = useSubmitterPrint(submissionId);
   const writer = useFillWriter(submissionId, {
     headRevisionId: snapshot.headRevisionId,
     signedIn,
     open,
   });
   const { busy, held, save: saveStatus } = writer.status;
+  const print = useSubmitterPrint(submissionId, open === undefined || saveStatus.state === 'saved');
   const formatTime = useFormatTime();
 
   const [renderError, setRenderError] = useState<string | null>(null);
