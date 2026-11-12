@@ -142,6 +142,7 @@ function NewSubmissionFill({ formId, labels }: Readonly<{ formId: string; labels
             formId: facts.id,
             workflowState: 'opened',
             formVersionId: version.formVersionId,
+            versionNo: version.versionNo,
             headRevisionId: null,
             currentRevisionNo: 0,
             role: 'owner',

@@ -52,6 +52,7 @@ export type FillLabels = {
   requestFailed: string;
   formUpdated: string;
   continueUpdated: string;
+  version: string;
   errors: Record<ApiErrorCode, string>;
 };
 
@@ -292,6 +293,9 @@ export function SubmissionFillForm({
 
   return (
     <>
+      <div className="text-end" data-testid="submission-fill-version">
+        {labels.version}: {snapshot.versionNo ?? 1}
+      </div>
       {renderError ? (
         <InlineAlert variant="danger" role="alert" data-testid="submission-fill-render-error">
           {renderError}

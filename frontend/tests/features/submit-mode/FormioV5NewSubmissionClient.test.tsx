@@ -38,7 +38,11 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
-    general: { sessionExpired: 'Your session has ended.', noAccess: 'You do not have access.' },
+    general: {
+      sessionExpired: 'Your session has ended.',
+      noAccess: 'You do not have access.',
+      version: 'Version',
+    },
     form: { loading: 'Loading...' },
     apiErrors: {
       open_denied: 'You are not able to submit this form.',
@@ -265,6 +269,7 @@ describe('FormioV5NewSubmissionClient', () => {
     expect(h.getSubmitFormVersionSchema).toHaveBeenCalledWith(undefined, 'ver-1');
     expect(h.form).toEqual(schema);
     expect(h.options?.readOnly).toBe(false);
+    expect(screen.getByTestId('submission-fill-version')).toHaveTextContent('Version: 1');
     expect(h.openSobaFormSubmission).not.toHaveBeenCalled();
     expect(replaceState).not.toHaveBeenCalled();
   });
@@ -593,6 +598,7 @@ describe('FormioV5NewSubmissionClient', () => {
       await userEvent.click(screen.getByTestId('submission-fill-continue-updated'));
       await waitFor(() => expect(h.mounts).toBe(2));
       expect(h.form).toEqual(changed);
+      expect(screen.getByTestId('submission-fill-version')).toHaveTextContent('Version: 2');
       expect(screen.getByTestId('submission-fill-save-draft')).toBeInTheDocument();
     });
 

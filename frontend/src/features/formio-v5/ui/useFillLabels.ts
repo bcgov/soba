@@ -31,6 +31,7 @@ export function useFillLabels(): FillLabels {
       requestFailed: labels.requestFailed,
       formUpdated: labels.formUpdated,
       continueUpdated: labels.continueUpdated,
+      version: dict.general.version,
       errors: dict.apiErrors,
     };
   }, [dict]);

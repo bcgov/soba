@@ -13,6 +13,7 @@ export const SubmitFillBundleSchema = z.object({
   formId: z.string(),
   workflowState: z.string(),
   formVersionId: z.string(),
+  versionNo: z.number().int().nullable(),
   headRevisionId: z.string().nullable(),
   // The head revision's number, in append order over every revision.
   currentRevisionNo: z.number().int(),

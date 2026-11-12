@@ -142,6 +142,7 @@ describe('submit routes over one read', () => {
       formId: 'f1',
       workflowState: 'draft',
       formVersionId: 'v1',
+      versionNo: 3,
       headRevisionId: 'r1',
       currentRevisionNo: 1,
       role: 'owner',
