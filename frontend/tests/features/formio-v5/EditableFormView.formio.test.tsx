@@ -84,7 +84,7 @@ const typeIntoName = async (value: string) => {
 describe('EditableFormView on the real Form.io', () => {
   beforeAll(async () => {
     const { Formio } = await import('@formio/js');
-    const bcgov = (await import('formio-components@0.0.2')) as { default?: unknown };
+    const bcgov = (await import('formio-components@0.0.3')) as { default?: unknown };
     (Formio as unknown as { use: (plugin: unknown) => void }).use(bcgov.default ?? bcgov);
   });
 
