@@ -30,18 +30,23 @@ export async function getStaffPrintFacts(
   return parseJson(response);
 }
 
-/** The submission rendered with a template already on its form version. */
+/**
+ * The submission rendered with a template already on its form version. `data`, answers not saved
+ * yet, is for the submit surface only: the server prints them, marked unsaved, in place of the
+ * saved ones.
+ */
 export async function printWithStoredTemplate(
   surface: PrintSurface,
   token: string | undefined,
   submissionId: string,
   templateId: string,
   options: PrintOptions,
+  data?: Record<string, unknown>,
 ): Promise<Blob> {
   const response = await sobaFetch(`${submissionPath(surface, submissionId)}/print`, {
     token,
     method: 'POST',
-    json: { templateId, options },
+    json: data ? { templateId, options, data } : { templateId, options },
   });
   return parseBlob(response);
 }

@@ -105,6 +105,14 @@ export const PrintBodySchema = z.strictObject({
   options: PrintOptionsSchema.optional(),
 });
 
+/**
+ * A submitter's print. `data` is answers not saved yet: the server renders them, marked unsaved, in
+ * place of the saved ones.
+ */
+export const SubmitPrintBodySchema = PrintBodySchema.extend({
+  data: z.record(z.string(), z.unknown()).optional(),
+});
+
 /** What a submitter's Print reads: the stored template, if any, and whether a backend can render. */
 export const SubmissionPrintFactsSchema = z.object({
   items: z.array(z.object({ id: z.uuid() })),
@@ -133,5 +141,6 @@ export type TemplateResponse = z.infer<typeof TemplateResponseSchema>;
 export type TemplateListResponse = z.infer<typeof TemplateListResponseSchema>;
 export type PrintOptions = z.infer<typeof PrintOptionsSchema>;
 export type PrintBody = z.infer<typeof PrintBodySchema>;
+export type SubmitPrintBody = z.infer<typeof SubmitPrintBodySchema>;
 export type SubmissionPrintFacts = z.infer<typeof SubmissionPrintFactsSchema>;
 export type StaffPrintFacts = z.infer<typeof StaffPrintFactsSchema>;

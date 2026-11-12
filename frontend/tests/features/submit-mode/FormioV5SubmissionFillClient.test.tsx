@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { SWRConfig, useSWRConfig } from 'swr';
@@ -23,6 +23,8 @@ const h = vi.hoisted(() => ({
   onSubmit: undefined as
     | undefined
     | ((submission: { data: Record<string, unknown> }) => Promise<void>),
+  onChange: undefined as undefined | ((value: unknown, flags: unknown, modified: boolean) => void),
+  printSources: [] as Array<{ opened: boolean; answers?: () => unknown }>,
   options: undefined as undefined | { readOnly?: boolean; bcgovFile?: unknown },
   submission: undefined as unknown,
   mounts: 0,
@@ -50,6 +52,9 @@ vi.mock('@/app/[lang]/Providers', () => ({
           fileNameColumn: 'File Name',
           uploadDateColumn: 'Upload Date',
           failed: 'Failed to generate the document.',
+          printedAt: 'Printed {time}',
+          unsavedMark: 'Not saved',
+          draftMark: 'Draft',
         },
       },
     },
@@ -105,22 +110,23 @@ vi.mock('@/src/shared/api/useAccessCaller', () => ({
 }));
 
 vi.mock('@/src/features/templates/data/useSubmissionPrint', () => ({
-  useSubmitterPrint: () => ({
-    choice: null,
-    printTemplate: vi.fn(),
-    staff: null,
-  }),
+  useSubmitterPrint: (_submissionId: string, source: (typeof h.printSources)[number]) => {
+    h.printSources.push(source);
+    return { choice: null, printTemplate: vi.fn(), staff: null };
+  },
 }));
 
 vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => {
   // Like @formio/react: onFormReady once, when the webform is built.
   function MockDynamicForm(props: {
     onSubmit: typeof h.onSubmit;
+    onChange?: typeof h.onChange;
     options: typeof h.options;
     submission: unknown;
     onFormReady?: (instance: unknown) => void;
   }) {
     h.onSubmit = props.onSubmit;
+    h.onChange = props.onChange;
     h.options = props.options;
     h.submission = props.submission;
     const { onFormReady } = props;
@@ -177,6 +183,7 @@ describe('FormioV5SubmissionFillClient', () => {
     vi.clearAllMocks();
     store = makeStore();
     h.formData = {};
+    h.printSources = [];
     h.mounts = 0;
     h.access = { caller: { idpCode: 'idir' }, pending: false };
     h.files = { option: {}, ready: true };
@@ -225,6 +232,63 @@ describe('FormioV5SubmissionFillClient', () => {
     await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
     expect(h.options?.readOnly).toBe(false);
     expect(screen.queryByTestId('submission-fill-readonly')).not.toBeInTheDocument();
+  });
+
+  describe('print', () => {
+    const draft = (form = facts.form) => ({
+      workflowState: 'draft',
+      formVersionId: 'ver-1',
+      headRevisionId: 'rev-1',
+      schema: { components: [] },
+      content: { data: { name: 'Ada' } },
+      ...facts,
+      form,
+    });
+    const watermark = () => screen.getByTestId('print-watermark');
+    const answers = () => h.printSources.at(-1)?.answers?.();
+    const renderForm = async () => {
+      await renderSignedOut();
+      await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+    };
+
+    it('prints a loaded draft as a draft, and as not saved once the user edits it', async () => {
+      h.getSubmitFillBundle.mockResolvedValue(draft());
+      await renderForm();
+      expect(h.printSources.at(-1)?.opened).toBe(true);
+      expect(watermark()).toHaveTextContent('Draft');
+      expect(answers()).toBeUndefined();
+      h.formData = { name: 'Ada Lovelace' };
+      act(() => h.onChange!({ data: h.formData }, {}, true));
+      expect(watermark()).toHaveTextContent('Not saved');
+      expect(answers()).toEqual({ name: 'Ada Lovelace' });
+    });
+
+    it('prints a submission with nothing saved as not saved, sending its answers', async () => {
+      h.formData = { name: 'Typed' };
+      await renderForm();
+      expect(watermark()).toHaveTextContent('Not saved');
+      expect(answers()).toEqual({ name: 'Typed' });
+    });
+
+    it('sends no answers for a caller who may only read, though nothing is saved', async () => {
+      h.formData = { name: 'Typed' };
+      h.getSubmitFillBundle.mockResolvedValue({
+        ...draft({ ...facts.form, permissions: [] }),
+        content: null,
+      });
+      await renderForm();
+      expect(answers()).toBeUndefined();
+    });
+
+    it('counts no edit and sends no answers when the caller may only read', async () => {
+      h.getSubmitFillBundle.mockResolvedValue(draft({ ...facts.form, permissions: [] }));
+      await renderForm();
+      fireEvent.pointerDown(screen.getByTestId('fill-form'));
+      fireEvent.input(screen.getByTestId('fill-form'));
+      act(() => h.onChange!({ data: { name: 'Changed by Form.io' } }, {}, true));
+      expect(watermark()).toHaveTextContent('Draft');
+      expect(answers()).toBeUndefined();
+    });
   });
 
   it('renders the form read-only, with a notice, when the caller may only read', async () => {

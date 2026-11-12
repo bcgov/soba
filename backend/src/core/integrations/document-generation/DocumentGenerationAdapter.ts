@@ -1,3 +1,4 @@
+import type { PrintStatusCode } from '@soba/lib';
 import type { TemplateFileType } from './templateFileType';
 
 /** Result of a document-generation readiness check; exposes no config or credentials. */
@@ -12,10 +13,22 @@ export interface DocumentRenderResult {
   contentType?: string;
 }
 
+/** Facts about the print that a template can show next to the answers. */
+export interface PrintContext {
+  status: PrintStatusCode;
+  /** ISO 8601. */
+  printedAt: string;
+  /** Null until the submission is confirmed, and for unsaved answers. */
+  confirmationCode: string | null;
+  /** The saved revision printed; null for unsaved answers. */
+  revisionNo: number | null;
+}
+
 /** A document to render: the template file, the answer data it renders, and backend options. */
 export interface DocumentRenderRequest {
   template: { content: Buffer; fileType: TemplateFileType };
   data: Record<string, unknown>;
+  context: PrintContext;
   /** Backend-specific render options, passed through unchanged. */
   options: Record<string, unknown>;
 }

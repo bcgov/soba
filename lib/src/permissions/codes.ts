@@ -57,6 +57,17 @@ export const PrintChoice = {
 } as const;
 export type PrintChoiceCode = (typeof PrintChoice)[keyof typeof PrintChoice];
 
+/** Which answers a printed document shows. */
+export const PrintStatus = {
+  /** Answers on screen that are not the saved ones. */
+  unsaved: 'unsaved',
+  /** The saved answers of a submission not yet submitted. */
+  draft: 'draft',
+  /** The saved answers of a submitted submission. */
+  submitted: 'submitted',
+} as const;
+export type PrintStatusCode = (typeof PrintStatus)[keyof typeof PrintStatus];
+
 /** Provider code of the shared public user that anonymous callers resolve to. */
 export const PUBLIC_PROVIDER_CODE = 'public';
 

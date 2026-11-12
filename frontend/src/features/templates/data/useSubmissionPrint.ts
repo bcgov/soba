@@ -49,7 +49,8 @@ export type SubmissionPrint = {
 
 type PrintFacts = { items: readonly { id: string }[]; renderAvailable: boolean };
 
-// The print choice reads this when the app has no template print or its facts failed.
+// The print choice reads this when the app has no template print, its facts failed, or the server
+// does not have the submission yet.
 const NO_TEMPLATE_PRINT: PrintFacts = { items: [], renderAvailable: false };
 const NO_PERMISSIONS: readonly string[] = [];
 
@@ -96,8 +97,21 @@ export function printChoiceFrom(read: {
 
 const NO_STORED_TEMPLATE = 'The form version has no stored template';
 
+/** What a page filling the submission tells its Print. */
+export type SubmitterPrintSource = {
+  /** The server has the submission; until it does, only the browser prints. */
+  opened: boolean;
+  /** The answers on screen when they are not saved, sent with a template print. */
+  answers?: () => Record<string, unknown> | undefined;
+};
+
+const OPENED: SubmitterPrintSource = { opened: true };
+
 /** Print on the submit surface, signed in or not. */
-export function useSubmitterPrint(submissionId: string, opened = true): SubmissionPrint {
+export function useSubmitterPrint(
+  submissionId: string,
+  { opened, answers }: SubmitterPrintSource = OPENED,
+): SubmissionPrint {
   const allowed = useTemplatePrintAllowed();
   const { token, initializing, initStarted } = useKeycloak();
   const { isSignedIn, tokenFor } = useCallToken();
@@ -120,14 +134,15 @@ export function useSubmitterPrint(submissionId: string, opened = true): Submissi
         submissionId,
         templateId,
         options,
+        answers?.(),
       );
     },
-    [isSignedIn, submissionId, templateId, tokenFor],
+    [answers, isSignedIn, submissionId, templateId, tokenFor],
   );
 
   const choice = printChoiceFrom({
     allowed,
-    facts: data,
+    facts: opened ? data : NO_TEMPLATE_PRINT,
     failed: !!error,
     permissions: NO_PERMISSIONS,
   });
