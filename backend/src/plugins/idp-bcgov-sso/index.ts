@@ -145,7 +145,7 @@ export const idpPluginDefinition: IdpPluginDefinition = {
           (req as Request & { idpPluginCode?: string }).idpPluginCode = 'bcgov-sso';
         }
         next();
-      });
+      }).catch(next);
     };
   },
 
