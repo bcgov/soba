@@ -79,6 +79,15 @@ async function fillNewKey(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('ApiKeyForm', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    session.token = 'token';
+    mockApi.listCredentials.mockResolvedValue(undefined);
+    mockApi.issueCredential.mockResolvedValue({ credential: saved, apiKey: 'shown-once' });
+    mockApi.regenerateCredential.mockResolvedValue({ credential: saved, apiKey: 'shown-again' });
+    mockApi.getCredential.mockResolvedValue(saved);
+  });
+
   it('sends a selected API permission when generating a key', async () => {
     const user = userEvent.setup();
     renderForm({ availablePermissions: ['submission_read'] });
@@ -114,15 +123,6 @@ describe('ApiKeyForm', () => {
         expect.objectContaining({ permissions: ['submission_read'] }),
       ),
     );
-  });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    session.token = 'token';
-    mockApi.listCredentials.mockResolvedValue(undefined);
-    mockApi.issueCredential.mockResolvedValue({ credential: saved, apiKey: 'shown-once' });
-    mockApi.regenerateCredential.mockResolvedValue({ credential: saved, apiKey: 'shown-again' });
-    mockApi.getCredential.mockResolvedValue(saved);
   });
 
   it('holds Save off until a key is generated, then shows the key once in a modal', async () => {
