@@ -16,7 +16,14 @@ const isDev = process.env.NODE_ENV === 'development';
 const pinoOptions: pino.LoggerOptions = {
   level: process.env.LOG_LEVEL ?? (isDev ? 'debug' : 'info'),
   redact: {
-    paths: ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]'],
+    paths: [
+      'req.headers.cookie',
+      'req.headers.authorization',
+      'req.headers["x-api-key"]',
+      'req.headers["x-soba-gateway-token"]',
+      'req.headers["gw-jwt"]',
+      'res.headers["set-cookie"]',
+    ],
     censor: '[REDACTED]',
   },
   mixin() {

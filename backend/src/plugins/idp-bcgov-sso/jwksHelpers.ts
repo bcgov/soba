@@ -1,13 +1,6 @@
 /**
- * JWKS/OIDC helpers for BC Gov SSO (RS256, JWKS URI).
- * Extracted from shared idp-base; used only by this plugin.
+ * Claim helpers specific to BC Gov SSO. Shared JWKS verification lives in core/auth/jwks.
  */
-
-import type { RequestHandler } from 'express';
-import { expressjwt as jwt } from 'express-jwt';
-import jwksRsa from 'jwks-rsa';
-import { getToken } from '../../core/auth/IdpPlugin';
-import { log } from '../../core/logging';
 
 export function firstString(
   claims: Record<string, unknown>,
@@ -61,33 +54,4 @@ export function sanitizeIdpAttributes(
     out[k] = v;
   }
   return out;
-}
-
-export interface JwksMiddlewareOptions {
-  jwksUri: string;
-  issuer: string;
-  audience?: string;
-  algorithms?: string[];
-}
-
-/**
- * Returns express-jwt middleware using JWKS for RS256 validation.
- */
-export function createJwksExpressMiddleware(options: JwksMiddlewareOptions): RequestHandler {
-  const { jwksUri, issuer, audience, algorithms = ['RS256'] } = options;
-  return jwt({
-    secret: jwksRsa.expressJwtSecret({
-      cache: true,
-      jwksUri,
-      handleSigningKeyError: (err, cb) => {
-        log.error({ err }, 'JWKS signing key error during authentication');
-        cb(new Error('Error occurred during authentication'));
-      },
-    }),
-    issuer,
-    audience,
-    algorithms: algorithms as ['RS256'],
-    requestProperty: 'decodedJwt',
-    getToken,
-  }) as RequestHandler;
 }

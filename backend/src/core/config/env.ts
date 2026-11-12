@@ -392,6 +392,40 @@ export function createEnvReader(source: EnvSource) {
 
 export type EnvReader = ReturnType<typeof createEnvReader>;
 
+export interface IntegrationGatewaySettings {
+  issuer: string;
+  jwksUri: string;
+  audience: string;
+  clientIdClaim: 'consumername' | 'consumerid';
+}
+
+/** Missing or invalid gateway configuration disables incoming integration authentication. */
+export const resolveIntegrationGatewaySettings = (
+  source: EnvSource,
+): IntegrationGatewaySettings | undefined => {
+  const issuer = getOptionalEnvFrom(source, 'INTEGRATION_GATEWAY_ISSUER')?.trim();
+  const jwksUri = getOptionalEnvFrom(source, 'INTEGRATION_GATEWAY_JWKS_URI')?.trim();
+  const audience = getOptionalEnvFrom(source, 'INTEGRATION_GATEWAY_AUDIENCE')?.trim();
+  const clientIdClaim =
+    getOptionalEnvFrom(source, 'INTEGRATION_GATEWAY_CLIENT_ID_CLAIM') ?? 'consumername';
+  if (
+    !issuer ||
+    !jwksUri ||
+    !audience ||
+    (clientIdClaim !== 'consumername' && clientIdClaim !== 'consumerid')
+  )
+    return undefined;
+  try {
+    for (const value of [issuer, jwksUri]) {
+      const url = new URL(value);
+      if (url.protocol !== 'https:' || url.username || url.password) return undefined;
+    }
+  } catch {
+    return undefined;
+  }
+  return { issuer, jwksUri, audience, clientIdClaim };
+};
+
 const getRequiredEnv = (key: string): string => getRequiredEnvFrom(process.env, key);
 const getOptionalEnv = (key: string): string | undefined => getOptionalEnvFrom(process.env, key);
 const getBooleanEnv = (key: string): boolean | undefined => getBooleanEnvFrom(process.env, key);
@@ -399,6 +433,7 @@ const getNumberEnv = (key: string): number | undefined => getNumberEnvFrom(proce
 const getCsvEnv = (key: string): string[] | undefined => getCsvEnvFrom(process.env, key);
 
 export const env = {
+  getIntegrationGatewaySettings: () => resolveIntegrationGatewaySettings(process.env),
   loadEnv,
   getRequiredEnv,
   getOptionalEnv,

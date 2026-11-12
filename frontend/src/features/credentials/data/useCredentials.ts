@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { API_KEY_SETTINGS_KEY } from '@soba/lib';
+import { API_KEY_SETTINGS_KEY, type CredentialPermission } from '@soba/lib';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { listReadConfig } from '@/src/shared/api/swrConfig';
 import { classifyDataError } from '@/src/shared/api/dataError';
@@ -18,7 +18,10 @@ import { listCredentials } from './api';
 export function useCredentials(
   owner: CredentialOwner,
   query: ListQueryArgs,
-): ListResult<CredentialMetadata> & { available: boolean | undefined } {
+): ListResult<CredentialMetadata> & {
+  available: boolean | undefined;
+  availablePermissions: CredentialPermission[];
+} {
   const locale = useSortLocale();
   const { data, isLoading, isValidating, error, mutate } = useAuthedSWR(
     [
@@ -44,6 +47,7 @@ export function useCredentials(
     rows,
     total: data?.page.total,
     available: data?.available,
+    availablePermissions: data?.availablePermissions ?? [],
     isLoading,
     isRefreshing: isValidating && data !== undefined,
     error: error ? classifyDataError(error) : null,

@@ -10,6 +10,14 @@ on:
       release:
         required: true
         type: string
+      ref:
+        description: Source ref used for the deployed backend
+        default: ""
+        type: string
+      integration_enabled:
+        description: Publish and authenticate the integration v2 service too
+        default: false
+        type: boolean
       gateway_hostname:
         description: Optional route hostname; PR and Dev use APS_GATEWAY_HOST_PREFIX with APS_HOST
         default: ""
@@ -29,6 +37,10 @@ on:
         description: Route hostname in the <name>.api.gov.bc.ca form (no scheme/path)
         required: true
         type: string
+      integration_enabled:
+        description: Also publish and verify the protected integration v2 service (backend JWT settings must already match)
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -41,7 +53,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     environment: ${{ inputs.environment }}
     env:
       RELEASE: ${{ inputs.release }}
@@ -53,12 +65,19 @@ jobs:
       APS_GATEWAY_HOST_PREFIX: ${{ vars.APS_GATEWAY_HOST_PREFIX }}
       GATEWAY_QUALIFIER: proxy-proof-${{ inputs.release }}
       GWA_SHA256: ${{ vars.GWA_LINUX_AMD64_SHA256 }}
+      INTEGRATIONS_ENABLED: ${{ inputs.integration_enabled }}
+      GATEWAY_ENVIRONMENT_APP_ID: ${{ vars.APS_ENVIRONMENT_APP_ID }}
+      GATEWAY_JWT_ISSUER: ${{ vars.APS_UPSTREAM_JWT_ISSUER || 'https://aps-jwks-upstream-jwt.api.gov.bc.ca' }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Validate settings and render gateway
         shell: bash
+        env:
+          APS_INTEGRATION_HEALTH_API_KEY: ${{ secrets.APS_INTEGRATION_HEALTH_API_KEY }}
         run: |
           set -euo pipefail
           # 49 leaves room for the -api-gov-bc-ca suffix in a 63-character DNS label.
@@ -106,6 +125,18 @@ jobs:
           node deployments/gateway/scripts/generate-gateway-config.mjs \
             --output "$RUNNER_TEMP/gateway-kong.yaml"
           cat "$RUNNER_TEMP/gateway-kong.yaml"
+          if [[ "$INTEGRATIONS_ENABLED" == true ]]; then
+            : "${GATEWAY_ENVIRONMENT_APP_ID:?Set APS_ENVIRONMENT_APP_ID in the selected GitHub environment}"
+            : "${APS_INTEGRATION_HEALTH_API_KEY:?Set APS_INTEGRATION_HEALTH_API_KEY to an approved CI API key}"
+            INTEGRATION_ROUTE_PATH="${GATEWAY_ROUTE_PATH}integrations/v2/"
+            echo "INTEGRATION_ROUTE_PATH=$INTEGRATION_ROUTE_PATH" >> "$GITHUB_ENV"
+            GATEWAY_QUALIFIER="integrations-${RELEASE}" \
+            GATEWAY_SERVICE_NAME="${RELEASE}-integrations-v2" \
+            GATEWAY_ROUTE_PATH="$INTEGRATION_ROUTE_PATH" \
+              node deployments/gateway/scripts/generate-gateway-config.mjs --integration \
+                --output "$RUNNER_TEMP/gateway-integrations.yaml"
+            cat "$RUNNER_TEMP/gateway-integrations.yaml"
+          fi
 
       - name: Install OpenShift CLI
         uses: redhat-actions/openshift-tools-installer@e3b32c2ab7b064b2ce189121c4a49f509a99a7b4 # v3.0
@@ -134,6 +165,13 @@ jobs:
           if ! oc get networkpolicy "${RELEASE}-aps" -n "$OPENSHIFT_NAMESPACE" > /dev/null; then
             echo "::error::NetworkPolicy ${RELEASE}-aps not found; enable gatewayNetworkPolicy in the release values"
             exit 1
+          fi
+          if [[ "$INTEGRATIONS_ENABLED" == true ]]; then
+            oc get configmap "${RELEASE}-backend-app" -n "$OPENSHIFT_NAMESPACE" -o json \
+              | jq -e --arg issuer "$GATEWAY_JWT_ISSUER" --arg audience "${RELEASE}-integrations-v2" '
+                .data.INTEGRATION_GATEWAY_ISSUER == $issuer
+                and .data.INTEGRATION_GATEWAY_AUDIENCE == $audience
+                and (.data.INTEGRATION_GATEWAY_JWKS_URI | type == "string" and length > 0)'
           fi
 
       - name: Install pinned GWA
@@ -182,6 +220,12 @@ jobs:
             --qualifier "$GATEWAY_QUALIFIER" --dry-run
           gwa publish-gateway gateway-kong.yaml \
             --qualifier "$GATEWAY_QUALIFIER"
+          if [[ "$INTEGRATIONS_ENABLED" == true ]]; then
+            gwa publish-gateway gateway-integrations.yaml \
+              --qualifier "integrations-${RELEASE}" --dry-run
+            gwa publish-gateway gateway-integrations.yaml \
+              --qualifier "integrations-${RELEASE}"
+          fi
 
       - name: Verify APS upstream and public health response
         shell: bash
@@ -204,6 +248,32 @@ jobs:
           done
           echo 'Gateway health verification failed; inspect status and NetworkPolicy.' >&2
           cat "$RUNNER_TEMP/gateway-status.json"
+          exit 1
+
+      - name: Verify protected integration health through APS
+        if: ${{ inputs.integration_enabled }}
+        shell: bash
+        env:
+          APS_INTEGRATION_HEALTH_API_KEY: ${{ secrets.APS_INTEGRATION_HEALTH_API_KEY }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            if gwa status --json > "$RUNNER_TEMP/integration-status.json" \
+              && INTEGRATION_HOST=$(jq -er --arg name "${RELEASE}-integrations-v2" '
+                [.[] | select(.name == $name and .status == "UP") | .env_host
+                  | select(type == "string" and length > 0)] | unique
+                | if length == 1 then .[0] else error("Expected one hostname for the integration service") end
+              ' "$RUNNER_TEMP/integration-status.json") \
+              && GATEWAY_HOSTNAME="$INTEGRATION_HOST" node deployments/gateway/scripts/verify-integration-health.mjs; then
+              printf 'Integration health: https://%s%shealth (API key + ACL + upstream JWT verified)\n' \
+                "$INTEGRATION_HOST" "$INTEGRATION_ROUTE_PATH" >> "$GITHUB_STEP_SUMMARY"
+              printf 'Integration identity: https://%s%sme (requires a key issued in this PR)\n' \
+                "$INTEGRATION_HOST" "$INTEGRATION_ROUTE_PATH" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo '::error::Protected integration health failed; check API key approval, ACL, issuer, JWKS and audience.'
           exit 1
 
       - name: Remove local GWA credentials
