@@ -4,6 +4,7 @@ const bundle = {
   formId: 'f1',
   workflowState: 'draft',
   formVersionId: 'v1',
+  versionNo: 3,
   headRevisionId: 'r1',
   currentRevisionNo: 1,
   role: 'owner',
@@ -38,9 +39,12 @@ describe('SubmitFillBundleSchema', () => {
     );
   });
 
-  it.each(['formId', 'currentRevisionNo', 'role', 'form'] as const)('requires %s', (field) => {
-    expect(SubmitFillBundleSchema.safeParse(without(bundle, field)).success).toBe(false);
-  });
+  it.each(['formId', 'versionNo', 'currentRevisionNo', 'role', 'form'] as const)(
+    'requires %s',
+    (field) => {
+      expect(SubmitFillBundleSchema.safeParse(without(bundle, field)).success).toBe(false);
+    },
+  );
 
   it.each([
     ['no role', null],
