@@ -1181,6 +1181,9 @@
     "WLRS": "Water, Land and Resource Stewardship (WLRS)"
   },
   "apiKeys": {
+    "permissions": "API permissions",
+    "permissionsHelp": "Choose permissions you currently hold in this workspace or form. No permissions are granted by default. Access also depends on the key creator’s current form permissions.",
+    "readSubmissions": "Read and export submissions",
     "heading": "API Keys",
     "workspaceScope": "API keys that belong to this workspace. Each form's own keys are managed in that form's Settings.",
     "formScope": "API keys for this form. Workspace keys are listed for reference and are managed in Workspace Form Settings.",

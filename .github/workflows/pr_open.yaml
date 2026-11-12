@@ -214,6 +214,8 @@ jobs:
           PR_NUM: ${{ needs.set-vars.outputs.PR_NUM }}
           FRONTEND_HOST: ${{ needs.set-vars.outputs.FRONTEND_HOST }}
           APS_PR_ENABLED: ${{ vars.APS_PR_ENABLED == 'true' }}
+          APS_UPSTREAM_JWT_ISSUER: ${{ vars.APS_UPSTREAM_JWT_ISSUER || 'https://aps-jwks-upstream-jwt.api.gov.bc.ca' }}
+          APS_UPSTREAM_JWKS_URI: ${{ vars.APS_UPSTREAM_JWKS_URI || 'https://aps-jwks-upstream-jwt.api.gov.bc.ca/certs' }}
           VAULT_AUTH_PATH: ${{ vars.VAULT_AUTH_PATH }}
           VAULT_NAMESPACE: ${{ vars.VAULT_NAMESPACE }}
           VAULT_ROLE: ${{ vars.VAULT_ROLE_NONPROD }}
@@ -284,6 +286,15 @@ jobs:
           OVERRIDE
 
           # Pipeline performance fix: Revert if needed.
+          INTEGRATION_VALUES=()
+          if [[ "$APS_PR_ENABLED" == true ]]; then
+            INTEGRATION_VALUES+=(
+              --set-string "backend.integrationGateway.issuer=${APS_UPSTREAM_JWT_ISSUER}"
+              --set-string "backend.integrationGateway.jwksUri=${APS_UPSTREAM_JWKS_URI}"
+              --set-string "backend.integrationGateway.audience=${RELEASE}-integrations-v2"
+              --set-string "backend.integrationGateway.clientIdClaim=consumername"
+            )
+          fi
           helm upgrade --install "${RELEASE}" ./deployments/helm/soba \
             --namespace "${NAMESPACE}" \
             --wait \
@@ -291,6 +302,7 @@ jobs:
             --timeout 660s \
             -f deployments/helm/soba/values-pr.yaml \
             -f /tmp/values-override.yaml \
+            "${INTEGRATION_VALUES[@]}" \
             --set-string "vault.authPath=${VAULT_AUTH_PATH}" \
             --set-string "vault.namespace=${VAULT_NAMESPACE}" \
             --set-string "vault.role=${VAULT_ROLE}" \
@@ -333,6 +345,8 @@ jobs:
     with:
       environment: pr
       release: soba-${{ needs.set-vars.outputs.JOB_NAME }}
+      ref: ${{ needs.set-vars.outputs.ref }}
+      integration_enabled: true
     secrets: inherit
 
   Tests:
