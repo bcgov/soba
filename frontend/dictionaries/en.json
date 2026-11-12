@@ -523,6 +523,11 @@
     }
   },
   "form": {
+    "deleteTitle": "Delete form",
+    "delete": "Delete",
+    "deleteMessage": "Delete \"{name}\"? The form will no longer be available, including through shared links. Its submissions will no longer be available to staff or submitters. This cannot be undone.",
+    "deleteSuccess": "Form deleted successfully.",
+    "deleteError": "Failed to delete the form.",
     "saved": "Form saved successfully.",
     "saveError": "Error saving form.",
     "versionConflict": "This form changed since you opened it. Save your edits as a new version, or discard them.",
@@ -574,6 +579,7 @@
     "formPreview": "Form Preview",
     "untitledForm": "Untitled Form",
     "closePreview": "Close Preview",
+    "previewSubmissionDisabled": "Submission during a preview is disabled.",
     "noFormLayout": "No form layout designed yet.",
     "createForm": "Create Form",
     "status": "Status",
@@ -814,7 +820,6 @@
     "export": {
       "button": "Export submissions",
       "pageTitle": "Export submissions",
-      "sampleNotice": "The CSV formats are not applied yet.",
       "back": "Back to submissions",
       "loadError": "Could not load the form.",
       "fieldsError": "Could not load the fields.",
