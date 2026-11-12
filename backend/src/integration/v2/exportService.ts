@@ -15,6 +15,7 @@ export interface IntegrationExportOptions {
   format: SubmissionExportFormat;
   fields?: string[];
   signal: AbortSignal;
+  maxBytes: number;
   /** Missing engine documents are skipped, as in the designer export. */
   onUnread: (count: number) => void;
 }
@@ -49,6 +50,8 @@ export const integrationExportService = {
       content: format.serialize(rows, {
         fields: options.fields ?? exportFieldNames(schemas),
         schemas,
+        signal: options.signal,
+        maxBytes: options.maxBytes,
       }),
     };
   },

@@ -2,7 +2,12 @@ jest.mock('../../../src/core/db/repos/submissionExportRepo', () => ({
   isVersionOfForm: jest.fn(),
 }));
 jest.mock('../../../src/features/submission-export/engineSource', () => ({
-  exportSchemas: jest.fn().mockResolvedValue([]),
+  exportSchemas: jest.fn().mockResolvedValue([
+    {
+      versionId: 'v1',
+      schema: { components: [{ key: 'answer', type: 'textfield', input: true }] },
+    },
+  ]),
   formAnswerReader: jest.fn().mockResolvedValue(jest.fn()),
   engineExportSource: jest.fn(),
 }));
@@ -19,6 +24,7 @@ const options = () => ({
   format: 'csv' as const,
   fields: ['answer'],
   signal: new AbortController().signal,
+  maxBytes: 1024,
   onUnread: jest.fn(),
 });
 
@@ -26,7 +32,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   (engineExportSource as jest.Mock).mockReturnValue({
     rows: async function* () {
-      yield { answers: { answer: 'hello, world' } };
+      yield { versionId: 'v1', answers: { answer: 'hello, world' } };
     },
   });
 });
@@ -36,7 +42,7 @@ it('streams CSV using the existing serializer and selected fields', async () => 
   let text = '';
   for await (const chunk of result.content) text += chunk;
   expect(result.contentType).toBe('text/csv');
-  expect(text).toBe('answer\r\n"hello, world"\r\n');
+  expect(text).toBe('\uFEFFanswer\r\n"hello, world"\r\n');
 });
 
 it('rejects a version from another form before opening the source', async () => {
@@ -45,6 +51,13 @@ it('rejects a version from another form before opening the source', async () => 
     integrationExportService.open({ ...bounds, formVersionId: 'other-version' }, options()),
   ).rejects.toThrow('That version is not one of this form');
   expect(engineExportSource).not.toHaveBeenCalled();
+});
+
+it('enforces the caller size limit while serializing', async () => {
+  const result = await integrationExportService.open(bounds, { ...options(), maxBytes: 1 });
+  await expect(async () => {
+    for await (const chunk of result.content) void chunk;
+  }).rejects.toThrow();
 });
 
 it('stops an aborted request before opening the source', async () => {
