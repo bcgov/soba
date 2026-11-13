@@ -141,6 +141,14 @@ describe('POST /:id/print', () => {
     expect(res.status).toBe(403);
     expect(service.print).not.toHaveBeenCalled();
   });
+
+  it('refuses answers sent with a staff print with 400', async () => {
+    const res = await request(app)
+      .post(`/submissions/${SUBMISSION}/print`)
+      .send({ templateId: TEMPLATE, data: { field: 'x' } });
+    expect(res.status).toBe(400);
+    expect(service.print).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /print-upload/:id', () => {

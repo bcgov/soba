@@ -1,5 +1,6 @@
 import {
   canDeleteSubmissionFile,
+  canPrintUnsavedAnswers,
   canReadSubmission,
   canRenderSubmission,
   canUploadSubmissionFile,
@@ -33,6 +34,8 @@ export const SubmitterOperation = {
   deleteFile: 'deleteFile',
   /** Render a document from a submission with a stored template: print, template list. */
   render: 'render',
+  /** Render answers not saved yet with a stored template. */
+  printUnsaved: 'printUnsaved',
   /** Delete the caller's own submission; the lifecycle limits it to one not yet submitted. */
   delete: 'delete',
   /** Send the caller's own submitted submission back to revise. */
@@ -57,6 +60,7 @@ const SUBMISSION_RULES: Record<
   upload: ({ access, form }, caller) => canUploadSubmissionFile(access, form, caller),
   deleteFile: ({ access, form }, caller) => canDeleteSubmissionFile(access, form, caller),
   render: ({ access, form }, caller) => canRenderSubmission(access, form, caller),
+  printUnsaved: ({ access, form }, caller) => canPrintUnsavedAnswers(access, form, caller),
   // The signed-in owner, whatever the state; the delete itself refuses a submitted submission.
   delete: ({ access }, caller) =>
     ownDeleteStatusOf(access, caller).status !== SubmissionChangeStatus.denied,

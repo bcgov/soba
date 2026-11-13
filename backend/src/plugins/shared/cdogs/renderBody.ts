@@ -21,13 +21,19 @@ const flattenAnswerData = (data: unknown): Payload => {
 };
 
 /**
- * Build the body posted to CDOGS: the template as base64, the flattened answer data, and the
- * options with `overwrite: true` so a cached template hash never 405s (v3/Carbone caches by content
- * hash; v2 ignores the flag). CDOGS-specific policy lives here, keeping the document-generation
- * service agnostic.
+ * Where templates read the print context: {d.$chefs.status}. Set after the answers, so an answer of
+ * that name cannot replace it.
+ */
+export const PRINT_CONTEXT_KEY = '$chefs';
+
+/**
+ * Build the body posted to CDOGS: the template as base64, the flattened answer data with the print
+ * context, and the options with `overwrite: true` so a cached template hash never 405s (v3/Carbone
+ * caches by content hash; v2 ignores the flag). CDOGS-specific policy lives here, keeping the
+ * document-generation service agnostic.
  */
 export const toCdogsRenderBody = (request: DocumentRenderRequest): Payload => ({
-  data: flattenAnswerData(request.data),
+  data: { ...flattenAnswerData(request.data), [PRINT_CONTEXT_KEY]: request.context },
   options: { ...request.options, overwrite: true },
   template: {
     content: request.template.content.toString('base64'),

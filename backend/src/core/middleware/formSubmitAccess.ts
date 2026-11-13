@@ -42,6 +42,7 @@ const DENIAL_MESSAGES: Record<SubmitterOperationCode, string> = {
   upload: CHANGE_DENIED,
   deleteFile: CHANGE_DENIED,
   render: 'Not authorized to generate this document',
+  printUnsaved: 'Not authorized to generate this document',
   delete: 'Not authorized to delete this submission',
   revise: 'Not authorized to revise this submission',
 };

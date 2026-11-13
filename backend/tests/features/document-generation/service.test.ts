@@ -86,7 +86,13 @@ const storedTemplate = {
 beforeEach(() => {
   jest.clearAllMocks();
   isLive.mockReturnValue(true);
-  getSubmissionRecordById.mockResolvedValue({ id: 's1', headRevisionId: 'rev-1' });
+  getSubmissionRecordById.mockResolvedValue({
+    id: 's1',
+    headRevisionId: 'rev-1',
+    workflowState: 'draft',
+    confirmationCode: 'ABC123',
+    currentRevisionNo: 2,
+  });
   readMock.mockImplementation(async () => {
     if (!isLive()) return null;
     const stored = storedSubmission({ role: (await holdsGrant()) ? 'owner' : null });
@@ -140,6 +146,7 @@ describe('documentGenerationService backend selection', () => {
       template: { content: Buffer.from('tpl bytes'), fileType: 'docx' },
       options: { reportName: 'r' },
       data: { data: { field: 'saved' } },
+      context: expect.objectContaining({ status: 'draft', revisionNo: 2 }),
     });
   });
 
@@ -213,6 +220,82 @@ describe('documentGenerationService.print', () => {
     const outcome = await print();
 
     expect(outcome.status).toBe('no-content');
+  });
+});
+
+describe('documentGenerationService.print with unsaved answers', () => {
+  const printSent = (data: Record<string, unknown>) =>
+    documentGenerationService.print(caller, { submissionId: 's1', templateId, data });
+
+  beforeEach(() => holdsGrant.mockResolvedValue(true));
+
+  it('renders the answers sent as unsaved, with no revision, without reading the saved ones', async () => {
+    const outcome = await printSent({ field: 'edited' });
+
+    expect(outcome).toMatchObject({ status: 'ok' });
+    expect(getContentMock).not.toHaveBeenCalled();
+    expect(renderMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { data: { field: 'edited' } },
+        context: expect.objectContaining({ status: 'unsaved', revisionNo: null }),
+      }),
+    );
+    expect(createAudit).toHaveBeenCalledWith(expect.objectContaining({ revisionId: null }));
+  });
+
+  it.each([
+    ['a submitted submission', { workflowState: 'submitted' }],
+    ['a caller who may print but not save', { form: { permissions: ['document_template_read'] } }],
+  ])('refuses answers sent for %s and renders nothing', async (_label, overrides) => {
+    readMock.mockImplementation(async () => {
+      const stored = storedSubmission(overrides);
+      return { ...stored, submission: { ...stored.submission, ...scope } };
+    });
+
+    const outcome = await printSent({ field: 'not on record' });
+
+    expect(outcome.status).toBe('denied');
+    expect(renderMock).not.toHaveBeenCalled();
+  });
+
+  it('prints the saved answers of a submitted submission when none are sent', async () => {
+    readMock.mockImplementation(async () => {
+      const stored = storedSubmission({ workflowState: 'submitted' });
+      return { ...stored, submission: { ...stored.submission, ...scope } };
+    });
+
+    expect(await print()).toMatchObject({ status: 'ok' });
+  });
+
+  it('renders the answers sent as unsaved though they equal the saved ones', async () => {
+    await printSent({ field: 'saved' });
+
+    expect(renderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ status: 'unsaved' }) }),
+    );
+  });
+
+  it('renders the saved answers as a draft, with their revision, when none are sent', async () => {
+    await print();
+
+    expect(renderMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { data: { field: 'saved' } },
+        context: expect.objectContaining({ status: 'draft', revisionNo: 2 }),
+      }),
+    );
+    expect(createAudit).toHaveBeenCalledWith(expect.objectContaining({ revisionId: 'rev-1' }));
+  });
+
+  it('renders the answers sent when the submission has none saved', async () => {
+    getContentMock.mockResolvedValue(null);
+
+    const outcome = await printSent({ field: 'typed' });
+
+    expect(outcome).toMatchObject({ status: 'ok' });
+    expect(renderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ status: 'unsaved' }) }),
+    );
   });
 });
 
@@ -353,6 +436,7 @@ describe('staffDocumentService.printUpload', () => {
       template: { content: Buffer.from('uploaded'), fileType: 'docx' },
       options,
       data: { data: { field: 'saved' } },
+      context: expect.objectContaining({ status: 'draft', revisionNo: 2 }),
     });
     expect(createAudit).toHaveBeenCalledWith(
       expect.objectContaining({

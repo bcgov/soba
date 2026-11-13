@@ -5,7 +5,7 @@ import { Features } from '../../core/db/codes';
 import { asyncHandler } from '../../core/api/shared/asyncHandler';
 import { validateRequest } from '../../core/api/shared/validation';
 import { listSubmissionTemplatesHandler, printDocumentHandler } from './controller';
-import { PrintBodySchema, SubmissionIdParamSchema } from './schema';
+import { SubmissionIdParamSchema, SubmitPrintBodySchema } from './schema';
 
 const router = express.Router();
 
@@ -21,11 +21,11 @@ router.get(
   asyncHandler(listSubmissionTemplatesHandler),
 );
 
-// print: render the submission's persisted data (read from the form engine).
+// print: render the submission's persisted data, or the answers sent, marked unsaved.
 router.post(
   '/:id/print',
   renderRateLimit,
-  validateRequest({ params: SubmissionIdParamSchema, body: PrintBodySchema }),
+  validateRequest({ params: SubmissionIdParamSchema, body: SubmitPrintBodySchema }),
   asyncHandler(printDocumentHandler),
 );
 

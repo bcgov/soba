@@ -675,7 +675,10 @@
         "storedOption": "Use default CDOGS template",
         "fileNameColumn": "File Name",
         "uploadDateColumn": "Upload Date",
-        "failed": "Failed to generate the document."
+        "failed": "Failed to generate the document.",
+        "printedAt": "Printed {time}",
+        "unsavedMark": "Not saved",
+        "draftMark": "Draft"
       }
     },
     "descriptionLabel": "Description",

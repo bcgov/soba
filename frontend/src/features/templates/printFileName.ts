@@ -7,6 +7,12 @@ const EXTENSION_BY_TYPE: Record<string, string> = {
   'text/html': 'html',
 };
 
+// A cut inside a surrogate pair leaves half a character, which the server refuses.
+const cutName = (name: string, max: number): string => {
+  const cut = name.slice(0, max);
+  return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
+};
+
 /** A printed submission's name: its form and confirmation code, or its id until it is submitted. */
 export function printBaseName(submission: {
   id: string;
@@ -17,12 +23,14 @@ export function printBaseName(submission: {
     .filter(Boolean)
     .join(' ');
   // Characters a file name cannot hold on Windows.
-  const cut = name
-    .replaceAll(/[\\/:*?"<>|]+/g, '-')
-    .trim()
-    .slice(0, PRINT_REPORT_NAME_MAX_LENGTH);
-  // A cut inside a surrogate pair leaves half a character, which the server refuses.
-  return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
+  return cutName(name.replaceAll(/[\\/:*?"<>|]+/g, '-').trim(), PRINT_REPORT_NAME_MAX_LENGTH);
+}
+
+/** The base name with a mark such as "Draft" after it, within the same length limit. */
+export function withPrintMark(baseName: string, mark: string | null): string {
+  if (!mark) return baseName;
+  const suffix = ` (${mark})`;
+  return `${cutName(baseName, PRINT_REPORT_NAME_MAX_LENGTH - suffix.length).trimEnd()}${suffix}`;
 }
 
 /** The base name with the extension the document's content type implies. */

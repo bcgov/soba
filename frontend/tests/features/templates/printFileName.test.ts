@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { printBaseName, printFileName } from '@/src/features/templates/printFileName';
+import {
+  printBaseName,
+  printFileName,
+  withPrintMark,
+} from '@/src/features/templates/printFileName';
 
 const ID = '01a0dc24-1f2e-7a3b-8c4d-5e6f7a8b9c0d';
 
@@ -33,6 +37,19 @@ describe('printBaseName', () => {
       confirmationCode: 'X1',
     });
     expect(name).toBe('x'.repeat(254));
+  });
+});
+
+describe('withPrintMark', () => {
+  it('puts the mark after the name, and leaves the name alone without one', () => {
+    expect(withPrintMark(`Permit ${ID}`, 'Not saved')).toBe(`Permit ${ID} (Not saved)`);
+    expect(withPrintMark(`Permit ${ID}`, null)).toBe(`Permit ${ID}`);
+  });
+
+  it('keeps the mark within the report name limit, cutting the name instead', () => {
+    const marked = withPrintMark('x'.repeat(255), 'Draft');
+    expect(marked).toHaveLength(255);
+    expect(marked.endsWith(' (Draft)')).toBe(true);
   });
 });
 

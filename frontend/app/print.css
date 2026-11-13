@@ -1,0 +1,27 @@
+/* Browser print: the page content without the controls, and the print marks. */
+
+@page {
+  margin: 1.5cm;
+}
+
+@media print {
+  /* Under the chrome, so it outranks Form.io's own display rules, which load after this file. */
+  .formio-v5-chrome .formio-component-button,
+  .formio-v5-chrome .formio-wizard-nav-container {
+    display: none;
+  }
+
+  .print-watermark {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    z-index: 1000;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    font-size: 6rem;
+    font-weight: 700;
+    color: #000;
+    opacity: 0.12;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+}

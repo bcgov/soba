@@ -212,6 +212,16 @@ export const canRenderSubmission = (
   canReadSubmission(submission) &&
   formAccessAllows(form, caller, Permissions.document_template_read);
 
+/** A render of answers not saved yet: only someone who could save them, while it can be edited. */
+export const canPrintUnsavedAnswers = (
+  submission: SubmissionAccessFacts,
+  form: FormAccessFacts,
+  caller: AccessCaller,
+): boolean =>
+  canRenderSubmission(submission, form, caller) &&
+  canWriteSubmission(submission, form, caller) &&
+  isSubmissionEditable(submission.workflowState);
+
 /** The caller deleting their own submission: the signed-in owner, then still in progress. */
 export const ownDeleteStatusOf = (
   submission: SubmissionAccessFacts,

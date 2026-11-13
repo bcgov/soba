@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { SWRConfig, useSWRConfig } from 'swr';
 import userEvent from '@testing-library/user-event';
@@ -26,6 +26,8 @@ const h = vi.hoisted(() => ({
   onSubmit: undefined as
     | undefined
     | ((submission: { data: Record<string, unknown> }) => Promise<void>),
+  onChange: undefined as undefined | ((value: unknown, flags: unknown, modified: boolean) => void),
+  printSources: [] as Array<{ opened: boolean; answers?: () => unknown }>,
   form: undefined as unknown,
   submission: undefined as unknown,
   options: undefined as undefined | { readOnly?: boolean },
@@ -39,7 +41,27 @@ const h = vi.hoisted(() => ({
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
     general: { sessionExpired: 'Your session has ended.', noAccess: 'You do not have access.' },
-    form: { loading: 'Loading...' },
+    form: {
+      loading: 'Loading...',
+      templates: {
+        print: {
+          button: 'Print',
+          modalTitle: 'Print Submission',
+          methodLabel: 'Print with',
+          browserOption: 'Browser print',
+          print: 'Print',
+          printing: 'Printing…',
+          uploadOption: 'Upload CDOGS template',
+          storedOption: 'Use default CDOGS template',
+          fileNameColumn: 'File Name',
+          uploadDateColumn: 'Upload Date',
+          failed: 'Failed to generate the document.',
+          printedAt: 'Printed {time}',
+          unsavedMark: 'Not saved',
+          draftMark: 'Draft',
+        },
+      },
+    },
     apiErrors: {
       open_denied: 'You are not able to submit this form.',
       not_published: 'This form is not accepting submissions.',
@@ -96,16 +118,25 @@ vi.mock('@/src/shared/api/useAccessCaller', () => ({
   useAccessCaller: () => h.access,
 }));
 
+vi.mock('@/src/features/templates/data/useSubmissionPrint', () => ({
+  useSubmitterPrint: (_submissionId: string, source: (typeof h.printSources)[number]) => {
+    h.printSources.push(source);
+    return { choice: null, printTemplate: vi.fn(), staff: null };
+  },
+}));
+
 vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => {
   function MockDynamicForm(props: {
     form: unknown;
     onSubmit: typeof h.onSubmit;
+    onChange?: typeof h.onChange;
     options: typeof h.options;
     submission: unknown;
     onFormReady?: (instance: unknown) => void;
   }) {
     h.form = props.form;
     h.onSubmit = props.onSubmit;
+    h.onChange = props.onChange;
     h.options = props.options;
     h.submission = props.submission;
     const { onFormReady } = props;
@@ -231,6 +262,7 @@ describe('FormioV5NewSubmissionClient', () => {
     vi.clearAllMocks();
     store = makeStore();
     h.formData = { name: 'Ada' };
+    h.printSources = [];
     h.mounts = 0;
     h.pathname = '/en/form/form-1';
     // The browser is at the start address, as the router reports it.
@@ -283,6 +315,142 @@ describe('FormioV5NewSubmissionClient', () => {
     expect(savedBody().baseRevisionId).toBe('rev-0');
     // The address becomes the fill page of the submission the open created.
     expect(replaceState).toHaveBeenCalledWith(null, '', `/en/submit/${openedId()}`);
+  });
+
+  describe('print', () => {
+    const lastSource = () => h.printSources.at(-1)!;
+    const watermark = () => screen.getByTestId('print-watermark').textContent;
+    const saveAndSettle = async () => {
+      const saves = h.saveSobaFormSubmission.mock.calls.length;
+      await userEvent.click(saveButton());
+      await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(saves + 1));
+      await waitFor(() => expect(saveButton()).toBeEnabled());
+    };
+    const edit = (data: Record<string, unknown>) =>
+      act(() => {
+        h.formData = data;
+        h.onChange!({ data }, {}, true);
+      });
+
+    it('prints from the browser, marked not saved, until a save opens the submission', async () => {
+      await renderLoaded();
+      expect(lastSource().opened).toBe(false);
+      expect(watermark()).toBe('Not saved');
+      await saveAndSettle();
+      expect(lastSource().opened).toBe(true);
+      expect(watermark()).toBe('Draft');
+    });
+
+    it('marks an edit not saved until a save holds it', async () => {
+      await renderLoaded();
+      await saveAndSettle();
+      await edit({ name: 'Ada Lovelace' });
+      expect(watermark()).toBe('Not saved');
+      await saveAndSettle();
+      expect(watermark()).toBe('Draft');
+    });
+
+    it('keeps an edit not saved when its save fails', async () => {
+      await renderLoaded();
+      await saveAndSettle();
+      await edit({ name: 'Ada Lovelace' });
+      h.saveSobaFormSubmission.mockRejectedValueOnce(
+        new NetworkError(new TypeError('Failed to fetch')),
+      );
+      await saveAndSettle();
+      expect(watermark()).toBe('Not saved');
+      expect(lastSource().opened).toBe(true);
+    });
+
+    it('keeps an edit made while a save is in flight not saved', async () => {
+      await renderLoaded();
+      let land: () => void = () => undefined;
+      h.saveSobaFormSubmission.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            land = () => resolve(written('rev-1'));
+          }),
+      );
+      await userEvent.click(saveButton());
+      await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(1));
+      await edit({ name: 'Ada Lovelace' });
+      await act(async () => land());
+      await waitFor(() => expect(saveButton()).toBeEnabled());
+      expect(watermark()).toBe('Not saved');
+    });
+
+    it('counts typing in the form at once, before Form.io reports the change', async () => {
+      await renderLoaded();
+      await saveAndSettle();
+      h.formData = { name: 'Typed' };
+      fireEvent.input(screen.getByTestId('fill-form'));
+      expect(watermark()).toBe('Not saved');
+      expect(lastSource().answers?.()).toEqual({ name: 'Typed' });
+    });
+
+    it('counts typing once, so a save right after it leaves nothing unsaved', async () => {
+      await renderLoaded();
+      await saveAndSettle();
+      h.formData = { name: 'Typed' };
+      fireEvent.input(screen.getByTestId('fill-form'));
+      await userEvent.click(saveButton());
+      // The change Form.io reports for that input, a moment after the save read the answers.
+      act(() => h.onChange!({ data: h.formData }, {}, true));
+      await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(saveButton()).toBeEnabled());
+      expect(watermark()).toBe('Draft');
+      expect(lastSource().answers?.()).toBeUndefined();
+    });
+
+    it('counts a change that comes well after the last input', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        await renderLoaded();
+        fireEvent.input(screen.getByTestId('fill-form'));
+        await saveAndSettle();
+        vi.setSystemTime(Date.now() + 2000);
+        act(() => h.onChange!({ data: { name: 'Picked' } }, {}, true));
+        expect(watermark()).toBe('Not saved');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('counts a change Form.io does not flag once the user has acted in the form', async () => {
+      await renderLoaded();
+      await saveAndSettle();
+      fireEvent.pointerDown(screen.getByTestId('fill-form'));
+      act(() => h.onChange!({ data: { name: 'Row removed' } }, {}, false));
+      expect(watermark()).toBe('Not saved');
+    });
+
+    it('does not count a change Form.io makes before the user acts', async () => {
+      await renderLoaded();
+      await saveAndSettle();
+      act(() => h.onChange!({ data: { name: 'Ada' } }, {}, false));
+      expect(watermark()).toBe('Draft');
+    });
+
+    it('gives a template print the answers on screen only while they are unsaved', async () => {
+      await renderLoaded();
+      await saveAndSettle();
+      // Taken before the edit: a print reads the answers when it runs, not when Print rendered.
+      const { answers } = lastSource();
+      expect(answers?.()).toBeUndefined();
+      await edit({ name: 'On screen' });
+      expect(answers?.()).toEqual({ name: 'On screen' });
+      await saveAndSettle();
+      expect(answers?.()).toBeUndefined();
+    });
+
+    it('offers Print, marked not saved, on a form without draft saves', async () => {
+      h.getSubmitForm.mockResolvedValue({ ...form, allowSubmitterDrafts: false });
+      await renderPage();
+      await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+      expect(screen.getByTestId('print-submission-button')).toBeInTheDocument();
+      expect(screen.queryByTestId('submission-fill-save-draft')).not.toBeInTheDocument();
+      expect(watermark()).toBe('Not saved');
+    });
   });
 
   it('opens on a submit without a save, then submits on the recorded head', async () => {
@@ -594,6 +762,30 @@ describe('FormioV5NewSubmissionClient', () => {
       await waitFor(() => expect(h.mounts).toBe(2));
       expect(h.form).toEqual(changed);
       expect(screen.getByTestId('submission-fill-save-draft')).toBeInTheDocument();
+    });
+
+    it('counts answers carried to the new version as unsaved until a save lands', async () => {
+      const changed = { components: [{ key: 'email', type: 'email' }] };
+      h.getSubmitFormVersionSchema.mockImplementation(async (_token: unknown, id: string) =>
+        id === 'ver-2' ? version(id, 'hash-2', changed) : version(id, 'hash-1'),
+      );
+      await renderLoaded();
+      await userEvent.click(saveButton());
+      await waitFor(() =>
+        expect(screen.getByTestId('submission-fill-form-updated')).toBeInTheDocument(),
+      );
+      await userEvent.click(screen.getByTestId('submission-fill-continue-updated'));
+      await waitFor(() => expect(h.mounts).toBe(2));
+      await waitFor(() => expect(saveButton()).toBeEnabled());
+      h.saveSobaFormSubmission.mockRejectedValueOnce(
+        new NetworkError(new TypeError('Failed to fetch')),
+      );
+      await userEvent.click(saveButton());
+      await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(saveButton()).toBeEnabled());
+      expect(h.printSources.at(-1)?.opened).toBe(true);
+      expect(screen.getByTestId('print-watermark')).toHaveTextContent('Not saved');
+      expect(h.printSources.at(-1)?.answers?.()).toEqual(h.formData);
     });
 
     it('tries the version it last sent first, where an open whose answer was lost landed', async () => {

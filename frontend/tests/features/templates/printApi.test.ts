@@ -30,6 +30,21 @@ describe('printApi', () => {
     expect(JSON.parse(init.body)).toEqual({ templateId: 't1', options: { convertTo: 'pdf' } });
   });
 
+  it('sends unsaved answers with a stored template print, and only when given', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => documentResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    await printWithStoredTemplate('submit', undefined, 's1', 't1', {}, { name: 'Ada' });
+    await printWithStoredTemplate('submit', undefined, 's1', 't1', {});
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      templateId: 't1',
+      options: {},
+      data: { name: 'Ada' },
+    });
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ templateId: 't1', options: {} });
+  });
+
   it('returns the rendered document from an uploaded template', async () => {
     const fetchMock = vi.fn().mockResolvedValue(documentResponse());
     vi.stubGlobal('fetch', fetchMock);

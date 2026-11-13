@@ -676,7 +676,10 @@
         "storedOption": "Utiliser le modèle CDOGS par défaut",
         "fileNameColumn": "Nom du fichier",
         "uploadDateColumn": "Date de téléversement",
-        "failed": "Échec de la génération du document."
+        "failed": "Échec de la génération du document.",
+        "printedAt": "Imprimé le {time}",
+        "unsavedMark": "Non enregistré",
+        "draftMark": "Brouillon"
       }
     },
     "descriptionLabel": "Description du Formulaire",

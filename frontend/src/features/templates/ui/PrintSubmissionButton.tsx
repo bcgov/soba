@@ -5,24 +5,35 @@ import { Button } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useDataErrorNotice } from '@/src/shared/api/useDataErrorNotice';
 import { saveBlob } from '@/src/shared/util/saveBlob';
-import { PrintChoice } from '@/src/types/templates';
+import { PrintChoice, type PrintStatusCode } from '@/src/types/templates';
 import type { SubmissionPrint } from '../data/useSubmissionPrint';
 import { printFailureMessages } from '../printError';
-import { printFileName } from '../printFileName';
+import { printFileName, withPrintMark } from '../printFileName';
+import { printMarkOf } from '../printMark';
 import { StaffPrintDialog } from './StaffPrintDialog';
 
 type PrintSubmissionButtonProps = {
   print: SubmissionPrint;
   /** The download's name, without an extension. */
   baseName: string;
+  /** What the answers printed are; the download's name carries the mark for those not submitted. */
+  status?: PrintStatusCode;
 };
 
 /**
  * Prints a submission the way its print choice says: the browser's print, a PDF of the stored
  * template, or the staff options.
  */
-export function PrintSubmissionButton({ print, baseName }: Readonly<PrintSubmissionButtonProps>) {
+export function PrintSubmissionButton({
+  print,
+  baseName: unmarkedName,
+  status,
+}: Readonly<PrintSubmissionButtonProps>) {
   const dict = useDictionary();
+  const baseName = withPrintMark(
+    unmarkedName,
+    status ? printMarkOf(status, dict.form.templates.print) : null,
+  );
   const notifyError = useDataErrorNotice();
   const [rendering, setRendering] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
