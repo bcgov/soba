@@ -347,6 +347,8 @@ jobs:
       release: soba-${{ needs.set-vars.outputs.JOB_NAME }}
       ref: ${{ needs.set-vars.outputs.ref }}
       integration_enabled: true
+      # Temporarily verify with a manually approved key after deployment.
+      integration_health_check: false
     secrets: inherit
 
   Tests:

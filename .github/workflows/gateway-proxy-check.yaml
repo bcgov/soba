@@ -14,6 +14,10 @@ on:
         description: Source ref used for the deployed backend
         default: ""
         type: string
+      integration_health_check:
+        description: Verify protected integration health with an approved CI API key
+        default: true
+        type: boolean
       integration_enabled:
         description: Publish and authenticate the integration v2 service too
         default: false
@@ -37,6 +41,10 @@ on:
         description: Route hostname in the <name>.api.gov.bc.ca form (no scheme/path)
         required: true
         type: string
+      integration_health_check:
+        description: Verify protected integration health with an approved CI API key
+        default: true
+        type: boolean
       integration_enabled:
         description: Also publish and verify the protected integration v2 service (backend JWT settings must already match)
         default: false
@@ -163,11 +171,8 @@ jobs:
       - name: Read Vault app ID and render integration gateway
         if: ${{ inputs.integration_enabled }}
         shell: bash
-        env:
-          APS_INTEGRATION_HEALTH_API_KEY: ${{ secrets.APS_INTEGRATION_HEALTH_API_KEY }}
         run: |
           set -euo pipefail
-          : "${APS_INTEGRATION_HEALTH_API_KEY:?Set APS_INTEGRATION_HEALTH_API_KEY to an approved CI API key}"
           # Reuse the backend's Vault injection (PR deployments use dev's Vault secret).
           # Print only the app ID; the injected file also contains issuer credentials.
           GATEWAY_ENVIRONMENT_APP_ID=$(oc exec "deployment/${RELEASE}-backend" \
@@ -265,12 +270,13 @@ jobs:
           exit 1
 
       - name: Verify protected integration health through APS
-        if: ${{ inputs.integration_enabled }}
+        if: ${{ inputs.integration_enabled && inputs.integration_health_check }}
         shell: bash
         env:
           APS_INTEGRATION_HEALTH_API_KEY: ${{ secrets.APS_INTEGRATION_HEALTH_API_KEY }}
         run: |
           set -euo pipefail
+          : "${APS_INTEGRATION_HEALTH_API_KEY:?Set APS_INTEGRATION_HEALTH_API_KEY to an approved CI API key}"
           for attempt in {1..12}; do
             if gwa status --json > "$RUNNER_TEMP/integration-status.json" \
               && INTEGRATION_HOST=$(jq -er --arg name "${RELEASE}-integrations-v2" '
@@ -289,6 +295,17 @@ jobs:
           done
           echo '::error::Protected integration health failed; check API key approval, ACL, issuer, JWKS and audience.'
           exit 1
+
+      - name: Record manual integration checks
+        if: ${{ inputs.integration_enabled && !inputs.integration_health_check }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'Authenticated integration health check skipped; manual verification required.' >> "$GITHUB_STEP_SUMMARY"
+          printf 'Integration health: https://%s%shealth (requires an approved API key)\n' \
+            "$GATEWAY_HOSTNAME" "$INTEGRATION_ROUTE_PATH" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Integration identity: https://%s%sme (requires a key issued in this PR)\n' \
+            "$GATEWAY_HOSTNAME" "$INTEGRATION_ROUTE_PATH" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Remove local GWA credentials
         if: always()
