@@ -49,11 +49,16 @@ integration service after deploying the backend. For PR 123 the integration serv
 both qualifiers under the same per-release gateway lock. The gateway job checks out the PR source
 ref so the rendered configuration matches the deployed feature code.
 
+The gateway job reads `PLUGIN_APS_CREDENTIAL_ISSUER_V3_ENVIRONMENT_APP_ID` from the deployed
+backend's Vault-injected `/vault/secrets/soba-aps-credential-issuer` file using OpenShift exec.
+PR deployments use dev's Vault secret, so the ACL and API key issuer share the same appId.
+The OpenShift CI account needs permission to exec into the backend container.
+No GitHub `APS_ENVIRONMENT_APP_ID` variable is needed.
+
 Configure the `pr` GitHub environment (or inherited repository settings):
 
 | Kind | Name | Purpose |
 | --- | --- | --- |
-| Variable | `APS_ENVIRONMENT_APP_ID` | Product Environment appId for the integration ACL; must match the environment used by the backend's APS credential issuer |
 | Secret | `APS_INTEGRATION_HEALTH_API_KEY` | Dedicated CI API key approved for that Product Environment; never a GWA management client secret |
 | Variable, optional | `APS_UPSTREAM_JWT_ISSUER` | Defaults to `https://aps-jwks-upstream-jwt.api.gov.bc.ca` |
 | Variable, optional | `APS_UPSTREAM_JWKS_URI` | Defaults to `https://aps-jwks-upstream-jwt.api.gov.bc.ca/certs` |

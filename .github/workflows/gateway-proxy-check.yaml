@@ -66,7 +66,6 @@ jobs:
       GATEWAY_QUALIFIER: proxy-proof-${{ inputs.release }}
       GWA_SHA256: ${{ vars.GWA_LINUX_AMD64_SHA256 }}
       INTEGRATIONS_ENABLED: ${{ inputs.integration_enabled }}
-      GATEWAY_ENVIRONMENT_APP_ID: ${{ vars.APS_ENVIRONMENT_APP_ID }}
       GATEWAY_JWT_ISSUER: ${{ vars.APS_UPSTREAM_JWT_ISSUER || 'https://aps-jwks-upstream-jwt.api.gov.bc.ca' }}
     steps:
       - name: Checkout
@@ -76,8 +75,6 @@ jobs:
 
       - name: Validate settings and render gateway
         shell: bash
-        env:
-          APS_INTEGRATION_HEALTH_API_KEY: ${{ secrets.APS_INTEGRATION_HEALTH_API_KEY }}
         run: |
           set -euo pipefail
           # 49 leaves room for the -api-gov-bc-ca suffix in a 63-character DNS label.
@@ -120,23 +117,12 @@ jobs:
             export GATEWAY_ROUTE_PATH="/pr/${BASH_REMATCH[1]}/"
           fi
           echo "GATEWAY_ROUTE_PATH=$GATEWAY_ROUTE_PATH" >> "$GITHUB_ENV"
+          echo "GATEWAY_HOSTNAME=$GATEWAY_HOSTNAME" >> "$GITHUB_ENV"
           export GATEWAY_SERVICE_NAME="soba-${GATEWAY_QUALIFIER}"
           export BACKEND_HOST="${RELEASE}-backend.${OPENSHIFT_NAMESPACE}.svc"
           node deployments/gateway/scripts/generate-gateway-config.mjs \
             --output "$RUNNER_TEMP/gateway-kong.yaml"
           cat "$RUNNER_TEMP/gateway-kong.yaml"
-          if [[ "$INTEGRATIONS_ENABLED" == true ]]; then
-            : "${GATEWAY_ENVIRONMENT_APP_ID:?Set APS_ENVIRONMENT_APP_ID in the selected GitHub environment}"
-            : "${APS_INTEGRATION_HEALTH_API_KEY:?Set APS_INTEGRATION_HEALTH_API_KEY to an approved CI API key}"
-            INTEGRATION_ROUTE_PATH="${GATEWAY_ROUTE_PATH}integrations/v2/"
-            echo "INTEGRATION_ROUTE_PATH=$INTEGRATION_ROUTE_PATH" >> "$GITHUB_ENV"
-            GATEWAY_QUALIFIER="integrations-${RELEASE}" \
-            GATEWAY_SERVICE_NAME="${RELEASE}-integrations-v2" \
-            GATEWAY_ROUTE_PATH="$INTEGRATION_ROUTE_PATH" \
-              node deployments/gateway/scripts/generate-gateway-config.mjs --integration \
-                --output "$RUNNER_TEMP/gateway-integrations.yaml"
-            cat "$RUNNER_TEMP/gateway-integrations.yaml"
-          fi
 
       - name: Install OpenShift CLI
         uses: redhat-actions/openshift-tools-installer@e3b32c2ab7b064b2ce189121c4a49f509a99a7b4 # v3.0
@@ -173,6 +159,34 @@ jobs:
                 and .data.INTEGRATION_GATEWAY_AUDIENCE == $audience
                 and (.data.INTEGRATION_GATEWAY_JWKS_URI | type == "string" and length > 0)'
           fi
+
+      - name: Read Vault app ID and render integration gateway
+        if: ${{ inputs.integration_enabled }}
+        shell: bash
+        env:
+          APS_INTEGRATION_HEALTH_API_KEY: ${{ secrets.APS_INTEGRATION_HEALTH_API_KEY }}
+        run: |
+          set -euo pipefail
+          : "${APS_INTEGRATION_HEALTH_API_KEY:?Set APS_INTEGRATION_HEALTH_API_KEY to an approved CI API key}"
+          # Reuse the backend's Vault injection (PR deployments use dev's Vault secret).
+          # Print only the app ID; the injected file also contains issuer credentials.
+          GATEWAY_ENVIRONMENT_APP_ID=$(oc exec "deployment/${RELEASE}-backend" \
+            -n "$OPENSHIFT_NAMESPACE" -c backend -- sh -eu -c '
+              . /vault/secrets/soba-aps-credential-issuer
+              printf "%s" "${PLUGIN_APS_CREDENTIAL_ISSUER_V3_ENVIRONMENT_APP_ID:?Missing environment appId in the backend Vault secret}"
+            ')
+          [[ "$GATEWAY_ENVIRONMENT_APP_ID" =~ ^[a-zA-Z0-9_-]+$ ]] \
+            || { echo '::error::Invalid environment appId in the backend Vault secret'; exit 1; }
+          export GATEWAY_ENVIRONMENT_APP_ID
+          export BACKEND_HOST="${RELEASE}-backend.${OPENSHIFT_NAMESPACE}.svc"
+          INTEGRATION_ROUTE_PATH="${GATEWAY_ROUTE_PATH}integrations/v2/"
+          echo "INTEGRATION_ROUTE_PATH=$INTEGRATION_ROUTE_PATH" >> "$GITHUB_ENV"
+          GATEWAY_QUALIFIER="integrations-${RELEASE}" \
+          GATEWAY_SERVICE_NAME="${RELEASE}-integrations-v2" \
+          GATEWAY_ROUTE_PATH="$INTEGRATION_ROUTE_PATH" \
+            node deployments/gateway/scripts/generate-gateway-config.mjs --integration \
+              --output "$RUNNER_TEMP/gateway-integrations.yaml"
+          cat "$RUNNER_TEMP/gateway-integrations.yaml"
 
       - name: Install pinned GWA
         shell: bash
