@@ -140,7 +140,7 @@ jobs:
       name: uat
       url: https://${{ env.ACRONYM }}-uat.${{ vars.OC_DOMAIN }}/designer
     env:
-      NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+      NAMESPACE: ${{ vars.OC_NAMESPACE }}
       OC_SERVER: ${{ vars.OC_SERVER }}
       OC_TOKEN: ${{ secrets.OC_TOKEN }}
       OC_DOMAIN: ${{ vars.OC_DOMAIN }}
@@ -153,7 +153,9 @@ jobs:
       MONGODB_DATABASE: ${{ vars.MONGODB_DATABASE || 'formio-ce' }}
       MONGODB_AUTH_SOURCE: ${{ vars.MONGODB_AUTH_SOURCE || 'formio-ce' }}
       MONGODB_REPLICA_SET: ${{ vars.MONGODB_REPLICA_SET || 'rs0' }}
-      VAULT_ROLE: ${{ vars.VAULT_ROLE }}
+      VAULT_AUTH_PATH: ${{ vars.VAULT_AUTH_PATH }}
+      VAULT_NAMESPACE: ${{ vars.VAULT_NAMESPACE }}
+      VAULT_ROLE: ${{ vars.VAULT_ROLE_NONPROD }}
       VAULT_SECRET_PATH: ${{ vars.VAULT_SECRET_PATH }}
       VAULT_SERVICE_ACCOUNT_NAME: ${{ vars.VAULT_SERVICE_ACCOUNT_NAME }}
       CHART_REF: ${{ needs.set-vars.outputs.chart_ref }}
@@ -182,15 +184,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          : "${NAMESPACE:?Set the OC_NAMESPACE UAT environment secret.}"
+          : "${NAMESPACE:?Set the OC_NAMESPACE UAT environment variable.}"
           : "${OC_SERVER:?Set the OC_SERVER UAT environment variable.}"
           : "${OC_DOMAIN:?Set the OC_DOMAIN UAT environment variable.}"
           : "${DATABASE_SECRET_NAME:?Set the DATABASE_SECRET_NAME UAT environment variable.}"
           : "${MONGODB_HOST:?Set the MONGODB_HOST UAT environment variable.}"
           : "${MONGODB_AUTH_SECRET_NAME:?Set the MONGODB_AUTH_SECRET_NAME UAT environment variable.}"
-          : "${VAULT_ROLE:?Set the VAULT_ROLE UAT environment variable.}"
+          : "${VAULT_AUTH_PATH:?Set the VAULT_AUTH_PATH repository variable.}"
+          : "${VAULT_NAMESPACE:?Set the VAULT_NAMESPACE repository variable.}"
+          : "${VAULT_ROLE:?Set the VAULT_ROLE_NONPROD repository variable.}"
           : "${VAULT_SECRET_PATH:?Set the VAULT_SECRET_PATH UAT environment variable.}"
-          : "${VAULT_SERVICE_ACCOUNT_NAME:?Set the VAULT_SERVICE_ACCOUNT_NAME UAT environment variable.}"
+          : "${VAULT_SERVICE_ACCOUNT_NAME:?Set the VAULT_SERVICE_ACCOUNT_NAME repository variable.}"
 
           oc -n "$NAMESPACE" get secret "$DATABASE_SECRET_NAME" >/dev/null
           oc -n "$NAMESPACE" get secret "$DATABASE_SECRET_NAME" -o json |
@@ -238,6 +242,8 @@ jobs:
             --set-string "mongodb.external.database=$MONGODB_DATABASE" \
             --set-string "mongodb.external.authSource=$MONGODB_AUTH_SOURCE" \
             --set-string "mongodb.external.replicaSet=$MONGODB_REPLICA_SET" \
+            --set-string "vault.authPath=$VAULT_AUTH_PATH" \
+            --set-string "vault.namespace=$VAULT_NAMESPACE" \
             --set-string "vault.role=$VAULT_ROLE" \
             --set-string "vault.secretPath=$VAULT_SECRET_PATH" \
             --set-string "vault.serviceAccountName=$VAULT_SERVICE_ACCOUNT_NAME"

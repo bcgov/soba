@@ -57,18 +57,18 @@ Each feature chooses a profile, a key prefix and an upload limit:
 
 `backend.storage` configures the `default` profile. Dev, test, UAT and prod use `storage-s3`, each
 under its own `defaultPrefix` (`dev`, `test`, `uat`, `prod`). Their endpoint, bucket and credentials
-come from Vault: `s3VaultKeyInfix` (`DEV`, `TEST`, `UAT`, `PROD`) picks the keys
-`S3_<infix>_ENDPOINT`, `S3_<infix>_BUCKET_NAME`, `S3_<infix>_ACCESS_KEY_ID` and
-`S3_<infix>_ACCESS_SECRET_KEY` in `vault.secretPath`, and every key must be there.
+come from the environment-specific `vault.secretPath`, using the same keys in every environment:
+`STORAGE_PROFILE_S3_ENDPOINT`, `STORAGE_PROFILE_S3_BUCKET_NAME`, `STORAGE_PROFILE_S3_ACCESS_KEY` and
+`STORAGE_PROFILE_S3_SECRET_KEY`.
 
 PR deployments use `storage-local` on the `<fullname>-backend-filestore` PVC (ReadWriteMany,
 `netapp-file-standard`, 1Gi) mounted at `/app/files`, and write nothing to S3. The chart keeps the
 PVC on uninstall unless `global.forceCleanup` is set; the PR close workflow deletes it.
 
 The chart fails on `storage-memory` with more than one replica or with autoscaling, `storage-local`
-without an absolute `defaultBasePath`, `storage-s3` without a valid `defaultPrefix`,
-`s3VaultKeyInfix` without `vault.enabled`, and a malformed feature prefix. Without
-`s3VaultKeyInfix` it does not set the S3 `ACCESS_KEY` or `SECRET_KEY`.
+without an absolute `defaultBasePath`, `storage-s3` without a valid `defaultPrefix` or with Vault
+disabled, and a malformed feature prefix. When using `storage-s3`, all four S3 keys must exist at
+the selected `vault.secretPath`.
 
 ## File store
 

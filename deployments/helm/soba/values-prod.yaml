@@ -25,7 +25,6 @@ backend:
   storage:
     defaultBackend: storage-s3
     defaultPrefix: prod
-    s3VaultKeyInfix: PROD
   config:
     nodeEnv: production
     logLevel: warn

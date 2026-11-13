@@ -24,7 +24,6 @@ backend:
   storage:
     defaultBackend: storage-s3
     defaultPrefix: uat
-    s3VaultKeyInfix: UAT
   config:
     nodeEnv: production
     logLevel: warn

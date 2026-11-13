@@ -1,0 +1,33 @@
+{
+  "git": {
+    "requireUpstream": false,
+    "commit": false,
+    "tag": false,
+    "push": false
+  },
+  "npm": {
+    "publish": false
+  },
+  "plugins": {
+    "@release-it/conventional-changelog": {
+      "preset": {
+        "name": "conventionalcommits"
+      }
+    },
+    "@release-it/bumper": {
+      "out": [
+        "backend/package.json",
+        "frontend/package.json",
+        "lib/package.json",
+        {
+          "file": "backend/package-lock.json",
+          "path": ["version", "packages[\"\"].version"]
+        },
+        {
+          "file": "deployments/helm/soba/Chart.yaml",
+          "path": "appVersion"
+        }
+      ]
+    }
+  }
+}

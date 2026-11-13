@@ -86,15 +86,14 @@ spec:
           {{`{{- end }}`}}
         {{- end }}
         {{- if include "soba.storageUsesS3Vault" . }}
-        {{- $s3 := upper .Values.backend.storage.s3VaultKeyInfix }}
         vault.hashicorp.com/error-on-missing-key-soba-s3: 'true'
         vault.hashicorp.com/agent-inject-secret-soba-s3: {{ .Values.vault.secretPath | quote }}
         vault.hashicorp.com/agent-inject-template-soba-s3: |
           {{`{{- with secret "`}}{{ .Values.vault.secretPath }}{{`" }}`}}
-          {{`export STORAGE_PROFILE_DEFAULT_ACCESS_KEY="{{ .Data.data.S3_`}}{{ $s3 }}{{`_ACCESS_KEY_ID }}"`}}
-          {{`export STORAGE_PROFILE_DEFAULT_SECRET_KEY="{{ .Data.data.S3_`}}{{ $s3 }}{{`_ACCESS_SECRET_KEY }}"`}}
-          {{`export STORAGE_PROFILE_DEFAULT_BUCKET_NAME="{{ .Data.data.S3_`}}{{ $s3 }}{{`_BUCKET_NAME }}"`}}
-          {{`export STORAGE_PROFILE_DEFAULT_ENDPOINT="{{ .Data.data.S3_`}}{{ $s3 }}{{`_ENDPOINT }}"`}}
+          {{`export STORAGE_PROFILE_DEFAULT_ACCESS_KEY="{{ .Data.data.STORAGE_PROFILE_S3_ACCESS_KEY }}"`}}
+          {{`export STORAGE_PROFILE_DEFAULT_SECRET_KEY="{{ .Data.data.STORAGE_PROFILE_S3_SECRET_KEY }}"`}}
+          {{`export STORAGE_PROFILE_DEFAULT_BUCKET_NAME="{{ .Data.data.STORAGE_PROFILE_S3_BUCKET_NAME }}"`}}
+          {{`export STORAGE_PROFILE_DEFAULT_ENDPOINT="{{ .Data.data.STORAGE_PROFILE_S3_ENDPOINT }}"`}}
           {{`{{- end }}`}}
         {{- end }}
         {{- end }}
