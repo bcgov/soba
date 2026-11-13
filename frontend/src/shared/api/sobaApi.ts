@@ -14,7 +14,7 @@ import type {
 } from '../../types/workspaces';
 import type { CurrentUserResponse } from '../../types/user';
 import type { SortLocale } from '@soba/lib/sort';
-import type { LoginProvidersMetaResponse, RolesMetaResponse } from '@soba/lib';
+import type { LoginProvidersMetaResponse } from '@soba/lib';
 import type { ListQueryArgs } from '../../types/list';
 import { sortLocaleHeaders } from './sortLocaleRequest';
 
@@ -38,6 +38,7 @@ export {
   getFormVersionSchema,
   updateSobaForm,
   deleteSobaSubmission,
+  deleteSobaForm,
   getSobaSubmissionReview,
   addSobaSubmissionNote,
   updateSobaSubmissionStatus,
@@ -173,16 +174,6 @@ export async function fetchFrontendConfigMeta(): Promise<unknown> {
 export async function fetchCodesMeta(onlyEnabledFeatures = true): Promise<unknown> {
   const q = onlyEnabledFeatures ? '?only_enabled_features=true' : '';
   const response = await fetch(`${getSobaApiBaseUrl()}/meta/codes${q}`, {
-    method: 'GET',
-    cache: 'no-store',
-    headers: { Accept: 'application/json' },
-  });
-  return parseJson(response);
-}
-
-export async function fetchRolesMeta(onlyEnabledFeatures = true): Promise<RolesMetaResponse> {
-  const q = onlyEnabledFeatures ? '?only_enabled_features=true' : '';
-  const response = await fetch(`${getSobaApiBaseUrl()}/meta/roles${q}`, {
     method: 'GET',
     cache: 'no-store',
     headers: { Accept: 'application/json' },
