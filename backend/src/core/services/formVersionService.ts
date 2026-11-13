@@ -13,6 +13,7 @@ import {
   listFormVersionsForWorkspace,
   lockFormVersion,
   lookupFormVersions,
+  nextFormVersionNo,
   updateFormVersionDraft,
   type FormVersionRecord,
   type LookupFormVersionsInput,
@@ -21,6 +22,7 @@ import { getFormById, getFormEngineCodeForForm } from '../db/repos/formRepo';
 import { copyDocumentTemplates } from '../db/repos/documentTemplateRepo';
 import type { FormAccessGrant } from '../db/repos/formAccessRepo';
 import { db, type DbOrTx } from '../db/client';
+import { FormVersionState } from '../db/codes';
 import { hasPgCode, isUniqueViolationOn, PG_UNIQUE_VIOLATION } from '../db/pgError';
 import { FORM_VERSION_ONE_PUBLISHED_UNIQUE, FORM_VERSION_PKEY } from '../db/schema';
 import { ConflictError, NotFoundError, ValidationError } from '../errors';
@@ -38,7 +40,8 @@ const FORM_VERSION_NOT_FOUND = 'Form version not found';
 /**
  * Runs `write` with the version row locked, once the version is confirmed as its form's current
  * version. The check and the write share the lock, so a publish of the same version cannot land
- * between them.
+ * between them. An opened version passes too: it is not current yet, and becomes the newest version
+ * when it is saved.
  */
 function withCurrentVersion<T>(
   input: { workspaceId: string; formVersionId: string },
@@ -47,6 +50,7 @@ function withCurrentVersion<T>(
   return db.transaction(async (tx) => {
     const version = await lockFormVersion(input.workspaceId, input.formVersionId, tx);
     if (!version) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
+    if (version.state === FormVersionState.opened) return write(version, tx);
 
     const current = await getCurrentFormVersion(input.workspaceId, version.formId, tx);
     if (current?.id !== version.id) {
@@ -56,17 +60,29 @@ function withCurrentVersion<T>(
   });
 }
 
+/**
+ * The number an opened version takes as it is saved: the next free one, which is the one it showed
+ * unless another version was saved since. Nothing for a version that already has its number.
+ */
+async function promotedNumber(
+  version: Pick<FormVersionRecord, 'workspaceId' | 'formId' | 'state'>,
+  tx: DbOrTx,
+): Promise<{ versionNo?: number }> {
+  if (version.state !== FormVersionState.opened) return {};
+  return { versionNo: await nextFormVersionNo(version.workspaceId, version.formId, tx) };
+}
+
 /** A provision this old is taken to have died, and no longer blocks the version. */
 const PROVISIONING_STALE_MS = 2 * 60 * 1000;
 /** A provision's engine calls are abandoned by then, before its claim can go stale. */
 const PROVISIONING_BUDGET_MS = 90 * 1000;
 
 /**
- * Only a draft's schema is written, and not while another save is still writing it: the engine
- * call runs after the lock is released.
+ * Only an opened version's or a draft's schema is written, and not while another save is still
+ * writing it: the engine call runs after the lock is released.
  */
 function assertSchemaWritable(version: FormVersionRecord): void {
-  if (version.state !== 'draft') {
+  if (version.state !== FormVersionState.opened && version.state !== FormVersionState.draft) {
     throw new ConflictError('Form version is not a draft');
   }
   if (
@@ -117,9 +133,12 @@ interface ListInput {
   sort: FormVersionListSort;
 }
 
-type LifecycleState = 'draft' | 'published' | 'archived' | 'deleted';
+type LifecycleState = 'opened' | 'draft' | 'published' | 'archived' | 'deleted';
 
 const ALLOWED_TRANSITIONS: Record<LifecycleState, LifecycleState[]> = {
+  // A save makes it a draft. It already has a schema, written when it was created, so it can be
+  // published without one.
+  opened: ['draft', 'published', 'deleted'],
   draft: ['published', 'deleted'],
   published: ['archived', 'deleted'],
   archived: ['published', 'deleted'],
@@ -265,6 +284,15 @@ export class FormVersionService {
   async save(input: SaveInput) {
     const updated = await withCurrentVersion(input, async (locked, tx) => {
       assertSchemaWritable(locked);
+      if (locked.state === FormVersionState.opened) {
+        await updateFormVersionDraft(
+          input.workspaceId,
+          input.formVersionId,
+          input.actorDisplayLabel,
+          { state: FormVersionState.draft, ...(await promotedNumber(locked, tx)) },
+          tx,
+        );
+      }
       return appendFormVersionRevision(
         {
           workspaceId: input.workspaceId,
@@ -320,7 +348,7 @@ export class FormVersionService {
           input.workspaceId,
           input.formVersionId,
           input.actorDisplayLabel,
-          stateStamps('published', input),
+          { ...stateStamps('published', input), ...(await promotedNumber(version, tx)) },
           tx,
         );
       } catch (err) {
@@ -381,6 +409,7 @@ export class FormVersionService {
         title: form?.name,
         engineRef: locked.engineSchemaRef ?? undefined,
         claimedAt: claimed.updatedAt,
+        version: locked,
       };
     });
 
@@ -408,12 +437,22 @@ export class FormVersionService {
       throw err;
     }
 
-    const finished = await finishFormVersionProvisioning(
-      input.workspaceId,
-      input.formVersionId,
-      input.actorDisplayLabel,
-      claim.claimedAt,
-      { engineSchemaRef: engineRef, engineSyncStatus: 'ready', engineSyncError: null },
+    // Only an opened version or a draft gets this far, so either way the save leaves a draft.
+    const finished = await db.transaction(async (tx) =>
+      finishFormVersionProvisioning(
+        input.workspaceId,
+        input.formVersionId,
+        input.actorDisplayLabel,
+        claim.claimedAt,
+        {
+          state: FormVersionState.draft,
+          ...(await promotedNumber(claim.version, tx)),
+          engineSchemaRef: engineRef,
+          engineSyncStatus: 'ready',
+          engineSyncError: null,
+        },
+        tx,
+      ),
     );
     // Another save took the version over after this one's stale window, or it stopped being a draft.
     if (!finished) {

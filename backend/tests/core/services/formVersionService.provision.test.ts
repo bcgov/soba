@@ -13,6 +13,7 @@ jest.mock('../../../src/core/db/repos/formVersionRepo', () => ({
   getCurrentFormVersion: jest.fn(),
   updateFormVersionDraft: jest.fn(),
   finishFormVersionProvisioning: jest.fn(),
+  nextFormVersionNo: jest.fn(),
 }));
 
 jest.mock('../../../src/core/db/repos/formRepo', () => ({
@@ -29,6 +30,7 @@ const updateDraft = versionRepo.updateFormVersionDraft as unknown as jest.Mock;
 const lock = versionRepo.lockFormVersion as unknown as jest.Mock;
 const getCurrent = versionRepo.getCurrentFormVersion as unknown as jest.Mock;
 const finish = versionRepo.finishFormVersionProvisioning as unknown as jest.Mock;
+const nextNo = versionRepo.nextFormVersionNo as unknown as jest.Mock;
 const getFormById = formRepo.getFormById as unknown as jest.Mock;
 const getEngineCode = formRepo.getFormEngineCodeForForm as unknown as jest.Mock;
 const createAdapter = registry.createFormEngineAdapter as unknown as jest.Mock;
@@ -88,6 +90,75 @@ describe('FormVersionService provision/getSchema', () => {
         engineSyncStatus: 'ready',
         engineSyncError: null,
       }),
+      expect.anything(),
+    );
+    // A draft already has its number.
+    expect(nextNo).not.toHaveBeenCalled();
+    expect(finish.mock.calls[0][4]).not.toHaveProperty('versionNo');
+  });
+
+  // The opened version showed 2, but another version took 2 while it was being edited.
+  it('provision: saving an opened version makes it a draft under the next free number', async () => {
+    getById.mockResolvedValue({
+      id: 'v1',
+      workspaceId: 'ws1',
+      formId: 'f1',
+      versionNo: 2,
+      engineSchemaRef: null,
+      state: 'opened',
+    });
+    nextNo.mockResolvedValue(3);
+    createAdapter.mockReturnValue({
+      upsertSchema: jest.fn().mockResolvedValue({ engineRef: 'eng-1' }),
+    });
+
+    await svc.provision({ ...actor, schema });
+
+    expect(nextNo).toHaveBeenCalledWith('ws1', 'f1', expect.anything());
+    expect(finish).toHaveBeenCalledWith(
+      'ws1',
+      'v1',
+      'Author',
+      CLAIMED_AT,
+      expect.objectContaining({ state: 'draft', versionNo: 3, engineSyncStatus: 'ready' }),
+      expect.anything(),
+    );
+  });
+
+  // An opened version is not current, so the current-version check would refuse every first save.
+  it('provision: saves an opened version that is not the current one', async () => {
+    getById.mockResolvedValue({ id: 'v2', formId: 'f1', engineSchemaRef: null, state: 'opened' });
+    getCurrent.mockResolvedValue({ id: 'v1' });
+    nextNo.mockResolvedValue(2);
+    createAdapter.mockReturnValue({
+      upsertSchema: jest.fn().mockResolvedValue({ engineRef: 'eng-2' }),
+    });
+
+    await expect(svc.provision({ ...actor, formVersionId: 'v2', schema })).resolves.toBeDefined();
+  });
+
+  // The version stays opened, so it stays out of the history until a save lands.
+  it('provision: a failed save leaves the state alone', async () => {
+    getById.mockResolvedValue({ id: 'v1', formId: 'f1', engineSchemaRef: null, state: 'opened' });
+    createAdapter.mockReturnValue({
+      upsertSchema: jest.fn().mockRejectedValue(new Error('bad schema')),
+    });
+
+    await expect(svc.provision({ ...actor, schema })).rejects.toThrow(/bad schema/);
+
+    expect(finish).toHaveBeenCalledWith(
+      'ws1',
+      'v1',
+      'Author',
+      CLAIMED_AT,
+      expect.not.objectContaining({ state: expect.anything() }),
+    );
+    expect(updateDraft).not.toHaveBeenCalledWith(
+      'ws1',
+      'v1',
+      'Author',
+      expect.objectContaining({ state: expect.anything() }),
+      expect.anything(),
     );
   });
 
