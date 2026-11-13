@@ -162,6 +162,7 @@ const opened = (id: string, formVersionId = 'ver-1') => ({
   id,
   formId: 'form-1',
   formVersionId,
+  versionNo: Number(formVersionId.slice(-1)),
   workflowState: 'opened',
   headRevisionId: 'rev-0',
 });
@@ -269,7 +270,7 @@ describe('FormioV5NewSubmissionClient', () => {
     expect(h.getSubmitFormVersionSchema).toHaveBeenCalledWith(undefined, 'ver-1');
     expect(h.form).toEqual(schema);
     expect(h.options?.readOnly).toBe(false);
-    expect(screen.getByTestId('submission-fill-version')).toHaveTextContent('Version: 1');
+    expect(screen.getByTestId('submission-fill-version')).toHaveTextContent(/^Version: 1$/);
     expect(h.openSobaFormSubmission).not.toHaveBeenCalled();
     expect(replaceState).not.toHaveBeenCalled();
   });
@@ -598,7 +599,7 @@ describe('FormioV5NewSubmissionClient', () => {
       await userEvent.click(screen.getByTestId('submission-fill-continue-updated'));
       await waitFor(() => expect(h.mounts).toBe(2));
       expect(h.form).toEqual(changed);
-      expect(screen.getByTestId('submission-fill-version')).toHaveTextContent('Version: 2');
+      expect(screen.getByTestId('submission-fill-version')).toHaveTextContent(/^Version: 2$/);
       expect(screen.getByTestId('submission-fill-save-draft')).toBeInTheDocument();
     });
 
@@ -631,6 +632,7 @@ describe('FormioV5NewSubmissionClient', () => {
       expect(openedId(1)).toBe(openedId(0));
       expect(screen.queryByTestId('submission-fill-form-updated')).not.toBeInTheDocument();
       expect(h.mounts).toBe(1);
+      expect(screen.getByTestId('submission-fill-version')).toHaveTextContent(/^Version: 2$/);
     });
 
     it('moves over with the answers when Continue comes after the session ended', async () => {

@@ -38,6 +38,12 @@ export const isFormUpdated = (err: unknown): err is FormUpdatedError =>
 const isVersionReplaced = (err: unknown) =>
   err instanceof ApiError && err.code === ApiErrorCodes.version_not_published;
 
+/** An opened submission's head, and the number of the version it opened on. */
+export interface OpenedSubmission {
+  head: string;
+  versionNo: number;
+}
+
 /** The head the first write is based on: the revision the open recorded. */
 const headOf = (opened: SubmissionResponse): string => {
   if (!opened.headRevisionId) throw new Error('The opened submission has no head revision');
@@ -55,17 +61,16 @@ export function useSubmissionOpener(formId: string, submissionId: string, signed
   const { tokenFor } = useCallToken();
   const lastSent = useRef<RenderedVersion | null>(null);
   const open = useCallback(
-    async (rendered: RenderedVersion): Promise<string> => {
+    async (rendered: RenderedVersion): Promise<OpenedSubmission> => {
       const openOn = async (version: RenderedVersion) => {
         lastSent.current = version;
-        return headOf(
-          await openSobaFormSubmission(
-            tokenFor(signedIn),
-            formId,
-            submissionId,
-            version.formVersionId,
-          ),
+        const opened = await openSobaFormSubmission(
+          tokenFor(signedIn),
+          formId,
+          submissionId,
+          version.formVersionId,
         );
+        return { head: headOf(opened), versionNo: opened.versionNo };
       };
       const first =
         lastSent.current?.schemaHash === rendered.schemaHash ? lastSent.current : rendered;

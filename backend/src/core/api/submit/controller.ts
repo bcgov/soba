@@ -110,7 +110,7 @@ export const getSubmitFillBundle = asyncHandler(async (req: Request, res: Respon
     formId: submission.formId,
     workflowState: submission.workflowState,
     formVersionId: submission.formVersionId,
-    versionNo: submission.formVersion.versionNo,
+    versionNo: submission.formVersion.versionNo ?? 1,
     headRevisionId: submission.headRevisionId,
     currentRevisionNo: submission.currentRevisionNo,
     // The read guard refuses a caller without a grant, and the database holds only these roles.
