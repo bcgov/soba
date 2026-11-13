@@ -5,8 +5,10 @@ test.beforeEach(async ({ page, baseURL, workspaceName }) => {
   if (!baseURL) throw new Error('Playwright baseURL must be configured');
   await page.goto(`${baseURL.replace(/\/$/, '')}/workspaces`);
   await expect(page).toHaveURL(/\/workspaces(?:\?|$)/);
+  // A full navigation must finish restoring the Keycloak session before the list renders.
+  await expect(page.getByTestId('user-dropdown')).toBeVisible({ timeout: 20000 });
   const search = page.getByTestId('search-workspaces-text').getByRole('textbox');
-  await expect(search).toBeEditable();
+  await expect(search).toBeEditable({ timeout: 15000 });
   await search.fill(workspaceName);
   await page.getByTestId('search-workspaces-button').click();
 
@@ -227,7 +229,9 @@ test('User can manage access tab settings for a workspace', async ({ page }) => 
   await page.getByRole('option', { name: 'nimya.1.john@gov.bc.ca' }).click();
   await expect(page.getByTestId('member-submit-button')).not.toBeEnabled();
 
-  const administrCheckbox = page.getByLabel('Form administrators');
+  const administrCheckbox = page
+    .getByTestId('workspace-member-add-form')
+    .getByRole('checkbox', { name: 'Form administrators', exact: true });
   await expect(administrCheckbox).toBeVisible();
   const submittersCheckbox = page.getByRole('checkbox', { name: 'Form submitters', exact: true });
   const submittersLabel = page
@@ -246,45 +250,37 @@ test('User can manage access tab settings for a workspace', async ({ page }) => 
   if (alreadyMember) {
     await page.getByTestId('member-cancel-button').click();
     await expect(page.getByTestId('workspace-member-add-form')).not.toBeVisible();
-    return;
+  } else {
+    await page.getByTestId('member-submit-button').click();
+    await expect(page.getByText('Person added successfully.')).toBeVisible();
   }
-  await page.getByTestId('member-submit-button').click();
-  await expect(page.getByText('Person added successfully.')).toBeVisible();
-  // Locate table rows
-  const tableRows = page.locator('tbody tr');
-
-  // Verify table has exactly 2 rows
-  await expect(tableRows).toHaveCount(2);
-
-  // Locate the row containing the email address
-  const memberRow = tableRows.filter({
-    hasText: 'nimya.1.john@gov.bc.ca',
-  });
-
-  // Verify member exists
+  // The search is still filtered to this person, so the owner is not in these results.
+  const memberRow = existingMember;
   await expect(memberRow).toBeVisible();
-
-  // Verify Remove button exists and is visible
   await expect(memberRow.getByRole('button', { name: 'Remove' })).toBeVisible();
   await expect(memberRow).toContainText('NIMJOHN');
   await expect(memberRow).toContainText('Viewer');
-  await expect(memberRow).toContainText('Form submitters');
-  await expect(memberRow).toContainText('CHEFSTST');
-  await expect(memberRow).toContainText('Owner');
-  await expect(memberRow).toContainText('Form administrators');
-  const memberRow1 = page.locator('tbody tr').filter({
-    hasText: 'nimya.1.john@gov.bc.ca',
-  });
-  await memberRow1.getByRole('button', { name: 'Edit' }).click();
-  await submittersCheckbox.click();
-  await administrCheckbox.click();
+  if (!alreadyMember) await expect(memberRow).toContainText('Form submitters');
+  await memberRow.getByRole('button', { name: 'Edit' }).click();
+  const editForm = page.getByTestId('workspace-member-edit-form');
+  if (await editForm.getByRole('checkbox', { name: 'Form submitters', exact: true }).isChecked()) {
+    await editForm.getByText('Form submitters', { exact: true }).click();
+  }
+  if (
+    !(await editForm
+      .getByRole('checkbox', { name: 'Form administrators', exact: true })
+      .isChecked())
+  ) {
+    await editForm.getByText('Form administrators', { exact: true }).click();
+  }
   await expect(page.getByTestId('member-submit-button')).toBeEnabled();
   await page.getByTestId('member-submit-button').click();
-  await expect(page.getByText('Person updated successfully.')).toBeVisible();
-  await memberRow1.getByRole('button', { name: 'Remove' }).click();
+  await expect(
+    page.getByText(dictionaries.workspaces.access.updateSuccess, { exact: true }),
+  ).toBeVisible();
+  await expect(memberRow).toContainText('Form administrators');
+  await memberRow.getByRole('button', { name: 'Remove' }).click();
   await page.getByTestId('confirm-modal-confirm').click();
-  // Verify table has exactly 1 row
-  await expect(tableRows).toHaveCount(1);
-  // Verify member not exists
   await expect(memberRow).not.toBeVisible();
+  await expect(page.getByTestId('datatable-empty')).toBeVisible();
 });
