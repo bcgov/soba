@@ -11,8 +11,6 @@ const SUBMISSION_AUTH_REQUIRED =
 // explicit rather than leaving security unset.
 const PUBLIC_SECURITY = [{}, { bearerAuth: [] }];
 const FILES_PATH = '/files';
-// Same routes as /files, mounted under submit for the Form.io file component.
-const SUBMIT_FILES_PATH = '/submit/files';
 
 export const FileUploadResponseSchema = z
   .object({
@@ -121,7 +119,6 @@ function registerFilesPaths(
 
 export function registerFilesOpenApi(registry: OpenAPIRegistry) {
   registerFilesPaths(registry, { basePath: FILES_PATH, deprecated: false });
-  registerFilesPaths(registry, { basePath: SUBMIT_FILES_PATH, deprecated: true });
   registry.registerPath({
     method: 'get',
     path: '/design/submissions/{id}/files/{fileId}',

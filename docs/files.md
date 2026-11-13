@@ -165,17 +165,3 @@ is rate limited by `RATE_LIMIT_RENDER_*`. Each pod renders at most
 slot before its body is read. A template that cannot be rendered, an infected upload, or a print
 with no saved data returns 422. An unavailable backend, scanner or template bytes return 503. The
 upload has its own path so its route can wait out the scan (300s, like the other uploads).
-
-## Submit files (deprecated)
-
-`/api/v1/submit/files` serves the same routes as `/api/v1/files` for the Form.io file component. New
-callers use `/api/v1/files`.
-
-The BC Gov file component (`bcgov-file`, from `bcgov/formio-components`) stores files through the
-`chefs` storage provider. `frontend/src/features/formio-v5/registerBcgovFormio.ts` registers both
-when the `files` feature is enabled and allowed by the app's `NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`.
-The provider uploads to `/submit/files` with the submission being filled, and the submission data
-keeps each file's URL as `<api>/submit/files/<id>`.
-
-`frontend/public/formio-v5/bcgov-file.css` applies Form.io's `.formio-component-file` rules to
-`bcgov-file`, which matches them only through its `customClass`.

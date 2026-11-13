@@ -192,8 +192,8 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0
       '@bcgov/formio-components':
-        specifier: github:bcgov/formio-components#v0.0.1
-        version: https://codeload.github.com/bcgov/formio-components/tar.gz/a9d810778c091ab889a13063ec2d9fc4d3a9ab23(@formio/js@5.4.0-api98.1(@popperjs/core@2.11.8))
+        specifier: github:bcgov/formio-components#v0.0.3
+        version: https://codeload.github.com/bcgov/formio-components/tar.gz/14e4167e39d946f38d49614acf24655ee36d39f6(@formio/js@5.4.0-api98.1(@popperjs/core@2.11.8))
       '@formatjs/intl-localematcher':
         specifier: ^0.8.1
         version: 0.8.5
@@ -212,9 +212,9 @@ importers:
       bootstrap:
         specifier: ^5.3.8
         version: 5.3.8(@popperjs/core@2.11.8)
-      formio-components@0.0.1:
-        specifier: github:bcgov/formio-components#v0.0.1
-        version: '@bcgov/formio-components@https://codeload.github.com/bcgov/formio-components/tar.gz/a9d810778c091ab889a13063ec2d9fc4d3a9ab23(@formio/js@5.4.0-api98.1(@popperjs/core@2.11.8))'
+      formio-components@0.0.3:
+        specifier: github:bcgov/formio-components#v0.0.3
+        version: '@bcgov/formio-components@https://codeload.github.com/bcgov/formio-components/tar.gz/14e4167e39d946f38d49614acf24655ee36d39f6(@formio/js@5.4.0-api98.1(@popperjs/core@2.11.8))'
       keycloak-js:
         specifier: ^26.2.3
         version: 26.2.4
@@ -574,9 +574,9 @@ packages:
   '@bcgov/design-tokens@5.0.0':
     resolution: {integrity: sha512-D4Ub2jZ04Jv7hBUi6gqHTzIYTLtsqdr/FMv+m598IcfMLUy3b6CEVh3UH9ZXZLC/npPC7g05I4j3YMm46IGWjQ==}
 
-  '@bcgov/formio-components@https://codeload.github.com/bcgov/formio-components/tar.gz/a9d810778c091ab889a13063ec2d9fc4d3a9ab23':
-    resolution: {tarball: https://codeload.github.com/bcgov/formio-components/tar.gz/a9d810778c091ab889a13063ec2d9fc4d3a9ab23}
-    version: 0.0.1
+  '@bcgov/formio-components@https://codeload.github.com/bcgov/formio-components/tar.gz/14e4167e39d946f38d49614acf24655ee36d39f6':
+    resolution: {tarball: https://codeload.github.com/bcgov/formio-components/tar.gz/14e4167e39d946f38d49614acf24655ee36d39f6}
+    version: 0.0.2
     peerDependencies:
       '@formio/js': ^5.0.0-rc.76
 
@@ -6159,7 +6159,7 @@ snapshots:
 
   '@bcgov/design-tokens@5.0.0': {}
 
-  '@bcgov/formio-components@https://codeload.github.com/bcgov/formio-components/tar.gz/a9d810778c091ab889a13063ec2d9fc4d3a9ab23(@formio/js@5.4.0-api98.1(@popperjs/core@2.11.8))':
+  '@bcgov/formio-components@https://codeload.github.com/bcgov/formio-components/tar.gz/14e4167e39d946f38d49614acf24655ee36d39f6(@formio/js@5.4.0-api98.1(@popperjs/core@2.11.8))':
     dependencies:
       '@formio/js': 5.4.0-api98.1(@popperjs/core@2.11.8)
 

@@ -1,7 +1,7 @@
 import { loadFeaturesMeta } from '@/src/shared/config/featuresMeta';
 import { createIsFeatureAllowed, FEATURE_CODES } from '@/src/shared/featureFlags/flags';
 import { getKeycloakInstance } from '@/lib/slices/keycloakSlice';
-import { openedActiveSubmissionId } from './activeSubmission';
+import { getActiveSubmission, openedActiveSubmissionId } from './activeSubmission';
 import { uploadToken } from './data/uploadToken';
 import { getSobaApiBaseUrl, loadFrontendRuntimeConfig } from '@/src/shared/config/runtimeConfig';
 
@@ -11,6 +11,8 @@ interface ChefsProviderConfig {
   getToken: () => string | Promise<string>;
   getWorkspaceId?: () => string | Promise<string>;
   getSubmissionId?: () => string | Promise<string>;
+  /** Whether an empty token means a deliberately anonymous session rather than one still loading. */
+  isAnonymous?: () => boolean | Promise<boolean>;
 }
 
 interface BcgovFormioModule {
@@ -43,7 +45,7 @@ export function ensureBcgovFormioRegistered(): Promise<{ filesEnabled: boolean }
     await loadFrontendRuntimeConfig().catch(() => {});
 
     const { Formio } = await import('@formio/js');
-    const bcgovMod = (await import('formio-components@0.0.1')) as unknown as BcgovFormioModule;
+    const bcgovMod = (await import('formio-components@0.0.3')) as unknown as BcgovFormioModule;
     const formio = Formio as unknown as FormioWithProviders;
 
     formio.use(bcgovMod.default ?? bcgovMod);
@@ -57,13 +59,17 @@ export function ensureBcgovFormioRegistered(): Promise<{ filesEnabled: boolean }
           // A getter so getSobaApiBaseUrl() is read per request (after runtime config has loaded).
           filesUrl: () => {
             const apiUrl = getSobaApiBaseUrl();
-            return `${apiUrl}/submit/files`;
+            return `${apiUrl}/files`;
           },
           getToken: () => uploadToken(() => getKeycloakInstance()?.token),
           // The submission currently being filled (set by the fill form), opened first if it is new;
           // uploads are tagged with it, and the backend derives the workspace from it, so no
           // workspace id is passed.
           getSubmissionId: openedActiveSubmissionId,
+          // Files saved in the browser are tied to the signed-in user. An empty token counts as
+          // anonymous only for a fill known not to be signed in; while that isn't known yet (no
+          // active submission), the user is unknown, so nothing is stored or retried as anonymous.
+          isAnonymous: () => getActiveSubmission()?.signedIn === false,
         }),
       );
     }
