@@ -36,7 +36,7 @@ jobs:
         id: crunchy
         uses: bcgov/actions-openshift/crunchy@46f2614322f7ba1a5ad88a7e4e1b98569c80dcf7 # v0.6.0
         with:
-          oc_namespace: ${{ secrets.OC_NAMESPACE }}
+          oc_namespace: ${{ vars.OC_NAMESPACE }}
           oc_token: ${{ secrets.OC_TOKEN }}
           oc_server: ${{ vars.OC_SERVER }}
           values_file: deployments/helm/action-crunchy/values-uat.yml
@@ -44,7 +44,7 @@ jobs:
 
       - name: Validate Crunchy resources
         env:
-          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          NAMESPACE: ${{ vars.OC_NAMESPACE }}
           CLUSTER: ${{ steps.crunchy.outputs.cluster }}
         run: |
           set -euo pipefail
@@ -96,7 +96,7 @@ jobs:
 
       - name: Harden database privileges
         env:
-          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          NAMESPACE: ${{ vars.OC_NAMESPACE }}
           CLUSTER: ${{ steps.crunchy.outputs.cluster }}
         run: |
           set -euo pipefail
