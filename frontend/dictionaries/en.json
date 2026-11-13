@@ -33,6 +33,7 @@
     "reference": "Reference:",
     "create": "Create",
     "version": "Version",
+    "labelSeparator": ": ",
     "clearFilters": "Reset Filters",
     "noAccess": "You do not have access to this.",
     "sortBy": "Sort by",

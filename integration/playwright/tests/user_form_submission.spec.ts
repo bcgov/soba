@@ -24,7 +24,7 @@ test('User can submit the shared form and find it in My Submissions', async ({
   const success = page.getByTestId('submission-success');
   await expect(success).toContainText(dictionaries.submission.success.message);
   await expect(success.getByRole('heading', { name: title, exact: true })).toBeVisible();
-  const confirmation = success.getByTestId('submission-view-confirmation').locator('strong');
+  const confirmation = success.getByTestId('submission-view-confirmation-code');
   await expect(confirmation).not.toBeEmpty();
   const confirmationCode = (await confirmation.innerText()).trim();
   const submissionId = new URL(page.url()).pathname.split('/').slice(-2)[0];

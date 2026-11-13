@@ -93,10 +93,11 @@ unrelated, and one group's numbers need not match.
 ## After Submission tab: `frontend/src/features/post-submission/`
 
 Post-submission actions are set on their own tab, after Settings in the designer and after Form
-Settings on the workspace page, with those tabs' permissions. The tab shows only where the
-`post-submission` feature is available (`data/usePostSubmissionAvailable.ts`). The feature is fixed,
-so that is everywhere while it is enabled; if it is made scoped, a form's check names its workspace
-too, since a workspace grant covers its forms.
+Settings on the workspace page, with those tabs' permissions. The tab shows where either of its parts
+is available: the `post-submission` actions (`data/usePostSubmissionAvailable.ts`) or the
+Confirmation Screen card (below). Both features are fixed, so that is everywhere while one is
+enabled; if one is made scoped, a form's check names its workspace too, since a workspace grant
+covers its forms.
 
 | file                               | role                                                                                                                                                                |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -110,6 +111,23 @@ too, since a workspace grant covers its forms.
 Each action reads and saves under the key `post-submission/<code>` through `useFormSettings` and
 `useWorkspaceSettings`, so a workspace save refreshes its forms' views. Its text lives under
 `postSubmission` in `en.json` and `fr.json`.
+
+### Confirmation Screen card: `frontend/src/features/submitter-email-copy/`
+
+The tab also holds a Confirmation Screen card, which says whether submitters can email themselves a
+copy of their confirmation. It is not a post-submission action: it is the `confirmation` settings
+group, read and saved through `useFormSettings` and `useWorkspaceSettings` like any other, and shown
+where the `submitter-email-copy` feature is available (`data/useEmailCopyAvailable.ts`). The tabs
+pass it to `PostSubmissionActions` as an extra drawer, so it shows even when the actions are off.
+
+| file                                 | role                                                            |
+| ------------------------------------ | --------------------------------------------------------------- |
+| `ui/FormConfirmationDrawer.tsx`      | a form's drawer: inherit the workspace's setting or set its own |
+| `ui/WorkspaceConfirmationDrawer.tsx` | a workspace's drawer, the default for its forms                 |
+| `constants.ts`                       | the drawer's id, shared by the tabs and their tests             |
+
+Its text lives under `postSubmission.confirmationScreen`. The send itself is described in
+[notifications.md](notifications.md).
 
 ## Feature flags
 

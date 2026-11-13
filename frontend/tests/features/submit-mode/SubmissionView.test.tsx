@@ -13,6 +13,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
       sessionExpired: 'Your session has ended.',
       noAccess: 'You do not have access to this.',
       version: 'Version',
+      labelSeparator: ': ',
     },
     form: { nameLabel: 'Form', templates: { print: { button: 'Print' } } },
     // The email receipt's modal names its button group.
@@ -126,9 +127,9 @@ describe('SubmissionView', () => {
     await renderView();
     await waitFor(() => expect(screen.getByTestId('submission-view-form')).toBeInTheDocument());
     expect(getSubmitSubmission).toHaveBeenCalledWith(undefined, 'sub-1');
-    expect(screen.getByTestId('submission-view-version')).toHaveTextContent('v3');
+    expect(screen.getByTestId('submission-view-version')).toHaveTextContent(/^Version: 3$/);
     expect(screen.getByTestId('submission-view-confirmation')).toHaveTextContent(
-      'Confirmation ID: K7M2Q9XA',
+      /^Confirmation ID: K7M2Q9XA$/,
     );
     expect(screen.queryByTestId('submission-view-submitter')).not.toBeInTheDocument();
   });
@@ -218,33 +219,44 @@ describe('SubmissionView', () => {
     expect(getSubmitSubmissionData).toHaveBeenCalledWith(undefined, 'sub-1');
   });
 
-  it('lays the confirmation screen out as designed: status, name, one line each, answers in a card', async () => {
-    initAnswered();
-    await renderView(true);
-    const form = await screen.findByTestId('submission-view-form');
-    expect(screen.getByTestId('submission-view-answers-card')).toContainElement(form);
+  // The submission page, which the email's link opens, looks the same as the confirmation screen.
+  it.each([
+    ['the confirmation screen', true],
+    ['the submission page', false],
+  ])(
+    'lays %s out as designed: status, name, one line each, answers in a card',
+    async (_, success) => {
+      initAnswered();
+      await renderView(success);
+      const form = await screen.findByTestId('submission-view-form');
+      expect(screen.getByTestId('submission-view-answers-card')).toContainElement(form);
 
-    const status = screen.getByTestId('submission-view-status');
-    const name = screen.getByRole('heading', { name: 'Form One' });
-    const id = screen.getByTestId('submission-view-confirmation');
-    const submitted = screen.getByTestId('submission-view-submitted');
-    const version = screen.getByTestId('submission-view-version');
-    [status, name, id, submitted, version].reduce((before, after) => {
-      expect(before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      return after;
-    });
-    expect(id).toHaveTextContent('Confirmation ID: K7M2Q9XA');
-    expect(submitted).toHaveTextContent(/^Submitted: /);
-    expect(version).toHaveTextContent('Version: 3');
-  });
+      const status = screen.getByTestId('submission-view-status');
+      const name = screen.getByRole('heading', { name: 'Form One' });
+      const id = screen.getByTestId('submission-view-confirmation');
+      const submitted = screen.getByTestId('submission-view-submitted');
+      const version = screen.getByTestId('submission-view-version');
+      [status, name, id, submitted, version].reduce((before, after) => {
+        expect(
+          before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+        return after;
+      });
+      expect(id).toHaveTextContent(/^Confirmation ID: K7M2Q9XA$/);
+      expect(screen.getByTestId('submission-view-confirmation-code')).toHaveTextContent(
+        /^K7M2Q9XA$/,
+      );
+      expect(submitted).toHaveTextContent(/^Submitted: \S/);
+      expect(version).toHaveTextContent(/^Version: 3$/);
+    },
+  );
 
-  it('keeps the compact header and no card on the regular submission page', async () => {
+  it('claims success only on the confirmation screen', async () => {
     initAnswered();
     await renderView(false);
     await screen.findByTestId('submission-view-form');
-    expect(screen.queryByTestId('submission-view-answers-card')).not.toBeInTheDocument();
-    expect(screen.getByTestId('submission-view-version')).toHaveTextContent('v3');
-    expect(screen.getByText('K7M2Q9XA').tagName).toBe('STRONG');
+    expect(screen.queryByTestId('submission-success')).not.toBeInTheDocument();
+    expect(screen.queryByText('Submitted successfully.')).not.toBeInTheDocument();
   });
 
   it('links a signed-in submitter to their submissions', async () => {

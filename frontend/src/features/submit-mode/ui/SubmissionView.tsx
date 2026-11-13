@@ -39,7 +39,7 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
           schema={data.schema}
           content={data.content}
           reviewLabel={data.submission.reviewLabel}
-          confirmation={success}
+          submitterLayout
         />
       );
       // One row of buttons from the left: what the page leads with, the email receipt where the

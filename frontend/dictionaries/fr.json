@@ -34,6 +34,7 @@
     "reference": "Référence:",
     "create": "Créer",
     "version": "Version",
+    "labelSeparator": " : ",
     "clearFilters": "Effacer les filtres",
     "noAccess": "Vous n'avez pas accès à ceci.",
     "sortBy": "Trier par",

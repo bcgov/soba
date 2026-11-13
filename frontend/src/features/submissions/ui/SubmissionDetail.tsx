@@ -21,10 +21,11 @@ type SubmissionDetailProps = {
   /** The review as its submitter is told it, shown in place of the workflow state once there is one. */
   reviewLabel?: SubmitterReviewLabel | null;
   /**
-   * Lays the submission out as the confirmation screen shows it: the status above the form's name,
-   * one line each for the confirmation ID, submitted date and version, and the answers in a card.
+   * Lays the submission out as its submitter sees it, on the confirmation screen and the submission
+   * page: the status above the form's name, one line each for the confirmation ID, submitted date
+   * and version, and the answers in a card. Staff views keep the compact header.
    */
-  confirmation?: boolean;
+  submitterLayout?: boolean;
 };
 
 /** A loaded submission: its header and the answers rendered read-only against its schema. */
@@ -34,11 +35,13 @@ export function SubmissionDetail({
   content,
   showSubmitter = false,
   reviewLabel = null,
-  confirmation = false,
+  submitterLayout = false,
 }: Readonly<SubmissionDetailProps>) {
   const dict = useDictionary();
   const dictSub = dict.submission;
   const formatLongDate = useFormatLongDate();
+  // French sets a space before the colon.
+  const sep = dict.general.labelSeparator;
 
   const formName = submission.formName || dict.form.nameLabel;
   const versionNo = submission.versionNo ?? 1;
@@ -53,7 +56,9 @@ export function SubmissionDetail({
   );
   const submitter = showSubmitter ? (
     <div data-testid="submission-view-submitter">
-      {dictSub.submitter}: {submission.createdBy || dictSub.anon}
+      {dictSub.submitter}
+      {sep}
+      {submission.createdBy || dictSub.anon}
     </div>
   ) : null;
 
@@ -70,7 +75,7 @@ export function SubmissionDetail({
       </InlineAlert>
     );
 
-  if (confirmation) {
+  if (submitterLayout) {
     return (
       <>
         <div className="mt-4 mb-4" data-testid="submission-view-header">
@@ -79,17 +84,25 @@ export function SubmissionDetail({
           <div className="d-flex flex-column gap-2">
             {submission.confirmationCode ? (
               <div data-testid="submission-view-confirmation">
-                {dictSub.confirmationId}: {submission.confirmationCode}
+                {dictSub.confirmationId}
+                {sep}
+                <span data-testid="submission-view-confirmation-code">
+                  {submission.confirmationCode}
+                </span>
               </div>
             ) : null}
             {submitter}
             {submission.submittedAt ? (
               <div data-testid="submission-view-submitted">
-                {dictSub.submittedLabel}: {formatLongDate(submission.submittedAt)}
+                {dictSub.submittedLabel}
+                {sep}
+                {formatLongDate(submission.submittedAt)}
               </div>
             ) : null}
             <div data-testid="submission-view-version">
-              {dict.general.version}: {versionNo}
+              {dict.general.version}
+              {sep}
+              {versionNo}
             </div>
           </div>
         </div>
@@ -106,7 +119,11 @@ export function SubmissionDetail({
         <h2 className="h5 mb-1">{formName}</h2>
         {submission.confirmationCode ? (
           <div data-testid="submission-view-confirmation">
-            {dictSub.confirmationId}: <strong>{submission.confirmationCode}</strong>
+            {dictSub.confirmationId}
+            {sep}
+            <strong data-testid="submission-view-confirmation-code">
+              {submission.confirmationCode}
+            </strong>
           </div>
         ) : null}
         {submitter}
