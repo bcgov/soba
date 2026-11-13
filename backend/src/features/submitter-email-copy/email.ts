@@ -4,10 +4,7 @@ import {
   defineSubmissionEmail,
   renderSubmissionEmail,
 } from '../../core/integrations/notification/email/submissionEmail';
-import {
-  formsMySubmissionsUrl,
-  formsSubmissionUrl,
-} from '../../core/integrations/notification/email/url';
+import { formsMySubmissionsUrl, formsSubmissionUrl } from '../../core/appLinks';
 
 export const EMAIL_COPY = defineSubmissionEmail({
   en: {
