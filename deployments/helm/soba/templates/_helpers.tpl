@@ -195,12 +195,11 @@ cannot drift apart.
 {{- end }}
 
 {{/*
-Truthy ("true") only when the default storage profile is storage-s3 with its credentials in Vault
-(s3VaultKeyInfix set). Gates the S3 Vault secret and the backend sourcing it off one value so they
-cannot drift apart.
+Truthy ("true") only when the default storage profile is storage-s3 with its credentials in Vault.
+Gates the S3 Vault secret and the backend sourcing it off one value so they cannot drift apart.
 */}}
 {{- define "soba.storageUsesS3Vault" -}}
-{{- if and (eq .Values.backend.storage.defaultBackend "storage-s3") .Values.backend.storage.s3VaultKeyInfix -}}true{{- end -}}
+{{- if eq .Values.backend.storage.defaultBackend "storage-s3" -}}true{{- end -}}
 {{- end }}
 
 {{/*
@@ -222,7 +221,7 @@ absolute.
 {{- fail "backend.storage.defaultPrefix must be lowercase words joined by dashes, in slash-separated segments" -}}
 {{- end -}}
 {{- if and (include "soba.storageUsesS3Vault" .) (not .Values.vault.enabled) -}}
-{{- fail "backend.storage.s3VaultKeyInfix needs vault.enabled=true to inject the S3 secrets" -}}
+{{- fail "backend.storage.defaultBackend storage-s3 needs vault.enabled=true to inject the S3 secrets" -}}
 {{- end -}}
 {{- range $key := list "filesStoragePrefix" "templatesStoragePrefix" -}}
 {{- $value := index $storage $key -}}

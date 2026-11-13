@@ -26,7 +26,6 @@ backend:
   storage:
     defaultBackend: storage-s3
     defaultPrefix: test
-    s3VaultKeyInfix: TEST
   config:
     nodeEnv: production
     documentGenerationDefaultCode: cdogs-v2
