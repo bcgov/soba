@@ -9,6 +9,7 @@ backend:
     post-submission: "enabled"
     post-submission-email: "enabled"
     submission-export: "enabled"
+    submitter-email-copy: "enabled"
     user-search: "enabled"
   replicas: 2
   sso:

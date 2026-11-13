@@ -163,4 +163,68 @@ describe('After Submission tabs', () => {
       en.postSubmission.workspaceIntro,
     );
   });
+
+  describe('Confirmation Screen card', () => {
+    const card = () => screen.findByText(dict.postSubmission.confirmationScreen.label);
+    const confirmationView = {
+      inherit: true,
+      own: null,
+      workspace: { allowSubmitterEmailCopy: true },
+      effective: { allowSubmitterEmailCopy: true },
+      version: 1,
+    };
+
+    beforeEach(() => {
+      mockGetWorkspaceSettings.mockImplementation((_token, _ws, key: string) =>
+        Promise.resolve(
+          key === 'post-submission'
+            ? { actions: [] }
+            : { values: { allowSubmitterEmailCopy: true }, version: 1 },
+        ),
+      );
+      mockGetFormSettings.mockImplementation((_token, _form, key: string) =>
+        Promise.resolve(key === 'post-submission' ? { actions: [] } : confirmationView),
+      );
+    });
+
+    it('shows after the actions where email copy is available', async () => {
+      renderTab(<WorkspacePostSubmissionTab dict={dict} workspaceId="ws1" confirmationAvailable />);
+      expect(await card()).toBeInTheDocument();
+    });
+
+    it('is left out where email copy is not available', async () => {
+      renderTab(<WorkspacePostSubmissionTab dict={dict} workspaceId="ws1" />);
+      expect(await screen.findByTestId('post-submission-empty')).toBeInTheDocument();
+      expect(
+        screen.queryByText(dict.postSubmission.confirmationScreen.label),
+      ).not.toBeInTheDocument();
+    });
+
+    // Post-submission off: the tab is only the card, and the actions are never read.
+    it('shows alone, reading no actions, where post-submission is off', async () => {
+      renderTab(
+        <FormPostSubmissionTab
+          dict={dict}
+          formId="f1"
+          actionsAvailable={false}
+          confirmationAvailable
+        />,
+      );
+      expect(await card()).toBeInTheDocument();
+      expect(screen.getByTestId('post-submission-intro')).toBeInTheDocument();
+      expect(screen.queryByTestId('post-submission-empty')).not.toBeInTheDocument();
+      expect(mockGetFormSettings).not.toHaveBeenCalledWith('token', 'f1', 'post-submission');
+    });
+
+    it('stays when the actions fail to load', async () => {
+      mockGetFormSettings.mockImplementation((_token, _form, key: string) =>
+        key === 'post-submission'
+          ? Promise.reject(new ApiError('boom', 500))
+          : Promise.resolve(confirmationView),
+      );
+      renderTab(<FormPostSubmissionTab dict={dict} formId="f1" confirmationAvailable />);
+      expect(await screen.findByTestId('post-submission-load-error')).toBeInTheDocument();
+      expect(await card()).toBeInTheDocument();
+    });
+  });
 });

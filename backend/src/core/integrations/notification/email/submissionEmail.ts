@@ -23,6 +23,8 @@ export interface SubmissionEmailCopy {
   /** The one sentence that says what happened. */
   sentence: (vars: SubmissionEmailVars) => string;
   linkText: string;
+  /** Text for a second link, for an email that has one. */
+  secondLinkText?: string;
 }
 
 /** A submission email's words in English and French. */
@@ -37,6 +39,8 @@ export interface SubmissionEmailFacts {
   confirmationCode: string;
   /** The link for a language, or null when there is none. */
   link: (language: EmailLanguage) => SafeUrl | null;
+  /** A second link for a language, after the first; it needs its template's `secondLinkText`. */
+  secondLink?: (language: EmailLanguage) => SafeUrl | null;
   /** The reviewer's comment as typed, when it goes in the email. */
   comment?: string | null;
 }
@@ -55,7 +59,8 @@ const commentBlock = (order: readonly EmailLanguage[], comment: string): SafeHtm
 
 /**
  * An email about a submission: in each language its Confirmation ID, one sentence and the link,
- * then the comment. The subject ends with the Confirmation ID.
+ * and a second link where the email has one, then the comment. The subject ends with the
+ * Confirmation ID.
  */
 export const renderSubmissionEmail = (
   template: SubmissionEmailTemplate,
@@ -69,6 +74,7 @@ export const renderSubmissionEmail = (
       part: (language) => {
         const copy = template[language];
         const url = facts.link(language);
+        const secondUrl = copy.secondLinkText ? (facts.secondLink?.(language) ?? null) : null;
         return {
           subject: copy.subject(vars),
           section: languageSection(language, [
@@ -77,6 +83,7 @@ export const renderSubmissionEmail = (
             ),
             paragraph(copy.sentence(vars)),
             url && paragraph(link(url, copy.linkText)),
+            secondUrl && copy.secondLinkText && paragraph(link(secondUrl, copy.secondLinkText)),
           ]),
         };
       },

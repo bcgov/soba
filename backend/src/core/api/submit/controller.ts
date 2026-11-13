@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   ApiErrorCodes,
   canContinueSubmission,
+  canEmailSubmissionCopy,
   type MySubmissionRole,
   type ReviseSubmissionBody,
   type SubmitFillBundle,
@@ -18,6 +19,7 @@ import { toSubmitterFormDto } from '../forms/serviceFactory';
 import { toSubmissionDto } from '../submissions/serviceFactory';
 import { submissionReviewService } from '../submissions/reviewService';
 import { workspacesApiService } from '../workspaces/service';
+import { isEmailCopyAvailable } from '../../../features/submitter-email-copy/availability';
 import type { Request, RequestHandler } from 'express';
 import { ListMyFormsQuerySchema, ListMySubmissionsQuerySchema } from './schema';
 
@@ -70,14 +72,20 @@ export const reviseOwnSubmission = asyncHandler(
   },
 );
 
-export const getSubmitSubmission: RequestHandler = (req, res) => {
+export const getSubmitSubmission = asyncHandler(async (req: Request, res: Response) => {
   const { submission, access, form } = loadedSubmission(req);
+  // The caller's grant, the form's setting and the submission's state first; only a submission
+  // that passes them looks up the flag and notifications, both cached.
+  const canEmailCopy =
+    canEmailSubmissionCopy(access, form) &&
+    (await isEmailCopyAvailable({ workspaceId: submission.workspaceId, formId: form.id }));
   res.json({
     ...toSubmissionDto(submission),
     reviewLabel: access.reviewStatus,
     canContinue: canContinueSubmission(access, form, resolveCaller(req)),
+    canEmailCopy,
   });
-};
+});
 
 export const getSubmitSubmissionData = asyncHandler(async (req: Request, res: Response) => {
   const content = await readContent(loadedSubmission(req).submission);

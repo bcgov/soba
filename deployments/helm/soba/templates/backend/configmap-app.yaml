@@ -74,6 +74,21 @@ data:
   {{- with include "soba.hourlyEmailLimit" (dict "name" "postSubmissionEmailEnvironmentHourlyLimit" "value" .Values.backend.config.postSubmissionEmailEnvironmentHourlyLimit) }}
   PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_ENVIRONMENT_HOURLY_LIMIT: {{ . }}
   {{- end }}
+  {{- with include "soba.optionalSetting" .Values.backend.config.submitterEmailCopySubmissionHourlyLimit }}
+  SUBMITTER_EMAIL_COPY_SUBMISSION_HOURLY_LIMIT: {{ . }}
+  {{- end }}
+  {{- with include "soba.optionalSetting" .Values.backend.config.submitterEmailCopyRecipientHourlyLimit }}
+  SUBMITTER_EMAIL_COPY_RECIPIENT_HOURLY_LIMIT: {{ . }}
+  {{- end }}
+  {{- with include "soba.optionalSetting" .Values.backend.config.submitterEmailCopyFormHourlyLimit }}
+  SUBMITTER_EMAIL_COPY_FORM_HOURLY_LIMIT: {{ . }}
+  {{- end }}
+  {{- with include "soba.optionalSetting" .Values.backend.config.submitterEmailCopyWorkspaceHourlyLimit }}
+  SUBMITTER_EMAIL_COPY_WORKSPACE_HOURLY_LIMIT: {{ . }}
+  {{- end }}
+  {{- with include "soba.optionalSetting" .Values.backend.config.submitterEmailCopyEnvironmentHourlyLimit }}
+  SUBMITTER_EMAIL_COPY_ENVIRONMENT_HOURLY_LIMIT: {{ . }}
+  {{- end }}
   {{- with include "soba.optionalSetting" .Values.backend.config.shutdownDelayMs }}
   SHUTDOWN_DELAY_MS: {{ . }}
   {{- end }}

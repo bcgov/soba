@@ -106,6 +106,7 @@ backend:
     post-submission: ""
     post-submission-email: ""
     submission-export: ""
+    submitter-email-copy: ""
     user-search: ""
 
   # -- configmap-app: general application config
@@ -163,6 +164,13 @@ backend:
     postSubmissionEmailFormHourlyLimit: ""
     postSubmissionEmailWorkspaceHourlyLimit: ""
     postSubmissionEmailEnvironmentHourlyLimit: ""
+    # submitter-email-copy: copies allowed per hour, per submission, recipient address, form,
+    # workspace and environment, each from 1 to 1000000. "" uses the defaults (5, 10, 500, 2000, 5000).
+    submitterEmailCopySubmissionHourlyLimit: ""
+    submitterEmailCopyRecipientHourlyLimit: ""
+    submitterEmailCopyFormHourlyLimit: ""
+    submitterEmailCopyWorkspaceHourlyLimit: ""
+    submitterEmailCopyEnvironmentHourlyLimit: ""
     sobaSystemSubject: soba-system
     # On SIGTERM the backend keeps serving for shutdownDelayMs, or until running jobs drain if that
     # takes longer (see jobs.drainMs), then closes the server and exits by shutdownTimeoutMs; keep

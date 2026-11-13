@@ -1,6 +1,7 @@
 import {
   canReadSubmission,
   canWriteSubmission,
+  emailCopyStatusOf,
   isIdentifiedCaller,
   ownDeleteStatusOf,
   reviseStatusOf,
@@ -44,6 +45,7 @@ const DENIAL_MESSAGES: Record<SubmitterOperationCode, string> = {
   render: 'Not authorized to generate this document',
   delete: 'Not authorized to delete this submission',
   revise: 'Not authorized to revise this submission',
+  emailCopy: 'Not authorized to access this submission',
 };
 
 /** Logs and throws the refusal: 401 for anonymous, 403 for an authenticated caller. */
@@ -212,6 +214,41 @@ export const requireSubmissionRevise: RequestHandler = (req, _res, next) => {
         req,
         SubmitterOperation.revise,
         { formId: submission.formId, submissionId: submission.id },
+        change.code,
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Authorizes emailing the caller a copy of the confirmation: a caller who cannot read the submission
+ * is refused as a read is (401 anonymous, 403 signed in). A form that does not allow it is 403 for
+ * everyone, since signing in would not change that, and a submission not yet submitted is 409.
+ */
+export const requireSubmissionEmailCopy: RequestHandler = (req, _res, next) => {
+  try {
+    const { submission, access, form } = loadedSubmission(req);
+    const change = emailCopyStatusOf(access, form);
+    if (change.status === SubmissionChangeStatus.denied) {
+      if (change.code === ApiErrorCodes.email_copy_disabled) {
+        throw new ForbiddenError(
+          "This form's confirmation does not offer an email copy",
+          change.code,
+        );
+      }
+      refuseSubmitter(
+        req,
+        SubmitterOperation.emailCopy,
+        { formId: submission.formId, submissionId: submission.id },
+        change.code,
+      );
+    }
+    if (change.status === SubmissionChangeStatus.closed) {
+      throw new ConflictError(
+        `Submission is ${submission.workflowState}; only a submitted submission can be emailed`,
         change.code,
       );
     }

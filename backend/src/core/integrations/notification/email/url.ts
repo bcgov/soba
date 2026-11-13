@@ -59,3 +59,9 @@ export const formsSubmissionUrl = (
   page: FormsSubmissionPage,
   submissionId: string,
 ): SafeUrl | null => appLink(base, [language, page, submissionId]);
+
+/** The signed-in submitter's own submissions in the forms app; opening it needs sign-in. */
+export const formsMySubmissionsUrl = (
+  base: string | undefined,
+  language: EmailLanguage,
+): SafeUrl | null => appLink(base, [language, 'my-submissions']);

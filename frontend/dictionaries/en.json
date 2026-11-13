@@ -411,7 +411,8 @@
       "submissionSubmitted": "Submission received",
       "submissionExport": "Submission export",
       "submissionStatusChanged": "Status changed",
-      "submissionStatusEmail": "Status email"
+      "submissionStatusEmail": "Status email",
+      "submissionEmailCopy": "Submitter email copy"
     },
     "detail": {
       "heading": "Job",
@@ -721,6 +722,7 @@
     "loading": "Loading submissions…",
     "error": "Could not load submissions.",
     "submittedOn": "Submitted",
+    "submittedLabel": "Submitted",
     "noContent": "No submitted answers to display.",
     "notFound": "Submission not found.",
     "loadError": "Could not load this submission.",
@@ -898,6 +900,17 @@
       "filePageTitle": "Download export",
       "backToExports": "Back to exports",
       "fileNotFound": "This export is no longer available. Start a new one."
+    },
+    "emailReceipt": {
+      "button": "Email receipt of submission",
+      "title": "Email a receipt of this submission",
+      "description": "We will email the confirmation ID and a link to this submission. Your answers are not included.",
+      "addressLabel": "Email address",
+      "invalidAddress": "Enter a valid email address.",
+      "send": "Send",
+      "cancel": "Cancel",
+      "sent": "A copy is on its way to {address}.",
+      "failed": "The copy could not be sent. Try again later."
     }
   },
   "mySubmissions": {
@@ -953,6 +966,10 @@
     "revise_denied": "Only the person who submitted it, signed in, can revise this submission.",
     "revise_disabled": "This form's settings do not let submitters revise their submissions.",
     "revise_closed": "This submission can no longer be revised: a reviewer has already taken it up.",
+    "email_copy_disabled": "This form does not offer an email copy of the confirmation.",
+    "email_copy_closed": "Only a submitted submission can be emailed.",
+    "email_copy_unavailable": "Email is not available right now. Try again later.",
+    "email_copy_limit_reached": "Too many copies were requested. Try again later.",
     "edit_closed": "Only a submitted submission can be changed by staff. A submission sent back for revision is its submitters’ to change.",
     "drafts_disabled": "Drafts are not turned on for this form.",
     "drafts_public": "Drafts cannot be saved on a public form.",
@@ -1093,6 +1110,11 @@
       "note": "Note",
       "noteHelp": "Up to {max} characters.",
       "noteValue": "Note: {note}"
+    },
+    "confirmationScreen": {
+      "label": "Confirmation Screen",
+      "allowEmailCopy": "Let submitters email themselves a copy of their submission",
+      "loadError": "The confirmation screen settings could not be loaded."
     }
   },
   "fileDownload": {

@@ -117,7 +117,7 @@ export type SubmissionChangeStatusCode =
 /**
  * Why an API request failed; an error response carries it as `code`. A `*_denied` refusal and
  * `sign_in_required` are 401 for an anonymous caller and 403 otherwise; `drafts_*`,
- * `status_updates_disabled` and `revise_disabled` are 403; `status_changed`,
+ * `status_updates_disabled`, `revise_disabled` and `email_copy_disabled` are 403; `status_changed`,
  * `status_move_not_allowed`, `revision_needs_submitter`, `data_changed`, `*_closed`, `*_taken`,
  * `version_not_published`, `already_exists`, `member_exists`, `member_protected`, `role_in_use` and
  * `last_form_admin` are 409; `*_not_found` and `not_published` are 404;
@@ -141,6 +141,11 @@ export const ApiErrorCodes = {
   delete_closed: 'delete_closed',
   revise_closed: 'revise_closed',
   edit_closed: 'edit_closed',
+  // Emailing a submitter a copy of their confirmation.
+  email_copy_disabled: 'email_copy_disabled',
+  email_copy_closed: 'email_copy_closed',
+  email_copy_unavailable: 'email_copy_unavailable',
+  email_copy_limit_reached: 'email_copy_limit_reached',
   not_published: 'not_published',
   // Opening a submission.
   form_not_found: 'form_not_found',

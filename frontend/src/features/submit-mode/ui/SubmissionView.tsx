@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, usePathname, useRouter } from 'next/navigation';
-import { InlineAlert, Link } from '@bcgov/design-system-react-components';
+import { Button, InlineAlert, Link } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
@@ -11,6 +11,7 @@ import { useSubmitSubmission } from '@/src/features/submit-mode/data/useSubmitSu
 import { useSubmitterPrint } from '@/src/features/templates/data/useSubmissionPrint';
 import { printBaseName } from '@/src/features/templates/printFileName';
 import { PrintSubmissionButton } from '@/src/features/templates/ui/PrintSubmissionButton';
+import { EmailReceiptButton } from '@/src/features/submitter-email-copy/ui/EmailReceiptButton';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { SubmissionWorkflowState, SubmitterReviewLabels } from '@/src/types/submissions';
 
@@ -38,14 +39,16 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
           schema={data.schema}
           content={data.content}
           reviewLabel={data.submission.reviewLabel}
+          confirmation={success}
         />
       );
-      const actions = (link: React.ReactNode) => (
-        <div className="mb-3 d-flex align-items-center gap-2 d-print-none">
-          {link}
-          <div className="ms-auto">
-            <PrintSubmissionButton print={print} baseName={printBaseName(data.submission)} />
-          </div>
+      // One row of buttons from the left: what the page leads with, the email receipt where the
+      // server offers it, then Print.
+      const actions = (leading: React.ReactNode) => (
+        <div className="mb-3 d-flex flex-wrap align-items-center gap-2 d-print-none">
+          {leading}
+          {data.submission.canEmailCopy && <EmailReceiptButton submissionId={submissionId} />}
+          <PrintSubmissionButton print={print} baseName={printBaseName(data.submission)} />
         </div>
       );
       if (!success) {
@@ -89,12 +92,14 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
           {/* Signed in only; the bare URL opens the list unfiltered. */}
           {actions(
             authenticated ? (
-              <Link
+              <Button
+                variant="secondary"
+                size="small"
                 data-testid="submission-success-my-submissions"
                 onPress={() => router.push(`/${locale}/my-submissions`)}
               >
                 {dict.mySubmissions.viewAll}
-              </Link>
+              </Button>
             ) : null,
           )}
           {detail}
