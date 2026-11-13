@@ -699,11 +699,13 @@ describe('FormForm', () => {
     it('asks before opening another version over them, and stays when told to', async () => {
       await editAndPick('v1');
 
-      expect(await screen.findByTestId('unsaved-message')).toBeInTheDocument();
+      expect(await screen.findByTestId('pending-unsaved-message')).toBeInTheDocument();
 
-      await userEvent.click(screen.getByTestId('unsaved-stay'));
+      await userEvent.click(screen.getByTestId('pending-unsaved-stay'));
 
-      await waitFor(() => expect(screen.queryByTestId('unsaved-message')).not.toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.queryByTestId('pending-unsaved-message')).not.toBeInTheDocument(),
+      );
       // Still on the draft the edits were made on, with Save still offered for them.
       expect(screen.getByTestId('form-designer')).toHaveTextContent('from-v2');
       expect(screen.queryByTestId('page-notice-history-view')).not.toBeInTheDocument();
@@ -713,7 +715,7 @@ describe('FormForm', () => {
     it('opens the other version once they are discarded', async () => {
       await editAndPick('v1');
 
-      await userEvent.click(await screen.findByTestId('unsaved-discard'));
+      await userEvent.click(await screen.findByTestId('pending-unsaved-discard'));
 
       await waitFor(() => expect(screen.getByTestId('form-designer')).toHaveTextContent('from-v1'));
       expect(api.saveFormVersionSchema).not.toHaveBeenCalled();
@@ -722,7 +724,7 @@ describe('FormForm', () => {
     it('saves them, then opens the other version', async () => {
       await editAndPick('v1');
 
-      await userEvent.click(await screen.findByTestId('unsaved-save'));
+      await userEvent.click(await screen.findByTestId('pending-unsaved-save'));
 
       await waitFor(() => expect(api.saveFormVersionSchema).toHaveBeenCalledTimes(1));
       expect(api.saveFormVersionSchema.mock.calls[0].slice(1, 3)).toEqual([
@@ -737,9 +739,11 @@ describe('FormForm', () => {
       api.saveFormVersionSchema.mockRejectedValue(new Error('boom'));
       await editAndPick('v1');
 
-      await userEvent.click(await screen.findByTestId('unsaved-save'));
+      await userEvent.click(await screen.findByTestId('pending-unsaved-save'));
 
-      await waitFor(() => expect(screen.queryByTestId('unsaved-message')).not.toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.queryByTestId('pending-unsaved-message')).not.toBeInTheDocument(),
+      );
       expect(screen.getByTestId('form-designer')).toHaveTextContent('from-v2');
       expect(screen.queryByTestId('page-notice-history-view')).not.toBeInTheDocument();
       expect(screen.getByTestId('save-form-button')).toBeEnabled();
@@ -750,7 +754,7 @@ describe('FormForm', () => {
       await editAndPick('create');
 
       await waitFor(() => expect(api.createFormVersion).toHaveBeenCalled());
-      expect(screen.queryByTestId('unsaved-message')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('pending-unsaved-message')).not.toBeInTheDocument();
     });
   });
 
