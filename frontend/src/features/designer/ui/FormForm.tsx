@@ -28,6 +28,7 @@ import { useWorkspace } from '@/src/shared/api/useWorkspaces';
 import { lookupTruncatedNote, withSelectedOption } from '@/src/shared/list/lookupOptions';
 import { useForm, useFormWriter } from '@/src/features/designer/data/useForm';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
+import { useLeaveGuard } from '@/src/shared/hooks/useLeaveGuard';
 
 import type { FormVersionSummary, SobaFormVersionListItem } from '@/src/types/forms';
 import { messageForDataError } from '@/src/shared/api/dataError';
@@ -195,6 +196,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     setSchema,
     discardEdits,
     selectVersion,
+    openVersion,
     refreshVersions,
   } = useForm(formId);
   const formWriter = useFormWriter(formId);
@@ -204,6 +206,8 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   const draftUnavailable = loading || !!loadError;
 
   const isCurrentPublished = currentVersion?.state === 'published';
+  // When save would take the edits: not on history, a published version, or a version since replaced.
+  const canSaveEdits = !isHistoryView && !isCurrentPublished && !editsStale;
 
   const selectedWorkspaceId = form?.workspaceId ?? null;
   const { workspace: formWorkspace } = useWorkspace(form?.workspaceId);
@@ -221,7 +225,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
       historicalVersionNo,
       isCurrentPublished,
       editsStale,
-      onSwitchToCurrent: () => selectVersion('current'),
+      onSwitchToCurrent: () => selectVersionGuarded('current'),
       onDiscardEdits: discardEdits,
     }),
   );
@@ -282,8 +286,8 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   };
 
   /**
-   * Run a new-version write, then select the new draft in-page (it has the highest versionNo, so it
-   * is the form's current version once the form is read again) and report. Navigate only on true.
+   * Run a new-version write, open the new version in the designer as the current one, and report.
+   * it stays out of the form's versions until it is saved. Navigate only on true.
    */
   const applyNewVersion = async (
     run: () => ReturnType<typeof formWriter.createVersion>,
@@ -293,12 +297,10 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     setIsSaving(true);
     try {
       const outcome = await run();
-      selectVersion('current');
       if (outcome.status === 'applied') {
+        openVersion(outcome.value);
         addNotification({
-          text: (
-            dict.form.versionDraftCreated || 'Version {version} draft created successfully!'
-          ).replace('{version}', String(outcome.value.versionNo)),
+          text: dict.form.versionOpened.replace('{version}', String(outcome.value.versionNo)),
           type: 'success',
         });
       }
@@ -330,6 +332,32 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   const restoreVersionAsNew = (version: SobaFormVersionListItem): Promise<boolean> =>
     applyNewVersion(() => formWriter.restoreVersion(token as string, version.id));
 
+  /** Delete a draft version and report. True when it is gone, so the caller can close its prompt. */
+  const deleteVersion = async (version: SobaFormVersionListItem): Promise<boolean> => {
+    if (writing.current || !token) return false;
+    writing.current = true;
+    setIsSaving(true);
+    try {
+      await formWriter.deleteVersion(token, version.id);
+      // The designer must not stay on a version that no longer exists.
+      if (selectedVersionId === version.id) selectVersion('current');
+      addNotification({
+        text: dict.form.versionDeleted.replace('{version}', String(version.versionNo)),
+        type: 'success',
+      });
+      return true;
+    } catch (e: unknown) {
+      // The conflict text is about unsaved edits, which a delete has nothing to do with. A 409 here
+      // means the version is no longer a draft, so the re-read shows why the delete was refused.
+      addNotification({ text: dict.form.deleteVersionError, type: 'error', consoleError: e });
+      if (isConflict(e)) await refreshVersions().catch(() => undefined);
+      return false;
+    } finally {
+      writing.current = false;
+      setIsSaving(false);
+    }
+  };
+
   const saveFormPublish = async () => {
     await saveForm(true);
   };
@@ -338,31 +366,84 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     await saveForm(false);
   };
 
-  const saveForm = async (publish: boolean = false) => {
-    if (writing.current || draftUnavailable) return;
-    // An existing form with no current version. Saving here would file the edits under a second form.
-    if (!currentVersion?.id) return;
+  /** True once the edits are saved. */
+  const saveForm = async (publish: boolean = false): Promise<boolean> => {
+    if (writing.current || draftUnavailable || !token) return false;
     writing.current = true;
     setIsSaving(true);
     try {
-      await formWriter.saveSchema(
-        token as string,
-        currentVersion.id,
-        (formSchema ?? {}) as FormType,
-        publish,
-      );
+      const schema = (formSchema ?? {}) as FormType;
+      let targetId = currentVersion?.id;
+      // A form with no saved version, such as a new one left before its first save, gets one here.
+      if (!targetId) {
+        const created = await formWriter.createVersion(token, schema);
+        if (created.status !== 'applied') return false;
+        targetId = created.value.id;
+      }
+      await formWriter.saveSchema(token, targetId, schema, publish);
       addNotification({
         text: publish ? dict.form.published || 'Form published successfully!' : dict.form.saved,
         type: 'success',
       });
       discardEdits();
+      return true;
     } catch (e: unknown) {
       await reportWriteFailure(e, dict.form.saveError);
+      return false;
     } finally {
       writing.current = false;
       setIsSaving(false);
     }
   };
+
+  // An action that would throw the unsaved edits away, waiting on the person's answer.
+  const [pendingLeave, setPendingLeave] = useState<{
+    proceed: () => void;
+    cancel: () => void;
+  } | null>(null);
+
+  /**
+   * Runs `action` at once when there is nothing unsaved. Otherwise asks first: save and go on,
+   * discard and go on, or stay. Settles with `stayed` when the person stays or the save fails.
+   */
+  const confirmDiscard = <T,>(action: () => T | Promise<T>, stayed: T): Promise<T> => {
+    if (!isDirty) return Promise.resolve(action());
+    return new Promise<T>((resolve) => {
+      setPendingLeave({
+        proceed: () => resolve(action()),
+        cancel: () => resolve(stayed),
+      });
+    });
+  };
+
+  useLeaveGuard(isDirty, (proceed) => {
+    setPendingLeave({ proceed, cancel: () => undefined });
+  });
+
+  const answerLeave = async (answer: 'save' | 'discard' | 'stay') => {
+    if (!pendingLeave) return;
+    if (answer === 'stay') {
+      setPendingLeave(null);
+      pendingLeave.cancel();
+      return;
+    }
+    if (answer === 'save' && !(await saveForm(false))) {
+      // The failure is reported; the edits are still here to save again or discard.
+      setPendingLeave(null);
+      pendingLeave.cancel();
+      return;
+    }
+    if (answer === 'discard') discardEdits();
+    setPendingLeave(null);
+    pendingLeave.proceed();
+  };
+
+  const selectVersionGuarded = (versionId: string): void => {
+    void confirmDiscard(() => selectVersion(versionId), undefined);
+  };
+
+  const restoreVersionGuarded = (version: SobaFormVersionListItem): Promise<boolean> =>
+    confirmDiscard(() => restoreVersionAsNew(version), false);
 
   if (initializing) {
     return <CenteredProgress label={dict.form.loading} />;
@@ -499,10 +580,11 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   };
 
   const selectVersionFromDrop = (key: string): void => {
+    // A new version carries the edits with it, so only opening another version loses them.
     if (key === CREATE_NEW_VERSION_KEY) {
       void createNewVersion();
     } else {
-      selectVersion(key);
+      selectVersionGuarded(key);
     }
   };
 
@@ -577,8 +659,9 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
             <FormHistoryTab
               dict={dict}
               formId={formId}
-              onSelectVersion={selectVersion}
-              onRestoreVersion={restoreVersionAsNew}
+              onSelectVersion={selectVersionGuarded}
+              onRestoreVersion={restoreVersionGuarded}
+              onDeleteVersion={deleteVersion}
               onNavigateToDesigner={() => openTab(DESIGNER_TAB)}
             />
           </Tab>
@@ -623,6 +706,47 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
           />
         </Tab>
       </Tabs>
+
+      <CommonModal
+        show={!!pendingLeave}
+        title={dict.form.unsavedChangesTitle}
+        onClose={() => void answerLeave('stay')}
+        size="sm"
+        footer={
+          <>
+            {canSaveEdits && (
+              <Button
+                variant="primary"
+                isDisabled={isSaving}
+                onPress={() => void answerLeave('save')}
+                data-testid="pending-unsaved-save"
+              >
+                {dict.form.unsavedChangesSave}
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              isDisabled={isSaving}
+              onPress={() => void answerLeave('discard')}
+              data-testid="pending-unsaved-discard"
+            >
+              {dict.form.unsavedChangesDiscard}
+            </Button>
+            <Button
+              variant="tertiary"
+              isDisabled={isSaving}
+              onPress={() => void answerLeave('stay')}
+              data-testid="pending-unsaved-stay"
+            >
+              {dict.form.unsavedChangesStay}
+            </Button>
+          </>
+        }
+      >
+        <p data-testid="pending-unsaved-message">
+          {canSaveEdits ? dict.form.unsavedChangesMessage : dict.form.unsavedChangesCannotSave}
+        </p>
+      </CommonModal>
 
       {/* Preview Modal */}
       <CommonModal

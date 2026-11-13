@@ -12,6 +12,7 @@ jest.mock('../../../src/core/db/repos/formVersionRepo', () => ({
   lockFormVersion: jest.fn(),
   getCurrentFormVersion: jest.fn(),
   updateFormVersionDraft: jest.fn(),
+  nextFormVersionNo: jest.fn(),
 }));
 
 const getById = repo.getFormVersionById as unknown as jest.Mock;
@@ -20,6 +21,7 @@ const getPublished = repo.getPublishedVersionForForm as unknown as jest.Mock;
 const updateDraft = repo.updateFormVersionDraft as unknown as jest.Mock;
 const lock = repo.lockFormVersion as unknown as jest.Mock;
 const getCurrent = repo.getCurrentFormVersion as unknown as jest.Mock;
+const nextNo = repo.nextFormVersionNo as unknown as jest.Mock;
 
 const actor = {
   workspaceId: 'ws1',
@@ -70,6 +72,50 @@ describe('FormVersionService state transitions', () => {
       }),
       expect.anything(),
     );
+  });
+
+  // Its schema was written when it was created, so it does not need a save first.
+  it('publish: opened → published, under the next free number', async () => {
+    getById.mockResolvedValue({
+      id: 'v1',
+      workspaceId: 'ws1',
+      formId: 'f1',
+      state: 'opened',
+      engineSyncStatus: 'ready',
+    });
+    getCurrent.mockResolvedValue(null);
+    getPublished.mockResolvedValue(null);
+    nextNo.mockResolvedValue(1);
+
+    await svc.publish(actor);
+
+    expect(updateDraft).toHaveBeenCalledWith(
+      'ws1',
+      'v1',
+      'Author',
+      expect.objectContaining({ state: 'published', versionNo: 1 }),
+      expect.anything(),
+    );
+  });
+
+  it('delete: opened → deleted', async () => {
+    getByIdInclDeleted.mockResolvedValue({ id: 'v1', formId: 'f1', state: 'opened' });
+
+    await svc.delete(actor);
+
+    expect(updateDraft).toHaveBeenCalledWith(
+      'ws1',
+      'v1',
+      'Author',
+      expect.objectContaining({ state: 'deleted' }),
+    );
+  });
+
+  it('unpublish: rejects an opened version', async () => {
+    getById.mockResolvedValue({ id: 'v1', formId: 'f1', state: 'opened' });
+
+    await expect(svc.unpublish(actor)).rejects.toThrow(/Cannot change/);
+    expect(updateDraft).not.toHaveBeenCalled();
   });
 
   it('publish: rejects when engineSyncStatus is not ready', async () => {

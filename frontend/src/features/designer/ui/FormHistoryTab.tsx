@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { Link } from '@bcgov/design-system-react-components';
 
 import type { Dictionary } from '@/src/types/dictionary';
+import { ConfirmModal } from '@/src/components/ConfirmModal';
 import { Tag, TagColor } from '@/src/components/Tag';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
@@ -19,6 +20,8 @@ interface FormHistoryTabProps {
   formId?: string;
   onSelectVersion: (versionId: string) => void;
   onRestoreVersion: (version: SobaFormVersionListItem) => Promise<boolean>;
+  /** Resolves true once the version is gone. The caller reports the outcome. */
+  onDeleteVersion: (version: SobaFormVersionListItem) => Promise<boolean>;
   onNavigateToDesigner?: () => void;
 }
 
@@ -32,6 +35,7 @@ export default function FormHistoryTab({
   formId,
   onSelectVersion,
   onRestoreVersion,
+  onDeleteVersion,
   onNavigateToDesigner,
 }: Readonly<FormHistoryTabProps>) {
   const query = useListQuery(FORM_VERSIONS_LIST_QUERY);
@@ -50,6 +54,20 @@ export default function FormHistoryTab({
     },
     [onSelectVersion, onNavigateToDesigner],
   );
+
+  const [pendingDelete, setPendingDelete] = useState<SobaFormVersionListItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // The prompt stays open on a failure, so the person can try again or back out.
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setIsDeleting(true);
+    try {
+      if (await onDeleteVersion(pendingDelete)) setPendingDelete(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const restore = useCallback(
     (version: SobaFormVersionListItem) => {
@@ -119,6 +137,15 @@ export default function FormHistoryTab({
             >
               {dict.form.newVersionFrom}
             </Link>
+            {version.state === 'draft' && (
+              <Link
+                className="bcds-react-aria-Link danger medium false me-2"
+                data-testid={`${version.id}-deleteVersion-link`}
+                onPress={() => setPendingDelete(version)}
+              >
+                {dict.form.deleteVersion}
+              </Link>
+            )}
           </>
         ),
       },
@@ -127,14 +154,32 @@ export default function FormHistoryTab({
   );
 
   return (
-    <DataTable<SobaFormVersionListItem>
-      {...table}
-      columns={columns}
-      emptyMessage={dict.form.emptyHistory}
-      loadingMessage={dict.general.loading}
-      itemName="items"
-      caption={dict.form.historyTab}
-      keyExtractor={(version) => version.id}
-    />
+    <>
+      <DataTable<SobaFormVersionListItem>
+        {...table}
+        columns={columns}
+        emptyMessage={dict.form.emptyHistory}
+        loadingMessage={dict.general.loading}
+        itemName="items"
+        caption={dict.form.historyTab}
+        keyExtractor={(version) => version.id}
+      />
+      {pendingDelete && (
+        <ConfirmModal
+          show
+          title={dict.form.deleteVersionConfirmTitle}
+          message={dict.form.deleteVersionConfirmMessage.replace(
+            '{version}',
+            String(pendingDelete.versionNo),
+          )}
+          confirmLabel={dict.form.deleteVersion}
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => {
+            if (!isDeleting) setPendingDelete(null);
+          }}
+          pending={isDeleting}
+        />
+      )}
+    </>
   );
 }

@@ -9,13 +9,23 @@ const { mockGetVersionPage, dict } = vi.hoisted(() => ({
   mockGetVersionPage: vi.fn(),
   dict: {
     locale: 'en',
-    general: { loading: 'Loading...', version: 'Version', forms: 'Forms', sortBy: 'Sort by' },
+    general: {
+      loading: 'Loading...',
+      version: 'Version',
+      forms: 'Forms',
+      sortBy: 'Sort by',
+      cancel: 'Cancel',
+    },
+    modal: { dialogActions: 'Dialog actions' },
     dataTable: { itemName: 'items', pageOf: 'of {totalPages} page(s)' },
     header: { design: 'Design' },
     form: {
       status: 'Status',
       newVersionFrom: 'New version from',
       emptyHistory: 'No versions yet.',
+      deleteVersion: 'Delete version',
+      deleteVersionConfirmTitle: 'Delete draft version',
+      deleteVersionConfirmMessage: 'Delete draft version {version}? This cannot be undone.',
     },
     submission: {
       formList: { columns: { createdBy: 'Created By', createdAt: 'Created Date' } },
@@ -60,6 +70,7 @@ let store: ReturnType<typeof makeStore>;
 function renderTab(
   onSelectVersion = vi.fn(),
   onRestoreVersion = vi.fn(() => Promise.resolve(true)),
+  onDeleteVersion = vi.fn(() => Promise.resolve(true)),
 ) {
   const onNavigateToDesigner = vi.fn();
   render(
@@ -72,12 +83,13 @@ function renderTab(
           formId="f1"
           onSelectVersion={onSelectVersion}
           onRestoreVersion={onRestoreVersion}
+          onDeleteVersion={onDeleteVersion}
           onNavigateToDesigner={onNavigateToDesigner}
         />
       </SWRConfig>
     </Provider>,
   );
-  return { onSelectVersion, onRestoreVersion, onNavigateToDesigner };
+  return { onSelectVersion, onRestoreVersion, onDeleteVersion, onNavigateToDesigner };
 }
 
 describe('FormHistoryTab', () => {
@@ -159,5 +171,48 @@ describe('FormHistoryTab', () => {
     await userEvent.click(screen.getByTestId('v9-newVersionFrom-link'));
 
     await waitFor(() => expect(onNavigateToDesigner).toHaveBeenCalled());
+  });
+
+  it('offers delete on a draft only', async () => {
+    mockGetVersionPage.mockResolvedValue({
+      items: [version('v9', 9), version('v8', 8, 'published')],
+      page: { offset: 0, limit: 10, total: 2 },
+    });
+    renderTab();
+    await screen.findByTestId('v8-status-tag');
+
+    expect(screen.getByTestId('v9-deleteVersion-link')).toBeInTheDocument();
+    expect(screen.queryByTestId('v8-deleteVersion-link')).not.toBeInTheDocument();
+  });
+
+  it('deletes a draft only once the person confirms', async () => {
+    const { onDeleteVersion } = renderTab();
+    await screen.findByTestId('v9-deleteVersion-link');
+
+    await userEvent.click(screen.getByTestId('v9-deleteVersion-link'));
+
+    expect(onDeleteVersion).not.toHaveBeenCalled();
+    expect(screen.getByText('Delete draft version 9? This cannot be undone.')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete version' }));
+
+    expect(onDeleteVersion).toHaveBeenCalledWith(expect.objectContaining({ id: 'v9' }));
+    await waitFor(() =>
+      expect(screen.queryByText(/This cannot be undone/)).not.toBeInTheDocument(),
+    );
+  });
+
+  it('keeps the prompt open when the delete fails', async () => {
+    renderTab(
+      vi.fn(),
+      vi.fn(() => Promise.resolve(true)),
+      vi.fn(() => Promise.resolve(false)),
+    );
+    await screen.findByTestId('v9-deleteVersion-link');
+
+    await userEvent.click(screen.getByTestId('v9-deleteVersion-link'));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete version' }));
+
+    expect(screen.getByText('Delete draft version 9? This cannot be undone.')).toBeInTheDocument();
   });
 });

@@ -243,6 +243,11 @@ export async function getSobaFormVersion(token: string, id: string): Promise<Sob
   return parseJson(response);
 }
 
+export async function deleteSobaFormVersion(token: string, id: string): Promise<void> {
+  const response = await sobaFetch(`${FORM_VERSIONS_PATH}/${id}`, { token, method: 'DELETE' });
+  if (!response.ok && response.status !== 404) await parseJson(response);
+}
+
 /** One page of a form's versions, for the history table. */
 export async function getSobaFormVersionPage(
   token: string,
