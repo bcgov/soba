@@ -8,7 +8,7 @@ import {
   Form,
   TextField,
 } from '@bcgov/design-system-react-components';
-import { CredentialFieldsSchema } from '@soba/lib';
+import { CredentialFieldsSchema, type CredentialPermission } from '@soba/lib';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
@@ -35,6 +35,7 @@ export interface ApiKeyFormProps {
   credentialId?: string;
   /** Whether the issuer can generate keys. */
   available: boolean;
+  availablePermissions?: CredentialPermission[];
   /** Told whether the form is issuing, showing or holding an unsaved new key. */
   onHoldChange?: (held: boolean) => void;
   onDone: () => void;
@@ -49,6 +50,7 @@ export function ApiKeyForm({
   owner,
   credentialId,
   available,
+  availablePermissions = [],
   onHoldChange,
   onDone,
 }: Readonly<ApiKeyFormProps>) {
@@ -69,6 +71,7 @@ export function ApiKeyForm({
         owner={owner}
         credential={seed}
         available={available}
+        availablePermissions={availablePermissions}
         onHoldChange={onHoldChange}
         onDone={onDone}
       />
@@ -103,6 +106,7 @@ interface ApiKeyFieldsProps {
   /** The key as read for this form, or null to generate one. Seeds the fields on mount. */
   credential: CredentialMetadata | null;
   available: boolean;
+  availablePermissions: CredentialPermission[];
   onHoldChange?: (held: boolean) => void;
   onDone: () => void;
 }
@@ -125,6 +129,7 @@ function ApiKeyFields({
   owner,
   credential,
   available,
+  availablePermissions,
   onHoldChange,
   onDone,
 }: Readonly<ApiKeyFieldsProps>) {
@@ -136,6 +141,9 @@ function ApiKeyFields({
   const [label, setLabel] = useState(credential?.label ?? '');
   const [notes, setNotes] = useState(credential?.notes ?? '');
   const [types, setTypes] = useState<CredentialType[]>(credential?.types ?? []);
+  const [permissions, setPermissions] = useState<CredentialPermission[]>(
+    credential?.permissions ?? [],
+  );
   // The key as last stored: null until a new key is generated.
   const [saved, setSaved] = useState<CredentialMetadata | null>(credential);
   // The key just issued, shown once in a modal until it is closed.
@@ -154,7 +162,7 @@ function ApiKeyFields({
     return () => onHoldChange?.(false);
   }, [held, onHoldChange]);
 
-  const fields = CredentialFieldsSchema.safeParse({ label, notes, types });
+  const fields = CredentialFieldsSchema.safeParse({ label, notes, types, permissions });
   const canGenerate = available && Boolean(token) && busy === null && fields.success;
   const canRegenerate =
     available && Boolean(token) && busy === null && saved?.status === 'active' && !regenerateFailed;
@@ -265,7 +273,10 @@ function ApiKeyFields({
           label={t.types}
           description={t.typesHelp}
           value={types}
-          onChange={(values) => setTypes(values as CredentialType[])}
+          onChange={(values) => {
+            setTypes(values as CredentialType[]);
+            if (!values.includes('api')) setPermissions([]);
+          }}
           isRequired
           isDisabled={busy !== null}
         >
@@ -276,6 +287,26 @@ function ApiKeyFields({
             {t.webComponents}
           </Checkbox>
         </CheckboxGroup>
+        {types.includes('api') && (
+          <CheckboxGroup
+            label={t.permissions}
+            description={t.permissionsHelp}
+            value={permissions}
+            onChange={(values) => setPermissions(values as CredentialPermission[])}
+            isDisabled={busy !== null}
+          >
+            <Checkbox
+              value="submission_read"
+              isDisabled={
+                !availablePermissions.includes('submission_read') &&
+                !permissions.includes('submission_read')
+              }
+              data-testid="api-key-permission-submission-read"
+            >
+              {t.readSubmissions}
+            </Checkbox>
+          </CheckboxGroup>
+        )}
         <div className={styles.actions}>
           <Button type="submit" variant="primary" isDisabled={!canSave} data-testid="api-key-save">
             {busy === 'save' ? t.saving : t.save}

@@ -11,12 +11,8 @@ import type {
 } from '../../core/auth/IdpPlugin';
 import type { NormalizedProfile, IdpAttributes } from '../../core/auth/jwtClaims';
 import { authEnv } from '../../core/config/authEnv';
-import {
-  firstString,
-  firstEmailLike,
-  sanitizeIdpAttributes,
-  createJwksExpressMiddleware,
-} from './jwksHelpers';
+import { createJwksExpressMiddleware } from '../../core/auth/jwks';
+import { firstString, firstEmailLike, sanitizeIdpAttributes } from './jwksHelpers';
 
 const CLAIM_DISPLAY_NAME = ['display_name', 'display_name_alt', 'name'] as const;
 const CLAIM_EMAIL = ['email', 'user_principal_name', 'upn', 'preferred_username'] as const;
@@ -149,7 +145,7 @@ export const idpPluginDefinition: IdpPluginDefinition = {
           (req as Request & { idpPluginCode?: string }).idpPluginCode = 'bcgov-sso';
         }
         next();
-      });
+      }).catch(next);
     };
   },
 

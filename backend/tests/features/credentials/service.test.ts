@@ -15,6 +15,14 @@ jest.mock('../../../src/core/integrations/credential-issuer/CredentialIssuerRegi
   createCredentialIssuerAdapter: jest.fn(),
   resolveDefaultCredentialIssuerCode: jest.fn(),
 }));
+jest.mock('../../../src/core/db/repos/formAccessRepo', () => ({
+  resolveFormPermissions: jest.fn(),
+  resolveWorkspacePermissions: jest.fn(),
+}));
+import {
+  resolveFormPermissions,
+  resolveWorkspacePermissions,
+} from '../../../src/core/db/repos/formAccessRepo';
 import { CredentialService } from '../../../src/features/credentials/service';
 import * as repo from '../../../src/core/db/repos/workspaceCredentialRepo';
 import * as registry from '../../../src/core/integrations/credential-issuer/CredentialIssuerRegistry';
@@ -34,6 +42,7 @@ const issued = {
   flow: 'kong-api-key-only' as const,
 };
 const record: repo.CredentialRecord = {
+  permissions: [],
   id: 'credential',
   workspaceId: 'workspace',
   formId: null,
@@ -69,6 +78,64 @@ beforeEach(() => {
 });
 
 describe('credential service', () => {
+  it('refuses a grant before reserving a key when the creator lacks access', async () => {
+    jest.mocked(resolveFormPermissions).mockResolvedValue(new Set());
+    await expect(
+      service.issue(formOwner, 'actor', {
+        label: 'Export',
+        notes: '',
+        types: ['api'],
+        permissions: ['submission_read'],
+      }),
+    ).rejects.toThrow('Cannot delegate');
+    expect(mockedRepo.reserveCredentialIssue).not.toHaveBeenCalled();
+    expect(adapter.issue).not.toHaveBeenCalled();
+  });
+
+  it('honors a form override rather than broader workspace permissions', async () => {
+    jest.mocked(resolveWorkspacePermissions).mockResolvedValue(new Set(['*']));
+    jest.mocked(resolveFormPermissions).mockResolvedValue(new Set(['form_update']));
+    expect(await service.availablePermissions(formOwner, 'actor')).toEqual([]);
+    expect(resolveWorkspacePermissions).not.toHaveBeenCalled();
+  });
+
+  it('passes explicitly selected grants to persistence when held by the creator', async () => {
+    jest.mocked(resolveFormPermissions).mockResolvedValue(new Set(['*']));
+    const granted = { ...record, permissions: ['submission_read' as const] };
+    mockedRepo.reserveCredentialIssue.mockResolvedValue(granted);
+    mockedRepo.completeCredentialOperation.mockResolvedValue({
+      ...active,
+      permissions: granted.permissions,
+    });
+    const fields = {
+      label: 'Export',
+      notes: '',
+      types: ['api' as const],
+      permissions: ['submission_read' as const],
+    };
+    const result = await service.issue(formOwner, 'actor', fields);
+    expect(mockedRepo.reserveCredentialIssue).toHaveBeenCalledWith(
+      formOwner,
+      'new-default',
+      'actor',
+      fields,
+    );
+    expect(result.credential.permissions).toEqual(['submission_read']);
+  });
+
+  it('refuses grant escalation during edits before writing', async () => {
+    jest.mocked(resolveWorkspacePermissions).mockResolvedValue(new Set());
+    await expect(
+      service.update(workspaceOwner, record.id, 'actor', {
+        label: 'Export',
+        notes: '',
+        types: ['api'],
+        permissions: ['submission_read'],
+      }),
+    ).rejects.toThrow('Cannot delegate');
+    expect(mockedRepo.updateCredentialFields).not.toHaveBeenCalled();
+  });
+
   it('reserves before issuing, sends trusted labels, and returns the key once', async () => {
     const result = await service.issue(formOwner, 'actor', { ...fields, types: [...fields.types] });
     expect(mockedRepo.reserveCredentialIssue).toHaveBeenCalledWith(

@@ -69,6 +69,24 @@ export const credentialAudit = sobaSchema.table('credential_audit', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Explicit grants; existing keys start with none. Secrets remain at the gateway. */
+export const credentialPermissions = sobaSchema.table(
+  'credential_permission',
+  {
+    credentialId: uuid('credential_id')
+      .notNull()
+      .references(() => workspaceCredentials.id, { onDelete: 'cascade' }),
+    permissionCode: text('permission_code').$type<'submission_read'>().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.credentialId, table.permissionCode] }),
+    permissionCheck: check(
+      'credential_permission_code_check',
+      sql`${table.permissionCode} in ('submission_read')`,
+    ),
+  }),
+);
+
 /** Supported purposes shared by many credentials. */
 export const credentialTypes = sobaSchema.table(
   'credential_type',

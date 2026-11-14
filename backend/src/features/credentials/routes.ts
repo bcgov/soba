@@ -42,7 +42,7 @@ export const apiKeySettingsRouter = (scope: SettingsScope): express.Router => {
     sortLocale,
     asyncHandler(async (req, res) => {
       const query = { ...req.query, locale: req.sortLocale } as CredentialListQuery;
-      res.json(await credentialService.list(ownerOf(req), query));
+      res.json(await credentialService.list(ownerOf(req), query, actorOf(req)));
     }),
   );
   router.post(

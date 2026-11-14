@@ -1,5 +1,95 @@
 # APS gateway check
 
+## Protected integration API v2
+
+`integration.template.yaml` renders a separate service for `/chefs/api/integrations/v2` with
+`key-auth`, the Product Environment `acl`, and `kong-upstream-jwt`. It accepts API keys only in
+`X-API-KEY`, strips the key before forwarding, and adds a raw signed token in `GW-JWT`.
+The original proxy-check template and its unauthenticated health workflow remain separate.
+
+Render locally (does not publish):
+
+```bash
+export GATEWAY_ID=gw-93f93
+export GATEWAY_QUALIFIER=integrations-soba-dev
+export GATEWAY_SERVICE_NAME=soba-dev-integrations-v2
+export GATEWAY_HOSTNAME=soba-dev.api.gov.bc.ca
+export GATEWAY_ROUTE_PATH=/integrations/v2/
+export BACKEND_HOST=soba-dev-backend.your-namespace.svc
+export GATEWAY_ENVIRONMENT_APP_ID='<Product-Environment-appId>'
+export GATEWAY_JWT_ISSUER=https://aps-jwks-upstream-jwt.api.gov.bc.ca
+node deployments/gateway/scripts/generate-gateway-config.mjs --integration --output /tmp/soba-integrations.yaml
+```
+
+Use a dedicated qualifier; publishing under the public proxy-check qualifier would replace that
+configuration. The Product Environment must use `kong-api-key-acl`, link this service, and its
+approved consumers must belong to its appId group. Obtain the appId from the Portal plugin
+template or Directory API, not the gateway ID. APS must have upstream signing keys provisioned.
+
+The backend must use the same `GATEWAY_JWT_ISSUER` as `INTEGRATION_GATEWAY_ISSUER`, configure
+its `/certs` JWKS URI, and set `INTEGRATION_GATEWAY_AUDIENCE` to exactly `GATEWAY_SERVICE_NAME`.
+In Helm, set `backend.integrationGateway.issuer`, `.jwksUri`, `.audience`, and `.clientIdClaim`;
+the backend ConfigMap maps these to the environment variables. Empty defaults keep JWT auth disabled.
+The APS instance determines the issuer/JWKS endpoints, even for SOBA dev/PR releases. See
+`backend/src/integration/README.md` for the endpoint table and signed identity mapping.
+
+All paths on this integration gateway service, including health and OpenAPI, require a valid API
+key and ACL membership. Health and OpenAPI remain public when called directly at the backend.
+The existing `verify-health.mjs` is for the public proxy check and cannot verify this protected
+service without credentials. Live publish and signed-claim mapping checks remain separate steps.
+
+Run generator checks with `node --test deployments/gateway/tests/generate-gateway-config.test.mjs`.
+
+### PR automation
+
+With `APS_PR_ENABLED=true`, PR Open now publishes both the public proxy check and a protected
+integration service after deploying the backend. For PR 123 the integration service is
+`soba-pr-123-integrations-v2`, its qualifier is `integrations-soba-pr-123`, and its route is
+`/pr/123/integrations/v2/`. The deployed backend audience matches the service name. PR Close removes
+both qualifiers under the same per-release gateway lock. The gateway job checks out the PR source
+ref so the rendered configuration matches the deployed feature code.
+
+The gateway job reads `PLUGIN_APS_CREDENTIAL_ISSUER_V3_ENVIRONMENT_APP_ID` from the deployed
+backend's Vault-injected `/vault/secrets/soba-aps-credential-issuer` file using OpenShift exec.
+PR deployments use dev's Vault secret, so the ACL and API key issuer share the same appId.
+The OpenShift CI account needs permission to exec into the backend container.
+No GitHub `APS_ENVIRONMENT_APP_ID` variable is needed.
+
+Configure the `pr` GitHub environment (or inherited repository settings):
+
+| Kind | Name | Purpose |
+| --- | --- | --- |
+| Secret | `APS_INTEGRATION_HEALTH_API_KEY` | Dedicated CI API key approved for that Product Environment; never a GWA management client secret |
+| Variable, optional | `APS_UPSTREAM_JWT_ISSUER` | Defaults to `https://aps-jwks-upstream-jwt.api.gov.bc.ca` |
+| Variable, optional | `APS_UPSTREAM_JWKS_URI` | Defaults to `https://aps-jwks-upstream-jwt.api.gov.bc.ca/certs` |
+
+Existing `APS_GATEWAY_ID`, `APS_HOST`, `APS_GATEWAY_HOST_PREFIX`, GWA credentials and OpenShift settings
+are still required. The optional issuer/JWKS overrides must both refer to the APS instance actually
+serving the gateway. The CI key is approved through APS once; the workflow does not issue or rotate it.
+It need not exist in the PR database because health verifies the gateway JWT without a credential lookup.
+
+The smoke check requests the integration health URL without a key and requires HTTP 401. It then
+uses the CI key and requires HTTP 200 with `gatewayAuthenticated: true`. This proves key-auth, ACL,
+v2 routing and backend JWT verification, including the configured issuer and audience. API keys
+are passed through environment variables and are never printed. The workflow summary records the
+health and `/me` URLs. `/me` additionally requires a key issued in that PR's database.
+After deployment, create and approve a key through that PR's credential UI, then call `/me` manually.
+
+Example after deployment (use the actual host printed in the workflow summary):
+
+```bash
+curl -i -H "X-API-KEY: $API_KEY" \
+  https://soba-pr.api.gov.bc.ca/pr/123/integrations/v2/health
+```
+
+Expected body: `{"status":"OK","timestamp":"...","gatewayAuthenticated":true}`.
+
+The reusable/manual gateway workflow also accepts `integration_enabled: true`; manual runs require
+the backend JWT settings to have been configured already. Run health-check unit tests with
+`node --test deployments/gateway/tests/integration-health.test.mjs`.
+
+## Public proxy check
+
 Publishes a reverse proxy on the BC Gov API Gateway (APS) in front of a SOBA backend and
 checks `/health` through it. The route has no gateway plugins, and the frontend still calls
 the backend through its OpenShift route.

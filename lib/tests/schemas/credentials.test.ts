@@ -6,7 +6,7 @@ describe('credential fields', () => {
     for (const types of [['api'], ['web-component'], ['api', 'web-component']]) {
       expect(
         CredentialFieldsSchema.parse({ ...input, label: ' Integration ', notes: ' Vault ', types }),
-      ).toEqual({ label: 'Integration', notes: 'Vault', types });
+      ).toEqual({ label: 'Integration', notes: 'Vault', types, permissions: [] });
     }
   });
   it.each([
@@ -17,6 +17,9 @@ describe('credential fields', () => {
     { ...input, types: ['api', 'api'] },
     { ...input, types: ['unknown'] },
     { ...input, clientId: 'untrusted' },
+    { ...input, permissions: ['*'] },
+    { ...input, permissions: ['submission_read', 'submission_read'] },
+    { ...input, types: ['web-component'], permissions: ['submission_read'] },
   ])('rejects invalid input %j', (body) => {
     expect(CredentialFieldsSchema.safeParse(body).success).toBe(false);
   });

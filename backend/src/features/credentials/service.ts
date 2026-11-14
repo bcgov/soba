@@ -1,10 +1,21 @@
 import type {
+  CredentialPermission,
   CredentialFields,
   CredentialMetadata,
   CredentialSecret,
   CredentialState,
 } from '@soba/lib';
-import { ConflictError, NotFoundError, ServiceUnavailableError } from '../../core/errors';
+import { CredentialPermissionSchema, hasAllPermissions } from '@soba/lib';
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  ServiceUnavailableError,
+} from '../../core/errors';
+import {
+  resolveFormPermissions,
+  resolveWorkspacePermissions,
+} from '../../core/db/repos/formAccessRepo';
 import {
   createCredentialIssuerAdapter,
   resolveDefaultCredentialIssuerCode,
@@ -25,6 +36,7 @@ export const credentialMetadata = (record: repo.CredentialRecord): CredentialMet
   label: record.label,
   notes: record.notes,
   types: record.types,
+  permissions: record.permissions ?? [],
   status: record.status,
   createdAt: record.createdAt.toISOString(),
   updatedAt: record.updatedAt.toISOString(),
@@ -68,10 +80,40 @@ const rotateAway = async (
 };
 
 export class CredentialService {
-  async list(owner: repo.CredentialOwner, query: CredentialListQuery): Promise<CredentialState> {
+  async availablePermissions(
+    owner: repo.CredentialOwner,
+    actorId: string,
+  ): Promise<CredentialPermission[]> {
+    const permissions = owner.formId
+      ? await resolveFormPermissions(actorId, owner.workspaceId, owner.formId)
+      : await resolveWorkspacePermissions(actorId, owner.workspaceId);
+    return CredentialPermissionSchema.options.filter((code) =>
+      hasAllPermissions(permissions, [code]),
+    );
+  }
+
+  private async requireDelegable(
+    owner: repo.CredentialOwner,
+    actorId: string,
+    fields: CredentialFields,
+  ): Promise<void> {
+    const requested = fields.permissions ?? [];
+    if (!requested.length) return;
+    const allowed = await this.availablePermissions(owner, actorId);
+    if (!fields.types.includes('api') || requested.some((code) => !allowed.includes(code))) {
+      throw new ForbiddenError('Cannot delegate these API permissions');
+    }
+  }
+
+  async list(
+    owner: repo.CredentialOwner,
+    query: CredentialListQuery,
+    actorId?: string,
+  ): Promise<CredentialState> {
     const { items, total } = await repo.listWorkspaceCredentials(owner, query);
     return {
       available: usableIssuer(resolveDefaultCredentialIssuerCode()) !== null,
+      availablePermissions: actorId ? await this.availablePermissions(owner, actorId) : [],
       items: items.map(credentialMetadata),
       page: { offset: query.offset, limit: query.limit, total },
       filters: { q: query.q },
@@ -90,6 +132,7 @@ export class CredentialService {
     actorId: string,
     fields: CredentialFields,
   ): Promise<CredentialSecret> {
+    await this.requireDelegable(owner, actorId, fields);
     const issuerCode = resolveDefaultCredentialIssuerCode();
     const issuer = requireIssuer(issuerCode);
     const record = await repo.reserveCredentialIssue(owner, issuerCode, actorId, fields);
@@ -113,6 +156,7 @@ export class CredentialService {
     actorId: string,
     fields: CredentialFields,
   ): Promise<CredentialMetadata> {
+    await this.requireDelegable(owner, actorId, fields);
     const record = await repo.updateCredentialFields(owner, id, actorId, fields);
     if (!record) throw notFound();
     return credentialMetadata(record);

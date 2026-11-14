@@ -1,0 +1,38 @@
+# Render with --integration. Publish under a dedicated qualifier, separate from the public proxy check.
+services:
+  - name: ${GATEWAY_SERVICE_NAME}
+    tags: [${CONFIG_TAG}]
+    host: ${BACKEND_HOST}
+    port: 4000
+    protocol: http
+    path: /chefs/api/integrations/v2
+    routes:
+      - name: ${GATEWAY_SERVICE_NAME}
+        tags: [${CONFIG_TAG}]
+        hosts: [${GATEWAY_HOSTNAME}]
+        protocols: [https]
+        paths: [${GATEWAY_ROUTE_PATH}]
+        preserve_host: false
+        strip_path: ${GATEWAY_STRIP_PATH}
+        path_handling: v0
+    plugins:
+      - name: key-auth
+        tags: [${CONFIG_TAG}]
+        config:
+          key_names: [X-API-KEY]
+          hide_credentials: true
+          key_in_header: true
+          key_in_query: false
+          key_in_body: false
+          run_on_preflight: true
+      - name: acl
+        tags: [${CONFIG_TAG}]
+        config:
+          allow: [${GATEWAY_ENVIRONMENT_APP_ID}]
+          hide_groups_header: true
+      - name: kong-upstream-jwt
+        tags: [${CONFIG_TAG}]
+        config:
+          header: GW-JWT
+          include_credential_type: false
+          issuer: ${GATEWAY_JWT_ISSUER}

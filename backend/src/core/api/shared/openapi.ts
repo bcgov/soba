@@ -75,14 +75,26 @@ export const withErrorBodies = <T extends { paths?: Record<string, unknown> }>(d
   return document;
 };
 
-/** The spec for the given path registrations, with the shared error body on every error response. */
-export const buildOpenApiDocument = (registrars: readonly RegisterOpenApiPaths[]) => {
+export interface OpenApiDocumentOptions {
+  info?: { title: string; version: string; description?: string };
+  servers?: { url: string; description?: string }[];
+  registerSecuritySchemes?: RegisterOpenApiPaths;
+}
+
+/** Shared builder; defaults retain the internal v1 contract. Explicit error bodies are preserved. */
+export const buildOpenApiDocument = (
+  registrars: readonly RegisterOpenApiPaths[],
+  options: OpenApiDocumentOptions = {},
+) => {
   const registry = new OpenAPIRegistry();
-  registry.registerComponent('securitySchemes', 'bearerAuth', {
-    type: 'http',
-    scheme: 'bearer',
-    bearerFormat: 'JWT',
-  });
+  if (options.registerSecuritySchemes) {
+    options.registerSecuritySchemes(registry);
+  } else
+    registry.registerComponent('securitySchemes', 'bearerAuth', {
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'JWT',
+    });
   registry.register('Core_ApiError', ApiErrorSchema);
 
   for (const registrar of registrars) {
@@ -92,12 +104,12 @@ export const buildOpenApiDocument = (registrars: readonly RegisterOpenApiPaths[]
   const generator = new OpenApiGeneratorV3(registry.definitions);
   const document = generator.generateDocument({
     openapi: '3.0.3',
-    info: {
+    info: options.info ?? {
       title: 'Soba Backend API',
       version: '1.0.0',
       description: 'Core and plugin APIs for Soba backend.',
     },
-    servers: [
+    servers: options.servers ?? [
       {
         url: `${env.getApiBasePath()}/api/v1`,
         description: 'Core API v1',

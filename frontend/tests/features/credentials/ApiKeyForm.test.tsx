@@ -38,6 +38,7 @@ import { ApiKeyForm } from '@/src/features/credentials/ui/ApiKeyForm';
 
 const owner = { kind: 'form' as const, id: 'form-1' };
 const saved: CredentialMetadata = {
+  permissions: [],
   id: 'k-1',
   scope: 'form',
   label: 'Integration',
@@ -49,7 +50,13 @@ const saved: CredentialMetadata = {
   rotatedAt: null,
 };
 
-const renderForm = (props: { credentialId?: string; available?: boolean } = {}) => {
+const renderForm = (
+  props: {
+    credentialId?: string;
+    available?: boolean;
+    availablePermissions?: 'submission_read'[];
+  } = {},
+) => {
   const onDone = vi.fn();
   renderSignedIn(
     <ApiKeyForm
@@ -57,6 +64,7 @@ const renderForm = (props: { credentialId?: string; available?: boolean } = {}) 
       owner={owner}
       credentialId={props.credentialId}
       available={props.available ?? true}
+      availablePermissions={props.availablePermissions ?? []}
       onDone={onDone}
     />,
   );
@@ -80,6 +88,43 @@ describe('ApiKeyForm', () => {
     mockApi.getCredential.mockResolvedValue(saved);
   });
 
+  it('sends a selected API permission when generating a key', async () => {
+    const user = userEvent.setup();
+    renderForm({ availablePermissions: ['submission_read'] });
+    await fillNewKey(user);
+    await user.click(screen.getByRole('checkbox', { name: t.readSubmissions }));
+    await user.click(screen.getByTestId('api-key-generate'));
+    await waitFor(() =>
+      expect(mockApi.issueCredential).toHaveBeenCalledWith(
+        'token',
+        owner,
+        expect.objectContaining({ permissions: ['submission_read'] }),
+      ),
+    );
+  });
+
+  it('does not offer a grant the editor cannot delegate', async () => {
+    const user = userEvent.setup();
+    renderForm();
+    await fillNewKey(user);
+    expect(screen.getByRole('checkbox', { name: t.readSubmissions })).toBeDisabled();
+  });
+
+  it('persists changes to permissions even when all other fields stay the same', async () => {
+    const user = userEvent.setup();
+    renderForm({ credentialId: saved.id, availablePermissions: ['submission_read'] });
+    await user.click(await screen.findByRole('checkbox', { name: t.readSubmissions }));
+    await user.click(screen.getByTestId('api-key-save'));
+    await waitFor(() =>
+      expect(mockApi.updateCredential).toHaveBeenCalledWith(
+        'token',
+        owner,
+        saved.id,
+        expect.objectContaining({ permissions: ['submission_read'] }),
+      ),
+    );
+  });
+
   it('holds Save off until a key is generated, then shows the key once in a modal', async () => {
     const user = userEvent.setup();
     renderForm();
@@ -94,6 +139,7 @@ describe('ApiKeyForm', () => {
       expect(mockApi.issueCredential).toHaveBeenCalledWith('token', owner, {
         label: 'Integration',
         notes: '',
+        permissions: [],
         types: ['api'],
       }),
     );
@@ -136,6 +182,7 @@ describe('ApiKeyForm', () => {
       expect(mockApi.updateCredential).toHaveBeenCalledWith('token', owner, 'k-1', {
         label: 'Integration',
         notes: 'Vault path',
+        permissions: [],
         types: ['api'],
       }),
     );

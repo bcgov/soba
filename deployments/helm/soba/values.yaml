@@ -15,6 +15,13 @@ gatewayNetworkPolicy:
 
 # -- Backend (Express API) ------------------------------------------------
 backend:
+  # Incoming integration requests remain disabled until issuer, JWKS URI and audience are set.
+  # Choose the APS instance endpoints; audience must equal the protected Kong service name.
+  integrationGateway:
+    issuer: ""
+    jwksUri: ""
+    audience: ""
+    clientIdClaim: consumername
   image:
     repository: ghcr.io/bcgov/soba/backend
     tag: latest

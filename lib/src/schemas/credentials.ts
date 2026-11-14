@@ -20,17 +20,28 @@ export const CredentialStatusSchema = z.enum([
 /** workspace: the key belongs to the workspace. form: it belongs to one of its forms. */
 export const CredentialScopeSchema = z.enum(['workspace', 'form']);
 
+/** Only permissions supported by the external integration API may be delegated. */
+export const CredentialPermissionSchema = z.enum(['submission_read']);
+export type CredentialPermission = z.infer<typeof CredentialPermissionSchema>;
+const credentialPermissions = z.array(CredentialPermissionSchema).max(1);
+
 /** What generating a key and editing it both take. */
-export const CredentialFieldsSchema = z.strictObject({
-  label: z.string().trim().min(1).max(100),
-  notes: z.string().trim().max(1000),
-  types: z
-    .array(CredentialTypeSchema)
-    .min(1)
-    .max(2)
-    .refine((types) => new Set(types).size === types.length, 'Choose each type only once'),
-});
-export type CredentialFields = z.infer<typeof CredentialFieldsSchema>;
+export const CredentialFieldsSchema = z
+  .strictObject({
+    label: z.string().trim().min(1).max(100),
+    notes: z.string().trim().max(1000),
+    permissions: credentialPermissions.default([]),
+    types: z
+      .array(CredentialTypeSchema)
+      .min(1)
+      .max(2)
+      .refine((types) => new Set(types).size === types.length, 'Choose each type only once'),
+  })
+  .refine((fields) => fields.types.includes('api') || fields.permissions.length === 0, {
+    message: 'API permissions require the API type',
+    path: ['permissions'],
+  });
+export type CredentialFields = z.input<typeof CredentialFieldsSchema>;
 export type CredentialType = z.infer<typeof CredentialTypeSchema>;
 export type CredentialStatus = z.infer<typeof CredentialStatusSchema>;
 export type CredentialScope = z.infer<typeof CredentialScopeSchema>;
@@ -41,6 +52,7 @@ export const CredentialMetadataSchema = z.object({
   label: z.string(),
   notes: z.string(),
   types: z.array(CredentialTypeSchema),
+  permissions: credentialPermissions.default([]),
   status: CredentialStatusSchema,
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
@@ -49,6 +61,7 @@ export const CredentialMetadataSchema = z.object({
 export const CredentialStateSchema = z.object({
   /** Whether the configured issuer can generate keys. False under the no-op issuer. */
   available: z.boolean(),
+  availablePermissions: credentialPermissions.default([]),
   items: z.array(CredentialMetadataSchema),
   page: OffsetPageSchema,
   filters: z.object({ q: z.string().optional() }),

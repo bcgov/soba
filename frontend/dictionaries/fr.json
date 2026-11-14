@@ -1196,6 +1196,9 @@
     "WLRS": "Gestion de l'eau, des terres et des ressources (WLRS)"
   },
   "apiKeys": {
+    "permissions": "Autorisations de l’API",
+    "permissionsHelp": "Choisissez les autorisations que vous détenez dans cet espace de travail ou formulaire. Aucune autorisation n’est accordée par défaut. L’accès dépend aussi des autorisations actuelles du créateur de la clé sur le formulaire.",
+    "readSubmissions": "Lire et exporter les soumissions",
     "heading": "Clés API",
     "workspaceScope": "Clés API qui appartiennent à cet espace de travail. Les clés propres à chaque formulaire sont gérées dans les paramètres de ce formulaire.",
     "formScope": "Clés API de ce formulaire. Les clés de l’espace de travail sont affichées à titre de référence et sont gérées dans les paramètres de formulaire de l’espace de travail.",

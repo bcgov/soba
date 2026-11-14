@@ -1,5 +1,6 @@
 import type { NormalizedProfile, IdpAttributes } from '../core/auth/jwtClaims';
 import type { SortLocale } from '@soba/lib';
+import type { CredentialRecord } from '../core/db/repos/workspaceCredentialRepo';
 import type { CoreRequestContext, CoreListScope } from '../core/middleware/requestContext';
 import type { SubmitterSubmission } from '../core/db/repos/submitterSubmissionRepo';
 import type {
@@ -20,6 +21,8 @@ declare global {
     }
 
     interface Request {
+      /** Authenticated integration identity; resource permissions must be checked separately. */
+      integrationCredential?: CredentialRecord;
       decodedJwt?: Record<string, unknown>;
       authPayload?: Record<string, unknown>;
       bceidType?: 'bceidbasic' | 'bceidbusiness';
