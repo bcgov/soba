@@ -50,9 +50,9 @@ describe('useEmailCopyAvailable', () => {
 
   it('is undefined while the check runs, and false without asking when there is no scope', () => {
     availability.check.mockReturnValue(new Promise(() => undefined));
-    expect(renderHook(() => useEmailCopyAvailable(scope), { wrapper }).result.current).toBe(
-      undefined,
-    );
+    expect(
+      renderHook(() => useEmailCopyAvailable(scope), { wrapper }).result.current,
+    ).toBeUndefined();
     expect(renderHook(() => useEmailCopyAvailable(null), { wrapper }).result.current).toBe(false);
     expect(availability.check).toHaveBeenCalledTimes(1);
   });
