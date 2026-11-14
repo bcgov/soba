@@ -164,6 +164,17 @@ it.each([
       mockRead.mockResolvedValue({ ...submitted(), access: { ...submitted().access, role: null } }),
     EMAIL_COPY_NOT_ALLOWED,
   ],
+  [
+    'the submission was sent back to revise',
+    () =>
+      mockRead.mockResolvedValue(
+        storedSubmission({
+          workflowState: 'revising',
+          form: { allowSubmitterEmailCopy: true, audienceMode: 'public', permissions: [] },
+        }),
+      ),
+    EMAIL_COPY_NOT_ALLOWED,
+  ],
   ['the feature was turned off', () => mockFeature.mockResolvedValue(false), EMAIL_COPY_TURNED_OFF],
 ])('ends cancelled without sending when %s', async (_label, arrange, reason) => {
   arrange();

@@ -1,6 +1,18 @@
 const mockTransaction = jest.fn();
+const mockFindWhere = jest.fn();
+let mockFound: unknown[] = [];
 jest.mock('../../../src/core/db/client', () => ({
-  db: { transaction: (...args: unknown[]) => mockTransaction(...args) },
+  db: {
+    transaction: (...args: unknown[]) => mockTransaction(...args),
+    select: () => ({
+      from: () => ({
+        where: (where: unknown) => {
+          mockFindWhere(where);
+          return { limit: () => Promise.resolve(mockFound) };
+        },
+      }),
+    }),
+  },
 }));
 const mockInsertJob = jest.fn();
 jest.mock('../../../src/core/db/repos/jobRepo', () => ({
@@ -8,7 +20,12 @@ jest.mock('../../../src/core/db/repos/jobRepo', () => ({
 }));
 
 import { PgDialect } from 'drizzle-orm/pg-core';
-import { queueEmailCopy, recentEmailCopies } from '../../../src/features/submitter-email-copy/repo';
+import type { SQL } from 'drizzle-orm';
+import {
+  findEmailCopyRequest,
+  queueEmailCopy,
+  recentEmailCopies,
+} from '../../../src/features/submitter-email-copy/repo';
 
 const copy = {
   workspaceId: 'ws1',
@@ -148,5 +165,27 @@ describe('queueEmailCopy', () => {
     transaction([0, 0, 0, 0, 0]);
     mockInsertJob.mockResolvedValue(null);
     await expect(queueEmailCopy(copy, limits)).rejects.toThrow('Email copy job not queued');
+  });
+});
+
+// Matched on the submission too, so a job can only send a request made for its own submission.
+describe('findEmailCopyRequest', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    mockFound = [];
+  });
+
+  it("reads the request by its id and the job's submission", async () => {
+    mockFound = [{ id: 'req-1' }];
+    await expect(findEmailCopyRequest('req-1', 's1')).resolves.toEqual({ id: 'req-1' });
+    const where = mockFindWhere.mock.calls[0][0] as SQL;
+    expect(new PgDialect().sqlToQuery(where)).toMatchObject({
+      sql: `(${T}."id" = $1 and ${T}."submission_id" = $2)`,
+      params: ['req-1', 's1'],
+    });
+  });
+
+  it('answers null when there is no such request for the submission', async () => {
+    await expect(findEmailCopyRequest('req-1', 's2')).resolves.toBeNull();
   });
 });

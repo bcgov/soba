@@ -35,17 +35,19 @@ export const accessDenial = (req: Request, message: string, code?: ApiErrorCode)
   req.user ? new ForbiddenError(message, code) : new UnauthorizedError(message, code);
 
 const CHANGE_DENIED = 'Not authorized to change this submission';
+// An email copy is refused to a caller exactly when a read is.
+const READ_DENIED = 'Not authorized to access this submission';
 
 const DENIAL_MESSAGES: Record<SubmitterOperationCode, string> = {
   open: 'Not authorized to submit this form',
-  read: 'Not authorized to access this submission',
+  read: READ_DENIED,
   write: CHANGE_DENIED,
   upload: CHANGE_DENIED,
   deleteFile: CHANGE_DENIED,
   render: 'Not authorized to generate this document',
   delete: 'Not authorized to delete this submission',
   revise: 'Not authorized to revise this submission',
-  emailCopy: 'Not authorized to access this submission',
+  emailCopy: READ_DENIED,
 };
 
 /** Logs and throws the refusal: 401 for anonymous, 403 for an authenticated caller. */
@@ -234,6 +236,7 @@ export const requireSubmissionEmailCopy: RequestHandler = (req, _res, next) => {
     const change = emailCopyStatusOf(access, form);
     if (change.status === SubmissionChangeStatus.denied) {
       if (change.code === ApiErrorCodes.email_copy_disabled) {
+        // Not logged as a refused access: the caller may read it, the form just does not offer it.
         throw new ForbiddenError(
           "This form's confirmation does not offer an email copy",
           change.code,

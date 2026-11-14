@@ -1026,6 +1026,40 @@ describe('FormForm', () => {
         expect(await screen.findByTestId('designer-tab')).toHaveAttribute('aria-selected', 'true');
         expect(screen.queryByTestId('post-submission-tab')).not.toBeInTheDocument();
       });
+
+      // The tab holds two parts, the actions and the Confirmation Screen card; either one shows it.
+      it.each([
+        ['only the actions', 'post-submission'],
+        ['only the Confirmation Screen', 'submitter-email-copy'],
+      ])('shows the tab where %s are available', async (_label, availableCode) => {
+        inWorkspace(['*'], false);
+        availability.check.mockImplementation((code: string) =>
+          Promise.resolve(code === availableCode),
+        );
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        expect(await screen.findByTestId('post-submission-tab')).toBeInTheDocument();
+        expect(availability.check).toHaveBeenCalledWith('submitter-email-copy', {
+          workspaceId: 'ws1',
+          formId: 'f1',
+        });
+      });
+
+      it('shows the tab once one part answers yes, while the other still runs', async () => {
+        inWorkspace(['*'], false);
+        availability.check.mockImplementation((code: string) =>
+          code === 'submitter-email-copy'
+            ? Promise.resolve(true)
+            : new Promise<boolean>(() => undefined),
+        );
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        expect(await screen.findByTestId('post-submission-tab')).toBeInTheDocument();
+      });
     });
 
     describe('Jobs', () => {

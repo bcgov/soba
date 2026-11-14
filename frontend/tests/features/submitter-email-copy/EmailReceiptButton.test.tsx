@@ -146,6 +146,40 @@ describe('EmailReceiptButton', () => {
     expect(mockAddNotification).not.toHaveBeenCalled();
   });
 
+  it('says the copy could not be sent when the failure has no reason of its own', async () => {
+    const user = userEvent.setup();
+    mockSend.mockRejectedValue(new TypeError('Failed to fetch'));
+    renderButton();
+    await open(user);
+    await user.type(address(), 'pat@example.com');
+    await user.click(screen.getByTestId('submission-email-receipt-send'));
+
+    expect(await screen.findByTestId('submission-email-receipt-error')).toHaveTextContent(
+      /^The copy could not be sent\. Try again later\.$/,
+    );
+    expect(mockAddNotification).not.toHaveBeenCalled();
+  });
+
+  it('opens fresh after a failure: no old error, and the address starts over', async () => {
+    const user = userEvent.setup();
+    signIn('pat@example.com');
+    mockSend.mockRejectedValue(new ApiError('too many', 429, 'email_copy_limit_reached'));
+    renderButton();
+    await open(user);
+    await user.clear(address());
+    await user.type(address(), 'other@example.com');
+    await user.click(screen.getByTestId('submission-email-receipt-send'));
+    await screen.findByTestId('submission-email-receipt-error');
+
+    await user.click(screen.getByTestId('submission-email-receipt-cancel'));
+    await waitFor(() =>
+      expect(screen.queryByTestId('submission-email-receipt-address')).not.toBeInTheDocument(),
+    );
+    await open(user);
+    expect(screen.queryByTestId('submission-email-receipt-error')).not.toBeInTheDocument();
+    expect(address()).toHaveValue('pat@example.com');
+  });
+
   it('sends once when Send is pressed twice', async () => {
     const user = userEvent.setup();
     let finish: () => void = () => undefined;

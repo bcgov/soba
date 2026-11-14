@@ -25,6 +25,7 @@ import { submitRouter } from '../../../../src/core/api/submit';
 import { submitterEmailCopyRouter } from '../../../../src/features/submitter-email-copy/route';
 import { findSubmitterSubmission } from '../../../../src/core/db/repos/submitterSubmissionRepo';
 import { coreErrorHandler } from '../../../../src/core/middleware/errorHandler';
+import { log } from '../../../../src/core/logging';
 import { isEmailCopyAvailable } from '../../../../src/features/submitter-email-copy/availability';
 import { isFeatureAvailable } from '../../../../src/core/services/featureAvailabilityService';
 import { notificationService } from '../../../../src/features/notifications/service';
@@ -237,6 +238,23 @@ describe('POST /submit/submissions/:id/email-copy', () => {
     expect(res.status).toBe(429);
     expect(res.body.code).toBe('email_copy_limit_reached');
     expect(JSON.stringify(res.body)).not.toContain('recipient');
+  });
+
+  // The log names the limit for whoever tunes them, and never the address.
+  it('logs which limit refused it, without the address', async () => {
+    const warn = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+    try {
+      mockRead.mockResolvedValue(submittedWithCopy());
+      mockQueue.mockResolvedValue({ limit: 'recipient' });
+      await emailCopy(signedIn);
+      expect(warn).toHaveBeenCalledWith(
+        { formId: 'f1', submissionId: 's1', limit: 'recipient' },
+        'Submitter email copy refused at its hourly limit',
+      );
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('example.com');
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('answers 503 and queues nothing while notifications are off', async () => {

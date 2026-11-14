@@ -237,4 +237,33 @@ describe('FormConfirmationDrawer', () => {
       }),
     );
   });
+
+  it('says someone else saved first, and goes back to what was read', async () => {
+    const user = userEvent.setup();
+    mockGetFormSettings.mockResolvedValue(inherited(true));
+    mockSetFormSettings.mockRejectedValue(new ApiError('changed', 409));
+    renderDrawer();
+    await waitFor(() => expect(inheritBox()).toBeEnabled());
+
+    await user.click(screen.getByText(s.inheritWorkspaceLabel));
+    await user.click(screen.getByText(t.allowEmailCopy));
+    await user.click(saveButton());
+
+    await waitFor(() =>
+      expect(mockAddNotification).toHaveBeenCalledWith({
+        type: 'error',
+        text: s.settingsConflictMessage,
+      }),
+    );
+    await waitFor(() => expect(inheritBox()).toBeChecked());
+    expect(allow()).toBeChecked();
+  });
+
+  it('says when the settings could not be loaded, and cannot change', async () => {
+    mockGetFormSettings.mockRejectedValue(new ApiError('boom', 500));
+    renderDrawer();
+    expect(await screen.findByTestId('form-confirmation-error')).toHaveTextContent(t.loadError);
+    expect(inheritBox()).toBeDisabled();
+    expect(allow()).toBeDisabled();
+  });
 });
