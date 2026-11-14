@@ -170,6 +170,8 @@ export const Features = {
   post_submission: 'post-submission',
   /** Emailing a notice to a list of addresses when a form receives a submission. */
   post_submission_email: 'post-submission-email',
+  /** Submitters emailing themselves a copy of their confirmation, from the confirmation screen. */
+  submitter_email_copy: 'submitter-email-copy',
   /** Exporting a form's submissions to a file, run as a background job. */
   submission_export: 'submission-export',
   /** Generating and managing gateway API keys for a workspace and its forms. */
@@ -267,6 +269,7 @@ export const JobType = {
   submission_export: 'submission-export',
   submission_status_changed: 'submission.status-changed',
   submission_status_email: 'submission.status-email',
+  submission_email_copy: 'submission.email-copy',
 } as const;
 export type JobTypeCode = (typeof JobType)[keyof typeof JobType];
 

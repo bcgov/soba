@@ -334,6 +334,27 @@ describe('WorkspaceForm', () => {
     expect(screen.queryByTestId('workspace-post-submission-tab')).not.toBeInTheDocument();
   });
 
+  // The tab holds two parts, the actions and the Confirmation Screen card; either one shows it.
+  it.each([
+    ['only the actions', 'post-submission'],
+    ['only the Confirmation Screen', 'submitter-email-copy'],
+  ])(
+    'manage mode shows the After Submission tab where %s are available',
+    async (_label, availableCode) => {
+      availability.check.mockImplementation((code: string) =>
+        Promise.resolve(code === availableCode),
+      );
+      await act(async () => {
+        renderForm('ws2');
+      });
+
+      expect(await screen.findByTestId('workspace-post-submission-tab')).toBeInTheDocument();
+      expect(availability.check).toHaveBeenCalledWith('submitter-email-copy', {
+        workspaceId: 'ws2',
+      });
+    },
+  );
+
   it('save on create posts the workspace', async () => {
     await act(async () => {
       renderForm();

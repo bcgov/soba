@@ -95,10 +95,12 @@ const content = renderSubmissionEmail(
 ```
 
 For each language, the submission block renders the Confirmation ID in bold, the sentence and the
-link. After every language's section it adds the reviewer's comment, once, under "Comments:",
-"Commentaires :", or "Comments: / Commentaires :" in an email in both. The subject ends with the
-Confirmation ID, as ` (code)`, so mail clients do not thread every email about one form into a
-single conversation.
+link. An email may also name a second link, with `secondLinkText` in its template and `secondLink`
+in its facts, such as a signed-in submitter's past submissions; the block renders it after the
+first, and leaves it out when either is missing. After every language's section it adds the
+reviewer's comment, once, under "Comments:", "Commentaires :", or "Comments: / Commentaires :" in an
+email in both. The subject ends with the Confirmation ID, as ` (code)`, so mail clients do not
+thread every email about one form into a single conversation.
 
 - **Form names** go through `cleanName` before a template sees them: no control or format
   characters, no links, one line, at most 200 characters.
@@ -155,6 +157,11 @@ reactions. The event commits or rolls back with the change, and its jobs retry w
 or down. A failed email never undoes the change that caused it. Every review status change records
 its event; a submit records one only where post-submission actions are available.
 
+A submitter asking for a copy of their confirmation changes nothing else, so the request is its own
+record: one transaction saves a `submitter_email_copy_request` row, with the address they typed,
+and queues the `submission.email-copy` job that names it (`features/submitter-email-copy`). The job's
+params hold the request id only, so the address stays out of job rows.
+
 | event                       | recorded by                                          | its reactions                                                                                                                          |
 | --------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `submission.submitted`      | a submit (`submissionService`)                       | the post-submission actions the form has on, such as "Email a notice" (`features/post-submission`)                                     |
@@ -208,18 +215,22 @@ its event; a submit records one only where post-submission actions are available
   action caused it. Running an email's job again attributes its sends to whoever ran it; running an
   event again does not, since the jobs it queues keep the event's creator. An action a form is
   configured with, such as the notice, sends as the system user.
-- **Hourly limits** apply where staff choose the recipients: the notice checks its form, workspace
-  and environment limits before its run sends anything. Status emails go out one per person's
-  action and have none.
+- **Hourly limits** apply where people choose the recipients. The notice, whose list staff set,
+  checks its form, workspace and environment limits before its run sends anything. A submitter's
+  copy, sent to an address they type, is checked when they ask: per submission, address, form,
+  workspace and environment, counted from its own requests, and refused with 429
+  `email_copy_limit_reached` so they know no copy is coming (`SUBMITTER_EMAIL_COPY_*_HOURLY_LIMIT`).
+  Status emails go out one per person's action and have none.
 
 ## Emails today
 
-| email                   | sent to                                              | link                                            | sent by                                                                                                                                              |
-| ----------------------- | ---------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| New submission (notice) | the addresses a form's "Email a notice" action lists | the submission in the designer                  | the action's job, queued by the `submission.submitted` fan-out (`plugins/post-submission-email-addresses`), as the system user                       |
-| Assigned                | the reviewer the submission is assigned to           | the submission in the designer                  | a `submission.status-email` job, queued by the `submission.status-changed` fan-out (`features/submission-review/statusEmailJob.ts`), as the reviewer |
-| Revision requested      | the submission's owner and active collaborators      | the submission's `submit` page in the forms app | a `submission.status-email` job, as the reviewer; none when a submitter sends their own submission back                                              |
-| Review complete         | the submission's owner and active collaborators      | the submission in the forms app                 | a `submission.status-email` job, as the reviewer                                                                                                     |
+| email                   | sent to                                                    | link                                                                          | sent by                                                                                                                                              |
+| ----------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| New submission (notice) | the addresses a form's "Email a notice" action lists       | the submission in the designer                                                | the action's job, queued by the `submission.submitted` fan-out (`plugins/post-submission-email-addresses`), as the system user                       |
+| Assigned                | the reviewer the submission is assigned to                 | the submission in the designer                                                | a `submission.status-email` job, queued by the `submission.status-changed` fan-out (`features/submission-review/statusEmailJob.ts`), as the reviewer |
+| Revision requested      | the submission's owner and active collaborators            | the submission's `submit` page in the forms app                               | a `submission.status-email` job, as the reviewer; none when a submitter sends their own submission back                                              |
+| Review complete         | the submission's owner and active collaborators            | the submission in the forms app                                               | a `submission.status-email` job, as the reviewer                                                                                                     |
+| Submitter's copy        | the address the submitter typed on the confirmation screen | the submission in the forms app, and a signed-in submitter's past submissions | a `submission.email-copy` job, queued with the request (`features/submitter-email-copy`), as the requester                                           |
 
 ## Adding an email
 

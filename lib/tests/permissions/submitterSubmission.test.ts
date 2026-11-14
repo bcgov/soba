@@ -2,6 +2,7 @@ import {
   canContinueSubmission,
   canDeleteOwnSubmission,
   canDeleteSubmissionFile,
+  canEmailSubmissionCopy,
   canReadSubmission,
   canReadVersionSchema,
   canRenderSubmission,
@@ -10,6 +11,7 @@ import {
   canStartSubmission,
   canUploadSubmissionFile,
   canWriteSubmission,
+  emailCopyStatusOf,
   isSubmissionEditable,
   isSubmissionInProgress,
   ownDeleteStatusOf,
@@ -451,4 +453,44 @@ describe('reviseStatusOf', () => {
     expect(reviseStatusOf(submission, facts, caller)).toEqual(expected);
     expect(canReviseSubmission(submission, facts, caller)).toBe(expected.status === 'allowed');
   });
+});
+
+describe('emailCopyStatusOf', () => {
+  const allowed = { allowSubmitterEmailCopy: true };
+  const submitted = (role: string | null): SubmissionAccessFacts => ({
+    role,
+    workflowState: SubmissionWorkflowState.submitted,
+  });
+
+  it.each(['owner', 'collaborator'])('allows a %s on a submitted submission', (role) => {
+    expect(emailCopyStatusOf(submitted(role), allowed)).toEqual({ status: 'allowed' });
+    expect(canEmailSubmissionCopy(submitted(role), allowed)).toBe(true);
+  });
+
+  it('refuses a caller with no grant on the submission', () => {
+    expect(emailCopyStatusOf(submitted(null), allowed)).toEqual({
+      status: 'denied',
+      code: 'read_denied',
+    });
+  });
+
+  // The setting is checked before the state, so a draft on a form without it says why plainly.
+  it('refuses when the form does not allow it, whatever the state', () => {
+    for (const workflowState of STATES) {
+      expect(
+        emailCopyStatusOf({ role: 'owner', workflowState }, { allowSubmitterEmailCopy: false }),
+      ).toEqual({ status: 'denied', code: 'email_copy_disabled' });
+    }
+  });
+
+  it.each(STATES.filter((state) => state !== SubmissionWorkflowState.submitted))(
+    'refuses a submission that is %s',
+    (workflowState) => {
+      expect(emailCopyStatusOf({ role: 'owner', workflowState }, allowed)).toEqual({
+        status: 'closed',
+        code: 'email_copy_closed',
+      });
+      expect(canEmailSubmissionCopy({ role: 'owner', workflowState }, allowed)).toBe(false);
+    },
+  );
 });

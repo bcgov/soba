@@ -34,6 +34,7 @@ import WorkspaceFormSettings from '@/src/features/form-settings/ui/WorkspaceForm
 import WorkspacePostSubmissionTab from '@/src/features/post-submission/ui/WorkspacePostSubmissionTab';
 import { WorkspaceJobsTab } from '@/src/features/jobs/ui/ScopedJobsTabs';
 import { usePostSubmissionAvailable } from '@/src/features/post-submission/data/usePostSubmissionAvailable';
+import { useEmailCopyAvailable } from '@/src/features/submitter-email-copy/data/useEmailCopyAvailable';
 import type { UpdateWorkspaceBody, WorkspaceItem } from '@/src/types/workspaces';
 import styles from './WorkspaceForm.module.css';
 import WorkspaceRoleTab from './WorkspaceRoleTab';
@@ -310,10 +311,13 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
   const { addNotification } = useNotificationStore();
   const { data: currentUser, loaded: currentUserLoaded } = useCurrentUser();
   const { workspace, isLoading } = useWorkspace(workspaceId);
-  // Asked only for a workspace this person manages, the role this page needs.
-  const postSubmissionAvailable = usePostSubmissionAvailable(
-    workspace && isWorkspaceManageRole(workspace.role) ? { workspaceId: workspace.id } : null,
-  );
+  // Asked only for a workspace this person manages, the role this page needs. The After Submission
+  // tab shows where either of its parts is available: the actions, or the confirmation screen.
+  const afterSubmissionScope =
+    workspace && isWorkspaceManageRole(workspace.role) ? { workspaceId: workspace.id } : null;
+  const actionsAvailable = usePostSubmissionAvailable(afterSubmissionScope);
+  const confirmationAvailable = useEmailCopyAvailable(afterSubmissionScope);
+  const postSubmissionAvailable = !!actionsAvailable || !!confirmationAvailable;
 
   const canSeeJobs = !!workspace && isWorkspaceOwnerRole(workspace.role);
 
@@ -444,7 +448,13 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
           tabAttrs={{ 'data-testid': 'workspace-post-submission-tab' }}
         >
           <div className={styles.tabContent}>
-            <WorkspacePostSubmissionTab key={workspace.id} dict={dict} workspaceId={workspace.id} />
+            <WorkspacePostSubmissionTab
+              key={workspace.id}
+              dict={dict}
+              workspaceId={workspace.id}
+              actionsAvailable={!!actionsAvailable}
+              confirmationAvailable={!!confirmationAvailable}
+            />
           </div>
         </Tab>
       )}

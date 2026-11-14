@@ -263,3 +263,31 @@ export const canReviseSubmission = (
   form: SubmitterFormFacts,
   caller: AccessCaller,
 ): boolean => isAllowed(reviseStatusOf(submission, form, caller));
+
+/** What the email-copy rule reads about the form, beyond the caller's standing on the submission. */
+export interface EmailCopyFacts {
+  /** The form's own confirmation setting letting submitters email a copy, or its workspace's. */
+  allowSubmitterEmailCopy: boolean;
+}
+
+/**
+ * A submitter emailing themselves a copy of their confirmation: anyone who may read the submission,
+ * the public user on a public form included, on a form whose confirmation settings allow it, once
+ * it is submitted. A submission sent back to revise is not received, so it sends none.
+ */
+export const emailCopyStatusOf = (
+  submission: SubmissionAccessFacts,
+  form: EmailCopyFacts,
+): SubmissionChange => {
+  if (!canReadSubmission(submission)) return denied(ApiErrorCodes.read_denied);
+  if (!form.allowSubmitterEmailCopy) return denied(ApiErrorCodes.email_copy_disabled);
+  if (submission.workflowState !== SubmissionWorkflowState.submitted) {
+    return closed(ApiErrorCodes.email_copy_closed);
+  }
+  return ALLOWED;
+};
+
+export const canEmailSubmissionCopy = (
+  submission: SubmissionAccessFacts,
+  form: EmailCopyFacts,
+): boolean => isAllowed(emailCopyStatusOf(submission, form));

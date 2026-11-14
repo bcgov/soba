@@ -12,8 +12,12 @@ vi.mock('@/app/[lang]/Providers', () => ({
       loading: 'Loading...',
       sessionExpired: 'Your session has ended.',
       noAccess: 'You do not have access to this.',
+      version: 'Version',
+      labelSeparator: ': ',
     },
     form: { nameLabel: 'Form', templates: { print: { button: 'Print' } } },
+    // The email receipt's modal names its button group.
+    modal: { dialogActions: 'Dialog actions' },
     submission: {
       success: {
         message: 'Submitted successfully.',
@@ -24,7 +28,9 @@ vi.mock('@/app/[lang]/Providers', () => ({
       notFound: 'Submission not found.',
       loadError: 'Could not load this submission.',
       noContent: 'No submitted answers to display.',
-      submittedOn: 'Submitted',
+      submittedOn: 'Submitted on',
+      submittedLabel: 'Submitted',
+      emailReceipt: { button: 'Email Receipt of Submission' },
     },
     mySubmissions: {
       viewAll: 'View my submissions',
@@ -121,9 +127,9 @@ describe('SubmissionView', () => {
     await renderView();
     await waitFor(() => expect(screen.getByTestId('submission-view-form')).toBeInTheDocument());
     expect(getSubmitSubmission).toHaveBeenCalledWith(undefined, 'sub-1');
-    expect(screen.getByTestId('submission-view-version')).toHaveTextContent('v3');
+    expect(screen.getByTestId('submission-view-version')).toHaveTextContent(/^Version: 3$/);
     expect(screen.getByTestId('submission-view-confirmation')).toHaveTextContent(
-      'Confirmation ID: K7M2Q9XA',
+      /^Confirmation ID: K7M2Q9XA$/,
     );
     expect(screen.queryByTestId('submission-view-submitter')).not.toBeInTheDocument();
   });
@@ -199,7 +205,10 @@ describe('SubmissionView', () => {
     const form = await screen.findByTestId('submission-view-form');
     const confirmation = screen.getByText('Keep this ID.');
     expect(screen.getByTestId('submission-success')).toHaveTextContent('Submitted successfully.');
-    expect(screen.getByText('K7M2Q9XA').tagName).toBe('STRONG');
+    expect(
+      confirmation.compareDocumentPosition(screen.getByTestId('submission-view-header')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(confirmation.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
@@ -208,6 +217,46 @@ describe('SubmissionView', () => {
     );
     expect(getSubmitSubmissionSchema).toHaveBeenCalledWith(undefined, 'sub-1');
     expect(getSubmitSubmissionData).toHaveBeenCalledWith(undefined, 'sub-1');
+  });
+
+  // The submission page, which the email's link opens, looks the same as the confirmation screen.
+  it.each([
+    ['the confirmation screen', true],
+    ['the submission page', false],
+  ])(
+    'lays %s out as designed: status, name, one line each, answers in a card',
+    async (_, success) => {
+      initAnswered();
+      await renderView(success);
+      const form = await screen.findByTestId('submission-view-form');
+      expect(screen.getByTestId('submission-view-answers-card')).toContainElement(form);
+
+      const status = screen.getByTestId('submission-view-status');
+      const name = screen.getByRole('heading', { name: 'Form One' });
+      const id = screen.getByTestId('submission-view-confirmation');
+      const submitted = screen.getByTestId('submission-view-submitted');
+      const version = screen.getByTestId('submission-view-version');
+      [status, name, id, submitted, version].reduce((before, after) => {
+        expect(
+          before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+        return after;
+      });
+      expect(id).toHaveTextContent(/^Confirmation ID: K7M2Q9XA$/);
+      expect(screen.getByTestId('submission-view-confirmation-code')).toHaveTextContent(
+        /^K7M2Q9XA$/,
+      );
+      expect(submitted).toHaveTextContent(/^Submitted: \S/);
+      expect(version).toHaveTextContent(/^Version: 3$/);
+    },
+  );
+
+  it('claims success only on the confirmation screen', async () => {
+    initAnswered();
+    await renderView(false);
+    await screen.findByTestId('submission-view-form');
+    expect(screen.queryByTestId('submission-success')).not.toBeInTheDocument();
+    expect(screen.queryByText('Submitted successfully.')).not.toBeInTheDocument();
   });
 
   it('links a signed-in submitter to their submissions', async () => {
@@ -308,5 +357,48 @@ describe('SubmissionView', () => {
 
     await waitFor(() => expect(screen.getByText('Signed in view')).toBeInTheDocument());
     expect(getSubmitSubmission).toHaveBeenCalledWith('token', 'sub-1');
+  });
+
+  describe('email receipt', () => {
+    it('offers it where the server says the submission can be emailed, between the links and Print', async () => {
+      initAnswered();
+      store.dispatch(setToken('token'));
+      store.dispatch(setAuthenticated(true));
+      getSubmitSubmission.mockResolvedValue({
+        ...(await getSubmitSubmission()),
+        canEmailCopy: true,
+      });
+      await renderView(true);
+
+      const receipt = await screen.findByTestId('submission-email-receipt');
+      const mine = screen.getByTestId('submission-success-my-submissions');
+      const print = screen.getByText('Print');
+      expect(mine.compareDocumentPosition(receipt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(
+        receipt.compareDocumentPosition(print) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    // The link in the email opens the submission page, so a returning submitter can ask again.
+    it('offers it on the submission page too, not only after submitting', async () => {
+      initAnswered();
+      getSubmitSubmission.mockResolvedValue({
+        ...(await getSubmitSubmission()),
+        canEmailCopy: true,
+      });
+      await renderView(false);
+      expect(await screen.findByTestId('submission-email-receipt')).toBeInTheDocument();
+    });
+
+    it('is left out where the server says no', async () => {
+      initAnswered();
+      getSubmitSubmission.mockResolvedValue({
+        ...(await getSubmitSubmission()),
+        canEmailCopy: false,
+      });
+      await renderView(true);
+      await screen.findByTestId('submission-success');
+      expect(screen.queryByTestId('submission-email-receipt')).not.toBeInTheDocument();
+    });
   });
 });

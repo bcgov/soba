@@ -86,6 +86,11 @@ describe('rerunRefusal', () => {
     },
   );
 
+  // The request keeps the address, so staff can run a copy again, as they can a status email.
+  it.each(['dead', 'cancelled'])('allows a %s email copy to run again', (status) => {
+    expect(rerunRefusal(facts({ type: JobType.submission_email_copy, status }))).toBeNull();
+  });
+
   it('refuses a job whose lease expired within the last lease, as it may still be running', () => {
     expect(rerunRefusal(facts({ lastError: LEASE_EXPIRED, finishedAt: ago(MINUTE / 2) }))).toBe(
       'Its last run may still be finishing; try again in a minute',

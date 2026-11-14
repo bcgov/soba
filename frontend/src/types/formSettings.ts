@@ -1,19 +1,23 @@
 export {
   AUDIENCE_MODES,
   AUDIENCE_SETTINGS_KEY,
+  CONFIRMATION_SETTINGS_KEY,
   REVIEW_SETTINGS_KEY,
   SUBMITTER_SETTINGS_KEY,
 } from '@soba/lib';
 export type {
   Audience,
   AudienceMode,
+  ConfirmationSettings,
   FormAudienceSettings,
+  FormConfirmationSettings,
   FormReviewSettings,
   FormSubmitterSettings,
   InheritableSettings,
   LoginProviderMeta,
   ReviewSettings,
   SetFormAudienceSettingsBody,
+  SetFormConfirmationSettingsBody,
   SetFormReviewSettingsBody,
   SetFormSubmitterSettingsBody,
   SetInheritableSettingsBody,

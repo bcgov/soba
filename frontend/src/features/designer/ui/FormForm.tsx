@@ -22,6 +22,7 @@ import FormSubmissionTab from './FormSubmissionTab';
 import FormShareTab from './FormShareTab';
 import FormPostSubmissionTab from '@/src/features/post-submission/ui/FormPostSubmissionTab';
 import { usePostSubmissionAvailable } from '@/src/features/post-submission/data/usePostSubmissionAvailable';
+import { useEmailCopyAvailable } from '@/src/features/submitter-email-copy/data/useEmailCopyAvailable';
 import { FormJobsTab } from '@/src/features/jobs/ui/ScopedJobsTabs';
 import { withBasePath } from '@/src/shared/config/basePath';
 import { useWorkspace } from '@/src/shared/api/useWorkspaces';
@@ -93,6 +94,13 @@ function draftNotices(args: {
           'This version is published and cannot be modified',
       },
   ];
+}
+
+/** True when either part is available; undefined while a check that could still say so runs. */
+function eitherAvailable(a: boolean | undefined, b: boolean | undefined): boolean | undefined {
+  if (a || b) return true;
+  if (a === undefined || b === undefined) return undefined;
+  return false;
 }
 
 const DESIGNER_TAB = 'designer';
@@ -279,10 +287,13 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     return hasPermission(permissions, Permissions.submission_read);
   }, [permissions]);
 
-  // The tab needs the Settings tab's permission and post-submission available for this form.
-  const postSubmissionAvailable = usePostSubmissionAvailable(
-    canSeeSettingsTab && form?.workspaceId ? { workspaceId: form.workspaceId, formId } : null,
-  );
+  // The tab needs the Settings tab's permission and, for this form, either of its parts available:
+  // the post-submission actions, or the confirmation screen. Undefined while either check runs.
+  const afterSubmissionScope =
+    canSeeSettingsTab && form?.workspaceId ? { workspaceId: form.workspaceId, formId } : null;
+  const actionsAvailable = usePostSubmissionAvailable(afterSubmissionScope);
+  const confirmationAvailable = useEmailCopyAvailable(afterSubmissionScope);
+  const postSubmissionAvailable = eitherAvailable(actionsAvailable, confirmationAvailable);
   const canSeePostSubmissionTab = canSeeSettingsTab && postSubmissionAvailable;
 
   const { activeTab, openedTabs, openTab } = useActiveTab({
@@ -579,7 +590,12 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
             disabled={isSaving || draftUnavailable}
             title={dict.postSubmission.tab}
           >
-            <FormPostSubmissionTab dict={dict} formId={formId} />
+            <FormPostSubmissionTab
+              dict={dict}
+              formId={formId}
+              actionsAvailable={!!actionsAvailable}
+              confirmationAvailable={!!confirmationAvailable}
+            />
           </Tab>
         )}
         {canSeeHistoryTab && (

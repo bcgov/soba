@@ -34,6 +34,7 @@
     "reference": "Référence:",
     "create": "Créer",
     "version": "Version",
+    "labelSeparator": " : ",
     "clearFilters": "Effacer les filtres",
     "noAccess": "Vous n'avez pas accès à ceci.",
     "sortBy": "Trier par",
@@ -412,7 +413,8 @@
       "submissionSubmitted": "Soumission reçue",
       "submissionExport": "Exportation des soumissions",
       "submissionStatusChanged": "Statut modifié",
-      "submissionStatusEmail": "Courriel de statut"
+      "submissionStatusEmail": "Courriel de statut",
+      "submissionEmailCopy": "Copie par courriel au soumissionnaire"
     },
     "detail": {
       "heading": "Tâche",
@@ -722,6 +724,7 @@
     "loading": "Chargement des soumissions…",
     "error": "Impossible de charger les soumissions.",
     "submittedOn": "Soumis le",
+    "submittedLabel": "Soumis",
     "noContent": "Aucune réponse soumise à afficher.",
     "notFound": "Soumission introuvable.",
     "loadError": "Impossible de charger cette soumission.",
@@ -898,6 +901,17 @@
       "filePageTitle": "Télécharger l’exportation",
       "backToExports": "Retour aux exportations",
       "fileNotFound": "Cette exportation n’est plus disponible. Démarrez-en une nouvelle."
+    },
+    "emailReceipt": {
+      "button": "Envoyer un reçu de la soumission par courriel",
+      "title": "Envoyer un reçu de cette soumission par courriel",
+      "description": "Nous enverrons par courriel l’ID de confirmation et un lien vers cette soumission. Vos réponses ne sont pas incluses.",
+      "addressLabel": "Adresse courriel",
+      "invalidAddress": "Entrez une adresse courriel valide.",
+      "send": "Envoyer",
+      "cancel": "Annuler",
+      "sent": "Une copie est en route vers {address}.",
+      "failed": "La copie n’a pas pu être envoyée. Réessayez plus tard."
     }
   },
   "mySubmissions": {
@@ -953,6 +967,10 @@
     "revise_denied": "Seule la personne qui l’a soumise, une fois connectée, peut réviser cette soumission.",
     "revise_disabled": "Les paramètres de ce formulaire ne permettent pas aux personnes ayant soumis de réviser leurs soumissions.",
     "revise_closed": "Cette soumission ne peut plus être révisée : un examinateur l’a déjà prise en charge.",
+    "email_copy_disabled": "Ce formulaire n’offre pas de copie de la confirmation par courriel.",
+    "email_copy_closed": "Seule une soumission soumise peut être envoyée par courriel.",
+    "email_copy_unavailable": "Le courriel n’est pas disponible pour le moment. Réessayez plus tard.",
+    "email_copy_limit_reached": "Trop de copies ont été demandées. Réessayez plus tard.",
     "edit_closed": "Seule une soumission soumise peut être modifiée par le personnel. Une soumission renvoyée pour révision doit être modifiée par les personnes qui l’ont soumise.",
     "drafts_disabled": "Les brouillons ne sont pas activés pour ce formulaire.",
     "drafts_public": "Les brouillons ne peuvent pas être enregistrés pour un formulaire public.",
@@ -1093,6 +1111,11 @@
       "note": "Note",
       "noteHelp": "Jusqu'à {max} caractères.",
       "noteValue": "Note : {note}"
+    },
+    "confirmationScreen": {
+      "label": "Écran de confirmation",
+      "allowEmailCopy": "Permettre aux soumissionnaires de s’envoyer une copie de leur soumission par courriel",
+      "loadError": "Les paramètres de l’écran de confirmation n’ont pas pu être chargés."
     }
   },
   "fileDownload": {

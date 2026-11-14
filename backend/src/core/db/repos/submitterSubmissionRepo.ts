@@ -113,6 +113,7 @@ export const findSubmitterSubmission = async (
     audienceIdps,
     allowSubmitterDrafts,
     allowSubmitterRevision,
+    allowSubmitterEmailCopy,
     reviewStatus,
     ...submission
   } = row;
@@ -134,6 +135,7 @@ export const findSubmitterSubmission = async (
       audienceIdps,
       allowSubmitterDrafts,
       allowSubmitterRevision,
+      allowSubmitterEmailCopy,
     },
   };
 };

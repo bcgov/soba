@@ -22,6 +22,8 @@ export const FEATURE_CODES = {
   SUBMISSION_EXPORT: 'submission-export',
   /** Generating and managing gateway API keys for a workspace and its forms. */
   API_KEYS: 'api-keys',
+  /** Submitters emailing themselves a copy of their confirmation, set on the After Submission tab. */
+  SUBMITTER_EMAIL_COPY: 'submitter-email-copy',
 } as const;
 
 export type FeatureCode = (typeof FEATURE_CODES)[keyof typeof FEATURE_CODES];
