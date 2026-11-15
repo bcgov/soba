@@ -101,7 +101,7 @@ function NewSubmissionFill({ formId, labels }: Readonly<{ formId: string; labels
 
   const open = useCallback(async () => {
     if (!version) throw new Error('No form version to open the submission on');
-    const head = await opener.open({
+    const opened = await opener.open({
       formVersionId: version.formVersionId,
       schemaHash: version.schemaHash,
     });
@@ -112,7 +112,7 @@ function NewSubmissionFill({ formId, labels }: Readonly<{ formId: string; labels
     if (onScreen.current && decodedPath(globalThis.location.pathname) === withBasePath(startPath)) {
       globalThis.history.replaceState(null, '', withBasePath(fillPath));
     }
-    return head;
+    return opened;
   }, [opener, version, startPath, fillPath]);
 
   // History can show this page at an address that is not its own: Back to an opened submission's
@@ -142,6 +142,7 @@ function NewSubmissionFill({ formId, labels }: Readonly<{ formId: string; labels
             formId: facts.id,
             workflowState: 'opened',
             formVersionId: version.formVersionId,
+            versionNo: version.versionNo,
             headRevisionId: null,
             currentRevisionNo: 0,
             role: 'owner',
