@@ -144,8 +144,7 @@ jobs:
       OC_SERVER: ${{ vars.OC_SERVER }}
       OC_TOKEN: ${{ secrets.OC_TOKEN }}
       OC_DOMAIN: ${{ vars.OC_DOMAIN }}
-      DATABASE_SECRET_NAME: ${{ vars.DATABASE_SECRET_NAME }}
-      DATABASE_SECRET_KEY: ${{ vars.DATABASE_SECRET_KEY || 'pgbouncer-uri' }}
+      CRUNCHY_CLUSTER: pg-soba-uat-crunchy
       MONGODB_HOST: ${{ vars.MONGODB_HOST }}
       MONGODB_PORT: ${{ vars.MONGODB_PORT || '27017' }}
       MONGODB_AUTH_SECRET_NAME: ${{ vars.MONGODB_AUTH_SECRET_NAME }}
@@ -187,7 +186,6 @@ jobs:
           : "${NAMESPACE:?Set the OC_NAMESPACE UAT environment variable.}"
           : "${OC_SERVER:?Set the OC_SERVER UAT environment variable.}"
           : "${OC_DOMAIN:?Set the OC_DOMAIN UAT environment variable.}"
-          : "${DATABASE_SECRET_NAME:?Set the DATABASE_SECRET_NAME UAT environment variable.}"
           : "${MONGODB_HOST:?Set the MONGODB_HOST UAT environment variable.}"
           : "${MONGODB_AUTH_SECRET_NAME:?Set the MONGODB_AUTH_SECRET_NAME UAT environment variable.}"
           : "${VAULT_AUTH_PATH:?Set the VAULT_AUTH_PATH repository variable.}"
@@ -196,9 +194,10 @@ jobs:
           : "${VAULT_SECRET_PATH:?Set the VAULT_SECRET_PATH UAT environment variable.}"
           : "${VAULT_SERVICE_ACCOUNT_NAME:?Set the VAULT_SERVICE_ACCOUNT_NAME repository variable.}"
 
-          oc -n "$NAMESPACE" get secret "$DATABASE_SECRET_NAME" >/dev/null
-          oc -n "$NAMESPACE" get secret "$DATABASE_SECRET_NAME" -o json |
-            jq -e --arg key "$DATABASE_SECRET_KEY" '.data[$key] != null' >/dev/null
+          oc -n "$NAMESPACE" get secret "${CRUNCHY_CLUSTER}-pguser-app" -o json |
+            jq -e '.data.uri != null' >/dev/null
+          oc -n "$NAMESPACE" get secret "${CRUNCHY_CLUSTER}-pguser-appproxy" -o json |
+            jq -e '.data["pgbouncer-uri"] != null' >/dev/null
           oc -n "$NAMESPACE" get secret "$MONGODB_AUTH_SECRET_NAME" >/dev/null
           oc -n "$NAMESPACE" get secret "$MONGODB_AUTH_SECRET_NAME" -o json |
             jq -e '.data["mongodb-passwords"] != null' >/dev/null
@@ -233,8 +232,11 @@ jobs:
             --set-string "temporalWorkersImage.tag=$UAT_TAG" \
             --set-string "temporalWorkersImage.pullPolicy=IfNotPresent" \
             --set-string "global.domain=$OC_DOMAIN" \
-            --set-string "database.existingSecretName=$DATABASE_SECRET_NAME" \
-            --set-string "database.existingSecretKey=$DATABASE_SECRET_KEY" \
+            --set-string "database.existingSecretName=${CRUNCHY_CLUSTER}-pguser-app" \
+            --set-string "database.existingSecretKey=uri" \
+            --set-string "database.runtimeSecretName=${CRUNCHY_CLUSTER}-pguser-appproxy" \
+            --set-string "database.runtimeSecretKey=pgbouncer-uri" \
+            --set-string "database.runtimeRole=appproxy" \
             --set-string "mongodb.external.host=$MONGODB_HOST" \
             --set-string "mongodb.external.port=$MONGODB_PORT" \
             --set-string "mongodb.external.authSecretName=$MONGODB_AUTH_SECRET_NAME" \
