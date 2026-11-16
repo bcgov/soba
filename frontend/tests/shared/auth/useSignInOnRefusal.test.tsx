@@ -3,9 +3,15 @@ import { renderHook } from '@testing-library/react';
 import type { DataError } from '@/src/shared/api/dataContracts';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 
-const h = vi.hoisted(() => ({
-  kc: { authenticated: false, initializing: false, login: vi.fn() },
-}));
+const signedOut = () => ({
+  authenticated: false,
+  initializing: false,
+  initStarted: true,
+  error: undefined as string | undefined,
+  login: vi.fn(),
+});
+
+const h = vi.hoisted(() => ({ kc: {} as ReturnType<typeof signedOut> }));
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({ useKeycloak: () => h.kc }));
 
@@ -19,7 +25,7 @@ const refusal = (status: number): DataError => ({
 const run = (error: DataError | null) => renderHook(() => useSignInOnRefusal(error)).result.current;
 
 beforeEach(() => {
-  h.kc = { authenticated: false, initializing: false, login: vi.fn() };
+  h.kc = signedOut();
 });
 
 describe('useSignInOnRefusal', () => {
@@ -30,7 +36,9 @@ describe('useSignInOnRefusal', () => {
 
   it.each([
     ['a signed-in caller refused with 403', { authenticated: true }, refusal(403)],
+    ['a 401 before Keycloak starts', { initStarted: false }, refusal(401)],
     ['a 401 while Keycloak initializes', { initializing: true }, refusal(401)],
+    ['a 401 when Keycloak could not be reached', { error: 'unreachable' }, refusal(401)],
     ['a server failure', {}, refusal(500)],
     ['no error', {}, null],
   ])('leaves %s alone', (_label, kc, error) => {

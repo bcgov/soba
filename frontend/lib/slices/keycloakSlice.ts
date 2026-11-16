@@ -146,6 +146,9 @@ export const { setToken, setIdTokenParsed, setAuthenticated, clear } = slice.act
 /** Signs in, returning to `redirectUri` (default: the app's home page). */
 export const login = (redirectUri?: string) => async (dispatch: AppDispatch) => {
   let kc: Keycloak.KeycloakInstance | null = kcInstance;
+  const returnTo =
+    redirectUri ??
+    (typeof window !== 'undefined' ? window.location.origin + getBasePath() : undefined);
   try {
     if (!kc) {
       const runtimeConfig = await loadFrontendRuntimeConfig();
@@ -158,19 +161,19 @@ export const login = (redirectUri?: string) => async (dispatch: AppDispatch) => 
       sessionEnded = false;
     }
     // prefer a forced login flow
-    await kc.init({ onLoad: 'login-required', checkLoginIframe: false, pkceMethod: 'S256' });
+    await kc.init({
+      onLoad: 'login-required',
+      checkLoginIframe: false,
+      pkceMethod: 'S256',
+      redirectUri: returnTo,
+    });
     dispatch(setToken(kc.token ?? undefined));
     dispatch(setIdTokenParsed(kc.idTokenParsed as Keycloak.KeycloakTokenParsed | undefined));
     dispatch(setAuthenticated(!!kc.authenticated));
   } catch {
     // fallback to direct login redirect
     try {
-      const opts = {
-        redirectUri:
-          redirectUri ??
-          (typeof window !== 'undefined' ? window.location.origin + getBasePath() : undefined),
-      };
-      await kc?.login(opts);
+      await kc?.login({ redirectUri: returnTo });
     } catch {
       // no-op
     }

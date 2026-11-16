@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   saveSobaFormSubmission: vi.fn(),
   submitSobaFormSubmission: vi.fn(),
   getSubmitFillBundle: vi.fn(),
+  login: vi.fn(),
   formData: {} as Record<string, unknown>,
   instance: {
     emit: vi.fn(),
@@ -112,6 +113,11 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
   saveSobaFormSubmission: (...args: unknown[]) => h.saveSobaFormSubmission(...args),
   submitSobaFormSubmission: (...args: unknown[]) => h.submitSobaFormSubmission(...args),
   getSubmitFillBundle: (...args: unknown[]) => h.getSubmitFillBundle(...args),
+}));
+
+vi.mock('@/lib/slices/keycloakSlice', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/slices/keycloakSlice')>()),
+  login: (redirectUri?: string) => () => h.login(redirectUri),
 }));
 
 vi.mock('@/src/features/formio-v5/useBcgovFileOption', () => ({
@@ -901,13 +907,17 @@ describe('FormioV5NewSubmissionClient', () => {
     expect(h.openSobaFormSubmission).not.toHaveBeenCalled();
   });
 
-  it.each([
-    [
-      'refused to an anonymous caller',
+  it('sends an anonymous caller refused on the form read to sign in, back to this address', async () => {
+    h.getSubmitForm.mockRejectedValue(
       new ApiError('Not authorized to submit this form', 401, 'open_denied'),
-      'new-submission-loaderror',
-      'You are not able to submit this form.',
-    ],
+    );
+    await renderPage();
+    await waitFor(() => expect(h.login).toHaveBeenCalledWith(globalThis.location.href));
+    expect(screen.queryByTestId('new-submission-loaderror')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('fill-form')).not.toBeInTheDocument();
+  });
+
+  it.each([
     [
       'refused to a signed-in caller',
       new ApiError('Not authorized to submit this form', 403, 'open_denied'),

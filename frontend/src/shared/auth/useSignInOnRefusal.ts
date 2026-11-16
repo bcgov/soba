@@ -7,11 +7,17 @@ import { isUnauthorized } from '@/src/shared/api/dataError';
 
 /**
  * Sends a signed-out visitor the server refused (401) to sign in, back to this address. True while
- * that redirect is under way. A signed-in caller is refused with 403, so it never loops.
+ * that redirect is under way. A signed-in caller is refused with 403, so it never loops; with
+ * Keycloak unreachable the caller shows its alert rather than wait on a redirect that cannot happen.
  */
 export function useSignInOnRefusal(error: DataError | null): boolean {
-  const { authenticated, initializing, login } = useKeycloak();
-  const refused = !authenticated && !initializing && isUnauthorized(error?.cause);
+  const { authenticated, initializing, initStarted, error: keycloakError, login } = useKeycloak();
+  const refused =
+    initStarted &&
+    !initializing &&
+    !keycloakError &&
+    !authenticated &&
+    isUnauthorized(error?.cause);
 
   useEffect(() => {
     if (refused) void login(globalThis.location.href);
