@@ -143,7 +143,8 @@ const slice = createSlice({
 export const { setToken, setIdTokenParsed, setAuthenticated, clear } = slice.actions;
 
 // Helper thunks
-export const login = () => async (dispatch: AppDispatch) => {
+/** Signs in, returning to `redirectUri` (default: the app's home page). */
+export const login = (redirectUri?: string) => async (dispatch: AppDispatch) => {
   let kc: Keycloak.KeycloakInstance | null = kcInstance;
   try {
     if (!kc) {
@@ -166,7 +167,8 @@ export const login = () => async (dispatch: AppDispatch) => {
     try {
       const opts = {
         redirectUri:
-          typeof window !== 'undefined' ? window.location.origin + getBasePath() : undefined,
+          redirectUri ??
+          (typeof window !== 'undefined' ? window.location.origin + getBasePath() : undefined),
       };
       await kc?.login(opts);
     } catch {

@@ -27,6 +27,10 @@ export class ApiError extends Error {
  */
 export const isForbidden = (err: unknown): boolean => err instanceof ApiError && err.status === 403;
 
+/** The caller sent no token and the server said no: signing in may let them through. */
+export const isUnauthorized = (err: unknown): boolean =>
+  err instanceof ApiError && err.status === 401;
+
 export const isNotFound = (err: unknown): boolean => err instanceof ApiError && err.status === 404;
 
 /** The server refused a write because what it targets changed since the caller read it. */

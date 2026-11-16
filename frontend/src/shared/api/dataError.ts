@@ -59,4 +59,4 @@ export function failureDetail(cause: unknown): FailureDetail {
 }
 
 export { isNetworkError, isSessionExpired } from './sobaFetch';
-export { isForbidden, isNotFound, isConflict } from './sobaHelpers';
+export { isForbidden, isNotFound, isConflict, isUnauthorized } from './sobaHelpers';

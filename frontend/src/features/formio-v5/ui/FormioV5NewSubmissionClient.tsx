@@ -27,12 +27,14 @@ import type { DataError } from '@/src/shared/api/dataContracts';
 import { apiErrorMessage } from '@/src/shared/api/dataError';
 import { useAccessCaller } from '@/src/shared/api/useAccessCaller';
 import { useAuthErrorDefaults } from '@/src/shared/api/useDataErrorNotice';
+import { useSignInOnRefusal } from '@/src/shared/auth/useSignInOnRefusal';
 import { LoadErrorAlert } from '@/src/shared/ui/LoadErrorAlert';
 import type { SubmitFillBundle } from '@/src/types/forms';
 
 /** A form or schema read failure, with the form's copy: refused as an open would be. */
 function FormLoadAlert({ error, labels }: Readonly<{ error: DataError; labels: FillLabels }>) {
   const authDefaults = useAuthErrorDefaults();
+  if (useSignInOnRefusal(error)) return <CenteredProgress label={labels.loading} />;
   const coded = apiErrorMessage(error.cause, labels.errors);
   return (
     <LoadErrorAlert
