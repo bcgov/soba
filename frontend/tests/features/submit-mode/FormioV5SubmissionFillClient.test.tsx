@@ -240,7 +240,13 @@ describe('FormioV5SubmissionFillClient', () => {
     h.files = { option: { bcgovFile }, ready: true };
     await renderSignedOut();
     await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
-    expect(h.options?.bcgovFile).toEqual(bcgovFile);
+    expect(h.options?.bcgovFile).toEqual({ ...bcgovFile, offlineScope: 'sub-1' });
+  });
+
+  it('scopes pending files to the submission even with no file limits', async () => {
+    await renderSignedOut();
+    await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+    expect(h.options?.bcgovFile).toEqual({ offlineScope: 'sub-1' });
   });
 
   // The public caller's roles never count, and a members audience admits no one outside it.

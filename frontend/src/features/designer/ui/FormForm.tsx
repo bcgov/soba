@@ -14,6 +14,7 @@ import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useDictionary } from '@/app/[lang]/Providers';
 import FormDesigner from '@/src/features/designer/ui/FormDesigner';
 import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
+import { withFilesReadOnly } from '@/src/features/formio-v5/filesReadOnly';
 import { usePageHeading, usePageNotices, type PageNotice } from '@/src/components/PageHeader';
 import FormSettingsTab from './FormSettingsTab';
 import FormTeamTab from './FormTeamTab';
@@ -231,6 +232,12 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
       setSchema(newFormSchema() as FormType);
     }
   }, [loading, form, formSchema, setSchema]);
+
+  // A preview has no submission to upload into, so its file components only show.
+  const previewSchema = useMemo(
+    () => (formSchema ? withFilesReadOnly(formSchema) : null),
+    [formSchema],
+  );
 
   const permissions = useMemo(() => {
     return form?.permissions;
@@ -640,8 +647,8 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
           </Button>
         }
       >
-        {formSchema ? (
-          <DynamicForm src="" form={formSchema} />
+        {previewSchema ? (
+          <DynamicForm src="" form={previewSchema} />
         ) : (
           <p className="text-center p-5 text-muted">
             {dict.form.noFormLayout || 'No form layout designed yet.'}

@@ -40,7 +40,7 @@ import { registerOpenApiPaths } from './shared/openapi';
 
 // API surfaces, each mounted under its own base path with its own auth (see app.ts):
 //  - designRouter   (/api/v1/design): staff form authoring + submission management.
-//  - submitRouter   (/api/v1/submit): public-capable submissions, file attachments, documents.
+//  - submitRouter   (/api/v1/submit): public-capable submissions, documents.
 //  - filesApiRouter (/api/v1/files):  public-capable submission file attachments.
 //  - coreRouter     (/api/v1):        workspace/account management, and staff document templates.
 registerOpenApiPaths((registry) => {
@@ -82,13 +82,12 @@ designRouter.use(filesDesignRouter);
 designRouter.use(notFoundHandler);
 designRouter.use(coreErrorHandler);
 
-// Submit feature: submission open/save/submit + reads of an existing submission, plus file
-// attachments at /files (upload/download/delete) and document templates/print, each
+// Submit feature: submission open/save/submit + reads of an existing submission
+// plus document templates/print, each
 // authorized by the submitter rules in @soba/lib. The files feature flag is enforced inside
-// filesDomain.router. Same routes as /files, mounted under submit for the Form.io file component.
+// filesDomain.router.
 const submitRouter = express.Router();
 submitRouter.use('/', submitRoutes);
-submitRouter.use('/files', filesDomain.router);
 // Mounted after submitRoutes so only the fall-through actions (templates, print) reach it;
 // the document-generation and templates feature gates live inside the router.
 submitRouter.use('/submissions', documentGenerationDomain.router);

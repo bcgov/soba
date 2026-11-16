@@ -148,10 +148,10 @@ export function SubmissionFillForm({
     setActiveOpener(
       open
         ? () =>
-            ensureOpened().catch((err: unknown) => {
-              if (isFormUpdated(err)) setUpdated({ version: err.version, form: err.form });
-              throw err;
-            })
+          ensureOpened().catch((err: unknown) => {
+            if (isFormUpdated(err)) setUpdated({ version: err.version, form: err.form });
+            throw err;
+          })
         : null,
     );
     return () => clearActiveSubmission();
@@ -165,10 +165,19 @@ export function SubmissionFillForm({
     [snapshot],
   );
   // We own all submit messaging (success toast + redirect, inline error), so suppress Form.io's
-  // built-in green "Submission Complete" alert.
+  // built-in "Submission Complete" alert. New submissions have no `_id`, so the file
+  // component is told which submission its pending uploads belong to, letting a reload restore them.
   const formOptions = useMemo(
-    () => ({ noAlerts: true, readOnly: !canWrite, ...fileOption }),
-    [canWrite, fileOption],
+    () => ({
+      noAlerts: true,
+      readOnly: !canWrite,
+      ...fileOption,
+      bcgovFile: {
+        ...(fileOption.bcgovFile as Record<string, unknown> | undefined),
+        offlineScope: submissionId,
+      },
+    }),
+    [canWrite, fileOption, submissionId],
   );
 
   // @formio/react applies the submission prop only after this callback, and Form.io applies it
@@ -242,9 +251,6 @@ export function SubmissionFillForm({
       switch (outcome.status) {
         case 'applied':
           addNotification({ text: labels.submitSuccess, type: 'success' });
-          // `submitDone` lets components clean up after a saved submit (BCGovFile drops its
-          // in-browser records of uploaded files). Emitting it only notifies listeners; Form.io's
-          // own success screen comes from its submit flow, which this host replaces.
           formInstanceRef.current?.emit('submitDone', submission);
           // Straight to the confirmation. replace, so Back does not return to the fill page of a
           // submitted record.

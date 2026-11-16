@@ -91,7 +91,7 @@ type Workspace = {
 };
 type Version = { id: string; versionNo: number; state: string };
 
-const { mockWorkspaceState, api, builder } = vi.hoisted(() => ({
+const { mockWorkspaceState, api, builder, preview } = vi.hoisted(() => ({
   mockWorkspaceState: {
     creatable: [{ id: 'ws1', disclaimerAccepted: true }] as Workspace[],
     formCreate: 'allowed' as string,
@@ -102,6 +102,8 @@ const { mockWorkspaceState, api, builder } = vi.hoisted(() => ({
   },
   // Captured so a test can simulate the user editing in the builder.
   builder: { onUpdateModel: null as ((model: unknown) => void) | null },
+  // The schema the preview was last drawn with.
+  preview: { form: null as unknown },
   api: {
     saveFormVersionSchema: vi.fn(),
     publishSobaFormVersion: vi.fn(),
@@ -146,7 +148,10 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
 
 // Mock DynamicForm and FormDesigner components used in FormForm
 vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => ({
-  DynamicForm: () => <div data-testid="dynamic-form">preview</div>,
+  DynamicForm: ({ form }: { form: unknown }) => {
+    preview.form = form;
+    return <div data-testid="dynamic-form">preview</div>;
+  },
 }));
 
 vi.mock('@bcgov/design-system-react-components', async (importOriginal) => {
@@ -307,6 +312,37 @@ describe('FormForm', () => {
     api.saveFormVersionSchema.mockResolvedValue({});
     api.publishSobaFormVersion.mockResolvedValue({});
     builder.onUpdateModel = null;
+    preview.form = null;
+  });
+
+  // A preview has no submission, so an upload there would be refused and left in the browser.
+  it('previews file components as read-only', async () => {
+    mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
+    mockWorkspaceState.schemas = {
+      v1: {
+        components: [
+          { key: 'name', type: 'textfield' },
+          { key: 'panel', type: 'panel', components: [{ key: 'doc', type: 'bcgov-file' }] },
+        ],
+      },
+    };
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+
+    await userEvent.click(await screen.findByTestId('preview-form-button'));
+
+    await screen.findByTestId('dynamic-form');
+    expect(preview.form).toEqual({
+      components: [
+        { key: 'name', type: 'textfield' },
+        {
+          key: 'panel',
+          type: 'panel',
+          components: [{ key: 'doc', type: 'bcgov-file', disabled: true }],
+        },
+      ],
+    });
   });
 
   it('renders designer tab content when authenticated and not initializing', async () => {
