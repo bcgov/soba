@@ -111,7 +111,7 @@ export function SideNav({ designMode, submitMode }: Readonly<SideNavProps>) {
     <nav className={`d-flex flex-column py-3 px-2 ${styles.sideNav}`}>
       <ul id="sidenav-items" className="nav flex-column gap-2">
         {navItems.map((item) => (
-          <li className="nav-item" key={item.href} hidden={item.hidden}>
+          <li className="nav-item" key={item.href} hidden={'hidden' in item && item.hidden === true}>
             <Link
               href={item.href}
               data-testid={item.testId}
