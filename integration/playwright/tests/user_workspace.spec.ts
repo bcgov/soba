@@ -180,6 +180,71 @@ test('User can manage post submission settings for a workspace', async ({ page }
   await page.getByTestId('form-settings-post-submission-email-addresses-save').click();
   await expect(page.getByText('Changes updated successfully.')).toBeVisible();
 });
+test('User can validate job status, type and form dropdowns for a workspace', async ({ page }) => {
+  const jobsTab = page.getByTestId('workspace-jobs-tab');
+  await jobsTab.click();
+  await expect(jobsTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByText(dictionaries.jobs.workspaceIntro, { exact: true })).toBeVisible();
+
+  const statusDropdown = page.getByTestId('jobs-status-filter').getByRole('button');
+  await statusDropdown.click();
+  await expect(statusDropdown).toHaveAttribute('aria-expanded', 'true');
+
+  const listbox = page.getByRole('listbox');
+  const expectedStatuses = [
+    'All statuses',
+    'Queued',
+    'Running',
+    'Succeeded',
+    'Failed',
+    'Cancelled',
+  ];
+  await expect(listbox.getByRole('option')).toHaveText(expectedStatuses);
+  for (const status of expectedStatuses) {
+    await expect(listbox.getByRole('option', { name: status, exact: true })).toBeVisible();
+  }
+
+  await listbox.press('Escape');
+  await expect(statusDropdown).toHaveAttribute('aria-expanded', 'false');
+
+  const typeDropdown = page.getByTestId('jobs-type-filter').getByRole('button');
+  await typeDropdown.click();
+  await expect(typeDropdown).toHaveAttribute('aria-expanded', 'true');
+
+  const expectedTypes = [
+    dictionaries.jobs.allTypes,
+    dictionaries.jobs.types.submissionSubmitted,
+    dictionaries.postSubmission.email.label,
+    dictionaries.postSubmission.log.label,
+    dictionaries.jobs.types.submissionStatusChanged,
+    dictionaries.jobs.types.submissionStatusEmail,
+  ];
+  await expect(listbox.getByRole('option')).toHaveText(expectedTypes);
+  for (const type of expectedTypes) {
+    await expect(listbox.getByRole('option', { name: type, exact: true })).toBeVisible();
+  }
+
+  await listbox.press('Escape');
+  await expect(typeDropdown).toHaveAttribute('aria-expanded', 'false');
+
+  const formsDropdown = page.getByTestId('jobs-form-filter').getByRole('button');
+  await formsDropdown.click();
+  await expect(formsDropdown).toHaveAttribute('aria-expanded', 'true');
+
+  const allFormsOption = listbox.getByRole('option', {
+    name: dictionaries.jobs.allForms,
+    exact: true,
+  });
+  await expect(allFormsOption).toBeVisible();
+  await allFormsOption.click();
+  await expect(formsDropdown).toContainText(dictionaries.jobs.allForms);
+  await expect(formsDropdown).toHaveAttribute('aria-expanded', 'false');
+
+  const resetFiltersButton = page.getByTestId('jobs-clear-filters');
+  await expect(resetFiltersButton).toBeVisible();
+  await expect(resetFiltersButton).toBeEnabled();
+});
+
 test('User can manage access tab settings for a workspace', async ({ page }) => {
   await page.getByTestId('workspace-access-tab').click();
   await expect(page.getByTestId('workspace-access-tab')).toHaveAttribute('aria-selected', 'true');
