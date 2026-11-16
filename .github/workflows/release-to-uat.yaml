@@ -37,7 +37,7 @@ jobs:
       branch: ${{ steps.release.outputs.branch }}
       chart_ref: ${{ steps.release.outputs.chart_ref }}
       release_tag: ${{ steps.release.outputs.release_tag }}
-      uat_tag: ${{ steps.release.outputs.uat_tag }}
+      uat_version_tag: ${{ steps.release.outputs.uat_version_tag }}
     steps:
       - name: Select tested release image
         id: release
@@ -84,7 +84,7 @@ jobs:
           printf 'branch=%s\n' "$BRANCH" >> "$GITHUB_OUTPUT"
           printf 'chart_ref=%s\n' "$CHART_REF" >> "$GITHUB_OUTPUT"
           printf 'release_tag=%s\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
-          printf 'uat_tag=soba-uat\n' >> "$GITHUB_OUTPUT"
+          printf 'uat_version_tag=soba-uat-%s\n' "${BRANCH#release/}" >> "$GITHUB_OUTPUT"
 
   approve-uat:
     name: Approve UAT promotion
@@ -115,7 +115,7 @@ jobs:
     env:
       CHART_REF: ${{ needs.set-vars.outputs.chart_ref }}
       RELEASE_TAG: ${{ needs.set-vars.outputs.release_tag }}
-      UAT_TAG: ${{ needs.set-vars.outputs.uat_tag }}
+      UAT_VERSION_TAG: ${{ needs.set-vars.outputs.uat_version_tag }}
       REPOSITORY: ${{ github.repository }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -144,27 +144,27 @@ jobs:
 
           promote() {
             local source="$1"
-            local uat_target="$2"
+            local version_target="$2"
             local latest_target="$3"
 
             docker buildx imagetools inspect "$source" >/dev/null
             docker buildx imagetools create \
-              -t "$uat_target" \
+              -t "$version_target" \
               -t "$latest_target" \
               "$source"
           }
 
           promote "$IMAGE_ROOT/backend:$RELEASE_TAG" \
-            "$IMAGE_ROOT/backend:$UAT_TAG" \
+            "$IMAGE_ROOT/backend:$UAT_VERSION_TAG" \
             "$IMAGE_ROOT/backend:latest"
           promote "$IMAGE_ROOT/frontend:$RELEASE_TAG-designer" \
-            "$IMAGE_ROOT/frontend:$UAT_TAG-designer" \
+            "$IMAGE_ROOT/frontend:$UAT_VERSION_TAG-designer" \
             "$IMAGE_ROOT/frontend:latest-designer"
           promote "$IMAGE_ROOT/frontend:$RELEASE_TAG-forms" \
-            "$IMAGE_ROOT/frontend:$UAT_TAG-forms" \
+            "$IMAGE_ROOT/frontend:$UAT_VERSION_TAG-forms" \
             "$IMAGE_ROOT/frontend:latest-forms"
           promote "$IMAGE_ROOT/temporal-worker:$RELEASE_TAG" \
-            "$IMAGE_ROOT/temporal-worker:$UAT_TAG" \
+            "$IMAGE_ROOT/temporal-worker:$UAT_VERSION_TAG" \
             "$IMAGE_ROOT/temporal-worker:latest"
 
   deploy:
@@ -197,7 +197,7 @@ jobs:
       VAULT_SERVICE_ACCOUNT_NAME: ${{ vars.VAULT_SERVICE_ACCOUNT_NAME }}
       CHART_REF: ${{ needs.set-vars.outputs.chart_ref }}
       RELEASE_TAG: ${{ needs.set-vars.outputs.release_tag }}
-      UAT_TAG: ${{ needs.set-vars.outputs.uat_tag }}
+      UAT_VERSION_TAG: ${{ needs.set-vars.outputs.uat_version_tag }}
       REPOSITORY: ${{ github.repository }}
     steps:
       - name: Checkout deployment chart
@@ -260,14 +260,14 @@ jobs:
             --timeout 900s \
             -f deployments/helm/soba/values-uat.yaml \
             --set-string "backend.image.repository=ghcr.io/$REPOSITORY_LOWER/backend" \
-            --set-string "backend.image.tag=$UAT_TAG" \
+            --set-string "backend.image.tag=$UAT_VERSION_TAG" \
             --set-string "backend.config.appVersion=$RELEASE_TAG" \
-            --set-string "backend.config.gitTag=$UAT_TAG" \
-            --set-string "backend.config.imageTag=$UAT_TAG" \
+            --set-string "backend.config.gitTag=$UAT_VERSION_TAG" \
+            --set-string "backend.config.imageTag=$UAT_VERSION_TAG" \
             --set-string "frontend.image.repository=ghcr.io/$REPOSITORY_LOWER/frontend" \
-            --set-string "frontend.image.tag=$UAT_TAG" \
+            --set-string "frontend.image.tag=$UAT_VERSION_TAG" \
             --set-string "temporalWorkersImage.repository=ghcr.io/$REPOSITORY_LOWER/temporal-worker" \
-            --set-string "temporalWorkersImage.tag=$UAT_TAG" \
+            --set-string "temporalWorkersImage.tag=$UAT_VERSION_TAG" \
             --set-string "temporalWorkersImage.pullPolicy=IfNotPresent" \
             --set-string "global.domain=$OC_DOMAIN" \
             --set-string "database.existingSecretName=${CRUNCHY_CLUSTER}-pguser-app" \
@@ -295,7 +295,7 @@ jobs:
             echo "## UAT deployment"
             echo
             echo "- Release tag: \`${RELEASE_TAG}\`"
-            echo "- Promoted UAT tag: \`${UAT_TAG}\`"
+            echo "- Promoted UAT tag: \`${UAT_VERSION_TAG}\`"
             echo "- Namespace: \`${NAMESPACE}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
