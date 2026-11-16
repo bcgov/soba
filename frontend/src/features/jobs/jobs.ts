@@ -11,6 +11,7 @@ const SUBMISSION_SUBMITTED = 'submission.submitted';
 const SUBMISSION_EXPORT = 'submission-export';
 const SUBMISSION_STATUS_CHANGED = 'submission.status-changed';
 const SUBMISSION_STATUS_EMAIL = 'submission.status-email';
+const SUBMISSION_EMAIL_COPY = 'submission.email-copy';
 
 /** The job types this build names itself, with their text. */
 const OWN_TYPE_LABELS: Readonly<Record<string, (dict: Dictionary) => string>> = {
@@ -18,6 +19,7 @@ const OWN_TYPE_LABELS: Readonly<Record<string, (dict: Dictionary) => string>> = 
   [SUBMISSION_EXPORT]: (dict) => dict.jobs.types.submissionExport,
   [SUBMISSION_STATUS_CHANGED]: (dict) => dict.jobs.types.submissionStatusChanged,
   [SUBMISSION_STATUS_EMAIL]: (dict) => dict.jobs.types.submissionStatusEmail,
+  [SUBMISSION_EMAIL_COPY]: (dict) => dict.jobs.types.submissionEmailCopy,
 };
 
 /** Text to show, and `lang` when only the server names it, which it does in English. */
@@ -41,13 +43,14 @@ export const jobTypeLabel = (
 
 /**
  * The types a submission's jobs can have that this build names: submission received and its
- * actions, status changed and its status emails.
+ * actions, status changed and its status emails, and submitter email copies.
  */
 export const submissionJobTypes = (): string[] => [
   SUBMISSION_SUBMITTED,
   ...postSubmissionActionCodes(),
   SUBMISSION_STATUS_CHANGED,
   SUBMISSION_STATUS_EMAIL,
+  SUBMISSION_EMAIL_COPY,
 ];
 
 const STATUS_VARIANTS: Record<JobStatus, StatusTagVariant> = {

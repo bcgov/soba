@@ -4,7 +4,7 @@ import {
   renderSubmissionEmail,
   type SubmissionEmailFacts,
 } from '../../../../../src/core/integrations/notification/email/submissionEmail';
-import { designerSubmissionUrl } from '../../../../../src/core/appLinks';
+import { designerSubmissionUrl, formsMySubmissionsUrl } from '../../../../../src/core/appLinks';
 
 const template = defineSubmissionEmail({
   en: {
@@ -90,6 +90,38 @@ describe('renderSubmissionEmail', () => {
     expect(renderSubmissionEmail(template, facts({ comment: 'Thanks' }), 'en').body).toContain(
       '<strong>Comments:</strong><br>Thanks',
     );
+  });
+
+  it('adds a second link after the first, where the template names it and the email has one', () => {
+    const withSecond = defineSubmissionEmail({
+      en: { ...template.en, secondLinkText: 'View your past submissions' },
+      fr: { ...template.fr, secondLinkText: 'Voir vos soumissions antérieures' },
+    });
+    const { body } = renderSubmissionEmail(
+      withSecond,
+      facts({
+        secondLink: (language) => formsMySubmissionsUrl('https://soba.example/forms', language),
+      }),
+      'en',
+    );
+    const first = body.indexOf('View this submission');
+    const second = body.indexOf(
+      '<a href="https://soba.example/forms/en/my-submissions" style="color:#255a90;text-decoration:underline;">View your past submissions</a>',
+    );
+    expect(first).toBeGreaterThan(-1);
+    expect(second).toBeGreaterThan(first);
+    expect(renderSubmissionEmail(withSecond, facts(), 'en').body).not.toContain('past submissions');
+  });
+
+  it('leaves out a second link the template has no text for', () => {
+    const { body } = renderSubmissionEmail(
+      template,
+      facts({
+        secondLink: (language) => formsMySubmissionsUrl('https://soba.example/forms', language),
+      }),
+      'en',
+    );
+    expect(body).not.toContain('my-submissions');
   });
 
   it('leaves out a blank comment and a missing link', () => {

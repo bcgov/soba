@@ -4,6 +4,7 @@ import {
   canRenderSubmission,
   canUploadSubmissionFile,
   canWriteSubmission,
+  emailCopyStatusOf,
   ownDeleteStatusOf,
   reviseStatusOf,
   SubmissionChangeStatus,
@@ -37,6 +38,8 @@ export const SubmitterOperation = {
   delete: 'delete',
   /** Send the caller's own submitted submission back to revise. */
   revise: 'revise',
+  /** Email the caller a copy of a submitted submission's confirmation. */
+  emailCopy: 'emailCopy',
 } as const;
 export type SubmitterOperationCode = (typeof SubmitterOperation)[keyof typeof SubmitterOperation];
 
@@ -63,6 +66,9 @@ const SUBMISSION_RULES: Record<
   // Refused only for the caller; the revise itself refuses a submission already taken up.
   revise: ({ access, form }, caller) =>
     reviseStatusOf(access, form, caller).status !== SubmissionChangeStatus.denied,
+  // Refused only for the caller or the form's setting; the copy itself refuses an unsubmitted one.
+  emailCopy: ({ access, form }) =>
+    emailCopyStatusOf(access, form).status !== SubmissionChangeStatus.denied,
 };
 
 /** The one read of a submission for the caller; null when it is not live or there is no actor. */

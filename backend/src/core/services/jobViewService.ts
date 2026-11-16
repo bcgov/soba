@@ -307,6 +307,7 @@ const TYPE_NAMES: Record<string, string> = {
   [JobType.submission_export]: 'Submission export',
   [JobType.submission_status_changed]: 'Status changed',
   [JobType.submission_status_email]: 'Status email',
+  [JobType.submission_email_copy]: 'Submitter email copy',
 };
 
 /** The job types this environment runs, named for the admin filter. */

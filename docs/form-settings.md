@@ -79,8 +79,10 @@ Form Settings (10) and Form Profile (20) save through the form update; Form Audi
 Submitter Settings (30) and Review Settings (35) use their group endpoints. The audience's login providers come from
 `GET /meta/login-providers` through `useLoginProviders`.
 
-A workspace's Form Settings tab holds one section per shared group: Form Audience (10), Submitter
-Settings (20) and Review Settings (30). Only workspace owners and admins reach the page, so the sections are editable there.
+A workspace's Form Settings tab holds a section for each shared group but one: Form Audience (10),
+Submitter Settings (20) and Review Settings (30). The `confirmation` group's card is on the After
+Submission tab instead (below). Only workspace owners and admins reach the page, so the sections
+are editable there.
 
 API Keys sits at 40 on a workspace's Form Settings tab and at 50 on a form's Settings tab. It is a
 collection of keys rather than one set of values, so its drawers use the credential feature's own
@@ -93,10 +95,12 @@ unrelated, and one group's numbers need not match.
 ## After Submission tab: `frontend/src/features/post-submission/`
 
 Post-submission actions are set on their own tab, after Settings in the designer and after Form
-Settings on the workspace page, with those tabs' permissions. The tab shows only where the
-`post-submission` feature is available (`data/usePostSubmissionAvailable.ts`). The feature is fixed,
-so that is everywhere while it is enabled; if it is made scoped, a form's check names its workspace
-too, since a workspace grant covers its forms.
+Settings on the workspace page, with those tabs' permissions. The tab shows where either of its parts
+is available: the `post-submission` actions (`data/usePostSubmissionAvailable.ts`) or the
+Confirmation Screen card (below), both asked through `data/useAfterSubmissionAvailable.ts`. The tab
+waits for both answers, and for the actions, before it lays out its drawers, so the first action
+starts open. The features are fixed, so that is everywhere while one is enabled; if one is made
+scoped, a form's check names its workspace too, since a workspace grant covers its forms.
 
 | file                               | role                                                                                                                                                                |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -110,6 +114,30 @@ too, since a workspace grant covers its forms.
 Each action reads and saves under the key `post-submission/<code>` through `useFormSettings` and
 `useWorkspaceSettings`, so a workspace save refreshes its forms' views. Its text lives under
 `postSubmission` in `en.json` and `fr.json`.
+
+### Confirmation Screen card: `frontend/src/features/confirmation-screen/`
+
+The tab also holds a Confirmation Screen card: whether the confirmation screen shows the
+Confirmation ID, and whether submitters can email themselves a copy of their confirmation. Both are
+on by default. It is not a post-submission action: it is the `confirmation` settings group, read and
+saved through `useFormSettings` and `useWorkspaceSettings` like any other. The group has a feature,
+`confirmation-screen`, and each setting has its own on top of it, `confirmation-id-visibility` and
+`confirmation-email-copy`; `CONFIRMATION_SETTING_FEATURES` in lib names them. The card shows where at
+least one setting is available, with only those settings, and notes when notifications are off,
+since copies are not sent without them. A setting whose feature is off has its default effect, and a
+save keeps its stored value. The tabs pass the card to `PostSubmissionActions` as an extra drawer, so
+it shows even when the actions are off.
+
+| file                                     | role                                                                        |
+| ---------------------------------------- | --------------------------------------------------------------------------- |
+| `data/useConfirmationScreenAvailable.ts` | which settings the card can show for a workspace or form, and notifications |
+| `ui/ConfirmationSettingControls.tsx`     | the checkboxes, one per available setting, with help text                   |
+| `ui/FormConfirmationDrawer.tsx`          | a form's drawer: inherit the workspace's settings or set its own            |
+| `ui/WorkspaceConfirmationDrawer.tsx`     | a workspace's drawer, the default for its forms                             |
+| `ui/confirmationDrawers.ts`              | the card as the tab's extra drawer, or none                                 |
+
+Its text lives under `postSubmission.confirmationScreen`. The send itself is described in
+[notifications.md](notifications.md).
 
 ## Feature flags
 
