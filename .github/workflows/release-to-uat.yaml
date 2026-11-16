@@ -87,7 +87,7 @@ jobs:
           printf 'uat_tag=soba-uat\n' >> "$GITHUB_OUTPUT"
 
   approve-uat:
-    name: Approve UAT promotion after database setup
+    name: Approve UAT promotion
     needs: [set-vars]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
