@@ -260,3 +260,15 @@ jobs:
             echo "- Promoted UAT tag: \`${UAT_TAG}\`"
             echo "- Namespace: \`${NAMESPACE}\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  gateway:
+    name: Verify UAT through APS gateway
+    needs: [deploy]
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/gateway-proxy-check.yaml
+    with:
+      environment: uat
+      release: soba-uat
+    secrets: inherit
