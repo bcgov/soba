@@ -19,7 +19,10 @@ import {
   setActiveOpener,
   setActiveSubmission,
 } from '@/src/features/formio-v5/activeSubmission';
-import { isFormUpdated } from '@/src/features/formio-v5/data/useSubmissionOpener';
+import {
+  isFormUpdated,
+  type OpenedSubmission,
+} from '@/src/features/formio-v5/data/useSubmissionOpener';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { apiErrorMessage, isNetworkError, isOutcomeUnknown } from '@/src/shared/api/dataError';
 import { useFormatTime } from '@/src/shared/hooks/useFormatLongDate';
@@ -60,6 +63,7 @@ export type FillLabels = {
   requestFailed: string;
   formUpdated: string;
   continueUpdated: string;
+  version: string;
   errors: Record<ApiErrorCode, string>;
 };
 
@@ -72,8 +76,8 @@ export type FillView = {
   fileOption: Record<string, unknown>;
   /** The page's session, which every write goes out as. */
   signedIn: boolean;
-  /** Opens a submission not opened yet, from the version this view shows, and returns its head. */
-  open?: () => Promise<string>;
+  /** Opens a submission not opened yet, from the version this view shows. */
+  open?: () => Promise<OpenedSubmission>;
 };
 
 /** A newer version of the form, with its facts as read with it. */
@@ -135,10 +139,22 @@ export function SubmissionFillForm({
   const [{ snapshot, canWrite, canSaveDraft, fileOption, signedIn, open }] = useState(view);
   const { addNotification } = useNotificationStore();
   const router = useRouter();
+  // An open can land on a newer version that renders the same, without remounting the form.
+  const [versionNo, setVersionNo] = useState(snapshot.versionNo);
+  const openShown = useMemo(
+    () =>
+      open &&
+      (async () => {
+        const opened = await open();
+        setVersionNo(opened.versionNo);
+        return opened.head;
+      }),
+    [open],
+  );
   const writer = useFillWriter(submissionId, {
     headRevisionId: snapshot.headRevisionId,
     signedIn,
-    open,
+    open: openShown,
   });
   const { busy, held, opened, save: saveStatus } = writer.status;
   const formatTime = useFormatTime();
@@ -342,6 +358,9 @@ export function SubmissionFillForm({
     <>
       <PrintMarks status={printStatus} />
       <div className="d-print-none">
+        <div className="text-end" data-testid="submission-fill-version">
+          {labels.version}: {versionNo}
+        </div>
         {renderError ? (
           <InlineAlert variant="danger" role="alert" data-testid="submission-fill-render-error">
             {renderError}

@@ -9,10 +9,6 @@ run-name: Deploy UAT Crunchy Postgres
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - ".github/workflows/deploy-crunchy-uat.yaml"
-      - "deployments/helm/action-crunchy/values-uat.yml"
 
 permissions:
   contents: read
@@ -36,7 +32,7 @@ jobs:
         id: crunchy
         uses: bcgov/actions-openshift/crunchy@46f2614322f7ba1a5ad88a7e4e1b98569c80dcf7 # v0.6.0
         with:
-          oc_namespace: ${{ secrets.OC_NAMESPACE }}
+          oc_namespace: ${{ vars.OC_NAMESPACE }}
           oc_token: ${{ secrets.OC_TOKEN }}
           oc_server: ${{ vars.OC_SERVER }}
           values_file: deployments/helm/action-crunchy/values-uat.yml
@@ -44,7 +40,7 @@ jobs:
 
       - name: Validate Crunchy resources
         env:
-          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
+          NAMESPACE: ${{ vars.OC_NAMESPACE }}
           CLUSTER: ${{ steps.crunchy.outputs.cluster }}
         run: |
           set -euo pipefail
@@ -70,9 +66,10 @@ jobs:
           fi
 
           for secret in \
+            "${CLUSTER}-pguser-app" \
+            "${CLUSTER}-pguser-postgres" \
             "${CLUSTER}-pguser-appproxy" \
-            "${CLUSTER}-pguser-admin" \
-            "${CLUSTER}-pguser-app-reader" \
+            "${CLUSTER}-pguser-appproxytest" \
             "${CLUSTER}-pguser-temporal"; do
             for attempt in $(seq 1 30); do
               if oc -n "$NAMESPACE" get secret "$secret" >/dev/null 2>&1; then
@@ -94,61 +91,6 @@ jobs:
           oc -n "$NAMESPACE" get secret "$APPPROXY_SECRET" -o jsonpath='{.data.uri}' >/dev/null
           oc -n "$NAMESPACE" get secret "$APPPROXY_SECRET" -o jsonpath="{.data['pgbouncer-uri']}" >/dev/null
 
-      - name: Harden database privileges
-        env:
-          NAMESPACE: ${{ secrets.OC_NAMESPACE }}
-          CLUSTER: ${{ steps.crunchy.outputs.cluster }}
-        run: |
-          set -euo pipefail
-
-          JOB_NAME="${CLUSTER}-db-hardening"
-          ADMIN_SECRET="${CLUSTER}-pguser-admin"
-          POSTGRES_IMAGE="$(oc -n "$NAMESPACE" get postgrescluster "$CLUSTER" -o jsonpath='{.spec.image}')"
-
-          oc -n "$NAMESPACE" delete job "$JOB_NAME" --ignore-not-found=true
-
-          cat <<EOF | oc -n "$NAMESPACE" apply -f -
-          apiVersion: batch/v1
-          kind: Job
-          metadata:
-            name: ${JOB_NAME}
-          spec:
-            backoffLimit: 2
-            ttlSecondsAfterFinished: 300
-            template:
-              metadata:
-                labels:
-                  postgres-operator.crunchydata.com/cluster: ${CLUSTER}
-              spec:
-                restartPolicy: Never
-                containers:
-                  - name: db-hardening
-                    image: ${POSTGRES_IMAGE}
-                    imagePullPolicy: IfNotPresent
-                    env:
-                      - name: DATABASE_URI
-                        valueFrom:
-                          secretKeyRef:
-                            name: ${ADMIN_SECRET}
-                            key: uri
-                    command:
-                      - sh
-                      - -ec
-                      - |
-                        psql "\$DATABASE_URI" -v ON_ERROR_STOP=1 <<'SQL'
-                        REVOKE CONNECT, TEMPORARY ON DATABASE app FROM PUBLIC;
-                        REVOKE CONNECT, TEMPORARY ON DATABASE postgres FROM PUBLIC;
-                        REVOKE CONNECT, TEMPORARY ON DATABASE temporal FROM PUBLIC;
-                        REVOKE CONNECT, TEMPORARY ON DATABASE temporal_visibility FROM PUBLIC;
-                        REVOKE CREATE, TEMPORARY ON DATABASE app FROM "app-reader";
-                        SQL
-          EOF
-
-          if ! oc -n "$NAMESPACE" wait --for=condition=complete "job/${JOB_NAME}" --timeout=5m; then
-            oc -n "$NAMESPACE" logs "job/${JOB_NAME}" || true
-            exit 1
-          fi
-
       - name: Deployment summary
         run: |
           {
@@ -160,8 +102,9 @@ jobs:
             echo ""
             echo "Expected pguser secrets:"
             echo ""
+            echo "- ${{ steps.crunchy.outputs.cluster }}-pguser-app"
+            echo "- ${{ steps.crunchy.outputs.cluster }}-pguser-postgres"
             echo "- ${{ steps.crunchy.outputs.cluster }}-pguser-appproxy"
-            echo "- ${{ steps.crunchy.outputs.cluster }}-pguser-admin"
-            echo "- ${{ steps.crunchy.outputs.cluster }}-pguser-app-reader"
+            echo "- ${{ steps.crunchy.outputs.cluster }}-pguser-appproxytest"
             echo "- ${{ steps.crunchy.outputs.cluster }}-pguser-temporal"
           } >> "$GITHUB_STEP_SUMMARY"

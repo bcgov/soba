@@ -35,13 +35,16 @@ layout frames any email, and a block for each kind of email fills it.
 | file                 | role                                                                                                                                                                                                     |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `html.ts`            | `markup`, a template tag that escapes every value unless it is markup the tag built, and `SafeHtml`, which nothing else can make. A look-alike object or `true` throws                                   |
-| `url.ts`             | `designerSubmissionUrl` and `formsSubmissionUrl`, the only makers of `SafeUrl`. `assertEmailLinkBases`, which stops startup when `DESIGNER_APP_URL` or `FORMS_APP_URL` is set but unusable               |
 | `language.ts`        | `EmailLanguage` (`en`, `fr`), `EmailLanguages` (adds `both`) and `DEFAULT_EMAIL_LANGUAGE`                                                                                                                |
 | `layout.ts`          | `renderEmail(parts, languages)`: the container, the order of `both`, "(Le français suit)", the divider, the footer and a one-line subject. Also `paragraph`, `link`, `languageSection`, `withLineBreaks` |
 | `submissionEmail.ts` | the block for an email about a submission: `defineSubmissionEmail` and `renderSubmissionEmail`                                                                                                           |
 
 The tag is named `markup`, not `html`: Prettier reformats the contents of any template tagged
 `html`, which would change the emails.
+
+Links in emails come from `backend/src/core/appLinks.ts`, which any feature uses for links into the
+designer and forms apps. Its helpers are the only makers of `SafeUrl`, and `assertAppLinkBases`
+stops startup when `DESIGNER_APP_URL` or `FORMS_APP_URL` is set but unusable.
 
 The layout knows nothing about submissions. An email about something else, such as a form reminder
 or a finished export, gets its own small block on the layout. It does not stretch the submission
@@ -92,10 +95,12 @@ const content = renderSubmissionEmail(
 ```
 
 For each language, the submission block renders the Confirmation ID in bold, the sentence and the
-link. After every language's section it adds the reviewer's comment, once, under "Comments:",
-"Commentaires :", or "Comments: / Commentaires :" in an email in both. The subject ends with the
-Confirmation ID, as ` (code)`, so mail clients do not thread every email about one form into a
-single conversation.
+link. An email may also name a second link, with `secondLinkText` in its template and `secondLink`
+in its facts, such as a signed-in submitter's past submissions; the block renders it after the
+first, and leaves it out when either is missing. After every language's section it adds the
+reviewer's comment, once, under "Comments:", "Commentaires :", or "Comments: / Commentaires :" in an
+email in both. The subject ends with the Confirmation ID, as ` (code)`, so mail clients do not
+thread every email about one form into a single conversation.
 
 - **Form names** go through `cleanName` before a template sees them: no control or format
   characters, no links, one line, at most 200 characters.
@@ -152,6 +157,12 @@ reactions. The event commits or rolls back with the change, and its jobs retry w
 or down. A failed email never undoes the change that caused it. Every review status change records
 its event; a submit records one only where post-submission actions are available.
 
+A submitter asking for a copy of their confirmation changes nothing else, so the request is its own
+record: one transaction saves a `submitter_email_copy_request` row, with the address they typed,
+and queues the `submission.email-copy` job that names it (`features/submitter-email-copy`). The job's
+params hold the request id only, so the address stays out of job rows. Request rows keep the
+address with no expiry, as `notification_audit` rows keep recipients.
+
 | event                       | recorded by                                          | its reactions                                                                                                                          |
 | --------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `submission.submitted`      | a submit (`submissionService`)                       | the post-submission actions the form has on, such as "Email a notice" (`features/post-submission`)                                     |
@@ -205,25 +216,30 @@ its event; a submit records one only where post-submission actions are available
   action caused it. Running an email's job again attributes its sends to whoever ran it; running an
   event again does not, since the jobs it queues keep the event's creator. An action a form is
   configured with, such as the notice, sends as the system user.
-- **Hourly limits** apply where staff choose the recipients: the notice checks its form, workspace
-  and environment limits before its run sends anything. Status emails go out one per person's
-  action and have none.
+- **Hourly limits** apply where people choose the recipients. The notice, whose list staff set,
+  checks its form, workspace and environment limits before its run sends anything. A submitter's
+  copy, sent to an address they type, is checked when they ask: per submission, address, form,
+  workspace and environment, counted from its own requests, and refused with 429
+  `email_copy_limit_reached` (`SUBMITTER_EMAIL_COPY_*_HOURLY_LIMIT`). A sent copy is also an
+  accepted send in `notification_audit`, so it counts toward the notice's limits. Status emails go
+  out one per person's action and have none.
 
 ## Emails today
 
-| email                   | sent to                                              | link                                            | sent by                                                                                                                                              |
-| ----------------------- | ---------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| New submission (notice) | the addresses a form's "Email a notice" action lists | the submission in the designer                  | the action's job, queued by the `submission.submitted` fan-out (`plugins/post-submission-email-addresses`), as the system user                       |
-| Assigned                | the reviewer the submission is assigned to           | the submission in the designer                  | a `submission.status-email` job, queued by the `submission.status-changed` fan-out (`features/submission-review/statusEmailJob.ts`), as the reviewer |
-| Revision requested      | the submission's owner and active collaborators      | the submission's `submit` page in the forms app | a `submission.status-email` job, as the reviewer; none when a submitter sends their own submission back                                              |
-| Review complete         | the submission's owner and active collaborators      | the submission in the forms app                 | a `submission.status-email` job, as the reviewer                                                                                                     |
+| email                   | sent to                                                    | link                                                                                                                                          | sent by                                                                                                                                              |
+| ----------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| New submission (notice) | the addresses a form's "Email a notice" action lists       | the submission in the designer                                                                                                                | the action's job, queued by the `submission.submitted` fan-out (`plugins/post-submission-email-addresses`), as the system user                       |
+| Assigned                | the reviewer the submission is assigned to                 | the submission in the designer                                                                                                                | a `submission.status-email` job, queued by the `submission.status-changed` fan-out (`features/submission-review/statusEmailJob.ts`), as the reviewer |
+| Revision requested      | the submission's owner and active collaborators            | the submission's `submit` page in the forms app                                                                                               | a `submission.status-email` job, as the reviewer; none when a submitter sends their own submission back                                              |
+| Review complete         | the submission's owner and active collaborators            | the submission in the forms app                                                                                                               | a `submission.status-email` job, as the reviewer                                                                                                     |
+| Submitter's copy        | the address the submitter typed on the confirmation screen | for a signed-in submitter, the submission in the forms app, and their past submissions on a form that is not public; none for the public user | a `submission.email-copy` job, queued with the request (`features/submitter-email-copy`), as the requester                                           |
 
 ## Adding an email
 
 1. Choose the block. An email about a submission uses `defineSubmissionEmail`; anything else gets a
    block of its own on `layout.ts`.
 2. Write the template beside the feature that sends it, in English and French.
-3. Build its link with a link helper, or add one to `url.ts` if the page is new.
+3. Build its link with a link helper, or add one to `backend/src/core/appLinks.ts` if the page is new.
 4. Add a `JobType` code (`backend/src/core/db/codes/index.ts`) and a job spec in
    `backend/src/core/jobs/` with its pool, `maxAttempts`, `timeoutMs` and params schema. Keep the
    spec apart from the handler, so queuing the job does not load the handler.

@@ -55,6 +55,8 @@ export const storedSubmission = (
       audienceIdps: [],
       allowSubmitterDrafts: true,
       allowSubmitterRevision: false,
+      allowSubmitterEmailCopy: false,
+      showConfirmationId: true,
       ...overrides.form,
     },
   };

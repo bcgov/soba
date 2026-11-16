@@ -161,9 +161,11 @@ describe('DesignSubmissionView', () => {
     expect(getFormVersionSchema).toHaveBeenCalledWith('token', 'v3');
     expect(getSobaSubmissionData).toHaveBeenCalledWith('token', 'sub-1');
     expect(screen.getByTestId('submission-view-confirmation')).toHaveTextContent(
-      'Confirmation ID: K7M2Q9XA',
+      /^Confirmation ID: K7M2Q9XA$/,
     );
-    expect(screen.getByTestId('submission-view-submitter')).toHaveTextContent('Ada Lovelace');
+    expect(screen.getByTestId('submission-view-submitter')).toHaveTextContent(
+      /^Submitted By: Ada Lovelace$/,
+    );
   });
 
   it('reads nothing until the session is ready', async () => {

@@ -35,7 +35,11 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
-    general: { sessionExpired: 'Your session has ended.', noAccess: 'You do not have access.' },
+    general: {
+      sessionExpired: 'Your session has ended.',
+      noAccess: 'You do not have access.',
+      version: 'Version',
+    },
     submission: { notFound: 'Submission not found.', loadError: 'Could not load this submission.' },
     form: {
       loading: 'Loading...',
@@ -191,6 +195,7 @@ describe('FormioV5SubmissionFillClient', () => {
     h.getSubmitFillBundle.mockResolvedValue({
       workflowState: 'opened',
       formVersionId: 'ver-1',
+      versionNo: 3,
       headRevisionId: 'rev-0',
       schema: { components: [] },
       content: null,
@@ -290,11 +295,17 @@ describe('FormioV5SubmissionFillClient', () => {
       expect(answers()).toBeUndefined();
     });
   });
+  it('shows the version the submission is on', async () => {
+    await renderSignedOut();
+    await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+    expect(screen.getByTestId('submission-fill-version')).toHaveTextContent(/^Version: 3$/);
+  });
 
   it('renders the form read-only, with a notice, when the caller may only read', async () => {
     h.getSubmitFillBundle.mockResolvedValue({
       workflowState: 'draft',
       formVersionId: 'ver-1',
+      versionNo: 3,
       headRevisionId: 'rev-1',
       schema: { components: [] },
       content: null,
@@ -372,6 +383,7 @@ describe('FormioV5SubmissionFillClient', () => {
     h.getSubmitFillBundle.mockResolvedValue({
       workflowState: 'submitted',
       formVersionId: 'ver-1',
+      versionNo: 3,
       headRevisionId: 'rev-3',
       schema: { components: [] },
       content: null,
@@ -387,6 +399,7 @@ describe('FormioV5SubmissionFillClient', () => {
     h.getSubmitFillBundle.mockResolvedValue({
       workflowState: 'revising',
       formVersionId: 'ver-1',
+      versionNo: 3,
       headRevisionId: 'rev-3',
       schema: { components: [] },
       content: { data: { a: 1 } },
@@ -407,6 +420,7 @@ describe('FormioV5SubmissionFillClient', () => {
         {
           workflowState: 'draft',
           formVersionId: 'ver-1',
+          versionNo: 3,
           headRevisionId: 'rev-7',
           schema: { components: [] },
           content: { data: { a: 9 } },
@@ -435,6 +449,7 @@ describe('FormioV5SubmissionFillClient', () => {
     h.getSubmitFillBundle.mockResolvedValue({
       workflowState: 'draft',
       formVersionId: 'ver-1',
+      versionNo: 3,
       headRevisionId: 'rev-1',
       schema: { components: [] },
       content: null,
@@ -582,6 +597,7 @@ describe('FormioV5SubmissionFillClient', () => {
       h.getSubmitFillBundle.mockResolvedValue({
         workflowState: 'opened',
         formVersionId: 'ver-1',
+        versionNo: 3,
         headRevisionId: null,
         schema: { components: [] },
         content: null,
@@ -668,6 +684,7 @@ describe('FormioV5SubmissionFillClient', () => {
       h.getSubmitFillBundle.mockResolvedValueOnce({
         workflowState: 'draft',
         formVersionId: 'ver-1',
+        versionNo: 3,
         headRevisionId: 'rev-9',
         schema: { components: [] },
         content: null,
@@ -695,6 +712,7 @@ describe('FormioV5SubmissionFillClient', () => {
     const bundle = (overrides: Record<string, unknown> = {}) => ({
       workflowState: 'draft',
       formVersionId: 'ver-1',
+      versionNo: 3,
       headRevisionId: 'rev-0',
       schema: { components: [] },
       content: null,
@@ -1194,6 +1212,7 @@ describe('SubmissionFillForm', () => {
       formId: 'form-1',
       workflowState: 'draft',
       formVersionId: 'ver-1',
+      versionNo: 1,
       headRevisionId: 'rev-1',
       currentRevisionNo: 1,
       schema: { components: [] },

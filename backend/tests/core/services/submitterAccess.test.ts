@@ -68,6 +68,15 @@ describe('isSubmitterAllowed', () => {
     [SubmitterOperation.delete, {}, true],
     [SubmitterOperation.delete, { workflowState: 'submitted' }, true],
     [SubmitterOperation.delete, { role: 'collaborator' }, false],
+    // Refused for the caller or the form's setting only; the copy itself refuses a draft.
+    [SubmitterOperation.emailCopy, { form: { allowSubmitterEmailCopy: true } }, true],
+    [
+      SubmitterOperation.emailCopy,
+      { workflowState: 'draft', form: { allowSubmitterEmailCopy: true } },
+      true,
+    ],
+    [SubmitterOperation.emailCopy, { form: { allowSubmitterEmailCopy: false } }, false],
+    [SubmitterOperation.emailCopy, { role: null, form: { allowSubmitterEmailCopy: true } }, false],
   ];
 
   it.each(matrix)('%s over the stored read %j is allowed=%s', async (op, overrides, ok) => {

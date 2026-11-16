@@ -83,12 +83,15 @@ export const SubmissionWriteResponseSchema = SubmissionResponseSchema.extend({
 });
 
 /**
- * A submission as its submitter reads it: its review as they are told it, and whether they can
- * continue it on the fill page.
+ * A submission as its submitter reads it: its review as they are told it, whether they can
+ * continue it on the fill page, whether they can email themselves a copy of its confirmation, and
+ * whether the confirmation screen shows its Confirmation ID.
  */
 export const SubmitSubmissionResponseSchema = SubmissionResponseSchema.extend({
   reviewLabel: SubmitterReviewLabelSchema.nullable(),
   canContinue: z.boolean(),
+  canEmailCopy: z.boolean(),
+  showConfirmationId: z.boolean(),
 });
 
 export type SubmissionRevisionInfo = z.infer<typeof SubmissionRevisionInfoSchema>;
