@@ -4,12 +4,14 @@ backend:
   # API keys issue through the APS issuer below.
   features:
     api-keys: "enabled"
+    confirmation-email-copy: "enabled"
+    confirmation-id-visibility: "enabled"
+    confirmation-screen: "enabled"
     dev-data: "enabled"
     notifications: "enabled"
     post-submission: "enabled"
     post-submission-email: "enabled"
     submission-export: "enabled"
-    submitter-email-copy: "enabled"
     user-search: "enabled"
   replicas: 2
   sso:

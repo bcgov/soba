@@ -51,6 +51,7 @@ export const findWorkspaceConfirmationSettings = async (
   const rows = await db
     .select({
       allowSubmitterEmailCopy: workspaceConfirmationSettings.allowSubmitterEmailCopy,
+      showConfirmationId: workspaceConfirmationSettings.showConfirmationId,
       version: workspaceConfirmationSettings.version,
     })
     .from(workspaceConfirmationSettings)
@@ -58,7 +59,13 @@ export const findWorkspaceConfirmationSettings = async (
     .limit(1);
   const row = rows[0];
   return row
-    ? { values: { allowSubmitterEmailCopy: row.allowSubmitterEmailCopy }, version: row.version }
+    ? {
+        values: {
+          allowSubmitterEmailCopy: row.allowSubmitterEmailCopy,
+          showConfirmationId: row.showConfirmationId,
+        },
+        version: row.version,
+      }
     : null;
 };
 
@@ -75,6 +82,7 @@ export const updateWorkspaceConfirmationSettings = (input: {
     eq(workspaceConfirmationSettings.workspaceId, input.workspaceId),
     {
       allowSubmitterEmailCopy: input.settings.allowSubmitterEmailCopy,
+      showConfirmationId: input.settings.showConfirmationId,
       updatedBy: input.actorDisplayLabel,
       updatedAt: new Date(),
     },
@@ -97,8 +105,10 @@ export const findConfirmationSettings = async (
     .select({
       inherit: formConfirmationSettings.inherit,
       allowSubmitterEmailCopy: formConfirmationSettings.allowSubmitterEmailCopy,
+      showConfirmationId: formConfirmationSettings.showConfirmationId,
       version: formConfirmationSettings.version,
       workspaceAllowSubmitterEmailCopy: workspaceConfirmationSettings.allowSubmitterEmailCopy,
+      workspaceShowConfirmationId: workspaceConfirmationSettings.showConfirmationId,
     })
     .from(formConfirmationSettings)
     .innerJoin(
@@ -117,10 +127,16 @@ export const findConfirmationSettings = async (
   return {
     inherit: row.inherit,
     own:
-      row.inherit || row.allowSubmitterEmailCopy == null
+      row.inherit || row.allowSubmitterEmailCopy == null || row.showConfirmationId == null
         ? null
-        : { allowSubmitterEmailCopy: row.allowSubmitterEmailCopy },
-    workspace: { allowSubmitterEmailCopy: row.workspaceAllowSubmitterEmailCopy },
+        : {
+            allowSubmitterEmailCopy: row.allowSubmitterEmailCopy,
+            showConfirmationId: row.showConfirmationId,
+          },
+    workspace: {
+      allowSubmitterEmailCopy: row.workspaceAllowSubmitterEmailCopy,
+      showConfirmationId: row.workspaceShowConfirmationId,
+    },
     version: row.version,
   };
 };
@@ -146,6 +162,7 @@ export const updateConfirmationSettings = (input: {
     {
       inherit: input.settings == null,
       allowSubmitterEmailCopy: input.settings?.allowSubmitterEmailCopy ?? null,
+      showConfirmationId: input.settings?.showConfirmationId ?? null,
       updatedBy: input.actorDisplayLabel,
       updatedAt: new Date(),
     },

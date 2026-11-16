@@ -5,6 +5,7 @@ const facts = {
   formName: 'Permit application',
   confirmationCode: 'K7M2Q9XA',
   signedIn: true,
+  publicForm: false,
 };
 const FORMS = 'https://forms.example';
 
@@ -34,10 +35,16 @@ describe('buildEmailCopy', () => {
     expect(body).not.toContain(`>${FORMS}`);
   });
 
-  // The public user's submissions are no one's own, so there is no list to link.
-  it('leaves out the past submissions link for a submitter who was not signed in', () => {
-    const { body } = buildEmailCopy({ ...facts, signedIn: false }, FORMS);
-    expect(body).toContain('/submission/s1');
+  // Anyone with the link can open a public user's submission, and its answers.
+  it('has no links for a submitter who was not signed in', () => {
+    const { body } = buildEmailCopy({ ...facts, signedIn: false, publicForm: true }, FORMS);
+    expect(body).toContain('Confirmation ID: <strong>K7M2Q9XA</strong>');
+    expect(body).not.toContain('<a ');
+  });
+
+  it('links only the submission for a signed-in submitter on a public form', () => {
+    const { body } = buildEmailCopy({ ...facts, publicForm: true }, FORMS);
+    expect(body).toContain(`href="${FORMS}/en/submission/s1"`);
     expect(body).not.toContain('my-submissions');
   });
 

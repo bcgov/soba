@@ -52,8 +52,9 @@ export interface SubmitterFormListRow extends SubmitterFormFacts {
   name: string;
   workspaceId: string;
   workspaceName: string;
-  /** The effective confirmation setting; read by submit-mode rules, not sent with the form. */
+  /** The effective confirmation settings; read by submit-mode rules, not sent with the form. */
   allowSubmitterEmailCopy: boolean;
+  showConfirmationId: boolean;
 }
 
 export interface ListSubmitterFormsInput {
@@ -128,8 +129,9 @@ const submitterFormIds = (userId: string, workspaceId?: string) => {
 };
 
 /**
- * The effective audience, drafts, submitter revision and email copy settings: the form's own unless it inherits
- * or leaves the value unset, then the workspace's. A form without both rows of a pair has neither. The same rule as
+ * The effective audience, drafts, submitter revision and confirmation settings: the form's own unless
+ * it inherits or leaves the value unset, then the workspace's. A form without both rows of a pair has
+ * neither, which reads as off, except the Confirmation ID, which reads as shown. The same rule as
  * findFormAudience and toInheritableSettings, which the settings screens read.
  */
 const settingsColumns = {
@@ -158,6 +160,11 @@ const settingsColumns = {
     when ${formConfirmationSettings.inherit} or ${formConfirmationSettings.allowSubmitterEmailCopy} is null
       then ${workspaceConfirmationSettings.allowSubmitterEmailCopy}
     else ${formConfirmationSettings.allowSubmitterEmailCopy} end, false)`,
+  showConfirmationId: sql<boolean>`coalesce(case
+    when ${workspaceConfirmationSettings.workspaceId} is null then null
+    when ${formConfirmationSettings.inherit} or ${formConfirmationSettings.showConfirmationId} is null
+      then ${workspaceConfirmationSettings.showConfirmationId}
+    else ${formConfirmationSettings.showConfirmationId} end, true)`,
 };
 
 /** Joins the settings rows settingsColumns reads; each pair has one row per form and workspace. */

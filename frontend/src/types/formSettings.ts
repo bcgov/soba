@@ -1,6 +1,9 @@
 export {
   AUDIENCE_MODES,
   AUDIENCE_SETTINGS_KEY,
+  CONFIRMATION_SCREEN_FEATURE,
+  CONFIRMATION_SETTING_FEATURES,
+  CONFIRMATION_SETTINGS,
   CONFIRMATION_SETTINGS_KEY,
   REVIEW_SETTINGS_KEY,
   SUBMITTER_SETTINGS_KEY,
@@ -8,6 +11,8 @@ export {
 export type {
   Audience,
   AudienceMode,
+  ConfirmationSetting,
+  ConfirmationSettingAvailability,
   ConfirmationSettings,
   FormAudienceSettings,
   FormConfirmationSettings,

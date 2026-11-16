@@ -124,6 +124,36 @@ describe('GET /submit/submissions/:id canEmailCopy', () => {
   });
 });
 
+describe('GET /submit/submissions/:id showConfirmationId', () => {
+  const hidden = () => submittedWithCopy({ form: { showConfirmationId: false } });
+
+  it('shows the Confirmation ID by default', async () => {
+    mockRead.mockResolvedValue(submittedWithCopy());
+    const res = await signedIn().get(`${BASE}/s1`);
+    expect(res.body.showConfirmationId).toBe(true);
+  });
+
+  it('hides it where the form hides it and the setting is available', async () => {
+    mockRead.mockResolvedValue(hidden());
+    const res = await anonymous().get(`${BASE}/s1`);
+    expect(res.body.showConfirmationId).toBe(false);
+    for (const code of ['confirmation-screen', 'confirmation-id-visibility']) {
+      expect(mockFeature).toHaveBeenCalledWith(code, { workspaceId: 'ws1', formId: 'f1' });
+    }
+  });
+
+  // A setting whose feature is off has its default effect, whatever is stored.
+  it.each(['confirmation-screen', 'confirmation-id-visibility'])(
+    'shows it while %s is off',
+    async (code) => {
+      mockRead.mockResolvedValue(hidden());
+      mockFeature.mockImplementation((feature) => Promise.resolve(feature !== code));
+      const res = await signedIn().get(`${BASE}/s1`);
+      expect(res.body.showConfirmationId).toBe(true);
+    },
+  );
+});
+
 describe('POST /submit/submissions/:id/email-copy', () => {
   const emailCopy = (caller: typeof signedIn, body: unknown = { to: ' Pat@Example.COM ' }) =>
     caller()
@@ -135,10 +165,9 @@ describe('POST /submit/submissions/:id/email-copy', () => {
     const res = await emailCopy(signedIn);
     expect(res.status).toBe(202);
     expect(res.text).toBe('');
-    expect(mockFeature).toHaveBeenCalledWith('submitter-email-copy', {
-      workspaceId: 'ws1',
-      formId: 'f1',
-    });
+    for (const code of ['confirmation-screen', 'confirmation-email-copy']) {
+      expect(mockFeature).toHaveBeenCalledWith(code, { workspaceId: 'ws1', formId: 'f1' });
+    }
     expect(mockQueue).toHaveBeenCalledTimes(1);
     expect(mockQueue).toHaveBeenCalledWith(
       {
@@ -180,13 +209,16 @@ describe('POST /submit/submissions/:id/email-copy', () => {
     expect(mockQueue).not.toHaveBeenCalled();
   });
 
-  it('answers 404 where the feature is off, as if the route did not exist', async () => {
-    mockRead.mockResolvedValue(submittedWithCopy());
-    mockFeature.mockResolvedValue(false);
-    const res = await emailCopy(signedIn);
-    expect(res.status).toBe(404);
-    expect(mockQueue).not.toHaveBeenCalled();
-  });
+  it.each(['confirmation-screen', 'confirmation-email-copy'])(
+    'answers 404 where %s is off, as if the route did not exist',
+    async (code) => {
+      mockRead.mockResolvedValue(submittedWithCopy());
+      mockFeature.mockImplementation((feature) => Promise.resolve(feature !== code));
+      const res = await emailCopy(signedIn);
+      expect(res.status).toBe(404);
+      expect(mockQueue).not.toHaveBeenCalled();
+    },
+  );
 
   it('answers 404 for a missing submission', async () => {
     mockRead.mockResolvedValue(null);

@@ -1,17 +1,14 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { Checkbox, InlineAlert } from '@bcgov/design-system-react-components';
+import { InlineAlert } from '@bcgov/design-system-react-components';
 
 import FormSettingsDrawers from '@/src/features/form-settings/ui/FormSettingsDrawers';
-import InheritCheckbox from '@/src/features/form-settings/ui/InheritCheckbox';
-import { useInheritableEdit } from '@/src/features/form-settings/ui/useInheritableEdit';
-import { useFormSettings } from '@/src/features/form-settings/data/useFormSettings';
+import { useWorkspaceSettings } from '@/src/features/form-settings/data/useWorkspaceSettings';
 import {
+  CONFIRMATION_SETTINGS,
   CONFIRMATION_SETTINGS_KEY,
   type ConfirmationSettings,
-  type FormConfirmationSettings,
-  type SetFormConfirmationSettingsBody,
 } from '@/src/types/formSettings';
 import type { Dictionary } from '@/src/types/dictionary';
 import { messageForDataError } from '@/src/shared/api/dataError';
@@ -19,12 +16,24 @@ import { isConflict } from '@/src/shared/api/sobaHelpers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { CONFIRMATION_DRAWER_ID } from '../constants';
+import type { ConfirmationScreenAvailability } from '../data/useConfirmationScreenAvailable';
+import ConfirmationSettingControls from './ConfirmationSettingControls';
 
-/** What the form's confirmation screen offers: its own setting, or its workspace's. */
-export default function FormConfirmationDrawer({
+const OFF: ConfirmationSettings = { allowSubmitterEmailCopy: false, showConfirmationId: false };
+
+const sameSettings = (a: ConfirmationSettings, b: ConfirmationSettings): boolean =>
+  CONFIRMATION_SETTINGS.every((setting) => a[setting] === b[setting]);
+
+/** What the confirmation screen offers on the workspace's forms, unless a form sets its own. */
+export default function WorkspaceConfirmationDrawer({
   dict,
-  formId,
-}: Readonly<{ dict: Dictionary; formId: string }>) {
+  workspaceId,
+  availability,
+}: Readonly<{
+  dict: Dictionary;
+  workspaceId: string;
+  availability: ConfirmationScreenAvailability;
+}>) {
   const t = dict.postSubmission.confirmationScreen;
   const s = dict.form.settings;
   const { token } = useKeycloak();
@@ -33,12 +42,10 @@ export default function FormConfirmationDrawer({
     settings,
     error: settingsError,
     save,
-  } = useFormSettings<FormConfirmationSettings, SetFormConfirmationSettingsBody>(
-    CONFIRMATION_SETTINGS_KEY,
-    formId,
-  );
+  } = useWorkspaceSettings<ConfirmationSettings>(CONFIRMATION_SETTINGS_KEY, workspaceId);
 
-  const edit = useInheritableEdit<ConfirmationSettings>(settings);
+  // Null means no edit, so a refresh shows through until the user changes something.
+  const [edited, setEdited] = useState<ConfirmationSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
 
@@ -54,23 +61,19 @@ export default function FormConfirmationDrawer({
     [settingsError, dict.general.sessionExpired, dict.general.noAccess, t.loadError],
   );
 
-  const canEdit = !!settings;
-  // Before the settings load, the drawer shows inheriting and unticked, and cannot change.
-  const inherit = edit.inherit;
-  const allowSubmitterEmailCopy = edit.values?.allowSubmitterEmailCopy ?? false;
+  const values = edited ?? settings?.values ?? OFF;
 
   const saveChanges = async () => {
-    const body = edit.body();
-    if (!token || !canEdit || !body || savingRef.current) return;
+    if (!token || !settings || !edited || savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
     try {
-      await save(token, body);
-      edit.reset();
+      await save(token, { values: edited, version: settings.version });
+      setEdited(null);
       addNotification({ type: 'success', text: s.formSettingsDrawerSaveSuccessMessage });
     } catch (err) {
       // Someone else saved first: the hook has read their change, so the stale edit goes.
-      if (isConflict(err)) edit.reset();
+      if (isConflict(err)) setEdited(null);
       addNotification({
         type: 'error',
         text: isConflict(err) ? s.settingsConflictMessage : s.formSettingsDrawerSaveErrorMessage,
@@ -87,31 +90,24 @@ export default function FormConfirmationDrawer({
       id={CONFIRMATION_DRAWER_ID}
       label={t.label}
       onSave={saveChanges}
-      onCancel={edit.reset}
-      canSave={canEdit && edit.changed && !saving}
+      onCancel={() => setEdited(null)}
+      canSave={!!settings && !saving && edited !== null && !sameSettings(edited, settings.values)}
     >
       {readErrorMessage && (
         <InlineAlert
           variant="warning"
           title={readErrorMessage}
-          data-testid="form-confirmation-error"
+          data-testid="workspace-confirmation-error"
         />
       )}
-      <InheritCheckbox
-        label={s.inheritWorkspaceLabel}
-        isSelected={inherit}
-        onChange={edit.setInherit}
-        isDisabled={saving || !canEdit}
-        testId="form-confirmation-inherit"
+      <ConfirmationSettingControls
+        dict={dict}
+        values={values}
+        availability={availability}
+        isDisabled={saving || !settings}
+        onChange={setEdited}
+        testIdPrefix="workspace-confirmation"
       />
-      <Checkbox
-        isSelected={allowSubmitterEmailCopy}
-        onChange={(allow) => edit.setValues({ allowSubmitterEmailCopy: allow })}
-        isDisabled={saving || !canEdit || inherit}
-        data-testid="form-confirmation-allow-email-copy"
-      >
-        {t.allowEmailCopy}
-      </Checkbox>
     </FormSettingsDrawers>
   );
 }

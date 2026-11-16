@@ -723,7 +723,6 @@
     "pageTitle": "Soumission",
     "loading": "Chargement des soumissions…",
     "error": "Impossible de charger les soumissions.",
-    "submittedOn": "Soumis le",
     "submittedLabel": "Soumis",
     "noContent": "Aucune réponse soumise à afficher.",
     "notFound": "Soumission introuvable.",
@@ -906,6 +905,7 @@
       "button": "Envoyer un reçu de la soumission par courriel",
       "title": "Envoyer un reçu de cette soumission par courriel",
       "description": "Nous enverrons par courriel l’ID de confirmation et un lien vers cette soumission. Vos réponses ne sont pas incluses.",
+      "descriptionAnonymous": "Nous enverrons par courriel l’ID de confirmation de cette soumission. Vos réponses ne sont pas incluses.",
       "addressLabel": "Adresse courriel",
       "invalidAddress": "Entrez une adresse courriel valide.",
       "send": "Envoyer",
@@ -1114,7 +1114,11 @@
     },
     "confirmationScreen": {
       "label": "Écran de confirmation",
+      "showConfirmationId": "Afficher l’ID de confirmation",
+      "showConfirmationIdHelp": "L’écran de confirmation affiche l’ID de confirmation de la soumission.",
       "allowEmailCopy": "Permettre aux soumissionnaires de s’envoyer une copie de leur soumission par courriel",
+      "allowEmailCopyHelp": "Les soumissionnaires peuvent s’envoyer l’ID de confirmation par courriel à partir de l’écran de confirmation. Le courriel n’inclut pas leurs réponses.",
+      "notificationsOff": "Le courriel est désactivé ici; les soumissionnaires ne se voient donc pas offrir de copie.",
       "loadError": "Les paramètres de l’écran de confirmation n’ont pas pu être chargés."
     }
   },

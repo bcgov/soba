@@ -31,7 +31,7 @@ export const registerSubmitterEmailCopyOpenApi = (registry: OpenAPIRegistry) => 
     responses: {
       202: {
         description:
-          'Queued: one email, English then French, with the form name, its confirmation ID and a link to it. Never its answers.',
+          'Queued: one email, English then French, with the form name and its confirmation ID. A signed-in requester also gets a link to the submission and, on a form that is not public, to their past submissions. Never its answers.',
       },
       400: { description: 'Invalid body (one address, and nothing else)' },
       401: {
@@ -42,7 +42,8 @@ export const registerSubmitterEmailCopyOpenApi = (registry: OpenAPIRegistry) => 
           "Not a participant on this submission, or the form's confirmation settings do not offer an email copy (email_copy_disabled)",
       },
       404: {
-        description: 'Submission not found, or submitter email copy is not available here',
+        description:
+          'Submission not found, or the confirmation screen or email copy feature is not available here',
       },
       409: { description: 'The submission is not submitted (email_copy_closed)' },
       429: {

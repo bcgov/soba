@@ -1,12 +1,16 @@
-import type {
-  FormConfirmationSettings,
-  SetFormConfirmationSettingsBody,
-  WorkspaceConfirmationSettings,
+import {
+  keepUnavailableSettings,
+  type ConfirmationSettings,
+  type FormConfirmationSettings,
+  type SetFormConfirmationSettingsBody,
+  type WorkspaceConfirmationSettings,
 } from '@soba/lib';
 import { NotFoundError } from '../../../core/errors';
+import type { FeatureScopeContext } from '../../../core/services/featureAvailabilityService';
 import { toInheritableSettings } from '../inheritable';
 import { assertSaved } from '../saved';
 import type { FormSettingsContext, FormSettingsService } from '../routes';
+import { confirmationSettingAvailability } from './availability';
 import {
   findConfirmationSettings,
   findWorkspaceConfirmationSettings,
@@ -16,6 +20,14 @@ import {
 
 const FORM_NOT_FOUND = 'Form confirmation settings not found';
 const WORKSPACE_NOT_FOUND = 'Workspace confirmation settings not found';
+
+/** What a save writes: the values sent, with each setting whose feature is off left as it is. */
+const valuesToSave = async (
+  sent: ConfirmationSettings,
+  current: ConfirmationSettings,
+  scope: FeatureScopeContext,
+): Promise<ConfirmationSettings> =>
+  keepUnavailableSettings(sent, current, await confirmationSettingAvailability(scope));
 
 const readForm = async (ctx: FormSettingsContext, formId: string) => {
   const row = await findConfirmationSettings(ctx.workspaceId, formId);
@@ -31,10 +43,17 @@ export const formConfirmationSettingsService: FormSettingsService<
   get: readForm,
 
   async set(ctx, formId, body) {
+    const settings =
+      body.inherit === false
+        ? await valuesToSave(body.values, (await readForm(ctx, formId)).effective, {
+            workspaceId: ctx.workspaceId,
+            formId,
+          })
+        : null;
     const status = await updateConfirmationSettings({
       workspaceId: ctx.workspaceId,
       formId,
-      settings: body.inherit === false ? body.values : null,
+      settings,
       version: body.version,
       actorDisplayLabel: ctx.actorDisplayLabel,
       audit: { actorId: ctx.actorId ?? null },
@@ -58,9 +77,12 @@ export const workspaceConfirmationSettingsService: FormSettingsService<
   get: readWorkspace,
 
   async set(ctx, _workspaceId, body) {
+    const settings = await valuesToSave(body.values, (await readWorkspace(ctx)).values, {
+      workspaceId: ctx.workspaceId,
+    });
     const status = await updateWorkspaceConfirmationSettings({
       workspaceId: ctx.workspaceId,
-      settings: body.values,
+      settings,
       version: body.version,
       actorDisplayLabel: ctx.actorDisplayLabel,
       audit: { actorId: ctx.actorId ?? null },

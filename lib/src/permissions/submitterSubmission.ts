@@ -265,7 +265,7 @@ export const canReviseSubmission = (
 ): boolean => isAllowed(reviseStatusOf(submission, form, caller));
 
 /** What the email-copy rule reads about the form, beyond the caller's standing on the submission. */
-export interface EmailCopyFacts {
+export interface EmailCopyFormFacts {
   /** The form's own confirmation setting letting submitters email a copy, or its workspace's. */
   allowSubmitterEmailCopy: boolean;
 }
@@ -277,7 +277,7 @@ export interface EmailCopyFacts {
  */
 export const emailCopyStatusOf = (
   submission: SubmissionAccessFacts,
-  form: EmailCopyFacts,
+  form: EmailCopyFormFacts,
 ): SubmissionChange => {
   if (!canReadSubmission(submission)) return denied(ApiErrorCodes.read_denied);
   if (!form.allowSubmitterEmailCopy) return denied(ApiErrorCodes.email_copy_disabled);
@@ -289,5 +289,5 @@ export const emailCopyStatusOf = (
 
 export const canEmailSubmissionCopy = (
   submission: SubmissionAccessFacts,
-  form: EmailCopyFacts,
+  form: EmailCopyFormFacts,
 ): boolean => isAllowed(emailCopyStatusOf(submission, form));

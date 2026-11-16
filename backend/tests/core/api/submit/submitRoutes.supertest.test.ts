@@ -86,6 +86,7 @@ const submitterForm = (overrides: Record<string, unknown> = {}) => ({
   allowSubmitterDrafts: true,
   allowSubmitterRevision: false,
   allowSubmitterEmailCopy: false,
+  showConfirmationId: true,
   ...overrides,
 });
 
@@ -483,9 +484,10 @@ describe('submit reads to start a submission', () => {
     mockForm.mockResolvedValue(submitterForm());
     const res = await signedIn().get('/api/v1/submit/forms/f1');
     expect(res.status).toBe(200);
-    // The email copy setting is read by submit-mode rules but not sent with the form.
-    const { allowSubmitterEmailCopy, ...sent } = submitterForm();
+    // The confirmation settings are read by submit-mode rules but not sent with the form.
+    const { allowSubmitterEmailCopy, showConfirmationId, ...sent } = submitterForm();
     expect(allowSubmitterEmailCopy).toBe(false);
+    expect(showConfirmationId).toBe(true);
     expect(res.body).toEqual(sent);
     expect(mockForm.mock.calls).toEqual([[{ userId: 'u1', formId: 'f1' }]]);
   });

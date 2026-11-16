@@ -28,13 +28,16 @@ export interface EmailCopyFacts {
   submissionId: string;
   formName: string;
   confirmationCode: string;
-  /** Only a signed-in submitter has submissions of their own to list. */
+  /** False for the public user, whose submissions anyone with the link can open. */
   signedIn: boolean;
+  /** The form's audience is public. */
+  publicForm: boolean;
 }
 
 /**
- * The copy, in each language: the Confirmation ID, the form, a link to the submission in the forms
- * app and, for a signed-in submitter, a link to their past submissions. Never its answers.
+ * The copy, in each language: the Confirmation ID and the form. A signed-in requester also gets a
+ * link to the submission, which needs their sign-in, and, on a form that is not public, a link to
+ * their past submissions. Never its answers.
  */
 export const buildEmailCopy = (
   facts: EmailCopyFacts,
@@ -46,10 +49,13 @@ export const buildEmailCopy = (
       formName: facts.formName,
       confirmationCode: facts.confirmationCode,
       link: (language) =>
-        formsSubmissionUrl(formsAppUrl, language, 'submission', facts.submissionId),
-      secondLink: facts.signedIn
-        ? (language) => formsMySubmissionsUrl(formsAppUrl, language)
-        : undefined,
+        facts.signedIn
+          ? formsSubmissionUrl(formsAppUrl, language, 'submission', facts.submissionId)
+          : null,
+      secondLink:
+        facts.signedIn && !facts.publicForm
+          ? (language) => formsMySubmissionsUrl(formsAppUrl, language)
+          : undefined,
     },
     DEFAULT_EMAIL_LANGUAGE,
   );

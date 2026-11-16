@@ -6,7 +6,12 @@ import { NormalizedEmailAddressSchema } from '@soba/lib';
 
 import { useDictionary } from '@/app/[lang]/Providers';
 import { Modal } from '@/src/components/Modal';
-import { apiErrorMessage } from '@/src/shared/api/dataError';
+import {
+  apiErrorMessage,
+  classifyDataError,
+  messageForDataError,
+} from '@/src/shared/api/dataError';
+import { useAuthErrorDefaults } from '@/src/shared/api/useDataErrorNotice';
 import { fillTemplate } from '@/src/shared/util/stringUtils';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
@@ -19,9 +24,10 @@ const signedInEmail = (token: object | undefined): string => {
 };
 
 /**
- * Emails the submitter a receipt of their submission: its confirmation ID and a link, never its
- * answers. Shown where the server says the submission offers one. The address is the only thing
- * asked for; a signed-in submitter starts with their own.
+ * Emails the submitter a receipt of their submission: its confirmation ID and, when they are signed
+ * in, a link, never its answers. Shown on the confirmation screen where the server says the
+ * submission offers one. The address is the only thing asked for; a signed-in submitter starts with
+ * their own.
  */
 export function EmailReceiptButton({ submissionId }: Readonly<{ submissionId: string }>) {
   const dict = useDictionary();
@@ -29,6 +35,7 @@ export function EmailReceiptButton({ submissionId }: Readonly<{ submissionId: st
   const { authenticated, idTokenParsed } = useKeycloak();
   const sendEmailCopy = useSendEmailCopy(submissionId);
   const { addNotification } = useNotificationStore();
+  const authDefaults = useAuthErrorDefaults();
 
   const [open, setOpen] = useState(false);
   const [address, setAddress] = useState('');
@@ -59,7 +66,13 @@ export function EmailReceiptButton({ submissionId }: Readonly<{ submissionId: st
       setOpen(false);
       addNotification({ type: 'success', text: fillTemplate(t.sent, { address: parsed.data }) });
     } catch (cause: unknown) {
-      setSendError(apiErrorMessage(cause, dict.apiErrors) ?? t.failed);
+      const coded = apiErrorMessage(cause, dict.apiErrors);
+      setSendError(
+        messageForDataError(classifyDataError(cause), {
+          ...authDefaults,
+          ...(coded ? { failed: coded, forbidden: coded } : { failed: t.failed }),
+        }),
+      );
     } finally {
       sendingRef.current = false;
       setSending(false);
@@ -81,6 +94,8 @@ export function EmailReceiptButton({ submissionId }: Readonly<{ submissionId: st
         title={t.title}
         size="md"
         // Held open while sending, so the result lands on the request it belongs to.
+        isDismissable={!sending}
+        isCloseable={!sending}
         onClose={() => {
           if (!sendingRef.current) setOpen(false);
         }}
@@ -113,10 +128,11 @@ export function EmailReceiptButton({ submissionId }: Readonly<{ submissionId: st
             void send();
           }}
         >
-          <p>{t.description}</p>
+          <p>{authenticated ? t.description : t.descriptionAnonymous}</p>
           {sendError && (
             <InlineAlert
               variant="danger"
+              role="alert"
               title={sendError}
               data-testid="submission-email-receipt-error"
             />

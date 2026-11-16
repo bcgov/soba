@@ -79,6 +79,9 @@ const submitted = (form: Record<string, unknown> = {}) =>
     form: { allowSubmitterEmailCopy: true, audienceMode: 'public', permissions: [], ...form },
   });
 
+const featureOff = (code: string) =>
+  mockFeature.mockImplementation((feature) => Promise.resolve(feature !== code));
+
 /** The actor the job's sends are attributed to. */
 const actor = async (): Promise<string> => {
   const [, actorId] = mockJobNotifications.mock.calls[0] as [ClaimedJob, () => Promise<string>];
@@ -122,14 +125,12 @@ it('reads the request and the submission as the requester, and sends one email t
     actorId: 'public-user',
     idpCode: 'public',
   });
-  expect(mockFeature).toHaveBeenCalledWith('submitter-email-copy', {
-    workspaceId: 'ws1',
-    formId: 'f1',
-  });
+  for (const code of ['confirmation-screen', 'confirmation-email-copy']) {
+    expect(mockFeature).toHaveBeenCalledWith(code, { workspaceId: 'ws1', formId: 'f1' });
+  }
   expect(emails.map((email) => email.recipients.to)).toEqual([[ADDRESS]]);
   expect(emails[0].content.subject).toContain('Permit application');
   expect(emails[0].content.body).toContain('<strong>K7M2Q9XA</strong>');
-  expect(emails[0].content.body).toContain('href="https://forms.example/en/submission/s1"');
   await expect(actor()).resolves.toBe('public-user');
 });
 
@@ -138,15 +139,20 @@ it('attributes a re-run to whoever ran the job again', async () => {
   await expect(actor()).resolves.toBe('admin-1');
 });
 
-// The public user's submissions are no one's own, so only a signed-in requester gets the list.
+// Anyone with the link can open the public user's submission, so only a signed-in requester gets
+// links; past submissions only on a form that is not public.
 it.each([
-  ['the public user', 'public', false],
-  ['a requester with no provider', null, false],
-  ['a signed-in requester', 'idir', true],
-] as const)('links past submissions for %s: %s', async (_label, idpCode, linked) => {
+  ['the public user on a public form', 'public', 'public', false, false],
+  ['a requester with no provider', null, 'public', false, false],
+  ['a signed-in requester on a public form', 'idir', 'public', true, false],
+  ['a signed-in requester on a protected form', 'idir', 'protected', true, true],
+] as const)('links for %s', async (_label, idpCode, audienceMode, submissionLinked, pastLinked) => {
   mockRequest.mockResolvedValue({ ...REQUEST, idpCode });
+  mockRead.mockResolvedValue(submitted({ audienceMode }));
   await run();
-  expect(emails[0].content.body.includes('/en/my-submissions')).toBe(linked);
+  const { body } = emails[0].content;
+  expect(body.includes('href="https://forms.example/en/submission/s1"')).toBe(submissionLinked);
+  expect(body.includes('/en/my-submissions')).toBe(pastLinked);
 });
 
 // What the request checked may have changed while the job waited.
@@ -175,7 +181,12 @@ it.each([
       ),
     EMAIL_COPY_NOT_ALLOWED,
   ],
-  ['the feature was turned off', () => mockFeature.mockResolvedValue(false), EMAIL_COPY_TURNED_OFF],
+  [
+    'the confirmation screen was turned off',
+    () => featureOff('confirmation-screen'),
+    EMAIL_COPY_TURNED_OFF,
+  ],
+  ['email copy was turned off', () => featureOff('confirmation-email-copy'), EMAIL_COPY_TURNED_OFF],
 ])('ends cancelled without sending when %s', async (_label, arrange, reason) => {
   arrange();
   await expect(run()).rejects.toThrow(new JobCancelledError(reason));

@@ -56,6 +56,7 @@ export const storedSubmission = (
       allowSubmitterDrafts: true,
       allowSubmitterRevision: false,
       allowSubmitterEmailCopy: false,
+      showConfirmationId: true,
       ...overrides.form,
     },
   };

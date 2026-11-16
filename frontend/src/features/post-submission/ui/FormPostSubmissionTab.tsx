@@ -3,8 +3,11 @@
 import type { Dictionary } from '@/src/types/dictionary';
 import { postSubmissionActionUi } from '@/src/features/post-submission/actions/registry';
 import { useFormPostSubmissionActions } from '@/src/features/post-submission/data/usePostSubmissionActions';
-import FormConfirmationDrawer from '@/src/features/submitter-email-copy/ui/FormConfirmationDrawer';
-import { CONFIRMATION_DRAWER_ID } from '@/src/features/submitter-email-copy/constants';
+import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
+import FormConfirmationDrawer from '@/src/features/confirmation-screen/ui/FormConfirmationDrawer';
+import { confirmationDrawers } from '@/src/features/confirmation-screen/ui/confirmationDrawers';
+import { CONFIRMATION_DRAWER_ID } from '@/src/features/confirmation-screen/constants';
+import type { ConfirmationScreenAvailability } from '@/src/features/confirmation-screen/data/useConfirmationScreenAvailable';
 import FormActionDrawer from './FormActionDrawer';
 import PostSubmissionActions from './PostSubmissionActions';
 import UnknownActionDrawer from './UnknownActionDrawer';
@@ -16,37 +19,35 @@ import UnknownActionDrawer from './UnknownActionDrawer';
 export default function FormPostSubmissionTab({
   dict,
   formId,
-  actionsAvailable = true,
-  confirmationAvailable = false,
+  actionsAvailable,
+  confirmation,
 }: Readonly<{
   dict: Dictionary;
   formId: string;
-  actionsAvailable?: boolean;
-  confirmationAvailable?: boolean;
+  /** Undefined while the check runs. */
+  actionsAvailable: boolean | undefined;
+  /** Undefined while the checks run. */
+  confirmation: ConfirmationScreenAvailability | undefined;
 }>) {
-  const { actions, error } = useFormPostSubmissionActions(formId, actionsAvailable);
+  const { actions, error } = useFormPostSubmissionActions(formId, actionsAvailable === true);
+  if (actionsAvailable === undefined || confirmation === undefined) {
+    return <CenteredProgress label={dict.general.loading} />;
+  }
   return (
     <PostSubmissionActions
       dict={dict}
       intro={dict.postSubmission.formIntro}
       actions={actionsAvailable ? actions : null}
       error={error}
-      extraDrawers={
-        confirmationAvailable
-          ? [
-              {
-                id: CONFIRMATION_DRAWER_ID,
-                node: (
-                  <FormConfirmationDrawer
-                    key={CONFIRMATION_DRAWER_ID}
-                    dict={dict}
-                    formId={formId}
-                  />
-                ),
-              },
-            ]
-          : []
-      }
+      extraDrawers={confirmationDrawers(
+        confirmation,
+        <FormConfirmationDrawer
+          key={CONFIRMATION_DRAWER_ID}
+          dict={dict}
+          formId={formId}
+          availability={confirmation}
+        />,
+      )}
       renderAction={(action) => {
         const ui = postSubmissionActionUi(action.code);
         return ui ? (

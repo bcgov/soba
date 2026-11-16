@@ -14,8 +14,8 @@ export type ExtraDrawer = { id: string; node: ReactNode };
  * The After Submission tab around its drawers: loading, a read that failed, a scope with no actions,
  * or one drawer per action in the server's order. A 404 means post-submission is no longer
  * available here, such as after it was turned off. `actions` null means post-submission is not
- * available, so only the extra drawers show. Extra drawers follow the actions in the same group,
- * and stay when the actions are loading, failed or empty.
+ * available, so only the extra drawers show, without the actions' intro. Extra drawers follow the
+ * actions in the same group, and stay when the actions failed or are empty.
  */
 export default function PostSubmissionActions<T extends { code: string }>({
   dict,
@@ -33,35 +33,33 @@ export default function PostSubmissionActions<T extends { code: string }>({
   extraDrawers?: readonly ExtraDrawer[];
 }>) {
   const t = dict.postSubmission;
+  // The group reads which drawer starts open only when it mounts, so it waits for the actions.
+  if (actions === undefined && !error) return <CenteredProgress label={dict.general.loading} />;
+
   let notice: ReactNode = null;
-  if (actions !== null) {
-    if (error) {
-      notice = (
-        <InlineAlert
-          variant="warning"
-          title={messageForDataError(error, {
-            sessionExpired: dict.general.sessionExpired,
-            forbidden: dict.general.noAccess,
-            notFound: t.notAvailable,
-            failed: t.loadError,
-          })}
-          data-testid="post-submission-load-error"
-        />
-      );
-    } else if (!actions) {
-      notice = <CenteredProgress label={dict.general.loading} />;
-    } else if (actions.length === 0) {
-      notice = <p data-testid="post-submission-empty">{t.empty}</p>;
-    }
+  if (actions !== null && error) {
+    notice = (
+      <InlineAlert
+        variant="warning"
+        title={messageForDataError(error, {
+          sessionExpired: dict.general.sessionExpired,
+          forbidden: dict.general.noAccess,
+          notFound: t.notAvailable,
+          failed: t.loadError,
+        })}
+        data-testid="post-submission-load-error"
+      />
+    );
+  } else if (actions?.length === 0) {
+    notice = <p data-testid="post-submission-empty">{t.empty}</p>;
   }
   const shownActions = actions && !error ? actions : [];
 
-  // With nothing to show after them, the notice stands alone, as it did before extra drawers.
   if (notice && extraDrawers.length === 0) return notice;
   const firstKey = shownActions[0]?.code ?? extraDrawers[0]?.id;
   return (
     <>
-      <p data-testid="post-submission-intro">{intro}</p>
+      {actions !== null && <p data-testid="post-submission-intro">{intro}</p>}
       {notice && <div className="mb-3">{notice}</div>}
       {firstKey && (
         <AccordionGroup allowsMultipleExpanded={false} defaultExpandedKeys={[firstKey]}>

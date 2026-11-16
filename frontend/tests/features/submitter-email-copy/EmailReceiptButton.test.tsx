@@ -60,7 +60,8 @@ describe('EmailReceiptButton', () => {
     renderButton();
     await open(user);
     expect(address()).toHaveValue('');
-    expect(screen.getByText(t.description)).toBeInTheDocument();
+    // Its copy has no link: anyone with the link could open an anonymous submission.
+    expect(screen.getByText(t.descriptionAnonymous)).toBeInTheDocument();
   });
 
   it('starts a signed-in submitter with their own address, which they can change', async () => {
@@ -69,6 +70,7 @@ describe('EmailReceiptButton', () => {
     renderButton();
     await open(user);
     expect(address()).toHaveValue('pat@example.com');
+    expect(screen.getByText(t.description)).toBeInTheDocument();
 
     await user.clear(address());
     await user.type(address(), 'other@example.com');
@@ -144,6 +146,21 @@ describe('EmailReceiptButton', () => {
     );
     expect(address()).toBeInTheDocument();
     expect(mockAddNotification).not.toHaveBeenCalled();
+  });
+
+  it('asks a submitter whose session ended to sign in again, and sends nothing', async () => {
+    const user = userEvent.setup();
+    store.dispatch(setAuthenticated(true));
+    renderButton();
+    await open(user);
+    await user.type(address(), 'pat@example.com');
+    await user.click(screen.getByTestId('submission-email-receipt-send'));
+
+    expect(await screen.findByTestId('submission-email-receipt-error')).toHaveTextContent(
+      en.general.sessionExpired,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(en.general.sessionExpired);
+    expect(mockSend).not.toHaveBeenCalled();
   });
 
   it('says the copy could not be sent when the failure has no reason of its own', async () => {

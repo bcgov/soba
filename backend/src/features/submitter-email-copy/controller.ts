@@ -2,6 +2,8 @@ import type { Request, Response } from 'express';
 import { ApiErrorCodes, type EmailSubmissionCopyBody } from '@soba/lib';
 import { asyncHandler } from '../../core/api/shared/asyncHandler';
 import { ServiceUnavailableError, TooManyRequestsError } from '../../core/errors';
+import { JobType } from '../../core/db/codes';
+import { nudgeJobs } from '../../core/jobs';
 import { getJobSettings } from '../../core/jobs/settings';
 import { submitterEmailCopyJob } from '../../core/jobs/submitterEmailCopy';
 import { log } from '../../core/logging';
@@ -16,9 +18,8 @@ const limits = readEmailCopyLimits();
 
 /**
  * Queues one copy of the confirmation to the address the submitter gave, and answers 202: the job
- * sends it. Runs after the feature gate and requireSubmissionEmailCopy. With notifications off
- * nothing could send it, so the request is refused rather than queued to be cancelled. A request
- * past an hourly limit is refused with 429, so the submitter knows no copy is coming.
+ * sends it. Runs after the feature gates and requireSubmissionEmailCopy. With notifications off the
+ * request is refused with 503, and past an hourly limit with 429; neither queues a job.
  */
 export const emailSubmissionCopy = asyncHandler(async (req: Request, res: Response) => {
   const { submission } = loadedSubmission(req);
@@ -52,5 +53,6 @@ export const emailSubmissionCopy = asyncHandler(async (req: Request, res: Respon
       ApiErrorCodes.email_copy_limit_reached,
     );
   }
+  nudgeJobs(JobType.submission_email_copy);
   res.status(202).end();
 });

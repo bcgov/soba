@@ -28,7 +28,6 @@ vi.mock('@/app/[lang]/Providers', () => ({
       notFound: 'Submission not found.',
       loadError: 'Could not load this submission.',
       noContent: 'No submitted answers to display.',
-      submittedOn: 'Submitted on',
       submittedLabel: 'Submitted',
       emailReceipt: { button: 'Email Receipt of Submission' },
     },
@@ -115,6 +114,8 @@ describe('SubmissionView', () => {
       workflowState: 'submitted',
       submittedAt: new Date('2026-01-02T03:04:05Z').toISOString(),
       confirmationCode: 'K7M2Q9XA',
+      canEmailCopy: false,
+      showConfirmationId: true,
     });
     getSubmitSubmissionSchema.mockResolvedValue({ components: [] });
     getSubmitSubmissionData.mockResolvedValue({ data: { field: 'value' } });
@@ -251,6 +252,33 @@ describe('SubmissionView', () => {
     },
   );
 
+  describe('Confirmation ID', () => {
+    const hidden = async () =>
+      getSubmitSubmission.mockResolvedValue({
+        ...(await getSubmitSubmission()),
+        showConfirmationId: false,
+      });
+
+    it('is left off the confirmation screen, with the line about keeping it, where the form hides it', async () => {
+      initAnswered();
+      await hidden();
+      await renderView(true);
+      await screen.findByTestId('submission-view-form');
+      expect(screen.getByTestId('submission-success')).toHaveTextContent('Submitted successfully.');
+      expect(screen.queryByText('Keep this ID.')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('submission-view-confirmation')).not.toBeInTheDocument();
+    });
+
+    it('stays on the submission page whatever the setting', async () => {
+      initAnswered();
+      await hidden();
+      await renderView(false);
+      expect(await screen.findByTestId('submission-view-confirmation')).toHaveTextContent(
+        'K7M2Q9XA',
+      );
+    });
+  });
+
   it('claims success only on the confirmation screen', async () => {
     initAnswered();
     await renderView(false);
@@ -379,15 +407,15 @@ describe('SubmissionView', () => {
       ).toBeTruthy();
     });
 
-    // The link in the email opens the submission page, so a returning submitter can ask again.
-    it('offers it on the submission page too, not only after submitting', async () => {
+    it('is offered on the confirmation screen only, not on the submission page', async () => {
       initAnswered();
       getSubmitSubmission.mockResolvedValue({
         ...(await getSubmitSubmission()),
         canEmailCopy: true,
       });
       await renderView(false);
-      expect(await screen.findByTestId('submission-email-receipt')).toBeInTheDocument();
+      await screen.findByTestId('submission-view-form');
+      expect(screen.queryByTestId('submission-email-receipt')).not.toBeInTheDocument();
     });
 
     it('is left out where the server says no', async () => {

@@ -18,4 +18,17 @@ describe('NormalizedEmailAddressSchema', () => {
   ])('rejects %s', (_label, value) => {
     expect(NormalizedEmailAddressSchema.safeParse(value).success).toBe(false);
   });
+
+  it('accepts an address of the longest length and refuses one longer', () => {
+    const local = (length: number) => 'a'.repeat(length - '@example.com'.length);
+    expect(NormalizedEmailAddressSchema.safeParse(`${local(254)}@example.com`).success).toBe(true);
+    expect(NormalizedEmailAddressSchema.safeParse(`${local(255)}@example.com`).success).toBe(false);
+  });
+
+  // The format check alone overflows the stack on a value this long.
+  it('refuses a value megabytes long without throwing', () => {
+    const huge = `a@a${'.a'.repeat(2_600_000)}`;
+    expect(() => NormalizedEmailAddressSchema.safeParse(huge)).not.toThrow();
+    expect(NormalizedEmailAddressSchema.safeParse(huge).success).toBe(false);
+  });
 });

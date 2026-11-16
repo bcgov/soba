@@ -38,8 +38,9 @@ vi.mock('@/lib/hooks/useNotificationStore', () => ({
 import { AccordionGroup } from '@bcgov/design-system-react-components';
 import makeStore from '@/lib/store';
 import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
-import FormConfirmationDrawer from '@/src/features/submitter-email-copy/ui/FormConfirmationDrawer';
-import WorkspaceConfirmationDrawer from '@/src/features/submitter-email-copy/ui/WorkspaceConfirmationDrawer';
+import FormConfirmationDrawer from '@/src/features/confirmation-screen/ui/FormConfirmationDrawer';
+import WorkspaceConfirmationDrawer from '@/src/features/confirmation-screen/ui/WorkspaceConfirmationDrawer';
+import type { ConfirmationScreenAvailability } from '@/src/features/confirmation-screen/data/useConfirmationScreenAvailable';
 
 const dict: Dictionary = en;
 const t = dict.postSubmission.confirmationScreen;
@@ -62,6 +63,11 @@ const input = (testId: string) =>
   screen.getByTestId(testId).querySelector('input') as HTMLInputElement;
 const saveButton = () => screen.getByTestId('form-settings-confirmation-screen-save');
 
+const EVERYTHING: ConfirmationScreenAvailability = {
+  settings: { allowSubmitterEmailCopy: true, showConfirmationId: true },
+  notifications: true,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   store = makeStore();
@@ -71,12 +77,14 @@ beforeEach(() => {
 
 describe('WorkspaceConfirmationDrawer', () => {
   const allow = () => input('workspace-confirmation-allow-email-copy');
-  const renderDrawer = () =>
-    renderOpen(<WorkspaceConfirmationDrawer dict={dict} workspaceId="ws1" />);
+  const renderDrawer = (availability = EVERYTHING) =>
+    renderOpen(
+      <WorkspaceConfirmationDrawer dict={dict} workspaceId="ws1" availability={availability} />,
+    );
 
   it('shows the saved setting under the Confirmation Screen card', async () => {
     mockGetWorkspaceSettings.mockResolvedValue({
-      values: { allowSubmitterEmailCopy: true },
+      values: { allowSubmitterEmailCopy: true, showConfirmationId: true },
       version: 3,
     });
     renderDrawer();
@@ -90,11 +98,11 @@ describe('WorkspaceConfirmationDrawer', () => {
   it('keeps Save off until something changes, then saves with the version read', async () => {
     const user = userEvent.setup();
     mockGetWorkspaceSettings.mockResolvedValue({
-      values: { allowSubmitterEmailCopy: true },
+      values: { allowSubmitterEmailCopy: true, showConfirmationId: true },
       version: 3,
     });
     mockSetWorkspaceSettings.mockResolvedValue({
-      values: { allowSubmitterEmailCopy: false },
+      values: { allowSubmitterEmailCopy: false, showConfirmationId: true },
       version: 4,
     });
     renderDrawer();
@@ -106,7 +114,7 @@ describe('WorkspaceConfirmationDrawer', () => {
 
     await waitFor(() =>
       expect(mockSetWorkspaceSettings).toHaveBeenCalledWith('token', 'ws1', 'confirmation', {
-        values: { allowSubmitterEmailCopy: false },
+        values: { allowSubmitterEmailCopy: false, showConfirmationId: true },
         version: 3,
       }),
     );
@@ -119,7 +127,7 @@ describe('WorkspaceConfirmationDrawer', () => {
   it('turns Save off again when the change is undone', async () => {
     const user = userEvent.setup();
     mockGetWorkspaceSettings.mockResolvedValue({
-      values: { allowSubmitterEmailCopy: true },
+      values: { allowSubmitterEmailCopy: true, showConfirmationId: true },
       version: 3,
     });
     renderDrawer();
@@ -134,7 +142,7 @@ describe('WorkspaceConfirmationDrawer', () => {
   it('says someone else saved first, and drops the stale edit', async () => {
     const user = userEvent.setup();
     mockGetWorkspaceSettings.mockResolvedValue({
-      values: { allowSubmitterEmailCopy: true },
+      values: { allowSubmitterEmailCopy: true, showConfirmationId: true },
       version: 3,
     });
     mockSetWorkspaceSettings.mockRejectedValue(new ApiError('changed', 409));
@@ -153,6 +161,57 @@ describe('WorkspaceConfirmationDrawer', () => {
     await waitFor(() => expect(allow()).toBeChecked());
   });
 
+  it('shows only the settings whose features are available', async () => {
+    mockGetWorkspaceSettings.mockResolvedValue({
+      values: { allowSubmitterEmailCopy: true, showConfirmationId: true },
+      version: 3,
+    });
+    renderDrawer({
+      ...EVERYTHING,
+      settings: { ...EVERYTHING.settings, allowSubmitterEmailCopy: false },
+    });
+    await waitFor(() => expect(input('workspace-confirmation-show-confirmation-id')).toBeEnabled());
+    expect(screen.getByText(t.showConfirmationIdHelp)).toBeInTheDocument();
+    expect(screen.queryByTestId('workspace-confirmation-allow-email-copy')).not.toBeInTheDocument();
+  });
+
+  it('says copies are not sent while notifications are off', async () => {
+    mockGetWorkspaceSettings.mockResolvedValue({
+      values: { allowSubmitterEmailCopy: true, showConfirmationId: true },
+      version: 3,
+    });
+    renderDrawer({ ...EVERYTHING, notifications: false });
+    expect(await screen.findByTestId('workspace-confirmation-notifications-off')).toHaveTextContent(
+      t.notificationsOff,
+    );
+    renderDrawer();
+    expect(screen.getAllByTestId('workspace-confirmation-notifications-off')).toHaveLength(1);
+  });
+
+  it('saves every setting, with the one changed', async () => {
+    const user = userEvent.setup();
+    mockGetWorkspaceSettings.mockResolvedValue({
+      values: { allowSubmitterEmailCopy: true, showConfirmationId: true },
+      version: 3,
+    });
+    mockSetWorkspaceSettings.mockResolvedValue({
+      values: { allowSubmitterEmailCopy: true, showConfirmationId: false },
+      version: 4,
+    });
+    renderDrawer();
+    await waitFor(() => expect(allow()).toBeEnabled());
+
+    await user.click(screen.getByText(t.showConfirmationId));
+    await user.click(saveButton());
+
+    await waitFor(() =>
+      expect(mockSetWorkspaceSettings).toHaveBeenCalledWith('token', 'ws1', 'confirmation', {
+        values: { allowSubmitterEmailCopy: true, showConfirmationId: false },
+        version: 3,
+      }),
+    );
+  });
+
   it('says when the settings could not be loaded, and cannot change', async () => {
     mockGetWorkspaceSettings.mockRejectedValue(new ApiError('boom', 500));
     renderDrawer();
@@ -166,13 +225,14 @@ describe('WorkspaceConfirmationDrawer', () => {
 describe('FormConfirmationDrawer', () => {
   const allow = () => input('form-confirmation-allow-email-copy');
   const inheritBox = () => input('form-confirmation-inherit');
-  const renderDrawer = () => renderOpen(<FormConfirmationDrawer dict={dict} formId="f1" />);
+  const renderDrawer = (availability = EVERYTHING) =>
+    renderOpen(<FormConfirmationDrawer dict={dict} formId="f1" availability={availability} />);
 
   const inherited = (allowSubmitterEmailCopy: boolean): FormConfirmationSettings => ({
     inherit: true,
     own: null,
-    workspace: { allowSubmitterEmailCopy },
-    effective: { allowSubmitterEmailCopy },
+    workspace: { allowSubmitterEmailCopy, showConfirmationId: true },
+    effective: { allowSubmitterEmailCopy, showConfirmationId: true },
     version: 1,
   });
 
@@ -190,9 +250,9 @@ describe('FormConfirmationDrawer', () => {
     mockGetFormSettings.mockResolvedValue(inherited(true));
     mockSetFormSettings.mockResolvedValue({
       inherit: false,
-      own: { allowSubmitterEmailCopy: false },
-      workspace: { allowSubmitterEmailCopy: true },
-      effective: { allowSubmitterEmailCopy: false },
+      own: { allowSubmitterEmailCopy: false, showConfirmationId: true },
+      workspace: { allowSubmitterEmailCopy: true, showConfirmationId: true },
+      effective: { allowSubmitterEmailCopy: false, showConfirmationId: true },
       version: 2,
     });
     renderDrawer();
@@ -206,7 +266,7 @@ describe('FormConfirmationDrawer', () => {
     await waitFor(() =>
       expect(mockSetFormSettings).toHaveBeenCalledWith('token', 'f1', 'confirmation', {
         inherit: false,
-        values: { allowSubmitterEmailCopy: false },
+        values: { allowSubmitterEmailCopy: false, showConfirmationId: true },
         version: 1,
       }),
     );
@@ -216,9 +276,9 @@ describe('FormConfirmationDrawer', () => {
     const user = userEvent.setup();
     mockGetFormSettings.mockResolvedValue({
       inherit: false,
-      own: { allowSubmitterEmailCopy: false },
-      workspace: { allowSubmitterEmailCopy: true },
-      effective: { allowSubmitterEmailCopy: false },
+      own: { allowSubmitterEmailCopy: false, showConfirmationId: true },
+      workspace: { allowSubmitterEmailCopy: true, showConfirmationId: true },
+      effective: { allowSubmitterEmailCopy: false, showConfirmationId: true },
       version: 2,
     });
     mockSetFormSettings.mockResolvedValue(inherited(true));

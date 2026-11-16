@@ -1,12 +1,11 @@
 import { canEmailSubmissionCopy, isIdentifiedCaller } from '@soba/lib';
 import { env } from '../../core/config/env';
-import { Features } from '../../core/db/codes';
 import { findSubmitterSubmission } from '../../core/db/repos/submitterSubmissionRepo';
 import { sendEachAddress } from '../../core/integrations/notification/sendEachAddress';
 import type { JobContext } from '../../core/jobs/registry';
 import { JobCancelledError } from '../../core/jobs/settlement';
 import { EmailCopyJobParamsSchema } from '../../core/jobs/submitterEmailCopy';
-import { isFeatureAvailable } from '../../core/services/featureAvailabilityService';
+import { isConfirmationSettingAvailable } from '../form-settings/confirmation/availability';
 import { jobNotifications } from '../notifications/jobNotifications';
 import { buildEmailCopy } from './email';
 import { findEmailCopyRequest } from './repo';
@@ -36,7 +35,7 @@ export const runEmailCopy = async ({ job, signal, log }: JobContext): Promise<vo
     throw new JobCancelledError(EMAIL_COPY_NOT_ALLOWED);
   }
   const scope = { workspaceId: request.workspaceId, formId: loaded.form.id };
-  if (!(await isFeatureAvailable(Features.submitter_email_copy, scope))) {
+  if (!(await isConfirmationSettingAvailable('allowSubmitterEmailCopy', scope))) {
     throw new JobCancelledError(EMAIL_COPY_TURNED_OFF);
   }
   const content = buildEmailCopy(
@@ -45,6 +44,7 @@ export const runEmailCopy = async ({ job, signal, log }: JobContext): Promise<vo
       formName: loaded.form.name ?? '',
       confirmationCode: loaded.submission.confirmationCode,
       signedIn: isIdentifiedCaller({ idpCode: request.idpCode }),
+      publicForm: loaded.form.audienceMode === 'public',
     },
     env.getFormsAppUrl(),
   );

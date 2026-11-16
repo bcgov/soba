@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, usePathname, useRouter } from 'next/navigation';
-import { Button, InlineAlert, Link } from '@bcgov/design-system-react-components';
+import { InlineAlert, Link } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
@@ -33,21 +33,25 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
   const renderContent = () => {
     // A failed background revalidation keeps the submission already on screen.
     if (data) {
+      // The form may hide the Confirmation ID on its confirmation screen only.
+      const showConfirmationId = !success || data.submission.showConfirmationId;
       const detail = (
         <SubmissionDetail
           submission={data.submission}
           schema={data.schema}
           content={data.content}
           reviewLabel={data.submission.reviewLabel}
-          submitterLayout
+          showConfirmationId={showConfirmationId}
         />
       );
       // One row of buttons from the left: what the page leads with, the email receipt where the
-      // server offers it, then Print.
+      // confirmation screen offers it, then Print.
       const actions = (leading: React.ReactNode) => (
         <div className="mb-3 d-flex flex-wrap align-items-center gap-2 d-print-none">
           {leading}
-          {data.submission.canEmailCopy && <EmailReceiptButton submissionId={submissionId} />}
+          {success && data.submission.canEmailCopy && (
+            <EmailReceiptButton submissionId={submissionId} />
+          )}
           <PrintSubmissionButton print={print} baseName={printBaseName(data.submission)} />
         </div>
       );
@@ -86,20 +90,23 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
               variant="success"
               role="status"
               title={dict.submission.success.message}
-              description={dict.submission.success.keepConfirmation}
+              description={
+                showConfirmationId ? dict.submission.success.keepConfirmation : undefined
+              }
             />
           </div>
           {/* Signed in only; the bare URL opens the list unfiltered. */}
           {actions(
             authenticated ? (
-              <Button
-                variant="secondary"
+              <Link
+                isButton
+                buttonVariant="secondary"
                 size="small"
                 data-testid="submission-success-my-submissions"
                 onPress={() => router.push(`/${locale}/my-submissions`)}
               >
                 {dict.mySubmissions.viewAll}
-              </Button>
+              </Link>
             ) : null,
           )}
           {detail}

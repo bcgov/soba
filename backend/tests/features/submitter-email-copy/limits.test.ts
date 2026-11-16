@@ -4,7 +4,7 @@ import {
 } from '../../../src/features/submitter-email-copy/limits';
 
 describe('readEmailCopyLimits', () => {
-  it('uses the defaults when nothing is set, or a value is blank', () => {
+  it('uses the defaults when nothing is set, or a value is empty', () => {
     const defaults = {
       submission: 5,
       recipient: 10,
@@ -13,7 +13,7 @@ describe('readEmailCopyLimits', () => {
       environment: 5000,
     };
     expect(readEmailCopyLimits({})).toEqual(defaults);
-    expect(readEmailCopyLimits({ SUBMITTER_EMAIL_COPY_FORM_HOURLY_LIMIT: '  ' })).toEqual(defaults);
+    expect(readEmailCopyLimits({ SUBMITTER_EMAIL_COPY_FORM_HOURLY_LIMIT: '' })).toEqual(defaults);
   });
 
   it('reads each limit from its variable', () => {
@@ -28,8 +28,7 @@ describe('readEmailCopyLimits', () => {
     ).toEqual({ submission: 1, recipient: 2, form: 3, workspace: 4, environment: 1_000_000 });
   });
 
-  // Out of range stops the start, naming the variable, rather than leaving no limit at all.
-  it.each(['0', '-1', '2.5', 'many', '1000001'])('refuses %s', (raw) => {
+  it.each(['0', '-1', '2.5', 'many', '1000001', '  '])('refuses %s', (raw) => {
     expect(() => readEmailCopyLimits({ SUBMITTER_EMAIL_COPY_RECIPIENT_HOURLY_LIMIT: raw })).toThrow(
       `SUBMITTER_EMAIL_COPY_RECIPIENT_HOURLY_LIMIT must be a whole number from 1 to 1000000, got '${raw}'`,
     );

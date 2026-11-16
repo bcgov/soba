@@ -2,6 +2,7 @@ CREATE TABLE "soba"."workspace_confirmation_setting" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"workspace_id" uuid NOT NULL,
 	"allow_submitter_email_copy" boolean DEFAULT true NOT NULL,
+	"show_confirmation_id" boolean DEFAULT true NOT NULL,
 	"version" integer DEFAULT 1 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -20,14 +21,15 @@ CREATE TABLE "soba"."form_confirmation_setting" (
 	"form_id" uuid NOT NULL,
 	"inherit" boolean DEFAULT true NOT NULL,
 	"allow_submitter_email_copy" boolean,
+	"show_confirmation_id" boolean,
 	"version" integer DEFAULT 1 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"created_by" text,
 	"updated_by" text,
 	CONSTRAINT "form_confirmation_setting_inherit_check" CHECK (
-		("inherit" AND "allow_submitter_email_copy" IS NULL)
-		OR (NOT "inherit" AND "allow_submitter_email_copy" IS NOT NULL)
+		("inherit" AND "allow_submitter_email_copy" IS NULL AND "show_confirmation_id" IS NULL)
+		OR (NOT "inherit" AND "allow_submitter_email_copy" IS NOT NULL AND "show_confirmation_id" IS NOT NULL)
 	)
 );
 --> statement-breakpoint
@@ -58,5 +60,7 @@ CREATE INDEX "submitter_email_copy_request_created_idx" ON "soba"."submitter_ema
 CREATE INDEX "submitter_email_copy_request_submission_idx" ON "soba"."submitter_email_copy_request" ("submission_id");--> statement-breakpoint
 CREATE INDEX "submitter_email_copy_request_address_created_idx" ON "soba"."submitter_email_copy_request" ("address","created_at");--> statement-breakpoint
 INSERT INTO "soba"."feature" ("code","name","description","version","status","availability","created_by","updated_by") VALUES
-	('submitter-email-copy','Submitter email copy','Letting submitters email themselves a copy of their submission confirmation',NULL,'disabled','fixed','SOBA System (seed)','SOBA System (seed)')
+	('confirmation-screen','Confirmation screen','The confirmation screen settings for workspaces and forms',NULL,'disabled','fixed','SOBA System (seed)','SOBA System (seed)'),
+	('confirmation-email-copy','Confirmation email copy','Letting submitters email themselves a copy of their submission confirmation',NULL,'disabled','fixed','SOBA System (seed)','SOBA System (seed)'),
+	('confirmation-id-visibility','Confirmation ID visibility','Choosing whether the confirmation screen shows the Confirmation ID',NULL,'disabled','fixed','SOBA System (seed)','SOBA System (seed)')
 ON CONFLICT DO NOTHING;

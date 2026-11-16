@@ -277,15 +277,16 @@ A limit outside 100 to 1000000 fails the render.
 To retire an action, take its code off the list first and remove its plugin in a later release.
 Jobs already queued for a plugin that no pod has stay queued.
 
-Submitters can email themselves a copy of their confirmation where a form's confirmation settings
-allow it. The feature, `backend.features.submitter-email-copy`, is on in dev, PR and test and off in
-UAT and prod. Like the action emails, it sends only while `backend.features.notifications` is
-enabled.
+The confirmation screen settings are gated by `backend.features.confirmation-screen`, and each
+setting by a feature of its own: `confirmation-email-copy` lets submitters email themselves a copy
+of their confirmation, and `confirmation-id-visibility` lets a form hide the Confirmation ID on its
+success page. All three are on in dev, PR and test and off in UAT and prod. Both settings default
+on. Copies send only while `backend.features.notifications` is enabled.
 
-Copies have hourly limits of their own, counted apart from the action emails. A request past one is
-refused with 429 `email_copy_limit_reached`, so the submitter knows no copy is coming. Set in
-ConfigMap `<fullname>-backend-app` only when non-empty; a value outside 1 to 1000000 stops the
-backend from starting:
+Copy requests are checked against hourly limits of their own; a request past one is refused with
+429 `email_copy_limit_reached`. Sent copies also count toward the action emails' limits above. Set
+in ConfigMap `<fullname>-backend-app` only when non-empty; a value outside 1 to 1000000 fails the
+render:
 
 | Helm value                                                | Env var                                         | Default |
 | --------------------------------------------------------- | ----------------------------------------------- | ------- |

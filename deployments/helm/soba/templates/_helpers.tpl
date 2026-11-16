@@ -309,15 +309,20 @@ unquoted numbers in values files as floats, so whole numbers are printed without
 {{- end }}
 
 {{/*
-An hourly email limit for post-submission-email-addresses, from (dict "name" <values key> "value"
-<value>): nothing when "" or unset, else a whole number from 100 to 1000000 as a quoted string.
-Anything else fails the render, so a bad value cannot quietly keep the plugin from loading.
+An hourly email limit, from (dict "name" <values key> "value" <value> "min" <lowest>): nothing when
+"" or unset, else a whole number from min (100 when not given) to 1000000 as a quoted string.
+Anything else fails the render, a fraction included, so a bad value cannot quietly keep the plugin
+or the backend from starting. The fraction check runs first: soba.optionalSetting rounds numbers.
 */}}
 {{- define "soba.hourlyEmailLimit" -}}
+{{- $min := int (default 100 .min) -}}
+{{- if and (kindIs "float64" .value) (ne (floor .value) .value) -}}
+{{- fail (printf "backend.config.%s must be a whole number from %d to 1000000, got %v" .name $min .value) -}}
+{{- end -}}
 {{- $raw := include "soba.optionalSetting" .value | trimAll "\"" -}}
 {{- if $raw -}}
-{{- if or (not (regexMatch "^[0-9]+$" $raw)) (lt (atoi $raw) 100) (gt (atoi $raw) 1000000) -}}
-{{- fail (printf "backend.config.%s must be a whole number from 100 to 1000000, got %q" .name $raw) -}}
+{{- if or (not (regexMatch "^[0-9]+$" $raw)) (lt (atoi $raw) $min) (gt (atoi $raw) 1000000) -}}
+{{- fail (printf "backend.config.%s must be a whole number from %d to 1000000, got %q" .name $min $raw) -}}
 {{- end -}}
 {{ $raw | quote }}
 {{- end -}}

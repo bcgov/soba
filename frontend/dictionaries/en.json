@@ -722,7 +722,6 @@
     "pageTitle": "Submission",
     "loading": "Loading submissions…",
     "error": "Could not load submissions.",
-    "submittedOn": "Submitted",
     "submittedLabel": "Submitted",
     "noContent": "No submitted answers to display.",
     "notFound": "Submission not found.",
@@ -905,6 +904,7 @@
       "button": "Email receipt of submission",
       "title": "Email a receipt of this submission",
       "description": "We will email the confirmation ID and a link to this submission. Your answers are not included.",
+      "descriptionAnonymous": "We will email the confirmation ID for this submission. Your answers are not included.",
       "addressLabel": "Email address",
       "invalidAddress": "Enter a valid email address.",
       "send": "Send",
@@ -1113,7 +1113,11 @@
     },
     "confirmationScreen": {
       "label": "Confirmation Screen",
+      "showConfirmationId": "Show the Confirmation ID",
+      "showConfirmationIdHelp": "The confirmation screen shows the submission's Confirmation ID.",
       "allowEmailCopy": "Let submitters email themselves a copy of their submission",
+      "allowEmailCopyHelp": "Submitters can email themselves the Confirmation ID from the confirmation screen. The email does not include their answers.",
+      "notificationsOff": "Email is turned off here, so submitters are not offered a copy.",
       "loadError": "The confirmation screen settings could not be loaded."
     }
   },

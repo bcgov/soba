@@ -3,8 +3,11 @@
 import type { Dictionary } from '@/src/types/dictionary';
 import { postSubmissionActionUi } from '@/src/features/post-submission/actions/registry';
 import { useWorkspacePostSubmissionActions } from '@/src/features/post-submission/data/usePostSubmissionActions';
-import WorkspaceConfirmationDrawer from '@/src/features/submitter-email-copy/ui/WorkspaceConfirmationDrawer';
-import { CONFIRMATION_DRAWER_ID } from '@/src/features/submitter-email-copy/constants';
+import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
+import WorkspaceConfirmationDrawer from '@/src/features/confirmation-screen/ui/WorkspaceConfirmationDrawer';
+import { confirmationDrawers } from '@/src/features/confirmation-screen/ui/confirmationDrawers';
+import { CONFIRMATION_DRAWER_ID } from '@/src/features/confirmation-screen/constants';
+import type { ConfirmationScreenAvailability } from '@/src/features/confirmation-screen/data/useConfirmationScreenAvailable';
 import PostSubmissionActions from './PostSubmissionActions';
 import UnknownActionDrawer from './UnknownActionDrawer';
 import WorkspaceActionDrawer from './WorkspaceActionDrawer';
@@ -16,37 +19,38 @@ import WorkspaceActionDrawer from './WorkspaceActionDrawer';
 export default function WorkspacePostSubmissionTab({
   dict,
   workspaceId,
-  actionsAvailable = true,
-  confirmationAvailable = false,
+  actionsAvailable,
+  confirmation,
 }: Readonly<{
   dict: Dictionary;
   workspaceId: string;
-  actionsAvailable?: boolean;
-  confirmationAvailable?: boolean;
+  /** Undefined while the check runs. */
+  actionsAvailable: boolean | undefined;
+  /** Undefined while the checks run. */
+  confirmation: ConfirmationScreenAvailability | undefined;
 }>) {
-  const { actions, error } = useWorkspacePostSubmissionActions(workspaceId, actionsAvailable);
+  const { actions, error } = useWorkspacePostSubmissionActions(
+    workspaceId,
+    actionsAvailable === true,
+  );
+  if (actionsAvailable === undefined || confirmation === undefined) {
+    return <CenteredProgress label={dict.general.loading} />;
+  }
   return (
     <PostSubmissionActions
       dict={dict}
       intro={dict.postSubmission.workspaceIntro}
       actions={actionsAvailable ? actions : null}
       error={error}
-      extraDrawers={
-        confirmationAvailable
-          ? [
-              {
-                id: CONFIRMATION_DRAWER_ID,
-                node: (
-                  <WorkspaceConfirmationDrawer
-                    key={CONFIRMATION_DRAWER_ID}
-                    dict={dict}
-                    workspaceId={workspaceId}
-                  />
-                ),
-              },
-            ]
-          : []
-      }
+      extraDrawers={confirmationDrawers(
+        confirmation,
+        <WorkspaceConfirmationDrawer
+          key={CONFIRMATION_DRAWER_ID}
+          dict={dict}
+          workspaceId={workspaceId}
+          availability={confirmation}
+        />,
+      )}
       renderAction={(action) => {
         const ui = postSubmissionActionUi(action.code);
         return ui ? (

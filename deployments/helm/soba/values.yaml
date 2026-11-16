@@ -101,12 +101,14 @@ backend:
   # the render. dev-data must stay off in production.
   features:
     api-keys: ""
+    confirmation-email-copy: ""
+    confirmation-id-visibility: ""
+    confirmation-screen: ""
     dev-data: ""
     notifications: ""
     post-submission: ""
     post-submission-email: ""
     submission-export: ""
-    submitter-email-copy: ""
     user-search: ""
 
   # -- configmap-app: general application config
@@ -164,7 +166,7 @@ backend:
     postSubmissionEmailFormHourlyLimit: ""
     postSubmissionEmailWorkspaceHourlyLimit: ""
     postSubmissionEmailEnvironmentHourlyLimit: ""
-    # submitter-email-copy: copies allowed per hour, per submission, recipient address, form,
+    # confirmation-email-copy: copies allowed per hour, per submission, recipient address, form,
     # workspace and environment, each from 1 to 1000000. "" uses the defaults (5, 10, 500, 2000, 5000).
     submitterEmailCopySubmissionHourlyLimit: ""
     submitterEmailCopyRecipientHourlyLimit: ""

@@ -16,6 +16,7 @@ export const workspaceConfirmationSettings = sobaSchema.table(
       .notNull()
       .references(() => workspaces.id),
     allowSubmitterEmailCopy: boolean('allow_submitter_email_copy').notNull().default(true),
+    showConfirmationId: boolean('show_confirmation_id').notNull().default(true),
     /** Moves on with every save; a save names the version it started from. */
     version: integer('version').notNull().default(1),
     ...auditColumns(),
@@ -44,6 +45,7 @@ export const formConfirmationSettings = sobaSchema.table(
       .references(() => forms.id),
     inherit: boolean('inherit').notNull().default(true),
     allowSubmitterEmailCopy: boolean('allow_submitter_email_copy'),
+    showConfirmationId: boolean('show_confirmation_id'),
     /** Moves on with every save; a save names the version it started from. */
     version: integer('version').notNull().default(1),
     ...auditColumns(),

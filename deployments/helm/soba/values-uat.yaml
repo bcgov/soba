@@ -1,12 +1,14 @@
 # UAT environment — production-like sizing and external service topology.
 backend:
   features:
+    confirmation-email-copy: "disabled"
+    confirmation-id-visibility: "disabled"
+    confirmation-screen: "disabled"
     dev-data: "disabled"
     notifications: "disabled"
     post-submission: "enabled"
     post-submission-email: "enabled"
     submission-export: "disabled"
-    submitter-email-copy: "disabled"
     user-search: "disabled"
   replicas: 3
   resources:

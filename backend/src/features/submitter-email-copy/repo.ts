@@ -2,6 +2,7 @@ import { and, count, eq, gte, sql, type SQL } from 'drizzle-orm';
 import { db, type Tx } from '../../core/db/client';
 import { JobType } from '../../core/db/codes';
 import { insertJob } from '../../core/db/repos/jobRepo';
+import { mapInOrder } from '../../core/inOrder';
 import { submitterEmailCopyRequests as requests } from '../../core/db/schema';
 import type { EmailCopyJobParams } from '../../core/jobs/submitterEmailCopy';
 import {
@@ -11,8 +12,10 @@ import {
   type EmailCopyScope,
 } from './limits';
 
-// Held while counting and queuing, so requests at once count one after the other: a burst for one
-// address cannot all count zero before any is saved.
+/**
+ * First int for `pg_advisory_xact_lock`, held while counting and queuing, so requests at once count
+ * one after the other; no other lock uses it.
+ */
 const ADV_LOCK_SUBMITTER_EMAIL_COPY = 1_773_309_244;
 
 export interface NewEmailCopy {
@@ -69,10 +72,10 @@ export const queueEmailCopy = (
   limits: EmailCopyHourlyLimits,
 ): Promise<{ jobId: string } | { limit: EmailCopyScope }> =>
   db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(${ADV_LOCK_SUBMITTER_EMAIL_COPY})`);
+    await tx.execute(sql`select pg_advisory_xact_lock(${ADV_LOCK_SUBMITTER_EMAIL_COPY}, 0)`);
 
-    const totals = await Promise.all(
-      EMAIL_COPY_SCOPES.map((scope) => countRecentEmailCopies(tx, scope, copy)),
+    const totals = await mapInOrder(EMAIL_COPY_SCOPES, (scope) =>
+      countRecentEmailCopies(tx, scope, copy),
     );
     const counts = Object.fromEntries(
       EMAIL_COPY_SCOPES.map((scope, index) => [scope, totals[index]]),

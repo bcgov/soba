@@ -114,6 +114,7 @@ export const findSubmitterSubmission = async (
     allowSubmitterDrafts,
     allowSubmitterRevision,
     allowSubmitterEmailCopy,
+    showConfirmationId,
     reviewStatus,
     ...submission
   } = row;
@@ -136,6 +137,7 @@ export const findSubmitterSubmission = async (
       allowSubmitterDrafts,
       allowSubmitterRevision,
       allowSubmitterEmailCopy,
+      showConfirmationId,
     },
   };
 };

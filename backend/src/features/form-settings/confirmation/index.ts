@@ -1,4 +1,5 @@
 import { CONFIRMATION_SETTINGS_KEY } from '@soba/lib';
+import { Features } from '../../../core/db/codes';
 import { formConfirmationSettings, workspaceConfirmationSettings } from '../../../core/db/schema';
 import { settingsRoutes } from '../routes';
 import type { FormSettingsModule } from '../types';
@@ -15,6 +16,7 @@ export { formConfirmationSettingsService, workspaceConfirmationSettingsService }
 export const confirmationSettingsModule: FormSettingsModule = {
   key: CONFIRMATION_SETTINGS_KEY,
   weight: 35,
+  featureCode: Features.confirmation_screen,
   router: () =>
     settingsRoutes(formConfirmationSettingsService, SetFormConfirmationSettingsBodySchema),
   registerOpenApi: registerConfirmationSettingsOpenApi,
