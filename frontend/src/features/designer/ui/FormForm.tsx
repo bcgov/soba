@@ -2,11 +2,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Tabs, Tab } from 'react-bootstrap';
-import { Button, Select } from '@bcgov/design-system-react-components';
+import { Button, InlineAlert, Select } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { Modal as CommonModal } from '@/src/components/Modal';
 import styles from './FormForm.module.css';
 
+import type { Webform } from '@formio/js';
 import type { FormType } from '@formio/react';
 import { newFormSchema } from '@soba/lib';
 
@@ -17,12 +18,11 @@ import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
 import { withFilesReadOnly } from '@/src/features/formio-v5/filesReadOnly';
 import { usePageHeading, usePageNotices, type PageNotice } from '@/src/components/PageHeader';
 import FormSettingsTab from './FormSettingsTab';
-import FormTeamTab from './FormTeamTab';
 import FormHistoryTab from './FormHistoryTab';
 import FormSubmissionTab from './FormSubmissionTab';
 import FormShareTab from './FormShareTab';
 import FormPostSubmissionTab from '@/src/features/post-submission/ui/FormPostSubmissionTab';
-import { usePostSubmissionAvailable } from '@/src/features/post-submission/data/usePostSubmissionAvailable';
+import { useAfterSubmissionAvailable } from '@/src/features/post-submission/data/useAfterSubmissionAvailable';
 import { FormJobsTab } from '@/src/features/jobs/ui/ScopedJobsTabs';
 import { withBasePath } from '@/src/shared/config/basePath';
 import { useWorkspace } from '@/src/shared/api/useWorkspaces';
@@ -100,7 +100,6 @@ const DESIGNER_TAB = 'designer';
 const SETTINGS_TAB = 'settings';
 const POST_SUBMISSION_TAB = 'post-submission';
 const JOBS_TAB = 'jobs';
-const ACCESS_TAB = 'team';
 const HISTORY_TAB = 'version';
 const SUBMISSIONS_TAB = 'submissions';
 const SHARE_TAB = 'share';
@@ -110,7 +109,6 @@ function useActiveTab(permissions: {
   canSeeSettingsTab?: boolean;
   /** Undefined until the feature check answers. */
   canSeePostSubmissionTab?: boolean;
-  canSeeAccessTab?: boolean;
   canSeeHistoryTab?: boolean;
   canSeeSubmissionsTab?: boolean;
 }) {
@@ -133,7 +131,6 @@ function useActiveTab(permissions: {
   const permsLoaded =
     permissions.canSeeDesignTab !== undefined &&
     permissions.canSeeSettingsTab !== undefined &&
-    permissions.canSeeAccessTab !== undefined &&
     permissions.canSeeHistoryTab !== undefined &&
     permissions.canSeeSubmissionsTab !== undefined;
   // A link to the After Submission tab waits for the feature check rather than open another tab
@@ -147,7 +144,6 @@ function useActiveTab(permissions: {
       permissions.canSeeDesignTab && DESIGNER_TAB,
       permissions.canSeeSettingsTab && SETTINGS_TAB,
       permissions.canSeePostSubmissionTab && POST_SUBMISSION_TAB,
-      permissions.canSeeAccessTab && ACCESS_TAB,
       permissions.canSeeHistoryTab && HISTORY_TAB,
       permissions.canSeeSubmissionsTab && SUBMISSIONS_TAB,
       // The Jobs tab takes the Settings tab's permission.
@@ -165,6 +161,36 @@ function useActiveTab(permissions: {
   return { activeTab, openedTabs, openTab };
 }
 
+type PreviewSubmission = { state?: string; data: Parameters<Webform['validate']>[0] };
+
+// Form.io runs beforeSubmit before its own validation, so the hook validates.
+function previewBeforeSubmit(onCancel: () => void) {
+  return function beforeSubmit(
+    this: Pick<Webform, 'validate' | 'triggerChange'>,
+    submission: PreviewSubmission,
+    next: (error?: unknown) => void,
+  ) {
+    const isDraft = submission.state === 'draft';
+    // Drafts skip Form.io validation, so their check stays silent.
+    const errors = this.validate(
+      submission.data,
+      isDraft
+        ? { dirty: false, silentCheck: true }
+        : { dirty: true, silentCheck: false, process: 'submit' },
+    );
+    if (errors.length && !isDraft) {
+      next(errors);
+      return;
+    }
+    onCancel();
+    next({ silent: true });
+    // A silent cancel disables disable-on-invalid buttons; a non-silent change re-checks validity.
+    if (!errors.length) {
+      this.triggerChange();
+    }
+  };
+}
+
 function FormForm({ formId }: Readonly<{ formId: string }>) {
   const dict = useDictionary();
   const { authenticated, token, initializing } = useKeycloak();
@@ -174,6 +200,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   // isSaving lags a render, so a second call in the same task still sees false; this does not.
   const writing = useRef(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [previewSubmitAttempts, setPreviewSubmitAttempts] = useState(0);
 
   const {
     form,
@@ -251,10 +278,6 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     return hasPermission(permissions, Permissions.form_update);
   }, [permissions]);
 
-  const canSeeAccessTab = useMemo(() => {
-    return hasPermission(permissions, Permissions.team_update);
-  }, [permissions]);
-
   const canSeeHistoryTab = useMemo(() => {
     return hasPermission(permissions, Permissions.design_update);
   }, [permissions]);
@@ -263,17 +286,17 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     return hasPermission(permissions, Permissions.submission_read);
   }, [permissions]);
 
-  // The tab needs the Settings tab's permission and post-submission available for this form.
-  const postSubmissionAvailable = usePostSubmissionAvailable(
+  // The tab needs the Settings tab's permission and, for this form, either of its parts available:
+  // the post-submission actions, or the confirmation screen.
+  const afterSubmission = useAfterSubmissionAvailable(
     canSeeSettingsTab && form?.workspaceId ? { workspaceId: form.workspaceId, formId } : null,
   );
-  const canSeePostSubmissionTab = canSeeSettingsTab && postSubmissionAvailable;
+  const canSeePostSubmissionTab = canSeeSettingsTab && afterSubmission.tabAvailable;
 
   const { activeTab, openedTabs, openTab } = useActiveTab({
     canSeeDesignTab,
     canSeeSettingsTab,
     canSeePostSubmissionTab,
-    canSeeAccessTab,
     canSeeHistoryTab,
     canSeeSubmissionsTab,
   });
@@ -460,7 +483,10 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
           <Button
             variant="secondary"
             data-testid="preview-form-button"
-            onPress={() => setShowPreview(true)}
+            onPress={() => {
+              setPreviewSubmitAttempts(0);
+              setShowPreview(true);
+            }}
             isDisabled={isSaving || loading}
           >
             {dict.form.preview || 'Preview'}
@@ -561,17 +587,12 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
             disabled={isSaving || draftUnavailable}
             title={dict.postSubmission.tab}
           >
-            <FormPostSubmissionTab dict={dict} formId={formId} />
-          </Tab>
-        )}
-        {canSeeAccessTab && (
-          <Tab
-            eventKey={ACCESS_TAB}
-            tabAttrs={{ 'data-testid': 'team-tab' }}
-            disabled={isSaving || draftUnavailable}
-            title={dict.form.teamTab || 'Team'}
-          >
-            <FormTeamTab dict={dict} formId={formId} />
+            <FormPostSubmissionTab
+              dict={dict}
+              formId={formId}
+              actionsAvailable={afterSubmission.actionsAvailable}
+              confirmation={afterSubmission.confirmation}
+            />
           </Tab>
         )}
         {canSeeHistoryTab && (
@@ -638,17 +659,42 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
         onClose={() => setShowPreview(false)}
         size="lg"
         footer={
-          <Button
-            variant="secondary"
-            data-testid="close-preview-button"
-            onPress={() => setShowPreview(false)}
-          >
-            {dict.form.closePreview || 'Close Preview'}
-          </Button>
+          <div className="d-flex flex-column gap-3 w-100">
+            {previewSubmitAttempts > 0 && (
+              <InlineAlert
+                key={previewSubmitAttempts}
+                variant="warning"
+                // BCDS points the alert's aria-labelledby at an id it only emits alongside `title`,
+                // so a notice without one has no accessible name.
+                title={dict.form.previewSubmissionDisabled}
+                role="alert"
+                data-testid="preview-submission-warning"
+              />
+            )}
+            <div className="d-flex justify-content-start">
+              <Button
+                variant="secondary"
+                data-testid="close-preview-button"
+                onPress={() => setShowPreview(false)}
+              >
+                {dict.form.closePreview || 'Close Preview'}
+              </Button>
+            </div>
+          </div>
         }
       >
         {previewSchema ? (
-          <DynamicForm src="" form={previewSchema} />
+          <DynamicForm
+            src=""
+            form={previewSchema}
+            options={{
+              hooks: {
+                beforeSubmit: previewBeforeSubmit(() =>
+                  setPreviewSubmitAttempts((attempts) => attempts + 1),
+                ),
+              },
+            }}
+          />
         ) : (
           <p className="text-center p-5 text-muted">
             {dict.form.noFormLayout || 'No form layout designed yet.'}

@@ -14,6 +14,7 @@ import {
   submissionExportRouter,
 } from '../../features/submission-export';
 import { groupsDomain } from './groups';
+import { rolesDomain } from './roles';
 import { accessDomain } from './access';
 import { filesDesignRouter, filesDomain } from '../../features/files';
 import {
@@ -21,6 +22,7 @@ import {
   documentGenerationDomain,
 } from '../../features/document-generation';
 import { templatesDomain } from '../../features/templates';
+import { submitterEmailCopyDomain } from '../../features/submitter-email-copy';
 import {
   formSettingsRouter,
   registerFormSettingsOpenApi,
@@ -51,6 +53,7 @@ registerOpenApiPaths((registry) => {
   registerSubmissionExportOpenApi(registry);
   registerSubmitOpenApi(registry);
   groupsDomain.registerOpenApi(registry);
+  rolesDomain.registerOpenApi(registry);
   accessDomain.registerOpenApi(registry);
   meDomain.registerOpenApi(registry);
   registerUserSearchOpenApi(registry);
@@ -58,6 +61,7 @@ registerOpenApiPaths((registry) => {
   membersDomain.registerOpenApi(registry);
   workspacesDomain.registerOpenApi(registry);
   filesDomain.registerOpenApi(registry);
+  submitterEmailCopyDomain.registerOpenApi(registry);
   documentGenerationDomain.registerOpenApi(registry);
   templatesDomain.registerOpenApi(registry);
   metaDomain.registerOpenApi(registry);
@@ -109,6 +113,7 @@ coreRouter.use('/workspaces/:id/jobs', workspaceJobsRouter);
 for (const domain of [
   workspacesDomain,
   groupsDomain,
+  rolesDomain,
   accessDomain,
   meDomain,
   membersDomain,

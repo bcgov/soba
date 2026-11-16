@@ -1,7 +1,8 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { Webform } from '@formio/js';
 import en from '@/dictionaries/en.json';
 
 // Set per test: whether the user is signed in, and the query string the page was opened with.
@@ -20,6 +21,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
     ...en,
     form: {
       loading: 'Loading',
+      previewSubmissionDisabled: 'Submission during a preview is disabled.',
       apiKey: 'API Key',
       nameLabel: 'Form Name',
       descriptionLabel: 'Description',
@@ -74,8 +76,21 @@ vi.mock('@/src/shared/featureFlags/featureAvailability', () => ({
   fetchFeatureAvailability: availability.check,
 }));
 
+// Shows what it is given, so a test can tell the two parts' availability apart.
 vi.mock('@/src/features/post-submission/ui/FormPostSubmissionTab', () => ({
-  default: () => <div data-testid="post-submission-content" />,
+  default: ({
+    actionsAvailable,
+    confirmation,
+  }: {
+    actionsAvailable?: boolean;
+    confirmation?: { settings: Record<string, boolean> };
+  }) => (
+    <div
+      data-testid="post-submission-content"
+      data-actions={String(actionsAvailable)}
+      data-confirmation={JSON.stringify(confirmation?.settings)}
+    />
+  ),
 }));
 
 vi.mock('@/src/features/jobs/ui/ScopedJobsTabs', () => ({
@@ -147,10 +162,29 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
 }));
 
 // Mock DynamicForm and FormDesigner components used in FormForm
+type PreviewHook = (
+  this: Pick<Webform, 'validate' | 'triggerChange'>,
+  submission: { state?: string; data: Record<string, unknown> },
+  next: (error?: unknown) => void,
+) => void;
+const preview = vi.hoisted(() => ({
+  cancel: vi.fn(),
+  beforeSubmit: null as PreviewHook | null,
+}));
 vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => ({
-  DynamicForm: ({ form }: { form: unknown }) => {
-    preview.form = form;
-    return <div data-testid="dynamic-form">preview</div>;
+  DynamicForm: ({ options }: { options: { hooks: { beforeSubmit: PreviewHook } } }) => {
+    preview.beforeSubmit = options.hooks.beforeSubmit;
+    // Stands in for a form with no validation errors.
+    const validForm = { validate: () => [], triggerChange: () => {} };
+    return (
+      <div data-testid="dynamic-form">
+        <button
+          onClick={() => options.hooks.beforeSubmit.call(validForm, { data: {} }, preview.cancel)}
+        >
+          Submit preview
+        </button>
+      </div>
+    );
   },
 }));
 
@@ -244,6 +278,7 @@ import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import FormForm from '@/src/features/designer/ui/FormForm';
 import { PageLayout } from '@/src/components/PageLayout';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
+import { newFormSchema } from '@soba/lib';
 
 let store: ReturnType<typeof makeStore>;
 
@@ -263,6 +298,35 @@ async function renderForm(props: { formId: string }) {
     </Provider>,
   );
   return view!;
+}
+
+// Opens the preview and builds a real Form.io form, with a Submit button, on the preview's hook.
+async function openPreviewWebform(
+  field: Record<string, unknown>,
+  submit: Record<string, unknown> = {
+    type: 'button',
+    key: 'submit',
+    action: 'submit',
+    label: 'Submit',
+  },
+) {
+  mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
+  await act(async () => {
+    await renderForm({ formId: 'f1' });
+  });
+  await userEvent.click(screen.getByTestId('preview-form-button'));
+  await screen.findByRole('button', { name: 'Submit preview' });
+
+  const { Formio } = await import('@formio/js');
+  const host = document.createElement('div');
+  const instance = await Formio.createForm(
+    host,
+    { components: [field, submit] },
+    { hooks: { beforeSubmit: preview.beforeSubmit } },
+  );
+  const submitButton = host.querySelector<HTMLButtonElement>('button[name="data[submit]"]');
+  if (!submitButton) throw new Error('Form.io did not render the Submit button');
+  return { dialog: screen.getByRole('dialog'), host, instance, submitButton };
 }
 
 describe('FormForm', () => {
@@ -352,6 +416,157 @@ describe('FormForm', () => {
     // The designer area includes a form name heading; assert it renders with loaded value
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Test' })).toBeInTheDocument());
   });
+
+  it('warns and cancels each valid preview submission', async () => {
+    mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+    await userEvent.click(screen.getByTestId('preview-form-button'));
+    const submit = await screen.findByRole('button', { name: 'Submit preview' });
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+
+    await userEvent.click(submit);
+    const firstWarning = within(dialog).getByRole('alert', {
+      name: en.form.previewSubmissionDisabled,
+    });
+    expect(within(dialog).getByTestId('preview-submission-warning')).toContainElement(firstWarning);
+    // Between the form and Close: in the footer, outside the scrolling body.
+    expect(screen.getByTestId('dynamic-form').compareDocumentPosition(firstWarning)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(firstWarning.compareDocumentPosition(screen.getByTestId('close-preview-button'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(submit).toHaveFocus();
+    await userEvent.click(submit);
+
+    expect(within(dialog).getByRole('alert', { name: en.form.previewSubmissionDisabled })).not.toBe(
+      firstWarning,
+    );
+    expect(submit).toHaveFocus();
+    expect(store.getState().notification.notifications).toEqual([]);
+    expect(preview.cancel).toHaveBeenCalledTimes(2);
+    expect(preview.cancel).toHaveBeenNthCalledWith(1, { silent: true });
+    expect(preview.cancel).toHaveBeenNthCalledWith(2, { silent: true });
+    expect(screen.getByTestId('dynamic-form')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('close-preview-button'));
+    await userEvent.click(screen.getByTestId('preview-form-button'));
+    expect(within(screen.getByRole('dialog')).queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('cancels a valid Form.io submit and clears its spinner without losing data', async () => {
+    const { dialog, host, instance, submitButton } = await openPreviewWebform({
+      type: 'textfield',
+      key: 'name',
+      label: 'Name',
+      input: true,
+    });
+    try {
+      await instance.setSubmission({ data: { name: 'Preview answer' } });
+      const onSubmit = vi.fn();
+      const onSubmitDone = vi.fn();
+      instance.on('submit', onSubmit);
+      instance.on('submitDone', onSubmitDone);
+
+      await act(async () => {
+        fireEvent.click(submitButton);
+      });
+      await waitFor(() =>
+        expect(within(dialog).getByRole('alert')).toHaveTextContent(
+          en.form.previewSubmissionDisabled,
+        ),
+      );
+      await waitFor(() => expect(instance.submissionInProcess).toBe(false));
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(onSubmitDone).not.toHaveBeenCalled();
+      expect(submitButton.querySelector('.button-icon-right')).not.toBeInTheDocument();
+      expect(instance.submitting).toBe(false);
+      expect(instance.data).toMatchObject({ name: 'Preview answer' });
+      expect(host).not.toHaveTextContent('Submission Complete');
+    } finally {
+      instance.destroy();
+    }
+  }, 15000);
+
+  it('re-enables the new-form Submit after a valid preview submit', async () => {
+    const [newFormSubmit] = newFormSchema().components;
+    expect(newFormSubmit).toMatchObject({ key: 'submit', disableOnInvalid: true });
+    const { dialog, instance, submitButton } = await openPreviewWebform(
+      { type: 'textfield', key: 'name', label: 'Name', input: true },
+      newFormSubmit,
+    );
+    try {
+      await act(async () => {
+        fireEvent.click(submitButton);
+      });
+      const firstWarning = await within(dialog).findByRole('alert');
+      await waitFor(() => expect(submitButton).toBeEnabled());
+
+      await act(async () => {
+        fireEvent.click(submitButton);
+      });
+      await waitFor(() => expect(within(dialog).getByRole('alert')).not.toBe(firstWarning));
+      await waitFor(() => expect(submitButton).toBeEnabled());
+    } finally {
+      instance.destroy();
+    }
+  }, 15000);
+
+  it('shows Form.io validation errors in preview without the warning', async () => {
+    const { dialog, host, instance, submitButton } = await openPreviewWebform({
+      type: 'textfield',
+      key: 'name',
+      label: 'Name',
+      input: true,
+      validate: { required: true },
+    });
+    // Form.io scrolls to its error list; jsdom does not implement scrolling.
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    try {
+      await act(async () => {
+        fireEvent.click(submitButton);
+      });
+      await waitFor(() =>
+        expect(host).toHaveTextContent('Please fix the following errors before submitting.'),
+      );
+      await waitFor(() => expect(instance.submissionInProcess).toBe(false));
+
+      expect(host).toHaveTextContent('Name is required');
+      expect(within(dialog).queryByTestId('preview-submission-warning')).not.toBeInTheDocument();
+      expect(submitButton.querySelector('.button-icon-right')).not.toBeInTheDocument();
+    } finally {
+      scrollTo.mockRestore();
+      instance.destroy();
+    }
+  }, 15000);
+
+  it('cancels a draft save in preview without validating it', async () => {
+    const { dialog, host, instance, submitButton } = await openPreviewWebform(
+      { type: 'textfield', key: 'name', label: 'Name', input: true, validate: { required: true } },
+      { type: 'button', key: 'submit', action: 'saveState', state: 'draft', label: 'Save Draft' },
+    );
+    try {
+      await act(async () => {
+        fireEvent.click(submitButton);
+      });
+      await within(dialog).findByRole('alert', { name: en.form.previewSubmissionDisabled });
+      await waitFor(() => expect(instance.submissionInProcess).toBe(false));
+      // Past the 100 ms change debounce, where a re-check would show the error list.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      });
+
+      expect(host).not.toHaveTextContent('Please fix the following errors before submitting.');
+      expect(host).not.toHaveTextContent('Name is required');
+      expect(submitButton.querySelector('.button-icon-right')).not.toBeInTheDocument();
+    } finally {
+      instance.destroy();
+    }
+  }, 15000);
 
   // The form's current version is what the builder is fed.
   it('reads the schema of the current version', async () => {
@@ -709,7 +924,6 @@ describe('FormForm', () => {
       'version-tab',
       'settings-tab',
       'jobs-tab',
-      'team-tab',
       'submission-tab',
       'share-tab',
     ];
@@ -749,7 +963,8 @@ describe('FormForm', () => {
     it.each([
       ['design_update', ['designer-tab', 'version-tab', 'share-tab']],
       ['form_update', ['settings-tab', 'jobs-tab', 'share-tab']],
-      ['team_update', ['team-tab', 'share-tab']],
+      // The Access tab is hidden for now, so team_update alone shows only Share.
+      ['team_update', ['share-tab']],
       ['submission_read', ['submission-tab', 'share-tab']],
       ['*', allTabs],
     ])('shows expected tabs when user has %s permission', async (permission, expectedTabs) => {
@@ -855,6 +1070,76 @@ describe('FormForm', () => {
         });
 
         expect(await screen.findByTestId('designer-tab')).toHaveAttribute('aria-selected', 'true');
+        expect(screen.queryByTestId('post-submission-tab')).not.toBeInTheDocument();
+      });
+
+      // The tab holds two parts, the actions and the Confirmation Screen card; either one shows it,
+      // and the tab is given which.
+      const CARD_CODES = ['confirmation-screen', 'confirmation-id-visibility', 'notifications'];
+      it.each([
+        [
+          'only the actions',
+          ['post-submission'],
+          'true',
+          { allowSubmitterEmailCopy: false, showConfirmationId: false },
+        ],
+        [
+          'only the Confirmation Screen',
+          CARD_CODES,
+          'false',
+          { allowSubmitterEmailCopy: false, showConfirmationId: true },
+        ],
+      ])('shows the tab where %s are available', async (_label, availableCodes, actions, card) => {
+        session.search = 'tab=post-submission';
+        inWorkspace(['*'], false);
+        availability.check.mockImplementation((code: string) =>
+          Promise.resolve(availableCodes.includes(code)),
+        );
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        const content = await screen.findByTestId('post-submission-content');
+        expect(content).toHaveAttribute('data-actions', actions);
+        expect(JSON.parse(content.getAttribute('data-confirmation') ?? 'null')).toEqual(card);
+        expect(availability.check).toHaveBeenCalledWith('confirmation-screen', {
+          workspaceId: 'ws1',
+          formId: 'f1',
+        });
+      });
+
+      it('shows the tab once one part answers yes, while the other still runs', async () => {
+        inWorkspace(['*'], false);
+        availability.check.mockImplementation((code: string) =>
+          code === 'post-submission'
+            ? new Promise<boolean>(() => undefined)
+            : Promise.resolve(true),
+        );
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        expect(await screen.findByTestId('post-submission-tab')).toBeInTheDocument();
+      });
+
+      it('keeps the tab hidden while one part answers no and the other still runs', async () => {
+        inWorkspace(['*'], false);
+        availability.check.mockImplementation((code: string) =>
+          code === 'post-submission'
+            ? Promise.resolve(false)
+            : new Promise<boolean>(() => undefined),
+        );
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        await waitFor(() =>
+          expect(availability.check).toHaveBeenCalledWith('post-submission', {
+            workspaceId: 'ws1',
+            formId: 'f1',
+          }),
+        );
+        expect(screen.getByTestId('settings-tab')).toBeInTheDocument();
         expect(screen.queryByTestId('post-submission-tab')).not.toBeInTheDocument();
       });
     });

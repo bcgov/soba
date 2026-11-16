@@ -85,6 +85,8 @@ const submitterForm = (overrides: Record<string, unknown> = {}) => ({
   audienceIdps: [],
   allowSubmitterDrafts: true,
   allowSubmitterRevision: false,
+  allowSubmitterEmailCopy: false,
+  showConfirmationId: true,
   ...overrides,
 });
 
@@ -142,6 +144,7 @@ describe('submit routes over one read', () => {
       formId: 'f1',
       workflowState: 'draft',
       formVersionId: 'v1',
+      versionNo: 3,
       headRevisionId: 'r1',
       currentRevisionNo: 1,
       role: 'owner',
@@ -482,7 +485,11 @@ describe('submit reads to start a submission', () => {
     mockForm.mockResolvedValue(submitterForm());
     const res = await signedIn().get('/api/v1/submit/forms/f1');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual(submitterForm());
+    // The confirmation settings are read by submit-mode rules but not sent with the form.
+    const { allowSubmitterEmailCopy, showConfirmationId, ...sent } = submitterForm();
+    expect(allowSubmitterEmailCopy).toBe(false);
+    expect(showConfirmationId).toBe(true);
+    expect(res.body).toEqual(sent);
     expect(mockForm.mock.calls).toEqual([[{ userId: 'u1', formId: 'f1' }]]);
   });
 

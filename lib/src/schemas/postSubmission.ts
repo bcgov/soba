@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EmailAddressSchema } from './email';
+import { NormalizedEmailAddressSchema } from './email';
 import {
   inheritableSettingsSchemas,
   type InheritableSettings,
@@ -73,11 +73,7 @@ export type PostSubmissionWorkspaceActionList = z.infer<
 export const POST_SUBMISSION_EMAIL_MAX_ADDRESSES = 100;
 
 /** One recipient as the email action keeps it: trimmed, lower-cased, then checked. */
-export const PostSubmissionEmailAddressSchema = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .pipe(EmailAddressSchema);
+export const PostSubmissionEmailAddressSchema = NormalizedEmailAddressSchema;
 
 /** The email action's options: 1 to 100 addresses, de-duplicated. */
 export const PostSubmissionEmailAddressesOptionsSchema = z.strictObject({

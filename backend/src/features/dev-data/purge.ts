@@ -27,6 +27,10 @@ import {
   forms,
   jobs,
   notificationAudits,
+  submitterEmailCopyRequests,
+  roleAudit,
+  rolePermissions,
+  roles,
   submissionExportAudits,
   settingsAudit,
   sobaAdmins,
@@ -273,6 +277,7 @@ export const WORKSPACE_SCOPED_TABLES: readonly string[] = [
   'job',
   'document_generation_audit',
   'notification_audit',
+  'submitter_email_copy_request',
   'submission_export_audit',
   'submission_revision',
   'submission_status',
@@ -292,6 +297,8 @@ export const WORKSPACE_SCOPED_TABLES: readonly string[] = [
   'workspace_group_role',
   'workspace_group_membership',
   'workspace_group',
+  'role_audit',
+  'role',
   'workspace_disclaimer_acceptance',
   'workspace_membership',
   'feature_scope',
@@ -348,6 +355,13 @@ async function purgeWorkspaceScoped(
   await record(
     'notification_audit',
     tx.delete(notificationAudits).where(inArray(notificationAudits.workspaceId, ids)),
+  );
+  // Copy requests reference submissions, forms and app users.
+  await record(
+    'submitter_email_copy_request',
+    tx
+      .delete(submitterEmailCopyRequests)
+      .where(inArray(submitterEmailCopyRequests.workspaceId, ids)),
   );
   await record(
     'submission_export_audit',
@@ -421,6 +435,19 @@ async function purgeWorkspaceScoped(
     'workspace_group',
     tx.delete(workspaceGroups).where(inArray(workspaceGroups.workspaceId, ids)),
   );
+  await record('role_audit', tx.delete(roleAudit).where(inArray(roleAudit.workspaceId, ids)));
+  await record(
+    'role_permission',
+    tx
+      .delete(rolePermissions)
+      .where(
+        inArray(
+          rolePermissions.roleCode,
+          tx.select({ code: roles.code }).from(roles).where(inArray(roles.workspaceId, ids)),
+        ),
+      ),
+  );
+  await record('role', tx.delete(roles).where(inArray(roles.workspaceId, ids)));
   await record(
     'workspace_disclaimer_acceptance',
     tx

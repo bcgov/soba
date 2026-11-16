@@ -2,6 +2,9 @@
 backend:
   # Development data generator: stated explicitly rather than left to the default.
   features:
+    confirmation-email-copy: "disabled"
+    confirmation-id-visibility: "disabled"
+    confirmation-screen: "disabled"
     dev-data: "disabled"
     notifications: "disabled"
     post-submission: "enabled"
@@ -21,11 +24,6 @@ backend:
     minReplicas: 3
     maxReplicas: 6
     targetCPUUtilizationPercentage: 75
-  # Files and templates in S3; credentials and bucket come from Vault.
-  storage:
-    defaultBackend: storage-s3
-    defaultPrefix: prod
-    s3VaultKeyInfix: PROD
   config:
     nodeEnv: production
     logLevel: warn
