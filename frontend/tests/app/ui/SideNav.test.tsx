@@ -21,6 +21,10 @@ vi.mock('@/src/shared/api/useCurrentUser', () => ({
   useCurrentUser: () => currentUser,
 }));
 
+vi.mock('@/src/shared/list/listQueryMemory', () => ({
+  navLink: (href: string) => href,
+}));
+
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
     locale: 'en',
@@ -61,7 +65,7 @@ function signIn(isSobaAdmin: boolean) {
   currentUser.data = { capabilities: { isSobaAdmin } };
 }
 
-const navTestIds = () => screen.getAllByRole('link').map((link) => link.dataset.testid);
+const navTestIds = () => screen.queryAllByRole('link').map((link) => link.dataset.testid);
 
 const iconPath = (element: Element) => element.querySelector('svg path')?.getAttribute('d');
 
@@ -79,16 +83,20 @@ describe('SideNav', () => {
     nav.pathname = '/en/forms';
   });
 
-  it('links to feedback and help with every feature off', async () => {
+  it('keeps feedback and help links hidden with every feature off', async () => {
     await renderNav();
 
-    expect(navTestIds()).toEqual(['feedback-nav', 'help-nav']);
+    expect(navTestIds()).toEqual([]);
+    expect(screen.getByTestId('feedback-nav').closest('li')).toHaveAttribute('hidden');
+    expect(screen.getByTestId('help-nav').closest('li')).toHaveAttribute('hidden');
   });
 
-  it('shows a signed-out visitor only feedback and help', async () => {
+  it('keeps feedback and help links hidden for a signed-out visitor', async () => {
     await renderNav(COMBINED);
 
-    expect(navTestIds()).toEqual(['feedback-nav', 'help-nav']);
+    expect(navTestIds()).toEqual([]);
+    expect(screen.getByTestId('feedback-nav').closest('li')).toHaveAttribute('hidden');
+    expect(screen.getByTestId('help-nav').closest('li')).toHaveAttribute('hidden');
   });
 
   it('links design mode to forms and workspaces', async () => {
@@ -96,7 +104,7 @@ describe('SideNav', () => {
 
     await renderNav(DESIGN_ONLY);
 
-    expect(navTestIds()).toEqual(['forms-nav', 'workspaces-nav', 'feedback-nav', 'help-nav']);
+    expect(navTestIds()).toEqual(['forms-nav', 'workspaces-nav']);
   });
 
   it('links submit mode to my forms and my submissions', async () => {
@@ -107,8 +115,6 @@ describe('SideNav', () => {
     expect(navTestIds()).toEqual([
       'my-forms-nav',
       'my-submissions-nav',
-      'feedback-nav',
-      'help-nav',
     ]);
   });
 
@@ -123,8 +129,6 @@ describe('SideNav', () => {
       'my-forms-nav',
       'my-submissions-nav',
       'admin-nav',
-      'feedback-nav',
-      'help-nav',
     ]);
   });
 
@@ -163,7 +167,7 @@ describe('SideNav', () => {
 
     await renderNav();
 
-    expect(navTestIds()).toEqual(['admin-nav', 'feedback-nav', 'help-nav']);
+    expect(navTestIds()).toEqual(['admin-nav']);
   });
 
   it('hides administration from a signed-in user who is not an admin', async () => {

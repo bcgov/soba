@@ -95,6 +95,7 @@ export function SideNav({ designMode, submitMode }: Readonly<SideNavProps>) {
       testId: 'feedback-nav',
       icon: <FaRegMessage size={20} />,
       isActive: pathname.startsWith(`/${locale}/feedback`),
+      hidden: true,
     },
     {
       href: `/${locale}/help`,
@@ -102,6 +103,7 @@ export function SideNav({ designMode, submitMode }: Readonly<SideNavProps>) {
       testId: 'help-nav',
       icon: <FaRegCircleQuestion size={20} />,
       isActive: pathname.startsWith(`/${locale}/help`),
+      hidden: true,
     },
   );
 
@@ -109,7 +111,7 @@ export function SideNav({ designMode, submitMode }: Readonly<SideNavProps>) {
     <nav className={`d-flex flex-column py-3 px-2 ${styles.sideNav}`}>
       <ul id="sidenav-items" className="nav flex-column gap-2">
         {navItems.map((item) => (
-          <li className="nav-item" key={item.href}>
+          <li className="nav-item" key={item.href} hidden={item.hidden}>
             <Link
               href={item.href}
               data-testid={item.testId}
