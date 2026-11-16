@@ -31,8 +31,39 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release-it:
+    name: Bump version on develop
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout develop with history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+
+      - name: Bump version
+        run: |
+          pnpm install --frozen-lockfile
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          pnpm exec release-it --ci
+
   build:
     name: Build & Push
+    needs: [release-it]
+    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || needs.release-it.result == 'success') }}
     uses: ./.github/workflows/build-images.yaml
     with:
       ref: develop
@@ -124,6 +155,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: develop
 
       - name: Install OpenShift CLI
         uses: redhat-actions/openshift-tools-installer@e3b32c2ab7b064b2ce189121c4a49f509a99a7b4 # v3.0
