@@ -112,10 +112,7 @@ describe('SideNav', () => {
 
     await renderNav(SUBMIT_ONLY);
 
-    expect(navTestIds()).toEqual([
-      'my-forms-nav',
-      'my-submissions-nav',
-    ]);
+    expect(navTestIds()).toEqual(['my-forms-nav', 'my-submissions-nav']);
   });
 
   it('orders design mode, submit mode, then administration when both modes are on', async () => {
