@@ -1,5 +1,6 @@
-import { and, isNull } from 'drizzle-orm';
+import { and, isNull, ne } from 'drizzle-orm';
 import { formVersions, forms, submissions } from '../schema';
+import { FormVersionState } from '../codes';
 
 /** The form is not deleted. */
 export const liveForm = isNull(forms.deletedAt);
@@ -9,3 +10,5 @@ export const liveFormVersion = and(isNull(formVersions.deletedAt), liveForm);
 
 /** Neither the submission, its form nor its form version is deleted. Expects `forms` and `formVersions` joined. */
 export const liveSubmission = and(isNull(submissions.deletedAt), liveFormVersion);
+
+export const notOpened = ne(formVersions.state, FormVersionState.opened);

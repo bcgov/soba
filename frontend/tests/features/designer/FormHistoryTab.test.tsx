@@ -5,8 +5,9 @@ import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { SWRConfig } from 'swr';
 
-const { mockGetVersionPage, dict } = vi.hoisted(() => ({
+const { mockGetVersionPage, getSobaForm, dict } = vi.hoisted(() => ({
   mockGetVersionPage: vi.fn(),
+  getSobaForm: vi.fn(),
   dict: {
     locale: 'en',
     general: {
@@ -35,6 +36,8 @@ const { mockGetVersionPage, dict } = vi.hoisted(() => ({
 
 vi.mock('@/src/shared/api/sobaApi', () => ({
   getSobaFormVersionPage: (...args: unknown[]) => mockGetVersionPage(...args),
+  getSobaForm: (...args: unknown[]) => getSobaForm(...args),
+  lookupFormVersions: async () => ({ items: [], limit: 500, truncated: false }),
 }));
 
 vi.mock('@/app/[lang]/Providers', () => ({
@@ -98,6 +101,7 @@ describe('FormHistoryTab', () => {
     store = makeStore();
     store.dispatch(setToken('token'));
     store.dispatch(setAuthenticated(true));
+    getSobaForm.mockResolvedValue({ id: 'f1', permissions: ['design_delete'] });
     mockGetVersionPage.mockResolvedValue({
       items: [version('v9', 9)],
       page: { offset: 0, limit: 10, total: 42 },
@@ -179,10 +183,18 @@ describe('FormHistoryTab', () => {
       page: { offset: 0, limit: 10, total: 2 },
     });
     renderTab();
-    await screen.findByTestId('v8-status-tag');
 
-    expect(screen.getByTestId('v9-deleteVersion-link')).toBeInTheDocument();
+    expect(await screen.findByTestId('v9-deleteVersion-link')).toBeInTheDocument();
     expect(screen.queryByTestId('v8-deleteVersion-link')).not.toBeInTheDocument();
+  });
+
+  it('offers no delete to someone who may not delete designs', async () => {
+    getSobaForm.mockResolvedValue({ id: 'f1', permissions: ['form_read'] });
+    renderTab();
+    await screen.findByTestId('v9-status-tag');
+    await waitFor(() => expect(getSobaForm).toHaveBeenCalled());
+
+    expect(screen.queryByTestId('v9-deleteVersion-link')).not.toBeInTheDocument();
   });
 
   it('deletes a draft only once the person confirms', async () => {

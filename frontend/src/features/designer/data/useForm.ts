@@ -213,6 +213,7 @@ export function useForm(formId?: string) {
     commitSchema,
     selectVersion,
     openVersion,
+    openedVersion,
     refreshForm,
     refreshVersions,
   };
@@ -325,16 +326,17 @@ export function useFormWriter(formId: string) {
       await saveFormVersionSchema(token, versionId, schema);
       if (publish) {
         await publishSobaFormVersion(token, versionId);
-        await refreshVersions();
       }
       await commitSchema(versionId, schema);
       await refreshForm();
+      //needs to always happen as opened->draft or published
+      await refreshVersions();
       return { status: 'applied', value: undefined };
     },
     [commitSchema, refreshVersions, refreshForm],
   );
 
-  // Only a draft can be deleted; the server refuses any other state.
+  // Only a draft with no submissions can be deleted; the server refuses any other state.
   const deleteVersion = useCallback(
     async (token: string, versionId: string): Promise<WriteOutcome<void>> => {
       await deleteSobaFormVersion(token, versionId);

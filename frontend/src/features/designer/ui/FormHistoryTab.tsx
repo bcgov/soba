@@ -8,12 +8,15 @@ import { ConfirmModal } from '@/src/components/ConfirmModal';
 import { Tag, TagColor } from '@/src/components/Tag';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
+import { useForm } from '@/src/features/designer/data/useForm';
 import { FORM_VERSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { useListQuery } from '@/src/shared/list/useListQuery';
 import { useDataTable } from '@/src/shared/list/useDataTable';
 import { useFormVersionPage } from '../data/useFormVersions';
 import type { SobaFormVersionListItem } from '@/src/types/forms';
 import { capitalizeFirstLetter } from '@/src/shared/util/stringUtils';
+import { hasPermission } from '@/src/shared/util/permissions';
+import { Permissions } from '@/src/types/permissions';
 
 interface FormHistoryTabProps {
   dict: Dictionary;
@@ -45,6 +48,10 @@ export default function FormHistoryTab({
     sort: query.sort,
   });
   const { table } = useDataTable(query, versionsResult, dict.form.loadVersionsError);
+  const { form } = useForm(formId);
+  const permissions = useMemo(() => {
+    return form?.permissions;
+  }, [form?.permissions]);
   const formatLongDate = useFormatLongDate();
 
   const openInDesigner = useCallback(
@@ -54,6 +61,10 @@ export default function FormHistoryTab({
     },
     [onSelectVersion, onNavigateToDesigner],
   );
+
+  const canDelete = useMemo(() => {
+    return hasPermission(permissions, Permissions.design_delete) === true;
+  }, [permissions]);
 
   const [pendingDelete, setPendingDelete] = useState<SobaFormVersionListItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -137,7 +148,7 @@ export default function FormHistoryTab({
             >
               {dict.form.newVersionFrom}
             </Link>
-            {version.state === 'draft' && (
+            {version.state === 'draft' && canDelete && (
               <Link
                 className="bcds-react-aria-Link danger medium false me-2"
                 data-testid={`${version.id}-deleteVersion-link`}
@@ -150,7 +161,7 @@ export default function FormHistoryTab({
         ),
       },
     ],
-    [dict, formatLongDate, openInDesigner, restore],
+    [dict, formatLongDate, openInDesigner, restore, canDelete],
   );
 
   return (

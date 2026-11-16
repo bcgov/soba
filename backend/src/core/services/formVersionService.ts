@@ -317,6 +317,9 @@ export class FormVersionService {
       input.formVersionId,
     );
     if (!version) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
+    if (version.state !== 'draft') {
+      throw new ValidationError('Only draft versions can be deleted');
+    }
     assertTransition(version.state, 'deleted');
     return updateFormVersionDraft(
       input.workspaceId,
@@ -454,7 +457,7 @@ export class FormVersionService {
         tx,
       ),
     );
-    // Another save took the version over after this one's stale window, or it stopped being a draft.
+    // Another save took the version over after this one's stale window, or it stopped being a draft/opened.
     if (!finished) {
       throw new ConflictError('Form version changed while its schema was being saved');
     }

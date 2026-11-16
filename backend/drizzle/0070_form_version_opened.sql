@@ -7,7 +7,7 @@ INSERT INTO "soba"."form_version_state" ("code","source","display","sort_order",
 	('opened','core','Opened',0,true)
 ON CONFLICT DO NOTHING;
 --> statement-breakpoint
--- An opened version holds no number until it is saved, so one left unsaved does not keep the next
+-- An opened version doesn't block that number until it is saved, so one left unsaved does not keep the next
 -- version from taking it. A deleted one may have been deleted while opened, so its number may since
 -- have been taken. New numbers still count deleted versions, so none is reused.
 DROP INDEX "soba"."form_version_workspace_form_version_uq";

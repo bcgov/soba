@@ -35,6 +35,7 @@ import { useFeatureAllowed } from '@/src/shared/api/useFeatureAllowed';
 import { useDesignFormRead } from '@/src/features/designer/data/useForm';
 import { Permissions } from '@/src/types/permissions';
 import { hasPermission } from '@/src/shared/util/permissions';
+import { requestLeave } from '@/src/shared/hooks/useLeaveGuard';
 
 const ALL_STATUSES = 'all';
 
@@ -118,6 +119,12 @@ export default function FormSubmissionTab({
     }
   }, [token, pendingDelete, submissionDeleter, addNotification, dict]);
 
+  const openSubmission = useCallback(
+    (sub: SubmissionListItem) =>
+      requestLeave(() => router.push(`/${locale}/build/${sub.formId}/submissions/${sub.id}`)),
+    [locale, router],
+  );
+
   const columns: Column<SubmissionListItem>[] = useMemo(
     () => [
       {
@@ -195,7 +202,7 @@ export default function FormSubmissionTab({
               className="bcds-react-aria-Link medium false me-2"
               aria-label={dict.submission.view}
               data-testid={`${sub.id}-view-link`}
-              onPress={() => router.push(`/${locale}/build/${sub.formId}/submissions/${sub.id}`)}
+              onPress={() => openSubmission(sub)}
             >
               <FaFile />
             </Link>
@@ -213,7 +220,7 @@ export default function FormSubmissionTab({
         ),
       },
     ],
-    [dict, dictReview, showReview, formatLongDate, locale, router, canDelete],
+    [dict, dictReview, showReview, formatLongDate, openSubmission, canDelete],
   );
 
   const statusOptions = useMemo(

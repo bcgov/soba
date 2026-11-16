@@ -225,6 +225,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     selectVersion,
     openVersion,
     refreshVersions,
+    openedVersion,
   } = useForm(formId);
   const formWriter = useFormWriter(formId);
 
@@ -309,7 +310,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
 
   /**
    * Run a new-version write, open the new version in the designer as the current one, and report.
-   * it stays out of the form's versions until it is saved. Navigate only on true.
+   * It stays out of the form's versions until it is saved. Navigate only on true.
    */
   const applyNewVersion = async (
     run: () => ReturnType<typeof formWriter.createVersion>,
@@ -369,7 +370,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
       });
       return true;
     } catch (e: unknown) {
-      // The conflict text is about unsaved edits, which a delete has nothing to do with. A 409 here
+      // The conflict text is about unsaved edits, which a delete has nothing to do with. A 400 or 409 here
       // means the version is no longer a draft, so the re-read shows why the delete was refused.
       addNotification({ text: dict.form.deleteVersionError, type: 'error', consoleError: e });
       if (isConflict(e)) await refreshVersions().catch(() => undefined);
@@ -438,7 +439,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     });
   };
 
-  useLeaveGuard(isDirty, (proceed) => {
+  useLeaveGuard(isDirty || openedVersion !== null, (proceed) => {
     setPendingLeave({ proceed, cancel: () => undefined });
   });
 
@@ -726,6 +727,8 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
         show={!!pendingLeave}
         title={dict.form.unsavedChangesTitle}
         onClose={() => void answerLeave('stay')}
+        isCloseable={!isSaving}
+        isDismissable={!isSaving}
         size="sm"
         footer={
           <>

@@ -1,13 +1,14 @@
-import { and, count, desc, eq, inArray, isNull, ne, sql, type InferSelectModel } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull, sql, type InferSelectModel } from 'drizzle-orm';
 import { DEFAULT_SORT_LOCALE, FORM_VERSION_SORT_FIELDS, type SortToken } from '@soba/lib';
 import { db, type DbOrTx, type Tx } from '../client';
 import { formVersionRevisions, formVersions, forms } from '../schema';
+import type { FormVersionState as FormVersionStateType } from '../schema/types';
 import { orderByForSort, prefixPattern, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 import { NotFoundError } from '../../errors';
 import { FormVersionState } from '../codes';
 import { listAllowsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
-import { liveFormVersion } from './liveRows';
+import { liveFormVersion, notOpened } from './liveRows';
 
 export type FormVersionRecord = InferSelectModel<typeof formVersions>;
 
@@ -18,6 +19,7 @@ interface CreateDraftInput {
   formId: string;
   actorId: string;
   actorDisplayLabel: string | null;
+  state?: FormVersionStateType;
   /** The version's form engine document, already written. */
   engineSchemaRef: string;
 }
@@ -84,7 +86,7 @@ export const getFormVersionListContext = async (
 };
 
 /**
- * The number the form's next saved version takes. Opened versions hold none, so one left unsaved
+ * The number the form's next saved version takes. Opened versions numbers don't block that nunber, so one left unsaved
  * does not use a number up. The form row is locked first, so versions of one form are numbered in
  * turn until the transaction ends; throws NotFoundError when the form is gone or deleted.
  */
@@ -104,11 +106,7 @@ export const nextFormVersionNo = async (
     .select({ versionNo: formVersions.versionNo })
     .from(formVersions)
     .where(
-      and(
-        eq(formVersions.workspaceId, workspaceId),
-        eq(formVersions.formId, formId),
-        ne(formVersions.state, FormVersionState.opened),
-      ),
+      and(eq(formVersions.workspaceId, workspaceId), eq(formVersions.formId, formId), notOpened),
     )
     .orderBy(desc(formVersions.versionNo))
     .limit(1);
@@ -133,7 +131,7 @@ export const createFormVersionDraft = async (
       workspaceId: input.workspaceId,
       formId: input.formId,
       versionNo,
-      state: FormVersionState.opened,
+      state: input.state ?? FormVersionState.opened,
       engineSchemaRef: input.engineSchemaRef,
       engineSyncStatus: 'ready',
       currentRevisionNo: 0,
@@ -186,8 +184,7 @@ export const listFormVersionsForWorkspace = async (
   const whereClauses = [
     inArray(formVersions.workspaceId, input.workspaceIds),
     liveFormVersion,
-    // A version nobody has saved yet is not part of the form's history.
-    ne(formVersions.state, FormVersionState.opened),
+    notOpened,
     permittedFormsWhere(input.formAccess, {
       workspaceId: formVersions.workspaceId,
       formId: formVersions.formId,
@@ -276,7 +273,7 @@ export const lookupFormVersions = async (
     inArray(formVersions.workspaceId, input.workspaceIds),
     eq(formVersions.formId, input.formId),
     isNull(formVersions.deletedAt),
-    ne(formVersions.state, FormVersionState.opened),
+    notOpened,
   ];
   if (input.q) {
     whereClauses.push(sql`${formVersions.versionNo}::text like ${prefixPattern(input.q)}`);
@@ -307,7 +304,7 @@ export const getCurrentFormVersion = async (
         eq(formVersions.workspaceId, workspaceId),
         eq(formVersions.formId, formId),
         isNull(formVersions.deletedAt),
-        ne(formVersions.state, FormVersionState.opened),
+        notOpened,
       ),
     )
     .orderBy(desc(formVersions.versionNo))
