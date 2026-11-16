@@ -201,7 +201,7 @@ const MAX_RETENTION_DAYS = 36_500;
 const MAX_RESULT_BYTES = 2_147_483_647;
 
 /** Unset uses the fallback; a value that is not a whole number from `min` to `max` throws. */
-function wholeNumberSetting(
+export function wholeNumberSetting(
   source: EnvSource,
   key: string,
   fallback: number,

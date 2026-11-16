@@ -10,47 +10,37 @@ import type { SubmissionDataDocument } from '@/src/types/forms';
 import type { SubmissionListItem, SubmitterReviewLabel } from '@/src/types/submissions';
 import { WorkflowStateBadge } from './WorkflowStateBadge';
 
-const SEPARATOR = ' \u00B7 ';
-
 type SubmissionDetailProps = {
   submission: SubmissionListItem;
   schema: FormType | null;
   /** null = no engine document (no saved answers); `{}` data = empty answers on a real document. */
   content: SubmissionDataDocument | null;
-  showSubmitter?: boolean;
   /** The review as its submitter is told it, shown in place of the workflow state once there is one. */
   reviewLabel?: SubmitterReviewLabel | null;
+  showConfirmationId?: boolean;
 };
 
-/** A loaded submission: its header and the answers rendered read-only against its schema. */
+/**
+ * A loaded submission as its submitter sees it: the status above the form's name, one line each
+ * for the confirmation ID, submitted date and version, and the answers rendered read-only in a card.
+ */
 export function SubmissionDetail({
   submission,
   schema,
   content,
-  showSubmitter = false,
   reviewLabel = null,
+  showConfirmationId = true,
 }: Readonly<SubmissionDetailProps>) {
   const dict = useDictionary();
   const dictSub = dict.submission;
   const formatLongDate = useFormatLongDate();
+  // French sets a space before the colon.
+  const sep = dict.general.labelSeparator;
 
   return (
     <>
-      <div className="mb-3" data-testid="submission-view-header">
-        <h2 className="h5 mb-1">{submission.formName || dict.form.nameLabel}</h2>
-        {submission.confirmationCode ? (
-          <div data-testid="submission-view-confirmation">
-            {dictSub.confirmationId}: <strong>{submission.confirmationCode}</strong>
-          </div>
-        ) : null}
-        {showSubmitter ? (
-          <div data-testid="submission-view-submitter">
-            {dictSub.submitter}: {submission.createdBy || dictSub.anon}
-          </div>
-        ) : null}
-        <div className="small text-muted">
-          <span data-testid="submission-view-version">v{submission.versionNo ?? 1}</span>
-          {SEPARATOR}
+      <div className="mt-4 mb-4" data-testid="submission-view-header">
+        <div className="mb-2">
           {reviewLabel ? (
             <StatusTag
               label={dict.mySubmissions.reviewStatuses[reviewLabel]}
@@ -63,28 +53,45 @@ export function SubmissionDetail({
               data-testid="submission-view-status"
             />
           )}
-          {submission.submittedAt ? (
-            <>
-              {SEPARATOR}
-              <span data-testid="submission-view-submitted">
-                {dictSub.submittedOn} {formatLongDate(submission.submittedAt)}
+        </div>
+        <h2 className="h3 fw-bold mb-3">{submission.formName || dict.form.nameLabel}</h2>
+        <div className="d-flex flex-column gap-2">
+          {showConfirmationId && submission.confirmationCode ? (
+            <div data-testid="submission-view-confirmation">
+              {dictSub.confirmationId}
+              {sep}
+              <span data-testid="submission-view-confirmation-code">
+                {submission.confirmationCode}
               </span>
-            </>
+            </div>
           ) : null}
+          {submission.submittedAt ? (
+            <div data-testid="submission-view-submitted">
+              {dictSub.submittedLabel}
+              {sep}
+              {formatLongDate(submission.submittedAt)}
+            </div>
+          ) : null}
+          <div data-testid="submission-view-version">
+            {dict.general.version}
+            {sep}
+            {submission.versionNo ?? 1}
+          </div>
         </div>
       </div>
-
-      {schema && content !== null ? (
-        <ReadOnlyFormView
-          schema={schema}
-          submission={{ data: (content.data ?? {}) as Submission['data'] }}
-          testId="submission-view-form"
-        />
-      ) : (
-        <InlineAlert variant="info" role="status" data-testid="submission-view-nocontent">
-          {dictSub.noContent}
-        </InlineAlert>
-      )}
+      <div className="border rounded p-4" data-testid="submission-view-answers-card">
+        {schema && content !== null ? (
+          <ReadOnlyFormView
+            schema={schema}
+            submission={{ data: (content.data ?? {}) as Submission['data'] }}
+            testId="submission-view-form"
+          />
+        ) : (
+          <InlineAlert variant="info" role="status" data-testid="submission-view-nocontent">
+            {dictSub.noContent}
+          </InlineAlert>
+        )}
+      </div>
     </>
   );
 }

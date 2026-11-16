@@ -22,6 +22,7 @@ import {
 import { db, type DbOrTx } from '../client';
 import {
   formAudienceSettings,
+  formConfirmationSettings,
   formReviewSettings,
   forms,
   formSubmitterSettings,
@@ -29,6 +30,7 @@ import {
   submissionParticipants,
   submissions,
   workspaceAudienceSettings,
+  workspaceConfirmationSettings,
   workspaceReviewSettings,
   workspaceSubmitterSettings,
   workspaces,
@@ -50,6 +52,9 @@ export interface SubmitterFormListRow extends SubmitterFormFacts {
   name: string;
   workspaceId: string;
   workspaceName: string;
+  /** The effective confirmation settings; read by submit-mode rules, not sent with the form. */
+  allowSubmitterEmailCopy: boolean;
+  showConfirmationId: boolean;
 }
 
 export interface ListSubmitterFormsInput {
@@ -124,8 +129,9 @@ const submitterFormIds = (userId: string, workspaceId?: string) => {
 };
 
 /**
- * The effective audience, drafts and submitter revision settings: the form's own unless it inherits
- * or leaves the value unset, then the workspace's. A form without both rows of a pair has neither. The same rule as
+ * The effective audience, drafts, submitter revision and confirmation settings: the form's own unless
+ * it inherits or leaves the value unset, then the workspace's. A form without both rows of a pair has
+ * neither, which reads as off, except the Confirmation ID, which reads as shown. The same rule as
  * findFormAudience and toInheritableSettings, which the settings screens read.
  */
 const settingsColumns = {
@@ -149,6 +155,16 @@ const settingsColumns = {
     when ${formReviewSettings.inherit} or ${formReviewSettings.allowSubmitterRevision} is null
       then ${workspaceReviewSettings.allowSubmitterRevision}
     else ${formReviewSettings.allowSubmitterRevision} end, false)`,
+  allowSubmitterEmailCopy: sql<boolean>`coalesce(case
+    when ${workspaceConfirmationSettings.workspaceId} is null then null
+    when ${formConfirmationSettings.inherit} or ${formConfirmationSettings.allowSubmitterEmailCopy} is null
+      then ${workspaceConfirmationSettings.allowSubmitterEmailCopy}
+    else ${formConfirmationSettings.allowSubmitterEmailCopy} end, false)`,
+  showConfirmationId: sql<boolean>`coalesce(case
+    when ${workspaceConfirmationSettings.workspaceId} is null then null
+    when ${formConfirmationSettings.inherit} or ${formConfirmationSettings.showConfirmationId} is null
+      then ${workspaceConfirmationSettings.showConfirmationId}
+    else ${formConfirmationSettings.showConfirmationId} end, true)`,
 };
 
 /** Joins the settings rows settingsColumns reads; each pair has one row per form and workspace. */
@@ -186,6 +202,17 @@ const withSettings = <T extends PgSelect>(query: T) =>
     .leftJoin(
       workspaceReviewSettings,
       eq(workspaceReviewSettings.workspaceId, formReviewSettings.workspaceId),
+    )
+    .leftJoin(
+      formConfirmationSettings,
+      and(
+        eq(formConfirmationSettings.formId, forms.id),
+        eq(formConfirmationSettings.workspaceId, forms.workspaceId),
+      ),
+    )
+    .leftJoin(
+      workspaceConfirmationSettings,
+      eq(workspaceConfirmationSettings.workspaceId, formConfirmationSettings.workspaceId),
     );
 
 const NO_PERMISSIONS = sql<string[]>`'{}'::text[]`;
