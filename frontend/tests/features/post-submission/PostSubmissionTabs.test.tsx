@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { SWRConfig } from 'swr';
 import en from '@/dictionaries/en.json';
@@ -38,6 +38,47 @@ const dict: Dictionary = en;
 const OFF = { enabled: false, options: {} };
 const formView = { inherit: true, own: null, workspace: OFF, effective: OFF, version: 0 };
 
+const NO_CARD = {
+  settings: { allowSubmitterEmailCopy: false, showConfirmationId: false },
+  notifications: true,
+};
+const CARD = {
+  settings: { allowSubmitterEmailCopy: true, showConfirmationId: true },
+  notifications: true,
+};
+type FormTabProps = Partial<React.ComponentProps<typeof FormPostSubmissionTab>>;
+type WorkspaceTabProps = Partial<React.ComponentProps<typeof WorkspacePostSubmissionTab>>;
+const formTab = (props: FormTabProps = {}) => (
+  <FormPostSubmissionTab
+    dict={dict}
+    formId="f1"
+    actionsAvailable
+    confirmation={NO_CARD}
+    {...props}
+  />
+);
+const workspaceTab = (props: WorkspaceTabProps = {}) => (
+  <WorkspacePostSubmissionTab
+    dict={dict}
+    workspaceId="ws1"
+    actionsAvailable
+    confirmation={NO_CARD}
+    {...props}
+  />
+);
+const twoActions = {
+  actions: ['post-submission-email-addresses', 'post-submission-log'].map((code) => ({
+    code,
+    name: code,
+    scopes: ['workspace', 'form'],
+    workspaceConfigurable: true,
+    settings: formView,
+  })),
+};
+/** Whether a drawer's header says it is open. */
+const expanded = (testId: string) =>
+  within(screen.getByTestId(testId)).getAllByRole('button')[0].getAttribute('aria-expanded');
+
 let store: ReturnType<typeof makeStore>;
 
 const renderTab = (tab: React.ReactNode) =>
@@ -65,21 +106,9 @@ describe('After Submission tabs', () => {
 
   it("lists a form's actions in the server's order, under the form's intro", async () => {
     mockGetFormSettings.mockImplementation((_token, _form, key: string) =>
-      Promise.resolve(
-        key === 'post-submission'
-          ? {
-              actions: ['post-submission-email-addresses', 'post-submission-log'].map((code) => ({
-                code,
-                name: code,
-                scopes: ['workspace', 'form'],
-                workspaceConfigurable: true,
-                settings: formView,
-              })),
-            }
-          : formView,
-      ),
+      Promise.resolve(key === 'post-submission' ? twoActions : formView),
     );
-    renderTab(<FormPostSubmissionTab dict={dict} formId="f1" />);
+    renderTab(formTab());
 
     expect(await screen.findByTestId('post-submission-intro')).toHaveTextContent(
       en.postSubmission.formIntro,
@@ -93,7 +122,7 @@ describe('After Submission tabs', () => {
   });
 
   it('says an administrator gives access when nothing is listed', async () => {
-    renderTab(<FormPostSubmissionTab dict={dict} formId="f1" />);
+    renderTab(formTab());
     expect(await screen.findByTestId('post-submission-empty')).toHaveTextContent(
       en.postSubmission.empty,
     );
@@ -101,7 +130,7 @@ describe('After Submission tabs', () => {
 
   it('says After Submission is not available when the list is not found', async () => {
     mockGetFormSettings.mockRejectedValue(new ApiError('Not found', 404));
-    renderTab(<FormPostSubmissionTab dict={dict} formId="f1" />);
+    renderTab(formTab());
     expect(await screen.findByTestId('post-submission-load-error')).toHaveTextContent(
       en.postSubmission.notAvailable,
     );
@@ -109,7 +138,7 @@ describe('After Submission tabs', () => {
 
   it('says the list did not load on any other failure', async () => {
     mockGetFormSettings.mockRejectedValue(new ApiError('Boom', 500));
-    renderTab(<FormPostSubmissionTab dict={dict} formId="f1" />);
+    renderTab(formTab());
     expect(await screen.findByTestId('post-submission-load-error')).toHaveTextContent(
       en.postSubmission.loadError,
     );
@@ -133,7 +162,7 @@ describe('After Submission tabs', () => {
           : formView,
       ),
     );
-    renderTab(<FormPostSubmissionTab dict={dict} formId="f1" />);
+    renderTab(formTab());
 
     expect(await screen.findByTestId('post-submission-zip-unknown-note')).toHaveTextContent(
       en.postSubmission.workspaceOnlyNote,
@@ -152,7 +181,7 @@ describe('After Submission tabs', () => {
         },
       ],
     });
-    renderTab(<WorkspacePostSubmissionTab dict={dict} workspaceId="ws1" />);
+    renderTab(workspaceTab());
 
     const card = await screen.findByTestId('post-submission-zip-unknown');
     expect(card).toHaveTextContent('Zips the files of each submission');
@@ -162,5 +191,92 @@ describe('After Submission tabs', () => {
     expect(screen.getByTestId('post-submission-intro')).toHaveTextContent(
       en.postSubmission.workspaceIntro,
     );
+  });
+
+  it('shows only a spinner while either check runs', () => {
+    renderTab(formTab({ actionsAvailable: undefined }));
+    expect(screen.queryByTestId('post-submission-intro')).not.toBeInTheDocument();
+    renderTab(workspaceTab({ confirmation: undefined }));
+    expect(screen.queryByTestId('post-submission-intro')).not.toBeInTheDocument();
+  });
+
+  describe('Confirmation Screen card', () => {
+    const card = () => screen.findByText(dict.postSubmission.confirmationScreen.label);
+    const settings = { allowSubmitterEmailCopy: true, showConfirmationId: true };
+    const confirmationView = {
+      inherit: true,
+      own: null,
+      workspace: settings,
+      effective: settings,
+      version: 1,
+    };
+
+    beforeEach(() => {
+      mockGetWorkspaceSettings.mockImplementation((_token, _ws, key: string) =>
+        Promise.resolve(
+          key === 'post-submission' ? { actions: [] } : { values: settings, version: 1 },
+        ),
+      );
+      mockGetFormSettings.mockImplementation((_token, _form, key: string) =>
+        Promise.resolve(key === 'post-submission' ? { actions: [] } : confirmationView),
+      );
+    });
+
+    it('shows after the actions where a setting is available', async () => {
+      renderTab(workspaceTab({ confirmation: CARD }));
+      expect(await card()).toBeInTheDocument();
+    });
+
+    it('is left out where no setting is available', async () => {
+      renderTab(workspaceTab());
+      expect(await screen.findByTestId('post-submission-empty')).toBeInTheDocument();
+      expect(
+        screen.queryByText(dict.postSubmission.confirmationScreen.label),
+      ).not.toBeInTheDocument();
+    });
+
+    // Post-submission off: the tab is only the card, and the actions are never read.
+    it('shows alone, reading no actions, where post-submission is off', async () => {
+      renderTab(formTab({ actionsAvailable: false, confirmation: CARD }));
+      expect(await card()).toBeInTheDocument();
+      expect(screen.queryByTestId('post-submission-intro')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('post-submission-empty')).not.toBeInTheDocument();
+      expect(mockGetFormSettings).not.toHaveBeenCalledWith('token', 'f1', 'post-submission');
+    });
+
+    it('stays when the actions fail to load', async () => {
+      mockGetFormSettings.mockImplementation((_token, _form, key: string) =>
+        key === 'post-submission'
+          ? Promise.reject(new ApiError('boom', 500))
+          : Promise.resolve(confirmationView),
+      );
+      renderTab(formTab({ confirmation: CARD }));
+      expect(await screen.findByTestId('post-submission-load-error')).toBeInTheDocument();
+      expect(await card()).toBeInTheDocument();
+    });
+
+    // The group reads which drawer opens only when it mounts, after the actions have loaded.
+    it('opens the first action, not the card, when both show', async () => {
+      const actions = ['post-submission-zip', 'post-submission-unzip'].map((code) => ({
+        code,
+        name: code,
+        scopes: ['workspace', 'form'],
+        workspaceConfigurable: true,
+        settings: formView,
+      }));
+      mockGetFormSettings.mockImplementation((_token, _form, key: string) =>
+        Promise.resolve(key === 'post-submission' ? { actions } : confirmationView),
+      );
+      renderTab(formTab({ confirmation: CARD }));
+      expect(await card()).toBeInTheDocument();
+      expect(expanded('accordion-post-submission-zip')).toBe('true');
+      expect(expanded('accordion-confirmation-screen')).toBe('false');
+    });
+
+    it('opens the card when it is all the tab holds', async () => {
+      renderTab(formTab({ actionsAvailable: false, confirmation: CARD }));
+      expect(await card()).toBeInTheDocument();
+      expect(expanded('accordion-confirmation-screen')).toBe('true');
+    });
   });
 });

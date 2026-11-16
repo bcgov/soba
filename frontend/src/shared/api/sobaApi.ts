@@ -62,6 +62,7 @@ export {
   submitSobaFormSubmission,
   deleteSubmitSubmission,
   reviseSubmitSubmission,
+  emailSubmitSubmissionCopy,
   getMyForms,
   getMySubmissions,
   getMyWorkspaces,

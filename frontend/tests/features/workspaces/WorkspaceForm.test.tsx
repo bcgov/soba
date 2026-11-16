@@ -82,8 +82,21 @@ vi.mock('@/src/shared/featureFlags/featureAvailability', () => ({
   fetchFeatureAvailability: availability.check,
 }));
 
+// Shows what it is given, so a test can tell the two parts' availability apart.
 vi.mock('@/src/features/post-submission/ui/WorkspacePostSubmissionTab', () => ({
-  default: () => <div data-testid="workspace-post-submission-content" />,
+  default: ({
+    actionsAvailable,
+    confirmation,
+  }: {
+    actionsAvailable?: boolean;
+    confirmation?: { settings: Record<string, boolean> };
+  }) => (
+    <div
+      data-testid="workspace-post-submission-content"
+      data-actions={String(actionsAvailable)}
+      data-confirmation={JSON.stringify(confirmation?.settings)}
+    />
+  ),
 }));
 
 vi.mock('@/src/features/jobs/ui/ScopedJobsTabs', () => ({
@@ -333,6 +346,42 @@ describe('WorkspaceForm', () => {
     expect(screen.getByRole('tab', { name: 'Form Settings' })).toBeInTheDocument();
     expect(screen.queryByTestId('workspace-post-submission-tab')).not.toBeInTheDocument();
   });
+
+  // The tab holds two parts, the actions and the Confirmation Screen card; either one shows it,
+  // and the tab is given which.
+  it.each([
+    [
+      'only the actions',
+      ['post-submission'],
+      'true',
+      { allowSubmitterEmailCopy: false, showConfirmationId: false },
+    ],
+    [
+      'only the Confirmation Screen',
+      ['confirmation-screen', 'confirmation-email-copy', 'notifications'],
+      'false',
+      { allowSubmitterEmailCopy: true, showConfirmationId: false },
+    ],
+  ])(
+    'manage mode shows the After Submission tab where %s are available',
+    async (_label, availableCodes, actions, card) => {
+      const user = userEvent.setup();
+      availability.check.mockImplementation((code: string) =>
+        Promise.resolve(availableCodes.includes(code)),
+      );
+      await act(async () => {
+        renderForm('ws2');
+      });
+
+      await user.click(await screen.findByTestId('workspace-post-submission-tab'));
+      const content = await screen.findByTestId('workspace-post-submission-content');
+      expect(content).toHaveAttribute('data-actions', actions);
+      expect(JSON.parse(content.getAttribute('data-confirmation') ?? 'null')).toEqual(card);
+      expect(availability.check).toHaveBeenCalledWith('confirmation-screen', {
+        workspaceId: 'ws2',
+      });
+    },
+  );
 
   it('save on create posts the workspace', async () => {
     await act(async () => {

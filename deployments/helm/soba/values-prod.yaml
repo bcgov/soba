@@ -2,6 +2,9 @@
 backend:
   # Development data generator: stated explicitly rather than left to the default.
   features:
+    confirmation-email-copy: "disabled"
+    confirmation-id-visibility: "disabled"
+    confirmation-screen: "disabled"
     dev-data: "disabled"
     notifications: "disabled"
     post-submission: "enabled"

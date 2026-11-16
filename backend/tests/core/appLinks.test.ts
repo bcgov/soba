@@ -3,6 +3,7 @@ import {
   assertAppLinkBases,
   designerSubmissionFileUrl,
   designerSubmissionUrl,
+  formsMySubmissionsUrl,
   formsSubmissionUrl,
 } from '../../src/core/appLinks';
 
@@ -30,6 +31,13 @@ describe('app links', () => {
     expect(formsSubmissionUrl('https://soba.example/forms', 'en', 'submission', 's1')).toBe(
       'https://soba.example/forms/en/submission/s1',
     );
+  });
+
+  it("points at the submitter's own submissions in the forms app, in the email's language", () => {
+    expect(formsMySubmissionsUrl('https://soba.example/forms/', 'fr')).toBe(
+      'https://soba.example/forms/fr/my-submissions',
+    );
+    expect(formsMySubmissionsUrl(undefined, 'en')).toBeNull();
   });
 
   it('encodes each part of the path', () => {

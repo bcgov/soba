@@ -277,6 +277,25 @@ A limit outside 100 to 1000000 fails the render.
 To retire an action, take its code off the list first and remove its plugin in a later release.
 Jobs already queued for a plugin that no pod has stay queued.
 
+The confirmation screen settings are gated by `backend.features.confirmation-screen`, and each
+setting by a feature of its own: `confirmation-email-copy` lets submitters email themselves a copy
+of their confirmation, and `confirmation-id-visibility` lets a form hide the Confirmation ID on its
+success page. All three are on in dev, PR and test and off in UAT and prod. Both settings default
+on. Copies send only while `backend.features.notifications` is enabled.
+
+Copy requests are checked against hourly limits of their own; a request past one is refused with
+429 `email_copy_limit_reached`. Sent copies also count toward the action emails' limits above. Set
+in ConfigMap `<fullname>-backend-app` only when non-empty; a value outside 1 to 1000000 fails the
+render:
+
+| Helm value                                                | Env var                                         | Default |
+| --------------------------------------------------------- | ----------------------------------------------- | ------- |
+| `backend.config.submitterEmailCopySubmissionHourlyLimit`  | `SUBMITTER_EMAIL_COPY_SUBMISSION_HOURLY_LIMIT`  | 5       |
+| `backend.config.submitterEmailCopyRecipientHourlyLimit`   | `SUBMITTER_EMAIL_COPY_RECIPIENT_HOURLY_LIMIT`   | 10      |
+| `backend.config.submitterEmailCopyFormHourlyLimit`        | `SUBMITTER_EMAIL_COPY_FORM_HOURLY_LIMIT`        | 500     |
+| `backend.config.submitterEmailCopyWorkspaceHourlyLimit`   | `SUBMITTER_EMAIL_COPY_WORKSPACE_HOURLY_LIMIT`   | 2000    |
+| `backend.config.submitterEmailCopyEnvironmentHourlyLimit` | `SUBMITTER_EMAIL_COPY_ENVIRONMENT_HOURLY_LIMIT` | 5000    |
+
 ## Job Result Files
 
 A background job can keep one file it produced, such as a submission export. Result files are not

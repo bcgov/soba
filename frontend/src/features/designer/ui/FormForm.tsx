@@ -21,7 +21,7 @@ import FormHistoryTab from './FormHistoryTab';
 import FormSubmissionTab from './FormSubmissionTab';
 import FormShareTab from './FormShareTab';
 import FormPostSubmissionTab from '@/src/features/post-submission/ui/FormPostSubmissionTab';
-import { usePostSubmissionAvailable } from '@/src/features/post-submission/data/usePostSubmissionAvailable';
+import { useAfterSubmissionAvailable } from '@/src/features/post-submission/data/useAfterSubmissionAvailable';
 import { FormJobsTab } from '@/src/features/jobs/ui/ScopedJobsTabs';
 import { withBasePath } from '@/src/shared/config/basePath';
 import { useWorkspace } from '@/src/shared/api/useWorkspaces';
@@ -284,11 +284,12 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     return hasPermission(permissions, Permissions.submission_read);
   }, [permissions]);
 
-  // The tab needs the Settings tab's permission and post-submission available for this form.
-  const postSubmissionAvailable = usePostSubmissionAvailable(
+  // The tab needs the Settings tab's permission and, for this form, either of its parts available:
+  // the post-submission actions, or the confirmation screen.
+  const afterSubmission = useAfterSubmissionAvailable(
     canSeeSettingsTab && form?.workspaceId ? { workspaceId: form.workspaceId, formId } : null,
   );
-  const canSeePostSubmissionTab = canSeeSettingsTab && postSubmissionAvailable;
+  const canSeePostSubmissionTab = canSeeSettingsTab && afterSubmission.tabAvailable;
 
   const { activeTab, openedTabs, openTab } = useActiveTab({
     canSeeDesignTab,
@@ -662,7 +663,12 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
             disabled={isSaving || draftUnavailable}
             title={dict.postSubmission.tab}
           >
-            <FormPostSubmissionTab dict={dict} formId={formId} />
+            <FormPostSubmissionTab
+              dict={dict}
+              formId={formId}
+              actionsAvailable={afterSubmission.actionsAvailable}
+              confirmation={afterSubmission.confirmation}
+            />
           </Tab>
         )}
         {canSeeHistoryTab && (

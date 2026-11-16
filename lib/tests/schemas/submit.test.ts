@@ -1,9 +1,10 @@
-import { SubmitFillBundleSchema } from '../../src/schemas/submit';
+import { EmailSubmissionCopyBodySchema, SubmitFillBundleSchema } from '../../src/schemas/submit';
 
 const bundle = {
   formId: 'f1',
   workflowState: 'draft',
   formVersionId: 'v1',
+  versionNo: 3,
   headRevisionId: 'r1',
   currentRevisionNo: 1,
   role: 'owner',
@@ -38,9 +39,12 @@ describe('SubmitFillBundleSchema', () => {
     );
   });
 
-  it.each(['formId', 'currentRevisionNo', 'role', 'form'] as const)('requires %s', (field) => {
-    expect(SubmitFillBundleSchema.safeParse(without(bundle, field)).success).toBe(false);
-  });
+  it.each(['formId', 'versionNo', 'currentRevisionNo', 'role', 'form'] as const)(
+    'requires %s',
+    (field) => {
+      expect(SubmitFillBundleSchema.safeParse(without(bundle, field)).success).toBe(false);
+    },
+  );
 
   it.each([
     ['no role', null],
@@ -52,5 +56,24 @@ describe('SubmitFillBundleSchema', () => {
   it('rejects a form without its facts', () => {
     const form = without(bundle.form, 'permissions');
     expect(SubmitFillBundleSchema.safeParse({ ...bundle, form }).success).toBe(false);
+  });
+});
+
+describe('EmailSubmissionCopyBodySchema', () => {
+  it('trims and lower-cases the one address', () => {
+    expect(EmailSubmissionCopyBodySchema.parse({ to: '  Pat@Example.COM ' })).toEqual({
+      to: 'pat@example.com',
+    });
+  });
+
+  // One address only, and nothing else: no list, no priority, no message text.
+  it.each([
+    ['no address', {}],
+    ['a blank address', { to: '  ' }],
+    ['an invalid address', { to: 'not-an-email' }],
+    ['a list of addresses', { to: ['a@example.com', 'b@example.com'] }],
+    ['an extra field', { to: 'a@example.com', priority: 'high' }],
+  ])('rejects %s', (_label, body) => {
+    expect(EmailSubmissionCopyBodySchema.safeParse(body).success).toBe(false);
   });
 });

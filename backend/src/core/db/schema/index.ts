@@ -9,6 +9,8 @@ export * from './forms';
 export * from './formGroupOverride';
 export * from './formSubmitterSetting';
 export * from './formReviewSetting';
+export * from './formConfirmationSetting';
+export * from './submitterEmailCopyRequest';
 export * from './audienceSetting';
 export * from './settingsAudit';
 export * from './submissionParticipant';
