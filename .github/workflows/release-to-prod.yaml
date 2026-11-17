@@ -84,12 +84,10 @@ jobs:
       CRUNCHY_CLUSTER: pg-soba-prod-crunchy
       MONGODB_HOST: ${{ vars.MONGODB_HOST }}
       MONGODB_PORT: ${{ vars.MONGODB_PORT || '27017' }}
-      MONGODB_AUTH_SECRET_NAME: ${{ vars.MONGODB_AUTH_SECRET_NAME }}
       MONGODB_USERNAME: ${{ vars.MONGODB_USERNAME || 'formio' }}
       MONGODB_DATABASE: ${{ vars.MONGODB_DATABASE || 'formio-ce' }}
       MONGODB_AUTH_SOURCE: ${{ vars.MONGODB_AUTH_SOURCE || 'formio-ce' }}
       MONGODB_REPLICA_SET: ${{ vars.MONGODB_REPLICA_SET || 'rs0' }}
-      FORMIO_EXTERNAL_URL: ${{ vars.FORMIO_EXTERNAL_URL }}
       VAULT_AUTH_PATH: ${{ vars.VAULT_AUTH_PATH }}
       VAULT_NAMESPACE: ${{ vars.VAULT_NAMESPACE }}
       VAULT_ROLE: ${{ vars.VAULT_ROLE_PROD }}
@@ -126,13 +124,13 @@ jobs:
           : "${OC_DOMAIN:?Set OC_DOMAIN on the prod environment.}"
           : "${CRUNCHY_CLUSTER:?Set CRUNCHY_CLUSTER to the production Crunchy cluster name.}"
           : "${MONGODB_HOST:?Set MONGODB_HOST on the prod environment.}"
-          : "${MONGODB_AUTH_SECRET_NAME:?Set MONGODB_AUTH_SECRET_NAME on the prod environment.}"
-          : "${FORMIO_EXTERNAL_URL:?Set FORMIO_EXTERNAL_URL on the prod environment.}"
           : "${VAULT_AUTH_PATH:?Set the production VAULT_AUTH_PATH.}"
           : "${VAULT_NAMESPACE:?Set the production VAULT_NAMESPACE.}"
           : "${VAULT_ROLE:?Set VAULT_ROLE_PROD.}"
           : "${VAULT_SECRET_PATH:?Set the production VAULT_SECRET_PATH.}"
           : "${VAULT_SERVICE_ACCOUNT_NAME:?Set the production VAULT_SERVICE_ACCOUNT_NAME.}"
+          MONGODB_AUTH_SECRET_NAME=$(ruby -ryaml -e 'puts YAML.load_file(ARGV.fetch(0)).dig("mongodb", "external", "authSecretName")' deployments/helm/soba/values-prod.yaml)
+          : "${MONGODB_AUTH_SECRET_NAME:?Set mongodb.external.authSecretName in values-prod.yaml.}"
           if [[ "$NAMESPACE" != *-prod ]]; then
             echo "::error::Production namespace must end in -prod."
             exit 1
@@ -249,10 +247,8 @@ jobs:
             --set-string "database.runtimeSecretName=${CRUNCHY_CLUSTER}-pguser-appproxy" \
             --set-string "database.runtimeSecretKey=pgbouncer-uri" \
             --set-string "database.runtimeRole=appproxy" \
-            --set-string "formio.external.url=$FORMIO_EXTERNAL_URL" \
             --set-string "mongodb.external.host=$MONGODB_HOST" \
             --set-string "mongodb.external.port=$MONGODB_PORT" \
-            --set-string "mongodb.external.authSecretName=$MONGODB_AUTH_SECRET_NAME" \
             --set-string "mongodb.external.username=$MONGODB_USERNAME" \
             --set-string "mongodb.external.database=$MONGODB_DATABASE" \
             --set-string "mongodb.external.authSource=$MONGODB_AUTH_SOURCE" \
