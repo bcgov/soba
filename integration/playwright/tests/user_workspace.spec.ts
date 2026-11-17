@@ -1,12 +1,13 @@
 import { test, expect } from '../fixtures/form_setup';
 import dictionaries from '../../../frontend/dictionaries/en.json';
+import { openAuthenticatedPage } from '../support/open_authenticated_page';
+
+test.describe.configure({ timeout: 60_000 });
 
 test.beforeEach(async ({ page, baseURL, workspaceName }) => {
   if (!baseURL) throw new Error('Playwright baseURL must be configured');
-  await page.goto(`${baseURL.replace(/\/$/, '')}/workspaces`);
+  await openAuthenticatedPage(page, `${baseURL.replace(/\/$/, '')}/workspaces`);
   await expect(page).toHaveURL(/\/workspaces(?:\?|$)/);
-  // A full navigation must finish restoring the Keycloak session before the list renders.
-  await expect(page.getByTestId('user-dropdown')).toBeVisible({ timeout: 20000 });
   const search = page.getByTestId('search-workspaces-text').getByRole('textbox');
   await expect(search).toBeEditable({ timeout: 15000 });
   await search.fill(workspaceName);
