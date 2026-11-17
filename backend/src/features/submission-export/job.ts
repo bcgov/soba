@@ -1,9 +1,9 @@
 import { createWriteStream } from 'node:fs';
-import { Readable, Transform } from 'node:stream';
+import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { z } from 'zod';
 import { hasAllPermissions, SUBMISSION_EXPORT_LAYOUTS } from '@soba/lib';
-import { JobPool } from '../../core/config/env';
+import { env, JobPool } from '../../core/config/env';
 import { quietDb } from '../../core/db/client';
 import { Features, JobType, Permissions, SubmissionExportAuditAction } from '../../core/db/codes';
 import { isFeatureEnabledCached } from '../../core/db/repos/featureRepo';
@@ -13,20 +13,22 @@ import { getTempStorageAdapter } from '../../core/integrations/plugins/PluginReg
 import type { JobContext, JobTypeDefinition } from '../../core/jobs/registry';
 import { JobCancelledError, JobFailedError } from '../../core/jobs/settlement';
 import { engineExportSource, exportSchemas, formAnswerReader } from './engineSource';
+import { staffLinkedRows } from './fileLinks';
 import { exportFormat } from './formats';
 import { exportFieldNames } from './schemaFields';
+import { sizeLimit } from './sizeLimit';
 import { exportBoundsOf } from './source';
 import { submissionExportQuery } from './submissionQuery';
 
 export const SUBMISSION_EXPORT_MAX_ATTEMPTS = 3;
 
 /**
- * Recorded as the job's error. The export routes read lost access and the size limit as why the
- * export ended; anything else, the feature turned off included, reads as an error.
+ * Recorded as the job's error. The export routes read lost access and the size limit
+ * (`EXPORT_TOO_LARGE`) as why the export ended; anything else, the feature turned off included,
+ * reads as an error.
  */
 export const EXPORT_ACCESS_LOST = "The export's starter can no longer read the form's submissions";
 export const EXPORT_TURNED_OFF = 'Submission export is turned off';
-export const EXPORT_TOO_LARGE = 'Result over the size limit';
 
 const PAGE_SIZE = 100;
 
@@ -40,21 +42,6 @@ export const ExportParamsSchema = z.object({
   to: z.iso.datetime({ offset: true }),
 });
 export type ExportParams = z.infer<typeof ExportParamsSchema>;
-
-/** Stops the write once the file passes `maxBytes`; a retry would fail the same way. */
-const sizeLimit = (maxBytes: number): Transform => {
-  let bytes = 0;
-  return new Transform({
-    transform(chunk: Buffer | string, _encoding, callback) {
-      bytes += Buffer.byteLength(chunk);
-      if (bytes > maxBytes) {
-        callback(new JobFailedError(`${EXPORT_TOO_LARGE} of ${maxBytes} bytes`));
-        return;
-      }
-      callback(null, chunk);
-    },
-  });
-};
 
 /** Counts each row as it passes, for progress. */
 async function* counting<T>(rows: AsyncIterable<T>, onRow: () => void): AsyncIterable<T> {
@@ -104,6 +91,7 @@ const stillAllowed = async (job: JobContext['job']): Promise<string> => {
 const runExport = async ({
   job,
   signal,
+  log,
   reportProgress,
   resultMaxBytes,
   storeResult,
@@ -144,10 +132,13 @@ const runExport = async ({
         progress();
       },
     );
-    const text = format.serialize(rows, {
+    const linked = staffLinkedRows(rows, job.formId, env.getDesignerAppUrl(), log);
+    const text = format.serialize(linked, {
       fields: params.fields ?? exportFieldNames(schemas),
       layout: params.layout,
       schemas,
+      maxBytes: resultMaxBytes,
+      signal,
     });
     await pipeline(Readable.from(text), sizeLimit(resultMaxBytes), createWriteStream(staged.path), {
       signal,

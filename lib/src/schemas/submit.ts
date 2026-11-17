@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { SubmitterFormSchema } from './forms';
+import { NormalizedEmailAddressSchema } from './email';
 import { MySubmissionRoleSchema } from './submissions';
 
 export const SubmissionDataDocumentSchema = z
@@ -13,6 +14,7 @@ export const SubmitFillBundleSchema = z.object({
   formId: z.string(),
   workflowState: z.string(),
   formVersionId: z.string(),
+  versionNo: z.number().int(),
   headRevisionId: z.string().nullable(),
   // The head revision's number, in append order over every revision.
   currentRevisionNo: z.number().int(),
@@ -35,3 +37,9 @@ export const SubmitFormVersionSchemaResponseSchema = z.object({
   schemaHash: z.string(),
 });
 export type SubmitFormVersionSchemaResponse = z.infer<typeof SubmitFormVersionSchemaResponseSchema>;
+
+/** A submitter asking for a copy of their confirmation: one address, trimmed and lower-cased. */
+export const EmailSubmissionCopyBodySchema = z.strictObject({
+  to: NormalizedEmailAddressSchema,
+});
+export type EmailSubmissionCopyBody = z.infer<typeof EmailSubmissionCopyBodySchema>;

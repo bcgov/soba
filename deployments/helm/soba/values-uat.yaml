@@ -1,6 +1,9 @@
 # UAT environment — production-like sizing and external service topology.
 backend:
   features:
+    confirmation-email-copy: "disabled"
+    confirmation-id-visibility: "disabled"
+    confirmation-screen: "disabled"
     dev-data: "disabled"
     notifications: "disabled"
     post-submission: "enabled"
@@ -20,11 +23,6 @@ backend:
     minReplicas: 3
     maxReplicas: 6
     targetCPUUtilizationPercentage: 75
-  # Files and templates in S3; credentials and bucket come from Vault.
-  storage:
-    defaultBackend: storage-s3
-    defaultPrefix: uat
-    s3VaultKeyInfix: UAT
   config:
     nodeEnv: production
     logLevel: warn
@@ -75,6 +73,12 @@ mongodb:
     enabled: false
   external:
     uri: ""
+    authSecretName: soba-uat-mongodb-auth
+
+gatewayNetworkPolicy:
+  enabled: true
+  namespaceName: "b8840c"
+  environment: prod
 
 vault:
   enabled: true

@@ -2,6 +2,9 @@
 backend:
   # Development data generator: stated explicitly rather than left to the default.
   features:
+    confirmation-email-copy: "disabled"
+    confirmation-id-visibility: "disabled"
+    confirmation-screen: "disabled"
     dev-data: "disabled"
     notifications: "disabled"
     post-submission: "enabled"
@@ -21,11 +24,6 @@ backend:
     minReplicas: 3
     maxReplicas: 6
     targetCPUUtilizationPercentage: 75
-  # Files and templates in S3; credentials and bucket come from Vault.
-  storage:
-    defaultBackend: storage-s3
-    defaultPrefix: prod
-    s3VaultKeyInfix: PROD
   config:
     nodeEnv: production
     logLevel: warn
@@ -72,19 +70,30 @@ frontend:
     maxReplicas: 6
     targetCPUUtilizationPercentage: 75
 
-# Typically external in production; set formio.internal.enabled=false and
-# formio.external.url to the shared Form.io instance.
 formio:
   internal:
-    enabled: false
-  external:
-    url: ""
+    enabled: true
+  replicas: 2
+  nodeOptions: "--max-old-space-size=2048"
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 3Gi
 
 mongodb:
   internal:
     enabled: false
   external:
     uri: ""
+    authSecretName: soba-prod-mongodb-auth
+
+gatewayNetworkPolicy:
+  enabled: true
+  namespaceName: "b8840c"
+  environment: prod
 
 # The prod deploy supplies vault.role, vault.secretPath and vault.serviceAccountName.
 vault:

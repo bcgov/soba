@@ -34,6 +34,7 @@
     "reference": "Référence:",
     "create": "Créer",
     "version": "Version",
+    "labelSeparator": " : ",
     "clearFilters": "Effacer les filtres",
     "noAccess": "Vous n'avez pas accès à ceci.",
     "sortBy": "Trier par",
@@ -187,7 +188,7 @@
       "systemGroup": "Groupe système",
       "systemGroupTooltip": "Les groupes système sont protégés et ne peuvent pas être supprimés.",
       "deleteConfirmTitle": "Supprimer le groupe",
-      "deleteConfirmMessage": "Êtes-vous sûr de vouloir supprimer le groupe \"{name}\" ? Les utilisateurs de ce groupe perdront l'accès à tous les formulaires de cet espace de travail.",
+      "deleteConfirmMessage": "Êtes-vous sûr de vouloir supprimer le groupe \"{name}\"? Les utilisateurs de ce groupe perdront l'accès à tous les formulaires de cet espace de travail.",
       "deleteSuccess": "Groupe supprimé avec succès.",
       "deleteError": "Échec de la suppression du groupe.",
       "createSuccess": "Groupe créé avec succès.",
@@ -256,8 +257,8 @@
       "updateSuccess": "Groupes mis à jour avec succès.",
       "updateError": "Échec de la mise à jour des groupes de cette personne.",
       "removeConfirmTitle": "Retirer la personne",
-      "removeConfirmMessage": "Retirer \"{name}\" de cet espace de travail ? Cette personne perdra l'accès à tous les formulaires de cet espace de travail.",
-      "removeConfirmRoleMessage": "Retirer \"{name}\" de cet espace de travail ? Cette personne perdra l'accès à tous les formulaires de cet espace de travail ainsi que son rôle {role}. Si elle est ajoutée de nouveau, elle aura le rôle Lecteur.",
+      "removeConfirmMessage": "Retirer \"{name}\" de cet espace de travail? Cette personne perdra l'accès à tous les formulaires de cet espace de travail.",
+      "removeConfirmRoleMessage": "Retirer \"{name}\" de cet espace de travail? Cette personne perdra l'accès à tous les formulaires de cet espace de travail ainsi que son rôle {role}. Si elle est ajoutée de nouveau, elle aura le rôle Lecteur.",
       "roleNames": {
         "admin": "Administrateur",
         "member": "Membre"
@@ -412,7 +413,8 @@
       "submissionSubmitted": "Soumission reçue",
       "submissionExport": "Exportation des soumissions",
       "submissionStatusChanged": "Statut modifié",
-      "submissionStatusEmail": "Courriel de statut"
+      "submissionStatusEmail": "Courriel de statut",
+      "submissionEmailCopy": "Copie par courriel au soumissionnaire"
     },
     "detail": {
       "heading": "Tâche",
@@ -524,6 +526,11 @@
     }
   },
   "form": {
+    "deleteTitle": "Supprimer le formulaire",
+    "delete": "Supprimer",
+    "deleteMessage": "Supprimer « {name} »? Le formulaire ne sera plus accessible, y compris par les liens partagés. Ses soumissions ne seront plus accessibles au personnel ni aux soumissionnaires. Cette action est irréversible.",
+    "deleteSuccess": "Le formulaire a été supprimé.",
+    "deleteError": "Impossible de supprimer le formulaire.",
     "saved": "Formulaire enregistré avec succès.",
     "saveError": "Erreur lors de l'enregistrement du formulaire.",
     "versionConflict": "Ce formulaire a été modifié depuis son ouverture. Enregistrez vos modifications comme nouvelle version, ou abandonnez-les.",
@@ -575,6 +582,7 @@
     "formPreview": "Aperçu du formulaire",
     "untitledForm": "Formulaire sans titre",
     "closePreview": "Fermer l'aperçu",
+    "previewSubmissionDisabled": "La soumission est désactivée pendant l'aperçu.",
     "noFormLayout": "Aucune mise en page de formulaire n'a encore été conçue.",
     "createForm": "Créer un Formulaire",
     "status": "Status",
@@ -644,7 +652,7 @@
       "downloadError": "Échec du téléchargement du modèle.",
       "delete": "Supprimer",
       "deleteTitle": "Supprimer le modèle",
-      "deleteMessage": "Supprimer « {name} » de {version} ? Cette action est irréversible.",
+      "deleteMessage": "Supprimer « {name} » de {version}? Cette action est irréversible.",
       "deleteSuccess": "Modèle supprimé.",
       "deleteError": "Échec de la suppression du modèle.",
       "loadError": "Échec du chargement des modèles.",
@@ -715,7 +723,7 @@
     "pageTitle": "Soumission",
     "loading": "Chargement des soumissions…",
     "error": "Impossible de charger les soumissions.",
-    "submittedOn": "Soumis le",
+    "submittedLabel": "Soumis",
     "noContent": "Aucune réponse soumise à afficher.",
     "notFound": "Soumission introuvable.",
     "loadError": "Impossible de charger cette soumission.",
@@ -815,7 +823,6 @@
     "export": {
       "button": "Exporter les soumissions",
       "pageTitle": "Exporter les soumissions",
-      "sampleNotice": "Les formats CSV ne sont pas encore appliqués.",
       "back": "Retour aux soumissions",
       "loadError": "Impossible de charger le formulaire.",
       "fieldsError": "Impossible de charger les champs.",
@@ -893,6 +900,18 @@
       "filePageTitle": "Télécharger l’exportation",
       "backToExports": "Retour aux exportations",
       "fileNotFound": "Cette exportation n’est plus disponible. Démarrez-en une nouvelle."
+    },
+    "emailReceipt": {
+      "button": "Envoyer un reçu de la soumission par courriel",
+      "title": "Envoyer un reçu de cette soumission par courriel",
+      "description": "Nous enverrons par courriel l’ID de confirmation et un lien vers cette soumission. Vos réponses ne sont pas incluses.",
+      "descriptionAnonymous": "Nous enverrons par courriel l’ID de confirmation de cette soumission. Vos réponses ne sont pas incluses.",
+      "addressLabel": "Adresse courriel",
+      "invalidAddress": "Entrez une adresse courriel valide.",
+      "send": "Envoyer",
+      "cancel": "Annuler",
+      "sent": "Une copie est en route vers {address}.",
+      "failed": "La copie n’a pas pu être envoyée. Réessayez plus tard."
     }
   },
   "mySubmissions": {
@@ -948,6 +967,10 @@
     "revise_denied": "Seule la personne qui l’a soumise, une fois connectée, peut réviser cette soumission.",
     "revise_disabled": "Les paramètres de ce formulaire ne permettent pas aux personnes ayant soumis de réviser leurs soumissions.",
     "revise_closed": "Cette soumission ne peut plus être révisée : un examinateur l’a déjà prise en charge.",
+    "email_copy_disabled": "Ce formulaire n’offre pas de copie de la confirmation par courriel.",
+    "email_copy_closed": "Seule une soumission soumise peut être envoyée par courriel.",
+    "email_copy_unavailable": "Le courriel n’est pas disponible pour le moment. Réessayez plus tard.",
+    "email_copy_limit_reached": "Trop de copies ont été demandées. Réessayez plus tard.",
     "edit_closed": "Seule une soumission soumise peut être modifiée par le personnel. Une soumission renvoyée pour révision doit être modifiée par les personnes qui l’ont soumise.",
     "drafts_disabled": "Les brouillons ne sont pas activés pour ce formulaire.",
     "drafts_public": "Les brouillons ne peuvent pas être enregistrés pour un formulaire public.",
@@ -1088,6 +1111,15 @@
       "note": "Note",
       "noteHelp": "Jusqu'à {max} caractères.",
       "noteValue": "Note : {note}"
+    },
+    "confirmationScreen": {
+      "label": "Écran de confirmation",
+      "showConfirmationId": "Afficher l’ID de confirmation",
+      "showConfirmationIdHelp": "L’écran de confirmation affiche l’ID de confirmation de la soumission.",
+      "allowEmailCopy": "Permettre aux soumissionnaires de s’envoyer une copie de leur soumission par courriel",
+      "allowEmailCopyHelp": "Les soumissionnaires peuvent s’envoyer l’ID de confirmation par courriel à partir de l’écran de confirmation. Le courriel n’inclut pas leurs réponses.",
+      "notificationsOff": "Le courriel est désactivé ici; les soumissionnaires ne se voient donc pas offrir de copie.",
+      "loadError": "Les paramètres de l’écran de confirmation n’ont pas pu être chargés."
     }
   },
   "fileDownload": {
@@ -1095,7 +1127,16 @@
     "loading": "Téléchargement du fichier…",
     "saved": "{name} est prêt. S'il n'a pas été enregistré, utilisez « Télécharger de nouveau ».",
     "again": "Télécharger de nouveau",
-    "loadError": "Impossible de télécharger ce fichier."
+    "loadError": "Impossible de télécharger ce fichier.",
+    "detailsHeading": "Détails",
+    "fileId": "Identifiant de fichier",
+    "submissionId": "Identifiant de soumission",
+    "exportId": "Identifiant d'exportation",
+    "type": "Type",
+    "size": "Taille",
+    "errorCode": "Code d'erreur",
+    "reference": "Référence",
+    "time": "Date et heure"
   },
   "Basic": "Basique",
   "Text Field": "Champ de Texte",

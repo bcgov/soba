@@ -1,0 +1,74 @@
+# Manual production Crunchy PostgreSQL deployment.
+#
+# This workflow manages only the production Crunchy cluster lifecycle. Normal app
+# deployments should consume the existing Crunchy-generated secrets and run
+# application migrations separately.
+name: Deploy Crunchy Prod
+
+run-name: Deploy Prod Crunchy Postgres
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: openshift-prod-crunchy
+  cancel-in-progress: false
+
+jobs:
+  deploy-crunchy-prod:
+    name: Deploy Prod Crunchy Postgres
+    environment:
+      name: prod
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      release: ${{ steps.crunchy.outputs.release }}
+      cluster: ${{ steps.crunchy.outputs.cluster }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Require main branch
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Production Crunchy deployment must run from main."
+            exit 1
+          fi
+
+      - name: Deploy Crunchy
+        id: crunchy
+        uses: bcgov/actions-openshift/crunchy@46f2614322f7ba1a5ad88a7e4e1b98569c80dcf7 # v0.6.0
+        with:
+          oc_namespace: ${{ vars.OC_NAMESPACE }}
+          oc_token: ${{ secrets.OC_TOKEN }}
+          oc_server: ${{ vars.OC_SERVER }}
+          values_file: deployments/helm/action-crunchy/values-prod.yaml
+          release_name: pg-soba-prod
+
+      - name: Validate Crunchy resources
+        uses: ./.github/actions/validate-crunchy-resources
+        with:
+          namespace: ${{ vars.OC_NAMESPACE }}
+          cluster: ${{ steps.crunchy.outputs.cluster }}
+
+      - name: Deployment summary
+        run: |
+          {
+            echo "## Prod Crunchy Postgres"
+            echo ""
+            echo "- Helm release: ${{ steps.crunchy.outputs.release }}"
+            echo "- Crunchy cluster: ${{ steps.crunchy.outputs.cluster }}"
+            echo "- Values file: deployments/helm/action-crunchy/values-prod.yaml"
+            echo ""
+            echo "Expected pguser secrets:"
+            echo ""
+            echo "- ${{ steps.crunchy.outputs.cluster }}-pguser-app"
+            echo "- ${{ steps.crunchy.outputs.cluster }}-pguser-postgres"
+            echo "- ${{ steps.crunchy.outputs.cluster }}-pguser-appproxy"
+            echo "- ${{ steps.crunchy.outputs.cluster }}-pguser-appproxytest"
+            echo "- ${{ steps.crunchy.outputs.cluster }}-pguser-temporal"
+          } >> "$GITHUB_STEP_SUMMARY"
