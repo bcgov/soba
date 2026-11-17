@@ -372,10 +372,10 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
       });
       return true;
     } catch (e: unknown) {
-      // The conflict text is about unsaved edits, which a delete has nothing to do with. A 400 or 409 here
-      // means the version is no longer a draft, so the re-read shows why the delete was refused.
+      // The conflict text is about unsaved edits, which a delete has nothing to do with. A refused
+      // delete means the version is no longer a draft, so the re-read shows why.
       addNotification({ text: dict.form.deleteVersionError, type: 'error', consoleError: e });
-      if (isConflict(e)) await refreshVersions().catch(() => undefined);
+      await refreshVersions().catch(() => undefined);
       return false;
     } finally {
       writing.current = false;
@@ -399,7 +399,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     try {
       const schema = (formSchema ?? {}) as FormType;
       let targetId = currentVersion?.id;
-      // A form with no saved version, such as a new one left before its first save, gets one here.
+      // A form with no saved version, such as one whose only draft was deleted, gets one here.
       if (!targetId) {
         const created = await formWriter.createVersion(token, schema);
         if (created.status !== 'applied') return false;
@@ -612,12 +612,9 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   };
 
   const selectVersionFromDrop = (key: string): void => {
-    // From the current version, a new version carries the edits with it. From history it is copied
-    // from the version on view, so the edits and any unsaved new version are lost.
-    if (key === CREATE_NEW_VERSION_KEY && !isHistoryView) {
+    // A new version carries the edits with it, so only opening another version loses them.
+    if (key === CREATE_NEW_VERSION_KEY) {
       void createNewVersion();
-    } else if (key === CREATE_NEW_VERSION_KEY) {
-      void confirmDiscard(() => createNewVersion(), false);
     } else {
       selectVersionGuarded(key);
     }

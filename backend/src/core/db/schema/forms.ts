@@ -67,9 +67,9 @@ export const formVersions = sobaSchema.table(
     ...softDeleteColumns(),
   },
   (table) => ({
-    // An opened version doesn't block that nunber until saved, so one left unsaved does not keep the next
-    // version from taking it. A deleted one may have been deleted while opened, so its number may since
-    // have been taken. New numbers still count deleted versions, so none is reused.
+    // An opened version doesn't block that number until it is saved, so one left unsaved does not
+    // keep the next version from taking it. A deleted one may have been deleted while opened, so its
+    // number may since have been taken. New numbers still count deleted versions, so none is reused.
     uniqueVersion: uniqueIndex('form_version_workspace_form_version_uq')
       .on(table.workspaceId, table.formId, table.versionNo)
       .where(notInArray(table.state, [FormVersionState.opened, FormVersionState.deleted])),

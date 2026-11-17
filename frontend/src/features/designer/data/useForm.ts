@@ -80,6 +80,11 @@ export function useForm(formId?: string) {
   const versions = Array.isArray(versionOptions?.items) ? versionOptions.items : EMPTY_VERSIONS;
 
   const [selectedVersionId, setSelectedVersionId] = useState<string>('current');
+  // The current version is never shown as history, such as a draft picked over a new version that
+  // was then discarded.
+  if (selectedVersionId !== 'current' && selectedVersionId === currentVersion?.id) {
+    setSelectedVersionId('current');
+  }
   const isHistoryView = selectedVersionId !== 'current';
 
   // Read by id, so the history tab can open a version the options stopped short of.
@@ -335,14 +340,14 @@ export function useFormWriter(formId: string) {
         await publishSobaFormVersion(token, versionId);
       }
       await commitSchema(versionId, schema);
-      //needs to always happen as opened->draft or published (this also refreshes form)
+      // needs to always happen as opened->draft or published (this also refreshes form)
       await refreshVersions();
       return { status: 'applied', value: undefined };
     },
     [commitSchema, refreshVersions],
   );
 
-  // Only a draft with no submissions can be deleted; the server refuses any other state.
+  // Only a draft can be deleted; the server refuses any other state.
   const deleteVersion = useCallback(
     async (token: string, versionId: string): Promise<WriteOutcome<void>> => {
       await deleteSobaFormVersion(token, versionId);

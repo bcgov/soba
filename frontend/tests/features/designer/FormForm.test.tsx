@@ -820,6 +820,17 @@ describe('FormForm', () => {
       expect(screen.getAllByText('Current Draft (v2)').length).toBeGreaterThan(0);
       expect(screen.queryByTestId('pending-unsaved-message')).not.toBeInTheDocument();
     });
+
+    it('opens a draft picked over a discarded new version as the current one', async () => {
+      await openNewVersion();
+      await userEvent.selectOptions(pickerSelect(), 'v2');
+
+      await userEvent.click(await screen.findByTestId('pending-unsaved-discard'));
+
+      await waitFor(() => expect(screen.getByTestId('form-designer')).toHaveTextContent('from-v2'));
+      expect(screen.queryByTestId('page-notice-history-view')).not.toBeInTheDocument();
+      expect(screen.getByTestId('save-form-button')).toBeEnabled();
+    });
   });
 
   // Saving drops the edit overlay. Without writing the saved body into the cache, the next write

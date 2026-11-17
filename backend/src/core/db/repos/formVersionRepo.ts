@@ -86,9 +86,10 @@ export const getFormVersionListContext = async (
 };
 
 /**
- * The number the form's next saved version takes. Opened versions numbers don't block that nunber, so one left unsaved
- * does not use a number up. The form row is locked first, so versions of one form are numbered in
- * turn until the transaction ends; throws NotFoundError when the form is gone or deleted.
+ * The number the form's next saved version takes. An opened version doesn't block that number until
+ * it is saved, so one left unsaved does not keep the next version from taking it. The form row is
+ * locked first, so versions of one form are numbered in turn until the transaction ends; throws
+ * NotFoundError when the form is gone or deleted.
  */
 export const nextFormVersionNo = async (
   workspaceId: string,
@@ -114,9 +115,9 @@ export const nextFormVersionNo = async (
 };
 
 /**
- * Inserts an opened version whose engine document already exists. It shows the number it would
- * take now; a save takes the next free one then, which differs only when another version was saved
- * in between.
+ * Inserts a version whose engine document already exists, opened unless `state` is given. An opened
+ * version shows the number it would take now; a save takes the next free one then, which differs
+ * only when another version was saved in between.
  */
 export const createFormVersionDraft = async (
   input: CreateDraftInput,

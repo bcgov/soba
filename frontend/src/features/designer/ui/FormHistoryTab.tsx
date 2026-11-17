@@ -8,7 +8,7 @@ import { ConfirmModal } from '@/src/components/ConfirmModal';
 import { Tag, TagColor } from '@/src/components/Tag';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
-import { useForm } from '@/src/features/designer/data/useForm';
+import { useDesignFormRead } from '@/src/features/designer/data/useForm';
 import { FORM_VERSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { useListQuery } from '@/src/shared/list/useListQuery';
 import { useDataTable } from '@/src/shared/list/useDataTable';
@@ -48,7 +48,7 @@ export default function FormHistoryTab({
     sort: query.sort,
   });
   const { table } = useDataTable(query, versionsResult, dict.form.loadVersionsError);
-  const { form } = useForm(formId);
+  const { data: form } = useDesignFormRead(formId);
   const permissions = useMemo(() => {
     return form?.permissions;
   }, [form?.permissions]);

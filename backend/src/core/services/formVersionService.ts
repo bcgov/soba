@@ -26,7 +26,11 @@ import { FormVersionState } from '../db/codes';
 import { hasPgCode, isUniqueViolationOn, PG_UNIQUE_VIOLATION } from '../db/pgError';
 import { FORM_VERSION_ONE_PUBLISHED_UNIQUE, FORM_VERSION_PKEY } from '../db/schema';
 import { ConflictError, NotFoundError, ValidationError } from '../errors';
-import { FORM_VERSION_ID_TAKEN, SOURCE_VERSION_HAS_NO_SCHEMA } from '../messages';
+import {
+  FORM_VERSION_ID_TAKEN,
+  ONLY_DRAFT_VERSIONS_DELETABLE,
+  SOURCE_VERSION_HAS_NO_SCHEMA,
+} from '../messages';
 import {
   discardLostEngineSchema,
   hashEngineSchema,
@@ -317,7 +321,9 @@ export class FormVersionService {
       input.formVersionId,
     );
     if (!version) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
-    assertTransition(version.state, 'deleted');
+    if (version.state !== FormVersionState.draft) {
+      throw new ValidationError(ONLY_DRAFT_VERSIONS_DELETABLE);
+    }
     return updateFormVersionDraft(
       input.workspaceId,
       input.formVersionId,
