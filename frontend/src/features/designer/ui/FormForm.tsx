@@ -542,8 +542,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   );
 
   return (
-    <>
-      <LeaveGuard active={isDirty} />
+    <LeaveGuard active={isDirty}>
       <Tabs
         id="form-designer-tabs"
         aria-label={dict.form.designerTabs || 'Form Designer tabs'}
@@ -696,7 +695,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
           </p>
         )}
       </CommonModal>
-    </>
+    </LeaveGuard>
   );
 }
 

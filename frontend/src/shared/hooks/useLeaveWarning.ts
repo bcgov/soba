@@ -1,18 +1,23 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getBasePath } from '@/src/shared/config/basePath';
 
 // The parts of the Navigation API used here; TypeScript's DOM types do not include it yet.
-type Navigation = EventTarget & { traverseTo: (key: string) => unknown };
-type NavigateEvent = Event & { navigationType: string; destination: { key: string } };
+type Navigation = EventTarget & { traverseTo: (key: string) => { finished: Promise<unknown> } };
+type NavigateEvent = Event & { navigationType: string; destination: { key: string; url: string } };
 
-/** Where a held leave goes: an in-app link, or a Back or Forward history entry. */
+/** Where a held leave goes: an app path for the router, or a Back or Forward history entry. */
 type Leaving = { href: string } | { key: string };
 
 const browserNavigation = () => (window as { navigation?: Navigation }).navigation;
 
-/** The in-app page a plain click on a link would leave to, or null for one that stays or opens elsewhere. */
+/**
+ * The app path, without the base path, that a plain click on a link would leave to; null for one that
+ * stays on this page, opens elsewhere, or loads another app on this origin, which the browser prompt
+ * covers.
+ */
 const linkDestination = (event: MouseEvent): string | null => {
   const link = (event.target as Element | null)?.closest?.('a[href]');
   if (!(link instanceof HTMLAnchorElement)) return null;
@@ -22,12 +27,15 @@ const linkDestination = (event: MouseEvent): string | null => {
   const url = new URL(link.href);
   // A query-only change, such as a tab, stays on the page and keeps the edits.
   if (url.origin !== location.origin || url.pathname === location.pathname) return null;
-  return url.pathname + url.search + url.hash;
+  const base = getBasePath();
+  if (url.pathname !== base && !url.pathname.startsWith(`${base}/`)) return null;
+  return (url.pathname.slice(base.length) || '/') + url.search + url.hash;
 };
 
 /**
  * While `active`, has the browser confirm a refresh or close, and holds a click on an in-app link to
- * another page, or a Back or Forward the browser lets the page cancel, until `leave` or `stay`.
+ * another page, a Back or Forward the browser lets the page cancel, or a `hold` call, until `leave`
+ * or `stay`.
  */
 export function useLeaveWarning(active: boolean) {
   const router = useRouter();
@@ -51,6 +59,7 @@ export function useLeaveWarning(active: boolean) {
     const holdTraverse = (event: Event) => {
       const { navigationType, destination } = event as NavigateEvent;
       if (navigationType !== 'traverse' || !event.cancelable || traversing.current) return;
+      if (new URL(destination.url).pathname === location.pathname) return;
       event.preventDefault();
       setLeaving({ key: destination.key });
     };
@@ -65,6 +74,18 @@ export function useLeaveWarning(active: boolean) {
     };
   }, [active]);
 
+  /** Pushes the app path `href`, or holds it while `active`. For navigation that is not a link. */
+  const hold = useCallback(
+    (href: string) => {
+      if (!active) {
+        router.push(href);
+        return;
+      }
+      setLeaving({ href });
+    },
+    [active, router],
+  );
+
   const leave = () => {
     if (!leaving) return;
     if ('href' in leaving) {
@@ -72,8 +93,13 @@ export function useLeaveWarning(active: boolean) {
       return;
     }
     traversing.current = true;
-    browserNavigation()?.traverseTo(leaving.key);
+    browserNavigation()
+      ?.traverseTo(leaving.key)
+      .finished.catch(() => {
+        // Not gone, so Back is held again.
+        traversing.current = false;
+      });
   };
 
-  return { leaving: leaving !== null, leave, stay: () => setLeaving(null) };
+  return { leaving: leaving !== null, leave, stay: () => setLeaving(null), hold };
 }

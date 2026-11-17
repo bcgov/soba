@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { Link } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useDictionary } from '@/app/[lang]/Providers';
@@ -28,19 +28,17 @@ export function DesignSubmissionView({
   submissionId,
 }: Readonly<DesignSubmissionViewProps>) {
   const dict = useDictionary();
-  const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
 
   const { data, error } = useDesignSubmission(submissionId, formId);
   const print = useStaffPrint(formId, submissionId);
   const [unsavedEdit, setUnsavedEdit] = useState(false);
-  const [confirmingBack, setConfirmingBack] = useState(false);
   const dictReview = dict.submission.review;
 
   usePageHeading({ heading: dictReview.heading });
-  useLeaveWarning(unsavedEdit);
+  const leaveEdit = useLeaveWarning(unsavedEdit);
 
-  const backToList = () => router.push(navLink(`/${locale}/build/${formId}?tab=submissions`));
+  const backToList = () => leaveEdit.hold(navLink(`/${locale}/build/${formId}?tab=submissions`));
 
   const renderContent = () => {
     // A failed background revalidation keeps the submission already on screen.
@@ -61,10 +59,7 @@ export function DesignSubmissionView({
   return (
     <div className="mt-3" data-testid="design-submission-view">
       <div className="mb-3 d-flex align-items-center gap-2 d-print-none">
-        <Link
-          data-testid="design-submission-back"
-          onPress={() => (unsavedEdit ? setConfirmingBack(true) : backToList())}
-        >
+        <Link data-testid="design-submission-back" onPress={backToList}>
           {dict.submission.backToSubmissions}
         </Link>
         {data ? (
@@ -75,13 +70,13 @@ export function DesignSubmissionView({
       </div>
       {renderContent()}
       <ConfirmModal
-        show={confirmingBack}
-        title={dictReview.leaveEditTitle}
-        message={dictReview.leaveEditMessage}
-        confirmLabel={dictReview.leaveEditConfirm}
-        cancelLabel={dictReview.leaveEditStay}
-        onConfirm={backToList}
-        onCancel={() => setConfirmingBack(false)}
+        show={leaveEdit.leaving}
+        title={dict.general.unsavedChanges.title}
+        message={dict.general.unsavedChanges.message}
+        confirmLabel={dict.general.unsavedChanges.confirm}
+        cancelLabel={dict.general.unsavedChanges.stay}
+        onConfirm={leaveEdit.leave}
+        onCancel={leaveEdit.stay}
       />
     </div>
   );

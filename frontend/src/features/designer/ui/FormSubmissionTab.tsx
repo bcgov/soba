@@ -2,11 +2,12 @@
 import { useMemo, useState, useCallback } from 'react';
 import { FaRegTrashCan, FaFile } from 'react-icons/fa6';
 import { Button, Checkbox, Link, Select } from '@bcgov/design-system-react-components';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 import type { Dictionary } from '@/src/types/dictionary';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { ConfirmModal } from '@/src/components/ConfirmModal';
+import { useGuardedPush } from '@/src/components/LeaveGuard';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import { SubmissionWorkflowState, type SubmissionListItem } from '@/src/types/submissions';
 import {
@@ -94,7 +95,8 @@ export default function FormSubmissionTab({
   const { token } = useKeycloak();
   const pathname = usePathname();
   const locale = getLocaleFromPath(pathname);
-  const router = useRouter();
+  // Asks first while the designer holds unsaved edits.
+  const push = useGuardedPush();
   const [pendingDelete, setPendingDelete] = useState<SubmissionListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { addNotification } = useNotificationStore();
@@ -195,7 +197,7 @@ export default function FormSubmissionTab({
               className="bcds-react-aria-Link medium false me-2"
               aria-label={dict.submission.view}
               data-testid={`${sub.id}-view-link`}
-              onPress={() => router.push(`/${locale}/build/${sub.formId}/submissions/${sub.id}`)}
+              onPress={() => push(`/${locale}/build/${sub.formId}/submissions/${sub.id}`)}
             >
               <FaFile />
             </Link>
@@ -213,7 +215,7 @@ export default function FormSubmissionTab({
         ),
       },
     ],
-    [dict, dictReview, showReview, formatLongDate, locale, router, canDelete],
+    [dict, dictReview, showReview, formatLongDate, locale, push, canDelete],
   );
 
   const statusOptions = useMemo(
@@ -232,7 +234,7 @@ export default function FormSubmissionTab({
             variant="secondary"
             size="small"
             isDisabled={!formId}
-            onPress={() => router.push(`/${locale}/build/${formId}/submissions/exports`)}
+            onPress={() => push(`/${locale}/build/${formId}/submissions/exports`)}
             data-testid="submissions-export-button"
           >
             {dict.submission.export.button}
