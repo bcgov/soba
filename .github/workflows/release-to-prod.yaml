@@ -83,7 +83,7 @@ jobs:
       OC_SERVER: ${{ vars.OC_SERVER }}
       OC_TOKEN: ${{ secrets.OC_TOKEN }}
       OC_DOMAIN: ${{ vars.OC_DOMAIN }}
-      CRUNCHY_CLUSTER: ${{ vars.CRUNCHY_CLUSTER }}
+      CRUNCHY_CLUSTER: pg-soba-prod-crunchy
       MONGODB_HOST: ${{ vars.MONGODB_HOST }}
       MONGODB_PORT: ${{ vars.MONGODB_PORT || '27017' }}
       MONGODB_AUTH_SECRET_NAME: ${{ vars.MONGODB_AUTH_SECRET_NAME }}
