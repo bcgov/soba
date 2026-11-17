@@ -218,6 +218,7 @@ test('User can validate job status, type and form dropdowns for a workspace', as
     dictionaries.postSubmission.log.label,
     dictionaries.jobs.types.submissionStatusChanged,
     dictionaries.jobs.types.submissionStatusEmail,
+    dictionaries.jobs.types.submissionEmailCopy,
   ];
   await expect(listbox.getByRole('option')).toHaveText(expectedTypes);
   for (const type of expectedTypes) {
