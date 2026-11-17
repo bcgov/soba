@@ -88,6 +88,27 @@ describe('useLeaveGuard', () => {
     expect(go).toHaveBeenCalledTimes(2);
   });
 
+  // Logout navigates as soon as the person agrees, before the page re-renders, so the browser must
+  // not ask again on the way out.
+  it('lets the browser leave without asking again once the person agrees', () => {
+    const onLeave = vi.fn();
+    renderHook(() => useLeaveGuard(true, onLeave));
+    let held: boolean | null = null;
+    const leaveIsHeld = () => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+
+    requestLeave(() => {
+      held = leaveIsHeld();
+    });
+    expect(leaveIsHeld()).toBe(true);
+    (onLeave.mock.calls[0][0] as () => void)();
+
+    expect(held).toBe(false);
+  });
+
   it('stops asking once unmounted', () => {
     const onLeave = vi.fn();
     const { unmount } = renderHook(() => useLeaveGuard(true, onLeave));

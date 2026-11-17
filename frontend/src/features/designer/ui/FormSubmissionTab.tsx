@@ -239,7 +239,9 @@ export default function FormSubmissionTab({
             variant="secondary"
             size="small"
             isDisabled={!formId}
-            onPress={() => router.push(`/${locale}/build/${formId}/submissions/exports`)}
+            onPress={() =>
+              requestLeave(() => router.push(`/${locale}/build/${formId}/submissions/exports`))
+            }
             data-testid="submissions-export-button"
           >
             {dict.submission.export.button}

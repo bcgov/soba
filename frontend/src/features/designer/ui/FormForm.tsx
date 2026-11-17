@@ -222,6 +222,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     error: loadError,
     setSchema,
     discardEdits,
+    discardUnsaved,
     selectVersion,
     openVersion,
     refreshVersions,
@@ -426,12 +427,16 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     cancel: () => void;
   } | null>(null);
 
+  // New version moves the edits into a version nobody has saved and clears them, so that version is
+  // unsaved work too.
+  const unsaved = isDirty || openedVersion !== null;
+
   /**
    * Runs `action` at once when there is nothing unsaved. Otherwise asks first: save and go on,
    * discard and go on, or stay. Settles with `stayed` when the person stays or the save fails.
    */
   const confirmDiscard = <T,>(action: () => T | Promise<T>, stayed: T): Promise<T> => {
-    if (!isDirty) return Promise.resolve(action());
+    if (!unsaved) return Promise.resolve(action());
     return new Promise<T>((resolve) => {
       setPendingLeave({
         proceed: () => resolve(action()),
@@ -440,7 +445,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     });
   };
 
-  useLeaveGuard(isDirty || openedVersion !== null, (proceed) => {
+  useLeaveGuard(unsaved, (proceed) => {
     setPendingLeave({ proceed, cancel: () => undefined });
   });
 
@@ -457,7 +462,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
       pendingLeave.cancel();
       return;
     }
-    if (answer === 'discard') discardEdits();
+    if (answer === 'discard') discardUnsaved();
     setPendingLeave(null);
     pendingLeave.proceed();
   };
@@ -607,9 +612,12 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   };
 
   const selectVersionFromDrop = (key: string): void => {
-    // A new version carries the edits with it, so only opening another version loses them.
-    if (key === CREATE_NEW_VERSION_KEY) {
+    // From the current version, a new version carries the edits with it. From history it is copied
+    // from the version on view, so the edits and any unsaved new version are lost.
+    if (key === CREATE_NEW_VERSION_KEY && !isHistoryView) {
       void createNewVersion();
+    } else if (key === CREATE_NEW_VERSION_KEY) {
+      void confirmDiscard(() => createNewVersion(), false);
     } else {
       selectVersionGuarded(key);
     }

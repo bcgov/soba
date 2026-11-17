@@ -179,6 +179,12 @@ export function useForm(formId?: string) {
     [discardEdits],
   );
 
+  /** Drop everything unsaved: the edits, and a new version nobody has saved, which leaving drops. */
+  const discardUnsaved = useCallback(() => {
+    discardEdits();
+    setOpenedVersion(null);
+  }, [discardEdits]);
+
   return {
     form: form ?? null,
     versions,
@@ -210,6 +216,7 @@ export function useForm(formId?: string) {
     setName,
     setSchema,
     discardEdits,
+    discardUnsaved,
     commitSchema,
     selectVersion,
     openVersion,
@@ -328,12 +335,11 @@ export function useFormWriter(formId: string) {
         await publishSobaFormVersion(token, versionId);
       }
       await commitSchema(versionId, schema);
-      await refreshForm();
-      //needs to always happen as opened->draft or published
+      //needs to always happen as opened->draft or published (this also refreshes form)
       await refreshVersions();
       return { status: 'applied', value: undefined };
     },
-    [commitSchema, refreshVersions, refreshForm],
+    [commitSchema, refreshVersions],
   );
 
   // Only a draft with no submissions can be deleted; the server refuses any other state.

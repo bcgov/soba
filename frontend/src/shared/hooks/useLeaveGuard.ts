@@ -42,7 +42,7 @@ function inAppLink(event: MouseEvent): HTMLAnchorElement | null {
  * browser's own prompt instead, which a page cannot replace. The browser's Back is not covered.
  */
 export function useLeaveGuard(active: boolean, onLeave: LeaveHandler) {
-  useLeaveWarning(active);
+  const releaseWarning = useLeaveWarning(active);
 
   const onLeaveRef = useRef(onLeave);
   useEffect(() => {
@@ -51,7 +51,12 @@ export function useLeaveGuard(active: boolean, onLeave: LeaveHandler) {
 
   useEffect(() => {
     if (!active) return undefined;
-    const handler: LeaveHandler = (proceed) => onLeaveRef.current(proceed);
+    // Once the person agrees, the browser is not asked again on the way out.
+    const handler: LeaveHandler = (proceed) =>
+      onLeaveRef.current(() => {
+        releaseWarning();
+        proceed();
+      });
     // Set while a link the person agreed to leave by is followed, so its own click goes through.
     let following = false;
 
@@ -78,5 +83,5 @@ export function useLeaveGuard(active: boolean, onLeave: LeaveHandler) {
       document.removeEventListener('click', onClick, true);
       if (activeHandler === handler) activeHandler = null;
     };
-  }, [active]);
+  }, [active, releaseWarning]);
 }

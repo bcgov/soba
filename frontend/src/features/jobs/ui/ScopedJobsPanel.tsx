@@ -18,6 +18,7 @@ import {
 } from '@/src/shared/list/listQueryMemory';
 import { useListQuery } from '@/src/shared/list/useListQuery';
 import { useDataTable } from '@/src/shared/list/useDataTable';
+import { requestLeave } from '@/src/shared/hooks/useLeaveGuard';
 import { isUuid } from '@/src/shared/util/uuid';
 import type { JobScopeRef, StaffJobFilters, StaffJobListItem } from '@/src/types/jobs';
 import { useJobForms, useScopedJobs } from '../data/useScopedJobs';
@@ -127,8 +128,9 @@ export function ScopedJobsPanel({ scope, jobHref }: ScopedJobsPanelProps) {
     [forms, dictJobs.allForms],
   );
 
+  // A button, not a link, so a page holding unsaved work (the designer) is asked here.
   const openJob = useCallback(
-    (job: StaffJobListItem) => router.push(jobHref(job.id)),
+    (job: StaffJobListItem) => requestLeave(() => router.push(jobHref(job.id))),
     [router, jobHref],
   );
 

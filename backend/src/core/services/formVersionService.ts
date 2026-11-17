@@ -138,10 +138,10 @@ type LifecycleState = 'opened' | 'draft' | 'published' | 'archived' | 'deleted';
 const ALLOWED_TRANSITIONS: Record<LifecycleState, LifecycleState[]> = {
   // A save makes it a draft. It already has a schema, written when it was created, so it can be
   // published without one.
-  opened: ['draft', 'published', 'deleted'],
+  opened: ['draft', 'published'],
   draft: ['published', 'deleted'],
-  published: ['archived', 'deleted'],
-  archived: ['published', 'deleted'],
+  published: ['archived'],
+  archived: ['published'],
   deleted: [],
 };
 
@@ -317,9 +317,6 @@ export class FormVersionService {
       input.formVersionId,
     );
     if (!version) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
-    if (version.state !== 'draft') {
-      throw new ValidationError('Only draft versions can be deleted');
-    }
     assertTransition(version.state, 'deleted');
     return updateFormVersionDraft(
       input.workspaceId,

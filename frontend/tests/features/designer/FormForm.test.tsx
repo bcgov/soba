@@ -769,6 +769,57 @@ describe('FormForm', () => {
       await waitFor(() => expect(api.createFormVersion).toHaveBeenCalled());
       expect(screen.queryByTestId('pending-unsaved-message')).not.toBeInTheDocument();
     });
+
+    // New version moves the edits into a version nobody has saved and clears them, so that version
+    // is what there is to lose.
+    const pickerSelect = () =>
+      screen.getByTestId('form-version-select').querySelector('select') as HTMLSelectElement;
+    const openNewVersion = async () => {
+      await editAndPick('create');
+      await waitFor(() => expect(api.createFormVersion).toHaveBeenCalledTimes(1));
+      await waitFor(() =>
+        expect(screen.getAllByText('Current Draft (v3)').length).toBeGreaterThan(0),
+      );
+    };
+
+    it('asks before opening another version over a new version nobody has saved', async () => {
+      await openNewVersion();
+
+      await userEvent.selectOptions(pickerSelect(), 'v1');
+
+      expect(await screen.findByTestId('pending-unsaved-message')).toBeInTheDocument();
+      await userEvent.click(screen.getByTestId('pending-unsaved-stay'));
+      await waitFor(() =>
+        expect(screen.queryByTestId('pending-unsaved-message')).not.toBeInTheDocument(),
+      );
+      expect(screen.queryByTestId('page-notice-history-view')).not.toBeInTheDocument();
+    });
+
+    // Discard drops the new version too, so nothing unsaved is left to ask about or leave behind.
+    it('drops a new version nobody has saved when it is discarded', async () => {
+      await openNewVersion();
+      await userEvent.selectOptions(pickerSelect(), 'v1');
+
+      await userEvent.click(await screen.findByTestId('pending-unsaved-discard'));
+
+      expect(await screen.findByTestId('page-notice-history-view')).toBeInTheDocument();
+      await userEvent.selectOptions(pickerSelect(), 'create');
+      await waitFor(() => expect(api.createFormVersion).toHaveBeenCalledTimes(2));
+      expect(screen.queryByTestId('pending-unsaved-message')).not.toBeInTheDocument();
+    });
+
+    it('returns to the saved current version once a new version is discarded', async () => {
+      await openNewVersion();
+      await userEvent.selectOptions(pickerSelect(), 'v1');
+      await userEvent.click(await screen.findByTestId('pending-unsaved-discard'));
+      expect(await screen.findByTestId('page-notice-history-view')).toBeInTheDocument();
+
+      fireEvent.change(pickerSelect(), { target: { value: 'current' } });
+
+      await waitFor(() => expect(screen.getByTestId('form-designer')).toHaveTextContent('from-v2'));
+      expect(screen.getAllByText('Current Draft (v2)').length).toBeGreaterThan(0);
+      expect(screen.queryByTestId('pending-unsaved-message')).not.toBeInTheDocument();
+    });
   });
 
   // Saving drops the edit overlay. Without writing the saved body into the cache, the next write
