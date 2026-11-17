@@ -22,6 +22,7 @@ import {
   isFormUpdated,
   type OpenedSubmission,
 } from '@/src/features/formio-v5/data/useSubmissionOpener';
+import { LeaveGuard } from '@/src/components/LeaveGuard';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { apiErrorMessage, isNetworkError, isOutcomeUnknown } from '@/src/shared/api/dataError';
 import { useFormatTime } from '@/src/shared/hooks/useFormatLongDate';
@@ -147,6 +148,13 @@ export function SubmissionFillForm({
   const formInstanceRef = useRef<FormInstance | null>(null);
   // True once the loaded answers are in the webform.
   const [formReady, setFormReady] = useState(false);
+  // Answers changed since the last save. Form.io changes answers itself as they load, and leaves
+  // `modified` off for some real edits, so a touch in the form also counts.
+  const [dirty, setDirty] = useState(false);
+  const touched = useRef(false);
+  const markTouched = useCallback(() => {
+    touched.current = true;
+  }, []);
 
   // A field that loses focus as the form unmounts, as when a click mounts a new one, leaves Form.io
   // a blur to run a moment later on the destroyed webform, where it throws.
@@ -240,10 +248,13 @@ export function SubmissionFillForm({
     const instance = formReady ? formInstanceRef.current : null;
     if (!instance || !writer.hasBase()) return;
     setRenderError(null);
+    // Cleared first, so an edit made while the save is in flight still counts.
+    setDirty(false);
     const outcome = await writer.save(instance.submission.data ?? {}).catch((err: unknown) => {
       if (isFormUpdated(err)) setUpdated({ version: err.version, form: err.form });
       return null;
     });
+    if (outcome?.status !== 'applied') setDirty(true);
     if (outcome?.status === 'held' && outcome.reason === 'closed') leaveClosed();
   };
 
@@ -308,6 +319,7 @@ export function SubmissionFillForm({
 
   return (
     <>
+      <LeaveGuard active={dirty} />
       <div className="text-end" data-testid="submission-fill-version">
         {labels.version}: {versionNo}
       </div>
@@ -402,7 +414,13 @@ export function SubmissionFillForm({
           </InlineAlert>
         }
       >
-        <div className="formio-v5-chrome" data-soba-formio-chrome data-testid="submission-fill">
+        <div
+          className="formio-v5-chrome"
+          data-soba-formio-chrome
+          data-testid="submission-fill"
+          onPointerDownCapture={markTouched}
+          onKeyDownCapture={markTouched}
+        >
           <DynamicForm
             className="formio-v5-form-root"
             src=""
@@ -410,6 +428,9 @@ export function SubmissionFillForm({
             submission={submissionProp}
             options={formOptions}
             onFormReady={onFormReady}
+            onChange={(_value: unknown, _flags: unknown, modified: boolean) => {
+              if (canWrite && (modified || touched.current)) setDirty(true);
+            }}
             onError={(err) => {
               setRenderError(
                 normalizeFormioRenderError(err, labels.loadError, labels.sessionExpired),

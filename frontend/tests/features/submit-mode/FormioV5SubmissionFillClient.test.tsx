@@ -25,6 +25,7 @@ const h = vi.hoisted(() => ({
     | ((submission: { data: Record<string, unknown> }) => Promise<void>),
   options: undefined as undefined | { readOnly?: boolean; bcgovFile?: unknown },
   submission: undefined as unknown,
+  onChange: undefined as undefined | ((value: unknown, flags: unknown, modified: boolean) => void),
   mounts: 0,
   access: { caller: { idpCode: 'idir' as string | null }, pending: false },
   files: { option: {} as Record<string, unknown>, ready: true },
@@ -33,10 +34,17 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
+    modal: { dialogActions: 'Dialog actions' },
     general: {
       sessionExpired: 'Your session has ended.',
       noAccess: 'You do not have access.',
       version: 'Version',
+      unsavedChanges: {
+        title: 'Leave without saving?',
+        message: 'Not saved.',
+        confirm: 'Leave',
+        stay: 'Stay',
+      },
     },
     submission: { notFound: 'Submission not found.', loadError: 'Could not load this submission.' },
     form: { loading: 'Loading...' },
@@ -98,8 +106,10 @@ vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => {
     options: typeof h.options;
     submission: unknown;
     onFormReady?: (instance: unknown) => void;
+    onChange?: typeof h.onChange;
   }) {
     h.onSubmit = props.onSubmit;
+    h.onChange = props.onChange;
     h.options = props.options;
     h.submission = props.submission;
     const { onFormReady } = props;
@@ -727,6 +737,64 @@ describe('FormioV5SubmissionFillClient', () => {
       expect(saveStatus()).toHaveTextContent('Saving draft...');
       expect(saveButton()).toHaveTextContent('Save draft');
       expect(saveButton()).toBeDisabled();
+    });
+
+    describe('leaving with unsaved answers', () => {
+      // jsdom cannot navigate; the guard listens earlier, on the document.
+      const clickNav = async () => {
+        const link = document.body.appendChild(document.createElement('a'));
+        link.href = '/en/forms';
+        link.addEventListener('click', (event) => event.preventDefault());
+        await userEvent.click(link);
+        link.remove();
+      };
+      const asked = () => screen.queryByText('Leave without saving?') !== null;
+      const edit = () => act(() => h.onChange?.({ data: { a: 2 } }, {}, true));
+
+      it('lets the filler leave before any edit, as loading the answers is not one', async () => {
+        await renderLoaded();
+        act(() => h.onChange?.({ data: {} }, {}, false));
+        await clickNav();
+        expect(asked()).toBe(false);
+      });
+
+      it('asks once an answer changes, and stays when told to', async () => {
+        await renderLoaded();
+        edit();
+        await clickNav();
+        expect(asked()).toBe(true);
+        await userEvent.click(screen.getByTestId('confirm-modal-cancel'));
+        await waitFor(() => expect(asked()).toBe(false));
+        expect(h.push).not.toHaveBeenCalled();
+      });
+
+      it('leaves to the link once the loss is confirmed', async () => {
+        await renderLoaded();
+        edit();
+        await clickNav();
+        await userEvent.click(screen.getByTestId('confirm-modal-confirm'));
+        expect(h.push).toHaveBeenCalledWith('/en/forms');
+      });
+
+      it('lets the filler leave once the draft is saved', async () => {
+        h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-1'));
+        await renderLoaded();
+        edit();
+        await saveDraft();
+        await waitFor(() => expect(saveStatus().textContent).toMatch(/^Draft saved at/));
+        await clickNav();
+        expect(asked()).toBe(false);
+      });
+
+      it('still asks when the save is held', async () => {
+        h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-x', 'pending', 'conflict'));
+        await renderLoaded();
+        edit();
+        await saveDraft();
+        await waitFor(() => expect(saveStatus().textContent).toBe('Draft not saved.'));
+        await clickNav();
+        expect(asked()).toBe(true);
+      });
     });
 
     it('says the draft was not saved when the save is held', async () => {

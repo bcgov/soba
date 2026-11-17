@@ -37,7 +37,11 @@ vi.mock('@/app/[lang]/Providers', () => ({
         formKindList: { team: 'Team', public: 'Public' },
       },
     },
-    general: { notAuthenticated: 'Not authed', lookupTruncated: 'Showing the first {limit}.' },
+    general: {
+      notAuthenticated: 'Not authed',
+      lookupTruncated: 'Showing the first {limit}.',
+      unsavedChanges: en.general.unsavedChanges,
+    },
     workspaces: { workspace: 'Workspace' },
     ministries: { min1: 'Ministry 1' },
     locale: 'en',
@@ -700,6 +704,34 @@ describe('FormForm', () => {
     expect(api.saveFormVersionSchema.mock.calls[1][2]).toEqual({
       components: [{ key: 'edited' }],
     });
+  });
+
+  it('asks before a link leaves unsaved edits, and not once they are saved', async () => {
+    mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
+    mockWorkspaceState.schemas = { v1: { components: [{ key: 'original' }] } };
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+    await waitFor(() => expect(screen.getByTestId('form-designer')).toHaveTextContent('original'));
+    const link = document.body.appendChild(document.createElement('a'));
+    link.href = '/en/forms';
+    // jsdom cannot navigate; the guard listens earlier, on the document.
+    link.addEventListener('click', (event) => event.preventDefault());
+    const leave = en.general.unsavedChanges.title;
+
+    await act(async () => {
+      builder.onUpdateModel?.({ components: [{ key: 'edited' }] } as never);
+    });
+    await userEvent.click(link);
+    expect(await screen.findByText(leave)).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('confirm-modal-cancel'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.saveFormVersionSchema).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByText(leave)).not.toBeInTheDocument());
+    await userEvent.click(link);
+    expect(screen.queryByText(leave)).not.toBeInTheDocument();
+    link.remove();
   });
 
   it('creates a new version from the saved schema', async () => {

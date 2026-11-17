@@ -38,10 +38,12 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
+    modal: { dialogActions: 'Dialog actions' },
     general: {
       sessionExpired: 'Your session has ended.',
       noAccess: 'You do not have access.',
       version: 'Version',
+      unsavedChanges: { title: 'Leave?', message: 'Not saved.', confirm: 'Leave', stay: 'Stay' },
     },
     form: { loading: 'Loading...' },
     apiErrors: {

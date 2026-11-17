@@ -10,6 +10,12 @@
     "description": "Bienvenue sur Common Hosted Forms Service (CHEFS) où vous pouvez créer et publier des formulaires, recevoir et examiner des soumissions, et intégrer avec vos systèmes métier.",
     "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à cette section.",
     "unknown": "Inconnu",
+    "unsavedChanges": {
+      "title": "Quitter sans enregistrer?",
+      "message": "Vos modifications n'ont pas été enregistrées. Si vous quittez, elles seront perdues.",
+      "confirm": "Quitter sans enregistrer",
+      "stay": "Continuer la modification"
+    },
     "home": "Accueil",
     "forms": "Formulaires",
     "myForms": "Mes formulaires",

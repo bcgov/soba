@@ -4,6 +4,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { Tabs, Tab } from 'react-bootstrap';
 import { Button, InlineAlert, Select } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
+import { LeaveGuard } from '@/src/components/LeaveGuard';
 import { Modal as CommonModal } from '@/src/components/Modal';
 import styles from './FormForm.module.css';
 
@@ -542,6 +543,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
 
   return (
     <>
+      <LeaveGuard active={isDirty} />
       <Tabs
         id="form-designer-tabs"
         aria-label={dict.form.designerTabs || 'Form Designer tabs'}
