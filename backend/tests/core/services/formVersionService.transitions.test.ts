@@ -12,6 +12,7 @@ jest.mock('../../../src/core/db/repos/formVersionRepo', () => ({
   lockFormVersion: jest.fn(),
   getCurrentFormVersion: jest.fn(),
   updateFormVersionDraft: jest.fn(),
+  nextFormVersionNo: jest.fn(),
 }));
 
 const getById = repo.getFormVersionById as unknown as jest.Mock;
@@ -20,6 +21,7 @@ const getPublished = repo.getPublishedVersionForForm as unknown as jest.Mock;
 const updateDraft = repo.updateFormVersionDraft as unknown as jest.Mock;
 const lock = repo.lockFormVersion as unknown as jest.Mock;
 const getCurrent = repo.getCurrentFormVersion as unknown as jest.Mock;
+const nextNo = repo.nextFormVersionNo as unknown as jest.Mock;
 
 const actor = {
   workspaceId: 'ws1',
@@ -72,6 +74,37 @@ describe('FormVersionService state transitions', () => {
     );
   });
 
+  // Its schema was written when it was created, so it does not need a save first.
+  it('publish: opened → published, under the next free number', async () => {
+    getById.mockResolvedValue({
+      id: 'v1',
+      workspaceId: 'ws1',
+      formId: 'f1',
+      state: 'opened',
+      engineSyncStatus: 'ready',
+    });
+    getCurrent.mockResolvedValue(null);
+    getPublished.mockResolvedValue(null);
+    nextNo.mockResolvedValue(1);
+
+    await svc.publish(actor);
+
+    expect(updateDraft).toHaveBeenCalledWith(
+      'ws1',
+      'v1',
+      'Author',
+      expect.objectContaining({ state: 'published', versionNo: 1 }),
+      expect.anything(),
+    );
+  });
+
+  it('unpublish: rejects an opened version', async () => {
+    getById.mockResolvedValue({ id: 'v1', formId: 'f1', state: 'opened' });
+
+    await expect(svc.unpublish(actor)).rejects.toThrow(/Cannot change/);
+    expect(updateDraft).not.toHaveBeenCalled();
+  });
+
   it('publish: rejects when engineSyncStatus is not ready', async () => {
     getById.mockResolvedValue({
       id: 'v1',
@@ -121,8 +154,8 @@ describe('FormVersionService state transitions', () => {
     expect(updateDraft).not.toHaveBeenCalled();
   });
 
-  it('delete: published → deleted, sets deletedAt/By and clears publishedAt/By', async () => {
-    getByIdInclDeleted.mockResolvedValue({ id: 'v1', formId: 'f1', state: 'published' });
+  it('delete: draft → deleted, sets deletedAt/By and clears publishedAt/By', async () => {
+    getByIdInclDeleted.mockResolvedValue({ id: 'v1', formId: 'f1', state: 'draft' });
     await svc.delete(actor);
     expect(updateDraft).toHaveBeenCalledWith(
       'ws1',
@@ -138,11 +171,18 @@ describe('FormVersionService state transitions', () => {
     );
   });
 
-  it('delete: rejects re-deleting a deleted version', async () => {
-    getByIdInclDeleted.mockResolvedValue({ id: 'v1', formId: 'f1', state: 'deleted' });
-    await expect(svc.delete(actor)).rejects.toThrow(/Cannot change/i);
-    expect(updateDraft).not.toHaveBeenCalled();
-  });
+  // A version that has been live, or one never saved, stays in the form's history.
+  it.each(['opened', 'published', 'archived', 'deleted'])(
+    'delete: refuses a version that is %s',
+    async (state) => {
+      getByIdInclDeleted.mockResolvedValue({ id: 'v1', formId: 'f1', state });
+      await expect(svc.delete(actor)).rejects.toMatchObject({
+        statusCode: 400,
+        message: 'Only draft versions can be deleted',
+      });
+      expect(updateDraft).not.toHaveBeenCalled();
+    },
+  );
 
   // Lookups skip deleted rows; the transition table refuses them even when one is read.
   it.each([

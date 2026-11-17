@@ -25,7 +25,11 @@ import {
   OFFSET_DRIFT_NOTE,
   sortLocaleQueryField,
 } from '../shared/offsetPagination';
-import { FORM_NAME_TAKEN, SOURCE_VERSION_HAS_NO_SCHEMA } from '../../messages';
+import {
+  FORM_NAME_TAKEN,
+  ONLY_DRAFT_VERSIONS_DELETABLE,
+  SOURCE_VERSION_HAS_NO_SCHEMA,
+} from '../../messages';
 import {
   workspaceIdQueryField,
   formIdQueryField,
@@ -61,7 +65,7 @@ export const FormWithPermissionsResponseSchema = FormResponseSchema.extend({
   permissions: SobaFormWithPermissionsResponseSchema.shape.permissions,
   currentVersion: FormVersionSummarySchema.nullable().openapi({
     description:
-      'The highest-numbered version that is not deleted. Save and publish target this one.',
+      'The highest-numbered version that is not deleted, among those saved at least once. Save and publish target this one. A new version is left out until its first save.',
   }),
 }).openapi('Forms_FormWithPermissionsResponse');
 export const FormVersionListItemSchema = SobaFormVersionListItemSchema.clone().openapi(
@@ -496,7 +500,10 @@ export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
     },
     responses: {
       204: {
-        description: 'Form version marked as deleted',
+        description: 'Draft form version marked as deleted',
+      },
+      400: {
+        description: ONLY_DRAFT_VERSIONS_DELETABLE,
       },
       404: {
         description: FORM_VERSION_NOT_FOUND,
