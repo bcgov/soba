@@ -277,7 +277,7 @@ function FormList() {
       {
         key: 'delete',
         label: dictFormList?.columns?.actions || 'Actions',
-        align: 'end',
+        align: 'start',
         render: (form: SobaFormSummary) =>
           hasPermission(form.permissions, Permissions.form_delete) === true ? (
             <RowActionButton

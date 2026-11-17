@@ -168,7 +168,7 @@ export function WorkspaceAccessTab({ dict, workspaceId }: Readonly<WorkspaceAcce
         key: 'actions',
         label: t.columns.actions,
         width: '10%',
-        align: 'end',
+        align: 'start',
         render: (member) => {
           const name = member.displayLabel ?? t.unnamed;
           // The API refuses the owner and the caller, who is unknown until the profile loads.

@@ -1,4 +1,13 @@
 /*
+ * Remove horizontal padding from buttons in table cells to prevent alignment issues.
+ * Table cells have their own padding (px-4); buttons shouldn't add extra horizontal space.
+ */
+:global(.bcds-react-aria-Button.small) {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+/*
  * The row's primary/default action (form name, submission id) — bolder than the
  * secondary action links so the main thing to click reads first. Targets the
  * BCDS button directly because it manages its own className; this selector

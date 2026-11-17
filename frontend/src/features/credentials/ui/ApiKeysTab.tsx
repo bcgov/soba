@@ -126,7 +126,7 @@ export function ApiKeysTab({ dict, owner }: Readonly<ApiKeysTabProps>) {
       {
         key: 'actions',
         label: t.columns.actions,
-        align: 'end',
+        align: 'start',
         render: (row) =>
           ownedBy(owner.kind, row) && (
             <div>

@@ -106,7 +106,7 @@ export function WorkspaceGroupTab({ dict, workspaceId }: Readonly<WorkspaceGroup
         key: 'actions',
         label: t.columns.actions,
         width: '10%',
-        align: 'end',
+        align: 'start',
         render: (group) => (
           <div>
             <RowActionButton

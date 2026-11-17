@@ -148,7 +148,7 @@ export function WorkspaceRoleTab({ dict, workspaceId }: Readonly<WorkspaceRoleTa
         key: 'actions',
         label: t.columns.actions,
         width: '10%',
-        align: 'end',
+        align: 'start',
         render: (role) => {
           const open = () => setFormView({ roleCode: role.roleCode });
           if (role.system) {
