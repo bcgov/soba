@@ -195,4 +195,16 @@ describe('Header language switch', () => {
     expect(assign).toHaveBeenCalledWith('/fr/forms');
     vi.unstubAllGlobals();
   });
+
+  it('goes nowhere for a value that is not a supported locale', async () => {
+    const assign = vi.fn();
+    vi.stubGlobal('location', { ...window.location, assign });
+    await act(async () => {
+      renderHeader();
+    });
+
+    fireEvent.change(screen.getByTestId('lang-selector'), { target: { value: 'javascript:x' } });
+    expect(assign).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
 });

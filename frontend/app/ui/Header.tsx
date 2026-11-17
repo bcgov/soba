@@ -8,6 +8,7 @@ import { FaUser } from 'react-icons/fa6';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { withBasePath } from '@/src/shared/config/basePath';
+import { knownLocale } from '@/src/shared/util/locale';
 import { useDictionary } from '../[lang]/Providers';
 import { LoginButton } from './LoginButton';
 import { LanguageSelector, type LanguageOption } from './LanguageSelector';
@@ -117,7 +118,10 @@ function Header({ designMode }: Readonly<HeaderProps>) {
   };
 
   // A full page load, so the browser asks before a page with unsaved changes is replaced.
-  const handleLanguageChange = (newLocale: string) => {
+  const handleLanguageChange = (selected: string) => {
+    // Only a supported locale goes into the address, never the select's own text.
+    const newLocale = knownLocale(selected);
+    if (!newLocale) return;
     if (!pathname.startsWith(`/${locale}/`) && pathname !== `/${locale}`) {
       window.location.assign(withBasePath(`/${newLocale}/`));
       return;
