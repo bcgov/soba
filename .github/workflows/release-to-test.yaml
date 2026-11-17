@@ -82,7 +82,7 @@ jobs:
       ref: ${{ needs.set-vars.outputs.ref }}
       platforms: amd64
       image_version: ${{ needs.set-vars.outputs.image_version }}
-      publish_latest: true
+      publish_latest: false
     secrets: inherit
     permissions:
       contents: read

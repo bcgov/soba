@@ -37,7 +37,9 @@ jobs:
       branch: ${{ steps.release.outputs.branch }}
       chart_ref: ${{ steps.release.outputs.chart_ref }}
       release_tag: ${{ steps.release.outputs.release_tag }}
-      uat_tag: ${{ steps.release.outputs.uat_tag }}
+      source_sha: ${{ steps.release.outputs.source_sha }}
+      short_sha: ${{ steps.tags.outputs.short_sha }}
+      uat_tag: ${{ steps.tags.outputs.uat_tag }}
     steps:
       - name: Select tested release image
         id: release
@@ -69,9 +71,11 @@ jobs:
               exit 1
             fi
             BRANCH=$(jq -r '.[0].head.ref' <<< "$MATCHES")
+            SOURCE_SHA=$(jq -r '.[0].head.sha' <<< "$MATCHES")
             CHART_REF="$EVENT_SHA"
           else
             BRANCH="$RELEASE_BRANCH"
+            SOURCE_SHA="${{ github.event.pull_request.head.sha }}"
             CHART_REF="$MERGE_SHA"
           fi
 
@@ -84,7 +88,21 @@ jobs:
           printf 'branch=%s\n' "$BRANCH" >> "$GITHUB_OUTPUT"
           printf 'chart_ref=%s\n' "$CHART_REF" >> "$GITHUB_OUTPUT"
           printf 'release_tag=%s\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
-          printf 'uat_tag=soba-uat\n' >> "$GITHUB_OUTPUT"
+          printf 'source_sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout release source commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ steps.release.outputs.source_sha }}
+
+      - name: Derive image tags from release source commit
+        id: tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          printf 'short_sha=%s\n' "$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          printf 'uat_tag=soba-uat-%s\n' "$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
   approve-uat:
     name: Approve UAT promotion
@@ -114,7 +132,7 @@ jobs:
       name: uat
     env:
       CHART_REF: ${{ needs.set-vars.outputs.chart_ref }}
-      RELEASE_TAG: ${{ needs.set-vars.outputs.release_tag }}
+      SHORT_SHA: ${{ needs.set-vars.outputs.short_sha }}
       UAT_TAG: ${{ needs.set-vars.outputs.uat_tag }}
       REPOSITORY: ${{ github.repository }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -145,27 +163,26 @@ jobs:
           promote() {
             local source="$1"
             local uat_target="$2"
-            local latest_target="$3"
 
             docker buildx imagetools inspect "$source" >/dev/null
             docker buildx imagetools create \
               -t "$uat_target" \
-              -t "$latest_target" \
               "$source"
           }
 
-          promote "$IMAGE_ROOT/backend:$RELEASE_TAG" \
-            "$IMAGE_ROOT/backend:$UAT_TAG" \
-            "$IMAGE_ROOT/backend:latest"
-          promote "$IMAGE_ROOT/frontend:$RELEASE_TAG-designer" \
-            "$IMAGE_ROOT/frontend:$UAT_TAG-designer" \
-            "$IMAGE_ROOT/frontend:latest-designer"
-          promote "$IMAGE_ROOT/frontend:$RELEASE_TAG-forms" \
-            "$IMAGE_ROOT/frontend:$UAT_TAG-forms" \
-            "$IMAGE_ROOT/frontend:latest-forms"
-          promote "$IMAGE_ROOT/temporal-worker:$RELEASE_TAG" \
-            "$IMAGE_ROOT/temporal-worker:$UAT_TAG" \
-            "$IMAGE_ROOT/temporal-worker:latest"
+          docker buildx imagetools inspect "$IMAGE_ROOT/backend:sha-$SHORT_SHA" >/dev/null
+          docker buildx imagetools inspect "$IMAGE_ROOT/frontend:sha-$SHORT_SHA-designer" >/dev/null
+          docker buildx imagetools inspect "$IMAGE_ROOT/frontend:sha-$SHORT_SHA-forms" >/dev/null
+          docker buildx imagetools inspect "$IMAGE_ROOT/temporal-worker:sha-$SHORT_SHA" >/dev/null
+
+          promote "$IMAGE_ROOT/backend:sha-$SHORT_SHA" \
+            "$IMAGE_ROOT/backend:$UAT_TAG"
+          promote "$IMAGE_ROOT/frontend:sha-$SHORT_SHA-designer" \
+            "$IMAGE_ROOT/frontend:$UAT_TAG-designer"
+          promote "$IMAGE_ROOT/frontend:sha-$SHORT_SHA-forms" \
+            "$IMAGE_ROOT/frontend:$UAT_TAG-forms"
+          promote "$IMAGE_ROOT/temporal-worker:sha-$SHORT_SHA" \
+            "$IMAGE_ROOT/temporal-worker:$UAT_TAG"
 
   deploy:
     name: Deploy promoted images to UAT
@@ -197,6 +214,7 @@ jobs:
       VAULT_SERVICE_ACCOUNT_NAME: ${{ vars.VAULT_SERVICE_ACCOUNT_NAME }}
       CHART_REF: ${{ needs.set-vars.outputs.chart_ref }}
       RELEASE_TAG: ${{ needs.set-vars.outputs.release_tag }}
+      SOURCE_SHA: ${{ needs.set-vars.outputs.source_sha }}
       UAT_TAG: ${{ needs.set-vars.outputs.uat_tag }}
       REPOSITORY: ${{ github.repository }}
     steps:
@@ -262,6 +280,7 @@ jobs:
             --set-string "backend.image.repository=ghcr.io/$REPOSITORY_LOWER/backend" \
             --set-string "backend.image.tag=$UAT_TAG" \
             --set-string "backend.config.appVersion=$RELEASE_TAG" \
+            --set-string "backend.config.gitSha=$SOURCE_SHA" \
             --set-string "backend.config.gitTag=$UAT_TAG" \
             --set-string "backend.config.imageTag=$UAT_TAG" \
             --set-string "frontend.image.repository=ghcr.io/$REPOSITORY_LOWER/frontend" \
