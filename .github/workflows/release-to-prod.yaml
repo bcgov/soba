@@ -73,8 +73,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    outputs:
-      gateway_hostname: ${{ steps.config.outputs.gateway_hostname }}
     environment:
       name: prod
       url: https://${{ env.ACRONYM }}-prod.${{ vars.OC_DOMAIN }}/designer
@@ -97,8 +95,6 @@ jobs:
       VAULT_ROLE: ${{ vars.VAULT_ROLE_PROD }}
       VAULT_SECRET_PATH: ${{ vars.VAULT_SECRET_PATH }}
       VAULT_SERVICE_ACCOUNT_NAME: ${{ vars.VAULT_SERVICE_ACCOUNT_NAME }}
-      APS_NAMESPACE_NAME: ${{ vars.APS_NAMESPACE_NAME }}
-      GATEWAY_HOSTNAME: ${{ vars.GATEWAY_HOSTNAME }}
       SOURCE_SHA: ${{ needs.set-vars.outputs.source_sha }}
       UAT_TAG: ${{ needs.set-vars.outputs.uat_tag }}
       PROD_TAG: ${{ needs.set-vars.outputs.prod_tag }}
@@ -122,7 +118,6 @@ jobs:
           namespace: ${{ env.NAMESPACE }}
 
       - name: Validate production configuration
-        id: config
         shell: bash
         run: |
           set -euo pipefail
@@ -138,8 +133,6 @@ jobs:
           : "${VAULT_ROLE:?Set VAULT_ROLE_PROD.}"
           : "${VAULT_SECRET_PATH:?Set the production VAULT_SECRET_PATH.}"
           : "${VAULT_SERVICE_ACCOUNT_NAME:?Set the production VAULT_SERVICE_ACCOUNT_NAME.}"
-          : "${APS_NAMESPACE_NAME:?Set APS_NAMESPACE_NAME for the production gateway NetworkPolicy.}"
-          : "${GATEWAY_HOSTNAME:?Set GATEWAY_HOSTNAME on the prod environment.}"
           if [[ "$NAMESPACE" != *-prod ]]; then
             echo "::error::Production namespace must end in -prod."
             exit 1
@@ -151,7 +144,6 @@ jobs:
           oc -n "$NAMESPACE" get secret "$MONGODB_AUTH_SECRET_NAME" -o json |
             jq -e '.data["mongodb-passwords"] != null' >/dev/null
           oc -n "$NAMESPACE" get serviceaccount "$VAULT_SERVICE_ACCOUNT_NAME" >/dev/null
-          printf 'gateway_hostname=%s\n' "$GATEWAY_HOSTNAME" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -265,9 +257,6 @@ jobs:
             --set-string "mongodb.external.database=$MONGODB_DATABASE" \
             --set-string "mongodb.external.authSource=$MONGODB_AUTH_SOURCE" \
             --set-string "mongodb.external.replicaSet=$MONGODB_REPLICA_SET" \
-            --set "gatewayNetworkPolicy.enabled=true" \
-            --set-string "gatewayNetworkPolicy.namespaceName=$APS_NAMESPACE_NAME" \
-            --set-string "gatewayNetworkPolicy.environment=prod" \
             --set-string "vault.authPath=$VAULT_AUTH_PATH" \
             --set-string "vault.namespace=$VAULT_NAMESPACE" \
             --set-string "vault.role=$VAULT_ROLE" \
@@ -295,5 +284,4 @@ jobs:
     with:
       environment: prod
       release: soba-prod
-      gateway_hostname: ${{ needs.deploy.outputs.gateway_hostname }}
     secrets: inherit
