@@ -207,6 +207,7 @@ jobs:
       MONGODB_DATABASE: ${{ vars.MONGODB_DATABASE || 'formio-ce' }}
       MONGODB_AUTH_SOURCE: ${{ vars.MONGODB_AUTH_SOURCE || 'formio-ce' }}
       MONGODB_REPLICA_SET: ${{ vars.MONGODB_REPLICA_SET || 'rs0' }}
+      FORMIO_EXTERNAL_URL: ${{ vars.FORMIO_EXTERNAL_URL }}
       VAULT_AUTH_PATH: ${{ vars.VAULT_AUTH_PATH }}
       VAULT_NAMESPACE: ${{ vars.VAULT_NAMESPACE }}
       VAULT_ROLE: ${{ vars.VAULT_ROLE_NONPROD }}
@@ -244,6 +245,7 @@ jobs:
           : "${OC_DOMAIN:?Set the OC_DOMAIN UAT environment variable.}"
           : "${MONGODB_HOST:?Set the MONGODB_HOST UAT environment variable.}"
           : "${MONGODB_AUTH_SECRET_NAME:?Set the MONGODB_AUTH_SECRET_NAME UAT environment variable.}"
+          : "${FORMIO_EXTERNAL_URL:?Set FORMIO_EXTERNAL_URL on the uat environment.}"
           : "${VAULT_AUTH_PATH:?Set the VAULT_AUTH_PATH repository variable.}"
           : "${VAULT_NAMESPACE:?Set the VAULT_NAMESPACE repository variable.}"
           : "${VAULT_ROLE:?Set the VAULT_ROLE_NONPROD repository variable.}"
@@ -294,6 +296,7 @@ jobs:
             --set-string "database.runtimeSecretName=${CRUNCHY_CLUSTER}-pguser-appproxy" \
             --set-string "database.runtimeSecretKey=pgbouncer-uri" \
             --set-string "database.runtimeRole=appproxy" \
+            --set-string "formio.external.url=$FORMIO_EXTERNAL_URL" \
             --set-string "mongodb.external.host=$MONGODB_HOST" \
             --set-string "mongodb.external.port=$MONGODB_PORT" \
             --set-string "mongodb.external.authSecretName=$MONGODB_AUTH_SECRET_NAME" \
