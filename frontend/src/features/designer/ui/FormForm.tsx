@@ -4,6 +4,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { Tabs, Tab } from 'react-bootstrap';
 import { Button, InlineAlert, Select } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
+import { ConfirmModal } from '@/src/components/ConfirmModal';
 import { LeaveGuard } from '@/src/components/LeaveGuard';
 import { Modal as CommonModal } from '@/src/components/Modal';
 import styles from './FormForm.module.css';
@@ -200,6 +201,8 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
   // isSaving lags a render, so a second call in the same task still sees false; this does not.
   const writing = useRef(false);
   const [showPreview, setShowPreview] = useState(false);
+  // Another version to open once the unsaved edits it discards are confirmed lost.
+  const [switchingTo, setSwitchingTo] = useState<string | null>(null);
   const [previewSubmitAttempts, setPreviewSubmitAttempts] = useState(0);
 
   const {
@@ -525,12 +528,27 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
     return dict.form.publishForm || 'Publish form';
   };
 
+  // Opening another version discards unsaved edits, so it asks first.
+  const openVersion = (versionId: string): void => {
+    if (!isDirty) {
+      selectVersion(versionId);
+      return;
+    }
+    setSwitchingTo(versionId);
+  };
+
+  const confirmSwitch = (): void => {
+    if (switchingTo) selectVersion(switchingTo);
+    setSwitchingTo(null);
+  };
+
+  // A new version is created from the edited design, so it loses nothing.
   const selectVersionFromDrop = (key: string): void => {
     if (key === CREATE_NEW_VERSION_KEY) {
       void createNewVersion();
-    } else {
-      selectVersion(key);
+      return;
     }
+    openVersion(key);
   };
 
   const renderDesignerContent = () => (
@@ -599,7 +617,7 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
             <FormHistoryTab
               dict={dict}
               formId={formId}
-              onSelectVersion={selectVersion}
+              onSelectVersion={openVersion}
               onRestoreVersion={restoreVersionAsNew}
               onNavigateToDesigner={() => openTab(DESIGNER_TAB)}
             />
@@ -645,6 +663,16 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
           />
         </Tab>
       </Tabs>
+
+      <ConfirmModal
+        show={switchingTo !== null}
+        title={dict.form.switchVersionTitle}
+        message={dict.form.switchVersionMessage}
+        confirmLabel={dict.form.discardEdits}
+        cancelLabel={dict.general.unsavedChanges.stay}
+        onConfirm={confirmSwitch}
+        onCancel={() => setSwitchingTo(null)}
+      />
 
       {/* Preview Modal */}
       <CommonModal

@@ -542,6 +542,8 @@
     "versionConflict": "Ce formulaire a été modifié depuis son ouverture. Enregistrez vos modifications comme nouvelle version, ou abandonnez-les.",
     "staleEdits": "Vos modifications non enregistrées ont été faites sur une version antérieure de ce formulaire. Enregistrez-les comme nouvelle version, ou abandonnez-les.",
     "discardEdits": "Abandonner les modifications",
+    "switchVersionTitle": "Ouvrir une autre version?",
+    "switchVersionMessage": "Vos modifications non enregistrées seront abandonnées.",
     "noActiveWorkspace": "Sélectionnez un espace de travail avant de créer un formulaire.",
     "noActiveWorkspaceError": "Sélectionnez un espace de travail avant d'enregistrer ce formulaire.",
     "published": "Formulaire publié avec succès !",

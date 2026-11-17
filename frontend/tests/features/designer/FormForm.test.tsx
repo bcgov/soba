@@ -32,6 +32,8 @@ vi.mock('@/app/[lang]/Providers', () => ({
       loadFormError: 'Failed to load form.',
       staleEdits: 'Your unsaved edits were made on an older version of this form.',
       discardEdits: 'Discard edits',
+      switchVersionTitle: 'Open another version?',
+      switchVersionMessage: 'Your unsaved edits will be discarded.',
       settings: {
         formSettingsDrawerLabel: 'Form Settings',
         formKindList: { team: 'Team', public: 'Public' },
@@ -650,6 +652,33 @@ describe('FormForm', () => {
     await userEvent.selectOptions(picker, 'v1');
 
     await waitFor(() => expect(getFormVersionSchema).toHaveBeenCalledWith('token', 'v1'));
+    expect(await screen.findByTestId('page-notice-history-view')).toBeInTheDocument();
+  });
+
+  it('asks before opening another version over unsaved edits', async () => {
+    mockWorkspaceState.versions = [
+      { id: 'v1', versionNo: 1, state: 'published' },
+      { id: 'v2', versionNo: 2, state: 'draft' },
+    ];
+    mockWorkspaceState.schemas = { v2: { components: [{ key: 'original' }] } };
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+    await waitFor(() => expect(screen.getByTestId('form-designer')).toHaveTextContent('original'));
+    await act(async () => {
+      builder.onUpdateModel?.({ components: [{ key: 'edited' }] } as never);
+    });
+    const picker = (await screen.findByTestId('form-version-select')).querySelector(
+      'select',
+    ) as HTMLSelectElement;
+
+    await userEvent.selectOptions(picker, 'v1');
+    expect(await screen.findByText('Open another version?')).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('confirm-modal-cancel'));
+    expect(screen.queryByTestId('page-notice-history-view')).not.toBeInTheDocument();
+
+    await userEvent.selectOptions(picker, 'v1');
+    await userEvent.click(await screen.findByTestId('confirm-modal-confirm'));
     expect(await screen.findByTestId('page-notice-history-view')).toBeInTheDocument();
   });
 

@@ -206,6 +206,8 @@ function NewSubmissionFill({ formId, labels }: Readonly<{ formId: string; labels
         signedIn: session.signedIn,
         // Taken when the form mounts, so it keeps the version the form shows.
         open,
+        // Moved with answers typed on the older version.
+        unsaved: moved !== null,
       }}
       labels={labels}
       onReload={reload}

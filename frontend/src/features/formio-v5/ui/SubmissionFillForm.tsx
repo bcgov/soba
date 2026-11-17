@@ -71,6 +71,8 @@ export type FillView = {
   signedIn: boolean;
   /** Opens a submission not opened yet, from the version this view shows. */
   open?: () => Promise<OpenedSubmission>;
+  /** Its answers were typed on an older version and are not saved yet. */
+  unsaved?: boolean;
 };
 
 /** A newer version of the form, with its facts as read with it. */
@@ -117,7 +119,8 @@ export function SubmissionFillForm({
   /** Moves a submission not opened yet to a newer version of the form. */
   onFormUpdated?: (update: FormUpdate) => void;
 }>) {
-  const [{ snapshot, canWrite, canSaveDraft, fileOption, signedIn, open }] = useState(view);
+  const [{ snapshot, canWrite, canSaveDraft, fileOption, signedIn, open, unsaved }] =
+    useState(view);
   const { addNotification } = useNotificationStore();
   const router = useRouter();
   // An open can land on a newer version that renders the same, without remounting the form.
@@ -150,7 +153,7 @@ export function SubmissionFillForm({
   const [formReady, setFormReady] = useState(false);
   // Answers changed since the last save. Form.io changes answers itself as they load, and leaves
   // `modified` off for some real edits, so a touch in the form also counts.
-  const [dirty, setDirty] = useState(false);
+  const [dirty, setDirty] = useState(unsaved === true);
   const touched = useRef(false);
   const markTouched = useCallback(() => {
     touched.current = true;

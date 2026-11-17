@@ -1,12 +1,13 @@
 'use client';
 import { useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { Dropdown } from 'react-bootstrap';
 import { Header as BCHeader } from '@bcgov/design-system-react-components';
 import { FaUser } from 'react-icons/fa6';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
+import { withBasePath } from '@/src/shared/config/basePath';
 import { useDictionary } from '../[lang]/Providers';
 import { LoginButton } from './LoginButton';
 import { LanguageSelector, type LanguageOption } from './LanguageSelector';
@@ -28,7 +29,6 @@ function Header({ designMode }: Readonly<HeaderProps>) {
     ([value, label]) => ({ value, label }),
   );
   const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { authenticated, idTokenParsed, token, logout, init, refresh, initStarted, initializing } =
     useKeycloak();
@@ -116,14 +116,15 @@ function Header({ designMode }: Readonly<HeaderProps>) {
     logout();
   };
 
+  // A full page load, so the browser asks before a page with unsaved changes is replaced.
   const handleLanguageChange = (newLocale: string) => {
-    if (pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`) {
-      const newPath = pathname.replace(`/${locale}`, `/${newLocale}`);
-      const search = searchParams.toString();
-      router.push(search ? `${newPath}?${search}` : newPath);
-    } else {
-      router.push(`/${newLocale}/`);
+    if (!pathname.startsWith(`/${locale}/`) && pathname !== `/${locale}`) {
+      window.location.assign(withBasePath(`/${newLocale}/`));
+      return;
     }
+    const newPath = pathname.replace(`/${locale}`, `/${newLocale}`);
+    const search = searchParams.toString();
+    window.location.assign(withBasePath(search ? `${newPath}?${search}` : newPath));
   };
 
   const authActions = () => {
