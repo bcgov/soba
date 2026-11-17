@@ -4,6 +4,9 @@ backend:
   # issue through the APS issuer below.
   features:
     api-keys: "enabled"
+    confirmation-email-copy: "enabled"
+    confirmation-id-visibility: "enabled"
+    confirmation-screen: "enabled"
     dev-data: "enabled"
     notifications: "enabled"
     post-submission: "enabled"
@@ -18,11 +21,6 @@ backend:
     limits:
       cpu: 250m
       memory: 512Mi
-  # Files and templates in S3; credentials and bucket come from Vault.
-  storage:
-    defaultBackend: storage-s3
-    defaultPrefix: dev
-    s3VaultKeyInfix: DEV
   config:
     logLevel: debug
     nodeEnv: development

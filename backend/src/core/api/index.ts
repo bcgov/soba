@@ -14,6 +14,7 @@ import {
   submissionExportRouter,
 } from '../../features/submission-export';
 import { groupsDomain } from './groups';
+import { rolesDomain } from './roles';
 import { accessDomain } from './access';
 import { filesDesignRouter, filesDomain } from '../../features/files';
 import {
@@ -21,6 +22,7 @@ import {
   documentGenerationDomain,
 } from '../../features/document-generation';
 import { templatesDomain } from '../../features/templates';
+import { submitterEmailCopyDomain } from '../../features/submitter-email-copy';
 import {
   formSettingsRouter,
   registerFormSettingsOpenApi,
@@ -51,6 +53,7 @@ registerOpenApiPaths((registry) => {
   registerSubmissionExportOpenApi(registry);
   registerSubmitOpenApi(registry);
   groupsDomain.registerOpenApi(registry);
+  rolesDomain.registerOpenApi(registry);
   accessDomain.registerOpenApi(registry);
   meDomain.registerOpenApi(registry);
   registerUserSearchOpenApi(registry);
@@ -58,6 +61,7 @@ registerOpenApiPaths((registry) => {
   membersDomain.registerOpenApi(registry);
   workspacesDomain.registerOpenApi(registry);
   filesDomain.registerOpenApi(registry);
+  submitterEmailCopyDomain.registerOpenApi(registry);
   documentGenerationDomain.registerOpenApi(registry);
   templatesDomain.registerOpenApi(registry);
   metaDomain.registerOpenApi(registry);
@@ -89,6 +93,8 @@ designRouter.use(coreErrorHandler);
 const submitRouter = express.Router();
 submitRouter.use('/', submitRoutes);
 submitRouter.use('/files', filesDomain.router);
+// Before document generation: its router gates every request that reaches it on its own flags.
+submitRouter.use(submitterEmailCopyDomain.path, submitterEmailCopyDomain.router);
 // Mounted after submitRoutes so only the fall-through actions (templates, print) reach it;
 // the document-generation and templates feature gates live inside the router.
 submitRouter.use('/submissions', documentGenerationDomain.router);
@@ -110,6 +116,7 @@ coreRouter.use('/workspaces/:id/jobs', workspaceJobsRouter);
 for (const domain of [
   workspacesDomain,
   groupsDomain,
+  rolesDomain,
   accessDomain,
   meDomain,
   membersDomain,

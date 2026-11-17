@@ -277,6 +277,29 @@ and the form table's `CHECK` covers the new column too.
 
 The endpoint, the registry and the section descriptor stay as they are.
 
+## Gating each setting with its own feature
+
+A group can have a feature for the group and one for each setting, so a setting can be turned on
+alone. The `confirmation` group is the reference copy.
+
+1. Seed a `feature` row per code in the group's migration, `disabled` and `fixed`, and add each code
+   to `Features` (backend), `FEATURE_CODES` (frontend), every `values*.yaml` under
+   `backend.features`, and `backend/.env.example`.
+2. Set the group's code as the module's `featureCode`, so its routes 404 while it is off.
+3. In lib, map each setting to its code as a `Record<keyof <Group>Settings, string>`, so a setting
+   added without a code fails the type-check. See `CONFIRMATION_SETTING_FEATURES`.
+4. In the backend, one helper says whether a setting is available: the group's feature and its own
+   (`form-settings/confirmation/availability.ts`). Everything that acts on a setting asks it, and a
+   setting that is not available has its default effect, whatever is stored.
+5. The service's `set` writes each unavailable setting as it is now, with `keepUnavailableSettings`
+   from lib, so a save cannot change a hidden setting. Choosing to inherit still takes the
+   workspace's values for every setting.
+6. The frontend asks for the group's code and each setting's (`useConfirmationScreenAvailable`)
+   and shows only the available settings. The save body still carries every setting.
+
+Adding a setting to such a group is the steps in the previous section, plus its code in step 1 and
+the map in step 3.
+
 ## Gotchas
 
 - **Defaults live in the database only.** No server code supplies a fallback; the row created with

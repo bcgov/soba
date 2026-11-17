@@ -81,8 +81,8 @@ templates/
 │   ├── configmap-document-generation.yaml # Document generation plugin config
 │   ├── configmap-sso.yaml       # SSO / JWT config
 │   ├── configmap-ratelimit.yaml # Rate limiting config
-│   ├── configmap-storage.yaml   # Files and templates features + storage profiles config
-│   └── pvc-filestore.yaml       # File store PVC when the default storage profile is storage-local
+│   ├── configmap-storage.yaml   # Storage profiles and the features that use them
+│   └── pvc-filestore.yaml       # File store PVC for a storage-local default profile
 ├── frontend/
 │   ├── deployment.yaml
 │   ├── service.yaml
@@ -277,13 +277,35 @@ A limit outside 100 to 1000000 fails the render.
 To retire an action, take its code off the list first and remove its plugin in a later release.
 Jobs already queued for a plugin that no pod has stay queued.
 
+The confirmation screen settings are gated by `backend.features.confirmation-screen`, and each
+setting by a feature of its own: `confirmation-email-copy` lets submitters email themselves a copy
+of their confirmation, and `confirmation-id-visibility` lets a form hide the Confirmation ID on its
+success page. All three are on in dev, PR and test and off in UAT and prod. Both settings default
+on. Copies send only while `backend.features.notifications` is enabled.
+
+Copy requests are checked against hourly limits of their own; a request past one is refused with
+429 `email_copy_limit_reached`. Sent copies also count toward the action emails' limits above. Set
+in ConfigMap `<fullname>-backend-app` only when non-empty; a value outside 1 to 1000000 fails the
+render:
+
+| Helm value                                                | Env var                                         | Default |
+| --------------------------------------------------------- | ----------------------------------------------- | ------- |
+| `backend.config.submitterEmailCopySubmissionHourlyLimit`  | `SUBMITTER_EMAIL_COPY_SUBMISSION_HOURLY_LIMIT`  | 5       |
+| `backend.config.submitterEmailCopyRecipientHourlyLimit`   | `SUBMITTER_EMAIL_COPY_RECIPIENT_HOURLY_LIMIT`   | 10      |
+| `backend.config.submitterEmailCopyFormHourlyLimit`        | `SUBMITTER_EMAIL_COPY_FORM_HOURLY_LIMIT`        | 500     |
+| `backend.config.submitterEmailCopyWorkspaceHourlyLimit`   | `SUBMITTER_EMAIL_COPY_WORKSPACE_HOURLY_LIMIT`   | 2000    |
+| `backend.config.submitterEmailCopyEnvironmentHourlyLimit` | `SUBMITTER_EMAIL_COPY_ENVIRONMENT_HOURLY_LIMIT` | 5000    |
+
 ## Job Result Files
 
 A background job can keep one file it produced, such as a submission export. Result files are not
 virus-scanned: no one uploads them. They are kept for `backend.jobs.resultRetentionDays` (default 7)
 and removed by the job sweeper, as are the files of jobs that failed or were stopped. A job whose file
 would pass `backend.jobs.resultMaxBytes` (default 200 MiB) fails. PR slots use 50 MiB and 1 day, as
-their file store volume is 1 Gi. Each running export needs temp disk up to that size.
+their file store volume is 1 Gi. A running CSV export stages its result and a spool of its ticked
+cells, which can be several times larger, in temp storage. With tempstorage-os that is the
+backend's `/tmp`, an emptyDir of `backend.tempStorage.tmpSizeLimit` (default 2Gi); past it the
+kubelet evicts the pod.
 
 | Helm value                                 | Env var                       | Default       |
 | ------------------------------------------ | ----------------------------- | ------------- |
@@ -291,13 +313,14 @@ their file store volume is 1 Gi. Each running export needs temp disk up to that 
 | `backend.jobs.resultMaxBytes`              | `JOB_RESULT_MAX_BYTES`        | 209715200     |
 | `backend.jobs.resultRetentionDays`         | `JOB_RESULT_RETENTION_DAYS`   | 7             |
 | `backend.jobs.resultSweepBatch`            | `JOB_RESULT_SWEEP_BATCH`      | 100           |
-| `backend.storage.jobResultsStorageProfile` | `JOB_RESULTS_STORAGE_PROFILE` | `default`     |
-| `backend.storage.jobResultsStoragePrefix`  | `JOB_RESULTS_STORAGE_PREFIX`  | `job-results` |
+| `backend.storage.jobResultsStorageProfile` | `JOB_RESULTS_STORAGE_PROFILE` | `s3`          |
+| `backend.storage.jobResultsStoragePrefix`  | `JOB_RESULTS_STORAGE_PREFIX`  | `jobs`        |
 
-The backend refuses to start with a results profile that is not configured. On S3, a pod that stops
-between uploading a file and recording it leaves the object behind, as can an interrupted multipart
-upload; a bucket lifecycle rule that aborts incomplete uploads and expires `job-results/` objects
-after the retention cleans those up.
+Dev, test, UAT and prod keep results in the `s3` profile, PR slots in `default`. The backend refuses
+to start with a results profile that is not configured, and the chart fails on one that
+`backend.storage.profiles` does not list. On S3, a pod that stops between uploading a file and
+recording it leaves the object behind, as can an interrupted multipart upload; a bucket lifecycle
+rule that aborts incomplete uploads and expires `jobs/` objects after the retention cleans those up.
 
 Submission export (`backend.features.submission-export`) is on in dev, PR and test and off in UAT and
 prod; the designer app's `featuresAllowed` lists it.

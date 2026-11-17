@@ -11,6 +11,7 @@ import { useSubmitSubmission } from '@/src/features/submit-mode/data/useSubmitSu
 import { useSubmitterPrint } from '@/src/features/templates/data/useSubmissionPrint';
 import { printBaseName } from '@/src/features/templates/printFileName';
 import { PrintSubmissionButton } from '@/src/features/templates/ui/PrintSubmissionButton';
+import { EmailReceiptButton } from '@/src/features/submitter-email-copy/ui/EmailReceiptButton';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
 import { SubmissionWorkflowState, SubmitterReviewLabels } from '@/src/types/submissions';
 
@@ -32,20 +33,26 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
   const renderContent = () => {
     // A failed background revalidation keeps the submission already on screen.
     if (data) {
+      // The form may hide the Confirmation ID on its confirmation screen only.
+      const showConfirmationId = !success || data.submission.showConfirmationId;
       const detail = (
         <SubmissionDetail
           submission={data.submission}
           schema={data.schema}
           content={data.content}
           reviewLabel={data.submission.reviewLabel}
+          showConfirmationId={showConfirmationId}
         />
       );
-      const actions = (link: React.ReactNode) => (
-        <div className="mb-3 d-flex align-items-center gap-2 d-print-none">
-          {link}
-          <div className="ms-auto">
-            <PrintSubmissionButton print={print} baseName={printBaseName(data.submission)} />
-          </div>
+      // One row of buttons from the left: what the page leads with, the email receipt where the
+      // confirmation screen offers it, then Print.
+      const actions = (leading: React.ReactNode) => (
+        <div className="mb-3 d-flex flex-wrap align-items-center gap-2 d-print-none">
+          {leading}
+          {success && data.submission.canEmailCopy && (
+            <EmailReceiptButton submissionId={submissionId} />
+          )}
+          <PrintSubmissionButton print={print} baseName={printBaseName(data.submission)} />
         </div>
       );
       if (!success) {
@@ -83,13 +90,18 @@ export function SubmissionView({ success = false }: Readonly<{ success?: boolean
               variant="success"
               role="status"
               title={dict.submission.success.message}
-              description={dict.submission.success.keepConfirmation}
+              description={
+                showConfirmationId ? dict.submission.success.keepConfirmation : undefined
+              }
             />
           </div>
           {/* Signed in only; the bare URL opens the list unfiltered. */}
           {actions(
             authenticated ? (
               <Link
+                isButton
+                buttonVariant="secondary"
+                size="small"
                 data-testid="submission-success-my-submissions"
                 onPress={() => router.push(`/${locale}/my-submissions`)}
               >

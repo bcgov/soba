@@ -37,8 +37,16 @@ export type AppUserStatusCode = (typeof AppUserStatus)[keyof typeof AppUserStatu
 export const RoleStatus = {
   active: 'active',
   deprecated: 'deprecated',
+  inactive: 'inactive',
 } as const;
 export type RoleStatusCode = (typeof RoleStatus)[keyof typeof RoleStatus];
+
+export const RoleAuditAction = {
+  create: 'create',
+  update: 'update',
+  delete: 'delete',
+} as const;
+export type RoleAuditActionCode = (typeof RoleAuditAction)[keyof typeof RoleAuditAction];
 
 export const WorkspaceMembershipRole = {
   owner: 'owner',
@@ -136,9 +144,9 @@ export type FeatureStatusCode = (typeof FeatureStatus)[keyof typeof FeatureStatu
 
 /**
  * Feature codes backed by the soba.feature table. Most gate a mounted API surface via
- * requireFeature and mirror the frontend FEATURE_CODES. Dev-data, antivirus, notifications,
- * post-submission-email and the per-backend document generation codes have no frontend code;
- * antivirus gates the upload scan in the core file store rather than a surface of its own.
+ * requireFeature and mirror the frontend FEATURE_CODES. Dev-data, antivirus, post-submission-email
+ * and the per-backend document generation codes have no frontend code; antivirus gates the upload
+ * scan in the core file store rather than a surface of its own.
  */
 export const Features = {
   design_mode: 'design-mode',
@@ -162,6 +170,12 @@ export const Features = {
   post_submission: 'post-submission',
   /** Emailing a notice to a list of addresses when a form receives a submission. */
   post_submission_email: 'post-submission-email',
+  /** The confirmation screen settings group; each of its settings has a feature of its own. */
+  confirmation_screen: 'confirmation-screen',
+  /** Submitters emailing themselves a copy of their confirmation, from the confirmation screen. */
+  confirmation_email_copy: 'confirmation-email-copy',
+  /** Forms choosing whether the confirmation screen shows the Confirmation ID. */
+  confirmation_id_visibility: 'confirmation-id-visibility',
   /** Exporting a form's submissions to a file, run as a background job. */
   submission_export: 'submission-export',
   /** Generating and managing gateway API keys for a workspace and its forms. */
@@ -257,6 +271,9 @@ export type JobStatusCode = (typeof JobStatus)[keyof typeof JobStatus];
 export const JobType = {
   submission_submitted: 'submission.submitted',
   submission_export: 'submission-export',
+  submission_status_changed: 'submission.status-changed',
+  submission_status_email: 'submission.status-email',
+  submission_email_copy: 'submission.email-copy',
 } as const;
 export type JobTypeCode = (typeof JobType)[keyof typeof JobType];
 
