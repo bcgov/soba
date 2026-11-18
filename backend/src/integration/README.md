@@ -95,7 +95,6 @@ resource permissions; a shared CI API key can therefore test each PR's gateway h
 The earlier shared-secret proof is no longer accepted. `GW-JWT` is redacted from both logs and
 the `/me` response. See `deployments/gateway/README.md` for the protected gateway template.
 
-
 ## Authentication and export regression tests
 
 Run `pnpm --filter @soba/backend exec jest --runInBand tests/integration/v2`.
