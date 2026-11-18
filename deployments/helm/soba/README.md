@@ -604,9 +604,9 @@ The gateway service's public route is the URL consumers call; it is not the Dire
 Dev, PR and test run `aps-credential-issuer-v3` with `backend.features.api-keys` on; the others run
 `credential-issuer-noop` with the feature off. PRs use gateway `gw-d3969`, matching their published
 routes. Configure the PR deployment's Vault secret with an issuer account authorized for this gateway
-and its product environment appId. The gateway check reads that appId from the backend's
-Vault-injected file; no GitHub `APS_ENVIRONMENT_APP_ID` variable is needed. Set the GitHub `pr`
-environment's `APS_GATEWAY_ID` to `gw-d3969`. Keys issued before this switch belong to the old gateway;
+and its product environment appId. Set the GitHub `pr` environment's `APS_ENVIRONMENT_APP_ID`
+to that same product environment appId and `APS_GATEWAY_ID` to `gw-d3969`. The gateway check reads
+its ACL appId from GitHub; the backend issuer continues to read its settings from Vault. Keys issued before this switch belong to the old gateway;
 create new keys after redeploying. Closing a PR removes its routes, not its APS consumers. Follow
 [Obtain the product environment appId](../../../docs/credential-issuer.md#obtain-the-product-environment-appid)
 to log in to the Portal, query products for the deployment's gateway in the API console, and copy

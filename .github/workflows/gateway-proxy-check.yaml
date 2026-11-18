@@ -74,6 +74,7 @@ jobs:
       GATEWAY_QUALIFIER: proxy-proof-${{ inputs.release }}
       GWA_SHA256: ${{ vars.GWA_LINUX_AMD64_SHA256 }}
       INTEGRATIONS_ENABLED: ${{ inputs.integration_enabled }}
+      GATEWAY_ENVIRONMENT_APP_ID: ${{ vars.APS_ENVIRONMENT_APP_ID }}
       GATEWAY_JWT_ISSUER: ${{ vars.APS_UPSTREAM_JWT_ISSUER || 'https://aps-jwks-upstream-jwt.api.gov.bc.ca' }}
     steps:
       - name: Checkout
@@ -168,21 +169,14 @@ jobs:
                 and (.data.INTEGRATION_GATEWAY_JWKS_URI | type == "string" and length > 0)'
           fi
 
-      - name: Read Vault app ID and render integration gateway
+      - name: Render integration gateway
         if: ${{ inputs.integration_enabled }}
         shell: bash
         run: |
           set -euo pipefail
-          # Reuse the backend's Vault injection (PR deployments use dev's Vault secret).
-          # Print only the app ID; the injected file also contains issuer credentials.
-          GATEWAY_ENVIRONMENT_APP_ID=$(oc exec "deployment/${RELEASE}-backend" \
-            -n "$OPENSHIFT_NAMESPACE" -c backend -- sh -eu -c '
-              . /vault/secrets/soba-aps-credential-issuer
-              printf "%s" "${PLUGIN_APS_CREDENTIAL_ISSUER_V3_ENVIRONMENT_APP_ID:?Missing environment appId in the backend Vault secret}"
-            ')
+          : "${GATEWAY_ENVIRONMENT_APP_ID:?Set APS_ENVIRONMENT_APP_ID in the selected GitHub environment}"
           [[ "$GATEWAY_ENVIRONMENT_APP_ID" =~ ^[a-zA-Z0-9_-]+$ ]] \
-            || { echo '::error::Invalid environment appId in the backend Vault secret'; exit 1; }
-          export GATEWAY_ENVIRONMENT_APP_ID
+            || { echo '::error::Invalid APS_ENVIRONMENT_APP_ID in the selected GitHub environment'; exit 1; }
           export BACKEND_HOST="${RELEASE}-backend.${OPENSHIFT_NAMESPACE}.svc"
           INTEGRATION_ROUTE_PATH="${GATEWAY_ROUTE_PATH}integrations/v2/"
           echo "INTEGRATION_ROUTE_PATH=$INTEGRATION_ROUTE_PATH" >> "$GITHUB_ENV"
