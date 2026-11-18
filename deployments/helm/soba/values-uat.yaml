@@ -73,6 +73,7 @@ mongodb:
     enabled: false
   external:
     uri: ""
+    authSecretName: soba-uat-mongodb-auth
 
 gatewayNetworkPolicy:
   enabled: true

@@ -5,17 +5,28 @@ import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { SWRConfig } from 'swr';
 
-const { mockGetVersionPage, dict } = vi.hoisted(() => ({
+const { mockGetVersionPage, getSobaForm, dict } = vi.hoisted(() => ({
   mockGetVersionPage: vi.fn(),
+  getSobaForm: vi.fn(),
   dict: {
     locale: 'en',
-    general: { loading: 'Loading...', version: 'Version', forms: 'Forms', sortBy: 'Sort by' },
+    general: {
+      loading: 'Loading...',
+      version: 'Version',
+      forms: 'Forms',
+      sortBy: 'Sort by',
+      cancel: 'Cancel',
+    },
+    modal: { dialogActions: 'Dialog actions' },
     dataTable: { itemName: 'items', pageOf: 'of {totalPages} page(s)' },
     header: { design: 'Design' },
     form: {
       status: 'Status',
       newVersionFrom: 'New version from',
       emptyHistory: 'No versions yet.',
+      deleteVersion: 'Delete version',
+      deleteVersionConfirmTitle: 'Delete draft version',
+      deleteVersionConfirmMessage: 'Delete draft version {version}? This cannot be undone.',
     },
     submission: {
       formList: { columns: { createdBy: 'Created By', createdAt: 'Created Date' } },
@@ -25,6 +36,8 @@ const { mockGetVersionPage, dict } = vi.hoisted(() => ({
 
 vi.mock('@/src/shared/api/sobaApi', () => ({
   getSobaFormVersionPage: (...args: unknown[]) => mockGetVersionPage(...args),
+  getSobaForm: (...args: unknown[]) => getSobaForm(...args),
+  lookupFormVersions: async () => ({ items: [], limit: 500, truncated: false }),
 }));
 
 vi.mock('@/app/[lang]/Providers', () => ({
@@ -60,6 +73,7 @@ let store: ReturnType<typeof makeStore>;
 function renderTab(
   onSelectVersion = vi.fn(),
   onRestoreVersion = vi.fn(() => Promise.resolve(true)),
+  onDeleteVersion = vi.fn(() => Promise.resolve(true)),
 ) {
   const onNavigateToDesigner = vi.fn();
   render(
@@ -72,12 +86,13 @@ function renderTab(
           formId="f1"
           onSelectVersion={onSelectVersion}
           onRestoreVersion={onRestoreVersion}
+          onDeleteVersion={onDeleteVersion}
           onNavigateToDesigner={onNavigateToDesigner}
         />
       </SWRConfig>
     </Provider>,
   );
-  return { onSelectVersion, onRestoreVersion, onNavigateToDesigner };
+  return { onSelectVersion, onRestoreVersion, onDeleteVersion, onNavigateToDesigner };
 }
 
 describe('FormHistoryTab', () => {
@@ -86,6 +101,7 @@ describe('FormHistoryTab', () => {
     store = makeStore();
     store.dispatch(setToken('token'));
     store.dispatch(setAuthenticated(true));
+    getSobaForm.mockResolvedValue({ id: 'f1', permissions: ['design_delete'] });
     mockGetVersionPage.mockResolvedValue({
       items: [version('v9', 9)],
       page: { offset: 0, limit: 10, total: 42 },
@@ -159,5 +175,56 @@ describe('FormHistoryTab', () => {
     await userEvent.click(screen.getByTestId('v9-newVersionFrom-link'));
 
     await waitFor(() => expect(onNavigateToDesigner).toHaveBeenCalled());
+  });
+
+  it('offers delete on a draft only', async () => {
+    mockGetVersionPage.mockResolvedValue({
+      items: [version('v9', 9), version('v8', 8, 'published')],
+      page: { offset: 0, limit: 10, total: 2 },
+    });
+    renderTab();
+
+    expect(await screen.findByTestId('v9-deleteVersion-link')).toBeInTheDocument();
+    expect(screen.queryByTestId('v8-deleteVersion-link')).not.toBeInTheDocument();
+  });
+
+  it('offers no delete to someone who may not delete designs', async () => {
+    getSobaForm.mockResolvedValue({ id: 'f1', permissions: ['form_read'] });
+    renderTab();
+    await screen.findByTestId('v9-status-tag');
+    await waitFor(() => expect(getSobaForm).toHaveBeenCalled());
+
+    expect(screen.queryByTestId('v9-deleteVersion-link')).not.toBeInTheDocument();
+  });
+
+  it('deletes a draft only once the person confirms', async () => {
+    const { onDeleteVersion } = renderTab();
+    await screen.findByTestId('v9-deleteVersion-link');
+
+    await userEvent.click(screen.getByTestId('v9-deleteVersion-link'));
+
+    expect(onDeleteVersion).not.toHaveBeenCalled();
+    expect(screen.getByText('Delete draft version 9? This cannot be undone.')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete version' }));
+
+    expect(onDeleteVersion).toHaveBeenCalledWith(expect.objectContaining({ id: 'v9' }));
+    await waitFor(() =>
+      expect(screen.queryByText(/This cannot be undone/)).not.toBeInTheDocument(),
+    );
+  });
+
+  it('keeps the prompt open when the delete fails', async () => {
+    renderTab(
+      vi.fn(),
+      vi.fn(() => Promise.resolve(true)),
+      vi.fn(() => Promise.resolve(false)),
+    );
+    await screen.findByTestId('v9-deleteVersion-link');
+
+    await userEvent.click(screen.getByTestId('v9-deleteVersion-link'));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete version' }));
+
+    expect(screen.getByText('Delete draft version 9? This cannot be undone.')).toBeInTheDocument();
   });
 });

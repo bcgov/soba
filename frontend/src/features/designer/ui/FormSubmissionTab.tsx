@@ -2,12 +2,11 @@
 import { useMemo, useState, useCallback } from 'react';
 import { FaRegTrashCan, FaFile } from 'react-icons/fa6';
 import { Button, Checkbox, Link, Select } from '@bcgov/design-system-react-components';
-import { usePathname } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 import type { Dictionary } from '@/src/types/dictionary';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { ConfirmModal } from '@/src/components/ConfirmModal';
-import { useGuardedPush } from '@/src/components/LeaveGuard';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
 import { SubmissionWorkflowState, type SubmissionListItem } from '@/src/types/submissions';
 import {
@@ -36,6 +35,7 @@ import { useFeatureAllowed } from '@/src/shared/api/useFeatureAllowed';
 import { useDesignFormRead } from '@/src/features/designer/data/useForm';
 import { Permissions } from '@/src/types/permissions';
 import { hasPermission } from '@/src/shared/util/permissions';
+import { requestLeave } from '@/src/shared/hooks/useLeaveGuard';
 
 const ALL_STATUSES = 'all';
 
@@ -95,8 +95,7 @@ export default function FormSubmissionTab({
   const { token } = useKeycloak();
   const pathname = usePathname();
   const locale = getLocaleFromPath(pathname);
-  // Asks first while the designer holds unsaved edits.
-  const push = useGuardedPush();
+  const router = useRouter();
   const [pendingDelete, setPendingDelete] = useState<SubmissionListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { addNotification } = useNotificationStore();
@@ -119,6 +118,12 @@ export default function FormSubmissionTab({
       setPendingDelete(null);
     }
   }, [token, pendingDelete, submissionDeleter, addNotification, dict]);
+
+  const openSubmission = useCallback(
+    (sub: SubmissionListItem) =>
+      requestLeave(() => router.push(`/${locale}/build/${sub.formId}/submissions/${sub.id}`)),
+    [locale, router],
+  );
 
   const columns: Column<SubmissionListItem>[] = useMemo(
     () => [
@@ -197,7 +202,7 @@ export default function FormSubmissionTab({
               className="bcds-react-aria-Link medium false me-2"
               aria-label={dict.submission.view}
               data-testid={`${sub.id}-view-link`}
-              onPress={() => push(`/${locale}/build/${sub.formId}/submissions/${sub.id}`)}
+              onPress={() => openSubmission(sub)}
             >
               <FaFile />
             </Link>
@@ -215,7 +220,7 @@ export default function FormSubmissionTab({
         ),
       },
     ],
-    [dict, dictReview, showReview, formatLongDate, locale, push, canDelete],
+    [dict, dictReview, showReview, formatLongDate, openSubmission, canDelete],
   );
 
   const statusOptions = useMemo(
@@ -234,7 +239,9 @@ export default function FormSubmissionTab({
             variant="secondary"
             size="small"
             isDisabled={!formId}
-            onPress={() => push(`/${locale}/build/${formId}/submissions/exports`)}
+            onPress={() =>
+              requestLeave(() => router.push(`/${locale}/build/${formId}/submissions/exports`))
+            }
             data-testid="submissions-export-button"
           >
             {dict.submission.export.button}

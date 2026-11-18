@@ -3,7 +3,7 @@ import { db, type Tx } from '../client';
 import { documentTemplates, files, formVersions, forms } from '../schema';
 import type { DocumentTemplateTypeCode } from '../codes';
 import type { FileRecord } from './fileRepo';
-import { liveFormVersion } from './liveRows';
+import { liveFormVersion, notOpened } from './liveRows';
 
 export type DocumentTemplateRecord = typeof documentTemplates.$inferSelect;
 
@@ -142,7 +142,7 @@ export const getDocumentTemplate = async (
 /** The templates on the form's versions that are not deleted: newest version first, then by type. */
 export const listFormDocumentTemplates = (formId: string): Promise<DocumentTemplateWithVersion[]> =>
   selectWithVersion()
-    .where(and(eq(documentTemplates.formId, formId), isNull(formVersions.deletedAt)))
+    .where(and(eq(documentTemplates.formId, formId), isNull(formVersions.deletedAt), notOpened))
     .orderBy(desc(formVersions.versionNo), asc(documentTemplates.type));
 
 const selectWithVersionAndForm = () =>
@@ -156,6 +156,7 @@ const onLiveVersion = (formVersionId: string, type: DocumentTemplateTypeCode) =>
     eq(documentTemplates.formVersionId, formVersionId),
     eq(documentTemplates.type, type),
     liveFormVersion,
+    notOpened,
   );
 
 /** The template when it is of the type on the form version and neither is deleted; null otherwise. */
@@ -191,7 +192,7 @@ export const getDocumentTemplateScope = async (
     .from(documentTemplates)
     .innerJoin(formVersions, eq(formVersions.id, documentTemplates.formVersionId))
     .innerJoin(forms, eq(forms.id, documentTemplates.formId))
-    .where(and(eq(documentTemplates.id, id), liveFormVersion))
+    .where(and(eq(documentTemplates.id, id), liveFormVersion, notOpened))
     .limit(1);
   return rows[0] ?? null;
 };

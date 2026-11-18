@@ -2,11 +2,13 @@ import { and, count, desc, eq, inArray, isNull, sql, type InferSelectModel } fro
 import { DEFAULT_SORT_LOCALE, FORM_VERSION_SORT_FIELDS, type SortToken } from '@soba/lib';
 import { db, type DbOrTx, type Tx } from '../client';
 import { formVersionRevisions, formVersions, forms } from '../schema';
+import type { FormVersionState as FormVersionStateType } from '../schema/types';
 import { orderByForSort, prefixPattern, type SortColumns } from '../listSort';
 import { readListPage } from '../listRead';
 import { NotFoundError } from '../../errors';
+import { FormVersionState } from '../codes';
 import { listAllowsNothing, permittedFormsWhere, type FormAccessGrant } from './formAccessRepo';
-import { liveFormVersion } from './liveRows';
+import { liveFormVersion, notOpened } from './liveRows';
 
 export type FormVersionRecord = InferSelectModel<typeof formVersions>;
 
@@ -17,6 +19,7 @@ interface CreateDraftInput {
   formId: string;
   actorId: string;
   actorDisplayLabel: string | null;
+  state?: FormVersionStateType;
   /** The version's form engine document, already written. */
   engineSchemaRef: string;
 }
@@ -83,18 +86,20 @@ export const getFormVersionListContext = async (
 };
 
 /**
- * Inserts a draft whose engine document already exists, under the form's next version number. The
- * form row is locked first, so concurrent drafts of one form are numbered in turn; throws
+ * The number the form's next saved version takes. An opened version doesn't block that number until
+ * it is saved, so one left unsaved does not keep the next version from taking it. The form row is
+ * locked first, so versions of one form are numbered in turn until the transaction ends; throws
  * NotFoundError when the form is gone or deleted.
  */
-export const createFormVersionDraft = async (
-  input: CreateDraftInput,
-  tx: Tx,
-): Promise<FormVersionRecord> => {
+export const nextFormVersionNo = async (
+  workspaceId: string,
+  formId: string,
+  tx: DbOrTx,
+): Promise<number> => {
   const [form] = await tx
     .select({ deletedAt: forms.deletedAt })
     .from(forms)
-    .where(and(eq(forms.id, input.formId), eq(forms.workspaceId, input.workspaceId)))
+    .where(and(eq(forms.id, formId), eq(forms.workspaceId, workspaceId)))
     .for('no key update');
   if (!form || form.deletedAt) throw new NotFoundError('Form not found');
 
@@ -102,10 +107,23 @@ export const createFormVersionDraft = async (
     .select({ versionNo: formVersions.versionNo })
     .from(formVersions)
     .where(
-      and(eq(formVersions.workspaceId, input.workspaceId), eq(formVersions.formId, input.formId)),
+      and(eq(formVersions.workspaceId, workspaceId), eq(formVersions.formId, formId), notOpened),
     )
     .orderBy(desc(formVersions.versionNo))
     .limit(1);
+  return (latest[0]?.versionNo ?? 0) + 1;
+};
+
+/**
+ * Inserts a version whose engine document already exists, opened unless `state` is given. An opened
+ * version shows the number it would take now; a save takes the next free one then, which differs
+ * only when another version was saved in between.
+ */
+export const createFormVersionDraft = async (
+  input: CreateDraftInput,
+  tx: Tx,
+): Promise<FormVersionRecord> => {
+  const versionNo = await nextFormVersionNo(input.workspaceId, input.formId, tx);
 
   const created = await tx
     .insert(formVersions)
@@ -113,8 +131,8 @@ export const createFormVersionDraft = async (
       id: input.id,
       workspaceId: input.workspaceId,
       formId: input.formId,
-      versionNo: (latest[0]?.versionNo ?? 0) + 1,
-      state: 'draft',
+      versionNo,
+      state: input.state ?? FormVersionState.opened,
       engineSchemaRef: input.engineSchemaRef,
       engineSyncStatus: 'ready',
       currentRevisionNo: 0,
@@ -167,6 +185,7 @@ export const listFormVersionsForWorkspace = async (
   const whereClauses = [
     inArray(formVersions.workspaceId, input.workspaceIds),
     liveFormVersion,
+    notOpened,
     permittedFormsWhere(input.formAccess, {
       workspaceId: formVersions.workspaceId,
       formId: formVersions.formId,
@@ -255,6 +274,7 @@ export const lookupFormVersions = async (
     inArray(formVersions.workspaceId, input.workspaceIds),
     eq(formVersions.formId, input.formId),
     isNull(formVersions.deletedAt),
+    notOpened,
   ];
   if (input.q) {
     whereClauses.push(sql`${formVersions.versionNo}::text like ${prefixPattern(input.q)}`);
@@ -267,7 +287,10 @@ export const lookupFormVersions = async (
     .limit(input.limit);
 };
 
-/** The version save and publish target: the highest-numbered one that is not deleted. */
+/**
+ * The version save and publish target: the highest-numbered one that is not deleted, among those
+ * saved at least once. An opened version is reached by its id until it is saved.
+ */
 export const getCurrentFormVersion = async (
   workspaceId: string,
   formId: string,
@@ -282,6 +305,7 @@ export const getCurrentFormVersion = async (
         eq(formVersions.workspaceId, workspaceId),
         eq(formVersions.formId, formId),
         isNull(formVersions.deletedAt),
+        notOpened,
       ),
     )
     .orderBy(desc(formVersions.versionNo))
@@ -317,6 +341,7 @@ export const updateFormVersionDraft = async (
   actorDisplayLabel: string | null,
   patch: Partial<{
     state: string;
+    versionNo: number;
     engineSyncStatus: string;
     engineSyncError: string | null;
     publishedAt: Date | null;
@@ -342,7 +367,8 @@ export const updateFormVersionDraft = async (
 
 /**
  * Records the outcome of a provision that claimed the version at `claimedAt`. Returns null and
- * changes nothing when another provision has claimed it since, or it is no longer a live draft.
+ * changes nothing when another provision has claimed it since, or it is no longer a live opened
+ * version or draft.
  */
 export const finishFormVersionProvisioning = async (
   workspaceId: string,
@@ -350,12 +376,16 @@ export const finishFormVersionProvisioning = async (
   actorDisplayLabel: string | null,
   claimedAt: Date,
   patch: Partial<{
+    state: string;
+    versionNo: number;
     engineSchemaRef: string;
     engineSyncStatus: string;
     engineSyncError: string | null;
   }>,
+  tx?: DbOrTx,
 ) => {
-  const updated = await db
+  const d = tx ?? db;
+  const updated = await d
     .update(formVersions)
     .set({ ...patch, updatedBy: actorDisplayLabel, updatedAt: new Date() })
     .where(
@@ -363,7 +393,7 @@ export const finishFormVersionProvisioning = async (
         eq(formVersions.id, formVersionId),
         eq(formVersions.workspaceId, workspaceId),
         eq(formVersions.updatedAt, claimedAt),
-        eq(formVersions.state, 'draft'),
+        inArray(formVersions.state, [FormVersionState.opened, FormVersionState.draft]),
         isNull(formVersions.deletedAt),
       ),
     )

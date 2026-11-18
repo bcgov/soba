@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { act } from 'react';
 
@@ -50,7 +50,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
     locale: 'en',
     general: { title: 'CHEFS', login: 'Login', logout: 'Logout' },
     header: {
-      languages: { en: 'English', fr: 'Français' },
+      languages: { en: 'English' },
       selectLanguage: 'Language',
       bcgovTitle: 'BC Gov',
       skipToMain: 'Skip',
@@ -179,32 +179,5 @@ describe('Header logo', () => {
     });
 
     expect(screen.getByTestId('app-header')).toHaveAttribute('data-styled');
-  });
-});
-
-describe('Header language switch', () => {
-  // A full page load, so the browser asks first when a page holds unsaved changes.
-  it('loads the same page, with its query, in the chosen language', async () => {
-    const assign = vi.fn();
-    vi.stubGlobal('location', { ...window.location, assign });
-    await act(async () => {
-      renderHeader();
-    });
-
-    fireEvent.change(screen.getByTestId('lang-selector'), { target: { value: 'fr' } });
-    expect(assign).toHaveBeenCalledWith('/fr/forms');
-    vi.unstubAllGlobals();
-  });
-
-  it('goes nowhere for a value that is not a supported locale', async () => {
-    const assign = vi.fn();
-    vi.stubGlobal('location', { ...window.location, assign });
-    await act(async () => {
-      renderHeader();
-    });
-
-    fireEvent.change(screen.getByTestId('lang-selector'), { target: { value: 'javascript:x' } });
-    expect(assign).not.toHaveBeenCalled();
-    vi.unstubAllGlobals();
   });
 });

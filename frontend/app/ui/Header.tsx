@@ -1,14 +1,12 @@
 'use client';
 import { useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Dropdown } from 'react-bootstrap';
 import { Header as BCHeader } from '@bcgov/design-system-react-components';
 import { FaUser } from 'react-icons/fa6';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
-import { withBasePath } from '@/src/shared/config/basePath';
-import { knownLocale } from '@/src/shared/util/locale';
 import { useDictionary } from '../[lang]/Providers';
 import { LoginButton } from './LoginButton';
 import { LanguageSelector, type LanguageOption } from './LanguageSelector';
@@ -16,6 +14,7 @@ import { WorkspaceModal, WORKSPACE_MODAL_DISMISSED_KEY } from '@/src/components/
 import { useClearSessionData } from '@/src/shared/api/useClearSessionData';
 import { removeSessionValues } from '@/src/shared/storage/sessionStore';
 import { isIdentityEnded } from '@/src/shared/auth/sessionIdentity';
+import { requestLeave } from '@/src/shared/hooks/useLeaveGuard';
 
 import styles from './Header.module.css';
 
@@ -30,6 +29,7 @@ function Header({ designMode }: Readonly<HeaderProps>) {
     ([value, label]) => ({ value, label }),
   );
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { authenticated, idTokenParsed, token, logout, init, refresh, initStarted, initializing } =
     useKeycloak();
@@ -110,26 +110,25 @@ function Header({ designMode }: Readonly<HeaderProps>) {
   const hasWorkspaces = currentUser.data?.capabilities?.hasWorkspaces === true;
   const canCreateWorkspace = currentUser.data?.capabilities?.canCreateWorkspace === true;
 
-  const handleLogout = () => {
-    // Cleared here rather than left to the identity effect: `logout()` navigates away, and an
-    // effect that does not run before the page unloads leaves this tab's state for the next user.
-    clearSessionState();
-    logout();
-  };
+  // Both leave the page, so a page holding unsaved work is asked first.
+  const handleLogout = () =>
+    requestLeave(() => {
+      // Cleared here rather than left to the identity effect: `logout()` navigates away, and an
+      // effect that does not run before the page unloads leaves this tab's state for the next user.
+      clearSessionState();
+      logout();
+    });
 
-  // A full page load, so the browser asks before a page with unsaved changes is replaced.
-  const handleLanguageChange = (selected: string) => {
-    // Only a supported locale goes into the address, never the select's own text.
-    const newLocale = knownLocale(selected);
-    if (!newLocale) return;
-    if (!pathname.startsWith(`/${locale}/`) && pathname !== `/${locale}`) {
-      window.location.assign(withBasePath(`/${newLocale}/`));
-      return;
-    }
-    const newPath = pathname.replace(`/${locale}`, `/${newLocale}`);
-    const search = searchParams.toString();
-    window.location.assign(withBasePath(search ? `${newPath}?${search}` : newPath));
-  };
+  const handleLanguageChange = (newLocale: string) =>
+    requestLeave(() => {
+      if (pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`) {
+        const newPath = pathname.replace(`/${locale}`, `/${newLocale}`);
+        const search = searchParams.toString();
+        router.push(search ? `${newPath}?${search}` : newPath);
+      } else {
+        router.push(`/${newLocale}/`);
+      }
+    });
 
   const authActions = () => {
     // The cache is cleared on sign-out, so anything loaded belongs to the current session. Matching
