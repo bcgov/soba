@@ -14,6 +14,7 @@ import { WorkspaceModal, WORKSPACE_MODAL_DISMISSED_KEY } from '@/src/components/
 import { useClearSessionData } from '@/src/shared/api/useClearSessionData';
 import { removeSessionValues } from '@/src/shared/storage/sessionStore';
 import { isIdentityEnded } from '@/src/shared/auth/sessionIdentity';
+import { requestLeave } from '@/src/shared/hooks/useLeaveGuard';
 
 import styles from './Header.module.css';
 
@@ -60,6 +61,12 @@ function Header({ designMode }: Readonly<HeaderProps>) {
     return () => observer.disconnect();
   }, []);
 
+  // The design system injects its stylesheet when its module loads, which is before this mounts.
+  // Until then the logo has no colours, so the CSS keeps it hidden until this is set.
+  useEffect(() => {
+    headerChromeRef.current?.setAttribute('data-styled', '');
+  }, []);
+
   // The cache and this tab's view state outlive the session, so the next person signing in here
   // must not be served the previous user's data. The dismissed-modal flag is this feature's, so it
   // is cleared here rather than in the shared session-data hook.
@@ -103,22 +110,25 @@ function Header({ designMode }: Readonly<HeaderProps>) {
   const hasWorkspaces = currentUser.data?.capabilities?.hasWorkspaces === true;
   const canCreateWorkspace = currentUser.data?.capabilities?.canCreateWorkspace === true;
 
-  const handleLogout = () => {
-    // Cleared here rather than left to the identity effect: `logout()` navigates away, and an
-    // effect that does not run before the page unloads leaves this tab's state for the next user.
-    clearSessionState();
-    logout();
-  };
+  // Both leave the page, so a page holding unsaved work is asked first.
+  const handleLogout = () =>
+    requestLeave(() => {
+      // Cleared here rather than left to the identity effect: `logout()` navigates away, and an
+      // effect that does not run before the page unloads leaves this tab's state for the next user.
+      clearSessionState();
+      logout();
+    });
 
-  const handleLanguageChange = (newLocale: string) => {
-    if (pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`) {
-      const newPath = pathname.replace(`/${locale}`, `/${newLocale}`);
-      const search = searchParams.toString();
-      router.push(search ? `${newPath}?${search}` : newPath);
-    } else {
-      router.push(`/${newLocale}/`);
-    }
-  };
+  const handleLanguageChange = (newLocale: string) =>
+    requestLeave(() => {
+      if (pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`) {
+        const newPath = pathname.replace(`/${locale}`, `/${newLocale}`);
+        const search = searchParams.toString();
+        router.push(search ? `${newPath}?${search}` : newPath);
+      } else {
+        router.push(`/${newLocale}/`);
+      }
+    });
 
   const authActions = () => {
     // The cache is cleared on sign-out, so anything loaded belongs to the current session. Matching

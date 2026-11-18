@@ -32,6 +32,13 @@ vi.mock('@/app/[lang]/Providers', () => ({
       loadFormError: 'Failed to load form.',
       staleEdits: 'Your unsaved edits were made on an older version of this form.',
       discardEdits: 'Discard edits',
+      versionOpened: en.form.versionOpened,
+      unsavedChangesTitle: en.form.unsavedChangesTitle,
+      unsavedChangesMessage: en.form.unsavedChangesMessage,
+      unsavedChangesCannotSave: en.form.unsavedChangesCannotSave,
+      unsavedChangesSave: en.form.unsavedChangesSave,
+      unsavedChangesDiscard: en.form.unsavedChangesDiscard,
+      unsavedChangesStay: en.form.unsavedChangesStay,
       settings: {
         formSettingsDrawerLabel: 'Form Settings',
         formKindList: { team: 'Team', public: 'Public' },
@@ -76,8 +83,21 @@ vi.mock('@/src/shared/featureFlags/featureAvailability', () => ({
   fetchFeatureAvailability: availability.check,
 }));
 
+// Shows what it is given, so a test can tell the two parts' availability apart.
 vi.mock('@/src/features/post-submission/ui/FormPostSubmissionTab', () => ({
-  default: () => <div data-testid="post-submission-content" />,
+  default: ({
+    actionsAvailable,
+    confirmation,
+  }: {
+    actionsAvailable?: boolean;
+    confirmation?: { settings: Record<string, boolean> };
+  }) => (
+    <div
+      data-testid="post-submission-content"
+      data-actions={String(actionsAvailable)}
+      data-confirmation={JSON.stringify(confirmation?.settings)}
+    />
+  ),
 }));
 
 vi.mock('@/src/features/jobs/ui/ScopedJobsTabs', () => ({
@@ -666,6 +686,153 @@ describe('FormForm', () => {
     await waitFor(() => expect(screen.getByTestId('form-designer')).toHaveTextContent('from-v2'));
   });
 
+  describe('unsaved edits', () => {
+    const editAndPick = async (versionId: string) => {
+      mockWorkspaceState.versions = [
+        { id: 'v1', versionNo: 1, state: 'published' },
+        { id: 'v2', versionNo: 2, state: 'draft' },
+      ];
+      mockWorkspaceState.schemas = {
+        v1: { components: [{ key: 'from-v1' }] },
+        v2: { components: [{ key: 'from-v2' }] },
+      };
+      await act(async () => {
+        await renderForm({ formId: 'f1' });
+      });
+      await waitFor(() => expect(screen.getByTestId('form-designer')).toHaveTextContent('from-v2'));
+      await act(async () => {
+        builder.onUpdateModel?.({ components: [{ key: 'edited' }] } as never);
+      });
+      const picker = screen
+        .getByTestId('form-version-select')
+        .querySelector('select') as HTMLSelectElement;
+      await userEvent.selectOptions(picker, versionId);
+    };
+
+    it('asks before opening another version over them, and stays when told to', async () => {
+      await editAndPick('v1');
+
+      expect(await screen.findByTestId('pending-unsaved-message')).toBeInTheDocument();
+
+      await userEvent.click(screen.getByTestId('pending-unsaved-stay'));
+
+      await waitFor(() =>
+        expect(screen.queryByTestId('pending-unsaved-message')).not.toBeInTheDocument(),
+      );
+      // Still on the draft the edits were made on, with Save still offered for them.
+      expect(screen.getByTestId('form-designer')).toHaveTextContent('from-v2');
+      expect(screen.queryByTestId('page-notice-history-view')).not.toBeInTheDocument();
+      expect(screen.getByTestId('save-form-button')).toBeEnabled();
+    });
+
+    it('opens the other version once they are discarded', async () => {
+      await editAndPick('v1');
+
+      await userEvent.click(await screen.findByTestId('pending-unsaved-discard'));
+
+      await waitFor(() => expect(screen.getByTestId('form-designer')).toHaveTextContent('from-v1'));
+      expect(api.saveFormVersionSchema).not.toHaveBeenCalled();
+    });
+
+    it('saves them, then opens the other version', async () => {
+      await editAndPick('v1');
+
+      await userEvent.click(await screen.findByTestId('pending-unsaved-save'));
+
+      await waitFor(() => expect(api.saveFormVersionSchema).toHaveBeenCalledTimes(1));
+      expect(api.saveFormVersionSchema.mock.calls[0].slice(1, 3)).toEqual([
+        'v2',
+        { components: [{ key: 'edited' }] },
+      ]);
+      await waitFor(() => expect(screen.getByTestId('form-designer')).toHaveTextContent('from-v1'));
+    });
+
+    // A failed save leaves the edits as the only copy, so nothing that would drop them goes ahead.
+    it('stays when the save fails', async () => {
+      api.saveFormVersionSchema.mockRejectedValue(new Error('boom'));
+      await editAndPick('v1');
+
+      await userEvent.click(await screen.findByTestId('pending-unsaved-save'));
+
+      await waitFor(() =>
+        expect(screen.queryByTestId('pending-unsaved-message')).not.toBeInTheDocument(),
+      );
+      expect(screen.getByTestId('form-designer')).toHaveTextContent('from-v2');
+      expect(screen.queryByTestId('page-notice-history-view')).not.toBeInTheDocument();
+      expect(screen.getByTestId('save-form-button')).toBeEnabled();
+    });
+
+    // The new version takes the edits with it.
+    it('does not ask before a new version', async () => {
+      await editAndPick('create');
+
+      await waitFor(() => expect(api.createFormVersion).toHaveBeenCalled());
+      expect(screen.queryByTestId('pending-unsaved-message')).not.toBeInTheDocument();
+    });
+
+    // New version moves the edits into a version nobody has saved and clears them, so that version
+    // is what there is to lose.
+    const pickerSelect = () =>
+      screen.getByTestId('form-version-select').querySelector('select') as HTMLSelectElement;
+    const openNewVersion = async () => {
+      await editAndPick('create');
+      await waitFor(() => expect(api.createFormVersion).toHaveBeenCalledTimes(1));
+      await waitFor(() =>
+        expect(screen.getAllByText('Current Draft (v3)').length).toBeGreaterThan(0),
+      );
+    };
+
+    it('asks before opening another version over a new version nobody has saved', async () => {
+      await openNewVersion();
+
+      await userEvent.selectOptions(pickerSelect(), 'v1');
+
+      expect(await screen.findByTestId('pending-unsaved-message')).toBeInTheDocument();
+      await userEvent.click(screen.getByTestId('pending-unsaved-stay'));
+      await waitFor(() =>
+        expect(screen.queryByTestId('pending-unsaved-message')).not.toBeInTheDocument(),
+      );
+      expect(screen.queryByTestId('page-notice-history-view')).not.toBeInTheDocument();
+    });
+
+    // Discard drops the new version too, so nothing unsaved is left to ask about or leave behind.
+    it('drops a new version nobody has saved when it is discarded', async () => {
+      await openNewVersion();
+      await userEvent.selectOptions(pickerSelect(), 'v1');
+
+      await userEvent.click(await screen.findByTestId('pending-unsaved-discard'));
+
+      expect(await screen.findByTestId('page-notice-history-view')).toBeInTheDocument();
+      await userEvent.selectOptions(pickerSelect(), 'create');
+      await waitFor(() => expect(api.createFormVersion).toHaveBeenCalledTimes(2));
+      expect(screen.queryByTestId('pending-unsaved-message')).not.toBeInTheDocument();
+    });
+
+    it('returns to the saved current version once a new version is discarded', async () => {
+      await openNewVersion();
+      await userEvent.selectOptions(pickerSelect(), 'v1');
+      await userEvent.click(await screen.findByTestId('pending-unsaved-discard'));
+      expect(await screen.findByTestId('page-notice-history-view')).toBeInTheDocument();
+
+      fireEvent.change(pickerSelect(), { target: { value: 'current' } });
+
+      await waitFor(() => expect(screen.getByTestId('form-designer')).toHaveTextContent('from-v2'));
+      expect(screen.getAllByText('Current Draft (v2)').length).toBeGreaterThan(0);
+      expect(screen.queryByTestId('pending-unsaved-message')).not.toBeInTheDocument();
+    });
+
+    it('opens a draft picked over a discarded new version as the current one', async () => {
+      await openNewVersion();
+      await userEvent.selectOptions(pickerSelect(), 'v2');
+
+      await userEvent.click(await screen.findByTestId('pending-unsaved-discard'));
+
+      await waitFor(() => expect(screen.getByTestId('form-designer')).toHaveTextContent('from-v2'));
+      expect(screen.queryByTestId('page-notice-history-view')).not.toBeInTheDocument();
+      expect(screen.getByTestId('save-form-button')).toBeEnabled();
+    });
+  });
+
   // Saving drops the edit overlay. Without writing the saved body into the cache, the next write
   // posts the schema as it was before the edits.
   it('posts the saved schema, not the pre-save one, on a second save', async () => {
@@ -807,17 +974,61 @@ describe('FormForm', () => {
     });
   });
 
-  // A form with no current version has nothing to save to. Writing anyway would file the schema
-  // against a version the form does not carry.
-  it('writes nothing for a form with no current version', async () => {
+  // A new form's first version is not current until it is saved, so leaving before then leaves the
+  // form with none. The first save makes one and saves to it.
+  it('makes a version on the first save of a form with no saved version', async () => {
     mockWorkspaceState.versions = [];
+    api.createFormVersion.mockResolvedValue({
+      value: { id: 'v-first', versionNo: 1, state: 'opened' },
+      created: true,
+    });
     await act(async () => {
       await renderForm({ formId: 'f1' });
     });
     await waitFor(() => expect(screen.getByTestId('save-form-button')).toBeEnabled());
 
     await userEvent.click(screen.getByTestId('save-form-button'));
-    expect(api.saveFormVersionSchema).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(api.saveFormVersionSchema).toHaveBeenCalledTimes(1));
+    expect(api.createFormVersion).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ formId: 'f1', fromFormVersionId: undefined }),
+    );
+    expect(api.saveFormVersionSchema.mock.calls[0][1]).toBe('v-first');
+  });
+
+  // The form and its options leave out a version nobody has saved, so only the page that made it
+  // can show it, as the current one.
+  it('edits a new version the form does not list yet as the current one, and saves to it', async () => {
+    mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'published' }];
+    mockWorkspaceState.schemas = { v1: { components: [{ key: 'original' }] } };
+    api.createFormVersion.mockResolvedValue({
+      value: { id: 'v-new', versionNo: 2, state: 'opened' },
+      created: true,
+    });
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+    await waitFor(() => expect(screen.getByTestId('form-designer')).toHaveTextContent('original'));
+
+    const picker = screen
+      .getByTestId('form-version-select')
+      .querySelector('select') as HTMLSelectElement;
+    await userEvent.selectOptions(picker, 'create');
+
+    await waitFor(() =>
+      expect(screen.getAllByText('Current Draft (v2)').length).toBeGreaterThan(0),
+    );
+    // The published version is no longer current, so it is offered as history.
+    expect(screen.getAllByText('v1 (published)').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('form-designer')).toHaveTextContent('original');
+
+    await act(async () => {
+      builder.onUpdateModel?.({ components: [{ key: 'edited' }] } as never);
+    });
+    await userEvent.click(screen.getByTestId('save-form-button'));
+    await waitFor(() => expect(api.saveFormVersionSchema).toHaveBeenCalledTimes(1));
+    expect(api.saveFormVersionSchema.mock.calls[0][1]).toBe('v-new');
   });
 
   // The schema key is null until the form arrives, so a loading flag covering only the schema read
@@ -1024,6 +1235,76 @@ describe('FormForm', () => {
         });
 
         expect(await screen.findByTestId('designer-tab')).toHaveAttribute('aria-selected', 'true');
+        expect(screen.queryByTestId('post-submission-tab')).not.toBeInTheDocument();
+      });
+
+      // The tab holds two parts, the actions and the Confirmation Screen card; either one shows it,
+      // and the tab is given which.
+      const CARD_CODES = ['confirmation-screen', 'confirmation-id-visibility', 'notifications'];
+      it.each([
+        [
+          'only the actions',
+          ['post-submission'],
+          'true',
+          { allowSubmitterEmailCopy: false, showConfirmationId: false },
+        ],
+        [
+          'only the Confirmation Screen',
+          CARD_CODES,
+          'false',
+          { allowSubmitterEmailCopy: false, showConfirmationId: true },
+        ],
+      ])('shows the tab where %s are available', async (_label, availableCodes, actions, card) => {
+        session.search = 'tab=post-submission';
+        inWorkspace(['*'], false);
+        availability.check.mockImplementation((code: string) =>
+          Promise.resolve(availableCodes.includes(code)),
+        );
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        const content = await screen.findByTestId('post-submission-content');
+        expect(content).toHaveAttribute('data-actions', actions);
+        expect(JSON.parse(content.getAttribute('data-confirmation') ?? 'null')).toEqual(card);
+        expect(availability.check).toHaveBeenCalledWith('confirmation-screen', {
+          workspaceId: 'ws1',
+          formId: 'f1',
+        });
+      });
+
+      it('shows the tab once one part answers yes, while the other still runs', async () => {
+        inWorkspace(['*'], false);
+        availability.check.mockImplementation((code: string) =>
+          code === 'post-submission'
+            ? new Promise<boolean>(() => undefined)
+            : Promise.resolve(true),
+        );
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        expect(await screen.findByTestId('post-submission-tab')).toBeInTheDocument();
+      });
+
+      it('keeps the tab hidden while one part answers no and the other still runs', async () => {
+        inWorkspace(['*'], false);
+        availability.check.mockImplementation((code: string) =>
+          code === 'post-submission'
+            ? Promise.resolve(false)
+            : new Promise<boolean>(() => undefined),
+        );
+        await act(async () => {
+          await renderForm({ formId: 'f1' });
+        });
+
+        await waitFor(() =>
+          expect(availability.check).toHaveBeenCalledWith('post-submission', {
+            workspaceId: 'ws1',
+            formId: 'f1',
+          }),
+        );
+        expect(screen.getByTestId('settings-tab')).toBeInTheDocument();
         expect(screen.queryByTestId('post-submission-tab')).not.toBeInTheDocument();
       });
     });

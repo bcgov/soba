@@ -7,7 +7,8 @@ import {
   integer,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
+import { notInArray, sql } from 'drizzle-orm';
+import { FormVersionState } from '../codes';
 import { auditColumns, idColumn, softDeleteColumns } from './audit';
 import { appUsers, sobaSchema, workspaces } from './core';
 
@@ -66,11 +67,12 @@ export const formVersions = sobaSchema.table(
     ...softDeleteColumns(),
   },
   (table) => ({
-    uniqueVersion: uniqueIndex('form_version_workspace_form_version_uq').on(
-      table.workspaceId,
-      table.formId,
-      table.versionNo,
-    ),
+    // An opened version doesn't block that number until it is saved, so one left unsaved does not
+    // keep the next version from taking it. A deleted one may have been deleted while opened, so its
+    // number may since have been taken. New numbers still count deleted versions, so none is reused.
+    uniqueVersion: uniqueIndex('form_version_workspace_form_version_uq')
+      .on(table.workspaceId, table.formId, table.versionNo)
+      .where(notInArray(table.state, [FormVersionState.opened, FormVersionState.deleted])),
     workspaceIdx: index('form_version_workspace_idx').on(table.workspaceId),
     formIdx: index('form_version_form_idx').on(table.formId),
     // Publishing archives the previous version first, so a form has at most one published version.

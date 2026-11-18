@@ -1,6 +1,6 @@
 import React, { act } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { SWRConfig } from 'swr';
@@ -45,6 +45,7 @@ vi.mock('next/navigation', async () => {
 import makeStore from '@/lib/store';
 import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import { ScopedJobsPanel } from '@/src/features/jobs/ui/ScopedJobsPanel';
+import { useLeaveGuard } from '@/src/shared/hooks/useLeaveGuard';
 
 const WORKSPACE = 'w1';
 const FORM_SCOPE: JobScopeRef = { kind: 'form', formId: 'f1' };
@@ -171,5 +172,21 @@ describe('ScopedJobsPanel', () => {
 
     await userEvent.click(await screen.findByTestId(`job-link-${JOB_ID}`));
     expect(mockPush).toHaveBeenCalledWith(jobHref(JOB_ID));
+  });
+
+  // On a form, the panel sits in the designer, which holds its unsaved work; the row is a button.
+  it('asks the page holding unsaved work before opening a job', async () => {
+    const onLeave = vi.fn();
+    const guard = renderHook(() => useLeaveGuard(true, onLeave));
+    stubJobsServer(listJobs('/design/forms/f1/jobs', [staffJobListItem()]));
+    await renderPanel(FORM_SCOPE);
+
+    await userEvent.click(await screen.findByTestId(`job-link-${JOB_ID}`));
+
+    expect(onLeave).toHaveBeenCalledTimes(1);
+    expect(mockPush).not.toHaveBeenCalled();
+    act(() => (onLeave.mock.calls[0][0] as () => void)());
+    expect(mockPush).toHaveBeenCalledWith(jobHref(JOB_ID));
+    guard.unmount();
   });
 });

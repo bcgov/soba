@@ -1,0 +1,39 @@
+mongodb:
+  enabled: true
+  fullnameOverride: soba-prod-mongodb
+
+  replicaCount: 3
+
+  auth:
+    existingSecret: soba-prod-mongodb-auth
+    usernames:
+      - formio
+    databases:
+      - formio-ce
+
+  persistence:
+    storageClass: netapp-block-standard
+    size: 10Gi
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+  extraFlags:
+    - "--wiredTigerCacheSizeGB=1"
+
+  networkPolicy:
+    ingressPodMatchLabels:
+      app.kubernetes.io/name: soba
+      app.kubernetes.io/instance: soba-prod
+      app.kubernetes.io/component: formio
+    extraEgress:
+      - ports:
+          - port: 5353
+            protocol: UDP
+          - port: 5353
+            protocol: TCP

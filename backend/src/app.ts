@@ -4,7 +4,7 @@ import { createApp } from './createApp';
 import { pool } from './core/db/client';
 import { log } from './core/logging';
 import { assertJobShutdownFits, getJobSettings, startJobs, stopJobs } from './core/jobs';
-import { assertEmailLinkBases } from './core/integrations/notification/email/url';
+import { assertAppLinkBases } from './core/appLinks';
 import { setTimeout as delay } from 'node:timers/promises';
 import {
   logStartupHealth,
@@ -24,7 +24,7 @@ const port = Number(process.env.PORT) || 4000;
 // Read before listening, so an invalid value stops startup before the port opens.
 const shutdownSettings = env.getShutdownSettings();
 assertJobShutdownFits(getJobSettings(), shutdownSettings.timeoutMs);
-assertEmailLinkBases({
+assertAppLinkBases({
   DESIGNER_APP_URL: env.getDesignerAppUrl(),
   FORMS_APP_URL: env.getFormsAppUrl(),
 });

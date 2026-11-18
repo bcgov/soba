@@ -1,6 +1,6 @@
 import React, { act } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { SWRConfig } from 'swr';
 
@@ -88,6 +88,7 @@ vi.mock('next/navigation', async () => {
 import makeStore from '@/lib/store';
 import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import FormSubmissionTab from '@/src/features/designer/ui/FormSubmissionTab';
+import { useLeaveGuard } from '@/src/shared/hooks/useLeaveGuard';
 import type { Dictionary } from '@/src/types/dictionary';
 
 describe('FormSubmissionTab', () => {
@@ -177,6 +178,27 @@ describe('FormSubmissionTab', () => {
     });
 
     expect(mockPush).toHaveBeenCalledWith('/en/build/f1/submissions/exports');
+  });
+
+  // The designer holds its unsaved work on this page, and these are buttons, not links.
+  it.each([
+    ['a submission', 'sub-1-view-link', '/en/build/f1/submissions/sub-1'],
+    ['the exports page', 'submissions-export-button', '/en/build/f1/submissions/exports'],
+  ])('asks the page holding unsaved work before opening %s', async (_label, testId, href) => {
+    const onLeave = vi.fn();
+    const guard = renderHook(() => useLeaveGuard(true, onLeave));
+    await renderTab();
+    const control = await waitFor(() => screen.getByTestId(testId));
+
+    await act(async () => {
+      fireEvent.click(control);
+    });
+
+    expect(onLeave).toHaveBeenCalledTimes(1);
+    expect(mockPush).not.toHaveBeenCalled();
+    act(() => (onLeave.mock.calls[0][0] as () => void)());
+    expect(mockPush).toHaveBeenCalledWith(href);
+    guard.unmount();
   });
 
   it.each([false, null])(

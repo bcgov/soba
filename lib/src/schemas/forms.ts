@@ -94,7 +94,10 @@ export const FormVersionSummarySchema = z.object({
 
 export const FormWithPermissionsResponseSchema = FormResponseSchema.extend({
   permissions: z.array(z.string()),
-  /** The highest-numbered version that is not deleted. Save and publish target this one. */
+  /**
+   * The highest-numbered version that is not deleted, among those saved at least once. Save and
+   * publish target this one. A new version is left out until its first save.
+   */
   currentVersion: FormVersionSummarySchema.nullable(),
 });
 

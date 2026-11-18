@@ -1,0 +1,78 @@
+name: Deploy MongoDB Prod
+run-name: Deploy Prod MongoDB
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: openshift-prod-mongodb
+  cancel-in-progress: false
+
+jobs:
+  deploy-mongodb:
+    name: Deploy Prod MongoDB
+    environment: prod
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Validate production target
+        shell: bash
+        env:
+          NAMESPACE: ${{ vars.OC_NAMESPACE }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Production MongoDB deployment must run from main."
+            exit 1
+          fi
+          : "${NAMESPACE:?Set OC_NAMESPACE on the prod environment.}"
+          if [[ "$NAMESPACE" != *-prod ]]; then
+            echo "::error::Production MongoDB namespace must end in -prod."
+            exit 1
+          fi
+
+      - name: Install OpenShift CLI
+        uses: redhat-actions/openshift-tools-installer@e3b32c2ab7b064b2ce189121c4a49f509a99a7b4 # v3.0
+        with:
+          oc: "4.14"
+
+      - name: Log in to OpenShift
+        uses: redhat-actions/oc-login@2a1614bc977c054c8786c8e35fc9534bd0ddc156 # v2.0.1
+        with:
+          openshift_server_url: ${{ vars.OC_SERVER }}
+          openshift_token: ${{ secrets.OC_TOKEN }}
+          namespace: ${{ vars.OC_NAMESPACE }}
+
+      - name: Prepare MongoDB chart
+        shell: bash
+        run: |
+          set -euo pipefail
+          if helm repo add bitnami https://charts.bitnami.com/bitnami --force-update && \
+             helm dependency build deployments/helm/action-mongodb; then
+            echo "Using the pinned Bitnami MongoDB chart."
+          else
+            echo "Bitnami download failed; using the chart stored in this repository."
+            mkdir -p deployments/helm/action-mongodb/charts
+            cp deployments/helm/action-mongodb/vendor/mongodb-19.1.21.tgz \
+              deployments/helm/action-mongodb/charts/mongodb-19.1.21.tgz
+          fi
+
+      - name: Deploy MongoDB
+        shell: bash
+        env:
+          NAMESPACE: ${{ vars.OC_NAMESPACE }}
+        run: |
+          set -euo pipefail
+          oc -n "$NAMESPACE" get secret soba-prod-mongodb-auth -o json |
+            jq -e '.data["mongodb-root-password"] and .data["mongodb-passwords"] and .data["mongodb-replica-set-key"]' >/dev/null
+          helm upgrade --install soba-prod-mongodb deployments/helm/action-mongodb \
+            --namespace "$NAMESPACE" \
+            --wait \
+            --timeout 660s \
+            -f deployments/helm/action-mongodb/values-prod.yaml

@@ -186,6 +186,23 @@ export async function reviseSubmitSubmission(
   return parseJson<SubmissionResponse>(response);
 }
 
+/**
+ * Ask for a copy of the submission's confirmation to be emailed to one address. The server answers
+ * 202 and sends it in the background; a refusal throws an ApiError carrying its code.
+ */
+export async function emailSubmitSubmissionCopy(
+  token: string | undefined,
+  submissionId: string,
+  to: string,
+): Promise<void> {
+  const response = await sobaFetch(`/submit/submissions/${submissionId}/email-copy`, {
+    token,
+    method: 'POST',
+    json: { to },
+  });
+  if (!response.ok) await parseJson(response);
+}
+
 /** Read a submission's metadata for the confirmation view. */
 export async function getSubmitSubmission(
   token: string | undefined,

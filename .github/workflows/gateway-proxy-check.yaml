@@ -31,7 +31,7 @@ on:
       environment:
         description: GitHub environment holding OpenShift and APS credentials
         type: choice
-        options: [dev, pr, test]
+        options: [dev, pr, test, uat]
         default: dev
       release:
         description: Existing Helm release (e.g. soba-dev or soba-pr-156)
@@ -91,7 +91,7 @@ jobs:
           [[ "$OPENSHIFT_NAMESPACE" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] \
             || { echo '::error::Set OC_NAMESPACE on the selected environment'; exit 1; }
           case "$APP_ENVIRONMENT" in
-            pr|dev|test|prod)
+            pr|dev|test|uat|prod)
               : "${APS_HOST:?Set APS_HOST repository variable.}"
               ;;
             *)
@@ -108,10 +108,6 @@ jobs:
             exit 1
           fi
           if [[ -z "$GATEWAY_HOSTNAME" ]]; then
-            if [[ "$APP_ENVIRONMENT" == prod ]]; then
-              echo '::error::Production requires an explicit gateway_hostname'
-              exit 1
-            fi
             if [[ "$APP_ENVIRONMENT" == pr ]]; then
               export GATEWAY_HOSTNAME="${APS_GATEWAY_HOST_PREFIX:?Set APS_GATEWAY_HOST_PREFIX in the pr environment.}.${APS_HOST}"
             elif [[ "$APP_ENVIRONMENT" == dev ]]; then

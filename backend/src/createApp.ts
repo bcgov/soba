@@ -35,8 +35,8 @@ export const createApp = () => {
 
   initializePassport();
 
-  // Downloads read their file name from Content-Disposition.
-  const corsExposedHeaders = ['Content-Disposition'];
+  // Downloads read their file name from Content-Disposition. Failed reads show X-Request-Id.
+  const corsExposedHeaders = ['Content-Disposition', 'X-Request-Id'];
   // CORS is always restricted to an explicit allowlist of trusted origins (never `*`).
   // Production origins come from CORS_ORIGIN; in development we fall back to CORS_DEV_ORIGIN
   // (configurable per developer via .env) when CORS_ORIGIN is unset.

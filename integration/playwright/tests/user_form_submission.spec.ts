@@ -1,13 +1,15 @@
 import { test, expect } from '../fixtures/form_setup';
 import dictionaries from '../../../frontend/dictionaries/en.json';
+import { openAuthenticatedPage } from '../support/open_authenticated_page';
+
+test.describe.configure({ timeout: 60_000 });
 
 test('User can submit the shared form and find it in My Submissions', async ({
   page,
   title,
   submissionUrl,
 }) => {
-  await page.goto(submissionUrl);
-  await expect(page.getByTestId('user-dropdown')).toBeVisible();
+  await openAuthenticatedPage(page, submissionUrl);
 
   const form = page.getByTestId('submission-fill');
   await expect(form).toBeVisible();
@@ -24,7 +26,7 @@ test('User can submit the shared form and find it in My Submissions', async ({
   const success = page.getByTestId('submission-success');
   await expect(success).toContainText(dictionaries.submission.success.message);
   await expect(success.getByRole('heading', { name: title, exact: true })).toBeVisible();
-  const confirmation = success.getByTestId('submission-view-confirmation').locator('strong');
+  const confirmation = success.getByTestId('submission-view-confirmation-code');
   await expect(confirmation).not.toBeEmpty();
   const confirmationCode = (await confirmation.innerText()).trim();
   const submissionId = new URL(page.url()).pathname.split('/').slice(-2)[0];

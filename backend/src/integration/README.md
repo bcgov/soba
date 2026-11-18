@@ -10,7 +10,7 @@ documentation are reused. Explicit gateway error bodies remain distinct from bac
 
 ## Credential grants
 
-Migration `0070_credential_permissions.sql` adds explicit per-key permissions; existing keys
+Migration `0072_credential_permissions.sql` adds explicit per-key permissions; existing keys
 receive none. `submission_read` is the initial supported permission. Creating or editing grants
 requires holding those permissions on the credential's workspace or form in addition to existing
 key-management authorization. A web-component-only credential cannot hold API grants.

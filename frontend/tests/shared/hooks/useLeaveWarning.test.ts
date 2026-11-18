@@ -23,6 +23,15 @@ describe('useLeaveWarning', () => {
     expect(leaveIsHeld()).toBe(false);
   });
 
+  // A leave already agreed to navigates before the re-render that would turn the warning off.
+  it('lets go at once when released', () => {
+    const { result } = renderHook(() => useLeaveWarning(true));
+    expect(leaveIsHeld()).toBe(true);
+
+    result.current();
+    expect(leaveIsHeld()).toBe(false);
+  });
+
   it('lets go on unmount', () => {
     const { unmount } = renderHook(() => useLeaveWarning(true));
     expect(leaveIsHeld()).toBe(true);

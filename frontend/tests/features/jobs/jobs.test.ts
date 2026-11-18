@@ -31,6 +31,17 @@ describe('job types', () => {
     expect(jobTypeLabel('submission.status-email', dict)).toEqual({ text: email });
   });
 
+  it.each([
+    ['en', en as Dictionary, 'Submitter email copy'],
+    ['fr', fr as Dictionary, 'Copie par courriel au soumissionnaire'],
+  ])('names submitter email copy jobs in %s', (_language, dict, name) => {
+    expect(jobTypeLabel('submission.email-copy', dict)).toEqual({ text: name });
+  });
+
+  it("lists submitter email copies among a submission's job types", () => {
+    expect(submissionJobTypes()).toContain('submission.email-copy');
+  });
+
   it("lists status changes and their emails among a submission's job types", () => {
     expect(submissionJobTypes()).toEqual(
       expect.arrayContaining(['submission.status-changed', 'submission.status-email']),

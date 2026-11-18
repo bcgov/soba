@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { isStoragePrefix } from '../integrations/storage-engine/storageKey';
+import { withoutTrailingSlashes } from '../url';
 
 let loaded = false;
 
@@ -136,7 +137,7 @@ export function resolveApiBasePath(source: EnvSource): string {
     return '';
   }
   const withLeadingSlash = raw.startsWith('/') ? raw : `/${raw}`;
-  return withLeadingSlash.endsWith('/') ? withLeadingSlash.slice(0, -1) : withLeadingSlash;
+  return withoutTrailingSlashes(withLeadingSlash);
 }
 
 /** The value when it is a whole number of at least 1; undefined otherwise. */
@@ -200,7 +201,7 @@ const MAX_RETENTION_DAYS = 36_500;
 const MAX_RESULT_BYTES = 2_147_483_647;
 
 /** Unset uses the fallback; a value that is not a whole number from `min` to `max` throws. */
-function wholeNumberSetting(
+export function wholeNumberSetting(
   source: EnvSource,
   key: string,
   fallback: number,
@@ -235,6 +236,12 @@ export function resolveJobSettings(source: EnvSource): JobSettings {
     wholeNumberSetting(source, key, fallback, { min: MIN_LEASE_MS });
   const retentionDays = (key: string, fallback: number) =>
     wholeNumberSetting(source, key, fallback, { max: MAX_RETENTION_DAYS });
+  const resultsStoragePrefix = getOptionalEnvFrom(source, 'JOB_RESULTS_STORAGE_PREFIX') ?? 'jobs';
+  if (!isStoragePrefix(resultsStoragePrefix)) {
+    throw new Error(
+      `JOB_RESULTS_STORAGE_PREFIX is not a valid storage prefix, got '${resultsStoragePrefix}'`,
+    );
+  }
   return {
     pools: resolveJobPools(source),
     pollMs: {
@@ -271,16 +278,8 @@ export function resolveJobSettings(source: EnvSource): JobSettings {
     resultRetentionDays: retentionDays('JOB_RESULT_RETENTION_DAYS', 7),
     resultSweepBatch: setting('JOB_RESULT_SWEEP_BATCH', 100),
     resultsStorageProfile: getOptionalEnvFrom(source, 'JOB_RESULTS_STORAGE_PROFILE') ?? 'default',
-    resultsStoragePrefix: resolveResultsPrefix(source),
+    resultsStoragePrefix,
   };
-}
-
-function resolveResultsPrefix(source: EnvSource): string {
-  const prefix = getOptionalEnvFrom(source, 'JOB_RESULTS_STORAGE_PREFIX') ?? 'job-results';
-  if (!isStoragePrefix(prefix)) {
-    throw new Error(`JOB_RESULTS_STORAGE_PREFIX is not a valid storage prefix, got '${prefix}'`);
-  }
-  return prefix;
 }
 
 export interface ShutdownSettings {

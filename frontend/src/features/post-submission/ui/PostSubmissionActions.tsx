@@ -7,10 +7,15 @@ import type { DataError } from '@/src/shared/api/dataContracts';
 import { messageForDataError } from '@/src/shared/api/dataError';
 import type { Dictionary } from '@/src/types/dictionary';
 
+/** A drawer shown after the actions, whatever becomes of them, such as the Confirmation Screen. */
+export type ExtraDrawer = { id: string; node: ReactNode };
+
 /**
  * The After Submission tab around its drawers: loading, a read that failed, a scope with no actions,
  * or one drawer per action in the server's order. A 404 means post-submission is no longer
- * available here, such as after it was turned off.
+ * available here, such as after it was turned off. `actions` null means post-submission is not
+ * available, so only the extra drawers show, without the actions' intro. Extra drawers follow the
+ * actions in the same group, and stay when the actions failed or are empty.
  */
 export default function PostSubmissionActions<T extends { code: string }>({
   dict,
@@ -18,16 +23,22 @@ export default function PostSubmissionActions<T extends { code: string }>({
   actions,
   error,
   renderAction,
+  extraDrawers = [],
 }: Readonly<{
   dict: Dictionary;
   intro: string;
-  actions: T[] | undefined;
+  actions: T[] | undefined | null;
   error: DataError | null;
   renderAction: (action: T) => ReactNode;
+  extraDrawers?: readonly ExtraDrawer[];
 }>) {
   const t = dict.postSubmission;
-  if (error) {
-    return (
+  // The group reads which drawer starts open only when it mounts, so it waits for the actions.
+  if (actions === undefined && !error) return <CenteredProgress label={dict.general.loading} />;
+
+  let notice: ReactNode = null;
+  if (actions !== null && error) {
+    notice = (
       <InlineAlert
         variant="warning"
         title={messageForDataError(error, {
@@ -39,15 +50,23 @@ export default function PostSubmissionActions<T extends { code: string }>({
         data-testid="post-submission-load-error"
       />
     );
+  } else if (actions?.length === 0) {
+    notice = <p data-testid="post-submission-empty">{t.empty}</p>;
   }
-  if (!actions) return <CenteredProgress label={dict.general.loading} />;
-  if (actions.length === 0) return <p data-testid="post-submission-empty">{t.empty}</p>;
+  const shownActions = actions && !error ? actions : [];
+
+  if (notice && extraDrawers.length === 0) return notice;
+  const firstKey = shownActions[0]?.code ?? extraDrawers[0]?.id;
   return (
     <>
-      <p data-testid="post-submission-intro">{intro}</p>
-      <AccordionGroup allowsMultipleExpanded={false} defaultExpandedKeys={[actions[0].code]}>
-        {actions.map(renderAction)}
-      </AccordionGroup>
+      {actions !== null && <p data-testid="post-submission-intro">{intro}</p>}
+      {notice && <div className="mb-3">{notice}</div>}
+      {firstKey && (
+        <AccordionGroup allowsMultipleExpanded={false} defaultExpandedKeys={[firstKey]}>
+          {shownActions.map(renderAction)}
+          {extraDrawers.map((drawer) => drawer.node)}
+        </AccordionGroup>
+      )}
     </>
   );
 }
