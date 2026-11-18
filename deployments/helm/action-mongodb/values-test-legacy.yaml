@@ -1,0 +1,41 @@
+# Test MongoDB runs independently from the SOBA application release.
+# Create soba-test-mongodb-auth before deploying this chart; do not put
+# credentials in this file or in the workflow.
+mongodb:
+  enabled: true
+  fullnameOverride: soba-test-mongodb
+
+  replicaCount: 3
+
+  auth:
+    existingSecret: soba-test-mongodb-auth
+    usernames:
+      - formio
+    databases:
+      - formio-ce
+
+  # A volume claim template cannot change in place: growing an existing volume means patching its
+  # PVC and deleting the StatefulSet with --cascade=orphan before the upgrade.
+  persistence:
+    storageClass: netapp-block-standard
+    size: 5Gi
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 1Gi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+  networkPolicy:
+    ingressPodMatchLabels:
+      app.kubernetes.io/name: soba
+      app.kubernetes.io/instance: soba-test
+      app.kubernetes.io/component: formio
+    extraEgress:
+      - ports:
+          - port: 5353
+            protocol: UDP
+          - port: 5353
+            protocol: TCP
