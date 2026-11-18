@@ -13,7 +13,7 @@ mongodb:
 
   persistence:
     storageClass: netapp-block-standard
-    size: 10Gi
+    size: 3Gi
 
   resources:
     requests:
