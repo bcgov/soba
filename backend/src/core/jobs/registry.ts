@@ -53,7 +53,8 @@ export interface JobTypeDefinition {
   keepResultWhenEnded?: boolean;
   /**
    * Returning means the work is done, even after an abort; throwing retries the job until its
-   * attempts run out, unless it throws `JobCancelledError` or `JobFailedError`. A job runs at least
+   * attempts run out, unless it throws `JobCancelledError` or `JobFailedError`. Throwing
+   * `JobDeferredError` runs it again after its delay without using an attempt. A job runs at least
    * once, and after a lost lease two pods can run it at the same time, so its side effects must be
    * safe to repeat.
    */

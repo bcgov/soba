@@ -268,11 +268,23 @@ export const finishJob = async (
   return rows.length > 0;
 };
 
+/** A wait a job asked for, and why. */
+export interface JobDeferral {
+  /** Whole milliseconds, at most a day, as `deferDelayMs` bounds it. */
+  delayMs: number;
+  /** Recorded as the job's last error. */
+  reason: string;
+}
+
 /**
- * Hand a claimed job back for another worker without counting the attempt. A job whose cancel was
- * requested ends cancelled instead.
+ * Hand a claimed job back without counting the attempt, to run again now or, with a deferral, after
+ * its delay; it stays the same run. A job whose cancel was requested ends cancelled instead.
  */
-export const releaseJob = async (id: string, claimToken: string): Promise<boolean> => {
+export const releaseJob = async (
+  id: string,
+  claimToken: string,
+  deferral?: JobDeferral,
+): Promise<boolean> => {
   const rows = await quietDb
     .update(jobs)
     .set({
@@ -280,7 +292,8 @@ export const releaseJob = async (id: string, claimToken: string): Promise<boolea
       status: unlessCancelRequested(JobStatus.queued),
       finishedAt: finishedIfCancelRequested(),
       attempts: sql`greatest(${jobs.attempts} - 1, 0)`,
-      runAfter: sql`now()`,
+      runAfter: deferral ? afterMs(deferral.delayMs) : sql`now()`,
+      ...(deferral ? { lastError: deferral.reason } : {}),
     })
     .where(held(id, claimToken))
     .returning({ id: jobs.id });

@@ -154,9 +154,10 @@ export interface PostSubmissionActionPluginDefinition<TOptions = Record<string, 
     /** Keep the result until it expires even when the job ends dead or cancelled. */
     keepResultWhenEnded?: boolean;
     /**
-     * Returning means the action is done; throwing retries it. Stop and throw when the signal
-     * aborts. It can run more than once, so its side effects must be safe to repeat. An error's
-     * message is stored on the job and logged, so it must not carry recipients or submission data.
+     * Returning means the action is done; throwing retries it, and throwing `JobDeferredError` runs
+     * it again after its delay without using an attempt. Stop and throw when the signal aborts. It can
+     * run more than once, so its side effects must be safe to repeat. An error's message is stored
+     * on the job and logged, so it must not carry recipients or submission data.
      */
     run: (context: PostSubmissionActionContext<TOptions>) => Promise<void>;
   };

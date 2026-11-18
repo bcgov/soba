@@ -17,8 +17,9 @@ import { OUTCOME_WRITE_RETRIES, OUTCOME_WRITE_RETRY_MS } from './settings';
 import {
   decideOutcome,
   errorText,
+  handlerEnding,
   JobCancelledError,
-  JobFailedError,
+  type HandlerEnding,
   type JobOutcome,
   type JobStopReason,
 } from './settlement';
@@ -28,8 +29,8 @@ interface RunningJob {
   job: ClaimedJob;
   controller: AbortController;
   stopReason?: JobStopReason;
-  /** The handler threw `JobFailedError`: no further attempts. */
-  permanent: boolean;
+  /** How the handler asked to end when it threw: no further attempts, or a deferral. */
+  ending: HandlerEnding;
   /** The handler has returned; only the outcome write is left. */
   returned: boolean;
   stopHeartbeat: () => void;
@@ -66,10 +67,11 @@ const recordOutcome = (
   job: ClaimedJob,
   outcome: JobOutcome,
   progress: JobProgress | undefined,
-): Promise<boolean> =>
-  outcome.kind === 'release'
-    ? releaseJob(job.id, job.claimToken)
-    : finishJob(job.id, job.claimToken, outcome, progress);
+): Promise<boolean> => {
+  if (outcome.kind === 'release') return releaseJob(job.id, job.claimToken);
+  if (outcome.kind === 'defer') return releaseJob(job.id, job.claimToken, outcome);
+  return finishJob(job.id, job.claimToken, outcome, progress);
+};
 
 const OUTCOME_MESSAGES: Record<JobOutcome['kind'], string> = {
   succeeded: 'Job succeeded',
@@ -77,7 +79,14 @@ const OUTCOME_MESSAGES: Record<JobOutcome['kind'], string> = {
   dead: 'Job dead',
   cancelled: 'Job cancelled',
   release: 'Job released for another pod',
+  defer: 'Job deferred',
 };
+
+const EXPECTED_OUTCOMES: ReadonlySet<JobOutcome['kind']> = new Set([
+  'succeeded',
+  'release',
+  'defer',
+]);
 
 /**
  * Runs queued jobs for the pools this pod is configured for. Each pool polls on its own interval and
@@ -185,7 +194,7 @@ export class JobRunner {
     const entry: RunningJob = {
       job,
       controller: new AbortController(),
-      permanent: false,
+      ending: {},
       returned: false,
       stopHeartbeat: () => undefined,
       done: Promise.resolve(),
@@ -216,7 +225,7 @@ export class JobRunner {
       const error = await this.runHandler(state, entry, log, progress.report);
       entry.returned = true;
       clearTimeout(entry.abandonTimer);
-      const outcome = decideOutcome(error, entry.stopReason, job, this.settings, entry.permanent);
+      const outcome = decideOutcome(error, entry.stopReason, job, this.settings, entry.ending);
       if (!outcome) {
         log.warn({ reason: entry.stopReason, error }, 'Job stopped before finishing');
         return;
@@ -228,7 +237,7 @@ export class JobRunner {
         OUTCOME_WRITE_RETRY_MS,
       );
       if (recorded) {
-        const expected = outcome.kind === 'succeeded' || outcome.kind === 'release';
+        const expected = EXPECTED_OUTCOMES.has(outcome.kind);
         log[expected ? 'info' : 'warn']({ outcome }, OUTCOME_MESSAGES[outcome.kind]);
       } else {
         log.warn({ outcome: outcome.kind }, 'Job was no longer held; outcome not recorded');
@@ -271,7 +280,7 @@ export class JobRunner {
       });
       return undefined;
     } catch (err) {
-      if (err instanceof JobFailedError) entry.permanent = true;
+      entry.ending = handlerEnding(err);
       if (err instanceof JobCancelledError && !entry.stopReason) entry.stopReason = 'cancel';
       return entry.stopReason === 'timeout' ? `Timed out after ${timeoutMs} ms` : errorText(err);
     } finally {
