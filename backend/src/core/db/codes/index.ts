@@ -86,6 +86,8 @@ export const FormStatus = {
 export type FormStatusCode = (typeof FormStatus)[keyof typeof FormStatus];
 
 export const FormVersionState = {
+  /** Created but never saved. Left out of the version list; the first save makes it a draft. */
+  opened: 'opened',
   draft: 'draft',
   published: 'published',
   archived: 'archived',

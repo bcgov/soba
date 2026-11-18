@@ -107,8 +107,14 @@ describe('FormService.create', () => {
       expect.anything(),
     );
     const tx = createForm.mock.calls[0][1];
+    // A draft, so the form has a current version and its first save does not create another v1.
     expect(createDraft).toHaveBeenCalledWith(
-      expect.objectContaining({ id: VERSION_ID, formId: FORM_ID, engineSchemaRef: 'engine-ref' }),
+      expect.objectContaining({
+        id: VERSION_ID,
+        formId: FORM_ID,
+        state: 'draft',
+        engineSchemaRef: 'engine-ref',
+      }),
       tx,
     );
     expect(createSettings).toHaveBeenCalledWith(

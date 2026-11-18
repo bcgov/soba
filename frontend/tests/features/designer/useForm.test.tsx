@@ -19,6 +19,12 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
   saveFormVersionSchema: (...args: unknown[]) => saveFormVersionSchema(...args),
 }));
 
+const deleteSobaFormVersion = vi.fn();
+vi.mock('@/src/shared/api/sobaApiDesign', async (importActual) => ({
+  ...(await importActual<Record<string, unknown>>()),
+  deleteSobaFormVersion: (...args: unknown[]) => deleteSobaFormVersion(...args),
+}));
+
 import makeStore from '@/lib/store';
 import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import { useDesignFormRead, useForm, useFormWriter } from '@/src/features/designer/data/useForm';
@@ -256,6 +262,25 @@ describe('useForm', () => {
 
     const [refused, next] = createFormVersion.mock.calls.map((call) => call[1].id);
     expect(next).not.toBe(refused);
+  });
+
+  // The form names its current version, so deleting the newest draft changes it too.
+  it('deletes a version, then reads the form and its versions again', async () => {
+    deleteSobaFormVersion.mockResolvedValue(undefined);
+    const { result } = renderHook(() => ({ form: useForm('f1'), writer: useFormWriter('f1') }), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.form.currentVersion?.id).toBe('v2'));
+    getSobaForm.mockClear();
+    lookupFormVersions.mockClear();
+
+    await act(async () => {
+      await result.current.writer.deleteVersion('token', 'v2');
+    });
+
+    expect(deleteSobaFormVersion).toHaveBeenCalledWith('token', 'v2');
+    expect(getSobaForm).toHaveBeenCalled();
+    expect(lookupFormVersions).toHaveBeenCalled();
   });
 
   it('opens an older version as history, read by id', async () => {
