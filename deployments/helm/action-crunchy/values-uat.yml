@@ -38,12 +38,12 @@ crunchy:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '9187'
     dataVolumeClaimSpec:
-      storage: 20Gi
+      storage: 3Gi
       storageClassName: netapp-block-standard
-      walStorage: 2Gi
+      walStorage: 1Gi
     requests:
-      cpu: 150m
-      memory: 1536Mi
+      cpu: 100m
+      memory: 1Gi
     replicaCertCopy:
       requests:
         cpu: 10m
