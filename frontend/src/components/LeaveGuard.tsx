@@ -1,49 +1,31 @@
 'use client';
 
-import { createContext, useCallback, useContext, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { useDictionary } from '@/app/[lang]/Providers';
-import { useLeaveWarning } from '@/src/shared/hooks/useLeaveWarning';
+import { useLeaveGuard } from '@/src/shared/hooks/useLeaveGuard';
 import { ConfirmModal } from './ConfirmModal';
 
-const HoldContext = createContext<((href: string) => void) | null>(null);
-
-/** Asks before a refresh, close, in-app link, Back or `useGuardedPush` loses unsaved changes. */
-export function LeaveGuard({
-  active,
-  children,
-}: Readonly<{ active: boolean; children?: ReactNode }>) {
+/** While `active`, asks before a link, Back, requestLeave, refresh or close loses unsaved changes. */
+export function LeaveGuard({ active }: Readonly<{ active: boolean }>) {
   const t = useDictionary().general.unsavedChanges;
-  const { leaving, leave, stay, hold } = useLeaveWarning(active);
+  // The leave waiting on the person's answer.
+  const [pending, setPending] = useState<{ go: () => void } | null>(null);
+  useLeaveGuard(active, (go) => setPending({ go }));
+
+  const leave = () => {
+    setPending(null);
+    pending?.go();
+  };
 
   return (
-    <HoldContext.Provider value={hold}>
-      {children}
-      <ConfirmModal
-        show={leaving}
-        title={t.title}
-        message={t.message}
-        confirmLabel={t.confirm}
-        cancelLabel={t.stay}
-        onConfirm={leave}
-        onCancel={stay}
-      />
-    </HoldContext.Provider>
-  );
-}
-
-/** `router.push` for a button that leaves the page: inside a LeaveGuard, it asks first. */
-export function useGuardedPush() {
-  const hold = useContext(HoldContext);
-  const router = useRouter();
-  return useCallback(
-    (href: string) => {
-      if (hold) {
-        hold(href);
-        return;
-      }
-      router.push(href);
-    },
-    [hold, router],
+    <ConfirmModal
+      show={pending !== null}
+      title={t.title}
+      message={t.message}
+      confirmLabel={t.confirm}
+      cancelLabel={t.stay}
+      onConfirm={leave}
+      onCancel={() => setPending(null)}
+    />
   );
 }

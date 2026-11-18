@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
@@ -744,10 +744,15 @@ describe('FormioV5SubmissionFillClient', () => {
       const clickNav = async () => {
         const link = document.body.appendChild(document.createElement('a'));
         link.href = '/en/forms';
-        link.addEventListener('click', (event) => event.preventDefault());
+        // Records the link being followed; a held click never reaches it.
+        const followed = vi.fn((event: MouseEvent) => event.preventDefault());
+        link.addEventListener('click', followed);
         await userEvent.click(link);
-        link.remove();
+        return followed;
       };
+      afterEach(() => {
+        for (const link of document.querySelectorAll('a[href="/en/forms"]')) link.remove();
+      });
       const asked = () => screen.queryByText('Leave without saving?') !== null;
       const edit = () => act(() => h.onChange?.({ data: { a: 2 } }, {}, true));
 
@@ -771,9 +776,10 @@ describe('FormioV5SubmissionFillClient', () => {
       it('leaves to the link once the loss is confirmed', async () => {
         await renderLoaded();
         edit();
-        await clickNav();
+        const followed = await clickNav();
+        expect(followed).not.toHaveBeenCalled();
         await userEvent.click(screen.getByTestId('confirm-modal-confirm'));
-        expect(h.push).toHaveBeenCalledWith('/en/forms');
+        expect(followed).toHaveBeenCalledTimes(1);
       });
 
       it('lets the filler leave once the draft is saved', async () => {

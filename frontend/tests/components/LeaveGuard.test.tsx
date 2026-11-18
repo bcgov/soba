@@ -1,20 +1,19 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import en from '@/dictionaries/en.json';
-import { LeaveGuard, useGuardedPush } from '@/src/components/LeaveGuard';
+import { LeaveGuard } from '@/src/components/LeaveGuard';
+import { requestLeave } from '@/src/shared/hooks/useLeaveGuard';
 
-const push = vi.fn();
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 vi.mock('@/app/[lang]/Providers', async () => {
   const dict = { ...(await import('@/dictionaries/en.json')).default, locale: 'en' };
   return { useDictionary: () => dict };
 });
 
-function ExportButton() {
-  const guardedPush = useGuardedPush();
+/** A button that leaves the page the way a router push does. */
+function ExportButton({ go }: Readonly<{ go: () => void }>) {
   return (
-    <button type="button" onClick={() => guardedPush('/en/exports')}>
+    <button type="button" onClick={() => requestLeave(go)}>
       Export
     </button>
   );
@@ -22,40 +21,50 @@ function ExportButton() {
 
 const leaveTitle = en.general.unsavedChanges.title;
 
-beforeEach(() => push.mockClear());
-
-describe('useGuardedPush', () => {
-  it('pushes at once outside a guard', async () => {
-    render(<ExportButton />);
-
-    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
-    expect(push).toHaveBeenCalledWith('/en/exports');
-  });
-
-  it('pushes at once inside a guard with nothing unsaved', async () => {
+describe('LeaveGuard', () => {
+  it('lets the leave go at once with nothing unsaved', async () => {
+    const go = vi.fn();
     render(
-      <LeaveGuard active={false}>
-        <ExportButton />
-      </LeaveGuard>,
+      <>
+        <LeaveGuard active={false} />
+        <ExportButton go={go} />
+      </>,
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'Export' }));
-    expect(push).toHaveBeenCalledWith('/en/exports');
+    expect(go).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(leaveTitle)).not.toBeInTheDocument();
   });
 
-  it('asks first inside a guard with unsaved changes, and goes once confirmed', async () => {
+  it('asks first with unsaved changes, and stays when told to', async () => {
+    const go = vi.fn();
     render(
-      <LeaveGuard active>
-        <ExportButton />
-      </LeaveGuard>,
+      <>
+        <LeaveGuard active />
+        <ExportButton go={go} />
+      </>,
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'Export' }));
-    expect(push).not.toHaveBeenCalled();
     expect(await screen.findByText(leaveTitle)).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('confirm-modal-cancel'));
 
-    await userEvent.click(screen.getByTestId('confirm-modal-confirm'));
-    expect(push).toHaveBeenCalledWith('/en/exports');
+    expect(go).not.toHaveBeenCalled();
+    expect(screen.queryByText(leaveTitle)).not.toBeInTheDocument();
+  });
+
+  it('goes once the loss is confirmed', async () => {
+    const go = vi.fn();
+    render(
+      <>
+        <LeaveGuard active />
+        <ExportButton go={go} />
+      </>,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
+    await userEvent.click(await screen.findByTestId('confirm-modal-confirm'));
+
+    expect(go).toHaveBeenCalledTimes(1);
   });
 });

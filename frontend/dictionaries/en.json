@@ -546,8 +546,6 @@
     "versionConflict": "This form changed since you opened it. Save your edits as a new version, or discard them.",
     "staleEdits": "Your unsaved edits were made on an older version of this form. Save them as a new version, or discard them.",
     "discardEdits": "Discard edits",
-    "switchVersionTitle": "Open another version?",
-    "switchVersionMessage": "Your unsaved edits will be discarded.",
     "noActiveWorkspace": "Select a workspace before creating a form.",
     "noActiveWorkspaceError": "Select a workspace before saving this form.",
     "published": "Form published successfully!",

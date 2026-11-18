@@ -1,18 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Link } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useDictionary } from '@/app/[lang]/Providers';
-import { ConfirmModal } from '@/src/components/ConfirmModal';
+import { LeaveGuard } from '@/src/components/LeaveGuard';
 import { usePageHeading } from '@/src/components/PageHeader';
 import { SubmissionLoadAlert } from '@/src/features/submissions/ui/SubmissionLoadAlert';
 import { useDesignSubmission } from '@/src/features/designer/data/useDesignSubmission';
 import { useStaffPrint } from '@/src/features/templates/data/useSubmissionPrint';
 import { printBaseName } from '@/src/features/templates/printFileName';
 import { PrintSubmissionButton } from '@/src/features/templates/ui/PrintSubmissionButton';
-import { useLeaveWarning } from '@/src/shared/hooks/useLeaveWarning';
+import { requestLeave } from '@/src/shared/hooks/useLeaveGuard';
 import { navLink } from '@/src/shared/list/listQueryMemory';
 import { SubmissionReview } from './SubmissionReview';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
@@ -28,6 +28,7 @@ export function DesignSubmissionView({
   submissionId,
 }: Readonly<DesignSubmissionViewProps>) {
   const dict = useDictionary();
+  const router = useRouter();
   const locale = getLocaleFromPath(usePathname());
 
   const { data, error } = useDesignSubmission(submissionId, formId);
@@ -36,9 +37,9 @@ export function DesignSubmissionView({
   const dictReview = dict.submission.review;
 
   usePageHeading({ heading: dictReview.heading });
-  const leaveEdit = useLeaveWarning(unsavedEdit);
 
-  const backToList = () => leaveEdit.hold(navLink(`/${locale}/build/${formId}?tab=submissions`));
+  const backToList = () =>
+    requestLeave(() => router.push(navLink(`/${locale}/build/${formId}?tab=submissions`)));
 
   const renderContent = () => {
     // A failed background revalidation keeps the submission already on screen.
@@ -69,15 +70,7 @@ export function DesignSubmissionView({
         ) : null}
       </div>
       {renderContent()}
-      <ConfirmModal
-        show={leaveEdit.leaving}
-        title={dict.general.unsavedChanges.title}
-        message={dict.general.unsavedChanges.message}
-        confirmLabel={dict.general.unsavedChanges.confirm}
-        cancelLabel={dict.general.unsavedChanges.stay}
-        onConfirm={leaveEdit.leave}
-        onCancel={leaveEdit.stay}
-      />
+      <LeaveGuard active={unsavedEdit} />
     </div>
   );
 }

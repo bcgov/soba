@@ -923,14 +923,18 @@ describe('DesignSubmissionView staff edits', () => {
       await renderView({ submissionId: SUBMISSION_ID });
       const link = document.body.appendChild(document.createElement('a'));
       link.href = '/en/forms';
+      // Records the link being followed; a held click never reaches it.
+      const followed = vi.fn((event: MouseEvent) => event.preventDefault());
+      link.addEventListener('click', followed);
 
       await user.click(await screen.findByTestId('submission-edit'));
       await user.click(screen.getByTestId('submission-edit-form'));
       await user.click(link);
 
       expect(await screen.findByTestId('confirm-modal-confirm')).toBeInTheDocument();
+      expect(followed).not.toHaveBeenCalled();
       await user.click(screen.getByTestId('confirm-modal-confirm'));
-      expect(mockPush).toHaveBeenCalledWith('/en/forms');
+      expect(followed).toHaveBeenCalledTimes(1);
       link.remove();
     });
 
