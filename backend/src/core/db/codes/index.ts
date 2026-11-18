@@ -226,6 +226,8 @@ export type FeatureScopeStatusCode = (typeof FeatureScopeStatus)[keyof typeof Fe
  */
 export const DocumentGenerationMode = {
   print: 'print',
+  /** A post-submission action job's render of a revision. */
+  package: 'package',
 } as const;
 export type DocumentGenerationModeCode =
   (typeof DocumentGenerationMode)[keyof typeof DocumentGenerationMode];

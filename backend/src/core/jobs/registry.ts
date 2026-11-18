@@ -7,6 +7,12 @@ import type { TempResource } from '../integrations/temp-storage/TempStorageAdapt
 export interface StoredJobResult {
   fileId: string;
   size: number;
+  expiresAt: Date;
+}
+
+export interface StoreResultOptions {
+  /** Who the result is attributed to; the job's creator when unset. */
+  actorId?: string;
 }
 
 export interface JobContext {
@@ -30,6 +36,7 @@ export interface JobContext {
   storeResult: (
     staged: TempResource,
     meta: { filename: string; contentType: string },
+    options?: StoreResultOptions,
   ) => Promise<StoredJobResult>;
 }
 
@@ -40,6 +47,10 @@ export interface JobTypeDefinition {
   maxAttempts?: number;
   /** Run time before the handler is aborted; the pool's JOB_*_TIMEOUT_MS when unset. */
   timeoutMs?: number;
+  /** Days a stored result is kept; JOB_RESULT_RETENTION_DAYS when unset. */
+  resultRetentionDays?: number;
+  /** Keep the result until it expires even when the job ends dead or cancelled. */
+  keepResultWhenEnded?: boolean;
   /**
    * Returning means the work is done, even after an abort; throwing retries the job until its
    * attempts run out, unless it throws `JobCancelledError` or `JobFailedError`. A job runs at least

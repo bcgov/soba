@@ -144,7 +144,8 @@ async function recordAudit(params: {
 }): Promise<void> {
   const createdBy = params.audit.actorId;
   if (!createdBy) {
-    // Shouldn't happen: both surfaces resolve an actor (the public user on submit); flag if it does.
+    // Shouldn't happen: every surface resolves an actor (the public user on submit, the system
+    // user in a job); flag if it does.
     log.warn(
       { mode: params.audit.mode },
       'skipping document-generation audit: no actor to attribute',
@@ -350,6 +351,46 @@ async function printStored(
     printAudit(record, actorId, stored),
   );
 }
+
+/** A job's render of one revision's answers. */
+export interface RevisionRenderInput {
+  workspaceId: string;
+  formId: string;
+  formVersionId: string;
+  submissionId: string;
+  revisionId: string;
+  answers: Record<string, unknown>;
+  actorId: string;
+}
+
+/** Render from a job. No caller is checked: the job checks the submission before it renders. */
+export const jobDocumentService = {
+  /**
+   * Render the answers as a PDF with the CDOGS template on the form version, audited in `package`
+   * mode against the revision. template-notfound when the version has none.
+   */
+  async renderRevision(input: RevisionRenderInput): Promise<DocumentRenderOutcome> {
+    const [stored] = await listLiveDocumentTemplates(
+      input.formVersionId,
+      DocumentTemplateType.cdogs,
+    );
+    if (!stored) return { status: 'template-notfound' };
+    const { workspaceId, formId, formVersionId } = input;
+    return renderWith(
+      { workspaceId, formId, formVersionId },
+      stored,
+      { options: { convertTo: 'pdf' }, data: input.answers },
+      {
+        mode: DocumentGenerationMode.package,
+        actorId: input.actorId,
+        submissionId: input.submissionId,
+        revisionId: input.revisionId,
+        templateId: stored.template.id,
+        templateFileId: stored.file.id,
+      },
+    );
+  },
+};
 
 /** Print from the submit surface: the submitter rules decide, and only stored templates render. */
 export const documentGenerationService = {

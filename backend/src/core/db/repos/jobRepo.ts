@@ -158,8 +158,14 @@ export const writeJobProgress = async (
 };
 
 export type AttachResultOutcome =
-  | { attached: true; previous: FileRecord | null }
+  | { attached: true; previous: FileRecord | null; expiresAt: Date }
   | { attached: false; reason: 'not_held' | 'cancel_requested' };
+
+/** How long a result is kept, and whether it outlives its job ending dead or cancelled. */
+export interface ResultRetention {
+  days: number;
+  keepWhenEnded: boolean;
+}
 
 /**
  * Point a held job at its new result file, in the caller's transaction, and delete the row of the
@@ -171,7 +177,7 @@ export const attachJobResult = async (
   id: string,
   claimToken: string,
   fileId: string,
-  retentionDays: number,
+  retention: ResultRetention,
 ): Promise<AttachResultOutcome> => {
   const [row] = await tx
     .select({ resultFileId: jobs.resultFileId, cancelRequestedAt: jobs.cancelRequestedAt })
@@ -180,16 +186,20 @@ export const attachJobResult = async (
     .for('update');
   if (!row) return { attached: false, reason: 'not_held' };
   if (row.cancelRequestedAt) return { attached: false, reason: 'cancel_requested' };
-  await tx
+  const [updated] = await tx
     .update(jobs)
     .set({
       resultFileId: fileId,
-      resultExpiresAt: sql`now() + ${retentionDays}::int * interval '1 day'`,
+      resultExpiresAt: sql`now() + ${retention.days}::int * interval '1 day'`,
+      keepResultWhenEnded: retention.keepWhenEnded,
     })
-    .where(eq(jobs.id, id));
-  if (!row.resultFileId) return { attached: true, previous: null };
+    .where(eq(jobs.id, id))
+    .returning({ expiresAt: jobs.resultExpiresAt });
+  if (!updated?.expiresAt) throw new Error(`Job ${id} result attach returned no expiry`);
+  const expiresAt = updated.expiresAt;
+  if (!row.resultFileId) return { attached: true, previous: null, expiresAt };
   const [previous] = await tx.delete(files).where(eq(files.id, row.resultFileId)).returning();
-  return { attached: true, previous: previous ?? null };
+  return { attached: true, previous: previous ?? null, expiresAt };
 };
 
 /** Extend the lease. `held` is false once the job is no longer this worker's. */
@@ -365,11 +375,18 @@ export const sweepJobs = async (retention: {
 
 const ENDED_UNSUCCESSFULLY = [JobStatus.dead, JobStatus.cancelled];
 
+/** A dead or cancelled job whose result is not kept past its end. */
+const endedWithoutKeep = and(
+  inArray(jobs.status, ENDED_UNSUCCESSFULLY),
+  eq(jobs.keepResultWhenEnded, false),
+);
+
 /**
  * Remove up to `batch` result files: those past their expiry, and those of jobs that ended dead or
- * cancelled. One transaction locks the jobs (skipping any being written), points them away from their
- * files and deletes the file rows; the caller then deletes the returned files' bytes. A dead or
- * cancelled job's expiry goes too, so it never reads as expired.
+ * cancelled without keeping their result. One transaction locks the jobs (skipping any being
+ * written), points them away from their files and deletes the file rows; the caller then deletes
+ * the returned files' bytes. Those dead or cancelled jobs lose their expiry too, so they never read
+ * as expired.
  */
 export const sweepJobResults = (batch: number): Promise<FileRecord[]> =>
   quietDb.transaction(async (tx) => {
@@ -379,7 +396,7 @@ export const sweepJobResults = (batch: number): Promise<FileRecord[]> =>
       .where(
         and(
           isNotNull(jobs.resultFileId),
-          or(lte(jobs.resultExpiresAt, sql`now()`), inArray(jobs.status, ENDED_UNSUCCESSFULLY)),
+          or(lte(jobs.resultExpiresAt, sql`now()`), endedWithoutKeep),
         ),
       )
       .limit(batch)
@@ -390,7 +407,7 @@ export const sweepJobResults = (batch: number): Promise<FileRecord[]> =>
       .update(jobs)
       .set({
         resultFileId: null,
-        resultExpiresAt: sql`case when ${inArray(jobs.status, ENDED_UNSUCCESSFULLY)} then null else ${jobs.resultExpiresAt} end`,
+        resultExpiresAt: sql`case when ${endedWithoutKeep} then null else ${jobs.resultExpiresAt} end`,
       })
       .where(
         inArray(

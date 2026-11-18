@@ -195,7 +195,7 @@ export const MAX_TIMER_MS = 2_147_483_647;
 const MIN_LEASE_MS = 1000;
 
 /** Past this, now() minus the retention overflows a Postgres timestamp. */
-const MAX_RETENTION_DAYS = 36_500;
+export const MAX_RETENTION_DAYS = 36_500;
 
 /** file.size is an integer column. */
 const MAX_RESULT_BYTES = 2_147_483_647;

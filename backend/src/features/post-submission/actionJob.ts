@@ -11,7 +11,6 @@ import type { JobTypeDefinition } from '../../core/jobs/registry';
 import { JobCancelledError } from '../../core/jobs/settlement';
 import { log } from '../../core/logging';
 import { isFeatureAvailable } from '../../core/services/featureAvailabilityService';
-import { actionNotifications } from './notifications';
 import { ActionJobParamsSchema } from './params';
 import { findActionSettingRows, findLiveSubmission, SUBMISSION_GONE } from './repo';
 import { actionFeatureAvailable, isWorkspaceConfigurable } from './resolve';
@@ -79,18 +78,25 @@ export const actionJobDefinition = (
   pool: plugin.job.pool,
   maxAttempts: plugin.job.maxAttempts,
   timeoutMs: plugin.job.timeoutMs,
-  run: async ({ job, signal, log }) => {
+  resultRetentionDays: plugin.job.resultRetentionDays,
+  keepResultWhenEnded: plugin.job.keepResultWhenEnded,
+  run: async ({ job, signal, log, reportProgress, resultMaxBytes, storeResult }) => {
     const { facts, submission } = await runFacts(plugin, job);
     const reason = cancelReason(facts);
     if (reason || submission === null) throw new JobCancelledError(reason ?? SUBMISSION_GONE);
     const params = ActionJobParamsSchema.parse(job.params);
     const options = plugin.optionsSchema.parse(params.options);
+    // Loaded on run: the services import the submission service, whose module loads the job
+    // catalog, which imports this module.
+    const { actionResult, actionServices } = await import('./actionServices');
     await plugin.job.run({
       job,
       options,
       source: params.source,
       submission,
-      services: { notifications: actionNotifications(job) },
+      services: actionServices(job, submission, log),
+      result: actionResult({ resultMaxBytes, storeResult }),
+      reportProgress,
       signal,
       log,
     });

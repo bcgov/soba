@@ -4,10 +4,15 @@ import { addAbortSignal } from 'node:stream';
 import type { Logger } from 'pino';
 import type { JobSettings } from '../config/env';
 import type { FileRecord } from '../db/repos/fileRepo';
-import { attachJobResult, type ClaimedJob, type JobProgress } from '../db/repos/jobRepo';
+import {
+  attachJobResult,
+  type ClaimedJob,
+  type JobProgress,
+  type ResultRetention,
+} from '../db/repos/jobRepo';
 import type { TempResource } from '../integrations/temp-storage/TempStorageAdapter';
 import { fileStore } from '../services/fileStore';
-import type { StoredJobResult } from './registry';
+import type { JobTypeDefinition, StoredJobResult, StoreResultOptions } from './registry';
 import { JobCancelledError, JobFailedError } from './settlement';
 
 /** progress_done and progress_total are integer columns. */
@@ -45,6 +50,25 @@ export const createProgressReporter = (
   };
 };
 
+/** How one stored result is kept, and who it is attributed to. */
+export interface ResolvedResultOptions {
+  actorId: string;
+  retention: ResultRetention;
+}
+
+export const resolveResultOptions = (
+  definition: Pick<JobTypeDefinition, 'resultRetentionDays' | 'keepResultWhenEnded'>,
+  job: Pick<ClaimedJob, 'createdBy'>,
+  settings: Pick<JobSettings, 'resultRetentionDays'>,
+  options: StoreResultOptions = {},
+): ResolvedResultOptions => ({
+  actorId: options.actorId ?? job.createdBy,
+  retention: {
+    days: definition.resultRetentionDays ?? settings.resultRetentionDays,
+    keepWhenEnded: definition.keepResultWhenEnded ?? false,
+  },
+});
+
 const NOT_STORED = 'Stopped before its result was stored';
 
 /** The error for a stop seen while storing; the signal's reason is the runner's stop reason. */
@@ -62,6 +86,7 @@ export const storeJobResult = async (
   meta: { filename: string; contentType: string },
   settings: JobSettings,
   signal: AbortSignal,
+  options: ResolvedResultOptions,
 ): Promise<StoredJobResult> => {
   if (signal.aborted) throw stoppedError(signal);
   const { size } = await stat(staged.path);
@@ -71,15 +96,15 @@ export const storeJobResult = async (
   // Set inside the record write's transaction.
   const attach: {
     refused?: 'not_held' | 'cancel_requested';
-    previous: FileRecord | null;
-  } = { previous: null };
+    attached?: { previous: FileRecord | null; expiresAt: Date };
+  } = {};
   const source = addAbortSignal(signal, createReadStream(staged.path));
   let record: FileRecord;
   try {
     record = await fileStore.putGenerated(
       {
         workspaceId: job.workspaceId,
-        actorId: job.createdBy,
+        actorId: options.actorId,
         profile: settings.resultsStorageProfile,
         prefix: settings.resultsStoragePrefix,
         filename: meta.filename,
@@ -93,13 +118,13 @@ export const storeJobResult = async (
           job.id,
           job.claimToken,
           file.id,
-          settings.resultRetentionDays,
+          options.retention,
         );
         if (outcome.attached === false) {
           attach.refused = outcome.reason;
           throw new Error('Result not attached');
         }
-        attach.previous = outcome.previous;
+        attach.attached = outcome;
       },
     );
   } catch (err) {
@@ -110,6 +135,7 @@ export const storeJobResult = async (
     if (signal.aborted) throw stoppedError(signal);
     throw err;
   }
-  if (attach.previous) await fileStore.deleteBytes(attach.previous);
-  return { fileId: record.id, size };
+  if (!attach.attached) throw new Error('Result not attached');
+  if (attach.attached.previous) await fileStore.deleteBytes(attach.attached.previous);
+  return { fileId: record.id, size, expiresAt: attach.attached.expiresAt };
 };

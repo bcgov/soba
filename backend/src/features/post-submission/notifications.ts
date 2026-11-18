@@ -3,7 +3,8 @@ import type { PostSubmissionActionNotifications } from '../../core/integrations/
 import { getSystemUser } from '../../core/services/systemUser';
 import { jobNotifications } from '../notifications/jobNotifications';
 
-const systemUserId = async (): Promise<string> => {
+/** The system user's id; throws when there is none. */
+export const systemUserId = async (): Promise<string> => {
   const systemUser = await getSystemUser();
   if (!systemUser) throw new Error('The system user is missing');
   return systemUser.id;

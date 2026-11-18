@@ -1,5 +1,5 @@
 import type { Logger } from 'pino';
-import { createProgressReporter } from '../../../src/core/jobs/results';
+import { createProgressReporter, resolveResultOptions } from '../../../src/core/jobs/results';
 import type { JobProgress } from '../../../src/core/db/repos/jobRepo';
 
 const log = { warn: jest.fn() } as unknown as Logger;
@@ -84,5 +84,27 @@ describe('createProgressReporter', () => {
     expect(reporter.latest()).toEqual({ done: 2, total: 0 });
     reporter.report(Number.NaN, 3_000_000_000);
     expect(reporter.latest()).toEqual({ done: 0, total: 2_147_483_647 });
+  });
+});
+
+describe('resolveResultOptions', () => {
+  const job = { createdBy: 'starter' };
+  const settings = { resultRetentionDays: 7 };
+
+  it("uses the settings' retention and the job's creator, and drops the result of a dead or cancelled job", () => {
+    expect(resolveResultOptions({}, job, settings)).toEqual({
+      actorId: 'starter',
+      retention: { days: 7, keepWhenEnded: false },
+    });
+  });
+
+  it("uses the job type's retention and keep rule when it sets them", () => {
+    expect(
+      resolveResultOptions({ resultRetentionDays: 30, keepResultWhenEnded: true }, job, settings),
+    ).toEqual({ actorId: 'starter', retention: { days: 30, keepWhenEnded: true } });
+  });
+
+  it('attributes the result to the actor the caller names', () => {
+    expect(resolveResultOptions({}, job, settings, { actorId: 'system' }).actorId).toBe('system');
   });
 });

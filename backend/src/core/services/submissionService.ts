@@ -139,7 +139,8 @@ const appendWithJobs = async (
   const result = await appendSubmissionRevision(
     append,
     queueJob
-      ? (tx, record) => enqueueSubmittedJob(tx, record, append.revisionId, append.actorId, actions)
+      ? (tx, record, facts) =>
+          enqueueSubmittedJob(tx, record, append.revisionId, append.actorId, actions, facts)
       : undefined,
   );
   if (queueJob && result.outcome === 'appended') nudgeJobs(JobType.submission_submitted);

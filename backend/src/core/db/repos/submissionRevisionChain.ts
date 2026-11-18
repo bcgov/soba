@@ -7,6 +7,7 @@ import {
   SubmissionWorkflowState,
   type RevisionReasonCode,
   type RevisionStatusCode,
+  type SubmissionWriteEventCode,
 } from '../codes';
 import { submissionRevisions } from '../schema';
 
@@ -38,6 +39,12 @@ export const resolveRevisionStanding = (
   }
   return { applyAsCurrent: true, status: RevisionStatus.current, reason: RevisionReason.accepted };
 };
+
+/** A submit to a submission never submitted, read from the row under the lock. */
+export const isFirstSubmit = (
+  eventType: SubmissionWriteEventCode,
+  submission: { submittedAt: Date | null },
+): boolean => eventType === SubmissionEventType.submitted && submission.submittedAt === null;
 
 /** Append order over all revisions; the current version's number lives in current_revision_no. */
 export const nextRevisionNo = async (

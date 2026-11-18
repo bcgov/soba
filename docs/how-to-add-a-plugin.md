@@ -64,6 +64,10 @@ Add `get<Kind>DefaultCode()` to both `createEnvReader` and `env` in `core/config
 - Parse the success body with Zod and return the lib type.
 - `encodeURIComponent` any path segment that comes from the caller.
 - A `post-submission-action` plugin keeps its options schema in `lib/src/schemas/postSubmission.ts`, beside the rules its After Submission drawer uses, such as the email action's address rule and list limit. The drawer is an entry in `frontend/src/features/post-submission/actions/registry.ts` with its text under `postSubmission` in `en.json` and `fr.json`; until it has one, the tab shows the action read-only.
+- A `post-submission-action` definition with `submits: 'first'` is queued by a submission's first submit only, not by a resubmit after a revision.
+- A `post-submission-action` definition with an unknown key at its top level or in its `job` does not load.
+- A `post-submission-action` stores a file as its job's result with `result.store`, attributed to the system user. Stage it with `services.tempStorage`, keep it within `result.maxBytes`, and remove the staged file afterwards. `job.resultRetentionDays` sets how many days the file is kept (JOB_RESULT_RETENTION_DAYS when unset), and `job.keepResultWhenEnded` keeps it that long even when the job ends dead or cancelled.
+- A `post-submission-action` gets `services` in place of feature code: `tempStorage` stages files, `answers.readRevision` reads a revision's answers, `documents.render` renders them as a PDF with the form version's CDOGS template, and `files.open` opens the submission's uploads. `answers.readRevision` and `files.open` throw a fixed message when the engine or file storage fails, so the attempt retries. `documents.render` returns its outcome instead of throwing, and `files.open` returns `'missing'` for an id that is not one of the submission's files, a deleted file included.
 
 ## 5. The consumer
 

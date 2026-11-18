@@ -55,6 +55,26 @@ describe('post-submission action plugins', () => {
     expect(findInstalledPostSubmissionAction('post-submission-test-no-schema')).toBeUndefined();
   });
 
+  it("keeps a plugin's submits, and skips one with a bad submits or an unknown key", () => {
+    expect(findInstalledPostSubmissionAction('post-submission-test-off')?.submits).toBe('first');
+    expect(findInstalledPostSubmissionAction('post-submission-test-bad-submits')).toBeUndefined();
+    expect(findInstalledPostSubmissionAction('post-submission-test-misspelled')).toBeUndefined();
+    expect(
+      findInstalledPostSubmissionAction('post-submission-test-misspelled-job'),
+    ).toBeUndefined();
+  });
+
+  it("keeps a plugin's result retention and keep rule, and skips one with a bad value", () => {
+    expect(findInstalledPostSubmissionAction('post-submission-test-off')?.job).toEqual(
+      expect.objectContaining({ resultRetentionDays: 2, keepResultWhenEnded: true }),
+    );
+    expect(findInstalledPostSubmissionAction('post-submission-test-bad-retention')).toBeUndefined();
+    expect(
+      findInstalledPostSubmissionAction('post-submission-test-long-retention'),
+    ).toBeUndefined();
+    expect(findInstalledPostSubmissionAction('post-submission-test-bad-keep')).toBeUndefined();
+  });
+
   it('installs one plugin per code when two folders share one', () => {
     expect(
       getPostSubmissionActionPluginDefinitions()

@@ -468,8 +468,10 @@ describe('SubmissionService save (versioned engine write)', () => {
       appendRevision.mock.invocationCallOrder[0],
     );
     const onAppended = appendRevision.mock.calls[0][1];
-    await onAppended('tx', { id: 's1' });
-    expect(enqueueJob).toHaveBeenCalledWith('tx', { id: 's1' }, 'rev-new', 'actor-1', ACTIONS);
+    await onAppended('tx', { id: 's1' }, { firstSubmit: false });
+    expect(enqueueJob).toHaveBeenCalledWith('tx', { id: 's1' }, 'rev-new', 'actor-1', ACTIONS, {
+      firstSubmit: false,
+    });
     expect(nudge).toHaveBeenCalledWith('submission.submitted');
   });
 
@@ -510,7 +512,7 @@ describe('SubmissionService save (versioned engine write)', () => {
     postSubmissionOn();
     enqueueJob.mockRejectedValue(new Error('job insert failed'));
     appendRevision.mockImplementation(async (_append, onAppended) => {
-      await onAppended('tx', { id: 's1' });
+      await onAppended('tx', { id: 's1' }, { firstSubmit: true });
     });
 
     await expect(svc.submit(input)).rejects.toThrow('job insert failed');

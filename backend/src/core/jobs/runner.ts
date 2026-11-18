@@ -12,7 +12,7 @@ import {
   type JobProgress,
 } from '../db/repos/jobRepo';
 import type { JobRegistry } from './registry';
-import { createProgressReporter, storeJobResult } from './results';
+import { createProgressReporter, resolveResultOptions, storeJobResult } from './results';
 import { OUTCOME_WRITE_RETRIES, OUTCOME_WRITE_RETRY_MS } from './settings';
 import {
   decideOutcome,
@@ -259,8 +259,15 @@ export class JobRunner {
         log,
         reportProgress,
         resultMaxBytes: this.settings.resultMaxBytes,
-        storeResult: (staged, meta) =>
-          storeJobResult(job, staged, meta, this.settings, controller.signal),
+        storeResult: (staged, meta, options) =>
+          storeJobResult(
+            job,
+            staged,
+            meta,
+            this.settings,
+            controller.signal,
+            resolveResultOptions(definition, job, this.settings, options),
+          ),
       });
       return undefined;
     } catch (err) {

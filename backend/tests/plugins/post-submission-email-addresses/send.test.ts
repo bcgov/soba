@@ -4,7 +4,9 @@ import type { SendEmail } from '../../../src/core/integrations/notification/Noti
 import type {
   PostSubmissionActionEmailResult,
   PostSubmissionActionNotifications,
+  PostSubmissionActionResult,
   PostSubmissionActionSendScope,
+  PostSubmissionActionServices,
 } from '../../../src/core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
 import { JobCancelledError } from '../../../src/core/jobs/settlement';
 import { sendNotices } from '../../../src/plugins/post-submission-email-addresses/send';
@@ -18,6 +20,7 @@ const ACCEPTED: PostSubmissionActionEmailResult = {
 const submission = {
   id: 's1',
   formId: 'f1',
+  formVersionId: 'v1',
   formName: 'Permit application',
   workspaceId: 'w1',
   workspaceName: 'Licensing',
@@ -70,7 +73,10 @@ const run = (
       options: { to },
       source: { scope: 'form', settingId: 'setting-1', version: 1 },
       submission,
-      services: { notifications },
+      // The email action uses only notifications, and stores no result.
+      services: { notifications } as PostSubmissionActionServices,
+      result: {} as PostSubmissionActionResult,
+      reportProgress: jest.fn(),
       signal: new AbortController().signal,
       log: { info: jest.fn(), warn: options.warn ?? jest.fn() } as unknown as Logger,
     },

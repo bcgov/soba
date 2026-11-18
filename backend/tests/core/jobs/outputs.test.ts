@@ -44,6 +44,15 @@ describe('resultFacts', () => {
     expect(resultFacts(row({ status }))).toBeNull();
   });
 
+  it.each(['dead', 'cancelled'])(
+    'shows nothing on a %s job whose kept result expired',
+    (status) => {
+      expect(
+        resultFacts(row({ status, resultExpired: true, resultFileId: null, resultFilename: null })),
+      ).toBeNull();
+    },
+  );
+
   it('shows nothing for a job that never stored a result', () => {
     expect(
       resultFacts(
