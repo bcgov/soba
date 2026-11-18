@@ -42,8 +42,8 @@ crunchy:
       storageClassName: netapp-block-standard
       walStorage: 1Gi
     requests:
-      cpu: 150m
-      memory: 1536Mi
+      cpu: 100m
+      memory: 1Gi
     replicaCertCopy:
       requests:
         cpu: 10m
