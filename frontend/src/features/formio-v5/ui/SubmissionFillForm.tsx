@@ -164,10 +164,10 @@ export function SubmissionFillForm({
     setActiveOpener(
       open
         ? () =>
-          ensureOpened().catch((err: unknown) => {
-            if (isFormUpdated(err)) setUpdated({ version: err.version, form: err.form });
-            throw err;
-          })
+            ensureOpened().catch((err: unknown) => {
+              if (isFormUpdated(err)) setUpdated({ version: err.version, form: err.form });
+              throw err;
+            })
         : null,
     );
     return () => clearActiveSubmission();

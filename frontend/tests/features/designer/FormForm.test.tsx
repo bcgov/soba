@@ -106,7 +106,7 @@ type Workspace = {
 };
 type Version = { id: string; versionNo: number; state: string };
 
-const { mockWorkspaceState, api, builder, preview } = vi.hoisted(() => ({
+const { mockWorkspaceState, api, builder } = vi.hoisted(() => ({
   mockWorkspaceState: {
     creatable: [{ id: 'ws1', disclaimerAccepted: true }] as Workspace[],
     formCreate: 'allowed' as string,
@@ -117,8 +117,6 @@ const { mockWorkspaceState, api, builder, preview } = vi.hoisted(() => ({
   },
   // Captured so a test can simulate the user editing in the builder.
   builder: { onUpdateModel: null as ((model: unknown) => void) | null },
-  // The schema the preview was last drawn with.
-  preview: { form: null as unknown },
   api: {
     saveFormVersionSchema: vi.fn(),
     publishSobaFormVersion: vi.fn(),
@@ -170,9 +168,18 @@ type PreviewHook = (
 const preview = vi.hoisted(() => ({
   cancel: vi.fn(),
   beforeSubmit: null as PreviewHook | null,
+  // The schema the preview was last drawn with.
+  form: null as unknown,
 }));
 vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => ({
-  DynamicForm: ({ options }: { options: { hooks: { beforeSubmit: PreviewHook } } }) => {
+  DynamicForm: ({
+    form,
+    options,
+  }: {
+    form: unknown;
+    options: { hooks: { beforeSubmit: PreviewHook } };
+  }) => {
+    preview.form = form;
     preview.beforeSubmit = options.hooks.beforeSubmit;
     // Stands in for a form with no validation errors.
     const validForm = { validate: () => [], triggerChange: () => {} };
