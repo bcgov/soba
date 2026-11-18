@@ -6,6 +6,18 @@ import { HealthLivenessResponseSchema } from '../../core/api/health/schema';
 
 extendZodWithOpenApi(z);
 
+export const IntegrationExportParamsSchema = z.object({ formId: z.uuid() });
+export const IntegrationExportQuerySchema = z
+  .strictObject({
+    format: z.enum(['json', 'csv']).default('json'),
+    formVersionId: z.uuid().optional(),
+    from: z.iso.datetime({ offset: true }).optional(),
+    to: z.iso.datetime({ offset: true }).optional(),
+  })
+  .refine((q) => !q.from || !q.to || new Date(q.from) < new Date(q.to), {
+    message: 'from must be before to',
+  });
+
 export const IntegrationCredentialSchema = z
   .object({
     id: z.uuid(),
@@ -71,6 +83,35 @@ export const registerIntegrationV2OpenApi = (registry: OpenAPIRegistry) => {
         content: { 'application/json': { schema: GatewayErrorSchema } },
       },
       503: { description: 'Gateway authentication is not configured' },
+    },
+  });
+  registry.registerPath({
+    method: 'get',
+    path: '/forms/{formId}/submissions/export',
+    security: [{ apiKey: [] }],
+    summary: 'Export a form’s submitted submissions as JSON or CSV',
+    description:
+      'Requires submission_read on the key and the creator’s current form permissions. Workspace/form scope and form overrides are enforced. Defaults to JSON. Includes all versions unless filtered; from is inclusive and to exclusive (capped at now). Drafts and deleted submissions are excluded. Maximum 10 MiB and 60 seconds; missing submission documents fail the export rather than silently returning incomplete data. CSV also requires a schema for every exported submission version.',
+    request: { params: IntegrationExportParamsSchema, query: IntegrationExportQuerySchema },
+    responses: {
+      200: {
+        description: 'Submission export',
+        content: {
+          'application/json': { schema: z.array(z.record(z.string(), z.unknown())) },
+          'text/csv': { schema: z.string() },
+        },
+      },
+      400: { description: 'Invalid format, filters or form version' },
+      401: { description: 'Invalid gateway identity or inactive credential' },
+      403: { description: 'Key or its creator lacks submission_read on the requested form' },
+      404: {
+        description: 'Form missing, outside the credential scope, or submission export is disabled',
+      },
+      413: { description: 'Export exceeds 10 MiB; narrow the date range' },
+      503: {
+        description:
+          'Export timed out, submission documents are unavailable, or CSV requires a missing version schema',
+      },
     },
   });
   registry.registerPath({

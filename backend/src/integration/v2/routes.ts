@@ -1,4 +1,7 @@
 import express from 'express';
+import { integrationExportHandler } from './exportRoute';
+import { validateRequest } from '../../core/api/shared/validation';
+import { IntegrationExportParamsSchema, IntegrationExportQuerySchema } from './schema';
 import { coreErrorHandler, notFoundHandler } from '../../core/middleware/errorHandler';
 import { resolveIntegrationCredential } from '../middleware/resolveCredential';
 import { buildIntegrationV2OpenApiSpec } from './openapi';
@@ -51,6 +54,13 @@ router.get('/me', resolveIntegrationCredential, (req, res) => {
     headers,
   });
 });
+
+router.get(
+  '/forms/:formId/submissions/export',
+  resolveIntegrationCredential,
+  validateRequest({ params: IntegrationExportParamsSchema, query: IntegrationExportQuerySchema }),
+  integrationExportHandler,
+);
 
 router.use(notFoundHandler);
 router.use(coreErrorHandler);
