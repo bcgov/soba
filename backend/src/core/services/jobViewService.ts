@@ -62,18 +62,10 @@ export interface RerunFacts {
   leaseMs: number;
 }
 
-/** Jobs whose run queues child jobs: an event's fan-out. */
-const FAN_OUT_TYPES: ReadonlySet<string> = new Set([
-  JobType.submission_submitted,
-  JobType.submission_status_changed,
-]);
-
-const isFanOut = (type: string): boolean => FAN_OUT_TYPES.has(type);
-
 /**
- * Why a job may not run again, or null when it may. A fan-out that queued its actions would queue
- * new action jobs once retention freed their dedupe keys, and those would have handled nobody yet,
- * so their emails would go to every address again.
+ * Why a job may not run again, or null when it may. A job that queued children would queue new ones
+ * once retention freed their dedupe keys, and those would have handled nobody yet, so their emails
+ * would go to every address again.
  */
 export const rerunRefusal = (facts: RerunFacts): string | null => {
   // An export is the person's own request, under their limit; they start a new one.
@@ -84,8 +76,8 @@ export const rerunRefusal = (facts: RerunFacts): string | null => {
     return 'Only a dead or cancelled job can be run again';
   }
   if (!facts.registered) return 'This environment does not run jobs of this type';
-  if (isFanOut(facts.type) && (facts.childCount > 0 || facts.childrenQueuedAt !== null)) {
-    return 'Its actions were queued already; run their jobs again instead';
+  if (facts.childCount > 0 || facts.childrenQueuedAt !== null) {
+    return 'It queued jobs already; run the jobs it queued again instead';
   }
   const finishedMs = facts.finishedAt ? facts.now.getTime() - facts.finishedAt.getTime() : 0;
   // A job the sweeper ended for an expired lease may still be running on the worker that held it.
@@ -330,7 +322,7 @@ export const rerunJob = async (scope: JobScope, id: string, actorId: string): Pr
   if (!row) throw new NotFoundError(NOT_FOUND);
   const definition = getJobRegistry().get(row.type);
   const settings = getJobSettings();
-  const children = isFanOut(row.type) ? await listChildJobs(scope, row.id) : [];
+  const children = await listChildJobs(scope, row.id);
   const refusal = rerunRefusal({
     status: row.status,
     type: row.type,

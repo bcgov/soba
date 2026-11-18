@@ -1,12 +1,6 @@
 import { db } from '../../core/db/client';
-import {
-  insertJob,
-  markChildrenQueued,
-  type ClaimedJob,
-  type NewJob,
-} from '../../core/db/repos/jobRepo';
+import type { ChildJob, ClaimedJob } from '../../core/db/repos/jobRepo';
 import { findInstalledPostSubmissionAction } from '../../core/integrations/post-submission-action/PostSubmissionActionRegistry';
-import { mapInOrder } from '../../core/inOrder';
 import type { JobContext } from '../../core/jobs/registry';
 import { getJobSettings } from '../../core/jobs/settings';
 import { JobCancelledError } from '../../core/jobs/settlement';
@@ -19,13 +13,11 @@ export const childJob = (
   parent: ClaimedJob,
   action: SubmittedAction,
   maxAttempts: number,
-): NewJob => ({
+): ChildJob => ({
   type: action.code,
-  workspaceId: parent.workspaceId,
   formId: parent.formId,
   submissionId: parent.submissionId,
   revisionId: parent.revisionId,
-  parentJobId: parent.id,
   actionConfigId: action.source.settingId,
   createdBy: parent.createdBy,
   params: { options: action.options, source: action.source },
@@ -43,7 +35,7 @@ export const childAttempts = (code: string): number =>
  * the job's start check decides whether it runs. Ends cancelled, queuing nothing, once the
  * submission, its form or its workspace is gone.
  */
-export const fanOutSubmitted = async ({ job, log }: JobContext): Promise<void> => {
+export const fanOutSubmitted = async ({ job, log, queueChildren }: JobContext): Promise<void> => {
   log.info({ submissionId: job.submissionId, revisionId: job.revisionId }, 'Submission received');
   const { actions } = SubmittedJobParamsSchema.parse(job.params);
   if (actions.length === 0) return;
@@ -53,16 +45,9 @@ export const fanOutSubmitted = async ({ job, log }: JobContext): Promise<void> =
     (await isSubmissionLive(db, { workspaceId: job.workspaceId, submissionId: job.submissionId }));
   if (!live) throw new JobCancelledError(SUBMISSION_GONE);
 
-  // The mark outlives the children, so a re-run is refused once they were queued, even after
-  // retention deletes them and frees their dedupe keys.
-  const jobIds = await db.transaction(async (tx) => {
-    if (!(await markChildrenQueued(tx, job.id, job.claimToken))) {
-      throw new Error('The job is no longer held; its actions were not queued');
-    }
-    return mapInOrder(actions, (action) =>
-      insertJob(tx, childJob(job, action, childAttempts(action.code))),
-    );
-  });
+  const jobIds = await queueChildren(
+    actions.map((action) => childJob(job, action, childAttempts(action.code))),
+  );
   log.info(
     {
       // A null job id means the action was already queued for this revision.

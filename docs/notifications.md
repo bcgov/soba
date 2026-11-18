@@ -259,11 +259,9 @@ address with no expiry, as `notification_audit` rows keep recipients.
    - an enqueue function in `backend/src/core/jobs/enqueue.ts`, run in the transaction that saves
      the event, which records the reactions
    - `nudgeJobs` after the commit
-   - a fan-out registered in the catalog
+   - a fan-out registered in the catalog, which queues the reactions with `queueChildren`, so neither
+     the server nor the page offers to run the event again once it has
    - its names in the Jobs tabs
-   - its type in both `FAN_OUT_TYPES` sets, in `jobViewService.ts` and
-     `frontend/src/features/jobs/jobs.ts`, so neither the server nor the page offers to run it again
-     once it has queued its reactions
 8. Test it: the full English body, a French subject and body, the reaction's rule, the handler's
    recipients, cancel reasons and attribution, and that the event records the reaction once. Unit
    tests use no real database.

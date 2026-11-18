@@ -425,7 +425,7 @@
       "loadError": "Failed to load the job.",
       "notFound": "This job was not found. Finished jobs are deleted after a while.",
       "refreshError": "Could not read the job again; trying again.",
-      "actionsQueued": "Its actions were queued already, so it cannot run again. Run their jobs again instead.",
+      "childrenQueued": "It queued jobs already, so it cannot run again. Run the jobs it queued again instead.",
       "exportEnded": "An export does not run again. Its starter can start a new one from the form's Exports page.",
       "byValue": "{at}, by {by}",
       "rerunsValue": "{count}, last on {at} by {by}",

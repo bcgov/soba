@@ -426,7 +426,7 @@
       "loadError": "Échec du chargement de la tâche.",
       "notFound": "Cette tâche est introuvable. Les tâches terminées sont supprimées après un certain temps.",
       "refreshError": "Impossible de relire la tâche; nouvelle tentative en cours.",
-      "actionsQueued": "Ses actions ont déjà été mises en file d'attente; elle ne peut donc pas être relancée. Relancez plutôt leurs tâches.",
+      "childrenQueued": "Elle a déjà mis des tâches en file d'attente; elle ne peut donc pas être relancée. Relancez plutôt les tâches qu'elle a mises en file d'attente.",
       "exportEnded": "Une exportation n'est pas relancée. La personne qui l'a démarrée peut en démarrer une nouvelle à partir de la page Exportations du formulaire.",
       "byValue": "{at}, par {by}",
       "rerunsValue": "{count}, la dernière le {at} par {by}",

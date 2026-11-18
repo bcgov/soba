@@ -1,5 +1,6 @@
 import { and, eq, inArray, isNotNull, isNull, lt, lte, or, sql, type SQL } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
+import { mapInOrder } from '../../inOrder';
 import { quietDb, type DbOrTx, type Tx } from '../client';
 import { JobStatus } from '../codes';
 import { files, jobs } from '../schema';
@@ -22,6 +23,11 @@ export interface NewJob {
   dedupeKey?: string | null;
   maxAttempts: number;
 }
+
+/** A job queued by another, which gives it its workspace and becomes its parent. */
+export type ChildJob = Omit<NewJob, 'workspaceId' | 'parentJobId' | 'dedupeKey'> & {
+  dedupeKey: string;
+};
 
 /**
  * How a claimed job ends. A retry goes back to queued after the delay. A retry or dead job whose
@@ -84,9 +90,9 @@ export const insertJob = async (dbOrTx: DbOrTx, input: NewJob): Promise<string |
 
 /**
  * Record, in the caller's transaction, that a held job queued its children. False when the job is no
- * longer this worker's, and the caller then rolls the children back.
+ * longer this worker's.
  */
-export const markChildrenQueued = async (
+const markChildrenQueued = async (
   dbOrTx: DbOrTx,
   id: string,
   claimToken: string,
@@ -97,6 +103,34 @@ export const markChildrenQueued = async (
     .where(held(id, claimToken))
     .returning({ id: jobs.id });
   return rows.length > 0;
+};
+
+/** A child job as inserted: in its parent's workspace, under its parent. */
+export const childRow = (
+  parent: Pick<ClaimedJob, 'id' | 'workspaceId'>,
+  child: ChildJob,
+): NewJob => ({
+  ...child,
+  workspaceId: parent.workspaceId,
+  parentJobId: parent.id,
+});
+
+/**
+ * Queue a held job's children in one transaction, in order, and record that it queued them. Each
+ * child's id, or null where its dedupe key was taken; null in place of the list, queuing nothing,
+ * when the job is no longer this worker's. An empty list queues and records nothing.
+ */
+export const queueChildJobs = async (
+  parent: Pick<ClaimedJob, 'id' | 'claimToken' | 'workspaceId'>,
+  children: readonly ChildJob[],
+): Promise<(string | null)[] | null> => {
+  if (children.length === 0) return [];
+  return quietDb.transaction(async (tx) => {
+    // The mark outlives the children, so a re-run is refused once they were queued, even after
+    // retention deletes them and frees their dedupe keys.
+    if (!(await markChildrenQueued(tx, parent.id, parent.claimToken))) return null;
+    return mapInOrder(children, (child) => insertJob(tx, childRow(parent, child)));
+  });
 };
 
 /**

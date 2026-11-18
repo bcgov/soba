@@ -1,6 +1,6 @@
 import type { Logger } from 'pino';
 import type { JobPoolCode } from '../config/env';
-import type { ClaimedJob } from '../db/repos/jobRepo';
+import type { ChildJob, ClaimedJob } from '../db/repos/jobRepo';
 import type { TempResource } from '../integrations/temp-storage/TempStorageAdapter';
 
 /** A result file a job stored. */
@@ -38,6 +38,12 @@ export interface JobContext {
     meta: { filename: string; contentType: string },
     options?: StoreResultOptions,
   ) => Promise<StoredJobResult>;
+  /**
+   * Queue child jobs in one transaction and record that this job queued them, after which staff can
+   * run its children again but not the job itself. Each child's id, or null where its dedupe key was
+   * taken. Throws when the job is no longer this worker's, so the attempt retries.
+   */
+  queueChildren: (children: readonly ChildJob[]) => Promise<(string | null)[]>;
 }
 
 export interface JobTypeDefinition {

@@ -6,8 +6,10 @@ import {
   claimJobs,
   finishJob,
   heartbeatJob,
+  queueChildJobs,
   releaseJob,
   writeJobProgress,
+  type ChildJob,
   type ClaimedJob,
   type JobProgress,
 } from '../db/repos/jobRepo';
@@ -71,6 +73,15 @@ const recordOutcome = (
   if (outcome.kind === 'release') return releaseJob(job.id, job.claimToken);
   if (outcome.kind === 'defer') return releaseJob(job.id, job.claimToken, outcome);
   return finishJob(job.id, job.claimToken, outcome, progress);
+};
+
+const queueChildren = async (
+  job: ClaimedJob,
+  children: readonly ChildJob[],
+): Promise<(string | null)[]> => {
+  const ids = await queueChildJobs(job, children);
+  if (!ids) throw new Error('Job no longer held; children not queued');
+  return ids;
 };
 
 const OUTCOME_MESSAGES: Record<JobOutcome['kind'], string> = {
@@ -277,6 +288,7 @@ export class JobRunner {
             controller.signal,
             resolveResultOptions(definition, job, this.settings, options),
           ),
+        queueChildren: (children) => queueChildren(job, children),
       });
       return undefined;
     } catch (err) {

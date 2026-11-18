@@ -1,15 +1,5 @@
-const TX = { tx: true };
-jest.mock('../../../src/core/db/client', () => ({
-  db: { transaction: (fn: (tx: unknown) => Promise<unknown>) => fn(TX) },
-  quietDb: {},
-}));
+jest.mock('../../../src/core/db/client', () => ({ db: {}, quietDb: {} }));
 jest.mock('../../../src/features/notifications/service', () => ({ notificationService: {} }));
-const mockInsertJob = jest.fn();
-const mockMarkChildrenQueued = jest.fn();
-jest.mock('../../../src/core/db/repos/jobRepo', () => ({
-  insertJob: (...args: unknown[]) => mockInsertJob(...args),
-  markChildrenQueued: (...args: unknown[]) => mockMarkChildrenQueued(...args),
-}));
 const mockIsLive = jest.fn();
 jest.mock('../../../src/features/post-submission/repo', () => ({
   SUBMISSION_GONE: 'The submission, its form or its workspace is gone',
@@ -32,30 +22,29 @@ const parent = {
   submissionId: 's1',
   revisionId: null,
   createdBy: 'rev-1',
-  claimToken: 'claim-1',
 } as ClaimedJob;
+
+const queueChildren = jest.fn();
 
 const fanOut = (actions: unknown[]) =>
   fanOutStatusChanged({
     job: { ...parent, params: { statusChangeId: CHANGE_ID, actions } },
     log: { info: jest.fn() } as unknown as Logger,
+    queueChildren,
   } as unknown as JobContext);
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockIsLive.mockResolvedValue(true);
-  mockMarkChildrenQueued.mockResolvedValue(true);
-  mockInsertJob.mockResolvedValue('child-job');
+  queueChildren.mockResolvedValue(['child-job']);
 });
 
 describe('reactionJob', () => {
-  it("is the status-changed job's child, deduped per reaction and change, with the recorded options", () => {
+  it('is deduped per reaction and change, with the recorded options', () => {
     expect(reactionJob(parent, CHANGE_ID, STATUS_EMAIL, 8)).toEqual({
       type: 'submission.status-email',
-      workspaceId: 'ws1',
       formId: 'f1',
       submissionId: 's1',
-      parentJobId: 'parent-job',
       createdBy: 'rev-1',
       params: { statusChangeId: CHANGE_ID, options: { attachComment: true } },
       dedupeKey: `submission.status-email:${CHANGE_ID}`,
@@ -65,24 +54,16 @@ describe('reactionJob', () => {
 });
 
 describe('fanOutStatusChanged', () => {
-  it('queues each recorded reaction, and marks the event, in one transaction', async () => {
+  it('queues each recorded reaction as a child job', async () => {
     await fanOut([STATUS_EMAIL]);
 
-    expect(mockMarkChildrenQueued).toHaveBeenCalledWith(TX, 'parent-job', 'claim-1');
-    expect(mockInsertJob).toHaveBeenCalledWith(
-      TX,
-      expect.objectContaining({
-        type: 'submission.status-email',
-        params: { statusChangeId: CHANGE_ID, options: { attachComment: true } },
-        maxAttempts: 8,
-      }),
-    );
+    expect(queueChildren).toHaveBeenCalledWith([reactionJob(parent, CHANGE_ID, STATUS_EMAIL, 8)]);
   });
 
   it('reads nothing more for a change that recorded no reactions', async () => {
     await fanOut([]);
     expect(mockIsLive).not.toHaveBeenCalled();
-    expect(mockInsertJob).not.toHaveBeenCalled();
+    expect(queueChildren).not.toHaveBeenCalled();
   });
 
   it('ends cancelled, queuing nothing, once the submission, its form or its workspace is gone', async () => {
@@ -90,13 +71,6 @@ describe('fanOutStatusChanged', () => {
     await expect(fanOut([STATUS_EMAIL])).rejects.toThrow(
       new JobCancelledError('The submission, its form or its workspace is gone'),
     );
-    expect(mockMarkChildrenQueued).not.toHaveBeenCalled();
-    expect(mockInsertJob).not.toHaveBeenCalled();
-  });
-
-  it('queues nothing, and fails so the job retries, when it no longer holds the job', async () => {
-    mockMarkChildrenQueued.mockResolvedValue(false);
-    await expect(fanOut([STATUS_EMAIL])).rejects.toThrow('The job is no longer held');
-    expect(mockInsertJob).not.toHaveBeenCalled();
+    expect(queueChildren).not.toHaveBeenCalled();
   });
 });

@@ -75,17 +75,10 @@ export const canRerunJob = (status: JobStatus): boolean =>
 /** An export is its starter's own request: they start a new one rather than run it again. */
 export const isExportJob = (type: string): boolean => type === SUBMISSION_EXPORT;
 
-/** Event jobs whose run queues a job for each action or reaction recorded with the event. */
-const FAN_OUT_TYPES: ReadonlySet<string> = new Set([
-  SUBMISSION_SUBMITTED,
-  SUBMISSION_STATUS_CHANGED,
-]);
-
 /**
- * An event job that queued its actions: the server refuses to run it again, since its actions'
- * jobs are the ones to run.
+ * A job that queued jobs: the server refuses to run it again, since the jobs it queued are the ones
+ * to run.
  */
-export const queuedItsActions = (
-  job: Pick<JobViewModel, 'type' | 'childrenQueuedAt' | 'children'>,
-): boolean =>
-  FAN_OUT_TYPES.has(job.type) && (job.childrenQueuedAt !== null || job.children.length > 0);
+export const queuedItsChildren = (
+  job: Pick<JobViewModel, 'childrenQueuedAt' | 'children'>,
+): boolean => job.childrenQueuedAt !== null || job.children.length > 0;
