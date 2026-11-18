@@ -1,3 +1,25 @@
+import { ApiErrorCodes } from '@soba/lib';
+import { ValidationError } from '../../core/errors';
+
+/** The submitted-in bounds: `to` no later than now, so a retry exports the same submissions. */
+export const exportBounds = (
+  body: { from?: string; to?: string },
+  now: Date,
+): { from?: string; to: string } => {
+  const requestedTo = body.to ? new Date(body.to) : now;
+  const to = requestedTo < now ? requestedTo : now;
+  if (body.from && new Date(body.from) >= to) {
+    throw new ValidationError(
+      'from must be before to, and before now',
+      ApiErrorCodes.request_invalid,
+    );
+  }
+  return {
+    ...(body.from ? { from: new Date(body.from).toISOString() } : {}),
+    to: to.toISOString(),
+  };
+};
+
 /** Which submissions an export covers, fixed when it was started. */
 export interface ExportBounds {
   workspaceId: string;

@@ -193,22 +193,26 @@ const pageRows = async (
 };
 
 /** Each page as rows, the next page read only once the previous one has been taken. */
-const rowPages = (
+async function* rowPages(
   pages: AsyncIterable<SubmissionRecord[]>,
   read: ReadAnswers,
   options: ExportRowsOptions,
-): AsyncIterable<ExportRow[]> => ({
-  [Symbol.asyncIterator]: () => {
-    const source = pages[Symbol.asyncIterator]();
-    return {
-      next: async (): Promise<IteratorResult<ExportRow[], undefined>> => {
-        const page = await source.next();
-        if (page.done) return { done: true, value: undefined };
-        return { done: false, value: await pageRows(page.value, read, options) };
-      },
-    };
-  },
-});
+): AsyncGenerator<ExportRow[]> {
+  const source = pages[Symbol.asyncIterator]();
+  try {
+    while (true) {
+      options.signal.throwIfAborted();
+      // Page reads are deliberately sequential, with no prefetch after cancellation.
+      // eslint-disable-next-line no-await-in-loop
+      const page = await source.next();
+      if (page.done) return;
+      // eslint-disable-next-line no-await-in-loop
+      yield await pageRows(page.value, read, options);
+    }
+  } finally {
+    await source.return?.();
+  }
+}
 
 /** The rows of each page in turn. */
 async function* eachRow(pages: AsyncIterable<ExportRow[]>): AsyncGenerator<ExportRow> {
