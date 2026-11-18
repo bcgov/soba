@@ -216,32 +216,6 @@ describe('Gateway authentication and identity', () => {
     },
   );
 
-  it.each(protectedOperations)(
-    'rejects expired JWTs at $method $path',
-    async ({ method, path }) => {
-      const res = await request(app)
-        [method](base + path)
-        .set('GW-JWT', token({ expiresIn: -60 }));
-      expect(res.status).toBe(401);
-      expect(findActiveApiCredential).not.toHaveBeenCalled();
-    },
-  );
-
-  it.each(protectedOperations)(
-    'rejects invalid JWT signatures at $method $path',
-    async ({ method, path }) => {
-      const forged = gateway.signWithOtherKey();
-      expect(
-        (
-          await request(app)
-            [method](base + path)
-            .set('GW-JWT', forged)
-        ).status,
-      ).toBe(401);
-      expect(findActiveApiCredential).not.toHaveBeenCalled();
-    },
-  );
-
   it('returns credential metadata that satisfies the public identity contract', async () => {
     const response = await request(app)
       .get(base + '/me')

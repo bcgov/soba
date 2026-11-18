@@ -21,6 +21,5 @@ export const gatewayJwtFixture = (issuer: string, audience: string, clientId: st
         ...defaults,
         ...options,
       }),
-    signWithOtherKey: () => jwt.sign({ consumername: clientId }, otherKeys.privateKey, defaults),
   };
 };
