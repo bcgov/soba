@@ -31,25 +31,25 @@ const renderTab = () => render(<WorkspacePermissionsTab dict={dict} workspaceId=
 const header = (label: string) => screen.getByRole('button', { name: label });
 
 describe('WorkspacePermissionsTab', () => {
-  it('shows roles, groups and access as drawers, in that order', () => {
+  it('shows access, groups, and roles as drawers, in that order', () => {
     renderTab();
 
     expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
-      t.rolesTab,
-      t.groupsTab,
       t.accessTab,
+      t.groupsTab,
+      t.rolesTab,
     ]);
   });
 
-  it('opens with roles expanded and the others closed', () => {
+  it('opens with access expanded and the others closed', () => {
     renderTab();
 
-    expect(header(t.rolesTab)).toHaveAttribute('aria-expanded', 'true');
+    expect(header(t.accessTab)).toHaveAttribute('aria-expanded', 'true');
     expect(header(t.groupsTab)).toHaveAttribute('aria-expanded', 'false');
-    expect(header(t.accessTab)).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByTestId('roles-drawer')).toBeVisible();
+    expect(header(t.rolesTab)).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByTestId('access-drawer')).toBeVisible();
     expect(screen.queryByTestId('groups-drawer')).not.toBeVisible();
-    expect(screen.queryByTestId('access-drawer')).not.toBeVisible();
+    expect(screen.queryByTestId('roles-drawer')).not.toBeVisible();
   });
 
   it('gives each drawer the workspace', () => {
@@ -82,9 +82,12 @@ describe('WorkspacePermissionsTab', () => {
     const user = userEvent.setup();
     renderTab();
 
-    await user.click(header(t.rolesTab));
+    expect(header(t.accessTab)).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('access-drawer')).toBeVisible();
 
-    expect(header(t.rolesTab)).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByTestId('roles-drawer')).not.toBeVisible();
+    await user.click(header(t.accessTab));
+
+    expect(header(t.accessTab)).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByTestId('access-drawer')).not.toBeVisible();
   });
 });
