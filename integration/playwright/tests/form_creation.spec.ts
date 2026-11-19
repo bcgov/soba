@@ -113,11 +113,12 @@ test('Create, edit, search, preview, and publish one form', async ({ page, title
 
   await page.getByRole('button', { name: 'Preview', exact: true }).click();
 
-  await expect(page.getByRole('heading', { name: /Form Preview chefs2-/ })).toBeVisible();
+  const previewDialog = page.getByRole('dialog', { name: /Form Preview chefs2-/ });
+  await expect(previewDialog).toBeVisible();
 
-  await expect(page.locator('input[name="data[textField]"]')).toBeVisible();
-  await expect(page.locator('input[name="data[number]"]')).toBeVisible();
-  await expect(page.locator('input[name="data[checkbox]"]')).toBeVisible();
+  await expect(previewDialog.locator('input[name="data[textField]"]')).toBeVisible();
+  await expect(previewDialog.locator('input[name="data[number]"]')).toBeVisible();
+  await expect(previewDialog.locator('input[name="data[checkbox]"]')).toBeVisible();
 
   await page.getByRole('button', { name: 'Close Preview', exact: true }).click();
 

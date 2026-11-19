@@ -24,6 +24,8 @@ vi.mock('@/app/[lang]/Providers', () => ({
           fileNameColumn: 'File Name',
           uploadDateColumn: 'Upload Date',
           failed: 'Failed to generate the document.',
+          unsavedMark: 'Not saved',
+          draftMark: 'Draft',
         },
       },
     },
@@ -90,6 +92,19 @@ describe('PrintSubmissionButton', () => {
       reportName: 'Receipt ABC123',
     });
     expect(window.print).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['unsaved', 'Receipt ABC123 (Not saved)'],
+    ['draft', 'Receipt ABC123 (Draft)'],
+    ['submitted', 'Receipt ABC123'],
+  ] as const)('names the download of %s answers with their mark', async (status, name) => {
+    const print = printOf({ choice: 'template' });
+    render(<PrintSubmissionButton print={print} baseName="Receipt ABC123" status={status} />);
+    press();
+
+    await waitFor(() => expect(mocks.saveBlob).toHaveBeenCalledWith(pdf, `${name}.pdf`));
+    expect(print.printTemplate).toHaveBeenCalledWith({ convertTo: 'pdf', reportName: name });
   });
 
   it('reports a refused render with the message for its code', async () => {
