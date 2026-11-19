@@ -4,7 +4,9 @@ import { useEffect, useRef } from 'react';
 import { useLeaveWarning } from './useLeaveWarning';
 
 // The parts of the Navigation API used here; TypeScript's DOM types do not include it yet.
-type Navigation = EventTarget & { traverseTo: (key: string) => { finished: Promise<unknown> } };
+type Navigation = EventTarget & {
+  traverseTo: (key: string) => { committed: Promise<unknown>; finished: Promise<unknown> };
+};
 type NavigateEvent = Event & {
   navigationType: string;
   userInitiated: boolean;
@@ -79,7 +81,8 @@ export function useLeaveGuard(active: boolean, onLeave: LeaveHandler) {
     let goingTo: string | null = null;
     const navigation = browserNavigation();
 
-    // Without a new click or key press the next Back is not cancelable, so the person can always leave.
+    // Without a new click, or a key other than Escape, the next Back is not cancelable: the person can
+    // always leave. So closing the dialog with Escape lets the next Back through.
     const onNavigate = (event: Event) => {
       const { navigationType, destination, userInitiated } = event as NavigateEvent;
       if (navigationType !== 'traverse' || !event.cancelable) return;
@@ -91,7 +94,10 @@ export function useLeaveGuard(active: boolean, onLeave: LeaveHandler) {
       // Not through `handler`: the browser's warning stays on until the page is actually left.
       onLeaveRef.current(() => {
         goingTo = destination.key;
-        navigation?.traverseTo(destination.key).finished.catch(noop);
+        // Both reject when the traversal fails or is aborted.
+        const traversal = navigation?.traverseTo(destination.key);
+        traversal?.committed.catch(noop);
+        traversal?.finished.catch(noop);
       });
     };
 

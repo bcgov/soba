@@ -30,6 +30,7 @@ import { useSubmitterPrint } from '@/src/features/templates/data/useSubmissionPr
 import { printBaseName } from '@/src/features/templates/printFileName';
 import { PrintMarks } from '@/src/features/templates/ui/PrintMarks';
 import { PrintSubmissionButton } from '@/src/features/templates/ui/PrintSubmissionButton';
+import { LeaveGuard } from '@/src/components/LeaveGuard';
 import { usePageHeading } from '@/src/components/PageHeader';
 import type {
   SubmitFillBundle,
@@ -169,10 +170,11 @@ export function SubmissionFillForm({
   // True once the loaded answers are in the webform.
   const [formReady, setFormReady] = useState(false);
 
-  const { unsaved, isUnsaved, beginSave, onFormChange, formProps } = useUnsavedEdits({
+  const { unsaved, edited, isUnsaved, beginSave, onFormChange, formProps } = useUnsavedEdits({
     canWrite,
     // Answers carried to a newer version of the form come with no head: nothing of them is saved.
     nothingSaved: snapshot.content === null || snapshot.headRevisionId === null,
+    carried: snapshot.content !== null && snapshot.headRevisionId === null,
   });
   // Sent only while unsaved: without them the server prints the saved answers.
   const answers = useCallback(
@@ -356,6 +358,7 @@ export function SubmissionFillForm({
 
   return (
     <>
+      <LeaveGuard active={edited} />
       <PrintMarks status={printStatus} />
       <div className="d-print-none">
         <div className="text-end" data-testid="submission-fill-version">

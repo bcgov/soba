@@ -18,7 +18,7 @@ const click = (anchor: HTMLAnchorElement, init: MouseEventInit = {}) =>
 
 // A stand-in for the browser's Navigation API, which jsdom lacks.
 const navigation = Object.assign(new EventTarget(), {
-  traverseTo: vi.fn(() => ({ finished: Promise.resolve() })),
+  traverseTo: vi.fn(() => ({ committed: Promise.resolve(), finished: Promise.resolve() })),
 });
 
 /** Dispatches a Back and says whether the page held it. By default the person pressed Back. */
@@ -196,12 +196,27 @@ describe('useLeaveGuard', () => {
 
     it('holds the next Back the person presses when the agreed one never completes', () => {
       Object.assign(window, { navigation });
-      navigation.traverseTo.mockReturnValueOnce({ finished: new Promise(() => undefined) });
+      const never = new Promise<void>(() => undefined);
+      navigation.traverseTo.mockReturnValueOnce({ committed: never, finished: never });
       const onLeave = vi.fn();
       renderHook(() => useLeaveGuard(true, onLeave));
       traverse();
 
       (onLeave.mock.calls[0][0] as () => void)();
+      expect(traverse()).toBe(true);
+    });
+
+    // Vitest fails the run on an unhandled rejection.
+    it('handles a traversal that fails', async () => {
+      Object.assign(window, { navigation });
+      const failed = () => Promise.reject(new DOMException('gone', 'InvalidStateError'));
+      navigation.traverseTo.mockReturnValueOnce({ committed: failed(), finished: failed() });
+      const onLeave = vi.fn();
+      renderHook(() => useLeaveGuard(true, onLeave));
+      traverse();
+
+      (onLeave.mock.calls[0][0] as () => void)();
+      await Promise.resolve();
       expect(traverse()).toBe(true);
     });
 

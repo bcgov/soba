@@ -14,18 +14,29 @@ const ECHO_MS = 500;
 export function useUnsavedEdits({
   canWrite,
   nothingSaved,
-}: Readonly<{ canWrite: boolean; nothingSaved: boolean }>) {
+  carried = false,
+}: Readonly<{
+  canWrite: boolean;
+  nothingSaved: boolean;
+  /** Answers typed on an older version of the form and carried here, so already edited. */
+  carried?: boolean;
+}>) {
   const { touchProps, isUserChange } = useUserChange();
-  const edits = useRef(0);
+  const edits = useRef(carried ? 1 : 0);
   const savedEdits = useRef(0);
   const saved = useRef(!nothingSaved);
   const echoUntil = useRef(0);
+  // The answers at Form.io's last change, so a change that leaves them as they were is not an edit.
+  const lastAnswers = useRef<string | null>(null);
   const [unsaved, setUnsaved] = useState(nothingSaved);
+  // Edits not yet held by an applied save; unlike `unsaved`, false on a blank new form.
+  const [edited, setEdited] = useState(canWrite && carried);
 
   const markEdited = useCallback(() => {
     if (!canWrite) return;
     edits.current += 1;
     setUnsaved(true);
+    setEdited(true);
   }, [canWrite]);
 
   const onInputCapture = useCallback(() => {
@@ -34,11 +45,16 @@ export function useUnsavedEdits({
   }, [markEdited]);
 
   const onFormChange = useCallback(
-    (_value: unknown, _flags: unknown, modified: boolean) => {
+    (value: { data?: unknown } | undefined, _flags: unknown, modified: boolean) => {
+      const answers = JSON.stringify(value?.data ?? null);
+      const unchanged = answers === lastAnswers.current;
+      lastAnswers.current = answers;
       if (Date.now() < echoUntil.current) {
         echoUntil.current = 0;
         return;
       }
+      // Form.io's own change on blur, such as Validate On: Blur, leaves the answers as they were.
+      if (!modified && unchanged) return;
       if (isUserChange(modified)) markEdited();
     },
     [isUserChange, markEdited],
@@ -51,6 +67,7 @@ export function useUnsavedEdits({
       saved.current = true;
       savedEdits.current = editsSaved;
       setUnsaved(edits.current > editsSaved);
+      setEdited(edits.current > editsSaved);
     };
   }, []);
 
@@ -66,5 +83,5 @@ export function useUnsavedEdits({
     [touchProps, onInputCapture],
   );
 
-  return { unsaved, isUnsaved, beginSave, onFormChange, formProps };
+  return { unsaved, edited, isUnsaved, beginSave, onFormChange, formProps };
 }
