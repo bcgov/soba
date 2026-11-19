@@ -32,8 +32,12 @@ export function RowActionButton({
   'aria-label': ariaLabel,
   'data-testid': testId,
 }: Readonly<RowActionButtonProps>) {
+  const wrapperClassName = [styles.root, main ? styles.main : '']
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <span className={main ? styles.main : undefined}>
+    <span className={wrapperClassName}>
       <Button
         variant="link"
         danger={danger}
