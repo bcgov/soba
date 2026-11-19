@@ -4,27 +4,30 @@ import type {
   JobEmailResult,
   JobNotifications,
 } from '../../../../src/core/integrations/notification/JobNotifications';
+import { sendEachAddress } from '../../../../src/core/integrations/notification/sendEachAddress';
 import {
-  sendEachAddress,
-  type SendPolicy,
-} from '../../../../src/core/integrations/notification/sendEachAddress';
-import { DAILY_LIMIT_REACHED } from '../../../../src/core/integrations/notification/dailyReset';
+  DAILY_LIMIT_REACHED,
+  PROVIDER_LIMIT_REACHED,
+} from '../../../../src/core/integrations/notification/dailyReset';
 import { JobCancelledError, JobDeferredError } from '../../../../src/core/jobs/settlement';
 
 const ACCEPTED: JobEmailResult = { outcome: 'accepted', httpStatus: null, audited: true };
+const REFUSED: JobEmailResult = { outcome: 'error', httpStatus: 400, audited: true };
+// The next daily reset, an hour away.
+const RESET = new Date(Date.now() + 3_600_000);
 const CONTENT: SendEmail['content'] = { subject: 'Subject', body: '<p>Body</p>', bodyType: 'html' };
 
 /**
  * The job's notifications, kept in memory: what the provider answers per address, the addresses
- * this job sent to or had refused on earlier attempts, and whether its current run has handled any
- * (by default, when any is handled).
+ * this job sent to or had refused on earlier attempts, and the emails the environment may still
+ * send today (plenty, by default).
  */
 function fakeNotifications(
   setup: {
     enabled?: boolean;
     handled?: string[];
     refusedBefore?: string[];
-    runStarted?: boolean;
+    room?: number;
     answers?: Record<string, JobEmailResult>;
   } = {},
 ) {
@@ -38,12 +41,8 @@ function fakeNotifications(
       return Promise.resolve(setup.answers?.[email.recipients.to[0]] ?? ACCEPTED);
     },
     handled: () =>
-      Promise.resolve({
-        recipients: new Set(handled),
-        runStarted: setup.runStarted ?? handled.length > 0,
-        anySent: sentBefore.length > 0,
-      }),
-    sentSince: () => Promise.resolve(0),
+      Promise.resolve({ recipients: new Set(handled), anySent: sentBefore.length > 0 }),
+    dailyRoom: jest.fn(() => Promise.resolve({ room: setup.room ?? 3225, resetsAt: RESET })),
   };
   const recipients = () => emails.map((email) => email.recipients.to[0]);
   return { notifications, emails, recipients };
@@ -52,7 +51,7 @@ function fakeNotifications(
 const run = (
   to: string[],
   notifications: JobNotifications,
-  options: { signal?: AbortSignal; info?: jest.Mock; warn?: jest.Mock; policy?: SendPolicy } = {},
+  options: { signal?: AbortSignal; info?: jest.Mock; warn?: jest.Mock } = {},
 ) =>
   sendEachAddress(
     {
@@ -65,7 +64,6 @@ const run = (
     },
     to,
     CONTENT,
-    options.policy,
   );
 
 describe('sendEachAddress', () => {
@@ -112,31 +110,46 @@ describe('sendEachAddress', () => {
     expect(fake.emails).toEqual([]);
   });
 
-  it('checks the budgets for what is left until the run has handled an address', async () => {
-    const checkBudgets = jest.fn(() => Promise.resolve());
-    await run(['a@example.com', 'b@example.com'], fakeNotifications().notifications, {
-      policy: { checkBudgets },
-    });
-    expect(checkBudgets).toHaveBeenCalledWith(2);
-
-    checkBudgets.mockClear();
-    const started = fakeNotifications({ handled: ['a@example.com'] });
-    await run(['a@example.com', 'b@example.com'], started.notifications, {
-      policy: { checkBudgets },
-    });
-    expect(checkBudgets).not.toHaveBeenCalled();
-    expect(started.recipients()).toEqual(['b@example.com']);
+  it('waits for the daily reset, sending nothing, when the day has no room left', async () => {
+    const fake = fakeNotifications({ room: 0 });
+    const sent = run(['a@example.com', 'b@example.com'], fake.notifications);
+    await expect(sent).rejects.toBeInstanceOf(JobDeferredError);
+    await expect(sent).rejects.toThrow(DAILY_LIMIT_REACHED);
+    expect(fake.emails).toEqual([]);
   });
 
-  it('sends nothing when a budget check stops it', async () => {
-    const fake = fakeNotifications();
-    const stop = new JobCancelledError('Over the limit');
-    await expect(
-      run(['a@example.com'], fake.notifications, {
-        policy: { checkBudgets: () => Promise.reject(stop) },
-      }),
-    ).rejects.toBe(stop);
-    expect(fake.emails).toEqual([]);
+  it("sends what fits in the day's room, in order, and the rest wait for the reset", async () => {
+    const fake = fakeNotifications({ room: 2 });
+    const info = jest.fn();
+    const sent = run(['a@example.com', 'b@example.com', 'c@example.com'], fake.notifications, {
+      info,
+    });
+    await expect(sent).rejects.toBeInstanceOf(JobDeferredError);
+    await expect(sent).rejects.toThrow(DAILY_LIMIT_REACHED);
+    expect(fake.recipients()).toEqual(['a@example.com', 'b@example.com']);
+    expect(info).toHaveBeenCalledWith(
+      { sent: 2, refused: 0, alreadyHandled: 0, waiting: 1 },
+      'Emails sent; the rest wait for the daily reset',
+    );
+  });
+
+  it('waits rather than cancels when what fit today was refused and more are left', async () => {
+    const fake = fakeNotifications({ room: 1, answers: { 'a@example.com': REFUSED } });
+    await expect(run(['a@example.com', 'b@example.com'], fake.notifications)).rejects.toThrow(
+      DAILY_LIMIT_REACHED,
+    );
+  });
+
+  it('counts the room against what is left, not what was handled before', async () => {
+    const fake = fakeNotifications({ room: 1, handled: ['a@example.com'] });
+    await run(['a@example.com', 'b@example.com'], fake.notifications);
+    expect(fake.recipients()).toEqual(['b@example.com']);
+  });
+
+  it("does not count today's sends when nothing is left to send", async () => {
+    const fake = fakeNotifications({ handled: ['a@example.com'], room: 0 });
+    await run(['a@example.com'], fake.notifications);
+    expect(fake.notifications.dailyRoom).not.toHaveBeenCalled();
   });
 
   it('does nothing when every address was handled, even with notifications off', async () => {
@@ -172,9 +185,8 @@ describe('sendEachAddress', () => {
   );
 
   it('ends cancelled when a fresh list is refused at every address', async () => {
-    const refused = { outcome: 'error' as const, httpStatus: 400, audited: true };
     const fake = fakeNotifications({
-      answers: { 'a@example.com': refused, 'b@example.com': refused },
+      answers: { 'a@example.com': REFUSED, 'b@example.com': REFUSED },
     });
     const warn = jest.fn();
     const outcome = run(['a@example.com', 'b@example.com'], fake.notifications, { warn });
@@ -189,7 +201,7 @@ describe('sendEachAddress', () => {
   it('finishes a retry whose remaining addresses are all refused, once one was sent', async () => {
     const fake = fakeNotifications({
       handled: ['a@example.com'],
-      answers: { 'b@example.com': { outcome: 'error', httpStatus: 400, audited: true } },
+      answers: { 'b@example.com': REFUSED },
     });
     await expect(run(['a@example.com', 'b@example.com'], fake.notifications)).resolves.toBe(
       undefined,
@@ -200,7 +212,7 @@ describe('sendEachAddress', () => {
   it('ends cancelled when every address was refused, across a retry', async () => {
     const fake = fakeNotifications({
       refusedBefore: ['a@example.com'],
-      answers: { 'b@example.com': { outcome: 'error', httpStatus: 400, audited: true } },
+      answers: { 'b@example.com': REFUSED },
     });
     await expect(run(['a@example.com', 'b@example.com'], fake.notifications)).rejects.toThrow(
       new JobCancelledError('Every address was refused (2)'),
@@ -239,11 +251,10 @@ describe('sendEachAddress', () => {
   );
 
   it('says where in the list it stopped, counting refused addresses too', async () => {
-    const refused = { outcome: 'error' as const, httpStatus: 400, audited: true };
     const fake = fakeNotifications({
       answers: {
-        'a@example.com': refused,
-        'b@example.com': refused,
+        'a@example.com': REFUSED,
+        'b@example.com': REFUSED,
         'c@example.com': { outcome: 'error', httpStatus: 503, audited: true },
       },
     });
@@ -272,13 +283,13 @@ describe('sendEachAddress', () => {
     expect(fake.recipients()).toEqual(['a@example.com', 'b@example.com']);
   });
 
-  it('waits for the daily reset at a sending limit, keeping the addresses sent before it', async () => {
+  it("waits for the daily reset at the provider's limit, keeping the addresses sent before it", async () => {
     const fake = fakeNotifications({
       answers: { 'b@example.com': { outcome: 'limited', httpStatus: 429, audited: true } },
     });
     const sent = run(['a@example.com', 'b@example.com', 'c@example.com'], fake.notifications);
     await expect(sent).rejects.toBeInstanceOf(JobDeferredError);
-    await expect(sent).rejects.toThrow(DAILY_LIMIT_REACHED);
+    await expect(sent).rejects.toThrow(PROVIDER_LIMIT_REACHED);
     expect(fake.recipients()).toEqual(['a@example.com', 'b@example.com']);
   });
 

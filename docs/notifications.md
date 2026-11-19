@@ -196,7 +196,7 @@ address with no expiry, as `notification_audit` rows keep recipients.
   | the job                       | when                                                                                                                                                                 |
   | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
   | throws, so it retries         | the provider fails without refusing the address, or times out; an audit row could not be written                                                                     |
-  | waits for the daily reset     | the provider answers with a limit status; the job is deferred to the next midnight in `NOTIFICATION_DAILY_RESET_TIME_ZONE`, without using an attempt                 |
+  | waits for the daily reset     | the day's sends reached `NOTIFICATION_DAILY_LIMIT`, or the provider answers with a limit status; the job is deferred to the next midnight, without using an attempt  |
   | ends cancelled, with a reason | notifications are off; the event no longer applies; no one is left to send to; a recipient cannot be resolved, such as an assignee who can no longer review the form |
 
   Cancel reasons show in the Jobs tabs, so they name no address, comment or form name.
@@ -205,26 +205,30 @@ address with no expiry, as `notification_audit` rows keep recipients.
   1. Puts each address in lower case and drops duplicates.
   2. Counts an address no provider would take as refused, without sending to it.
   3. Skips the addresses this job already handled. With none left it stops, unless none was ever
-     sent (step 7).
+     sent (step 8).
   4. Checks that notifications are on.
-  5. Runs the policy's `checkBudgets`, if any, until the run has handled an address.
+  5. Takes as many of the rest as the environment may still send today; with none, the job waits
+     for the daily reset.
   6. Sends to one address at a time. A refused address (400 or 422) is recorded and skipped. A send
-     refused at a sending limit is recorded as `limited`, and the job waits for the daily reset,
-     then goes on from that address. Any other failure throws.
-  7. Ends cancelled when no email on the list has been sent, on this attempt or an earlier one:
+     refused at the provider's limit is recorded as `limited`, and the job waits for the daily
+     reset, then goes on from that address. Any other failure throws.
+  7. Waits for the daily reset when addresses are left that did not fit in today's room.
+  8. Ends cancelled when no email on the list has been sent, on this attempt or an earlier one:
      every address was refused.
 - **Attribution.** `jobNotifications(job, actorId)` binds the service to the job; `actorId` is a
   function that gives the user each send is attributed to. A send is attributed to the person whose
   action caused it. Running an email's job again attributes its sends to whoever ran it; running an
   event again does not, since the jobs it queues keep the event's creator. An action a form is
   configured with, such as the notice, sends as the system user.
-- **Hourly limits** apply where people choose the recipients. The notice, whose list staff set,
-  checks its form, workspace and environment limits before its run sends anything. A submitter's
-  copy, sent to an address they type, is checked when they ask: per submission, address, form,
-  workspace and environment, counted from its own requests, and refused with 429
-  `email_copy_limit_reached` (`SUBMITTER_EMAIL_COPY_*_HOURLY_LIMIT`). A sent copy is also an
-  accepted send in `notification_audit`, so it counts toward the notice's limits. Status emails go
-  out one per person's action and have none.
+- **The daily limit.** The environment sends up to `NOTIFICATION_DAILY_LIMIT` emails a day (3225
+  when unset, about Notify's 100,000 a month over 31 days), counted from midnight in
+  `NOTIFICATION_DAILY_RESET_TIME_ZONE` (`America/Vancouver` when unset) over every email job's sends
+  the provider accepted or refused. Past it, a job sends what fits and the rest wait for the next
+  day; the limit drops no email, though a job that no longer applies when it wakes ends cancelled.
+  Jobs that check at the same time can take the same room, so a day can end a little past it.
+- **Copy request limits.** A submitter's copy, sent to an address they type, is also checked when
+  they ask: per submission, address, form, workspace and environment, counted from its own
+  requests, and refused with 429 `email_copy_limit_reached` (`SUBMITTER_EMAIL_COPY_*_HOURLY_LIMIT`).
 
 ## Emails today
 

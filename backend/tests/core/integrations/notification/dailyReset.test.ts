@@ -1,10 +1,14 @@
 import {
   DAILY_LIMIT_REACHED,
-  deferUntilDailyReset,
+  deferUntilReset,
+  lastMidnight,
   nextMidnight,
+  PROVIDER_LIMIT_REACHED,
 } from '../../../../src/core/integrations/notification/dailyReset';
-import { getNotificationSettings } from '../../../../src/core/integrations/notification/settings';
 import { JobDeferredError } from '../../../../src/core/jobs/settlement';
+
+// A zone that never changes its clocks: seven hours behind UTC.
+const UTC_MINUS_7 = 'Etc/GMT+7';
 
 /** The date in `timeZone` at `instant`, as yyyy-mm-dd. */
 const dateIn = (instant: number, timeZone: string): string =>
@@ -16,9 +20,6 @@ const dateIn = (instant: number, timeZone: string): string =>
   }).format(instant);
 
 describe('nextMidnight', () => {
-  // A zone that never changes its clocks: seven hours behind UTC.
-  const UTC_MINUS_7 = 'Etc/GMT+7';
-
   it.each([
     ['in the morning', '2026-11-19T13:00:00Z', '2026-11-20T07:00:00Z'],
     ['a second before midnight', '2026-11-20T06:59:59Z', '2026-11-20T07:00:00Z'],
@@ -52,22 +53,54 @@ describe('nextMidnight', () => {
   });
 });
 
-describe('deferUntilDailyReset', () => {
-  const now = new Date('2026-11-19T20:00:00Z');
-  const reset = nextMidnight(now, getNotificationSettings().dailyResetTimeZone);
+describe('lastMidnight', () => {
+  it.each([
+    ['in the morning', '2026-11-19T13:00:00Z', '2026-11-19T07:00:00Z'],
+    ['a second before midnight', '2026-11-20T06:59:59Z', '2026-11-19T07:00:00Z'],
+    ['at midnight itself', '2026-11-20T07:00:00Z', '2026-11-20T07:00:00Z'],
+  ])('gives the local midnight that started the day %s', (_case, now, expected) => {
+    expect(lastMidnight(new Date(now), UTC_MINUS_7)).toEqual(new Date(expected));
+  });
 
-  it('waits for the next midnight in the configured zone, saying why', () => {
-    const deferral = deferUntilDailyReset(now, () => 0);
+  // Rule-independent, as above: the first instant of the day the instant falls in.
+  it.each([
+    ['America/Vancouver', '2026-03-08T11:00:00Z'],
+    ['America/Vancouver', '2026-11-01T10:00:00Z'],
+    ['America/Havana', '2027-03-14T15:00:00Z'],
+    ['America/Santiago', '2026-09-06T15:00:00Z'],
+  ])('starts the day in %s at %s', (zone, now) => {
+    const at = new Date(now).getTime();
+    const start = lastMidnight(new Date(now), zone).getTime();
+    expect(start).toBeLessThanOrEqual(at);
+    expect(dateIn(start, zone)).toBe(dateIn(at, zone));
+    expect(dateIn(start - 1000, zone)).not.toBe(dateIn(at, zone));
+  });
+});
+
+describe('deferUntilReset', () => {
+  const now = new Date('2026-11-19T20:00:00Z');
+  const reset = new Date('2026-11-20T08:00:00Z');
+
+  it('waits for the reset, giving the reason', () => {
+    const deferral = deferUntilReset(reset, PROVIDER_LIMIT_REACHED, now, () => 0);
     expect(deferral).toBeInstanceOf(JobDeferredError);
-    expect(deferral.message).toBe(DAILY_LIMIT_REACHED);
-    expect(deferral.delayMs).toBe(reset.getTime() - now.getTime());
+    expect(deferral.message).toBe(PROVIDER_LIMIT_REACHED);
+    expect(deferral.delayMs).toBe(12 * 3_600_000);
   });
 
   it('spreads the waiting jobs over the five minutes after it', () => {
     const random = jest.fn(() => 299_999);
-    expect(deferUntilDailyReset(now, random).delayMs).toBe(
-      reset.getTime() - now.getTime() + 299_999,
+    expect(deferUntilReset(reset, DAILY_LIMIT_REACHED, now, random).delayMs).toBe(
+      12 * 3_600_000 + 299_999,
     );
     expect(random).toHaveBeenCalledWith(300_000);
+  });
+
+  // Midnight passed while the job was sending: it goes again at once and counts the new day.
+  it('waits a second for a reset already past', () => {
+    expect(
+      deferUntilReset(reset, DAILY_LIMIT_REACHED, new Date('2026-11-20T08:00:30Z'), () => 0)
+        .delayMs,
+    ).toBe(1000);
   });
 });

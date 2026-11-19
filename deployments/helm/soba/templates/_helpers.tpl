@@ -346,13 +346,13 @@ unquoted numbers in values files as floats, so whole numbers are printed without
 {{- end }}
 
 {{/*
-An hourly email limit, from (dict "name" <values key> "value" <value> "min" <lowest>): nothing when
-"" or unset, else a whole number from min (100 when not given) to 1000000 as a quoted string.
-Anything else fails the render, a fraction included, so a bad value cannot quietly keep the plugin
-or the backend from starting. The fraction check runs first: soba.optionalSetting rounds numbers.
+An hourly email limit, from (dict "name" <values key> "value" <value>): nothing when "" or unset,
+else a whole number from 1 to 1000000 as a quoted string. Anything else fails the render, a
+fraction included, so a bad value cannot quietly keep the backend from starting. The fraction check
+runs first: soba.optionalSetting rounds numbers.
 */}}
 {{- define "soba.hourlyEmailLimit" -}}
-{{- $min := int (default 100 .min) -}}
+{{- $min := 1 -}}
 {{- if and (kindIs "float64" .value) (ne (floor .value) .value) -}}
 {{- fail (printf "backend.config.%s must be a whole number from %d to 1000000, got %v" .name $min .value) -}}
 {{- end -}}

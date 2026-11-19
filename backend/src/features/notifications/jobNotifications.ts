@@ -1,27 +1,17 @@
 import {
-  countNotificationsSince,
+  countNotificationSendsSince,
   listJobNotificationSends,
-  type NotificationCountScope,
 } from '../../core/db/repos/notificationAuditRepo';
-import type {
-  JobNotifications,
-  NotificationSendScope,
-} from '../../core/integrations/notification/JobNotifications';
+import { lastMidnight, nextMidnight } from '../../core/integrations/notification/dailyReset';
+import type { JobNotifications } from '../../core/integrations/notification/JobNotifications';
 import {
-  hasRunStarted,
   isHandledForRun,
   isSentSend,
   REFUSED_HTTP_STATUSES,
 } from '../../core/integrations/notification/sendOutcome';
+import { getNotificationSettings } from '../../core/integrations/notification/settings';
 import type { JobFacts } from '../../core/jobs/facts';
 import { notificationService } from './service';
-
-const countScope = (scope: NotificationSendScope, job: JobFacts): NotificationCountScope => {
-  if (scope === 'environment') return { kind: 'environment' };
-  if (scope === 'workspace' || job.formId === null)
-    return { kind: 'workspace', id: job.workspaceId };
-  return { kind: 'form', id: job.formId };
-};
 
 /**
  * The notification service for one job. Sends carry the job's ids into the audit and are
@@ -55,11 +45,21 @@ export const jobNotifications = (
           .filter((send) => isHandledForRun(send, job.run.queuedAt))
           .flatMap((send) => send.recipients.to),
       ),
-      runStarted: hasRunStarted(sends, job.run.queuedAt),
       anySent: sends.some(isSentSend),
     };
   },
 
-  sentSince: (scope, seconds) =>
-    countNotificationsSince(countScope(scope, job), seconds, REFUSED_HTTP_STATUSES),
+  async dailyRoom() {
+    const { dailyLimit, dailyResetTimeZone } = getNotificationSettings();
+    // One reading of the clock, so a count that crosses midnight still waits for the right reset.
+    const now = new Date();
+    const sent = await countNotificationSendsSince(
+      lastMidnight(now, dailyResetTimeZone),
+      REFUSED_HTTP_STATUSES,
+    );
+    return {
+      room: Math.max(dailyLimit - sent, 0),
+      resetsAt: nextMidnight(now, dailyResetTimeZone),
+    };
+  },
 });

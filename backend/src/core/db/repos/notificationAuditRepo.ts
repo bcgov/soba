@@ -1,4 +1,4 @@
-import { and, count, eq, gte, inArray, or, sql, type SQL } from 'drizzle-orm';
+import { and, count, eq, gte, inArray, or } from 'drizzle-orm';
 import { db } from '../client';
 import { NotificationOutcome, type NotificationOutcomeCode } from '../codes';
 import { notificationAudits, type NotificationAuditRecipients } from '../schema';
@@ -64,36 +64,28 @@ export const listJobNotificationSends = (jobId: string): Promise<JobNotification
     .from(notificationAudits)
     .where(eq(notificationAudits.jobId, jobId));
 
-/** Which audit rows to count: one form's, one workspace's, or every row. */
-export type NotificationCountScope =
-  | { kind: 'form'; id: string }
-  | { kind: 'workspace'; id: string }
-  | { kind: 'environment' };
-
 /**
- * Sends the provider dealt with in the last `seconds`, by the database clock: accepted, or refused
- * with one of `refusedStatuses`. Failures to be retried are not counted.
+ * The environment's sends since `since` that the provider dealt with: accepted, or refused with one
+ * of `refusedStatuses`. Failures to be retried and sends refused at a limit are not counted.
  */
-export const countNotificationsSince = async (
-  scope: NotificationCountScope,
-  seconds: number,
+export const countNotificationSendsSince = async (
+  since: Date,
   refusedStatuses: readonly number[],
 ): Promise<number> => {
-  const filters: SQL[] = [
-    or(
-      eq(notificationAudits.outcome, NotificationOutcome.accepted),
-      and(
-        eq(notificationAudits.outcome, NotificationOutcome.error),
-        inArray(notificationAudits.httpStatus, [...refusedStatuses]),
-      ),
-    ) as SQL,
-    gte(notificationAudits.createdAt, sql`now() - make_interval(secs => ${seconds})`),
-  ];
-  if (scope.kind === 'form') filters.push(eq(notificationAudits.formId, scope.id));
-  if (scope.kind === 'workspace') filters.push(eq(notificationAudits.workspaceId, scope.id));
   const [row] = await db
     .select({ total: count() })
     .from(notificationAudits)
-    .where(and(...filters));
+    .where(
+      and(
+        or(
+          eq(notificationAudits.outcome, NotificationOutcome.accepted),
+          and(
+            eq(notificationAudits.outcome, NotificationOutcome.error),
+            inArray(notificationAudits.httpStatus, [...refusedStatuses]),
+          ),
+        ),
+        gte(notificationAudits.createdAt, since),
+      ),
+    );
   return row?.total ?? 0;
 };

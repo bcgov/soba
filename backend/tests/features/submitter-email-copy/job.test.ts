@@ -101,9 +101,8 @@ beforeEach(() => {
         emails.push(email);
         return Promise.resolve(outcome as never);
       },
-      handled: () =>
-        Promise.resolve({ recipients: new Set<string>(), runStarted: false, anySent: false }),
-      sentSince: () => Promise.resolve(0),
+      handled: () => Promise.resolve({ recipients: new Set<string>(), anySent: false }),
+      dailyRoom: () => Promise.resolve({ room: 3225, resetsAt: new Date(Date.now() + 3_600_000) }),
     }),
   );
 });

@@ -166,7 +166,7 @@ const stepJobDefinition = (
       options,
       source: params.source,
       submission,
-      services: actionServices(job, submission, log),
+      services: actionServices(job, submission, signal, log),
       result: actionResult({ resultMaxBytes, storeResult }),
       reportProgress,
       signal,

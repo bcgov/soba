@@ -298,9 +298,15 @@ export function resolveShutdownSettings(source: EnvSource): ShutdownSettings {
 }
 
 export interface NotificationSettings {
+  /** Emails the environment sends in a day; the rest wait for the next day. */
+  dailyLimit: number;
   /** The IANA time zone whose midnight starts each day of the email limit. */
   dailyResetTimeZone: string;
 }
+
+// The provider's quota is 100,000 emails a month: about 3,225 a day over 31 days.
+const DEFAULT_DAILY_LIMIT = 3225;
+const MAX_DAILY_LIMIT = 100_000;
 
 // Intl throws on a zone it does not know.
 const isTimeZone = (zone: string): boolean => {
@@ -320,7 +326,12 @@ export function resolveNotificationSettings(source: EnvSource): NotificationSett
       `NOTIFICATION_DAILY_RESET_TIME_ZONE is not an IANA time zone, got '${dailyResetTimeZone}'`,
     );
   }
-  return { dailyResetTimeZone };
+  return {
+    dailyLimit: wholeNumberSetting(source, 'NOTIFICATION_DAILY_LIMIT', DEFAULT_DAILY_LIMIT, {
+      max: MAX_DAILY_LIMIT,
+    }),
+    dailyResetTimeZone,
+  };
 }
 
 /** Build an env reader that reads from the given source. Use in tests with a simulated .env object. */

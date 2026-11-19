@@ -34,9 +34,3 @@ export const isHandledForRun = (
   send: SendOutcome & { createdAt: Date },
   runQueuedAt: Date,
 ): boolean => isHandledSend(send) && !(isRefusedSend(send) && send.createdAt < runQueuedAt);
-
-/** Whether a job's current run, queued at `runQueuedAt`, has handled an address yet. */
-export const hasRunStarted = (
-  sends: readonly (SendOutcome & { createdAt: Date })[],
-  runQueuedAt: Date,
-): boolean => sends.some((send) => isHandledSend(send) && send.createdAt >= runQueuedAt);

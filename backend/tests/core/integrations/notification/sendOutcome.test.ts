@@ -1,5 +1,4 @@
 import {
-  hasRunStarted,
   isHandledForRun,
   isHandledSend,
   isRefusedSend,
@@ -66,33 +65,6 @@ describe('isHandledForRun', () => {
 
   it('retries a failure the provider may not have taken, whenever it happened', () => {
     expect(isHandledForRun({ outcome: 'error', httpStatus: 503, createdAt: after }, rerunAt)).toBe(
-      false,
-    );
-  });
-});
-
-describe('hasRunStarted', () => {
-  const accepted = { outcome: 'accepted', httpStatus: null } as const;
-
-  it('counts any handled send in the first run', () => {
-    expect(hasRunStarted([{ ...accepted, createdAt: before }], createdAt)).toBe(true);
-    expect(hasRunStarted([], createdAt)).toBe(false);
-  });
-
-  it('counts only sends since the last re-run, so a re-run checks its limits again', () => {
-    expect(hasRunStarted([{ ...accepted, createdAt: before }], rerunAt)).toBe(false);
-    expect(hasRunStarted([{ ...accepted, createdAt: after }], rerunAt)).toBe(true);
-    expect(hasRunStarted([{ outcome: 'error', httpStatus: 400, createdAt: after }], rerunAt)).toBe(
-      true,
-    );
-  });
-
-  it('counts a send at the moment the run was queued as part of the run', () => {
-    expect(hasRunStarted([{ ...accepted, createdAt: rerunAt }], rerunAt)).toBe(true);
-  });
-
-  it('does not count a failure to be retried', () => {
-    expect(hasRunStarted([{ outcome: 'error', httpStatus: 503, createdAt: after }], rerunAt)).toBe(
       false,
     );
   });

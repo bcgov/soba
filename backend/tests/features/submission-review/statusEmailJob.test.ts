@@ -94,9 +94,8 @@ beforeEach(() => {
         emails.push(email);
         return Promise.resolve({ outcome: 'accepted', httpStatus: null, audited: true });
       },
-      handled: () =>
-        Promise.resolve({ recipients: new Set<string>(), runStarted: false, anySent: false }),
-      sentSince: () => Promise.resolve(0),
+      handled: () => Promise.resolve({ recipients: new Set<string>(), anySent: false }),
+      dailyRoom: () => Promise.resolve({ room: 3225, resetsAt: new Date(Date.now() + 3_600_000) }),
     }),
   );
 });
@@ -146,7 +145,7 @@ it('ends cancelled, sending nothing, once the submission, its form or its worksp
 it('ends cancelled, sending nothing, when the status has moved on', async () => {
   mockChange.mockResolvedValue({ ...ASSIGNED, current: false });
   await expect(run()).rejects.toThrow(
-    new JobCancelledError('The status has changed since; no email sent'),
+    new JobCancelledError('The status has changed since; no more emails are sent'),
   );
   expect(mockUserEmail).not.toHaveBeenCalled();
   expect(emails).toEqual([]);

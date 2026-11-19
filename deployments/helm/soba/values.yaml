@@ -161,11 +161,6 @@ backend:
     userSearchPlugins: user-search-soba
     # Post-submission action plugins this environment runs, comma-separated. Empty runs none.
     postSubmissionActionPlugins: ""
-    # post-submission-email-addresses: emails allowed per hour, per form, per workspace and for the
-    # whole environment, each from 100 to 1000000. "" uses the defaults (500, 2000 and 5000).
-    postSubmissionEmailFormHourlyLimit: ""
-    postSubmissionEmailWorkspaceHourlyLimit: ""
-    postSubmissionEmailEnvironmentHourlyLimit: ""
     # confirmation-email-copy: copies allowed per hour, per submission, recipient address, form,
     # workspace and environment, each from 1 to 1000000. "" uses the defaults (5, 10, 500, 2000, 5000).
     submitterEmailCopySubmissionHourlyLimit: ""
@@ -327,8 +322,10 @@ backend:
       # -- outbound deadline in ms; empty uses the backend default (30000)
       timeoutMs: "5000"
 
-  # -- configmap-notification: PLUGIN_NOTIFY_V1_*, default notification code + daily reset time zone
+  # -- configmap-notification: PLUGIN_NOTIFY_V1_*, default notification code, daily email limit + reset time zone
   notification:
+    # -- emails the environment sends in a day, 1 to 100000; empty uses 3225 (about 100,000 a month)
+    dailyLimit: ""
     # -- IANA time zone whose midnight resets the daily email limit; empty uses America/Vancouver
     dailyResetTimeZone: ""
     notifyV1:

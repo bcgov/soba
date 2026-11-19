@@ -72,7 +72,10 @@ export const runStatusEmailJob = async ({ job, signal, log }: JobContext): Promi
     submissionId: change.submissionId,
   });
   if (!submission) throw new JobCancelledError(SUBMISSION_GONE);
-  if (!change.current) throw new JobCancelledError('The status has changed since; no email sent');
+  // A list can be part sent when the change is overtaken while it waits for the daily reset.
+  if (!change.current) {
+    throw new JobCancelledError('The status has changed since; no more emails are sent');
+  }
   const email = statusEmailFor(change.status);
   if (!email) throw new JobCancelledError('This status sends no email');
   const to = await recipientsFor(email, change, submission.formId);

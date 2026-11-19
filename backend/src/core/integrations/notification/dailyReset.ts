@@ -1,10 +1,13 @@
 import { randomInt } from 'node:crypto';
 import { JobDeferredError } from '../../jobs/settlement';
-import { getNotificationSettings } from './settings';
 
-/** Why an email job waits: its sends are past the daily limit. */
+/** Why an email job waits: the environment's sends today reached NOTIFICATION_DAILY_LIMIT. */
 export const DAILY_LIMIT_REACHED =
   'Daily email limit reached; the rest are sent after it resets at midnight';
+
+/** Why an email job waits: the provider refused a send at its own limit. */
+export const PROVIDER_LIMIT_REACHED =
+  "Email provider's limit reached; the rest are tried again after midnight";
 
 // The jobs waiting for the reset start over its first five minutes, not all at once.
 const RESET_SPREAD_MS = 300_000;
@@ -35,26 +38,37 @@ const instantAt = (wallMs: number, timeZone: string): number => {
   return wallMs - (wallClockMs(guess, timeZone) - guess);
 };
 
-/** The start of the next day in `timeZone` after `now`: its midnight, or the first instant after. */
-export const nextMidnight = (now: Date, timeZone: string): Date => {
+/**
+ * The first instant of the local day `daysAhead` days from the one `now` falls in: its midnight, or
+ * the first instant after where a clock change skips midnight.
+ */
+const dayStart = (now: Date, timeZone: string, daysAhead: number): Date => {
   const today = new Date(wallClockMs(now.getTime(), timeZone));
-  const tomorrow = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + 1);
-  const midnight = instantAt(tomorrow, timeZone);
+  const wallMs = Date.UTC(
+    today.getUTCFullYear(),
+    today.getUTCMonth(),
+    today.getUTCDate() + daysAhead,
+  );
+  const midnight = instantAt(wallMs, timeZone);
   // Where a clock change skips midnight, the guess lands the evening before; the day starts after.
-  return new Date(midnight + Math.max(tomorrow - wallClockMs(midnight, timeZone), 0));
+  return new Date(midnight + Math.max(wallMs - wallClockMs(midnight, timeZone), 0));
 };
 
+/** The start of the day in `timeZone` that `now` falls in. */
+export const lastMidnight = (now: Date, timeZone: string): Date => dayStart(now, timeZone, 0);
+
+/** The start of the next day in `timeZone` after `now`. */
+export const nextMidnight = (now: Date, timeZone: string): Date => dayStart(now, timeZone, 1);
+
 /**
- * The deferral to the next midnight in NOTIFICATION_DAILY_RESET_TIME_ZONE, spread over the five
- * minutes after it. A wait past a day is cut to a day, and the job defers again when it wakes.
+ * The deferral to `resetsAt`, a daily reset, spread over the five minutes after it, with `reason`
+ * shown on the job. A reset already past waits a second; a wait past a day is cut to a day, and the
+ * job defers again when it wakes.
  */
-export const deferUntilDailyReset = (
+export const deferUntilReset = (
+  resetsAt: Date,
+  reason: string,
   now: Date = new Date(),
   random: (max: number) => number = randomInt,
-): JobDeferredError => {
-  const reset = nextMidnight(now, getNotificationSettings().dailyResetTimeZone);
-  return new JobDeferredError(
-    reset.getTime() - now.getTime() + random(RESET_SPREAD_MS),
-    DAILY_LIMIT_REACHED,
-  );
-};
+): JobDeferredError =>
+  new JobDeferredError(resetsAt.getTime() - now.getTime() + random(RESET_SPREAD_MS), reason);

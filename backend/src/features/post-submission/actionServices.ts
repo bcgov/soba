@@ -61,9 +61,10 @@ const openUpload = async (
 export const actionServices = (
   job: JobFacts,
   submission: PostSubmissionActionSubmission,
+  signal: AbortSignal,
   log: Logger,
 ): PostSubmissionActionServices => ({
-  notifications: actionNotifications(job),
+  notifications: actionNotifications(job, signal, log),
   // Looked up on use, so an action that stages nothing runs without temp storage.
   tempStorage: {
     reserve: (opts) => getTempStorageAdapter().reserve(opts),

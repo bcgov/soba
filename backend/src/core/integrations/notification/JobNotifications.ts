@@ -11,14 +11,20 @@ export interface JobEmailResult extends SendOutcome {
 export interface HandledAddresses {
   /** Addresses already handed to the provider, or that the provider refused since the last re-run. */
   recipients: Set<string>;
-  /** The current run has handled an address. */
-  runStarted: boolean;
   /** Any of the job's emails reached its address, in any run. */
   anySent: boolean;
 }
 
-/** Where a send count looks: the job's form, its workspace, or the whole environment. */
-export type NotificationSendScope = 'form' | 'workspace' | 'environment';
+/** Where the environment's day stands, read at one moment. */
+export interface DailyRoom {
+  /**
+   * Emails it may still send today: NOTIFICATION_DAILY_LIMIT less the sends the provider accepted
+   * or refused since the last midnight in NOTIFICATION_DAILY_RESET_TIME_ZONE; never below zero.
+   */
+  room: number;
+  /** The next midnight there, when the count starts again. */
+  resetsAt: Date;
+}
 
 /**
  * The notification service bound to one job: each send carries the job's ids into the audit and is
@@ -29,9 +35,6 @@ export interface JobNotifications {
   sendEmail(email: SendEmail): Promise<JobEmailResult>;
   /** Where this job's sends stand, from its audit rows. */
   handled(): Promise<HandledAddresses>;
-  /**
-   * Sends the provider accepted or refused in the last `seconds`, by the database clock. Failures
-   * that will be retried are not counted, so an outage does not use up the hour.
-   */
-  sentSince(scope: NotificationSendScope, seconds: number): Promise<number>;
+  /** Where the environment's day stands. */
+  dailyRoom(): Promise<DailyRoom>;
 }

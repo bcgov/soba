@@ -6,11 +6,7 @@ import type { JobPoolCode } from '../../config/env';
 import type { JobFacts } from '../../jobs/facts';
 import type { JobResultFacts } from '../../jobs/outputs';
 import type { StoredJobResult } from '../../jobs/registry';
-import type {
-  JobEmailResult,
-  JobNotifications,
-  NotificationSendScope,
-} from '../notification/JobNotifications';
+import type { SendEmail } from '../notification/NotificationAdapter';
 import type { TempResource, TempStorageAdapter } from '../temp-storage/TempStorageAdapter';
 
 export type { PostSubmissionActionScope };
@@ -39,14 +35,23 @@ export interface PostSubmissionActionSubmission {
  */
 export type PostSubmissionActionJob = JobFacts & { submissionId: string; revisionId: string };
 
-/** One email send, as the notification service reported and audited it. */
-export type PostSubmissionActionEmailResult = JobEmailResult;
+/** An email's subject, body and body type, the same for every address it goes to. */
+export type PostSubmissionActionEmailContent = SendEmail['content'];
 
-/** Where a send count looks: the job's form, its workspace, or the whole environment. */
-export type PostSubmissionActionSendScope = NotificationSendScope;
-
-/** The notification service, bound to the job: sends are attributed to the system user. */
-export type PostSubmissionActionNotifications = JobNotifications;
+/** Email for the job: sends are audited against it and attributed to the system user. */
+export interface PostSubmissionActionNotifications {
+  /**
+   * Send `content` to each address, one email each, skipping those the job already handled, and no
+   * more than the environment's daily limit allows. Past it, or at the provider's limit, it throws
+   * `JobDeferredError` and the rest go after the daily reset; it throws `JobCancelledError` when
+   * notifications are off or every address was refused. Any other failure throws, so the attempt
+   * retries.
+   */
+  sendToEach(
+    addresses: readonly string[],
+    content: PostSubmissionActionEmailContent,
+  ): Promise<void>;
+}
 
 /** Which submits queue an action: every submit, or the submission's first only. */
 export type PostSubmissionActionSubmits = 'every' | 'first';

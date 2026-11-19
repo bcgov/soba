@@ -213,14 +213,17 @@ Notify with an API key. ConfigMap `<fullname>-backend-notification`:
 | Helm value                                    | Env var                              | Used by                       |
 | --------------------------------------------- | ------------------------------------ | ----------------------------- |
 | `backend.config.notificationDefaultCode`      | `NOTIFICATION_DEFAULT_CODE`          | default notification resolver |
-| `backend.notification.dailyResetTimeZone`     | `NOTIFICATION_DAILY_RESET_TIME_ZONE` | email jobs at a sending limit |
+| `backend.notification.dailyLimit`             | `NOTIFICATION_DAILY_LIMIT`           | every email job               |
+| `backend.notification.dailyResetTimeZone`     | `NOTIFICATION_DAILY_RESET_TIME_ZONE` | every email job               |
 | `backend.notification.notifyV1.endpoint`      | `PLUGIN_NOTIFY_V1_ENDPOINT`          | notify-v1 adapter             |
 | `backend.notification.notifyV1.timeoutMs`     | `PLUGIN_NOTIFY_V1_TIMEOUT_MS`        | notify-v1 adapter             |
 | `backend.notification.notifyV1.limitStatuses` | `PLUGIN_NOTIFY_V1_LIMIT_STATUSES`    | notify-v1 adapter             |
 
-An email job that reaches a sending limit waits until midnight in
-`NOTIFICATION_DAILY_RESET_TIME_ZONE` (`America/Vancouver` when unset); an invalid zone stops
-startup. Notify's limit statuses default to `429`.
+The environment sends up to `NOTIFICATION_DAILY_LIMIT` emails a day (3225 when unset, about
+Notify's 100,000 a month over 31 days), counting from midnight in
+`NOTIFICATION_DAILY_RESET_TIME_ZONE` (`America/Vancouver` when unset). An email job past it, or
+one Notify answers with a limit status (`429` by default), waits until the next midnight. A limit
+outside 1 to 100000 or an invalid zone stops startup.
 
 ### Secret values (Vault template in backend Deployment)
 
@@ -260,25 +263,21 @@ is on; the After Submission tab shows on every workspace and form then. The list
 codes this environment runs, comma-separated; with none listed, a submit queues no actions. Set in
 ConfigMap `<fullname>-backend-app` only when non-empty:
 
-| Helm value                                                 | Env var                                                           | Used by                         |
-| ---------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------- |
-| `backend.config.postSubmissionActionPlugins`               | `POST_SUBMISSION_ACTION_PLUGINS`                                  | post-submission actions         |
-| `backend.config.postSubmissionEmailFormHourlyLimit`        | `PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_FORM_HOURLY_LIMIT`        | post-submission-email-addresses |
-| `backend.config.postSubmissionEmailWorkspaceHourlyLimit`   | `PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_WORKSPACE_HOURLY_LIMIT`   | post-submission-email-addresses |
-| `backend.config.postSubmissionEmailEnvironmentHourlyLimit` | `PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_ENVIRONMENT_HOURLY_LIMIT` | post-submission-email-addresses |
+| Helm value                                   | Env var                          | Used by                 |
+| -------------------------------------------- | -------------------------------- | ----------------------- |
+| `backend.config.postSubmissionActionPlugins` | `POST_SUBMISSION_ACTION_PLUGINS` | post-submission actions |
 
 `post-submission-log` only logs that it ran. No environment lists it; a local run can.
 
 `post-submission-email-addresses` emails a notice to a list of up to 100 addresses through the
-active notification plugin. The hourly limits (defaults 500 per form, 2000 per workspace, 5000 for
-the environment) are checked before a list starts; a list that would pass one is not sent and its
-job ends cancelled with the counts. Its feature, `backend.features.post-submission-email`, applies
-to every workspace and form while its status is `enabled`. Every environment lists the plugin and
-enables both features. Dev, PR and test send through Notify test, which delivers only to its
-safelist. UAT and prod keep `backend.features.notifications` disabled, so email jobs there end
-cancelled; sending needs that feature enabled, `notificationDefaultCode: notify-v1`,
+active notification plugin, within the daily email limit (see Notification Configuration); past
+it, the rest of a list waits for the next day. Its feature,
+`backend.features.post-submission-email`, applies to every workspace and form while its status is
+`enabled`. Every environment lists the plugin and enables both features. Dev, PR and test send
+through Notify test, which delivers only to its safelist. UAT and prod keep
+`backend.features.notifications` disabled, so email jobs there end cancelled; sending needs that
+feature enabled, `notificationDefaultCode: notify-v1`,
 `notification.notifyV1.endpoint`, and `PLUGIN_NOTIFY_V1_API_KEY` in the Vault secret.
-A limit outside 100 to 1000000 fails the render.
 
 To retire an action, take its code off the list first and remove its plugin in a later release.
 Jobs already queued for a plugin that no pod has stay queued.
@@ -290,7 +289,7 @@ success page. All three are on in dev, PR and test and off in UAT and prod. Both
 on. Copies send only while `backend.features.notifications` is enabled.
 
 Copy requests are checked against hourly limits of their own; a request past one is refused with
-429 `email_copy_limit_reached`. Sent copies also count toward the action emails' limits above. Set
+429 `email_copy_limit_reached`. Sent copies also count toward the daily email limit. Set
 in ConfigMap `<fullname>-backend-app` only when non-empty; a value outside 1 to 1000000 fails the
 render:
 
