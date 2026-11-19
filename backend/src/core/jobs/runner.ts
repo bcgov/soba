@@ -185,6 +185,12 @@ export class JobRunner {
     this.schedule(state, 0);
   }
 
+  /** `nudge` the pool that runs jobs of `type`; nothing for a type this process does not know. */
+  nudgeType(type: string): void {
+    const definition = this.registry.get(type);
+    if (definition) this.nudge(definition.pool);
+  }
+
   /**
    * Stop claiming and wait up to the drain deadline for running jobs. Jobs still running then are
    * aborted; once its handler returns, each is released, or waits as asked when it deferred. Jobs

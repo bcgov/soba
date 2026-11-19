@@ -1,79 +1,20 @@
-import { db } from '../../core/db/client';
-import { Features } from '../../core/db/codes';
-import { readJobOutputs, type JobOutputRow } from '../../core/db/repos/jobOutputRepo';
-import { extendJobResult, type ChildJob } from '../../core/db/repos/jobRepo';
+import type { ChildJob } from '../../core/db/repos/jobRepo';
 import type {
   PostSubmissionActionJobSettings,
   PostSubmissionActionPluginDefinition,
-  PostSubmissionActionPreviousStep,
-  PostSubmissionActionSubmission,
 } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
 import {
   actionStepType,
   getEnabledPostSubmissionActionCodes,
 } from '../../core/integrations/post-submission-action/PostSubmissionActionRegistry';
 import { getPostSubmissionActionPluginDefinitions } from '../../core/integrations/plugins/PluginRegistry';
-import { JobCancelledError, JobFailedError } from '../../core/jobs/errors';
 import type { JobFacts } from '../../core/jobs/facts';
-import { resultFacts } from '../../core/jobs/outputs';
 import type { JobTypeDefinition } from '../../core/jobs/registry';
 import { getJobSettings } from '../../core/jobs/settings';
 import { log } from '../../core/logging';
-import { isFeatureAvailable } from '../../core/services/featureAvailabilityService';
+import { actionResult } from './actionServices';
+import { runActionStep } from './actionStep';
 import { ActionJobParamsSchema, type ActionJobParams } from './params';
-import { findActionSettingRows, findLiveSubmission, SUBMISSION_GONE } from './repo';
-import { actionFeatureAvailable, isWorkspaceConfigurable } from './resolve';
-import { effectiveAction, formActionScopes, rowsFor } from './rules';
-
-/** What an action job checks before it runs. */
-export interface ActionRunFacts {
-  postSubmissionAvailable: boolean;
-  enabledHere: boolean;
-  featureAvailable: boolean;
-  live: boolean;
-  stillEnabled: boolean;
-}
-
-/** Why an action job should end cancelled instead of running; null to run it. */
-export const cancelReason = (facts: ActionRunFacts): string | null => {
-  if (!facts.postSubmissionAvailable) return 'Post-submission is not available for the form';
-  if (!facts.enabledHere) return 'The action is not enabled in this environment';
-  if (!facts.featureAvailable) return "The action's feature is not available for the form";
-  if (!facts.live) return SUBMISSION_GONE;
-  if (!facts.stillEnabled) return 'The action was turned off';
-  return null;
-};
-
-const runFacts = async (
-  plugin: PostSubmissionActionPluginDefinition,
-  job: JobFacts,
-): Promise<{ facts: ActionRunFacts; submission: PostSubmissionActionSubmission | null }> => {
-  const scope = { workspaceId: job.workspaceId, formId: job.formId ?? undefined };
-  const [postSubmissionAvailable, featureAvailable, workspaceConfigurable, submission, rows] =
-    await Promise.all([
-      isFeatureAvailable(Features.post_submission, scope),
-      actionFeatureAvailable(plugin, scope),
-      isWorkspaceConfigurable(plugin, job.workspaceId),
-      job.submissionId === null
-        ? Promise.resolve(null)
-        : findLiveSubmission(db, { workspaceId: job.workspaceId, submissionId: job.submissionId }),
-      job.formId === null
-        ? Promise.resolve([])
-        : findActionSettingRows(db, job.workspaceId, job.formId),
-    ]);
-  const { workspaceRow, formRow } = rowsFor(rows, plugin.code);
-  const scopes = formActionScopes(plugin.scopes, workspaceConfigurable);
-  return {
-    facts: {
-      postSubmissionAvailable,
-      enabledHere: getEnabledPostSubmissionActionCodes().includes(plugin.code),
-      featureAvailable,
-      live: submission !== null,
-      stillEnabled: effectiveAction(workspaceRow, formRow, scopes).values.enabled,
-    },
-    submission,
-  };
-};
 
 /** One step of an action, as a job type. */
 interface ActionStep extends PostSubmissionActionJobSettings {
@@ -88,30 +29,6 @@ const actionSteps = (plugin: PostSubmissionActionPluginDefinition): ActionStep[]
     type: actionStepType(plugin.code, step.name),
   })),
 ];
-
-/**
- * The step before a later one, and the result it stored. It succeeded, since a step is queued with
- * the success of the one before, and retention keeps it until this one succeeds. Should it be gone,
- * the job ends cancelled.
- */
-export const previousStep = (row: JobOutputRow | undefined): PostSubmissionActionPreviousStep => {
-  if (!row) throw new JobCancelledError('The step before it is gone');
-  return { jobId: row.jobId, result: resultFacts(row) };
-};
-
-/** The step before and its result, once the result's expiry is pushed to its retention from now. */
-const loadPreviousStep = async (
-  { parentJobId }: JobFacts,
-  before: ActionStep,
-): Promise<PostSubmissionActionPreviousStep> => {
-  if (parentJobId === null) return previousStep(undefined);
-  await extendJobResult(
-    parentJobId,
-    before.resultRetentionDays ?? getJobSettings().resultRetentionDays,
-  );
-  const [row] = await readJobOutputs([parentJobId]);
-  return previousStep(row);
-};
 
 /** The next step's job: a child of this step's job with its params as stored, one per parent. */
 export const nextStepJob = (
@@ -131,11 +48,8 @@ export const nextStepJob = (
 });
 
 /**
- * The job type for one step of an action. Before the step runs, the job ends cancelled if the
- * feature or the action was turned off, or the submission is gone; that is how a queued action is
- * stopped. The options are the ones recorded when the submission was received. A later step gets
- * the step before it; the next step is queued in the transaction that records this one as
- * succeeded.
+ * The job type for one step of an action, which `runActionStep` runs. The next step is queued in the
+ * transaction that records this one as succeeded.
  */
 const stepJobDefinition = (
   plugin: PostSubmissionActionPluginDefinition,
@@ -157,29 +71,14 @@ const stepJobDefinition = (
     storeResult,
     queueOnSuccess,
   }) => {
-    const { facts, submission } = await runFacts(plugin, job);
-    const reason = cancelReason(facts);
-    if (reason || submission === null) throw new JobCancelledError(reason ?? SUBMISSION_GONE);
-    if (job.revisionId === null) throw new JobFailedError('The action has no revision to run for');
-    const previous = before ? await loadPreviousStep(job, before) : null;
-    const params = ActionJobParamsSchema.parse(job.params);
-    const options = plugin.optionsSchema.parse(params.options);
-    // Loaded on run: the services import the submission service, whose module loads the job
-    // catalog, which imports this module.
-    const { actionResult, actionServices } = await import('./actionServices');
-    await step.run({
-      job: { ...job, submissionId: submission.id, revisionId: job.revisionId },
-      previous,
-      options,
-      source: params.source,
-      submission,
-      services: actionServices(job, submission, signal, log),
+    await runActionStep(plugin, step, before, {
+      job,
       result: actionResult({ resultMaxBytes, storeResult }),
       reportProgress,
       signal,
       log,
     });
-    if (next) queueOnSuccess([nextStepJob(job, next, params)]);
+    if (next) queueOnSuccess([nextStepJob(job, next, ActionJobParamsSchema.parse(job.params))]);
   },
 });
 

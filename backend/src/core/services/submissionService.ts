@@ -40,8 +40,8 @@ import {
   type SubmissionWriteEventCode,
   type SubmissionWorkflowStateCode,
 } from '../db/codes';
-import { nudgeJobs } from '../jobs';
 import { enqueueSubmittedJob, queuesSubmittedJob } from '../jobs/enqueue';
+import { nudgeJobs } from '../jobs/nudge';
 import { availableActions } from '../../features/post-submission/resolve';
 import {
   decideRecordedWrite,

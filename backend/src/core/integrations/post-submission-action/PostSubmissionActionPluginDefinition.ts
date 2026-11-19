@@ -3,8 +3,6 @@ import type { Logger } from 'pino';
 import type { z } from 'zod';
 import type { PostSubmissionActionScope } from '@soba/lib';
 import type { JobPoolCode } from '../../config/env';
-import type { JobFacts } from '../../jobs/facts';
-import type { JobResultFacts } from '../../jobs/outputs';
 import type { StoredJobResult } from '../../jobs/registry';
 import type { SendEmail } from '../notification/NotificationAdapter';
 import type { TempResource, TempStorageAdapter } from '../temp-storage/TempStorageAdapter';
@@ -33,10 +31,23 @@ export interface PostSubmissionActionSubmission {
 }
 
 /**
- * An action job's facts. It is always about a submission, and `revisionId` is the revision whose
- * submit queued it, which a later submit can have replaced as the submission's latest.
+ * The job a step runs as, recorded in soba.job. `revisionId` is the revision whose submit queued the
+ * action, which a later submit can have replaced as the submission's latest.
  */
-export type PostSubmissionActionJob = JobFacts & { submissionId: string; revisionId: string };
+export interface PostSubmissionActionJob {
+  id: string;
+  /** The action's code for its first step, `<code>:<name>` for a later one. */
+  type: string;
+  submissionId: string;
+  revisionId: string;
+  /** The attempt within this run, from 1. */
+  attempt: number;
+  /**
+   * The job's current run: `number` is 1, then one more each time staff run the job again;
+   * `queuedAt` and `queuedBy` say when and by whom this run was queued.
+   */
+  run: { number: number; queuedAt: Date; queuedBy: string };
+}
 
 /** An email's subject, body and body type, the same for every address it goes to. */
 export type PostSubmissionActionEmailContent = SendEmail['content'];
@@ -48,7 +59,7 @@ export interface PostSubmissionActionNotifications {
    * more than the environment's daily limit allows. Past it, or at the provider's limit, it throws
    * `JobDeferredError` and the rest go after the daily reset; it throws `JobCancelledError` when
    * notifications are off or every address was refused. Any other failure throws, so the attempt
-   * retries.
+   * retries. Call it once per step: a second call skips the addresses the first handled.
    */
   sendToEach(
     addresses: readonly string[],
@@ -128,13 +139,18 @@ export interface PostSubmissionActionResult {
   ): Promise<StoredJobResult>;
 }
 
-/** A result a step stored: ready to read until it expires, then expired. */
-export type PostSubmissionActionStoredResult = JobResultFacts;
+/** A file a step stored as its job's result, kept until `expiresAt` at least. */
+export interface PostSubmissionActionStoredResult {
+  filename: string;
+  size: number | null;
+  contentType: string | null;
+  expiresAt: Date;
+}
 
 /** The step before this one, which succeeded: its job and the result it stored. */
 export interface PostSubmissionActionPreviousStep {
   jobId: string;
-  /** Null when it stored none. */
+  /** Null when it stored none, or its file is gone. */
   result: PostSubmissionActionStoredResult | null;
 }
 
@@ -169,8 +185,8 @@ export interface PostSubmissionActionJobSettings<TOptions = Record<string, unkno
    * Returning means the step is done; throwing retries it, and throwing `JobDeferredError` runs it
    * again after its delay without using an attempt. Stop and throw when the signal aborts, with an
    * ordinary error rather than a deferral, which would hold the step back by its delay when the pod
-   * drains. It can run more than once, so its side effects must be safe to repeat. An error's message is stored on
-   * the job and logged, so it must not carry recipients or submission data.
+   * drains. It can run more than once, so its side effects must be safe to repeat. An error's
+   * message is stored on the job and logged, so it must not carry recipients or submission data.
    */
   run: (context: PostSubmissionActionContext<TOptions>) => Promise<void>;
 }

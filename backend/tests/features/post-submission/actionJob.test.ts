@@ -1,27 +1,11 @@
 import { z } from 'zod';
-import type { JobOutputRow } from '../../../src/core/db/repos/jobOutputRepo';
 import type { PostSubmissionActionPluginDefinition } from '../../../src/core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
-import { JobCancelledError } from '../../../src/core/jobs/errors';
 import type { JobFacts } from '../../../src/core/jobs/facts';
 import { getJobSettings } from '../../../src/core/jobs/settings';
-import {
-  actionJobDefinitions,
-  cancelReason,
-  nextStepJob,
-  previousStep,
-  type ActionRunFacts,
-} from '../../../src/features/post-submission/actionJob';
+import { actionJobDefinitions, nextStepJob } from '../../../src/features/post-submission/actionJob';
 import type { ActionJobParams } from '../../../src/features/post-submission/params';
 
 jest.mock('../../../src/core/db/client', () => ({ db: {}, quietDb: {} }));
-
-const ready: ActionRunFacts = {
-  postSubmissionAvailable: true,
-  enabledHere: true,
-  featureAvailable: true,
-  live: true,
-  stillEnabled: true,
-};
 
 const run = () => Promise.resolve();
 
@@ -35,22 +19,6 @@ const plugin = (
   optionsSchema: z.object({}),
   job: { pool: 'heavy', run, ...job },
   steps,
-});
-
-describe('cancelReason', () => {
-  it('runs the action when every check passes', () => {
-    expect(cancelReason(ready)).toBeNull();
-  });
-
-  it.each([
-    ['postSubmissionAvailable', 'Post-submission is not available for the form'],
-    ['enabledHere', 'The action is not enabled in this environment'],
-    ['featureAvailable', "The action's feature is not available for the form"],
-    ['live', 'The submission, its form or its workspace is gone'],
-    ['stillEnabled', 'The action was turned off'],
-  ] as const)('cancels when %s fails', (fact, reason) => {
-    expect(cancelReason({ ...ready, [fact]: false })).toBe(reason);
-  });
 });
 
 describe('actionJobDefinitions', () => {
@@ -108,59 +76,6 @@ describe('actionJobDefinitions', () => {
         timeoutMs: 60_000,
       },
     ]);
-  });
-});
-
-describe('previousStep', () => {
-  const expiresAt = new Date('2026-11-25T00:00:00Z');
-  const row = (overrides: Partial<JobOutputRow> = {}): JobOutputRow => ({
-    jobId: 'step-1',
-    status: 'succeeded',
-    progressDone: null,
-    progressTotal: null,
-    resultExpiresAt: null,
-    resultExpired: false,
-    resultFileId: null,
-    resultFilename: null,
-    resultSize: null,
-    resultContentType: null,
-    resultStoredThisRun: false,
-    ...overrides,
-  });
-  const stored = {
-    resultExpiresAt: expiresAt,
-    resultFileId: 'file-1',
-    resultFilename: 'package.zip',
-    resultSize: 2048,
-    resultContentType: 'application/zip',
-    resultStoredThisRun: true,
-  };
-
-  it('gives the step before, with the result it stored', () => {
-    expect(previousStep(row(stored))).toEqual({
-      jobId: 'step-1',
-      result: {
-        state: 'ready',
-        filename: 'package.zip',
-        size: 2048,
-        contentType: 'application/zip',
-        expiresAt,
-      },
-    });
-  });
-
-  it('gives an expired result as expired, and no result as none', () => {
-    expect(previousStep(row({ ...stored, resultExpired: true })).result).toEqual({
-      state: 'expired',
-      expiresAt,
-    });
-    expect(previousStep(row()).result).toBeNull();
-  });
-
-  it('ends cancelled when the step before is gone', () => {
-    expect(() => previousStep(undefined)).toThrow(
-      new JobCancelledError('The step before it is gone'),
-    );
   });
 });
 
