@@ -297,6 +297,32 @@ export function resolveShutdownSettings(source: EnvSource): ShutdownSettings {
   };
 }
 
+export interface NotificationSettings {
+  /** The IANA time zone whose midnight starts each day of the email limit. */
+  dailyResetTimeZone: string;
+}
+
+// Intl throws on a zone it does not know.
+const isTimeZone = (zone: string): boolean => {
+  try {
+    return Boolean(new Intl.DateTimeFormat('en-US', { timeZone: zone }));
+  } catch {
+    return false;
+  }
+};
+
+/** Notification settings from `source`. A set value that is not valid stops startup. */
+export function resolveNotificationSettings(source: EnvSource): NotificationSettings {
+  const dailyResetTimeZone =
+    getOptionalEnvFrom(source, 'NOTIFICATION_DAILY_RESET_TIME_ZONE') ?? 'America/Vancouver';
+  if (!isTimeZone(dailyResetTimeZone)) {
+    throw new Error(
+      `NOTIFICATION_DAILY_RESET_TIME_ZONE is not an IANA time zone, got '${dailyResetTimeZone}'`,
+    );
+  }
+  return { dailyResetTimeZone };
+}
+
 /** Build an env reader that reads from the given source. Use in tests with a simulated .env object. */
 export function createEnvReader(source: EnvSource) {
   return {
@@ -386,6 +412,7 @@ export function createEnvReader(source: EnvSource) {
       getNumberEnvFrom(source, 'TEMPORAL_WORKER_HEALTH_PORT') ?? 9090,
     getJobSettings: () => resolveJobSettings(source),
     getShutdownSettings: () => resolveShutdownSettings(source),
+    getNotificationSettings: () => resolveNotificationSettings(source),
   };
 }
 
@@ -499,4 +526,5 @@ export const env = {
     wholeNumberSetting(process.env, 'SUBMISSION_EXPORT_ACTIVE_LIMIT', 2),
   getJobSettings: () => resolveJobSettings(process.env),
   getShutdownSettings: () => resolveShutdownSettings(process.env),
+  getNotificationSettings: () => resolveNotificationSettings(process.env),
 };

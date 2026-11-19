@@ -196,6 +196,7 @@ address with no expiry, as `notification_audit` rows keep recipients.
   | the job                       | when                                                                                                                                                                 |
   | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
   | throws, so it retries         | the provider fails without refusing the address, or times out; an audit row could not be written                                                                     |
+  | waits for the daily reset     | the provider answers with a limit status; the job is deferred to the next midnight in `NOTIFICATION_DAILY_RESET_TIME_ZONE`, without using an attempt                 |
   | ends cancelled, with a reason | notifications are off; the event no longer applies; no one is left to send to; a recipient cannot be resolved, such as an assignee who can no longer review the form |
 
   Cancel reasons show in the Jobs tabs, so they name no address, comment or form name.
@@ -207,8 +208,9 @@ address with no expiry, as `notification_audit` rows keep recipients.
      sent (step 7).
   4. Checks that notifications are on.
   5. Runs the policy's `checkBudgets`, if any, until the run has handled an address.
-  6. Sends to one address at a time. A refused address (400 or 422) is recorded and skipped; any
-     other failure throws.
+  6. Sends to one address at a time. A refused address (400 or 422) is recorded and skipped. A send
+     refused at a sending limit is recorded as `limited`, and the job waits for the daily reset,
+     then goes on from that address. Any other failure throws.
   7. Ends cancelled when no email on the list has been sent, on this attempt or an earlier one:
      every address was refused.
 - **Attribution.** `jobNotifications(job, actorId)` binds the service to the job; `actorId` is a

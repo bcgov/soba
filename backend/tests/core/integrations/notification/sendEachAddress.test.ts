@@ -8,7 +8,8 @@ import {
   sendEachAddress,
   type SendPolicy,
 } from '../../../../src/core/integrations/notification/sendEachAddress';
-import { JobCancelledError } from '../../../../src/core/jobs/settlement';
+import { DAILY_LIMIT_REACHED } from '../../../../src/core/integrations/notification/dailyReset';
+import { JobCancelledError, JobDeferredError } from '../../../../src/core/jobs/settlement';
 
 const ACCEPTED: JobEmailResult = { outcome: 'accepted', httpStatus: null, audited: true };
 const CONTENT: SendEmail['content'] = { subject: 'Subject', body: '<p>Body</p>', bodyType: 'html' };
@@ -268,6 +269,16 @@ describe('sendEachAddress', () => {
     await expect(
       run(['a@example.com', 'b@example.com', 'c@example.com'], fake.notifications),
     ).rejects.toThrow(new JobCancelledError('Notifications are off'));
+    expect(fake.recipients()).toEqual(['a@example.com', 'b@example.com']);
+  });
+
+  it('waits for the daily reset at a sending limit, keeping the addresses sent before it', async () => {
+    const fake = fakeNotifications({
+      answers: { 'b@example.com': { outcome: 'limited', httpStatus: 429, audited: true } },
+    });
+    const sent = run(['a@example.com', 'b@example.com', 'c@example.com'], fake.notifications);
+    await expect(sent).rejects.toBeInstanceOf(JobDeferredError);
+    await expect(sent).rejects.toThrow(DAILY_LIMIT_REACHED);
     expect(fake.recipients()).toEqual(['a@example.com', 'b@example.com']);
   });
 

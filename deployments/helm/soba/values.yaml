@@ -327,13 +327,17 @@ backend:
       # -- outbound deadline in ms; empty uses the backend default (30000)
       timeoutMs: "5000"
 
-  # -- configmap-notification: PLUGIN_NOTIFY_V1_* + default notification code
+  # -- configmap-notification: PLUGIN_NOTIFY_V1_*, default notification code + daily reset time zone
   notification:
+    # -- IANA time zone whose midnight resets the daily email limit; empty uses America/Vancouver
+    dailyResetTimeZone: ""
     notifyV1:
       # -- Notify base URL including /api/v1
       endpoint: ""
       # -- outbound deadline in ms; empty uses the backend default (30000)
       timeoutMs: ""
+      # -- comma-separated HTTP statuses that mean Notify's sending limit; empty uses 429
+      limitStatuses: ""
 
   # -- configmap-sso: IDP / SSO config
   sso:

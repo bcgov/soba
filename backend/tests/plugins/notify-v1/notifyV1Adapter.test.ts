@@ -3,6 +3,7 @@ import { NotifyV1Adapter } from '../../../src/plugins/notify-v1/notifyV1Adapter'
 import { createPluginConfigReaderFrom } from '../../../src/core/config/pluginConfig';
 import { createEnvReader } from '../../../src/core/config/env';
 import {
+  NotificationLimitError,
   SendEmailSchema,
   providerDetailOf,
   type SendEmail,
@@ -21,12 +22,13 @@ const accepted = {
   createdAt: '2026-10-05T12:00:00.000Z',
   message: 'Notification accepted for delivery',
 };
-const makeAdapter = () =>
+const makeAdapter = (extra: Record<string, string> = {}) =>
   new NotifyV1Adapter(
     createPluginConfigReaderFrom(
       createEnvReader({
         PLUGIN_NOTIFY_V1_ENDPOINT: 'https://notify.example/api/v1',
         PLUGIN_NOTIFY_V1_API_KEY: 'configured-key',
+        ...extra,
       }),
       'notify-v1',
     ),
@@ -55,6 +57,50 @@ test('keeps Notify error text out of the message but on the error for the audit'
     "Request validation failed: Recipient(s) not on this tenant's safelist: recipient@example.com. This environment only sends to safelisted recipients.",
   );
   expect(Object.keys(err as object)).not.toContain('providerDetail');
+});
+
+describe('limit statuses', () => {
+  const adapterWith = (limitStatuses: string) =>
+    makeAdapter({ PLUGIN_NOTIFY_V1_LIMIT_STATUSES: limitStatuses });
+  const failWith = async (adapter: NotifyV1Adapter, status: number, body = '{}') => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(new Response(body, { status }));
+    return adapter.sendEmail(email).catch((e: unknown) => e);
+  };
+
+  it('reports a 429 as a sending limit, with its status and text for the audit', async () => {
+    const err = await failWith(
+      makeAdapter(),
+      429,
+      JSON.stringify({ message: 'Exceeded send limits (10000) for today' }),
+    );
+    expect(err).toBeInstanceOf(NotificationLimitError);
+    expect(err).toEqual(new Error('Notify email send failed (upstream HTTP 429)'));
+    expect(upstreamStatusOf(err)).toBe(429);
+    expect(providerDetailOf(err)).toBe('Exceeded send limits (10000) for today');
+  });
+
+  it('treats a 400 as a refused address unless it is listed', async () => {
+    expect(await failWith(makeAdapter(), 400)).not.toBeInstanceOf(NotificationLimitError);
+    expect(await failWith(adapterWith('429, 400'), 400)).toBeInstanceOf(NotificationLimitError);
+  });
+
+  it('reports only the listed statuses as limits', async () => {
+    expect(await failWith(adapterWith('400'), 429)).not.toBeInstanceOf(NotificationLimitError);
+  });
+
+  it('uses 429 when the setting is empty', async () => {
+    expect(await failWith(adapterWith(' '), 429)).toBeInstanceOf(NotificationLimitError);
+  });
+
+  it('ignores an empty entry in the list', async () => {
+    expect(await failWith(adapterWith('429,'), 429)).toBeInstanceOf(NotificationLimitError);
+  });
+
+  it.each(['429,abc', '200', '600', '429.5'])('refuses %s as the setting', (value) => {
+    expect(() => adapterWith(value)).toThrow(
+      `PLUGIN_NOTIFY_V1_LIMIT_STATUSES must list HTTP statuses from 400 to 599, got '${value}'`,
+    );
+  });
 });
 
 test('keeps a non-JSON error body as the provider detail', async () => {

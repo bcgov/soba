@@ -2,6 +2,7 @@ import { EmailAddressSchema } from '@soba/lib';
 import type { Logger } from 'pino';
 import { NotificationOutcome } from '../../db/codes';
 import { JobCancelledError } from '../../jobs/settlement';
+import { deferUntilDailyReset } from './dailyReset';
 import type { JobNotifications } from './JobNotifications';
 import type { SendEmail } from './NotificationAdapter';
 import { isRefusedSend } from './sendOutcome';
@@ -32,7 +33,10 @@ const normalize = (address: string): string => address.trim().toLowerCase();
 
 const isAddress = (address: string): boolean => EmailAddressSchema.safeParse(address).success;
 
-/** Sends to each address in turn; a failure other than a refusal stops the rest of the list. */
+/**
+ * Sends to each address in turn; a failure other than a refusal stops the rest of the list, and a
+ * sending limit defers it to the daily reset.
+ */
 const sendInTurn = async (
   { notifications, signal }: SendEachAddressContext,
   addresses: readonly string[],
@@ -51,6 +55,8 @@ const sendInTurn = async (
     if (result.outcome === NotificationOutcome.disabled) {
       throw new JobCancelledError(NOTIFICATIONS_OFF);
     }
+    // The addresses before this one stay handled; this one and the rest go after the reset.
+    if (result.outcome === NotificationOutcome.limited) throw deferUntilDailyReset();
     if (isRefusedSend(result)) return sendFrom(index + 1, { ...tally, refused: tally.refused + 1 });
     if (result.outcome === NotificationOutcome.error) {
       throw new Error(`Email send failed (status ${result.httpStatus ?? 'none'}) ${stoppedAt}`);
@@ -64,8 +70,9 @@ const sendInTurn = async (
  * Sends one email per address, each address once and in lower case, skipping those already handled
  * for this job. An address no provider would take, or one the provider refuses, is counted as
  * refused and skipped; a list on which no email has reached anyone, on any attempt, ends cancelled.
- * Any other failure, a missing audit row or an abort stops the run and throws, so the job retries
- * and the retry skips what was handled. Logs counts only, never addresses.
+ * A send the provider refuses at a sending limit defers the job, without using an attempt, until
+ * the daily reset. Any other failure, a missing audit row or an abort stops the run and throws, so
+ * the job retries and the retry skips what was handled. Logs counts only, never addresses.
  */
 export const sendEachAddress = async (
   context: SendEachAddressContext,

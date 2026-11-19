@@ -210,11 +210,17 @@ starts nothing. ConfigMap `<fullname>-backend-workflow-engine`:
 Notification sends email. `notification-noop` (the default) sends nothing; `notify-v1` calls BC Gov
 Notify with an API key. ConfigMap `<fullname>-backend-notification`:
 
-| Helm value                                | Env var                       | Used by                       |
-| ----------------------------------------- | ----------------------------- | ----------------------------- |
-| `backend.config.notificationDefaultCode`  | `NOTIFICATION_DEFAULT_CODE`   | default notification resolver |
-| `backend.notification.notifyV1.endpoint`  | `PLUGIN_NOTIFY_V1_ENDPOINT`   | notify-v1 adapter             |
-| `backend.notification.notifyV1.timeoutMs` | `PLUGIN_NOTIFY_V1_TIMEOUT_MS` | notify-v1 adapter             |
+| Helm value                                    | Env var                              | Used by                       |
+| --------------------------------------------- | ------------------------------------ | ----------------------------- |
+| `backend.config.notificationDefaultCode`      | `NOTIFICATION_DEFAULT_CODE`          | default notification resolver |
+| `backend.notification.dailyResetTimeZone`     | `NOTIFICATION_DAILY_RESET_TIME_ZONE` | email jobs at a sending limit |
+| `backend.notification.notifyV1.endpoint`      | `PLUGIN_NOTIFY_V1_ENDPOINT`          | notify-v1 adapter             |
+| `backend.notification.notifyV1.timeoutMs`     | `PLUGIN_NOTIFY_V1_TIMEOUT_MS`        | notify-v1 adapter             |
+| `backend.notification.notifyV1.limitStatuses` | `PLUGIN_NOTIFY_V1_LIMIT_STATUSES`    | notify-v1 adapter             |
+
+An email job that reaches a sending limit waits until midnight in
+`NOTIFICATION_DAILY_RESET_TIME_ZONE` (`America/Vancouver` when unset); an invalid zone stops
+startup. Notify's limit statuses default to `429`.
 
 ### Secret values (Vault template in backend Deployment)
 

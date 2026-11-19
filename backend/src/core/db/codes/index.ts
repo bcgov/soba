@@ -248,6 +248,8 @@ export const NotificationOutcome = {
   not_sent: 'not_sent',
   /** The notifications feature is off, so no plugin was called. */
   disabled: 'disabled',
+  /** The provider refused it at a sending limit; it is sent again after the limit resets. */
+  limited: 'limited',
   error: 'error',
 } as const;
 export type NotificationOutcomeCode =
