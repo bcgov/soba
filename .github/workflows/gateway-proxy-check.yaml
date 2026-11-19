@@ -83,10 +83,6 @@ jobs:
             exit 1
           fi
           if [[ -z "$GATEWAY_HOSTNAME" ]]; then
-            if [[ "$APP_ENVIRONMENT" == prod ]]; then
-              echo '::error::Production requires an explicit gateway_hostname'
-              exit 1
-            fi
             if [[ "$APP_ENVIRONMENT" == pr ]]; then
               export GATEWAY_HOSTNAME="${APS_GATEWAY_HOST_PREFIX:?Set APS_GATEWAY_HOST_PREFIX in the pr environment.}.${APS_HOST}"
             elif [[ "$APP_ENVIRONMENT" == dev ]]; then

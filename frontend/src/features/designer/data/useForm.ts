@@ -13,7 +13,11 @@ import {
   publishSobaFormVersion,
   saveFormVersionSchema,
 } from '@/src/shared/api/sobaApi';
-import { deleteSobaForm, updateSobaForm } from '@/src/shared/api/sobaApiDesign';
+import {
+  deleteSobaFormVersion,
+  deleteSobaForm,
+  updateSobaForm,
+} from '@/src/shared/api/sobaApiDesign';
 import { useAuthedSWR } from '@/src/shared/api/useAuthedSWR';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 import { sessionReadConfig } from '@/src/shared/api/swrConfig';
@@ -61,13 +65,26 @@ export function useFormVersionLookup(formId?: string) {
 export function useForm(formId?: string) {
   const { data: form, mutate: refreshForm, error: formError } = useDesignFormRead(formId);
 
+  // A version made here that nobody has saved yet. The form does not count it as current and the
+  // options leave it out, so only this page can reach it: leaving drops it.
+  const [openedVersion, setOpenedVersion] = useState<FormVersionSummary | null>(null);
+  // Once a save lands it is the form's current version, with the number it took.
+  if (openedVersion && form?.currentVersion?.id === openedVersion.id) {
+    setOpenedVersion(null);
+  }
+
   // Save and publish target this version, so it comes from the form and never from the options.
-  const currentVersion: FormVersionSummary | null = form?.currentVersion ?? null;
+  const currentVersion: FormVersionSummary | null = openedVersion ?? form?.currentVersion ?? null;
 
   const { data: versionOptions, error: versionsError } = useFormVersionLookup(formId);
   const versions = Array.isArray(versionOptions?.items) ? versionOptions.items : EMPTY_VERSIONS;
 
   const [selectedVersionId, setSelectedVersionId] = useState<string>('current');
+  // The current version is never shown as history, such as a draft picked over a new version that
+  // was then discarded.
+  if (selectedVersionId !== 'current' && selectedVersionId === currentVersion?.id) {
+    setSelectedVersionId('current');
+  }
   const isHistoryView = selectedVersionId !== 'current';
 
   // Read by id, so the history tab can open a version the options stopped short of.
@@ -157,6 +174,22 @@ export function useForm(formId?: string) {
     [discardEdits, currentVersionId],
   );
 
+  /** Edit a version just made, which stays unlisted until it is saved, as the current one. */
+  const openVersion = useCallback(
+    (version: FormVersionSummary) => {
+      setOpenedVersion(version);
+      setSelectedVersionId('current');
+      discardEdits();
+    },
+    [discardEdits],
+  );
+
+  /** Drop everything unsaved: the edits, and a new version nobody has saved, which leaving drops. */
+  const discardUnsaved = useCallback(() => {
+    discardEdits();
+    setOpenedVersion(null);
+  }, [discardEdits]);
+
   return {
     form: form ?? null,
     versions,
@@ -188,8 +221,11 @@ export function useForm(formId?: string) {
     setName,
     setSchema,
     discardEdits,
+    discardUnsaved,
     commitSchema,
     selectVersion,
+    openVersion,
+    openedVersion,
     refreshForm,
     refreshVersions,
   };
@@ -302,13 +338,23 @@ export function useFormWriter(formId: string) {
       await saveFormVersionSchema(token, versionId, schema);
       if (publish) {
         await publishSobaFormVersion(token, versionId);
-        await refreshVersions();
       }
       await commitSchema(versionId, schema);
-      await refreshForm();
+      // needs to always happen as opened->draft or published (this also refreshes form)
+      await refreshVersions();
       return { status: 'applied', value: undefined };
     },
-    [commitSchema, refreshVersions, refreshForm],
+    [commitSchema, refreshVersions],
+  );
+
+  // Only a draft can be deleted; the server refuses any other state.
+  const deleteVersion = useCallback(
+    async (token: string, versionId: string): Promise<WriteOutcome<void>> => {
+      await deleteSobaFormVersion(token, versionId);
+      await refreshVersions();
+      return { status: 'applied', value: undefined };
+    },
+    [refreshVersions],
   );
 
   const remove = useCallback(
@@ -324,7 +370,7 @@ export function useFormWriter(formId: string) {
     [formId, mutate],
   );
 
-  return { update, createVersion, restoreVersion, saveSchema, remove };
+  return { update, createVersion, restoreVersion, saveSchema, deleteVersion, remove };
 }
 
 /**

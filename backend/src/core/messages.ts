@@ -3,6 +3,7 @@ export const FORM_NAME_TAKEN = 'A form with this name already exists';
 export const FORM_ID_TAKEN = 'Form id already in use';
 export const FORM_VERSION_ID_TAKEN = 'Form version id already in use';
 export const SOURCE_VERSION_HAS_NO_SCHEMA = 'The version to copy has no schema';
+export const ONLY_DRAFT_VERSIONS_DELETABLE = 'Only draft versions can be deleted';
 export const WORKSPACE_NAME_TAKEN = 'A workspace with this name already exists';
 export const WORKSPACE_CREATE_FORBIDDEN =
   'Only users authenticated through a BC Government identity provider can create workspaces';
