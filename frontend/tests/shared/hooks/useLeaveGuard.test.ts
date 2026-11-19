@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, renderHook } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import { requestLeave, useLeaveGuard } from '@/src/shared/hooks/useLeaveGuard';
 
 /** A link in the page, standing in for the side navigation's. Its own click handler records a follow. */
@@ -21,11 +21,17 @@ const navigation = Object.assign(new EventTarget(), {
   traverseTo: vi.fn(() => ({ finished: Promise.resolve() })),
 });
 
-/** Dispatches a Back to `url` and says whether the page held it. */
-const traverse = (cancelable = true, url = 'http://localhost/en/forms') => {
+/** Dispatches a Back and says whether the page held it. By default the person pressed Back. */
+const traverse = ({
+  cancelable = true,
+  url = 'http://localhost/en/forms',
+  userInitiated = true,
+  sameDocument = true,
+} = {}) => {
   const event = Object.assign(new Event('navigate', { cancelable }), {
     navigationType: 'traverse',
-    destination: { key: 'back-key', url },
+    userInitiated,
+    destination: { key: 'back-key', url, sameDocument },
   });
   navigation.dispatchEvent(event);
   return event.defaultPrevented;
@@ -139,6 +145,12 @@ describe('useLeaveGuard', () => {
   });
 
   describe('Back and Forward', () => {
+    const leaveIsHeld = () => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+
     it('asks before one the browser lets the page cancel, and goes once the person agrees', () => {
       Object.assign(window, { navigation });
       const onLeave = vi.fn();
@@ -150,7 +162,7 @@ describe('useLeaveGuard', () => {
       (onLeave.mock.calls[0][0] as () => void)();
       expect(navigation.traverseTo).toHaveBeenCalledWith('back-key');
       // Its own traversal is not held again.
-      expect(traverse()).toBe(false);
+      expect(traverse({ userInitiated: false })).toBe(false);
     });
 
     it('lets through one the browser does not let the page cancel', () => {
@@ -158,8 +170,19 @@ describe('useLeaveGuard', () => {
       const onLeave = vi.fn();
       renderHook(() => useLeaveGuard(true, onLeave));
 
-      expect(traverse(false)).toBe(false);
+      expect(traverse({ cancelable: false })).toBe(false);
       expect(onLeave).not.toHaveBeenCalled();
+    });
+
+    // Safari reports some of these as cancelable, then loses the edits on the way there.
+    it('leaves one to another document to the browser', () => {
+      Object.assign(window, { navigation });
+      const onLeave = vi.fn();
+      renderHook(() => useLeaveGuard(true, onLeave));
+
+      expect(traverse({ sameDocument: false })).toBe(false);
+      expect(onLeave).not.toHaveBeenCalled();
+      expect(navigation.traverseTo).not.toHaveBeenCalled();
     });
 
     it('lets through one that stays on this page', () => {
@@ -168,18 +191,28 @@ describe('useLeaveGuard', () => {
       renderHook(() => useLeaveGuard(true, onLeave));
 
       const here = `${window.location.origin}${window.location.pathname}${window.location.search}`;
-      expect(traverse(true, `${here}#main-content`)).toBe(false);
+      expect(traverse({ url: `${here}#main-content` })).toBe(false);
     });
 
-    it('holds Back again when the agreed traversal fails', async () => {
+    it('holds the next Back the person presses when the agreed one never completes', () => {
       Object.assign(window, { navigation });
-      navigation.traverseTo.mockReturnValueOnce({ finished: Promise.reject(new Error('gone')) });
+      navigation.traverseTo.mockReturnValueOnce({ finished: new Promise(() => undefined) });
       const onLeave = vi.fn();
       renderHook(() => useLeaveGuard(true, onLeave));
       traverse();
 
-      await act(async () => (onLeave.mock.calls[0][0] as () => void)());
+      (onLeave.mock.calls[0][0] as () => void)();
       expect(traverse()).toBe(true);
+    });
+
+    it('keeps the browser warning on after agreeing to a Back', () => {
+      Object.assign(window, { navigation });
+      const onLeave = vi.fn();
+      renderHook(() => useLeaveGuard(true, onLeave));
+      traverse();
+
+      (onLeave.mock.calls[0][0] as () => void)();
+      expect(leaveIsHeld()).toBe(true);
     });
 
     it('holds nothing while there is nothing unsaved', () => {

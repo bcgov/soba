@@ -5,7 +5,13 @@ import { useLeaveWarning } from './useLeaveWarning';
 
 // The parts of the Navigation API used here; TypeScript's DOM types do not include it yet.
 type Navigation = EventTarget & { traverseTo: (key: string) => { finished: Promise<unknown> } };
-type NavigateEvent = Event & { navigationType: string; destination: { key: string; url: string } };
+type NavigateEvent = Event & {
+  navigationType: string;
+  userInitiated: boolean;
+  destination: { key: string; url: string; sameDocument?: boolean };
+};
+
+const noop = () => undefined;
 
 const browserNavigation = () => (window as { navigation?: Navigation }).navigation;
 
@@ -69,22 +75,23 @@ export function useLeaveGuard(active: boolean, onLeave: LeaveHandler) {
     // Set while a link the person agreed to leave by is followed, so its own click goes through.
     let following = false;
 
-    // Set while a Back or Forward the person agreed to is under way, so it is not held again.
-    let traversing = false;
-    const holdBackAgain = () => {
-      traversing = false;
-    };
+    // The history entry this page went to once the person agreed, so that traversal goes through.
+    let goingTo: string | null = null;
     const navigation = browserNavigation();
 
     // Without a new click or key press the next Back is not cancelable, so the person can always leave.
     const onNavigate = (event: Event) => {
-      const { navigationType, destination } = event as NavigateEvent;
-      if (traversing || navigationType !== 'traverse' || !event.cancelable) return;
-      if (isThisPage(new URL(destination.url))) return;
+      const { navigationType, destination, userInitiated } = event as NavigateEvent;
+      if (navigationType !== 'traverse' || !event.cancelable) return;
+      // Only this page's own traversal: a Back the person presses is held again, even after one stalled.
+      if (!userInitiated && destination.key === goingTo) return;
+      // Another document gets the browser's own prompt, as Safari loses the edits on traverseTo there.
+      if (destination.sameDocument === false || isThisPage(new URL(destination.url))) return;
       event.preventDefault();
-      handler(() => {
-        traversing = true;
-        navigation?.traverseTo(destination.key).finished.catch(holdBackAgain);
+      // Not through `handler`: the browser's warning stays on until the page is actually left.
+      onLeaveRef.current(() => {
+        goingTo = destination.key;
+        navigation?.traverseTo(destination.key).finished.catch(noop);
       });
     };
 
