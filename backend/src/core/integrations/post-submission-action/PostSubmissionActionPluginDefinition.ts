@@ -59,8 +59,9 @@ export type PostSubmissionActionSubmits = 'every' | 'first';
 /**
  * How a render ended: `ok` with the document; `no-template` when the form version has no CDOGS
  * template; `unavailable` when no document generation backend serves the form; `busy` when every
- * render slot is taken; `refused` when the template is not renderable or the backend refused it or
- * the data; `failed` when the backend or the template's storage failed.
+ * render slot is taken; `refused` when the template is not renderable, the backend refused it or
+ * the data, or the revision is not one of the submission's submitted revisions; `failed` when the
+ * backend or the template's storage failed.
  */
 export type PostSubmissionActionRenderOutcome =
   | { status: 'ok'; data: Buffer; contentType?: string }
@@ -90,8 +91,9 @@ export interface PostSubmissionActionServices {
   };
   documents: {
     /**
-     * Render the answers as a PDF with the CDOGS template on the submission's form version,
-     * audited as the system user against the revision.
+     * Render the answers as a PDF with the CDOGS template on the submission's form version, with
+     * the print context of the submitted revision (its number and the confirmation code), audited
+     * as the system user against the revision.
      */
     render(input: {
       revisionId: string;

@@ -49,7 +49,7 @@ import { readTemplateContent } from './templateContent';
 import { scanUpload } from '../../core/services/scanUpload';
 import { TEMPLATE_NOT_RENDERED, toRenderError } from './renderError';
 import { withRenderSlot } from './renderSlots';
-import { printContextOf, printSourceOf } from './printSource';
+import { printContextOf, printSourceOf, submittedRevisionContext } from './printSource';
 
 export interface PrintInput {
   submissionId: string;
@@ -374,13 +374,15 @@ async function printStored(
   );
 }
 
-/** A job's render of one revision's answers. */
+/** A job's render of one submitted revision's answers. */
 export interface RevisionRenderInput {
   workspaceId: string;
   formId: string;
   formVersionId: string;
   submissionId: string;
+  confirmationCode: string;
   revisionId: string;
+  revisionNo: number;
   answers: Record<string, unknown>;
   actorId: string;
 }
@@ -388,8 +390,9 @@ export interface RevisionRenderInput {
 /** Render from a job. No caller is checked: the job checks the submission before it renders. */
 export const jobDocumentService = {
   /**
-   * Render the answers as a PDF with the CDOGS template on the form version, audited in `package`
-   * mode against the revision. template-notfound when the version has none.
+   * Render the answers as a PDF with the CDOGS template on the form version, with the submitted
+   * revision's print context, audited in `package` mode against the revision. template-notfound
+   * when the version has none.
    */
   async renderRevision(input: RevisionRenderInput): Promise<DocumentRenderOutcome> {
     const [stored] = await listLiveDocumentTemplates(
@@ -401,7 +404,11 @@ export const jobDocumentService = {
     return renderWith(
       { workspaceId, formId, formVersionId },
       stored,
-      { options: { convertTo: 'pdf' }, data: input.answers },
+      {
+        options: { convertTo: 'pdf' },
+        data: input.answers,
+        context: submittedRevisionContext(input),
+      },
       {
         mode: DocumentGenerationMode.package,
         actorId: input.actorId,

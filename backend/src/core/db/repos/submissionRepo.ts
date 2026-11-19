@@ -364,6 +364,15 @@ export const getSubmissionRevisionById = async (
   return rows[0] ?? null;
 };
 
+/** The revision, when it is the submission's and not pending. */
+const savedRevisionOf = (workspaceId: string, submissionId: string, revisionId: string) =>
+  and(
+    eq(submissionRevisions.id, revisionId),
+    eq(submissionRevisions.workspaceId, workspaceId),
+    eq(submissionRevisions.submissionId, submissionId),
+    ne(submissionRevisions.status, RevisionStatus.pending),
+  );
+
 /**
  * The engine ref of the answers a revision left, when the revision is the submission's and not
  * pending; null otherwise, or when it left none.
@@ -376,16 +385,38 @@ export const findSubmissionRevisionContent = async (
   const [row] = await db
     .select({ engineSubmissionRef: submissionRevisions.afterEngineSubmissionRef })
     .from(submissionRevisions)
+    .where(savedRevisionOf(workspaceId, submissionId, revisionId))
+    .limit(1);
+  return row?.engineSubmissionRef ?? null;
+};
+
+// The events that leave submitted answers: a submit, a staff edit, and a restore of the last submit.
+const SUBMITTED_ANSWER_EVENTS = [
+  SubmissionEventType.submitted,
+  SubmissionEventType.edited,
+  SubmissionEventType.restored,
+];
+
+/**
+ * A revision's number, when the revision is the submission's, not pending, and left submitted
+ * answers; null otherwise.
+ */
+export const findSubmittedRevisionNo = async (
+  workspaceId: string,
+  submissionId: string,
+  revisionId: string,
+): Promise<number | null> => {
+  const [row] = await db
+    .select({ revisionNo: submissionRevisions.revisionNo })
+    .from(submissionRevisions)
     .where(
       and(
-        eq(submissionRevisions.id, revisionId),
-        eq(submissionRevisions.workspaceId, workspaceId),
-        eq(submissionRevisions.submissionId, submissionId),
-        ne(submissionRevisions.status, RevisionStatus.pending),
+        savedRevisionOf(workspaceId, submissionId, revisionId),
+        inArray(submissionRevisions.eventType, SUBMITTED_ANSWER_EVENTS),
       ),
     )
     .limit(1);
-  return row?.engineSubmissionRef ?? null;
+  return row?.revisionNo ?? null;
 };
 
 /** Fetch the raw (non-deleted) submission row — used by the engine write path. */

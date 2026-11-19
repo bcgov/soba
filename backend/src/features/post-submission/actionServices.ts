@@ -2,7 +2,10 @@ import type { Logger } from 'pino';
 import { validate as isUuid } from 'uuid';
 import { getFormEngineCodeForForm } from '../../core/db/repos/formRepo';
 import { getFormVersionById } from '../../core/db/repos/formVersionRepo';
-import { findSubmissionRevisionContent } from '../../core/db/repos/submissionRepo';
+import {
+  findSubmissionRevisionContent,
+  findSubmittedRevisionNo,
+} from '../../core/db/repos/submissionRepo';
 import type {
   PostSubmissionActionResult,
   PostSubmissionActionServices,
@@ -73,6 +76,11 @@ export const actionServices = (
   answers: { readRevision: (revisionId) => readRevision(submission, revisionId, log) },
   documents: {
     render: async ({ revisionId, answers }) => {
+      const revisionNo = isUuid(revisionId)
+        ? await findSubmittedRevisionNo(submission.workspaceId, submission.id, revisionId)
+        : null;
+      // Not one of the submission's submitted revisions: there is no submitted revision to print.
+      if (revisionNo === null) return { status: 'refused' };
       const actorId = await systemUserId();
       return toRenderOutcome(
         await jobDocumentService.renderRevision({
@@ -80,7 +88,9 @@ export const actionServices = (
           formId: submission.formId,
           formVersionId: submission.formVersionId,
           submissionId: submission.id,
+          confirmationCode: submission.confirmationCode,
           revisionId,
+          revisionNo,
           answers,
           actorId,
         }),

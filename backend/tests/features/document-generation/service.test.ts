@@ -40,6 +40,7 @@ jest.mock('../../../src/core/services/scanUpload', () => ({
 import type { PrintOptions } from '@soba/lib';
 import {
   documentGenerationService,
+  jobDocumentService,
   staffDocumentService,
 } from '../../../src/features/document-generation/service';
 import { scanUpload } from '../../../src/core/services/scanUpload';
@@ -461,6 +462,52 @@ describe('staffDocumentService.printUpload', () => {
     arrange();
     const outcome = await printUpload();
     expect(outcome.status).toBe(status);
+    expect(renderMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('jobDocumentService.renderRevision', () => {
+  const listLiveTemplates = templateRepo.listLiveDocumentTemplates as unknown as jest.Mock;
+  const input = {
+    ...scope,
+    submissionId: 's1',
+    confirmationCode: 'K7M2Q9XA',
+    revisionId: 'rev-3',
+    revisionNo: 3,
+    answers: { data: { field: 'submitted' } },
+    actorId: 'system-1',
+  };
+
+  it('renders the revision as a PDF with its print context, audited as a package', async () => {
+    listLiveTemplates.mockResolvedValue([storedTemplate]);
+    await expect(jobDocumentService.renderRevision(input)).resolves.toMatchObject({
+      status: 'ok',
+    });
+    expect(renderMock).toHaveBeenCalledWith({
+      template: { content: Buffer.from('tpl bytes'), fileType: 'docx' },
+      options: { convertTo: 'pdf' },
+      data: { data: { field: 'submitted' } },
+      context: expect.objectContaining({
+        status: 'submitted',
+        confirmationCode: 'K7M2Q9XA',
+        revisionNo: 3,
+      }),
+    });
+    expect(createAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'package',
+        submissionId: 's1',
+        revisionId: 'rev-3',
+        createdBy: 'system-1',
+      }),
+    );
+  });
+
+  it('is template-notfound, rendering nothing, when the version has no CDOGS template', async () => {
+    listLiveTemplates.mockResolvedValue([]);
+    await expect(jobDocumentService.renderRevision(input)).resolves.toEqual({
+      status: 'template-notfound',
+    });
     expect(renderMock).not.toHaveBeenCalled();
   });
 });
