@@ -68,12 +68,11 @@ export const jobs = sobaSchema.table(
     // What the running attempt last reported; cleared at each claim.
     progressDone: integer('progress_done'),
     progressTotal: integer('progress_total'),
-    // The file the job produced, until it expires or the job ends dead or cancelled without
-    // keep_result_when_ended. The expiry stays once the file expires, so the job reads as expired.
+    // The file the job produced, until it expires or the job ends dead or cancelled, but never while a
+    // child of the job has not succeeded. The expiry stays once the file expires, so the job reads as
+    // expired.
     resultFileId: uuid('result_file_id').references(() => files.id),
     resultExpiresAt: timestamp('result_expires_at', { withTimezone: true }),
-    // Copied from the job type with each result; the result sweep reads it.
-    keepResultWhenEnded: boolean('keep_result_when_ended').notNull().default(false),
   },
   (table) => ({
     dedupeKeyUq: uniqueIndex('job_dedupe_key_uq').on(table.dedupeKey),

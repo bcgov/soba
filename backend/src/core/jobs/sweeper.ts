@@ -7,7 +7,8 @@ import { jitteredMs } from './timing';
 
 /**
  * Periodically requeues jobs whose worker died, removes result files that expired or belong to jobs
- * that did not succeed, and deletes finished jobs past retention.
+ * that did not succeed, unless a job they queued has not succeeded, and deletes finished jobs past
+ * retention.
  */
 export class JobSweeper {
   private timer?: NodeJS.Timeout;

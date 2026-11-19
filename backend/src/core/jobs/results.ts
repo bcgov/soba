@@ -4,12 +4,7 @@ import { addAbortSignal } from 'node:stream';
 import type { Logger } from 'pino';
 import type { JobSettings } from '../config/env';
 import type { FileRecord } from '../db/repos/fileRepo';
-import {
-  attachJobResult,
-  type ClaimedJob,
-  type JobProgress,
-  type ResultRetention,
-} from '../db/repos/jobRepo';
+import { attachJobResult, type ClaimedJob, type JobProgress } from '../db/repos/jobRepo';
 import type { TempResource } from '../integrations/temp-storage/TempStorageAdapter';
 import { fileStore } from '../services/fileStore';
 import { JobCancelledError, JobFailedError } from './errors';
@@ -50,23 +45,20 @@ export const createProgressReporter = (
   };
 };
 
-/** How one stored result is kept, and who it is attributed to. */
+/** How long one stored result is kept, and who it is attributed to. */
 export interface ResolvedResultOptions {
   actorId: string;
-  retention: ResultRetention;
+  retentionDays: number;
 }
 
 export const resolveResultOptions = (
-  definition: Pick<JobTypeDefinition, 'resultRetentionDays' | 'keepResultWhenEnded'>,
+  definition: Pick<JobTypeDefinition, 'resultRetentionDays'>,
   job: Pick<ClaimedJob, 'createdBy'>,
   settings: Pick<JobSettings, 'resultRetentionDays'>,
   options: StoreResultOptions = {},
 ): ResolvedResultOptions => ({
   actorId: options.actorId ?? job.createdBy,
-  retention: {
-    days: definition.resultRetentionDays ?? settings.resultRetentionDays,
-    keepWhenEnded: definition.keepResultWhenEnded ?? false,
-  },
+  retentionDays: definition.resultRetentionDays ?? settings.resultRetentionDays,
 });
 
 const NOT_STORED = 'Stopped before its result was stored';
@@ -118,7 +110,7 @@ export const storeJobResult = async (
           job.id,
           job.claimToken,
           file.id,
-          options.retention,
+          options.retentionDays,
         );
         if (outcome.attached === false) {
           attach.refused = outcome.reason;

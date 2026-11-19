@@ -56,10 +56,11 @@ export interface JobTypeDefinition {
   maxAttempts?: number;
   /** Run time before the handler is aborted; the pool's JOB_*_TIMEOUT_MS when unset. */
   timeoutMs?: number;
-  /** Days a stored result is kept; JOB_RESULT_RETENTION_DAYS when unset. */
+  /**
+   * Days a stored result is kept; JOB_RESULT_RETENTION_DAYS when unset. Kept past that while a child
+   * of the job has not succeeded, and lost when the job ends dead or cancelled.
+   */
   resultRetentionDays?: number;
-  /** Keep the result until it expires even when the job ends dead or cancelled. */
-  keepResultWhenEnded?: boolean;
   /**
    * Returning means the work is done, even after an abort; throwing retries the job until its
    * attempts run out, unless it throws `JobCancelledError` or `JobFailedError`. Throwing

@@ -159,10 +159,12 @@ export interface PostSubmissionActionJobSettings<TOptions = Record<string, unkno
   pool: JobPoolCode;
   maxAttempts?: number;
   timeoutMs?: number;
-  /** Days a stored result is kept; JOB_RESULT_RETENTION_DAYS when unset. */
+  /**
+   * Days a stored result is kept; JOB_RESULT_RETENTION_DAYS when unset. When a step follows, the
+   * result is kept until that step succeeds, and each time that step starts, its expiry moves to at
+   * least this many days later.
+   */
   resultRetentionDays?: number;
-  /** Keep the result until it expires even when the job ends dead or cancelled. */
-  keepResultWhenEnded?: boolean;
   /**
    * Returning means the step is done; throwing retries it, and throwing `JobDeferredError` runs it
    * again after its delay without using an attempt. Stop and throw when the signal aborts, with an

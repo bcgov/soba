@@ -91,17 +91,18 @@ describe('resolveResultOptions', () => {
   const job = { createdBy: 'starter' };
   const settings = { resultRetentionDays: 7 };
 
-  it("uses the settings' retention and the job's creator, and drops the result of a dead or cancelled job", () => {
+  it("uses the settings' retention and the job's creator", () => {
     expect(resolveResultOptions({}, job, settings)).toEqual({
       actorId: 'starter',
-      retention: { days: 7, keepWhenEnded: false },
+      retentionDays: 7,
     });
   });
 
-  it("uses the job type's retention and keep rule when it sets them", () => {
-    expect(
-      resolveResultOptions({ resultRetentionDays: 30, keepResultWhenEnded: true }, job, settings),
-    ).toEqual({ actorId: 'starter', retention: { days: 30, keepWhenEnded: true } });
+  it("uses the job type's retention when it sets one", () => {
+    expect(resolveResultOptions({ resultRetentionDays: 30 }, job, settings)).toEqual({
+      actorId: 'starter',
+      retentionDays: 30,
+    });
   });
 
   it('attributes the result to the actor the caller names', () => {

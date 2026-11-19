@@ -61,7 +61,6 @@ describe('actionJobDefinitions', () => {
           maxAttempts: 8,
           timeoutMs: 900_000,
           resultRetentionDays: 30,
-          keepResultWhenEnded: true,
         }),
       ),
     ).toEqual([
@@ -71,7 +70,6 @@ describe('actionJobDefinitions', () => {
         maxAttempts: 8,
         timeoutMs: 900_000,
         resultRetentionDays: 30,
-        keepResultWhenEnded: true,
       }),
     ]);
   });
@@ -79,7 +77,6 @@ describe('actionJobDefinitions', () => {
   it('leaves unset what the plugin leaves unset', () => {
     const [definition] = actionJobDefinitions(plugin());
     expect(definition.resultRetentionDays).toBeUndefined();
-    expect(definition.keepResultWhenEnded).toBeUndefined();
   });
 
   it('adds a job type for each later step, typed by the code and the step, with its settings', () => {
@@ -160,7 +157,7 @@ describe('previousStep', () => {
     expect(previousStep(row()).result).toBeNull();
   });
 
-  it('ends cancelled when retention has deleted the step before', () => {
+  it('ends cancelled when the step before is gone', () => {
     expect(() => previousStep(undefined)).toThrow(
       new JobCancelledError('The step before it is gone'),
     );

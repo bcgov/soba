@@ -9,7 +9,6 @@ export const postSubmissionActionPluginDefinition = {
   job: {
     pool: 'heavy',
     resultRetentionDays: 2,
-    keepResultWhenEnded: true,
     run: () => Promise.resolve(),
   },
 };

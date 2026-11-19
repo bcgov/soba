@@ -1,7 +1,7 @@
 import { db } from '../../core/db/client';
 import { Features } from '../../core/db/codes';
 import { readJobOutputs, type JobOutputRow } from '../../core/db/repos/jobOutputRepo';
-import type { ChildJob } from '../../core/db/repos/jobRepo';
+import { extendJobResult, type ChildJob } from '../../core/db/repos/jobRepo';
 import type {
   PostSubmissionActionJobSettings,
   PostSubmissionActionPluginDefinition,
@@ -91,17 +91,25 @@ const actionSteps = (plugin: PostSubmissionActionPluginDefinition): ActionStep[]
 
 /**
  * The step before a later one, and the result it stored. It succeeded, since a step is queued with
- * the success of the one before; the job ends cancelled when retention has deleted that one.
+ * the success of the one before, and retention keeps it until this one succeeds. Should it be gone,
+ * the job ends cancelled.
  */
 export const previousStep = (row: JobOutputRow | undefined): PostSubmissionActionPreviousStep => {
   if (!row) throw new JobCancelledError('The step before it is gone');
   return { jobId: row.jobId, result: resultFacts(row) };
 };
 
-const loadPreviousStep = async ({
-  parentJobId,
-}: JobFacts): Promise<PostSubmissionActionPreviousStep> => {
-  const [row] = parentJobId === null ? [] : await readJobOutputs([parentJobId]);
+/** The step before and its result, once the result's expiry is pushed to its retention from now. */
+const loadPreviousStep = async (
+  { parentJobId }: JobFacts,
+  before: ActionStep,
+): Promise<PostSubmissionActionPreviousStep> => {
+  if (parentJobId === null) return previousStep(undefined);
+  await extendJobResult(
+    parentJobId,
+    before.resultRetentionDays ?? getJobSettings().resultRetentionDays,
+  );
+  const [row] = await readJobOutputs([parentJobId]);
   return previousStep(row);
 };
 
@@ -132,7 +140,7 @@ export const nextStepJob = (
 const stepJobDefinition = (
   plugin: PostSubmissionActionPluginDefinition,
   step: ActionStep,
-  index: number,
+  before: ActionStep | undefined,
   next: ActionStep | undefined,
 ): JobTypeDefinition => ({
   type: step.type,
@@ -140,7 +148,6 @@ const stepJobDefinition = (
   maxAttempts: step.maxAttempts,
   timeoutMs: step.timeoutMs,
   resultRetentionDays: step.resultRetentionDays,
-  keepResultWhenEnded: step.keepResultWhenEnded,
   run: async ({
     job,
     signal,
@@ -154,7 +161,7 @@ const stepJobDefinition = (
     const reason = cancelReason(facts);
     if (reason || submission === null) throw new JobCancelledError(reason ?? SUBMISSION_GONE);
     if (job.revisionId === null) throw new JobFailedError('The action has no revision to run for');
-    const previous = index === 0 ? null : await loadPreviousStep(job);
+    const previous = before ? await loadPreviousStep(job, before) : null;
     const params = ActionJobParamsSchema.parse(job.params);
     const options = plugin.optionsSchema.parse(params.options);
     // Loaded on run: the services import the submission service, whose module loads the job
@@ -181,7 +188,9 @@ export const actionJobDefinitions = (
   plugin: PostSubmissionActionPluginDefinition,
 ): JobTypeDefinition[] => {
   const steps = actionSteps(plugin);
-  return steps.map((step, index) => stepJobDefinition(plugin, step, index, steps[index + 1]));
+  return steps.map((step, index) =>
+    stepJobDefinition(plugin, step, index > 0 ? steps[index - 1] : undefined, steps[index + 1]),
+  );
 };
 
 /**

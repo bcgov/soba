@@ -6,6 +6,7 @@ import {
   isNull,
   lt,
   lte,
+  ne,
   notExists,
   or,
   sql,
@@ -71,6 +72,19 @@ const afterMs = (ms: number): SQL => sql`now() + ${ms}::int * interval '1 millis
 const daysAgo = (days: number): SQL => sql`now() - ${days}::int * interval '1 day'`;
 
 const childJobs = alias(jobs, 'child_job');
+
+/**
+ * True when every child of the job has succeeded, or it has none. A later action step reads the step
+ * before it on every run, including one run again after it ended dead or cancelled, so the step
+ * before keeps its row and its result until the later step succeeds.
+ */
+const everyChildSucceeded = (): SQL =>
+  notExists(
+    quietDb
+      .select({ id: childJobs.id })
+      .from(childJobs)
+      .where(and(eq(childJobs.parentJobId, jobs.id), ne(childJobs.status, JobStatus.succeeded))),
+  );
 
 const held = (id: string, claimToken: string) =>
   and(eq(jobs.id, id), eq(jobs.claimToken, claimToken), eq(jobs.status, JobStatus.running));
@@ -174,12 +188,6 @@ export type AttachResultOutcome =
   | { attached: true; previous: FileRecord | null; expiresAt: Date }
   | { attached: false; reason: 'not_held' | 'cancel_requested' };
 
-/** How long a result is kept, and whether it outlives its job ending dead or cancelled. */
-export interface ResultRetention {
-  days: number;
-  keepWhenEnded: boolean;
-}
-
 /**
  * Point a held job at its new result file, in the caller's transaction, and delete the row of the
  * file it pointed at before; the caller deletes that file's bytes after commit. Refused once the job
@@ -190,7 +198,7 @@ export const attachJobResult = async (
   id: string,
   claimToken: string,
   fileId: string,
-  retention: ResultRetention,
+  retentionDays: number,
 ): Promise<AttachResultOutcome> => {
   const [row] = await tx
     .select({ resultFileId: jobs.resultFileId, cancelRequestedAt: jobs.cancelRequestedAt })
@@ -203,8 +211,7 @@ export const attachJobResult = async (
     .update(jobs)
     .set({
       resultFileId: fileId,
-      resultExpiresAt: sql`now() + ${retention.days}::int * interval '1 day'`,
-      keepResultWhenEnded: retention.keepWhenEnded,
+      resultExpiresAt: sql`now() + ${retentionDays}::int * interval '1 day'`,
     })
     .where(eq(jobs.id, id))
     .returning({ expiresAt: jobs.resultExpiresAt });
@@ -213,6 +220,21 @@ export const attachJobResult = async (
   if (!row.resultFileId) return { attached: true, previous: null, expiresAt };
   const [previous] = await tx.delete(files).where(eq(files.id, row.resultFileId)).returning();
   return { attached: true, previous: previous ?? null, expiresAt };
+};
+
+/**
+ * Keep a succeeded job's result file at least `days` from now, never shortening its expiry. Nothing
+ * when the job has no result file.
+ */
+export const extendJobResult = async (id: string, days: number): Promise<void> => {
+  await quietDb
+    .update(jobs)
+    .set({
+      resultExpiresAt: sql`greatest(${jobs.resultExpiresAt}, now() + ${days}::int * interval '1 day')`,
+    })
+    .where(
+      and(eq(jobs.id, id), eq(jobs.status, JobStatus.succeeded), isNotNull(jobs.resultFileId)),
+    );
 };
 
 /** Extend the lease. `held` is false once the job is no longer this worker's. */
@@ -389,7 +411,7 @@ export const cancelJob = async (
  * delete up to `retentionBatch` finished jobs past retention. Succeeded jobs use
  * `succeededRetentionDays`; dead and cancelled jobs use `deadRetentionDays`. A job that still points
  * at a result file is kept until the result sweep has removed it, and one is kept while a child it
- * queued is queued or running.
+ * queued has not succeeded.
  */
 export const sweepJobs = async (retention: {
   retentionBatch: number;
@@ -408,20 +430,9 @@ export const sweepJobs = async (retention: {
     })
     .where(and(eq(jobs.status, JobStatus.running), lt(jobs.leaseUntil, sql`now()`)))
     .returning({ status: jobs.status });
-  // A job whose children are still to run is kept: a later action step reads the step before it.
   const isPastRetention = and(
     isNull(jobs.resultFileId),
-    notExists(
-      quietDb
-        .select({ id: childJobs.id })
-        .from(childJobs)
-        .where(
-          and(
-            eq(childJobs.parentJobId, jobs.id),
-            inArray(childJobs.status, [JobStatus.queued, JobStatus.running]),
-          ),
-        ),
-    ),
+    everyChildSucceeded(),
     or(
       and(
         eq(jobs.status, JobStatus.succeeded),
@@ -451,20 +462,14 @@ export const sweepJobs = async (retention: {
   };
 };
 
-const ENDED_UNSUCCESSFULLY = [JobStatus.dead, JobStatus.cancelled];
-
-/** A dead or cancelled job whose result is not kept past its end. */
-const endedWithoutKeep = and(
-  inArray(jobs.status, ENDED_UNSUCCESSFULLY),
-  eq(jobs.keepResultWhenEnded, false),
-);
+const endedUnsuccessfully = inArray(jobs.status, [JobStatus.dead, JobStatus.cancelled]);
 
 /**
  * Remove up to `batch` result files: those past their expiry, and those of jobs that ended dead or
- * cancelled without keeping their result. One transaction locks the jobs (skipping any being
- * written), points them away from their files and deletes the file rows; the caller then deletes
- * the returned files' bytes. Those dead or cancelled jobs lose their expiry too, so they never read
- * as expired.
+ * cancelled, except while a child of the job has not succeeded. One transaction locks the jobs
+ * (skipping any being written), points them away from their files and deletes the file rows; the
+ * caller then deletes the returned files' bytes. Those dead or cancelled jobs lose their expiry too,
+ * so they never read as expired.
  */
 export const sweepJobResults = (batch: number): Promise<FileRecord[]> =>
   quietDb.transaction(async (tx) => {
@@ -474,7 +479,8 @@ export const sweepJobResults = (batch: number): Promise<FileRecord[]> =>
       .where(
         and(
           isNotNull(jobs.resultFileId),
-          or(lte(jobs.resultExpiresAt, sql`now()`), endedWithoutKeep),
+          or(lte(jobs.resultExpiresAt, sql`now()`), endedUnsuccessfully),
+          everyChildSucceeded(),
         ),
       )
       .limit(batch)
@@ -485,7 +491,7 @@ export const sweepJobResults = (batch: number): Promise<FileRecord[]> =>
       .update(jobs)
       .set({
         resultFileId: null,
-        resultExpiresAt: sql`case when ${endedWithoutKeep} then null else ${jobs.resultExpiresAt} end`,
+        resultExpiresAt: sql`case when ${endedUnsuccessfully} then null else ${jobs.resultExpiresAt} end`,
       })
       .where(
         inArray(

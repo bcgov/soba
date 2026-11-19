@@ -65,15 +65,14 @@ describe('post-submission action plugins', () => {
     ).toBeUndefined();
   });
 
-  it("keeps a plugin's result retention and keep rule, and skips one with a bad value", () => {
+  it("keeps a plugin's result retention, and skips one with a bad value", () => {
     expect(findInstalledPostSubmissionAction('post-submission-test-off')?.job).toEqual(
-      expect.objectContaining({ resultRetentionDays: 2, keepResultWhenEnded: true }),
+      expect.objectContaining({ resultRetentionDays: 2 }),
     );
     expect(findInstalledPostSubmissionAction('post-submission-test-bad-retention')).toBeUndefined();
     expect(
       findInstalledPostSubmissionAction('post-submission-test-long-retention'),
     ).toBeUndefined();
-    expect(findInstalledPostSubmissionAction('post-submission-test-bad-keep')).toBeUndefined();
   });
 
   it("keeps a plugin's steps, and skips one with a duplicate, bad or misspelled step", () => {
