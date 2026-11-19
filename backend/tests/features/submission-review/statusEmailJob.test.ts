@@ -31,9 +31,9 @@ jest.mock('../../../src/core/config/env', () => ({
 import type { Logger } from 'pino';
 import type { SendEmail } from '../../../src/core/integrations/notification/NotificationAdapter';
 import type { JobNotifications } from '../../../src/core/integrations/notification/JobNotifications';
+import { JobCancelledError } from '../../../src/core/jobs/errors';
 import type { JobFacts } from '../../../src/core/jobs/facts';
 import type { JobContext } from '../../../src/core/jobs/registry';
-import { JobCancelledError } from '../../../src/core/jobs/settlement';
 import { runStatusEmailJob } from '../../../src/features/submission-review/statusEmailJob';
 
 const CHANGE_ID = '0190f3a2-7c1e-7a4b-9d2e-5f6a7b8c9d0e';

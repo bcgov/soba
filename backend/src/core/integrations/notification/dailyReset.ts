@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { JobDeferredError } from '../../jobs/settlement';
+import { JobDeferredError } from '../../jobs/errors';
 
 /** Why an email job waits: the environment's sends today reached NOTIFICATION_DAILY_LIMIT. */
 export const DAILY_LIMIT_REACHED =

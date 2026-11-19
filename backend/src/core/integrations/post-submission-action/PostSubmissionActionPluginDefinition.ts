@@ -11,6 +11,9 @@ import type { TempResource, TempStorageAdapter } from '../temp-storage/TempStora
 
 export type { PostSubmissionActionScope };
 
+// What an action throws to end its job cancelled, dead, or waiting for a while.
+export { JobCancelledError, JobDeferredError, JobFailedError } from '../../jobs/errors';
+
 /** The saved settings an action job runs with. */
 export interface PostSubmissionActionSource {
   scope: PostSubmissionActionScope;
@@ -162,8 +165,9 @@ export interface PostSubmissionActionJobSettings<TOptions = Record<string, unkno
   keepResultWhenEnded?: boolean;
   /**
    * Returning means the step is done; throwing retries it, and throwing `JobDeferredError` runs it
-   * again after its delay without using an attempt. Stop and throw when the signal aborts. It can
-   * run more than once, so its side effects must be safe to repeat. An error's message is stored on
+   * again after its delay without using an attempt. Stop and throw when the signal aborts, with an
+   * ordinary error rather than a deferral, which would hold the step back by its delay when the pod
+   * drains. It can run more than once, so its side effects must be safe to repeat. An error's message is stored on
    * the job and logged, so it must not carry recipients or submission data.
    */
   run: (context: PostSubmissionActionContext<TOptions>) => Promise<void>;

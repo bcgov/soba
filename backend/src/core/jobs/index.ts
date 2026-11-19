@@ -24,7 +24,7 @@ export const startJobs = (): void => {
   sweeper.start();
 };
 
-/** Stop claiming and sweeping. Resolves once running jobs finish, are released, or are left. */
+/** Stop claiming and sweeping. Resolves once running jobs end, are released or deferred, or are left. */
 export const stopJobs = async (): Promise<void> => {
   await Promise.all([runner?.stop(), sweeper?.stop()]);
 };

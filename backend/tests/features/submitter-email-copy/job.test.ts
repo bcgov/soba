@@ -22,9 +22,9 @@ import { findSubmitterSubmission } from '../../../src/core/db/repos/submitterSub
 import type { JobNotifications } from '../../../src/core/integrations/notification/JobNotifications';
 import type { SendEmail } from '../../../src/core/integrations/notification/NotificationAdapter';
 import { NOTIFICATIONS_OFF } from '../../../src/core/integrations/notification/sendEachAddress';
+import { JobCancelledError } from '../../../src/core/jobs/errors';
 import type { JobFacts } from '../../../src/core/jobs/facts';
 import type { JobContext } from '../../../src/core/jobs/registry';
-import { JobCancelledError } from '../../../src/core/jobs/settlement';
 import { submitterEmailCopyJob } from '../../../src/core/jobs/submitterEmailCopy';
 import { isFeatureAvailable } from '../../../src/core/services/featureAvailabilityService';
 import {

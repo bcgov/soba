@@ -13,11 +13,11 @@ import {
   getEnabledPostSubmissionActionCodes,
 } from '../../core/integrations/post-submission-action/PostSubmissionActionRegistry';
 import { getPostSubmissionActionPluginDefinitions } from '../../core/integrations/plugins/PluginRegistry';
+import { JobCancelledError, JobFailedError } from '../../core/jobs/errors';
 import type { JobFacts } from '../../core/jobs/facts';
 import { resultFacts } from '../../core/jobs/outputs';
 import type { JobTypeDefinition } from '../../core/jobs/registry';
 import { getJobSettings } from '../../core/jobs/settings';
-import { JobCancelledError, JobFailedError } from '../../core/jobs/settlement';
 import { log } from '../../core/logging';
 import { isFeatureAvailable } from '../../core/services/featureAvailabilityService';
 import { ActionJobParamsSchema, type ActionJobParams } from './params';

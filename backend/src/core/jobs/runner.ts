@@ -2,11 +2,11 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import rTracer from 'cls-rtracer';
 import type { Logger } from 'pino';
 import type { JobPoolCode, JobSettings } from '../config/env';
+import { isPgDataError } from '../db/pgError';
 import {
   claimJobs,
   finishJob,
   heartbeatJob,
-  queueChildJobs,
   releaseJob,
   STOPPED_BEFORE_CHILDREN,
   succeedJobQueuingChildren,
@@ -15,6 +15,7 @@ import {
   type ClaimedJob,
   type JobProgress,
 } from '../db/repos/jobRepo';
+import { JobCancelledError } from './errors';
 import { jobFacts } from './facts';
 import type { JobRegistry } from './registry';
 import { createProgressReporter, resolveResultOptions, storeJobResult } from './results';
@@ -23,7 +24,6 @@ import {
   decideOutcome,
   errorText,
   handlerEnding,
-  JobCancelledError,
   type HandlerEnding,
   type JobOutcome,
   type JobStopReason,
@@ -80,32 +80,47 @@ const writeOutcome = (
   return finishJob(job.id, job.claimToken, outcome, progress);
 };
 
+// Begins the error a job ends dead with when the database refuses its children.
+const CHILDREN_NOT_QUEUED = 'Could not queue the jobs that follow it';
+
 /**
- * Write the outcome, queuing the children asked for on success in the same transaction. The outcome
- * recorded, which is cancelled for a success with children to queue whose stop was asked for first;
- * null when the job was no longer held.
+ * Write the outcome, queuing the children asked for on success in the same transaction, and log
+ * the children queued. The outcome recorded: cancelled for a success with children to queue whose
+ * stop was asked for first, and dead when the database refuses the transaction, which another try
+ * would not change; null when the job was no longer held.
  */
 const recordOutcome = async (
   job: ClaimedJob,
   outcome: JobOutcome,
   progress: JobProgress | undefined,
   onSuccess: readonly ChildJob[],
+  log: Logger,
 ): Promise<JobOutcome | null> => {
   if (outcome.kind !== 'succeeded' || onSuccess.length === 0) {
     return (await writeOutcome(job, outcome, progress)) ? outcome : null;
   }
-  const ended = await succeedJobQueuingChildren(job, onSuccess, progress);
-  if (ended === 'cancelled') return { kind: 'cancelled', error: STOPPED_BEFORE_CHILDREN };
-  return ended ? outcome : null;
-};
-
-const queueChildren = async (
-  job: ClaimedJob,
-  children: readonly ChildJob[],
-): Promise<(string | null)[]> => {
-  const ids = await queueChildJobs(job, children);
-  if (!ids) throw new Error('Job no longer held; children not queued');
-  return ids;
+  let queued: Awaited<ReturnType<typeof succeedJobQueuingChildren>>;
+  try {
+    queued = await succeedJobQueuingChildren(job, onSuccess, progress);
+  } catch (err) {
+    // Any data or constraint error in the transaction; its own update writes only clamped values.
+    if (!isPgDataError(err)) throw err;
+    const dead: JobOutcome = { kind: 'dead', error: `${CHILDREN_NOT_QUEUED}: ${errorText(err)}` };
+    return (await finishJob(job.id, job.claimToken, dead, progress)) ? dead : null;
+  }
+  if (queued?.ended === 'cancelled') return { kind: 'cancelled', error: STOPPED_BEFORE_CHILDREN };
+  if (!queued) return null;
+  log.info(
+    {
+      // A null job id: a job with that dedupe key was queued already.
+      children: onSuccess.map((child, index) => ({
+        type: child.type,
+        jobId: queued.jobIds[index],
+      })),
+    },
+    'Job queued the jobs that follow it',
+  );
+  return outcome;
 };
 
 const OUTCOME_MESSAGES: Record<JobOutcome['kind'], string> = {
@@ -172,9 +187,9 @@ export class JobRunner {
 
   /**
    * Stop claiming and wait up to the drain deadline for running jobs. Jobs still running then are
-   * aborted; each is released once its handler returns. Jobs whose handler has returned get the
-   * outcome write's retries. A handler that does not return within the grace keeps its job until the
-   * lease expires and the sweeper takes it.
+   * aborted; once its handler returns, each is released, or waits as asked when it deferred. Jobs
+   * whose handler has returned get the outcome write's retries. A handler that does not return
+   * within the grace keeps its job until the lease expires and the sweeper takes it.
    */
   async stop(): Promise<void> {
     this.stopping = true;
@@ -268,7 +283,7 @@ export class JobRunner {
       }
       // The heartbeat keeps the lease while the outcome is written.
       const recorded = await withRetries(
-        () => recordOutcome(job, outcome, progress.latest(), entry.onSuccess),
+        () => recordOutcome(job, outcome, progress.latest(), entry.onSuccess, log),
         OUTCOME_WRITE_RETRIES,
         OUTCOME_WRITE_RETRY_MS,
       );
@@ -313,7 +328,6 @@ export class JobRunner {
             controller.signal,
             resolveResultOptions(definition, job, this.settings, options),
           ),
-        queueChildren: (children) => queueChildren(job, children),
         queueOnSuccess: (children) => {
           entry.onSuccess.push(...children);
         },

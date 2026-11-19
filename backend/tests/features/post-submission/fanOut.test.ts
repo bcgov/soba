@@ -1,8 +1,8 @@
 import type { Logger } from 'pino';
+import { JobCancelledError } from '../../../src/core/jobs/errors';
 import type { JobFacts } from '../../../src/core/jobs/facts';
 import type { JobContext } from '../../../src/core/jobs/registry';
 import { getJobSettings } from '../../../src/core/jobs/settings';
-import { JobCancelledError } from '../../../src/core/jobs/settlement';
 import {
   childAttempts,
   childJob,
@@ -71,24 +71,23 @@ describe('childAttempts', () => {
 });
 
 describe('fanOutSubmitted', () => {
-  const queueChildren = jest.fn();
+  const queueOnSuccess = jest.fn();
   const fanOut = (actions: SubmittedAction[]) =>
     fanOutSubmitted({
       job: { ...parent, params: { actions } },
       log: { info: jest.fn() } as unknown as Logger,
-      queueChildren,
+      queueOnSuccess,
     } as unknown as JobContext);
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsLive.mockResolvedValue(true);
-    queueChildren.mockResolvedValue(['child-a', null]);
   });
 
   it("queues each recorded action as a child job, with its plugin's attempts", async () => {
     await fanOut([action('post-submission-a'), action('post-submission-newer')]);
 
-    expect(queueChildren).toHaveBeenCalledWith([
+    expect(queueOnSuccess).toHaveBeenCalledWith([
       childJob(parent, action('post-submission-a'), 5),
       childJob(parent, action('post-submission-newer'), getJobSettings().maxAttempts),
     ]);
@@ -97,7 +96,7 @@ describe('fanOutSubmitted', () => {
   it('reads nothing more for a submission that recorded no actions', async () => {
     await fanOut([]);
     expect(mockIsLive).not.toHaveBeenCalled();
-    expect(queueChildren).not.toHaveBeenCalled();
+    expect(queueOnSuccess).not.toHaveBeenCalled();
   });
 
   it('ends cancelled, queuing nothing, once the submission, its form or its workspace is gone', async () => {
@@ -106,6 +105,6 @@ describe('fanOutSubmitted', () => {
     await expect(fanOut([action('post-submission-a')])).rejects.toThrow(
       new JobCancelledError('The submission, its form or its workspace is gone'),
     );
-    expect(queueChildren).not.toHaveBeenCalled();
+    expect(queueOnSuccess).not.toHaveBeenCalled();
   });
 });

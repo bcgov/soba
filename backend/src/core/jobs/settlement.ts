@@ -1,7 +1,8 @@
 import { DrizzleQueryError } from 'drizzle-orm/errors';
 import { pgErrorFields } from '../db/pgError';
 import type { JobDeferral, JobFinish } from '../db/repos/jobRepo';
-import { backoffDelayMs, deferDelayMs } from './timing';
+import { JobDeferredError, JobFailedError } from './errors';
+import { backoffDelayMs } from './timing';
 
 /** Why the runner aborted a handler. */
 export type JobStopReason = 'cancel' | 'timeout' | 'lease_lost' | 'drain';
@@ -12,32 +13,11 @@ export type JobStopReason = 'cancel' | 'timeout' | 'lease_lost' | 'drain';
  */
 export type JobOutcome = JobFinish | { kind: 'release' } | ({ kind: 'defer' } & JobDeferral);
 
-/** Thrown by a handler that decides its job should not run; the job ends cancelled, not retried. */
-export class JobCancelledError extends Error {}
-
-/** Thrown by a handler whose job would fail the same way on every attempt; the job ends dead. */
-export class JobFailedError extends Error {}
-
-/**
- * Thrown by a handler whose job has to wait, for a limit or a busy service. The job runs again after
- * its delay, from a second to a day, without using an attempt, and its message is recorded as the
- * job's last error.
- */
-export class JobDeferredError extends Error {
-  /** The delay, bounded by `deferDelayMs`. */
-  readonly delayMs: number;
-
-  constructor(delayMs: number, reason: string) {
-    super(reason);
-    this.delayMs = deferDelayMs(delayMs);
-  }
-}
-
 /** How a handler that threw asked to end. */
 export interface HandlerEnding {
   /** It threw `JobFailedError`. */
   permanent?: boolean;
-  /** It threw `JobDeferredError` with this delay. */
+  /** It threw `JobDeferredError` with this delay, already bounded. */
   deferMs?: number;
 }
 
@@ -68,11 +48,11 @@ export const errorText = (err: unknown): string => {
 
 /**
  * What to record when a handler returns; `error` is undefined when it succeeded. A success is
- * recorded even after an abort. A failure after a cancel ends cancelled; after a drain the job is
- * released without using an attempt; after a lost lease nothing is written. A deferral
- * (`JobDeferredError`) that did not time out goes back to the queue after its delay without using an
- * attempt, even on the last one. A permanent failure (`JobFailedError`) ends dead; any other
- * failure, a timeout included, counts as a failed attempt.
+ * recorded even after an abort. A failure after a cancel ends cancelled; after a lost lease nothing
+ * is written. A deferral (`JobDeferredError`) that did not time out goes back to the queue after
+ * its delay without using an attempt, even on the last one and during a drain; any other failure
+ * after a drain is released to run again now without using an attempt. A permanent failure
+ * (`JobFailedError`) ends dead; any other failure, a timeout included, counts as a failed attempt.
  */
 export const decideOutcome = (
   error: string | undefined,
@@ -83,11 +63,11 @@ export const decideOutcome = (
 ): JobOutcome | null => {
   if (error === undefined) return { kind: 'succeeded' };
   if (stopReason === 'cancel') return { kind: 'cancelled', error };
-  if (stopReason === 'drain') return { kind: 'release' };
   if (stopReason === 'lease_lost') return null;
-  if (ending.deferMs !== undefined && stopReason === undefined) {
-    return { kind: 'defer', delayMs: deferDelayMs(ending.deferMs), reason: error };
+  if (ending.deferMs !== undefined && (stopReason === undefined || stopReason === 'drain')) {
+    return { kind: 'defer', delayMs: ending.deferMs, reason: error };
   }
+  if (stopReason === 'drain') return { kind: 'release' };
   if (ending.permanent || job.attempts >= job.maxAttempts) return { kind: 'dead', error };
   return { kind: 'retry', delayMs: backoffDelayMs(job.attempts, backoff), error };
 };

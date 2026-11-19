@@ -9,7 +9,7 @@ import {
   DAILY_LIMIT_REACHED,
   PROVIDER_LIMIT_REACHED,
 } from '../../../../src/core/integrations/notification/dailyReset';
-import { JobCancelledError, JobDeferredError } from '../../../../src/core/jobs/settlement';
+import { JobCancelledError, JobDeferredError } from '../../../../src/core/jobs/errors';
 
 const ACCEPTED: JobEmailResult = { outcome: 'accepted', httpStatus: null, audited: true };
 const REFUSED: JobEmailResult = { outcome: 'error', httpStatus: 400, audited: true };

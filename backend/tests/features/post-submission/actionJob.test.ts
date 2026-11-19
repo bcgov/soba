@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import type { JobOutputRow } from '../../../src/core/db/repos/jobOutputRepo';
 import type { PostSubmissionActionPluginDefinition } from '../../../src/core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
+import { JobCancelledError } from '../../../src/core/jobs/errors';
 import type { JobFacts } from '../../../src/core/jobs/facts';
 import { getJobSettings } from '../../../src/core/jobs/settings';
-import { JobCancelledError } from '../../../src/core/jobs/settlement';
 import {
   actionJobDefinitions,
   cancelReason,

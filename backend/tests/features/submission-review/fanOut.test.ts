@@ -7,9 +7,9 @@ jest.mock('../../../src/features/post-submission/repo', () => ({
 }));
 
 import type { Logger } from 'pino';
+import { JobCancelledError } from '../../../src/core/jobs/errors';
 import type { JobFacts } from '../../../src/core/jobs/facts';
 import type { JobContext } from '../../../src/core/jobs/registry';
-import { JobCancelledError } from '../../../src/core/jobs/settlement';
 import { fanOutStatusChanged, reactionJob } from '../../../src/features/submission-review/fanOut';
 
 const CHANGE_ID = '0190f3a2-7c1e-7a4b-9d2e-5f6a7b8c9d0e';
@@ -24,19 +24,18 @@ const parent = {
   createdBy: 'rev-1',
 } as JobFacts;
 
-const queueChildren = jest.fn();
+const queueOnSuccess = jest.fn();
 
 const fanOut = (actions: unknown[]) =>
   fanOutStatusChanged({
     job: { ...parent, params: { statusChangeId: CHANGE_ID, actions } },
     log: { info: jest.fn() } as unknown as Logger,
-    queueChildren,
+    queueOnSuccess,
   } as unknown as JobContext);
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockIsLive.mockResolvedValue(true);
-  queueChildren.mockResolvedValue(['child-job']);
 });
 
 describe('reactionJob', () => {
@@ -57,13 +56,13 @@ describe('fanOutStatusChanged', () => {
   it('queues each recorded reaction as a child job', async () => {
     await fanOut([STATUS_EMAIL]);
 
-    expect(queueChildren).toHaveBeenCalledWith([reactionJob(parent, CHANGE_ID, STATUS_EMAIL, 8)]);
+    expect(queueOnSuccess).toHaveBeenCalledWith([reactionJob(parent, CHANGE_ID, STATUS_EMAIL, 8)]);
   });
 
   it('reads nothing more for a change that recorded no reactions', async () => {
     await fanOut([]);
     expect(mockIsLive).not.toHaveBeenCalled();
-    expect(queueChildren).not.toHaveBeenCalled();
+    expect(queueOnSuccess).not.toHaveBeenCalled();
   });
 
   it('ends cancelled, queuing nothing, once the submission, its form or its workspace is gone', async () => {
@@ -71,6 +70,6 @@ describe('fanOutStatusChanged', () => {
     await expect(fanOut([STATUS_EMAIL])).rejects.toThrow(
       new JobCancelledError('The submission, its form or its workspace is gone'),
     );
-    expect(queueChildren).not.toHaveBeenCalled();
+    expect(queueOnSuccess).not.toHaveBeenCalled();
   });
 });

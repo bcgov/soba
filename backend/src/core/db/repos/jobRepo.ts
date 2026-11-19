@@ -102,23 +102,6 @@ export const insertJob = async (dbOrTx: DbOrTx, input: NewJob): Promise<string |
   return row?.id ?? null;
 };
 
-/**
- * Record, in the caller's transaction, that a held job queued its children. False when the job is no
- * longer this worker's.
- */
-const markChildrenQueued = async (
-  dbOrTx: DbOrTx,
-  id: string,
-  claimToken: string,
-): Promise<boolean> => {
-  const rows = await dbOrTx
-    .update(jobs)
-    .set({ childrenQueuedAt: sql`now()` })
-    .where(held(id, claimToken))
-    .returning({ id: jobs.id });
-  return rows.length > 0;
-};
-
 /** A child job as inserted: in its parent's workspace, under its parent. */
 export const childRow = (
   parent: Pick<ClaimedJob, 'id' | 'workspaceId'>,
@@ -128,24 +111,6 @@ export const childRow = (
   workspaceId: parent.workspaceId,
   parentJobId: parent.id,
 });
-
-/**
- * Queue a held job's children in one transaction, in order, and record that it queued them. Each
- * child's id, or null where its dedupe key was taken; null in place of the list, queuing nothing,
- * when the job is no longer this worker's. An empty list queues and records nothing.
- */
-export const queueChildJobs = async (
-  parent: Pick<ClaimedJob, 'id' | 'claimToken' | 'workspaceId'>,
-  children: readonly ChildJob[],
-): Promise<(string | null)[] | null> => {
-  if (children.length === 0) return [];
-  return quietDb.transaction(async (tx) => {
-    // The mark outlives the children, so a re-run is refused once they were queued, even after
-    // retention deletes them and frees their dedupe keys.
-    if (!(await markChildrenQueued(tx, parent.id, parent.claimToken))) return null;
-    return mapInOrder(children, (child) => insertJob(tx, childRow(parent, child)));
-  });
-};
 
 /**
  * Claim up to `limit` due jobs of the given types, oldest first. Rows another worker has locked are
@@ -322,13 +287,14 @@ export const STOPPED_BEFORE_CHILDREN = 'Stopped before it queued the jobs that f
 /**
  * Record a held job as succeeded and queue its children, in order, in the same transaction, marking
  * that it queued them. A job whose stop was asked for ends cancelled instead and queues none, so it
- * can run again. How it ended, or null when it was no longer this worker's.
+ * can run again. How it ended, with each child's id or null where its dedupe key was taken; null
+ * when it was no longer this worker's.
  */
 export const succeedJobQueuingChildren = (
   job: Pick<ClaimedJob, 'id' | 'claimToken' | 'workspaceId'>,
   children: readonly ChildJob[],
   progress?: JobProgress,
-): Promise<'succeeded' | 'cancelled' | null> =>
+): Promise<{ ended: 'succeeded'; jobIds: (string | null)[] } | { ended: 'cancelled' } | null> =>
   quietDb.transaction(async (tx) => {
     const succeeded = await tx
       .update(jobs)
@@ -340,8 +306,8 @@ export const succeedJobQueuingChildren = (
       .where(and(held(job.id, job.claimToken), isNull(jobs.cancelRequestedAt)))
       .returning({ id: jobs.id });
     if (succeeded.length > 0) {
-      await mapInOrder(children, (child) => insertJob(tx, childRow(job, child)));
-      return 'succeeded';
+      const jobIds = await mapInOrder(children, (child) => insertJob(tx, childRow(job, child)));
+      return { ended: 'succeeded', jobIds };
     }
     const cancelled = await tx
       .update(jobs)
@@ -351,7 +317,7 @@ export const succeedJobQueuingChildren = (
       })
       .where(held(job.id, job.claimToken))
       .returning({ id: jobs.id });
-    return cancelled.length > 0 ? 'cancelled' : null;
+    return cancelled.length > 0 ? { ended: 'cancelled' } : null;
   });
 
 /** A wait a job asked for, and why. */

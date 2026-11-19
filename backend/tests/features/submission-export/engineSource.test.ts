@@ -4,7 +4,7 @@ import type {
   FormEngineAdapter,
   ReadSubmissionsResult,
 } from '../../../src/core/integrations/form-engine/FormEngineAdapter';
-import { JobFailedError } from '../../../src/core/jobs/settlement';
+import { JobFailedError } from '../../../src/core/jobs/errors';
 import {
   bulkAnswerReader,
   engineExportSource,

@@ -40,16 +40,11 @@ export interface JobContext {
     options?: StoreResultOptions,
   ) => Promise<StoredJobResult>;
   /**
-   * Queue child jobs in one transaction and record that this job queued them, after which staff can
-   * run its children again but not the job itself. Each child's id, or null where its dedupe key was
-   * taken. Throws when the job is no longer this worker's, so the attempt retries.
-   */
-  queueChildren: (children: readonly ChildJob[]) => Promise<(string | null)[]>;
-  /**
    * Queue child jobs in the transaction that records this attempt as succeeded, and record that this
-   * job queued them; an attempt that ends any other way queues none. A stop asked for before then
-   * ends the job cancelled instead, so it can run again, unless `queueChildren` already queued
-   * children in this run. Each call adds to the list.
+   * job queued them, after which staff can run its children again but not the job itself. An attempt
+   * that ends any other way queues none. A stop asked for before then ends the job cancelled
+   * instead, so it can run again; a child the database refuses ends it dead. A child whose dedupe
+   * key is taken is not queued again. Each call adds to the list.
    */
   queueOnSuccess: (children: readonly ChildJob[]) => void;
 }
@@ -68,9 +63,10 @@ export interface JobTypeDefinition {
   /**
    * Returning means the work is done, even after an abort; throwing retries the job until its
    * attempts run out, unless it throws `JobCancelledError` or `JobFailedError`. Throwing
-   * `JobDeferredError` runs it again after its delay without using an attempt. A job runs at least
-   * once, and after a lost lease two pods can run it at the same time, so its side effects must be
-   * safe to repeat.
+   * `JobDeferredError` runs it again after its delay without using an attempt, so throw it for a
+   * wait the work needs, not on an abort, or a pod's drain holds the job back by that delay. A job
+   * runs at least once, and after a lost lease two pods can run it at the same time, so its side
+   * effects must be safe to repeat.
    */
   run: (context: JobContext) => Promise<void>;
 }

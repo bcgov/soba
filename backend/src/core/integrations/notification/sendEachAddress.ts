@@ -1,7 +1,7 @@
 import { EmailAddressSchema } from '@soba/lib';
 import type { Logger } from 'pino';
 import { NotificationOutcome } from '../../db/codes';
-import { JobCancelledError } from '../../jobs/settlement';
+import { JobCancelledError } from '../../jobs/errors';
 import { DAILY_LIMIT_REACHED, deferUntilReset, PROVIDER_LIMIT_REACHED } from './dailyReset';
 import type { JobNotifications } from './JobNotifications';
 import type { SendEmail } from './NotificationAdapter';

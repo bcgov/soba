@@ -176,11 +176,13 @@ address with no expiry, as `notification_audit` rows keep recipients.
   decided inside it, and the event's `params.actions` records them, so later settings changes don't
   alter them. The Jobs tabs show them as "Actions recorded". A new reaction to an existing event is
   a new entry in that event's list; the code that records the event does not change.
-- **The fan-out queues the reactions.** In one transaction it marks the event's children queued and
-  inserts one job per recorded reaction, with dedupe key `<reaction type>:<event id>`, the event as
-  parent and the event's creator as its own. Once the children are queued, the event can't be run
-  again; their jobs can. When the submission, its form or its workspace is already gone, the event
-  ends cancelled with that reason and queues nothing.
+- **The fan-out queues the reactions.** The transaction that records the event's job as succeeded
+  marks its children queued and inserts one job per recorded reaction, with dedupe key
+  `<reaction type>:<event id>`, the event as parent and the event's creator as its own. Once the
+  children are queued, the event can't be run again; their jobs can. A stop asked for before then
+  ends the event cancelled with nothing queued, and a reaction the database refuses ends it dead.
+  When the submission, its form or its workspace is already gone, the event ends cancelled with that
+  reason and queues nothing.
 - **Params hold ids and choices, never content.** A status-changed event's params are
   `{ statusChangeId, actions }`, and its status email's are
   `{ statusChangeId, options: { attachComment } }`: a reaction's job keeps its recorded options
@@ -265,8 +267,8 @@ address with no expiry, as `notification_audit` rows keep recipients.
    - an enqueue function in `backend/src/core/jobs/enqueue.ts`, run in the transaction that saves
      the event, which records the reactions
    - `nudgeJobs` after the commit
-   - a fan-out registered in the catalog, which queues the reactions with `queueChildren`, so neither
-     the server nor the page offers to run the event again once it has
+   - a fan-out registered in the catalog, which queues the reactions with `queueOnSuccess`, so
+     neither the server nor the page offers to run the event again once it has
    - its names in the Jobs tabs
 8. Test it: the full English body, a French subject and body, the reaction's rule, the handler's
    recipients, cancel reasons and attribution, and that the event records the reaction once. Unit

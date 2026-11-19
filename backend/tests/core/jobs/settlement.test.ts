@@ -1,13 +1,6 @@
 import { DrizzleQueryError } from 'drizzle-orm/errors';
-import {
-  decideOutcome,
-  errorText,
-  handlerEnding,
-  JobCancelledError,
-  JobDeferredError,
-  JobFailedError,
-} from '../../../src/core/jobs/settlement';
-import { MAX_DEFER_MS, MIN_DEFER_MS } from '../../../src/core/jobs/timing';
+import { JobCancelledError, JobDeferredError, JobFailedError } from '../../../src/core/jobs/errors';
+import { decideOutcome, errorText, handlerEnding } from '../../../src/core/jobs/settlement';
 
 const backoff = { backoffBaseMs: 30_000, backoffMaxMs: 1_800_000 };
 const firstOfThree = { attempts: 1, maxAttempts: 3 };
@@ -110,21 +103,19 @@ describe('decideOutcome', () => {
     });
   });
 
-  it('bounds the delay it defers by', () => {
-    expect(decideOutcome(waiting, undefined, firstOfThree, backoff, { deferMs: 0 })).toEqual({
+  // A pod shutting down would otherwise hand the job to another pod at once, to meet the same limit.
+  it('keeps the delay of a deferral asked for while the pod drains', () => {
+    expect(decideOutcome(waiting, 'drain', lastOfThree, backoff, deferred)).toEqual({
       kind: 'defer',
-      delayMs: MIN_DEFER_MS,
+      delayMs: 60_000,
       reason: waiting,
     });
   });
 
-  it('lets a cancel, a drain, a lost lease or a timeout decide before a deferral', () => {
+  it('lets a cancel, a lost lease or a timeout decide before a deferral', () => {
     expect(decideOutcome(waiting, 'cancel', firstOfThree, backoff, deferred)).toEqual({
       kind: 'cancelled',
       error: waiting,
-    });
-    expect(decideOutcome(waiting, 'drain', firstOfThree, backoff, deferred)).toEqual({
-      kind: 'release',
     });
     expect(decideOutcome(waiting, 'lease_lost', firstOfThree, backoff, deferred)).toBeNull();
     expect(decideOutcome('Timed out', 'timeout', firstOfThree, backoff, deferred)).toEqual({
@@ -136,21 +127,6 @@ describe('decideOutcome', () => {
       kind: 'dead',
       error: 'Timed out',
     });
-  });
-});
-
-describe('JobDeferredError', () => {
-  it('carries its reason as its message and its delay, bounded', () => {
-    const err = new JobDeferredError(0, waiting);
-    expect(err.message).toBe(waiting);
-    expect(err.delayMs).toBe(MIN_DEFER_MS);
-    expect(new JobDeferredError(2 * MAX_DEFER_MS, waiting).delayMs).toBe(MAX_DEFER_MS);
-  });
-
-  it('waits the least when code without types gives no delay', () => {
-    expect(new JobDeferredError(undefined as unknown as number, waiting).delayMs).toBe(
-      MIN_DEFER_MS,
-    );
   });
 });
 

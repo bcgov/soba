@@ -5,7 +5,7 @@ import {
   nextMidnight,
   PROVIDER_LIMIT_REACHED,
 } from '../../../../src/core/integrations/notification/dailyReset';
-import { JobDeferredError } from '../../../../src/core/jobs/settlement';
+import { JobDeferredError } from '../../../../src/core/jobs/errors';
 
 // A zone that never changes its clocks: seven hours behind UTC.
 const UTC_MINUS_7 = 'Etc/GMT+7';

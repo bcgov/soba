@@ -6,9 +6,9 @@ import {
   type StatusChangeForEmail,
 } from '../../core/db/repos/submissionReviewRepo';
 import { sendEachAddress } from '../../core/integrations/notification/sendEachAddress';
+import { JobCancelledError } from '../../core/jobs/errors';
 import type { JobFacts } from '../../core/jobs/facts';
 import type { JobContext } from '../../core/jobs/registry';
-import { JobCancelledError } from '../../core/jobs/settlement';
 import { StatusEmailJobParamsSchema } from '../../core/jobs/submissionStatusEmail';
 import { jobNotifications } from '../notifications/jobNotifications';
 import { findLiveSubmission, SUBMISSION_GONE } from '../post-submission/repo';

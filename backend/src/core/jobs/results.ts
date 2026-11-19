@@ -12,8 +12,8 @@ import {
 } from '../db/repos/jobRepo';
 import type { TempResource } from '../integrations/temp-storage/TempStorageAdapter';
 import { fileStore } from '../services/fileStore';
+import { JobCancelledError, JobFailedError } from './errors';
 import type { JobTypeDefinition, StoredJobResult, StoreResultOptions } from './registry';
-import { JobCancelledError, JobFailedError } from './settlement';
 
 /** progress_done and progress_total are integer columns. */
 const MAX_COUNT = 2_147_483_647;
