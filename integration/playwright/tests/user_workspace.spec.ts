@@ -247,9 +247,12 @@ test('User can validate job status, type and form dropdowns for a workspace', as
   await expect(resetFiltersButton).toBeEnabled();
 });
 
-test('User can manage access tab settings for a workspace', async ({ page }) => {
-  await page.getByTestId('workspace-access-tab').click();
-  await expect(page.getByTestId('workspace-access-tab')).toHaveAttribute('aria-selected', 'true');
+test('User can manage access drawer settings for a workspace', async ({ page }) => {
+  await page.getByTestId('workspace-permissions-tab').click();
+  await expect(page.getByTestId('workspace-permissions-tab')).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await expect(page.getByRole('textbox', { name: 'Search' })).toBeVisible();
   await page.getByTestId('search-ws-access-button').click();
   await page.getByRole('textbox', { name: 'Search' }).fill('nimya');
