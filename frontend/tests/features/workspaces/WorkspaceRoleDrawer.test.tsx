@@ -45,7 +45,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 
-import WorkspaceRoleTab from '@/src/features/workspaces/ui/WorkspaceRoleTab';
+import WorkspaceRoleDrawer from '@/src/features/workspaces/ui/WorkspaceRoleDrawer';
 
 const role = (
   roleCode: string,
@@ -68,8 +68,8 @@ const FORM_DESIGNER = role('form_designer', 'Form designer', ['design_read', 'fo
 const FIXED = [TEAM_MANAGER, FORM_ADMIN, FORM_SUBMITTER, FORM_DESIGNER];
 const AUDITOR = role('custom-1', 'Auditor', ['form_read', 'submission_read'], false);
 
-const renderTab = (tabDict: Dictionary = dict) =>
-  renderSignedIn(<WorkspaceRoleTab dict={tabDict} workspaceId={WORKSPACE_ID} />);
+const renderDrawer = (drawerDict: Dictionary = dict) =>
+  renderSignedIn(<WorkspaceRoleDrawer dict={drawerDict} workspaceId={WORKSPACE_ID} />);
 
 const shownNames = () => screen.getAllByTestId(/^role-name-(?!input)/).map((c) => c.textContent);
 const permissionBox = (code: keyof typeof en.workspaces.roles.permissionNames) =>
@@ -86,7 +86,7 @@ const typeSearch = async (
   await user.keyboard('{Enter}');
 };
 
-describe('WorkspaceRoleTab', () => {
+describe('WorkspaceRoleDrawer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLocale.value = 'en';
@@ -103,7 +103,7 @@ describe('WorkspaceRoleTab', () => {
   });
 
   it('lists each role by the name shown, with its type and permission count', async () => {
-    renderTab();
+    renderDrawer();
 
     expect(await screen.findByTestId('role-name-form_admin')).toHaveTextContent(
       dict.workspaces.groups.roleNames.form_admin,
@@ -121,7 +121,7 @@ describe('WorkspaceRoleTab', () => {
     mockApi.listWorkspaceRoles.mockResolvedValue({
       items: [role('custom-2', 'Reader', ['form_read'], false)],
     });
-    renderTab();
+    renderDrawer();
 
     expect(await screen.findByTestId('role-permissions-custom-2')).toHaveTextContent(
       t.permissionCountOne,
@@ -129,7 +129,7 @@ describe('WorkspaceRoleTab', () => {
   });
 
   it('offers View on a fixed role, and Edit and Remove on a custom one', async () => {
-    renderTab();
+    renderDrawer();
     await screen.findByTestId('role-name-form_admin');
 
     expect(screen.getByTestId('view-role-button-form_admin')).toBeInTheDocument();
@@ -142,7 +142,7 @@ describe('WorkspaceRoleTab', () => {
 
   it('orders by the name shown, and reverses when the name header is pressed', async () => {
     const user = userEvent.setup();
-    const view = renderTab();
+    const view = renderDrawer();
     await screen.findByTestId('role-name-form_admin');
 
     expect(shownNames()).toEqual([
@@ -168,7 +168,7 @@ describe('WorkspaceRoleTab', () => {
   it('orders by the French names in French', async () => {
     mockLocale.value = 'fr';
     mockApi.listWorkspaceRoles.mockResolvedValue({ items: FIXED });
-    renderTab({ ...fr, locale: 'fr' } as unknown as Dictionary);
+    renderDrawer({ ...fr, locale: 'fr' } as unknown as Dictionary);
     await screen.findByTestId('role-name-form_admin');
 
     expect(shownNames()).toEqual([
@@ -183,7 +183,7 @@ describe('WorkspaceRoleTab', () => {
     mockLocale.value = 'fr';
     const frDict = { ...fr, locale: 'fr' } as unknown as Dictionary;
     const user = userEvent.setup();
-    const view = renderTab(frDict);
+    const view = renderDrawer(frDict);
     await screen.findByTestId('role-name-form_admin');
     const box = within(screen.getByTestId('search-ws-roles-text')).getByRole('textbox');
 
@@ -203,7 +203,7 @@ describe('WorkspaceRoleTab', () => {
     );
     mockApi.listWorkspaceRoles.mockResolvedValue({ items });
     window.history.replaceState(null, '', '/en/workspace/ws-1?workspaceRoles.page=2');
-    renderTab();
+    renderDrawer();
 
     await screen.findByTestId('role-name-custom-11');
     expect(shownNames()).toEqual(['Role 10', 'Role 11']);
@@ -211,7 +211,7 @@ describe('WorkspaceRoleTab', () => {
 
   it('opens a fixed role below the table for reference, with nothing to save', async () => {
     const user = userEvent.setup();
-    renderTab();
+    renderDrawer();
     await user.click(await screen.findByTestId('view-role-button-form_submitter'));
 
     const section = await screen.findByTestId('workspace-role-edit-form');
@@ -234,7 +234,7 @@ describe('WorkspaceRoleTab', () => {
 
   it('ticks every permission for a role holding the wildcard', async () => {
     const user = userEvent.setup();
-    renderTab();
+    renderDrawer();
     await user.click(await screen.findByTestId('view-role-button-form_admin'));
 
     const section = await screen.findByTestId('workspace-role-edit-form');
@@ -246,7 +246,7 @@ describe('WorkspaceRoleTab', () => {
 
   it('creates a role with what was ticked and what that needs, then closes', async () => {
     const user = userEvent.setup();
-    renderTab();
+    renderDrawer();
     await screen.findByTestId('role-name-form_admin');
     const readsBefore = mockApi.listWorkspaceRoles.mock.calls.length;
 
@@ -280,7 +280,7 @@ describe('WorkspaceRoleTab', () => {
 
   it('saves without a permission that was auto-ticked and then unticked', async () => {
     const user = userEvent.setup();
-    renderTab();
+    renderDrawer();
     await user.click(await screen.findByTestId('create-ws-role-button'));
     await user.click(nameInput());
     await user.paste('Add-on');
@@ -298,7 +298,7 @@ describe('WorkspaceRoleTab', () => {
 
   it('will not save a role with no permissions left', async () => {
     const user = userEvent.setup();
-    renderTab();
+    renderDrawer();
     await user.click(await screen.findByTestId('edit-role-button-custom-1'));
     await screen.findByDisplayValue('Auditor');
     await user.click(permissionBox('form_read'));
@@ -312,7 +312,7 @@ describe('WorkspaceRoleTab', () => {
     mockApi.createWorkspaceRole.mockRejectedValue(
       new ApiError('A role with this name already exists', 409, 'role_name_taken'),
     );
-    renderTab();
+    renderDrawer();
     await user.click(await screen.findByTestId('create-ws-role-button'));
     await user.click(nameInput());
     await user.paste('Auditor');
@@ -329,7 +329,7 @@ describe('WorkspaceRoleTab', () => {
 
   it('seeds an edit from the role read by code, enabled', async () => {
     const user = userEvent.setup();
-    renderTab();
+    renderDrawer();
     await user.click(await screen.findByTestId('edit-role-button-custom-1'));
 
     await screen.findByDisplayValue('Auditor');
@@ -343,7 +343,7 @@ describe('WorkspaceRoleTab', () => {
 
   it('sends only the name when only the name changed', async () => {
     const user = userEvent.setup();
-    renderTab();
+    renderDrawer();
     await user.click(await screen.findByTestId('edit-role-button-custom-1'));
     await screen.findByDisplayValue('Auditor');
     await user.clear(nameInput());
@@ -359,7 +359,7 @@ describe('WorkspaceRoleTab', () => {
 
   it('sends only the permissions when only they changed', async () => {
     const user = userEvent.setup();
-    renderTab();
+    renderDrawer();
     await user.click(await screen.findByTestId('edit-role-button-custom-1'));
     await screen.findByDisplayValue('Auditor');
     await user.click(permissionBox('team_read'));
@@ -375,7 +375,7 @@ describe('WorkspaceRoleTab', () => {
 
   it('sends nothing when nothing changed, and still closes', async () => {
     const user = userEvent.setup();
-    renderTab();
+    renderDrawer();
     await user.click(await screen.findByTestId('edit-role-button-custom-1'));
     await screen.findByDisplayValue('Auditor');
     await user.click(screen.getByTestId('role-submit-button'));
@@ -388,7 +388,7 @@ describe('WorkspaceRoleTab', () => {
 
   it('removes a role once confirmed, closing its open form', async () => {
     const user = userEvent.setup();
-    renderTab();
+    renderDrawer();
     await user.click(await screen.findByTestId('edit-role-button-custom-1'));
     await screen.findByDisplayValue('Auditor');
     const readsBefore = mockApi.listWorkspaceRoles.mock.calls.length;
@@ -411,7 +411,7 @@ describe('WorkspaceRoleTab', () => {
     mockApi.deleteWorkspaceRole.mockRejectedValue(
       new ApiError('This role is still assigned to a group', 409, 'role_in_use'),
     );
-    renderTab();
+    renderDrawer();
     await user.click(await screen.findByTestId('delete-role-button-custom-1'));
     await user.click(screen.getByRole('button', { name: t.deleteRole }));
 
@@ -426,7 +426,7 @@ describe('WorkspaceRoleTab', () => {
 
   it('leaves an open create form alone when another role is removed', async () => {
     const user = userEvent.setup();
-    renderTab();
+    renderDrawer();
     await user.click(await screen.findByTestId('create-ws-role-button'));
     await user.click(nameInput());
     await user.paste('Inspector');
@@ -441,7 +441,7 @@ describe('WorkspaceRoleTab', () => {
   it('re-reads the list after a refused create', async () => {
     const user = userEvent.setup();
     mockApi.createWorkspaceRole.mockRejectedValue(new ApiError('Request failed (500)', 500));
-    renderTab();
+    renderDrawer();
     await user.click(await screen.findByTestId('create-ws-role-button'));
     await user.click(nameInput());
     await user.paste('Inspector');
@@ -458,7 +458,7 @@ describe('WorkspaceRoleTab', () => {
   it('re-reads the list after a refused edit, as the role may have gone', async () => {
     const user = userEvent.setup();
     mockApi.updateWorkspaceRole.mockRejectedValue(new ApiError('Role not found', 404));
-    renderTab();
+    renderDrawer();
     await user.click(await screen.findByTestId('edit-role-button-custom-1'));
     await screen.findByDisplayValue('Auditor');
     await user.clear(nameInput());
@@ -477,7 +477,7 @@ describe('WorkspaceRoleTab', () => {
     mockApi.deleteWorkspaceRole.mockRejectedValue(
       new ApiError('This role is still assigned to a group', 409, 'role_in_use'),
     );
-    renderTab();
+    renderDrawer();
     await user.click(await screen.findByTestId('delete-role-button-custom-1'));
     const readsBefore = mockApi.listWorkspaceRoles.mock.calls.length;
     await user.click(screen.getByRole('button', { name: t.deleteRole }));
@@ -490,7 +490,7 @@ describe('WorkspaceRoleTab', () => {
   it('shows no fields when the role cannot be read', async () => {
     const user = userEvent.setup();
     mockApi.getWorkspaceRole.mockRejectedValue(new ApiError('Request failed (500)', 500));
-    renderTab();
+    renderDrawer();
     await user.click(await screen.findByTestId('edit-role-button-custom-1'));
 
     expect(await screen.findByTestId('role-load-error')).toHaveTextContent(t.roleLoadError);
@@ -499,7 +499,7 @@ describe('WorkspaceRoleTab', () => {
 
   it('reports a failed load in the table', async () => {
     mockApi.listWorkspaceRoles.mockRejectedValue(new ApiError('Request failed (500)', 500));
-    renderTab();
+    renderDrawer();
 
     expect(await screen.findByText(t.loadError)).toBeInTheDocument();
   });

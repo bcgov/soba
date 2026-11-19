@@ -1,6 +1,5 @@
 {
   "locale": "fr",
-  "name": "Common Hosted Forms",
   "general": {
     "login": "Connecter",
     "logout": "Déconnexion",
@@ -106,6 +105,7 @@
     "unavailableFilter": "Cet espace de travail n'est pas disponible pour vous. Affichage de tous les formulaires.",
     "clearFilter": "Effacer le filtre",
     "listLoadError": "Échec du chargement des espaces de travail.",
+    "permissionsTab": "Autorisations",
     "rolesTab": "Rôles",
     "roles": {
       "addRole": "Ajouter un rôle",

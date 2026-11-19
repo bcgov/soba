@@ -24,7 +24,7 @@ import { groupRoleLabel, rolesByLabel } from '../groupRoleLabel';
 import { grantsAllPermissions } from '../rolePermissions';
 import WorkspaceRoleForm from './WorkspaceRoleForm';
 
-export interface WorkspaceRoleTabProps {
+export interface WorkspaceRoleDrawerProps {
   dict: Dictionary;
   workspaceId: string;
 }
@@ -41,7 +41,7 @@ const permissionSummary = (
   return t.permissionCount.replace('{count}', String(permissions.length));
 };
 
-export function WorkspaceRoleTab({ dict, workspaceId }: Readonly<WorkspaceRoleTabProps>) {
+export function WorkspaceRoleDrawer({ dict, workspaceId }: Readonly<WorkspaceRoleDrawerProps>) {
   const t = dict.workspaces.roles;
   const { token } = useKeycloak();
   const { addNotification } = useNotificationStore();
@@ -176,7 +176,7 @@ export function WorkspaceRoleTab({ dict, workspaceId }: Readonly<WorkspaceRoleTa
   const openCode = formView && formView !== 'new' ? formView.roleCode : undefined;
 
   return (
-    <div data-testid="workspace-roles-tab-content">
+    <div data-testid="workspace-roles-drawer-content">
       <ListPageToolbar>
         <ListPageSearchField
           value={query.searchInput}
@@ -229,4 +229,4 @@ export function WorkspaceRoleTab({ dict, workspaceId }: Readonly<WorkspaceRoleTa
   );
 }
 
-export default WorkspaceRoleTab;
+export default WorkspaceRoleDrawer;

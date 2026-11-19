@@ -105,6 +105,7 @@
     "unavailableFilter": "That workspace is not available to you. Showing all forms instead.",
     "clearFilter": "Clear filter",
     "listLoadError": "Failed to load workspaces.",
+    "permissionsTab": "Permissions",
     "rolesTab": "Roles",
     "roles": {
       "addRole": "Add Role",

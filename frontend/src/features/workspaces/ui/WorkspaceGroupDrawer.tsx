@@ -21,7 +21,7 @@ import { useWorkspaceRoles } from '../data/useWorkspaceRoles';
 import { assignableRoleLabel, groupRoleLabel } from '../groupRoleLabel';
 import WorkspaceGroupForm from './WorkspaceGroupForm';
 
-export interface WorkspaceGroupTabProps {
+export interface WorkspaceGroupDrawerProps {
   dict: Dictionary;
   workspaceId: string;
 }
@@ -29,7 +29,7 @@ export interface WorkspaceGroupTabProps {
 /** What opens under the table: nothing, the create form, or the edit form for one group's id. */
 type FormView = null | 'new' | { groupId: string };
 
-export function WorkspaceGroupTab({ dict, workspaceId }: Readonly<WorkspaceGroupTabProps>) {
+export function WorkspaceGroupDrawer({ dict, workspaceId }: Readonly<WorkspaceGroupDrawerProps>) {
   const t = dict.workspaces.groups;
   const { token } = useKeycloak();
   const { addNotification } = useNotificationStore();
@@ -134,7 +134,7 @@ export function WorkspaceGroupTab({ dict, workspaceId }: Readonly<WorkspaceGroup
   const editingId = formView && formView !== 'new' ? formView.groupId : undefined;
 
   return (
-    <div data-testid="workspace-groups-tab-content">
+    <div data-testid="workspace-groups-drawer-content">
       <ListPageToolbar>
         <ListPageSearchField
           value={query.searchInput}
@@ -187,4 +187,4 @@ export function WorkspaceGroupTab({ dict, workspaceId }: Readonly<WorkspaceGroup
   );
 }
 
-export default WorkspaceGroupTab;
+export default WorkspaceGroupDrawer;

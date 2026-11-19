@@ -54,8 +54,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
       manageHeading: 'Manage Workspace',
       settingsTab: 'Settings',
       formSettingsTab: 'Form Settings',
-      rolesTab: 'Roles',
-      groupsTab: 'Groups',
+      permissionsTab: 'Permissions',
       nameLabel: 'Name',
       save: 'Save',
       create: 'Create',
@@ -147,14 +146,9 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(mockSearchParams.value),
 }));
 
-vi.mock('@/src/features/workspaces/ui/WorkspaceRoleTab', () => ({
-  default: () => <div data-testid="workspace-roles-tab-content">Workspace Roles Content</div>,
-}));
-
-vi.mock('@/src/features/workspaces/ui/WorkspaceGroupTab', () => ({
-  default: () => <div data-testid="workspace-groups-tab-content">Workspace Groups Content</div>,
-  WorkspaceGroupTab: () => (
-    <div data-testid="workspace-groups-tab-content">Workspace Groups Content</div>
+vi.mock('@/src/features/workspaces/ui/WorkspacePermissionsTab', () => ({
+  default: () => (
+    <div data-testid="workspace-permissions-tab-content">Workspace Permissions Content</div>
   ),
 }));
 
@@ -285,8 +279,7 @@ describe('WorkspaceForm', () => {
       'Settings',
       'Form Settings',
       'After Submission',
-      'Roles',
-      'Groups',
+      'Permissions',
       'Jobs',
     ]);
     expect(availability.check).toHaveBeenCalledWith('post-submission', { workspaceId: 'ws2' });
@@ -684,30 +677,41 @@ describe('WorkspaceForm', () => {
     await waitFor(() => expect(mockRefreshCurrentUser).toHaveBeenCalled());
   });
 
-  it('switches to the groups tab when clicked without kicking back to settings', async () => {
+  it('switches to the permissions tab when clicked without kicking back to settings', async () => {
     await act(async () => {
       renderForm('ws2');
     });
     expect(await screen.findByDisplayValue('Team Workspace')).toBeInTheDocument();
 
-    const groupsTabButton = screen.getByRole('tab', { name: 'Groups' });
-    expect(groupsTabButton).toBeInTheDocument();
+    const permissionsTabButton = screen.getByRole('tab', { name: 'Permissions' });
+    expect(permissionsTabButton).toBeInTheDocument();
 
-    await userEvent.click(groupsTabButton);
-    expect(await screen.findByTestId('workspace-groups-tab-content')).toBeInTheDocument();
+    await userEvent.click(permissionsTabButton);
+    expect(await screen.findByTestId('workspace-permissions-tab-content')).toBeInTheDocument();
   });
 
-  it('opens the roles tab from a link that names it', async () => {
-    mockSearchParams.value = 'tab=roles';
+  it('opens the permissions tab from a link that names it', async () => {
+    mockSearchParams.value = 'tab=permissions';
     await act(async () => {
       renderForm('ws2');
     });
 
-    expect(await screen.findByTestId('workspace-roles-tab-content')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Roles' })).toHaveAttribute(
+    expect(await screen.findByTestId('workspace-permissions-tab-content')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Permissions' })).toHaveAttribute(
       'data-testid',
-      'workspace-roles-tab',
+      'workspace-permissions-tab',
     );
+  });
+
+  // Roles, groups and access were tabs of their own before they moved under Permissions.
+  it('opens settings from a link to a tab that no longer exists', async () => {
+    mockSearchParams.value = 'tab=groups';
+    await act(async () => {
+      renderForm('ws2');
+    });
+
+    expect(await screen.findByDisplayValue('Team Workspace')).toBeInTheDocument();
+    expect(screen.queryByTestId('workspace-permissions-tab-content')).not.toBeInTheDocument();
   });
 
   it('keeps the base path in the URL it writes for the selected tab', async () => {
@@ -718,20 +722,11 @@ describe('WorkspaceForm', () => {
     });
     expect(await screen.findByDisplayValue('Team Workspace')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Groups' }));
-    expect(replaceState.mock.calls.at(-1)?.[2]).toBe('/designer-230/en/workspace?tab=groups');
+    await userEvent.click(screen.getByRole('tab', { name: 'Permissions' }));
+    expect(replaceState.mock.calls.at(-1)?.[2]).toBe('/designer-230/en/workspace?tab=permissions');
 
     await userEvent.click(screen.getByRole('tab', { name: 'Settings' }));
     expect(replaceState.mock.calls.at(-1)?.[2]).toBe('/designer-230/en/workspace');
-  });
-
-  it('initializes to the groups tab if tab=groups is present in the URL query', async () => {
-    mockSearchParams.value = 'tab=groups';
-    await act(async () => {
-      renderForm('ws2');
-    });
-
-    expect(await screen.findByTestId('workspace-groups-tab-content')).toBeInTheDocument();
   });
 
   it('opens After Submission from the URL query once the check says it is available', async () => {

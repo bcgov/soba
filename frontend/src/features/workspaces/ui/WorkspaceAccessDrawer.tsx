@@ -25,7 +25,7 @@ import { WorkspaceRoleBadge } from './WorkspaceRoleBadge';
 import WorkspaceAccessForm from './WorkspaceAccessForm';
 import styles from './WorkspaceForm.module.css';
 
-export interface WorkspaceAccessTabProps {
+export interface WorkspaceAccessDrawerProps {
   dict: Dictionary;
   workspaceId: string;
 }
@@ -54,7 +54,7 @@ function removeMessage(
     .replace('{role}', () => role ?? '');
 }
 
-export function WorkspaceAccessTab({ dict, workspaceId }: Readonly<WorkspaceAccessTabProps>) {
+export function WorkspaceAccessDrawer({ dict, workspaceId }: Readonly<WorkspaceAccessDrawerProps>) {
   const t = dict.workspaces.access;
   const { token } = useKeycloak();
   const { addNotification } = useNotificationStore();
@@ -203,7 +203,7 @@ export function WorkspaceAccessTab({ dict, workspaceId }: Readonly<WorkspaceAcce
   const editingId = formView && formView !== 'add' ? formView.membershipId : undefined;
 
   return (
-    <div data-testid="workspace-access-tab-content">
+    <div data-testid="workspace-access-drawer-content">
       <ListPageToolbar>
         <ListPageSearchField
           value={query.searchInput}
@@ -273,4 +273,4 @@ export function WorkspaceAccessTab({ dict, workspaceId }: Readonly<WorkspaceAcce
   );
 }
 
-export default WorkspaceAccessTab;
+export default WorkspaceAccessDrawer;
