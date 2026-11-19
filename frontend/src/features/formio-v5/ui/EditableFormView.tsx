@@ -5,6 +5,7 @@ import type { FormType, Submission } from '@formio/react';
 import { withFilesReadOnly } from '@/src/features/formio-v5/filesReadOnly';
 import { DynamicForm } from './DynamicForm';
 import styles from './EditableFormView.module.css';
+import { useUserChange } from './useUserChange';
 
 /** What an editor reads of the live webform. */
 export type EditableFormInstance = {
@@ -38,13 +39,7 @@ export function EditableFormView({
   const options = useMemo(() => ({ readOnly: false, noAlerts: true }), []);
   const form = useMemo(() => withFilesReadOnly(schema), [schema]);
   const instance = useRef<EditableFormInstance | null>(null);
-  // Whether the user has acted in the form. Form.io changes the answers itself as they load, and
-  // leaves `modified` off for some real edits, such as removing a grid row, so neither the flag nor
-  // a comparison with the loaded answers says what the user changed.
-  const touched = useRef(false);
-  const markTouched = useCallback(() => {
-    touched.current = true;
-  }, []);
+  const { touchProps, isUserChange } = useUserChange();
 
   // A field that loses focus as the form unmounts leaves Form.io a blur to run a moment later on the
   // destroyed webform, where it throws.
@@ -67,8 +62,7 @@ export function EditableFormView({
       className={`formio-v5-chrome ${styles.editing}`}
       data-soba-formio-chrome
       data-testid={testId}
-      onPointerDownCapture={markTouched}
-      onKeyDownCapture={markTouched}
+      {...touchProps}
     >
       <DynamicForm
         className="formio-v5-form-root"
@@ -82,7 +76,7 @@ export function EditableFormView({
           _flags: unknown,
           modified: boolean,
         ) => {
-          if (value?.data && (modified || touched.current)) onDataChange(value.data);
+          if (value?.data && isUserChange(modified)) onDataChange(value.data);
         }}
       />
     </div>

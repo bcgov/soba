@@ -51,6 +51,12 @@ const renderRequest: DocumentRenderRequest = {
   template: { content: Buffer.from('x'), fileType: 'docx' },
   options: {},
   data: {},
+  context: {
+    status: 'draft',
+    printedAt: '2026-11-12T18:00:00.000Z',
+    confirmationCode: null,
+    revisionNo: 1,
+  },
 };
 
 describe('cdogs-v2 plugin', () => {
