@@ -1,17 +1,26 @@
 import { db } from '../../core/db/client';
 import { Features } from '../../core/db/codes';
+import { readJobOutputs, type JobOutputRow } from '../../core/db/repos/jobOutputRepo';
+import type { ChildJob } from '../../core/db/repos/jobRepo';
 import type {
+  PostSubmissionActionJobSettings,
   PostSubmissionActionPluginDefinition,
+  PostSubmissionActionPreviousStep,
   PostSubmissionActionSubmission,
 } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
-import { getEnabledPostSubmissionActionCodes } from '../../core/integrations/post-submission-action/PostSubmissionActionRegistry';
+import {
+  actionStepType,
+  getEnabledPostSubmissionActionCodes,
+} from '../../core/integrations/post-submission-action/PostSubmissionActionRegistry';
 import { getPostSubmissionActionPluginDefinitions } from '../../core/integrations/plugins/PluginRegistry';
 import type { JobFacts } from '../../core/jobs/facts';
+import { resultFacts } from '../../core/jobs/outputs';
 import type { JobTypeDefinition } from '../../core/jobs/registry';
+import { getJobSettings } from '../../core/jobs/settings';
 import { JobCancelledError, JobFailedError } from '../../core/jobs/settlement';
 import { log } from '../../core/logging';
 import { isFeatureAvailable } from '../../core/services/featureAvailabilityService';
-import { ActionJobParamsSchema } from './params';
+import { ActionJobParamsSchema, type ActionJobParams } from './params';
 import { findActionSettingRows, findLiveSubmission, SUBMISSION_GONE } from './repo';
 import { actionFeatureAvailable, isWorkspaceConfigurable } from './resolve';
 import { effectiveAction, formActionScopes, rowsFor } from './rules';
@@ -66,32 +75,94 @@ const runFacts = async (
   };
 };
 
+/** One step of an action, as a job type. */
+interface ActionStep extends PostSubmissionActionJobSettings {
+  type: string;
+}
+
+/** An action's steps in order: the first typed by its code, each later one by `<code>:<name>`. */
+const actionSteps = (plugin: PostSubmissionActionPluginDefinition): ActionStep[] => [
+  { ...plugin.job, type: plugin.code },
+  ...(plugin.steps ?? []).map((step) => ({
+    ...step,
+    type: actionStepType(plugin.code, step.name),
+  })),
+];
+
 /**
- * The job type for one action plugin. Before the plugin runs, the job ends cancelled if the
- * feature or the action was turned off, or the submission is gone; that is how a queued action is
- * stopped. The options are the ones recorded when the submission was received.
+ * The step before a later one, and the result it stored. It succeeded, since a step is queued with
+ * the success of the one before; the job ends cancelled when retention has deleted that one.
  */
-export const actionJobDefinition = (
+export const previousStep = (row: JobOutputRow | undefined): PostSubmissionActionPreviousStep => {
+  if (!row) throw new JobCancelledError('The step before it is gone');
+  return { jobId: row.jobId, result: resultFacts(row) };
+};
+
+const loadPreviousStep = async ({
+  parentJobId,
+}: JobFacts): Promise<PostSubmissionActionPreviousStep> => {
+  const [row] = parentJobId === null ? [] : await readJobOutputs([parentJobId]);
+  return previousStep(row);
+};
+
+/** The next step's job: a child of this step's job with its params as stored, one per parent. */
+export const nextStepJob = (
+  job: JobFacts,
+  next: ActionStep,
+  params: ActionJobParams,
+): ChildJob => ({
+  type: next.type,
+  formId: job.formId,
+  submissionId: job.submissionId,
+  revisionId: job.revisionId,
+  actionConfigId: params.source.settingId,
+  createdBy: job.createdBy,
+  params: job.params,
+  dedupeKey: `${next.type}:${job.id}`,
+  maxAttempts: next.maxAttempts ?? getJobSettings().maxAttempts,
+});
+
+/**
+ * The job type for one step of an action. Before the step runs, the job ends cancelled if the
+ * feature or the action was turned off, or the submission is gone; that is how a queued action is
+ * stopped. The options are the ones recorded when the submission was received. A later step gets
+ * the step before it; the next step is queued in the transaction that records this one as
+ * succeeded.
+ */
+const stepJobDefinition = (
   plugin: PostSubmissionActionPluginDefinition,
+  step: ActionStep,
+  index: number,
+  next: ActionStep | undefined,
 ): JobTypeDefinition => ({
-  type: plugin.code,
-  pool: plugin.job.pool,
-  maxAttempts: plugin.job.maxAttempts,
-  timeoutMs: plugin.job.timeoutMs,
-  resultRetentionDays: plugin.job.resultRetentionDays,
-  keepResultWhenEnded: plugin.job.keepResultWhenEnded,
-  run: async ({ job, signal, log, reportProgress, resultMaxBytes, storeResult }) => {
+  type: step.type,
+  pool: step.pool,
+  maxAttempts: step.maxAttempts,
+  timeoutMs: step.timeoutMs,
+  resultRetentionDays: step.resultRetentionDays,
+  keepResultWhenEnded: step.keepResultWhenEnded,
+  run: async ({
+    job,
+    signal,
+    log,
+    reportProgress,
+    resultMaxBytes,
+    storeResult,
+    queueOnSuccess,
+  }) => {
     const { facts, submission } = await runFacts(plugin, job);
     const reason = cancelReason(facts);
     if (reason || submission === null) throw new JobCancelledError(reason ?? SUBMISSION_GONE);
     if (job.revisionId === null) throw new JobFailedError('The action has no revision to run for');
+    const previous = index === 0 ? null : await loadPreviousStep(job);
     const params = ActionJobParamsSchema.parse(job.params);
     const options = plugin.optionsSchema.parse(params.options);
     // Loaded on run: the services import the submission service, whose module loads the job
     // catalog, which imports this module.
     const { actionResult, actionServices } = await import('./actionServices');
-    await plugin.job.run({
+    await step.run({
       job: { ...job, submissionId: submission.id, revisionId: job.revisionId },
+      previous,
       options,
       source: params.source,
       submission,
@@ -101,12 +172,21 @@ export const actionJobDefinition = (
       signal,
       log,
     });
+    if (next) queueOnSuccess([nextStepJob(job, next, params)]);
   },
 });
 
+/** The job types for one action plugin: one per step. */
+export const actionJobDefinitions = (
+  plugin: PostSubmissionActionPluginDefinition,
+): JobTypeDefinition[] => {
+  const steps = actionSteps(plugin);
+  return steps.map((step, index) => stepJobDefinition(plugin, step, index, steps[index + 1]));
+};
+
 /**
- * One job type per installed action plugin; the start check cancels those not enabled here. Warns
- * once about enabled codes with no plugin; those never run.
+ * The job types for every installed action plugin; the start check cancels those not enabled here.
+ * Warns once about enabled codes with no plugin; those never run.
  */
 export const postSubmissionActionJobs = (): JobTypeDefinition[] => {
   const installed = getPostSubmissionActionPluginDefinitions();
@@ -116,5 +196,5 @@ export const postSubmissionActionJobs = (): JobTypeDefinition[] => {
   if (notInstalled.length > 0) {
     log.warn({ codes: notInstalled }, 'POST_SUBMISSION_ACTION_PLUGINS names plugins not installed');
   }
-  return installed.map(actionJobDefinition);
+  return installed.flatMap(actionJobDefinitions);
 };

@@ -8,6 +8,8 @@ import {
   heartbeatJob,
   queueChildJobs,
   releaseJob,
+  STOPPED_BEFORE_CHILDREN,
+  succeedJobQueuingChildren,
   writeJobProgress,
   type ChildJob,
   type ClaimedJob,
@@ -34,6 +36,8 @@ interface RunningJob {
   stopReason?: JobStopReason;
   /** How the handler asked to end when it threw: no further attempts, or a deferral. */
   ending: HandlerEnding;
+  /** Children the handler asked to queue with its success. */
+  onSuccess: ChildJob[];
   /** The handler has returned; only the outcome write is left. */
   returned: boolean;
   stopHeartbeat: () => void;
@@ -66,7 +70,7 @@ const settlesWithin = async (promise: Promise<unknown>, ms: number): Promise<boo
   }
 };
 
-const recordOutcome = (
+const writeOutcome = (
   job: ClaimedJob,
   outcome: JobOutcome,
   progress: JobProgress | undefined,
@@ -74,6 +78,25 @@ const recordOutcome = (
   if (outcome.kind === 'release') return releaseJob(job.id, job.claimToken);
   if (outcome.kind === 'defer') return releaseJob(job.id, job.claimToken, outcome);
   return finishJob(job.id, job.claimToken, outcome, progress);
+};
+
+/**
+ * Write the outcome, queuing the children asked for on success in the same transaction. The outcome
+ * recorded, which is cancelled for a success with children to queue whose stop was asked for first;
+ * null when the job was no longer held.
+ */
+const recordOutcome = async (
+  job: ClaimedJob,
+  outcome: JobOutcome,
+  progress: JobProgress | undefined,
+  onSuccess: readonly ChildJob[],
+): Promise<JobOutcome | null> => {
+  if (outcome.kind !== 'succeeded' || onSuccess.length === 0) {
+    return (await writeOutcome(job, outcome, progress)) ? outcome : null;
+  }
+  const ended = await succeedJobQueuingChildren(job, onSuccess, progress);
+  if (ended === 'cancelled') return { kind: 'cancelled', error: STOPPED_BEFORE_CHILDREN };
+  return ended ? outcome : null;
 };
 
 const queueChildren = async (
@@ -207,6 +230,7 @@ export class JobRunner {
       job,
       controller: new AbortController(),
       ending: {},
+      onSuccess: [],
       returned: false,
       stopHeartbeat: () => undefined,
       done: Promise.resolve(),
@@ -244,13 +268,13 @@ export class JobRunner {
       }
       // The heartbeat keeps the lease while the outcome is written.
       const recorded = await withRetries(
-        () => recordOutcome(job, outcome, progress.latest()),
+        () => recordOutcome(job, outcome, progress.latest(), entry.onSuccess),
         OUTCOME_WRITE_RETRIES,
         OUTCOME_WRITE_RETRY_MS,
       );
       if (recorded) {
-        const expected = EXPECTED_OUTCOMES.has(outcome.kind);
-        log[expected ? 'info' : 'warn']({ outcome }, OUTCOME_MESSAGES[outcome.kind]);
+        const expected = EXPECTED_OUTCOMES.has(recorded.kind);
+        log[expected ? 'info' : 'warn']({ outcome: recorded }, OUTCOME_MESSAGES[recorded.kind]);
       } else {
         log.warn({ outcome: outcome.kind }, 'Job was no longer held; outcome not recorded');
       }
@@ -290,6 +314,9 @@ export class JobRunner {
             resolveResultOptions(definition, job, this.settings, options),
           ),
         queueChildren: (children) => queueChildren(job, children),
+        queueOnSuccess: (children) => {
+          entry.onSuccess.push(...children);
+        },
       });
       return undefined;
     } catch (err) {

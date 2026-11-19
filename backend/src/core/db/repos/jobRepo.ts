@@ -1,5 +1,17 @@
-import { and, eq, inArray, isNotNull, isNull, lt, lte, or, sql, type SQL } from 'drizzle-orm';
-import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
+import {
+  and,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  notExists,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
+import { alias, type PgUpdateSetSource } from 'drizzle-orm/pg-core';
 import { mapInOrder } from '../../inOrder';
 import { quietDb, type DbOrTx, type Tx } from '../client';
 import { JobStatus } from '../codes';
@@ -57,6 +69,8 @@ export const LEASE_EXPIRED = 'Lease expired';
 
 const afterMs = (ms: number): SQL => sql`now() + ${ms}::int * interval '1 millisecond'`;
 const daysAgo = (days: number): SQL => sql`now() - ${days}::int * interval '1 day'`;
+
+const childJobs = alias(jobs, 'child_job');
 
 const held = (id: string, claimToken: string) =>
   and(eq(jobs.id, id), eq(jobs.claimToken, claimToken), eq(jobs.status, JobStatus.running));
@@ -281,6 +295,9 @@ const finishValues = (finish: JobFinish): PgUpdateSetSource<typeof jobs> => {
   }
 };
 
+const progressValues = (progress?: JobProgress): PgUpdateSetSource<typeof jobs> =>
+  progress ? { progressDone: progress.done, progressTotal: progress.total } : {};
+
 /**
  * Record how a claimed job ended, with the progress it last reported. False when the job was no
  * longer this worker's.
@@ -293,14 +310,49 @@ export const finishJob = async (
 ): Promise<boolean> => {
   const rows = await quietDb
     .update(jobs)
-    .set({
-      ...finishValues(finish),
-      ...(progress ? { progressDone: progress.done, progressTotal: progress.total } : {}),
-    })
+    .set({ ...finishValues(finish), ...progressValues(progress) })
     .where(held(id, claimToken))
     .returning({ id: jobs.id });
   return rows.length > 0;
 };
+
+/** The error a job ends cancelled with when its stop was asked for before its children were queued. */
+export const STOPPED_BEFORE_CHILDREN = 'Stopped before it queued the jobs that follow it';
+
+/**
+ * Record a held job as succeeded and queue its children, in order, in the same transaction, marking
+ * that it queued them. A job whose stop was asked for ends cancelled instead and queues none, so it
+ * can run again. How it ended, or null when it was no longer this worker's.
+ */
+export const succeedJobQueuingChildren = (
+  job: Pick<ClaimedJob, 'id' | 'claimToken' | 'workspaceId'>,
+  children: readonly ChildJob[],
+  progress?: JobProgress,
+): Promise<'succeeded' | 'cancelled' | null> =>
+  quietDb.transaction(async (tx) => {
+    const succeeded = await tx
+      .update(jobs)
+      .set({
+        ...finishValues({ kind: 'succeeded' }),
+        ...progressValues(progress),
+        childrenQueuedAt: sql`now()`,
+      })
+      .where(and(held(job.id, job.claimToken), isNull(jobs.cancelRequestedAt)))
+      .returning({ id: jobs.id });
+    if (succeeded.length > 0) {
+      await mapInOrder(children, (child) => insertJob(tx, childRow(job, child)));
+      return 'succeeded';
+    }
+    const cancelled = await tx
+      .update(jobs)
+      .set({
+        ...finishValues({ kind: 'cancelled', error: STOPPED_BEFORE_CHILDREN }),
+        ...progressValues(progress),
+      })
+      .where(held(job.id, job.claimToken))
+      .returning({ id: jobs.id });
+    return cancelled.length > 0 ? 'cancelled' : null;
+  });
 
 /** A wait a job asked for, and why. */
 export interface JobDeferral {
@@ -370,7 +422,8 @@ export const cancelJob = async (
  * Requeue running jobs whose lease expired (their worker died), or end them as cancelled or dead, then
  * delete up to `retentionBatch` finished jobs past retention. Succeeded jobs use
  * `succeededRetentionDays`; dead and cancelled jobs use `deadRetentionDays`. A job that still points
- * at a result file is kept until the result sweep has removed it.
+ * at a result file is kept until the result sweep has removed it, and one is kept while a child it
+ * queued is queued or running.
  */
 export const sweepJobs = async (retention: {
   retentionBatch: number;
@@ -389,8 +442,20 @@ export const sweepJobs = async (retention: {
     })
     .where(and(eq(jobs.status, JobStatus.running), lt(jobs.leaseUntil, sql`now()`)))
     .returning({ status: jobs.status });
+  // A job whose children are still to run is kept: a later action step reads the step before it.
   const isPastRetention = and(
     isNull(jobs.resultFileId),
+    notExists(
+      quietDb
+        .select({ id: childJobs.id })
+        .from(childJobs)
+        .where(
+          and(
+            eq(childJobs.parentJobId, jobs.id),
+            inArray(childJobs.status, [JobStatus.queued, JobStatus.running]),
+          ),
+        ),
+    ),
     or(
       and(
         eq(jobs.status, JobStatus.succeeded),

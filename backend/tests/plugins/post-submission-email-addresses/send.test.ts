@@ -70,6 +70,7 @@ const run = (
   sendNotices(
     {
       job: { id: 'job-1' } as PostSubmissionActionJob,
+      previous: null,
       options: { to },
       source: { scope: 'form', settingId: 'setting-1', version: 1 },
       submission,

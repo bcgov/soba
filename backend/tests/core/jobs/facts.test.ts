@@ -12,6 +12,7 @@ const row = (overrides: Partial<JobRecord> = {}): JobRecord =>
     formId: 'f1',
     submissionId: 's1',
     revisionId: 'r1',
+    parentJobId: 'parent-1',
     params: { options: {} },
     createdBy: 'actor-1',
     createdAt,
@@ -25,7 +26,7 @@ const row = (overrides: Partial<JobRecord> = {}): JobRecord =>
   }) as JobRecord;
 
 describe('jobFacts', () => {
-  it('gives the ids, params, creator, attempt and first run, and nothing of the claim', () => {
+  it('gives the ids, parent, params, creator, attempt and first run, and nothing of the claim', () => {
     expect(jobFacts(row())).toEqual({
       id: 'job-1',
       type: 'post-submission-log',
@@ -33,6 +34,7 @@ describe('jobFacts', () => {
       formId: 'f1',
       submissionId: 's1',
       revisionId: 'r1',
+      parentJobId: 'parent-1',
       params: { options: {} },
       createdBy: 'actor-1',
       createdAt,

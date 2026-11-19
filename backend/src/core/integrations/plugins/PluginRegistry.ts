@@ -90,10 +90,22 @@ const hasParsers = (value: unknown): boolean =>
   typeof (value as { parse?: unknown }).parse === 'function' &&
   typeof (value as { safeParse?: unknown }).safeParse === 'function';
 
-// The code is also a job type and a URL segment, so it is lowercase words joined by dashes. Strict
-// at the top level and in job: a misspelled optional key would otherwise read as unset.
+const DashedNameSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+
+const ActionJobSettingsShape = {
+  pool: z.enum(['light', 'heavy']),
+  maxAttempts: z.number().int().positive().optional(),
+  timeoutMs: z.number().int().positive().optional(),
+  resultRetentionDays: z.number().int().positive().max(MAX_RETENTION_DAYS).optional(),
+  keepResultWhenEnded: z.boolean().optional(),
+  run: z.custom((value) => typeof value === 'function', 'Expected a function'),
+};
+
+// The code is also a job type and a URL segment, and a step's name is part of its job type, so both
+// are lowercase words joined by dashes. Strict at the top level, in job and in each step: a
+// misspelled optional key would otherwise read as unset.
 const PostSubmissionActionPluginDefinitionSchema = z.strictObject({
-  code: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  code: DashedNameSchema,
   metadata: z.object({
     code: z.string(),
     name: z.string(),
@@ -104,14 +116,14 @@ const PostSubmissionActionPluginDefinitionSchema = z.strictObject({
   scopes: z.array(PostSubmissionActionScopeSchema).min(1),
   submits: z.enum(['every', 'first']).optional(),
   optionsSchema: z.custom(hasParsers, 'Expected a schema with parse and safeParse'),
-  job: z.strictObject({
-    pool: z.enum(['light', 'heavy']),
-    maxAttempts: z.number().int().positive().optional(),
-    timeoutMs: z.number().int().positive().optional(),
-    resultRetentionDays: z.number().int().positive().max(MAX_RETENTION_DAYS).optional(),
-    keepResultWhenEnded: z.boolean().optional(),
-    run: z.custom((value) => typeof value === 'function', 'Expected a function'),
-  }),
+  job: z.strictObject(ActionJobSettingsShape),
+  steps: z
+    .array(z.strictObject({ name: DashedNameSchema, ...ActionJobSettingsShape }))
+    .refine(
+      (steps) => new Set(steps.map((step) => step.name)).size === steps.length,
+      'Step names must be unique',
+    )
+    .optional(),
 });
 
 // --- Discovery --------------------------------------------------------------

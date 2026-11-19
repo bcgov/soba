@@ -35,6 +35,7 @@ describe('post-submission-log', () => {
     const source = { scope: 'form' as const, settingId: 'setting-1', version: 2 };
     await plugin.job.run({
       job: { id: 'job-1', submissionId: 's1', revisionId: 'r1' } as PostSubmissionActionJob,
+      previous: null,
       options: { note: 'private words' },
       source,
       submission: {

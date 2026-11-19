@@ -21,7 +21,7 @@ export interface JobContext {
   /**
    * Aborted when the job is cancelled, times out, loses its lease, or the pod shuts down; the reason
    * is the `JobStopReason`. The handler must then stop and throw: returning records the job as
-   * succeeded.
+   * succeeded, or cancelled when it has children to queue on success and a stop was asked for.
    */
   signal: AbortSignal;
   log: Logger;
@@ -45,6 +45,13 @@ export interface JobContext {
    * taken. Throws when the job is no longer this worker's, so the attempt retries.
    */
   queueChildren: (children: readonly ChildJob[]) => Promise<(string | null)[]>;
+  /**
+   * Queue child jobs in the transaction that records this attempt as succeeded, and record that this
+   * job queued them; an attempt that ends any other way queues none. A stop asked for before then
+   * ends the job cancelled instead, so it can run again, unless `queueChildren` already queued
+   * children in this run. Each call adds to the list.
+   */
+  queueOnSuccess: (children: readonly ChildJob[]) => void;
 }
 
 export interface JobTypeDefinition {

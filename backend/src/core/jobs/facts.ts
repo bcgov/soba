@@ -20,6 +20,8 @@ export interface JobFacts {
   formId: string | null;
   submissionId: string | null;
   revisionId: string | null;
+  /** The job that queued this one; null for a job queued by a request, or once that job is gone. */
+  parentJobId: string | null;
   /** Ids and options only, never answer data. */
   params: Record<string, unknown>;
   createdBy: string;
@@ -37,6 +39,7 @@ export const jobFacts = (row: JobRecord): JobFacts => ({
   formId: row.formId,
   submissionId: row.submissionId,
   revisionId: row.revisionId,
+  parentJobId: row.parentJobId,
   params: row.params,
   createdBy: row.createdBy,
   createdAt: row.createdAt,

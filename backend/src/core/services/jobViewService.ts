@@ -28,6 +28,7 @@ import {
 } from '../db/repos/notificationAuditRepo';
 import { ConflictError, NotFoundError } from '../errors';
 import { isHandledSend, isRefusedSend } from '../integrations/notification/sendOutcome';
+import { actionStepType } from '../integrations/post-submission-action/PostSubmissionActionRegistry';
 import { getPostSubmissionActionPluginDefinitions } from '../integrations/plugins/PluginRegistry';
 import { nudgeJobs } from '../jobs';
 import { getJobRegistry } from '../jobs/catalog';
@@ -302,11 +303,23 @@ const TYPE_NAMES: Record<string, string> = {
   [JobType.submission_email_copy]: 'Submitter email copy',
 };
 
-/** The job types this environment runs, named for the admin filter. */
+/**
+ * The job types this environment runs, named for the admin filter. An action's later step is named
+ * by the action, then the step.
+ */
 export const listJobTypes = (): JobTypeItem[] => {
   const registry = getJobRegistry();
   const pluginNames = new Map(
-    getPostSubmissionActionPluginDefinitions().map((plugin) => [plugin.code, plugin.metadata.name]),
+    getPostSubmissionActionPluginDefinitions().flatMap((plugin) => [
+      [plugin.code, plugin.metadata.name] as const,
+      ...(plugin.steps ?? []).map(
+        (step) =>
+          [
+            actionStepType(plugin.code, step.name),
+            `${plugin.metadata.name} (${step.name})`,
+          ] as const,
+      ),
+    ]),
   );
   return Object.values(JobPool)
     .flatMap((pool) => registry.typesIn(pool))

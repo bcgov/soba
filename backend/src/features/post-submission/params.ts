@@ -23,3 +23,5 @@ export const ActionJobParamsSchema = z.object({
   options: z.record(z.string(), z.unknown()),
   source: SourceSchema,
 });
+
+export type ActionJobParams = z.infer<typeof ActionJobParamsSchema>;
