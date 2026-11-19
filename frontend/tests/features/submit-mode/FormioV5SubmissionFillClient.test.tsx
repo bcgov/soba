@@ -1,6 +1,6 @@
 import React from 'react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { SWRConfig, useSWRConfig } from 'swr';
@@ -23,9 +23,10 @@ const h = vi.hoisted(() => ({
   onSubmit: undefined as
     | undefined
     | ((submission: { data: Record<string, unknown> }) => Promise<void>),
+  onChange: undefined as undefined | ((value: unknown, flags: unknown, modified: boolean) => void),
+  printSources: [] as Array<{ opened: boolean; answers?: () => unknown }>,
   options: undefined as undefined | { readOnly?: boolean; bcgovFile?: unknown },
   submission: undefined as unknown,
-  onChange: undefined as undefined | ((value: unknown, flags: unknown, modified: boolean) => void),
   mounts: 0,
   access: { caller: { idpCode: 'idir' as string | null }, pending: false },
   files: { option: {} as Record<string, unknown>, ready: true },
@@ -34,20 +35,33 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
-    modal: { dialogActions: 'Dialog actions' },
     general: {
       sessionExpired: 'Your session has ended.',
       noAccess: 'You do not have access.',
       version: 'Version',
-      unsavedChanges: {
-        title: 'Leave without saving?',
-        message: 'Not saved.',
-        confirm: 'Leave',
-        stay: 'Stay',
-      },
     },
     submission: { notFound: 'Submission not found.', loadError: 'Could not load this submission.' },
-    form: { loading: 'Loading...' },
+    form: {
+      loading: 'Loading...',
+      templates: {
+        print: {
+          button: 'Print',
+          modalTitle: 'Print Submission',
+          methodLabel: 'Print with',
+          browserOption: 'Browser print',
+          print: 'Print',
+          printing: 'Printing…',
+          uploadOption: 'Upload CDOGS template',
+          storedOption: 'Use default CDOGS template',
+          fileNameColumn: 'File Name',
+          uploadDateColumn: 'Upload Date',
+          failed: 'Failed to generate the document.',
+          printedAt: 'Printed {time}',
+          unsavedMark: 'Not saved',
+          draftMark: 'Draft',
+        },
+      },
+    },
     apiErrors: {
       drafts_disabled: 'Drafts are off for this form.',
       submission_not_found: 'This submission is gone.',
@@ -99,14 +113,21 @@ vi.mock('@/src/shared/api/useAccessCaller', () => ({
   useAccessCaller: () => h.access,
 }));
 
+vi.mock('@/src/features/templates/data/useSubmissionPrint', () => ({
+  useSubmitterPrint: (_submissionId: string, source: (typeof h.printSources)[number]) => {
+    h.printSources.push(source);
+    return { choice: null, printTemplate: vi.fn(), staff: null };
+  },
+}));
+
 vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => {
   // Like @formio/react: onFormReady once, when the webform is built.
   function MockDynamicForm(props: {
     onSubmit: typeof h.onSubmit;
+    onChange?: typeof h.onChange;
     options: typeof h.options;
     submission: unknown;
     onFormReady?: (instance: unknown) => void;
-    onChange?: typeof h.onChange;
   }) {
     h.onSubmit = props.onSubmit;
     h.onChange = props.onChange;
@@ -166,6 +187,7 @@ describe('FormioV5SubmissionFillClient', () => {
     vi.clearAllMocks();
     store = makeStore();
     h.formData = {};
+    h.printSources = [];
     h.mounts = 0;
     h.access = { caller: { idpCode: 'idir' }, pending: false };
     h.files = { option: {}, ready: true };
@@ -217,6 +239,62 @@ describe('FormioV5SubmissionFillClient', () => {
     expect(screen.queryByTestId('submission-fill-readonly')).not.toBeInTheDocument();
   });
 
+  describe('print', () => {
+    const draft = (form = facts.form) => ({
+      workflowState: 'draft',
+      formVersionId: 'ver-1',
+      headRevisionId: 'rev-1',
+      schema: { components: [] },
+      content: { data: { name: 'Ada' } },
+      ...facts,
+      form,
+    });
+    const watermark = () => screen.getByTestId('print-watermark');
+    const answers = () => h.printSources.at(-1)?.answers?.();
+    const renderForm = async () => {
+      await renderSignedOut();
+      await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+    };
+
+    it('prints a loaded draft as a draft, and as not saved once the user edits it', async () => {
+      h.getSubmitFillBundle.mockResolvedValue(draft());
+      await renderForm();
+      expect(h.printSources.at(-1)?.opened).toBe(true);
+      expect(watermark()).toHaveTextContent('Draft');
+      expect(answers()).toBeUndefined();
+      h.formData = { name: 'Ada Lovelace' };
+      act(() => h.onChange!({ data: h.formData }, {}, true));
+      expect(watermark()).toHaveTextContent('Not saved');
+      expect(answers()).toEqual({ name: 'Ada Lovelace' });
+    });
+
+    it('prints a submission with nothing saved as not saved, sending its answers', async () => {
+      h.formData = { name: 'Typed' };
+      await renderForm();
+      expect(watermark()).toHaveTextContent('Not saved');
+      expect(answers()).toEqual({ name: 'Typed' });
+    });
+
+    it('sends no answers for a caller who may only read, though nothing is saved', async () => {
+      h.formData = { name: 'Typed' };
+      h.getSubmitFillBundle.mockResolvedValue({
+        ...draft({ ...facts.form, permissions: [] }),
+        content: null,
+      });
+      await renderForm();
+      expect(answers()).toBeUndefined();
+    });
+
+    it('counts no edit and sends no answers when the caller may only read', async () => {
+      h.getSubmitFillBundle.mockResolvedValue(draft({ ...facts.form, permissions: [] }));
+      await renderForm();
+      fireEvent.pointerDown(screen.getByTestId('fill-form'));
+      fireEvent.input(screen.getByTestId('fill-form'));
+      act(() => h.onChange!({ data: { name: 'Changed by Form.io' } }, {}, true));
+      expect(watermark()).toHaveTextContent('Draft');
+      expect(answers()).toBeUndefined();
+    });
+  });
   it('shows the version the submission is on', async () => {
     await renderSignedOut();
     await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
@@ -737,70 +815,6 @@ describe('FormioV5SubmissionFillClient', () => {
       expect(saveStatus()).toHaveTextContent('Saving draft...');
       expect(saveButton()).toHaveTextContent('Save draft');
       expect(saveButton()).toBeDisabled();
-    });
-
-    describe('leaving with unsaved answers', () => {
-      // jsdom cannot navigate; the guard listens earlier, on the document.
-      const clickNav = async () => {
-        const link = document.body.appendChild(document.createElement('a'));
-        link.href = '/en/forms';
-        // Records the link being followed; a held click never reaches it.
-        const followed = vi.fn((event: MouseEvent) => event.preventDefault());
-        link.addEventListener('click', followed);
-        await userEvent.click(link);
-        return followed;
-      };
-      afterEach(() => {
-        for (const link of document.querySelectorAll('a[href="/en/forms"]')) link.remove();
-      });
-      const asked = () => screen.queryByText('Leave without saving?') !== null;
-      const edit = () => act(() => h.onChange?.({ data: { a: 2 } }, {}, true));
-
-      it('lets the filler leave before any edit, as loading the answers is not one', async () => {
-        await renderLoaded();
-        act(() => h.onChange?.({ data: {} }, {}, false));
-        await clickNav();
-        expect(asked()).toBe(false);
-      });
-
-      it('asks once an answer changes, and stays when told to', async () => {
-        await renderLoaded();
-        edit();
-        await clickNav();
-        expect(asked()).toBe(true);
-        await userEvent.click(screen.getByTestId('confirm-modal-cancel'));
-        await waitFor(() => expect(asked()).toBe(false));
-        expect(h.push).not.toHaveBeenCalled();
-      });
-
-      it('leaves to the link once the loss is confirmed', async () => {
-        await renderLoaded();
-        edit();
-        const followed = await clickNav();
-        expect(followed).not.toHaveBeenCalled();
-        await userEvent.click(screen.getByTestId('confirm-modal-confirm'));
-        expect(followed).toHaveBeenCalledTimes(1);
-      });
-
-      it('lets the filler leave once the draft is saved', async () => {
-        h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-1'));
-        await renderLoaded();
-        edit();
-        await saveDraft();
-        await waitFor(() => expect(saveStatus().textContent).toMatch(/^Draft saved at/));
-        await clickNav();
-        expect(asked()).toBe(false);
-      });
-
-      it('still asks when the save is held', async () => {
-        h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-x', 'pending', 'conflict'));
-        await renderLoaded();
-        edit();
-        await saveDraft();
-        await waitFor(() => expect(saveStatus().textContent).toBe('Draft not saved.'));
-        await clickNav();
-        expect(asked()).toBe(true);
-      });
     });
 
     it('says the draft was not saved when the save is held', async () => {

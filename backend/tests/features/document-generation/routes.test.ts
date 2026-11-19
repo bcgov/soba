@@ -92,8 +92,21 @@ describe('POST /:id/print', () => {
     expect(print).not.toHaveBeenCalled();
   });
 
-  it('refuses a body field the print does not take with 400', async () => {
+  it('passes the answers on screen to the print', async () => {
     const res = await postPrint({ templateId: TEMPLATE, data: { field: 'x' } });
+    expect(res.status).toBe(200);
+    expect(print).toHaveBeenCalledWith(expect.anything(), {
+      submissionId: SUBMISSION,
+      templateId: TEMPLATE,
+      data: { field: 'x' },
+    });
+  });
+
+  it.each([
+    ['answers that are not an object', { data: ['x'] }],
+    ['a body field the print does not take', { extra: 'x' }],
+  ])('refuses %s with 400', async (_label, fields) => {
+    const res = await postPrint({ templateId: TEMPLATE, ...fields });
     expect(res.status).toBe(400);
     expect(print).not.toHaveBeenCalled();
   });

@@ -1,4 +1,5 @@
 import './globals.css';
+import './print.css';
 
 const DEFAULT_API_BASE_URL = 'http://localhost:4000/chefs/api/v1';
 
