@@ -21,10 +21,6 @@ vi.mock('@/src/shared/api/useCurrentUser', () => ({
   useCurrentUser: () => currentUser,
 }));
 
-vi.mock('@/src/shared/list/listQueryMemory', () => ({
-  navLink: (href: string) => href,
-}));
-
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
     locale: 'en',
@@ -87,16 +83,16 @@ describe('SideNav', () => {
     await renderNav();
 
     expect(navTestIds()).toEqual([]);
-    expect(screen.getByTestId('feedback-nav').closest('li')).toHaveAttribute('hidden');
-    expect(screen.getByTestId('help-nav').closest('li')).toHaveAttribute('hidden');
+    expect(screen.getByTestId('feedback-nav')).not.toBeVisible();
+    expect(screen.getByTestId('help-nav')).not.toBeVisible();
   });
 
   it('keeps feedback and help links hidden for a signed-out visitor', async () => {
     await renderNav(COMBINED);
 
     expect(navTestIds()).toEqual([]);
-    expect(screen.getByTestId('feedback-nav').closest('li')).toHaveAttribute('hidden');
-    expect(screen.getByTestId('help-nav').closest('li')).toHaveAttribute('hidden');
+    expect(screen.getByTestId('feedback-nav')).not.toBeVisible();
+    expect(screen.getByTestId('help-nav')).not.toBeVisible();
   });
 
   it('links design mode to forms and workspaces', async () => {
