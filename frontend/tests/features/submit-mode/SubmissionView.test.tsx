@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import { Provider } from 'react-redux';
@@ -59,8 +59,40 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
   getSubmitSubmissionData: (...args: unknown[]) => getSubmitSubmissionData(...args),
 }));
 
+// Keycloak is the external boundary for the sign-in cases; the slice and store stay real.
+const kc = vi.hoisted(() => ({
+  token: undefined as string | undefined,
+  authenticated: false,
+  idTokenParsed: undefined,
+  init: vi.fn(),
+  login: vi.fn(),
+  logout: vi.fn(),
+  updateToken: vi.fn(),
+}));
+// A function expression, not an arrow: the slice calls `new Keycloak(...)`.
+vi.mock('keycloak-js', () => ({
+  default: vi.fn(function () {
+    return kc;
+  }),
+}));
+vi.mock('@/src/shared/config/runtimeConfig', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/src/shared/config/runtimeConfig')>()),
+  loadFrontendRuntimeConfig: vi.fn().mockResolvedValue({
+    auth: { keycloak: { url: 'http://kc.test', realm: 'r', clientId: 'c' } },
+  }),
+}));
+vi.mock('@/src/features/formio-v5/disableFormioBrowserAuth', () => ({
+  disableFormioBrowserAuth: vi.fn(),
+}));
+
 import makeStore from '@/lib/store';
-import { initKeycloak, setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
+import {
+  clear,
+  initKeycloak,
+  logout,
+  setAuthenticated,
+  setToken,
+} from '@/lib/slices/keycloakSlice';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
 import { SubmissionView } from '@/src/features/submit-mode/ui/SubmissionView';
 import { ReadOnlyFormView } from '@/src/features/formio-v5/ui/ReadOnlyFormView';
@@ -385,6 +417,65 @@ describe('SubmissionView', () => {
 
     await waitFor(() => expect(screen.getByText('Signed in view')).toBeInTheDocument());
     expect(getSubmitSubmission).toHaveBeenCalledWith('token', 'sub-1');
+  });
+
+  describe('signed-out refusal', () => {
+    const refused = new ApiError('Not authorized to access this submission', 401, 'read_denied');
+
+    // Boots Keycloak through the real slice, as the header does on page load.
+    const boot = async (signedIn: boolean) => {
+      kc.authenticated = signedIn;
+      kc.token = signedIn ? 'token' : undefined;
+      kc.init.mockResolvedValueOnce(signedIn);
+      await act(async () => {
+        await store.dispatch(initKeycloak());
+      });
+    };
+
+    beforeEach(() => {
+      store.dispatch(clear());
+      store = makeStore();
+      kc.logout.mockReturnValue(new Promise(() => undefined));
+    });
+
+    afterEach(() => {
+      store.dispatch(clear());
+    });
+
+    it('sends a signed-out visitor refused with 401 to sign in, back to this address', async () => {
+      await boot(false);
+      getSubmitSubmission.mockRejectedValue(refused);
+      kc.init.mockRejectedValueOnce(
+        new Error("A 'Keycloak' instance can only be initialized once."),
+      );
+
+      await renderView();
+
+      await waitFor(() =>
+        expect(kc.login).toHaveBeenCalledWith({ redirectUri: globalThis.location.href }),
+      );
+      expect(screen.queryByTestId('submission-view-loaderror')).not.toBeInTheDocument();
+    });
+
+    // clear() turns the read anonymous and it is refused; signing in then would cancel the logout.
+    it('does not send someone logging out back to sign in', async () => {
+      const submission = await getSubmitSubmission();
+      await boot(true);
+      getSubmitSubmission.mockImplementation((token: string | undefined) =>
+        token ? Promise.resolve(submission) : Promise.reject(refused),
+      );
+      await renderView();
+      await screen.findByTestId('submission-view-form');
+
+      await act(async () => {
+        store.dispatch(logout());
+      });
+
+      await waitFor(() => expect(getSubmitSubmission).toHaveBeenCalledWith(undefined, 'sub-1'));
+      expect(kc.logout).toHaveBeenCalled();
+      expect(kc.login).not.toHaveBeenCalled();
+      expect(kc.init).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('email receipt', () => {

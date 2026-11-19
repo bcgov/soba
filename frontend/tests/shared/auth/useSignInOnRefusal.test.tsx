@@ -36,6 +36,7 @@ describe('useSignInOnRefusal', () => {
 
   it.each([
     ['a signed-in caller refused with 403', { authenticated: true }, refusal(403)],
+    ['a 401 to a signed-in caller', { authenticated: true }, refusal(401)],
     ['a 401 before Keycloak starts', { initStarted: false }, refusal(401)],
     ['a 401 while Keycloak initializes', { initializing: true }, refusal(401)],
     ['a 401 when Keycloak could not be reached', { error: 'unreachable' }, refusal(401)],

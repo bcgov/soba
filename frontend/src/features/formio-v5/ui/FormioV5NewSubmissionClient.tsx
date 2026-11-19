@@ -34,7 +34,8 @@ import type { SubmitFillBundle } from '@/src/types/forms';
 /** A form or schema read failure, with the form's copy: refused as an open would be. */
 function FormLoadAlert({ error, labels }: Readonly<{ error: DataError; labels: FillLabels }>) {
   const authDefaults = useAuthErrorDefaults();
-  if (useSignInOnRefusal(error)) return <CenteredProgress label={labels.loading} />;
+  const signingIn = useSignInOnRefusal(error);
+  if (signingIn) return <CenteredProgress label={labels.loading} />;
   const coded = apiErrorMessage(error.cause, labels.errors);
   return (
     <LoadErrorAlert

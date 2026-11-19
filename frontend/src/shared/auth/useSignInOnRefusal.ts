@@ -6,9 +6,8 @@ import type { DataError } from '@/src/shared/api/dataContracts';
 import { isUnauthorized } from '@/src/shared/api/dataError';
 
 /**
- * Sends a signed-out visitor the server refused (401) to sign in, back to this address. True while
- * that redirect is under way. A signed-in caller is refused with 403, so it never loops; with
- * Keycloak unreachable the caller shows its alert rather than wait on a redirect that cannot happen.
+ * Sends a signed-out visitor refused with 401 to sign in, back here; true while redirecting. Not
+ * when signed in or Keycloak is down. Back from sign-in redirects again; a failed one keeps spinning.
  */
 export function useSignInOnRefusal(error: DataError | null): boolean {
   const { authenticated, initializing, initStarted, error: keycloakError, login } = useKeycloak();

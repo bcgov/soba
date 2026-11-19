@@ -40,6 +40,13 @@ describe('SubmissionLoadAlert', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('does not send a signed-in caller to sign in again on a 401', () => {
+    h.kc.authenticated = true;
+    render(<SubmissionLoadAlert error={refused(401)} />);
+    expect(h.kc.login).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toBeTruthy();
+  });
+
   it('shows the refusal to a signed-in caller refused with 403', () => {
     h.kc.authenticated = true;
     render(<SubmissionLoadAlert error={refused(403)} />);

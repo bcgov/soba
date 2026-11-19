@@ -12,7 +12,8 @@ import { LoadErrorAlert } from '@/src/shared/ui/LoadErrorAlert';
 export function SubmissionLoadAlert({ error }: Readonly<{ error: DataError }>) {
   const dict = useDictionary();
   const authDefaults = useAuthErrorDefaults();
-  if (useSignInOnRefusal(error)) return <CenteredProgress label={dict.general.loading} />;
+  const signingIn = useSignInOnRefusal(error);
+  if (signingIn) return <CenteredProgress label={dict.general.loading} />;
   return (
     <LoadErrorAlert
       error={error}
