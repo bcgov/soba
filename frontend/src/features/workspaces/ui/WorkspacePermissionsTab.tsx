@@ -16,22 +16,25 @@ export function WorkspacePermissionsTab({
   workspaceId,
 }: Readonly<WorkspacePermissionsTabProps>) {
   const t = dict.workspaces;
+  const defExpanded = ['workspace-access'];
 
   return (
-    <AccordionGroup allowsMultipleExpanded={false} defaultExpandedKeys={['workspace-roles']}>
-      <Accordion id="workspace-roles" data-testid="accordion-workspace-roles" label={t.rolesTab}>
+    <AccordionGroup allowsMultipleExpanded={false} defaultExpandedKeys={defExpanded}>
+      <Accordion id="workspace-access" data-testid="accordion-workspace-access" label={t.accessTab}>
         <div className="d-block w-100">
-          <WorkspaceRoleDrawer dict={dict} workspaceId={workspaceId} />
+          <WorkspaceAccessDrawer dict={dict} workspaceId={workspaceId} />
         </div>
       </Accordion>
+
       <Accordion id="workspace-groups" data-testid="accordion-workspace-groups" label={t.groupsTab}>
         <div className="d-block w-100">
           <WorkspaceGroupDrawer dict={dict} workspaceId={workspaceId} />
         </div>
       </Accordion>
-      <Accordion id="workspace-access" data-testid="accordion-workspace-access" label={t.accessTab}>
+
+      <Accordion id="workspace-roles" data-testid="accordion-workspace-roles" label={t.rolesTab}>
         <div className="d-block w-100">
-          <WorkspaceAccessDrawer dict={dict} workspaceId={workspaceId} />
+          <WorkspaceRoleDrawer dict={dict} workspaceId={workspaceId} />
         </div>
       </Accordion>
     </AccordionGroup>
