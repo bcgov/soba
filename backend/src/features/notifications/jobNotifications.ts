@@ -1,4 +1,3 @@
-import type { ClaimedJob } from '../../core/db/repos/jobRepo';
 import {
   countNotificationsSince,
   listJobNotificationSends,
@@ -14,9 +13,10 @@ import {
   isSentSend,
   REFUSED_HTTP_STATUSES,
 } from '../../core/integrations/notification/sendOutcome';
+import type { JobFacts } from '../../core/jobs/facts';
 import { notificationService } from './service';
 
-const countScope = (scope: NotificationSendScope, job: ClaimedJob): NotificationCountScope => {
+const countScope = (scope: NotificationSendScope, job: JobFacts): NotificationCountScope => {
   if (scope === 'environment') return { kind: 'environment' };
   if (scope === 'workspace' || job.formId === null)
     return { kind: 'workspace', id: job.workspaceId };
@@ -28,7 +28,7 @@ const countScope = (scope: NotificationSendScope, job: ClaimedJob): Notification
  * attributed to the user `actorId` resolves to, read at each send.
  */
 export const jobNotifications = (
-  job: ClaimedJob,
+  job: JobFacts,
   actorId: () => Promise<string>,
 ): JobNotifications => ({
   enabled: () => notificationService.enabled(),
@@ -52,10 +52,10 @@ export const jobNotifications = (
     return {
       recipients: new Set(
         sends
-          .filter((send) => isHandledForRun(send, job.lastRequeuedAt))
+          .filter((send) => isHandledForRun(send, job.run.queuedAt))
           .flatMap((send) => send.recipients.to),
       ),
-      runStarted: hasRunStarted(sends, job.lastRequeuedAt),
+      runStarted: hasRunStarted(sends, job.run.queuedAt),
       anySent: sends.some(isSentSend),
     };
   },

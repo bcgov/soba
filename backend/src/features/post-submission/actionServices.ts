@@ -2,7 +2,6 @@ import type { Logger } from 'pino';
 import { validate as isUuid } from 'uuid';
 import { getFormEngineCodeForForm } from '../../core/db/repos/formRepo';
 import { getFormVersionById } from '../../core/db/repos/formVersionRepo';
-import type { ClaimedJob } from '../../core/db/repos/jobRepo';
 import { findSubmissionRevisionContent } from '../../core/db/repos/submissionRepo';
 import type {
   PostSubmissionActionResult,
@@ -11,6 +10,7 @@ import type {
   PostSubmissionActionUpload,
 } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
 import { getTempStorageAdapter } from '../../core/integrations/plugins/PluginRegistry';
+import type { JobFacts } from '../../core/jobs/facts';
 import type { JobContext } from '../../core/jobs/registry';
 import { SubmissionService } from '../../core/services/submissionService';
 import { jobDocumentService } from '../document-generation/service';
@@ -59,7 +59,7 @@ const openUpload = async (
  * the system user.
  */
 export const actionServices = (
-  job: ClaimedJob,
+  job: JobFacts,
   submission: PostSubmissionActionSubmission,
   log: Logger,
 ): PostSubmissionActionServices => ({

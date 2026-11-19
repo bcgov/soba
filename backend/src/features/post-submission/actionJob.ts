@@ -1,14 +1,14 @@
 import { db } from '../../core/db/client';
 import { Features } from '../../core/db/codes';
-import type { ClaimedJob } from '../../core/db/repos/jobRepo';
 import type {
   PostSubmissionActionPluginDefinition,
   PostSubmissionActionSubmission,
 } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
 import { getEnabledPostSubmissionActionCodes } from '../../core/integrations/post-submission-action/PostSubmissionActionRegistry';
 import { getPostSubmissionActionPluginDefinitions } from '../../core/integrations/plugins/PluginRegistry';
+import type { JobFacts } from '../../core/jobs/facts';
 import type { JobTypeDefinition } from '../../core/jobs/registry';
-import { JobCancelledError } from '../../core/jobs/settlement';
+import { JobCancelledError, JobFailedError } from '../../core/jobs/settlement';
 import { log } from '../../core/logging';
 import { isFeatureAvailable } from '../../core/services/featureAvailabilityService';
 import { ActionJobParamsSchema } from './params';
@@ -37,7 +37,7 @@ export const cancelReason = (facts: ActionRunFacts): string | null => {
 
 const runFacts = async (
   plugin: PostSubmissionActionPluginDefinition,
-  job: ClaimedJob,
+  job: JobFacts,
 ): Promise<{ facts: ActionRunFacts; submission: PostSubmissionActionSubmission | null }> => {
   const scope = { workspaceId: job.workspaceId, formId: job.formId ?? undefined };
   const [postSubmissionAvailable, featureAvailable, workspaceConfigurable, submission, rows] =
@@ -84,13 +84,14 @@ export const actionJobDefinition = (
     const { facts, submission } = await runFacts(plugin, job);
     const reason = cancelReason(facts);
     if (reason || submission === null) throw new JobCancelledError(reason ?? SUBMISSION_GONE);
+    if (job.revisionId === null) throw new JobFailedError('The action has no revision to run for');
     const params = ActionJobParamsSchema.parse(job.params);
     const options = plugin.optionsSchema.parse(params.options);
     // Loaded on run: the services import the submission service, whose module loads the job
     // catalog, which imports this module.
     const { actionResult, actionServices } = await import('./actionServices');
     await plugin.job.run({
-      job,
+      job: { ...job, submissionId: submission.id, revisionId: job.revisionId },
       options,
       source: params.source,
       submission,

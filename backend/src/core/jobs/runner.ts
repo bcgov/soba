@@ -13,6 +13,7 @@ import {
   type ClaimedJob,
   type JobProgress,
 } from '../db/repos/jobRepo';
+import { jobFacts } from './facts';
 import type { JobRegistry } from './registry';
 import { createProgressReporter, resolveResultOptions, storeJobResult } from './results';
 import { OUTCOME_WRITE_RETRIES, OUTCOME_WRITE_RETRY_MS } from './settings';
@@ -274,7 +275,7 @@ export class JobRunner {
       timeoutMs = definition.timeoutMs ?? timeoutMs;
       timer = setTimeout(() => this.abort(entry, 'timeout'), timeoutMs);
       await definition.run({
-        job,
+        job: jobFacts(job),
         signal: controller.signal,
         log,
         reportProgress,

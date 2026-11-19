@@ -1,6 +1,7 @@
 import { db } from '../../core/db/client';
-import type { ChildJob, ClaimedJob } from '../../core/db/repos/jobRepo';
+import type { ChildJob } from '../../core/db/repos/jobRepo';
 import { findInstalledPostSubmissionAction } from '../../core/integrations/post-submission-action/PostSubmissionActionRegistry';
+import type { JobFacts } from '../../core/jobs/facts';
 import type { JobContext } from '../../core/jobs/registry';
 import { getJobSettings } from '../../core/jobs/settings';
 import { JobCancelledError } from '../../core/jobs/settlement';
@@ -10,7 +11,7 @@ import type { SubmittedAction } from './resolve';
 
 /** One action's job: a child of the submitted job, at most one per action and revision. */
 export const childJob = (
-  parent: ClaimedJob,
+  parent: JobFacts,
   action: SubmittedAction,
   maxAttempts: number,
 ): ChildJob => ({

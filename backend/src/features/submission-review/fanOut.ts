@@ -1,5 +1,6 @@
 import { db } from '../../core/db/client';
-import type { ChildJob, ClaimedJob } from '../../core/db/repos/jobRepo';
+import type { ChildJob } from '../../core/db/repos/jobRepo';
+import type { JobFacts } from '../../core/jobs/facts';
 import type { JobContext } from '../../core/jobs/registry';
 import { JobCancelledError } from '../../core/jobs/settlement';
 import { isSubmissionLive, SUBMISSION_GONE } from '../post-submission/repo';
@@ -11,7 +12,7 @@ import { reactionAttempts, type StatusReaction } from './statusReactions';
  * the options recorded for it.
  */
 export const reactionJob = (
-  parent: ClaimedJob,
+  parent: JobFacts,
   statusChangeId: string,
   reaction: StatusReaction,
   maxAttempts: number,

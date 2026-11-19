@@ -1,8 +1,8 @@
 import type { Logger } from 'pino';
-import type { ClaimedJob } from '../../../src/core/db/repos/jobRepo';
 import type { SendEmail } from '../../../src/core/integrations/notification/NotificationAdapter';
 import type {
   PostSubmissionActionEmailResult,
+  PostSubmissionActionJob,
   PostSubmissionActionNotifications,
   PostSubmissionActionResult,
   PostSubmissionActionSendScope,
@@ -69,7 +69,7 @@ const run = (
 ) =>
   sendNotices(
     {
-      job: { id: 'job-1' } as ClaimedJob,
+      job: { id: 'job-1' } as PostSubmissionActionJob,
       options: { to },
       source: { scope: 'form', settingId: 'setting-1', version: 1 },
       submission,

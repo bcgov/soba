@@ -3,7 +3,7 @@ import type { Logger } from 'pino';
 import type { z } from 'zod';
 import type { PostSubmissionActionScope } from '@soba/lib';
 import type { JobPoolCode } from '../../config/env';
-import type { ClaimedJob } from '../../db/repos/jobRepo';
+import type { JobFacts } from '../../jobs/facts';
 import type { StoredJobResult } from '../../jobs/registry';
 import type {
   JobEmailResult,
@@ -31,6 +31,12 @@ export interface PostSubmissionActionSubmission {
   workspaceName: string;
   confirmationCode: string;
 }
+
+/**
+ * An action job's facts. It is always about a submission, and `revisionId` is the revision whose
+ * submit queued it, which a later submit can have replaced as the submission's latest.
+ */
+export type PostSubmissionActionJob = JobFacts & { submissionId: string; revisionId: string };
 
 /** One email send, as the notification service reported and audited it. */
 export type PostSubmissionActionEmailResult = JobEmailResult;
@@ -112,7 +118,7 @@ export interface PostSubmissionActionResult {
 }
 
 export interface PostSubmissionActionContext<TOptions> {
-  job: ClaimedJob;
+  job: PostSubmissionActionJob;
   /** The options saved when the submission was received, parsed by the plugin's schema. */
   options: TOptions;
   source: PostSubmissionActionSource;

@@ -1,7 +1,8 @@
 import type { Logger } from 'pino';
 import type { JobPoolCode } from '../config/env';
-import type { ChildJob, ClaimedJob } from '../db/repos/jobRepo';
+import type { ChildJob } from '../db/repos/jobRepo';
 import type { TempResource } from '../integrations/temp-storage/TempStorageAdapter';
+import type { JobFacts } from './facts';
 
 /** A result file a job stored. */
 export interface StoredJobResult {
@@ -16,7 +17,7 @@ export interface StoreResultOptions {
 }
 
 export interface JobContext {
-  job: ClaimedJob;
+  job: JobFacts;
   /**
    * Aborted when the job is cancelled, times out, loses its lease, or the pod shuts down; the reason
    * is the `JobStopReason`. The handler must then stop and throw: returning records the job as

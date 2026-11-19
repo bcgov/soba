@@ -1,6 +1,6 @@
 import type { Logger } from 'pino';
-import type { ClaimedJob } from '../../../src/core/db/repos/jobRepo';
 import type {
+  PostSubmissionActionJob,
   PostSubmissionActionResult,
   PostSubmissionActionServices,
 } from '../../../src/core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
@@ -34,7 +34,7 @@ describe('post-submission-log', () => {
     const info = jest.fn();
     const source = { scope: 'form' as const, settingId: 'setting-1', version: 2 };
     await plugin.job.run({
-      job: { id: 'job-1', submissionId: 's1', revisionId: 'r1' } as ClaimedJob,
+      job: { id: 'job-1', submissionId: 's1', revisionId: 'r1' } as PostSubmissionActionJob,
       options: { note: 'private words' },
       source,
       submission: {

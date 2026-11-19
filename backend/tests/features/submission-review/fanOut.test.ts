@@ -7,7 +7,7 @@ jest.mock('../../../src/features/post-submission/repo', () => ({
 }));
 
 import type { Logger } from 'pino';
-import type { ClaimedJob } from '../../../src/core/db/repos/jobRepo';
+import type { JobFacts } from '../../../src/core/jobs/facts';
 import type { JobContext } from '../../../src/core/jobs/registry';
 import { JobCancelledError } from '../../../src/core/jobs/settlement';
 import { fanOutStatusChanged, reactionJob } from '../../../src/features/submission-review/fanOut';
@@ -22,7 +22,7 @@ const parent = {
   submissionId: 's1',
   revisionId: null,
   createdBy: 'rev-1',
-} as ClaimedJob;
+} as JobFacts;
 
 const queueChildren = jest.fn();
 

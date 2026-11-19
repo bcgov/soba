@@ -1,5 +1,5 @@
 import type { Logger } from 'pino';
-import type { ClaimedJob } from '../../../src/core/db/repos/jobRepo';
+import type { JobFacts } from '../../../src/core/jobs/facts';
 import type { JobContext } from '../../../src/core/jobs/registry';
 import { getJobSettings } from '../../../src/core/jobs/settings';
 import { JobCancelledError } from '../../../src/core/jobs/settlement';
@@ -39,7 +39,7 @@ const parent = {
   submissionId: 's1',
   revisionId: 'r9',
   createdBy: 'actor-1',
-} as ClaimedJob;
+} as JobFacts;
 
 describe('childJob', () => {
   it('is deduped per action and revision, with the recorded options', () => {

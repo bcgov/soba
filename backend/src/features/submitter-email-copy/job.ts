@@ -48,9 +48,8 @@ export const runEmailCopy = async ({ job, signal, log }: JobContext): Promise<vo
     },
     env.getFormsAppUrl(),
   );
-  const actorId = job.lastRequeuedBy ?? job.createdBy;
   await sendEachAddress(
-    { notifications: jobNotifications(job, () => Promise.resolve(actorId)), signal, log },
+    { notifications: jobNotifications(job, () => Promise.resolve(job.run.queuedBy)), signal, log },
     [request.address],
     content,
   );
