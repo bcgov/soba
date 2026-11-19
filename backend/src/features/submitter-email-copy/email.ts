@@ -8,16 +8,18 @@ import { formsMySubmissionsUrl, formsSubmissionUrl } from '../../core/appLinks';
 
 export const EMAIL_COPY = defineSubmissionEmail({
   en: {
-    subject: ({ form }) => `Your submission to ${form} was submitted`,
+    subject: ({ form }) => `${form} submitted`,
+    title: ({ form }) => `${form} submitted`,
     sentence: ({ form }) =>
-      `Thank you for your ${form} submission. You asked for this copy on the confirmation screen.`,
+      `Thank you for your ${form} submission. You can view your submission details by visiting the following links:`,
     linkText: 'View this submission',
     secondLinkText: 'View your past submissions (sign in required)',
   },
   fr: {
-    subject: ({ form }) => `Votre soumission à ${form} a été soumise`,
+    subject: ({ form }) => `${form} soumis`,
+    title: ({ form }) => `${form} soumis`,
     sentence: ({ form }) =>
-      `Merci pour votre soumission pour ${form}. Vous avez demandé cette copie à partir de l’écran de confirmation.`,
+      `Merci pour votre soumission pour ${form}. Vous pouvez consulter les détails de votre soumission en visitant les liens suivants :`,
     linkText: 'Voir cette soumission',
     secondLinkText: 'Voir vos soumissions antérieures (connexion requise)',
   },

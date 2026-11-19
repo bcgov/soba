@@ -35,6 +35,7 @@ const FRENCH_FOLLOWS = '(Le français suit)';
 // Inline styles only: mail clients drop style sheets. Colours meet WCAG AA on white.
 const CONTAINER_STYLE =
   'max-width:600px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:24px;color:#2d2d2d;';
+const HEADING_STYLE = 'margin:0 0 16px 0;font-size:20px;line-height:28px;font-weight:bold;';
 const PARAGRAPH_STYLE = 'margin:0 0 16px 0;';
 const LINK_STYLE = 'color:#255a90;text-decoration:underline;';
 const FOOTER_STYLE = 'margin:0;font-size:14px;line-height:20px;color:#474543;';
@@ -47,6 +48,9 @@ const lines = (parts: readonly HtmlValue[]): HtmlValue[] =>
   parts
     .filter((part) => part !== null && part !== undefined && part !== false && part !== '')
     .flatMap((part, index) => (index === 0 ? [part] : ['\n', part]));
+
+export const heading = (content: HtmlValue): SafeHtml =>
+  markup`<h1 style="${HEADING_STYLE}">${content}</h1>`;
 
 export const paragraph = (content: HtmlValue): SafeHtml =>
   markup`<p style="${PARAGRAPH_STYLE}">${content}</p>`;
