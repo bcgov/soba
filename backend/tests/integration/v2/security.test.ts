@@ -4,7 +4,13 @@ jest.mock('../../../src/core/db/repos/workspaceCredentialRepo', () => ({
 jest.mock('../../../src/core/integrations/credential-issuer/CredentialIssuerRegistry', () => ({
   resolveDefaultCredentialIssuerCode: () => 'aps',
 }));
-jest.mock('jwks-rsa', () => ({ __esModule: true, default: jest.fn() }));
+jest.mock('jwks-rsa', () => {
+  const actual = jest.requireActual<typeof import('jwks-rsa')>('jwks-rsa');
+  return {
+    __esModule: true,
+    default: Object.assign(jest.fn(), { expressJwtSecret: actual.expressJwtSecret }),
+  };
+});
 
 import { restoreAppTestEnvironment } from '../fixtures/appEnvironment';
 import { credentialFixture } from '../fixtures/data';

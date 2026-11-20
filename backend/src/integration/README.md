@@ -14,8 +14,8 @@ using `kong-upstream-jwt` (`include_credential_type: false`). Clients still send
 The backend verifies the signature using cached configured JWKS keys, RS256, exact issuer and
 service audience, expiration and a maximum token age of two minutes (five seconds clock tolerance).
 Both `iat` and `exp` are required. Token-supplied certificate chains and JWKS URLs are not trusted.
-JWKS resolution is shared with staff SSO in `core/auth/jwks.ts`; gateway identity checks remain
-in integration middleware. Configuration is parsed through `core/config/env.ts`.
+JWKS resolution and signature verification live in `core/auth/jwks.ts`; gateway identity checks
+remain in integration middleware. Configuration is parsed through `core/config/env.ts`.
 
 Configure the backend using the APS instance serving the gateway, rather than the SOBA app's
 environment name. Gold may serve SOBA dev/PR releases using the production APS instance.

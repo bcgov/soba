@@ -1,7 +1,5 @@
-import { expressjwt } from 'express-jwt';
 import jwt, { type Algorithm, type JwtPayload, type VerifyOptions } from 'jsonwebtoken';
 import jwksRsa from 'jwks-rsa';
-import { getToken } from './IdpPlugin';
 import { log } from '../logging';
 
 interface JwksVerificationOptions {
@@ -56,18 +54,4 @@ export const createJwksVerifier = (options: JwksVerificationOptions) => {
         resolve(decoded);
       });
     });
-};
-
-export const createJwksExpressMiddleware = (options: JwksVerificationOptions) => {
-  const signingKey = signingKeyResolver(options);
-  return expressjwt({
-    ...verificationOptions(options),
-    algorithms: options.algorithms ?? ['RS256'],
-    secret: async (_req, token) => {
-      if (!token) throw new Error('Invalid JWT');
-      return signingKey(token.header);
-    },
-    requestProperty: 'decodedJwt',
-    getToken,
-  });
 };
