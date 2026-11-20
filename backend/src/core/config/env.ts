@@ -414,16 +414,24 @@ export const resolveIntegrationGatewaySettings = (
     (clientIdClaim !== 'consumername' && clientIdClaim !== 'consumerid')
   )
     return undefined;
+  const development = getOptionalEnvFrom(source, 'NODE_ENV') === 'development';
   try {
     for (const value of [issuer, jwksUri]) {
       const url = new URL(value);
-      if (url.protocol !== 'https:' || url.username || url.password) return undefined;
+      if (!isTrustedGatewayUrl(url, development) || url.username || url.password) return undefined;
     }
   } catch {
     return undefined;
   }
   return { issuer, jwksUri, audience, clientIdClaim };
 };
+
+/** HTTPS, or plain HTTP on this machine in development, where the local dev gateway serves. */
+const isTrustedGatewayUrl = (url: URL, development: boolean): boolean =>
+  url.protocol === 'https:' ||
+  (development &&
+    url.protocol === 'http:' &&
+    (url.hostname === 'localhost' || url.hostname === '127.0.0.1'));
 
 const getRequiredEnv = (key: string): string => getRequiredEnvFrom(process.env, key);
 const getOptionalEnv = (key: string): string | undefined => getOptionalEnvFrom(process.env, key);

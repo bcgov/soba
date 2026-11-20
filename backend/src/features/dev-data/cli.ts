@@ -178,6 +178,11 @@ function reportManifest(manifest: DevDataManifest): void {
     ? `${submissions.workspaceId} form ${submissions.formId}`
     : '-';
   console.log(`  paging submissions ${submissionsAnchor}`);
+  console.log(
+    manifest.apiKey
+      ? `Dev gateway API key: X-API-KEY ${manifest.apiKey.clientId} (workspace ${manifest.apiKey.workspaceId})`
+      : 'Dev gateway API key: not created; dev-data creates it only under credential-issuer-noop',
+  );
   const { coverage } = manifest;
   console.log(
     `Access coverage set: ${Object.keys(coverage.personas).length} personas, ` +

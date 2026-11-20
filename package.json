@@ -38,6 +38,7 @@
     "db:seed": "pnpm --filter @soba/backend run db:seed",
     "db:dev-data": "pnpm --filter @soba/backend run db:dev-data",
     "db:dev-data:verify": "pnpm --filter @soba/backend run db:dev-data:verify",
+    "dev:gateway": "pnpm --filter @soba/backend run dev:gateway",
     "db:init": "pnpm db:migrate && pnpm db:seed",
     "dev:services:up": "docker compose -f .devcontainer/docker-compose.yml up -d --wait",
     "dev:db:up": "pnpm dev:services:up && pnpm db:init",

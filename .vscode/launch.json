@@ -39,6 +39,16 @@
       "console": "integratedTerminal"
     },
     {
+      "name": "SOBA Dev Gateway",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/backend",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev:gateway"],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal"
+    },
+    {
       "name": "SOBA Temporal Worker (soba)",
       "type": "node",
       "request": "launch",

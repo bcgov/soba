@@ -66,6 +66,31 @@ resource permissions; a shared CI API key can therefore test each PR's gateway h
 
 Only `GW-JWT` is accepted as gateway proof. It is redacted from both logs and the `/me` response. See `deployments/gateway/README.md` for the protected gateway template.
 
+## Local dev gateway
+
+`pnpm dev:gateway` runs a stand-in for APS on `127.0.0.1:4002` (development only). It serves its
+own signing key at `/certs`, and for every other request takes `X-API-KEY` as the consumer name,
+replaces it with a signed `GW-JWT` and forwards the path to the integration port. It does not check
+keys or ACLs, so it listens on loopback only. The key is generated at each start and kept in
+memory. Configure the backend with the local block in `backend/.env.example`; plain HTTP is
+accepted for these settings only in development and only on `localhost` or `127.0.0.1`. The dev
+gateway refuses to start unless `INTEGRATION_GATEWAY_JWKS_URI` is its own `/certs` and its upstream
+is plain HTTP on this machine. Development means `NODE_ENV=development`, which the deployed dev
+namespace also sets; its HTTPS APS settings stay in force there, so the dev gateway refuses to start.
+
+Under the no-op credential issuer (the local default), `pnpm db:dev-data --seed` creates an active
+API key in a workspace the target user owns and prints its client ID. With the backend and the dev
+gateway running:
+
+```bash
+curl -i -H "X-API-KEY: <client ID from the seed>" \
+  http://localhost:4002/chefs/api/integrations/v2/me
+```
+
+Under any other issuer the seed creates no key: that issuer never issued it, so it could not
+regenerate or delete it. Delete needs an issuer, so only `pnpm db:dev-data --purge` (or `--reset`)
+removes the seeded key.
+
 ## Authentication regression tests
 
 Run `pnpm --filter @soba/backend exec jest --runInBand tests/integration/v2`.
