@@ -1,6 +1,9 @@
 jest.mock('../../../src/core/db/repos/workspaceCredentialRepo', () => ({
   findActiveApiCredential: jest.fn(),
 }));
+jest.mock('../../../src/core/services/featureAvailabilityService', () => ({
+  isFeatureAvailable: jest.fn(),
+}));
 jest.mock('../../../src/core/integrations/credential-issuer/CredentialIssuerRegistry', () => ({
   resolveDefaultCredentialIssuerCode: () => 'aps',
 }));
@@ -22,6 +25,7 @@ import {
   findActiveApiCredential,
   type CredentialRecord,
 } from '../../../src/core/db/repos/workspaceCredentialRepo';
+import { isFeatureAvailable } from '../../../src/core/services/featureAvailabilityService';
 import { createApp } from '../../../src/createApp';
 import { createIntegrationApp } from '../../../src/integration/createIntegrationApp';
 import { integrationV2Router } from '../../../src/integration/v2/routes';
@@ -66,6 +70,7 @@ beforeEach(() => {
   });
   credential = credentialFixture();
   jest.mocked(findActiveApiCredential).mockImplementation(async () => credential);
+  jest.mocked(isFeatureAvailable).mockResolvedValue(true);
 });
 afterAll(() => {
   restoreAppTestEnvironment();
@@ -196,7 +201,9 @@ describe('Production middleware and staff authentication boundaries', () => {
   it.each(operations.filter((op) => !op.backendAuth).map(({ path }) => path))(
     'serves %s without a gateway JWT at the backend',
     async (path) => {
-      expect((await request(app).get(base + path)).status).toBe(200);
+      const response = await request(app).get(base + path);
+      expect(response.status).toBe(200);
+      expect(response.headers['ratelimit']).toBeDefined();
       expect(findActiveApiCredential).not.toHaveBeenCalled();
     },
   );
@@ -214,9 +221,14 @@ describe('Listener separation', () => {
     },
   );
 
-  it('does not serve the staff API on the integration port', async () => {
-    expect((await request(app).get('/chefs/api/v1/health')).status).toBe(404);
-  });
+  it.each(['/chefs/api/v1/health', `${base}/nope`])(
+    'answers %s on the integration port with a rate-limited 404',
+    async (path) => {
+      const response = await request(app).get(path);
+      expect(response.status).toBe(404);
+      expect(response.headers['ratelimit']).toBeDefined();
+    },
+  );
 });
 
 describe('Published specification', () => {
@@ -237,5 +249,43 @@ describe('Published specification', () => {
     const page = await request(staffApp).get('/chefs/api/docs/');
     expect(page.status).toBe(200);
     expect(page.text).not.toContain('download-url-wrapper { display: none }');
+  });
+});
+
+describe('Rate limits', () => {
+  const remaining = (response: { headers: Record<string, unknown> }) => {
+    const match = /remaining=(\d+)/.exec(String(response.headers['ratelimit']));
+    if (!match) throw new Error('RateLimit header missing');
+    return Number(match[1]);
+  };
+  const unverifiedMe = () => request(app).get(base + '/me');
+  const meAs = (consumername: string) =>
+    request(app)
+      .get(base + '/me')
+      .set('GW-JWT', gateway.sign({ consumername }));
+
+  it('counts /me per gateway consumer, so consumers behind one gateway address do not share a limit', async () => {
+    const first = await meAs('rate-a');
+    const again = await meAs('rate-a');
+    const other = await meAs('rate-b');
+    expect([first.status, again.status, other.status]).toEqual([200, 200, 200]);
+    expect(remaining(again)).toBe(remaining(first) - 1);
+    expect(remaining(other)).toBe(remaining(first));
+  });
+
+  it('counts /me requests that fail gateway verification, but not verified ones', async () => {
+    const first = await unverifiedMe();
+    const verified = await meAs('rate-verified');
+    const again = await unverifiedMe();
+    expect([first.status, verified.status, again.status]).toEqual([401, 200, 401]);
+    expect(remaining(again)).toBe(remaining(first) - 1);
+  });
+
+  it('counts /me calls refused for an unknown or inactive key', async () => {
+    credential = null;
+    const first = await meAs('rate-refused');
+    const again = await meAs('rate-refused');
+    expect([first.status, again.status]).toEqual([401, 401]);
+    expect(remaining(again)).toBe(remaining(first) - 1);
   });
 });

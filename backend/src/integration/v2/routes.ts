@@ -1,9 +1,17 @@
 import express from 'express';
 import { coreErrorHandler, notFoundHandler } from '../../core/middleware/errorHandler';
-import { resolveIntegrationCredential } from '../middleware/resolveCredential';
+import {
+  resolveIntegrationCredential,
+  verifyIntegrationGateway,
+} from '../middleware/resolveCredential';
 import { buildIntegrationV2OpenApiSpec } from './openapi';
 import { asyncHandler } from '../../core/api/shared/asyncHandler';
 import { gatewayClientId } from '../middleware/gatewayJwt';
+import {
+  integrationConsumerRateLimit,
+  integrationPublicRateLimit,
+  integrationUnverifiedRateLimit,
+} from '../../core/middleware/rateLimit';
 
 const router = express.Router();
 
@@ -11,6 +19,7 @@ const router = express.Router();
 // CI can verify the gateway hop without creating a credential record in every PR database.
 router.get(
   '/health',
+  integrationPublicRateLimit,
   asyncHandler(async (req, res) => {
     const gatewayToken = req.headers['gw-jwt'];
     if (gatewayToken !== undefined) await gatewayClientId(gatewayToken);
@@ -23,35 +32,34 @@ router.get(
   }),
 );
 
-router.get('/openapi.json', (_req, res) => {
+router.get('/openapi.json', integrationPublicRateLimit, (_req, res) => {
   res.json(buildIntegrationV2OpenApiSpec());
 });
 
 // Identity introspection only; resource access requires additional per-request authorization.
-router.get('/me', resolveIntegrationCredential, (req, res) => {
-  const headers = Object.fromEntries(
-    Object.entries(req.headers).map(([name, value]) => [
-      name,
-      /authorization|cookie|key|token|secret|jwt/i.test(name) ? '[REDACTED]' : value,
-    ]),
-  );
+router.get(
+  '/me',
+  integrationUnverifiedRateLimit,
+  verifyIntegrationGateway,
+  integrationConsumerRateLimit,
+  resolveIntegrationCredential,
+  (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      credential: {
+        id: req.integrationCredential!.id,
+        clientId: req.integrationCredential!.clientId,
+        workspaceId: req.integrationCredential!.workspaceId,
+        formId: req.integrationCredential!.formId,
+      },
+      method: req.method,
+      path: `${req.baseUrl}${req.path}`,
+      ip: req.ip,
+    });
+  },
+);
 
-  res.set('Cache-Control', 'no-store');
-  res.json({
-    credential: {
-      id: req.integrationCredential!.id,
-      clientId: req.integrationCredential!.clientId,
-      workspaceId: req.integrationCredential!.workspaceId,
-      formId: req.integrationCredential!.formId,
-    },
-    method: req.method,
-    path: `${req.baseUrl}${req.path}`,
-    ip: req.ip,
-    headers,
-  });
-});
-
-router.use(notFoundHandler);
+router.use(integrationPublicRateLimit, notFoundHandler);
 router.use(coreErrorHandler);
 
 export const integrationV2Router = router;

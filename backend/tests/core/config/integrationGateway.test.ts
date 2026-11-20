@@ -14,6 +14,15 @@ it('reads configured gateway settings and defaults to the signed consumer name',
   });
 });
 it.each([
+  [' consumerid ', 'consumerid'],
+  ['  ', 'consumername'],
+])('trims the client ID claim setting %j', (claim, expected) => {
+  expect(
+    resolveIntegrationGatewaySettings({ ...config, INTEGRATION_GATEWAY_CLIENT_ID_CLAIM: claim })
+      ?.clientIdClaim,
+  ).toBe(expected);
+});
+it.each([
   {},
   { ...config, INTEGRATION_GATEWAY_AUDIENCE: '' },
   { ...config, INTEGRATION_GATEWAY_ISSUER: 'http://aps.example.test' },

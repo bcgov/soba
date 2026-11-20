@@ -23,6 +23,8 @@ declare global {
     interface Request {
       /** Authenticated integration identity; resource permissions must be checked separately. */
       integrationCredential?: CredentialRecord;
+      /** The gateway consumer named by a verified GW-JWT. */
+      integrationClientId?: string;
       decodedJwt?: Record<string, unknown>;
       authPayload?: Record<string, unknown>;
       bceidType?: 'bceidbasic' | 'bceidbusiness';

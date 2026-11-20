@@ -1,4 +1,4 @@
-import { createJwksVerifier } from '../../core/auth/jwks';
+import { createJwksVerifier, SigningKeyUnavailableError } from '../../core/auth/jwks';
 import { env } from '../../core/config/env';
 import { ServiceUnavailableError, UnauthorizedError } from '../../core/errors';
 
@@ -43,7 +43,10 @@ export const gatewayClientId = async (token: string | string[] | undefined): Pro
       throw new Error('Missing gateway identity or token lifetime');
     }
     return id;
-  } catch {
+  } catch (error) {
+    if (error instanceof SigningKeyUnavailableError) {
+      throw new ServiceUnavailableError('Gateway signing keys are unavailable');
+    }
     throw new UnauthorizedError('Invalid gateway JWT');
   }
 };

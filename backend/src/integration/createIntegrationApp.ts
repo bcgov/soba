@@ -3,7 +3,7 @@ import rTracer from 'cls-rtracer';
 import { env } from '../core/config/env';
 import { httpLogger } from '../core/logging';
 import { coreErrorHandler, notFoundHandler } from '../core/middleware/errorHandler';
-import { globalRateLimit, publicRateLimit } from '../core/middleware/rateLimit';
+import { integrationPublicRateLimit } from '../core/middleware/rateLimit';
 import { integrationV2Router } from './v2/routes';
 
 /**
@@ -22,12 +22,12 @@ export const createIntegrationApp = () => {
     }),
   );
   app.use(httpLogger);
-  app.use(globalRateLimit);
 
-  // Integration v1 is reserved for CHEFS Classic compatibility.
-  app.use(`${env.getApiBasePath()}/api/integrations/v2`, publicRateLimit, integrationV2Router);
+  // Integration v1 is reserved for CHEFS Classic compatibility. The v2 routes rate-limit
+  // themselves: public paths per address, authenticated ones per gateway consumer.
+  app.use(`${env.getApiBasePath()}/api/integrations/v2`, integrationV2Router);
 
-  app.use(notFoundHandler);
+  app.use(integrationPublicRateLimit, notFoundHandler);
   app.use(coreErrorHandler);
   return app;
 };

@@ -406,7 +406,7 @@ export const resolveIntegrationGatewaySettings = (
   const jwksUri = getOptionalEnvFrom(source, 'INTEGRATION_GATEWAY_JWKS_URI')?.trim();
   const audience = getOptionalEnvFrom(source, 'INTEGRATION_GATEWAY_AUDIENCE')?.trim();
   const clientIdClaim =
-    getOptionalEnvFrom(source, 'INTEGRATION_GATEWAY_CLIENT_ID_CLAIM') ?? 'consumername';
+    getOptionalEnvFrom(source, 'INTEGRATION_GATEWAY_CLIENT_ID_CLAIM')?.trim() || 'consumername';
   if (
     !issuer ||
     !jwksUri ||

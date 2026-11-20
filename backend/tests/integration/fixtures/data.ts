@@ -1,6 +1,6 @@
 import type { CredentialRecord } from '../../../src/core/db/repos/workspaceCredentialRepo';
 
-const testIds = {
+export const testIds = {
   credential: '00000000-0000-4000-8000-000000000001',
   workspace: '00000000-0000-4000-8000-000000000002',
   creator: '00000000-0000-4000-8000-000000000004',

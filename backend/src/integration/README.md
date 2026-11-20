@@ -55,8 +55,14 @@ claims. These are the two claims documented by the upstream plugin; the mapping 
 integration check. NetworkPolicy and protected transport remain necessary for the gateway hop.
 
 `GET /me` requires a valid gateway JWT and an active API credential from the configured issuer;
-it returns only credential metadata and redacted request details. No raw API key is stored.
-Missing gateway configuration fails closed with 503. Invalid JWT or credential returns 401.
+it returns the credential's metadata and the request's method, path and IP. No raw API key is stored.
+Missing gateway configuration, or signing keys that cannot be read, fail closed with 503. An
+invalid JWT returns 401; one naming a key the key set does not hold returns 401, or 503 while the
+key set's fetch limit (10 a minute) is spent. A credential that is inactive, or whose workspace or
+form does not have the `api-keys` feature, returns 401. `/me` is rate-limited per gateway consumer
+(`RATE_LIMIT_API_*`), counted before the credential lookup, and its requests that fail gateway
+verification per address. `/health`, `/openapi.json` and unknown paths are limited per address
+(`RATE_LIMIT_PUBLIC_*`), which through the gateway all consumers share.
 `/health` and `/openapi.json` need no credential at the backend; the gateway requires an API key,
 so the spec declares the key on every operation.
 When `/health` receives `GW-JWT`, it verifies the token and returns `gatewayAuthenticated: true`;
@@ -64,7 +70,7 @@ an invalid supplied token is rejected. PR gateway smoke checks require this fiel
 probe proves JWT verification, not just liveness. Health does not resolve a credential or check
 resource permissions; a shared CI API key can therefore test each PR's gateway hop.
 
-Only `GW-JWT` is accepted as gateway proof. It is redacted from both logs and the `/me` response. See `deployments/gateway/README.md` for the protected gateway template.
+Only `GW-JWT` is accepted as gateway proof. It is redacted from logs. See `deployments/gateway/README.md` for the protected gateway template.
 
 ## Local dev gateway
 

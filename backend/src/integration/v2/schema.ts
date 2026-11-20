@@ -20,7 +20,6 @@ export const IntegrationMeResponseSchema = z
     method: z.string(),
     path: z.string(),
     ip: z.string().optional(),
-    headers: z.record(z.string(), z.union([z.string(), z.array(z.string())])),
   })
   .openapi('IntegrationV2_MeResponse');
 
@@ -55,26 +54,32 @@ export const registerIntegrationV2OpenApi = (registry: OpenAPIRegistry) => {
         content: { 'application/json': { schema: z.union([ApiErrorSchema, GatewayErrorSchema]) } },
       },
       403: gatewayAclDenied,
-      503: { description: 'A gateway JWT was supplied but verification is not configured' },
+      503: {
+        description:
+          'A gateway JWT was supplied but verification is not configured or its signing keys are unavailable',
+      },
     },
   });
   registry.registerPath({
     method: 'get',
     path: '/me',
     security: [{ apiKey: [] }],
-    summary: 'Inspect the active API credential and redacted incoming request',
-    description: 'Secrets are redacted and the response is not cached.',
+    summary: 'Inspect the active API credential and the request as received',
+    description: 'The response is not cached.',
     responses: {
       200: {
         description: 'Resolved identity',
         content: { 'application/json': { schema: IntegrationMeResponseSchema } },
       },
       401: {
-        description: 'Gateway API-key rejection, invalid upstream JWT or inactive API credential',
+        description:
+          'Gateway API-key rejection, invalid upstream JWT, or a credential that is inactive or whose workspace or form does not have API keys',
         content: { 'application/json': { schema: z.union([ApiErrorSchema, GatewayErrorSchema]) } },
       },
       403: gatewayAclDenied,
-      503: { description: 'Gateway authentication is not configured' },
+      503: {
+        description: 'Gateway authentication is not configured or its signing keys are unavailable',
+      },
     },
   });
   registry.registerPath({

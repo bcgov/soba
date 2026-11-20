@@ -1,12 +1,15 @@
 jest.mock('../../../src/core/db/repos/workspaceCredentialRepo', () => ({
   findActiveApiCredential: jest.fn(),
 }));
+jest.mock('../../../src/core/services/featureAvailabilityService', () => ({
+  isFeatureAvailable: jest.fn(),
+}));
 jest.mock('../../../src/core/integrations/credential-issuer/CredentialIssuerRegistry', () => ({
   resolveDefaultCredentialIssuerCode: () => 'aps',
 }));
 jest.mock('jwks-rsa', () => ({ __esModule: true, default: jest.fn() }));
 
-import { credentialFixture } from '../fixtures/data';
+import { credentialFixture, testIds } from '../fixtures/data';
 import { gatewayJwtFixture } from '../fixtures/gatewayJwt';
 import express from 'express';
 import request from 'supertest';
@@ -14,6 +17,7 @@ import jwt from 'jsonwebtoken';
 import jwksRsa from 'jwks-rsa';
 import { env } from '../../../src/core/config/env';
 import { findActiveApiCredential } from '../../../src/core/db/repos/workspaceCredentialRepo';
+import { isFeatureAvailable } from '../../../src/core/services/featureAvailabilityService';
 import { integrationV2Router } from '../../../src/integration/v2/routes';
 import { buildIntegrationV2OpenApiSpec } from '../../../src/integration/v2/openapi';
 
@@ -41,6 +45,7 @@ beforeEach(() => {
   jest
     .mocked(findActiveApiCredential)
     .mockResolvedValue(credentialFixture({ clientId: 'aps-client' }));
+  jest.mocked(isFeatureAvailable).mockResolvedValue(true);
 });
 afterAll(() => {
   for (const [key, value] of Object.entries(original)) {
@@ -58,8 +63,8 @@ describe('Signed identity mapping and header trust', () => {
       .set('X-API-KEY', 'secret');
     expect(response.status).toBe(200);
     expect(findActiveApiCredential).toHaveBeenCalledWith('aps', 'aps-client');
-    expect(response.body.headers['gw-jwt']).toBe('[REDACTED]');
-    expect(response.body.headers['x-api-key']).toBe('[REDACTED]');
+    expect(response.body).not.toHaveProperty('headers');
+    expect(JSON.stringify(response.body)).not.toContain('secret');
     expect(response.headers['cache-control']).toBe('no-store');
     expect(getSigningKey).toHaveBeenCalledWith('aps-key');
   });
@@ -127,11 +132,22 @@ describe('JWT and credential rejection', () => {
     expect(findActiveApiCredential).not.toHaveBeenCalled();
   });
 
-  it('rejects signing-key failures without exposing the error', async () => {
+  it('reports unreadable signing keys as 503 without exposing the error', async () => {
     getSigningKey.mockRejectedValue(new Error('private internal detail'));
     const response = await request(app).get('/me').set('GW-JWT', token());
-    expect(response.status).toBe(401);
+    expect(response.status).toBe(503);
     expect(JSON.stringify(response.body)).not.toContain('private internal detail');
+    expect(findActiveApiCredential).not.toHaveBeenCalled();
+  });
+
+  it('rejects a token naming a signing key the key set does not hold as 401', async () => {
+    getSigningKey.mockRejectedValue(
+      Object.assign(new Error('Unable to find a signing key that matches'), {
+        name: 'SigningKeyNotFoundError',
+      }),
+    );
+    const response = await request(app).get('/me').set('GW-JWT', token());
+    expect(response.status).toBe(401);
     expect(findActiveApiCredential).not.toHaveBeenCalled();
   });
 
@@ -151,9 +167,29 @@ describe('JWT and credential rejection', () => {
     jest.mocked(findActiveApiCredential).mockResolvedValue(null);
     expect((await request(app).get('/me').set('GW-JWT', token())).status).toBe(401);
   });
+
+  it.each([
+    { workspaceId: testIds.workspace, formId: null },
+    { workspaceId: testIds.workspace, formId: '00000000-0000-4000-8000-000000000009' },
+  ])('rejects a key where the api-keys feature is unavailable: %j', async (scope) => {
+    jest
+      .mocked(findActiveApiCredential)
+      .mockResolvedValue(credentialFixture({ clientId: 'aps-client', ...scope }));
+    jest.mocked(isFeatureAvailable).mockResolvedValue(false);
+    const response = await request(app).get('/me').set('GW-JWT', token());
+    expect(response.status).toBe(401);
+    expect(isFeatureAvailable).toHaveBeenCalledWith('api-keys', scope);
+  });
 });
 
 describe('Gateway proof on health', () => {
+  it('reports unreadable signing keys on health as 503', async () => {
+    getSigningKey.mockRejectedValue(new Error('key set down'));
+    const response = await request(app).get('/health').set('GW-JWT', token());
+    expect(response.status).toBe(503);
+    expect(JSON.stringify(response.body)).not.toContain('key set down');
+  });
+
   it('verifies the gateway hop on health without requiring a local credential record', async () => {
     jest.mocked(findActiveApiCredential).mockResolvedValue(null);
     const response = await request(app).get('/health').set('GW-JWT', token());
