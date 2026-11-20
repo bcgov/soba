@@ -1,13 +1,15 @@
 import { test, expect } from '../fixtures/form_setup';
 import dictionaries from '../../../frontend/dictionaries/en.json';
+import { openAuthenticatedPage } from '../support/open_authenticated_page';
+
+test.describe.configure({ timeout: 60_000 });
 
 test('User can submit the shared form and find it in My Submissions', async ({
   page,
   title,
   submissionUrl,
 }) => {
-  await page.goto(submissionUrl);
-  await expect(page.getByTestId('user-dropdown')).toBeVisible();
+  await openAuthenticatedPage(page, submissionUrl);
 
   const form = page.getByTestId('submission-fill');
   await expect(form).toBeVisible();

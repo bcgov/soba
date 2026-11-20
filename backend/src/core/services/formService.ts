@@ -22,6 +22,7 @@ import {
 import type { FormAccessGrant } from '../db/repos/formAccessRepo';
 import { isWorkspaceDisclaimerAccepted } from '../db/repos/workspaceRepo';
 import { db } from '../db/client';
+import { FormVersionState } from '../db/codes';
 import { hasPgCode, isUniqueViolationOn, PG_UNIQUE_VIOLATION } from '../db/pgError';
 import { FORM_PKEY, FORM_VERSION_PKEY, FORM_WORKSPACE_NAME_UNIQUE } from '../db/schema';
 import { env } from '../config/env';
@@ -165,6 +166,7 @@ export class FormService {
         },
         tx,
       );
+      // A new form's v1 is its current version, a draft, not an opened version a save must promote.
       const version = await createFormVersionDraft(
         {
           id: versionId,
@@ -172,6 +174,7 @@ export class FormService {
           formId: form.id,
           actorId: input.actorId,
           actorDisplayLabel: input.actorDisplayLabel,
+          state: FormVersionState.draft,
           engineSchemaRef,
         },
         tx,

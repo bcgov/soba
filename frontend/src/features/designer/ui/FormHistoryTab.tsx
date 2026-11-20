@@ -1,24 +1,30 @@
 'use client';
 
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { Link } from '@bcgov/design-system-react-components';
 
 import type { Dictionary } from '@/src/types/dictionary';
+import { ConfirmModal } from '@/src/components/ConfirmModal';
 import { Tag, TagColor } from '@/src/components/Tag';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { useFormatLongDate } from '@/src/shared/hooks/useFormatLongDate';
+import { useDesignFormRead } from '@/src/features/designer/data/useForm';
 import { FORM_VERSIONS_LIST_QUERY } from '@/src/shared/list/listQueryMemory';
 import { useListQuery } from '@/src/shared/list/useListQuery';
 import { useDataTable } from '@/src/shared/list/useDataTable';
 import { useFormVersionPage } from '../data/useFormVersions';
 import type { SobaFormVersionListItem } from '@/src/types/forms';
 import { capitalizeFirstLetter } from '@/src/shared/util/stringUtils';
+import { hasPermission } from '@/src/shared/util/permissions';
+import { Permissions } from '@/src/types/permissions';
 
 interface FormHistoryTabProps {
   dict: Dictionary;
   formId?: string;
   onSelectVersion: (versionId: string) => void;
   onRestoreVersion: (version: SobaFormVersionListItem) => Promise<boolean>;
+  /** Resolves true once the version is gone. The caller reports the outcome. */
+  onDeleteVersion: (version: SobaFormVersionListItem) => Promise<boolean>;
   onNavigateToDesigner?: () => void;
 }
 
@@ -32,6 +38,7 @@ export default function FormHistoryTab({
   formId,
   onSelectVersion,
   onRestoreVersion,
+  onDeleteVersion,
   onNavigateToDesigner,
 }: Readonly<FormHistoryTabProps>) {
   const query = useListQuery(FORM_VERSIONS_LIST_QUERY);
@@ -41,6 +48,10 @@ export default function FormHistoryTab({
     sort: query.sort,
   });
   const { table } = useDataTable(query, versionsResult, dict.form.loadVersionsError);
+  const { data: form } = useDesignFormRead(formId);
+  const permissions = useMemo(() => {
+    return form?.permissions;
+  }, [form?.permissions]);
   const formatLongDate = useFormatLongDate();
 
   const openInDesigner = useCallback(
@@ -50,6 +61,24 @@ export default function FormHistoryTab({
     },
     [onSelectVersion, onNavigateToDesigner],
   );
+
+  const canDelete = useMemo(() => {
+    return hasPermission(permissions, Permissions.design_delete) === true;
+  }, [permissions]);
+
+  const [pendingDelete, setPendingDelete] = useState<SobaFormVersionListItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // The prompt stays open on a failure, so the person can try again or back out.
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setIsDeleting(true);
+    try {
+      if (await onDeleteVersion(pendingDelete)) setPendingDelete(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const restore = useCallback(
     (version: SobaFormVersionListItem) => {
@@ -119,22 +148,49 @@ export default function FormHistoryTab({
             >
               {dict.form.newVersionFrom}
             </Link>
+            {version.state === 'draft' && canDelete && (
+              <Link
+                className="bcds-react-aria-Link danger medium false me-2"
+                data-testid={`${version.id}-deleteVersion-link`}
+                onPress={() => setPendingDelete(version)}
+              >
+                {dict.form.deleteVersion}
+              </Link>
+            )}
           </>
         ),
       },
     ],
-    [dict, formatLongDate, openInDesigner, restore],
+    [dict, formatLongDate, openInDesigner, restore, canDelete],
   );
 
   return (
-    <DataTable<SobaFormVersionListItem>
-      {...table}
-      columns={columns}
-      emptyMessage={dict.form.emptyHistory}
-      loadingMessage={dict.general.loading}
-      itemName="items"
-      caption={dict.form.historyTab}
-      keyExtractor={(version) => version.id}
-    />
+    <>
+      <DataTable<SobaFormVersionListItem>
+        {...table}
+        columns={columns}
+        emptyMessage={dict.form.emptyHistory}
+        loadingMessage={dict.general.loading}
+        itemName="items"
+        caption={dict.form.historyTab}
+        keyExtractor={(version) => version.id}
+      />
+      {pendingDelete && (
+        <ConfirmModal
+          show
+          title={dict.form.deleteVersionConfirmTitle}
+          message={dict.form.deleteVersionConfirmMessage.replace(
+            '{version}',
+            String(pendingDelete.versionNo),
+          )}
+          confirmLabel={dict.form.deleteVersion}
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => {
+            if (!isDeleting) setPendingDelete(null);
+          }}
+          pending={isDeleting}
+        />
+      )}
+    </>
   );
 }

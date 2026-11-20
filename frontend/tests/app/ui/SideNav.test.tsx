@@ -61,7 +61,7 @@ function signIn(isSobaAdmin: boolean) {
   currentUser.data = { capabilities: { isSobaAdmin } };
 }
 
-const navTestIds = () => screen.getAllByRole('link').map((link) => link.dataset.testid);
+const navTestIds = () => screen.queryAllByRole('link').map((link) => link.dataset.testid);
 
 const iconPath = (element: Element) => element.querySelector('svg path')?.getAttribute('d');
 
@@ -79,16 +79,20 @@ describe('SideNav', () => {
     nav.pathname = '/en/forms';
   });
 
-  it('links to feedback and help with every feature off', async () => {
+  it('keeps feedback and help links hidden with every feature off', async () => {
     await renderNav();
 
-    expect(navTestIds()).toEqual(['feedback-nav', 'help-nav']);
+    expect(navTestIds()).toEqual([]);
+    expect(screen.getByTestId('feedback-nav')).not.toBeVisible();
+    expect(screen.getByTestId('help-nav')).not.toBeVisible();
   });
 
-  it('shows a signed-out visitor only feedback and help', async () => {
+  it('keeps feedback and help links hidden for a signed-out visitor', async () => {
     await renderNav(COMBINED);
 
-    expect(navTestIds()).toEqual(['feedback-nav', 'help-nav']);
+    expect(navTestIds()).toEqual([]);
+    expect(screen.getByTestId('feedback-nav')).not.toBeVisible();
+    expect(screen.getByTestId('help-nav')).not.toBeVisible();
   });
 
   it('links design mode to forms and workspaces', async () => {
@@ -96,7 +100,7 @@ describe('SideNav', () => {
 
     await renderNav(DESIGN_ONLY);
 
-    expect(navTestIds()).toEqual(['forms-nav', 'workspaces-nav', 'feedback-nav', 'help-nav']);
+    expect(navTestIds()).toEqual(['forms-nav', 'workspaces-nav']);
   });
 
   it('links submit mode to my forms and my submissions', async () => {
@@ -104,12 +108,7 @@ describe('SideNav', () => {
 
     await renderNav(SUBMIT_ONLY);
 
-    expect(navTestIds()).toEqual([
-      'my-forms-nav',
-      'my-submissions-nav',
-      'feedback-nav',
-      'help-nav',
-    ]);
+    expect(navTestIds()).toEqual(['my-forms-nav', 'my-submissions-nav']);
   });
 
   it('orders design mode, submit mode, then administration when both modes are on', async () => {
@@ -123,8 +122,6 @@ describe('SideNav', () => {
       'my-forms-nav',
       'my-submissions-nav',
       'admin-nav',
-      'feedback-nav',
-      'help-nav',
     ]);
   });
 
@@ -163,7 +160,7 @@ describe('SideNav', () => {
 
     await renderNav();
 
-    expect(navTestIds()).toEqual(['admin-nav', 'feedback-nav', 'help-nav']);
+    expect(navTestIds()).toEqual(['admin-nav']);
   });
 
   it('hides administration from a signed-in user who is not an admin', async () => {

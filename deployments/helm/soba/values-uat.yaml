@@ -13,15 +13,15 @@ backend:
   replicas: 3
   resources:
     requests:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 100m
+      memory: 384Mi
     limits:
       cpu: "1"
       memory: 1Gi
   autoscaling:
     enabled: true
     minReplicas: 3
-    maxReplicas: 6
+    maxReplicas: 3
     targetCPUUtilizationPercentage: 75
   config:
     nodeEnv: production
@@ -44,15 +44,15 @@ frontend:
   replicas: 3
   resources:
     requests:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 85m
+      memory: 384Mi
     limits:
       cpu: "1"
       memory: 1Gi
   autoscaling:
     enabled: true
     minReplicas: 3
-    maxReplicas: 6
+    maxReplicas: 3
     targetCPUUtilizationPercentage: 75
 
 formio:
@@ -62,7 +62,7 @@ formio:
   nodeOptions: "--max-old-space-size=2048"
   resources:
     requests:
-      cpu: 250m
+      cpu: 150m
       memory: 1Gi
     limits:
       cpu: 1
@@ -73,6 +73,7 @@ mongodb:
     enabled: false
   external:
     uri: ""
+    authSecretName: soba-uat-mongodb-auth
 
 gatewayNetworkPolicy:
   enabled: true

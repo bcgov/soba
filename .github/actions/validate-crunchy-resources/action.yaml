@@ -1,0 +1,67 @@
+name: Validate Crunchy resources
+description: Wait for the expected Postgres replicas and database user secrets.
+
+inputs:
+  namespace:
+    description: OpenShift namespace containing the Crunchy cluster.
+    required: true
+  cluster:
+    description: Crunchy PostgresCluster name.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Validate Crunchy resources
+      shell: bash
+      env:
+        NAMESPACE: ${{ inputs.namespace }}
+        CLUSTER: ${{ inputs.cluster }}
+      run: |
+        set -euo pipefail
+
+        EXPECTED_REPLICAS=3
+        READY_REPLICAS="0"
+        for attempt in $(seq 1 90); do
+          READY_REPLICAS="$(oc -n "$NAMESPACE" get postgrescluster "$CLUSTER" -o jsonpath='{.status.instances[0].readyReplicas}' 2>/dev/null || true)"
+          if [ "$READY_REPLICAS" = "$EXPECTED_REPLICAS" ]; then
+            echo "Crunchy cluster ${CLUSTER} has ${EXPECTED_REPLICAS} ready Postgres replicas."
+            break
+          fi
+
+          echo "Attempt ${attempt}: expected ${EXPECTED_REPLICAS} ready Postgres replicas for ${CLUSTER}, got ${READY_REPLICAS:-0}; waiting 10 seconds"
+          sleep 10
+        done
+
+        if [ "$READY_REPLICAS" != "$EXPECTED_REPLICAS" ]; then
+          echo "::error::Expected ${EXPECTED_REPLICAS} ready Postgres replicas for ${CLUSTER}, got ${READY_REPLICAS:-0}"
+          oc -n "$NAMESPACE" get postgrescluster "$CLUSTER" -o yaml || true
+          oc -n "$NAMESPACE" get pods -l "postgres-operator.crunchydata.com/cluster=${CLUSTER}" || true
+          exit 1
+        fi
+
+        for secret in \
+          "${CLUSTER}-pguser-app" \
+          "${CLUSTER}-pguser-postgres" \
+          "${CLUSTER}-pguser-appproxy" \
+          "${CLUSTER}-pguser-appproxytest" \
+          "${CLUSTER}-pguser-temporal"; do
+          for attempt in $(seq 1 30); do
+            if oc -n "$NAMESPACE" get secret "$secret" >/dev/null 2>&1; then
+              echo "Found expected secret ${secret}."
+              break
+            fi
+
+            if [ "$attempt" = "30" ]; then
+              echo "::error::Expected secret ${secret} was not created."
+              exit 1
+            fi
+
+            echo "Attempt ${attempt}: expected secret ${secret} not found; waiting 10 seconds"
+            sleep 10
+          done
+        done
+
+        APPPROXY_SECRET="${CLUSTER}-pguser-appproxy"
+        oc -n "$NAMESPACE" get secret "$APPPROXY_SECRET" -o jsonpath='{.data.uri}' >/dev/null
+        oc -n "$NAMESPACE" get secret "$APPPROXY_SECRET" -o jsonpath="{.data['pgbouncer-uri']}" >/dev/null

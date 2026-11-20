@@ -10,12 +10,14 @@ jest.mock('../../../src/core/db/repos/formVersionRepo', () => ({
   updateFormVersionDraft: jest.fn(),
   lockFormVersion: jest.fn(),
   getCurrentFormVersion: jest.fn(),
+  nextFormVersionNo: jest.fn(),
 }));
 
 const appendRevision = repo.appendFormVersionRevision as unknown as jest.Mock;
 const updateDraft = repo.updateFormVersionDraft as unknown as jest.Mock;
 const lock = repo.lockFormVersion as unknown as jest.Mock;
 const getCurrent = repo.getCurrentFormVersion as unknown as jest.Mock;
+const nextNo = repo.nextFormVersionNo as unknown as jest.Mock;
 
 const baseInput = {
   workspaceId: 'ws1',
@@ -66,6 +68,26 @@ describe('FormVersionService.save', () => {
       expect.anything(),
     );
     expect(updateDraft).not.toHaveBeenCalled();
+  });
+
+  // It is not the current version until this save, so the current-version check does not apply.
+  it('makes an opened version a draft under the next free number, with the revision', async () => {
+    lock.mockResolvedValue({ id: 'v1', workspaceId: 'ws1', formId: 'f1', state: 'opened' });
+    getCurrent.mockResolvedValue({ id: 'v0' });
+    nextNo.mockResolvedValue(2);
+    appendRevision.mockResolvedValue({ id: 'v1', formId: 'f1', state: 'draft' });
+
+    const svc = new FormVersionService();
+    await svc.save(baseInput);
+
+    expect(updateDraft).toHaveBeenCalledWith(
+      'ws1',
+      'v1',
+      'Author',
+      { state: 'draft', versionNo: 2 },
+      expect.anything(),
+    );
+    expect(appendRevision).toHaveBeenCalled();
   });
 
   it('throws NotFoundError when the version revision cannot be created', async () => {

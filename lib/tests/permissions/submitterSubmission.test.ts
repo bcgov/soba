@@ -4,6 +4,7 @@ import {
   canDeleteSubmissionFile,
   canEmailSubmissionCopy,
   canReadSubmission,
+  canPrintUnsavedAnswers,
   canReadVersionSchema,
   canRenderSubmission,
   canReviseSubmission,
@@ -68,6 +69,7 @@ interface Expected {
   upload: boolean;
   deleteFile: boolean;
   render: boolean;
+  printUnsaved: boolean;
   deleteOwn: boolean;
 }
 
@@ -79,6 +81,7 @@ const all = (value: boolean): Expected => ({
   upload: value,
   deleteFile: value,
   render: value,
+  printUnsaved: value,
   deleteOwn: value,
 });
 
@@ -90,7 +93,14 @@ const CASES: Array<[string, SubmissionAccessFacts, SubmitterFormFacts, AccessCal
     sub('owner', 'submitted'),
     forms.roles,
     idir,
-    { ...all(true), continue: false, upload: false, deleteFile: false, deleteOwn: false },
+    {
+      ...all(true),
+      continue: false,
+      upload: false,
+      deleteFile: false,
+      printUnsaved: false,
+      deleteOwn: false,
+    },
   ],
   [
     'owner of a submission sent back to revise',
@@ -195,7 +205,14 @@ const CASES: Array<[string, SubmissionAccessFacts, SubmitterFormFacts, AccessCal
     sub('owner', 'draft'),
     form({ permissions: [Permissions.submission_create] }),
     idir,
-    { ...all(true), render: false },
+    { ...all(true), render: false, printUnsaved: false },
+  ],
+  [
+    'owner of a draft on a form granting template read but not create',
+    sub('owner', 'draft'),
+    form({ permissions: [Permissions.document_template_read] }),
+    idir,
+    { ...all(false), read: true, render: true, deleteOwn: true },
   ],
   [
     'owner with update, on a submission neither in progress nor submitted',
@@ -216,6 +233,7 @@ describe('submission rules', () => {
       upload: canUploadSubmissionFile(submission, facts, caller),
       deleteFile: canDeleteSubmissionFile(submission, facts, caller),
       render: canRenderSubmission(submission, facts, caller),
+      printUnsaved: canPrintUnsavedAnswers(submission, facts, caller),
       deleteOwn: canDeleteOwnSubmission(submission, caller),
     }).toEqual(expected);
   });
