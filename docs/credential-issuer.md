@@ -98,14 +98,14 @@ configured (`FEATURE_API_KEYS_STATUS`, or `backend.features.api-keys` in Helm); 
 lists it in its frontend feature allowlist. The group is a form settings module at the `api-keys` key, so it
 is served at both levels, relative to the API base (normally `/chefs/api/v1`):
 
-| Method | Path                                    | Response                                          |
-| ------ | --------------------------------------- | ------------------------------------------------- |
-| GET    | `<base>`                                | `{ available, items, page, filters, sort }`       |
-| POST   | `<base>`                                | 201 `{ credential, apiKey }`                      |
-| GET    | `<base>/:credentialId`                  | the key's metadata                                |
-| PATCH  | `<base>/:credentialId`                  | the key's metadata after the save                 |
-| POST   | `<base>/:credentialId/regenerate`       | 200 `{ credential, apiKey }`                      |
-| DELETE | `<base>/:credentialId`                  | 204                                               |
+| Method | Path                              | Response                                                     |
+| ------ | --------------------------------- | ------------------------------------------------------------ |
+| GET    | `<base>`                          | `{ available, integrationApi?, items, page, filters, sort }` |
+| POST   | `<base>`                          | 201 `{ credential, apiKey }`                                 |
+| GET    | `<base>/:credentialId`            | the key's metadata                                           |
+| PATCH  | `<base>/:credentialId`            | the key's metadata after the save                            |
+| POST   | `<base>/:credentialId/regenerate` | 200 `{ credential, apiKey }`                                 |
+| DELETE | `<base>/:credentialId`            | 204                                                          |
 
 `<base>` is `/workspaces/:id/settings/api-keys` or `/design/forms/:id/settings/api-keys`.
 Permissions are those of every settings group. A form's keys are read with `form_read` and changed
@@ -132,7 +132,8 @@ rejected. Rows and the total are read from one snapshot.
 `available` is false when the default issuer cannot be built from its configuration or cannot
 generate keys, as with the no-op. It is not a live readiness check. Metadata holds `id`, `scope`,
 `label`, `notes`, `types`, `status`, `createdAt`, `updatedAt` and nullable `rotatedAt`, never the
-consumer ID or issuer settings. Every response of the group carries `Cache-Control: no-store`.
+consumer ID or issuer settings. `integrationApi.url` is `INTEGRATION_API_PUBLIC_URL`, present only
+when it is set. Every response of the group carries `Cache-Control: no-store`.
 
 ## Key lifecycle
 

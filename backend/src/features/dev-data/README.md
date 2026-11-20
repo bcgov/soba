@@ -56,6 +56,13 @@ pnpm db:dev-data:verify                                         # check the acce
 pnpm db:dev-data:verify --persona outsider --form protectedOwn  # explain one case
 ```
 
+Under the no-op credential issuer (the local default), a seed also creates one active API key,
+labelled `[dev] Integration API`, in a workspace the target user owns, and prints its client ID.
+Send that client ID as `X-API-KEY` to the local dev gateway to call the integration API; see
+`src/integration/README.md`. The integration API refuses it while the `api-keys` feature is off, as
+it is by default; the seed then prints how to turn it on. Only purge removes it. Under any other
+issuer the seed creates no key and says so.
+
 `--owner-file` must point inside the project; a path that escapes it is refused.
 `--skip-anonymous` attributes the public user's submissions to the target user instead, so the
 row counts the paging anchors depend on stay the same. `--purge --dry-run` reports what would be

@@ -111,6 +111,9 @@ spec:
             - name: http
               containerPort: {{ .Values.backend.service.port }}
               protocol: TCP
+            - name: integration
+              containerPort: {{ .Values.backend.service.integrationPort }}
+              protocol: TCP
           {{- if .Values.vault.enabled }}
           command: ["/bin/sh", "-c"]
           args:

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button, InlineAlert, TextField } from '@bcgov/design-system-react-components';
 import { Modal } from '@/src/components/Modal';
 import type { Dictionary } from '@/src/types/dictionary';
+import { IntegrationApiDetails } from './IntegrationApiDetails';
 
 /** What the modal holds: a regenerate to confirm for the named key, or a key to show once. */
 export type ApiKeyModalStage = { kind: 'confirm'; label: string } | { kind: 'key'; apiKey: string };
@@ -15,6 +16,8 @@ export interface ApiKeyModalProps {
   stage: ApiKeyModalStage;
   /** A regenerate is in progress; the modal cannot be closed until it ends. */
   pending: boolean;
+  /** Where consumers call the integration API; shown with the key when configured. */
+  integrationApiUrl?: string;
   onConfirm: () => void;
   onClose: () => void;
 }
@@ -27,6 +30,7 @@ export function ApiKeyModal({
   dict,
   stage,
   pending,
+  integrationApiUrl,
   onConfirm,
   onClose,
 }: Readonly<ApiKeyModalProps>) {
@@ -73,13 +77,17 @@ export function ApiKeyModal({
           {t.regenerateConfirmMessage.replace('{label}', () => stage.label)}
         </p>
       ) : (
-        <ApiKeyShown dict={dict} apiKey={stage.apiKey} />
+        <ApiKeyShown dict={dict} apiKey={stage.apiKey} integrationApiUrl={integrationApiUrl} />
       )}
     </Modal>
   );
 }
 
-function ApiKeyShown({ dict, apiKey }: Readonly<{ dict: Dictionary; apiKey: string }>) {
+function ApiKeyShown({
+  dict,
+  apiKey,
+  integrationApiUrl,
+}: Readonly<{ dict: Dictionary; apiKey: string; integrationApiUrl?: string }>) {
   const t = dict.apiKeys;
   const [copyState, setCopyState] = useState<CopyState>('idle');
   const copy = async () => {
@@ -124,6 +132,7 @@ function ApiKeyShown({ dict, apiKey }: Readonly<{ dict: Dictionary; apiKey: stri
           {t.copyError}
         </p>
       )}
+      {integrationApiUrl && <IntegrationApiDetails dict={dict} url={integrationApiUrl} />}
     </div>
   );
 }

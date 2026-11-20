@@ -625,8 +625,12 @@ The dev, PR, test and prod values files each declare their own issuer configurat
 The gateway service's public route is the URL consumers call; it is not the Directory API URL.
 
 Dev, PR and test run `aps-credential-issuer-v3` with `backend.features.api-keys` on; the others run
-`credential-issuer-noop` with the feature off. PRs read dev's Vault secret, so they share dev's gateway ID
-and product environment appId, and a key made on a PR stays in dev's gateway after the PR closes. Follow
+`credential-issuer-noop` with the feature off. PRs use gateway `gw-d3969`, matching their published
+routes. Configure the PR deployment's Vault secret with an issuer account authorized for this gateway
+and its product environment appId. Set the GitHub `pr` environment's `APS_ENVIRONMENT_APP_ID`
+to that same product environment appId and `APS_GATEWAY_ID` to `gw-d3969`. The gateway check reads
+its ACL appId from GitHub; the backend issuer reads its settings from Vault. Closing a PR removes its
+routes, not its APS consumers. Follow
 [Obtain the product environment appId](../../../docs/credential-issuer.md#obtain-the-product-environment-appid)
 to log in to the Portal, query products for the deployment's gateway in the API console, and copy
 the appropriate service's `environments[].appId` into its Vault secret.
@@ -637,3 +641,19 @@ Before selecting `aps-credential-issuer-v3` for an environment, add
 account needs `CredentialIssuer.Generate` on that environment's gateway. Set
 `backend.config.credentialIssuerDefaultCode` to `aps-credential-issuer-v3` after the keys are in place.
 The base chart retains the no-op default.
+
+### Integration API gateway
+
+| Value | Environment variable | Purpose |
+| --- | --- | --- |
+| `backend.service.integrationPort` | `INTEGRATION_PORT` | Integration API listener (default 4001); the Route and router NetworkPolicy cover only `backend.service.port` |
+| `backend.integrationGateway.issuer` | `INTEGRATION_GATEWAY_ISSUER` | APS upstream JWT issuer |
+| `backend.integrationGateway.jwksUri` | `INTEGRATION_GATEWAY_JWKS_URI` | APS upstream JWT signing keys |
+| `backend.integrationGateway.audience` | `INTEGRATION_GATEWAY_AUDIENCE` | The protected Kong service name, `<release>-integrations-v2` |
+| `backend.integrationGateway.clientIdClaim` | `INTEGRATION_GATEWAY_CLIENT_ID_CLAIM` | `consumername` (default) or `consumerid` |
+| `backend.integrationGateway.publicUrl` | `INTEGRATION_API_PUBLIC_URL` | Gateway URL consumers call; the published spec's server, shown with API keys |
+
+Empty issuer, JWKS URI or audience leaves integration authentication off: `/me` returns 503. The
+dev, test, UAT and prod values files set all of them; PR Open sets them with `--set-string`. See
+[the gateway README](../../gateway/README.md) for the gateway side and
+[the integration API README](../../../backend/src/integration/README.md) for the backend.

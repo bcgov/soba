@@ -14,7 +14,7 @@
       "minikube": "latest"
     }
   },
-  "forwardPorts": [3000, 3001, 3100, 3101, 4000, 5432, 7233, 8088, 27017, 9000, 9001],
+  "forwardPorts": [3000, 3001, 3100, 3101, 4000, 4001, 4002, 5432, 7233, 8088, 27017, 9000, 9001],
   "portsAttributes": {
     "3000": {
       "label": "Frontend - Combined (Next.js)"
@@ -30,6 +30,12 @@
     },
     "4000": {
       "label": "Backend (Express)"
+    },
+    "4001": {
+      "label": "Backend integration API (Express)"
+    },
+    "4002": {
+      "label": "Dev gateway (local APS stand-in)"
     },
     "5432": {
       "label": "PostgreSQL"

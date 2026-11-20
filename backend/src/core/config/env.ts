@@ -391,6 +391,48 @@ export function createEnvReader(source: EnvSource) {
 
 export type EnvReader = ReturnType<typeof createEnvReader>;
 
+export interface IntegrationGatewaySettings {
+  issuer: string;
+  jwksUri: string;
+  audience: string;
+  clientIdClaim: 'consumername' | 'consumerid';
+}
+
+/** Missing or invalid gateway configuration disables incoming integration authentication. */
+export const resolveIntegrationGatewaySettings = (
+  source: EnvSource,
+): IntegrationGatewaySettings | undefined => {
+  const issuer = getOptionalEnvFrom(source, 'INTEGRATION_GATEWAY_ISSUER')?.trim();
+  const jwksUri = getOptionalEnvFrom(source, 'INTEGRATION_GATEWAY_JWKS_URI')?.trim();
+  const audience = getOptionalEnvFrom(source, 'INTEGRATION_GATEWAY_AUDIENCE')?.trim();
+  const clientIdClaim =
+    getOptionalEnvFrom(source, 'INTEGRATION_GATEWAY_CLIENT_ID_CLAIM')?.trim() || 'consumername';
+  if (
+    !issuer ||
+    !jwksUri ||
+    !audience ||
+    (clientIdClaim !== 'consumername' && clientIdClaim !== 'consumerid')
+  )
+    return undefined;
+  const development = getOptionalEnvFrom(source, 'NODE_ENV') === 'development';
+  try {
+    for (const value of [issuer, jwksUri]) {
+      const url = new URL(value);
+      if (!isTrustedGatewayUrl(url, development) || url.username || url.password) return undefined;
+    }
+  } catch {
+    return undefined;
+  }
+  return { issuer, jwksUri, audience, clientIdClaim };
+};
+
+/** HTTPS, or plain HTTP on this machine in development, where the local dev gateway serves. */
+const isTrustedGatewayUrl = (url: URL, development: boolean): boolean =>
+  url.protocol === 'https:' ||
+  (development &&
+    url.protocol === 'http:' &&
+    (url.hostname === 'localhost' || url.hostname === '127.0.0.1'));
+
 const getRequiredEnv = (key: string): string => getRequiredEnvFrom(process.env, key);
 const getOptionalEnv = (key: string): string | undefined => getOptionalEnvFrom(process.env, key);
 const getBooleanEnv = (key: string): boolean | undefined => getBooleanEnvFrom(process.env, key);
@@ -398,6 +440,7 @@ const getNumberEnv = (key: string): number | undefined => getNumberEnvFrom(proce
 const getCsvEnv = (key: string): string[] | undefined => getCsvEnvFrom(process.env, key);
 
 export const env = {
+  getIntegrationGatewaySettings: () => resolveIntegrationGatewaySettings(process.env),
   loadEnv,
   getRequiredEnv,
   getOptionalEnv,
@@ -477,6 +520,11 @@ export const env = {
   getTemporalNamespace: () => getOptionalEnv('TEMPORAL_NAMESPACE') ?? 'default',
   getTemporalTaskQueue: () => getOptionalEnv('TEMPORAL_TASK_QUEUE') ?? 'soba',
   getTemporalWorkerHealthPort: () => getNumberEnv('TEMPORAL_WORKER_HEALTH_PORT') ?? 9090,
+  // Integration API listener; the chart sets it from backend.service.integrationPort.
+  getIntegrationPort: () => getNumberEnv('INTEGRATION_PORT') ?? 4001,
+  /** Gateway URL integration consumers call: the published spec's server, shown with API keys. */
+  getIntegrationApiPublicUrl: () =>
+    getOptionalEnv('INTEGRATION_API_PUBLIC_URL')?.trim() || undefined,
   // Match the chart's haproxy.router.openshift.io/timeout annotation.
   getHttpRouteTimeoutMs: () => getNumberEnv('HTTP_ROUTE_TIMEOUT_MS'),
   // Budget for one outbound call. Unset derives it from the route timeout.

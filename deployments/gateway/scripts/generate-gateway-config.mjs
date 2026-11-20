@@ -7,7 +7,7 @@ import { parseArgs } from 'node:util';
 const help = `Render the SOBA gateway configuration for gwa publish-gateway without publishing it.
 
 Usage:
-  node deployments/gateway/scripts/generate-gateway-config.mjs [--output FILE]
+  node deployments/gateway/scripts/generate-gateway-config.mjs [--integration] [--output FILE]
 
 Required environment variables:
   GATEWAY_ID             Gateway ID, e.g. gw-e1890
@@ -16,6 +16,11 @@ Required environment variables:
   GATEWAY_HOSTNAME       Route hostname, without scheme or path
   GATEWAY_ROUTE_PATH     Route path prefix, ending in /
   BACKEND_HOST           Backend Service DNS name, without scheme, port, or path
+
+With --integration, also requires:
+  GATEWAY_ENVIRONMENT_APP_ID   Product Environment appId allowed by the ACL
+  GATEWAY_JWT_ISSUER           APS upstream JWT issuer (HTTPS URL)
+Use a dedicated service name and qualifier for this protected integration service.
 
 Writes YAML to stdout unless --output is supplied. Uses only Node.js built-ins.
 `;
@@ -43,6 +48,7 @@ async function main() {
     options: {
       output: { type: 'string', short: 'o' },
       help: { type: 'boolean', short: 'h' },
+      integration: { type: 'boolean', default: false },
     },
   });
   if (values.help) {
@@ -72,7 +78,20 @@ async function main() {
     GATEWAY_ROUTE_PATH: required('GATEWAY_ROUTE_PATH', env.GATEWAY_ROUTE_PATH),
     GATEWAY_STRIP_PATH: env.GATEWAY_ROUTE_PATH !== '/',
   };
-  const template = await readFile(new URL('../service.template.yaml', import.meta.url), 'utf8');
+  if (!/^\/(?:[a-zA-Z0-9_-]+\/)*$/.test(substitutions.GATEWAY_ROUTE_PATH)) {
+    throw new Error('GATEWAY_ROUTE_PATH must be / or slash-separated path segments ending in /');
+  }
+  if (values.integration) {
+    substitutions.GATEWAY_ENVIRONMENT_APP_ID = required('GATEWAY_ENVIRONMENT_APP_ID', env.GATEWAY_ENVIRONMENT_APP_ID);
+    const issuer = required('GATEWAY_JWT_ISSUER', env.GATEWAY_JWT_ISSUER);
+    const issuerUrl = new URL(issuer);
+    if (issuerUrl.protocol !== 'https:' || issuerUrl.username || issuerUrl.password || issuerUrl.search || issuerUrl.hash) {
+      throw new Error('GATEWAY_JWT_ISSUER must be an HTTPS issuer URL');
+    }
+    substitutions.GATEWAY_JWT_ISSUER = issuer;
+  }
+  const templateName = values.integration ? '../integration.template.yaml' : '../service.template.yaml';
+  const template = await readFile(new URL(templateName, import.meta.url), 'utf8');
   const rendered = template.replace(/\$\{([^}]+)\}/g, (_, name) => {
     if (!Object.hasOwn(substitutions, name)) {
       throw new Error(`Unknown template variable: ${name}`);

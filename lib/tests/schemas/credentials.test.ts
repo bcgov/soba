@@ -1,4 +1,4 @@
-import { CredentialFieldsSchema } from '../../src/schemas/credentials';
+import { CredentialFieldsSchema, CredentialStateSchema } from '../../src/schemas/credentials';
 
 const input = { label: 'Integration', notes: '', types: ['api'] };
 describe('credential fields', () => {
@@ -19,5 +19,22 @@ describe('credential fields', () => {
     { ...input, clientId: 'untrusted' },
   ])('rejects invalid input %j', (body) => {
     expect(CredentialFieldsSchema.safeParse(body).success).toBe(false);
+  });
+});
+
+describe('credential state', () => {
+  const state = {
+    available: true,
+    items: [],
+    page: { offset: 0, limit: 10, total: 0 },
+    filters: {},
+    sort: 'createdAt:desc',
+  };
+  it('accepts a state with or without the integration API URL', () => {
+    expect(CredentialStateSchema.parse(state)).not.toHaveProperty('integrationApi');
+    const url = 'https://gateway.example.test/integrations/v2';
+    expect(
+      CredentialStateSchema.parse({ ...state, integrationApi: { url } }).integrationApi,
+    ).toEqual({ url });
   });
 });

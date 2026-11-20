@@ -105,23 +105,24 @@ jobs:
           gwa config set host "$APS_HOST"
           gwa config set gateway "$GATEWAY_ID"
           gwa login --client-id "$GWA_CLIENT_ID" --client-secret "$GWA_CLIENT_SECRET"
-          QUALIFIER="proxy-proof-${RELEASE}"
-          SERVICE="soba-${QUALIFIER}"
           # GWA resolves config paths relative to the current working directory.
           cd "$RUNNER_TEMP"
           # Never publish an empty configuration without the exact PR qualifier.
           printf 'services: []\n' > empty-gateway.yaml
-          gwa publish-gateway empty-gateway.yaml \
-            --qualifier "$QUALIFIER" --dry-run
-          gwa publish-gateway empty-gateway.yaml \
-            --qualifier "$QUALIFIER"
+          for QUALIFIER in "proxy-proof-${RELEASE}" "integrations-${RELEASE}"; do
+            gwa publish-gateway empty-gateway.yaml \
+              --qualifier "$QUALIFIER" --dry-run
+            gwa publish-gateway empty-gateway.yaml \
+              --qualifier "$QUALIFIER"
+          done
           for attempt in {1..12}; do
             if gwa status --json > "$RUNNER_TEMP/gateway-status.json" \
-              && jq -e --arg name "$SERVICE" \
-                'if type == "array" then all(.[]; .name != $name) else false end' \
+              && jq -e --arg public "soba-proxy-proof-${RELEASE}" \
+                --arg integration "${RELEASE}-integrations-v2" \
+                'if type == "array" then all(.[]; .name != $public and .name != $integration) else false end' \
                 "$RUNNER_TEMP/gateway-status.json"; then
-              printf 'Removed PR gateway configuration: %s (qualifier %s)\n' \
-                "$SERVICE" "$QUALIFIER" >> "$GITHUB_STEP_SUMMARY"
+              printf 'Removed PR gateway configurations: proxy-proof-%s and integrations-%s\n' \
+                "$RELEASE" "$RELEASE" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
             sleep 5

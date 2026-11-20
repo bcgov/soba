@@ -3,7 +3,7 @@
  * form engine. No argv, console, or process exit: takes options, returns a manifest.
  */
 import { db } from '../../core/db/client';
-import type { WorkspaceMembershipRoleCode } from '../../core/db/codes';
+import { WorkspaceMembershipRole, type WorkspaceMembershipRoleCode } from '../../core/db/codes';
 import { ConflictError } from '../../core/errors';
 import { mapInOrder } from '../../core/inOrder';
 import { createTeamWorkspace } from '../../core/db/repos/workspaceRepo';
@@ -27,6 +27,7 @@ import {
   type PlannedUser,
   type SizeName,
 } from './plan';
+import { createDevApiKey, type ManifestApiKey } from './apiKey';
 import { requireBaseSeed } from './preconditions';
 import { finishRun, hasOpenRun, recordIds, startRun } from './runs';
 import { resolveTargetUser, type ResolvedUser, type UserRef } from './resolveUser';
@@ -74,6 +75,8 @@ export interface DevDataManifest {
   };
   users: Array<{ id: string; displayLabel: string; identityProviderCode: string }>;
   workspaces: ManifestWorkspace[];
+  /** The key for the local dev gateway, in a workspace the target user owns. Null unless no-op. */
+  apiKey: ManifestApiKey | null;
   counts: Record<string, number>;
   coverage: CoverageManifest;
 }
@@ -367,6 +370,8 @@ export async function generate(options: GenerateOptions): Promise<DevDataManifes
   await mapInOrder([...plan.workspaces].reverse(), async (planned) => {
     created[planned.index] = await createWorkspace(ctx, planned);
   });
+  const keyWorkspace = created.find((w) => w.targetUserRole === WorkspaceMembershipRole.owner);
+  const apiKey = keyWorkspace ? await createDevApiKey(runId, keyWorkspace.id, target.id) : null;
 
   const manifest: DevDataManifest = {
     generatedAt: new Date().toISOString(),
@@ -379,6 +384,7 @@ export async function generate(options: GenerateOptions): Promise<DevDataManifes
       identityProviderCode: u.identityProviderCode,
     })),
     workspaces: created,
+    apiKey,
     counts: countRows(created, ctx.users.size),
     coverage,
   };

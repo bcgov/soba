@@ -46,9 +46,14 @@ export const CredentialMetadataSchema = z.object({
   updatedAt: z.iso.datetime(),
   rotatedAt: z.iso.datetime().nullable(),
 });
+/** The Swagger UI name of the integration API spec, selected by `?urls.primaryName=`. */
+export const INTEGRATION_API_DOCS_NAME = 'Integration API v2';
+
 export const CredentialStateSchema = z.object({
   /** Whether the configured issuer can generate keys. False under the no-op issuer. */
   available: z.boolean(),
+  /** Where consumers call the integration API with a key. Absent when the deployment has none. */
+  integrationApi: z.object({ url: z.string() }).optional(),
   items: z.array(CredentialMetadataSchema),
   page: OffsetPageSchema,
   filters: z.object({ q: z.string().optional() }),

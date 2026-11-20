@@ -29,11 +29,12 @@ pnpm --dir frontend dev   # in another terminal
 
 Ports are forwarded to your host, so open these in your host browser:
 
-| App      | URL                                                       |
-| -------- | --------------------------------------------------------- |
-| Frontend | http://localhost:3000                                     |
-| Backend  | http://localhost:4000                                     |
-| Form.io  | http://localhost:3001 (`formio@localhost.com` / `formio`) |
+| App             | URL                                                       |
+| --------------- | --------------------------------------------------------- |
+| Frontend        | http://localhost:3000                                     |
+| Backend         | http://localhost:4000                                     |
+| Integration API | http://localhost:4001/chefs/api/integrations/v2/health    |
+| Form.io         | http://localhost:3001 (`formio@localhost.com` / `formio`) |
 
 ## Sidecar connection strings
 

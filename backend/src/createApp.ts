@@ -1,0 +1,174 @@
+import { env } from './core/config/env';
+env.loadEnv();
+
+import express from 'express';
+import rTracer from 'cls-rtracer';
+import { INTEGRATION_API_DOCS_NAME } from '@soba/lib';
+import cors from 'cors';
+import passport from 'passport';
+import { checkJwt } from './core/middleware/auth';
+import { designRouter, submitRouter, filesApiRouter, coreRouter } from './core/api';
+import { healthRouter } from './core/api/health';
+import { metaRouter } from './core/api/meta';
+import { buildOpenApiSpec } from './core/api/shared/openapi';
+import { buildIntegrationV2OpenApiSpec } from './integration/v2/openapi';
+import swaggerUi from 'swagger-ui-express';
+import { httpLogger, log } from './core/logging';
+import { resolveActor, resolveActorOrPublic } from './core/middleware/actor';
+import { requireFeature } from './core/middleware/requireFeature';
+import { requireSobaAdmin } from './core/middleware/requireSobaAdmin';
+import { coreErrorHandler, notFoundHandler } from './core/middleware/errorHandler';
+import { adminRouter } from './core/api/admin';
+import { globalRateLimit, apiRateLimit, publicRateLimit } from './core/middleware/rateLimit';
+import { initializePassport } from './core/auth/passport';
+import { Features } from './core/db/codes';
+
+/** Build the main API HTTP stack without opening sockets or starting background workers. */
+export const createApp = () => {
+  const app = express();
+  app.disable('x-powered-by');
+  // The app serves the base path itself, so Routes and probes address the same URLs the browser uses.
+  const apiBasePath = env.getApiBasePath();
+  const apiPath = (path: string) => `${apiBasePath}${path}`;
+
+  // Trust X-Forwarded-* from a bounded number of proxies (not `true` — breaks express-rate-limit IP keys)
+  app.set('trust proxy', env.getTrustProxySetting());
+
+  initializePassport();
+
+  // Downloads read their file name from Content-Disposition. Failed reads show X-Request-Id.
+  const corsExposedHeaders = ['Content-Disposition', 'X-Request-Id'];
+  // CORS is always restricted to an explicit allowlist of trusted origins (never `*`).
+  // Production origins come from CORS_ORIGIN; in development we fall back to CORS_DEV_ORIGIN
+  // (configurable per developer via .env) when CORS_ORIGIN is unset.
+  const configuredOrigins = env.getCorsOrigins() ?? [];
+  let allowedOrigins = configuredOrigins;
+  if (allowedOrigins.length === 0 && env.isDevelopment()) {
+    allowedOrigins = env.getCorsDevOrigins() ?? [];
+  }
+
+  if (allowedOrigins.length > 0) {
+    log.info({ origins: allowedOrigins }, 'Allowing CORS for configured origins');
+    app.use(
+      cors({
+        origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
+        credentials: true,
+        exposedHeaders: corsExposedHeaders,
+      }),
+    );
+  } else {
+    log.info('No CORS origins configured; cross-origin requests will be blocked');
+  }
+
+  app.use(
+    rTracer.expressMiddleware({
+      useHeader: true,
+      headerName: 'X-Request-Id',
+      echoHeader: true,
+    }),
+  );
+
+  app.use(httpLogger);
+  app.use(passport.initialize());
+
+  app.use(globalRateLimit);
+
+  // ——— Public routes (no authentication) ———
+  const apiSpecPath = apiPath('/api/docs/openapi.json');
+  // Only the spec is public here; the integration API itself is served on its own port.
+  const integrationSpecPath = apiPath('/api/docs/integrations/v2/openapi.json');
+  app.get(apiSpecPath, publicRateLimit, (_req, res) => {
+    res.json(buildOpenApiSpec());
+  });
+  app.get(integrationSpecPath, publicRateLimit, (_req, res) => {
+    res.json(buildIntegrationV2OpenApiSpec());
+  });
+  app.use(
+    apiPath('/api/docs'),
+    publicRateLimit,
+    swaggerUi.serve,
+    swaggerUi.setup(null, {
+      // Without explorer, swagger-ui-express hides the spec selector.
+      explorer: true,
+      swaggerOptions: {
+        urls: [
+          { url: apiSpecPath, name: 'Backend API v1' },
+          { url: integrationSpecPath, name: INTEGRATION_API_DOCS_NAME },
+        ],
+      },
+    }),
+  );
+
+  // ——— v1 API ———
+  // Each surface has its own base path, so its middleware only runs for its own routes (no fall-through,
+  // no double rate-limit) and its auth stack is uniform.
+  app.use(apiPath('/api/v1/meta'), publicRateLimit, express.json(), metaRouter);
+  app.use(apiPath('/api/v1/health'), publicRateLimit, healthRouter);
+
+  // Body limit for the body-carrying surfaces (see env.getJsonBodyLimit). meta stays at express's
+  // default: it is public and body-less.
+  const jsonBodyLimit = env.getJsonBodyLimit();
+
+  // Submit feature (public-capable): anonymous resolves to the public user; each submit route authorizes
+  // itself. 404s when submit-mode is disabled.
+  app.use(
+    apiPath('/api/v1/submit'),
+    apiRateLimit,
+    express.json({ limit: jsonBodyLimit }),
+    checkJwt({ allowPublic: true }),
+    resolveActorOrPublic,
+    requireFeature(Features.submit_mode),
+    submitRouter,
+  );
+
+  // Files feature (public-capable): submission attachments, same auth as submit. Multipart and
+  // body-less only, so no JSON parser. 404s when submit-mode is disabled.
+  app.use(
+    apiPath('/api/v1/files'),
+    apiRateLimit,
+    checkJwt({ allowPublic: true }),
+    resolveActorOrPublic,
+    requireFeature(Features.submit_mode),
+    filesApiRouter,
+  );
+
+  // Design feature (staff): mandatory auth. 404s when design-mode is disabled.
+  app.use(
+    apiPath('/api/v1/design'),
+    apiRateLimit,
+    express.json({ limit: jsonBodyLimit }),
+    checkJwt(),
+    resolveActor,
+    requireFeature(Features.design_mode),
+    designRouter,
+  );
+
+  // Admin: platform administration.
+  app.use(
+    apiPath('/api/v1/admin'),
+    apiRateLimit,
+    express.json({ limit: jsonBodyLimit }),
+    checkJwt(),
+    resolveActor,
+    requireSobaAdmin,
+    adminRouter,
+  );
+
+  // Core: workspace/account management and staff document templates (mandatory auth). Mounted last
+  // so the more specific paths win.
+  app.use(
+    apiPath('/api/v1'),
+    apiRateLimit,
+    express.json({ limit: jsonBodyLimit }),
+    checkJwt(),
+    resolveActor,
+    coreRouter,
+  );
+
+  // Paths outside every surface, and errors raised by the surface middleware above (auth, feature
+  // gates, body parsing), which run before a surface router's own error handler.
+  app.use(notFoundHandler);
+  app.use(coreErrorHandler);
+
+  return app;
+};

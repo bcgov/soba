@@ -318,7 +318,7 @@ jobs:
 
   gateway:
     name: Verify UAT through APS gateway
-    needs: [deploy]
+    needs: [set-vars, deploy]
     permissions:
       contents: read
       pull-requests: read
@@ -326,4 +326,8 @@ jobs:
     with:
       environment: uat
       release: soba-uat
+      ref: ${{ needs.set-vars.outputs.chart_ref }}
+      integration_enabled: true
+      # Temporarily verify with a manually approved key after deployment.
+      integration_health_check: false
     secrets: inherit
