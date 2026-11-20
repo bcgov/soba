@@ -703,7 +703,7 @@ describe('WorkspaceForm', () => {
     );
   });
 
-  it("opens settings from a link to a tab that doesn' exists", async () => {
+  it('opens settings from a link to a tab that does not exist', async () => {
     mockSearchParams.value = 'tab=notATab';
     await act(async () => {
       renderForm('ws2');

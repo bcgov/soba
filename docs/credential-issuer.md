@@ -98,14 +98,14 @@ configured (`FEATURE_API_KEYS_STATUS`, or `backend.features.api-keys` in Helm); 
 lists it in its frontend feature allowlist. The group is a form settings module at the `api-keys` key, so it
 is served at both levels, relative to the API base (normally `/chefs/api/v1`):
 
-| Method | Path                              | Response                                    |
-| ------ | --------------------------------- | ------------------------------------------- |
-| GET    | `<base>`                          | `{ available, items, page, filters, sort }` |
-| POST   | `<base>`                          | 201 `{ credential, apiKey }`                |
-| GET    | `<base>/:credentialId`            | the key's metadata                          |
-| PATCH  | `<base>/:credentialId`            | the key's metadata after the save           |
-| POST   | `<base>/:credentialId/regenerate` | 200 `{ credential, apiKey }`                |
-| DELETE | `<base>/:credentialId`            | 204                                         |
+| Method | Path                                    | Response                                          |
+| ------ | --------------------------------------- | ------------------------------------------------- |
+| GET    | `<base>`                                | `{ available, items, page, filters, sort }`       |
+| POST   | `<base>`                                | 201 `{ credential, apiKey }`                      |
+| GET    | `<base>/:credentialId`                  | the key's metadata                                |
+| PATCH  | `<base>/:credentialId`                  | the key's metadata after the save                 |
+| POST   | `<base>/:credentialId/regenerate`       | 200 `{ credential, apiKey }`                      |
+| DELETE | `<base>/:credentialId`                  | 204                                               |
 
 `<base>` is `/workspaces/:id/settings/api-keys` or `/design/forms/:id/settings/api-keys`.
 Permissions are those of every settings group. A form's keys are read with `form_read` and changed
@@ -182,9 +182,10 @@ local metadata only; their consumers stay in the gateway.
 ## Settings drawers
 
 Workspace > Form Settings > API Keys lists the workspace's keys; a form's Settings > API Keys lists
-the workspace's keys, read-only, and the form's own. Each drawer follows the groups drawer in the Permissions tab: search and
-Add API Key above a server-paged table, Edit and Delete on the rows the drawer owns, and the add or
-edit form below the table. Delete is offered for `active` and `failed` keys.
+the workspace's keys, read-only, and the form's own. Each drawer follows the Groups drawer on the
+workspace Permissions tab: search and Add API Key above a server-paged table, Edit and Delete on the
+rows the drawer owns, and the add or edit form below the table. Delete is offered for `active` and
+`failed` keys.
 
 The add form takes the label, notes and types. Generate API Key creates the key and shows it once in
 a modal with a Copy button; Save then stores any change to the label, notes and types, and stays

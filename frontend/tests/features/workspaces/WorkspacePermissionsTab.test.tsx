@@ -62,8 +62,8 @@ describe('WorkspacePermissionsTab', () => {
     expect(header(t.groupsTab)).toHaveAttribute('aria-expanded', 'false');
     expect(header(t.rolesTab)).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByTestId('access-drawer')).toBeVisible();
-    expect(screen.queryByTestId('groups-drawer')).not.toBeVisible();
-    expect(screen.queryByTestId('roles-drawer')).not.toBeVisible();
+    expect(screen.getByTestId('groups-drawer')).not.toBeVisible();
+    expect(screen.getByTestId('roles-drawer')).not.toBeVisible();
   });
 
   it('gives each drawer the workspace', () => {
@@ -80,8 +80,10 @@ describe('WorkspacePermissionsTab', () => {
 
     await user.click(header(t.groupsTab));
 
+    expect(header(t.accessTab)).toHaveAttribute('aria-expanded', 'false');
     expect(header(t.groupsTab)).toHaveAttribute('aria-expanded', 'true');
     expect(header(t.rolesTab)).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByTestId('access-drawer')).not.toBeVisible();
     expect(screen.getByTestId('groups-drawer')).toBeVisible();
     expect(screen.getByTestId('roles-drawer')).not.toBeVisible();
 
