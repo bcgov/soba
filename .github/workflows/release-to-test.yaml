@@ -9,7 +9,7 @@ env:
 on:
   push:
     branches:
-      - "release/sprint-*"
+      - "release/s*-r*"
     paths:
       - "backend/**"
       - "frontend/**"
@@ -27,7 +27,7 @@ on:
   workflow_dispatch:
     inputs:
       release_branch:
-        description: "Release branch to deploy, for example release/sprint-30"
+        description: "Release branch to deploy, for example release/s10-r1"
         required: true
         type: string
 
@@ -42,13 +42,15 @@ jobs:
     name: Set release variables
     # The create event is emitted for every new branch and tag; only release
     # branches should start this deployment workflow.
-    if: ${{ github.event_name != 'create' || (github.event.ref_type == 'branch' && startsWith(github.event.ref, 'release/sprint-')) }}
+    if: >-
+      (github.event_name != 'create' ||
+      (github.event.ref_type == 'branch' && startsWith(github.event.ref, 'release/s'))) &&
+      (github.event_name != 'push' || github.event.created != true)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       ref: ${{ steps.vars.outputs.ref }}
       branch: ${{ steps.vars.outputs.branch }}
-      image_version: ${{ steps.vars.outputs.image_version }}
     steps:
       - name: Validate release branch
         id: vars
@@ -61,27 +63,198 @@ jobs:
             BRANCH="${{ github.ref_name }}"
           fi
 
-          if ! echo "$BRANCH" | grep -Eq '^release/sprint-[0-9]+$'; then
-            echo "Branch '$BRANCH' does not match release/sprint-xxx."
+          if ! echo "$BRANCH" | grep -Eq '^release/s[0-9]+-r[0-9]+$'; then
+            echo "Branch '$BRANCH' does not match release/s<sprint>-r<release>."
             exit 1
           fi
 
-          # Keep release images distinct from ordinary branch images.
-          # release/sprint-34 becomes soba-release-sprint-34.
-          IMAGE_VERSION="soba-$(echo "$BRANCH" | tr '/' '-')"
-
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
           echo "ref=refs/heads/$BRANCH" >> "$GITHUB_OUTPUT"
-          echo "image_version=$IMAGE_VERSION" >> "$GITHUB_OUTPUT"
+
+  version:
+    name: Version release commit
+    needs: [set-vars]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: read
+    outputs:
+      ref: ${{ steps.version.outputs.ref }}
+      image_version: ${{ steps.version.outputs.image_version }}
+    steps:
+      - name: Checkout release branch and tags
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.set-vars.outputs.ref }}
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+
+      - name: Install existing release-it dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Calculate and commit release version
+        id: version
+        shell: bash
+        env:
+          BRANCH: ${{ needs.set-vars.outputs.branch }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git fetch origin develop --tags
+          HEAD_SHA=$(git rev-parse HEAD)
+          if [ "$EVENT_NAME" != workflow_dispatch ] && [ "$HEAD_SHA" != "$EVENT_SHA" ]; then
+            MESSAGE=$(git log -1 --format=%s)
+            if [ "$(git rev-parse HEAD^)" != "$EVENT_SHA" ] ||
+               [[ "$MESSAGE" != "chore(release): version "*" from $EVENT_SHA" ]]; then
+              echo "::error::Release branch moved since this event; rerun from its current head."
+              exit 1
+            fi
+          fi
+
+          BUMP=none
+          if [ "$HEAD_SHA" = "$EVENT_SHA" ] && [ "$EVENT_NAME" = create ]; then
+            if [ "$HEAD_SHA" != "$(git rev-parse origin/develop)" ]; then
+              echo "::error::New release branch must point at the current develop commit."
+              exit 1
+            fi
+            LATEST_TAG=$(git tag --list 'v[0-9]*' --sort=-v:refname |
+              grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed -n '1p' || true)
+            if [ -z "$LATEST_TAG" ]; then
+              LATEST_TAG=$(git tag --list 'v[0-9]*' --sort=-v:refname |
+                grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-[0-9A-Za-z.-]+$' | sed -n '1p' || true)
+            fi
+            : "${LATEST_TAG:?No finalized version tag is reachable from develop.}"
+            git merge-base --is-ancestor "$LATEST_TAG" HEAD || {
+              echo "::error::Latest finalized release is not in develop; back-merge main first."
+              exit 1
+            }
+            COMMITS=$(git log --format='%B%n---SOBA-COMMIT---' "$LATEST_TAG"..HEAD)
+            SUBJECTS=$(git log --format='%s' "$LATEST_TAG"..HEAD)
+            BASE_VERSION=${LATEST_TAG#v}
+          elif [ "$HEAD_SHA" = "$EVENT_SHA" ] && [ "$EVENT_NAME" = push ]; then
+            PR_NUMBER=""
+            for attempt in 1 2 3 4 5; do
+              PRS=$(gh api "repos/$GITHUB_REPOSITORY/commits/$EVENT_SHA/pulls?per_page=100")
+              PR_NUMBER=$(jq -r --arg branch "$BRANCH" --arg sha "$EVENT_SHA" \
+                '[.[] | select(.merged_at != null and .base.ref == $branch and .merge_commit_sha == $sha)] | if length == 1 then .[0].number else empty end' <<< "$PRS")
+              [ -n "$PR_NUMBER" ] && break
+              [ "$attempt" -eq 5 ] || sleep 2
+            done
+            COMMITS=""
+            SUBJECTS=""
+            if [ -n "$PR_NUMBER" ]; then
+              PR_COMMITS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/commits?per_page=100")
+              COMMITS=$(jq -r '.[].commit.message' <<< "$PR_COMMITS")
+              SUBJECTS=$(jq -r '.[].commit.message | split("\n")[0]' <<< "$PR_COMMITS")
+            fi
+            BASE_VERSION=$(jq -r .version package.json)
+          else
+            COMMITS=""
+            SUBJECTS=""
+            BASE_VERSION=$(jq -r .version package.json)
+          fi
+
+          for manifest in backend/package.json frontend/package.json lib/package.json; do
+            [ "$(jq -r .version "$manifest")" = "$(jq -r .version package.json)" ] || {
+              echo "::error::Application package versions are not synchronized."
+              exit 1
+            }
+          done
+          if [ "$EVENT_NAME" = create ] && [ "$HEAD_SHA" = "$EVENT_SHA" ] &&
+             [ "$(jq -r .version package.json)" != "$BASE_VERSION" ]; then
+            echo "::error::develop application version differs from the latest finalized tag; back-merge main first."
+            exit 1
+          fi
+
+          if grep -Eq '^BREAKING[ -]CHANGE:|^[a-z]+(\([^)]*\))?!:' <<< "$COMMITS"; then
+            BUMP=major
+          elif grep -Eq '^feat(\([^)]*\))?:' <<< "$SUBJECTS"; then
+            BUMP=minor
+          elif grep -Eq '^fix(\([^)]*\))?:' <<< "$SUBJECTS"; then
+            BUMP=patch
+          fi
+
+          NEXT_VERSION="$BASE_VERSION"
+          if [ "$EVENT_NAME" = create ] && [ "$HEAD_SHA" = "$EVENT_SHA" ] &&
+             [[ "$BASE_VERSION" == *-* ]] && [ "$BUMP" = none ]; then
+            NEXT_VERSION=${BASE_VERSION%%-*}
+          elif [ "$BUMP" != none ]; then
+            STABLE=${BASE_VERSION%%-*}
+            IFS=. read -r MAJOR MINOR PATCH <<< "$STABLE"
+            case "$BUMP" in
+              major) NEXT_VERSION="$((MAJOR + 1)).0.0" ;;
+              minor) NEXT_VERSION="$MAJOR.$((MINOR + 1)).0" ;;
+              patch) if [[ "$BASE_VERSION" == *-* ]]; then NEXT_VERSION="$STABLE";
+                     else NEXT_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"; fi ;;
+            esac
+          fi
+
+          if [ "$EVENT_NAME" = create ] && [ "$HEAD_SHA" = "$EVENT_SHA" ] &&
+             [ "$NEXT_VERSION" = "$BASE_VERSION" ]; then
+            echo "::error::No new version is due since the latest finalized release."
+            exit 1
+          fi
+
+          if [ "$NEXT_VERSION" != "$(jq -r .version package.json)" ]; then
+            if git show-ref --verify --quiet "refs/tags/v$NEXT_VERSION"; then
+              echo "::error::Application version $NEXT_VERSION is already finalized."
+              exit 1
+            fi
+            RELEASE_REFS=$(git ls-remote --heads origin 'refs/heads/release/s*-r*')
+            while read -r _ other_ref; do
+              [ -n "$other_ref" ] || continue
+              other_branch=${other_ref#refs/heads/}
+              [ "$other_branch" = "$BRANCH" ] && continue
+              encoded=$(jq -rn --arg branch "$other_branch" '$branch | @uri')
+              other_version=$(gh api "repos/$GITHUB_REPOSITORY/contents/package.json?ref=$encoded" \
+                --jq .content | base64 -d | jq -r .version)
+              if [ "$other_version" = "$NEXT_VERSION" ]; then
+                echo "::error::Application version $NEXT_VERSION is already in $other_branch."
+                exit 1
+              fi
+            done <<< "$RELEASE_REFS"
+            pnpm exec release-it "$NEXT_VERSION" --ci
+            for manifest in package.json backend/package.json frontend/package.json lib/package.json; do
+              [ "$(jq -r .version "$manifest")" = "$NEXT_VERSION" ] || exit 1
+            done
+            git diff --name-only | grep -Ev '^(package.json|backend/package.json|frontend/package.json|lib/package.json)$' && {
+              echo "::error::release-it changed a file outside the four application manifests."
+              exit 1
+            }
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add package.json backend/package.json frontend/package.json lib/package.json
+            git commit -m "chore(release): version $NEXT_VERSION from $EVENT_SHA"
+            git push origin "HEAD:refs/heads/$BRANCH"
+          fi
+
+          BUILT_SHA=$(git rev-parse HEAD)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION=$(jq -r .version package.json)
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::Release builds require a stable application version."
+            exit 1
+          }
+          printf 'ref=%s\nimage_version=%s-%s\n' "$BUILT_SHA" "$VERSION" "$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build & Push
     uses: ./.github/workflows/build-images.yaml
-    needs: [set-vars]
+    needs: [version]
     with:
-      ref: ${{ needs.set-vars.outputs.ref }}
+      ref: ${{ needs.version.outputs.ref }}
       platforms: amd64
-      image_version: ${{ needs.set-vars.outputs.image_version }}
+      image_version: ${{ needs.version.outputs.image_version }}
       publish_latest: false
     secrets: inherit
     permissions:
@@ -172,7 +345,7 @@ jobs:
 
   deploy:
     name: Deploy SOBA to Test
-    needs: [set-vars, build, deploy-crunchy, deploy-mongodb]
+    needs: [set-vars, version, build, deploy-crunchy, deploy-mongodb]
     permissions:
       contents: read
     environment:
@@ -184,7 +357,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.set-vars.outputs.ref }}
+          ref: ${{ needs.version.outputs.ref }}
 
       - name: Install OpenShift CLI
         uses: redhat-actions/openshift-tools-installer@e3b32c2ab7b064b2ce189121c4a49f509a99a7b4 # v3.0
@@ -230,7 +403,7 @@ jobs:
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
           NAMESPACE: ${{ vars.OC_NAMESPACE }}
-          TAG: sha-${{ needs.build.outputs.short_sha }}
+          TAG: ${{ needs.version.outputs.image_version }}
           SHORT_SHA: ${{ needs.build.outputs.short_sha }}
           DOMAIN: ${{ vars.OC_DOMAIN }}
           VAULT_AUTH_PATH: ${{ vars.VAULT_AUTH_PATH }}
@@ -335,3 +508,46 @@ jobs:
       keycloakUsername: ${{ secrets.keycloakUsername }}
       keycloakPassword: ${{ secrets.keycloakPassword }}
       MFA_CODE: ${{ secrets.MFA_CODE }}
+
+  tested-image:
+    name: Record validated release image
+    needs: [set-vars, version, build, gateway, Tests]
+    runs-on: ubuntu-24.04
+    permissions:
+      statuses: write
+      packages: read
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Record successful TEST validation on the built commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_SHA: ${{ needs.version.outputs.ref }}
+          IMAGE_TAG: ${{ needs.version.outputs.image_version }}
+          BRANCH: ${{ needs.set-vars.outputs.branch }}
+        run: |
+          set -euo pipefail
+          IMAGE_ROOT="ghcr.io/${GITHUB_REPOSITORY,,}"
+          for entry in 'backend|' 'frontend|-designer' 'frontend|-forms' 'temporal-worker|'; do
+            IFS='|' read -r image suffix <<< "$entry"
+            digest=$(docker buildx imagetools inspect \
+              "$IMAGE_ROOT/$image:$IMAGE_TAG$suffix" --format '{{json .Manifest}}' |
+              jq -er '.digest | select(test("^sha256:[0-9a-f]{64}$"))')
+            gh api "repos/$GITHUB_REPOSITORY/statuses/$SOURCE_SHA" \
+              -f state=success \
+              -f "context=soba/release-digest/$image$suffix" \
+              -f "description=$digest" >/dev/null
+          done
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SOURCE_SHA" \
+            -f state=success \
+            -f context=soba/release-test \
+            -f description="TEST validated $BRANCH image $IMAGE_TAG" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null

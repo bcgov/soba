@@ -30,6 +30,8 @@ jobs:
     outputs:
       source_sha: ${{ steps.tags.outputs.source_sha }}
       short_sha: ${{ steps.tags.outputs.short_sha }}
+      release_tag: ${{ steps.tags.outputs.release_tag }}
+      image_tag: ${{ steps.tags.outputs.image_tag }}
       uat_tag: ${{ steps.tags.outputs.uat_tag }}
       prod_tag: ${{ steps.tags.outputs.prod_tag }}
     steps:
@@ -60,8 +62,15 @@ jobs:
           set -euo pipefail
           SOURCE_SHA=$(git rev-parse HEAD)
           SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION=$(jq -r .version package.json)
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          for manifest in backend/package.json frontend/package.json lib/package.json; do
+            [ "$(jq -r .version "$manifest")" = "$VERSION" ] || exit 1
+          done
           printf 'source_sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
           printf 'short_sha=%s\n' "$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          printf 'release_tag=%s\n' "$VERSION" >> "$GITHUB_OUTPUT"
+          printf 'image_tag=%s-%s\n' "$VERSION" "$SHORT_SHA" >> "$GITHUB_OUTPUT"
           printf 'uat_tag=soba-uat-%s\n' "$SHORT_SHA" >> "$GITHUB_OUTPUT"
           printf 'prod_tag=soba-prod-%s\n' "$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
@@ -94,9 +103,12 @@ jobs:
       VAULT_SECRET_PATH: ${{ vars.VAULT_SECRET_PATH }}
       VAULT_SERVICE_ACCOUNT_NAME: ${{ vars.VAULT_SERVICE_ACCOUNT_NAME }}
       SOURCE_SHA: ${{ needs.set-vars.outputs.source_sha }}
+      RELEASE_TAG: ${{ needs.set-vars.outputs.release_tag }}
+      IMAGE_TAG: ${{ needs.set-vars.outputs.image_tag }}
       UAT_TAG: ${{ needs.set-vars.outputs.uat_tag }}
       PROD_TAG: ${{ needs.set-vars.outputs.prod_tag }}
       REPOSITORY: ${{ github.repository }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout production deployment chart from main
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -160,6 +172,12 @@ jobs:
           REPOSITORY_LOWER="${REPOSITORY,,}"
           IMAGE_ROOT="$REGISTRY/$REPOSITORY_LOWER"
 
+          TAG_SHA=$(gh api "repos/$REPOSITORY/git/ref/tags/v$RELEASE_TAG" --jq .object.sha)
+          [ "$TAG_SHA" = "$SOURCE_SHA" ] || {
+            echo "::error::The final version tag does not identify the approved UAT source."
+            exit 1
+          }
+
           digest() {
             local image_ref="$1"
             docker buildx imagetools inspect "$image_ref" --format '{{json .Manifest}}' |
@@ -173,6 +191,14 @@ jobs:
             source="$IMAGE_ROOT/$image:$UAT_TAG$suffix"
             source_digest=$(digest "$source") || {
               echo "::error::Missing or unreadable UAT source: $source"
+              exit 1
+            }
+            release_digest=$(digest "$IMAGE_ROOT/$image:$IMAGE_TAG$suffix") || {
+              echo "::error::Missing or unreadable release source: $IMAGE_TAG$suffix"
+              exit 1
+            }
+            [ "$source_digest" = "$release_digest" ] || {
+              echo "::error::UAT and release source digests differ for $image$suffix."
               exit 1
             }
             printf '%s|%s|%s\n' "$image" "$suffix" "$source_digest" >> "$RUNNER_TEMP/prod-images"
@@ -233,7 +259,7 @@ jobs:
             -f deployments/helm/soba/values-prod.yaml \
             --set-string "backend.image.repository=ghcr.io/$REPOSITORY_LOWER/backend" \
             --set-string "backend.image.tag=$PROD_TAG" \
-            --set-string "backend.config.appVersion=$PROD_TAG" \
+            --set-string "backend.config.appVersion=$RELEASE_TAG" \
             --set-string "backend.config.gitSha=$SOURCE_SHA" \
             --set-string "backend.config.gitTag=$PROD_TAG" \
             --set-string "backend.config.imageTag=$PROD_TAG" \
@@ -267,6 +293,7 @@ jobs:
             echo "## Production deployment"
             echo
             echo "- Source commit: \`${SOURCE_SHA}\`"
+            echo "- Release version: \`v${RELEASE_TAG}\`"
             echo "- Production tag: \`${PROD_TAG}\`"
             echo "- Namespace: \`${NAMESPACE}\`"
           } >> "$GITHUB_STEP_SUMMARY"

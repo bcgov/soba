@@ -26,7 +26,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.merged == true &&
-      startsWith(github.event.pull_request.head.ref, 'release/sprint-') &&
+      startsWith(github.event.pull_request.head.ref, 'release/s') &&
       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -36,9 +36,10 @@ jobs:
     outputs:
       branch: ${{ steps.release.outputs.branch }}
       chart_ref: ${{ steps.release.outputs.chart_ref }}
-      release_tag: ${{ steps.release.outputs.release_tag }}
+      release_tag: ${{ steps.tags.outputs.release_tag }}
       source_sha: ${{ steps.release.outputs.source_sha }}
       short_sha: ${{ steps.tags.outputs.short_sha }}
+      image_tag: ${{ steps.tags.outputs.image_tag }}
       uat_tag: ${{ steps.tags.outputs.uat_tag }}
     steps:
       - name: Select tested release image
@@ -64,10 +65,10 @@ jobs:
             # This recovers its existing Test image tag without accepting a branch input.
             PRS=$(gh api "repos/$GITHUB_REPOSITORY/commits/$EVENT_SHA/pulls?per_page=100")
             MATCHES=$(jq --arg repo "$GITHUB_REPOSITORY" --arg sha "$EVENT_SHA" \
-              '[.[] | select(.merged_at != null and .base.ref == "main" and .head.repo.full_name == $repo and .merge_commit_sha == $sha and (.head.ref | test("^release/sprint-[0-9]+$")))]' \
+              '[.[] | select(.merged_at != null and .base.ref == "main" and .head.repo.full_name == $repo and .merge_commit_sha == $sha and (.head.ref | test("^release/s[0-9]+-r[0-9]+$")))]' \
               <<< "$PRS")
             if [ "$(jq 'length' <<< "$MATCHES")" -ne 1 ]; then
-              echo "::error::The current main commit must belong to exactly one merged release/sprint-* PR. No UAT image was promoted."
+              echo "::error::The current main commit must belong to exactly one merged release/s<sprint>-r<release> PR. No UAT image was promoted."
               exit 1
             fi
             BRANCH=$(jq -r '.[0].head.ref' <<< "$MATCHES")
@@ -79,15 +80,13 @@ jobs:
             CHART_REF="$MERGE_SHA"
           fi
 
-          if ! [[ "$BRANCH" =~ ^release/sprint-[0-9]+$ ]]; then
-            echo "The release branch must match release/sprint-<number>." >&2
+          if ! [[ "$BRANCH" =~ ^release/s[0-9]+-r[0-9]+$ ]]; then
+            echo "The release branch must match release/s<sprint>-r<release>." >&2
             exit 1
           fi
 
-          RELEASE_TAG="soba-${BRANCH//\//-}"
           printf 'branch=%s\n' "$BRANCH" >> "$GITHUB_OUTPUT"
           printf 'chart_ref=%s\n' "$CHART_REF" >> "$GITHUB_OUTPUT"
-          printf 'release_tag=%s\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           printf 'source_sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Checkout release source commit
@@ -100,9 +99,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          VERSION=$(jq -r .version package.json)
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::Release source must have a stable application version."
+            exit 1
+          }
+          for manifest in backend/package.json frontend/package.json lib/package.json; do
+            [ "$(jq -r .version "$manifest")" = "$VERSION" ] || exit 1
+          done
           SHORT_SHA=$(git rev-parse --short HEAD)
           printf 'short_sha=%s\n' "$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          printf 'image_tag=%s-%s\n' "$VERSION" "$SHORT_SHA" >> "$GITHUB_OUTPUT"
           printf 'uat_tag=soba-uat-%s\n' "$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          printf 'release_tag=%s\n' "$VERSION" >> "$GITHUB_OUTPUT"
 
   approve-uat:
     name: Approve UAT promotion
@@ -126,13 +135,17 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
-      contents: read
+      contents: write
       packages: write
+      statuses: read
     environment:
       name: uat
     env:
       CHART_REF: ${{ needs.set-vars.outputs.chart_ref }}
       SHORT_SHA: ${{ needs.set-vars.outputs.short_sha }}
+      SOURCE_SHA: ${{ needs.set-vars.outputs.source_sha }}
+      IMAGE_TAG: ${{ needs.set-vars.outputs.image_tag }}
+      RELEASE_TAG: ${{ needs.set-vars.outputs.release_tag }}
       UAT_TAG: ${{ needs.set-vars.outputs.uat_tag }}
       REPOSITORY: ${{ github.repository }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -160,28 +173,86 @@ jobs:
           REPOSITORY_LOWER="${REPOSITORY,,}"
           IMAGE_ROOT="$REGISTRY/$REPOSITORY_LOWER"
 
+          TEST_STATUSES=$(gh api "repos/$REPOSITORY/commits/$SOURCE_SHA/status?per_page=100")
+          TEST_STATUS=$(jq -r '[.statuses[] | select(.context == "soba/release-test")][0].state // empty' \
+            <<< "$TEST_STATUSES")
+          if [ "$TEST_STATUS" != success ]; then
+            echo "::error::The exact release commit has not passed TEST validation."
+            exit 1
+          fi
+
           promote() {
             local source="$1"
             local uat_target="$2"
-
-            docker buildx imagetools inspect "$source" >/dev/null
-            docker buildx imagetools create \
-              -t "$uat_target" \
-              "$source"
+            local source_digest target_digest
+            source_digest=$(docker buildx imagetools inspect "$source" \
+              --format '{{json .Manifest}}' | jq -er .digest)
+            if target_digest=$(docker buildx imagetools inspect "$uat_target" \
+              --format '{{json .Manifest}}' 2>"$RUNNER_TEMP/uat-target-error" | jq -er .digest); then
+              [ "$target_digest" = "$source_digest" ] || {
+                echo "::error::Refusing to overwrite a different UAT digest: $uat_target"
+                exit 1
+              }
+            else
+              if ! grep -Eqi 'not found|manifest unknown|name unknown' "$RUNNER_TEMP/uat-target-error"; then
+                cat "$RUNNER_TEMP/uat-target-error" >&2
+                exit 1
+              fi
+              docker buildx imagetools create -t "$uat_target" "$source"
+            fi
+            target_digest=$(docker buildx imagetools inspect "$uat_target" \
+              --format '{{json .Manifest}}' | jq -er .digest)
+            [ "$target_digest" = "$source_digest" ]
           }
 
-          docker buildx imagetools inspect "$IMAGE_ROOT/backend:sha-$SHORT_SHA" >/dev/null
-          docker buildx imagetools inspect "$IMAGE_ROOT/frontend:sha-$SHORT_SHA-designer" >/dev/null
-          docker buildx imagetools inspect "$IMAGE_ROOT/frontend:sha-$SHORT_SHA-forms" >/dev/null
-          docker buildx imagetools inspect "$IMAGE_ROOT/temporal-worker:sha-$SHORT_SHA" >/dev/null
+          for entry in 'backend|' 'frontend|-designer' 'frontend|-forms' 'temporal-worker|'; do
+            IFS='|' read -r image suffix <<< "$entry"
+            version_digest=$(docker buildx imagetools inspect \
+              "$IMAGE_ROOT/$image:$IMAGE_TAG$suffix" --format '{{json .Manifest}}' | jq -er .digest)
+            sha_digest=$(docker buildx imagetools inspect \
+              "$IMAGE_ROOT/$image:sha-$SHORT_SHA$suffix" --format '{{json .Manifest}}' | jq -er .digest)
+            [ "$version_digest" = "$sha_digest" ] || {
+              echo "::error::Version and SHA image tags differ for $image$suffix."
+              exit 1
+            }
+            approved_digest=$(jq -r --arg context "soba/release-digest/$image$suffix" \
+              '[.statuses[] | select(.context == $context and .state == "success")][0].description // empty' \
+              <<< "$TEST_STATUSES")
+            [ "$version_digest" = "$approved_digest" ] || {
+              echo "::error::Release image digest differs from the TEST validated digest for $image$suffix."
+              exit 1
+            }
+            target="$IMAGE_ROOT/$image:$UAT_TAG$suffix"
+            if target_digest=$(docker buildx imagetools inspect "$target" \
+              --format '{{json .Manifest}}' 2>"$RUNNER_TEMP/uat-target-error" | jq -er .digest); then
+              [ "$target_digest" = "$version_digest" ] || {
+                echo "::error::Refusing to overwrite a different UAT digest: $target"
+                exit 1
+              }
+            elif ! grep -Eqi 'not found|manifest unknown|name unknown' "$RUNNER_TEMP/uat-target-error"; then
+              cat "$RUNNER_TEMP/uat-target-error" >&2
+              exit 1
+            fi
+          done
 
-          promote "$IMAGE_ROOT/backend:sha-$SHORT_SHA" \
+          GIT_TAG="v$RELEASE_TAG"
+          if existing_sha=$(gh api "repos/$REPOSITORY/git/ref/tags/$GIT_TAG" --jq .object.sha 2>/dev/null); then
+            [ "$existing_sha" = "$SOURCE_SHA" ] || {
+              echo "::error::Finalized version $GIT_TAG belongs to another source commit."
+              exit 1
+            }
+          else
+            gh api -X POST "repos/$REPOSITORY/git/refs" \
+              -f "ref=refs/tags/$GIT_TAG" -f "sha=$SOURCE_SHA" >/dev/null
+          fi
+
+          promote "$IMAGE_ROOT/backend:$IMAGE_TAG" \
             "$IMAGE_ROOT/backend:$UAT_TAG"
-          promote "$IMAGE_ROOT/frontend:sha-$SHORT_SHA-designer" \
+          promote "$IMAGE_ROOT/frontend:$IMAGE_TAG-designer" \
             "$IMAGE_ROOT/frontend:$UAT_TAG-designer"
-          promote "$IMAGE_ROOT/frontend:sha-$SHORT_SHA-forms" \
+          promote "$IMAGE_ROOT/frontend:$IMAGE_TAG-forms" \
             "$IMAGE_ROOT/frontend:$UAT_TAG-forms"
-          promote "$IMAGE_ROOT/temporal-worker:sha-$SHORT_SHA" \
+          promote "$IMAGE_ROOT/temporal-worker:$IMAGE_TAG" \
             "$IMAGE_ROOT/temporal-worker:$UAT_TAG"
 
   deploy:
@@ -311,7 +382,7 @@ jobs:
           {
             echo "## UAT deployment"
             echo
-            echo "- Release tag: \`${RELEASE_TAG}\`"
+            echo "- Release tag: \`v${RELEASE_TAG}\`"
             echo "- Promoted UAT tag: \`${UAT_TAG}\`"
             echo "- Namespace: \`${NAMESPACE}\`"
           } >> "$GITHUB_STEP_SUMMARY"
