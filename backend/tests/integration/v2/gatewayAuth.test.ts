@@ -1,6 +1,3 @@
-jest.mock('../../../src/integration/v2/exportRoute', () => ({
-  integrationExportHandler: jest.fn(),
-}));
 jest.mock('../../../src/core/db/repos/workspaceCredentialRepo', () => ({
   findActiveApiCredential: jest.fn(),
 }));
@@ -185,12 +182,7 @@ describe('Public probes and OpenAPI contract', () => {
 
   it('documents integration security and gateway error schemas independently of staff auth', () => {
     const spec = buildIntegrationV2OpenApiSpec();
-    expect(Object.keys(spec.paths).sort()).toEqual([
-      '/forms/{formId}/submissions/export',
-      '/health',
-      '/me',
-      '/openapi.json',
-    ]);
+    expect(Object.keys(spec.paths).sort()).toEqual(['/health', '/me', '/openapi.json']);
     expect(spec.paths['/me'].get.security).toEqual([{ apiKey: [] }]);
     expect(spec.components.securitySchemes).not.toHaveProperty('bearerAuth');
     expect(spec.components.schemas).toHaveProperty('IntegrationV2_MeResponse');

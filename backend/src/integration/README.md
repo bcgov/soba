@@ -19,35 +19,6 @@ Workspace grants are an upper bound; form overrides must still be respected at r
 The creator's current access must also bound each future resource request. Credential lookup
 alone is authentication, not resource authorization.
 
-## Submission export
-
-`GET /forms/{formId}/submissions/export?format=json` exports submitted, non-deleted submissions;
-use `format=csv` for CSV (JSON is the default). Optional filters are `formVersionId`, `from` and
-`to` (ISO timestamps, inclusive lower and exclusive upper bound, capped at now).
-The endpoint reuses the designer export serializers, including CSV formula escaping.
-It requires the `submission-export` feature to be enabled (otherwise 404), checked after
-authorization before each database page and before returning the file. It checks the active key's
-`submission_read` grant, workspace/optional form scope and the creator's
-current form permissions (including overrides), before each database page and again before sending.
-Responses are buffered up to 10 MiB. A 60-second export deadline starts before the initial
-permission checks, after gateway authentication. It bounds waiting for database queries, schema
-loading and serialization; client disconnects abort the reader. Dependencies that do not support
-cancellation may finish in the background, but no later page is started or late response sent. Missing engine documents fail the
-request rather than returning an incomplete export. CSV also returns 503 if an exported row’s
-version schema is unavailable; schemas from other versions are never used as a fallback. JSON
-can still return the submission answers without that schema. Narrow the date range for larger exports.
-
-Local gateway examples (create/approve the key in the local database):
-
-```bash
-curl --fail-with-body -H "X-API-KEY: $API_KEY" \
-  "https://soba-dev.api.gov.bc.ca/local/integrations/v2/forms/$FORM_ID/submissions/export?format=json" \
-  -o submissions.json
-curl --fail-with-body -H "X-API-KEY: $API_KEY" \
-  "https://soba-dev.api.gov.bc.ca/local/integrations/v2/forms/$FORM_ID/submissions/export?format=csv" \
-  -o submissions.csv
-```
-
 ## Gateway identity
 
 The gateway validates `X-API-KEY` and the Product Environment ACL, then adds a signed `GW-JWT`
@@ -95,20 +66,17 @@ resource permissions; a shared CI API key can therefore test each PR's gateway h
 The earlier shared-secret proof is no longer accepted. `GW-JWT` is redacted from both logs and
 the `/me` response. See `deployments/gateway/README.md` for the protected gateway template.
 
-## Authentication and export regression tests
+## Authentication regression tests
 
 Run `pnpm --filter @soba/backend exec jest --runInBand tests/integration/v2`.
-`exportSecurity.test.ts` uses the production `createApp()` middleware stack and keeps JWT verification,
-credential middleware, permission checks, export paging and JSON/CSV serialization real.
-Only JWKS transport, repositories and engine data are mocked. An explicit inventory checks every
-registered and documented method/path and its public/API-key security policy. New operations need
-an inventory entry and authentication regressions, including non-GET operations. Test fixtures live
-in `tests/integration/fixtures`: complete typed records, signing keys, and application environment
-settings pinned before middleware initialization. Mock declarations remain local to each suite.
-Suites group identity, HTTP behavior, permissions, deadlines, schema integrity and cleanup separately.
-Tests cover application request tracing/rate-limit headers, separation from staff authentication,
-forged identity headers, invalid audience, missing local credentials, scope boundaries,
-permission/grant loss and revocation between pages, feature changes, stalled dependencies and
-client disconnects. Resolver mocks do not replace database-backed tests of membership/override SQL,
-and these tests do not require a database, APS access or a separate CI job. Server listening,
-startup diagnostics and background workers stay in `app.ts` and are not started by the tests.
+`security.test.ts` uses the production `createApp()` middleware stack and keeps JWT verification
+and credential middleware real. Only JWKS transport, the credential repository and the default
+credential issuer lookup are mocked. An explicit inventory checks every registered and documented
+method/path and its public/API-key security policy. New operations need an inventory entry and authentication regressions, including
+non-GET operations. Test fixtures live in `tests/integration/fixtures`: complete typed records,
+signing keys, and application environment settings pinned before middleware initialization. Mock
+declarations remain local to each suite. Tests cover application request tracing/rate-limit
+headers, separation from staff authentication, forged identity headers, invalid audience and
+missing local credentials. They do not require a database, APS access or a separate CI job. Server
+listening, startup diagnostics and background workers stay in `app.ts` and are not started by the
+tests.

@@ -41,7 +41,7 @@ import {
 } from './job';
 import { exportFieldNames } from './schemaFields';
 import { EXPORT_TOO_LARGE } from './sizeLimit';
-import { exportBounds, exportBoundsOf } from './source';
+import { exportBoundsOf } from './source';
 
 /** Who is asking, about which form. */
 export type ExportContext = { actorId: string; workspaceId: string; formId: string };
@@ -113,6 +113,25 @@ const requireOwnExport = async (ctx: ExportContext, exportId: string): Promise<E
   const row = await getExportJob(ctx.formId, ctx.actorId, exportId);
   if (!row) throw new NotFoundError(NOT_FOUND);
   return row;
+};
+
+/** The submitted-in bounds: `to` no later than now, so a retry exports the same submissions. */
+export const exportBounds = (
+  body: SubmissionExportFieldsBody,
+  now: Date,
+): { from?: string; to: string } => {
+  const requestedTo = body.to ? new Date(body.to) : now;
+  const to = requestedTo < now ? requestedTo : now;
+  if (body.from && new Date(body.from) >= to) {
+    throw new ValidationError(
+      'from must be before to, and before now',
+      ApiErrorCodes.request_invalid,
+    );
+  }
+  return {
+    ...(body.from ? { from: new Date(body.from).toISOString() } : {}),
+    to: to.toISOString(),
+  };
 };
 
 export const submissionExportService = {

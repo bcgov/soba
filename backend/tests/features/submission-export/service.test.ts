@@ -21,10 +21,11 @@ import {
   type ExportJobRow,
 } from '../../../src/core/db/repos/submissionExportRepo';
 import { ApiErrorCodes } from '@soba/lib';
-import { InternalError } from '../../../src/core/errors';
+import { InternalError, ValidationError } from '../../../src/core/errors';
 import { readEngineSchema } from '../../../src/core/services/engineSchema';
 import { EXPORT_ACCESS_LOST } from '../../../src/features/submission-export/job';
 import {
+  exportBounds,
   exportStatusOf,
   submissionExportService,
   toSubmissionExport,
@@ -146,6 +147,27 @@ describe('toSubmissionExport', () => {
     expect(queued).not.toHaveProperty('result');
     expect(queued).not.toHaveProperty('unreadCount');
     expect(queued).not.toHaveProperty('endReason');
+  });
+});
+
+describe('exportBounds', () => {
+  const now = new Date('2026-10-29T20:00:00Z');
+
+  it('ends at now when no end is given or the end is later', () => {
+    expect(exportBounds({}, now)).toEqual({ to: now.toISOString() });
+    expect(exportBounds({ to: '2026-12-01T00:00:00Z' }, now)).toEqual({
+      to: now.toISOString(),
+    });
+  });
+
+  it('keeps an earlier end and the start as given', () => {
+    expect(exportBounds({ from: '2026-10-01T07:00:00Z', to: '2026-10-02T07:00:00Z' }, now)).toEqual(
+      { from: '2026-10-01T07:00:00.000Z', to: '2026-10-02T07:00:00.000Z' },
+    );
+  });
+
+  it('refuses a start at or after now', () => {
+    expect(() => exportBounds({ from: '2026-10-30T00:00:00Z' }, now)).toThrow(ValidationError);
   });
 });
 
