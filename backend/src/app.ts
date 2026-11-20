@@ -6,6 +6,7 @@ import { pool } from './core/db/client';
 import { log } from './core/logging';
 import { assertJobShutdownFits, getJobSettings, startJobs, stopJobs } from './core/jobs';
 import { assertAppLinkBases } from './core/appLinks';
+import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 import {
   logStartupHealth,
@@ -30,30 +31,44 @@ assertAppLinkBases({
   DESIGNER_APP_URL: env.getDesignerAppUrl(),
   FORMS_APP_URL: env.getFormsAppUrl(),
 });
+if (integrationPort === port) {
+  throw new Error(`INTEGRATION_PORT must differ from PORT; both are ${port}`);
+}
 
 const app = createApp();
 
 const server = app.listen(port, () => {
   log.info({ port }, 'Express is listening');
-  startJobs();
-  void logStartupHealth()
-    .then(logTempStorageSelfTest)
-    .then(logVirusScanSelfTest)
-    .then(logCacheSelfTest)
-    .then(logMessageBusSelfTest)
-    .then(logEventStreamSelfTest)
-    .then(logDocumentGenerationReadiness)
-    .then(logTenantEngineReadiness)
-    .then(logCredentialIssuerReadiness)
-    .then(logWorkflowEngineReadiness)
-    .then(logNotificationReadiness)
-    .then(logUserSearchReadiness)
-    .catch((err) => log.warn({ err }, 'Startup diagnostics failed'));
 });
 
 const integrationServer = createIntegrationApp().listen(integrationPort, () => {
   log.info({ port: integrationPort }, 'Integration API is listening');
 });
+
+// Jobs and startup diagnostics start once both servers are listening; a listen error on either
+// exits the process. The rejection handler sees listen errors only, not a startJobs() failure.
+Promise.all([once(server, 'listening'), once(integrationServer, 'listening')]).then(
+  () => {
+    startJobs();
+    void logStartupHealth()
+      .then(logTempStorageSelfTest)
+      .then(logVirusScanSelfTest)
+      .then(logCacheSelfTest)
+      .then(logMessageBusSelfTest)
+      .then(logEventStreamSelfTest)
+      .then(logDocumentGenerationReadiness)
+      .then(logTenantEngineReadiness)
+      .then(logCredentialIssuerReadiness)
+      .then(logWorkflowEngineReadiness)
+      .then(logNotificationReadiness)
+      .then(logUserSearchReadiness)
+      .catch((err) => log.warn({ err }, 'Startup diagnostics failed'));
+  },
+  (err: unknown) => {
+    log.error({ err, port, integrationPort }, 'Server failed to listen');
+    process.exit(1);
+  },
+);
 
 const closeServer = (target: typeof server) =>
   new Promise<void>((resolve) => target.close(() => resolve()));
