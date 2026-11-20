@@ -3,6 +3,7 @@ env.loadEnv();
 
 import express from 'express';
 import rTracer from 'cls-rtracer';
+import { INTEGRATION_API_DOCS_NAME } from '@soba/lib';
 import cors from 'cors';
 import passport from 'passport';
 import { checkJwt } from './core/middleware/auth';
@@ -92,7 +93,7 @@ export const createApp = () => {
       swaggerOptions: {
         urls: [
           { url: apiSpecPath, name: 'Backend API v1' },
-          { url: integrationSpecPath, name: 'Integration API v2' },
+          { url: integrationSpecPath, name: INTEGRATION_API_DOCS_NAME },
         ],
       },
     }),

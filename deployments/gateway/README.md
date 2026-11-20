@@ -32,7 +32,7 @@ its `/certs` JWKS URI, and set `INTEGRATION_GATEWAY_AUDIENCE` to exactly `GATEWA
 In Helm, set `backend.integrationGateway.issuer`, `.jwksUri`, `.audience`, and `.clientIdClaim`;
 the backend ConfigMap maps these to the environment variables. Empty defaults keep JWT auth disabled.
 `.publicUrl` is the gateway URL consumers call; the spec published at `/chefs/api/docs` lists it as
-the server.
+the server, and form and workspace settings show it with API keys.
 The APS instance determines the issuer/JWKS endpoints, even for SOBA dev/PR releases. See
 `backend/src/integration/README.md` for the endpoint table and signed identity mapping.
 

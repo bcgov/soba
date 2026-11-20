@@ -319,4 +319,22 @@ describe('credential service', () => {
     });
     expect((await service.list(formOwner, query)).available).toBe(false);
   });
+
+  it.each([
+    { publicUrl: 'https://gateway.example.test/integrations/v2', expected: true },
+    { publicUrl: undefined, expected: false },
+  ])('reports the integration API URL only when configured: $publicUrl', async (cases) => {
+    mockedRepo.listWorkspaceCredentials.mockResolvedValue({ items: [], total: 0 });
+    const previous = process.env.INTEGRATION_API_PUBLIC_URL;
+    if (cases.publicUrl === undefined) delete process.env.INTEGRATION_API_PUBLIC_URL;
+    else process.env.INTEGRATION_API_PUBLIC_URL = cases.publicUrl;
+    try {
+      const listed = await service.list(formOwner, query);
+      expect(listed.integrationApi).toEqual(cases.expected ? { url: cases.publicUrl } : undefined);
+      expect('integrationApi' in listed).toBe(cases.expected);
+    } finally {
+      if (previous === undefined) delete process.env.INTEGRATION_API_PUBLIC_URL;
+      else process.env.INTEGRATION_API_PUBLIC_URL = previous;
+    }
+  });
 });

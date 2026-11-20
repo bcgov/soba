@@ -514,7 +514,7 @@ export const env = {
   getTemporalWorkerHealthPort: () => getNumberEnv('TEMPORAL_WORKER_HEALTH_PORT') ?? 9090,
   // Integration API listener; the chart sets it from backend.service.integrationPort.
   getIntegrationPort: () => getNumberEnv('INTEGRATION_PORT') ?? 4001,
-  /** Gateway URL that integration consumers call; the published spec lists it as the server. */
+  /** Gateway URL integration consumers call: the published spec's server, shown with API keys. */
   getIntegrationApiPublicUrl: () =>
     getOptionalEnv('INTEGRATION_API_PUBLIC_URL')?.trim() || undefined,
   // Match the chart's haproxy.router.openshift.io/timeout annotation.

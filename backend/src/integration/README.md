@@ -10,7 +10,9 @@ key at `${API_BASE_PATH}/api/docs/integrations/v2/openapi.json` on the main API 
 Swagger UI at `${API_BASE_PATH}/api/docs` offers it beside the backend API. Its server is
 `INTEGRATION_API_PUBLIC_URL`, the gateway URL consumers call (Helm
 `backend.integrationGateway.publicUrl`; PR deployments set it to their `/pr/<N>/integrations/v2`
-route). Unset, it is the backend path, which resolves only on the integration port. The docs page
+route). Form and workspace settings show the same URL, the `X-API-KEY` header and a link to this
+spec with API keys. Unset, the spec's server is the backend path, which resolves only on the
+integration port, and settings show nothing. The docs page
 is reference only: Try it out cannot reach the gateway from the browser.
 
 `v2/schema.ts` defines named schemas and registers operations; `v2/openapi.ts` builds the separate
