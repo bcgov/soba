@@ -1,5 +1,13 @@
 # UAT environment — production-like sizing and external service topology.
 backend:
+  # Integration API v2 through the Gold APS gateway. The audience is the Kong service the gateway
+  # check publishes for this release, <release>-integrations-v2.
+  integrationGateway:
+    issuer: https://aps-jwks-upstream-jwt.api.gov.bc.ca
+    jwksUri: https://aps-jwks-upstream-jwt.api.gov.bc.ca/certs
+    audience: soba-uat-integrations-v2
+    clientIdClaim: consumername
+    publicUrl: https://soba-uat.api.gov.bc.ca/integrations/v2
   features:
     confirmation-email-copy: "disabled"
     confirmation-id-visibility: "disabled"

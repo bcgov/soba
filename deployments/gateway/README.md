@@ -97,6 +97,34 @@ The reusable/manual gateway workflow also accepts `integration_enabled: true`; m
 the backend JWT settings to have been configured already. Run health-check unit tests with
 `node --test deployments/gateway/tests/integration-health.test.mjs`.
 
+### Dev, test, UAT and prod
+
+On Merge and the Release to Test, UAT and Prod workflows publish the integration service with
+`integration_enabled: true` and `integration_health_check: false`, like PR Open. The route is
+`/integrations/v2/` on the release's gateway host, and the service is `<release>-integrations-v2`.
+Each `values-<env>.yaml` sets `backend.integrationGateway` to match: the Gold APS issuer and JWKS
+URI, that service name as the audience, and `publicUrl` on the same host.
+
+| Environment | Integration API URL |
+| --- | --- |
+| dev | `https://soba-dev.api.gov.bc.ca/integrations/v2` |
+| test | `https://soba-test.api.gov.bc.ca/integrations/v2` |
+| uat | `https://soba-uat.api.gov.bc.ca/integrations/v2` |
+| prod | `https://soba-prod.api.gov.bc.ca/integrations/v2` |
+
+The hosts follow the gateway check: dev uses `APS_GATEWAY_HOST_PREFIX` with `APS_HOST`; test, UAT
+and prod use `<release>.api.gov.bc.ca`. Change `publicUrl` with them.
+
+Each of these GitHub environments needs `APS_ENVIRONMENT_APP_ID`, the appId of a Product
+Environment on that environment's gateway. Test and UAT share `gw-7f49d`, so give them separate
+Product Environments; with one appId, a test key would pass UAT's ACL. Each Product Environment
+must use `kong-api-key-acl` and link `<release>-integrations-v2`. Without the variable the gateway
+job fails at "Render integration gateway"; the deploy itself has already finished.
+
+SOBA issues keys only in dev and test, where the `api-keys` feature and an APS credential issuer
+are configured. No workflow removes `integrations-<release>` from these gateways; to withdraw
+one, publish an empty configuration under that qualifier, as PR Close does.
+
 ## Public proxy check
 
 Publishes a reverse proxy on the BC Gov API Gateway (APS) in front of a SOBA backend and

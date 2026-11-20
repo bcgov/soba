@@ -281,7 +281,7 @@ jobs:
               && GATEWAY_HOSTNAME="$INTEGRATION_HOST" node deployments/gateway/scripts/verify-integration-health.mjs; then
               printf 'Integration health: https://%s%shealth (API key + ACL + upstream JWT verified)\n' \
                 "$INTEGRATION_HOST" "$INTEGRATION_ROUTE_PATH" >> "$GITHUB_STEP_SUMMARY"
-              printf 'Integration identity: https://%s%sme (requires a key issued in this PR)\n' \
+              printf 'Integration identity: https://%s%sme (requires a key issued in this environment)\n' \
                 "$INTEGRATION_HOST" "$INTEGRATION_ROUTE_PATH" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
@@ -298,7 +298,7 @@ jobs:
           echo 'Authenticated integration health check skipped; manual verification required.' >> "$GITHUB_STEP_SUMMARY"
           printf 'Integration health: https://%s%shealth (requires an approved API key)\n' \
             "$GATEWAY_HOSTNAME" "$INTEGRATION_ROUTE_PATH" >> "$GITHUB_STEP_SUMMARY"
-          printf 'Integration identity: https://%s%sme (requires a key issued in this PR)\n' \
+          printf 'Integration identity: https://%s%sme (requires a key issued in this environment)\n' \
             "$GATEWAY_HOSTNAME" "$INTEGRATION_ROUTE_PATH" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Remove local GWA credentials
