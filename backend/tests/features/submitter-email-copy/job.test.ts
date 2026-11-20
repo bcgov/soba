@@ -102,7 +102,12 @@ beforeEach(() => {
         return Promise.resolve(outcome as never);
       },
       handled: () => Promise.resolve({ recipients: new Set<string>(), anySent: false }),
-      dailyRoom: () => Promise.resolve({ room: 3225, resetsAt: new Date(Date.now() + 3_600_000) }),
+      dailyRoom: () =>
+        Promise.resolve({
+          room: 3000,
+          limited: false,
+          resetsAt: new Date(Date.now() + 3_600_000),
+        }),
     }),
   );
 });

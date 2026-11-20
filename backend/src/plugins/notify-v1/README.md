@@ -11,8 +11,6 @@ Configure these backend environment variables (put the API key in a Secret):
 - `PLUGIN_NOTIFY_V1_ENDPOINT`: Notify base URL including `/api/v1`
 - `PLUGIN_NOTIFY_V1_API_KEY`: the SOBA API key
 - `PLUGIN_NOTIFY_V1_TIMEOUT_MS`: optional outbound timeout
-- `PLUGIN_NOTIFY_V1_LIMIT_STATUSES`: comma-separated HTTP statuses with which Notify says
-  a sending limit was reached; `429` when unset. Each must be from 400 to 599.
 - `PLUGIN_NOTIFY_V1_DEBUG_RESPONSES=true`: log full upstream HTTP error response bodies
   and unexpected success responses with schema validation issues
   for local debugging. Disabled by default; bodies may contain private data.
@@ -45,6 +43,6 @@ are supported. `bodyType` is `text` or `html`. The receipt's `id` is Notify's
 `notifyId` and `status` is Notify's status; acceptance does not mean delivery.
 Sends are never retried automatically. Upstream failures throw
 `ServiceUnavailableError` with the upstream status (its subclass
-`NotificationLimitError` for a limit status); the message carries no recipient
+`NotificationLimitError` for a 429); the message carries no recipient
 or credential details. Notify's error text, such as a safelist refusal, goes to
 the audit row only.

@@ -1,12 +1,11 @@
 const mockSends = jest.fn();
-const mockCount = jest.fn();
+const mockDay = jest.fn();
 jest.mock('../../../src/core/db/repos/notificationAuditRepo', () => ({
   listJobNotificationSends: (...args: unknown[]) => mockSends(...args),
-  countNotificationSendsSince: (...args: unknown[]) => mockCount(...args),
+  readEmailDay: (...args: unknown[]) => mockDay(...args),
 }));
 jest.mock('../../../src/features/notifications/service', () => ({ notificationService: {} }));
 
-import { lastMidnight, nextMidnight } from '../../../src/core/integrations/notification/dailyReset';
 import { REFUSED_HTTP_STATUSES } from '../../../src/core/integrations/notification/sendOutcome';
 import { getNotificationSettings } from '../../../src/core/integrations/notification/settings';
 import type { JobFacts } from '../../../src/core/jobs/facts';
@@ -58,27 +57,13 @@ it('tries a refused address again on a re-run', async () => {
 
 describe('dailyRoom', () => {
   const { dailyLimit, dailyResetTimeZone } = getNotificationSettings();
-  const now = new Date('2026-11-19T20:00:00Z');
+  const resetsAt = new Date('2026-11-20T08:00:00Z');
   const dailyRoom = () =>
     jobNotifications({ id: 'job-1' } as JobFacts, () => Promise.resolve('u1')).dailyRoom();
 
-  beforeEach(() => jest.useFakeTimers({ now }));
-  afterEach(() => jest.useRealTimers());
-
-  it("counts the environment's sends since the last midnight against the daily limit", async () => {
-    mockCount.mockResolvedValue(dailyLimit - 5);
-    await expect(dailyRoom()).resolves.toEqual({
-      room: 5,
-      resetsAt: nextMidnight(now, dailyResetTimeZone),
-    });
-    expect(mockCount).toHaveBeenCalledWith(
-      lastMidnight(now, dailyResetTimeZone),
-      REFUSED_HTTP_STATUSES,
-    );
-  });
-
-  it('gives no room, not less, once the day went past the limit', async () => {
-    mockCount.mockResolvedValue(dailyLimit + 10);
-    await expect(dailyRoom()).resolves.toMatchObject({ room: 0 });
+  it("reads the environment's day in the reset zone and leaves the limit less its sends", async () => {
+    mockDay.mockResolvedValue({ counted: dailyLimit - 5, limited: false, resetsAt });
+    await expect(dailyRoom()).resolves.toEqual({ room: 5, limited: false, resetsAt });
+    expect(mockDay).toHaveBeenCalledWith(dailyResetTimeZone, REFUSED_HTTP_STATUSES);
   });
 });

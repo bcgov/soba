@@ -1,8 +1,5 @@
-import {
-  countNotificationSendsSince,
-  listJobNotificationSends,
-} from '../../core/db/repos/notificationAuditRepo';
-import { lastMidnight, nextMidnight } from '../../core/integrations/notification/dailyReset';
+import { listJobNotificationSends, readEmailDay } from '../../core/db/repos/notificationAuditRepo';
+import { roomToday } from '../../core/integrations/notification/dailyReset';
 import type { JobNotifications } from '../../core/integrations/notification/JobNotifications';
 import {
   isHandledForRun,
@@ -51,15 +48,7 @@ export const jobNotifications = (
 
   async dailyRoom() {
     const { dailyLimit, dailyResetTimeZone } = getNotificationSettings();
-    // One reading of the clock, so a count that crosses midnight still waits for the right reset.
-    const now = new Date();
-    const sent = await countNotificationSendsSince(
-      lastMidnight(now, dailyResetTimeZone),
-      REFUSED_HTTP_STATUSES,
-    );
-    return {
-      room: Math.max(dailyLimit - sent, 0),
-      resetsAt: nextMidnight(now, dailyResetTimeZone),
-    };
+    const day = await readEmailDay(dailyResetTimeZone, REFUSED_HTTP_STATUSES);
+    return { room: roomToday(dailyLimit, day), limited: day.limited, resetsAt: day.resetsAt };
   },
 });

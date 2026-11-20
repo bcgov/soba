@@ -5,6 +5,7 @@ import type {
   JobNotifications,
 } from '../../../../src/core/integrations/notification/JobNotifications';
 import { sendEachAddress } from '../../../../src/core/integrations/notification/sendEachAddress';
+import { isRefusedSend } from '../../../../src/core/integrations/notification/sendOutcome';
 import {
   DAILY_LIMIT_REACHED,
   PROVIDER_LIMIT_REACHED,
@@ -19,8 +20,9 @@ const CONTENT: SendEmail['content'] = { subject: 'Subject', body: '<p>Body</p>',
 
 /**
  * The job's notifications, kept in memory: what the provider answers per address, the addresses
- * this job sent to or had refused on earlier attempts, and the emails the environment may still
- * send today (plenty, by default).
+ * this job sent to or had refused on earlier attempts, and the environment's day: the emails it may
+ * still send (plenty, by default), less each one accepted or refused, and none once the provider
+ * refused a send at its limit today.
  */
 function fakeNotifications(
   setup: {
@@ -28,21 +30,28 @@ function fakeNotifications(
     handled?: string[];
     refusedBefore?: string[];
     room?: number;
+    limited?: boolean;
     answers?: Record<string, JobEmailResult>;
   } = {},
 ) {
   const emails: SendEmail[] = [];
   const sentBefore = setup.handled ?? [];
   const handled = [...sentBefore, ...(setup.refusedBefore ?? [])];
+  let room = setup.room ?? 3000;
+  const limited = setup.limited ?? false;
   const notifications: JobNotifications = {
     enabled: jest.fn(() => Promise.resolve(setup.enabled ?? true)),
     sendEmail: (email) => {
       emails.push(email);
-      return Promise.resolve(setup.answers?.[email.recipients.to[0]] ?? ACCEPTED);
+      const result = setup.answers?.[email.recipients.to[0]] ?? ACCEPTED;
+      if (result.outcome === 'accepted' || isRefusedSend(result)) room -= 1;
+      return Promise.resolve(result);
     },
     handled: () =>
       Promise.resolve({ recipients: new Set(handled), anySent: sentBefore.length > 0 }),
-    dailyRoom: jest.fn(() => Promise.resolve({ room: setup.room ?? 3225, resetsAt: RESET })),
+    dailyRoom: jest.fn(() =>
+      Promise.resolve({ room: limited ? 0 : room, limited, resetsAt: RESET }),
+    ),
   };
   const recipients = () => emails.map((email) => email.recipients.to[0]);
   return { notifications, emails, recipients };
@@ -144,6 +153,27 @@ describe('sendEachAddress', () => {
     const fake = fakeNotifications({ room: 1, handled: ['a@example.com'] });
     await run(['a@example.com', 'b@example.com'], fake.notifications);
     expect(fake.recipients()).toEqual(['b@example.com']);
+  });
+
+  it("checks the room before each send, so other jobs' sends in between count", async () => {
+    const fake = fakeNotifications();
+    // Another job takes the last of the day's room after this job's first send.
+    jest
+      .mocked(fake.notifications.dailyRoom)
+      .mockResolvedValueOnce({ room: 5, limited: false, resetsAt: RESET })
+      .mockResolvedValueOnce({ room: 0, limited: false, resetsAt: RESET });
+    const sent = run(['a@example.com', 'b@example.com'], fake.notifications);
+    await expect(sent).rejects.toThrow(DAILY_LIMIT_REACHED);
+    expect(fake.recipients()).toEqual(['a@example.com']);
+    expect(fake.notifications.dailyRoom).toHaveBeenCalledTimes(2);
+  });
+
+  it("waits with the provider's reason, sending nothing, once it refused a send at its limit today", async () => {
+    const fake = fakeNotifications({ limited: true });
+    const sent = run(['a@example.com'], fake.notifications);
+    await expect(sent).rejects.toBeInstanceOf(JobDeferredError);
+    await expect(sent).rejects.toThrow(PROVIDER_LIMIT_REACHED);
+    expect(fake.emails).toEqual([]);
   });
 
   it("does not count today's sends when nothing is left to send", async () => {
@@ -287,10 +317,17 @@ describe('sendEachAddress', () => {
     const fake = fakeNotifications({
       answers: { 'b@example.com': { outcome: 'limited', httpStatus: 429, audited: true } },
     });
-    const sent = run(['a@example.com', 'b@example.com', 'c@example.com'], fake.notifications);
+    const info = jest.fn();
+    const sent = run(['a@example.com', 'b@example.com', 'c@example.com'], fake.notifications, {
+      info,
+    });
     await expect(sent).rejects.toBeInstanceOf(JobDeferredError);
     await expect(sent).rejects.toThrow(PROVIDER_LIMIT_REACHED);
     expect(fake.recipients()).toEqual(['a@example.com', 'b@example.com']);
+    expect(info).toHaveBeenCalledWith(
+      { sent: 1, refused: 0, alreadyHandled: 0, waiting: 2 },
+      'Emails sent; the rest wait for the daily reset',
+    );
   });
 
   it("throws the runner's abort reason before the next send", async () => {

@@ -1,4 +1,4 @@
-import { and, count, eq, gte, inArray, or } from 'drizzle-orm';
+import { and, eq, gte, inArray, or, sql } from 'drizzle-orm';
 import { db } from '../client';
 import { NotificationOutcome, type NotificationOutcomeCode } from '../codes';
 import { notificationAudits, type NotificationAuditRecipients } from '../schema';
@@ -64,28 +64,43 @@ export const listJobNotificationSends = (jobId: string): Promise<JobNotification
     .from(notificationAudits)
     .where(eq(notificationAudits.jobId, jobId));
 
+/** The environment's emails today, by the database clock. */
+export interface EmailDay {
+  /** Sends the provider dealt with: accepted, or refused for the address. */
+  counted: number;
+  /** The provider refused a send at its limit. */
+  limited: boolean;
+  /** When the next day begins. */
+  resetsAt: Date;
+}
+
 /**
- * The environment's sends since `since` that the provider dealt with: accepted, or refused with one
- * of `refusedStatuses`. Failures to be retried and sends refused at a limit are not counted.
+ * The environment's emails since the last midnight in `timeZone`, by the database clock, which
+ * also stamps each send. It counts those accepted and those refused with one of
+ * `refusedStatuses`; failures to be retried and sends refused at a limit are not counted.
  */
-export const countNotificationSendsSince = async (
-  since: Date,
+export const readEmailDay = async (
+  timeZone: string,
   refusedStatuses: readonly number[],
-): Promise<number> => {
+): Promise<EmailDay> => {
+  const localDay = sql`date_trunc('day', now() at time zone ${timeZone})`;
+  const dealtWith = or(
+    eq(notificationAudits.outcome, NotificationOutcome.accepted),
+    and(
+      eq(notificationAudits.outcome, NotificationOutcome.error),
+      inArray(notificationAudits.httpStatus, [...refusedStatuses]),
+    ),
+  );
   const [row] = await db
-    .select({ total: count() })
-    .from(notificationAudits)
-    .where(
-      and(
-        or(
-          eq(notificationAudits.outcome, NotificationOutcome.accepted),
-          and(
-            eq(notificationAudits.outcome, NotificationOutcome.error),
-            inArray(notificationAudits.httpStatus, [...refusedStatuses]),
-          ),
-        ),
-        gte(notificationAudits.createdAt, since),
+    .select({
+      counted: sql<number>`(count(*) filter (where ${dealtWith}))::int`,
+      limited: sql<boolean>`coalesce(bool_or(${eq(notificationAudits.outcome, NotificationOutcome.limited)}), false)`,
+      resetsAt: sql<Date>`(${localDay} + interval '1 day') at time zone ${timeZone}`.mapWith(
+        notificationAudits.createdAt,
       ),
-    );
-  return row?.total ?? 0;
+    })
+    .from(notificationAudits)
+    .where(gte(notificationAudits.createdAt, sql`${localDay} at time zone ${timeZone}`));
+  if (!row) throw new Error('The email day read returned no row');
+  return row;
 };

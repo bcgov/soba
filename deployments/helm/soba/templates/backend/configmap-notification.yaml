@@ -18,6 +18,3 @@ data:
   {{- with .Values.backend.notification.notifyV1.timeoutMs }}
   PLUGIN_NOTIFY_V1_TIMEOUT_MS: {{ . | quote }}
   {{- end }}
-  {{- with .Values.backend.notification.notifyV1.limitStatuses }}
-  PLUGIN_NOTIFY_V1_LIMIT_STATUSES: {{ . | quote }}
-  {{- end }}

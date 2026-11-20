@@ -210,20 +210,19 @@ starts nothing. ConfigMap `<fullname>-backend-workflow-engine`:
 Notification sends email. `notification-noop` (the default) sends nothing; `notify-v1` calls BC Gov
 Notify with an API key. ConfigMap `<fullname>-backend-notification`:
 
-| Helm value                                    | Env var                              | Used by                       |
-| --------------------------------------------- | ------------------------------------ | ----------------------------- |
-| `backend.config.notificationDefaultCode`      | `NOTIFICATION_DEFAULT_CODE`          | default notification resolver |
-| `backend.notification.dailyLimit`             | `NOTIFICATION_DAILY_LIMIT`           | every email job               |
-| `backend.notification.dailyResetTimeZone`     | `NOTIFICATION_DAILY_RESET_TIME_ZONE` | every email job               |
-| `backend.notification.notifyV1.endpoint`      | `PLUGIN_NOTIFY_V1_ENDPOINT`          | notify-v1 adapter             |
-| `backend.notification.notifyV1.timeoutMs`     | `PLUGIN_NOTIFY_V1_TIMEOUT_MS`        | notify-v1 adapter             |
-| `backend.notification.notifyV1.limitStatuses` | `PLUGIN_NOTIFY_V1_LIMIT_STATUSES`    | notify-v1 adapter             |
+| Helm value                                | Env var                              | Used by                       |
+| ----------------------------------------- | ------------------------------------ | ----------------------------- |
+| `backend.config.notificationDefaultCode`  | `NOTIFICATION_DEFAULT_CODE`          | default notification resolver |
+| `backend.notification.dailyLimit`         | `NOTIFICATION_DAILY_LIMIT`           | every email job               |
+| `backend.notification.dailyResetTimeZone` | `NOTIFICATION_DAILY_RESET_TIME_ZONE` | every email job               |
+| `backend.notification.notifyV1.endpoint`  | `PLUGIN_NOTIFY_V1_ENDPOINT`          | notify-v1 adapter             |
+| `backend.notification.notifyV1.timeoutMs` | `PLUGIN_NOTIFY_V1_TIMEOUT_MS`        | notify-v1 adapter             |
 
-The environment sends up to `NOTIFICATION_DAILY_LIMIT` emails a day (3225 when unset, about
-Notify's 100,000 a month over 31 days), counting from midnight in
-`NOTIFICATION_DAILY_RESET_TIME_ZONE` (`America/Vancouver` when unset). An email job past it, or
-one Notify answers with a limit status (`429` by default), waits until the next midnight. A limit
-outside 1 to 100000 or an invalid zone stops startup.
+The environment sends up to `NOTIFICATION_DAILY_LIMIT` emails a day (3000 when unset, under
+Notify's 100,000 a month over 31 days; 100 in PR environments), counting from midnight in
+`NOTIFICATION_DAILY_RESET_TIME_ZONE` (`America/Vancouver` when unset). An email job past it waits
+until the next midnight, and once Notify answers 429, its monthly limit, every email job waits
+until then. A limit outside 1 to 100000 or an invalid zone stops startup.
 
 ### Secret values (Vault template in backend Deployment)
 

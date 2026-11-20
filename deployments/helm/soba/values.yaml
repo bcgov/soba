@@ -324,7 +324,7 @@ backend:
 
   # -- configmap-notification: PLUGIN_NOTIFY_V1_*, default notification code, daily email limit + reset time zone
   notification:
-    # -- emails the environment sends in a day, 1 to 100000; empty uses 3225 (about 100,000 a month)
+    # -- emails the environment sends in a day, 1 to 100000; empty uses 3000 (under 100,000 a month)
     dailyLimit: ""
     # -- IANA time zone whose midnight resets the daily email limit; empty uses America/Vancouver
     dailyResetTimeZone: ""
@@ -333,8 +333,6 @@ backend:
       endpoint: ""
       # -- outbound deadline in ms; empty uses the backend default (30000)
       timeoutMs: ""
-      # -- comma-separated HTTP statuses that mean Notify's sending limit; empty uses 429
-      limitStatuses: ""
 
   # -- configmap-sso: IDP / SSO config
   sso:

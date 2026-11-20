@@ -17,12 +17,11 @@ export interface HandledAddresses {
 
 /** Where the environment's day stands, read at one moment. */
 export interface DailyRoom {
-  /**
-   * Emails it may still send today: NOTIFICATION_DAILY_LIMIT less the sends the provider accepted
-   * or refused since the last midnight in NOTIFICATION_DAILY_RESET_TIME_ZONE; never below zero.
-   */
+  /** Emails it may still send today (`roomToday`). */
   room: number;
-  /** The next midnight there, when the count starts again. */
+  /** The provider refused a send at its limit today. */
+  limited: boolean;
+  /** The next midnight in NOTIFICATION_DAILY_RESET_TIME_ZONE, when the count starts again. */
   resetsAt: Date;
 }
 

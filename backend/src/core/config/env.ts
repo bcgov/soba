@@ -304,14 +304,17 @@ export interface NotificationSettings {
   dailyResetTimeZone: string;
 }
 
-// The provider's quota is 100,000 emails a month: about 3,225 a day over 31 days.
-const DEFAULT_DAILY_LIMIT = 3225;
+// The provider's quota is 100,000 emails a month; 3,000 a day over 31 days stays under it.
+const DEFAULT_DAILY_LIMIT = 3000;
 const MAX_DAILY_LIMIT = 100_000;
 
-// Intl throws on a zone it does not know.
+// An IANA name as written. Intl also takes offsets and abbreviations, which Postgres, applying the
+// zone, reads differently: '-07:00' as seven hours ahead, 'PST' as a fixed offset.
 const isTimeZone = (zone: string): boolean => {
   try {
-    return Boolean(new Intl.DateTimeFormat('en-US', { timeZone: zone }));
+    const resolved = new Intl.DateTimeFormat('en-US', { timeZone: zone }).resolvedOptions()
+      .timeZone;
+    return resolved === zone && !/^[+-]/.test(zone);
   } catch {
     return false;
   }

@@ -1,7 +1,7 @@
 import { EmailAddressSchema } from '@soba/lib';
 import type { Logger } from 'pino';
 import { NotificationOutcome } from '../../db/codes';
-import { JobCancelledError } from '../../jobs/errors';
+import { JobCancelledError, type JobDeferredError } from '../../jobs/errors';
 import { DAILY_LIMIT_REACHED, deferUntilReset, PROVIDER_LIMIT_REACHED } from './dailyReset';
 import type { JobNotifications } from './JobNotifications';
 import type { SendEmail } from './NotificationAdapter';
@@ -19,6 +19,8 @@ export interface SendEachAddressContext {
 interface Tally {
   sent: number;
   refused: number;
+  /** Set when the rest wait for the daily reset. */
+  deferral?: JobDeferredError;
 }
 
 const normalize = (address: string): string => address.trim().toLowerCase();
@@ -26,18 +28,25 @@ const normalize = (address: string): string => address.trim().toLowerCase();
 const isAddress = (address: string): boolean => EmailAddressSchema.safeParse(address).success;
 
 /**
- * Sends to each address in turn; a failure other than a refusal stops the rest of the list, and the
- * provider's limit defers it to `resetsAt`.
+ * Sends to each address in turn while the day has room, read before each send so jobs sending at
+ * the same time share it. A failure other than a refusal stops the rest of the list; no room leaves
+ * the rest to wait for the daily reset.
  */
 const sendInTurn = async (
   { notifications, signal }: SendEachAddressContext,
   addresses: readonly string[],
   content: SendEmail['content'],
-  resetsAt: Date,
 ): Promise<Tally> => {
   const sendFrom = async (index: number, tally: Tally): Promise<Tally> => {
     if (index === addresses.length) return tally;
     signal.throwIfAborted();
+    const { room, limited, resetsAt } = await notifications.dailyRoom();
+    // A stop that came during the read: another worker may hold the job now.
+    signal.throwIfAborted();
+    if (room === 0) {
+      const reason = limited ? PROVIDER_LIMIT_REACHED : DAILY_LIMIT_REACHED;
+      return { ...tally, deferral: deferUntilReset(resetsAt, reason) };
+    }
     const result = await notifications.sendEmail({
       recipients: { to: [addresses[index]] },
       content,
@@ -50,7 +59,7 @@ const sendInTurn = async (
     }
     // The addresses before this one stay handled; this one and the rest go after the reset.
     if (result.outcome === NotificationOutcome.limited) {
-      throw deferUntilReset(resetsAt, PROVIDER_LIMIT_REACHED);
+      return { ...tally, deferral: deferUntilReset(resetsAt, PROVIDER_LIMIT_REACHED) };
     }
     if (isRefusedSend(result)) return sendFrom(index + 1, { ...tally, refused: tally.refused + 1 });
     if (result.outcome === NotificationOutcome.error) {
@@ -65,10 +74,9 @@ const sendInTurn = async (
  * Sends one email per address, each address once and in lower case, skipping those already handled
  * for this job. An address no provider would take, or one the provider refuses, is counted as
  * refused and skipped; a list on which no email has reached anyone, on any attempt, ends cancelled.
- * It sends no more than the environment may still send today and defers the rest, without using an
- * attempt, until the daily reset, as it does when the provider refuses a send at its own limit. Any
- * other failure, a missing audit row or an abort stops the run and throws, so
- * the job retries and the retry skips what was handled. Logs counts only, never addresses.
+ * It sends no more than the environment may still send today (see `roomToday`) and defers the rest,
+ * without using an attempt, until the daily reset. Any other failure, a missing audit row or an abort stops the run and throws, so the job
+ * retries and the retry skips what was handled. Logs counts only, never addresses.
  */
 export const sendEachAddress = async (
   context: SendEachAddressContext,
@@ -88,22 +96,20 @@ export const sendEachAddress = async (
   let tally: Tally = { sent: 0, refused: 0 };
   if (remaining.length > 0) {
     if (!(await notifications.enabled())) throw new JobCancelledError(NOTIFICATIONS_OFF);
-    // One reading of the day for the whole attempt, so every wait in it is for the same reset.
-    const { room, resetsAt } = await notifications.dailyRoom();
-    if (room === 0) throw deferUntilReset(resetsAt, DAILY_LIMIT_REACHED);
-    tally = await sendInTurn(context, remaining.slice(0, room), content, resetsAt);
-    const waiting = remaining.length - room;
-    if (waiting > 0) {
-      log.info(
-        {
-          sent: tally.sent,
-          refused: tally.refused + invalid,
-          alreadyHandled: handled.size,
-          waiting,
-        },
-        'Emails sent; the rest wait for the daily reset',
-      );
-      throw deferUntilReset(resetsAt, DAILY_LIMIT_REACHED);
+    tally = await sendInTurn(context, remaining, content);
+    if (tally.deferral) {
+      if (tally.sent + tally.refused > 0) {
+        log.info(
+          {
+            sent: tally.sent,
+            refused: tally.refused + invalid,
+            alreadyHandled: handled.size,
+            waiting: remaining.length - tally.sent - tally.refused,
+          },
+          'Emails sent; the rest wait for the daily reset',
+        );
+      }
+      throw tally.deferral;
     }
   }
   const refused = tally.refused + invalid;

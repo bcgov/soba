@@ -59,47 +59,27 @@ test('keeps Notify error text out of the message but on the error for the audit'
   expect(Object.keys(err as object)).not.toContain('providerDetail');
 });
 
-describe('limit statuses', () => {
-  const adapterWith = (limitStatuses: string) =>
-    makeAdapter({ PLUGIN_NOTIFY_V1_LIMIT_STATUSES: limitStatuses });
-  const failWith = async (adapter: NotifyV1Adapter, status: number, body = '{}') => {
+describe('the sending limit', () => {
+  const failWith = async (status: number, body = '{}') => {
     jest.spyOn(global, 'fetch').mockResolvedValue(new Response(body, { status }));
-    return adapter.sendEmail(email).catch((e: unknown) => e);
+    return makeAdapter()
+      .sendEmail(email)
+      .catch((e: unknown) => e);
   };
 
   it('reports a 429 as a sending limit, with its status and text for the audit', async () => {
     const err = await failWith(
-      makeAdapter(),
       429,
-      JSON.stringify({ message: 'Exceeded send limits (10000) for today' }),
+      JSON.stringify({ message: 'Exceeded send limits (100000) for this month' }),
     );
     expect(err).toBeInstanceOf(NotificationLimitError);
     expect(err).toEqual(new Error('Notify email send failed (upstream HTTP 429)'));
     expect(upstreamStatusOf(err)).toBe(429);
-    expect(providerDetailOf(err)).toBe('Exceeded send limits (10000) for today');
+    expect(providerDetailOf(err)).toBe('Exceeded send limits (100000) for this month');
   });
 
-  it('treats a 400 as a refused address unless it is listed', async () => {
-    expect(await failWith(makeAdapter(), 400)).not.toBeInstanceOf(NotificationLimitError);
-    expect(await failWith(adapterWith('429, 400'), 400)).toBeInstanceOf(NotificationLimitError);
-  });
-
-  it('reports only the listed statuses as limits', async () => {
-    expect(await failWith(adapterWith('400'), 429)).not.toBeInstanceOf(NotificationLimitError);
-  });
-
-  it('uses 429 when the setting is empty', async () => {
-    expect(await failWith(adapterWith(' '), 429)).toBeInstanceOf(NotificationLimitError);
-  });
-
-  it('ignores an empty entry in the list', async () => {
-    expect(await failWith(adapterWith('429,'), 429)).toBeInstanceOf(NotificationLimitError);
-  });
-
-  it.each(['429,abc', '200', '600', '429.5'])('refuses %s as the setting', (value) => {
-    expect(() => adapterWith(value)).toThrow(
-      `PLUGIN_NOTIFY_V1_LIMIT_STATUSES must list HTTP statuses from 400 to 599, got '${value}'`,
-    );
+  it.each([400, 422, 502])('reports a %s as a failure, not a limit', async (status) => {
+    expect(await failWith(status)).not.toBeInstanceOf(NotificationLimitError);
   });
 });
 

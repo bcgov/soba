@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { parseCsvValue } from '../../core/config/env';
 import type { PluginConfigReader } from '../../core/config/pluginConfig';
 import {
   NotificationLimitError,
@@ -85,27 +84,13 @@ function failureMessage(action: string, err: unknown): string {
   return `${action} failed`;
 }
 
-// Notify's status at a sending limit; a 400 is a refused address, not a limit.
-const DEFAULT_LIMIT_STATUSES = [429];
-
-/** PLUGIN_NOTIFY_V1_LIMIT_STATUSES: the HTTP statuses that mean a sending limit was reached. */
-const readLimitStatuses = (config: PluginConfigReader): ReadonlySet<number> => {
-  const raw = config.getOptional('LIMIT_STATUSES') ?? '';
-  const statuses = parseCsvValue(raw).map(Number);
-  if (statuses.length === 0) return new Set(DEFAULT_LIMIT_STATUSES);
-  if (statuses.some((status) => !Number.isInteger(status) || status < 400 || status > 599)) {
-    throw new Error(
-      `PLUGIN_NOTIFY_V1_LIMIT_STATUSES must list HTTP statuses from 400 to 599, got '${raw}'`,
-    );
-  }
-  return new Set(statuses);
-};
+// Notify's status once its monthly sending limit is reached; a 400 is a refused address.
+const LIMIT_STATUS = 429;
 
 /** Notify v1 email client using the configured API key. */
 export class NotifyV1Adapter implements NotificationAdapter {
   private readonly http: HttpClient;
   private readonly debugResponses: boolean;
-  private readonly limitStatuses: ReadonlySet<number>;
 
   constructor(config: PluginConfigReader) {
     this.http = new HttpClient({
@@ -115,7 +100,6 @@ export class NotifyV1Adapter implements NotificationAdapter {
       timeoutMs: config.getOptionalNumber('TIMEOUT_MS'),
     });
     this.debugResponses = config.getOptional('DEBUG_RESPONSES') === 'true';
-    this.limitStatuses = readLimitStatuses(config);
   }
 
   async readinessCheck(): Promise<NotificationReadinessResult> {
@@ -144,15 +128,16 @@ export class NotifyV1Adapter implements NotificationAdapter {
   }
 
   /**
-   * The error for a failed send: a `NotificationLimitError` for a limit status. The message never
+   * The error for a failed send: a `NotificationLimitError` for a 429. The message never
    * carries the upstream body; Notify's error text goes to the audit as provider detail.
    */
   private sendFailure(err: unknown): ServiceUnavailableError {
     const message = failureMessage('Notify email send', err);
     if (!(err instanceof HttpClientError)) return new ServiceUnavailableError(message);
-    const error = this.limitStatuses.has(err.status)
-      ? new NotificationLimitError(message)
-      : new ServiceUnavailableError(message);
+    const error =
+      err.status === LIMIT_STATUS
+        ? new NotificationLimitError(message)
+        : new ServiceUnavailableError(message);
     if (this.debugResponses) {
       log.error(
         {
