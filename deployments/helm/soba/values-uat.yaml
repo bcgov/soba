@@ -24,7 +24,6 @@ backend:
     maxReplicas: 3
     targetCPUUtilizationPercentage: 75
   config:
-    nodeEnv: production
     logLevel: warn
     documentGenerationDefaultCode: cdogs-v2
     # Email jobs end cancelled while notifications are disabled. Sending needs the notifications

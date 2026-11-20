@@ -100,8 +100,12 @@ const run = async () => {
 };
 // Pipeline performance fix: Revert if needed.
 
-run().catch(async (error) => {
-  console.error('Migration failed', error);
-  await pool.end();
-  process.exit(1);
-});
+// Exit explicitly: a handle left open, such as a log transport worker, would otherwise keep the
+// deploy hook running until its deadline.
+run()
+  .then(() => process.exit(0))
+  .catch(async (error) => {
+    console.error('Migration failed', error);
+    await pool.end();
+    process.exit(1);
+  });
