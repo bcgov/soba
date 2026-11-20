@@ -65,6 +65,8 @@ export function useFillWriter(
   const baseRef = useRef(headRevisionId);
   // The open in flight, or settled; cleared when it fails so the next write tries again.
   const openRef = useRef<Promise<void> | null>(null);
+  // Whether the server has the submission.
+  const [opened, setOpened] = useState(headRevisionId !== null || !open);
   const saveInFlightRef = useRef<Promise<unknown> | null>(null);
   const [busy, setBusy] = useState<FillBusy | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ state: 'idle' });
@@ -88,6 +90,7 @@ export function useFillWriter(
     openRef.current ??= open().then(
       (head) => {
         baseRef.current = head;
+        setOpened(true);
       },
       (err: unknown) => {
         openRef.current = null;
@@ -194,7 +197,7 @@ export function useFillWriter(
 
   return {
     signedIn,
-    status: { busy, held, save: saveStatus },
+    status: { busy, held, opened, save: saveStatus },
     hasBase,
     ensureOpened,
     save,

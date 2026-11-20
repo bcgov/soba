@@ -156,17 +156,17 @@ and `customDesigner` (each in a group carrying a role the Roles workspace owns),
 Audience, its group carries a role Roles owns), `outsider`, `bceidOutsider` (`bceidbusiness`), and
 `collaborator`.
 
-| Workspace                    | Audience, drafts           | Review (status updates, submitter revision) | Forms                                                                                                                                                 |
-| ---------------------------- | -------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `[dev] Zz Coverage Roles`    | members only, on           | on, on                                      | inherits; override; cleared override; designers override; never published; form deleted; version deleted; version replaced; own drafts and review off |
-| `[dev] Zz Coverage Audience` | protected `azureidir`, off | off, off                                    | inherits; own public; own protected `bceidbusiness`; own members only with review on                                                                  |
-| `[dev] Zz Coverage Public`   | public, on                 | on, off                                     | inherits; own protected `azureidir`                                                                                                                   |
+| Workspace                    | Audience, drafts           | Review (status updates, submitter revision) | Forms                                                                                                                                |
+| ---------------------------- | -------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `[dev] Zz Coverage Roles`    | members only, on           | on, on                                      | inherits; override; cleared override; designers override; never published; form deleted; version replaced; own drafts and review off |
+| `[dev] Zz Coverage Audience` | protected `azureidir`, off | off, off                                    | inherits; own public; own protected `bceidbusiness`; own members only with review on                                                 |
+| `[dev] Zz Coverage Public`   | public, on                 | on, off                                     | inherits; own protected `azureidir`                                                                                                  |
 
-Twelve submissions cover owner and collaborator grants, an inactive grant, the opened, draft,
-submitted and revising states, a deleted submission, anonymous submissions, submissions on a deleted
-form and a deleted version, and a draft on a version a newer one replaced. Three submitted ones carry
-staff notes; in Audience the admin assigns one to themselves, and in Roles another is assigned to the
-reviewer, who completes it, and the reviewer sends a third back to the submitter to revise. The public user also holds a seat in Roles' form submitters group, which
+Eleven submissions cover owner and collaborator grants, an inactive grant, the opened, draft,
+submitted and revising states, a deleted submission, anonymous submissions, a submission on a
+deleted form, and a draft on a version a newer one replaced. Two submitted ones carry staff notes;
+in Audience the admin assigns one to themselves, and in Roles the reviewer sends the other back to
+the submitter to revise. The public user also holds a seat in Roles' form submitters group, which
 grants it nothing.
 
 For browser checks the owner is in the form submitters group in Roles and the form admins group in

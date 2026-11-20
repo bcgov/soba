@@ -5,6 +5,7 @@ import {
   PrintOptionsSchema as LibPrintOptionsSchema,
   StaffPrintFactsSchema as LibStaffPrintFactsSchema,
   SubmissionPrintFactsSchema as LibSubmissionPrintFactsSchema,
+  SubmitPrintBodySchema as LibSubmitPrintBodySchema,
 } from '@soba/lib';
 
 extendZodWithOpenApi(z);
@@ -29,6 +30,10 @@ export const PrintOptionsSchema = LibPrintOptionsSchema.clone().openapi(
 export const PrintBodySchema = LibPrintBodySchema.extend({
   options: PrintOptionsSchema.optional(),
 }).openapi('DocumentGeneration_PrintBody');
+
+export const SubmitPrintBodySchema = LibSubmitPrintBodySchema.extend({
+  options: PrintOptionsSchema.optional(),
+}).openapi('DocumentGeneration_SubmitPrintBody');
 
 const SubmissionPrintFactsSchema = LibSubmissionPrintFactsSchema.clone().openapi(
   'DocumentGeneration_SubmissionPrintFacts',
@@ -65,6 +70,11 @@ const printBody = {
   content: { 'application/json': { schema: PrintBodySchema } },
 };
 
+const submitPrintBody = {
+  required: true,
+  content: { 'application/json': { schema: SubmitPrintBodySchema } },
+};
+
 export function registerDocumentGenerationOpenApi(registry: OpenAPIRegistry) {
   const tag = 'feature.document-generation';
 
@@ -91,8 +101,9 @@ export function registerDocumentGenerationOpenApi(registry: OpenAPIRegistry) {
     path: `${SUBMIT_BASE}/print`,
     tags: [tag],
     security: PUBLIC_SECURITY,
-    summary: "Render a document from a stored template and the submission's persisted data",
-    request: { params: SubmissionIdParamSchema, body: printBody },
+    summary:
+      "Render a document from a stored template and the submission's persisted data, or the answers sent, marked unsaved",
+    request: { params: SubmissionIdParamSchema, body: submitPrintBody },
     responses: { ...renderResponses, ...submitAccessResponses },
   });
 

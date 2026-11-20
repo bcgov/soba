@@ -449,20 +449,6 @@ export const appendFormVersionRevision = async (input: SaveRevisionInput, tx?: D
   return updated[0] ?? null;
 };
 
-/** Loads a form version by id including soft-deleted rows (for restore/delete guards). */
-export const getFormVersionByIdIncludingDeleted = async (
-  workspaceId: string,
-  formVersionId: string,
-) => {
-  const row = await db
-    .select()
-    .from(formVersions)
-    .where(and(eq(formVersions.workspaceId, workspaceId), eq(formVersions.id, formVersionId)))
-    .limit(1);
-
-  return row[0] ?? null;
-};
-
 /** The form's currently-published version (if any), used by publish to demote the incumbent. */
 export const getPublishedVersionForForm = async (
   workspaceId: string,

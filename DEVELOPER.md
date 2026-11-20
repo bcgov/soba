@@ -485,7 +485,7 @@ Auth-related env: `IDP_PLUGINS`, `IDP_PLUGIN_DEFAULT_*`, and per-IdP `PLUGIN_<ID
 ### App structure (frontend)
 
 - **Root layout** (`app/layout.tsx`): Minimal — html/body, globals.css. No providers here so the tree stays simple.
-- **Locale layout** (`app/[lang]/layout.tsx`): Wraps all `[lang]` routes. Loads dictionary and features meta server-side, provides `DictionaryProvider`, renders `Header`, `SideNav`, `<main>{children}</main>`, and `Footer`. For signed-in users, SideNav shows Forms and Workspaces when `design-mode` is allowed, then My Forms and My Submissions when `submit-mode` is allowed, then Administration for SOBA admins. Feedback and Help always show.
+- **Locale layout** (`app/[lang]/layout.tsx`): Wraps all `[lang]` routes. Loads dictionary and features meta server-side, provides `DictionaryProvider`, renders `Header`, `SideNav`, `<main>{children}</main>`, and `Footer`. For signed-in users, SideNav shows Forms and Workspaces when `design-mode` is allowed, then My Forms and My Submissions when `submit-mode` is allowed, then Administration for SOBA admins. Feedback and Help are rendered but hidden until their pages have content.
 - **Folders:** `app/ui/` - shared UI (Header, SideNav, Footer, forms). `lib/` - Redux store, slices, hooks, Keycloak init, runtime config. `src/features/` - admin, designer, formio-v5, onboarding, submit-mode, workspaces. `src/shared/` - API client, config, feature flags. `src/app/` - providers and routing. Use `@/lib`, `@/app`, `@/src` for imports.
 
 ### Runtime config (frontend)

@@ -111,7 +111,6 @@ export const COVERAGE_FORM_KEYS = [
   'rolesDesignersOverride',
   'rolesUnpublished',
   'rolesFormDeleted',
-  'rolesVersionDeleted',
   'rolesVersionReplaced',
   'rolesDraftsOff',
   'protectedInherit',
@@ -129,8 +128,8 @@ export interface PlannedGroupOverride {
   cleared?: boolean;
 }
 
-/** Deleting the form, or its published version, once its submissions exist. */
-export type PlannedDelete = 'deleteForm' | 'deleteVersion';
+/** Deleting the form once its submissions exist. */
+export type PlannedDelete = 'deleteForm';
 
 /** A delete, or a new version published over the submissions' own, once they exist. */
 export type PlannedChange = PlannedDelete | 'publishNewVersion';
@@ -170,7 +169,6 @@ export const COVERAGE_SUBMISSION_KEYS = [
   'outsiderSubmitted',
   'outsiderOpened',
   'bceidDeleted',
-  'submitterOnDeletedVersion',
   'submitterOnDeletedForm',
   'ownerDraft',
   'submitterDraft',
@@ -404,12 +402,6 @@ const ROLES_WORKSPACE: PlannedCoverageWorkspace = {
       afterSubmissions: 'deleteForm',
     }),
     form(
-      'rolesVersionDeleted',
-      'Roles version deleted',
-      'Its published version was deleted after a submission.',
-      { afterSubmissions: 'deleteVersion' },
-    ),
-    form(
       'rolesVersionReplaced',
       'Roles version replaced',
       'A new version was published after a draft was saved.',
@@ -512,20 +504,6 @@ const SUBMISSIONS: PlannedCoverageSubmission[] = [
   },
   { key: 'outsiderOpened', form: 'publicInherit', by: 'outsider', events: [] },
   { key: 'bceidDeleted', form: 'bceidOwn', by: 'bceidOutsider', events: ['saved'], deleted: true },
-  {
-    key: 'submitterOnDeletedVersion',
-    form: 'rolesVersionDeleted',
-    by: 'submitter',
-    events: ['submitted'],
-    notes: [
-      { by: 'reviewer', text: 'Budget figure needs a second look.' },
-      { by: 'admin', text: 'Confirmed with the regional office.' },
-    ],
-    statusChanges: [
-      { by: ADMIN, status: SubmissionReviewStatuses.assigned, assignee: 'reviewer' },
-      { by: 'reviewer', status: SubmissionReviewStatuses.completed },
-    ],
-  },
   { key: 'submitterOnDeletedForm', form: 'rolesFormDeleted', by: 'submitter', events: ['saved'] },
   { key: 'ownerDraft', form: 'protectedOwn', by: OWNER, events: ['saved'] },
   // Listed submissions whose access comes from the form's roles, not its audience.

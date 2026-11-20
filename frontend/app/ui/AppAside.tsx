@@ -28,7 +28,10 @@ export function AppAside({ children }: Readonly<{ children: ReactNode }>) {
   }, []);
 
   return (
-    <aside ref={asideRef} className={`p-2 d-flex flex-column flex-shrink-0 ${styles.aside}`}>
+    <aside
+      ref={asideRef}
+      className={`p-2 d-flex flex-column flex-shrink-0 d-print-none ${styles.aside}`}
+    >
       {children}
     </aside>
   );
