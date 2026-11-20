@@ -45,24 +45,28 @@ const integrationServer = createIntegrationApp().listen(integrationPort, () => {
   log.info({ port: integrationPort }, 'Integration API is listening');
 });
 
+/** Startup diagnostics, one after another; a failure is logged, not fatal. */
+const runStartupDiagnostics = () =>
+  logStartupHealth()
+    .then(logTempStorageSelfTest)
+    .then(logVirusScanSelfTest)
+    .then(logCacheSelfTest)
+    .then(logMessageBusSelfTest)
+    .then(logEventStreamSelfTest)
+    .then(logDocumentGenerationReadiness)
+    .then(logTenantEngineReadiness)
+    .then(logCredentialIssuerReadiness)
+    .then(logWorkflowEngineReadiness)
+    .then(logNotificationReadiness)
+    .then(logUserSearchReadiness)
+    .catch((err) => log.warn({ err }, 'Startup diagnostics failed'));
+
 // Jobs and startup diagnostics start once both servers are listening; a listen error on either
 // exits the process. The rejection handler sees listen errors only, not a startJobs() failure.
 Promise.all([once(server, 'listening'), once(integrationServer, 'listening')]).then(
   () => {
     startJobs();
-    void logStartupHealth()
-      .then(logTempStorageSelfTest)
-      .then(logVirusScanSelfTest)
-      .then(logCacheSelfTest)
-      .then(logMessageBusSelfTest)
-      .then(logEventStreamSelfTest)
-      .then(logDocumentGenerationReadiness)
-      .then(logTenantEngineReadiness)
-      .then(logCredentialIssuerReadiness)
-      .then(logWorkflowEngineReadiness)
-      .then(logNotificationReadiness)
-      .then(logUserSearchReadiness)
-      .catch((err) => log.warn({ err }, 'Startup diagnostics failed'));
+    void runStartupDiagnostics();
   },
   (err: unknown) => {
     log.error({ err, port, integrationPort }, 'Server failed to listen');
