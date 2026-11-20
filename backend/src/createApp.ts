@@ -10,6 +10,7 @@ import { designRouter, submitRouter, filesApiRouter, coreRouter } from './core/a
 import { healthRouter } from './core/api/health';
 import { metaRouter } from './core/api/meta';
 import { buildOpenApiSpec } from './core/api/shared/openapi';
+import { buildIntegrationV2OpenApiSpec } from './integration/v2/openapi';
 import swaggerUi from 'swagger-ui-express';
 import { httpLogger, log } from './core/logging';
 import { resolveActor, resolveActorOrPublic } from './core/middleware/actor';
@@ -72,16 +73,27 @@ export const createApp = () => {
   app.use(globalRateLimit);
 
   // ——— Public routes (no authentication) ———
-  app.get(apiPath('/api/docs/openapi.json'), publicRateLimit, (_req, res) => {
+  const apiSpecPath = apiPath('/api/docs/openapi.json');
+  // Only the spec is public here; the integration API itself is served on its own port.
+  const integrationSpecPath = apiPath('/api/docs/integrations/v2/openapi.json');
+  app.get(apiSpecPath, publicRateLimit, (_req, res) => {
     res.json(buildOpenApiSpec());
+  });
+  app.get(integrationSpecPath, publicRateLimit, (_req, res) => {
+    res.json(buildIntegrationV2OpenApiSpec());
   });
   app.use(
     apiPath('/api/docs'),
     publicRateLimit,
     swaggerUi.serve,
     swaggerUi.setup(null, {
+      // Without explorer, swagger-ui-express hides the spec selector.
+      explorer: true,
       swaggerOptions: {
-        url: apiPath('/api/docs/openapi.json'),
+        urls: [
+          { url: apiSpecPath, name: 'Backend API v1' },
+          { url: integrationSpecPath, name: 'Integration API v2' },
+        ],
       },
     }),
   );

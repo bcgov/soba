@@ -6,7 +6,7 @@ metadata:
     {{- include "soba.labels" (dict "root" . "component" "backend") | nindent 4 }}
 data:
   {{- with $gateway := .Values.backend.integrationGateway }}
-  {{- range $key, $name := dict "issuer" "INTEGRATION_GATEWAY_ISSUER" "jwksUri" "INTEGRATION_GATEWAY_JWKS_URI" "audience" "INTEGRATION_GATEWAY_AUDIENCE" "clientIdClaim" "INTEGRATION_GATEWAY_CLIENT_ID_CLAIM" }}
+  {{- range $key, $name := dict "issuer" "INTEGRATION_GATEWAY_ISSUER" "jwksUri" "INTEGRATION_GATEWAY_JWKS_URI" "audience" "INTEGRATION_GATEWAY_AUDIENCE" "clientIdClaim" "INTEGRATION_GATEWAY_CLIENT_ID_CLAIM" "publicUrl" "INTEGRATION_API_PUBLIC_URL" }}
   {{- with index $gateway $key }}
   {{ $name }}: {{ . | quote }}
   {{- end }}

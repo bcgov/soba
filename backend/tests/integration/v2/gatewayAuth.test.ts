@@ -12,6 +12,7 @@ import express from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import jwksRsa from 'jwks-rsa';
+import { env } from '../../../src/core/config/env';
 import { findActiveApiCredential } from '../../../src/core/db/repos/workspaceCredentialRepo';
 import { integrationV2Router } from '../../../src/integration/v2/routes';
 import { buildIntegrationV2OpenApiSpec } from '../../../src/integration/v2/openapi';
@@ -194,5 +195,26 @@ describe('Public probes and OpenAPI contract', () => {
         'application/json': { schema: { $ref: '#/components/schemas/IntegrationV2_GatewayError' } },
       },
     });
+  });
+
+  it.each([
+    {
+      publicUrl: 'https://gateway.example.test/pr/1/integrations/v2',
+      servers: [
+        { url: 'https://gateway.example.test/pr/1/integrations/v2', description: 'APS gateway' },
+      ],
+    },
+    { publicUrl: undefined, servers: [{ url: `${env.getApiBasePath()}/api/integrations/v2` }] },
+    { publicUrl: '  ', servers: [{ url: `${env.getApiBasePath()}/api/integrations/v2` }] },
+  ])('lists the server for a gateway URL of $publicUrl', ({ publicUrl, servers }) => {
+    const previous = process.env.INTEGRATION_API_PUBLIC_URL;
+    if (publicUrl === undefined) delete process.env.INTEGRATION_API_PUBLIC_URL;
+    else process.env.INTEGRATION_API_PUBLIC_URL = publicUrl;
+    try {
+      expect(buildIntegrationV2OpenApiSpec().servers).toEqual(servers);
+    } finally {
+      if (previous === undefined) delete process.env.INTEGRATION_API_PUBLIC_URL;
+      else process.env.INTEGRATION_API_PUBLIC_URL = previous;
+    }
   });
 });

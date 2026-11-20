@@ -2,9 +2,16 @@
 
 Served at `${API_BASE_PATH}/api/integrations/v2` by `createIntegrationApp()` on its own port,
 `INTEGRATION_PORT` (default 4001). The Route and the router NetworkPolicy cover only the main API
-port; from outside the release, only the APS NetworkPolicy admits this one. The OpenAPI document is
-served at
-`/openapi.json`; it documents implemented endpoints only.
+port; from outside the release, only the APS NetworkPolicy admits this one.
+
+The OpenAPI document documents implemented endpoints only. It is served at `/openapi.json` under
+the integration base path (through the gateway, which requires an API key), and published without a
+key at `${API_BASE_PATH}/api/docs/integrations/v2/openapi.json` on the main API port, where the
+Swagger UI at `${API_BASE_PATH}/api/docs` offers it beside the backend API. Its server is
+`INTEGRATION_API_PUBLIC_URL`, the gateway URL consumers call (Helm
+`backend.integrationGateway.publicUrl`; PR deployments set it to their `/pr/<N>/integrations/v2`
+route). Unset, it is the backend path, which resolves only on the integration port. The docs page
+is reference only: Try it out cannot reach the gateway from the browser.
 
 `v2/schema.ts` defines named schemas and registers operations; `v2/openapi.ts` builds the separate
 document using the shared backend OpenAPI builder. Common liveness/error schemas and rate-limit
@@ -48,7 +55,8 @@ integration check. NetworkPolicy and protected transport remain necessary for th
 `GET /me` requires a valid gateway JWT and an active API credential from the configured issuer;
 it returns only credential metadata and redacted request details. No raw API key is stored.
 Missing gateway configuration fails closed with 503. Invalid JWT or credential returns 401.
-`/health` and `/openapi.json` need no credential at the backend; the gateway requires an API key.
+`/health` and `/openapi.json` need no credential at the backend; the gateway requires an API key,
+so the spec declares the key on every operation.
 When `/health` receives `GW-JWT`, it verifies the token and returns `gatewayAuthenticated: true`;
 an invalid supplied token is rejected. PR gateway smoke checks require this field so a passing
 probe proves JWT verification, not just liveness. Health does not resolve a credential or check
@@ -63,7 +71,8 @@ Run `pnpm --filter @soba/backend exec jest --runInBand tests/integration/v2`.
 `security.test.ts` uses the production `createIntegrationApp()` and `createApp()` stacks and keeps
 JWT verification and credential middleware real. Only JWKS transport, the credential repository and
 the default credential issuer lookup are mocked. An explicit inventory checks every registered and
-documented method/path and its public/API-key security policy. New operations need an inventory
+documented method/path, the API key the spec declares on it, and whether the backend itself requires
+the gateway JWT. New operations need an inventory
 entry and authentication regressions, including non-GET operations. Test fixtures live in
 `tests/integration/fixtures`: complete typed records, signing keys, and application environment
 settings pinned before middleware initialization. Mock declarations remain local to each suite.

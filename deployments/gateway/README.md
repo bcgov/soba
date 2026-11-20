@@ -31,6 +31,8 @@ The backend must use the same `GATEWAY_JWT_ISSUER` as `INTEGRATION_GATEWAY_ISSUE
 its `/certs` JWKS URI, and set `INTEGRATION_GATEWAY_AUDIENCE` to exactly `GATEWAY_SERVICE_NAME`.
 In Helm, set `backend.integrationGateway.issuer`, `.jwksUri`, `.audience`, and `.clientIdClaim`;
 the backend ConfigMap maps these to the environment variables. Empty defaults keep JWT auth disabled.
+`.publicUrl` is the gateway URL consumers call; the spec published at `/chefs/api/docs` lists it as
+the server.
 The APS instance determines the issuer/JWKS endpoints, even for SOBA dev/PR releases. See
 `backend/src/integration/README.md` for the endpoint table and signed identity mapping.
 
@@ -47,7 +49,8 @@ Run generator checks with `node --test deployments/gateway/tests/generate-gatewa
 With `APS_PR_ENABLED=true`, PR Open now publishes both the public proxy check and a protected
 integration service after deploying the backend. For PR 123 the integration service is
 `soba-pr-123-integrations-v2`, its qualifier is `integrations-soba-pr-123`, and its route is
-`/pr/123/integrations/v2/`. The deployed backend audience matches the service name. PR Close removes
+`/pr/123/integrations/v2/`. The deployed backend audience matches the service name, and its
+`publicUrl` is `https://<APS_GATEWAY_HOST_PREFIX>.<APS_HOST>/pr/123/integrations/v2`. PR Close removes
 both qualifiers under the same per-release gateway lock. The gateway job checks out the PR source
 ref so the rendered configuration matches the deployed feature code.
 

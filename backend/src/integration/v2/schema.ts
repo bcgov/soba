@@ -31,20 +31,30 @@ export const IntegrationHealthResponseSchema = HealthLivenessResponseSchema.exte
   gatewayAuthenticated: z.literal(true).optional(),
 }).openapi('IntegrationV2_HealthResponse');
 
+// Consumers reach every operation through the gateway, which requires an API key on all of them.
+const gatewayAclDenied = {
+  description: 'Gateway ACL denies access to this Product Environment',
+  content: { 'application/json': { schema: GatewayErrorSchema } },
+};
+
 export const registerIntegrationV2OpenApi = (registry: OpenAPIRegistry) => {
   registry.registerPath({
     method: 'get',
     path: '/health',
-    security: [],
+    security: [{ apiKey: [] }],
     summary: 'Integration API liveness; does not check dependencies',
     description:
-      'Direct backend probes are public. The protected gateway requires an API key and ACL approval. A supplied upstream JWT is verified; gatewayAuthenticated is then true.',
+      'The gateway requires an API key and ACL approval. The backend verifies the gateway JWT it adds; gatewayAuthenticated is then true.',
     responses: {
       200: {
         description: 'Alive',
         content: { 'application/json': { schema: IntegrationHealthResponseSchema } },
       },
-      401: { description: 'Invalid supplied gateway JWT, or gateway key authentication failed' },
+      401: {
+        description: 'Gateway API-key rejection or invalid gateway JWT',
+        content: { 'application/json': { schema: z.union([ApiErrorSchema, GatewayErrorSchema]) } },
+      },
+      403: gatewayAclDenied,
       503: { description: 'A gateway JWT was supplied but verification is not configured' },
     },
   });
@@ -63,18 +73,24 @@ export const registerIntegrationV2OpenApi = (registry: OpenAPIRegistry) => {
         description: 'Gateway API-key rejection, invalid upstream JWT or inactive API credential',
         content: { 'application/json': { schema: z.union([ApiErrorSchema, GatewayErrorSchema]) } },
       },
-      403: {
-        description: 'Gateway ACL denies access to this Product Environment',
-        content: { 'application/json': { schema: GatewayErrorSchema } },
-      },
+      403: gatewayAclDenied,
       503: { description: 'Gateway authentication is not configured' },
     },
   });
   registry.registerPath({
     method: 'get',
     path: '/openapi.json',
-    security: [],
+    security: [{ apiKey: [] }],
     summary: 'Integration API v2 OpenAPI document',
-    responses: { 200: { description: 'OpenAPI 3.0 document' } },
+    description:
+      'The gateway requires an API key and ACL approval. The same document is published without a key at /api/docs/integrations/v2/openapi.json on the main API.',
+    responses: {
+      200: { description: 'OpenAPI 3.0 document' },
+      401: {
+        description: 'Gateway API-key rejection',
+        content: { 'application/json': { schema: GatewayErrorSchema } },
+      },
+      403: gatewayAclDenied,
+    },
   });
 };

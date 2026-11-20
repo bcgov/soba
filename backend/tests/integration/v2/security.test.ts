@@ -29,14 +29,15 @@ import { IntegrationMeResponseSchema } from '../../../src/integration/v2/schema'
 import { buildIntegrationV2OpenApiSpec } from '../../../src/integration/v2/openapi';
 
 const base = '/chefs/api/integrations/v2';
-// Every mounted/documented operation must explicitly declare its access policy here.
+// Every mounted/documented operation must be listed here. The spec declares the gateway API key on
+// all of them; backendAuth is whether the backend itself requires the gateway JWT.
 const operations = [
-  { method: 'get', path: '/health', access: 'public' },
-  { method: 'get', path: '/openapi.json', access: 'public' },
-  { method: 'get', path: '/me', access: 'apiKey' },
+  { method: 'get', path: '/health', backendAuth: false },
+  { method: 'get', path: '/openapi.json', backendAuth: false },
+  { method: 'get', path: '/me', backendAuth: true },
 ] as const;
 const protectedOperations = operations
-  .filter((op) => op.access === 'apiKey')
+  .filter((op) => op.backendAuth)
   .map(({ method, path }) => ({ method, path }));
 const getSigningKey = jest.fn();
 jest.mocked(jwksRsa).mockReturnValue({ getSigningKey } as unknown as ReturnType<typeof jwksRsa>);
@@ -89,11 +90,7 @@ describe('Endpoint inventory and access policies', () => {
     );
     expect(documented).toEqual(
       expect.arrayContaining(
-        operations.map(({ method, path, access }) => ({
-          method,
-          path,
-          security: access === 'public' ? [] : [{ apiKey: [] }],
-        })),
+        operations.map(({ method, path }) => ({ method, path, security: [{ apiKey: [] }] })),
       ),
     );
     expect(documented).toHaveLength(operations.length);
@@ -196,8 +193,8 @@ describe('Production middleware and staff authentication boundaries', () => {
     expect(findActiveApiCredential).not.toHaveBeenCalled();
   });
 
-  it.each(['/health', '/openapi.json'])(
-    'keeps the intended public integration probe %s reachable through the app mount',
+  it.each(operations.filter((op) => !op.backendAuth).map(({ path }) => path))(
+    'serves %s without a gateway JWT at the backend',
     async (path) => {
       expect((await request(app).get(base + path)).status).toBe(200);
       expect(findActiveApiCredential).not.toHaveBeenCalled();
@@ -219,5 +216,26 @@ describe('Listener separation', () => {
 
   it('does not serve the staff API on the integration port', async () => {
     expect((await request(app).get('/chefs/api/v1/health')).status).toBe(404);
+  });
+});
+
+describe('Published specification', () => {
+  it('publishes the integration spec on the main API docs, matching the inventory', async () => {
+    const response = await request(staffApp).get('/chefs/api/docs/integrations/v2/openapi.json');
+    expect(response.status).toBe(200);
+    expect(Object.keys(response.body.paths).sort()).toEqual(
+      operations.map(({ path }) => path).sort(),
+    );
+  });
+
+  it('offers both specs in the docs page selector', async () => {
+    const init = await request(staffApp).get('/chefs/api/docs/swagger-ui-init.js');
+    expect(init.status).toBe(200);
+    expect(init.text).toContain('"url": "/chefs/api/docs/openapi.json"');
+    expect(init.text).toContain('"url": "/chefs/api/docs/integrations/v2/openapi.json"');
+    // swagger-ui-express hides the selector with this rule unless explorer is on.
+    const page = await request(staffApp).get('/chefs/api/docs/');
+    expect(page.status).toBe(200);
+    expect(page.text).not.toContain('download-url-wrapper { display: none }');
   });
 });

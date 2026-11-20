@@ -216,6 +216,8 @@ jobs:
           APS_PR_ENABLED: ${{ vars.APS_PR_ENABLED == 'true' }}
           APS_UPSTREAM_JWT_ISSUER: ${{ vars.APS_UPSTREAM_JWT_ISSUER || 'https://aps-jwks-upstream-jwt.api.gov.bc.ca' }}
           APS_UPSTREAM_JWKS_URI: ${{ vars.APS_UPSTREAM_JWKS_URI || 'https://aps-jwks-upstream-jwt.api.gov.bc.ca/certs' }}
+          APS_GATEWAY_HOST_PREFIX: ${{ vars.APS_GATEWAY_HOST_PREFIX }}
+          APS_HOST: ${{ vars.APS_HOST }}
           VAULT_AUTH_PATH: ${{ vars.VAULT_AUTH_PATH }}
           VAULT_NAMESPACE: ${{ vars.VAULT_NAMESPACE }}
           VAULT_ROLE: ${{ vars.VAULT_ROLE_NONPROD }}
@@ -293,6 +295,7 @@ jobs:
               --set-string "backend.integrationGateway.jwksUri=${APS_UPSTREAM_JWKS_URI}"
               --set-string "backend.integrationGateway.audience=${RELEASE}-integrations-v2"
               --set-string "backend.integrationGateway.clientIdClaim=consumername"
+              --set-string "backend.integrationGateway.publicUrl=https://${APS_GATEWAY_HOST_PREFIX:?Set APS_GATEWAY_HOST_PREFIX in the pr environment.}.${APS_HOST:?Set the APS_HOST variable.}/pr/${PR_NUM}/integrations/v2"
             )
           fi
           helm upgrade --install "${RELEASE}" ./deployments/helm/soba \

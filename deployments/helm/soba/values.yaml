@@ -22,6 +22,8 @@ backend:
     jwksUri: ""
     audience: ""
     clientIdClaim: consumername
+    # Gateway URL consumers call, listed as the server in the spec published at /api/docs.
+    publicUrl: ""
   image:
     repository: ghcr.io/bcgov/soba/backend
     tag: latest
