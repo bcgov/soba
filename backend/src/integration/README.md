@@ -85,8 +85,10 @@ is plain HTTP on this machine. Development means `NODE_ENV=development`, which t
 namespace also sets; its HTTPS APS settings stay in force there, so the dev gateway refuses to start.
 
 Under the no-op credential issuer (the local default), `pnpm db:dev-data --seed` creates an active
-API key in a workspace the target user owns and prints its client ID. With the backend and the dev
-gateway running:
+API key in a workspace the target user owns and prints its client ID. `/me` refuses it while the
+`api-keys` feature is off, as it is by default: set `FEATURE_API_KEYS_STATUS=enabled` in
+`backend/.env` and run `pnpm db:seed` (the dev-data seed says when it is off). With the backend and
+the dev gateway running:
 
 ```bash
 curl -i -H "X-API-KEY: <client ID from the seed>" \

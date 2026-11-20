@@ -6,6 +6,7 @@ import { parseArgs } from 'node:util';
 
 import { AppError } from '../../core/errors';
 import { parseOrUsage, runCli, UsageError } from './cliSupport';
+import type { ManifestApiKey } from './apiKey';
 import { generate, type DevDataManifest } from './generate';
 import { collectTargets, purge, type PurgeResult } from './purge';
 import { acquireDevDataLock, assertDevDataEnabled, describeTarget } from './guard';
@@ -163,6 +164,18 @@ async function reportDryRun(): Promise<void> {
   console.log(`  stored files${''.padEnd(20)} ${targets.storedFiles.length}`);
 }
 
+function describeApiKey(apiKey: ManifestApiKey | null): string {
+  if (!apiKey) {
+    return 'Dev gateway API key: not created; dev-data creates it only under credential-issuer-noop';
+  }
+  const key = `Dev gateway API key: X-API-KEY ${apiKey.clientId} (workspace ${apiKey.workspaceId})`;
+  if (apiKey.apiKeysAvailable) return key;
+  return (
+    `${key}\n  The integration API refuses it while the api-keys feature is off: ` +
+    'set FEATURE_API_KEYS_STATUS=enabled in backend/.env, then run pnpm db:seed'
+  );
+}
+
 function reportManifest(manifest: DevDataManifest): void {
   console.log(
     `Generated (${manifest.size}) for ${manifest.owner.displayLabel ?? manifest.owner.id}:`,
@@ -178,11 +191,7 @@ function reportManifest(manifest: DevDataManifest): void {
     ? `${submissions.workspaceId} form ${submissions.formId}`
     : '-';
   console.log(`  paging submissions ${submissionsAnchor}`);
-  console.log(
-    manifest.apiKey
-      ? `Dev gateway API key: X-API-KEY ${manifest.apiKey.clientId} (workspace ${manifest.apiKey.workspaceId})`
-      : 'Dev gateway API key: not created; dev-data creates it only under credential-issuer-noop',
-  );
+  console.log(describeApiKey(manifest.apiKey));
   const { coverage } = manifest;
   console.log(
     `Access coverage set: ${Object.keys(coverage.personas).length} personas, ` +

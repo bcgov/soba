@@ -1,9 +1,11 @@
+import { Features } from '../../core/db/codes';
 import { db } from '../../core/db/client';
 import {
   credentialTypeAssignments,
   workspaceCredentials,
 } from '../../core/db/schema/workspaceCredential';
 import { resolveDefaultCredentialIssuerCode } from '../../core/integrations/credential-issuer/CredentialIssuerRegistry';
+import { isFeatureAvailable } from '../../core/services/featureAvailabilityService';
 
 /** The local default. A real issuer never issued this key, so it could not regenerate or delete it. */
 const NOOP_ISSUER_CODE = 'credential-issuer-noop';
@@ -12,6 +14,11 @@ export interface ManifestApiKey {
   workspaceId: string;
   /** Sent as X-API-KEY to the local dev gateway, which passes it on as the consumer. */
   clientId: string;
+  /**
+   * Whether api-keys was available in the workspace at seed time. The integration API refuses the
+   * key while it is not.
+   */
+  apiKeysAvailable: boolean;
 }
 
 /**
@@ -49,5 +56,9 @@ export async function createDevApiKey(
       typeCode: 'api',
     });
   });
-  return { workspaceId, clientId };
+  const apiKeysAvailable = await isFeatureAvailable(Features.api_keys, {
+    workspaceId,
+    formId: null,
+  });
+  return { workspaceId, clientId, apiKeysAvailable };
 }
