@@ -314,7 +314,7 @@ export class FormVersionService {
     return updated;
   }
 
-  async delete(input: VersionActionInput) {
+  delete(input: VersionActionInput) {
     // Under the lock publish takes, so a version published meanwhile is refused, not deleted.
     return db.transaction(async (tx) => {
       const version = await lockFormVersion(input.workspaceId, input.formVersionId, tx);
