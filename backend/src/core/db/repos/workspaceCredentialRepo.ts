@@ -2,7 +2,6 @@ import type {
   CredentialFields,
   CredentialStatus,
   CredentialType,
-  CredentialPermission,
   CREDENTIAL_SORT_FIELDS,
   SortLocale,
   SortToken,
@@ -14,7 +13,6 @@ import { likePattern, orderByForSort, type SortColumns } from '../listSort';
 import {
   credentialAudit,
   credentialTypeAssignments,
-  credentialPermissions,
   workspaceCredentials,
 } from '../schema/workspaceCredential';
 import { sobaSchema } from '../schema/sobaSchema';
@@ -35,7 +33,6 @@ export type CredentialListInput = {
 
 export type CredentialRecord = typeof workspaceCredentials.$inferSelect & {
   types: CredentialType[];
-  permissions: CredentialPermission[];
 };
 
 // Drizzle leaves columns unqualified in a single-table select or returning, so the outer key's id
@@ -43,11 +40,6 @@ export type CredentialRecord = typeof workspaceCredentials.$inferSelect & {
 const outerKeyId = sql`${sql.identifier(sobaSchema.schemaName)}.${sql.identifier('workspace_credential')}.${sql.identifier('id')}`;
 const credentialSelection = {
   ...getTableColumns(workspaceCredentials),
-  permissions: sql<CredentialPermission[]>`array(
-    select ${credentialPermissions.permissionCode} from ${credentialPermissions}
-    where ${credentialPermissions.credentialId} = ${outerKeyId}
-    order by ${credentialPermissions.permissionCode}
-  )`,
   types: sql<CredentialType[]>`array(
     select ${credentialTypeAssignments.typeCode} from ${credentialTypeAssignments}
     where ${credentialTypeAssignments.credentialId} = ${outerKeyId}
@@ -88,13 +80,6 @@ const assignTypes = (tx: DbOrTx, key: KeyRef, types: CredentialType[]) =>
     );
 
 const sortedTypes = (types: CredentialType[]) => [...types].sort((a, b) => a.localeCompare(b));
-
-const assignPermissions = async (tx: DbOrTx, id: string, permissions: CredentialPermission[]) => {
-  if (permissions.length)
-    await tx
-      .insert(credentialPermissions)
-      .values(permissions.map((permissionCode) => ({ credentialId: id, permissionCode })));
-};
 
 /** Only a configured issuer's live, active API credentials may authenticate incoming requests. */
 export const findActiveApiCredential = async (
@@ -189,9 +174,8 @@ export const reserveCredentialIssue = (
       .returning();
     if (!row) throw new Error('Credential reservation was not written');
     await assignTypes(tx, row, fields.types);
-    await assignPermissions(tx, row.id, fields.permissions ?? []);
     await audit(tx, row, actorId, 'issue_started');
-    return { ...row, types: sortedTypes(fields.types), permissions: fields.permissions ?? [] };
+    return { ...row, types: sortedTypes(fields.types) };
   });
 
 /** Moves an active key to rotating; null when it is missing or another operation holds it. */
@@ -317,10 +301,8 @@ export const updateCredentialFields = (
       .delete(credentialTypeAssignments)
       .where(eq(credentialTypeAssignments.credentialId, id));
     await assignTypes(tx, row, fields.types);
-    await tx.delete(credentialPermissions).where(eq(credentialPermissions.credentialId, id));
-    await assignPermissions(tx, id, fields.permissions ?? []);
     await audit(tx, row, actorId, 'fields_updated');
-    return { ...row, types: sortedTypes(fields.types), permissions: fields.permissions ?? [] };
+    return { ...row, types: sortedTypes(fields.types) };
   });
 
 /** Deletes a key the issuer refused to create. Returns false when there is no such key. */

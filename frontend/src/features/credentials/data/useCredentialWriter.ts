@@ -21,8 +21,6 @@ import {
 const sameFields = (record: CredentialMetadata, fields: CredentialFields) =>
   record.label === fields.label &&
   record.notes === fields.notes &&
-  (record.permissions ?? []).length === (fields.permissions ?? []).length &&
-  (record.permissions ?? []).every((code) => fields.permissions?.includes(code)) &&
   record.types.length === fields.types.length &&
   record.types.every((type) => fields.types.includes(type));
 

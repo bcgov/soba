@@ -196,7 +196,6 @@ export function ApiKeysTab({ dict, owner }: Readonly<ApiKeysTabProps>) {
           owner={owner}
           credentialId={editingId}
           available={keys.available === true}
-          availablePermissions={keys.availablePermissions}
           onHoldChange={setFormHeld}
           onDone={() => setFormView(null)}
         />

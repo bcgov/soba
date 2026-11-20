@@ -41,7 +41,6 @@ vi.mock('next/navigation', () => ({
 import ApiKeysTab from '@/src/features/credentials/ui/ApiKeysTab';
 
 const key = (overrides: Partial<CredentialMetadata> & { id: string }): CredentialMetadata => ({
-  permissions: [],
   scope: 'workspace',
   label: overrides.id,
   notes: '',
@@ -53,7 +52,6 @@ const key = (overrides: Partial<CredentialMetadata> & { id: string }): Credentia
   ...overrides,
 });
 const state = (items: CredentialMetadata[], available = true): CredentialState => ({
-  availablePermissions: [],
   available,
   items,
   page: { offset: 0, limit: 10, total: items.length },

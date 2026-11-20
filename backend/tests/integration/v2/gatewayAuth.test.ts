@@ -39,7 +39,7 @@ beforeEach(() => {
   getSigningKey.mockResolvedValue({ getPublicKey: () => publicKey });
   jest
     .mocked(findActiveApiCredential)
-    .mockResolvedValue(credentialFixture({ clientId: 'aps-client', permissions: [] }));
+    .mockResolvedValue(credentialFixture({ clientId: 'aps-client' }));
 });
 afterAll(() => {
   for (const [key, value] of Object.entries(original)) {

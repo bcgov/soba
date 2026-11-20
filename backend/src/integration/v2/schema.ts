@@ -1,6 +1,5 @@
 import { extendZodWithOpenApi, type OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
-import { CredentialPermissionSchema } from '@soba/lib';
 import { ApiErrorSchema } from '../../core/api/shared/schema';
 import { HealthLivenessResponseSchema } from '../../core/api/health/schema';
 
@@ -12,7 +11,6 @@ export const IntegrationCredentialSchema = z
     clientId: z.string(),
     workspaceId: z.uuid(),
     formId: z.uuid().nullable(),
-    permissions: z.array(CredentialPermissionSchema),
   })
   .openapi('IntegrationV2_Credential');
 
@@ -55,8 +53,7 @@ export const registerIntegrationV2OpenApi = (registry: OpenAPIRegistry) => {
     path: '/me',
     security: [{ apiKey: [] }],
     summary: 'Inspect the active API credential and redacted incoming request',
-    description:
-      'Grants are configured permissions, not proof of access to a specific resource. Form/workspace authorization is required separately. Secrets are redacted and the response is not cached.',
+    description: 'Secrets are redacted and the response is not cached.',
     responses: {
       200: {
         description: 'Resolved identity',

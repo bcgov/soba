@@ -1,23 +1,11 @@
 # Integration API v2
 
 Mounted at `${API_BASE_PATH}/api/integrations/v2`. The OpenAPI document is served at
-`/openapi.json`; it documents implemented endpoints only. The existing internal API's credential
-OpenAPI contracts include `permissions` and `availablePermissions`.
+`/openapi.json`; it documents implemented endpoints only.
 
 `v2/schema.ts` defines named schemas and registers operations; `v2/openapi.ts` builds the separate
 document using the shared backend OpenAPI builder. Common liveness/error schemas and rate-limit
 documentation are reused. Explicit gateway error bodies remain distinct from backend errors.
-
-## Credential grants
-
-Migration `0072_credential_permissions.sql` adds explicit per-key permissions; existing keys
-receive none. `submission_read` is the initial supported permission. Creating or editing grants
-requires holding those permissions on the credential's workspace or form in addition to existing
-key-management authorization. A web-component-only credential cannot hold API grants.
-
-Workspace grants are an upper bound; form overrides must still be respected at request time.
-The creator's current access must also bound each future resource request. Credential lookup
-alone is authentication, not resource authorization.
 
 ## Gateway identity
 

@@ -43,7 +43,6 @@ router.get('/me', resolveIntegrationCredential, (req, res) => {
       clientId: req.integrationCredential!.clientId,
       workspaceId: req.integrationCredential!.workspaceId,
       formId: req.integrationCredential!.formId,
-      permissions: req.integrationCredential!.permissions,
     },
     method: req.method,
     path: `${req.baseUrl}${req.path}`,

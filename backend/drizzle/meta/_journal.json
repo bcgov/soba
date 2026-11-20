@@ -498,13 +498,6 @@
       "when": 1773568444000,
       "tag": "0071_form_version_opened",
       "breakpoints": true
-    },
-    {
-      "idx": 72,
-      "version": "7",
-      "when": 1773654844000,
-      "tag": "0072_credential_permissions",
-      "breakpoints": true
     }
   ]
 }

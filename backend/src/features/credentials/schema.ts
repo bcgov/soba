@@ -78,9 +78,7 @@ const registerScope = (registry: OpenAPIRegistry, docs: ScopeDocs): void => {
   const invalid = { 400: { description: 'Validation error' } };
   const writeErrors = {
     ...invalid,
-    403: {
-      description: `${docs.writeForbidden}; requested API grants must also be held by the editor at this scope`,
-    },
+    403: { description: docs.writeForbidden },
     404: { description: KEY_NOT_FOUND },
     409: { description: 'Another operation holds the key, or it needs reconciliation' },
     503: { description: OPERATION_FAILED },
@@ -167,16 +165,14 @@ export const registerApiKeySettingsOpenApi: RegisterOpenApiPaths = (registry) =>
     path: '/design/forms/{id}/settings/api-keys',
     params: FormSettingsParamsSchema,
     readForbidden: 'Requires form_read',
-    writeForbidden:
-      'Requires form_update; API grants additionally require the selected permissions on the form',
+    writeForbidden: 'Requires form_update',
     listDescription: "The workspace's keys, which the form cannot change, and the form's own keys",
   });
   registerScope(registry, {
     path: '/workspaces/{id}/settings/api-keys',
     params: WorkspaceSettingsParamsSchema,
     readForbidden: 'Requires workspace membership',
-    writeForbidden:
-      'Workspace management requires an owner or admin role; API grants additionally require the selected workspace permissions',
+    writeForbidden: 'Workspace management requires an owner or admin role',
     listDescription: "The workspace's own keys",
   });
 };

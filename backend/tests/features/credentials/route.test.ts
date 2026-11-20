@@ -56,7 +56,7 @@ const workspacePath = `/workspaces/${workspaceId}/settings/api-keys`;
 const formPath = `/design/forms/${formId}/settings/api-keys`;
 const workspaceOwner = { workspaceId, formId: null };
 const formOwner = { workspaceId, formId };
-const fields = { label: 'Embedding', notes: '', types: ['api', 'web-component'], permissions: [] };
+const fields = { label: 'Embedding', notes: '', types: ['api', 'web-component'] };
 const query = { offset: 0, limit: 20, sort: 'createdAt:desc', locale: 'en' };
 
 const app = express();
@@ -82,7 +82,6 @@ beforeEach(() => {
   grant();
   service.list.mockResolvedValue({
     available: true,
-    availablePermissions: [],
     items: [],
     page: { offset: 0, limit: 20, total: 0 },
     filters: {},
@@ -108,17 +107,13 @@ describe('api keys settings group', () => {
       .set('Accept-Language', 'fr-CA');
     expect(response.status).toBe(200);
     expect(response.headers['cache-control']).toBe('no-store');
-    expect(service.list).toHaveBeenCalledWith(
-      workspaceOwner,
-      {
-        offset: 10,
-        limit: 5,
-        q: 'Vault',
-        sort: 'label:asc',
-        locale: 'fr',
-      },
-      'actor',
-    );
+    expect(service.list).toHaveBeenCalledWith(workspaceOwner, {
+      offset: 10,
+      limit: 5,
+      q: 'Vault',
+      sort: 'label:asc',
+      locale: 'fr',
+    });
   });
 
   it("refuses a member every write to the workspace's keys, uncached", async () => {
@@ -164,7 +159,7 @@ describe('api keys settings group', () => {
   it("reads a form's keys with form_read and refuses its writes without form_update", async () => {
     grant(Permissions.form_read);
     expect((await request(app).get(formPath).set('x-test-role', 'member')).status).toBe(200);
-    expect(service.list).toHaveBeenCalledWith(formOwner, query, 'actor');
+    expect(service.list).toHaveBeenCalledWith(formOwner, query);
     expect(resolveFormPermissions).toHaveBeenCalledWith('actor', workspaceId, formId);
     for (const write of writes(formPath)) {
       expect((await write().set('x-test-role', 'owner')).status).toBe(403);

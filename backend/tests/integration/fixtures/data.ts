@@ -25,6 +25,5 @@ export const credentialFixture = (overrides: Partial<CredentialRecord> = {}): Cr
   deletedAt: null,
   deletedBy: null,
   types: ['api'],
-  permissions: ['submission_read'],
   ...overrides,
 });
