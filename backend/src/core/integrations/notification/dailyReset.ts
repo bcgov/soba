@@ -7,30 +7,65 @@ export const DAILY_LIMIT_REACHED =
 
 /** Why an email job waits: the provider refused a send at its limit. */
 export const PROVIDER_LIMIT_REACHED =
-  "Email provider's limit reached; the rest are tried again after midnight";
+  "Email provider's limit reached; email waits from a minute to an hour, then tries again";
 
 // The jobs waiting for the reset start over its first five minutes, not all at once.
 const RESET_SPREAD_MS = 300_000;
+// The jobs waiting out a pause start over the half minute after it.
+const PAUSE_SPREAD_MS = 30_000;
+const FIRST_PAUSE_MS = 60_000;
+const LONGEST_PAUSE_MS = 3_600_000;
 
 /**
  * Emails the environment may still send today: NOTIFICATION_DAILY_LIMIT less the sends the provider
  * accepted or refused for the address since the last midnight in NOTIFICATION_DAILY_RESET_TIME_ZONE,
- * never below zero, and none once the provider refused a send at its limit today.
+ * never below zero.
  */
-export const roomToday = (
-  dailyLimit: number,
-  day: { counted: number; limited: boolean },
-): number => (day.limited ? 0 : Math.max(dailyLimit - day.counted, 0));
+export const roomToday = (dailyLimit: number, counted: number): number =>
+  Math.max(dailyLimit - counted, 0);
 
 /**
- * The deferral to `resetsAt`, a daily reset, spread over the five minutes after it, with `reason`
- * shown on the job. A reset already past waits a second; a wait past a day is cut to a day, and the
- * job defers again when it wakes.
+ * When every email job may send again after the provider refused sends at its limit: a minute after
+ * the last refusal when it is the first since an email was accepted, doubling with each one after,
+ * up to an hour. Null when no pause is in force at `now`.
+ */
+export const limitPauseEnds = (
+  lastLimitedAt: Date | null,
+  limitedInARow: number,
+  now: Date,
+): Date | null => {
+  if (lastLimitedAt === null || limitedInARow < 1) return null;
+  const pauseMs = Math.min(FIRST_PAUSE_MS * 2 ** (limitedInARow - 1), LONGEST_PAUSE_MS);
+  const ends = new Date(lastLimitedAt.getTime() + pauseMs);
+  return ends > now ? ends : null;
+};
+
+/**
+ * The deferral to `resetsAt`, the daily reset, spread over the five minutes after it. A reset already
+ * past waits a second; a wait past a day is cut to a day, and the job defers again when it wakes.
  */
 export const deferUntilReset = (
   resetsAt: Date,
-  reason: string,
   now: Date = new Date(),
   random: (max: number) => number = randomInt,
 ): JobDeferredError =>
-  new JobDeferredError(resetsAt.getTime() - now.getTime() + random(RESET_SPREAD_MS), reason);
+  new JobDeferredError(
+    resetsAt.getTime() - now.getTime() + random(RESET_SPREAD_MS),
+    DAILY_LIMIT_REACHED,
+  );
+
+/**
+ * The deferral to the end of a pause after the provider's limit, spread over the half minute after;
+ * a first pause from `now` when none shows, as when a send that started after it was accepted.
+ */
+export const deferUntilPauseEnds = (
+  pausedUntil: Date | null,
+  now: Date = new Date(),
+  random: (max: number) => number = randomInt,
+): JobDeferredError => {
+  const ends = pausedUntil?.getTime() ?? now.getTime() + FIRST_PAUSE_MS;
+  return new JobDeferredError(
+    ends - now.getTime() + random(PAUSE_SPREAD_MS),
+    PROVIDER_LIMIT_REACHED,
+  );
+};

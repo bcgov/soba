@@ -221,8 +221,8 @@ Notify with an API key. ConfigMap `<fullname>-backend-notification`:
 The environment sends up to `NOTIFICATION_DAILY_LIMIT` emails a day (3000 when unset, under
 Notify's 100,000 a month over 31 days; 100 in PR environments), counting from midnight in
 `NOTIFICATION_DAILY_RESET_TIME_ZONE` (`America/Vancouver` when unset). An email job past it waits
-until the next midnight, and once Notify answers 429, its monthly limit, every email job waits
-until then. A limit outside 1 to 100000 or an invalid zone stops startup.
+until the next midnight. When Notify answers 429, every email job waits a minute, doubling with
+each 429 in a row, up to an hour. A limit outside 1 to 100000 or an invalid zone stops startup.
 
 ### Secret values (Vault template in backend Deployment)
 

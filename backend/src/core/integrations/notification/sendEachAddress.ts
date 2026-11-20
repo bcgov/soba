@@ -2,7 +2,7 @@ import { EmailAddressSchema } from '@soba/lib';
 import type { Logger } from 'pino';
 import { NotificationOutcome } from '../../db/codes';
 import { JobCancelledError, type JobDeferredError } from '../../jobs/errors';
-import { DAILY_LIMIT_REACHED, deferUntilReset, PROVIDER_LIMIT_REACHED } from './dailyReset';
+import { deferUntilPauseEnds, deferUntilReset } from './dailyReset';
 import type { JobNotifications } from './JobNotifications';
 import type { SendEmail } from './NotificationAdapter';
 import { isRefusedSend } from './sendOutcome';
@@ -19,7 +19,7 @@ export interface SendEachAddressContext {
 interface Tally {
   sent: number;
   refused: number;
-  /** Set when the rest wait for the daily reset. */
+  /** Set when the rest wait. */
   deferral?: JobDeferredError;
 }
 
@@ -28,9 +28,10 @@ const normalize = (address: string): string => address.trim().toLowerCase();
 const isAddress = (address: string): boolean => EmailAddressSchema.safeParse(address).success;
 
 /**
- * Sends to each address in turn while the day has room, read before each send so jobs sending at
- * the same time share it. A failure other than a refusal stops the rest of the list; no room leaves
- * the rest to wait for the daily reset.
+ * Sends to each address in turn while the day has room and no pause after the provider's limit is
+ * in force, both read before each send so jobs sending at the same time share them. A failure other
+ * than a refusal stops the rest of the list; no room leaves the rest to wait for the daily reset,
+ * and a pause, or a refusal at the provider's limit, for the pause to end.
  */
 const sendInTurn = async (
   { notifications, signal }: SendEachAddressContext,
@@ -40,13 +41,11 @@ const sendInTurn = async (
   const sendFrom = async (index: number, tally: Tally): Promise<Tally> => {
     if (index === addresses.length) return tally;
     signal.throwIfAborted();
-    const { room, limited, resetsAt } = await notifications.dailyRoom();
+    const { room, resetsAt, pausedUntil } = await notifications.dailyRoom();
     // A stop that came during the read: another worker may hold the job now.
     signal.throwIfAborted();
-    if (room === 0) {
-      const reason = limited ? PROVIDER_LIMIT_REACHED : DAILY_LIMIT_REACHED;
-      return { ...tally, deferral: deferUntilReset(resetsAt, reason) };
-    }
+    if (pausedUntil) return { ...tally, deferral: deferUntilPauseEnds(pausedUntil) };
+    if (room === 0) return { ...tally, deferral: deferUntilReset(resetsAt) };
     const result = await notifications.sendEmail({
       recipients: { to: [addresses[index]] },
       content,
@@ -57,9 +56,11 @@ const sendInTurn = async (
     if (result.outcome === NotificationOutcome.disabled) {
       throw new JobCancelledError(NOTIFICATIONS_OFF);
     }
-    // The addresses before this one stay handled; this one and the rest go after the reset.
+    // The addresses before this one stay handled; this one and the rest wait out the pause, which
+    // the audited refusal starts or lengthens for every email job.
     if (result.outcome === NotificationOutcome.limited) {
-      return { ...tally, deferral: deferUntilReset(resetsAt, PROVIDER_LIMIT_REACHED) };
+      const after = await notifications.dailyRoom();
+      return { ...tally, deferral: deferUntilPauseEnds(after.pausedUntil) };
     }
     if (isRefusedSend(result)) return sendFrom(index + 1, { ...tally, refused: tally.refused + 1 });
     if (result.outcome === NotificationOutcome.error) {
@@ -75,8 +76,10 @@ const sendInTurn = async (
  * for this job. An address no provider would take, or one the provider refuses, is counted as
  * refused and skipped; a list on which no email has reached anyone, on any attempt, ends cancelled.
  * It sends no more than the environment may still send today (see `roomToday`) and defers the rest,
- * without using an attempt, until the daily reset. Any other failure, a missing audit row or an abort stops the run and throws, so the job
- * retries and the retry skips what was handled. Logs counts only, never addresses.
+ * without using an attempt, until the daily reset; after the provider refuses a send at its limit,
+ * every email job defers until the pause ends (see `limitPauseEnds`). Any other failure, a missing
+ * audit row or an abort stops the run and throws, so the job retries and the retry skips what was
+ * handled. Logs counts only, never addresses.
  */
 export const sendEachAddress = async (
   context: SendEachAddressContext,
@@ -105,8 +108,9 @@ export const sendEachAddress = async (
             refused: tally.refused + invalid,
             alreadyHandled: handled.size,
             waiting: remaining.length - tally.sent - tally.refused,
+            waitingFor: tally.deferral.message,
           },
-          'Emails sent; the rest wait for the daily reset',
+          'Emails sent; the rest wait',
         );
       }
       throw tally.deferral;

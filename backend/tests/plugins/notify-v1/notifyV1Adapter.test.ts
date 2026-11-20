@@ -68,14 +68,11 @@ describe('the sending limit', () => {
   };
 
   it('reports a 429 as a sending limit, with its status and text for the audit', async () => {
-    const err = await failWith(
-      429,
-      JSON.stringify({ message: 'Exceeded send limits (100000) for this month' }),
-    );
+    const err = await failWith(429, JSON.stringify({ message: 'Too many requests' }));
     expect(err).toBeInstanceOf(NotificationLimitError);
     expect(err).toEqual(new Error('Notify email send failed (upstream HTTP 429)'));
     expect(upstreamStatusOf(err)).toBe(429);
-    expect(providerDetailOf(err)).toBe('Exceeded send limits (100000) for this month');
+    expect(providerDetailOf(err)).toBe('Too many requests');
   });
 
   it.each([400, 422, 502])('reports a %s as a failure, not a limit', async (status) => {

@@ -198,7 +198,8 @@ address with no expiry, as `notification_audit` rows keep recipients.
   | the job                       | when                                                                                                                                                                 |
   | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
   | throws, so it retries         | the provider fails without refusing the address, or times out; an audit row could not be written                                                                     |
-  | waits for the daily reset     | the day's sends reached `NOTIFICATION_DAILY_LIMIT`, or the provider answered 429 today; the job is deferred to the next midnight, without using an attempt           |
+  | waits for the daily reset     | the day's sends reached `NOTIFICATION_DAILY_LIMIT`; the job is deferred to the next midnight, without using an attempt                                               |
+  | waits for a pause             | the provider answered 429, or a pause after one is in force (see the provider's limit below); without using an attempt                                               |
   | ends cancelled, with a reason | notifications are off; the event no longer applies; no one is left to send to; a recipient cannot be resolved, such as an assignee who can no longer review the form |
 
   Cancel reasons show in the Jobs tabs, so they name no address, comment or form name.
@@ -210,10 +211,11 @@ address with no expiry, as `notification_audit` rows keep recipients.
      sent (step 6).
   4. Checks that notifications are on.
   5. Sends to one address at a time, checking before each send that the environment may still
-     send today; with no room, the job waits for the daily reset and goes on from that address. A
-     refused address (400 or 422) is recorded and skipped. A send refused at the provider's limit
-     (429) is recorded as `limited`, and the job waits for the daily reset. Any other failure
-     throws.
+     send today and that no pause after the provider's limit is in force; otherwise the job waits
+     for the daily reset or the end of the pause, and goes on from that address. A refused address
+     (400 or 422) is recorded and skipped. A send refused at the provider's limit (429) is recorded
+     as `limited`, which starts or lengthens the pause, and the job waits for it to end. Any other
+     failure throws.
   6. Ends cancelled when no email on the list has been sent, on this attempt or an earlier one:
      every address was refused.
 - **Attribution.** `jobNotifications(job, actorId)` binds the service to the job; `actorId` is a
@@ -227,8 +229,12 @@ address with no expiry, as `notification_audit` rows keep recipients.
   job's sends the provider accepted or refused, by the database clock. Past it, a job sends what
   fits and the rest wait for the next day; the limit drops no email, though a job that no longer
   applies when it wakes ends cancelled. Each send checks the room first, so jobs sending at the same
-  moment can end a day past the limit by at most one email each. Once Notify answers 429, its
-  monthly limit, no job sends again that day.
+  moment can end a day past the limit by at most one email each.
+- **The provider's limit.** Notify answers 429 at a sending limit, a rate or its monthly quota. A
+  429 pauses every email job, and only email jobs, for a minute after it; each further 429 before
+  Notify accepts an email doubles the pause, up to an hour. 429s in the same clock minute, as from
+  sends in flight together, count once, and sends count in the order they started. The daily limit
+  keeps the environment under the monthly quota.
 - **Copy request limits.** A submitter's copy, sent to an address they type, is also checked when
   they ask: per submission, address, form, workspace and environment, counted from its own
   requests, and refused with 429 `email_copy_limit_reached` (`SUBMITTER_EMAIL_COPY_*_HOURLY_LIMIT`).

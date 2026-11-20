@@ -61,9 +61,23 @@ describe('dailyRoom', () => {
   const dailyRoom = () =>
     jobNotifications({ id: 'job-1' } as JobFacts, () => Promise.resolve('u1')).dailyRoom();
 
-  it("reads the environment's day in the reset zone and leaves the limit less its sends", async () => {
-    mockDay.mockResolvedValue({ counted: dailyLimit - 5, limited: false, resetsAt });
-    await expect(dailyRoom()).resolves.toEqual({ room: 5, limited: false, resetsAt });
+  it("reads the environment's email in the reset zone: the room left and any pause", async () => {
+    // The database clock runs an hour behind this process's; the pause has 50 s left.
+    const dbNow = new Date(Date.now() - 3_600_000);
+    mockDay.mockResolvedValue({
+      now: dbNow,
+      counted: dailyLimit - 5,
+      resetsAt,
+      lastLimitedAt: new Date(dbNow.getTime() - 10_000),
+      limitedInARow: 1,
+    });
+    const room = await dailyRoom();
+    expect(room.room).toBe(5);
+    // Both times move onto this process's clock, an hour ahead of the database's.
+    expect(Math.abs(room.resetsAt.getTime() - resetsAt.getTime() - 3_600_000)).toBeLessThan(1000);
+    const left = (room.pausedUntil?.getTime() ?? 0) - Date.now();
+    expect(left).toBeGreaterThan(45_000);
+    expect(left).toBeLessThanOrEqual(50_000);
     expect(mockDay).toHaveBeenCalledWith(dailyResetTimeZone, REFUSED_HTTP_STATUSES);
   });
 });

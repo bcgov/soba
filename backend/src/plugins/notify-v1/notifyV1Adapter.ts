@@ -84,7 +84,7 @@ function failureMessage(action: string, err: unknown): string {
   return `${action} failed`;
 }
 
-// Notify's status once its monthly sending limit is reached; a 400 is a refused address.
+// Notify's status at a sending limit, a rate or its monthly quota; a 400 is a refused address.
 const LIMIT_STATUS = 429;
 
 /** Notify v1 email client using the configured API key. */

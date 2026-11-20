@@ -56,10 +56,11 @@ export type PostSubmissionActionEmailContent = SendEmail['content'];
 export interface PostSubmissionActionNotifications {
   /**
    * Send `content` to each address, one email each, skipping those the job already handled, and no
-   * more than the environment's daily limit allows. Past it, or at the provider's limit, it throws
-   * `JobDeferredError` and the rest go after the daily reset; it throws `JobCancelledError` when
-   * notifications are off or every address was refused. Any other failure throws, so the attempt
-   * retries. Call it once per step: a second call skips the addresses the first handled.
+   * more than the environment's daily limit allows. Past it, it throws `JobDeferredError` and the
+   * rest go after the daily reset; at the provider's limit, after a pause of a minute to an hour.
+   * It throws `JobCancelledError` when notifications are off or every address was refused. Any
+   * other failure throws, so the attempt retries. Call it once per step: a second call skips the
+   * addresses the first handled.
    */
   sendToEach(
     addresses: readonly string[],

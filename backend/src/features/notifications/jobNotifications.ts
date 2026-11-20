@@ -1,5 +1,5 @@
 import { listJobNotificationSends, readEmailDay } from '../../core/db/repos/notificationAuditRepo';
-import { roomToday } from '../../core/integrations/notification/dailyReset';
+import { limitPauseEnds, roomToday } from '../../core/integrations/notification/dailyReset';
 import type { JobNotifications } from '../../core/integrations/notification/JobNotifications';
 import {
   isHandledForRun,
@@ -49,6 +49,13 @@ export const jobNotifications = (
   async dailyRoom() {
     const { dailyLimit, dailyResetTimeZone } = getNotificationSettings();
     const day = await readEmailDay(dailyResetTimeZone, REFUSED_HTTP_STATUSES);
-    return { room: roomToday(dailyLimit, day), limited: day.limited, resetsAt: day.resetsAt };
+    const pauseEnds = limitPauseEnds(day.lastLimitedAt, day.limitedInARow, day.now);
+    // From the database clock to this process's, which the deferrals count from.
+    const onThisClock = (at: Date): Date => new Date(at.getTime() + Date.now() - day.now.getTime());
+    return {
+      room: roomToday(dailyLimit, day.counted),
+      resetsAt: onThisClock(day.resetsAt),
+      pausedUntil: pauseEnds && onThisClock(pauseEnds),
+    };
   },
 });

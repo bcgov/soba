@@ -98,8 +98,8 @@ beforeEach(() => {
       dailyRoom: () =>
         Promise.resolve({
           room: 3000,
-          limited: false,
           resetsAt: new Date(Date.now() + 3_600_000),
+          pausedUntil: null,
         }),
     }),
   );
