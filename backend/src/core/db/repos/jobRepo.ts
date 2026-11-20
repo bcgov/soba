@@ -1,6 +1,7 @@
 import {
   and,
   eq,
+  exists,
   inArray,
   isNotNull,
   isNull,
@@ -16,7 +17,7 @@ import { alias, type PgUpdateSetSource } from 'drizzle-orm/pg-core';
 import { mapInOrder } from '../../inOrder';
 import { quietDb, type DbOrTx, type Tx } from '../client';
 import { JobStatus } from '../codes';
-import { files, jobs } from '../schema';
+import { files, jobs, submissions } from '../schema';
 import type { FileRecord } from './fileRepo';
 
 export type JobRecord = typeof jobs.$inferSelect;
@@ -76,7 +77,8 @@ const childJobs = alias(jobs, 'child_job');
 /**
  * True when every child of the job has succeeded, or it has none. A later action step reads the step
  * before it on every run, including one run again after it ended dead or cancelled, so the step
- * before keeps its row and its result until the later step succeeds.
+ * before keeps its row and its result until the later step succeeds, unless the submission is
+ * deleted.
  */
 const everyChildSucceeded = (): SQL =>
   notExists(
@@ -464,12 +466,22 @@ export const sweepJobs = async (retention: {
 
 const endedUnsuccessfully = inArray(jobs.status, [JobStatus.dead, JobStatus.cancelled]);
 
+/** A job about a submission that has been deleted. */
+const submissionDeleted = (): SQL =>
+  exists(
+    quietDb
+      .select({ id: submissions.id })
+      .from(submissions)
+      .where(and(eq(submissions.id, jobs.submissionId), isNotNull(submissions.deletedAt))),
+  );
+
 /**
  * Remove up to `batch` result files: those past their expiry, and those of jobs that ended dead or
- * cancelled, except while a child of the job has not succeeded. One transaction locks the jobs
- * (skipping any being written), points them away from their files and deletes the file rows; the
- * caller then deletes the returned files' bytes. Those dead or cancelled jobs lose their expiry too,
- * so they never read as expired.
+ * cancelled, except while a child of the job has not succeeded; and those of jobs whose submission
+ * was deleted, whatever their children. One transaction locks the jobs (skipping any being
+ * written), points them away from their files and deletes the file rows; the caller then deletes
+ * the returned files' bytes. Those dead or cancelled jobs lose their expiry too, so they never read
+ * as expired.
  */
 export const sweepJobResults = (batch: number): Promise<FileRecord[]> =>
   quietDb.transaction(async (tx) => {
@@ -479,8 +491,13 @@ export const sweepJobResults = (batch: number): Promise<FileRecord[]> =>
       .where(
         and(
           isNotNull(jobs.resultFileId),
-          or(lte(jobs.resultExpiresAt, sql`now()`), endedUnsuccessfully),
-          everyChildSucceeded(),
+          or(
+            and(
+              or(lte(jobs.resultExpiresAt, sql`now()`), endedUnsuccessfully),
+              everyChildSucceeded(),
+            ),
+            submissionDeleted(),
+          ),
         ),
       )
       .limit(batch)
@@ -491,7 +508,8 @@ export const sweepJobResults = (batch: number): Promise<FileRecord[]> =>
       .update(jobs)
       .set({
         resultFileId: null,
-        resultExpiresAt: sql`case when ${endedUnsuccessfully} then null else ${jobs.resultExpiresAt} end`,
+        // A succeeded job released for a deleted submission reads as expired from now.
+        resultExpiresAt: sql`case when ${endedUnsuccessfully} then null when ${submissionDeleted()} then least(${jobs.resultExpiresAt}, now()) else ${jobs.resultExpiresAt} end`,
       })
       .where(
         inArray(

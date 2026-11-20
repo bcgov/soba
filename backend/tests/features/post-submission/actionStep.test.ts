@@ -35,7 +35,6 @@ describe('cancelReason', () => {
 });
 
 describe('pluginJob', () => {
-  const queuedAt = new Date('2026-11-19T10:00:00Z');
   const job: JobFacts = {
     id: 'job-1',
     type: 'post-submission-test:send-email',
@@ -48,17 +47,15 @@ describe('pluginJob', () => {
     createdBy: 'submitter',
     createdAt: new Date('2026-11-19T09:00:00Z'),
     attempt: 2,
-    run: { number: 3, queuedAt, queuedBy: 'staff' },
+    run: { number: 3, queuedAt: new Date('2026-11-19T10:00:00Z'), queuedBy: 'staff' },
   };
 
-  it("gives a step its job's ids, attempt and run, and none of the runner's own facts", () => {
+  it("gives a step its job's ids and none of the runner's own facts", () => {
     expect(pluginJob(job, 's1', 'r1')).toStrictEqual({
       id: 'job-1',
       type: 'post-submission-test:send-email',
       submissionId: 's1',
       revisionId: 'r1',
-      attempt: 2,
-      run: { number: 3, queuedAt, queuedBy: 'staff' },
     });
   });
 });

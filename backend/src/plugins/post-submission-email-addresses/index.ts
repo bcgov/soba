@@ -5,7 +5,7 @@ import {
 import { env, JobPool } from '../../core/config/env';
 import { Features } from '../../core/db/codes';
 import type { PostSubmissionActionPluginDefinition } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
-import { sendNotices } from './send';
+import { buildNotice } from './notice';
 
 const CODE = 'post-submission-email-addresses';
 
@@ -26,6 +26,11 @@ export const postSubmissionActionPluginDefinition: PostSubmissionActionPluginDef
       // About an hour of retries at the default backoff, to ride out a provider outage.
       maxAttempts: 8,
       timeoutMs: 300_000,
-      run: (context) => sendNotices(context, env.getDesignerAppUrl()),
+      // One email per listed address not yet handled for this job, within the daily email limit.
+      run: ({ options, submission, services }) =>
+        services.notifications.sendToEach(
+          options.to,
+          buildNotice(submission, env.getDesignerAppUrl()),
+        ),
     },
   };

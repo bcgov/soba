@@ -15,14 +15,14 @@ export interface HandledAddresses {
   anySent: boolean;
 }
 
-/** Where the environment's email stands, read at one moment, with times on this process's clock. */
-export interface DailyRoom {
+/** Where the environment's email stands, read at one moment by the database clock. */
+export interface EmailRoom {
   /** Emails it may still send today (`roomToday`). */
   room: number;
-  /** The next midnight in NOTIFICATION_DAILY_RESET_TIME_ZONE, when the count starts again. */
-  resetsAt: Date;
-  /** When email may go again after the provider's limit (`limitPauseEnds`); null when it may now. */
-  pausedUntil: Date | null;
+  /** Until the next midnight in NOTIFICATION_DAILY_RESET_TIME_ZONE, when the count starts again. */
+  resetInMs: number;
+  /** Until email may go again after the provider's limit (`limitPauseEnds`); null if it may now. */
+  pauseLeftMs: number | null;
 }
 
 /**
@@ -35,5 +35,5 @@ export interface JobNotifications {
   /** Where this job's sends stand, from its audit rows. */
   handled(): Promise<HandledAddresses>;
   /** Where the environment's email stands: the day's room and any pause. */
-  dailyRoom(): Promise<DailyRoom>;
+  emailRoom(): Promise<EmailRoom>;
 }

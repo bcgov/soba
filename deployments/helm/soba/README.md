@@ -222,7 +222,9 @@ The environment sends up to `NOTIFICATION_DAILY_LIMIT` emails a day (3000 when u
 Notify's 100,000 a month over 31 days; 100 in PR environments), counting from midnight in
 `NOTIFICATION_DAILY_RESET_TIME_ZONE` (`America/Vancouver` when unset). An email job past it waits
 until the next midnight. When Notify answers 429, every email job waits a minute, doubling with
-each 429 in a row, up to an hour. A limit outside 1 to 100000 or an invalid zone stops startup.
+each 429 in a row, up to an hour. Each environment counts only its own sends, so environments that
+share a Notify key share its quota, and their limits together should stay under it. A
+`dailyLimit` outside 1 to 100000 fails the render; an invalid zone stops startup.
 
 ### Secret values (Vault template in backend Deployment)
 

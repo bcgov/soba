@@ -84,8 +84,6 @@ export const pluginJob = (
   type: job.type,
   submissionId,
   revisionId,
-  attempt: job.attempt,
-  run: { number: job.run.number, queuedAt: job.run.queuedAt, queuedBy: job.run.queuedBy },
 });
 
 /** The result a step stored, as a later step sees it; null when it stored none or it is gone. */

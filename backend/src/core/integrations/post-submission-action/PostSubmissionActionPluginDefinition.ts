@@ -40,13 +40,6 @@ export interface PostSubmissionActionJob {
   type: string;
   submissionId: string;
   revisionId: string;
-  /** The attempt within this run, from 1. */
-  attempt: number;
-  /**
-   * The job's current run: `number` is 1, then one more each time staff run the job again;
-   * `queuedAt` and `queuedBy` say when and by whom this run was queued.
-   */
-  run: { number: number; queuedAt: Date; queuedBy: string };
 }
 
 /** An email's subject, body and body type, the same for every address it goes to. */
@@ -140,7 +133,10 @@ export interface PostSubmissionActionResult {
   ): Promise<StoredJobResult>;
 }
 
-/** A file a step stored as its job's result, kept until `expiresAt` at least. */
+/**
+ * A file a step stored as its job's result, kept until `expiresAt` at least, unless the submission
+ * is deleted.
+ */
 export interface PostSubmissionActionStoredResult {
   filename: string;
   size: number | null;
@@ -178,8 +174,8 @@ export interface PostSubmissionActionJobSettings<TOptions = Record<string, unkno
   timeoutMs?: number;
   /**
    * Days a stored result is kept; JOB_RESULT_RETENTION_DAYS when unset. When a step follows, the
-   * result is kept until that step succeeds, and each time that step starts, its expiry moves to at
-   * least this many days later.
+   * result is kept at least until that step succeeds, and each time that step passes its start
+   * check, its expiry moves to at least this many days later; unless the submission is deleted.
    */
   resultRetentionDays?: number;
   /**

@@ -95,12 +95,7 @@ beforeEach(() => {
         return Promise.resolve({ outcome: 'accepted', httpStatus: null, audited: true });
       },
       handled: () => Promise.resolve({ recipients: new Set<string>(), anySent: false }),
-      dailyRoom: () =>
-        Promise.resolve({
-          room: 3000,
-          resetsAt: new Date(Date.now() + 3_600_000),
-          pausedUntil: null,
-        }),
+      emailRoom: () => Promise.resolve({ room: 3000, resetInMs: 3_600_000, pauseLeftMs: null }),
     }),
   );
 });

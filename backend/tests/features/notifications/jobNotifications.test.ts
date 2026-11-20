@@ -55,29 +55,25 @@ it('tries a refused address again on a re-run', async () => {
   });
 });
 
-describe('dailyRoom', () => {
+describe('emailRoom', () => {
   const { dailyLimit, dailyResetTimeZone } = getNotificationSettings();
-  const resetsAt = new Date('2026-11-20T08:00:00Z');
-  const dailyRoom = () =>
-    jobNotifications({ id: 'job-1' } as JobFacts, () => Promise.resolve('u1')).dailyRoom();
+  const emailRoom = () =>
+    jobNotifications({ id: 'job-1' } as JobFacts, () => Promise.resolve('u1')).emailRoom();
 
-  it("reads the environment's email in the reset zone: the room left and any pause", async () => {
-    // The database clock runs an hour behind this process's; the pause has 50 s left.
-    const dbNow = new Date(Date.now() - 3_600_000);
+  it("reads the environment's email in the reset zone: the room left, the reset and any pause", async () => {
+    const now = new Date('2026-11-19T20:00:00Z');
     mockDay.mockResolvedValue({
-      now: dbNow,
+      now,
       counted: dailyLimit - 5,
-      resetsAt,
-      lastLimitedAt: new Date(dbNow.getTime() - 10_000),
+      resetsAt: new Date('2026-11-20T07:00:00Z'),
+      lastLimitedAt: new Date(now.getTime() - 10_000),
       limitedInARow: 1,
     });
-    const room = await dailyRoom();
-    expect(room.room).toBe(5);
-    // Both times move onto this process's clock, an hour ahead of the database's.
-    expect(Math.abs(room.resetsAt.getTime() - resetsAt.getTime() - 3_600_000)).toBeLessThan(1000);
-    const left = (room.pausedUntil?.getTime() ?? 0) - Date.now();
-    expect(left).toBeGreaterThan(45_000);
-    expect(left).toBeLessThanOrEqual(50_000);
+    await expect(emailRoom()).resolves.toEqual({
+      room: 5,
+      resetInMs: 11 * 3_600_000,
+      pauseLeftMs: 50_000,
+    });
     expect(mockDay).toHaveBeenCalledWith(dailyResetTimeZone, REFUSED_HTTP_STATUSES);
   });
 });

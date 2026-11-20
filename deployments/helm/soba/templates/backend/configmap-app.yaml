@@ -65,19 +65,19 @@ data:
   {{- with include "soba.optionalSetting" .Values.backend.config.postSubmissionActionPlugins }}
   POST_SUBMISSION_ACTION_PLUGINS: {{ . }}
   {{- end }}
-  {{- with include "soba.hourlyEmailLimit" (dict "name" "submitterEmailCopySubmissionHourlyLimit" "value" .Values.backend.config.submitterEmailCopySubmissionHourlyLimit) }}
+  {{- with include "soba.wholeNumberSetting" (dict "key" "backend.config.submitterEmailCopySubmissionHourlyLimit" "value" .Values.backend.config.submitterEmailCopySubmissionHourlyLimit "max" 1000000) }}
   SUBMITTER_EMAIL_COPY_SUBMISSION_HOURLY_LIMIT: {{ . }}
   {{- end }}
-  {{- with include "soba.hourlyEmailLimit" (dict "name" "submitterEmailCopyRecipientHourlyLimit" "value" .Values.backend.config.submitterEmailCopyRecipientHourlyLimit) }}
+  {{- with include "soba.wholeNumberSetting" (dict "key" "backend.config.submitterEmailCopyRecipientHourlyLimit" "value" .Values.backend.config.submitterEmailCopyRecipientHourlyLimit "max" 1000000) }}
   SUBMITTER_EMAIL_COPY_RECIPIENT_HOURLY_LIMIT: {{ . }}
   {{- end }}
-  {{- with include "soba.hourlyEmailLimit" (dict "name" "submitterEmailCopyFormHourlyLimit" "value" .Values.backend.config.submitterEmailCopyFormHourlyLimit) }}
+  {{- with include "soba.wholeNumberSetting" (dict "key" "backend.config.submitterEmailCopyFormHourlyLimit" "value" .Values.backend.config.submitterEmailCopyFormHourlyLimit "max" 1000000) }}
   SUBMITTER_EMAIL_COPY_FORM_HOURLY_LIMIT: {{ . }}
   {{- end }}
-  {{- with include "soba.hourlyEmailLimit" (dict "name" "submitterEmailCopyWorkspaceHourlyLimit" "value" .Values.backend.config.submitterEmailCopyWorkspaceHourlyLimit) }}
+  {{- with include "soba.wholeNumberSetting" (dict "key" "backend.config.submitterEmailCopyWorkspaceHourlyLimit" "value" .Values.backend.config.submitterEmailCopyWorkspaceHourlyLimit "max" 1000000) }}
   SUBMITTER_EMAIL_COPY_WORKSPACE_HOURLY_LIMIT: {{ . }}
   {{- end }}
-  {{- with include "soba.hourlyEmailLimit" (dict "name" "submitterEmailCopyEnvironmentHourlyLimit" "value" .Values.backend.config.submitterEmailCopyEnvironmentHourlyLimit) }}
+  {{- with include "soba.wholeNumberSetting" (dict "key" "backend.config.submitterEmailCopyEnvironmentHourlyLimit" "value" .Values.backend.config.submitterEmailCopyEnvironmentHourlyLimit "max" 1000000) }}
   SUBMITTER_EMAIL_COPY_ENVIRONMENT_HOURLY_LIMIT: {{ . }}
   {{- end }}
   {{- with include "soba.optionalSetting" .Values.backend.config.shutdownDelayMs }}

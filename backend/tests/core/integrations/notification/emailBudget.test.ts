@@ -5,7 +5,7 @@ import {
   limitPauseEnds,
   PROVIDER_LIMIT_REACHED,
   roomToday,
-} from '../../../../src/core/integrations/notification/dailyReset';
+} from '../../../../src/core/integrations/notification/emailBudget';
 import { JobDeferredError } from '../../../../src/core/jobs/errors';
 
 describe('roomToday', () => {
@@ -48,41 +48,38 @@ describe('limitPauseEnds', () => {
 });
 
 describe('deferUntilReset', () => {
-  const now = new Date('2026-11-19T20:00:00Z');
-  const reset = new Date('2026-11-20T08:00:00Z');
+  const twelveHours = 12 * 3_600_000;
 
   it('waits for the reset, giving the reason', () => {
-    const deferral = deferUntilReset(reset, now, () => 0);
+    const deferral = deferUntilReset(twelveHours, () => 0);
     expect(deferral).toBeInstanceOf(JobDeferredError);
     expect(deferral.message).toBe(DAILY_LIMIT_REACHED);
-    expect(deferral.delayMs).toBe(12 * 3_600_000);
+    expect(deferral.delayMs).toBe(twelveHours);
   });
 
   it('spreads the waiting jobs over the five minutes after it', () => {
     const random = jest.fn(() => 299_999);
-    expect(deferUntilReset(reset, now, random).delayMs).toBe(12 * 3_600_000 + 299_999);
+    expect(deferUntilReset(twelveHours, random).delayMs).toBe(twelveHours + 299_999);
     expect(random).toHaveBeenCalledWith(300_000);
   });
 
   // Midnight passed while the job was sending: it goes again at once and counts the new day.
   it('waits a second for a reset already past', () => {
-    expect(deferUntilReset(reset, new Date('2026-11-20T08:00:30Z'), () => 0).delayMs).toBe(1000);
+    expect(deferUntilReset(-30_000, () => 0).delayMs).toBe(1000);
   });
 });
 
 describe('deferUntilPauseEnds', () => {
-  const now = new Date('2026-11-19T20:00:00Z');
-
   it("waits for the pause to end, spread over the half minute after, with the provider's reason", () => {
     const random = jest.fn(() => 29_999);
-    const deferral = deferUntilPauseEnds(new Date(now.getTime() + 120_000), now, random);
+    const deferral = deferUntilPauseEnds(120_000, random);
     expect(deferral).toBeInstanceOf(JobDeferredError);
     expect(deferral.message).toBe(PROVIDER_LIMIT_REACHED);
     expect(deferral.delayMs).toBe(120_000 + 29_999);
     expect(random).toHaveBeenCalledWith(30_000);
   });
 
-  it('waits a first pause from now when none shows', () => {
-    expect(deferUntilPauseEnds(null, now, () => 0).delayMs).toBe(60_000);
+  it('waits a first pause when none shows', () => {
+    expect(deferUntilPauseEnds(null, () => 0).delayMs).toBe(60_000);
   });
 });

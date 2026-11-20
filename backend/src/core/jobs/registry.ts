@@ -57,8 +57,9 @@ export interface JobTypeDefinition {
   /** Run time before the handler is aborted; the pool's JOB_*_TIMEOUT_MS when unset. */
   timeoutMs?: number;
   /**
-   * Days a stored result is kept; JOB_RESULT_RETENTION_DAYS when unset. Kept past that while a child
-   * of the job has not succeeded, and lost when the job ends dead or cancelled.
+   * Days a stored result is kept; JOB_RESULT_RETENTION_DAYS when unset. Kept past that while a
+   * child of the job has not succeeded, unless the job's submission is deleted, and lost when the
+   * job ends dead or cancelled.
    */
   resultRetentionDays?: number;
   /**

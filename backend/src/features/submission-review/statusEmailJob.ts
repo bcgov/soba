@@ -72,7 +72,7 @@ export const runStatusEmailJob = async ({ job, signal, log }: JobContext): Promi
     submissionId: change.submissionId,
   });
   if (!submission) throw new JobCancelledError(SUBMISSION_GONE);
-  // A list can be part sent when the change is overtaken while it waits for the daily reset.
+  // A list can be part sent when the change is overtaken while it waits for the reset or a pause.
   if (!change.current) {
     throw new JobCancelledError('The status has changed since; no more emails are sent');
   }

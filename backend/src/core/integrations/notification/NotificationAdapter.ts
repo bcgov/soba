@@ -41,7 +41,7 @@ export const providerDetailOf = (err: unknown): string | undefined => {
   return typeof detail === 'string' ? detail : undefined;
 };
 
-/** The provider refused a send at a sending limit; it can go once the limit resets. */
+/** The provider refused a send at a sending limit; it can go after the pause that starts. */
 export class NotificationLimitError extends ServiceUnavailableError {}
 
 /** Result of a notification readiness check; no config or credentials are exposed. */

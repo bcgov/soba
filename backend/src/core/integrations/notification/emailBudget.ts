@@ -17,9 +17,9 @@ const FIRST_PAUSE_MS = 60_000;
 const LONGEST_PAUSE_MS = 3_600_000;
 
 /**
- * Emails the environment may still send today: NOTIFICATION_DAILY_LIMIT less the sends the provider
- * accepted or refused for the address since the last midnight in NOTIFICATION_DAILY_RESET_TIME_ZONE,
- * never below zero.
+ * Emails the environment may still send today: NOTIFICATION_DAILY_LIMIT less the sends the
+ * provider accepted or refused for the address since the last midnight in
+ * NOTIFICATION_DAILY_RESET_TIME_ZONE, never below zero.
  */
 export const roomToday = (dailyLimit: number, counted: number): number =>
   Math.max(dailyLimit - counted, 0);
@@ -41,31 +41,26 @@ export const limitPauseEnds = (
 };
 
 /**
- * The deferral to `resetsAt`, the daily reset, spread over the five minutes after it. A reset already
- * past waits a second; a wait past a day is cut to a day, and the job defers again when it wakes.
+ * The deferral to the daily reset, `resetInMs` away, spread over the five minutes after it. A reset
+ * already past waits a second; a wait past a day is cut to a day, and the job defers again when it
+ * wakes.
  */
 export const deferUntilReset = (
-  resetsAt: Date,
-  now: Date = new Date(),
+  resetInMs: number,
+  random: (max: number) => number = randomInt,
+): JobDeferredError =>
+  new JobDeferredError(resetInMs + random(RESET_SPREAD_MS), DAILY_LIMIT_REACHED);
+
+/**
+ * The deferral to the end of a pause after the provider's limit, `pauseLeftMs` away, spread over
+ * the half minute after; a first pause when none shows, as when a send that started after the
+ * refusal was accepted.
+ */
+export const deferUntilPauseEnds = (
+  pauseLeftMs: number | null,
   random: (max: number) => number = randomInt,
 ): JobDeferredError =>
   new JobDeferredError(
-    resetsAt.getTime() - now.getTime() + random(RESET_SPREAD_MS),
-    DAILY_LIMIT_REACHED,
-  );
-
-/**
- * The deferral to the end of a pause after the provider's limit, spread over the half minute after;
- * a first pause from `now` when none shows, as when a send that started after it was accepted.
- */
-export const deferUntilPauseEnds = (
-  pausedUntil: Date | null,
-  now: Date = new Date(),
-  random: (max: number) => number = randomInt,
-): JobDeferredError => {
-  const ends = pausedUntil?.getTime() ?? now.getTime() + FIRST_PAUSE_MS;
-  return new JobDeferredError(
-    ends - now.getTime() + random(PAUSE_SPREAD_MS),
+    (pauseLeftMs ?? FIRST_PAUSE_MS) + random(PAUSE_SPREAD_MS),
     PROVIDER_LIMIT_REACHED,
   );
-};

@@ -2,7 +2,7 @@ import { EmailAddressSchema } from '@soba/lib';
 import type { Logger } from 'pino';
 import { NotificationOutcome } from '../../db/codes';
 import { JobCancelledError, type JobDeferredError } from '../../jobs/errors';
-import { deferUntilPauseEnds, deferUntilReset } from './dailyReset';
+import { deferUntilPauseEnds, deferUntilReset } from './emailBudget';
 import type { JobNotifications } from './JobNotifications';
 import type { SendEmail } from './NotificationAdapter';
 import { isRefusedSend } from './sendOutcome';
@@ -27,12 +27,7 @@ const normalize = (address: string): string => address.trim().toLowerCase();
 
 const isAddress = (address: string): boolean => EmailAddressSchema.safeParse(address).success;
 
-/**
- * Sends to each address in turn while the day has room and no pause after the provider's limit is
- * in force, both read before each send so jobs sending at the same time share them. A failure other
- * than a refusal stops the rest of the list; no room leaves the rest to wait for the daily reset,
- * and a pause, or a refusal at the provider's limit, for the pause to end.
- */
+/** Sends to each address in turn, reading the room before each send (see `sendEachAddress`). */
 const sendInTurn = async (
   { notifications, signal }: SendEachAddressContext,
   addresses: readonly string[],
@@ -41,11 +36,11 @@ const sendInTurn = async (
   const sendFrom = async (index: number, tally: Tally): Promise<Tally> => {
     if (index === addresses.length) return tally;
     signal.throwIfAborted();
-    const { room, resetsAt, pausedUntil } = await notifications.dailyRoom();
+    const { room, resetInMs, pauseLeftMs } = await notifications.emailRoom();
     // A stop that came during the read: another worker may hold the job now.
     signal.throwIfAborted();
-    if (pausedUntil) return { ...tally, deferral: deferUntilPauseEnds(pausedUntil) };
-    if (room === 0) return { ...tally, deferral: deferUntilReset(resetsAt) };
+    if (pauseLeftMs !== null) return { ...tally, deferral: deferUntilPauseEnds(pauseLeftMs) };
+    if (room === 0) return { ...tally, deferral: deferUntilReset(resetInMs) };
     const result = await notifications.sendEmail({
       recipients: { to: [addresses[index]] },
       content,
@@ -59,8 +54,8 @@ const sendInTurn = async (
     // The addresses before this one stay handled; this one and the rest wait out the pause, which
     // the audited refusal starts or lengthens for every email job.
     if (result.outcome === NotificationOutcome.limited) {
-      const after = await notifications.dailyRoom();
-      return { ...tally, deferral: deferUntilPauseEnds(after.pausedUntil) };
+      const after = await notifications.emailRoom();
+      return { ...tally, deferral: deferUntilPauseEnds(after.pauseLeftMs) };
     }
     if (isRefusedSend(result)) return sendFrom(index + 1, { ...tally, refused: tally.refused + 1 });
     if (result.outcome === NotificationOutcome.error) {
@@ -75,9 +70,10 @@ const sendInTurn = async (
  * Sends one email per address, each address once and in lower case, skipping those already handled
  * for this job. An address no provider would take, or one the provider refuses, is counted as
  * refused and skipped; a list on which no email has reached anyone, on any attempt, ends cancelled.
- * It sends no more than the environment may still send today (see `roomToday`) and defers the rest,
- * without using an attempt, until the daily reset; after the provider refuses a send at its limit,
- * every email job defers until the pause ends (see `limitPauseEnds`). Any other failure, a missing
+ * It reads the room before each send, so jobs sending at the same time share it: it sends no more
+ * than the environment may still send today (see `roomToday`) and defers the rest, without using an
+ * attempt, until the daily reset; after the provider refuses a send at its limit, every email job
+ * defers until the pause ends (see `limitPauseEnds`). Any other failure, a missing
  * audit row or an abort stops the run and throws, so the job retries and the retry skips what was
  * handled. Logs counts only, never addresses.
  */
