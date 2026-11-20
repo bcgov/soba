@@ -8,6 +8,7 @@ import type { ApiErrorCode } from '@soba/lib';
 import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFormioRenderError';
 import { FormioV5FormRenderErrorBoundary } from '@/src/features/formio-v5/ui/FormioV5FormRenderErrorBoundary';
 import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
+import { fillFormOptions } from '@/src/features/formio-v5/fillFormOptions';
 import { useUnsavedEdits } from '@/src/features/formio-v5/ui/useUnsavedEdits';
 import {
   BLOCKED_REASON,
@@ -168,6 +169,8 @@ export function SubmissionFillForm({
   const formInstanceRef = useRef<FormInstance | null>(null);
   // True once the loaded answers are in the webform.
   const [formReady, setFormReady] = useState(false);
+  // True once a submit is applied; the page is leaving for the confirmation.
+  const submitted = useRef(false);
 
   const { unsaved, isUnsaved, beginSave, onFormChange, formProps } = useUnsavedEdits({
     canWrite,
@@ -213,11 +216,9 @@ export function SubmissionFillForm({
     () => ({ data: (snapshot.content?.data ?? {}) as Submission['data'] }),
     [snapshot],
   );
-  // We own all submit messaging (success toast + redirect, inline error), so suppress Form.io's
-  // built-in green "Submission Complete" alert.
   const formOptions = useMemo(
-    () => ({ noAlerts: true, readOnly: !canWrite, ...fileOption }),
-    [canWrite, fileOption],
+    () => fillFormOptions({ canWrite, fileOption, submissionId }),
+    [canWrite, fileOption, submissionId],
   );
 
   // @formio/react applies the submission prop only after this callback, and Form.io applies it
@@ -283,6 +284,9 @@ export function SubmissionFillForm({
   };
 
   const submitForm = async (submission: Submission) => {
+    // Submitted, and on the way to the confirmation. Form.io's button takes submitDone as leave to
+    // submit again, which would find the submission closed and send the filler to its view instead.
+    if (submitted.current) return;
     if (!writer.hasBase()) {
       setRenderError(labels.loadError);
       releaseSubmit();
@@ -292,10 +296,12 @@ export function SubmissionFillForm({
       const outcome = await writer.submit((submission?.data ?? {}) as Record<string, unknown>);
       switch (outcome.status) {
         case 'applied':
+          submitted.current = true;
           addNotification({ text: labels.submitSuccess, type: 'success' });
-          // Straight to the confirmation; navigating away unmounts the form, so there's no need to
-          // emit `submitDone` and no flash of Form.io's own success screen. replace, so Back does
-          // not return to the fill page of a submitted record.
+          // Lets BCGovFile forget the browser's records of the files this submission now holds.
+          formInstanceRef.current?.emit('submitDone', submission);
+          // Straight to the confirmation. replace, so Back does not return to the fill page of a
+          // submitted record.
           router.replace(`${submissionPath}/success`);
           break;
         case 'held':
@@ -325,7 +331,8 @@ export function SubmissionFillForm({
     onFormUpdated?.({ ...updated, data: formInstanceRef.current?.submission.data ?? {} });
   };
 
-  // Discards the typed answers: the container mounts a new form on the latest bundle.
+  // Discards the typed answers: the container mounts a new form on the latest bundle, which restores
+  // the files kept in the browser. Deleting them here would drop any the latest version still holds.
   const reloadLatest = () => writer.discardMine(onReload);
 
   // Writes the typed answers over the current head. A submit goes through Form.io again, so an

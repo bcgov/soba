@@ -125,6 +125,26 @@ saved earlier can still reference it.
 Extensions in `BLOCKED_FILE_EXTENSIONS` (`backend/src/features/files/config.ts`) are refused with
 415 whatever the form allows. `GET /api/v1/meta/files-config` returns them and the upload limit.
 
+The BC Gov file component (`bcgov-file`, from `bcgov/formio-components`) stores files through the
+`chefs` storage provider. `frontend/src/features/formio-v5/registerBcgovFormio.ts` registers both
+when the `files` feature is enabled and allowed by the app's `NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`.
+The provider uploads to `/api/v1/files` with the submission being filled, and downloads and deletes
+at `/api/v1/files/<id>` from the file's `id`. The submission data keeps each file's URL as
+`<api>/files/<id>`. Older submissions can hold `<api>/submit/files/<id>`, a path the API does not
+serve; the provider does not read the stored URL, but an export without `DESIGNER_APP_URL` keeps it.
+
+The component keeps each file in the browser (IndexedDB, or localStorage up to 3 MB a file where
+IndexedDB is missing) until it uploads, and retries while the browser is online. A kept file
+belongs to the user who added it and to the submission being filled
+(`frontend/src/features/formio-v5/fillFormOptions.ts` sets the component's `offlineScope` to the
+submission id). It is restored into that submission's form when the same user opens it for writing
+in the same browser, including after "Reload latest version". Submit stays disabled while a file is
+pending. A record of each upload stays in the browser until a submit carries the file, or for 30
+days.
+
+`frontend/public/formio-v5/bcgov-file.css` applies Form.io's `.formio-component-file` rules to
+`bcgov-file`, which matches them only through its `customClass`.
+
 ## Templates
 
 Feature `templates`. A template is a named file of a type, bound to one form version through
@@ -173,17 +193,3 @@ is rate limited by `RATE_LIMIT_RENDER_*`. Each pod renders at most
 slot before its body is read. A template that cannot be rendered, an infected upload, or a print
 with no saved data returns 422. An unavailable backend, scanner or template bytes return 503. The
 upload has its own path so its route can wait out the scan (300s, like the other uploads).
-
-## Submit files (deprecated)
-
-`/api/v1/submit/files` serves the same routes as `/api/v1/files` for the Form.io file component. New
-callers use `/api/v1/files`.
-
-The BC Gov file component (`bcgov-file`, from `bcgov/formio-components`) stores files through the
-`chefs` storage provider. `frontend/src/features/formio-v5/registerBcgovFormio.ts` registers both
-when the `files` feature is enabled and allowed by the app's `NEXT_PUBLIC_SOBA_FEATURES_ALLOWED`.
-The provider uploads to `/submit/files` with the submission being filled, and the submission data
-keeps each file's URL as `<api>/submit/files/<id>`.
-
-`frontend/public/formio-v5/bcgov-file.css` applies Form.io's `.formio-component-file` rules to
-`bcgov-file`, which matches them only through its `customClass`.

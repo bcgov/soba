@@ -340,7 +340,13 @@ describe('FormioV5SubmissionFillClient', () => {
     h.files = { option: { bcgovFile }, ready: true };
     await renderSignedOut();
     await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
-    expect(h.options?.bcgovFile).toEqual(bcgovFile);
+    expect(h.options?.bcgovFile).toEqual({ ...bcgovFile, offlineScope: 'sub-1' });
+  });
+
+  it('scopes pending files to the submission even with no file limits', async () => {
+    await renderSignedOut();
+    await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+    expect(h.options?.bcgovFile).toEqual({ offlineScope: 'sub-1' });
   });
 
   // The public caller's roles never count, and a members audience admits no one outside it.
@@ -649,6 +655,21 @@ describe('FormioV5SubmissionFillClient', () => {
       await submit({ a: 1 });
       expect(h.replace).toHaveBeenCalledWith('/en/submission/sub-1/success');
       expect(h.push).not.toHaveBeenCalled();
+      // Lets components such as BCGovFile clean up after a saved submit
+      expect(h.instance.emit).toHaveBeenCalledWith('submitDone', { data: { a: 1 } });
+    });
+
+    // submitDone turns Form.io's button back on, and the page has not left yet.
+    it('sends nothing more for a second click once the submit is applied', async () => {
+      h.submitSobaFormSubmission.mockResolvedValue(writeResponse('current'));
+      await renderReady();
+      await submit({ a: 1 });
+      h.submitSobaFormSubmission.mockResolvedValue(writeResponse('pending', 'closed'));
+      await submit({ a: 1 });
+
+      expect(h.submitSobaFormSubmission).toHaveBeenCalledTimes(1);
+      expect(h.replace).toHaveBeenCalledTimes(1);
+      expect(h.replace).toHaveBeenCalledWith('/en/submission/sub-1/success');
     });
 
     it('stays on the form with the held notice when the submit conflicts', async () => {
@@ -664,7 +685,7 @@ describe('FormioV5SubmissionFillClient', () => {
         'Submit my version',
       );
       expect(h.instance.emit).toHaveBeenCalledWith('submitError', '');
-      expect(h.instance.emit).not.toHaveBeenCalledWith('submitDone');
+      expect(h.instance.emit.mock.calls.map(([event]) => event)).not.toContain('submitDone');
     });
 
     it('refuses another submit while the held notice shows', async () => {
