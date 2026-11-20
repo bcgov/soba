@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Button } from '@bcgov/design-system-react-components';
+import { Accordion, Button } from '@bcgov/design-system-react-components';
 import { matchesSearchTerm } from '@soba/lib/sort';
 import { ListPageToolbar } from '@/src/components/ListPageLayout';
 import { DataTable, type Column } from '@/src/components/DataTable';
@@ -26,6 +26,8 @@ import WorkspaceRoleForm from './WorkspaceRoleForm';
 
 export interface WorkspaceRoleDrawerProps {
   dict: Dictionary;
+  /** The drawer's id in its AccordionGroup. */
+  drawerName: string;
   workspaceId: string;
 }
 
@@ -41,7 +43,11 @@ const permissionSummary = (
   return t.permissionCount.replace('{count}', String(permissions.length));
 };
 
-export function WorkspaceRoleDrawer({ dict, workspaceId }: Readonly<WorkspaceRoleDrawerProps>) {
+export function WorkspaceRoleDrawer({
+  dict,
+  drawerName,
+  workspaceId,
+}: Readonly<WorkspaceRoleDrawerProps>) {
   const t = dict.workspaces.roles;
   const { token } = useKeycloak();
   const { addNotification } = useNotificationStore();
@@ -176,56 +182,62 @@ export function WorkspaceRoleDrawer({ dict, workspaceId }: Readonly<WorkspaceRol
   const openCode = formView && formView !== 'new' ? formView.roleCode : undefined;
 
   return (
-    <div data-testid="workspace-roles-drawer-content">
-      <ListPageToolbar>
-        <ListPageSearchField
-          value={query.searchInput}
-          onChange={query.setSearchInput}
-          onSubmit={query.commitSearch}
-          testIdPrefix="ws-roles"
-        />
-        <Button
-          variant="primary"
-          data-testid="create-ws-role-button"
-          onPress={() => setFormView((view) => (view === 'new' ? null : 'new'))}
-        >
-          {t.addRole}
-        </Button>
-      </ListPageToolbar>
+    <Accordion
+      id={drawerName}
+      data-testid={`accordion-${drawerName}`}
+      label={dict.workspaces.rolesTab}
+    >
+      <div className="d-block w-100" data-testid="workspace-roles-drawer-content">
+        <ListPageToolbar>
+          <ListPageSearchField
+            value={query.searchInput}
+            onChange={query.setSearchInput}
+            onSubmit={query.commitSearch}
+            testIdPrefix="ws-roles"
+          />
+          <Button
+            variant="primary"
+            data-testid="create-ws-role-button"
+            onPress={() => setFormView((view) => (view === 'new' ? null : 'new'))}
+          >
+            {t.addRole}
+          </Button>
+        </ListPageToolbar>
 
-      <DataTable<WorkspaceRole>
-        {...table}
-        columns={columns}
-        emptyMessage={t.empty}
-        loadingMessage={dict.general.loading}
-        itemName="items"
-        keyExtractor={(role) => role.roleCode}
-      />
-
-      {formView && (
-        <WorkspaceRoleForm
-          key={openCode ?? 'new'}
-          dict={dict}
-          workspaceId={workspaceId}
-          roleCode={openCode}
-          onDone={() => setFormView(null)}
+        <DataTable<WorkspaceRole>
+          {...table}
+          columns={columns}
+          emptyMessage={t.empty}
+          loadingMessage={dict.general.loading}
+          itemName="items"
+          keyExtractor={(role) => role.roleCode}
         />
-      )}
 
-      {pendingDelete && (
-        <ConfirmModal
-          show
-          title={t.deleteConfirmTitle}
-          message={t.deleteConfirmMessage.replace('{name}', () => pendingDelete.name)}
-          confirmLabel={t.deleteRole}
-          onConfirm={() => void confirmDelete()}
-          onCancel={() => {
-            if (!isDeleting) setPendingDelete(null);
-          }}
-          pending={isDeleting}
-        />
-      )}
-    </div>
+        {formView && (
+          <WorkspaceRoleForm
+            key={openCode ?? 'new'}
+            dict={dict}
+            workspaceId={workspaceId}
+            roleCode={openCode}
+            onDone={() => setFormView(null)}
+          />
+        )}
+
+        {pendingDelete && (
+          <ConfirmModal
+            show
+            title={t.deleteConfirmTitle}
+            message={t.deleteConfirmMessage.replace('{name}', () => pendingDelete.name)}
+            confirmLabel={t.deleteRole}
+            onConfirm={() => void confirmDelete()}
+            onCancel={() => {
+              if (!isDeleting) setPendingDelete(null);
+            }}
+            pending={isDeleting}
+          />
+        )}
+      </div>
+    </Accordion>
   );
 }
 

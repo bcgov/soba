@@ -5,21 +5,35 @@ import userEvent from '@testing-library/user-event';
 import en from '@/dictionaries/en.json';
 import type { Dictionary } from '@/src/types/dictionary';
 
-// Each drawer has its own tests; here they only show which workspace they were given.
-vi.mock('@/src/features/workspaces/ui/WorkspaceRoleDrawer', () => ({
-  default: ({ workspaceId }: { workspaceId: string }) => (
-    <div data-testid="roles-drawer">{workspaceId}</div>
-  ),
+// Each drawer has its own tests. Here each is its own Accordion, as they are, showing only which
+// workspace it was given.
+const { stubDrawer } = vi.hoisted(() => ({
+  stubDrawer: async (testId: string, label: 'accessTab' | 'groupsTab' | 'rolesTab') => {
+    const { Accordion } = await import('@bcgov/design-system-react-components');
+    const { workspaces } = (await import('@/dictionaries/en.json')).default;
+    return function StubDrawer({
+      drawerName,
+      workspaceId,
+    }: {
+      drawerName: string;
+      workspaceId: string;
+    }) {
+      return (
+        <Accordion id={drawerName} label={workspaces[label]}>
+          <div data-testid={testId}>{workspaceId}</div>
+        </Accordion>
+      );
+    };
+  },
 }));
-vi.mock('@/src/features/workspaces/ui/WorkspaceGroupDrawer', () => ({
-  default: ({ workspaceId }: { workspaceId: string }) => (
-    <div data-testid="groups-drawer">{workspaceId}</div>
-  ),
+vi.mock('@/src/features/workspaces/ui/WorkspaceRoleDrawer', async () => ({
+  default: await stubDrawer('roles-drawer', 'rolesTab'),
 }));
-vi.mock('@/src/features/workspaces/ui/WorkspaceAccessDrawer', () => ({
-  default: ({ workspaceId }: { workspaceId: string }) => (
-    <div data-testid="access-drawer">{workspaceId}</div>
-  ),
+vi.mock('@/src/features/workspaces/ui/WorkspaceGroupDrawer', async () => ({
+  default: await stubDrawer('groups-drawer', 'groupsTab'),
+}));
+vi.mock('@/src/features/workspaces/ui/WorkspaceAccessDrawer', async () => ({
+  default: await stubDrawer('access-drawer', 'accessTab'),
 }));
 
 import WorkspacePermissionsTab from '@/src/features/workspaces/ui/WorkspacePermissionsTab';

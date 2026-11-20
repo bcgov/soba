@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type Key } from 'react';
-import { Button, Select } from '@bcgov/design-system-react-components';
+import { Accordion, Button, Select } from '@bcgov/design-system-react-components';
 import { ListPageFilters, ListPageToolbar } from '@/src/components/ListPageLayout';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { RowActionButton } from '@/src/components/RowActionButton';
@@ -27,6 +27,8 @@ import styles from './WorkspaceForm.module.css';
 
 export interface WorkspaceAccessDrawerProps {
   dict: Dictionary;
+  /** The drawer's id in its AccordionGroup. */
+  drawerName: string;
   workspaceId: string;
 }
 
@@ -54,7 +56,11 @@ function removeMessage(
     .replace('{role}', () => role ?? '');
 }
 
-export function WorkspaceAccessDrawer({ dict, workspaceId }: Readonly<WorkspaceAccessDrawerProps>) {
+export function WorkspaceAccessDrawer({
+  dict,
+  drawerName,
+  workspaceId,
+}: Readonly<WorkspaceAccessDrawerProps>) {
   const t = dict.workspaces.access;
   const { token } = useKeycloak();
   const { addNotification } = useNotificationStore();
@@ -203,73 +209,81 @@ export function WorkspaceAccessDrawer({ dict, workspaceId }: Readonly<WorkspaceA
   const editingId = formView && formView !== 'add' ? formView.membershipId : undefined;
 
   return (
-    <div data-testid="workspace-access-drawer-content">
-      <ListPageToolbar>
-        <ListPageSearchField
-          value={query.searchInput}
-          onChange={query.setSearchInput}
-          onSubmit={query.commitSearch}
-          testIdPrefix="ws-access"
-        />
-        {searchAllowed && (
-          <Button
-            variant="primary"
-            data-testid="add-ws-member-button"
-            onPress={() => setFormView((view) => (view === 'add' ? null : 'add'))}
-          >
-            {t.addMember}
-          </Button>
-        )}
-      </ListPageToolbar>
-
-      <ListPageFilters>
-        {/* The design system replaces its own root class when given one, so the width sits
-            on a wrapper. */}
-        <div className={styles.filterField}>
-          <Select
-            size="medium"
-            label={t.show}
-            items={includeOptions}
-            selectedKey={include}
-            onSelectionChange={(key: Key | null) => setFilters(key === ALL ? { include: ALL } : {})}
-            data-testid="ws-access-include-filter"
+    <Accordion
+      id={drawerName}
+      data-testid={`accordion-${drawerName}`}
+      label={dict.workspaces.accessTab}
+    >
+      <div className="d-block w-100" data-testid="workspace-access-drawer-content">
+        <ListPageToolbar>
+          <ListPageSearchField
+            value={query.searchInput}
+            onChange={query.setSearchInput}
+            onSubmit={query.commitSearch}
+            testIdPrefix="ws-access"
           />
-        </div>
-      </ListPageFilters>
+          {searchAllowed && (
+            <Button
+              variant="primary"
+              data-testid="add-ws-member-button"
+              onPress={() => setFormView((view) => (view === 'add' ? null : 'add'))}
+            >
+              {t.addMember}
+            </Button>
+          )}
+        </ListPageToolbar>
 
-      <DataTable<WorkspaceAccessMember>
-        {...table}
-        columns={columns}
-        emptyMessage={emptyMessage(t, query.q, include)}
-        loadingMessage={dict.general.loading}
-        itemName="items"
-        keyExtractor={(member) => member.membershipId}
-      />
+        <ListPageFilters>
+          {/* The design system replaces its own root class when given one, so the width sits
+              on a wrapper. */}
+          <div className={styles.filterField}>
+            <Select
+              size="medium"
+              label={t.show}
+              items={includeOptions}
+              selectedKey={include}
+              onSelectionChange={(key: Key | null) =>
+                setFilters(key === ALL ? { include: ALL } : {})
+              }
+              data-testid="ws-access-include-filter"
+            />
+          </div>
+        </ListPageFilters>
 
-      {formView && (
-        <WorkspaceAccessForm
-          key={editingId ?? 'add'}
-          dict={dict}
-          workspaceId={workspaceId}
-          membershipId={editingId}
-          onDone={() => setFormView(null)}
+        <DataTable<WorkspaceAccessMember>
+          {...table}
+          columns={columns}
+          emptyMessage={emptyMessage(t, query.q, include)}
+          loadingMessage={dict.general.loading}
+          itemName="items"
+          keyExtractor={(member) => member.membershipId}
         />
-      )}
 
-      {pendingRemove && (
-        <ConfirmModal
-          show
-          title={t.removeConfirmTitle}
-          message={removeMessage(t, pendingRemove)}
-          confirmLabel={t.removeMember}
-          onConfirm={() => void confirmRemove()}
-          onCancel={() => {
-            if (!isRemoving) setPendingRemove(null);
-          }}
-          pending={isRemoving}
-        />
-      )}
-    </div>
+        {formView && (
+          <WorkspaceAccessForm
+            key={editingId ?? 'add'}
+            dict={dict}
+            workspaceId={workspaceId}
+            membershipId={editingId}
+            onDone={() => setFormView(null)}
+          />
+        )}
+
+        {pendingRemove && (
+          <ConfirmModal
+            show
+            title={t.removeConfirmTitle}
+            message={removeMessage(t, pendingRemove)}
+            confirmLabel={t.removeMember}
+            onConfirm={() => void confirmRemove()}
+            onCancel={() => {
+              if (!isRemoving) setPendingRemove(null);
+            }}
+            pending={isRemoving}
+          />
+        )}
+      </div>
+    </Accordion>
   );
 }
 

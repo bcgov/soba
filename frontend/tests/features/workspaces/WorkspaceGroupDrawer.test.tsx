@@ -51,10 +51,15 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 
+import { AccordionGroup } from '@bcgov/design-system-react-components';
 import WorkspaceGroupDrawer from '@/src/features/workspaces/ui/WorkspaceGroupDrawer';
 
 const renderDrawer = () =>
-  renderSignedIn(<WorkspaceGroupDrawer dict={dict} workspaceId={WORKSPACE_ID} />);
+  renderSignedIn(
+    <AccordionGroup defaultExpandedKeys={['workspace-groups']}>
+      <WorkspaceGroupDrawer dict={dict} drawerName="workspace-groups" workspaceId={WORKSPACE_ID} />
+    </AccordionGroup>,
+  );
 
 /** The query of the most recent list read. */
 const lastListQuery = () => mockApi.listWorkspaceGroups.mock.calls.at(-1)?.[2];
@@ -66,6 +71,17 @@ describe('WorkspaceGroupDrawer', () => {
     window.sessionStorage.clear();
     mockApi.listWorkspaceGroups.mockResolvedValue(groupsPage([ADMINS, REVIEWERS]));
     mockApi.listWorkspaceRoles.mockResolvedValue(ROLES);
+  });
+
+  it('is its own drawer, named for groups', async () => {
+    renderDrawer();
+    await screen.findByText('Form administrators');
+
+    expect(screen.getByTestId('accordion-workspace-groups')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: dict.workspaces.groupsTab })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
   });
 
   it('reads the first page by name in the app language and lists each group with its roles', async () => {

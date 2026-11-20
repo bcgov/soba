@@ -64,13 +64,19 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 
+import { AccordionGroup } from '@bcgov/design-system-react-components';
 import WorkspaceAccessDrawer from '@/src/features/workspaces/ui/WorkspaceAccessDrawer';
 import { useWorkspaceGroupsWriter } from '@/src/features/workspaces/data/useWorkspaceGroupsWriter';
 
-const renderDrawer = () =>
-  renderSignedIn(<WorkspaceAccessDrawer dict={dict} workspaceId={WORKSPACE_ID} />);
+/** The drawer, opened as the Permissions tab opens it. */
+const OpenDrawer = () => (
+  <AccordionGroup defaultExpandedKeys={['workspace-access']}>
+    <WorkspaceAccessDrawer dict={dict} drawerName="workspace-access" workspaceId={WORKSPACE_ID} />
+  </AccordionGroup>
+);
 
-/** Renames a group as the Groups tab does, beside the Access tab and sharing its cache. */
+const renderDrawer = () => renderSignedIn(<OpenDrawer />);
+
 function RenameGroup() {
   const writer = useWorkspaceGroupsWriter(WORKSPACE_ID);
   return (
@@ -106,6 +112,17 @@ describe('WorkspaceAccessDrawer', () => {
     window.sessionStorage.clear();
     mockAccessApi.listWorkspaceAccess.mockResolvedValue(accessPage([OWNER, SELF, REVIEWER]));
     mockGroupsApi.listWorkspaceGroups.mockResolvedValue(groupsPage([ADMINS, REVIEWERS]));
+  });
+
+  it('is its own drawer, named for the people with access', async () => {
+    renderDrawer();
+    await screen.findByText('Rita Reviewer');
+
+    expect(screen.getByTestId('accordion-workspace-access')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: dict.workspaces.accessTab })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
   });
 
   it('reads people in a group by name and lists each with their email, role and groups', async () => {
@@ -240,12 +257,12 @@ describe('WorkspaceAccessDrawer', () => {
     expect(screen.queryByTestId('remove-member-button-m-self')).not.toBeInTheDocument();
   });
 
-  it('reads the people again when a group is renamed on the Groups tab', async () => {
+  it('reads the people again when a group is renamed on the Permissions tab groups drawer', async () => {
     const user = userEvent.setup();
     mockGroupsApi.renameWorkspaceGroup.mockResolvedValue(REVIEWERS);
     renderSignedIn(
       <>
-        <WorkspaceAccessDrawer dict={dict} workspaceId={WORKSPACE_ID} />
+        <OpenDrawer />
         <RenameGroup />
       </>,
     );

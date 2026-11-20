@@ -7,7 +7,7 @@ submit rather than as the user types.
 Offset paging can repeat or skip a row if the data changes between two page requests. That is
 fine for these tables. Within one response, `items` and `total` come from a single snapshot.
 
-The exception is the workspace Roles tab. Fixed roles show dictionary names the server does not have,
+The exception is the workspace permissions tab roles drawer. Fixed roles show dictionary names the server does not have,
 so the screen reads the whole list and searches, sorts and pages it in the browser. The URL still
 carries the query.
 
@@ -40,7 +40,7 @@ Frontend:
 ### Sort fields
 
 ```ts
-export const THING_SORT_FIELDS = ['name', 'status', 'createdAt'] as const;
+export const THING_SORT_FIELDS = ["name", "status", "createdAt"] as const;
 export type ThingListSortField = (typeof THING_SORT_FIELDS)[number];
 export type ThingListSort = SortToken<ThingListSortField>;
 
@@ -94,8 +94,8 @@ workspaces". Return `{ items: [], total: 0 }` without querying.
 export const ListThingsQuerySchema = z.object({
   ...offsetQueryFields,
   cursor: rejectedCursorField,
-  q: searchQueryField.openapi({ description: 'Matches anywhere in the name.' }),
-  sort: makeSortEnum(THING_SORT_FIELDS).default('createdAt:desc'),
+  q: searchQueryField.openapi({ description: "Matches anywhere in the name." }),
+  sort: makeSortEnum(THING_SORT_FIELDS).default("createdAt:desc"),
   locale: sortLocaleQueryField,
 });
 ```
@@ -116,10 +116,10 @@ Add it next to the others in `listQueryMemory.ts`. `sortOptionsFor` is already i
 
 ```ts
 export const THINGS_LIST_QUERY: ListQuerySpec = {
-  resource: 'things',
-  filters: ['status'],
-  sortOptions: sortOptionsFor(['name', 'status', 'createdAt']),
-  defaultSort: 'createdAt:desc',
+  resource: "things",
+  filters: ["status"],
+  sortOptions: sortOptionsFor(["name", "status", "createdAt"]),
+  defaultSort: "createdAt:desc",
 };
 ```
 
@@ -180,8 +180,8 @@ re-runs the page's server component for a client-side query change. Next keeps
 Params are named `{resource}.{name}`. A hand-written `?workspace=ws1` is ignored.
 
 ```ts
-listLink(`/${locale}/forms`, FORMS_LIST_QUERY, { workspace: workspaceId })
-navLink(`/${locale}/workspaces`)
+listLink(`/${locale}/forms`, FORMS_LIST_QUERY, { workspace: workspaceId });
+navLink(`/${locale}/workspaces`);
 ```
 
 `listLink` writes the spec's names (`forms.workspace=<id>`). Use it when the destination should

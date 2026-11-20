@@ -1,6 +1,6 @@
 'use client';
 
-import { AccordionGroup, Accordion } from '@bcgov/design-system-react-components';
+import { AccordionGroup } from '@bcgov/design-system-react-components';
 import type { Dictionary } from '@/src/types/dictionary';
 import WorkspaceRoleDrawer from './WorkspaceRoleDrawer';
 import WorkspaceGroupDrawer from './WorkspaceGroupDrawer';
@@ -11,32 +11,16 @@ export interface WorkspacePermissionsTabProps {
   workspaceId: string;
 }
 
+/** A workspace's Permissions tab: a drawer each for its people, groups and roles. */
 export function WorkspacePermissionsTab({
   dict,
   workspaceId,
 }: Readonly<WorkspacePermissionsTabProps>) {
-  const t = dict.workspaces;
-  const defExpanded = ['workspace-access'];
-
   return (
-    <AccordionGroup allowsMultipleExpanded={false} defaultExpandedKeys={defExpanded}>
-      <Accordion id="workspace-access" data-testid="accordion-workspace-access" label={t.accessTab}>
-        <div className="d-block w-100">
-          <WorkspaceAccessDrawer dict={dict} workspaceId={workspaceId} />
-        </div>
-      </Accordion>
-
-      <Accordion id="workspace-groups" data-testid="accordion-workspace-groups" label={t.groupsTab}>
-        <div className="d-block w-100">
-          <WorkspaceGroupDrawer dict={dict} workspaceId={workspaceId} />
-        </div>
-      </Accordion>
-
-      <Accordion id="workspace-roles" data-testid="accordion-workspace-roles" label={t.rolesTab}>
-        <div className="d-block w-100">
-          <WorkspaceRoleDrawer dict={dict} workspaceId={workspaceId} />
-        </div>
-      </Accordion>
+    <AccordionGroup allowsMultipleExpanded={false} defaultExpandedKeys={['workspace-access']}>
+      <WorkspaceAccessDrawer dict={dict} drawerName="workspace-access" workspaceId={workspaceId} />
+      <WorkspaceGroupDrawer dict={dict} drawerName="workspace-groups" workspaceId={workspaceId} />
+      <WorkspaceRoleDrawer dict={dict} drawerName="workspace-roles" workspaceId={workspaceId} />
     </AccordionGroup>
   );
 }

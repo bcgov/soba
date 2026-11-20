@@ -45,6 +45,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 
+import { AccordionGroup } from '@bcgov/design-system-react-components';
 import WorkspaceRoleDrawer from '@/src/features/workspaces/ui/WorkspaceRoleDrawer';
 
 const role = (
@@ -69,7 +70,15 @@ const FIXED = [TEAM_MANAGER, FORM_ADMIN, FORM_SUBMITTER, FORM_DESIGNER];
 const AUDITOR = role('custom-1', 'Auditor', ['form_read', 'submission_read'], false);
 
 const renderDrawer = (drawerDict: Dictionary = dict) =>
-  renderSignedIn(<WorkspaceRoleDrawer dict={drawerDict} workspaceId={WORKSPACE_ID} />);
+  renderSignedIn(
+    <AccordionGroup defaultExpandedKeys={['workspace-roles']}>
+      <WorkspaceRoleDrawer
+        dict={drawerDict}
+        drawerName="workspace-roles"
+        workspaceId={WORKSPACE_ID}
+      />
+    </AccordionGroup>,
+  );
 
 const shownNames = () => screen.getAllByTestId(/^role-name-(?!input)/).map((c) => c.textContent);
 const permissionBox = (code: keyof typeof en.workspaces.roles.permissionNames) =>
@@ -100,6 +109,17 @@ describe('WorkspaceRoleDrawer', () => {
     mockApi.createWorkspaceRole.mockResolvedValue(AUDITOR);
     mockApi.updateWorkspaceRole.mockResolvedValue(AUDITOR);
     mockApi.deleteWorkspaceRole.mockResolvedValue(undefined);
+  });
+
+  it('is its own drawer, named for roles', async () => {
+    renderDrawer();
+    await screen.findByTestId('role-name-form_admin');
+
+    expect(screen.getByTestId('accordion-workspace-roles')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: dict.workspaces.rolesTab })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
   });
 
   it('lists each role by the name shown, with its type and permission count', async () => {

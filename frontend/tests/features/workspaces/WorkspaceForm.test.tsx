@@ -703,9 +703,8 @@ describe('WorkspaceForm', () => {
     );
   });
 
-  // Roles, groups and access were tabs of their own before they moved under Permissions.
-  it('opens settings from a link to a tab that no longer exists', async () => {
-    mockSearchParams.value = 'tab=groups';
+  it("opens settings from a link to a tab that doesn' exists", async () => {
+    mockSearchParams.value = 'tab=notATab';
     await act(async () => {
       renderForm('ws2');
     });
