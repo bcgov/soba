@@ -35,6 +35,15 @@ backend:
     # feature enabled, notificationDefaultCode notify-v1, notification.notifyV1.endpoint, and
     # PLUGIN_NOTIFY_V1_API_KEY in the Vault secret.
     postSubmissionActionPlugins: post-submission-email-addresses
+
+    ## These were unset as of Nov 19, 2026
+    cacheDefaultCode: cache-redis
+    messagebusDefaultCode: messagebus-redis
+    eventStreamDefaultCode: eventstream-redis
+    workflowEngineDefaultCode: cs-workflow-v1
+    notificationDefaultCode: notify-v1
+    userSearchPlugins: css-v1,user-search-soba
+
   notification:
     notifyV1:
       # Keeps one slow send well inside an email job's lease and timeout.
