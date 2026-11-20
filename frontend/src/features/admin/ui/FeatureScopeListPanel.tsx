@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { Button, InlineAlert, Switch } from '@bcgov/design-system-react-components';
+import { Button, ButtonGroup, InlineAlert, Switch } from '@bcgov/design-system-react-components';
 import { usePathname, useRouter } from 'next/navigation';
 import { ConfirmModal } from '@/src/components/ConfirmModal';
 import { DataTable, type Column } from '@/src/components/DataTable';
@@ -164,7 +164,7 @@ export function FeatureScopeListPanel({
         key: 'actions',
         label: dictScopes.columns.actions,
         render: (featureScope) => (
-          <div className="d-flex gap-2 justify-content-start">
+          <ButtonGroup ariaLabel={dictScopes.columns.actions}>
             <RowActionButton
               data-testid={`manage-feature-scope-${featureScope.id}`}
               onPress={() => router.push(`/${locale}/admin/feature-scopes/${featureScope.id}`)}
@@ -177,7 +177,7 @@ export function FeatureScopeListPanel({
             >
               {dictScopes.delete}
             </RowActionButton>
-          </div>
+          </ButtonGroup>
         ),
       },
     ],

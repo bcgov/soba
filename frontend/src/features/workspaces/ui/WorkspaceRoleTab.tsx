@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Button } from '@bcgov/design-system-react-components';
+import { Button, ButtonGroup } from '@bcgov/design-system-react-components';
 import { matchesSearchTerm } from '@soba/lib/sort';
 import { ListPageToolbar } from '@/src/components/ListPageLayout';
 import { DataTable, type Column } from '@/src/components/DataTable';
@@ -148,7 +148,7 @@ export function WorkspaceRoleTab({ dict, workspaceId }: Readonly<WorkspaceRoleTa
         key: 'actions',
         label: t.columns.actions,
         width: '10%',
-        align: 'end',
+        align: 'start',
         render: (role) => {
           const open = () => setFormView({ roleCode: role.roleCode });
           if (role.system) {
@@ -159,14 +159,14 @@ export function WorkspaceRoleTab({ dict, workspaceId }: Readonly<WorkspaceRoleTa
             });
           }
           return (
-            <div>
+            <ButtonGroup ariaLabel={t.columns.actions}>
               {rowAction(role, { label: t.editRole, testId: 'edit-role-button', onPress: open })}
               {rowAction(role, {
                 label: t.deleteRole,
                 testId: 'delete-role-button',
                 onPress: () => setPendingDelete(role),
               })}
-            </div>
+            </ButtonGroup>
           );
         },
       },

@@ -123,7 +123,7 @@ export default function TemplatesDrawer({
       {
         key: 'size',
         label: text.sizeColumn,
-        align: 'end',
+        align: 'start',
         render: (template) => <span className="small">{formatSize(template.size)}</span>,
       },
       {
@@ -136,7 +136,7 @@ export default function TemplatesDrawer({
             {
               key: 'actions',
               label: text.actionsColumn,
-              align: 'end' as const,
+              align: 'start' as const,
               render: (template: TemplateResponse) => (
                 <RowActionButton
                   data-testid={`template-${template.id}-delete`}
