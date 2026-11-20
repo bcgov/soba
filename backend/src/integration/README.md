@@ -64,8 +64,7 @@ an invalid supplied token is rejected. PR gateway smoke checks require this fiel
 probe proves JWT verification, not just liveness. Health does not resolve a credential or check
 resource permissions; a shared CI API key can therefore test each PR's gateway hop.
 
-The earlier shared-secret proof is no longer accepted. `GW-JWT` is redacted from both logs and
-the `/me` response. See `deployments/gateway/README.md` for the protected gateway template.
+Only `GW-JWT` is accepted as gateway proof. It is redacted from both logs and the `/me` response. See `deployments/gateway/README.md` for the protected gateway template.
 
 ## Authentication regression tests
 

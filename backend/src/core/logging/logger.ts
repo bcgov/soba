@@ -20,7 +20,6 @@ const pinoOptions: pino.LoggerOptions = {
       'req.headers.cookie',
       'req.headers.authorization',
       'req.headers["x-api-key"]',
-      'req.headers["x-soba-gateway-token"]',
       'req.headers["gw-jwt"]',
       'res.headers["set-cookie"]',
     ],

@@ -5,8 +5,8 @@
 `integration.template.yaml` renders a separate service for `/chefs/api/integrations/v2` on the
 backend's integration port, 4001, with `key-auth`, the Product Environment `acl`, and
 `kong-upstream-jwt`. It accepts API keys only in `X-API-KEY`, strips the key before forwarding, and
-adds a raw signed token in `GW-JWT`.
-The original proxy-check template and its unauthenticated health workflow remain separate.
+adds a raw signed token in `GW-JWT`. The public proxy check below is a separate service with no
+gateway plugins.
 
 Render locally (does not publish):
 
@@ -46,7 +46,7 @@ Run generator checks with `node --test deployments/gateway/tests/generate-gatewa
 
 ### PR automation
 
-With `APS_PR_ENABLED=true`, PR Open now publishes both the public proxy check and a protected
+With `APS_PR_ENABLED=true`, PR Open publishes both the public proxy check and a protected
 integration service after deploying the backend. For PR 123 the integration service is
 `soba-pr-123-integrations-v2`, its qualifier is `integrations-soba-pr-123`, and its route is
 `/pr/123/integrations/v2/`. The deployed backend audience matches the service name, and its
@@ -72,10 +72,10 @@ are still required. The optional issuer/JWKS overrides must both refer to the AP
 serving the gateway. The CI key is approved through APS once; the workflow does not issue or rotate it.
 It need not exist in the PR database because health verifies the gateway JWT without a credential lookup.
 
-PR Open temporarily sets `integration_health_check: false`: it publishes the protected service,
-keeps API key protection enabled, and records manual test URLs without requiring a CI API key.
-Set that input back to `true` to restore the automated check after manual validation.
-Reusable/manual runs default to `true`.
+PR Open and the dev, test, UAT and prod workflows set `integration_health_check: false`: they
+publish the protected service, keep API key protection enabled, and record manual test URLs
+without requiring a CI API key. Set that input to `true` once a CI API key is approved for each
+Product Environment. Reusable/manual runs default to `true`.
 
 When enabled, the smoke check requests the integration health URL without a key and requires HTTP 401. It then
 uses the CI key and requires HTTP 200 with `gatewayAuthenticated: true`. This proves key-auth, ACL,

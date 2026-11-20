@@ -70,13 +70,13 @@ describe('Signed identity mapping and header trust', () => {
     expect(findActiveApiCredential).toHaveBeenCalledWith('aps', 'kong-id');
   });
 
-  it('does not trust an unsigned client ID or old shared-secret header', async () => {
+  it('does not trust an unsigned client ID or any gateway header other than GW-JWT', async () => {
     expect(
       (
         await request(app)
           .get('/me')
           .set('X-Consumer-Username', 'aps-client')
-          .set('X-Soba-Gateway-Token', 'old-secret')
+          .set('X-Gateway-Token', 'not-a-gateway-jwt')
       ).status,
     ).toBe(401);
     expect(findActiveApiCredential).not.toHaveBeenCalled();
