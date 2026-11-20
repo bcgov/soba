@@ -22,6 +22,8 @@ const h = vi.hoisted(() => ({
     get submission() {
       return { data: h.formData };
     },
+    // A form with no file fields.
+    everyComponent: vi.fn(),
   },
   onSubmit: undefined as
     | undefined

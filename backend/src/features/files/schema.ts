@@ -28,17 +28,13 @@ export const SubmissionFileParamsSchema = z
   .object({ id: z.uuid().toLowerCase(), fileId: z.uuid().toLowerCase() })
   .openapi('Files_SubmissionFileParams');
 
-function registerFilesPaths(
-  registry: OpenAPIRegistry,
-  { basePath, deprecated }: { basePath: string; deprecated: boolean },
-) {
+function registerFilesPaths(registry: OpenAPIRegistry, basePath: string) {
   const tag = 'feature.files';
 
   registry.registerPath({
     method: 'post',
     path: basePath,
     tags: [tag],
-    deprecated,
     security: PUBLIC_SECURITY,
     request: {
       body: {
@@ -83,7 +79,6 @@ function registerFilesPaths(
     method: 'get',
     path: `${basePath}/{id}`,
     tags: [tag],
-    deprecated,
     security: PUBLIC_SECURITY,
     request: { params: FileGetParamsSchema },
     responses: {
@@ -104,7 +99,6 @@ function registerFilesPaths(
     method: 'delete',
     path: `${basePath}/{id}`,
     tags: [tag],
-    deprecated,
     security: PUBLIC_SECURITY,
     request: { params: FileDeleteParamsSchema },
     responses: {
@@ -118,7 +112,7 @@ function registerFilesPaths(
 }
 
 export function registerFilesOpenApi(registry: OpenAPIRegistry) {
-  registerFilesPaths(registry, { basePath: FILES_PATH, deprecated: false });
+  registerFilesPaths(registry, FILES_PATH);
   registry.registerPath({
     method: 'get',
     path: '/design/submissions/{id}/files/{fileId}',

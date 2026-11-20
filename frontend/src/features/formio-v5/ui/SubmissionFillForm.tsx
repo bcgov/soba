@@ -8,6 +8,7 @@ import type { ApiErrorCode } from '@soba/lib';
 import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFormioRenderError';
 import { FormioV5FormRenderErrorBoundary } from '@/src/features/formio-v5/ui/FormioV5FormRenderErrorBoundary';
 import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
+import { discardStoredFiles, fillFormOptions } from '@/src/features/formio-v5/fillFileOptions';
 import {
   BLOCKED_REASON,
   useFillWriter,
@@ -88,6 +89,7 @@ type FormInstance = {
   submit: () => Promise<unknown>;
   setSubmission: (submission: { data: Record<string, unknown> }) => Promise<unknown>;
   submission: { data?: Record<string, unknown> };
+  everyComponent: (visit: (component: unknown) => void) => void;
   /** Form.io's blur, scheduled to run a moment after a field loses focus. */
   pendingBlur?: { cancel?: () => void } | null;
 };
@@ -147,6 +149,8 @@ export function SubmissionFillForm({
   const formInstanceRef = useRef<FormInstance | null>(null);
   // True once the loaded answers are in the webform.
   const [formReady, setFormReady] = useState(false);
+  // True once a submit is applied; the page is leaving for the confirmation.
+  const submitted = useRef(false);
 
   // A field that loses focus as the form unmounts, as when a click mounts a new one, leaves Form.io
   // a blur to run a moment later on the destroyed webform, where it throws.
@@ -180,19 +184,8 @@ export function SubmissionFillForm({
     () => ({ data: (snapshot.content?.data ?? {}) as Submission['data'] }),
     [snapshot],
   );
-  // We own all submit messaging (success toast + redirect, inline error), so suppress Form.io's
-  // built-in "Submission Complete" alert. New submissions have no `_id`, so the file
-  // component is told which submission its pending uploads belong to, letting a reload restore them.
   const formOptions = useMemo(
-    () => ({
-      noAlerts: true,
-      readOnly: !canWrite,
-      ...fileOption,
-      bcgovFile: {
-        ...(fileOption.bcgovFile as Record<string, unknown> | undefined),
-        offlineScope: submissionId,
-      },
-    }),
+    () => fillFormOptions({ canWrite, fileOption, submissionId }),
     [canWrite, fileOption, submissionId],
   );
 
@@ -257,6 +250,9 @@ export function SubmissionFillForm({
   };
 
   const submitForm = async (submission: Submission) => {
+    // Submitted, and on the way to the confirmation. Form.io's button takes submitDone as leave to
+    // submit again, which would find the submission closed and send the filler to its view instead.
+    if (submitted.current) return;
     if (!writer.hasBase()) {
       setRenderError(labels.loadError);
       releaseSubmit();
@@ -266,7 +262,9 @@ export function SubmissionFillForm({
       const outcome = await writer.submit((submission?.data ?? {}) as Record<string, unknown>);
       switch (outcome.status) {
         case 'applied':
+          submitted.current = true;
           addNotification({ text: labels.submitSuccess, type: 'success' });
+          // Lets BCGovFile forget the browser's records of the files this submission now holds.
           formInstanceRef.current?.emit('submitDone', submission);
           // Straight to the confirmation. replace, so Back does not return to the fill page of a
           // submitted record.
@@ -299,8 +297,14 @@ export function SubmissionFillForm({
     onFormUpdated?.({ ...updated, data: formInstanceRef.current?.submission.data ?? {} });
   };
 
-  // Discards the typed answers: the container mounts a new form on the latest bundle.
-  const reloadLatest = () => writer.discardMine(onReload);
+  // Discards the typed answers, with the files kept in the browser until they upload: the container
+  // mounts a new form on the latest bundle, which would otherwise restore those files into it.
+  const reloadLatest = () =>
+    writer.discardMine(async () => {
+      const instance = formInstanceRef.current;
+      if (instance) await discardStoredFiles(instance);
+      await onReload();
+    });
 
   // Writes the typed answers over the current head. A submit goes through Form.io again, so an
   // invalid form shows its field errors and never reaches submitForm.

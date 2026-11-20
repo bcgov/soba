@@ -19,7 +19,10 @@ const h = vi.hoisted(() => ({
     get submission() {
       return { data: h.formData };
     },
+    everyComponent: (visit: (component: unknown) => void) => h.fields.forEach(visit),
   },
+  // The webform's components, as everyComponent visits them.
+  fields: [] as unknown[],
   onSubmit: undefined as
     | undefined
     | ((submission: { data: Record<string, unknown> }) => Promise<void>),
@@ -156,6 +159,7 @@ describe('FormioV5SubmissionFillClient', () => {
     vi.clearAllMocks();
     store = makeStore();
     h.formData = {};
+    h.fields = [];
     h.mounts = 0;
     h.access = { caller: { idpCode: 'idir' }, pending: false };
     h.files = { option: {}, ready: true };
@@ -571,6 +575,19 @@ describe('FormioV5SubmissionFillClient', () => {
       expect(h.instance.emit).toHaveBeenCalledWith('submitDone', { data: { a: 1 } });
     });
 
+    // submitDone turns Form.io's button back on, and the page has not left yet.
+    it('sends nothing more for a second click once the submit is applied', async () => {
+      h.submitSobaFormSubmission.mockResolvedValue(writeResponse('current'));
+      await renderReady();
+      await submit({ a: 1 });
+      h.submitSobaFormSubmission.mockResolvedValue(writeResponse('pending', 'closed'));
+      await submit({ a: 1 });
+
+      expect(h.submitSobaFormSubmission).toHaveBeenCalledTimes(1);
+      expect(h.replace).toHaveBeenCalledTimes(1);
+      expect(h.replace).toHaveBeenCalledWith('/en/submission/sub-1/success');
+    });
+
     it('stays on the form with the held notice when the submit conflicts', async () => {
       h.submitSobaFormSubmission.mockResolvedValue(writeResponse('pending', 'conflict'));
       await renderReady();
@@ -584,7 +601,7 @@ describe('FormioV5SubmissionFillClient', () => {
         'Submit my version',
       );
       expect(h.instance.emit).toHaveBeenCalledWith('submitError', '');
-      expect(h.instance.emit).not.toHaveBeenCalledWith('submitDone');
+      expect(h.instance.emit.mock.calls.map(([event]) => event)).not.toContain('submitDone');
     });
 
     it('refuses another submit while the held notice shows', async () => {
@@ -1022,6 +1039,33 @@ describe('FormioV5SubmissionFillClient', () => {
       await saveDraft();
       await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(2));
       expect(savedBody(1).baseRevisionId).toBe('rev-9');
+    });
+
+    // The new form would restore files kept in the browser for the submission, those of the answers
+    // just thrown away included.
+    it('deletes the files kept in the browser before loading the latest version', async () => {
+      let stored!: () => void;
+      const field = {
+        component: { type: 'bcgov-file' },
+        resetValue: vi.fn(),
+        refreshOfflineFiles: vi.fn(() => new Promise<void>((resolve) => (stored = resolve))),
+      };
+      const other = { component: { type: 'textfield' }, resetValue: vi.fn() };
+      h.fields = [field, other];
+      h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-x', 'pending', 'conflict'));
+      await renderLoaded();
+      await saveDraft();
+      await waitFor(() => expect(screen.getByTestId('submission-fill-held')).toBeInTheDocument());
+      h.getSubmitFillBundle.mockResolvedValue(bundle({ headRevisionId: 'rev-9' }));
+
+      await userEvent.click(screen.getByTestId('submission-fill-reload-latest'));
+
+      expect(field.resetValue).toHaveBeenCalledTimes(1);
+      expect(other.resetValue).not.toHaveBeenCalled();
+      expect(h.getSubmitFillBundle).toHaveBeenCalledTimes(1);
+      await act(async () => stored());
+      await waitFor(() => expect(h.getSubmitFillBundle).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(h.mounts).toBe(2));
     });
 
     it('keeps the held notice, and refuses a submit, until the latest version has loaded', async () => {

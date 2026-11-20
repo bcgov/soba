@@ -88,10 +88,11 @@ designRouter.use(coreErrorHandler);
 
 // Submit feature: submission open/save/submit + reads of an existing submission
 // plus document templates/print, each
-// authorized by the submitter rules in @soba/lib. The files feature flag is enforced inside
-// filesDomain.router.
+// authorized by the submitter rules in @soba/lib.
 const submitRouter = express.Router();
 submitRouter.use('/', submitRoutes);
+// Before document generation: its router gates every request that reaches it on its own flags.
+submitRouter.use(submitterEmailCopyDomain.path, submitterEmailCopyDomain.router);
 // Mounted after submitRoutes so only the fall-through actions (templates, print) reach it;
 // the document-generation and templates feature gates live inside the router.
 submitRouter.use('/submissions', documentGenerationDomain.router);
