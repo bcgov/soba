@@ -46,11 +46,11 @@ const endToEndHeaders = (
 };
 
 /**
- * The upstream URL for a request target, or null when it is not under basePath on the upstream.
- * Resolving the target, rather than appending it, removes dot segments before the check and turns a
- * target such as //host/x into that host, which the origin check then refuses.
+ * The path to forward for a request target, or null when the target does not resolve under basePath
+ * on the upstream. Resolving the target, rather than passing it on, removes dot segments before the
+ * check and turns a target such as //host/x into that host, which the origin check then refuses.
  */
-const forwardTarget = (target: string, upstream: URL, basePath: string): URL | null => {
+const forwardPath = (target: string, upstream: URL, basePath: string): string | null => {
   let url: URL;
   try {
     url = new URL(target, upstream);
@@ -60,7 +60,7 @@ const forwardTarget = (target: string, upstream: URL, basePath: string): URL | n
   }
   if (url.origin !== upstream.origin) return null;
   const underBasePath = url.pathname === basePath || url.pathname.startsWith(`${basePath}/`);
-  return underBasePath ? url : null;
+  return underBasePath ? `${url.pathname}${url.search}` : null;
 };
 
 const sendJson = (res: http.ServerResponse, status: number, body: unknown) => {
@@ -91,8 +91,8 @@ export const createDevGateway = ({
       sendJson(res, 400, { message: 'Request target must be a path' });
       return;
     }
-    const target = forwardTarget(req.url, upstream, basePath);
-    if (!target) {
+    const path = forwardPath(req.url, upstream, basePath);
+    if (path === null) {
       sendJson(res, 404, { message: 'no Route matched with those values' });
       return;
     }
@@ -122,12 +122,22 @@ export const createDevGateway = ({
     else if (req.headers['content-length'] !== undefined) {
       headers['content-length'] = req.headers['content-length'];
     }
-    const forward = http.request(target, { method: req.method, headers }, (upstreamRes) => {
-      res.writeHead(upstreamRes.statusCode ?? 502, endToEndHeaders(upstreamRes.headers));
-      pipeline(upstreamRes, res, (error) => {
-        if (error) res.destroy();
-      });
-    });
+    // Only the path comes from the request; the host and port are always the upstream's.
+    const forward = http.request(
+      {
+        hostname: upstream.hostname,
+        port: upstream.port || 80,
+        path,
+        method: req.method,
+        headers,
+      },
+      (upstreamRes) => {
+        res.writeHead(upstreamRes.statusCode ?? 502, endToEndHeaders(upstreamRes.headers));
+        pipeline(upstreamRes, res, (error) => {
+          if (error) res.destroy();
+        });
+      },
+    );
     forward.on('error', () => {
       if (res.headersSent) res.destroy();
       else sendJson(res, 502, { message: 'Integration API is not reachable' });
