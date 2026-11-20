@@ -18,16 +18,18 @@ const operations = (paths: Record<string, Operations>, path: string) =>
   Object.entries(paths[path] ?? {}).map(([method, op]) => [method, op.deprecated === true]);
 
 describe('files OpenAPI', () => {
-  const paths = filesPaths();
+  it('documents upload, download and delete at /files, none deprecated', () => {
+    const paths = filesPaths();
 
-  it.each([['/files', false]])(
-    '%s documents upload, download and delete (deprecated: %s)',
-    (base, deprecated) => {
-      expect(operations(paths, base)).toEqual([['post', deprecated]]);
-      expect(operations(paths, `${base}/{id}`)).toEqual([
-        ['get', deprecated],
-        ['delete', deprecated],
-      ]);
-    },
-  );
+    expect(Object.keys(paths).sort()).toEqual([
+      '/design/submissions/{id}/files/{fileId}',
+      '/files',
+      '/files/{id}',
+    ]);
+    expect(operations(paths, '/files')).toEqual([['post', false]]);
+    expect(operations(paths, '/files/{id}')).toEqual([
+      ['get', false],
+      ['delete', false],
+    ]);
+  });
 });

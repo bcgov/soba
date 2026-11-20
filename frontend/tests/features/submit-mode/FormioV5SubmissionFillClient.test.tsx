@@ -19,10 +19,7 @@ const h = vi.hoisted(() => ({
     get submission() {
       return { data: h.formData };
     },
-    everyComponent: (visit: (component: unknown) => void) => h.fields.forEach(visit),
   },
-  // The webform's components, as everyComponent visits them.
-  fields: [] as unknown[],
   onSubmit: undefined as
     | undefined
     | ((submission: { data: Record<string, unknown> }) => Promise<void>),
@@ -190,7 +187,6 @@ describe('FormioV5SubmissionFillClient', () => {
     vi.clearAllMocks();
     store = makeStore();
     h.formData = {};
-    h.fields = [];
     h.printSources = [];
     h.mounts = 0;
     h.access = { caller: { idpCode: 'idir' }, pending: false };
@@ -1127,33 +1123,6 @@ describe('FormioV5SubmissionFillClient', () => {
       await saveDraft();
       await waitFor(() => expect(h.saveSobaFormSubmission).toHaveBeenCalledTimes(2));
       expect(savedBody(1).baseRevisionId).toBe('rev-9');
-    });
-
-    // The new form would restore files kept in the browser for the submission, those of the answers
-    // just thrown away included.
-    it('deletes the files kept in the browser before loading the latest version', async () => {
-      let stored!: () => void;
-      const field = {
-        component: { type: 'bcgov-file' },
-        resetValue: vi.fn(),
-        refreshOfflineFiles: vi.fn(() => new Promise<void>((resolve) => (stored = resolve))),
-      };
-      const other = { component: { type: 'textfield' }, resetValue: vi.fn() };
-      h.fields = [field, other];
-      h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-x', 'pending', 'conflict'));
-      await renderLoaded();
-      await saveDraft();
-      await waitFor(() => expect(screen.getByTestId('submission-fill-held')).toBeInTheDocument());
-      h.getSubmitFillBundle.mockResolvedValue(bundle({ headRevisionId: 'rev-9' }));
-
-      await userEvent.click(screen.getByTestId('submission-fill-reload-latest'));
-
-      expect(field.resetValue).toHaveBeenCalledTimes(1);
-      expect(other.resetValue).not.toHaveBeenCalled();
-      expect(h.getSubmitFillBundle).toHaveBeenCalledTimes(1);
-      await act(async () => stored());
-      await waitFor(() => expect(h.getSubmitFillBundle).toHaveBeenCalledTimes(2));
-      await waitFor(() => expect(h.mounts).toBe(2));
     });
 
     it('keeps the held notice, and refuses a submit, until the latest version has loaded', async () => {

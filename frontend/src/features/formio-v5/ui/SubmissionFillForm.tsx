@@ -8,7 +8,7 @@ import type { ApiErrorCode } from '@soba/lib';
 import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFormioRenderError';
 import { FormioV5FormRenderErrorBoundary } from '@/src/features/formio-v5/ui/FormioV5FormRenderErrorBoundary';
 import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
-import { discardStoredFiles, fillFormOptions } from '@/src/features/formio-v5/fillFileOptions';
+import { fillFormOptions } from '@/src/features/formio-v5/fillFormOptions';
 import { useUnsavedEdits } from '@/src/features/formio-v5/ui/useUnsavedEdits';
 import {
   BLOCKED_REASON,
@@ -97,7 +97,6 @@ type FormInstance = {
   submit: () => Promise<unknown>;
   setSubmission: (submission: { data: Record<string, unknown> }) => Promise<unknown>;
   submission: { data?: Record<string, unknown> };
-  everyComponent: (visit: (component: unknown) => void) => void;
   /** Form.io's blur, scheduled to run a moment after a field loses focus. */
   pendingBlur?: { cancel?: () => void } | null;
 };
@@ -332,14 +331,9 @@ export function SubmissionFillForm({
     onFormUpdated?.({ ...updated, data: formInstanceRef.current?.submission.data ?? {} });
   };
 
-  // Discards the typed answers, with the files kept in the browser until they upload: the container
-  // mounts a new form on the latest bundle, which would otherwise restore those files into it.
-  const reloadLatest = () =>
-    writer.discardMine(async () => {
-      const instance = formInstanceRef.current;
-      if (instance) await discardStoredFiles(instance);
-      await onReload();
-    });
+  // Discards the typed answers: the container mounts a new form on the latest bundle, which restores
+  // the files kept in the browser. Deleting them here would drop any the latest version still holds.
+  const reloadLatest = () => writer.discardMine(onReload);
 
   // Writes the typed answers over the current head. A submit goes through Form.io again, so an
   // invalid form shows its field errors and never reaches submitForm.

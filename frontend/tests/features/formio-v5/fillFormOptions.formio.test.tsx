@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render } from '@testing-library/react';
 import { Form, type FormType } from '@formio/react';
-import { discardStoredFiles, fillFormOptions } from '@/src/features/formio-v5/fillFileOptions';
+import { fillFormOptions } from '@/src/features/formio-v5/fillFormOptions';
 
 // The real Form.io and BC Gov file component, with a file kept in the browser the way the component
 // keeps one it could not upload: what the fill form's options make of it is what these tests are for.
@@ -35,10 +35,7 @@ const storeFile = (scope: string) => {
   );
 };
 
-type Webform = {
-  data: { doc?: { offlineKey?: string }[] };
-  everyComponent: (visit: (component: unknown) => void) => void;
-};
+type Webform = { data: { doc?: { offlineKey?: string }[] } };
 
 const settle = (ms = 800) => act(() => new Promise((resolve) => setTimeout(resolve, ms)));
 
@@ -100,18 +97,15 @@ describe('the fill form options on the real Form.io', () => {
     view.unmount();
   });
 
-  it('deletes the kept files, so the next form for the submission has none', async () => {
+  // As when "Reload latest version" mounts a new form for the submission.
+  it('restores a kept file into the next form for the submission', async () => {
     storeFile('sub-1');
     const first = await renderFill('sub-1');
-    expect(restored(first.webform)).toEqual(['k-1']);
-
-    await act(() => discardStoredFiles(first.webform));
     first.view.unmount();
 
-    expect(localStorage.getItem(META_KEY)).toBeNull();
-    expect(localStorage.getItem(FILE_KEY)).toBeNull();
+    expect(localStorage.getItem(META_KEY)).not.toBeNull();
     const next = await renderFill('sub-1');
-    expect(restored(next.webform)).toEqual([]);
+    expect(restored(next.webform)).toEqual(['k-1']);
     next.view.unmount();
   });
 });

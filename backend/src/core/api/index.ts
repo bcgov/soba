@@ -86,9 +86,8 @@ designRouter.use(filesDesignRouter);
 designRouter.use(notFoundHandler);
 designRouter.use(coreErrorHandler);
 
-// Submit feature: submission open/save/submit + reads of an existing submission
-// plus document templates/print, each
-// authorized by the submitter rules in @soba/lib.
+// Submit feature: submission open/save/submit, reads of an existing submission, email copy of a
+// submitted one and document templates/print, each authorized by the submitter rules in @soba/lib.
 const submitRouter = express.Router();
 submitRouter.use('/', submitRoutes);
 // Before document generation: its router gates every request that reaches it on its own flags.
@@ -99,7 +98,8 @@ submitRouter.use('/submissions', documentGenerationDomain.router);
 submitRouter.use(notFoundHandler);
 submitRouter.use(coreErrorHandler);
 
-// Files feature: submission attachments, authorized through the submission each file belongs to.
+// Files feature: submission attachments, authorized through the submission each file belongs to;
+// gates itself on the files flag.
 const filesApiRouter = express.Router();
 filesApiRouter.use('/', filesDomain.router);
 filesApiRouter.use(notFoundHandler);
