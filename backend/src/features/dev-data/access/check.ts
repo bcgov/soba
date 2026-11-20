@@ -459,7 +459,7 @@ const DESIGN_LISTS: readonly {
       return items.map((item) => ({ formId: item.formId }));
     },
     codeSets: [[Permissions.form_read]],
-    hides: ['deleteForm', 'deleteVersion'],
+    hides: ['deleteForm'],
   },
   {
     name: 'submissions',
@@ -475,7 +475,7 @@ const DESIGN_LISTS: readonly {
       return items.map((item) => ({ formId: item.formId }));
     },
     codeSets: [[Permissions.submission_read]],
-    hides: ['deleteForm', 'deleteVersion'],
+    hides: ['deleteForm'],
   },
 ];
 
@@ -548,9 +548,7 @@ const PLANNED_DELETES: ReadonlyMap<string, PlannedDelete> = new Map(
   buildCoveragePlan()
     .workspaces.flatMap((workspace) => workspace.forms)
     .flatMap(({ key, afterSubmissions }) =>
-      afterSubmissions === 'deleteForm' || afterSubmissions === 'deleteVersion'
-        ? [[key, afterSubmissions] as const]
-        : [],
+      afterSubmissions === 'deleteForm' ? [[key, afterSubmissions] as const] : [],
     ),
 );
 

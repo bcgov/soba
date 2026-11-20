@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Accordion, Button } from '@bcgov/design-system-react-components';
+import { Accordion, Button, ButtonGroup } from '@bcgov/design-system-react-components';
 import { ListPageToolbar } from '@/src/components/ListPageLayout';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { RowActionButton } from '@/src/components/RowActionButton';
@@ -112,9 +112,9 @@ export function WorkspaceGroupDrawer({
         key: 'actions',
         label: t.columns.actions,
         width: '10%',
-        align: 'end',
+        align: 'start',
         render: (group) => (
-          <div>
+          <ButtonGroup ariaLabel={t.columns.actions}>
             <RowActionButton
               onPress={() => setFormView({ groupId: group.id })}
               aria-label={`${t.editGroup}: ${group.name}`}
@@ -131,7 +131,7 @@ export function WorkspaceGroupDrawer({
                 {t.deleteGroup}
               </RowActionButton>
             )}
-          </div>
+          </ButtonGroup>
         ),
       },
     ];

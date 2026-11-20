@@ -33,7 +33,7 @@ test.describe.serial('Landing page tests', () => {
     await authenticatedPage.goto('');
     // The SideNav is always visible for authenticated users (no menu toggle).
     await expect(authenticatedPage.locator('[data-testid="forms-nav"]')).toBeVisible();
-    await expect(authenticatedPage.locator('[data-testid="feedback-nav"]')).toBeVisible();
-    await expect(authenticatedPage.locator('[data-testid="help-nav"]')).toBeVisible();
+    await expect(authenticatedPage.locator('[data-testid="feedback-nav"]')).not.toBeVisible();
+    await expect(authenticatedPage.locator('[data-testid="help-nav"]')).not.toBeVisible();
   });
 });

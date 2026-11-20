@@ -8,6 +8,8 @@ import type { ApiErrorCode } from '@soba/lib';
 import { normalizeFormioRenderError } from '@/src/features/formio-v5/normalizeFormioRenderError';
 import { FormioV5FormRenderErrorBoundary } from '@/src/features/formio-v5/ui/FormioV5FormRenderErrorBoundary';
 import { DynamicForm } from '@/src/features/formio-v5/ui/DynamicForm';
+import { fillFormOptions } from '@/src/features/formio-v5/fillFormOptions';
+import { useUnsavedEdits } from '@/src/features/formio-v5/ui/useUnsavedEdits';
 import {
   BLOCKED_REASON,
   useFillWriter,
@@ -25,11 +27,18 @@ import {
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
 import { apiErrorMessage, isNetworkError, isOutcomeUnknown } from '@/src/shared/api/dataError';
 import { useFormatTime } from '@/src/shared/hooks/useFormatLongDate';
+import { useSubmitterPrint } from '@/src/features/templates/data/useSubmissionPrint';
+import { printBaseName } from '@/src/features/templates/printFileName';
+import { PrintMarks } from '@/src/features/templates/ui/PrintMarks';
+import { PrintSubmissionButton } from '@/src/features/templates/ui/PrintSubmissionButton';
+import { usePageHeading } from '@/src/components/PageHeader';
 import type {
   SubmitFillBundle,
   SubmitFormVersionSchemaResponse,
   SubmitterForm,
 } from '@/src/types/forms';
+import { SubmissionWorkflowState } from '@/src/types/submissions';
+import { PrintStatus, type PrintStatusCode } from '@/src/types/templates';
 
 export type FillLabels = {
   loading: string;
@@ -92,6 +101,18 @@ type FormInstance = {
   pendingBlur?: { cancel?: () => void } | null;
 };
 
+/** What a browser print of the form says about the answers on it. */
+const printStatusOf = (
+  opened: boolean,
+  unsaved: boolean,
+  workflowState: string,
+): PrintStatusCode => {
+  if (!opened || unsaved) return PrintStatus.unsaved;
+  return workflowState === SubmissionWorkflowState.submitted
+    ? PrintStatus.submitted
+    : PrintStatus.draft;
+};
+
 /**
  * Fills one loaded bundle of a submission: saves drafts and submits. A submission not opened yet is
  * opened by its first write or upload, through the view's `open`. It reads its view once, when it
@@ -136,8 +157,9 @@ export function SubmissionFillForm({
     signedIn,
     open: openShown,
   });
-  const { busy, held, save: saveStatus } = writer.status;
+  const { busy, held, opened, save: saveStatus } = writer.status;
   const formatTime = useFormatTime();
+  usePageHeading({ heading: snapshot.form.name });
 
   const [renderError, setRenderError] = useState<string | null>(null);
   // A newer version of the form, found by an open; the filler moves over to it.
@@ -147,6 +169,20 @@ export function SubmissionFillForm({
   const formInstanceRef = useRef<FormInstance | null>(null);
   // True once the loaded answers are in the webform.
   const [formReady, setFormReady] = useState(false);
+  // True once a submit is applied; the page is leaving for the confirmation.
+  const submitted = useRef(false);
+
+  const { unsaved, isUnsaved, beginSave, onFormChange, formProps } = useUnsavedEdits({
+    canWrite,
+    // Answers carried to a newer version of the form come with no head: nothing of them is saved.
+    nothingSaved: snapshot.content === null || snapshot.headRevisionId === null,
+  });
+  // Sent only while unsaved: without them the server prints the saved answers.
+  const answers = useCallback(
+    () => (isUnsaved() ? formInstanceRef.current?.submission.data : undefined),
+    [isUnsaved],
+  );
+  const print = useSubmitterPrint(submissionId, { opened, answers });
 
   // A field that loses focus as the form unmounts, as when a click mounts a new one, leaves Form.io
   // a blur to run a moment later on the destroyed webform, where it throws.
@@ -180,11 +216,9 @@ export function SubmissionFillForm({
     () => ({ data: (snapshot.content?.data ?? {}) as Submission['data'] }),
     [snapshot],
   );
-  // We own all submit messaging (success toast + redirect, inline error), so suppress Form.io's
-  // built-in green "Submission Complete" alert.
   const formOptions = useMemo(
-    () => ({ noAlerts: true, readOnly: !canWrite, ...fileOption }),
-    [canWrite, fileOption],
+    () => fillFormOptions({ canWrite, fileOption, submissionId }),
+    [canWrite, fileOption, submissionId],
   );
 
   // @formio/react applies the submission prop only after this callback, and Form.io applies it
@@ -240,14 +274,19 @@ export function SubmissionFillForm({
     const instance = formReady ? formInstanceRef.current : null;
     if (!instance || !writer.hasBase()) return;
     setRenderError(null);
+    const saveApplied = beginSave();
     const outcome = await writer.save(instance.submission.data ?? {}).catch((err: unknown) => {
       if (isFormUpdated(err)) setUpdated({ version: err.version, form: err.form });
       return null;
     });
+    if (outcome?.status === 'applied') saveApplied();
     if (outcome?.status === 'held' && outcome.reason === 'closed') leaveClosed();
   };
 
   const submitForm = async (submission: Submission) => {
+    // Submitted, and on the way to the confirmation. Form.io's button takes submitDone as leave to
+    // submit again, which would find the submission closed and send the filler to its view instead.
+    if (submitted.current) return;
     if (!writer.hasBase()) {
       setRenderError(labels.loadError);
       releaseSubmit();
@@ -257,10 +296,12 @@ export function SubmissionFillForm({
       const outcome = await writer.submit((submission?.data ?? {}) as Record<string, unknown>);
       switch (outcome.status) {
         case 'applied':
+          submitted.current = true;
           addNotification({ text: labels.submitSuccess, type: 'success' });
-          // Straight to the confirmation; navigating away unmounts the form, so there's no need to
-          // emit `submitDone` and no flash of Form.io's own success screen. replace, so Back does
-          // not return to the fill page of a submitted record.
+          // Lets BCGovFile forget the browser's records of the files this submission now holds.
+          formInstanceRef.current?.emit('submitDone', submission);
+          // Straight to the confirmation. replace, so Back does not return to the fill page of a
+          // submitted record.
           router.replace(`${submissionPath}/success`);
           break;
         case 'held':
@@ -290,7 +331,8 @@ export function SubmissionFillForm({
     onFormUpdated?.({ ...updated, data: formInstanceRef.current?.submission.data ?? {} });
   };
 
-  // Discards the typed answers: the container mounts a new form on the latest bundle.
+  // Discards the typed answers: the container mounts a new form on the latest bundle, which restores
+  // the files kept in the browser. Deleting them here would drop any the latest version still holds.
   const reloadLatest = () => writer.discardMine(onReload);
 
   // Writes the typed answers over the current head. A submit goes through Form.io again, so an
@@ -306,23 +348,39 @@ export function SubmissionFillForm({
     }
   };
 
+  const printStatus = printStatusOf(opened, unsaved, snapshot.workflowState);
+  const printButton = (
+    <PrintSubmissionButton
+      print={print}
+      status={printStatus}
+      baseName={printBaseName({
+        id: submissionId,
+        formName: snapshot.form.name,
+        confirmationCode: null,
+      })}
+    />
+  );
+
   return (
     <>
-      <div className="text-end" data-testid="submission-fill-version">
-        {labels.version}: {versionNo}
+      <PrintMarks status={printStatus} />
+      <div className="d-print-none">
+        <div className="text-end" data-testid="submission-fill-version">
+          {labels.version}: {versionNo}
+        </div>
+        {renderError ? (
+          <InlineAlert variant="danger" role="alert" data-testid="submission-fill-render-error">
+            {renderError}
+          </InlineAlert>
+        ) : null}
+        {canWrite ? null : (
+          <InlineAlert variant="info" data-testid="submission-fill-readonly">
+            {labels.readOnly}
+          </InlineAlert>
+        )}
       </div>
-      {renderError ? (
-        <InlineAlert variant="danger" role="alert" data-testid="submission-fill-render-error">
-          {renderError}
-        </InlineAlert>
-      ) : null}
-      {canWrite ? null : (
-        <InlineAlert variant="info" data-testid="submission-fill-readonly">
-          {labels.readOnly}
-        </InlineAlert>
-      )}
       {updated ? (
-        <div className="mb-3">
+        <div className="mb-3 d-print-none">
           <InlineAlert
             variant="warning"
             title={labels.formUpdated}
@@ -342,7 +400,7 @@ export function SubmissionFillForm({
         </div>
       ) : null}
       {held ? (
-        <div className="mb-3">
+        <div className="mb-3 d-print-none">
           <InlineAlert
             variant="warning"
             // BCDS names the alert from `title`; without it the notice has no accessible name.
@@ -379,7 +437,10 @@ export function SubmissionFillForm({
         </div>
       ) : null}
       {canSaveDraft ? (
-        <div className="mb-3 d-flex gap-2" data-testid="submission-fill-actions">
+        <div
+          className="mb-3 d-flex gap-2 align-items-center d-print-none"
+          data-testid="submission-fill-actions"
+        >
           <Button
             variant="secondary"
             onPress={() => {
@@ -393,8 +454,11 @@ export function SubmissionFillForm({
           <output className="align-self-center" data-testid="submission-fill-save-status">
             {saveStatusText(saveStatus)}
           </output>
+          <div className="ms-auto">{printButton}</div>
         </div>
-      ) : null}
+      ) : (
+        <div className="mb-3 d-flex justify-content-end d-print-none">{printButton}</div>
+      )}
       <FormioV5FormRenderErrorBoundary
         fallback={
           <InlineAlert variant="danger" role="alert">
@@ -402,7 +466,12 @@ export function SubmissionFillForm({
           </InlineAlert>
         }
       >
-        <div className="formio-v5-chrome" data-soba-formio-chrome data-testid="submission-fill">
+        <div
+          className="formio-v5-chrome"
+          data-soba-formio-chrome
+          data-testid="submission-fill"
+          {...formProps}
+        >
           <DynamicForm
             className="formio-v5-form-root"
             src=""
@@ -410,6 +479,7 @@ export function SubmissionFillForm({
             submission={submissionProp}
             options={formOptions}
             onFormReady={onFormReady}
+            onChange={onFormChange}
             onError={(err) => {
               setRenderError(
                 normalizeFormioRenderError(err, labels.loadError, labels.sessionExpired),

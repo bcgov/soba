@@ -8,7 +8,6 @@ import {
   finishFormVersionProvisioning,
   getCurrentFormVersion,
   getFormVersionById,
-  getFormVersionByIdIncludingDeleted,
   getPublishedVersionForForm,
   listFormVersionsForWorkspace,
   lockFormVersion,
@@ -315,21 +314,22 @@ export class FormVersionService {
     return updated;
   }
 
-  async delete(input: VersionActionInput) {
-    const version = await getFormVersionByIdIncludingDeleted(
-      input.workspaceId,
-      input.formVersionId,
-    );
-    if (!version) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
-    if (version.state !== FormVersionState.draft) {
-      throw new ValidationError(ONLY_DRAFT_VERSIONS_DELETABLE);
-    }
-    return updateFormVersionDraft(
-      input.workspaceId,
-      input.formVersionId,
-      input.actorDisplayLabel,
-      stateStamps('deleted', input),
-    );
+  delete(input: VersionActionInput) {
+    // Under the lock publish takes, so a version published meanwhile is refused, not deleted.
+    return db.transaction(async (tx) => {
+      const version = await lockFormVersion(input.workspaceId, input.formVersionId, tx);
+      if (!version) throw new NotFoundError(FORM_VERSION_NOT_FOUND);
+      if (version.state !== FormVersionState.draft) {
+        throw new ValidationError(ONLY_DRAFT_VERSIONS_DELETABLE);
+      }
+      return updateFormVersionDraft(
+        input.workspaceId,
+        input.formVersionId,
+        input.actorDisplayLabel,
+        stateStamps('deleted', input),
+        tx,
+      );
+    });
   }
 
   async publish(input: VersionActionInput) {

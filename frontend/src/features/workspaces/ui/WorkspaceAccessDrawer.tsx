@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type Key } from 'react';
-import { Accordion, Button, Select } from '@bcgov/design-system-react-components';
+import { Accordion, Button, ButtonGroup, Select } from '@bcgov/design-system-react-components';
 import { ListPageFilters, ListPageToolbar } from '@/src/components/ListPageLayout';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { RowActionButton } from '@/src/components/RowActionButton';
@@ -174,14 +174,14 @@ export function WorkspaceAccessDrawer({
         key: 'actions',
         label: t.columns.actions,
         width: '10%',
-        align: 'end',
+        align: 'start',
         render: (member) => {
           const name = member.displayLabel ?? t.unnamed;
           // The API refuses the owner and the caller, who is unknown until the profile loads.
           const protectedMember =
             isWorkspaceOwnerRole(member.role) || !actorId || member.userId === actorId;
           return (
-            <div>
+            <ButtonGroup ariaLabel={t.columns.actions}>
               <RowActionButton
                 onPress={() => setFormView({ membershipId: member.membershipId })}
                 aria-label={`${t.editMember}: ${name}`}
@@ -198,7 +198,7 @@ export function WorkspaceAccessDrawer({
                   {t.removeMember}
                 </RowActionButton>
               )}
-            </div>
+            </ButtonGroup>
           );
         },
       },

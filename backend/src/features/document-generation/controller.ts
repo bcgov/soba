@@ -5,6 +5,7 @@ import {
   templateExtensionsText,
   type PrintBody,
   type PrintOptions,
+  type SubmitPrintBody,
 } from '@soba/lib';
 import {
   documentGenerationService,
@@ -130,11 +131,12 @@ export async function listSubmissionTemplatesHandler(req: Request, res: Response
 }
 
 export async function printDocumentHandler(req: Request, res: Response): Promise<void> {
-  const body = req.body as PrintBody;
+  const body = req.body as SubmitPrintBody;
   const outcome = await documentGenerationService.print(resolveCaller(req), {
     submissionId: req.params.id,
     templateId: body.templateId,
     options: body.options,
+    data: body.data,
   });
   respond(req, res, outcome, buildFilename(body.options));
 }

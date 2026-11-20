@@ -1,6 +1,7 @@
 import {
   PrintBodySchema,
   PrintOptionsSchema,
+  SubmitPrintBodySchema,
   TemplateNameBodySchema,
   TemplateResponseSchema,
   TemplateUploadBodySchema,
@@ -116,5 +117,18 @@ describe('print schemas', () => {
     expect(
       PrintBodySchema.safeParse({ templateId: UUID, options: { convertTo: 'html' } }).success,
     ).toBe(false);
+  });
+});
+
+describe('SubmitPrintBodySchema', () => {
+  it('takes unsaved answers as an object, and nothing else', () => {
+    expect(SubmitPrintBodySchema.safeParse({ templateId: UUID }).success).toBe(true);
+    expect(
+      SubmitPrintBodySchema.safeParse({ templateId: UUID, data: { name: 'Ann', items: [1] } })
+        .success,
+    ).toBe(true);
+    expect(SubmitPrintBodySchema.safeParse({ templateId: UUID, data: ['a'] }).success).toBe(false);
+    expect(SubmitPrintBodySchema.safeParse({ templateId: UUID, data: 'a' }).success).toBe(false);
+    expect(SubmitPrintBodySchema.safeParse({ templateId: UUID, extra: 1 }).success).toBe(false);
   });
 });
