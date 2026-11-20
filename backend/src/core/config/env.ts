@@ -512,6 +512,8 @@ export const env = {
   getTemporalNamespace: () => getOptionalEnv('TEMPORAL_NAMESPACE') ?? 'default',
   getTemporalTaskQueue: () => getOptionalEnv('TEMPORAL_TASK_QUEUE') ?? 'soba',
   getTemporalWorkerHealthPort: () => getNumberEnv('TEMPORAL_WORKER_HEALTH_PORT') ?? 9090,
+  // Integration API listener; the chart sets it from backend.service.integrationPort.
+  getIntegrationPort: () => getNumberEnv('INTEGRATION_PORT') ?? 4001,
   // Match the chart's haproxy.router.openshift.io/timeout annotation.
   getHttpRouteTimeoutMs: () => getNumberEnv('HTTP_ROUTE_TIMEOUT_MS'),
   // Budget for one outbound call. Unset derives it from the route timeout.

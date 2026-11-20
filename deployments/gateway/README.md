@@ -2,9 +2,10 @@
 
 ## Protected integration API v2
 
-`integration.template.yaml` renders a separate service for `/chefs/api/integrations/v2` with
-`key-auth`, the Product Environment `acl`, and `kong-upstream-jwt`. It accepts API keys only in
-`X-API-KEY`, strips the key before forwarding, and adds a raw signed token in `GW-JWT`.
+`integration.template.yaml` renders a separate service for `/chefs/api/integrations/v2` on the
+backend's integration port, 4001, with `key-auth`, the Product Environment `acl`, and
+`kong-upstream-jwt`. It accepts API keys only in `X-API-KEY`, strips the key before forwarding, and
+adds a raw signed token in `GW-JWT`.
 The original proxy-check template and its unauthenticated health workflow remain separate.
 
 Render locally (does not publish):
@@ -34,7 +35,8 @@ The APS instance determines the issuer/JWKS endpoints, even for SOBA dev/PR rele
 `backend/src/integration/README.md` for the endpoint table and signed identity mapping.
 
 All paths on this integration gateway service, including health and OpenAPI, require a valid API
-key and ACL membership. Health and OpenAPI remain public when called directly at the backend.
+key and ACL membership. At the backend they need no credential; from outside the release, only the
+APS NetworkPolicy admits the integration port.
 The existing `verify-health.mjs` is for the public proxy check and cannot verify this protected
 service without credentials. Live publish and signed-claim mapping checks remain separate steps.
 
@@ -126,7 +128,8 @@ applies to everything except the public endpoints.
 ## NetworkPolicy
 
 `deployments/helm/soba/templates/backend/networkpolicy-aps.yaml` lets the APS namespace reach
-backend pods on port 4000. PR and Dev values select the Gold APS namespace with labels
+backend pods on port 4000 (public proxy check) and 4001 (integration API). The OpenShift router
+reaches only 4000. PR and Dev values select the Gold APS namespace with labels
 `name: b8840c` and `environment: prod`. Any other release needs `gatewayNetworkPolicy` enabled
 in its values before a check; the workflow fails when `<release>-aps` is missing.
 

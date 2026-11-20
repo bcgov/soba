@@ -27,6 +27,7 @@ test('renders protected v2 routing, ACL and upstream JWT', () => {
   const result = render(['--integration'], integration);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /path: \/chefs\/api\/integrations\/v2/);
+  assert.match(result.stdout, /port: 4001\n/);
   for (const name of ['key-auth', 'acl', 'kong-upstream-jwt']) {
     assert.ok(result.stdout.includes(`name: ${name}`));
   }

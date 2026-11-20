@@ -23,6 +23,7 @@ import {
   type CredentialRecord,
 } from '../../../src/core/db/repos/workspaceCredentialRepo';
 import { createApp } from '../../../src/createApp';
+import { createIntegrationApp } from '../../../src/integration/createIntegrationApp';
 import { integrationV2Router } from '../../../src/integration/v2/routes';
 import { IntegrationMeResponseSchema } from '../../../src/integration/v2/schema';
 import { buildIntegrationV2OpenApiSpec } from '../../../src/integration/v2/openapi';
@@ -46,7 +47,8 @@ const settings = {
   INTEGRATION_GATEWAY_CLIENT_ID_CLAIM: 'consumername',
 };
 const original = Object.fromEntries(Object.keys(settings).map((key) => [key, process.env[key]]));
-const app = createApp();
+const app = createIntegrationApp();
+const staffApp = createApp();
 const gateway = gatewayJwtFixture(
   settings.INTEGRATION_GATEWAY_ISSUER,
   settings.INTEGRATION_GATEWAY_AUDIENCE,
@@ -189,7 +191,7 @@ describe('Production middleware and staff authentication boundaries', () => {
   );
 
   it('does not accept gateway authentication on the staff API', async () => {
-    const response = await request(app).get('/chefs/api/v1/me').set('GW-JWT', token());
+    const response = await request(staffApp).get('/chefs/api/v1/me').set('GW-JWT', token());
     expect(response.status).toBe(401);
     expect(findActiveApiCredential).not.toHaveBeenCalled();
   });
@@ -201,4 +203,21 @@ describe('Production middleware and staff authentication boundaries', () => {
       expect(findActiveApiCredential).not.toHaveBeenCalled();
     },
   );
+});
+
+describe('Listener separation', () => {
+  it.each(operations.map(({ path }) => path))(
+    'does not serve integration %s on the main API port',
+    async (path) => {
+      const response = await request(staffApp)
+        .get(base + path)
+        .set('GW-JWT', token());
+      expect(response.status).toBe(404);
+      expect(findActiveApiCredential).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not serve the staff API on the integration port', async () => {
+    expect((await request(app).get('/chefs/api/v1/health')).status).toBe(404);
+  });
 });

@@ -1,6 +1,7 @@
 import { env } from './core/config/env';
 env.loadEnv();
 import { createApp } from './createApp';
+import { createIntegrationApp } from './integration/createIntegrationApp';
 import { pool } from './core/db/client';
 import { log } from './core/logging';
 import { assertJobShutdownFits, getJobSettings, startJobs, stopJobs } from './core/jobs';
@@ -21,6 +22,7 @@ import {
   logUserSearchReadiness,
 } from './core/api/health';
 const port = Number(process.env.PORT) || 4000;
+const integrationPort = env.getIntegrationPort();
 // Read before listening, so an invalid value stops startup before the port opens.
 const shutdownSettings = env.getShutdownSettings();
 assertJobShutdownFits(getJobSettings(), shutdownSettings.timeoutMs);
@@ -49,6 +51,13 @@ const server = app.listen(port, () => {
     .catch((err) => log.warn({ err }, 'Startup diagnostics failed'));
 });
 
+const integrationServer = createIntegrationApp().listen(integrationPort, () => {
+  log.info({ port: integrationPort }, 'Integration API is listening');
+});
+
+const closeServer = (target: typeof server) =>
+  new Promise<void>((resolve) => target.close(() => resolve()));
+
 let shuttingDown = false;
 
 /**
@@ -66,7 +75,7 @@ const shutdown = (signal: NodeJS.Signals): void => {
   }, shutdownSettings.timeoutMs).unref();
   const serveMs = signal === 'SIGTERM' ? shutdownSettings.delayMs : 0;
   Promise.all([stopJobs(), delay(serveMs)])
-    .then(() => new Promise<void>((resolve) => server.close(() => resolve())))
+    .then(() => Promise.all([closeServer(server), closeServer(integrationServer)]))
     .then(() => pool.end())
     .then(() => process.exit(0))
     .catch((err: unknown) => {

@@ -7,7 +7,6 @@ import cors from 'cors';
 import passport from 'passport';
 import { checkJwt } from './core/middleware/auth';
 import { designRouter, submitRouter, filesApiRouter, coreRouter } from './core/api';
-import { integrationV2Router } from './integration/v2/routes';
 import { healthRouter } from './core/api/health';
 import { metaRouter } from './core/api/meta';
 import { buildOpenApiSpec } from './core/api/shared/openapi';
@@ -22,7 +21,7 @@ import { globalRateLimit, apiRateLimit, publicRateLimit } from './core/middlewar
 import { initializePassport } from './core/auth/passport';
 import { Features } from './core/db/codes';
 
-/** Build the production HTTP stack without opening sockets or starting background workers. */
+/** Build the main API HTTP stack without opening sockets or starting background workers. */
 export const createApp = () => {
   const app = express();
   app.disable('x-powered-by');
@@ -86,10 +85,6 @@ export const createApp = () => {
       },
     }),
   );
-
-  // Integration API versions are independent of the internal v1 API below.
-  // Integration v1 is reserved for CHEFS Classic compatibility.
-  app.use(apiPath('/api/integrations/v2'), publicRateLimit, integrationV2Router);
 
   // ——— v1 API ———
   // Each surface has its own base path, so its middleware only runs for its own routes (no fall-through,

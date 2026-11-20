@@ -12,6 +12,7 @@ services:
     image: soba/backend:local
     ports:
       - "4000:4000"
+      - "4001:4001"
     env_file:
       - ../backend/.env
       - ../backend/.env.local

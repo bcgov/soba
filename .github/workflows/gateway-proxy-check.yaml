@@ -158,6 +158,10 @@ jobs:
             exit 1
           fi
           if [[ "$INTEGRATIONS_ENABLED" == true ]]; then
+            oc get service "${RELEASE}-backend" -n "$OPENSHIFT_NAMESPACE" -o json \
+              | jq -e '.spec.ports | any(.port == 4001)'
+            oc get networkpolicy "${RELEASE}-aps" -n "$OPENSHIFT_NAMESPACE" -o json \
+              | jq -e '[.spec.ingress[]?.ports[]?.port] | any(. == 4001)'
             oc get configmap "${RELEASE}-backend-app" -n "$OPENSHIFT_NAMESPACE" -o json \
               | jq -e --arg issuer "$GATEWAY_JWT_ISSUER" --arg audience "${RELEASE}-integrations-v2" '
                 .data.INTEGRATION_GATEWAY_ISSUER == $issuer

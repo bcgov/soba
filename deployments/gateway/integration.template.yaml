@@ -3,7 +3,7 @@ services:
   - name: ${GATEWAY_SERVICE_NAME}
     tags: [${CONFIG_TAG}]
     host: ${BACKEND_HOST}
-    port: 4000
+    port: 4001
     protocol: http
     path: /chefs/api/integrations/v2
     routes:

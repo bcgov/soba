@@ -12,6 +12,7 @@ data:
   {{- end }}
   {{- end }}
   {{- end }}
+  INTEGRATION_PORT: {{ .Values.backend.service.integrationPort | quote }}
   LOG_LEVEL: {{ .Values.backend.config.logLevel | quote }}
   {{- with .Values.backend.config.httpRouteTimeoutMs }}
   HTTP_ROUTE_TIMEOUT_MS: {{ . | quote }}
