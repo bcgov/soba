@@ -10,7 +10,6 @@ jest.mock('../../../src/core/db/client', () => ({
 jest.mock('../../../src/core/db/repos/formVersionRepo', () => ({
   findFormVersionAnywhere: jest.fn(),
   getFormVersionById: jest.fn(),
-  getFormVersionByIdIncludingDeleted: jest.fn(),
   createFormVersionDraft: jest.fn(),
   lockFormVersion: jest.fn(),
   getCurrentFormVersion: jest.fn(),
@@ -35,7 +34,6 @@ jest.mock('../../../src/core/services/engineSchema', () => ({
 
 const findAnywhere = repo.findFormVersionAnywhere as unknown as jest.Mock;
 const getById = repo.getFormVersionById as unknown as jest.Mock;
-const getByIdInclDeleted = repo.getFormVersionByIdIncludingDeleted as unknown as jest.Mock;
 const createDraft = repo.createFormVersionDraft as unknown as jest.Mock;
 const lock = repo.lockFormVersion as unknown as jest.Mock;
 const getCurrent = repo.getCurrentFormVersion as unknown as jest.Mock;
@@ -131,7 +129,7 @@ describe('FormVersionService numbering of opened versions', () => {
   // Only a draft is deleted, so an unsaved version is left behind rather than deleted; it holds no
   // number, so the next one is created and saved under the number it showed.
   it('refuses to delete an opened version, and the next is still saved under its number', async () => {
-    getByIdInclDeleted.mockResolvedValue(version('a', 'opened'));
+    lock.mockResolvedValue(version('a', 'opened'));
 
     await expect(svc.delete({ ...actor, formVersionId: 'a' })).rejects.toThrow(
       'Only draft versions can be deleted',

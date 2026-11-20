@@ -7,7 +7,6 @@ jest.mock('../../../src/core/db/client', () => ({
 
 jest.mock('../../../src/core/db/repos/formVersionRepo', () => ({
   getFormVersionById: jest.fn(),
-  getFormVersionByIdIncludingDeleted: jest.fn(),
   getPublishedVersionForForm: jest.fn(),
   lockFormVersion: jest.fn(),
   getCurrentFormVersion: jest.fn(),
@@ -16,7 +15,6 @@ jest.mock('../../../src/core/db/repos/formVersionRepo', () => ({
 }));
 
 const getById = repo.getFormVersionById as unknown as jest.Mock;
-const getByIdInclDeleted = repo.getFormVersionByIdIncludingDeleted as unknown as jest.Mock;
 const getPublished = repo.getPublishedVersionForForm as unknown as jest.Mock;
 const updateDraft = repo.updateFormVersionDraft as unknown as jest.Mock;
 const lock = repo.lockFormVersion as unknown as jest.Mock;
@@ -155,8 +153,11 @@ describe('FormVersionService state transitions', () => {
   });
 
   it('delete: draft → deleted, sets deletedAt/By and clears publishedAt/By', async () => {
-    getByIdInclDeleted.mockResolvedValue({ id: 'v1', formId: 'f1', state: 'draft' });
+    lock.mockResolvedValue({ id: 'v1', formId: 'f1', state: 'draft' });
     await svc.delete(actor);
+    expect(lock).toHaveBeenCalledWith('ws1', 'v1', expect.anything());
+    // The state check and the write share the locking transaction.
+    expect(updateDraft.mock.calls[0][4]).toBe(lock.mock.calls[0][2]);
     expect(updateDraft).toHaveBeenCalledWith(
       'ws1',
       'v1',
@@ -168,14 +169,15 @@ describe('FormVersionService state transitions', () => {
         publishedAt: null,
         publishedBy: null,
       }),
+      expect.anything(),
     );
   });
 
   // A version that has been live, or one never saved, stays in the form's history.
-  it.each(['opened', 'published', 'archived', 'deleted'])(
+  it.each(['opened', 'published', 'archived'])(
     'delete: refuses a version that is %s',
     async (state) => {
-      getByIdInclDeleted.mockResolvedValue({ id: 'v1', formId: 'f1', state });
+      lock.mockResolvedValue({ id: 'v1', formId: 'f1', state });
       await expect(svc.delete(actor)).rejects.toMatchObject({
         statusCode: 400,
         message: 'Only draft versions can be deleted',
@@ -211,8 +213,9 @@ describe('FormVersionService state transitions', () => {
     expect(updateDraft).not.toHaveBeenCalled();
   });
 
-  it('delete: throws NotFoundError when the version is missing', async () => {
-    getByIdInclDeleted.mockResolvedValue(null);
+  // The lock skips deleted rows, so an already deleted version is not found.
+  it('delete: throws NotFoundError when the version is missing or deleted', async () => {
+    lock.mockResolvedValue(null);
     await expect(svc.delete(actor)).rejects.toThrow(/not found/i);
     expect(updateDraft).not.toHaveBeenCalled();
   });
