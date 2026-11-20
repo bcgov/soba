@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useCallback, useEffect, useState } from 'react';
-import { Button as DSButton } from '@bcgov/design-system-react-components';
+import { ButtonGroup, Button as DSButton } from '@bcgov/design-system-react-components';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { Tag } from '@/src/components/Tag';
 import {
@@ -73,11 +73,13 @@ const CustomActionButtons = ({
   onAction,
   submitLabel,
   submissionsLabel,
+  groupLabel,
 }: {
   form: SobaFormSummary;
   onAction: (name: string, id: string) => void;
   submitLabel: string;
   submissionsLabel: string;
+  groupLabel: string;
 }) => {
   // Actions are keyed on the SOBA formId.
   const sobaFormId = form.id;
@@ -88,7 +90,7 @@ const CustomActionButtons = ({
   ];
 
   return (
-    <div className="d-flex gap-2 justify-content-start">
+    <ButtonGroup ariaLabel={groupLabel}>
       {actions.map((action) => (
         <RowActionButton
           key={action.name}
@@ -102,7 +104,7 @@ const CustomActionButtons = ({
           {action.icon}
         </RowActionButton>
       ))}
-    </div>
+    </ButtonGroup>
   );
 };
 
@@ -254,6 +256,7 @@ function FormList() {
             onAction={handleAction}
             submitLabel={dictForm?.submit || 'Submit'}
             submissionsLabel={dict.submission?.submissions || 'Submissions'}
+            groupLabel={dictFormList?.columns?.quickLinks || 'Quick Links'}
           />
         ),
       },

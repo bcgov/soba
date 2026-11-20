@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type Key } from 'react';
-import { Button, Select } from '@bcgov/design-system-react-components';
+import { Button, ButtonGroup, Select } from '@bcgov/design-system-react-components';
 import { ListPageFilters, ListPageToolbar } from '@/src/components/ListPageLayout';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { RowActionButton } from '@/src/components/RowActionButton';
@@ -175,7 +175,7 @@ export function WorkspaceAccessTab({ dict, workspaceId }: Readonly<WorkspaceAcce
           const protectedMember =
             isWorkspaceOwnerRole(member.role) || !actorId || member.userId === actorId;
           return (
-            <div>
+            <ButtonGroup ariaLabel={t.columns.actions}>
               <RowActionButton
                 onPress={() => setFormView({ membershipId: member.membershipId })}
                 aria-label={`${t.editMember}: ${name}`}
@@ -192,7 +192,7 @@ export function WorkspaceAccessTab({ dict, workspaceId }: Readonly<WorkspaceAcce
                   {t.removeMember}
                 </RowActionButton>
               )}
-            </div>
+            </ButtonGroup>
           );
         },
       },

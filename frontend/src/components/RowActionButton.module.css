@@ -3,8 +3,8 @@
  * Table cells have their own padding (px-4); buttons shouldn't add extra horizontal space.
  */
 .root :global(.bcds-react-aria-Button.small) {
-  padding-left: 0;
-  padding-right: 0;
+  padding-left: var(--layout-padding-none);
+  padding-right: var(--layout-padding-none);
 }
 
 /*

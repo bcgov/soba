@@ -32,9 +32,7 @@ export function RowActionButton({
   'aria-label': ariaLabel,
   'data-testid': testId,
 }: Readonly<RowActionButtonProps>) {
-  const wrapperClassName = [styles.root, main ? styles.main : '']
-    .filter(Boolean)
-    .join(' ');
+  const wrapperClassName = [styles.root, main ? styles.main : ''].filter(Boolean).join(' ');
 
   return (
     <span className={wrapperClassName}>
