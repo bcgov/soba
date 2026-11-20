@@ -135,7 +135,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
-      contents: write
+      contents: read
       packages: write
       statuses: read
     environment:
@@ -145,7 +145,6 @@ jobs:
       SHORT_SHA: ${{ needs.set-vars.outputs.short_sha }}
       SOURCE_SHA: ${{ needs.set-vars.outputs.source_sha }}
       IMAGE_TAG: ${{ needs.set-vars.outputs.image_tag }}
-      RELEASE_TAG: ${{ needs.set-vars.outputs.release_tag }}
       UAT_TAG: ${{ needs.set-vars.outputs.uat_tag }}
       REPOSITORY: ${{ github.repository }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -184,9 +183,14 @@ jobs:
           promote() {
             local source="$1"
             local uat_target="$2"
+            local approved_digest="$3"
             local source_digest target_digest
             source_digest=$(docker buildx imagetools inspect "$source" \
               --format '{{json .Manifest}}' | jq -er .digest)
+            [ "$source_digest" = "$approved_digest" ] || {
+              echo "::error::Release source changed since TEST validation: $source"
+              exit 1
+            }
             if target_digest=$(docker buildx imagetools inspect "$uat_target" \
               --format '{{json .Manifest}}' 2>"$RUNNER_TEMP/uat-target-error" | jq -er .digest); then
               [ "$target_digest" = "$source_digest" ] || {
@@ -198,13 +202,14 @@ jobs:
                 cat "$RUNNER_TEMP/uat-target-error" >&2
                 exit 1
               fi
-              docker buildx imagetools create -t "$uat_target" "$source"
+              docker buildx imagetools create -t "$uat_target" "${source%:*}@$approved_digest"
             fi
             target_digest=$(docker buildx imagetools inspect "$uat_target" \
               --format '{{json .Manifest}}' | jq -er .digest)
             [ "$target_digest" = "$source_digest" ]
           }
 
+          declare -A APPROVED
           for entry in 'backend|' 'frontend|-designer' 'frontend|-forms' 'temporal-worker|'; do
             IFS='|' read -r image suffix <<< "$entry"
             version_digest=$(docker buildx imagetools inspect \
@@ -216,12 +221,13 @@ jobs:
               exit 1
             }
             approved_digest=$(jq -r --arg context "soba/release-digest/$image$suffix" \
-              '[.statuses[] | select(.context == $context and .state == "success")][0].description // empty' \
+              '[.statuses[] | select(.context == $context)][0] | select(.state == "success") | .description // empty' \
               <<< "$TEST_STATUSES")
             [ "$version_digest" = "$approved_digest" ] || {
               echo "::error::Release image digest differs from the TEST validated digest for $image$suffix."
               exit 1
             }
+            APPROVED["$image$suffix"]="$approved_digest"
             target="$IMAGE_ROOT/$image:$UAT_TAG$suffix"
             if target_digest=$(docker buildx imagetools inspect "$target" \
               --format '{{json .Manifest}}' 2>"$RUNNER_TEMP/uat-target-error" | jq -er .digest); then
@@ -235,25 +241,14 @@ jobs:
             fi
           done
 
-          GIT_TAG="v$RELEASE_TAG"
-          if existing_sha=$(gh api "repos/$REPOSITORY/git/ref/tags/$GIT_TAG" --jq .object.sha 2>/dev/null); then
-            [ "$existing_sha" = "$SOURCE_SHA" ] || {
-              echo "::error::Finalized version $GIT_TAG belongs to another source commit."
-              exit 1
-            }
-          else
-            gh api -X POST "repos/$REPOSITORY/git/refs" \
-              -f "ref=refs/tags/$GIT_TAG" -f "sha=$SOURCE_SHA" >/dev/null
-          fi
-
           promote "$IMAGE_ROOT/backend:$IMAGE_TAG" \
-            "$IMAGE_ROOT/backend:$UAT_TAG"
+            "$IMAGE_ROOT/backend:$UAT_TAG" "${APPROVED[backend]}"
           promote "$IMAGE_ROOT/frontend:$IMAGE_TAG-designer" \
-            "$IMAGE_ROOT/frontend:$UAT_TAG-designer"
+            "$IMAGE_ROOT/frontend:$UAT_TAG-designer" "${APPROVED[frontend-designer]}"
           promote "$IMAGE_ROOT/frontend:$IMAGE_TAG-forms" \
-            "$IMAGE_ROOT/frontend:$UAT_TAG-forms"
+            "$IMAGE_ROOT/frontend:$UAT_TAG-forms" "${APPROVED[frontend-forms]}"
           promote "$IMAGE_ROOT/temporal-worker:$IMAGE_TAG" \
-            "$IMAGE_ROOT/temporal-worker:$UAT_TAG"
+            "$IMAGE_ROOT/temporal-worker:$UAT_TAG" "${APPROVED[temporal-worker]}"
 
   deploy:
     name: Deploy promoted images to UAT
@@ -382,7 +377,7 @@ jobs:
           {
             echo "## UAT deployment"
             echo
-            echo "- Release tag: \`v${RELEASE_TAG}\`"
+            echo "- Release version: \`${RELEASE_TAG}\`"
             echo "- Promoted UAT tag: \`${UAT_TAG}\`"
             echo "- Namespace: \`${NAMESPACE}\`"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -398,3 +393,54 @@ jobs:
       environment: uat
       release: soba-uat
     secrets: inherit
+
+  record-uat:
+    name: Record verified UAT release
+    needs: [set-vars, gateway]
+    runs-on: ubuntu-24.04
+    permissions:
+      packages: read
+      statuses: write
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Record source, version, and validated digests
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_SHA: ${{ needs.set-vars.outputs.source_sha }}
+          RELEASE_TAG: ${{ needs.set-vars.outputs.release_tag }}
+          IMAGE_TAG: ${{ needs.set-vars.outputs.image_tag }}
+          UAT_TAG: ${{ needs.set-vars.outputs.uat_tag }}
+        run: |
+          set -euo pipefail
+          REPOSITORY_LOWER="${GITHUB_REPOSITORY,,}"
+          IMAGE_ROOT="$REGISTRY/$REPOSITORY_LOWER"
+          TEST_STATUSES=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/status?per_page=100")
+          [ "$(jq -r '[.statuses[] | select(.context == "soba/release-test")][0].state // empty' <<< "$TEST_STATUSES")" = success ] || exit 1
+          for entry in 'backend|' 'frontend|-designer' 'frontend|-forms' 'temporal-worker|'; do
+            IFS='|' read -r image suffix <<< "$entry"
+            context="soba/release-digest/$image$suffix"
+            approved=$(jq -r --arg context "$context" \
+              '[.statuses[] | select(.context == $context)][0] | select(.state == "success") | .description // empty' <<< "$TEST_STATUSES")
+            actual=$(docker buildx imagetools inspect "$IMAGE_ROOT/$image:$UAT_TAG$suffix" \
+              --format '{{json .Manifest}}' | jq -er .digest)
+            [ "$approved" = "$actual" ] || {
+              echo "::error::UAT image differs from TEST approval: $image$suffix"
+              exit 1
+            }
+            gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$SOURCE_SHA" \
+              -f state=success -f "context=soba/uat-digest/$image$suffix" \
+              -f "description=$actual" >/dev/null
+          done
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$SOURCE_SHA" \
+            -f state=success -f context=soba/release-uat \
+            -f "description=UAT validated $RELEASE_TAG image $IMAGE_TAG" >/dev/null

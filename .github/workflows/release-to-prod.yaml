@@ -82,6 +82,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      statuses: read
     environment:
       name: prod
       url: https://${{ env.ACRONYM }}-prod.${{ vars.OC_DOMAIN }}/designer
@@ -172,9 +173,25 @@ jobs:
           REPOSITORY_LOWER="${REPOSITORY,,}"
           IMAGE_ROOT="$REGISTRY/$REPOSITORY_LOWER"
 
-          TAG_SHA=$(gh api "repos/$REPOSITORY/git/ref/tags/v$RELEASE_TAG" --jq .object.sha)
-          [ "$TAG_SHA" = "$SOURCE_SHA" ] || {
-            echo "::error::The final version tag does not identify the approved UAT source."
+          if TAG_SHA=$(gh api "repos/$REPOSITORY/git/ref/tags/v$RELEASE_TAG" \
+            --jq .object.sha 2>"$RUNNER_TEMP/tag-error"); then
+            [ "$TAG_SHA" = "$SOURCE_SHA" ] || {
+              echo "::error::Version v$RELEASE_TAG is already finalized from another source."
+              exit 1
+            }
+          elif ! grep -Eqi 'HTTP 404|Not Found' "$RUNNER_TEMP/tag-error"; then
+            cat "$RUNNER_TEMP/tag-error" >&2
+            exit 1
+          fi
+
+          RELEASE_STATUSES=$(gh api "repos/$REPOSITORY/commits/$SOURCE_SHA/status?per_page=100")
+          [ "$(jq -r '[.statuses[] | select(.context == "soba/release-test")][0].state // empty' <<< "$RELEASE_STATUSES")" = success ] || {
+            echo "::error::The release source has not passed TEST validation."
+            exit 1
+          }
+          UAT_STATUS=$(jq -r '[.statuses[] | select(.context == "soba/release-uat")][0] | select(.state == "success") | .description // empty' <<< "$RELEASE_STATUSES")
+          [ "$UAT_STATUS" = "UAT validated $RELEASE_TAG image $IMAGE_TAG" ] || {
+            echo "::error::The exact source and version have not passed UAT deployment and gateway validation."
             exit 1
           }
 
@@ -201,6 +218,15 @@ jobs:
               echo "::error::UAT and release source digests differ for $image$suffix."
               exit 1
             }
+            for context in "soba/release-digest/$image$suffix" "soba/uat-digest/$image$suffix"; do
+              approved_digest=$(jq -r --arg context "$context" \
+                '[.statuses[] | select(.context == $context)][0] | select(.state == "success") | .description // empty' \
+                <<< "$RELEASE_STATUSES")
+              [ "$source_digest" = "$approved_digest" ] || {
+                echo "::error::UAT source differs from approved digest in $context."
+                exit 1
+              }
+            done
             printf '%s|%s|%s\n' "$image" "$suffix" "$source_digest" >> "$RUNNER_TEMP/prod-images"
           done
 
@@ -309,3 +335,34 @@ jobs:
       environment: prod
       release: soba-prod
     secrets: inherit
+
+  finalize-release:
+    name: Tag verified production release
+    needs: [set-vars, gateway]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Create final Git version tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_SHA: ${{ needs.set-vars.outputs.source_sha }}
+          RELEASE_TAG: ${{ needs.set-vars.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          GIT_TAG="v$RELEASE_TAG"
+          if existing_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GIT_TAG" \
+            --jq .object.sha 2>"$RUNNER_TEMP/tag-error"); then
+            [ "$existing_sha" = "$SOURCE_SHA" ] || {
+              echo "::error::Finalized version $GIT_TAG belongs to another source commit."
+              exit 1
+            }
+          else
+            if ! grep -Eqi 'HTTP 404|Not Found' "$RUNNER_TEMP/tag-error"; then
+              cat "$RUNNER_TEMP/tag-error" >&2
+              exit 1
+            fi
+            gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f "ref=refs/tags/$GIT_TAG" -f "sha=$SOURCE_SHA" >/dev/null
+          fi

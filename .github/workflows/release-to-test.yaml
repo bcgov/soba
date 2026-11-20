@@ -123,8 +123,8 @@ jobs:
 
           BUMP=none
           if [ "$HEAD_SHA" = "$EVENT_SHA" ] && [ "$EVENT_NAME" = create ]; then
-            if [ "$HEAD_SHA" != "$(git rev-parse origin/develop)" ]; then
-              echo "::error::New release branch must point at the current develop commit."
+            if ! git merge-base --is-ancestor "$HEAD_SHA" origin/develop; then
+              echo "::error::New release branch commit is not in develop history."
               exit 1
             fi
             LATEST_TAG=$(git tag --list 'v[0-9]*' --sort=-v:refname |
@@ -143,19 +143,26 @@ jobs:
             BASE_VERSION=${LATEST_TAG#v}
           elif [ "$HEAD_SHA" = "$EVENT_SHA" ] && [ "$EVENT_NAME" = push ]; then
             PR_NUMBER=""
-            for attempt in 1 2 3 4 5; do
-              PRS=$(gh api "repos/$GITHUB_REPOSITORY/commits/$EVENT_SHA/pulls?per_page=100")
-              PR_NUMBER=$(jq -r --arg branch "$BRANCH" --arg sha "$EVENT_SHA" \
-                '[.[] | select(.merged_at != null and .base.ref == $branch and .merge_commit_sha == $sha)] | if length == 1 then .[0].number else empty end' <<< "$PRS")
-              [ -n "$PR_NUMBER" ] && break
-              [ "$attempt" -eq 5 ] || sleep 2
-            done
             COMMITS=""
             SUBJECTS=""
-            if [ -n "$PR_NUMBER" ]; then
+            if [ "$(git rev-list --parents -n 1 "$EVENT_SHA" | awk '{print NF - 1}')" -gt 1 ]; then
+              for attempt in 1 2 3 4 5; do
+                PRS=$(gh api "repos/$GITHUB_REPOSITORY/commits/$EVENT_SHA/pulls?per_page=100")
+                PR_NUMBER=$(jq -r --arg branch "$BRANCH" --arg sha "$EVENT_SHA" \
+                  '[.[] | select(.merged_at != null and .base.ref == $branch and .merge_commit_sha == $sha)] | if length == 1 then .[0].number else empty end' <<< "$PRS")
+                [ -n "$PR_NUMBER" ] && break
+                [ "$attempt" -eq 5 ] || sleep 2
+              done
+              [ -n "$PR_NUMBER" ] || {
+                echo "::error::Merge commit has no identifiable merged PR; refusing an unversioned build."
+                exit 1
+              }
+              PR_TITLE=$(jq -r --arg branch "$BRANCH" --arg sha "$EVENT_SHA" \
+                '[.[] | select(.merged_at != null and .base.ref == $branch and .merge_commit_sha == $sha)][0].title // empty' <<< "$PRS")
+              [ -n "$PR_TITLE" ] || { echo "::error::Merged PR has no title."; exit 1; }
               PR_COMMITS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/commits?per_page=100")
-              COMMITS=$(jq -r '.[].commit.message' <<< "$PR_COMMITS")
-              SUBJECTS=$(jq -r '.[].commit.message | split("\n")[0]' <<< "$PR_COMMITS")
+              COMMITS=$(printf '%s\n%s\n' "$PR_TITLE" "$(jq -r '.[].commit.message' <<< "$PR_COMMITS")")
+              SUBJECTS=$(printf '%s\n%s\n' "$PR_TITLE" "$(jq -r '.[].commit.message | split("\n")[0]' <<< "$PR_COMMITS")")
             fi
             BASE_VERSION=$(jq -r .version package.json)
           else
@@ -196,6 +203,7 @@ jobs:
               minor) NEXT_VERSION="$MAJOR.$((MINOR + 1)).0" ;;
               patch) if [[ "$BASE_VERSION" == *-* ]]; then NEXT_VERSION="$STABLE";
                      else NEXT_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"; fi ;;
+              *) echo "::error::Unexpected version bump: $BUMP"; exit 1 ;;
             esac
           fi
 
