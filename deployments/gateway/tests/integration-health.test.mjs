@@ -34,7 +34,12 @@ test('requires backend verification rather than only an OK response', async () =
 });
 test('validates the CI key and target before making requests', async () => {
   const fetchImpl = () => { throw new Error('Must not fetch'); };
-  for (const overrides of [{ apiKey: '' }, { hostname: 'https://invalid' }, { routePath: '/other/' }]) {
-    await assert.rejects(checkIntegrationHealth({ ...options, ...overrides, fetchImpl }));
+  for (const [overrides, message] of [
+    [{ apiKey: '' }, /valid CI API key/],
+    [{ apiKey: 'key\nX-Injected: 1' }, /valid CI API key/],
+    [{ hostname: 'https://invalid' }, /DNS hostname/],
+    [{ routePath: '/other/' }, /integrations\/v2/],
+  ]) {
+    await assert.rejects(checkIntegrationHealth({ ...options, ...overrides, fetchImpl }), message);
   }
 });

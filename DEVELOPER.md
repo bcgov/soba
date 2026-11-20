@@ -80,9 +80,10 @@ The repo is a **[pnpm](https://pnpm.io) workspace** (faster installs, shared sto
 | `pnpm build`                                       | `build:lib`, `build:frontend`, then `build:backend`             |
 | `pnpm build:frontend` / `pnpm build:backend`       | Build one app                                                   |
 | `pnpm build:lib`                                   | Build the shared lib into `lib/dist`                            |
-| `pnpm test`                                        | Run lib, frontend and backend tests                             |
+| `pnpm test`                                        | Run lib, frontend, backend and gateway tests                    |
 | `pnpm test:frontend` / `pnpm test:backend`         | Test one app                                                    |
 | `pnpm test:lib`                                    | Test the shared lib                                             |
+| `pnpm test:gateway`                                | Test the APS gateway config scripts                             |
 | `pnpm lint`                                        | Lint lib, frontend and backend                                  |
 | `pnpm lint:fix`                                    | Lint with auto-fix, all three                                   |
 | `pnpm db:migrate`                                  | Run pending DB migrations (backend)                             |

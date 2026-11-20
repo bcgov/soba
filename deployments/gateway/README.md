@@ -42,7 +42,7 @@ APS NetworkPolicy admits the integration port.
 The existing `verify-health.mjs` is for the public proxy check and cannot verify this protected
 service without credentials. Live publish and signed-claim mapping checks remain separate steps.
 
-Run generator checks with `node --test deployments/gateway/tests/generate-gateway-config.test.mjs`.
+Run the generator and health-check tests with `pnpm run test:gateway`; QA runs them on every PR.
 
 ### PR automation
 
@@ -94,8 +94,7 @@ curl -i -H "X-API-KEY: $API_KEY" \
 Expected body: `{"status":"OK","timestamp":"...","gatewayAuthenticated":true}`.
 
 The reusable/manual gateway workflow also accepts `integration_enabled: true`; manual runs require
-the backend JWT settings to have been configured already. Run health-check unit tests with
-`node --test deployments/gateway/tests/integration-health.test.mjs`.
+the backend JWT settings to have been configured already.
 
 ### Dev, test, UAT and prod
 
