@@ -25,7 +25,6 @@ backend:
     maxReplicas: 6
     targetCPUUtilizationPercentage: 75
   config:
-    nodeEnv: production
     logLevel: warn
     documentGenerationDefaultCode: cdogs-v2
     tenantEngineDefaultCode: cstar-v1
