@@ -11,6 +11,8 @@ export interface DevGatewayOptions {
   audience: string;
   /** The integration listener, e.g. http://127.0.0.1:4001. Every request goes to this host. */
   upstream: URL;
+  /** Only paths under this one are forwarded, as APS routes only to the integration service. */
+  basePath: string;
   key: SigningKey;
 }
 
@@ -43,18 +45,42 @@ const endToEndHeaders = (
   return Object.fromEntries(Object.entries(headers).filter(([name]) => !drop.has(name)));
 };
 
+/**
+ * The upstream URL for a request target, or null when it is not under basePath on the upstream.
+ * Resolving the target, rather than appending it, removes dot segments before the check and turns a
+ * target such as //host/x into that host, which the origin check then refuses.
+ */
+const forwardTarget = (target: string, upstream: URL, basePath: string): URL | null => {
+  let url: URL;
+  try {
+    url = new URL(target, upstream);
+  } catch {
+    // A target such as //[ names a host that cannot be parsed.
+    return null;
+  }
+  if (url.origin !== upstream.origin) return null;
+  const underBasePath = url.pathname === basePath || url.pathname.startsWith(`${basePath}/`);
+  return underBasePath ? url : null;
+};
+
 const sendJson = (res: http.ServerResponse, status: number, body: unknown) => {
   res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
   res.end(JSON.stringify(body));
 };
 
 /**
- * A local stand-in for the APS gateway. Serves its signing key at /certs. A path request with
- * X-API-KEY is forwarded to the integration listener with the key replaced by a signed GW-JWT
- * naming it as the consumer; other targets get 400 and requests without a key 401. It does not
- * check keys or ACLs.
+ * A local stand-in for the APS gateway. Serves its signing key at /certs. A request for a path under
+ * basePath with X-API-KEY is forwarded to the integration listener with the key replaced by a signed
+ * GW-JWT naming it as the consumer. Targets that are not paths get 400, other paths 404 (as APS
+ * answers when no route matches) and requests without a key 401. It does not check keys or ACLs.
  */
-export const createDevGateway = ({ issuer, audience, upstream, key }: DevGatewayOptions) =>
+export const createDevGateway = ({
+  issuer,
+  audience,
+  upstream,
+  basePath,
+  key,
+}: DevGatewayOptions) =>
   http.createServer((req, res) => {
     if (req.method === 'GET' && req.url === CERTS_PATH) {
       sendJson(res, 200, { keys: [key.jwk] });
@@ -63,6 +89,11 @@ export const createDevGateway = ({ issuer, audience, upstream, key }: DevGateway
     // Absolute-form and `*` targets are refused rather than passed upstream.
     if (!req.url?.startsWith('/')) {
       sendJson(res, 400, { message: 'Request target must be a path' });
+      return;
+    }
+    const target = forwardTarget(req.url, upstream, basePath);
+    if (!target) {
+      sendJson(res, 404, { message: 'no Route matched with those values' });
       return;
     }
     const apiKey = req.headers['x-api-key'];
@@ -91,21 +122,12 @@ export const createDevGateway = ({ issuer, audience, upstream, key }: DevGateway
     else if (req.headers['content-length'] !== undefined) {
       headers['content-length'] = req.headers['content-length'];
     }
-    const forward = http.request(
-      {
-        hostname: upstream.hostname,
-        port: upstream.port || 80,
-        path: req.url,
-        method: req.method,
-        headers,
-      },
-      (upstreamRes) => {
-        res.writeHead(upstreamRes.statusCode ?? 502, endToEndHeaders(upstreamRes.headers));
-        pipeline(upstreamRes, res, (error) => {
-          if (error) res.destroy();
-        });
-      },
-    );
+    const forward = http.request(target, { method: req.method, headers }, (upstreamRes) => {
+      res.writeHead(upstreamRes.statusCode ?? 502, endToEndHeaders(upstreamRes.headers));
+      pipeline(upstreamRes, res, (error) => {
+        if (error) res.destroy();
+      });
+    });
     forward.on('error', () => {
       if (res.headersSent) res.destroy();
       else sendJson(res, 502, { message: 'Integration API is not reachable' });

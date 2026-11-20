@@ -75,9 +75,10 @@ Only `GW-JWT` is accepted as gateway proof. It is redacted from logs. See `deplo
 ## Local dev gateway
 
 `pnpm dev:gateway` runs a stand-in for APS on `127.0.0.1:4002` (development only). It serves its
-own signing key at `/certs`, and for every other request takes `X-API-KEY` as the consumer name,
-replaces it with a signed `GW-JWT` and forwards the path to the integration port. It does not check
-keys or ACLs, so it listens on loopback only. The key is generated at each start and kept in
+own signing key at `/certs`. For a path under `${API_BASE_PATH}/api/integrations/v2` it takes
+`X-API-KEY` as the consumer name, replaces it with a signed `GW-JWT` and forwards the request to the
+integration port; other paths get 404, as on APS. It does not check keys or ACLs, so it listens on
+loopback only. The key is generated at each start and kept in
 memory. Configure the backend with the local block in `backend/.env.example`; plain HTTP is
 accepted for these settings only in development and only on `localhost` or `127.0.0.1`. The dev
 gateway refuses to start unless `INTEGRATION_GATEWAY_JWKS_URI` is its own `/certs` and its upstream

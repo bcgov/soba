@@ -25,12 +25,14 @@ const upstream = new URL(
 );
 const problem = devGatewayConfigProblem({ jwksUri: settings.jwksUri, port, upstream });
 if (problem) fail(problem);
+const basePath = `${env.getApiBasePath()}/api/integrations/v2`;
 
 // Loopback only: the gateway signs a token for any key value it is sent.
 createDevGateway({
   issuer: settings.issuer,
   audience: settings.audience,
   upstream,
+  basePath,
   key: createSigningKey(),
 })
   .on('error', (error: Error) =>
@@ -38,7 +40,7 @@ createDevGateway({
   )
   .listen(port, '127.0.0.1', () => {
     console.log(
-      `Dev gateway listening on http://127.0.0.1:${port}, forwarding to ${upstream.href}`,
+      `Dev gateway listening on http://127.0.0.1:${port}, forwarding ${basePath} to ${upstream.origin}`,
     );
     console.log(`  issuer ${settings.issuer}, audience ${settings.audience}`);
     console.log(`  signing key at http://127.0.0.1:${port}${CERTS_PATH}`);

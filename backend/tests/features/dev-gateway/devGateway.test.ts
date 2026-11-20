@@ -9,6 +9,8 @@ type Seen = { method?: string; url?: string; headers: http.IncomingHttpHeaders; 
 
 const issuer = 'http://127.0.0.1:4002';
 const audience = 'local-integrations-v2';
+const basePath = '/chefs/api/integrations/v2';
+const at = (path: string) => `${basePath}${path}`;
 const seen: Seen[] = [];
 
 // A real upstream that records what reached it. /reset drops the connection mid-response.
@@ -18,12 +20,12 @@ const upstream = http.createServer((req, res) => {
   req.on('data', (chunk: string) => (body += chunk));
   req.on('end', () => {
     seen.push({ method: req.method, url: req.url, headers: req.headers, body });
-    if (req.url === '/hop-response') {
+    if (req.url === at('/hop-response')) {
       res.writeHead(200, { Connection: 'X-Up', 'X-Up': 'drop me', 'X-Kept': 'yes' });
       res.end('ok');
       return;
     }
-    if (req.url === '/reset') {
+    if (req.url === at('/reset')) {
       res.writeHead(200, { 'content-type': 'text/plain' });
       res.write('partial');
       setImmediate(() => res.socket?.destroy());
@@ -74,6 +76,7 @@ beforeAll(async () => {
     issuer,
     audience,
     upstream: new URL(`http://127.0.0.1:${upstreamPort}`),
+    basePath,
     key: createSigningKey(),
   });
   gatewayPort = await listen(gateway);
@@ -129,12 +132,16 @@ describe('dev gateway forwarding', () => {
     'keeps a chunked %s body framed, so the next request on the connection is intact',
     async (method) => {
       const first = await raw(
-        { method, path: '/first', headers: { 'X-API-KEY': 'k', 'Transfer-Encoding': 'chunked' } },
+        {
+          method,
+          path: at('/first'),
+          headers: { 'X-API-KEY': 'k', 'Transfer-Encoding': 'chunked' },
+        },
         ['GET /smuggled HTTP/1.1\r\nHost: x\r\n\r\n', 'tail'],
       );
-      const second = await raw({ path: '/second', headers: { 'X-API-KEY': 'k' } });
+      const second = await raw({ path: at('/second'), headers: { 'X-API-KEY': 'k' } });
       expect([first.status, second.status]).toEqual([200, 200]);
-      expect(seen.map((s) => s.url)).toEqual(['/first', '/second']);
+      expect(seen.map((s) => s.url)).toEqual([at('/first'), at('/second')]);
       expect(seen[0].body).toBe('GET /smuggled HTTP/1.1\r\nHost: x\r\n\r\ntail');
     },
   );
@@ -146,7 +153,7 @@ describe('dev gateway forwarding', () => {
       const first = await raw(
         {
           method,
-          path: '/first',
+          path: at('/first'),
           headers: {
             'X-API-KEY': 'k',
             Connection: 'keep-alive, Content-Length',
@@ -155,9 +162,9 @@ describe('dev gateway forwarding', () => {
         },
         [body],
       );
-      const second = await raw({ path: '/second', headers: { 'X-API-KEY': 'k' } });
+      const second = await raw({ path: at('/second'), headers: { 'X-API-KEY': 'k' } });
       expect([first.status, second.status]).toEqual([200, 200]);
-      expect(seen.map((s) => s.url)).toEqual(['/first', '/second']);
+      expect(seen.map((s) => s.url)).toEqual([at('/first'), at('/second')]);
       expect(seen[0].body).toBe(body);
     },
   );
@@ -166,7 +173,7 @@ describe('dev gateway forwarding', () => {
     const response = await raw(
       {
         method: 'POST',
-        path: '/coded',
+        path: at('/coded'),
         headers: { 'X-API-KEY': 'k', 'Transfer-Encoding': 'gzip, chunked' },
       },
       ['data'],
@@ -176,7 +183,7 @@ describe('dev gateway forwarding', () => {
   });
 
   it('drops hop-by-hop response headers and any header the upstream Connection names', async () => {
-    const response = await raw({ path: '/hop-response', headers: { 'X-API-KEY': 'k' } });
+    const response = await raw({ path: at('/hop-response'), headers: { 'X-API-KEY': 'k' } });
     expect(response.status).toBe(200);
     expect(response.headers['x-up']).toBeUndefined();
     expect(response.headers['x-kept']).toBe('yes');
@@ -184,7 +191,7 @@ describe('dev gateway forwarding', () => {
 
   it('drops hop-by-hop request headers and any header Connection names', async () => {
     await raw({
-      path: '/hop',
+      path: at('/hop'),
       headers: {
         'X-API-KEY': 'k',
         Connection: 'keep-alive, X-Hop',
@@ -208,14 +215,31 @@ describe('dev gateway forwarding', () => {
     },
   );
 
-  it.each(['//127.0.0.2:9/x', '/\\127.0.0.2:9/x'])(
-    'sends a path that looks like a host, %s, to the configured upstream only',
+  it.each(['//127.0.0.2:9/x', '/\\127.0.0.2:9/x', `//127.0.0.2:9${basePath}/me`, '//[/x'])(
+    'refuses a path that names another or an invalid host, %s, without reaching any host',
     async (path) => {
       const response = await raw({ path, headers: { 'X-API-KEY': 'k' } });
-      expect(response.status).toBe(200);
-      expect(seen.map((s) => s.url)).toEqual([path]);
+      expect(response.status).toBe(404);
+      expect(seen).toHaveLength(0);
     },
   );
+
+  it.each([
+    '/chefs/api/v1/health',
+    '/chefs/api/integrations/v2x/me',
+    `${basePath}/../../v1/health`,
+    `${basePath}/%2e%2e/%2E%2E/v1/health`,
+  ])('answers %s, outside the integration path, with 404 like APS', async (path) => {
+    const response = await raw({ path, headers: { 'X-API-KEY': 'k' } });
+    expect(response.status).toBe(404);
+    expect(seen).toHaveLength(0);
+  });
+
+  it('forwards the resolved path, without dot segments', async () => {
+    const response = await raw({ path: at('/x/../me?y=2'), headers: { 'X-API-KEY': 'k' } });
+    expect(response.status).toBe(200);
+    expect(seen.map((s) => s.url)).toEqual([at('/me?y=2')]);
+  });
 
   it.each([undefined, '', '   '])('refuses a request without an API key (%j)', async (key) => {
     const headers: Record<string, string> = key === undefined ? {} : { 'X-API-KEY': key };
@@ -225,7 +249,7 @@ describe('dev gateway forwarding', () => {
   });
 
   it('closes the response when the integration API drops the connection mid-body', async () => {
-    const response = await fetch(`${base}/reset`, { headers: { 'X-API-KEY': 'k' } });
+    const response = await fetch(`${base}${at('/reset')}`, { headers: { 'X-API-KEY': 'k' } });
     await expect(response.text()).rejects.toThrow();
   });
 
@@ -237,11 +261,12 @@ describe('dev gateway forwarding', () => {
       issuer,
       audience,
       upstream: new URL(`http://127.0.0.1:${closedPort}`),
+      basePath,
       key: createSigningKey(),
     });
     const orphanPort = await listen(orphan);
     try {
-      const response = await fetch(`http://127.0.0.1:${orphanPort}/x`, {
+      const response = await fetch(`http://127.0.0.1:${orphanPort}${at('/x')}`, {
         headers: { 'X-API-KEY': 'k' },
       });
       expect(response.status).toBe(502);
