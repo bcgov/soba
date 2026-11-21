@@ -39,7 +39,7 @@ async function findAttachment(id: string, caller: CallerIdentity) {
   return { record: attachment.file, loaded };
 }
 
-type OpenedFile = { record: FileRecord; file: GetFileResult };
+export type OpenedFile = { record: FileRecord; file: GetFileResult };
 
 /**
  * Whether a file stays stored when its submitters remove it: while revising, a file attached before
@@ -107,8 +107,8 @@ export const filesService = {
   },
 
   /**
-   * A file attached to the submission, for staff. The route's workspaceFromResource has checked the
-   * submission is live and in this workspace, and requireFormPermissions the caller's access.
+   * A file attached to the submission. Callers check the submission first: the staff route through
+   * workspaceFromResource and requireFormPermissions, an action job before it runs.
    */
   async getForSubmission(
     workspaceId: string,

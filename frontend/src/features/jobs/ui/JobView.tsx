@@ -29,7 +29,7 @@ import {
   isActiveJobStatus,
   jobStatusVariant,
   jobTypeLabel,
-  queuedItsActions,
+  queuedItsChildren,
   type JobTypeLabel,
 } from '../jobs';
 import styles from './Jobs.module.css';
@@ -369,7 +369,7 @@ export function JobView({ job, refreshFailed, refresh, back, facts, rerun, stop 
       : dictDetail.rerunMessage;
   const endedExport = canRerunJob(job.status) && isExportJob(job.type);
   const rerunnable = canRerunJob(job.status) && !endedExport;
-  const actionsQueued = rerunnable && queuedItsActions(job);
+  const childrenQueued = rerunnable && queuedItsChildren(job);
   const canStop = isActiveJobStatus(job.status) && job.cancelRequestedAt === null;
   const stopping = action === 'stop';
 
@@ -378,7 +378,7 @@ export function JobView({ job, refreshFailed, refresh, back, facts, rerun, stop 
       {back}
       <JobStatusLine job={job} refreshFailed={refreshFailed} ref={statusRef} />
       <div className={`${styles.actions} mb-4`}>
-        {rerunnable && !actionsQueued ? (
+        {rerunnable && !childrenQueued ? (
           <Button
             variant="primary"
             isDisabled={pending}
@@ -399,7 +399,7 @@ export function JobView({ job, refreshFailed, refresh, back, facts, rerun, stop 
           </Button>
         ) : null}
       </div>
-      {actionsQueued ? <p data-testid="job-actions-queued">{dictDetail.actionsQueued}</p> : null}
+      {childrenQueued ? <p data-testid="job-children-queued">{dictDetail.childrenQueued}</p> : null}
       {endedExport ? <p data-testid="job-export-ended">{dictDetail.exportEnded}</p> : null}
 
       {facts}

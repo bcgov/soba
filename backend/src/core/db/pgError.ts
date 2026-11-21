@@ -43,6 +43,16 @@ export function pgErrorFields(err: unknown): PgErrorFields | null {
   return null;
 }
 
+/**
+ * True when Postgres refused the statement for its data: a data exception (class 22) or a constraint
+ * violation (class 23), such as a foreign key to a row that is gone. The same statement is refused
+ * every time.
+ */
+export function isPgDataError(err: unknown): boolean {
+  const code = pgErrorFields(err)?.code;
+  return code !== undefined && (code.startsWith('22') || code.startsWith('23'));
+}
+
 /** True when `err` is a unique violation on the named constraint or index. */
 export function isUniqueViolationOn(err: unknown, constraint: string): boolean {
   const fields = pgErrorFields(err);

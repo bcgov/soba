@@ -346,20 +346,19 @@ unquoted numbers in values files as floats, so whole numbers are printed without
 {{- end }}
 
 {{/*
-An hourly email limit, from (dict "name" <values key> "value" <value> "min" <lowest>): nothing when
-"" or unset, else a whole number from min (100 when not given) to 1000000 as a quoted string.
-Anything else fails the render, a fraction included, so a bad value cannot quietly keep the plugin
-or the backend from starting. The fraction check runs first: soba.optionalSetting rounds numbers.
+A whole-number setting, from (dict "key" <values key> "value" <value> "max" <largest>): nothing
+when "" or unset, else a whole number from 1 to max as a quoted string. Anything else fails the
+render, a fraction included, so a bad value cannot quietly keep the backend from starting. The
+fraction check runs first: soba.optionalSetting rounds numbers.
 */}}
-{{- define "soba.hourlyEmailLimit" -}}
-{{- $min := int (default 100 .min) -}}
+{{- define "soba.wholeNumberSetting" -}}
 {{- if and (kindIs "float64" .value) (ne (floor .value) .value) -}}
-{{- fail (printf "backend.config.%s must be a whole number from %d to 1000000, got %v" .name $min .value) -}}
+{{- fail (printf "%s must be a whole number from 1 to %d, got %v" .key (int .max) .value) -}}
 {{- end -}}
 {{- $raw := include "soba.optionalSetting" .value | trimAll "\"" -}}
 {{- if $raw -}}
-{{- if or (not (regexMatch "^[0-9]+$" $raw)) (lt (atoi $raw) $min) (gt (atoi $raw) 1000000) -}}
-{{- fail (printf "backend.config.%s must be a whole number from %d to 1000000, got %q" .name $min $raw) -}}
+{{- if or (not (regexMatch "^[0-9]+$" $raw)) (lt (atoi $raw) 1) (gt (atoi $raw) (int .max)) -}}
+{{- fail (printf "%s must be a whole number from 1 to %d, got %q" .key (int .max) $raw) -}}
 {{- end -}}
 {{ $raw | quote }}
 {{- end -}}

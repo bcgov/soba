@@ -1,5 +1,4 @@
 import {
-  hasRunStarted,
   isHandledForRun,
   isHandledSend,
   isRefusedSend,
@@ -37,10 +36,13 @@ describe('send outcomes', () => {
   });
 });
 
+// A job created at 10:00, with sends at 11:00 and 12:01, and a re-run queued at 12:00.
+const createdAt = new Date('2026-10-28T10:00:00Z');
+const rerunAt = new Date('2026-10-28T12:00:00Z');
+const before = new Date('2026-10-28T11:00:00Z');
+const after = new Date('2026-10-28T12:01:00Z');
+
 describe('isHandledForRun', () => {
-  const rerunAt = new Date('2026-10-28T12:00:00Z');
-  const before = new Date('2026-10-28T11:00:00Z');
-  const after = new Date('2026-10-28T12:01:00Z');
   const refused = { outcome: 'error', httpStatus: 400 } as const;
   const accepted = { outcome: 'accepted', httpStatus: null } as const;
 
@@ -48,9 +50,13 @@ describe('isHandledForRun', () => {
     expect(isHandledForRun({ ...refused, createdAt: before }, rerunAt)).toBe(false);
   });
 
-  it('keeps an address refused since the last re-run, or on a job never re-run', () => {
+  it('keeps an address refused since the last re-run, or in the first run', () => {
     expect(isHandledForRun({ ...refused, createdAt: after }, rerunAt)).toBe(true);
-    expect(isHandledForRun({ ...refused, createdAt: before }, null)).toBe(true);
+    expect(isHandledForRun({ ...refused, createdAt: before }, createdAt)).toBe(true);
+  });
+
+  it('keeps an address refused at the moment the run was queued', () => {
+    expect(isHandledForRun({ ...refused, createdAt: rerunAt }, rerunAt)).toBe(true);
   });
 
   it('never sends again to an address accepted before the re-run', () => {
@@ -59,32 +65,6 @@ describe('isHandledForRun', () => {
 
   it('retries a failure the provider may not have taken, whenever it happened', () => {
     expect(isHandledForRun({ outcome: 'error', httpStatus: 503, createdAt: after }, rerunAt)).toBe(
-      false,
-    );
-  });
-});
-
-describe('hasRunStarted', () => {
-  const rerunAt = new Date('2026-10-28T12:00:00Z');
-  const before = new Date('2026-10-28T11:00:00Z');
-  const after = new Date('2026-10-28T12:01:00Z');
-  const accepted = { outcome: 'accepted', httpStatus: null } as const;
-
-  it('counts any handled send for a job never re-run', () => {
-    expect(hasRunStarted([{ ...accepted, createdAt: before }], null)).toBe(true);
-    expect(hasRunStarted([], null)).toBe(false);
-  });
-
-  it('counts only sends since the last re-run, so a re-run checks its limits again', () => {
-    expect(hasRunStarted([{ ...accepted, createdAt: before }], rerunAt)).toBe(false);
-    expect(hasRunStarted([{ ...accepted, createdAt: after }], rerunAt)).toBe(true);
-    expect(hasRunStarted([{ outcome: 'error', httpStatus: 400, createdAt: after }], rerunAt)).toBe(
-      true,
-    );
-  });
-
-  it('does not count a failure to be retried', () => {
-    expect(hasRunStarted([{ outcome: 'error', httpStatus: 503, createdAt: after }], rerunAt)).toBe(
       false,
     );
   });

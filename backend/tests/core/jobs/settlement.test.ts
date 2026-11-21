@@ -1,9 +1,13 @@
 import { DrizzleQueryError } from 'drizzle-orm/errors';
-import { decideOutcome, errorText } from '../../../src/core/jobs/settlement';
+import { JobCancelledError, JobDeferredError, JobFailedError } from '../../../src/core/jobs/errors';
+import { decideOutcome, errorText, handlerEnding } from '../../../src/core/jobs/settlement';
 
 const backoff = { backoffBaseMs: 30_000, backoffMaxMs: 1_800_000 };
 const firstOfThree = { attempts: 1, maxAttempts: 3 };
 const lastOfThree = { attempts: 3, maxAttempts: 3 };
+const permanent = { permanent: true };
+const deferred = { deferMs: 60_000 };
+const waiting = 'Waiting for room in the email limit';
 
 describe('decideOutcome', () => {
   it.each([undefined, 'cancel', 'timeout', 'lease_lost', 'drain'] as const)(
@@ -62,25 +66,80 @@ describe('decideOutcome', () => {
   });
 
   it('ends a permanent failure dead on its first attempt, a timeout included', () => {
-    expect(decideOutcome('too big', undefined, firstOfThree, backoff, true)).toEqual({
+    expect(decideOutcome('too big', undefined, firstOfThree, backoff, permanent)).toEqual({
       kind: 'dead',
       error: 'too big',
     });
-    expect(decideOutcome('Timed out', 'timeout', firstOfThree, backoff, true)).toEqual({
+    expect(decideOutcome('Timed out', 'timeout', firstOfThree, backoff, permanent)).toEqual({
       kind: 'dead',
       error: 'Timed out',
     });
   });
 
   it('lets a cancel, a drain or a lost lease decide before a permanent failure', () => {
-    expect(decideOutcome('too big', 'cancel', firstOfThree, backoff, true)).toEqual({
+    expect(decideOutcome('too big', 'cancel', firstOfThree, backoff, permanent)).toEqual({
       kind: 'cancelled',
       error: 'too big',
     });
-    expect(decideOutcome('too big', 'drain', firstOfThree, backoff, true)).toEqual({
+    expect(decideOutcome('too big', 'drain', firstOfThree, backoff, permanent)).toEqual({
       kind: 'release',
     });
-    expect(decideOutcome('too big', 'lease_lost', firstOfThree, backoff, true)).toBeNull();
+    expect(decideOutcome('too big', 'lease_lost', firstOfThree, backoff, permanent)).toBeNull();
+  });
+
+  it('defers with the delay asked for and the error text as its reason', () => {
+    expect(decideOutcome(waiting, undefined, firstOfThree, backoff, deferred)).toEqual({
+      kind: 'defer',
+      delayMs: 60_000,
+      reason: waiting,
+    });
+  });
+
+  it('defers on the last attempt, since a deferral uses none', () => {
+    expect(decideOutcome(waiting, undefined, lastOfThree, backoff, deferred)).toEqual({
+      kind: 'defer',
+      delayMs: 60_000,
+      reason: waiting,
+    });
+  });
+
+  // A pod shutting down would otherwise hand the job to another pod at once, to meet the same limit.
+  it('keeps the delay of a deferral asked for while the pod drains', () => {
+    expect(decideOutcome(waiting, 'drain', lastOfThree, backoff, deferred)).toEqual({
+      kind: 'defer',
+      delayMs: 60_000,
+      reason: waiting,
+    });
+  });
+
+  it('lets a cancel, a lost lease or a timeout decide before a deferral', () => {
+    expect(decideOutcome(waiting, 'cancel', firstOfThree, backoff, deferred)).toEqual({
+      kind: 'cancelled',
+      error: waiting,
+    });
+    expect(decideOutcome(waiting, 'lease_lost', firstOfThree, backoff, deferred)).toBeNull();
+    expect(decideOutcome('Timed out', 'timeout', firstOfThree, backoff, deferred)).toEqual({
+      kind: 'retry',
+      delayMs: 30_000,
+      error: 'Timed out',
+    });
+    expect(decideOutcome('Timed out', 'timeout', lastOfThree, backoff, deferred)).toEqual({
+      kind: 'dead',
+      error: 'Timed out',
+    });
+  });
+});
+
+describe('handlerEnding', () => {
+  it('reads a permanent failure and a deferral from what the handler threw', () => {
+    expect(handlerEnding(new JobFailedError('too big'))).toEqual({ permanent: true });
+    expect(handlerEnding(new JobDeferredError(60_000, waiting))).toEqual({ deferMs: 60_000 });
+  });
+
+  it('reads nothing from any other error', () => {
+    expect(handlerEnding(new Error('engine down'))).toEqual({});
+    expect(handlerEnding(new JobCancelledError('gone'))).toEqual({});
+    expect(handlerEnding('plain')).toEqual({});
   });
 });
 

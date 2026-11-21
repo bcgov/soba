@@ -76,7 +76,7 @@ jest.mock('../../../../src/core/jobs/enqueue', () => ({
   enqueueStatusChangedJob: (...args: unknown[]) => mockEnqueueStatusChanged(...args),
 }));
 const mockNudgeJobs = jest.fn();
-jest.mock('../../../../src/core/jobs', () => ({
+jest.mock('../../../../src/core/jobs/nudge', () => ({
   nudgeJobs: (...args: unknown[]) => mockNudgeJobs(...args),
 }));
 

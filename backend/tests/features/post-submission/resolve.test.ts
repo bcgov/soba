@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { RevisionAppendedFacts } from '../../../src/core/db/repos/submissionRepo';
 import type {
   PostSubmissionActionPluginDefinition,
   PostSubmissionActionScope,
@@ -132,6 +133,9 @@ const action = (
   scopes: PostSubmissionActionScope[] = ['workspace', 'form'],
 ): ScopedAction => ({ plugin: plugin(code), scopes });
 
+const FIRST_SUBMIT: RevisionAppendedFacts = { firstSubmit: true };
+const RESUBMIT: RevisionAppendedFacts = { firstSubmit: false };
+
 const row = (actionCode: string, overrides: Partial<ActionSettingRow> = {}): ActionSettingRow => ({
   id: `${actionCode}-ws`,
   formId: null,
@@ -146,7 +150,11 @@ const row = (actionCode: string, overrides: Partial<ActionSettingRow> = {}): Act
 describe('chooseSubmittedActions', () => {
   it('records each available action its settings turn on, with its options and source', () => {
     expect(
-      chooseSubmittedActions([row('post-submission-on')], [action('post-submission-on')]),
+      chooseSubmittedActions(
+        [row('post-submission-on')],
+        [action('post-submission-on')],
+        FIRST_SUBMIT,
+      ),
     ).toEqual([
       {
         code: 'post-submission-on',
@@ -159,7 +167,7 @@ describe('chooseSubmittedActions', () => {
   it('leaves out an action turned off, one with no settings, and settings with no available plugin', () => {
     const rows = [row('post-submission-off', { enabled: false }), row('post-submission-gone')];
     const actions = [action('post-submission-off'), action('post-submission-unset')];
-    expect(chooseSubmittedActions(rows, actions)).toEqual([]);
+    expect(chooseSubmittedActions(rows, actions, FIRST_SUBMIT)).toEqual([]);
   });
 
   it("uses a form's override over the workspace default", () => {
@@ -167,7 +175,7 @@ describe('chooseSubmittedActions', () => {
       row('post-submission-on'),
       row('post-submission-on', { id: 'form', formId: 'f1', options: { note: 'form' } }),
     ];
-    expect(chooseSubmittedActions(rows, [action('post-submission-on')])).toEqual([
+    expect(chooseSubmittedActions(rows, [action('post-submission-on')], FIRST_SUBMIT)).toEqual([
       expect.objectContaining({
         options: { note: 'form' },
         source: { scope: 'form', settingId: 'form', version: 1 },
@@ -180,9 +188,13 @@ describe('chooseSubmittedActions', () => {
     const inherits = row('post-submission-on', { id: 'form', formId: 'f1', inherit: true });
     const own = row('post-submission-on', { id: 'form', formId: 'f1', options: { note: 'form' } });
 
-    expect(chooseSubmittedActions([row('post-submission-on')], formOnly)).toEqual([]);
-    expect(chooseSubmittedActions([row('post-submission-on'), inherits], formOnly)).toEqual([]);
-    expect(chooseSubmittedActions([row('post-submission-on'), own], formOnly)).toEqual([
+    expect(chooseSubmittedActions([row('post-submission-on')], formOnly, FIRST_SUBMIT)).toEqual([]);
+    expect(
+      chooseSubmittedActions([row('post-submission-on'), inherits], formOnly, FIRST_SUBMIT),
+    ).toEqual([]);
+    expect(
+      chooseSubmittedActions([row('post-submission-on'), own], formOnly, FIRST_SUBMIT),
+    ).toEqual([
       expect.objectContaining({ source: { scope: 'form', settingId: 'form', version: 1 } }),
     ]);
   });
@@ -190,9 +202,31 @@ describe('chooseSubmittedActions', () => {
   it('records actions in the order the plugins are enabled', () => {
     const rows = [row('post-submission-b'), row('post-submission-a')];
     const actions = [action('post-submission-a'), action('post-submission-b')];
-    expect(chooseSubmittedActions(rows, actions).map((chosen) => chosen.code)).toEqual([
-      'post-submission-a',
-      'post-submission-b',
+    expect(
+      chooseSubmittedActions(rows, actions, FIRST_SUBMIT).map((chosen) => chosen.code),
+    ).toEqual(['post-submission-a', 'post-submission-b']);
+  });
+
+  it('records a first-submit action on the first submit only, and the others on every submit', () => {
+    const rows = [
+      row('post-submission-first'),
+      row('post-submission-every'),
+      row('post-submission-unset'),
+    ];
+    const scopes: PostSubmissionActionScope[] = ['workspace', 'form'];
+    const actions = [
+      { plugin: plugin('post-submission-first', { submits: 'first' }), scopes },
+      { plugin: plugin('post-submission-every', { submits: 'every' }), scopes },
+      action('post-submission-unset'),
+    ];
+    const codes = (facts: RevisionAppendedFacts) =>
+      chooseSubmittedActions(rows, actions, facts).map((chosen) => chosen.code);
+
+    expect(codes(FIRST_SUBMIT)).toEqual([
+      'post-submission-first',
+      'post-submission-every',
+      'post-submission-unset',
     ]);
+    expect(codes(RESUBMIT)).toEqual(['post-submission-every', 'post-submission-unset']);
   });
 });

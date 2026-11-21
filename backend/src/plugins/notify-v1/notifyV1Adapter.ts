@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { PluginConfigReader } from '../../core/config/pluginConfig';
 import {
+  NotificationLimitError,
   SendEmailSchema,
   withProviderDetail,
   type EmailReceipt,
@@ -83,6 +84,9 @@ function failureMessage(action: string, err: unknown): string {
   return `${action} failed`;
 }
 
+// Notify's status at a sending limit, a rate or its monthly quota; a 400 is a refused address.
+const LIMIT_STATUS = 429;
+
 /** Notify v1 email client using the configured API key. */
 export class NotifyV1Adapter implements NotificationAdapter {
   private readonly http: HttpClient;
@@ -124,12 +128,16 @@ export class NotifyV1Adapter implements NotificationAdapter {
   }
 
   /**
-   * The error for a failed send. The message never carries the upstream body; Notify's error text
-   * goes to the audit as provider detail.
+   * The error for a failed send: a `NotificationLimitError` for a 429. The message never
+   * carries the upstream body; Notify's error text goes to the audit as provider detail.
    */
   private sendFailure(err: unknown): ServiceUnavailableError {
-    const error = new ServiceUnavailableError(failureMessage('Notify email send', err));
-    if (!(err instanceof HttpClientError)) return error;
+    const message = failureMessage('Notify email send', err);
+    if (!(err instanceof HttpClientError)) return new ServiceUnavailableError(message);
+    const error =
+      err.status === LIMIT_STATUS
+        ? new NotificationLimitError(message)
+        : new ServiceUnavailableError(message);
     if (this.debugResponses) {
       log.error(
         {

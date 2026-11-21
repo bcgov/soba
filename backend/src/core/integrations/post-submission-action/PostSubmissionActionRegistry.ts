@@ -7,6 +7,9 @@ export const getEnabledPostSubmissionActionCodes = (): string[] => [
   ...new Set(env.getPostSubmissionActionPlugins()),
 ];
 
+/** The job type of an action's step after the first: the action's code, then the step's name. */
+export const actionStepType = (code: string, name: string): string => `${code}:${name}`;
+
 /** The installed action plugins this environment enables, in POST_SUBMISSION_ACTION_PLUGINS order. */
 export const getPostSubmissionActions = (): PostSubmissionActionPluginDefinition[] => {
   const enabled = getEnabledPostSubmissionActionCodes();

@@ -62,6 +62,8 @@ backend:
     csWorkflowV1:
       apiBaseUrl: https://test-workflow.apps.gold.devops.gov.bc.ca/api/v1
   notification:
+    # A review environment sends a few emails a day.
+    dailyLimit: "100"
     notifyV1:
       endpoint: https://gw-fe8c5-notify.test.api.gov.bc.ca/api/v1
       # Keeps one slow send well inside an email job's lease and timeout.

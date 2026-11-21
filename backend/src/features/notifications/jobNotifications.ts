@@ -1,34 +1,21 @@
-import type { ClaimedJob } from '../../core/db/repos/jobRepo';
+import { listJobNotificationSends, readEmailDay } from '../../core/db/repos/notificationAuditRepo';
+import { limitPauseEnds, roomToday } from '../../core/integrations/notification/emailBudget';
+import type { JobNotifications } from '../../core/integrations/notification/JobNotifications';
 import {
-  countNotificationsSince,
-  listJobNotificationSends,
-  type NotificationCountScope,
-} from '../../core/db/repos/notificationAuditRepo';
-import type {
-  JobNotifications,
-  NotificationSendScope,
-} from '../../core/integrations/notification/JobNotifications';
-import {
-  hasRunStarted,
   isHandledForRun,
   isSentSend,
   REFUSED_HTTP_STATUSES,
 } from '../../core/integrations/notification/sendOutcome';
+import { getNotificationSettings } from '../../core/integrations/notification/settings';
+import type { JobFacts } from '../../core/jobs/facts';
 import { notificationService } from './service';
-
-const countScope = (scope: NotificationSendScope, job: ClaimedJob): NotificationCountScope => {
-  if (scope === 'environment') return { kind: 'environment' };
-  if (scope === 'workspace' || job.formId === null)
-    return { kind: 'workspace', id: job.workspaceId };
-  return { kind: 'form', id: job.formId };
-};
 
 /**
  * The notification service for one job. Sends carry the job's ids into the audit and are
  * attributed to the user `actorId` resolves to, read at each send.
  */
 export const jobNotifications = (
-  job: ClaimedJob,
+  job: JobFacts,
   actorId: () => Promise<string>,
 ): JobNotifications => ({
   enabled: () => notificationService.enabled(),
@@ -52,14 +39,21 @@ export const jobNotifications = (
     return {
       recipients: new Set(
         sends
-          .filter((send) => isHandledForRun(send, job.lastRequeuedAt))
+          .filter((send) => isHandledForRun(send, job.run.queuedAt))
           .flatMap((send) => send.recipients.to),
       ),
-      runStarted: hasRunStarted(sends, job.lastRequeuedAt),
       anySent: sends.some(isSentSend),
     };
   },
 
-  sentSince: (scope, seconds) =>
-    countNotificationsSince(countScope(scope, job), seconds, REFUSED_HTTP_STATUSES),
+  async emailRoom() {
+    const { dailyLimit, dailyResetTimeZone } = getNotificationSettings();
+    const day = await readEmailDay(dailyResetTimeZone, REFUSED_HTTP_STATUSES);
+    const pauseEnds = limitPauseEnds(day.lastLimitedAt, day.limitedInARow, day.now);
+    return {
+      room: roomToday(dailyLimit, day.counted),
+      resetInMs: day.resetsAt.getTime() - day.now.getTime(),
+      pauseLeftMs: pauseEnds && pauseEnds.getTime() - day.now.getTime(),
+    };
+  },
 });

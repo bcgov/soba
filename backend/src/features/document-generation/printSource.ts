@@ -51,3 +51,17 @@ export const printContextOf = (
     revisionNo: savedAnswers ? submission.currentRevisionNo : null,
   };
 };
+
+/**
+ * The print context of a render of one submitted revision: that revision's own number and the
+ * submission's confirmation code, whatever has happened to the submission since.
+ */
+export const submittedRevisionContext = (
+  facts: { confirmationCode: string; revisionNo: number },
+  now = new Date(),
+): PrintContext => ({
+  status: PrintStatus.submitted,
+  printedAt: now.toISOString(),
+  confirmationCode: facts.confirmationCode,
+  revisionNo: facts.revisionNo,
+});

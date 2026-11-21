@@ -1,5 +1,5 @@
 import type { Logger } from 'pino';
-import { createProgressReporter } from '../../../src/core/jobs/results';
+import { createProgressReporter, resolveResultOptions } from '../../../src/core/jobs/results';
 import type { JobProgress } from '../../../src/core/db/repos/jobRepo';
 
 const log = { warn: jest.fn() } as unknown as Logger;
@@ -84,5 +84,28 @@ describe('createProgressReporter', () => {
     expect(reporter.latest()).toEqual({ done: 2, total: 0 });
     reporter.report(Number.NaN, 3_000_000_000);
     expect(reporter.latest()).toEqual({ done: 0, total: 2_147_483_647 });
+  });
+});
+
+describe('resolveResultOptions', () => {
+  const job = { createdBy: 'starter' };
+  const settings = { resultRetentionDays: 7 };
+
+  it("uses the settings' retention and the job's creator", () => {
+    expect(resolveResultOptions({}, job, settings)).toEqual({
+      actorId: 'starter',
+      retentionDays: 7,
+    });
+  });
+
+  it("uses the job type's retention when it sets one", () => {
+    expect(resolveResultOptions({ resultRetentionDays: 30 }, job, settings)).toEqual({
+      actorId: 'starter',
+      retentionDays: 30,
+    });
+  });
+
+  it('attributes the result to the actor the caller names', () => {
+    expect(resolveResultOptions({}, job, settings, { actorId: 'system' }).actorId).toBe('system');
   });
 });

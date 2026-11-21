@@ -111,6 +111,7 @@ export const findLiveSubmission = async (
     .select({
       id: submissions.id,
       formId: submissions.formId,
+      formVersionId: submissions.formVersionId,
       formName: forms.name,
       workspaceId: submissions.workspaceId,
       workspaceName: workspaces.name,
