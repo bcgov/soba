@@ -18,6 +18,10 @@ import { rolesDomain } from './roles';
 import { accessDomain } from './access';
 import { filesDesignRouter, filesDomain } from '../../features/files';
 import {
+  registerSubmissionPackageOpenApi,
+  submissionPackageRouter,
+} from '../../features/submission-package';
+import {
   documentGenerationDesignRouter,
   documentGenerationDomain,
 } from '../../features/document-generation';
@@ -51,6 +55,7 @@ registerOpenApiPaths((registry) => {
   registerSubmissionsOpenApi(registry);
   registerSubmissionReviewOpenApi(registry);
   registerSubmissionExportOpenApi(registry);
+  registerSubmissionPackageOpenApi(registry);
   registerSubmitOpenApi(registry);
   groupsDomain.registerOpenApi(registry);
   rolesDomain.registerOpenApi(registry);
@@ -83,6 +88,8 @@ designRouter.use('/submissions', designSubmissionsRouter);
 designRouter.use(documentGenerationDesignRouter);
 // Staff attachment download; gates itself.
 designRouter.use(filesDesignRouter);
+// Submission package download at /submissions/:id/packages/:jobId/file; gates itself.
+designRouter.use(submissionPackageRouter);
 designRouter.use(notFoundHandler);
 designRouter.use(coreErrorHandler);
 

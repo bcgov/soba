@@ -9,6 +9,9 @@ import {
 /** URL segment of the group; one action's settings are at `post-submission/<code>`. */
 export const POST_SUBMISSION_SETTINGS_KEY = 'post-submission';
 
+/** The email-package action's plugin and feature code, and its package job's type. */
+export const POST_SUBMISSION_EMAIL_PACKAGE_CODE = 'post-submission-email-package';
+
 /** Where an action is set: a workspace default its forms inherit, or one form. */
 export const PostSubmissionActionScopeSchema = z.enum(['workspace', 'form']);
 export type PostSubmissionActionScope = z.infer<typeof PostSubmissionActionScopeSchema>;

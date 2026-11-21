@@ -2,6 +2,7 @@ import {
   appUrlProblem,
   assertAppLinkBases,
   designerSubmissionFileUrl,
+  designerSubmissionPackageUrl,
   designerSubmissionUrl,
   formsMySubmissionsUrl,
   formsSubmissionUrl,
@@ -22,6 +23,13 @@ describe('app links', () => {
       designerSubmissionFileUrl('https://soba.example/designer/', 'en', 'f1', 's1', 'a/b'),
     ).toBe('https://soba.example/designer/en/build/f1/submissions/s1/files/a%2Fb');
     expect(designerSubmissionFileUrl(undefined, 'en', 'f1', 's1', 'file-1')).toBeNull();
+  });
+
+  it("points at a submission's package in the designer, encoding each part", () => {
+    expect(
+      designerSubmissionPackageUrl('https://soba.example/designer/', 'fr', 'f1', 's1', 'a/b'),
+    ).toBe('https://soba.example/designer/fr/build/f1/submissions/s1/packages/a%2Fb');
+    expect(designerSubmissionPackageUrl(undefined, 'en', 'f1', 's1', 'job-1')).toBeNull();
   });
 
   it('points at the submission in the forms app, on the page asked for', () => {
